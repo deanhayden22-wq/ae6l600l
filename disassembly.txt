@@ -1,0 +1,1298 @@
+================================================================================
+SH7058 ECU ROM Disassembly
+ROM: 2013 USDM Subaru Impreza WRX MT  |  Part: AE5L600L
+MCU: Renesas SH7058  |  Arch: SH2 Big-Endian  |  ROM Base: 0x00000000
+RAM: 0xFFFF8000-0xFFFFFFFF (32KB)  |  ROM Size: 1MB (0x100000)
+Generated from RomRaider/EcuFlash definition files
+================================================================================
+
+; ─────────────────────────────────────────────────────
+; EXCEPTION VECTOR TABLE  @ 0x00000000
+; ─────────────────────────────────────────────────────
+  00000000:  .long  0x00000C0C   ; Power-On Reset PC
+  00000004:  .long  0xFFFFBFA0   ; Power-On Reset SP
+  00000008:  .long  0x00000C0C   ; Manual Reset PC
+  0000000C:  .long  0xFFFFBFA0   ; Manual Reset SP
+  00000010:  .long  0x00000BFA   ; General Illegal Instruction
+  00000014:  .long  0x00000BFA   ; Reserved
+  00000018:  .long  0x00000BFA   ; Slot Illegal Instruction
+  0000001C:  .long  0x00000BFA   ; Reserved
+  00000020:  .long  0x00000BFA   ; Reserved
+  00000024:  .long  0x00000BFA   ; CPU Address Error
+  00000028:  .long  0x00000BFA   ; DMA Address Error
+  0000002C:  .long  0x00000BAC   ; NMI
+  00000030:  .long  0x00000BFA   ; User Break
+
+; ─────────────────────────────────────────────────────
+; NMI Handler  @ 0x00000BAC
+; ─────────────────────────────────────────────────────
+  00000BAC:  2f76        mov.l    r7,@-r15
+  00000BAE:  2f66        mov.l    r6,@-r15
+  00000BB0:  2f56        mov.l    r5,@-r15
+  00000BB2:  2f46        mov.l    r4,@-r15
+  00000BB4:  2f36        mov.l    r3,@-r15
+  00000BB6:  2f26        mov.l    r2,@-r15
+  00000BB8:  2f16        mov.l    r1,@-r15
+  00000BBA:  2f06        mov.l    r0,@-r15
+  00000BBC:  4f22        sts.l    pr,@-r15
+  00000BBE:  4f02        sts.l    mach,@-r15
+  00000BC0:  4f12        sts.l    macl,@-r15
+  00000BC2:  d310        mov.l    0xc04,r3
+  00000BC4:  430b        jsr      @r3
+  00000BC6:  e414        mov      #20,r4
+  00000BC8:  9319        mov.w    0xbfe,r3
+  00000BCA:  6231        mov.w    @r3,r2
+  00000BCC:  622d        extu.w   r2,r2
+  00000BCE:  d10e        mov.l    0xc08,r1
+  00000BD0:  2218        tst      r1,r2
+  00000BD2:  8b05        bf       0xbe0
+  00000BD4:  9214        mov.w    0xc00,r2
+  00000BD6:  6020        mov.b    @r2,r0
+  00000BD8:  c9fe        and      #254,r0
+  00000BDA:  2200        mov.b    r0,@r2
+  00000BDC:  b00d        bsr      0xbfa
+  00000BDE:  0009        nop      
+  00000BE0:  4f16        lds.l    @r15+,macl
+  00000BE2:  4f06        lds.l    @r15+,mach
+  00000BE4:  4f26        lds.l    @r15+,pr
+  00000BE6:  60f6        mov.l    @r15+,r0
+  00000BE8:  61f6        mov.l    @r15+,r1
+  00000BEA:  62f6        mov.l    @r15+,r2
+  00000BEC:  63f6        mov.l    @r15+,r3
+  00000BEE:  64f6        mov.l    @r15+,r4
+  00000BF0:  65f6        mov.l    @r15+,r5
+  00000BF2:  66f6        mov.l    @r15+,r6
+  00000BF4:  67f6        mov.l    @r15+,r7
+  00000BF6:  002b        rte      
+  00000BF8:  0009        nop      
+  00000BFA:  affe        bra      0xbfa
+  00000BFC:  0009        nop      
+  00000BFE:  ed18        mov      #24,r13
+
+; ─────────────────────────────────────────────────────
+; Default Exception Handler  @ 0x00000BFA
+; ─────────────────────────────────────────────────────
+  00000BFA:  affe        bra      0xbfa
+  00000BFC:  0009        nop      
+  00000BFE:  ed18        mov      #24,r13
+
+; ─────────────────────────────────────────────────────
+; Reset / Startup Initialization  @ 0x00000C0C
+; ─────────────────────────────────────────────────────
+  00000C0C:  b008        bsr      0xc20
+  00000C0E:  0009        nop      
+  00000C10:  b020        bsr      0xc54
+  00000C12:  0009        nop      
+  00000C14:  d353        mov.l    0xd64,r3
+  00000C16:  e500        mov      #0,r5
+  00000C18:  430b        jsr      @r3
+  00000C1A:  6453        mov      r5,r4
+  00000C1C:  affe        bra      0xc1c
+  00000C1E:  0009        nop      
+  00000C20:  9284        mov.w    0xd2c,r2
+  00000C22:  e30f        mov      #15,r3
+  00000C24:  2231        mov.w    r3,@r2
+  00000C26:  e500        mov      #0,r5
+  00000C28:  9381        mov.w    0xd2e,r3
+  00000C2A:  2351        mov.w    r5,@r3
+  00000C2C:  9180        mov.w    0xd30,r1
+  00000C2E:  9080        mov.w    0xd32,r0
+  00000C30:  2011        mov.w    r1,@r0
+  00000C32:  7206        add      #6,r2
+  00000C34:  2251        mov.w    r5,@r2
+  00000C36:  e377        mov      #119,r3
+  00000C38:  917c        mov.w    0xd34,r1
+  00000C3A:  2130        mov.b    r3,@r1
+  00000C3C:  907b        mov.w    0xd36,r0
+  00000C3E:  937b        mov.w    0xd38,r3
+  00000C40:  2301        mov.w    r0,@r3
+  00000C42:  947a        mov.w    0xd3a,r4
+  00000C44:  2451        mov.w    r5,@r4
+  00000C46:  d548        mov.l    0xd68,r5
+  00000C48:  6341        mov.w    @r4,r3
+  00000C4A:  633d        extu.w   r3,r3
+  00000C4C:  2358        tst      r5,r3
+  00000C4E:  89fb        bt       0xc48
+  00000C50:  000b        rts      
+  00000C52:  0009        nop      
+  00000C54:  9672        mov.w    0xd3c,r6
+  00000C56:  e400        mov      #0,r4
+  00000C58:  2641        mov.w    r4,@r6
+  00000C5A:  d544        mov.l    0xd6c,r5
+  00000C5C:  936f        mov.w    0xd3e,r3
+  00000C5E:  2351        mov.w    r5,@r3
+  00000C60:  926e        mov.w    0xd40,r2
+  00000C62:  2241        mov.w    r4,@r2
+  00000C64:  916d        mov.w    0xd42,r1
+  00000C66:  2141        mov.w    r4,@r1
+  00000C68:  2641        mov.w    r4,@r6
+  00000C6A:  7610        add      #16,r6
+  00000C6C:  2641        mov.w    r4,@r6
+  00000C6E:  d340        mov.l    0xd70,r3
+  00000C70:  9068        mov.w    0xd44,r0
+  00000C72:  2031        mov.w    r3,@r0
+  00000C74:  7210        add      #16,r2
+  00000C76:  2241        mov.w    r4,@r2
+  00000C78:  9365        mov.w    0xd46,r3
+  00000C7A:  2341        mov.w    r4,@r3
+  00000C7C:  7112        add      #18,r1
+  00000C7E:  2141        mov.w    r4,@r1
+  00000C80:  d23c        mov.l    0xd74,r2
+  00000C82:  2621        mov.w    r2,@r6
+  00000C84:  760a        add      #10,r6
+  00000C86:  2641        mov.w    r4,@r6
+  00000C88:  925e        mov.w    0xd48,r2
+  00000C8A:  e01f        mov      #31,r0
+  00000C8C:  2201        mov.w    r0,@r2
+  00000C8E:  7308        add      #8,r3
+  00000C90:  2341        mov.w    r4,@r3
+  00000C92:  2641        mov.w    r4,@r6
+  00000C94:  7606        add      #6,r6
+  00000C96:  2641        mov.w    r4,@r6
+  00000C98:  9157        mov.w    0xd4a,r1
+  00000C9A:  9057        mov.w    0xd4c,r0
+  00000C9C:  2011        mov.w    r1,@r0
+  00000C9E:  7204        add      #4,r2
+  00000CA0:  2241        mov.w    r4,@r2
+  00000CA2:  7308        add      #8,r3
+  00000CA4:  2341        mov.w    r4,@r3
+  00000CA6:  2641        mov.w    r4,@r6
+  00000CA8:  7610        add      #16,r6
+  00000CAA:  2641        mov.w    r4,@r6
+  00000CAC:  914f        mov.w    0xd4e,r1
+  00000CAE:  2151        mov.w    r5,@r1
+  00000CB0:  7210        add      #16,r2
+  00000CB2:  2241        mov.w    r4,@r2
+  00000CB4:  2641        mov.w    r4,@r6
+  00000CB6:  76f8        add      #-8,r6
+  00000CB8:  2641        mov.w    r4,@r6
+  00000CBA:  730a        add      #10,r3
+  00000CBC:  2351        mov.w    r5,@r3
+  00000CBE:  d12a        mov.l    0xd68,r1
+  00000CC0:  9046        mov.w    0xd50,r0
+  00000CC2:  2011        mov.w    r1,@r0
+  00000CC4:  72fa        add      #-6,r2
+  00000CC6:  2241        mov.w    r4,@r2
+  00000CC8:  2641        mov.w    r4,@r6
+  00000CCA:  7618        add      #24,r6
+  00000CCC:  2641        mov.w    r4,@r6
+  00000CCE:  e30f        mov      #15,r3
+  00000CD0:  913f        mov.w    0xd52,r1
+  00000CD2:  2131        mov.w    r3,@r1
+  00000CD4:  903e        mov.w    0xd54,r0
+  00000CD6:  2041        mov.w    r4,@r0
+  00000CD8:  2641        mov.w    r4,@r6
+  00000CDA:  76c8        add      #-56,r6
+  00000CDC:  2641        mov.w    r4,@r6
+  00000CDE:  933a        mov.w    0xd56,r3
+  00000CE0:  2351        mov.w    r5,@r3
+  00000CE2:  72de        add      #-34,r2
+  00000CE4:  2241        mov.w    r4,@r2
+  00000CE6:  2641        mov.w    r4,@r6
+  00000CE8:  763e        add      #62,r6
+  00000CEA:  2641        mov.w    r4,@r6
+  00000CEC:  7108        add      #8,r1
+  00000CEE:  2151        mov.w    r5,@r1
+  00000CF0:  733c        add      #60,r3
+  00000CF2:  2341        mov.w    r4,@r3
+  00000CF4:  7240        add      #64,r2
+  00000CF6:  2241        mov.w    r4,@r2
+  00000CF8:  2641        mov.w    r4,@r6
+  00000CFA:  760a        add      #10,r6
+  00000CFC:  2641        mov.w    r4,@r6
+  00000CFE:  710c        add      #12,r1
+  00000D00:  2151        mov.w    r5,@r1
+  00000D02:  730a        add      #10,r3
+  00000D04:  2341        mov.w    r4,@r3
+  00000D06:  720a        add      #10,r2
+  00000D08:  2241        mov.w    r4,@r2
+  00000D0A:  71fe        add      #-2,r1
+  00000D0C:  2141        mov.w    r4,@r1
+  00000D0E:  2641        mov.w    r4,@r6
+  00000D10:  9522        mov.w    0xd58,r5
+  00000D12:  2541        mov.w    r4,@r5
+  00000D14:  9321        mov.w    0xd5a,r3
+  00000D16:  9021        mov.w    0xd5c,r0
+  00000D18:  2031        mov.w    r3,@r0
+  00000D1A:  e250        mov      #80,r2
+  00000D1C:  931f        mov.w    0xd5e,r3
+  00000D1E:  2321        mov.w    r2,@r3
+  00000D20:  71e4        add      #-28,r1
+  00000D22:  2141        mov.w    r4,@r1
+  00000D24:  921c        mov.w    0xd60,r2
+  00000D26:  2241        mov.w    r4,@r2
+  00000D28:  000b        rts      
+  00000D2A:  2541        mov.w    r4,@r5
+  00000D2C:  ec20        mov      #32,r12
+  00000D2E:  ec22        mov      #34,r12
+  00000D30:  7777        add      #119,r7
+  00000D32:  ec24        mov      #36,r12
+  00000D34:  bfad        bsr      0xc92
+  00000D36:  3c04        div1     r0,r12
+
+; ─────────────────────────────────────────────────────
+; CALIBRATION TABLE DIRECTORY  (535 tables)
+; ─────────────────────────────────────────────────────
+; Address      Category                            Table Name
+; ------------ ----------------------------------- ----------------------------------------
+  00014004:  Max Wastegate Duty Limit Post-Compensation
+              ; Boost Control - Wastegate  [2D]  (Wastegate Duty Cycle (%))
+  00020384:  Engine Load Limit A (Maximum)
+              ; Mass Airflow / Engine Load  [2D]  (Engine Load (g/rev))
+  00021CAC:  Front Oxygen Sensor Rich Limit
+              ; Fueling - Closed Loop  [2D]  (Air/Fuel Ratio)
+  00035FFC:  AF 3 Correction Limits
+              ; Experimental  [2D]  (A/F Learning #1 Limits (%))
+  00036000:  AF 3 Learning Limits
+  0004BBAC:  Fuel Pump Duty
+              ;   [Static Y Axis]  
+  0009A770:  (P0335) CRANKSHAFT POS. SENSOR A MALFUNCTION
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A771:  (P0336) CRANKSHAFT POS. SENSOR A RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A772:  (P0604) CONTROL MODULE RAM ERROR
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A773:  (P0102) MAF SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A774:  (P0103) MAF SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A775:  (P0500) VEHICLE SPEED SENSOR A
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A776:  (P0327) KNOCK SENSOR 1 LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A777:  (P0328) KNOCK SENSOR 1 HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A778:  (P0122) TPS A LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A779:  (P0123) TPS A HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A77A:  (P0117) COOLANT TEMP SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A77B:  (P0118) COOLANT TEMP SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A77C:  (P0125) INSUFFICIENT COOLANT TEMP (FUELING)
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A77D:  (P0462) FUEL LEVEL SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A77E:  (P0463) FUEL LEVEL SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A77F:  (P0461) FUEL LEVEL SENSOR RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A780:  (P0851) NEUTRAL SWITCH INPUT LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A781:  (P0852) NEUTRAL SWITCH INPUT HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A782:  (P0506) IDLE CONTROL RPM LOWER THAN EXPECTED
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A783:  (P0507) IDLE CONTROL RPM HIGH THAN EXPECTED
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A784:  (P0011) CAMSHAFT POS. - TIMING OVER-ADVANCED 1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A785:  (P0021) CAMSHAFT POS. - TIMING OVER-ADVANCED 2
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A786:  (P1400) FUEL TANK PRESSURE SOL. LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A787:  (P1420) FUEL TANK PRESSURE SOL. HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A788:  (P0458) EVAP PURGE VALVE CIRCUIT LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A789:  (P0459) EVAP PURGE VALVE CIRCUIT HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A78A:  (P0141) REAR O2 SENSOR MALFUNCTION
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A78D:  (P0420) CAT EFFICIENCY BELOW THRESHOLD
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A78E:  (P0456) EVAP LEAK DETECTED (VERY SMALL)
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A78F:  (P0171) SYSTEM TOO LEAN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A790:  (P0172) SYSTEM TOO RICH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A791:  (P0301) MISFIRE CYLINDER 1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A792:  (P0302) MISFIRE CYLINDER 2
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A793:  (P0303) MISFIRE CYLINDER 3
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A794:  (P0304) MISFIRE CYLINDER 4
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A797:  (P0000) PASS CODE (NO DTC DETECTED)
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A798:  (P0000) PASS CODE (NO DTC DETECTED)_
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A799:  (P0137) REAR O2 SENSOR LOW VOLTAGE
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A79A:  (P0131) FRONT O2 SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A79B:  (P0132) FRONT O2 SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A79C:  (P0138) REAR O2 SENSOR HIGH VOLTAGE
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A79D:  (P0112) IAT SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A79E:  (P0113) IAT SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A79F:  (P0111) IAT SENSOR RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A0:  (P0038) REAR O2 SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A1:  (P0032) FRONT O2 SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A2:  (P0037) REAR O2 SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A3:  (P0031) FRONT O2 SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A4:  (P0107) MAP SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A5:  (P0108) MAP SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A6:  (P0128) THERMOSTAT MALFUNCTION
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A7:  (P0245) WASTEGATE SOLENOID A LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A8:  (P0246) WASTEGATE SOLENOID A HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7A9:  (P0244) WASTEGATE SOLENOID A RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7AA:  (P0230) FUEL PUMP PRIMARY CIRCUIT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7AB:  (P0068) MAP SENSOR RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7AC:  (P0101) MAF SENSOR RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7AD:  (P0134) FRONT O2 SENSOR NO ACTIVITY
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7AE:  (P0030) FRONT O2 SENSOR RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7AF:  (P2109) TPS A MINIMUM STOP PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B0:  (P0222) TPS B LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B1:  (P0223) TPS B HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B2:  (P1160) ABNORMAL RETURN SPRING
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B3:  (P2102) THROTTLE ACTUATOR CIRCUIT LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B4:  (P2103) THROTTLE ACTUATOR CIRCUIT HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B5:  (P2101) THROTTLE ACTUATOR CIRCUIT RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B6:  (P2096) POST CATALYST TOO LEAN B1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B7:  (P2138) TPS D/E VOLTAGE
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B8:  (P2127) TPS E CIRCUIT LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7B9:  (P2128) TPS E CIRCUIT HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7BA:  (P2122) TPS D CIRCUIT LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7BB:  (P2123) TPS D CIRCUIT HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7BC:  (P2135) TPS A/B VOLTAGE
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7BD:  (P2097) POST CATALYST TOO RICH B1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7C0:  (P0345) CAMSHAFT POS. SENSOR A BANK 2
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7C1:  (P0340) CAMSHAFT POS. SENSOR A MALFUNCTION
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7C2:  (P0605) CONTROL MODULE ROM ERROR
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7C7:  (P2093) OCV SOLENOID A2 CIRCUIT SHORT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7C8:  (P2092) OCV SOLENOID A2 CIRCUIT OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7C9:  (P2089) OCV SOLENOID A1 CIRCUIT SHORT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7CA:  (P2088) OCV SOLENOID A1 CIRCUIT OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7CE:  (P2004) TGV - INTAKE MANIFOLD RUNNER 1 STUCK OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7CF:  (P2006) TGV - INTAKE MANIFOLD RUNNER 1 STUCK CLOSED
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D0:  (P2005) TGV - INTAKE MANIFOLD RUNNER 2 STUCK OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D1:  (P2007) TGV - INTAKE MANIFOLD RUNNER 2 STUCK CLOSED
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D3:  (P2016) TGV - INTAKE MANIFOLD RUNNER 1 POS. SENSOR LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D4:  (P2017) TGV - INTAKE MANIFOLD RUNNER 1 POS. SENSOR HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D5:  (P2021) TGV - INTAKE MANIFOLD RUNNER 2 POS. SENSOR LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D6:  (P2022) TGV - INTAKE MANIFOLD RUNNER 2 POS. SENSOR HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D7:  (P2009) TGV - INTAKE MANIFOLD RUNNER 1 CIRCUIT LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D8:  (P2012) TGV - INTAKE MANIFOLD RUNNER 2 CIRCUIT LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7D9:  (P2008) TGV - INTAKE MANIFOLD RUNNER 1 CIRCUIT OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7DA:  (P2011) TGV - INTAKE MANIFOLD RUNNER 2 CIRCUIT OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7DB:  (P2444) SECONDARY AIR PUMP 1 STUCK ON B1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7DC:  (P0411) SECONDARY AIR PUMP INCORRECT FLOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7DD:  (P0410) SECONDARY AIR PUMP SYSTEM
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7DE:  (P2431) SECONDARY AIR PUMP CIRCUIT RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7DF:  (P2433) SECONDARY AIR PUMP CIRCUIT HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E0:  (P2432) SECONDARY AIR PUMP CIRCUIT LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E1:  (P0413) SECONDARY AIR PUMP A OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E2:  (P0140) REAR O2 SENSOR NO ACTIVITY
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E3:  (P0414) SECONDARY AIR PUMP A SHORTED
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E4:  (P0018) CRANKSHAFT/CAMSHAFT CORRELATION 2A
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E5:  (P0016) CRANKSHAFT/CAMSHAFT CORRELATION 1A
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E6:  (P1410) SECONDARY AIR PUMP VALVE STUCK OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E7:  (P2443) SECONDARY AIR PUMP 2 STUCK CLOSED
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E8:  (P2442) SECONDARY AIR PUMP VALVE 2 STUCK OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7E9:  (P2441) SECONDARY AIR PUMP VALVE 1 STUCK CLOSED
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7EA:  (P2440) SECONDARY AIR PUMP VALVE 1 STUCK OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7EB:  (P0417) SECONDARY AIR PUMP B SHORTED
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7EC:  (P0416) SECONDARY AIR PUMP B OPEN
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7F2:  (P0201) INJECTOR CIRCUIT MALFUNCTION CYLINDER 1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7F3:  (P0204) INJECTOR CIRCUIT MALFUNCTION CYLINDER 4
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7F4:  (P0203) INJECTOR CIRCUIT MALFUNCTION CYLINDER 3
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7F5:  (P0202) INJECTOR CIRCUIT MALFUNCTION CYLINDER 2
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7F6:  (U0422) CAN INVALID DATA RECEIVED FROM BIU
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7F7:  (U0140) CAN LOST COMMUNICATION WITH BIU
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7F8:  (U0402) CAN INVALID DATA RECEIVED FROM TCM
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7F9:  (U0101) CAN LOST COMMUNICATION WITH TCM
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7FA:  (U0416) CAN INVALID DATA RECEIVED FROM VDC
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7FB:  (U0122) CAN LOST COMMUNICATION WITH VDC
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7FC:  (U0073) CAN COMMUNICATION BUS A OFF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7FD:  (P050B) COLD START IGNITION TIMING PERFORMANCE
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7FE:  (P050A) COLD START IDLE AIR CONTROL SYSTEM PERFORMANCE
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A7FF:  (P2610) ECM/PCM INTERNAL ENGINE OFF TIMER PERFORMANCE
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A800:  (P2420) EVAP SWITCHING VALVE HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A801:  (P2419) EVAP SWITCHING VALVE LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A802:  (P2401) EVAP LEAK DETECTION PUMP CONTROL CIRCUIT LOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A803:  (P0453) EVAP PRESSURE SENSOR HIGH INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A804:  (P0452) EVAP PRESSURE SENSOR LOW INPUT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A805:  (P015B) O2 SENSOR DELAYED RESPONSE LEAN TO RICH B1 S1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A806:  (P015A) O2 SENSOR DELAYED RESPONSE RICH TO LEAN B1 S1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A807:  (P014D) O2 SENSOR SLOW RESPONSE LEAN TO RICH B1 S1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A808:  (P014C) O2 SENSOR SLOW RESPONSE RICH TO LEAN B1 S1
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A809:  (P1451) EVAPORATIVE EMISSION CONT. SYS.
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A80A:  (P1449) EVAPORATIVE EMISSION CONT. SYS. AIR FILTER CLOG
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A80B:  (P0455) EVAP EMISSION CONTROL SYSTEM LEAK DETECTED (GROSS LEAK)
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A80C:  (P0451) EVAP PRESSURE SENSOR RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A80D:  (P0441) EVAP INCORRECT PURGE FLOW
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A80F:  (P219A) BANK 1 AFR IMBALANCE
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A810:  (P2404) EVAP LEAK DETECTION PUMP SENSE CIRCUIT RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A811:  (P2402) EVAP LEAK DETECTION PUMP CONTROL CIRCUIT HIGH
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A812:  (P013F) O2 SENSOR DELAYED RESPONSE LEAN TO RICH B1 S2
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A813:  (P013E) O2 SENSOR DELAYED RESPONSE RICH TO LEAN B1 S2
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A814:  (P013B) O2 SENSOR SLOW RESPONSE LEAN TO RICH B1 S2
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A815:  (P013A) O2 SENSOR SLOW RESPONSE RICH TO LEAN B1 S2
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A816:  (P0354) IGNITION COIL D PRIMARY/SECONDARY CIRCUIT MALFUNCTION
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A817:  (P0353) IGNITION COIL C PRIMARY/SECONDARY CIRCUIT MALFUNCTION
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A818:  (P0352) IGNITION COIL B PRIMARY/SECONDARY CIRCUIT MALFUNCTION
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A819:  (P0351) IGNITION COIL A PRIMARY/SECONDARY CIRCUIT MALFUNCTION
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A81A:  (P0512) STARTER REQUEST CIRCUIT
+              ; Diagnostic Trouble Codes  [1D]  
+  0009A82B:  (P0341) CAMSHAFT POS. SENSOR A RANGE/PERF
+              ; Diagnostic Trouble Codes  [1D]  
+  000AAE20:  Engine Load Limit B Maximum (RPM) - Multiplier
+              ; ALPHA Engine Load Limit B Multiplier  [2D]  (raw ecu value)
+  000C0BAD:  Boost Control Disable Delay (Fine Correction)
+              ; Boost Control - Limits  [2D]  (counter threshold)
+  000C0BC8:  Boost disable during fuel cut-Boost(psi) threshold
+  000C0BCC:  Boost disable during fuel cut-Load threshold
+  000C0BD0:  Boost disable during fuel cut-RPM threshold
+  000C0BD4:  TD Activation Thresholds (Target Boost)_
+              ; Boost Control - Turbo Dynamics  [2D]  (Target Boost (psi relative))
+  000C0BDC:  TD Integral Negative Activation (Boost Error)
+              ; Boost Control - Turbo Dynamics  [2D]  (Boost Error (psi))
+  000C0BE0:  TD Integral Positive Activation (Boost Error)
+              ; Boost Control - Turbo Dynamics  [2D]  (Boost Error (psi))
+  000C0BE4:  TD Integral Negative Activation (Wastegate Duty)
+              ; Boost Control - Turbo Dynamics  [2D]  (Wastegate Duty Cycle (%))
+  000C0BE8:  TD Activation Thresholds (RPM)
+              ; Boost Control - Turbo Dynamics  [2D]  (Engine Speed (RPM))
+  000C0BF0:  TD Integral Cumulative Range (WGDC Correction)
+              ; Boost Control - Turbo Dynamics  [2D]  (TD Integral Cumulative Wastegate Duty Correction (% absolute))
+  000C0BF8:  Boost Control Disable (Fine Correction)
+              ; Boost Control - Limits  [2D]  (Current Fine Correction Learning (degrees of correction))
+  000C0BFC:  Boost Control Disable (IAM)
+              ; Boost Control - Limits  [2D]  (Ignition Advance Multiplier (IAM))
+  000C0C08:  Target Boost Compensation (1st Gear) Speed Disable
+              ; Boost Control - Target  [2D]  (Vehicle Speed (MPH))
+  000C0C0C:  Target Boost Compensation (1st Gear)
+              ;   [Static Y Axis]  
+  000C0C14:  Coolant Temperature
+              ;   [Y Axis]  (Degrees F)
+  000C0C54:  Intake Temperature
+              ;   [Y Axis]  (Degrees F)
+  000C0C94:  Initial/Max Wastegate Duty Compensation (IAT)
+              ; Boost Control - Wastegate  [2D]  (Initial/Max Wastegate Duty Compensation (% relative))
+  000C0CB4:  Initial/Max Wastegate Duty Compensation (ECT)
+              ; Boost Control - Wastegate  [2D]  (Initial/Max Wastegate Duty Compensation (% relative))
+  000C0CC4:  TD Proportional Compensation (IAT)
+              ; Boost Control - Turbo Dynamics  [2D]  (TD Proportional Map Target Compensation (% relative))
+  000C0CD4:  TD Integral Negative Compensation (IAT)
+              ; Boost Control - Turbo Dynamics  [2D]  (TD Integral Negative Map Target Compensation (% relative))
+  000C0CE4:  TD Integral Positive Compensation (IAT)
+              ; Boost Control - Turbo Dynamics  [2D]  (TD Integral Positive Map Target Compensation (% relative))
+  000C0CF4:  Target Boost Compensation (ECT)
+              ; Boost Control - Target  [2D]  (Target Boost (psia) Compensation (%))
+  000C0D04:  Boost Error
+              ;   [Y Axis]  (psi)
+  000C0D28:  Turbo Dynamics Proportional
+              ; Boost Control - Turbo Dynamics  [2D]  (Wastegate Duty Correction (% absolute))
+  000C0D3C:  Boost Error
+              ;   [Y Axis]  (psi)
+  000C0D60:  Turbo Dynamics Integral Negative
+              ;   [Static Y Axis]  
+  000C0D74:  Boost Error
+              ;   [Y Axis]  (psi)
+  000C0D98:  Turbo Dynamics Integral Positive
+              ;   [Static Y Axis]  
+  000C0E24:  Intake Temperature
+              ;   [Y Axis]  (Degrees F)
+  000C0E3C:  Target Boost Compensation (IAT)_
+              ; Boost Control - Target  [2D]  (Target Boost (psia) Compensation (%))
+  000C0E54:  Atmospheric Pressure
+              ;   [X Axis]  (psi)
+  000C0E6C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C0E7C:  Initial/Max Wastegate Duty Compensation (Atm. Pressure)
+              ; Boost Control - Wastegate  [3D]  (Initial/Max Wastegate Duty Compensation (% relative))
+  000C0E94:  Atmospheric Pressure
+              ;   [X Axis]  (psi)
+  000C0EAC:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C0EC4:  Target Boost Compensation (Atm. Pressure)_
+              ; Boost Control - Target  [3D]  (Target Boost (psia) Compensation (%))
+  000C0EE8:  Requested Torque
+              ;   [X Axis]  (raw ecu value)
+  000C0F24:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C0F58:  Max Wastegate Duty_
+              ; Boost Control - Wastegate  [3D]  (Wastegate Duty Cycle (%))
+  000C10E0:  Requested Torque
+              ;   [X Axis]  (raw ecu value)
+  000C111C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C1150:  Initial Wastegate Duty_
+              ; Boost Control - Wastegate  [3D]  (Wastegate Duty Cycle (%))
+  000C12D8:  Requested Torque
+              ;   [X Axis]  (raw ecu value)
+  000C1304:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C1340:  Target Boost_
+              ; Boost Control - Target  [3D]  (Boost Target (psi relative sea level))
+  000C1780:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000C17C0:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C1800:  Calculated Engine Torque A
+              ; Alpha - Drive-by-Wire Throttle (DBW)  [3D]  (Requested Torque (raw ecu value))
+  000C1A00:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000C1A40:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C1A80:  Calculated Engine Torque B
+              ; Alpha - Drive-by-Wire Throttle (DBW)  [3D]  (Requested Torque (raw ecu value))
+  000C1C80:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000C1CC0:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C1D00:  Calculated Engine Torque C
+              ; Alpha - Drive-by-Wire Throttle (DBW)  [3D]  (Requested Torque (raw ecu value))
+  000C1F00:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000C1F40:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C1F80:  Calculated Engine Torque D
+              ; Alpha - Drive-by-Wire Throttle (DBW)  [3D]  (Requested Torque (raw ecu value))
+  000C3100:  MAF Limit (Maximum)
+              ; Mass Airflow / Engine Load  [2D]  (Mass Airflow (g/s))
+  000C3474:  Gear Determination Thresholds A
+              ; Miscellaneous - Thresholds  [2D]  (Rev/Mile)
+  000C3488:  Gear Determination Thresholds B
+              ; Miscellaneous - Thresholds  [2D]  (Rev/Mile)
+  000C349C:  Gear Determination Thresholds C
+              ; Miscellaneous - Thresholds  [2D]  (Rev/Mile)
+  000C3600:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C3608:  Engine Load Limit B Maximum (RPM)
+              ; Mass Airflow / Engine Load  [2D]  (Engine Load (g/rev))
+  000C36F8:  Atmospheric Pressure
+              ;   [X Axis]  (psi)
+  000C3708:  Front Oxygen Sensor Compensation (Atm. Pressure)
+              ; Fueling - Closed Loop  [2D]  (Front Oxygen Sensor Compensation)
+  000C3B7C:  Intake Temperature
+              ;   [Y Axis]  (Degrees F)
+  000C3B90:  Mass Airflow
+              ;   [Y Axis]  (Mass Airflow (g/s))
+  000C3BB0:  MAF Compensation (IAT)
+              ; Mass Airflow / Engine Load  [3D]  (Mass Airflow Compensation (%))
+  000C3BD8:  Manifold Pressure
+              ;   [Y Axis]  (psi relative (sea level))
+  000C3C04:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C3C3C:  Engine Load Compensation Cruise (MP)
+              ; Mass Airflow / Engine Load  [3D]  (Engine Load Compensation (%))
+  000C3CD8:  Manifold Pressure
+              ;   [Y Axis]  (psi relative (sea level))
+  000C3D04:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000C3D3C:  Engine Load Compensation Non-Cruise (MP)
+              ; Mass Airflow / Engine Load  [3D]  (Engine Load Compensation (%))
+  000CBC08:  Tip-in Enrichment Applied Counter Reset
+              ; Fueling - Tip-in Enrichment  [2D]  (tip-in last applied counter period)
+  000CBC09:  Tip-in Throttle Cumulative Reset
+              ; Fueling - Tip-in Enrichment  [2D]  (tip-in last applied counter period)
+  000CBC5A:  CL Delay Engine Load Counter Threshold
+              ; Fueling - CL/OL Transition  [2D]  (counter threshold)
+  000CBC5C:  CL to OL Delay/Switch SI-DRIVE Intelligent
+              ; Fueling - CL/OL Transition  [2D]  (counter threshold)
+  000CBC62:  CL to OL Delay_
+              ; Fueling - CL/OL Transition  [2D]  (counter threshold)
+  000CBE0C:  Injector Flow Scaling
+              ; Fueling - Injectors  [2D]  (ESTIMATED Flow Rate - Gas Only (cc/min))
+  000CBF9C:  CL Fueling Target Compensation (ECT) Disable
+              ; Fueling - Closed Loop  [2D]  (Coolant Temp (Degrees F))
+  000CC064:  A/F Learning #1 Limits
+              ; Fueling - AF Correction / Learning  [2D]  (A/F Learning #1 Limits (%))
+  000CC074:  A/F Learning #1 Airflow Ranges
+              ; Fueling - AF Correction / Learning  [2D]  (Mass Airflow (g/s))
+  000CC16C:  Primary Open Loop Fuel Map Switch (IAM)
+              ; Fueling - Primary Open Loop  [2D]  (Ignition Advance Multiplier (IAM))
+  000CC170:  Minimum Active Primary Open Loop Enrichment
+              ; Fueling - Primary Open Loop  [2D]  (Estimated Air/Fuel Ratio)
+  000CC174:  CL to OL Transition with Delay BPW Hysteresis
+              ; Fueling - CL/OL Transition  [2D]  (Base Pulse Width (ms))
+  000CC178:  CL to OL Transition with Delay Throttle Hysteresis
+              ; Fueling - CL/OL Transition  [2D]  (Throttle Plate Opening Angle (%))
+  000CC17C:  CL Delay Minimum (ECT)
+              ; Fueling - CL/OL Transition  [2D]  (Coolant Temp (Degrees F))
+  000CC180:  CL Delay Maximum Engine Speed (Per Gear)
+              ; Fueling - CL/OL Transition  [2D]  (Engine Speed (RPM))
+  000CC1A8:  CL Delay Maximum Engine Speed (Neutral)
+              ; Fueling - CL/OL Transition  [2D]  (Engine Speed (RPM))
+  000CC1D8:  CL Delay Maximum (Throttle)
+              ; Fueling - CL/OL Transition  [2D]  (Throttle Plate Opening Angle (%))
+  000CC1F4:  CL Delay Maximum (Vehicle Speed)
+              ; Fueling - CL/OL Transition  [2D]  (Vehicle Speed (MPH))
+  000CC204:  CL Delay Maximum (Engine Load)
+              ; Fueling - CL/OL Transition  [2D]  (Engine Load (g/rev))
+  000CC498:  Overrun Enrich RPM Delta Activation
+              ; ALPHA OverRun Fueling  [2D]  (raw ecu value)
+  000CC49C:  Overrun initial injector enrichment (pulsewidth)
+              ; ALPHA OverRun Fueling  [2D]  (ms)
+  000CC4A0:  Minimum Tip-in Enrichment Activation (Throttle)
+              ; Fueling - Tip-in Enrichment  [2D]  (Throttle Angle Change (%))
+  000CC4A4:  Minimum Tip-in Enrichment Activation
+              ; Fueling - Tip-in Enrichment  [2D]  (Additional Injector Pulse Width (ms))
+  000CC4A8:  Tip-in Enrichment Compensation D (ECT) Activation
+              ; Fueling - Tip-in Enrichment  [2D]  (Throttle Angle Change (%))
+  000CC4EC:  Overrun Fueling Cut Counter RPM Threshold
+              ; ALPHA OverRun Fueling  [2D]  (RPM)
+  000CC500:  Rev Limit On
+  000CC504:  Rev Limit Off
+  000CC508:  Rev Limit On (2)
+  000CC50C:  Rev Limit Off (2)
+  000CC510:  Rev Limit On (3)
+  000CC514:  Rev Limit Off (3)
+  000CC518:  Rev Limit Fuel Resume (Boost)
+              ; Miscellaneous - Limits  [2D]  (Manifold Pressure (psi relative sea level))
+  000CC520:  Speed Limiting Enable (Fuel Cut)
+              ; Miscellaneous - Limits  [2D]  (Vehicle Speed (MPH))
+  000CC528:  Speed Limiting Disable (Fuel Cut)
+              ; Miscellaneous - Limits  [2D]  (Vehicle Speed (MPH))
+  000CC624:  Coolant Temperature
+              ;   [Y Axis]  (Degrees F)
+  000CC664:  Coolant Temperature
+              ;   [Y Axis]  (Degrees F)
+  000CC830:  Min Primary Base Enrichment 1 (Non-Primary OL)_
+              ; Fueling - Warm-Up Enrichment  [2D]  (Minimum Primary Enrichment Offset Additive 1)
+  000CC840:  Manifold Pressure
+              ;   [Y Axis]  (psi relative (sea level))
+  000CC868:  Cranking Fuel IPW Compensation (MAP)
+              ; Fueling - Cranking  [2D]  (Cranking Fuel Injector Pulse Width Compensation (%))
+  000CC874:  Accelerator Pedal Angle
+              ;   [X Axis]  (%)
+  000CC89C:  Cranking Fuel IPW Compensation (Accelerator)
+              ; Fueling - Cranking  [2D]  (Cranking Fuel Injector Pulse Width Compensation (%))
+  000CC8A8:  Intake Temperature
+              ;   [Y Axis]  (Degrees F)
+  000CC8BC:  Cranking Fuel IPW Compensation (IAT)
+              ; Fueling - Cranking  [2D]  (Cranking Fuel Injector Pulse Width Compensation (%))
+  000CCD18:  'Timing Compensation (MRP)' + 'Timing Compensation (IAT)'
+              ;   [Y Axis]  (degrees of correction)
+  000CCD30:  Primary Open Loop Fueling Compensation (Timing Compensation)_
+              ; Fueling - Primary Open Loop  [2D]  ('Primary Open Loop Fueling' Raw Enrichment Offset Additive)
+  000CCD38:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000CCD78:  CL to OL Transition with Delay (Throttle)
+              ; Fueling - CL/OL Transition  [2D]  (Throttle Plate Opening Angle (%))
+  000CCD88:  Throttle Plate Opening Angle
+              ;   [Y Axis]  (Target Throttle Plate Opening Angle (%))
+  000CCDA0:  Minimum Primary Open Loop Enrichment (Throttle)
+              ; Fueling - Primary Open Loop  [2D]  (Estimated Primary Open Loop Air/Fuel Ratio Lean Limit)
+  000CCDA8:  Accelerator Pedal Angle
+              ;   [X Axis]  (%)
+  000CCDC0:  Minimum Primary Open Loop Enrichment (Accelerator)
+              ; Fueling - Primary Open Loop  [2D]  (Estimated Primary Open Loop Air/Fuel Ratio Lean Limit)
+  000CD0D8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000CD118:  Tip-in Enrichment Compensation (RPM)
+              ; Fueling - Tip-in Enrichment  [2D]  (Throttle Tip-in Enrichment Compensation (%))
+  000CD128:  Boost Error
+              ;   [Y Axis]  (psi)
+  000CD14C:  Tip-in Enrichment Compensation (Boost Error)
+              ; Fueling - Tip-in Enrichment  [2D]  (Throttle Tip-in Enrichment Compensation (%))
+  000CD155:  Tip-in Enrichment Compensation A (ECT)
+              ; Fueling - Tip-in Enrichment  [2D]  (Throttle Tip-in Enrichment Compensation (%))
+  000CD165:  Tip-in Enrichment Disable Applied Counter Threshold A (ECT)
+              ; Fueling - Tip-in Enrichment  [2D]  (tip-in enrichment applied counter)
+  000CD175:  Tip-in Enrichment Disable Applied Counter Threshold B (ECT)
+              ; Fueling - Tip-in Enrichment  [2D]  (tip-in enrichment applied counter)
+  000CD2E6:  Cranking Fuel Injector Pulse Width A (ECT)
+              ; Fueling - Cranking  [2D]  (Injector Pulse Width (ms))
+  000CD306:  Cranking Fuel Injector Pulse Width B (ECT)
+              ; Fueling - Cranking  [2D]  (Injector Pulse Width (ms))
+  000CD326:  Cranking Fuel Injector Pulse Width C (ECT)
+              ; Fueling - Cranking  [2D]  (Injector Pulse Width (ms))
+  000CD346:  Cranking Fuel Injector Pulse Width D (ECT)
+              ; Fueling - Cranking  [2D]  (Injector Pulse Width (ms))
+  000CD366:  Cranking Fuel Injector Pulse Width E (ECT)
+              ; Fueling - Cranking  [2D]  (Injector Pulse Width (ms))
+  000CD386:  Cranking Fuel Injector Pulse Width F (ECT)
+              ; Fueling - Cranking  [2D]  (Injector Pulse Width (ms))
+  000CE5B8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000CE5F8:  CL to OL Transition with Delay (Base Pulse Width)
+              ; Fueling - CL/OL Transition  [2D]  (Base Pulse Width (ms))
+  000CE618:  Mass Airflow
+              ;   [Y Axis]  (Mass Airflow (g/s))
+  000CE640:  CL to OL Transition Counter Step Value (MAF)
+              ; Fueling - CL/OL Transition  [2D]  (CL to OL Counter Increment (WARNING - value should NEVER be zero))
+  000CE6CC:  Primary Open Loop Fueling Compensation (ECT)
+              ; Fueling - Primary Open Loop  [2D]  ('Primary Open Loop Fueling' Enrichment Offset Compensation (%))
+  000CED08:  Throttle Angle Change
+              ;   [Y Axis]  (%)
+  000CED50:  Throttle Tip-in Enrichment A
+              ; Fueling - Tip-in Enrichment  [2D]  (Additional Injector Pulse Width (ms))
+  000CED74:  Throttle Angle Change
+              ;   [Y Axis]  (%)
+  000CEDBC:  Throttle Tip-in Enrichment B
+              ; Fueling - Tip-in Enrichment  [2D]  (Additional Injector Pulse Width (ms))
+  000CEDE0:  Tip-in Enrichment Compensation B (ECT)
+              ; Fueling - Tip-in Enrichment  [2D]  (Throttle Tip-in Enrichment Compensation (%))
+  000CEE00:  Tip-in Enrichment Compensation C (ECT)
+              ; Fueling - Tip-in Enrichment  [2D]  (Throttle Tip-in Enrichment Compensation (%))
+  000CEE40:  Tip-in Enrichment Compensation D (ECT)
+              ; Fueling - Tip-in Enrichment  [2D]  (Throttle Tip-in Enrichment Compensation (%))
+  000CEE60:  Tip-in Enrichment Disable Throttle Cumulative Threshold A (ECT)
+              ; Fueling - Tip-in Enrichment  [2D]  (cumulative throttle angle change)
+  000CEE80:  Tip-in Enrichment Disable Throttle Cumulative Threshold B (ECT)
+              ; Fueling - Tip-in Enrichment  [2D]  (cumulative throttle angle change)
+  000CEED0:  Overrun Fueling RPM Resume Threshold
+              ; ALPHA OverRun Fueling  [2D]  (units)
+  000CF680:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000CF694:  Coolant Temperature
+              ;   [Y Axis]  (Degrees F)
+  000CF6B0:  Cranking Fuel IPW Compensation Imm. Non-Cruise (RPM)
+              ; Fueling - Cranking  [3D]  (Cranking Fuel Injector Pulse Width Compensation (%))
+  000CF6D4:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000CF6E8:  Coolant Temperature
+              ;   [Y Axis]  (Degrees F)
+  000CF704:  Cranking Fuel IPW Compensation Imm. Cruise (RPM)
+              ; Fueling - Cranking  [3D]  (Cranking Fuel Injector Pulse Width Compensation (%))
+  000CF898:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000CF8B8:  Min Primary Base Enrichment 1 Non-Cruise
+              ; Fueling - Warm-Up Enrichment  [3D]  (Minimum Primary Enrichment Offset Additive Non-Cruise)
+  000CF938:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000CF95C:  Min Primary Base Enrichment 1 Cruise
+              ; Fueling - Warm-Up Enrichment  [3D]  (Minimum Primary Enrichment Offset Additive Cruise)
+  000CFCA4:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000CFCE8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000CFD30:  Primary Open Loop Fueling (KCA Alternate Mode)
+              ; Fueling - Primary Open Loop  [3D]  (Estimated Air/Fuel Ratio)
+  000CFE64:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000CFEA8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000CFEF0:  Primary Open Loop Fueling (Failsafe)(KCA Alternate Mode)
+              ; Fueling - Primary Open Loop  [3D]  (Estimated Air/Fuel Ratio)
+  000D01B8:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D01FC:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D0244:  Primary Open Loop Fueling (KCA Additive B Low)
+              ; Fueling - Primary Open Loop  [3D]  (Estimated Air/Fuel Ratio)
+  000D0378:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D03BC:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D0404:  Primary Open Loop Fueling (KCA Additive B High)
+              ; Fueling - Primary Open Loop  [3D]  (Estimated Air/Fuel Ratio)
+  000D0538:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D057C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D05C4:  Primary Open Loop Fueling (Failsafe)
+              ; Fueling - Primary Open Loop  [3D]  (Estimated Air/Fuel Ratio)
+  000D0760:  Last Calculated Base Pulse Width
+              ;   [X Axis]  (ms)
+  000D07A4:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D07E8:  Per Injector Pulse Width Compensation A
+              ; Fueling - Injectors  [3D]  (Injector Pulse Width Compensation)
+  000D090C:  Last Calculated Base Pulse Width
+              ;   [X Axis]  (ms)
+  000D0950:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D0994:  Per Injector Pulse Width Compensation B
+              ; Fueling - Injectors  [3D]  (Injector Pulse Width Compensation)
+  000D0AB8:  Last Calculated Base Pulse Width
+              ;   [X Axis]  (ms)
+  000D0AFC:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D0B40:  Per Injector Pulse Width Compensation C
+              ; Fueling - Injectors  [3D]  (Injector Pulse Width Compensation)
+  000D0C64:  Last Calculated Base Pulse Width
+              ;   [X Axis]  (ms)
+  000D0CA8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D0CEC:  Per Injector Pulse Width Compensation D
+              ; Fueling - Injectors  [3D]  (Injector Pulse Width Compensation)
+  000D104C:  Battery Output
+              ;   [Y Axis]  (volts)
+  000D1060:  Manifold Pressure
+              ;   [Y Axis]  (psi relative (sea level))
+  000D106C:  Injector Latency_
+              ; Fueling - Injectors  [3D]  (Latency (ms))
+  000D13A4:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D13B0:  CL Fueling Target Compensation Imm. Cruise (ECT)
+              ; Fueling - Closed Loop  [3D]  (Estimated Air/Fuel Ratio Points (Additive))
+  000D1410:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D141C:  CL Fueling Target Compensation Imm. Non-Cruise (ECT)
+              ; Fueling - Closed Loop  [3D]  (Estimated Air/Fuel Ratio Points (Additive))
+  000D147C:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D14A8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D14D0:  CL Fueling Target Compensation A (Load)
+              ; Fueling - Closed Loop  [3D]  (Estimated Air/Fuel Ratio Points (Additive))
+  000D16DC:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D1710:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D1740:  CL Fueling Target Compensation B (Load)
+              ; Fueling - Closed Loop  [3D]  (Estimated Air/Fuel Ratio Points (Additive))
+  000D2530:  Atmospheric Pressure
+              ;   [X Axis]  (psi)
+  000D2548:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D2560:  Boost Limit (Fuel Cut)_
+              ; Boost Control - Limits  [3D]  (psi absolute)
+  000D29DE:  Feedback Correction Negative Advance Delay
+              ; Ignition Timing - Knock Control  [2D]  (counter threshold)
+  000D29EE:  Fine Correction Advance Delay
+              ; Ignition Timing - Knock Control  [2D]  (counter threshold)
+  000D2ADC:  Base Timing Idle Minimum Vehicle Speed Enable
+              ; Ignition Timing - Advance  [2D]  (Vehicle Speed (MPH))
+  000D2CD8:  Timing Compensation B (IAT) Max Additive
+              ; Ignition Timing - Compensation  [2D]  (degrees of correction)
+  000D2CF4:  Timing Compensation B (IAT) IAM Activation
+              ; Ignition Timing - Compensation  [2D]  (Ignition Advance Multiplier (IAM))
+  000D2D38:  Timing Compensation Per Gear Activation (RPM)
+              ; Ignition Timing - Compensation  [2D]  (Engine Speed (RPM))
+  000D2D40:  Timing Compensation Per Gear Activation (Load)
+              ; Ignition Timing - Compensation  [2D]  (Engine Load (g/rev))
+  000D2D98:  Timing Comp Maximum RPM (Per Cylinder)
+              ; Ignition Timing - Compensation  [2D]  (Engine Speed (RPM))
+  000D2D9C:  Timing Comp Minimum Load (Per Cylinder)
+              ; Ignition Timing - Compensation  [2D]  (Engine Load (g/rev))
+  000D2DA0:  Timing Comp Minimum Coolant Temp (Per Cylinder)
+              ; Ignition Timing - Compensation  [2D]  (Coolant Temp (Degrees F))
+  000D2DA4:  Feedback Correction Minimum Load
+              ; Ignition Timing - Knock Control  [2D]  (Engine Load (g/rev))
+  000D2DAC:  Feedback Correction Range (RPM)
+              ; Ignition Timing - Knock Control  [2D]  (Engine Speed (RPM))
+  000D2DC8:  Feedback Correction Retard Limit
+              ; Ignition Timing - Knock Control  [2D]  (degrees of correction)
+  000D2DCC:  Feedback Correction Retard Value
+              ; Ignition Timing - Knock Control  [2D]  (degrees of correction)
+  000D2DD0:  Feedback Correction Negative Advance Value
+              ; Ignition Timing - Knock Control  [2D]  (degrees of correction)
+  000D2DD8:  Extended Feedback Correction High RPM Compensation
+              ; Ignition Timing - Knock Control  [2D]  (multiplier)
+  000D2EBC:  Rough Correction Range (RPM)
+              ; Ignition Timing - Knock Control  [2D]  (Engine Speed (RPM))
+  000D2ECC:  Rough Correction Range (Load)
+              ; Ignition Timing - Knock Control  [2D]  (Engine Load (g/rev))
+  000D2EDC:  Rough Correction Minimum KC Advance Map Value
+              ; Ignition Timing - Knock Control  [2D]  (Current 'Knock Correction Advance Max' Map Value (degrees))
+  000D2EE0:  Advance Multiplier (Initial)
+              ; Ignition Timing - Knock Control  [2D]  (Ignition Advance Multiplier (IAM))
+  000D2EE4:  Advance Multiplier Step Value
+              ; Ignition Timing - Knock Control  [2D]  (change in multiplier)
+  000D2F0C:  Fine Correction Rows (RPM)
+              ; Ignition Timing - Knock Control  [2D]  (Engine Speed (RPM))
+  000D2F28:  Fine Correction Columns (Load)
+              ; Ignition Timing - Knock Control  [2D]  (Engine Load (g/rev))
+  000D2F44:  Fine Correction Advance Limit
+              ; Ignition Timing - Knock Control  [2D]  (degrees of correction)
+  000D2F48:  Fine Correction Advance Value
+              ; Ignition Timing - Knock Control  [2D]  (degrees of correction)
+  000D2F4C:  Fine Correction Retard Limit
+              ; Ignition Timing - Knock Control  [2D]  (degrees of correction)
+  000D2F50:  Fine Correction Retard Value
+              ; Ignition Timing - Knock Control  [2D]  (degrees of correction)
+  000D2F6C:  Fine Correction Range (RPM)
+              ; Ignition Timing - Knock Control  [2D]  (Engine Speed (RPM))
+  000D2F7C:  Fine Correction Range (Load)
+              ; Ignition Timing - Knock Control  [2D]  (Engine Load (g/rev))
+  000D2F8C:  Coolant Temperature
+              ;   [Y Axis]  (Degrees F)
+  000D300C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D319D:  Base Timing Idle Minimum
+              ; Ignition Timing - Advance  [2D]  (Base Ignition Timing (degrees BTDC))
+  000D31A6:  Base Timing Idle A (In-Gear)
+              ; Ignition Timing - Advance  [2D]  (Base Ignition Timing (degrees BTDC))
+  000D31B6:  Base Timing Idle B (In-Gear)
+              ; Ignition Timing - Advance  [2D]  (Base Ignition Timing (degrees BTDC))
+  000D31C6:  Base Timing Idle A (Neutral)
+              ; Ignition Timing - Advance  [2D]  (Base Ignition Timing (degrees BTDC))
+  000D31D6:  Base Timing Idle B (Neutral)
+              ; Ignition Timing - Advance  [2D]  (Base Ignition Timing (degrees BTDC))
+  000D3206:  Timing Compensation Imm. Non-Cruise A (ECT)
+              ; Ignition Timing - Compensation  [2D]  (Ignition Timing Correction (degrees))
+  000D3216:  Timing Compensation Imm. Non-Cruise B (ECT)
+              ; Ignition Timing - Compensation  [2D]  (Ignition Timing Correction (degrees))
+  000D3226:  Timing Compensation Imm. Cruise A (ECT)
+              ; Ignition Timing - Compensation  [2D]  (Ignition Timing Correction (degrees))
+  000D3236:  Timing Compensation Imm. Cruise B (ECT)
+              ; Ignition Timing - Compensation  [2D]  (Ignition Timing Correction (degrees))
+  000D3248:  Intake Temperature
+              ;   [Y Axis]  (Degrees F)
+  000D3288:  Timing Compensation A (IAT)
+              ; Ignition Timing - Compensation  [2D]  (Ignition Timing Correction (degrees))
+  000D3860:  Intake Temperature
+              ;   [Y Axis]  (Degrees F)
+  000D38A0:  Timing Compensation B (IAT)
+              ; Ignition Timing - Compensation  [2D]  (Ignition Timing Correction (degrees))
+  000D3C04:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D3C2C:  Rough Correction Learning Delay (Increasing)_
+              ; Ignition Timing - Knock Control  [2D]  (Rough Correction (IAM) Positive Learning Delay (counter threshold))
+  000D4688:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D46CC:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D4714:  Base Timing Primary Cruise
+              ; Ignition Timing - Advance  [3D]  (Base Ignition Timing (degrees BTDC))
+  000D4848:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D488C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D48D4:  Base Timing Primary Non-Cruise
+              ; Ignition Timing - Advance  [3D]  (Base Ignition Timing (degrees BTDC))
+  000D4A08:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D4A4C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D4A94:  Base Timing Reference Cruise (AVCS related)
+              ; Ignition Timing - Advance  [3D]  (Base Ignition Timing (degrees BTDC))
+  000D4BC8:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D4C0C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D4C54:  Base Timing Reference Non-Cruise (AVCS related)
+              ; Ignition Timing - Advance  [3D]  (Base Ignition Timing (degrees BTDC))
+  000D4D88:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D4DA8:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D4DC8:  Timing Compensation A (IAT) Activation
+              ; Ignition Timing - Compensation  [3D]  (Timing Compensation Intake Temp Map Target Compensation (%))
+  000D5374:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D5388:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D5394:  Timing Compensation Per Gear (1st)
+              ; Ignition Timing - Compensation  [3D]  (Timing Compensation (degrees))
+  000D53A4:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D53B8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D53C4:  Timing Compensation Per Gear (2nd)
+              ; Ignition Timing - Compensation  [3D]  (Timing Compensation (degrees))
+  000D53D4:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D53E8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D53F4:  Timing Compensation Per Gear (3rd)
+              ; Ignition Timing - Compensation  [3D]  (Timing Compensation (degrees))
+  000D5404:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D5418:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D5424:  Timing Compensation Per Gear (4th)
+              ; Ignition Timing - Compensation  [3D]  (Timing Compensation (degrees))
+  000D5434:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D5448:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D5454:  Timing Compensation Per Gear (5th)
+              ; Ignition Timing - Compensation  [3D]  (Timing Compensation (degrees))
+  000D5464:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D549C:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D54B0:  Timing Compensation Per Cylinder A
+              ; Ignition Timing - Compensation  [3D]  (Ignition Timing Correction (degrees))
+  000D54F8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D5530:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D5544:  Timing Compensation Per Cylinder B
+              ; Ignition Timing - Compensation  [3D]  (Ignition Timing Correction (degrees))
+  000D558C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D55C4:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D55D8:  Timing Compensation Per Cylinder C
+              ; Ignition Timing - Compensation  [3D]  (Ignition Timing Correction (degrees))
+  000D5620:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D5658:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D5670:  Timing Compensation Per Cylinder D
+              ; Ignition Timing - Compensation  [3D]  (Ignition Timing Correction (degrees))
+  000D5878:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D58BC:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D5904:  Knock Correction Advance Max Cruise
+              ; Ignition Timing - Advance  [3D]  (Maximum Knock Correction Timing Advance (degrees))
+  000D5A38:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000D5A7C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D5AC4:  Knock Correction Advance Max Non-Cruise
+              ; Ignition Timing - Advance  [3D]  (Maximum Knock Correction Timing Advance (degrees))
+  000D6214:  Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter
+              ; ALPHA Idle Control  [1D]  (raw ecu value)
+  000D6480:  Idle Airflow Min Target Decel Adder Active Veh Speed A
+              ; ALPHA Idle Control  [1D]  (Vehicle Speed (MPH))
+  000D6484:  Idle Airflow Min Target Decel Initial Idle Min Airflow A
+              ; ALPHA Idle Control  [1D]  (raw ecu value)
+  000D64A4:  Idle Airflow Min Target Decel Ramping Adder Decreasing
+              ; ALPHA Idle Control  [1D]  (units)
+  000D64A8:  Idle Airflow Min Target Decel Ramping Adder Increasing
+              ; ALPHA Idle Control  [1D]  (raw ecu value)
+  000D67C8:  Coolant Temperature
+              ;   [Y Axis]  (Degrees F)
+  000D6F34:  Idle Speed Target A
+              ; Idle Control  [2D]  (Engine Speed (RPM))
+  000D6F74:  Idle Speed Target B
+              ; Idle Control  [2D]  (Engine Speed (RPM))
+  000D6FB4:  Idle Speed Target C
+              ; Idle Control  [2D]  (Engine Speed (RPM))
+  000D7054:  Idle Speed Target D
+              ; Idle Control  [2D]  (Engine Speed (RPM))
+  000D7DF8:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D7E38:  Coolant Temp
+              ;   [Y Axis]  (Coolant Temp (Degrees F))
+  000D7E40:  Idle Airflow Min Target Decel Adder (RPM x ECT)
+              ; ALPHA Idle Control  [3D]  (Advance (degrees))
+  000D7E80:  Idle Speed Error
+              ;   [X Axis]  (RPM)
+  000D7EC4:  Engine Speed Delta
+              ;   [X Axis]  (RPM)
+  000D7EE8:  Idle Speed Stability A
+              ; EXPERIMENTAL - idle tables  [3D]  (MAP related)
+  000D801C:  Idle Speed Error
+              ;   [X Axis]  (RPM)
+  000D8060:  Engine Speed Delta
+              ;   [X Axis]  (RPM)
+  000D8084:  Idle Speed Stability B
+              ; EXPERIMENTAL - idle tables  [3D]  (MAP related)
+  000D8A39:  Manifold Pressure Sensor CEL Delays
+              ; Manifold Pressure Sensor  [2D]  (counter threshold)
+  000D8A88:  Manifold Pressure Sensor Limits (CEL)
+              ; Manifold Pressure Sensor  [2D]  (Volts)
+  000D8AD8:  Manifold Pressure Sensor Scaling_
+              ; Manifold Pressure Sensor  [2D]  (psi absolute)
+  000D8BC4:  MAF sensor
+              ;   [Y Axis]  (volts)
+  000D8C9C:  MAF Sensor Scaling
+              ; Mass Airflow / Engine Load  [2D]  (Mass Airflow (g/s))
+  000D8D74:  Front Oxygen Sensor
+              ;   [Y Axis]  (mA)
+  000D8DA8:  Front Oxygen Sensor Scaling
+              ; Fueling - Closed Loop  [2D]  (Air/Fuel Ratio)
+  000D8DDC:  Coolant Temp Sensor
+              ;   [Y Axis]  (volts)
+  000D8E4C:  Coolant Temp Sensor Scaling
+              ; Miscellaneous - Sensor Scalings  [2D]  (Temperature (Degrees F))
+  000D8EBC:  Intake Temp Sensor
+              ;   [Y Axis]  (volts)
+  000D8F34:  Intake Temp Sensor Scaling
+              ; Miscellaneous - Sensor Scalings  [2D]  (Temperature (Degrees F))
+  000D8FAC:  Fuel Temp Sensor
+              ;   [Y Axis]  (volts)
+  000D9024:  Fuel Temp Sensor Scaling
+              ; Miscellaneous - Sensor Scalings  [2D]  (Fuel Temp (Degrees F))
+  000D918C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000D91CC:  Battery Volts
+              ;   [Y Axis]  (volts)
+  000D91E0:  Ignition Dwell
+              ; ALPHA Ignition Dwell  [3D]  (Ignition Dwell (ms))
+  000D932C:  Radiator Fan Modes A (ECT)
+              ; Miscellaneous - Thresholds  [2D]  (Coolant Temp (Degrees F))
+  000D933C:  Radiator Fan Modes B (ECT)
+              ; Miscellaneous - Thresholds  [2D]  (Coolant Temp (Degrees F))
+  000D934C:  Radiator Fan Modes (Veh. Speed)
+              ; Miscellaneous - Thresholds  [2D]  (Vehicle Speed (MPH))
+  000DA8E4:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000DA92C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000DA96C:  Intake Cam Advance Angle Cruise (AVCS)
+              ; Variable Valve Timing (AVCS)  [3D]  (Advance (degrees))
+  000DABAC:  Engine Load
+              ;   [X Axis]  (g/rev)
+  000DABF4:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000DAC34:  Intake Cam Advance Angle Non-Cruise (AVCS)
+              ; Variable Valve Timing (AVCS)  [3D]  (Advance (degrees))
+  000F104C:  LC disable speed(MPH)threshold
+  000F1050:  LC RPM delta
+  000F1054:  FFS RPM delta
+  000F8948:  Speed Limiting A (Throttle) SI-DRIVE Sport/Sport Sharp
+              ; Miscellaneous - Limits  [2D]  (Vehicle Speed (MPH))
+  000F8954:  Speed Limiting (Throttle) SI-DRIVE Intelligent
+              ; Miscellaneous - Limits  [2D]  (Vehicle Speed (MPH))
+  000F8960:  Speed Limiting B (Throttle) SI-DRIVE Sport/Sport Sharp
+              ; Miscellaneous - Limits  [2D]  (Vehicle Speed (MPH))
+  000F8B14:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F8B54:  Requested Torque Base (RPM)
+              ; Drive-by-Wire Throttle (DBW)  [2D]  (Requested Torque (raw ecu value))
+  000F8F84:  'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'
+              ;   [X Axis]  (ratio)
+  000F8FC4:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F9004:  Target Throttle Plate Position Cruise (Requested Torque Ratio)
+              ; Drive-by-Wire Throttle (DBW)  [3D]  (Target Throttle Plate Opening Angle (%))
+  000F9204:  'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'
+              ;   [X Axis]  (ratio)
+  000F9244:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F9284:  Target Throttle Plate Position Non-Cruise (Requested Torque Ratio)
+              ; Drive-by-Wire Throttle (DBW)  [3D]  (Target Throttle Plate Opening Angle (%))
+  000F9484:  'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'
+              ;   [X Axis]  (ratio)
+  000F94C4:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F9504:  Target Throttle Plate Position Maximum (Requested Torque Ratio)
+              ; Drive-by-Wire Throttle (DBW)  [3D]  (Target Throttle Plate Opening Angle (%))
+  000F9730:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F9770:  Gear
+              ;   [Y Axis]  (gear)
+  000F9788:  Requested Torque Limit A (Per Gear/Engine Speed)
+              ; ALPHA Per Gear Requested Torque  [3D]  (Requested Torque (raw ecu value))
+  000F9848:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F9888:  Gear
+              ;   [Y Axis]  (gear)
+  000F98A0:  Requested Torque Limit B (Per Gear/Engine Speed)
+              ; ALPHA Per Gear Requested Torque  [3D]  (Requested Torque (raw ecu value))
+  000F9960:  Accelerator Pedal Angle
+              ;   [X Axis]  (%)
+  000F999C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F99E0:  Requested Torque (Accelerator Pedal) SI-DRIVE Sport
+              ; Drive-by-Wire Throttle (DBW)  [3D]  (Requested Torque (raw ecu value))
+  000F9BE0:  Accelerator Pedal Angle
+              ;   [X Axis]  (%)
+  000F9C1C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F9C60:  Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp
+              ; Drive-by-Wire Throttle (DBW)  [3D]  (Requested Torque (raw ecu value))
+  000F9E60:  Accelerator Pedal Angle
+              ;   [X Axis]  (%)
+  000F9E9C:  Engine Speed
+              ;   [Y Axis]  (RPM)
+  000F9EE0:  Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent
+              ; Drive-by-Wire Throttle (DBW)  [3D]  (Requested Torque (raw ecu value))
+
+; ─────────────────────────────────────────────────────
+; End of disassembly  |  ROM size: 1048576 bytes
+; ─────────────────────────────────────────────────────
