@@ -31,6 +31,7 @@
 	<scaling name="Advance(degrees)3" units="Advance (degrees)" toexpr="(x*.0054931640625)-45" frexpr="(x+45)/.0054931640625" format="%.2f" min="-50" max="50" inc="0.5" storagetype="uint16" endian="big"/>
 	<scaling name="Advance(degrees)4" units="Advance (degrees)" toexpr="(x*.001525879)-45" frexpr="(x+45)/.001525879" format="%.2f" min="0" max="40" inc="0.5" storagetype="uint16" endian="big"/>
 	<scaling name="Air/FuelRatio" units="Air/Fuel Ratio" toexpr="x*14.7" frexpr="x/14.7" format="%.2f" min="11.02" max="20.28" inc="0.06" storagetype="float" endian="big"/>
+	<scaling name="AirflowAdder" units="Airflow Adder" toexpr="x*.001525879" frexpr="x/.001525879" format="%.2f" min="0" max="40" inc="0.5" storagetype="uint16" endian="big"/>
 	<scaling name="Airflow Overrun" units="Unknown" toexpr="x*.001525879" frexpr="x/.001525879" format="%.2f" min="0" max="40" inc="0.5" storagetype="uint16" endian="big"/>
 	<scaling name="AtmosphericPressure(psi)" units="Atmospheric Pressure (psi)" toexpr="x*.01933677" frexpr="x/.01933677" format="%.2f" min="13.38" max="13.53" inc="0.01" storagetype="float" endian="big"/>
 	<scaling name="AtmosphericPressure(psi)Multiplier" units="Atmospheric Pressure (psi) Multiplier" toexpr="x*.00078910749" frexpr="x/.00078910749" format="%.5f" min="0.05" max="0.08" inc="0.0004" storagetype="uint16" endian="big"/>
@@ -4672,7 +4673,7 @@
 
 	<table name="Map_Switching_Cruise_Thresholds_Min_Delay" category="Map Switching" type="1D" level="1" scaling="Map_Switching_Cruise_Switch_Min_Delay"/>
 
-	<table name="Idle_Airflow_Min_Target_Decel_Adder" category="EXPERIMENTAL - idle tables" type="3D" level="1" scaling="Advance(degrees)1">
+	<table name="Idle_Airflow_Min_Target_Decel_Adder" category="EXPERIMENTAL - idle tables" type="3D" level="1" scaling="AirflowAdder">
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 		<table name="Coolant Temp" type="Y Axis" elements="14" scaling="CoolantTemp(DegreesF)"/>
 	</table>
@@ -5706,23 +5707,23 @@
 		</table>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder A" category="ALPHA Idle Control" type="2D" level="1" scaling="Advance(degrees)1">
+	<table name="Idle Airflow Min Target Decel Adder A" category="ALPHA Idle Control" type="2D" level="1" scaling="AirflowAdder">
 		<description>This table is added to idle airflow when the minimum activation threshold based on vehicle speed is reached</description>
 		<table name="Engine Speed" type="X Axis" elements="2" scaling="RPM"/>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder B" category="ALPHA Idle Control" type="2D" level="1" scaling="Advance(degrees)1">
+	<table name="Idle Airflow Min Target Decel Adder B" category="ALPHA Idle Control" type="2D" level="1" scaling="AirflowAdder">
 		<description>This table is added to idle airflow when the minimum activation threshold based on vehicle speed is reached</description>
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder (RPM x ECT)" category="ALPHA Idle Control" type="3D" level="1" scaling="Advance(degrees)1">
+	<table name="Idle Airflow Min Target Decel Adder (RPM x ECT)" category="ALPHA Idle Control" type="3D" level="1" scaling="AirflowAdder">
 		<description>This table is an RPM by Engine Coolant table which is added to idle airflow when the minimum activation threshold based on vehicle speed is reached</description>
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 		<table name="Coolant Temp" type="Y Axis" elements="13" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder (RPM)" category="ALPHA Idle Control" type="2D" level="1" scaling="Advance(degrees)1">
+	<table name="Idle Airflow Min Target Decel Adder (RPM)" category="ALPHA Idle Control" type="2D" level="1" scaling="AirflowAdder">
 		<description>This table is an RPM by Engine Coolant table which is added to idle airflow when the minimum activation threshold based on vehicle speed is reached</description>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
