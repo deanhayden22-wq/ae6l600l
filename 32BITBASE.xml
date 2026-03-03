@@ -1190,7 +1190,7 @@
 		</table>
 	</table>
 
-	<table name="CL to OL Transition Counter Step Value (MAF)" category="Fueling - CL/OL Transition" type="2D" level="1" scaling="CLtoOLCounterIncrement(WARNING-valueshouldNEVERbezero)">
+	<table name="CL to OL Transition Counter Step Value (MAF)" category="Fueling - CL/OL Transition" type="2D"  scaling="CLtoOLCounterIncrement(WARNING-valueshouldNEVERbezero)">
 		<description>This value determines the increment of the CL to OL transition counter based on MAF. This counter is incremented when the 'CL to OL Transition with Delay' load or throttle thresholds are continuously exceeded. When the counter is greater than or equal to the current delay value, the transition from CL to OL will occur (depending on the fuel map). WARNING - this value should NEVER be zero.</description>
 		<table name="Mass Airflow" type="Y Axis" elements="10" scaling="g/s"/>
 	</table>
@@ -1386,272 +1386,272 @@
 		</table>
 	</table>
 
-	<table name="Per Injector Primary Fuel Offset Compensation A" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorFuelOffsetAdditive1">
+	<table name="Per Injector Primary Fuel Offset Compensation A" category="Fueling - Injectors" type="3D"  scaling="InjectorFuelOffsetAdditive1">
 		<description>This determines the additive (per injector) to the base injector duration multiplier based on the last calculated injector pulse width and engine speed. The base injector duration is the injector pulse width necessary for stoich fueling at the current engine load. The base injector duration multiplier determines the correction applied to achieve a desired level of enrichment (or enleanment). No enrichment or enleanment would result in a base injector duration multiplier of 1.0. The offset from this table is added to other factors (such as primary open loop enrichment) and then added to this base injector duration multiplier to achieve the desired level of enrichment or enleanment. To estimate the effect of this compensation, first estimate the desired AFR that the compensation would be applied to (ex. 12:1 AFR). Convert this to the base injector duration multiplier (ex. 14.7/x = 14.7/12 = 1.225). Add the per injector compensation to this multiplier (ex. 1.225 + 0.05 = 1.275). Then convert the multiplier back to the estimated AFR (ex. 14.7/x = 14.7/1.275 = 11.53 AFR). It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="8" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Primary Fuel Offset Compensation B" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorFuelOffsetAdditive1">
+	<table name="Per Injector Primary Fuel Offset Compensation B" category="Fueling - Injectors" type="3D"  scaling="InjectorFuelOffsetAdditive1">
 		<description>This determines the additive (per injector) to the base injector duration multiplier based on the last calculated injector pulse width and engine speed. The base injector duration is the injector pulse width necessary for stoich fueling at the current engine load. The base injector duration multiplier determines the correction applied to achieve a desired level of enrichment (or enleanment). No enrichment or enleanment would result in a base injector duration multiplier of 1.0. The offset from this table is added to other factors (such as primary open loop enrichment) and then added to this base injector duration multiplier to achieve the desired level of enrichment or enleanment. To estimate the effect of this compensation, first estimate the desired AFR that the compensation would be applied to (ex. 12:1 AFR). Convert this to the base injector duration multiplier (ex. 14.7/x = 14.7/12 = 1.225). Add the per injector compensation to this multiplier (ex. 1.225 + 0.05 = 1.275). Then convert the multiplier back to the estimated AFR (ex. 14.7/x = 14.7/1.275 = 11.53 AFR). It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="8" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Primary Fuel Offset Compensation C" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorFuelOffsetAdditive1">
+	<table name="Per Injector Primary Fuel Offset Compensation C" category="Fueling - Injectors" type="3D"  scaling="InjectorFuelOffsetAdditive1">
 		<description>This determines the additive (per injector) to the base injector duration multiplier based on the last calculated injector pulse width and engine speed. The base injector duration is the injector pulse width necessary for stoich fueling at the current engine load. The base injector duration multiplier determines the correction applied to achieve a desired level of enrichment (or enleanment). No enrichment or enleanment would result in a base injector duration multiplier of 1.0. The offset from this table is added to other factors (such as primary open loop enrichment) and then added to this base injector duration multiplier to achieve the desired level of enrichment or enleanment. To estimate the effect of this compensation, first estimate the desired AFR that the compensation would be applied to (ex. 12:1 AFR). Convert this to the base injector duration multiplier (ex. 14.7/x = 14.7/12 = 1.225). Add the per injector compensation to this multiplier (ex. 1.225 + 0.05 = 1.275). Then convert the multiplier back to the estimated AFR (ex. 14.7/x = 14.7/1.275 = 11.53 AFR). It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="8" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Primary Fuel Offset Compensation D" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorFuelOffsetAdditive1">
+	<table name="Per Injector Primary Fuel Offset Compensation D" category="Fueling - Injectors" type="3D"  scaling="InjectorFuelOffsetAdditive1">
 		<description>This determines the additive (per injector) to the base injector duration multiplier based on the last calculated injector pulse width and engine speed. The base injector duration is the injector pulse width necessary for stoich fueling at the current engine load. The base injector duration multiplier determines the correction applied to achieve a desired level of enrichment (or enleanment). No enrichment or enleanment would result in a base injector duration multiplier of 1.0. The offset from this table is added to other factors (such as primary open loop enrichment) and then added to this base injector duration multiplier to achieve the desired level of enrichment or enleanment. To estimate the effect of this compensation, first estimate the desired AFR that the compensation would be applied to (ex. 12:1 AFR). Convert this to the base injector duration multiplier (ex. 14.7/x = 14.7/12 = 1.225). Add the per injector compensation to this multiplier (ex. 1.225 + 0.05 = 1.275). Then convert the multiplier back to the estimated AFR (ex. 14.7/x = 14.7/1.275 = 11.53 AFR). It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="8" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Primary Fuel Offset Compensation A_" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorFuelOffsetAdditive">
+	<table name="Per Injector Primary Fuel Offset Compensation A_" category="Fueling - Injectors" type="3D"  scaling="InjectorFuelOffsetAdditive">
 		<description>This determines the additive (per injector) to the base injector duration multiplier based on the last calculated injector pulse width and engine speed. The base injector duration is the injector pulse width necessary for stoich fueling at the current engine load. The base injector duration multiplier determines the correction applied to achieve a desired level of enrichment (or enleanment). No enrichment or enleanment would result in a base injector duration multiplier of 1.0. The offset from this table is added to other factors (such as primary open loop enrichment) and then added to this base injector duration multiplier to achieve the desired level of enrichment or enleanment. To estimate the effect of this compensation, first estimate the desired AFR that the compensation would be applied to (ex. 12:1 AFR). Convert this to the base injector duration multiplier (ex. 14.7/x = 14.7/12 = 1.225). Add the per injector compensation to this multiplier (ex. 1.225 + 0.05 = 1.275). Then convert the multiplier back to the estimated AFR (ex. 14.7/x = 14.7/1.275 = 11.53 AFR). It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="8" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="7" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Primary Fuel Offset Compensation B_" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorFuelOffsetAdditive">
+	<table name="Per Injector Primary Fuel Offset Compensation B_" category="Fueling - Injectors" type="3D"  scaling="InjectorFuelOffsetAdditive">
 		<description>This determines the additive (per injector) to the base injector duration multiplier based on the last calculated injector pulse width and engine speed. The base injector duration is the injector pulse width necessary for stoich fueling at the current engine load. The base injector duration multiplier determines the correction applied to achieve a desired level of enrichment (or enleanment). No enrichment or enleanment would result in a base injector duration multiplier of 1.0. The offset from this table is added to other factors (such as primary open loop enrichment) and then added to this base injector duration multiplier to achieve the desired level of enrichment or enleanment. To estimate the effect of this compensation, first estimate the desired AFR that the compensation would be applied to (ex. 12:1 AFR). Convert this to the base injector duration multiplier (ex. 14.7/x = 14.7/12 = 1.225). Add the per injector compensation to this multiplier (ex. 1.225 + 0.05 = 1.275). Then convert the multiplier back to the estimated AFR (ex. 14.7/x = 14.7/1.275 = 11.53 AFR). It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="8" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="7" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Primary Fuel Offset Compensation C_" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorFuelOffsetAdditive">
+	<table name="Per Injector Primary Fuel Offset Compensation C_" category="Fueling - Injectors" type="3D"  scaling="InjectorFuelOffsetAdditive">
 		<description>This determines the additive (per injector) to the base injector duration multiplier based on the last calculated injector pulse width and engine speed. The base injector duration is the injector pulse width necessary for stoich fueling at the current engine load. The base injector duration multiplier determines the correction applied to achieve a desired level of enrichment (or enleanment). No enrichment or enleanment would result in a base injector duration multiplier of 1.0. The offset from this table is added to other factors (such as primary open loop enrichment) and then added to this base injector duration multiplier to achieve the desired level of enrichment or enleanment. To estimate the effect of this compensation, first estimate the desired AFR that the compensation would be applied to (ex. 12:1 AFR). Convert this to the base injector duration multiplier (ex. 14.7/x = 14.7/12 = 1.225). Add the per injector compensation to this multiplier (ex. 1.225 + 0.05 = 1.275). Then convert the multiplier back to the estimated AFR (ex. 14.7/x = 14.7/1.275 = 11.53 AFR). It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="8" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="7" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Primary Fuel Offset Compensation D_" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorFuelOffsetAdditive">
+	<table name="Per Injector Primary Fuel Offset Compensation D_" category="Fueling - Injectors" type="3D"  scaling="InjectorFuelOffsetAdditive">
 		<description>This determines the additive (per injector) to the base injector duration multiplier based on the last calculated injector pulse width and engine speed. The base injector duration is the injector pulse width necessary for stoich fueling at the current engine load. The base injector duration multiplier determines the correction applied to achieve a desired level of enrichment (or enleanment). No enrichment or enleanment would result in a base injector duration multiplier of 1.0. The offset from this table is added to other factors (such as primary open loop enrichment) and then added to this base injector duration multiplier to achieve the desired level of enrichment or enleanment. To estimate the effect of this compensation, first estimate the desired AFR that the compensation would be applied to (ex. 12:1 AFR). Convert this to the base injector duration multiplier (ex. 14.7/x = 14.7/12 = 1.225). Add the per injector compensation to this multiplier (ex. 1.225 + 0.05 = 1.275). Then convert the multiplier back to the estimated AFR (ex. 14.7/x = 14.7/1.275 = 11.53 AFR). It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="8" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="7" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Pulse Width Compensation A" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorPulseWidthCompensation">
+	<table name="Per Injector Pulse Width Compensation A" category="Fueling - Injectors" type="3D"  scaling="InjectorPulseWidthCompensation">
 		<description>This determines the compensation (per injector) to the current calculated injector duration based on the last calculated injector duration and engine speed. The calculated injector pulse width is based on engine load and a number of other correction factors necessary to achieve the desired fueling. It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="17" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Pulse Width Compensation B" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorPulseWidthCompensation">
+	<table name="Per Injector Pulse Width Compensation B" category="Fueling - Injectors" type="3D"  scaling="InjectorPulseWidthCompensation">
 		<description>This determines the compensation (per injector) to the current calculated injector duration based on the last calculated injector duration and engine speed. The calculated injector pulse width is based on engine load and a number of other correction factors necessary to achieve the desired fueling. It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="17" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Pulse Width Compensation C" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorPulseWidthCompensation">
+	<table name="Per Injector Pulse Width Compensation C" category="Fueling - Injectors" type="3D"  scaling="InjectorPulseWidthCompensation">
 		<description>This determines the compensation (per injector) to the current calculated injector duration based on the last calculated injector duration and engine speed. The calculated injector pulse width is based on engine load and a number of other correction factors necessary to achieve the desired fueling. It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="17" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Pulse Width Compensation D" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorPulseWidthCompensation">
+	<table name="Per Injector Pulse Width Compensation D" category="Fueling - Injectors" type="3D"  scaling="InjectorPulseWidthCompensation">
 		<description>This determines the compensation (per injector) to the current calculated injector duration based on the last calculated injector duration and engine speed. The calculated injector pulse width is based on engine load and a number of other correction factors necessary to achieve the desired fueling. It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="17" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Pulse Width Compensation E" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorPulseWidthCompensation">
+	<table name="Per Injector Pulse Width Compensation E" category="Fueling - Injectors" type="3D"  scaling="InjectorPulseWidthCompensation">
 		<description>This determines the compensation (per injector) to the current calculated injector duration based on the last calculated injector duration and engine speed. The calculated injector pulse width is based on engine load and a number of other correction factors necessary to achieve the desired fueling. It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="17" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Pulse Width Compensation F" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorPulseWidthCompensation">
+	<table name="Per Injector Pulse Width Compensation F" category="Fueling - Injectors" type="3D"  scaling="InjectorPulseWidthCompensation">
 		<description>This determines the compensation (per injector) to the current calculated injector duration based on the last calculated injector duration and engine speed. The calculated injector pulse width is based on engine load and a number of other correction factors necessary to achieve the desired fueling. It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="17" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width A (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width A (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width B (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width B (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width C (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width C (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width D (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width D (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width E (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width E (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width F (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width F (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width G (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width G (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width H (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width H (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width I (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width I (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width J (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width J (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width K (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width K (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width L (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width L (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width M (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width M (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width N (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width N (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width O (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width O (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width P (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width P (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width Q (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width Q (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width R (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width R (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width S (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width S (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width T (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width T (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel Injector Pulse Width U (ECT)" category="Fueling - Cranking" type="2D" level="1" scaling="InjectorPulseWidth(ms)">
+	<table name="Cranking Fuel Injector Pulse Width U (ECT)" category="Fueling - Cranking" type="2D"  scaling="InjectorPulseWidth(ms)">
 		<description>This is the injector pulse width based on coolant temp when cranking the motor. Compensation tables may impact the final pulse width. Although the exact conditions for map switching is not entirely known, some of it is based on whether the ignition switch is on or off and whether the motor has begun to start or not at any given time in the cranking process. TGV status may also be involved. WARNING: UNTESTED</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation (RPM)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation (RPM)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation A (RPM)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation A (RPM)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation B (RPM)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation B (RPM)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation (RPM)(MT)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation (RPM)(MT)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation A (RPM)(MT)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation A (RPM)(MT)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation B (RPM)(MT)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation B (RPM)(MT)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation (RPM)(AT)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation (RPM)(AT)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation A (RPM)(AT)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation A (RPM)(AT)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation B (RPM)(AT)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation B (RPM)(AT)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation Imm. Cruise (RPM)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation Imm. Cruise (RPM)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp. Cruise and non-cruise conditions are determined by a number of factors including engine speed, requested torque, MAF, vehicle speed, IAT, idle mode, ECT, and SI-Drive mode (if applicable). Note: This is based on the immediate conditions related to cruise/non-cruise and results in an immediate switch, not the ramping behavior inherent with other tables when switching.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation Imm. Non-Cruise (RPM)" category="Fueling - Cranking" type="3D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation Imm. Non-Cruise (RPM)" category="Fueling - Cranking" type="3D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on engine speed and coolant temp. Cruise and non-cruise conditions are determined by a number of factors including engine speed, requested torque, MAF, vehicle speed, IAT, idle mode, ECT, and SI-Drive mode (if applicable). Note: This is based on the immediate conditions related to cruise/non-cruise and results in an immediate switch, not the ramping behavior inherent with other tables when switching.</description>
 		<table name="Engine Speed" type="X Axis" elements="5" scaling="RPM"/>
 		<table name="Coolant Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation (MAP)" category="Fueling - Cranking" type="2D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation (MAP)" category="Fueling - Cranking" type="2D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on the manifold absolute pressure.</description>
 		<table name="Manifold Pressure" type="Y Axis" elements="10" scaling="psiabsolute1"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation (Accelerator)" category="Fueling - Cranking" type="2D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation (Accelerator)" category="Fueling - Cranking" type="2D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on the accelerator pedal.</description>
 		<table name="Accelerator Pedal Angle" type="Y Axis" elements="6" scaling="%"/>
 	</table>
 
-	<table name="Cranking Fuel IPW Compensation (IAT)" category="Fueling - Cranking" type="2D" level="1" scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
+	<table name="Cranking Fuel IPW Compensation (IAT)" category="Fueling - Cranking" type="2D"  scaling="CrankingFuelInjectorPulseWidthCompensation(%)">
 		<description>This is the change to the 'Cranking Fuel Injector Pulse Width (ECT)', based on the accelerator pedal.</description>
 		<table name="Intake Temperature" type="Y Axis" elements="5" scaling="DegreesF"/>
 	</table>
@@ -1732,12 +1732,12 @@
 		</table>
 	</table>
 
-	<table name="Tip-in Enrichment Compensation D (ECT)_" category="Fueling - Tip-in Enrichment" type="2D" level="1" scaling="ThrottleTip-inEnrichmentCompensation(%)1">
+	<table name="Tip-in Enrichment Compensation D (ECT)_" category="Fueling - Tip-in Enrichment" type="2D"  scaling="ThrottleTip-inEnrichmentCompensation(%)1">
 		<description>This is the change in 'Throttle Tip-in Enrichment' based on coolant temperature.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Tip-in Enrichment Compensation D (ECT) Activation_" category="Fueling - Tip-in Enrichment" type="2D" level="1" scaling="ThrottleAngleChange(%)">
+	<table name="Tip-in Enrichment Compensation D (ECT) Activation_" category="Fueling - Tip-in Enrichment" type="2D"  scaling="ThrottleAngleChange(%)">
 		<description>This is the minimum throttle tip-in for the 'Tip-in Enrichment D (ECT)' table to be active. This table does not act independently and other requirements must also be met in order for tip-in enrichment to be active.</description>
 		<table name="Tip-in Enrichment" type="Static Y Axis" elements="1">
 			<data>Active Above</data>
@@ -1792,107 +1792,107 @@
 		</table>
 	</table>
 
-	<table name="Min Primary Base Enrichment 1" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
+	<table name="Min Primary Base Enrichment 1" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
 		<description>This is one of three factors which determines the minimum primary afterstart fuel enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x).</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrichment 1 A" category="Fueling - Warm-Up Enrichment" type="3D" level="1" scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
+	<table name="Min Primary Base Enrichment 1 A" category="Fueling - Warm-Up Enrichment" type="3D"  scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
 		<description>This is one of three factors which determines the minimum primary afterstart fuel enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: (Non-Primary OL) Enrichment 1 is added to either 1-A or 1-B (or non-cruise/cruise) to determine the final offset for table group 1, but is only added during open loop conditions not the result of the primary fuel map.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="DegreesF"/>
 		<table name="Engine Load" type="Y Axis" elements="8" scaling="g/rev"/>
 	</table>
 
-	<table name="Min Primary Base Enrichment 1 B" category="Fueling - Warm-Up Enrichment" type="3D" level="1" scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
+	<table name="Min Primary Base Enrichment 1 B" category="Fueling - Warm-Up Enrichment" type="3D"  scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
 		<description>This is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: (Non-Primary OL) Enrichment 1 is added to either 1-A or 1-B (or non-cruise/cruise) to determine the final offset for table group 1, but is only added during open loop conditions not the result of the primary fuel map.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="DegreesF"/>
 		<table name="Engine Load" type="Y Axis" elements="8" scaling="g/rev"/>
 	</table>
 
-	<table name="Min Primary Base Enrichment 1 Cruise" category="Fueling - Warm-Up Enrichment" type="3D" level="1" scaling="MinimumPrimaryEnrichmentOffsetAdditiveCruise">
+	<table name="Min Primary Base Enrichment 1 Cruise" category="Fueling - Warm-Up Enrichment" type="3D"  scaling="MinimumPrimaryEnrichmentOffsetAdditiveCruise">
 		<description>This is one of three factors which determines the minimum primary afterstart fuel enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: (Non-Primary OL) Enrichment 1 is added to either 1-A or 1-B (or non-cruise/cruise) to determine the final offset for table group 1, but is only added during open loop conditions not the result of the primary fuel map.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="DegreesF"/>
 		<table name="Engine Load" type="Y Axis" elements="8" scaling="g/rev"/>
 	</table>
 
-	<table name="Min Primary Base Enrichment 1 Non-Cruise" category="Fueling - Warm-Up Enrichment" type="3D" level="1" scaling="MinimumPrimaryEnrichmentOffsetAdditiveNon-Cruise">
+	<table name="Min Primary Base Enrichment 1 Non-Cruise" category="Fueling - Warm-Up Enrichment" type="3D"  scaling="MinimumPrimaryEnrichmentOffsetAdditiveNon-Cruise">
 		<description>This is one of three factors which determines the minimum primary afterstart fuel enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: (Non-Primary OL) Enrichment 1 is added to either 1-A or 1-B (or non-cruise/cruise) to determine the final offset for table group 1, but is only added during open loop conditions not the result of the primary fuel map.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="DegreesF"/>
 		<table name="Engine Load" type="Y Axis" elements="8" scaling="g/rev"/>
 	</table>
 
-	<table name="Min Primary Base Enrichment 1 (Non-Primary OL)" category="Fueling - Warm-Up Enrichment" type="3D" level="1" scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
+	<table name="Min Primary Base Enrichment 1 (Non-Primary OL)" category="Fueling - Warm-Up Enrichment" type="3D"  scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
 		<description>This is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: (Non-Primary OL) Enrichment 1 is added to either 1-A or 1-B (or non-cruise/cruise) to determine the final offset for table group 1, but is only added during open loop conditions not the result of the primary fuel map.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="10" scaling="DegreesF"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Min Primary Base Enrichment 1 (Non-Primary OL)_" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
+	<table name="Min Primary Base Enrichment 1 (Non-Primary OL)_" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="MinimumPrimaryEnrichmentOffsetAdditive1">
 		<description>This is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: (Non-Primary OL) Enrichment 1 is added to either 1-A or 1-B (or non-cruise/cruise) to determine the final offset for table group 1, but is only added during open loop conditions not the result of the primary fuel map.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 2 Initial Start 1A" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="InitialAfterstartOffset">
+	<table name="Min Primary Base Enrich 2 Initial Start 1A" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="InitialAfterstartOffset">
 		<description>This is the initial afterstart minimum enrichment offset for group 2. This value decays to zero based on the "decay step" value. Group 2 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 2, only one initial start is chosen out of 1A, 1B, 2A, and 2B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 2 Initial Start 1B" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="InitialAfterstartOffset">
+	<table name="Min Primary Base Enrich 2 Initial Start 1B" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="InitialAfterstartOffset">
 		<description>This is the initial afterstart minimum enrichment offset for group 2. This value decays to zero based on the "decay step" value. Group 2 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 2, only one initial start is chosen out of 1A, 1B, 2A, and 2B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 2 Initial Start 2A" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="InitialAfterstartOffset">
+	<table name="Min Primary Base Enrich 2 Initial Start 2A" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="InitialAfterstartOffset">
 		<description>This is the initial afterstart minimum enrichment offset for group 2. This value decays to zero based on the "decay step" value. Group 2 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 2, only one initial start is chosen out of 1A, 1B, 2A, and 2B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 2 Initial Start 2B" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="InitialAfterstartOffset">
+	<table name="Min Primary Base Enrich 2 Initial Start 2B" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="InitialAfterstartOffset">
 		<description>This is the initial afterstart minimum enrichment offset for group 2. This value decays to zero based on the "decay step" value. Group 2 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 2, only one initial start is chosen out of 1A, 1B, 2A, and 2B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 2 Decay Step 1" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="DecayStepValue">
+	<table name="Min Primary Base Enrich 2 Decay Step 1" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="DecayStepValue">
 		<description>This is the decay step value which reduces the afterstart minimum enrichment offset for group 2. This reduces the minimum offset for group 2 to zero starting at the "initial" value. Group 2 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 2, only one decay step is chosen out of tables 1 and 2.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 2 Decay Step 2" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="DecayStepValue">
+	<table name="Min Primary Base Enrich 2 Decay Step 2" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="DecayStepValue">
 		<description>This is the decay step value which reduces the afterstart minimum enrichment offset for group 2. This reduces the minimum offset for group 2 to zero starting at the "initial" value. Group 2 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 2, only one decay step is chosen out of tables 1 and 2.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 3 Initial Start 1A" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="InitialAfterstartOffset1">
+	<table name="Min Primary Base Enrich 3 Initial Start 1A" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="InitialAfterstartOffset1">
 		<description>This is the initial afterstart minimum enrichment offset for group 3. This value decays to zero based on the "decay multiplier" and "decay delay" values. Group 3 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 3, only one initial start is chosen out of 1A, 1B, 2A, and 2B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 3 Initial Start 1B" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="InitialAfterstartOffset1">
+	<table name="Min Primary Base Enrich 3 Initial Start 1B" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="InitialAfterstartOffset1">
 		<description>This is the initial afterstart minimum enrichment offset for group 3. This value decays to zero based on the "decay multiplier" and "decay delay" values. Group 3 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 3, only one initial start is chosen out of 1A, 1B, 2A, and 2B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 3 Initial Start 2A" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="InitialAfterstartOffset1">
+	<table name="Min Primary Base Enrich 3 Initial Start 2A" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="InitialAfterstartOffset1">
 		<description>This is the initial afterstart minimum enrichment offset for group 3. This value decays to zero based on the "decay multiplier" and "decay delay" values. Group 3 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 3, only one initial start is chosen out of 1A, 1B, 2A, and 2B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 3 Initial Start 2B" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="InitialAfterstartOffset1">
+	<table name="Min Primary Base Enrich 3 Initial Start 2B" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="InitialAfterstartOffset1">
 		<description>This is the initial afterstart minimum enrichment offset for group 3. This value decays to zero based on the "decay multiplier" and "decay delay" values. Group 3 is one of three factors which determines the minimum primary fuel afterstart enrichment. The primary fuel enrichment is a multiplier (determined primarily by the open loop fuel maps) applied to the base injector duration to determine the level of primary enrichment. The minimum enrichment offsets determined by tables 1, 2, and 3 are added together to determine the final primary minimum enrichment. That is, regardless of the primary open loop fuel map value, enrichment will not be less than the final primary minimum enrichment. To determine an approximate minimum AFR for a particular condition, determine the final primary minimum enrichment offset from tables 1, 2, and 3 (adding together all three offsets) and calculate the estimated minimum AFR as 14.7/(1+x). Note: For group 3, only one initial start is chosen out of 1A, 1B, 2A, and 2B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 3 Decay Delay A" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="Periodin-betweendecaymultiplierapplication">
+	<table name="Min Primary Base Enrich 3 Decay Delay A" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="Periodin-betweendecaymultiplierapplication">
 		<description>This is the period in-between decay multiplier application. That is, over this period, the decay multiplier is not applied. Note: Only one delay period is chosen at any given time between A and B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 3 Decay Delay B" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="Periodin-betweendecaymultiplierapplication">
+	<table name="Min Primary Base Enrich 3 Decay Delay B" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="Periodin-betweendecaymultiplierapplication">
 		<description>This is the period in-between decay multiplier application. That is, over this period, the decay multiplier is not applied. Note: Only one delay period is chosen at any given time between A and B.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Min Primary Base Enrich 3 Decay Multiplier" category="Fueling - Warm-Up Enrichment" type="2D" level="1" scaling="Multiplier">
+	<table name="Min Primary Base Enrich 3 Decay Multiplier" category="Fueling - Warm-Up Enrichment" type="2D"  scaling="Multiplier">
 		<description>This multiplier is applied to the current group 3 offset outside of the "decay delay" which reduces the offset, over time, towards zero after engine start.</description>
 		<table name="Active Decay" type="Static Y Axis" elements="1">
 			<data>Offset</data>
@@ -2308,7 +2308,7 @@
 		</table>
 	</table>
 
-	<table name="Base Timing Alternate (ECT)" category="Ignition Timing - Advance" type="2D" level="1" scaling="BaseIgnitionTiming(degreesBTDC)1">
+	<table name="Base Timing Alternate (ECT)" category="Ignition Timing - Advance" type="2D"  scaling="BaseIgnitionTiming(degreesBTDC)1">
 		<description>The timing indicated in this table is used as base timing when the target for this table exceeds the normal base timing target after compensations.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="DegreesF"/>
 	</table>
@@ -2512,97 +2512,97 @@
 		<table name="Manifold Relative Pressure" type="Y Axis" elements="3" scaling="psi1"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder A__" category="Ignition Timing - Compensation" type="2D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder A__" category="Ignition Timing - Compensation" type="2D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="Y Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder B__" category="Ignition Timing - Compensation" type="2D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder B__" category="Ignition Timing - Compensation" type="2D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="Y Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder C__" category="Ignition Timing - Compensation" type="2D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder C__" category="Ignition Timing - Compensation" type="2D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="Y Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder D__" category="Ignition Timing - Compensation" type="2D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder D__" category="Ignition Timing - Compensation" type="2D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="Y Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder A_" category="Ignition Timing - Compensation" type="2D" level="1" scaling="degreesofcorrection">
+	<table name="Timing Compensation Per Cylinder A_" category="Ignition Timing - Compensation" type="2D"  scaling="degreesofcorrection">
 		<description>This is the change in total ignition timing per cylinder based on RPM. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder B_" category="Ignition Timing - Compensation" type="2D" level="1" scaling="degreesofcorrection">
+	<table name="Timing Compensation Per Cylinder B_" category="Ignition Timing - Compensation" type="2D"  scaling="degreesofcorrection">
 		<description>This is the change in total ignition timing per cylinder based on RPM. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder C_" category="Ignition Timing - Compensation" type="2D" level="1" scaling="degreesofcorrection">
+	<table name="Timing Compensation Per Cylinder C_" category="Ignition Timing - Compensation" type="2D"  scaling="degreesofcorrection">
 		<description>This is the change in total ignition timing per cylinder based on RPM. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder D_" category="Ignition Timing - Compensation" type="2D" level="1" scaling="degreesofcorrection">
+	<table name="Timing Compensation Per Cylinder D_" category="Ignition Timing - Compensation" type="2D"  scaling="degreesofcorrection">
 		<description>This is the change in total ignition timing per cylinder based on RPM. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder A" category="Ignition Timing - Compensation" type="3D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder A" category="Ignition Timing - Compensation" type="3D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM and engine load. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="X Axis" elements="14" scaling="RPM"/>
 		<table name="Engine Load" type="Y Axis" elements="4" scaling="g/rev"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder B" category="Ignition Timing - Compensation" type="3D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder B" category="Ignition Timing - Compensation" type="3D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM and engine load. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="X Axis" elements="14" scaling="RPM"/>
 		<table name="Engine Load" type="Y Axis" elements="4" scaling="g/rev"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder C" category="Ignition Timing - Compensation" type="3D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder C" category="Ignition Timing - Compensation" type="3D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM and engine load. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="X Axis" elements="14" scaling="RPM"/>
 		<table name="Engine Load" type="Y Axis" elements="4" scaling="g/rev"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder D" category="Ignition Timing - Compensation" type="3D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder D" category="Ignition Timing - Compensation" type="3D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM and engine load. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="X Axis" elements="14" scaling="RPM"/>
 		<table name="Engine Load" type="Y Axis" elements="4" scaling="g/rev"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder E" category="Ignition Timing - Compensation" type="3D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder E" category="Ignition Timing - Compensation" type="3D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM and engine load. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="X Axis" elements="14" scaling="RPM"/>
 		<table name="Engine Load" type="Y Axis" elements="4" scaling="g/rev"/>
 	</table>
 
-	<table name="Timing Compensation Per Cylinder F" category="Ignition Timing - Compensation" type="3D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Compensation Per Cylinder F" category="Ignition Timing - Compensation" type="3D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>This is the change in total ignition timing per cylinder based on RPM and engine load. It is not currently known which table corresponds to which cylinder, however it is suspected that table A corresponds to cylinder #1. When logging 'ignition timing' only cylinder A is monitored.</description>
 		<table name="Engine Speed" type="X Axis" elements="14" scaling="RPM"/>
 		<table name="Engine Load" type="Y Axis" elements="4" scaling="g/rev"/>
 	</table>
 
-	<table name="Timing Comp Minimum Load (Per Cylinder)" category="Ignition Timing - Compensation" type="2D" level="1" scaling="EngineLoad(g/rev)1">
+	<table name="Timing Comp Minimum Load (Per Cylinder)" category="Ignition Timing - Compensation" type="2D"  scaling="EngineLoad(g/rev)1">
 		<description>The minimum load necessary in order for the 'Timing Compensation Per Cylinder' tables to be active. Active per cylinder compensation is also dependent on the 'Timing Comp Maximum RPM (Per Cylinder)' and 'Timing Comp Minimum Coolant Temp (Per Cylinder)' tables.</description>
 		<table name="Per Cylinder Timing Compensation" type="Static Y Axis" elements="1">
 			<data>Enable Above</data>
 		</table>
 	</table>
 
-	<table name="Timing Comp Maximum RPM (Per Cylinder)" category="Ignition Timing - Compensation" type="2D" level="1" scaling="EngineSpeed(RPM)1">
+	<table name="Timing Comp Maximum RPM (Per Cylinder)" category="Ignition Timing - Compensation" type="2D"  scaling="EngineSpeed(RPM)1">
 		<description>This is the maximum engine speed for which the 'Timing Compensation Per Cylinder' tables are active. Active per cylinder compensation is also dependent on the 'Timing Comp Minimum Load (Per Cylinder)' and 'Timing Comp Minimum Coolant Temp (Per Cylinder)' tables.</description>
 		<table name="Per Cylinder Timing Compensation" type="Static Y Axis" elements="1">
 			<data>Enable Below</data>
 		</table>
 	</table>
 
-	<table name="Timing Comp Minimum Coolant Temp (Per Cylinder)" category="Ignition Timing - Compensation" type="2D" level="1" scaling="CoolantTemp(DegreesF)1">
+	<table name="Timing Comp Minimum Coolant Temp (Per Cylinder)" category="Ignition Timing - Compensation" type="2D"  scaling="CoolantTemp(DegreesF)1">
 		<description>The minimum coolant temp necessary in order for the 'Timing Compensation Per Cylinder' tables to be active. Active per cylinder compensation is also dependent on the 'Timing Comp Maximum RPM (Per Cylinder)' and 'Timing Comp Minimum Engine Load (Per Cylinder)' tables.</description>
 		<table name="Per Cylinder Timing Compensation" type="Static Y Axis" elements="1">
 			<data>Enable Above</data>
@@ -4622,574 +4622,375 @@
 		<description>CHARGING SYSTEM VOLTAGE HIGH. Change to disabled to deactivate. Off-road use only.</description>
 	</table>
 
-	<table name="Intake Cam Advance Angle (ECT Related)" type="3D" level="1" scaling="Advance(degrees)3">
+	<table name="Intake Cam Advance Angle (ECT Related)" type="3D"  scaling="Advance(degrees)3">
 		<table name="Engine Load" type="X Axis" elements="19" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="18" scaling="RPM"/>
 	</table>
 
-	<table name="AF 3 Correction Limits" category="Experimental" type="2D" level="1" scaling="A/FLearning#1Limits(%)">
-		<table name="X" type="Static X Axis" elements="2">
-			<data>High</data>
-			<data>Low</data>
-		</table>
-	</table>
-
-	<table name="Closed_loop_fueling_target_comp_RearO2" category="Experimental" type="2D" level="1" scaling="AF3 Lambda">
-		<table name="X" type="Static X Axis" elements="2">
-			<data>High</data>
-			<data>Low</data>
-		</table>
-	</table>
-
-	<table name="Af learning Max threshhold" category="Experimental" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="Af learning Min threshhold" category="Experimental" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="Ignition Timing Compensation Retard on Shift" category="EXPERIMENTAL MISC" type="2D" level="1" scaling="IgnitionTimingCorrection(degrees)">
-		<table name="Accelerator Pedal Opening %" type="Y Axis" elements="2" scaling="rawecuvalue"/>
-	</table>
-
-	<table name="Cruise_Control_Speed_Limit_Min_A" category="EXPERIMENTAL MISC" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="Cruise_Control_Speed_Limit_Min_B" category="EXPERIMENTAL MISC" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="Cruise_Control_Speed_Limit_Max_A" category="EXPERIMENTAL MISC" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="Cruise_Control_Speed_Limit_Max_B" category="EXPERIMENTAL MISC" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="Ignition Timing Compensation Overrun" category="EXPERIMENTAL MISC" type="2D" level="1" scaling="IgnitionTimingCorrection(degrees)">
-		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
-	</table>
-
-	<table name="Overrun_Enrich_RPM_Delta_Activation" category="EXPERIMENTAL MISC" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="Overrun_initial_enrichment" category="EXPERIMENTAL MISC" type="1D" level="1" scaling="ms"/>
-
-	<table name="Speed_Limits_Throttle_reduction_A" category="EXPERIMENTAL MISC" type="1D" level="1" scaling="RPM"/>
-
-	<table name="Speed_Limits_Throttle_reduction_B" category="EXPERIMENTAL MISC" type="1D" level="1" scaling="RPM"/>
-
-	<table name="Map_Switching_Cruise_Switch_Min_Delay" category="Map Switching" type="1D" level="1" scaling="Map_Switching_Cruise_Switch_Min_Delay"/>
-
-	<table name="Map_Switching_Cruise_Thresholds_Min_Delay" category="Map Switching" type="1D" level="1" scaling="Map_Switching_Cruise_Switch_Min_Delay"/>
-
-	<table name="Idle_Airflow_Min_Target_Decel_Adder" category="EXPERIMENTAL - idle tables" type="3D" level="1" scaling="AirflowAdder">
+	<table name="Idle_Airflow_Min_Target_Decel_Adder" category="Idle control" type="3D"  scaling="AirflowAdder">
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 		<table name="Coolant Temp" type="Y Axis" elements="14" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Idle Speed Stability A" category="EXPERIMENTAL - idle tables" type="3D" level="1" scaling="Idle Stability">
+	<table name="Idle Speed Stability A" category="Idle control" type="3D"  scaling="Idle Stability">
 		<table name="Idle Speed Error" type="X Axis" elements="24" scaling="RPM"/>
 		<table name="Engine Speed Delta" type="Y Axis" elements="11" scaling="RPM"/>
 	</table>
 
-	<table name="Idle Speed Stability B" category="EXPERIMENTAL - idle tables" type="3D" level="1" scaling="Idle Stability">
+	<table name="Idle Speed Stability B" category="Idle control" type="3D"  scaling="Idle Stability">
 		<table name="Idle Speed Error" type="X Axis" elements="24" scaling="RPM"/>
 		<table name="Engine Speed Delta" type="Y Axis" elements="11" scaling="RPM"/>
 	</table>
 
-	<table name="Idle_Airflow_Min_Target_Decel_Adder_Active_Veh_Speed" category="EXPERIMENTAL - idle tables" type="1D" level="1" scaling="VehicleSpeed(MPH)"/>
+	<table name="Idle_Airflow_Min_Target_Decel_Adder_Active_Veh_Speed" category="Idle control" type="1D"  scaling="VehicleSpeed(MPH)"/>
 
-	<table name="Idle_Airflow_Min_Target_Decel_Initial_Idle_Min_Airflow" category="EXPERIMENTAL - idle tables" type="1D" level="1" scaling="rawecuvalue"/>
+	<table name="Idle_Airflow_Min_Target_Decel_Initial_Idle_Min_Airflow" category="Idle control" type="1D"  scaling="rawecuvalue"/>
 
-	<table name="Idle_Airflow_Min_Target_Decel_Initial_Idle_Activation_Max_Mode_Counter" category="EXPERIMENTAL - idle tables" type="1D" level="1" scaling="Map_Switching_Cruise_Switch_Min_Delay"/>
+	<table name="Idle_Airflow_Min_Target_Decel_Initial_Idle_Activation_Max_Mode_Counter" category="Idle control" type="1D"  scaling="Map_Switching_Cruise_Switch_Min_Delay"/>
 
-	<table name="Idle_Airflow_Min_Target_Decel_Ramping_Adder_Decreasing" category="EXPERIMENTAL - idle tables" type="1D" level="1" scaling="negative"/>
+	<table name="Idle_Airflow_Min_Target_Decel_Ramping_Adder_Decreasing" category="Idle control" type="1D"  scaling="negative"/>
 
-	<table name="Idle_Airflow_Min_Target_Decel_Ramping_Adder_Increasing" category="EXPERIMENTAL - idle tables" type="1D" level="1" scaling="rawecuvalue"/>
+	<table name="Idle_Airflow_Min_Target_Decel_Ramping_Adder_Increasing" category="Idle control" type="1D"  scaling="rawecuvalue"/>
 
-	<table name="Target Throttle_Angle_Idle_Airflow_Target" category="EXPERIMENTAL - idle tables" type="2D" level="1" scaling="%1">
+	<table name="Target Throttle_Angle_Idle_Airflow_Target" category="Idle control" type="2D"  scaling="%1">
 		<table name="Target Throttle Plate Position %" type="X Axis" elements="24" scaling="%"/>
 	</table>
 
-	<table name="Target Throttle_Angle_Idle_Airflow_Target_Base_Min" category="EXPERIMENTAL - idle tables" type="3D" level="1" scaling="TPS Throttle">
+	<table name="Target Throttle_Angle_Idle_Airflow_Target_Base_Min" category="Idle control" type="3D"  scaling="TPS Throttle">
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 		<table name="Requested Torque" type="Y Axis" elements="16" scaling="RequestedTorque(rawecuvalue)1"/>
 	</table>
 
-	<table name="Target Throttle_Angle_Idle_Airflow_Target_Base_Min_App_Max" category="EXPERIMENTAL - idle tables" type="1D" level="1" scaling="%1"/>
+	<table name="Target Throttle_Angle_Idle_Airflow_Target_Base_Min_App_Max" category="Idle control" type="1D"  scaling="%1"/>
 
-	<table name="Overrun_Fueling_Cut_Counter_RPM_Threshold" category="EXPERIMENTAL MISC" type="2D" level="1" scaling="RPM">
-		<table name="RPM" type="Static X Axis" elements="3">
-			<data>Low</data>
-			<data>Med</data>
-			<data>High</data>
-		</table>
-	</table>
-
-	<table name="Overun Fueling Resume RPM Threshholds" category="EXPERIMENTAL MISC" type="2D" level="1" scaling="Overrun Fueling">
-		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
-	</table>
-
-	<table name="MAP_Switch_Cruise_REq_Torque_Thresh_Max_A" category="Map Switching" type="2D" level="1" scaling="Requested Torque (Map Switch)">
-		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
-	</table>
-
-	<table name="MAP_Switch_Accel_Switch_REq_Torque_Thresh_Min_A" category="Map Switching" type="2D" level="1" scaling="Requested Torque (Map Switch)">
-		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
-	</table>
-
-	<table name="Table_MAP_Switch_Cruise_REq_Torque_Thresh_Max_B" category="Map Switching" type="2D" level="1" scaling="Requested Torque (Map Switch)">
-		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
-	</table>
-
-	<table name="MAP_Switch_Accel_Switch_REq_Torque_Thresh_Min_B" category="Map Switching" type="2D" level="1" scaling="Requested Torque (Map Switch)">
-		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
-	</table>
-
-	<table name="MAP_Switch_Cruise_REq_Torque_Thresh_Max_C" category="Map Switching" type="2D" level="1" scaling="Requested Torque (Map Switch)">
-		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
-	</table>
-
-	<table name="MAP_Switch_Accel_Switch_REq_Torque_Thresh_Min_C" category="Map Switching" type="2D" level="1" scaling="Requested Torque (Map Switch)">
-		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
-	</table>
-
-	<table name="Map_Switching_AccelSwitch_Min_Intake_Temp" category="Map Switching" type="2D" level="1" scaling="Intake Air Temp (Map Switch)">
-		<table name="Intake Air Temp" type="X Axis" elements="11" scaling="rawecuvalue"/>
-	</table>
-
-	<table name="MAP_Switch_Cruise_Accel_Airflow_enable_below" category="Map Switching" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="MAP_Switch_Cruise_Accel_Airflow_disable_above" category="Map Switching" type="1D" level="1" scaling="rawecuvalue"/>
-
-	<table name="MAP_Switch_AccelSwitch_Min_Coolant_Temp" category="Map Switching" type="2D" level="1" scaling="rawecuvalue">
-		<table name="Coolant Temp" type="Static X Axis" elements="2"/>
-	</table>
-
-	<table name="Map_Switch_Ramping_Adder_Accel" category="Map Switching" type="1D" level="1" scaling="Map_Switch_Ramping_Adder"/>
-
-	<table name="Map_Switch_Ramping_Adder_Cruise" category="Map Switching" type="1D" level="1" scaling="negative"/>
-
-	<table name="Knock_Sensor_Calibration" category="Knock Sensor" type="2D" level="1" scaling="rawecuvalue">
+		<table name="Knock_Sensor_Calibration" category="Knock Sensor" type="2D"  scaling="rawecuvalue">
 		<table name="Volts" type="X Axis" elements="65" scaling="rawecuvalue"/>
 	</table>
 
-	<table name="Knock_threshold_filter_Final_Limit_Min" category="Knock Sensor" type="2D" level="1" scaling="Knock">
+	<table name="Knock_threshold_filter_Final_Limit_Min" category="Knock Sensor" type="2D"  scaling="Knock">
 		<table name="Volts" type="X Axis" elements="10" scaling="RPM"/>
 	</table>
 
-	<table name="Knock_threshold_filter_Final_Limit_Max_Cyl_1" category="Knock Sensor" type="2D" level="1" scaling="Knock">
+	<table name="Knock_threshold_filter_Final_Limit_Max_Cyl_1" category="Knock Sensor" type="2D"  scaling="Knock">
 		<table name="Volts" type="X Axis" elements="10" scaling="RPM"/>
 	</table>
 
-	<table name="Knock_threshold_filter_Final_Limit_Max_Cyl_2" category="Knock Sensor" type="2D" level="1" scaling="Knock">
+	<table name="Knock_threshold_filter_Final_Limit_Max_Cyl_2" category="Knock Sensor" type="2D"  scaling="Knock">
 		<table name="Volts" type="X Axis" elements="10" scaling="RPM"/>
 	</table>
 
-	<table name="Knock_threshold_filter_Final_Limit_Max_Cyl_3" category="Knock Sensor" type="2D" level="1" scaling="Knock">
+	<table name="Knock_threshold_filter_Final_Limit_Max_Cyl_3" category="Knock Sensor" type="2D"  scaling="Knock">
 		<table name="Volts" type="X Axis" elements="10" scaling="RPM"/>
 	</table>
 
-	<table name="Knock_threshold_filter_Final_Limit_Max_Cyl_4" category="Knock Sensor" type="2D" level="1" scaling="Knock">
+	<table name="Knock_threshold_filter_Final_Limit_Max_Cyl_4" category="Knock Sensor" type="2D"  scaling="Knock">
 		<table name="Volts" type="X Axis" elements="10" scaling="RPM"/>
 	</table>
 
-	<table name="Knock_threshold_weight_factor_RPM_Load_Cyl_1" category="Knock Sensor" type="3D" level="1" scaling="Knock">
+	<table name="Knock_threshold_weight_factor_RPM_Load_Cyl_1" category="Knock Sensor" type="3D"  scaling="Knock">
 		<table name="X" type="X Axis" elements="18" scaling="RPM"/>
 		<table name="Y" type="Y Axis" elements="3" scaling="Knock"/>
 	</table>
 
-	<table name="Knock_threshold_weight_factor_RPM_Load_Cyl_2" category="Knock Sensor" type="3D" level="1" scaling="Knock">
+	<table name="Knock_threshold_weight_factor_RPM_Load_Cyl_2" category="Knock Sensor" type="3D"  scaling="Knock">
 		<table name="X" type="X Axis" elements="18" scaling="RPM"/>
 		<table name="Y" type="Y Axis" elements="3" scaling="Knock"/>
 	</table>
 
-	<table name="Knock_threshold_weight_factor_RPM_Load_Cyl_3" category="Knock Sensor" type="3D" level="1" scaling="Knock">
+	<table name="Knock_threshold_weight_factor_RPM_Load_Cyl_3" category="Knock Sensor" type="3D"  scaling="Knock">
 		<table name="X" type="X Axis" elements="18" scaling="RPM"/>
 		<table name="Y" type="Y Axis" elements="3" scaling="Knock"/>
 	</table>
 
-	<table name="Knock_threshold_weight_factor_RPM_Load_Cyl_4" category="Knock Sensor" type="3D" level="1" scaling="Knock">
+	<table name="Knock_threshold_weight_factor_RPM_Load_Cyl_4" category="Knock Sensor" type="3D"  scaling="Knock">
 		<table name="X" type="X Axis" elements="18" scaling="RPM"/>
 		<table name="Y" type="Y Axis" elements="3" scaling="Knock"/>
 	</table>
 
-	<table name="Knock_threshold_filter_Background_Noise_interval_Weighting_Factor_Low_RPM_Delta" category="Knock Sensor" type="2D" level="1" scaling="Knock4">
+	<table name="Knock_threshold_filter_Background_Noise_interval_Weighting_Factor_Low_RPM_Delta" category="Knock Sensor" type="2D"  scaling="Knock4">
 		<table name="Volts" type="X Axis" elements="7" scaling="RPM"/>
 	</table>
 
-	<table name="Background_Noise_Delta_Smoothing_Weighting_Factor_RPM_Delta_Threshold_Imm" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Background_Noise_Delta_Smoothing_Weighting_Factor_RPM_Delta_Threshold_Imm" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Background_Noise_Delta_Smoothing_Weighting_Factor_RPM_Delta_Threshold_Short" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Background_Noise_Delta_Smoothing_Weighting_Factor_RPM_Delta_Threshold_Short" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Background_Noise_Delta_Weighting_Factor_Low_RPM_Delta" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Background_Noise_Delta_Weighting_Factor_Low_RPM_Delta" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Background_Noise_Base_Smoothing_Factor_High_Rpm_Delta" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Background_Noise_Base_Smoothing_Factor_High_Rpm_Delta" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Background_Noise_Delta_Weighting_Factor_High_RPM_Delta" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Background_Noise_Delta_Weighting_Factor_High_RPM_Delta" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Background_Noise_Base_Smoothing_Factor_Low_Rpm_Delta" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Background_Noise_Base_Smoothing_Factor_Low_Rpm_Delta" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Knock_threshhold_Filter_background_noise_interv_weight_factor_RPM_Delta_Short" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Knock_threshhold_Filter_background_noise_interv_weight_factor_RPM_Delta_Short" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Knock_threshhold_Filter_background_noise_interv_weight_factor_High_RPM_Delta_Limit_max" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Knock_threshhold_Filter_background_noise_interv_weight_factor_High_RPM_Delta_Limit_max" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Knock_threshhold_Filter_background_noise_interv_weight_factor_High_RPM_Delta_Rpm_delta_ratio" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Knock_threshhold_Filter_background_noise_interv_weight_factor_High_RPM_Delta_Rpm_delta_ratio" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Knock_threshhold_Filter_Final_Limit_max_modify_pre_final_limit" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Knock_threshhold_Filter_Final_Limit_max_modify_pre_final_limit" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Knock_Threshhold_Level_Final_Limit_Min" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Knock_Threshhold_Level_Final_Limit_Min" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Knock_Threshhold_Level_Final_Limit_Max" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Knock_Threshhold_Level_Final_Limit_Max" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Filter_Noise_Level_Weighting_Factor" category="Knock Sensor" type="1D" level="1" scaling="Knock"/>
+	<table name="Filter_Noise_Level_Weighting_Factor" category="Knock Sensor" type="1D"  scaling="Knock"/>
 
-	<table name="Filter_Ref_Max_Range_Hysteresis_Corr_Knock_Sen_output_modify" category="Knock Sensor" type="1D" level="1" scaling="Knock3"/>
+	<table name="Filter_Ref_Max_Range_Hysteresis_Corr_Knock_Sen_output_modify" category="Knock Sensor" type="1D"  scaling="Knock3"/>
 
-	<table name="Knock_Detection_Minimum_Engine_Run_Time" category="Knock Sensor" type="1D" level="1" scaling="Knock2"/>
+	<table name="Knock_Detection_Minimum_Engine_Run_Time" category="Knock Sensor" type="1D"  scaling="Knock2"/>
 
-	<table name="Misfire Count MAP Threshold" category="Misfire" type="2D" level="1" scaling="Pressure (bar)">
+	<table name="Misfire Count MAP Threshold" category="Misfire" type="2D"  scaling="Pressure (bar)">
 		<table name="X" category="Misfire" type="X Axis" elements="14" scaling="RPM"/>
 	</table>
 
-	<table name="Misfire DTC Threshold" category="Misfire" type="3D" level="1" scaling="MisfireDTCThreshold">
+	<table name="Misfire DTC Threshold" category="Misfire" type="3D"  scaling="MisfireDTCThreshold">
 		<table name="Engine Load" type="X Axis" elements="14" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="19" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="hot_restart_enrich_decay_delay" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 2"/>
+	<table name="hot_restart_enrich_decay_delay" category="Hot Restart" type="1D"  scaling="Hot Restart 2"/>
 
-	<table name="hot_restart_enrich_decay_step_value" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_decay_step_value" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
-	<table name="hot_restart_enrich_initial_high" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_initial_high" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
-	<table name="hot_restart_enrich_initial_high_activat_min_coolant_temp" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_initial_high_activat_min_coolant_temp" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
-	<table name="hot_restart_enrich_initial_high_activat_min_intake_temp" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_initial_high_activat_min_intake_temp" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
-	<table name="hot_restart_enrich_initial_low" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_initial_low" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
-	<table name="hot_restart_enrich_initial_low_activat_min_coolant_temp" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_initial_low_activat_min_coolant_temp" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
-	<table name="hot_restart_enrich_initial_low_activat_min_intake_temp" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_initial_low_activat_min_intake_temp" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
-	<table name="hot_restart_enrich_max_non_idle" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_max_non_idle" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
 	<table name="hot_restart_enrich_max_non_idle_activation_max_run_time" category="Hot Restart" type="1D" level="2" scaling="Hot Restart 2"/>
 
-	<table name="hot_restart_enrich_min_lim_activat_max_run_time" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 2"/>
+	<table name="hot_restart_enrich_min_lim_activat_max_run_time" category="Hot Restart" type="1D"  scaling="Hot Restart 2"/>
 
-	<table name="hot_restart_enrich_min_limit" category="Hot Restart" type="1D" level="1" scaling="Hot Restart 1"/>
+	<table name="hot_restart_enrich_min_limit" category="Hot Restart" type="1D"  scaling="Hot Restart 1"/>
 
-	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_1A" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay">
+	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_1A" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_1B" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay">
+	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_1B" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_2A" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay">
+	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_2A" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_2B" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay">
+	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_2B" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Initial_1A" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay1">
+	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Initial_1A" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay1">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Initial_1B" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay1">
+	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Initial_1B" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay1">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Initial_2A" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay1">
+	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Initial_2A" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay1">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Initial_2B" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay1">
+	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Initial_2B" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay1">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Step_Value_1" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay2">
+	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Step_Value_1" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay2">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Step_Value_2" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay2">
+	<table name="Table_Post_Start_Enrich_High_Speed_Decay_Step_Value_2" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay2">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Delay_1" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay3">
+	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Delay_1" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay3">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Delay_2" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay3">
+	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Delay_2" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay3">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Delay_Multiplier" category="Post Start Enrichment" type="2D" level="1" scaling="Post_Start_Enrich_Decay4">
+	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Delay_Multiplier" category="Post Start Enrichment" type="2D"  scaling="Post_Start_Enrich_Decay4">
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Fuel Pump Duty High Injector Duty Cycle" category="FUEL PUMP DUTY Experimental" type="3D" level="1" scaling="IDC">
+	<table name="Fuel Pump Duty High Injector Duty Cycle" category="Alpha Fuel Pump" type="3D"  scaling="IDC">
 		<table name="Battery Voltage" type="X Axis" elements="2" scaling="rawecuvalue"/>
 		<table name="Manifold Relative Pressure" type="Y Axis" elements="2" scaling="psirelativesealevel"/>
 	</table>
 
-	<table name="Fuel Pump Duty Medium Injector Duty Cycle" category="FUEL PUMP DUTY Experimental" type="3D" level="1" scaling="IDC">
+	<table name="Fuel Pump Duty Medium Injector Duty Cycle" category="Alpha Fuel Pump" type="3D"  scaling="IDC">
 		<table name="Battery Voltage" type="X Axis" elements="2" scaling="rawecuvalue"/>
 		<table name="Manifold Relative Pressure" type="Y Axis" elements="2" scaling="psirelativesealevel"/>
 	</table>
 
-	<table name="Table_TPS_Related_Fuel_Adder_Activation_Min_TPS_Target_Delta" category="TPS Related" type="2D" level="1" scaling="TPS Throttle">
+	<table name="Table_TPS_Related_Fuel_Adder_Activation_Min_TPS_Target_Delta" category="AlphaTPS" type="2D"  scaling="TPS Throttle">
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Table_TPS_Related_Fuel_Adder_Activation_Min_Load" category="TPS Related" type="3D" level="1" scaling="EngineLoad(g/rev)">
+	<table name="Table_TPS_Related_Fuel_Adder_Activation_Min_Load" category="AlphaTPS" type="3D"  scaling="EngineLoad(g/rev)">
 		<table name="Vehicle Speed" type="X Axis" elements="2" scaling="VehicleSpeed(MPH)"/>
 		<table name="RPM" type="Y Axis" elements="2" scaling="RPM"/>
 	</table>
 
-	<table name="TPS_Related_Fuel_Activation_Min_TPS_Target_Delta_Hysteresis" category="TPS Related" type="1D" level="1" scaling="ThrottlePlateOpeningAngle(%)"/>
+	<table name="TPS_Related_Fuel_Activation_Min_TPS_Target_Delta_Hysteresis" category="AlphaTPS" type="1D"  scaling="ThrottlePlateOpeningAngle(%)"/>
 
-	<table name="TPS_Related_Fuel_Adder_Low_A" category="TPS Related" type="1D" level="1" scaling="rawecuvalue"/>
+	<table name="TPS_Related_Fuel_Adder_Low_A" category="AlphaTPS" type="1D"  scaling="rawecuvalue"/>
 
-	<table name="TPS_Related_Fuel_Adder_High_A" category="TPS Related" type="1D" level="1" scaling="rawecuvalue"/>
+	<table name="TPS_Related_Fuel_Adder_High_A" category="AlphaTPS" type="1D"  scaling="rawecuvalue"/>
 
-	<table name="TPS_Related_Fuel_Adder_Low_B" category="TPS Related" type="1D" level="1" scaling="rawecuvalue"/>
+	<table name="TPS_Related_Fuel_Adder_Low_B" category="AlphaTPS" type="1D"  scaling="rawecuvalue"/>
 
-	<table name="TPS_Related_Fuel_Adder_High_B" category="TPS Related" type="1D" level="1" scaling="rawecuvalue"/>
+	<table name="TPS_Related_Fuel_Adder_High_B" category="AlphaTPS" type="1D"  scaling="rawecuvalue"/>
 
-	<table name="TPS_Related_Fuel_Adder_Low_High_Switch_Coolant" category="TPS Related" type="2D" level="1" scaling="rawecuvalue">
+	<table name="TPS_Related_Fuel_Adder_Low_High_Switch_Coolant" category="AlphaTPS" type="2D"  scaling="rawecuvalue">
 		<table name="Engine Coolant Temperature" type="Static X Axis" elements="2" scaling="RPM"/>
 	</table>
 
-	<table name="TPS_Related_Fuel_Adder_Activation_Min_Coolant_Temp" category="TPS Related" type="2D" level="1" scaling="rawecuvalue">
+	<table name="TPS_Related_Fuel_Adder_Activation_Min_Coolant_Temp" category="AlphaTPS" type="2D"  scaling="rawecuvalue">
 		<table name="Engine Coolant Temperature" type="Static X Axis" elements="2" scaling="RPM"/>
 	</table>
 
-	<table name="TPS_Related_Fuel_Adder_No_Delay_Disable_Load_Thresh_not_met" category="TPS Related" type="1D" level="1" scaling="rawecuvalue"/>
+	<table name="TPS_Related_Fuel_Adder_No_Delay_Disable_Load_Thresh_not_met" category="AlphaTPS" type="1D"  scaling="rawecuvalue"/>
 
-	<table name="TPS_Related_Fuel_Adder_Activation_Min_Run_Time" category="TPS Related" type="1D" level="1" scaling="TPS"/>
+	<table name="TPS_Related_Fuel_Adder_Activation_Min_Run_Time" category="AlphaTPS" type="1D"  scaling="TPS"/>
 
-	<table name="Minimum IPW" type="1D" level="1" scaling="ms"/>
+	<table name="Minimum IPW" type="1D"  scaling="ms"/>
 
-	<table name="Ignition Timing Minimum" type="1D" level="1" scaling="BaseIgnitionTiming(degreesBTDC)"/>
+	<table name="Ignition Timing Minimum" type="1D"  scaling="BaseIgnitionTiming(degreesBTDC)"/>
 
-	<table name="Ignition Timing Maximum" type="1D" level="1" scaling="BaseIgnitionTiming(degreesBTDC)"/>
+	<table name="Ignition Timing Maximum" type="1D"  scaling="BaseIgnitionTiming(degreesBTDC)"/>
 
-	<table name="Timing Compensation Per Gear Conversion Multiplier" category="Ignition Timing - Compensation" type="1D" level="1" scaling="rawecuvalue"/>
+	<table name="Timing Compensation Per Gear Conversion Multiplier" category="Ignition Timing - Compensation" type="1D"  scaling="rawecuvalue"/>
 
-	<table name="Calculated Engine Torque A" category="Alpha - Drive-by-Wire Throttle (DBW)" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
+	<table name="Calculated Engine Torque A" category="Alpha Drive-by-Wire Throttle (DBW)" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
 		<description>This table determines the expected Crank Engine Torque output relative to engine load and engine speed.</description>
 		<table name="Engine Load" type="X Axis" elements="16" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Calculated Engine Torque B" category="Alpha - Drive-by-Wire Throttle (DBW)" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
+	<table name="Calculated Engine Torque B" category="Alpha Drive-by-Wire Throttle (DBW)" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
 		<description>This table determines the expected Crank Engine Torque output relative to engine load and engine speed.</description>
 		<table name="Engine Load" type="X Axis" elements="16" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Calculated Engine Torque C" category="Alpha - Drive-by-Wire Throttle (DBW)" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
+	<table name="Calculated Engine Torque C" category="Alpha Drive-by-Wire Throttle (DBW)" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
 		<description>This table determines the expected Crank Engine Torque output relative to engine load and engine speed.</description>
 		<table name="Engine Load" type="X Axis" elements="16" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Calculated Engine Torque D" category="Alpha - Drive-by-Wire Throttle (DBW)" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
+	<table name="Calculated Engine Torque D" category="Alpha Drive-by-Wire Throttle (DBW)" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
 		<description>This table determines the expected Crank Engine Torque output relative to engine load and engine speed.</description>
 		<table name="Engine Load" type="X Axis" elements="16" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="AFR Minimum Correction" category="Alpha - BRZ" type="2D" level="3" scaling="EstimatedAir/FuelRatio2">
-		<description>no description</description>
-		<table name="Air Fuel Ratio" type="Y Axis" elements="9" scaling="float"/>
-	</table>
 
-	<table name="AFR Maximum Correction" category="Alpha - BRZ" type="2D" level="3" scaling="EstimatedAir/FuelRatio2">
-		<description>no description</description>
-		<table name="Air Fuel Ratio" type="Y Axis" elements="9" scaling="float"/>
-	</table>
-
-	<table name="Port Injection MRP Compensation" category="Alpha - BRZ" type="2D" scaling="float">
-		<description>no description</description>
-		<table name="Manifold Pressure" type="Y Axis" elements="16" scaling="psirelativesealevel"/>
-	</table>
-
-	<table name="Direct Injection Quantity Maximum" category="Alpha - BRZ" type="2D" scaling="DI Injection">
-		<description>no description</description>
-		<table name="Engine Speed" type="Y Axis" elements="12" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Direct Injection Quantity Minimum" category="Alpha - BRZ" type="2D" scaling="DI Injection">
-		<description>no description</description>
-		<table name="Fuel Pressure" type="Y Axis" elements="6" scaling="Fuel Pressure"/>
-	</table>
-
-	<table name="GDI Firing Angle Cold Idle" category="Alpha - BRZ" type="3D" scaling="GDI Firing Angle">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="11" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="17" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="GDI Firing Angle High Load Cold" category="Alpha - BRZ" type="3D" scaling="GDI Firing Angle">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="11" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="17" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="GDI Firing Angle High Load Hot" category="Alpha - BRZ" type="3D" scaling="GDI Firing Angle">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="11" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="17" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="GDI Firing Angle Low Load Cold" category="Alpha - BRZ" type="3D" scaling="GDI Firing Angle">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="11" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="17" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="GDI Firing Angle Low Load Hot" category="Alpha - BRZ" type="3D" scaling="GDI Firing Angle">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="11" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="17" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="GDI Pressure Multiplier A" category="Alpha - BRZ" type="3D" scaling="GDI Pressure Multiplier">
-		<description>no description</description>
-		<table name="Fuel Pressure" type="X Axis" elements="9" scaling="Fuel Pressure"/>
-		<table name="Mass Airflow" type="Y Axis" elements="10" scaling="MassAirflow(g/s)1"/>
-	</table>
-
-	<table name="GDI Pressure Multiplier B" category="Alpha - BRZ" type="3D" scaling="GDI Pressure Multiplier B">
-		<description>no description</description>
-		<table name="Fuel Pressure" type="X Axis" elements="9" scaling="Fuel Pressure"/>
-		<table name="Mass Airflow" type="Y Axis" elements="10" scaling="MassAirflow(g/s)1"/>
-	</table>
-
-	<table name="GDI Pressure Target A" category="Alpha - BRZ" type="3D" scaling="GDI Pressure Target">
-		<description>no description</description>
-		<table name="Base Pulse Width Related" type="X Axis" elements="2" scaling="GDI Base Pulse Width"/>
-		<table name="Engine Speed" type="Y Axis" elements="2" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="GDI Pressure Target B" category="Alpha - BRZ" type="3D" scaling="GDI Pressure Target">
-		<description>no description</description>
-		<table name="Base Pulse Width Related" type="X Axis" elements="2" scaling="GDI Base Pulse Width"/>
-		<table name="Engine Speed" type="Y Axis" elements="2" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Total Injection Ratio Port Cold" category="Alpha - BRZ" type="3D" scaling="Port Injection Ratio">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="12" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Total Injection Ratio Port Hot" category="Alpha - BRZ" type="3D" scaling="Port Injection Ratio">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="12" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Total Injection Ratio Port Warm" category="Alpha - BRZ" type="3D" scaling="Port Injection Ratio">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="12" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Input A Rising Load Activation ECT Load 1" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 1" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 2" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 2" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 3" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 3" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 4" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 4" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Manifold Pressure" type="Y Axis" elements="3" scaling="TauMrp"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 5" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 5" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Manifold Pressure" type="Y Axis" elements="3" scaling="TauMrp"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 6" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 6" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 7" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 7" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 8" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 8" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 9" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 9" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Manifold Pressure" type="Y Axis" elements="3" scaling="TauMrp"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 10" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 10" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 11" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 11" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Manifold Pressure" type="Y Axis" elements="3" scaling="TauMrp"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 12" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 12" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 13" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 13" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Manifold Pressure" type="Y Axis" elements="3" scaling="TauMrp"/>
 	</table>
 
-	<table name="Input A Rising Load Activation ECT Load 14" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Input A Rising Load Activation ECT Load 14" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="TPS Related Fuel Adder Activation Min Load" category="Miscellaneous - Other" type="3D" scaling="EngineLoad(g/rev)">
+	<table name="AlphaTPS Fuel Adder Activation Min Load" category="Alpha TPS" type="3D" scaling="EngineLoad(g/rev)">
 		<description>no description</description>
 		<table name="Vehicle Speed" type="X Axis" elements="7" scaling="VehicleSpeed(MPH)"/>
 		<table name="Engine Speed" type="Y Axis" elements="7" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="GDI Flow Rate" category="Alpha - BRZ" type="3D" scaling="GDI Flow Rate">
-		<description>no description</description>
-		<table name="Fuel Pressure" type="X Axis" elements="6" scaling="Fuel Pressure"/>
-		<table name="Mass Airflow Voltage" type="Y Axis" elements="14" scaling="MassAirflow Voltage"/>
-	</table>
-
+	
 	<table name="Ignition Timing Post Start" category="Ignition Timing - Advance" type="2D" scaling="BaseIgnitionTiming(degreesBTDC)1">
 		<description>no description</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
@@ -5205,265 +5006,56 @@
 		<table name="Manifold Pressure" type="Y Axis" elements="9" scaling="ManifoldPressure(psirelativesealevel)"/>
 	</table>
 
-	<table name="AFR_Sensor_Atmospheric_Pressure_Compensation" category="Alpha - BRZ" type="2D" scaling="AFR Sensor Atmospheric Pressure Compensation">
-		<description>no description</description>
-		<table name="Manifold Pressure" type="Y Axis" elements="4" scaling="ManifoldPressure(psirelativesealevel)"/>
-	</table>
 
-	<table name="Minimum CFP Delta for Transient Retard" category="Alpha - BRZ" type="2D" scaling="CFP Delta">
-		<description>no description</description>
-		<table name="Engine Speed" type="Y Axis" elements="8" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Catalyst Warm Up Idle" category="Alpha - BRZ" type="3D" scaling="IgnitionTimingAdvanceCorrection(degrees)">
-		<description>no description</description>
-		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
-		<table name="Unknown" type="Y Axis" elements="3" scaling="float"/>
-	</table>
-
-	<table name="Catalyst Warm Up Non-Idle" category="Alpha - BRZ" type="3D" scaling="IgnitionTimingAdvanceCorrection(degrees)">
-		<description>no description</description>
-		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
-		<table name="Unknown" type="Y Axis" elements="3" scaling="float"/>
-	</table>
-
-	<table name="Transient Ignition Retard" category="Alpha - BRZ" type="3D" scaling="TransientIgnitionRetard">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="7" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="24" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Transient Ignition Retard Temperature Compensation" category="Alpha - BRZ" type="3D" scaling="EstimatedAir/FuelRatio2">
-		<description>no description</description>
-		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
-		<table name="Intake Temperature" type="Y Axis" elements="7" scaling="DegreesF"/>
-	</table>
-
-	<table name="Transient Ignition Retard ECT Threshhold" category="Alpha - BRZ" type="2D" level="2" scaling="CoolantTemp(DegreesF)">
-		<description>Transient Ignition Retard will be disabled above this threshhold</description>
-		<table type="Static Y Axis" elements="1">
-			<data>Disable above</data>
-		</table>
-	</table>
-
-	<table name="Transient Ignition Retard RPM Threshhold" category="Alpha - BRZ" type="2D" level="2" scaling="EngineSpeed(RPM)1">
-		<description>Transient Ignition Retard will be disabled above this threshhold</description>
-		<table type="Static Y Axis" elements="1">
-			<data>Disable above</data>
-		</table>
-	</table>
-
-	<table name="Transient Ignition Retard TPS Angle Threshhold" category="Alpha - BRZ" type="2D" level="2" scaling="ThrottlePlateOpeningAngle(%)">
-		<description>Transient Ignition Retard will be disabled below this threshhold</description>
-		<table type="Static Y Axis" elements="1">
-			<data>Disable below</data>
-		</table>
-	</table>
-
-	<table name="Transient Ignition Retard Engine Load Threshhold" category="Alpha - BRZ" type="2D" level="2" scaling="g/rev">
-		<description>Transient Ignition Retard will be disabled below this threshhold</description>
-		<table type="Static Y Axis" elements="1">
-			<data>Disable below</data>
-		</table>
-	</table>
-
-	<table name="Desired Overrun Mass Airflow A" category="Alpha - BRZ" type="3D" scaling="Airflow Overrun">
-		<description>no description</description>
-		<table name="Engine Speed" type="X Axis" elements="21" scaling="EngineSpeed(RPM)1"/>
-		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
-	</table>
-
-	<table name="Desired Overrun Mass Airflow B" category="Alpha - BRZ" type="3D" scaling="Airflow Overrun">
-		<description>no description</description>
-		<table name="Engine Speed" type="X Axis" elements="21" scaling="EngineSpeed(RPM)1"/>
-		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
-	</table>
-
-	<table name="Desired Overrun Mass Airflow C" category="Alpha - BRZ" type="3D" scaling="Airflow Overrun">
-		<description>no description</description>
-		<table name="Engine Speed" type="X Axis" elements="2" scaling="EngineSpeed(RPM)1"/>
-		<table name="Coolant Temperature" type="Y Axis" elements="2" scaling="CoolantTemp(DegreesF)"/>
-	</table>
-
-	<table name="AFR Sensor Heater Duty Cycle A" category="Alpha - BRZ" type="2D" scaling="FrontOxygenSensorCompensation">
-		<description>no description</description>
-		<table name="Unknown" type="Y Axis" elements="4" scaling="float1"/>
-	</table>
-
-	<table name="AFR Sensor Heater Duty Cycle B" category="Alpha - BRZ" type="2D" scaling="FrontOxygenSensorCompensation">
-		<description>no description</description>
-		<table name="Unknown" type="Y Axis" elements="4" scaling="float1"/>
-	</table>
-
-	<table name="AFR Sensor Heating Limit" category="Alpha - BRZ" type="3D" scaling="FrontOxygenSensorCompensation">
-		<description>no description</description>
-		<table name="Engine Speed" type="X Axis" elements="6" scaling="EngineSpeed(RPM)1"/>
-		<table name="Unknown" type="Y Axis" elements="6" scaling="float"/>
-	</table>
-
-	<table name="AFR Sensor Heating Limit A" category="Alpha - BRZ" type="3D" scaling="FrontOxygenSensorCompensation">
-		<description>no description</description>
-		<table name="Engine Speed" type="X Axis" elements="6" scaling="EngineSpeed(RPM)1"/>
-		<table name="Unknown" type="Y Axis" elements="6" scaling="float"/>
-	</table>
-
-	<table name="AFR Sensor Heating Limit B" category="Alpha - BRZ" type="3D" scaling="FrontOxygenSensorCompensation">
-		<description>no description</description>
-		<table name="Engine Speed" type="X Axis" elements="6" scaling="EngineSpeed(RPM)1"/>
-		<table name="Unknown" type="Y Axis" elements="6" scaling="float"/>
-	</table>
-
-	<table name="AFR Sensor Heater Protection" category="Alpha - BRZ" type="2D" scaling="EstimatedAir/FuelRatio2">
-		<description>no description</description>
-		<table name="MassAirflow Voltage" type="Y Axis" elements="5" scaling="volts"/>
-	</table>
-
-	<table name="Exhaust Cam Retard Angle Base AVCS_" category="Alpha - BRZ" type="3D" scaling="Retard(degrees)3">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="12" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="21" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Intake Cam Advance Angle Safe AVCS_" category="Alpha - BRZ" type="3D" scaling="Advance(degrees)2">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="16" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="24" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Intake Cam Advance Angle Normal AVCS_" category="Alpha - BRZ" type="3D" scaling="Advance(degrees)2">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="16" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="24" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Intake Cam Advance Angle Base AVCS_" category="Alpha - BRZ" type="3D" scaling="Advance(degrees)2">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="12" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="21" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Exhaust Cam Retard Angle Safe AVCS_" category="Alpha - BRZ" type="3D" scaling="Retard(degrees)1">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="16" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="24" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Exhaust Cam Retard Angle Normal AVCS_" category="Alpha - BRZ" type="3D" scaling="Retard(degrees)1">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="16" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="24" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Intake Duty Correction A" category="Alpha - Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
+	<table name="Intake Duty Correction A" category="Alpha Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
 		<description>no description</description>
 		<table name="Intake VVT Error" type="X Axis" elements="9" scaling="VVT Error"/>
 		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="Intake Duty Correction B" category="Alpha - Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
+	<table name="Intake Duty Correction B" category="Alpha Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
 		<description>no description</description>
 		<table name="Intake VVT Error" type="X Axis" elements="9" scaling="VVT Error"/>
 		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="Intake Duty Correction C" category="Alpha - Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
+	<table name="Intake Duty Correction C" category="Alpha Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
 		<description>no description</description>
 		<table name="Intake VVT Error" type="X Axis" elements="9" scaling="VVT Error"/>
 		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="Intake Duty Correction D" category="Alpha - Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
+	<table name="Intake Duty Correction D" category="Alpha Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
 		<description>no description</description>
 		<table name="Intake VVT Error" type="X Axis" elements="9" scaling="VVT Error"/>
 		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="Exhaust Duty Correction A" category="Alpha - Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
+	<table name="Exhaust Duty Correction A" category="Alpha Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
 		<description>no description</description>
 		<table name="Exhaust VVT Error" type="X Axis" elements="9" scaling="VVT Error"/>
 		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="Exhaust Duty Correction B" category="Alpha - Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
+	<table name="Exhaust Duty Correction B" category="Alpha Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
 		<description>no description</description>
 		<table name="Exhaust VVT Error" type="X Axis" elements="9" scaling="VVT Error"/>
 		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="Exhaust Duty Correction C" category="Alpha - Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
+	<table name="Exhaust Duty Correction C" category="Alpha Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
 		<description>no description</description>
 		<table name="Exhaust VVT Error" type="X Axis" elements="9" scaling="VVT Error"/>
 		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="Exhaust Duty Correction D" category="Alpha - Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
+	<table name="Exhaust Duty Correction D" category="Alpha Variable Valve Timing (AVCS)" type="3D" scaling="Intake Duty Correction">
 		<description>no description</description>
 		<table name="Exhaust VVT Error" type="X Axis" elements="9" scaling="VVT Error"/>
 		<table name="Engine Speed" type="Y Axis" elements="10" scaling="EngineSpeed(RPM)1"/>
 	</table>
 
-	<table name="Minimum Port Injection Quantity" category="Alpha - BRZ" type="2D" level="2" scaling="PortInjection">
-		<description>no description</description>
-		<table type="Static Y Axis" elements="1">
-			<data>Port Injection</data>
-		</table>
-	</table>
-
-	<table name="Fuel Injection Ratio ECT Threshold A" category="Alpha - BRZ" type="2D" level="2" scaling="CoolantTemp(DegreesF)">
-		<description>no description</description>
-		<table type="Static Y Axis" elements="2">
-			<data>On above</data>
-			<data>Off below</data>
-		</table>
-	</table>
-
-	<table name="Fuel Injection Ratio ECT Threshold B" category="Alpha - BRZ" type="2D" level="2" scaling="CoolantTemp(DegreesF)">
-		<description>no description</description>
-		<table type="Static Y Axis" elements="2">
-			<data>On above</data>
-			<data>Off below</data>
-		</table>
-	</table>
-
-	<table name="Cylinder Fill Percentage" category="Alpha - BRZ" type="3D" scaling="CylinderFill">
-		<description>no description</description>
-		<table name="Engine Speed" type="X Axis" elements="16" scaling="EngineSpeed(RPM)1"/>
-		<table name="Throttle Plate Opening Angle" type="Y Axis" elements="22" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
-	</table>
-
-	<table name="Solenoid Control" category="Alpha - BRZ" type="3D" scaling="SolenoidControl">
-		<description>no description</description>
-		<table name="Manifold Relative Pressure" type="X Axis" elements="7" scaling="ManifoldPressure(psirelativesealevel)"/>
-		<table name="CPC Valve Duty Ratio" type="Y Axis" elements="5" scaling="CPCValveDutyRatio"/>
-	</table>
-
-	<table name="Solenoid Duty" category="Alpha - BRZ" type="3D" scaling="SolenoidControl">
-		<description>no description</description>
-		<table name="Manifold Relative Pressure" type="X Axis" elements="7" scaling="ManifoldPressure(psirelativesealevel)"/>
-		<table name="CPC Valve Duty Ratio" type="Y Axis" elements="5" scaling="CPCValveDutyRatio"/>
-	</table>
-
-	<table name="Misfire Count MAP Threshold A" category="Alpha - BRZ" type="2D" scaling="psiabsolute3">
-		<description>no description</description>
-		<table name="Engine Speed" type="Y Axis" elements="13" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Misfire Count MAP Threshold B" category="Alpha - BRZ" type="2D" scaling="psiabsolute3">
-		<description>no description</description>
-		<table name="Engine Speed" type="Y Axis" elements="13" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Calculated Torque A" category="Alpha - BRZ" type="3D" scaling="CalculatedTorque">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="12" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="23" scaling="EngineSpeed(RPM)1"/>
-	</table>
-
-	<table name="Calculated Torque B" category="Alpha - BRZ" type="3D" scaling="CalculatedTorque">
-		<description>no description</description>
-		<table name="Engine Load" type="X Axis" elements="11" scaling="g/rev"/>
-		<table name="Engine Speed" type="Y Axis" elements="23" scaling="EngineSpeed(RPM)1"/>
-	</table>
+	
 
 	<table name="Post Cranking Airflow Initial Reference Coolant" category="Fueling - Cranking" type="2D" scaling="MassAirflow(g/s)">
 		<description>no description</description>
@@ -5475,107 +5067,103 @@
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Fuel Multiplier Display Offset" category="Alpha - BRZ" type="2D" scaling="Volts">
-		<description>no description</description>
-		<table name="Rail Pressure" type="Y Axis" elements="5" scaling="Fuel Pressure"/>
-	</table>
 
-	<table name="Ignition Timing Compensation Idle Target In Error Range A" category="ALPHA Idle Control" type="3D" level="1" scaling="Idle Ignition Timing">
+	<table name="Ignition Timing Compensation Idle Target In Error Range A" category="Alpha Idle Control" type="3D"  scaling="Idle Ignition Timing">
 		<description>This table is a compensation to idle ignition timing when idle speed error is within a specific range, and engine load is not changing</description>
 		<table name="Idle Speed Error" type="X Axis" elements="9" scaling="RPM"/>
 		<table name="Engine Speed Delta" type="Y Axis" elements="9" scaling="RPM"/>
 	</table>
 
-	<table name="Ignition Timing Compensation Idle Target In Error Range B" category="ALPHA Idle Control" type="3D" level="1" scaling="Idle Ignition Timing">
+	<table name="Ignition Timing Compensation Idle Target In Error Range B" category="Alpha Idle Control" type="3D"  scaling="Idle Ignition Timing">
 		<description>This table is a compensation to idle ignition timing when idle speed error is within a specific range, and engine load is not changing</description>
 		<table name="Idle Speed Error" type="X Axis" elements="9" scaling="RPM"/>
 		<table name="Engine Speed Delta" type="Y Axis" elements="9" scaling="RPM"/>
 	</table>
 
-	<table name="Ignition Timing Compensation Idle Target Out of Error Range A" category="ALPHA Idle Control" type="3D" level="1" scaling="Idle Ignition Timing">
+	<table name="Ignition Timing Compensation Idle Target Out of Error Range A" category="Alpha Idle Control" type="3D"  scaling="Idle Ignition Timing">
 		<description>This table is a compensation to idle ignition timing when idle speed error is outside a specific range, RPMs are not below idle target, and engine load is not changing</description>
 		<table name="Idle Speed Error" type="X Axis" elements="10" scaling="RPM"/>
 		<table name="Idle Speed Target" type="Y Axis" elements="2" scaling="RPM"/>
 	</table>
 
-	<table name="Ignition Timing Compensation Idle Target Out of Error Range B" category="ALPHA Idle Control" type="3D" level="1" scaling="Idle Ignition Timing">
+	<table name="Ignition Timing Compensation Idle Target Out of Error Range B" category="Alpha Idle Control" type="3D"  scaling="Idle Ignition Timing">
 		<description>This table is a compensation to idle ignition timing when idle speed error is outside a specific range, RPMs are not below idle target, and engine load is not changing</description>
 		<table name="Idle Speed Error" type="X Axis" elements="9" scaling="RPM"/>
 		<table name="Idle Speed Target" type="Y Axis" elements="9" scaling="RPM"/>
 	</table>
 
-	<table name="Ignition Timing Compensation Idle Target Load Change A" category="ALPHA Idle Control" type="3D" level="1" scaling="Idle Ignition Timing">
+	<table name="Ignition Timing Compensation Idle Target Load Change A" category="Alpha Idle Control" type="3D"  scaling="Idle Ignition Timing">
 		<description>This table is a compensation to idle ignition timing when engine load is changing, or RPMs are below idle target and idle speed error is outside a specific range</description>
 		<table name="Engine Speed Delta" type="X Axis" elements="9" scaling="RPM"/>
 		<table name="Idle Speed Target" type="Y Axis" elements="2" scaling="RPM"/>
 	</table>
 
-	<table name="Ignition Timing Compensation Idle Target Load Change B" category="ALPHA Idle Control" type="3D" level="1" scaling="Idle Ignition Timing">
+	<table name="Ignition Timing Compensation Idle Target Load Change B" category="Alpha Idle Control" type="3D"  scaling="Idle Ignition Timing">
 		<description>This table is a compensation to idle ignition timing when engine load is changing, or RPMs are below idle target and idle speed error is outside a specific range</description>
 		<table name="Engine Speed Delta" type="X Axis" elements="9" scaling="RPM"/>
 		<table name="Idle Speed Target" type="Y Axis" elements="2" scaling="RPM"/>
 	</table>
 
-	<table name="Cluster Display Fuel Consumption Correction" category="ALPHA Fueling - Injectors" type="2D" level="2" scaling="clusterfueleffcomp">
+	<table name="Cluster Display Fuel Consumption Correction" category="Alpha Fueling - Injectors" type="2D" level="2" scaling="clusterfueleffcomp">
 		<description>This is the correction applied to the fuel efficiency calculation to account for injector size change. Adjust this value by the same percentage as used for injector scaling. NewCorrection = CurrentCorrection * (NewInjectorScale / OldInjectorScale)</description>
 		<table type="Static Y Axis" elements="1">
 			<data>Fuel Efficiency Correction</data>
 		</table>
 	</table>
 
-	<table name="Idle Rolling in Gear Limit A" type="1D" level="1" scaling="RPM"/>
+	<table name="Idle Rolling in Gear Limit A" type="1D"  scaling="RPM"/>
 
-	<table name="Idle Rolling in Gear Limit B" type="1D" level="1" scaling="RPM"/>
+	<table name="Idle Rolling in Gear Limit B" type="1D"  scaling="RPM"/>
 
-	<table name="Idle Rolling in Gear Limit C" type="1D" level="1" scaling="RPM"/>
+	<table name="Idle Rolling in Gear Limit C" type="1D"  scaling="RPM"/>
 
-	<table name="Idle Rolling in Gear Limit D" type="1D" level="1" scaling="RPM"/>
+	<table name="Idle Rolling in Gear Limit D" type="1D"  scaling="RPM"/>
 
-	<table name="Low Pulse Width Fuel Injector Compensation" category="ALPHA Low PW Injector Comp" type="2D" level="1" scaling="InjectorPulseWidthCompensation">
+	<table name="Low Pulse Width Fuel Injector Compensation" category="Alpha Low PW Injector Comp" type="2D"  scaling="InjectorPulseWidthCompensation">
 		<description>This compensation is applied to the injector pulsewidth when the RPM and IPW thresholds are met. It is used to compensate for nonlinear injector response at low pulsewidth. This portion of the response is known as the 'knee'</description>
 		<table name="Injector Pulse Width" type="Y Axis" elements="8" scaling="BasePulseWidth(ms)"/>
 	</table>
 
-	<table name="Low pulse width fuel injector compensation maximum RPM" category="ALPHA Low PW Injector Comp" type="2D" level="1" scaling="RPM">
+	<table name="Low pulse width fuel injector compensation maximum RPM" category="Alpha Low PW Injector Comp" type="2D"  scaling="RPM">
 		<description>This is the maximum RPM that the Low Pulse Width Fuel Injector Compensation is applied</description>
 		<table type="Static Y Axis" elements="1">
 			<data>Maximum RPM Limit</data>
 		</table>
 	</table>
 
-	<table name="Low pulse width fuel injector compensation maximum IPW" category="ALPHA Low PW Injector Comp" type="2D" level="1" scaling="BasePulseWidth(ms)">
+	<table name="Low pulse width fuel injector compensation maximum IPW" category="Alpha Low PW Injector Comp" type="2D"  scaling="BasePulseWidth(ms)">
 		<description>This is the maximum IPW that the Low Pulse Width Fuel Injector Compensation is applied</description>
 		<table type="Static Y Axis" elements="1">
 			<data>Maximum IPW Limit</data>
 		</table>
 	</table>
 
-	<table name="Ignition Dwell" category="ALPHA Ignition Dwell" type="3D" level="1" scaling="IgnitionDwell(ms)">
+	<table name="Ignition Dwell" category="Alpha Ignition Dwell" type="3D"  scaling="IgnitionDwell(ms)">
 		<description>UNVERIFIED - This table defines the amount of time before a spark event that the ECU needs to start charging the ignition system. Since the time needed to charge up the ignition doesn't change as engine speed increases, you need to start that event sooner to compensate for the piston moving faster.</description>
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 		<table name="Battery Volts" type="Y Axis" elements="5" scaling="volts"/>
 	</table>
 
-	<table name="Requested Torque Limit A (Per Gear/Engine Speed)" category="ALPHA Per Gear Requested Torque" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
+	<table name="Requested Torque Limit A (Per Gear/Engine Speed)" category="Alpha Per Gear Requested Torque" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
 		<description>This table determines the Max requested torque based on calculated Gear and engine speed.</description>
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 		<table name="Gear" type="Y Axis" elements="6" scaling="Gear"/>
 	</table>
 
-	<table name="Requested Torque Limit B (Per Gear/Engine Speed)" category="ALPHA Per Gear Requested Torque" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
+	<table name="Requested Torque Limit B (Per Gear/Engine Speed)" category="Alpha Per Gear Requested Torque" type="3D" level="4" scaling="RequestedTorque(rawecuvalue)">
 		<description>This table determines the Max requested torque based on calculated Gear and engine speed.</description>
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 		<table name="Gear" type="Y Axis" elements="6" scaling="Gear"/>
 	</table>
 
-	<table name="Engine Load Limit B Maximum (RPM) - Multiplier" category="ALPHA Engine Load Limit B Multiplier" type="2D" level="1" scaling="rawecuvalueverbose">
+	<table name="Engine Load Limit B Maximum (RPM) - Multiplier" category="Alpha Engine Load Limit B Multiplier" type="2D"  scaling="rawecuvalueverbose">
 		<description>Change this value to change the maximum  of the Engine Load Limit B Maximum (RPM) table from it's nominal value.  By setting this field to twice (x2) of it's nominal value you will increase the cap of the Engine Load Limit B Maximum (RPM) to double it's nomial value.</description>
 		<table type="Static Y Axis" elements="1">
 			<data>Engine Load Limit B Multiplier</data>
 		</table>
 	</table>
 
-	<table name="Fuel Pump Duty" category="ALPHA Fuel Pump" type="2D" level="1" scaling="rawecuvalue">
+	<table name="Fuel Pump Duty" category="Alpha Fuel Pump" type="2D"  scaling="rawecuvalue">
 		<description>The ECU will set fuel pump duty cycle to 0%, 100%, or one of these two values.</description>
 		<table name="Fuel Pump Duty" type="Static Y Axis" elements="2">
 			<data>Medium</data>
@@ -5583,111 +5171,111 @@
 		</table>
 	</table>
 
-	<table name="A/F #1 Learning Max Threshold" category="ALPHA A/F #1 Learning Thresholds" type="1D" level="1" scaling="MassAirflow(g/s)1">
+	<table name="A/F #1 Learning Max Threshold" category="Alpha A/F #1 Learning Thresholds" type="1D"  scaling="MassAirflow(g/s)1">
 		<description>This determines the maximum mass airflow that AF Learning values will be applied to. By setting this lower than D range, no fuel learnings will be carried into open loop fueling.</description>
 	</table>
 
-	<table name="A/F #1 Learning Min Threshold" category="ALPHA A/F #1 Learning Thresholds" type="1D" level="1" scaling="MassAirflow(g/s)1">
+	<table name="A/F #1 Learning Min Threshold" category="Alpha A/F #1 Learning Thresholds" type="1D"  scaling="MassAirflow(g/s)1">
 		<description>This determines the minimum mass airflow that AF Learning values will be applied to.</description>
 	</table>
 
-	<table name="AF 3 CL Target Compensation Limits" category="ALPHA AF 3 (Rear O2 Sensor)" type="2D" level="1" scaling="AF3 Lambda">
+	<table name="AF 3 CL Target Compensation Limits" category="Alpha AF 3 (Rear O2 Sensor)" type="2D"  scaling="AF3 Lambda">
 		<table name="X" type="Static X Axis" elements="2">
 			<data>High</data>
 			<data>Low</data>
 		</table>
 	</table>
 
-	<table name="Tau Input A Falling Load Activation" category="ALPHA Transient Fueling (Tau)" type="2D" level="1" scaling="Tau">
+	<table name="Tau Input A Falling Load Activation" category="Alpha Transient Fueling (Tau)" type="2D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is decreasing.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Tau Input A Falling Load Activation A" category="ALPHA Transient Fueling (Tau)" type="2D" level="1" scaling="Tau">
+	<table name="Tau Input A Falling Load Activation A" category="Alpha Transient Fueling (Tau)" type="2D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is decreasing.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Tau Input A Falling Load Activation B" category="ALPHA Transient Fueling (Tau)" type="2D" level="1" scaling="Tau">
+	<table name="Tau Input A Falling Load Activation B" category="Alpha Transient Fueling (Tau)" type="2D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is decreasing.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Tau Input A Falling Load Activation C" category="ALPHA Transient Fueling (Tau)" type="2D" level="1" scaling="Tau">
+	<table name="Tau Input A Falling Load Activation C" category="Alpha Transient Fueling (Tau)" type="2D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is decreasing.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Tau Input B Activation" category="ALPHA Transient Fueling (Tau)" type="2D" level="1" scaling="Tau">
+	<table name="Tau Input B Activation" category="Alpha Transient Fueling (Tau)" type="2D"  scaling="Tau">
 		<description>This table determines the Tau B enrichment multiplier.</description>
 		<table type="Y Axis" elements="11" scaling="TauMrp"/>
 	</table>
 
-	<table name="Tau Input B Activation A" category="ALPHA Transient Fueling (Tau)" type="2D" level="1" scaling="Tau">
+	<table name="Tau Input B Activation A" category="Alpha Transient Fueling (Tau)" type="2D"  scaling="Tau">
 		<description>This table determines the Tau B enrichment multiplier.</description>
 		<table type="Y Axis" elements="11" scaling="TauMrp"/>
 	</table>
 
-	<table name="Tau Input B Activation B" category="ALPHA Transient Fueling (Tau)" type="2D" level="1" scaling="Tau">
+	<table name="Tau Input B Activation B" category="Alpha Transient Fueling (Tau)" type="2D"  scaling="Tau">
 		<description>This table determines the Tau B enrichment multiplier.</description>
 		<table type="Y Axis" elements="11" scaling="TauMrp"/>
 	</table>
 
-	<table name="Tau Input B Activation (Engine Load)" category="ALPHA Transient Fueling (Tau)" type="2D" level="1" scaling="Tau">
+	<table name="Tau Input B Activation (Engine Load)" category="Alpha Transient Fueling (Tau)" type="2D"  scaling="Tau">
 		<description>This table determines the Tau B enrichment multiplier.</description>
 		<table name="Engine Load" type="Y Axis" elements="11" scaling="g/rev"/>
 	</table>
 
-	<table name="Tau Input A Rising Load Activation" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Tau Input A Rising Load Activation" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Engine Load" type="Y Axis" elements="3" scaling="g/rev"/>
 	</table>
 
-	<table name="Tau Input A Rising Load Activation A" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Tau Input A Rising Load Activation A" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Manifold Pressure" type="Y Axis" elements="3" scaling="TauMrp"/>
 	</table>
 
-	<table name="Tau Input A Rising Load Activation B" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Tau Input A Rising Load Activation B" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Manifold Pressure" type="Y Axis" elements="3" scaling="TauMrp"/>
 	</table>
 
-	<table name="Tau Input A Rising Load Activation C" category="ALPHA Transient Fueling (Tau)" type="3D" level="1" scaling="Tau">
+	<table name="Tau Input A Rising Load Activation C" category="Alpha Transient Fueling (Tau)" type="3D"  scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is increasing.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 		<table name="Manifold Pressure" type="Y Axis" elements="3" scaling="TauMrp"/>
 	</table>
 
-	<table name="Front AF Sensor Smoothing Table" category="ALPHA Front O2 Sensor Smoothing" type="3D" level="2" scaling="SmoothingFactor">
+	<table name="Front AF Sensor Smoothing Table" category="Alpha Front O2 Sensor Smoothing" type="3D" level="2" scaling="SmoothingFactor">
 		<description>Front AF Sensor Smoothing Factor Table, lower values = less smoothing, DO NOT SET TO 100% or higher!</description>
 		<table name="Smoothed MAF" type="X Axis" elements="4" scaling="g/s"/>
 		<table name="Engine Load" type="Y Axis" elements="4" scaling="g/rev"/>
 	</table>
 
-	<table name="Overrun Fueling RPM Resume Threshold" category="ALPHA OverRun Fueling" type="2D" level="1" scaling="OverRun Fueling">
+	<table name="Overrun Fueling RPM Resume Threshold" category="Alpha OverRun Fueling" type="2D"  scaling="OverRun Fueling">
 		<description>This 2D table determines (on an ECT x axis) at what RPM the injectors switch back on from coasting (i.e. full lean, and injector pulse width at zero). This would be useful to those with much larger injectors than stock that have a problem with stalling out as the vehicle comes to stop / idle.</description>
 		<table name="Coolant Temperature" type="X Axis" elements="16" scaling="DegreesF"/>
 	</table>
 
-	<table name="Overrun Enrich RPM Delta Activation" category="ALPHA OverRun Fueling" type="2D" level="1" scaling="rawecuvalue">
+	<table name="Overrun Enrich RPM Delta Activation" category="Alpha OverRun Fueling" type="2D"  scaling="rawecuvalue">
 		<description>This table sets the required RPM delta for overrun enrichment to activate.</description>
 		<table name="OverRun" type="Static Y Axis" elements="1">
 			<data>RPM Delta</data>
 		</table>
 	</table>
 
-	<table name="Overrun initial injector enrichment (pulsewidth)" category="ALPHA OverRun Fueling" type="2D" level="1" scaling="ms">
+	<table name="Overrun initial injector enrichment (pulsewidth)" category="Alpha OverRun Fueling" type="2D"  scaling="ms">
 		<description>This table sets the initial overrun enrichment when active.</description>
 		<table name="OverRun" type="Static Y Axis" elements="1">
 			<data>Initial Enrichment (pulsewidth)</data>
 		</table>
 	</table>
 
-	<table name="Overrun Fueling Cut Counter RPM Threshold" category="ALPHA OverRun Fueling" type="2D" level="1" scaling="RPM">
+	<table name="Overrun Fueling Cut Counter RPM Threshold" category="Alpha OverRun Fueling" type="2D"  scaling="RPM">
 		<description>These counters determine the RPM count before injectors cut off during overrun.</description>
 		<table name="RPM" type="Static Y Axis" elements="3">
 			<data>Low</data>
@@ -5696,7 +5284,7 @@
 		</table>
 	</table>
 
-	<table name="Overrun Fueling Cut Counter RPM Threshold_" category="ALPHA OverRun Fueling" type="2D" level="1" scaling="RPM">
+	<table name="Overrun Fueling Cut Counter RPM Threshold_" category="Alpha OverRun Fueling" type="2D"  scaling="RPM">
 		<description>These counters determine the RPM count before injectors cut off during overrun.</description>
 		<table name="RPM" type="Static Y Axis" elements="5">
 			<data>A</data>
@@ -5707,100 +5295,100 @@
 		</table>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder A" category="ALPHA Idle Control" type="2D" level="1" scaling="AirflowAdder">
+	<table name="Idle Airflow Min Target Decel Adder A" category="Alpha Idle Control" type="2D"  scaling="AirflowAdder">
 		<description>This table is added to idle airflow when the minimum activation threshold based on vehicle speed is reached</description>
 		<table name="Engine Speed" type="X Axis" elements="2" scaling="RPM"/>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder B" category="ALPHA Idle Control" type="2D" level="1" scaling="AirflowAdder">
+	<table name="Idle Airflow Min Target Decel Adder B" category="Alpha Idle Control" type="2D"  scaling="AirflowAdder">
 		<description>This table is added to idle airflow when the minimum activation threshold based on vehicle speed is reached</description>
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder (RPM x ECT)" category="ALPHA Idle Control" type="3D" level="1" scaling="AirflowAdder">
+	<table name="Idle Airflow Min Target Decel Adder (RPM x ECT)" category="Alpha Idle Control" type="3D"  scaling="AirflowAdder">
 		<description>This table is an RPM by Engine Coolant table which is added to idle airflow when the minimum activation threshold based on vehicle speed is reached</description>
 		<table name="Engine Speed" type="X Axis" elements="16" scaling="RPM"/>
 		<table name="Coolant Temp" type="Y Axis" elements="13" scaling="CoolantTemp(DegreesF)"/>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder (RPM)" category="ALPHA Idle Control" type="2D" level="1" scaling="AirflowAdder">
+	<table name="Idle Airflow Min Target Decel Adder (RPM)" category="Alpha Idle Control" type="2D"  scaling="AirflowAdder">
 		<description>This table is an RPM by Engine Coolant table which is added to idle airflow when the minimum activation threshold based on vehicle speed is reached</description>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder Active Veh Speed A" category="ALPHA Idle Control" type="1D" level="1" scaling="VehicleSpeed(MPH)">
+	<table name="Idle Airflow Min Target Decel Adder Active Veh Speed A" category="Alpha Idle Control" type="1D"  scaling="VehicleSpeed(MPH)">
 		<description>This table sets the activation threshold for the Idle Aifrlow Min Target Decel Adder table.</description>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Adder Active Veh Speed B" category="ALPHA Idle Control" type="1D" level="1" scaling="VehicleSpeed(MPH)">
+	<table name="Idle Airflow Min Target Decel Adder Active Veh Speed B" category="Alpha Idle Control" type="1D"  scaling="VehicleSpeed(MPH)">
 		<description>This table sets the activation threshold for the Idle Aifrlow Min Target Decel Adder table.</description>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Initial Idle Min Airflow A" category="ALPHA Idle Control" type="1D" level="1" scaling="rawecuvalue">
+	<table name="Idle Airflow Min Target Decel Initial Idle Min Airflow A" category="Alpha Idle Control" type="1D"  scaling="rawecuvalue">
 		<description>Idle airflow will be limited to a minimum value as determined by this table, for a time determined by Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter</description>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Initial Idle Min Airflow B" category="ALPHA Idle Control" type="1D" level="1" scaling="rawecuvalue">
+	<table name="Idle Airflow Min Target Decel Initial Idle Min Airflow B" category="Alpha Idle Control" type="1D"  scaling="rawecuvalue">
 		<description>Idle airflow will be limited to a minimum value as determined by this table, for a time determined by Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter</description>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter" category="ALPHA Idle Control" type="1D" level="1" scaling="rawecuvalue">
+	<table name="Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter" category="Alpha Idle Control" type="1D"  scaling="rawecuvalue">
 		<description>Determines how long Idle Airflow Min Target Decel Initial Idle Min Airflow limit is applied.</description>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Ramping Adder Decreasing" category="ALPHA Idle Control" type="1D" level="1" scaling="negative_rawecuvalue">
+	<table name="Idle Airflow Min Target Decel Ramping Adder Decreasing" category="Alpha Idle Control" type="1D"  scaling="negative_rawecuvalue">
 		<description>This table is added to target idle airflow depending on the direction of error.</description>
 	</table>
 
-	<table name="Idle Airflow Min Target Decel Ramping Adder Increasing" category="ALPHA Idle Control" type="1D" level="1" scaling="rawecuvalue">
+	<table name="Idle Airflow Min Target Decel Ramping Adder Increasing" category="Alpha Idle Control" type="1D"  scaling="rawecuvalue">
 		<description>This table is added to target idle airflow depending on the direction of error.</description>
 	</table>
 
-	<table name="Hotstart Enrichment Decay Delay" category="ALPHA Hotstart" type="1D" level="1" scaling="Hotstart Counter uint16">
+	<table name="Hotstart Enrichment Decay Delay" category="Alpha Hotstart" type="1D"  scaling="Hotstart Counter uint16">
 		<description>Delay before the Initial Hotstart Enrichment is decayed by the decay step value.</description>
 	</table>
 
-	<table name="Hotstart Enrichment Decay Step" category="ALPHA Hotstart" type="1D" level="1" scaling="Hotstart Enrichment">
+	<table name="Hotstart Enrichment Decay Step" category="Alpha Hotstart" type="1D"  scaling="Hotstart Enrichment">
 		<description>Step value that is decayed from the initial enrichment every time the counter increments.</description>
 	</table>
 
-	<table name="Initial Hotstart Enrichment (High)" category="ALPHA Hotstart" type="1D" level="1" scaling="Hotstart Enrichment">
+	<table name="Initial Hotstart Enrichment (High)" category="Alpha Hotstart" type="1D"  scaling="Hotstart Enrichment">
 		<description>Initial High Enrichment. This is applied when BOTH high enrichment thresholds are met.</description>
 	</table>
 
-	<table name="Hotstart High Enrichment Activation Threshold (Coolant Temperature)" category="ALPHA Hotstart" type="1D" level="1" scaling="CoolantTemp(DegreesF)">
+	<table name="Hotstart High Enrichment Activation Threshold (Coolant Temperature)" category="Alpha Hotstart" type="1D"  scaling="CoolantTemp(DegreesF)">
 		<description>Minimum Coolant Temperature threshold for high enrichment.</description>
 	</table>
 
-	<table name="Hotstart High Enrichment Activation Threshold (Intake Air Temperature)" category="ALPHA Hotstart" type="1D" level="1" scaling="DegreesF">
+	<table name="Hotstart High Enrichment Activation Threshold (Intake Air Temperature)" category="Alpha Hotstart" type="1D"  scaling="DegreesF">
 		<description>Minimum Intake Air Temperature threshold for high enrichment.</description>
 	</table>
 
-	<table name="Initial Hotstart Enrichment (Low)" category="ALPHA Hotstart" type="1D" level="1" scaling="Hotstart Enrichment">
+	<table name="Initial Hotstart Enrichment (Low)" category="Alpha Hotstart" type="1D"  scaling="Hotstart Enrichment">
 		<description>Initial Low Enrichment. This is applied when ANY high enrichment threshold is not met AND both low enrichment thresholds are met.</description>
 	</table>
 
-	<table name="Hotstart Low Enrichment Activation Threshold (Coolant Temperature)" category="ALPHA Hotstart" type="1D" level="1" scaling="CoolantTemp(DegreesF)">
+	<table name="Hotstart Low Enrichment Activation Threshold (Coolant Temperature)" category="Alpha Hotstart" type="1D"  scaling="CoolantTemp(DegreesF)">
 		<description>Minimum Coolant Temperature threshold for low enrichment.</description>
 	</table>
 
-	<table name="Hotstart Low Enrichment Activation Threshold (Minimum Intake Air Temperature)" category="ALPHA Hotstart" type="1D" level="1" scaling="DegreesF">
+	<table name="Hotstart Low Enrichment Activation Threshold (Minimum Intake Air Temperature)" category="Alpha Hotstart" type="1D"  scaling="DegreesF">
 		<description>Minimum Intake Air Temperature threshold for low enrichment.</description>
 	</table>
 
-	<table name="Maximum Non-Idle Hotstart Enrichment (Post Delay)" category="ALPHA Hotstart" type="1D" level="1" scaling="Hotstart Enrichment">
+	<table name="Maximum Non-Idle Hotstart Enrichment (Post Delay)" category="Alpha Hotstart" type="1D"  scaling="Hotstart Enrichment">
 		<description>Maximum Non-Idle enrichment after the Hotstart Maximum Non-Idle Enrichment delay.</description>
 	</table>
 
-	<table name="Hotstart Maximum Non-Idle Enrichment Delay" category="ALPHA Hotstart" type="1D" level="2" scaling="Hotstart Counter uint16">
+	<table name="Hotstart Maximum Non-Idle Enrichment Delay" category="Alpha Hotstart" type="1D" level="2" scaling="Hotstart Counter uint16">
 		<description>Delay before Maximum Non-Idle Hotstart Enrichment limit is applied.</description>
 	</table>
 
-	<table name="Hotstart Minimum Enrichment Limit Runtime" category="ALPHA Hotstart" type="1D" level="1" scaling="Hotstart Counter uint16">
+	<table name="Hotstart Minimum Enrichment Limit Runtime" category="Alpha Hotstart" type="1D"  scaling="Hotstart Counter uint16">
 		<description>Determines how long the minimum enrichment limit is enabled.</description>
 	</table>
 
-	<table name="Hotstart Minimum Enrichment (During Delay and Runtime)" category="ALPHA Hotstart" type="1D" level="1" scaling="Hotstart Enrichment">
+	<table name="Hotstart Minimum Enrichment (During Delay and Runtime)" category="Alpha Hotstart" type="1D"  scaling="Hotstart Enrichment">
 		<description>Minimum enrichment limit that is only active during decay delay and hotstart minimum enrichment runtime.</description>
 	</table>
 
@@ -5816,20 +5404,15 @@
 		<table name="Engine Speed" type="Y Axis" elements="12" scaling="RPM"/>
 	</table>
 
-	<table name="Injector Flow Scaling BRZ" category="Fueling - Injectors" type="2D" level="3" scaling="Injector_Flow_BRZ">
-		<description>This is the BRZ fuel injector constant.</description>
-		<table type="Static Y Axis" elements="1">
-			<data>Injector Flow Constant</data>
-		</table>
-	</table>
 
-	<table name="Per Injector Pulse Width Compensation G" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorPulseWidthCompensation">
+
+	<table name="Per Injector Pulse Width Compensation G" category="Fueling - Injectors" type="3D"  scaling="InjectorPulseWidthCompensation">
 		<description>This determines the compensation (per injector) to the current calculated injector duration based on the last calculated injector duration and engine speed. The calculated injector pulse width is based on engine load and a number of other correction factors necessary to achieve the desired fueling. It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="17" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Per Injector Pulse Width Compensation H" category="Fueling - Injectors" type="3D" level="1" scaling="InjectorPulseWidthCompensation">
+	<table name="Per Injector Pulse Width Compensation H" category="Fueling - Injectors" type="3D"  scaling="InjectorPulseWidthCompensation">
 		<description>This determines the compensation (per injector) to the current calculated injector duration based on the last calculated injector duration and engine speed. The calculated injector pulse width is based on engine load and a number of other correction factors necessary to achieve the desired fueling. It is not currently known which table corresponds to which injector. WARNING: UNTESTED</description>
 		<table name="Last Calculated Base Pulse Width" type="X Axis" elements="17" scaling="ms"/>
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
@@ -5991,32 +5574,32 @@
 		<table name="Engine Speed" type="Y Axis" elements="17" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Gear (1st)" category="Ignition Timing - Compensation" type="3D" level="1" scaling="PerGearIgnitionCompensation (degreesofcorrection)">
+	<table name="Timing Compensation Per Gear (1st)" category="Ignition Timing - Compensation" type="3D"  scaling="PerGearIgnitionCompensation (degreesofcorrection)">
 		<table name="Engine Load" type="X Axis" elements="4" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="3" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Gear (2nd)" category="Ignition Timing - Compensation" type="3D" level="1" scaling="PerGearIgnitionCompensation (degreesofcorrection)">
+	<table name="Timing Compensation Per Gear (2nd)" category="Ignition Timing - Compensation" type="3D"  scaling="PerGearIgnitionCompensation (degreesofcorrection)">
 		<table name="Engine Load" type="X Axis" elements="4" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="3" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Gear (3rd)" category="Ignition Timing - Compensation" type="3D" level="1" scaling="PerGearIgnitionCompensation (degreesofcorrection)">
+	<table name="Timing Compensation Per Gear (3rd)" category="Ignition Timing - Compensation" type="3D"  scaling="PerGearIgnitionCompensation (degreesofcorrection)">
 		<table name="Engine Load" type="X Axis" elements="4" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="3" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Gear (4th)" category="Ignition Timing - Compensation" type="3D" level="1" scaling="PerGearIgnitionCompensation (degreesofcorrection)">
+	<table name="Timing Compensation Per Gear (4th)" category="Ignition Timing - Compensation" type="3D"  scaling="PerGearIgnitionCompensation (degreesofcorrection)">
 		<table name="Engine Load" type="X Axis" elements="4" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="3" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Gear (5th)" category="Ignition Timing - Compensation" type="3D" level="1" scaling="PerGearIgnitionCompensation (degreesofcorrection)">
+	<table name="Timing Compensation Per Gear (5th)" category="Ignition Timing - Compensation" type="3D"  scaling="PerGearIgnitionCompensation (degreesofcorrection)">
 		<table name="Engine Load" type="X Axis" elements="4" scaling="g/rev"/>
 		<table name="Engine Speed" type="Y Axis" elements="3" scaling="RPM"/>
 	</table>
 
-	<table name="Timing Compensation Per Gear Activation (RPM)" category="Ignition Timing - Compensation" type="2D" level="1" scaling="EngineSpeed(RPM)1">
+	<table name="Timing Compensation Per Gear Activation (RPM)" category="Ignition Timing - Compensation" type="2D"  scaling="EngineSpeed(RPM)1">
 		<description>This is per-gear timing compensation activation threshold by RPM.</description>
 		<table name="Timing Compensation Per Gear Activation RPM" type="Static Y Axis" elements="2">
 			<data>Enable Above</data>
@@ -6024,7 +5607,7 @@
 		</table>
 	</table>
 
-	<table name="Timing Compensation Per Gear Activation (Load)" category="Ignition Timing - Compensation" type="2D" level="1" scaling="EngineLoad(g/rev)1">
+	<table name="Timing Compensation Per Gear Activation (Load)" category="Ignition Timing - Compensation" type="2D"  scaling="EngineLoad(g/rev)1">
 		<description>This is per-gear timing compensation activation threshold by load (g/rev).</description>
 		<table name="Timing Compensation Per Gear Activation Load" type="Static Y Axis" elements="2">
 			<data>Enable Above</data>
@@ -6032,14 +5615,14 @@
 		</table>
 	</table>
 
-	<table name="Timing Compensation Overrun RPM Delta" category="Ignition Timing - Compensation" type="2D" level="1" scaling="EngineSpeed(RPM)1">
+	<table name="Timing Compensation Overrun RPM Delta" category="Ignition Timing - Compensation" type="2D"  scaling="EngineSpeed(RPM)1">
 		<description>If the overrun engine speed delta is over this value, ignition overrun may be enabled.</description>
 		<table type="Static Y Axis" elements="1">
 			<data>RPM Delta</data>
 		</table>
 	</table>
 
-	<table name="Timing Overrun" category="Ignition Timing - Compensation" type="2D" level="1" scaling="IgnitionTimingCorrection(degrees)">
+	<table name="Timing Overrun" category="Ignition Timing - Compensation" type="2D"  scaling="IgnitionTimingCorrection(degrees)">
 		<description>Compensation to ignition timing under overrrun conditions.</description>
 		<table name="Coolant Temp" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
 	</table>
@@ -6096,12 +5679,12 @@
 		<table name="Engine Speed" type="Y Axis" elements="16" scaling="RPM"/>
 	</table>
 
-	<table name="Target Throttle Plate Position (Idle)" category="Drive-by-Wire Throttle (DBW)" type="2D" level="1" scaling="ThrottlePlateOpeningAngle(%)2">
+	<table name="Target Throttle Plate Position (Idle)" category="Drive-by-Wire Throttle (DBW)" type="2D"  scaling="ThrottlePlateOpeningAngle(%)2">
 		<description>The idle airflow target is used to determing the the target throttle opening during idle, which is then added to the target throttle angle to arrive at the final target throttle angle.</description>
 		<table name="Idle Airflow Target" type="X Axis" elements="17" scaling="MassAirflow(g/s)1"/>
 	</table>
 
-	<table name="Target Throttle Plate Position (Idle) Minimum" category="Drive-by-Wire Throttle (DBW)" type="2D" level="1" scaling="ThrottlePlateOpeningAngle(%)2">
+	<table name="Target Throttle Plate Position (Idle) Minimum" category="Drive-by-Wire Throttle (DBW)" type="2D"  scaling="ThrottlePlateOpeningAngle(%)2">
 		<description>This is the minimum target throttle opening during idle which can be added to the target throttle angle to arrive at the final target throttle angle.</description>
 		<table type="Static Y Axis" elements="1">
 			<data>Minimum TPS (Idle) Position</data>
@@ -6550,31 +6133,31 @@
 		<description>(P9578). To disable this DTC, make sure the box above is unchecked. Off-road use only.</description>
 	</table>
 
-	<table name="MAF Adder (CPC Multiplier)" type="1D" level="1" scaling="%"/>
+	<table name="MAF Adder (CPC Multiplier)" type="1D"  scaling="%"/>
 
-	<table name="AF 3 Correction Adder (Increase)" category="ALPHA AF 3 (Rear O2 Sensor)" type="1D" level="1" scaling="AF3_Adder"/>
+	<table name="AF 3 Correction Adder (Increase)" category="Alpha AF 3 (Rear O2 Sensor)" type="1D"  scaling="AF3_Adder"/>
 
-	<table name="AF 3 Correction Adder (Decrease)" category="ALPHA AF 3 (Rear O2 Sensor)" type="1D" level="1" scaling="AF3_Adder"/>
+	<table name="AF 3 Correction Adder (Decrease)" category="Alpha AF 3 (Rear O2 Sensor)" type="1D"  scaling="AF3_Adder"/>
 
-	<table name="Throttle_Angle_Idle_Airflow_Target" type="2D" level="1" scaling="%1">
+	<table name="Throttle_Angle_Idle_Airflow_Target" type="2D"  scaling="%1">
 		<table name="Idle Airflow Target" type="X Axis" elements="17" scaling="Idle Airflow Target"/>
 	</table>
 
-	<table name="Rev Limiter (RPM) A" type="2D" level="1" scaling="RPM">
+	<table name="Rev Limiter (RPM) A" type="2D"  scaling="RPM">
 		<table type="Static Y Axis" elements="2">
 			<data>Enable</data>
 			<data>Disable</data>
 		</table>
 	</table>
 
-	<table name="Rev Limiter (RPM) B" type="2D" level="1" scaling="RPM">
+	<table name="Rev Limiter (RPM) B" type="2D"  scaling="RPM">
 		<table type="Static Y Axis" elements="2">
 			<data>Enable</data>
 			<data>Disable</data>
 		</table>
 	</table>
 
-	<table name="Info Panel Fuel Consumption Correction" category="Fuel" type="2D" level="1" scaling="rawecuvalue">
+	<table name="Info Panel Fuel Consumption Correction" category="Fuel" type="2D"  scaling="rawecuvalue">
 		<description>This is the correction applied to the fuel efficiency calculation to account for injector size change. Adjust this value by the same percentage as used for injector scaling. NewCorrection = CurrentCorrection * (NewInjectorScale / OldInjectorScale)</description>
 		<table name="Fuel Efficiency Correction" type="Static Y Axis" elements="1">
 			<data>Value</data>
@@ -6587,5 +6170,10 @@
 			<data>Value</data>
 		</table>
 	</table>
+	
+	  <table name="Wastegate Duty Cycle Frequency" type="1D" category="Boost Control - Wastegate" storagetype="uint16" endian="big">
+    <description>PWM frequency of the wastegate solenoid in Hz. Stock is typically 14-16 Hz. Higher frequencies reduce audible chatter.</description>
+ <scaling units="Hz" toexpr="250000/x" frexpr="250000/x" format="%.2f" min="1" max="100" step="0.01"/>
+</table>
 
 </rom>
