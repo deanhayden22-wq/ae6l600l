@@ -1186,13 +1186,19 @@
 <table name="TPS Opening %" type="Y Axis" elements="9" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
 </table>
   
-  <table name="AF 3 Correction Limits" category="AFR #3" address="35ffc" type="1D" level="1" scaling="A/FLearning#1Limits(%)">
+  <table name="AF 3 Correction Limits" category="AFR #3" address="35ffc" type="2D" level="1" scaling="A/FLearning#1Limits(%)">
 <description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE. </description>
-<table name="limits" type="X Axis" elements="2"/>
+<table name="limits" type="Static X Axis" elements="2">
+<data>+</data>
+<data>-</data>
 </table>
-<table name="AF 3 Learning Limits" category="AFR #3" address="36000" type="1D" level="1" scaling="A/FLearning#1Limits(%)">
+</table>
+<table name="AF 3 Learning Limits" category="AFR #3" address="36004" type="2D" level="1" scaling="A/FLearning#1Limits(%)">
 <description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE. </description>
-<table name="limits" type="X Axis" elements="2"/>
+<table name="limits" type="Static X Axis" elements="2">
+<data>+</data>
+<data>-</data>
+</table>
 </table>
   
   <table name="Wastegate Duty Cycle Frequency" storageaddress="c009e" type="1D" category="Boost Control - Wastegate" storagetype="uint16" endian="big">
