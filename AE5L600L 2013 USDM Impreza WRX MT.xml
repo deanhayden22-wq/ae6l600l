@@ -16,10 +16,53 @@
 	</romid>
 
 	<include>32BITBASE</include>
+	<scaling name="AF3_Adder2" units="units" toexpr="x*0.000015258789" frexpr="x/0.000015258789" format="%.6f" min="0" max="255" inc="1e-05" storagetype="uint16" endian="big"/>
+	<scaling name="LCRPM" units="Engine Speed (RPM)" toexpr="x" frexpr="x" format="%.0f" min="0" max="12000" inc="50" storagetype="float" endian="big"/>
+	<scaling name="LCSPEED(KMH)" units="Vehicle Speed (KMH)" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="float" endian="big"/>
+	<scaling name="LCSPEED(MPH)" units="Vehicle Speed (MPH)" toexpr="x*.621" frexpr="x/.621" format="%.0f" min="0" max="300" inc="1" storagetype="float" endian="big"/>
+	<scaling name="LoadGRev" units="g/rev" toexpr="x" frexpr="x" format="%.2f" min="0" max="5" inc="0.05" storagetype="float" endian="big"/>
+	<scaling name="barpressureabsolute" units="bar absolute" toexpr="x*.001333224" frexpr="x/.001333224" format="%.3f" min="0.2" max="2.67" inc="0.01" storagetype="float" endian="big"/>
+	<scaling name="psipressureabsolute" units="psi absolute" toexpr="x*.01933677" frexpr="x/.01933677" format="%.3f" min="-8.01" max="9.94" inc="0.01" storagetype="float" endian="big"/>
 
-	<notes>2014/05/22 [Tactrix] Tactrix definition auto cleaned|merged w/ RomRaiderGitHubAlphaMay2014.
-</notes>
+	<table name="Boost disable during fuel cut-RPM threshold" category="tinywrex patches" address="c0bd0" type="1D" scaling="LCRPM"/>
 
+	<table name="Boost disable during fuel cut-Load threshold" category="tinywrex patches" address="c0bcc" type="1D" scaling="EngineLoad(g/rev)"/>
+
+	<table name="Boost disable during fuel cut-Boost(bar) threshold" category="tinywrex patches" address="c0bc8" type="1D" scaling="barpressureabsolute"/>
+
+	<table name="Boost disable during fuel cut-Boost(psi) threshold" category="tinywrex patches" address="c0bc8" type="1D" scaling="psipressureabsolute"/>
+
+	<table name="LC disable speed(KMH)threshold" category="tinywrex patches" address="f104c" type="1D" scaling="LCSPEED(KMH)"/>
+
+	<table name="LC disable speed(MPH)threshold" category="tinywrex patches" address="f104c" type="1D" scaling="LCSPEED(MPH)"/>
+
+	<table name="LC RPM delta" category="tinywrex patches" address="f1050" type="1D" scaling="LCRPM"/>
+
+	<table name="FFS RPM delta" category="tinywrex patches" address="f1054" type="1D" scaling="LCRPM"/>
+
+	<table name="Rev Limit On" category="tinywrex patches" address="cc500" type="1D" scaling="LCRPM"/>
+
+	<table name="Rev Limit Off" category="tinywrex patches" address="cc504" type="1D" scaling="LCRPM"/>
+
+	<table name="Rev Limit On (2)" category="tinywrex patches" address="cc508" type="1D" scaling="LCRPM"/>
+
+	<table name="Rev Limit Off (2)" category="tinywrex patches" address="cc50c" type="1D" scaling="LCRPM"/>
+
+	<table name="Rev Limit On (3)" category="tinywrex patches" address="cc510" type="1D" scaling="LCRPM"/>
+
+	<table name="Rev Limit Off (3)" category="tinywrex patches" address="cc514" type="1D" scaling="LCRPM"/>
+
+	<table name="AF 3 Correction Adder (Increase) B" category="Fueling - AF Correction / Learning" type="2D" scaling="AF3_Adder2">
+		<table name="TPS Opening %" type="Y Axis" elements="9" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
+	</table>
+
+	<table name="AF 3 Correction Limits" category="Fueling - AF Correction / Learning" address="35ffc" type="1D" scaling="A/FLearning#1Limits(%)">
+		<description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE.</description>
+	</table>
+
+	<table name="AF 3 Learning Limits" category="Fueling - AF Correction / Learning" address="36000" type="1D" scaling="A/FLearning#1Limits(%)">
+		<description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE.</description>
+	</table>
 
 	<table name="Target Boost_" address="c1340">
 		<table name="Requested Torque" address="c12d8"/>
@@ -135,7 +178,6 @@
 
 	<table name="Manifold Pressure Sensor CEL Delays" address="d8a39">
 	</table>
-
 
 	<table name="Primary Open Loop Fueling (KCA Additive B Low)" address="d0244">
 		<table name="Engine Load" address="d01b8" elements="17"/>
@@ -1010,6 +1052,16 @@
 		<table name="Engine Speed" address="c1f40"/>
 	</table>
 
+	<table name="Low Pulse Width Fuel Injector Compensation" address="d39a8">
+		<table name="Injector Pulse Width" address="d3988" type="Y Axis"/>
+	</table>
+
+	<table name="Low pulse width fuel injector compensation maximum RPM" address="d2d28">
+	</table>
+
+	<table name="Low pulse width fuel injector compensation maximum IPW" address="d2d2c">
+	</table>
+
 	<table name="Ignition Dwell" address="d91e0">
 		<table name="Engine Speed" address="d918c"/>
 		<table name="Battery Volts" address="d91cc"/>
@@ -1025,7 +1077,31 @@
 		<table name="Gear" address="f9888"/>
 	</table>
 
+	<table name="Engine Load Limit B Maximum (RPM) - Multiplier" category="Alpha Engine Load Limit B Multiplier" address="aae20" type="2D" scaling="rawecuvalueverbose">
+	</table>
+
 	<table name="Fuel Pump Duty" address="4bbac">
+	</table>
+
+	<table name="Tau Input A Falling Load Activation" address="cd746">
+		<table name="Coolant Temperature" address="cc624"/>
+	</table>
+
+	<table name="Tau Input A Falling Load Activation A" address="cd766">
+		<table name="Coolant Temperature" address="cc624"/>
+	</table>
+
+	<table name="Tau Input A Falling Load Activation B" address="cd848">
+		<table name="Coolant Temperature" address="cc624"/>
+	</table>
+
+	<table name="Tau Input A Falling Load Activation C" address="cd868">
+		<table name="Coolant Temperature" address="cc624"/>
+	</table>
+
+	<table name="Tau Input A Rising Load Activation" address="cd6e6">
+		<table name="Coolant Temperature" address="cc624"/>
+		<table name="Engine Load" address="ccdcc"/>
 	</table>
 
 	<table name="Overrun Fueling RPM Resume Threshold" address="ceed0">
@@ -1154,53 +1230,11 @@
 	<table name="(U0416) CAN INVALID DATA RECEIVED FROM VDC" address="9a7fa"/>
 
 	<table name="(U0422) CAN INVALID DATA RECEIVED FROM BIU" address="9a7f6"/>
-	
-	  <scaling name="LCRPM" units="Engine Speed (RPM)" toexpr="x" frexpr="x" format="%.0f" min="0" max="12000" inc="50" storagetype="float" endian="big" />
-  <scaling name="LCSPEED(KMH)" units="Vehicle Speed (KMH)" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="float" endian="big" />
-  <scaling name="LCSPEED(MPH)" units="Vehicle Speed (MPH)" toexpr="x*.621" frexpr="x/.621" format="%.0f" min="0" max="300" inc="1" storagetype="float" endian="big" />
-  <scaling name="barpressureabsolute" units="bar absolute" toexpr="x*.001333224" frexpr="x/.001333224" format="%.3f" min="0.20" max="2.67" inc=".01" storagetype="float" endian="big" />
-  <scaling name="psipressureabsolute" units="psi absolute" toexpr="x*.01933677" frexpr="x/.01933677" format="%.3f" min="-8.01" max="9.94" inc=".01" storagetype="float" endian="big" />
-  <scaling name="LoadGRev" units="g/rev" toexpr="x" frexpr="x" format="%.2f" min="0" max="5" inc=".05" storagetype="float" endian="big" />
 
-	<table name="Boost disable during fuel cut-RPM threshold" category="tinywrex patches" address="C0BD0" type="1D" level="1" scaling="LCRPM"/>
-	<table name="Boost disable during fuel cut-Load threshold" category="tinywrex patches" address="C0BCC" type="1D" level="1" scaling="EngineLoad(g/rev)"/>
-	<table name="Boost disable during fuel cut-Boost(bar) threshold" category="tinywrex patches" address="C0BC8" type="1D" level="1" scaling="barpressureabsolute"/>
-	<table name="Boost disable during fuel cut-Boost(psi) threshold" category="tinywrex patches" address="C0BC8" type="1D" level="1" scaling="psipressureabsolute"/>
-
-  <table name="LC disable speed(KMH)threshold" category="tinywrex patches" address="F104C" type="1D" level="1" scaling="LCSPEED(KMH)"/>
-  <table name="LC disable speed(MPH)threshold" category="tinywrex patches" address="F104C" type="1D" level="1" scaling="LCSPEED(MPH)"/>
-  <table name="LC RPM delta" category="tinywrex patches" address="F1050" type="1D" level="1" scaling="LCRPM"/>
- <table name="FFS RPM delta" category="tinywrex patches" address="F1054" type="1D" level="1" scaling="LCRPM"/>
-  <table name="Rev Limit On" category="tinywrex patches" address="CC500" type="1D" level="1" scaling="LCRPM"/>
-  <table name="Rev Limit Off" category="tinywrex patches" address="CC504" type="1D" level="1" scaling="LCRPM"/>
-   <table name="Rev Limit On (2)" category="tinywrex patches" address="CC508" type="1D" level="1" scaling="LCRPM"/>
-    <table name="Rev Limit Off (2)" category="tinywrex patches" address="CC50c" type="1D" level="1" scaling="LCRPM"/>
-	<table name="Rev Limit On (3)" category="tinywrex patches" address="CC510" type="1D" level="1" scaling="LCRPM"/>
-	 <table name="Rev Limit Off (3)" category="tinywrex patches" address="CC514" type="1D" level="1" scaling="LCRPM"/>
-  
-  <scaling name="AF3_Adder2" units="units" toexpr="x*0.000015258789" frexpr="x/0.000015258789" format="%.6f" min="0" max="255" inc="1e-05" storagetype="uint16" endian="big"/>
-<table name="AF 3 Correction Adder (Increase) B" category="AFR #3" type="2D" level="1" scaling="AF3_Adder2">
-<table name="TPS Opening %" type="Y Axis" elements="9" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
-</table>
-<table name="AF 3 Correction Adder (Decrease)" category="AFR #3" type="2D" level="1" scaling="AF3_Adder2">
-<table name="TPS Opening %" type="Y Axis" elements="9" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
-</table>
-  
-  <table name="AF 3 Correction Limits" category="AFR #3" address="35ffc" type="1D" level="1" scaling="A/FLearning#1Limits(%)">
-<description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE. </description>
-<table name="limits" type="X Axis" elements="2"/>
-</table>
-<table name="AF 3 Learning Limits" category="AFR #3" address="36000" type="1D" level="1" scaling="A/FLearning#1Limits(%)">
-<description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE. </description>
-<table name="limits" type="X Axis" elements="2"/>
-</table>
-  
-  <table name="Wastegate Duty Cycle Frequency" storageaddress="c009e" type="1D" category="Boost Control - Wastegate" storagetype="uint16" endian="big">
-    <description>PWM frequency of the wastegate solenoid in Hz. Stock is typically 14-16 Hz. Higher frequencies reduce audible chatter.</description>
- <scaling units="Hz" toexpr="250000/x" frexpr="250000/x" format="%.2f" min="1" max="100" step="0.01"/>
-</table>
-
-<table name="Engine Load Limit B Maximum (RPM) - Multiplier" address="aae20" category="ALPHA Engine Load Limit B Multiplier" type="2D" level="1" scaling="rawecuvalueverbose">
+	<table name="AF 3 Correction Adder (Decrease)" category="Fueling - AF Correction / Learning" type="2D">
+		<table type="Y Axis" elements="9" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
 	</table>
-  
+
+	<table name="Wastegate Duty Cycle Frequency" category="Boost Control - Wastegate" address="c009e" type="1D" scaling="0.01"/>
+
 </rom>
