@@ -3,7 +3,8 @@ SH7058 ECU ROM Disassembly
 ROM: 2013 USDM Subaru Impreza WRX MT  |  Part: AE5L600L
 MCU: Renesas SH7058  |  Arch: SH2 Big-Endian  |  ROM Base: 0x00000000
 RAM: 0xFFFF8000-0xFFFFFFFF (32KB)  |  ROM Size: 1MB (0x100000)
-Generated from RomRaider/EcuFlash definition files
+ECU ID: 8A12587007  |  Flash Method: subarucan  |  Checksum: subarudbw
+Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ================================================================================
 
 ; ─────────────────────────────────────────────────────
@@ -230,8 +231,245 @@ Generated from RomRaider/EcuFlash definition files
   00000D34:  bfad        bsr      0xc92
   00000D36:  3c04        div1     r0,r12
 
+; ═════════════════════════════════════════════════════════════════════════════
+; SCHEDULER / TASK TABLE
+; ═════════════════════════════════════════════════════════════════════════════
+; The ECU runs a periodic task dispatcher from a scheduler table.
+;
+;   0x00E628:  sched_table_main     - Scheduler table, entry -> 0x04A94C
+;   0x04A94C:  sched_periodic_dispatch  - Per-tick dispatcher, calls 59 tasks
+;   0x04AD40:  task_table           - 59-entry periodic task pointer table
+;              Terminator = 0xFFFF8322
+;
+; Selected task entries:
+;   [11] 0x04AD6C -> fn_04438C  (reads knock flag)
+;   [12] 0x04AD70 -> fn_043D68  (writes 0xFFFF81D9, NOT the knock flag)
+;   [18] 0x04AD88 -> flkc_path_J   (FLKC fast-response correction)
+;   [25] 0x04ADA4 -> flkc_paths_FG (FLKC sustained-knock correction)
+
+; ═════════════════════════════════════════════════════════════════════════════
+; KNOCK DETECTION & FLKC (Fine Learning Knock Correction) ANALYSIS
+; ═════════════════════════════════════════════════════════════════════════════
+; Reverse-engineered from Ghidra analysis of the knock correction system.
+; Two GBR contexts: knock_detector uses GBR=0xFFFF80FC,
+;                   flkc_paths_FG uses GBR=0xFFFF8290.
+;
+; ─── Functions ───────────────────────────────────────
+;
+;   0x043750:  knock_wrapper
+;              Checks cylinder index R4 in {0,6,12,18} and counter < 4,
+;              then BSR to knock_detector (0x043782).
+;
+;   0x043782:  knock_detector
+;              Actual knock detection routine.  GBR = 0xFFFF80FC.
+;              Writes KNOCK_FLAG [0xFFFF81BA] = 1 (knock) or 0 (no knock)
+;              Writes KNOCK_BANK_FLAG [0xFFFF81BB] = bank index (0 or 1)
+;
+;   0x045BFE:  flkc_path_J  (task [18])
+;              FLKC fast-response correction.
+;              If KNOCK_FLAG != 0: FR13 -= base_step * 0.5
+;              At stock: base_step=0.5, multiplier=0.5 -> retard = -0.25 steps.
+;              ROM[0x045DD8] = 0x3F000000 = 0.5 (multiplier constant).
+;              Fires every cycle knock is detected. No bank discrimination.
+;
+;   0x0463BA:  flkc_paths_FG  (task [25])
+;              FLKC sustained-knock correction.  GBR = 0xFFFF8290.
+;              Requires 7 conditions including knock flag, counter >= 90,
+;              cylinder index match, and FP range checks.
+;              Branches on KNOCK_BANK_FLAG:
+;                bank != 1 -> PATH F: FR4 -= 1.01  (ROM[0xD2F50])
+;                bank == 1 -> PATH F: FR4 -= 2.80  (ROM[0xD2F64])
+;                early bail -> PATH G: FR4 -= 1.01  (ROM[0xD2F50])
+;
+; ─── ROM Constants (FLKC literal pool) ──────────────
+;
+;   0x045DD8:  PATH_J_HALFSTEP_MULT  = 0x3F000000 = 0.5
+;              Path J multiplier. retard = RAM[0xFFFF323C] * 0.5 = 0.25 steps.
+;              Change to 0x3F800000 (1.0) for full-step, 0x3F400000 (0.75) for 3/4.
+;
+;   0x0D2F40:  FLKC_FG_LIMIT_100   = 0x42C80000 = 100.0  (FR15 upper limit)
+;   0x0D2F44:  tbl_d2f44_8p0       = 0x41000000 = 8.0
+;   0x0D2F48:  tbl_d2f48_0p25      = 0x3E800000 = 0.25
+;   0x0D2F4C:  tbl_d2f4c_n15       = 0xC1700000 = -15.0
+;   0x0D2F50:  FLKC_RETARD_STEP    = 0x3F8147AE = 1.01  (Path F & G retard step)
+;   0x0D2F54:  tbl_d2f54_0p35      = 0x3EB33333 = 0.35
+;   0x0D2F58:  tbl_d2f58_0p35      = 0x3EB33333 = 0.35
+;   0x0D2F5C:  tbl_d2f5c_1p40      = 0x3FB33333 = 1.40
+;   0x0D2F60:  tbl_d2f60_1p40      = 0x3FB33333 = 1.40
+;   0x0D2F64:  FLKC_RETARD_BANK1   = 0x40333333 = 2.80  (Path F bank-1 step)
+;   0x0D2F68:  tbl_d2f68_2p80      = 0x40333333 = 2.80
+;
+; ─── RAM Variables ───────────────────────────────────
+;
+;   0xFFFF80FC:  knock_det_GBR_base    - GBR base for knock_detector
+;   0xFFFF81BA:  KNOCK_FLAG            - 1=knock detected, 0=no knock (per cycle)
+;   0xFFFF81BB:  KNOCK_BANK_FLAG       - Bank selector: 1=bank1, 0=bank0
+;   0xFFFF81D9:  fn_043d68_output      - Written by task [12], NOT the knock flag
+;   0xFFFF323C:  FLKC_BASE_STEP        - Base correction step (float), = 0.5 stock
+;   0xFFFF8290:  flkc_fg_GBR_base      - GBR base for flkc_paths_FG
+;   0xFFFF8294:  flkc_fg_counter       - Cycle counter, must be >= 90 for F/G
+;   0xFFFF8298:  flkc_fg_cyl_index     - Current cylinder/bank index
+;   0xFFFF829C:  flkc_fg_active        - Active flag; cleared on knock entry
+;   0xFFFF829D:  flkc_fg_retard_done   - Set to 1 after retard applied
+;   0xFFFF829E:  flkc_fg_enable        - Must == 1 to enter main logic
+;   0xFFFF82A0:  flkc_fg_exit_flag     - Set to 1 at normal exit
+;   0xFFFF82A1:  flkc_fg_bank_route    - Routes post-retard clamp fn call
+;   0xFFFF82AA:  flkc_fg_prev_cyl      - Previous cylinder; must match for retard
+;   0xFFFF8258:  flkc_fg_limit_FR15    - Loaded into FR15, compared vs 100.0
+;   0xFFFF3234:  flkc_fg_ref_FR14      - Loaded into FR14 at entry
+;   0xFFFF3244:  flkc_fg_R0_init       - Early R0 setup
+;   0xFFFF3248:  flkc_fg_var_3248      - Read in setup
+;   0xFFFF8233:  flkc_fg_flag_8233     - Byte flag checked during FP setup
+;   0xFFFF7D18:  sched_status_R1       - Read at fn_0463ba entry
+;   0xFFFF3360:  flkc_output_table     - Output (word array indexed by cylinder)
+;   0xFFFF8EDC:  sched_disable_flag    - If != 0, entire dispatch is skipped
+
+; ═════════════════════════════════════════════════════════════════════════════
+; FUELING ANALYSIS — FAILSAFE MAP BEHAVIOR
+; ═════════════════════════════════════════════════════════════════════════════
+; When IAM (Ignition Advance Multiplier) drops below the threshold at
+; 'Primary Open Loop Fuel Map Switch (IAM)' @ 0xCC16C, the ECU switches
+; from normal fuel maps to the Failsafe fuel map @ 0xD05C4.
+;
+; IAM Switch Thresholds @ 0xCC16C:
+;   Threshold 1: IAM = 0.5000  (begin failsafe transition)
+;   Threshold 2: IAM = 0.0500  (full failsafe)
+;
+; Normal Maps (KCA Low/High @ 0xD0244/0xD0404, Alternate @ 0xCFD30):
+;   Max raw value = 0x2B (43) -> minimum AFR = 11.00
+;
+; Failsafe Map (@ 0xD05C4):
+;   Max raw value = 0x46 (70) -> minimum AFR = 9.50
+;   At 2000 RPM / 2.60 g/rev: raw = 0x3C (60)
+;     AFR = 14.7 / (1 + 60 * 0.0078125) = 14.7 / 1.46875 = 10.01 ~ 10.02
+;   This is the root cause of observed "10.02 AFR Final Fueling Base".
+
+; ═════════════════════════════════════════════════════════════════════════════
+; POST START ENRICHMENT (PSE) TABLES
+; ═════════════════════════════════════════════════════════════════════════════
+; Code function at 0x30674-0x30A78.
+; 26 ECU descriptor entries at 0xAC948-0xACB3F.
+; 13 calibration tables + 2 Coolant Temperature axes.
+;
+; ─── Descriptor Format ───────────────────────────────
+;   20-byte: [meta(4)][axis_ptr(4)][data_ptr(4)][scale_float(4)][pad(4)]
+;   12-byte: [meta(4)][axis_ptr(4)][data_ptr(4)]  (no scale = direct value)
+;   Meta 0x00100800 = 16 elements, uint16 storage.
+;
+; ─── Scale Factor Identification ─────────────────────
+;   0x3B800000 = 0.00390625     -> Post_Start_Enrich_Decay1 (LSD Initial)
+;   0x39800000 = 0.000244140625 -> Post_Start_Enrich_Decay  (HSD Initial Start)
+;   0x35800000 = 9.5367e-7      -> Post_Start_Enrich_Decay2 (HSD Step Value)
+;   0x3C000000 = 0.0078125      -> Post_Start_Enrich_Decay4 (LSD Delay Multiplier)
+;   (no scale)                  -> Post_Start_Enrich_Decay3 (LSD Delay, direct)
+;
+; ─── CT Axes ─────────────────────────────────────────
+;   0xCC624:  PSE_CT_Axis_1  - 16 float32, -40 to 110 deg F (used by 12 tables)
+;   0xCC664:  PSE_CT_Axis_2  - 16 float32, -40 to 110 deg F (used by LSD Delay 2)
+;
+; ─── Descriptors at 0xAC948-0xACB3F ──────────────────
+;   0xAC948:  PSE_Desc_LSD_Initial_1A       -> data 0xCD3A6, axis 0xCC624, Decay1
+;   0xAC95C:  PSE_Desc_LSD_Initial_1B       -> data 0xCD3C6, axis 0xCC624, Decay1
+;   0xAC970:  PSE_Desc_LSD_Initial_2A       -> data 0xCD3E6, axis 0xCC624, Decay1
+;   0xAC984:  PSE_Desc_LSD_Initial_2B       -> data 0xCD406, axis 0xCC624, Decay1
+;   0xAC998:  PSE_Desc_LSD_Delay_1          -> data 0xCD426, axis 0xCC624 (12-byte)
+;   0xAC9A4:  PSE_Desc_HSD_InitStart_1A     -> data 0xCD446, axis 0xCC624, Decay
+;   0xAC9B8:  PSE_Desc_HSD_InitStart_Zero1  -> data 0xCD466 (zeros)
+;   0xAC9CC:  PSE_Desc_HSD_InitStart_Zero2  -> data 0xCD486 (zeros)
+;   0xAC9E0:  PSE_Desc_HSD_InitStart_1B     -> data 0xCD4A6, axis 0xCC624, Decay
+;   0xAC9F4:  PSE_Desc_HSD_InitStart_Zero3  -> data 0xCD4C6 (zeros)
+;   0xACA08:  PSE_Desc_HSD_InitStart_2A     -> data 0xCD4E6, axis 0xCC624, Decay
+;   0xACA1C:  PSE_Desc_HSD_InitStart_Zero4  -> data 0xCD506 (zeros)
+;   0xACA30:  PSE_Desc_HSD_InitStart_Zero5  -> data 0xCD526 (zeros)
+;   0xACA44:  PSE_Desc_HSD_InitStart_2B     -> data 0xCD546, axis 0xCC624, Decay
+;   0xACA58:  PSE_Desc_HSD_InitStart_Zero6  -> data 0xCD566 (zeros)
+;   0xACA6C:  PSE_Desc_LSD_Delay_2          -> data 0xCD586, axis 0xCC664 (12-byte)
+;   0xACA78:  PSE_Desc_HSD_StepValue_1      -> data 0xCD5A6, axis 0xCC624, Decay2
+;   0xACA8C:  PSE_Desc_HSD_StepValue_Zero1  -> data 0xCD5C6 (zeros)
+;   0xACAA0:  PSE_Desc_HSD_StepValue_2      -> data 0xCD5E6, axis 0xCC624, Decay2
+;   0xACAB4:  PSE_Desc_HSD_StepValue_Zero2  -> data 0xCD606 (zeros)
+;   0xACAC8:  PSE_Desc_HSD_StepValue_Zero3  -> data 0xCD626 (zeros)
+;   0xACADC:  PSE_Desc_HSD_StepValue_Zero4  -> data 0xCD646 (zeros)
+;   0xACAF0:  PSE_Desc_LSD_DelayMult        -> data 0xCD666, axis 0xCC624, Decay4
+;   0xACB04:  PSE_Desc_LSD_DelayMult_Zero   -> data 0xCD686 (zeros)
+;   0xACB18:  PSE_Desc_HSD_InitStart_Extra1 -> data 0xCD6A6 (zeros)
+;   0xACB2C:  PSE_Desc_HSD_InitStart_Extra2 -> data 0xCD6C6 (zeros)
+;
+; ─── Code Literal Pools ──────────────────────────────
+;   0x30674:  LSD Initial group pointers
+;             0x30674 -> 0xAC970 (LSD Init 2A)
+;             0x30684 -> 0xAC984 (LSD Init 2B)
+;             0x30688 -> 0xAC948 (LSD Init 1A)
+;             0x3068C -> 0xAC95C (LSD Init 1B)
+;   0x306CC:  LSD Delay 1 pointer -> 0xAC998
+;   0x309EC:  HSD Initial Start group (10 pointers, 4 active + 6 zero)
+;             0x30A04 -> 0xAC9A4 (HSD Init 1A)
+;             0x30A10 -> 0xAC9E0 (HSD Init 1B)
+;             0x30A0C -> 0xACA08 (HSD Init 2A)
+;             0x30A18 -> 0xACA44 (HSD Init 2B)
+;   0x30A3C:  LSD Delay 2 pointer -> 0xACA6C
+;   0x30A4C:  LSD Delay Mult + extra HSD Init pointers
+;   0x30A60:  HSD Step Value group (6 pointers, 2 active + 4 zero)
+;             0x30A60 -> 0xACA78 (HSD Step 1)
+;             0x30A6C -> 0xACAA0 (HSD Step 2)
+;
+; ─── Active PSE Data Tables ──────────────────────────
+;   Address   Table Name                                     Scaling        Status
+;   0xCD3A6   LSD Initial 1A  (16 x uint16, CT @ 0xCC624)   Decay1         active
+;   0xCD3C6   LSD Initial 1B  (16 x uint16, CT @ 0xCC624)   Decay1         active
+;   0xCD3E6   LSD Initial 2A  (16 x uint16, CT @ 0xCC624)   Decay1         active
+;   0xCD406   LSD Initial 2B  (16 x uint16, CT @ 0xCC624)   Decay1         active
+;   0xCD426   LSD Delay 1     (16 x uint16, CT @ 0xCC624)   Decay3(direct) flat=38
+;   0xCD446   HSD InitStart 1A(16 x uint16, CT @ 0xCC624)   Decay          active
+;   0xCD4A6   HSD InitStart 1B(16 x uint16, CT @ 0xCC624)   Decay          active
+;   0xCD4E6   HSD InitStart 2A(16 x uint16, CT @ 0xCC624)   Decay          active
+;   0xCD546   HSD InitStart 2B(16 x uint16, CT @ 0xCC624)   Decay          active
+;   0xCD586   LSD Delay 2     (16 x uint16, CT @ 0xCC664)   Decay3(direct) all zeros
+;   0xCD5A6   HSD StepValue 1 (16 x uint16, CT @ 0xCC624)   Decay2         active
+;   0xCD5E6   HSD StepValue 2 (16 x uint16, CT @ 0xCC624)   Decay2         active
+;   0xCD666   LSD DelayMult   (16 x uint16, CT @ 0xCC624)   Decay4         active
+;
+; NOTE: 32BITBASE.xml defines Decay3 and Decay4 as uint8, but this ROM stores uint16.
+
+; ═════════════════════════════════════════════════════════════════════════════
+; AVCS (VARIABLE CAM TIMING) DUTY CORRECTION TABLES
+; ═════════════════════════════════════════════════════════════════════════════
+; Reverse-engineered from ECU descriptor structures (28-byte format).
+; Descriptor format: [bias(4)][dims(4)][Y_axis(4)][X_axis(4)][data(4)][storage(4)][scale(4)]
+;
+; ─── Intake Duty Correction A ────────────────────────
+;   Descriptor @ 0xAD620 (28 bytes):
+;     bias=0, dims=10x9, Y=0xCF9EC, X=0xCFA14, data=0xCFA38
+;     storage=0x04000000 (uint8), scale=0x3E4CCCCC (0.2)
+;
+;   0xCF9EC:  VVT Error axis (Y, 10 floats): [4,6,10,15,20,25,30,40,60,80] degrees
+;   0xCFA14:  RPM axis (X, 9 floats): [650,800,1000,1200,1600,2000,2400,3000,3600]
+;   0xCFA38:  Data (90 uint8, 10 rows x 9 cols, physical = raw * 0.2 degrees)
+;
+; ─── Exhaust Duty Correction A ───────────────────────
+;   Descriptor @ 0xAD848 (28 bytes):
+;     bias=0, dims=10x9, Y=0xD11D0, X=0xD11F8, data=0xD121C
+;     storage=0x08000000 (uint16), scale=0x38800000 (0.000061)
+;
+;   0xD11D0:  VVT Error axis (Y, 10 floats): [4,6,10,15,20,25,30,40,60,80] degrees
+;   0xD11F8:  RPM axis (X, 9 floats): [650,800,1000,1200,1600,2000,2400,3000,3600]
+;   0xD121C:  Data (90 uint16, 180 bytes, physical = raw * 0.003051758 - 100 degrees)
+
+; ═════════════════════════════════════════════════════════════════════════════
+; LOW PULSE WIDTH INJECTOR COMPENSATION
+; ═════════════════════════════════════════════════════════════════════════════
+; Found via gate function (0x043470) literal pool and 0xAE000 descriptor analysis.
+;
+;   0xD3988:  Y axis - Base Pulse Width (8 x float32): 0.7 to 4.5 ms
+;   0xD39A8:  Data - Low PW Fuel Injector Compensation (8 x uint8)
+;             Scaling: InjectorPulseWidthCompensation
+;   0xD2D28:  Low PW fuel injector comp maximum RPM (float)
+;             Currently = 10000 RPM (feature effectively disabled)
+;   0xD2D2C:  Low PW fuel injector comp maximum IPW (float)
+;             Currently = 10000 raw = 10.0 ms (feature effectively disabled)
+
 ; ─────────────────────────────────────────────────────
-; CALIBRATION TABLE DIRECTORY  (535 tables)
+; CALIBRATION TABLE DIRECTORY  (535+ tables)
 ; ─────────────────────────────────────────────────────
 ; Address      Category                            Table Name
 ; ------------ ----------------------------------- ----------------------------------------
@@ -639,6 +877,8 @@ Generated from RomRaider/EcuFlash definition files
               ;   [Y Axis]  (RPM)
   000C1340:  Target Boost_
               ; Boost Control - Target  [3D]  (Boost Target (psi relative sea level))
+  000C1598:  Cluster Display Fuel Consumption Correction
+              ; Fueling - Injectors  [2D]  (Fuel Consumption Correction)
   000C1780:  Engine Load
               ;   [X Axis]  (g/rev)
   000C17C0:  Engine Speed
@@ -819,6 +1059,32 @@ Generated from RomRaider/EcuFlash definition files
               ; Fueling - Cranking  [2D]  (Injector Pulse Width (ms))
   000CD386:  Cranking Fuel Injector Pulse Width F (ECT)
               ; Fueling - Cranking  [2D]  (Injector Pulse Width (ms))
+  000CD3A6:  Post Start Enrich Low Speed Decay Initial 1A
+              ; Post Start Enrichment  [2D]  (Decay1: x*0.00390625)  CT axis @ 0xCC624
+  000CD3C6:  Post Start Enrich Low Speed Decay Initial 1B
+              ; Post Start Enrichment  [2D]  (Decay1: x*0.00390625)  CT axis @ 0xCC624
+  000CD3E6:  Post Start Enrich Low Speed Decay Initial 2A
+              ; Post Start Enrichment  [2D]  (Decay1: x*0.00390625)  CT axis @ 0xCC624
+  000CD406:  Post Start Enrich Low Speed Decay Initial 2B
+              ; Post Start Enrichment  [2D]  (Decay1: x*0.00390625)  CT axis @ 0xCC624
+  000CD426:  Post Start Enrich Low Speed Decay Delay 1
+              ; Post Start Enrichment  [2D]  (Decay3: direct uint16)  CT axis @ 0xCC624  flat=38
+  000CD446:  Post Start Enrich High Speed Decay Initial Start 1A
+              ; Post Start Enrichment  [2D]  (Decay: x*0.00024414062)  CT axis @ 0xCC624
+  000CD4A6:  Post Start Enrich High Speed Decay Initial Start 1B
+              ; Post Start Enrichment  [2D]  (Decay: x*0.00024414062)  CT axis @ 0xCC624
+  000CD4E6:  Post Start Enrich High Speed Decay Initial Start 2A
+              ; Post Start Enrichment  [2D]  (Decay: x*0.00024414062)  CT axis @ 0xCC624
+  000CD546:  Post Start Enrich High Speed Decay Initial Start 2B
+              ; Post Start Enrichment  [2D]  (Decay: x*0.00024414062)  CT axis @ 0xCC624
+  000CD586:  Post Start Enrich Low Speed Decay Delay 2
+              ; Post Start Enrichment  [2D]  (Decay3: direct uint16)  CT axis @ 0xCC664  all zeros
+  000CD5A6:  Post Start Enrich High Speed Decay Step Value 1
+              ; Post Start Enrichment  [2D]  (Decay2: x*0.00000095367432)  CT axis @ 0xCC624
+  000CD5E6:  Post Start Enrich High Speed Decay Step Value 2
+              ; Post Start Enrichment  [2D]  (Decay2: x*0.00000095367432)  CT axis @ 0xCC624
+  000CD666:  Post Start Enrich Low Speed Decay Delay Multiplier
+              ; Post Start Enrichment  [2D]  (Decay4: x*0.0078125)  CT axis @ 0xCC624
   000CE5B8:  Engine Speed
               ;   [Y Axis]  (RPM)
   000CE5F8:  CL to OL Transition with Delay (Base Pulse Width)
@@ -869,6 +1135,13 @@ Generated from RomRaider/EcuFlash definition files
               ;   [X Axis]  (g/rev)
   000CF95C:  Min Primary Base Enrichment 1 Cruise
               ; Fueling - Warm-Up Enrichment  [3D]  (Minimum Primary Enrichment Offset Additive Cruise)
+  000CF9EC:  AVCS Intake Duty Correction A - VVT Error Axis (Y)
+              ; Variable Valve Timing (AVCS)  [axis]  (10 floats: 4-80 degrees)
+  000CFA14:  AVCS Intake Duty Correction A - RPM Axis (X)
+              ; Variable Valve Timing (AVCS)  [axis]  (9 floats: 650-3600 RPM)
+  000CFA38:  AVCS Intake Duty Correction A
+              ; Alpha Variable Valve Timing (AVCS)  [3D]  (90 uint8, 10x9, scale=0.2 degrees)
+              ; Descriptor @ 0xAD620
   000CFCA4:  Engine Load
               ;   [X Axis]  (g/rev)
   000CFCE8:  Engine Speed
@@ -929,6 +1202,13 @@ Generated from RomRaider/EcuFlash definition files
               ;   [Y Axis]  (psi relative (sea level))
   000D106C:  Injector Latency_
               ; Fueling - Injectors  [3D]  (Latency (ms))
+  000D11D0:  AVCS Exhaust Duty Correction A - VVT Error Axis (Y)
+              ; Variable Valve Timing (AVCS)  [axis]  (10 floats: 4-80 degrees)
+  000D11F8:  AVCS Exhaust Duty Correction A - RPM Axis (X)
+              ; Variable Valve Timing (AVCS)  [axis]  (9 floats: 650-3600 RPM)
+  000D121C:  AVCS Exhaust Duty Correction A
+              ; Alpha Variable Valve Timing (AVCS)  [3D]  (90 uint16, 10x9, scale=0.000061)
+              ; Descriptor @ 0xAD848. physical = raw * 0.003051758 - 100 degrees
   000D13A4:  Engine Load
               ;   [X Axis]  (g/rev)
   000D13B0:  CL Fueling Target Compensation Imm. Cruise (ECT)
@@ -965,6 +1245,10 @@ Generated from RomRaider/EcuFlash definition files
               ; Ignition Timing - Compensation  [2D]  (degrees of correction)
   000D2CF4:  Timing Compensation B (IAT) IAM Activation
               ; Ignition Timing - Compensation  [2D]  (Ignition Advance Multiplier (IAM))
+  000D2D28:  Low PW Fuel Injector Comp Maximum RPM
+              ; ALPHA Low PW Injector Comp  [2D]  (Engine Speed (RPM))  currently 10000 = disabled
+  000D2D2C:  Low PW Fuel Injector Comp Maximum IPW
+              ; ALPHA Low PW Injector Comp  [2D]  (Base Pulse Width (ms))  currently 10.0 ms = disabled
   000D2D38:  Timing Compensation Per Gear Activation (RPM)
               ; Ignition Timing - Compensation  [2D]  (Engine Speed (RPM))
   000D2D40:  Timing Compensation Per Gear Activation (Load)
@@ -1043,6 +1327,10 @@ Generated from RomRaider/EcuFlash definition files
               ;   [Y Axis]  (Degrees F)
   000D38A0:  Timing Compensation B (IAT)
               ; Ignition Timing - Compensation  [2D]  (Ignition Timing Correction (degrees))
+  000D3988:  Low PW Fuel Injector Comp - Base Pulse Width Axis (Y)
+              ; ALPHA Low PW Injector Comp  [axis]  (8 floats: 0.7-4.5 ms)
+  000D39A8:  Low Pulse Width Fuel Injector Compensation
+              ; ALPHA Low PW Injector Comp  [2D]  (8 x uint8, InjectorPulseWidthCompensation)
   000D3C04:  Engine Speed
               ;   [Y Axis]  (RPM)
   000D3C2C:  Rough Correction Learning Delay (Increasing)_
@@ -1292,6 +1580,66 @@ Generated from RomRaider/EcuFlash definition files
               ;   [Y Axis]  (RPM)
   000F9EE0:  Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent
               ; Drive-by-Wire Throttle (DBW)  [3D]  (Requested Torque (raw ecu value))
+
+; ═════════════════════════════════════════════════════════════════════════════
+; ECU DESCRIPTOR STRUCTURES SUMMARY
+; ═════════════════════════════════════════════════════════════════════════════
+; The ECU uses fixed-format descriptor structures in ROM to reference
+; calibration tables. Two formats have been identified:
+;
+; 28-byte descriptor (AVCS tables):
+;   Offset  Size  Field
+;   0x00    4     bias (additive offset, usually 0)
+;   0x04    4     dimensions (rows<<16 | cols)
+;   0x08    4     Y_axis pointer (float array)
+;   0x0C    4     X_axis pointer (float array)
+;   0x10    4     data pointer
+;   0x14    4     storage type (0x04=uint8, 0x08=uint16)
+;   0x18    4     scale factor (float)
+;
+; 20-byte descriptor (PSE tables):
+;   Offset  Size  Field
+;   0x00    4     meta (element count << 16 | storage type)
+;   0x04    4     axis pointer (Coolant Temperature)
+;   0x08    4     data pointer
+;   0x0C    4     scale factor (float)
+;   0x10    4     padding
+;
+; 12-byte descriptor (PSE Delay tables, no scale):
+;   Offset  Size  Field
+;   0x00    4     meta (element count << 16 | storage type)
+;   0x04    4     axis pointer (Coolant Temperature)
+;   0x08    4     data pointer
+;
+; Known descriptor regions:
+;   0xAC948-0xACB3F:  PSE descriptors (26 entries)
+;   0xAD620:          AVCS Intake Duty Correction A descriptor
+;   0xAD848:          AVCS Exhaust Duty Correction A descriptor
+;   0xAE000+:         Low PW Injector Comp descriptors (gate fn 0x043470)
+
+; ═════════════════════════════════════════════════════════════════════════════
+; ROM MEMORY MAP SUMMARY
+; ═════════════════════════════════════════════════════════════════════════════
+;   0x00000000-0x00000030:  Exception vector table
+;   0x00000BAC-0x00000BFC:  NMI handler + default exception handler
+;   0x00000C0C-0x00000D36:  Reset / startup initialization
+;   0x0000E628:             Scheduler table
+;   0x00014004-0x000F9EE0:  Calibration tables (535+)
+;   0x00029858:             Helper functions
+;   0x00030674-0x00030A78:  Post Start Enrichment code function
+;   0x00043470:             Low PW Injector Comp gate function
+;   0x00043750-0x00043B62:  Knock detection (wrapper + detector)
+;   0x00045BFE-0x00045DD8:  FLKC Path J (fast knock correction)
+;   0x000463BA-0x000466A0:  FLKC Paths F/G (sustained knock correction)
+;   0x0004A94C:             Scheduler periodic dispatch
+;   0x0004AD40-0x0004AE2C:  59-entry periodic task table
+;   0x0009A770-0x0009A82B:  Diagnostic Trouble Codes (DTCs)
+;   0x000AC948-0x000ACB3F:  PSE descriptor table (26 entries)
+;   0x000AD620:             AVCS Intake descriptor
+;   0x000AD848:             AVCS Exhaust descriptor
+;   0x000AE000+:            Low PW Injector Comp descriptors
+;   0x000C0000-0x000FFFFF:  Primary calibration data region
+;   0xFFFF8000-0xFFFFFFFF:  Internal RAM (32KB)
 
 ; ─────────────────────────────────────────────────────
 ; End of disassembly  |  ROM size: 1048576 bytes
