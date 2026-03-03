@@ -25,6 +25,7 @@
 	<scaling name="LoadGRev" units="g/rev" toexpr="x" frexpr="x" format="%.2f" min="0" max="5" inc="0.05" storagetype="float" endian="big"/>
 	<scaling name="barpressureabsolute" units="bar absolute" toexpr="x*.001333224" frexpr="x/.001333224" format="%.3f" min="0.2" max="2.67" inc="0.01" storagetype="float" endian="big"/>
 	<scaling name="psipressureabsolute" units="psi absolute" toexpr="x*.01933677" frexpr="x/.01933677" format="%.3f" min="-8.01" max="9.94" inc="0.01" storagetype="float" endian="big"/>
+	<scaling name="Intake Duty Correction (uint8)" units="Correction" toexpr="x*0.2" frexpr="x/0.2" format="%.1f" min="0" max="51" inc="0.2" storagetype="uint8" endian="big"/>
 
 	<table name="Boost disable during fuel cut-RPM threshold" category="tinywrex patches" address="c0bd0" type="1D" scaling="LCRPM"/>
 
@@ -693,6 +694,16 @@
 	<table name="Intake Cam Advance Angle Non-Cruise (AVCS)" address="dac34">
 		<table name="Engine Load" address="dabac" elements="18"/>
 		<table name="Engine Speed" address="dabf4" elements="16"/>
+	</table>
+
+	<table name="Intake Duty Correction A" address="cfa38" scaling="Intake Duty Correction (uint8)">
+		<table name="Engine Speed" address="cfa14"/>
+		<table name="Intake VVT Error" address="cf9ec"/>
+	</table>
+
+	<table name="Exhaust Duty Correction A" address="d121c">
+		<table name="Engine Speed" address="d11f8"/>
+		<table name="Exhaust VVT Error" address="d11d0"/>
 	</table>
 
 	<table name="Requested Torque (Accelerator Pedal) SI-DRIVE Sport" address="f99e0">
