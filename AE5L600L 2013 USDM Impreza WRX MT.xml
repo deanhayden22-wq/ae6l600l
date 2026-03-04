@@ -55,26 +55,6 @@
 
 	<table name="Rev Limit Off (3)" category="tinywrex patches" address="cc514" type="1D" scaling="LCRPM"/>
 
-	<table name="AF 3 Correction Adder (Increase) B" category="Fueling - AF Correction / Learning" type="2D" scaling="AF3_Adder2">
-		<table name="TPS Opening %" type="Y Axis" elements="9" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
-	</table>
-
-	<table name="AF 3 Correction Limits" category="Fueling - AF Correction / Learning" address="35ffc" type="2D" scaling="A/FLearning#1Limits(%)">
-		<description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE.</description>
-		<table name="limits" type="Static X Axis" elements="2">
-			<data>+</data>
-			<data>-</data>
-		</table>
-	</table>
-
-	<table name="AF 3 Learning Limits" category="Fueling - AF Correction / Learning" address="36004" type="2D" scaling="A/FLearning#1Limits(%)">
-		<description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE.</description>
-		<table name="limits" type="Static X Axis" elements="2">
-			<data>+</data>
-			<data>-</data>
-		</table>
-	</table>
-
 	<table name="Target Boost_" address="c1340">
 		<table name="Requested Torque" address="c12d8"/>
 		<table name="Engine Speed" address="c1304"/>
@@ -322,6 +302,9 @@
 	</table>
 
 	<table name="Injector Flow Scaling" address="cbe0c">
+	</table>
+
+	<table name="Cluster Display Fuel Consumption Correction" address="c1598">
 	</table>
 
 	<table name="Per Injector Pulse Width Compensation A" address="d07e8">
@@ -1309,5 +1292,18 @@
 	<table name="Table_Post_Start_Enrich_Low_Speed_Decay_Delay_Multiplier" address="CD666">
 		<table name="Coolant Temperature" address="CC624"/>
 	</table>
+
+	<table name="AF 3 Correction Limits" category="Fueling - AF Correction / Learning" address="35ffc" type="2D" scaling="A/FLearning#1Limits(%)">
+		<description>CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2 SENSOR DELETE.</description>
+		<table name="limits" type="Static X Axis" elements="2">
+			<data>+</data>
+			<data>-</data>
+		</table>
+	</table>
+
+	<table name="AF 3 Correction Adder (Increase) B" category="Fueling - AF Correction / Learning" type="2D" scaling="AF3_Adder2">
+		<table name="TPS Opening %" type="Y Axis" elements="9" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
+	</table>
+
 
 </rom>
