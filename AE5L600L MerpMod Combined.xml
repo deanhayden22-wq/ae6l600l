@@ -278,7 +278,7 @@
 	<scaling name="MerpModSpeedMPH" units="mph" toexpr="x*0.621371" frexpr="x/0.621371" format="%.1f" min="0" max="200" inc="1" storagetype="float" endian="big" />
 	<scaling name="MerpModTemp" units="deg C" toexpr="x" frexpr="x" format="%.1f" min="-40" max="200" inc="1" storagetype="float" endian="big" />
 	<scaling name="MerpModTempF" units="deg F" toexpr="(x*1.8)+32" frexpr="(x-32)/1.8" format="%.1f" min="-40" max="400" inc="1" storagetype="float" endian="big" />
-	<scaling name="MerpModPressure" units="mmHg" toexpr="x" frexpr="x" format="%.0f" min="0" max="2500" inc="10" storagetype="float" endian="big" />
+	<scaling name="MerpModPressure" units="psi" toexpr="x*0.0193368" frexpr="x/0.0193368" format="%.2f" min="0" max="50" inc="0.1" storagetype="float" endian="big" />
 	<scaling name="MerpModUint8" units="units" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="uint8" endian="big" />
 	<scaling name="MerpModPercent" units="%" toexpr="x" frexpr="x" format="%.1f" min="0" max="100" inc="0.5" storagetype="float" endian="big" />
 	<scaling name="MerpModThreshold" units="units" toexpr="x" frexpr="x" format="%.2f" min="-100" max="100" inc="0.1" storagetype="float" endian="big" />
@@ -2209,16 +2209,16 @@
 		<description>Ceiling value for the timing blend ratio. Stock value: 1.0.</description>
 	</table>
 	<table name="MerpMod VE Table 1" category="MerpMod Speed Density" address="db384" type="3D" level="4" scaling="MerpModVE">
-		<table name="Manifold Pressure (mmHg)" address="db864" type="X Axis" elements="24" scaling="MerpModPressure" />
+		<table name="Manifold Pressure (psi)" address="db864" type="X Axis" elements="24" scaling="MerpModPressure" />
 		<table name="Engine Speed (RPM)" address="db804" type="Y Axis" elements="24" scaling="MerpModRPM" />
 	</table>
 	<table name="MerpMod SD Blending Table" category="MerpMod Speed Density" address="db1fc" type="3D" level="3" scaling="MerpModSDBlend">
-		<table name="Manifold Pressure (mmHg)" address="db288" type="X Axis" elements="10" scaling="MerpModPressure" />
+		<table name="Manifold Pressure (psi)" address="db288" type="X Axis" elements="10" scaling="MerpModPressure" />
 		<table name="Engine Speed (RPM)" address="db260" type="Y Axis" elements="10" scaling="MerpModRPM" />
 	</table>
 	<table name="MerpMod Atmospheric Compensation" category="MerpMod Speed Density" address="db2cc" type="3D" level="3" scaling="MerpModAtmComp">
-		<table name="Manifold Pressure (mmHg)" address="db34c" type="X Axis" elements="7" scaling="MerpModPressure" />
-		<table name="Atmospheric Pressure (mmHg)" address="db330" type="Y Axis" elements="7" scaling="MerpModPressure" />
+		<table name="Manifold Pressure (psi)" address="db34c" type="X Axis" elements="7" scaling="MerpModPressure" />
+		<table name="Atmospheric Pressure (psi)" address="db330" type="Y Axis" elements="7" scaling="MerpModPressure" />
 	</table>
 	<table name="MerpMod Speed Density Mode" category="MerpMod Speed Density" address="db8d0" type="1D" level="1" scaling="MerpModMafMode" />
 	<table name="MerpMod Engine Displacement" category="MerpMod Speed Density" address="db8c4" type="1D" level="1" scaling="MerpModFloat" />
