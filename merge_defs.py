@@ -1,26 +1,63 @@
 #!/usr/bin/env python3
-"""Merge 32BITBASE + AE5L600L stock + MerpMod ECUFlash XML defs into one file."""
+"""Merge 32BITBASE + AE5L600L stock + MerpMod ECUFlash XML defs into one file.
+
+ECUFlash's <include> mechanism merges tables by name:
+- 32BITBASE provides templates: category, type, scaling, description, axis info (NO addresses)
+- ROM-specific def provides addresses for matching table names + axis addresses
+- Child attributes override parent attributes
+
+This script replicates that merge logic to produce a single self-contained XML.
+"""
 
 import xml.etree.ElementTree as ET
-import sys
+import copy
 import re
+
 
 def parse_rom(path):
     """Parse an ECUFlash ROM XML, return the root <rom> element."""
-    # ECUFlash XMLs may not have a proper declaration; wrap if needed
     with open(path, 'r', encoding='utf-8', errors='replace') as f:
         content = f.read()
-    # Some files have bare <rom> without xml declaration - that's fine for ET
     return ET.fromstring(content)
 
+
 def extract_elements(rom_elem):
-    """Extract romid, includes, notes, scalings, and tables from a <rom>."""
+    """Extract romid, scalings, and tables from a <rom>."""
     romid = rom_elem.find('romid')
-    includes = [e.text for e in rom_elem.findall('include')]
-    notes = rom_elem.find('notes')
     scalings = rom_elem.findall('scaling')
     tables = rom_elem.findall('table')
-    return romid, includes, notes, scalings, tables
+    return romid, scalings, tables
+
+
+def merge_table(base_t, stock_t):
+    """Merge a base template table with a stock ROM-specific table.
+
+    ECUFlash inheritance: stock (child) attributes override base (parent).
+    The stock table typically provides just the address; the base provides
+    category, type, scaling, description, axis element counts, etc.
+
+    For sub-tables (axes), we merge by name as well.
+    """
+    merged = copy.deepcopy(base_t)
+
+    # Stock attributes override base attributes
+    for attr, val in stock_t.attrib.items():
+        merged.set(attr, val)
+
+    # Merge sub-tables (axes) by name
+    base_subs = {sub.get('name'): sub for sub in merged.findall('table')}
+    for stock_sub in stock_t.findall('table'):
+        sub_name = stock_sub.get('name')
+        if sub_name in base_subs:
+            # Merge: stock axis attributes override base axis attributes
+            for attr, val in stock_sub.attrib.items():
+                base_subs[sub_name].set(attr, val)
+        else:
+            # Stock has an axis not in base - add it
+            merged.append(copy.deepcopy(stock_sub))
+
+    return merged
+
 
 def indent(elem, level=0):
     """Add pretty-print indentation to an XML element tree."""
@@ -38,6 +75,7 @@ def indent(elem, level=0):
         if level and (not elem.tail or not elem.tail.strip()):
             elem.tail = i
 
+
 def main():
     base_path = "32BITBASE.xml"
     stock_path = "AE5L600L 2013 USDM Impreza WRX MT.xml"
@@ -46,69 +84,89 @@ def main():
 
     print(f"Parsing {base_path}...")
     base_rom = parse_rom(base_path)
-    base_romid, _, base_notes, base_scalings, base_tables = extract_elements(base_rom)
+    _, base_scalings, base_tables = extract_elements(base_rom)
 
     print(f"Parsing {stock_path}...")
     stock_rom = parse_rom(stock_path)
-    stock_romid, _, stock_notes, stock_scalings, stock_tables = extract_elements(stock_rom)
+    _, stock_scalings, stock_tables = extract_elements(stock_rom)
 
     print(f"Parsing {merp_path}...")
     merp_rom = parse_rom(merp_path)
-    merp_romid, _, merp_notes, merp_scalings, merp_tables = extract_elements(merp_rom)
+    merp_romid, merp_scalings, merp_tables = extract_elements(merp_rom)
 
-    # Build the merged ROM
+    # Build base table lookup by name
+    base_table_map = {}
+    for t in base_tables:
+        name = t.get('name')
+        if name:
+            base_table_map[name] = t
+
+    # ---- Build merged ROM ----
     merged = ET.Element('rom')
 
-    # Use MerpMod romid but with a new xmlid so it doesn't conflict
+    # romid from MerpMod
     new_romid = ET.SubElement(merged, 'romid')
     for child in merp_romid:
         new_child = ET.SubElement(new_romid, child.tag)
         new_child.text = child.text
-    # Override xmlid
     xmlid_elem = new_romid.find('xmlid')
     if xmlid_elem is not None:
         xmlid_elem.text = 'AE5L600L_MerpMod_Combined'
 
-    # No <include> directives - everything is self-contained
-
-    # Track scaling names to avoid duplicates (last one wins)
+    # ---- Scalings (deduplicated, last wins) ----
     scaling_map = {}
-
-    # Add scalings in order: 32BITBASE -> stock AE5L600L -> MerpMod
     for s in base_scalings:
-        name = s.get('name', '')
-        scaling_map[name] = s
+        scaling_map[s.get('name', '')] = s
     for s in stock_scalings:
-        name = s.get('name', '')
-        scaling_map[name] = s
+        scaling_map[s.get('name', '')] = s
     for s in merp_scalings:
-        name = s.get('name', '')
-        scaling_map[name] = s
+        scaling_map[s.get('name', '')] = s
 
     print(f"Total unique scalings: {len(scaling_map)}")
-
-    # Add all scalings
-    comment_added = set()
-    for name, s in scaling_map.items():
+    for s in scaling_map.values():
         merged.append(s)
 
-    # Add 32BITBASE tables first (these are the base/shared tables)
-    print(f"32BITBASE tables: {len(base_tables)}")
-    for t in base_tables:
-        merged.append(t)
+    # ---- Tables ----
+    # Strategy:
+    # 1. For stock tables that match a base template by name: merge (base template + stock addresses)
+    # 2. For stock tables with no base match: include as-is (ROM-specific, e.g. tinywrex)
+    # 3. Skip base-only tables (templates for other ROMs, no address = useless)
+    # 4. MerpMod tables: include as-is (self-contained with all attributes)
 
-    # Add stock AE5L600L tables (ROM-specific)
-    print(f"Stock AE5L600L tables: {len(stock_tables)}")
+    merged_count = 0
+    stock_only_count = 0
+    skipped_base_count = 0
+
+    stock_names_used = set()
     for t in stock_tables:
-        merged.append(t)
+        name = t.get('name')
+        if name in base_table_map:
+            # Merge base template with stock addresses
+            merged_t = merge_table(base_table_map[name], t)
+            merged.append(merged_t)
+            stock_names_used.add(name)
+            merged_count += 1
+        else:
+            # Stock-only table (e.g. tinywrex patches, ROM-specific)
+            merged.append(copy.deepcopy(t))
+            stock_only_count += 1
 
-    # Add MerpMod tables
-    print(f"MerpMod tables: {len(merp_tables)}")
+    # Count skipped base-only templates
+    for t in base_tables:
+        if t.get('name') not in stock_names_used:
+            skipped_base_count += 1
+
+    # Add MerpMod tables as-is
+    merp_count = 0
     for t in merp_tables:
-        merged.append(t)
+        merged.append(copy.deepcopy(t))
+        merp_count += 1
 
-    total = len(base_tables) + len(stock_tables) + len(merp_tables)
-    print(f"Total tables: {total}")
+    print(f"Merged (base+stock): {merged_count}")
+    print(f"Stock-only (ROM-specific): {stock_only_count}")
+    print(f"MerpMod: {merp_count}")
+    print(f"Skipped base templates (no AE5L600L address): {skipped_base_count}")
+    print(f"Total tables in output: {merged_count + stock_only_count + merp_count}")
 
     # Pretty print
     indent(merged)
@@ -118,18 +176,16 @@ def main():
     with open(out_path, 'wb') as f:
         tree.write(f, encoding='utf-8', xml_declaration=False)
 
-    # Re-read and clean up: ECUFlash expects no xml declaration
+    # Clean up xml declaration if present
     with open(out_path, 'r', encoding='utf-8') as f:
         content = f.read()
-
-    # Remove any xml declaration if present
     content = re.sub(r'<\?xml[^?]*\?>\s*', '', content)
-
     with open(out_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
     print(f"\nWrote merged definition to: {out_path}")
     print("This file is fully self-contained - no <include> directives needed.")
+
 
 if __name__ == '__main__':
     main()
