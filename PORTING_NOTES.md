@@ -192,6 +192,37 @@ RAM:
 0xFFFFBFA0             Stack pointer (grows down)
 ```
 
+## Cross-Reference: All AE5-Series Targets
+
+Addresses that are **identical** across all three existing AE5 targets are very likely the same in AE5L600L:
+
+| Parameter | AE5F301C | AE5IB00V | AE5K700V | AE5L600L (ours) |
+|---|---|---|---|---|
+| pIntakeAirTemp | 0xFFFF4128 | 0xFFFF4128 | 0xFFFF4128 | 0xFFFF4128 |
+| pMassAirFlow | 0xFFFF40B4 | 0xFFFF40B4 | 0xFFFF40B4 | 0xFFFF40B4 |
+| pMafSensorVoltage | 0xFFFF4042 | 0xFFFF4042 | 0xFFFF4042 | 0xFFFF4042 |
+| pAf1Res | 0xFFFF40C8 | 0xFFFF40C8 | 0xFFFF40C8 | 0xFFFF40C8 |
+| pObdVinDirect | 0xFFFF2004 | - | 0xFFFF2004 | 0xFFFF2004 |
+| pMemoryResetLimit | 0xFFFFBF9F | 0xFFFFBF9F | 0xFFFFBF9F | 0xFFFFBF9F |
+| dCalId | 0x2004 | 0x2004 | 0x2004 | 0x2004 |
+
+Addresses that **vary** between AE5 targets (need verification):
+
+| Parameter | AE5F301C | AE5IB00V | AE5K700V | AE5L600L (ours) |
+|---|---|---|---|---|
+| pEngineSpeed | 0xFFFF69C8 | 0xFFFF663C | 0xFFFF6648 | 0xFFFF6648 (?) |
+| pVehicleSpeed | - | 0xFFFF6618 | 0xFFFF6624 | 0xFFFF6624 (?) |
+| pCoolantTemp | - | 0xFFFF4140 | 0xFFFF4144 | 0xFFFF4144 (?) |
+| pClutchFlags | 0xFFFF6974 | 0xFFFF65E8 | 0xFFFF65F4 | ? |
+| pResumeFlags | 0xFFFF6317 | 0xFFFF5FBF | 0xFFFF5FCB | ? |
+| sPull2DFloat | 0xBE990 | 0xBE7F4 | 0xBE7F4 | 0xBE608 |
+| sPull3DFloat | 0xBEA44 | 0xBE8A8 | 0xBE8A8 | 0xBE830 |
+| hMafCalc | 0x4800 | 0x49E8 | 0x49E8 | ~0x496C (?) |
+| dRomHoleStart | 0xE1000 | 0xE1000 | 0xE1000 | 0xDB000 |
+| dInjectorScaling | 0xC8A70 | 0xCBEF0 | 0xCCA68 | 0xCCA68 |
+
+Note: AE5IB00V and AE5K700V share Pull2D/3DFloat addresses, but our ROM does not.
+
 ## Key Differences from AE5K700V
 
 | Item | AE5K700V | AE5L600L | Notes |

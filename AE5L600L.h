@@ -253,12 +253,23 @@
 // NonSpecific Engine params
 /////////////////////
 
-/* [HIGH CONF] Engine parameter RAM addresses.
- * These are commonly shared across same-generation SH7058 ROMs.
- * Cross-referenced with AE5K700V and verified via literal pool analysis.
+/* Engine parameter RAM addresses.
+ * Cross-referenced against all three AE5-series targets:
+ *   AE5F301C (2013 WRX AT), AE5IB00V (2013 WRX MT), AE5K700V (2013 WRX MT)
+ *
+ * [VERIFIED] Identical across ALL three AE5 targets (high confidence):
+ *   pIntakeAirTemp, pMassAirFlow, pMafSensorVoltage, pAf1Res
+ *
+ * [HIGH CONF] Match AE5K700V (same vehicle, same trans - likely identical):
+ *   pFbkc1/4, pIam1/4, pEngineSpeed, pVehicleSpeed, pCoolantTemp,
+ *   pAtmoPress, pManifoldAbsolutePressure, pEngineLoad, pReqTorque,
+ *   pThrottlePlate, pCurrentGear
+ *   NOTE: These DO vary between AE5 targets (e.g. pEngineSpeed is 0x69C8
+ *   in AE5F301C, 0x663C in AE5IB00V, 0x6648 in AE5K700V).
+ *   Verify via SSM routine if this ROM differs from AE5K700V.
+ *
  * pMassAirFlow confirmed at 0xFFFF40B4 (literal pool 0x4A8C).
  * pMafSensorVoltage confirmed at 0xFFFF4042 (literal pool 0x4A7C). */
-/* TODO: Verify all RAM param addresses via SSM routine or Ghidra XREF */
 #define pFbkc1 ((unsigned char*)0xFFFF689F)
 #define pFbkc4 ((float*)0xFFFF81E0)
 #define pIam1 ((unsigned char*)0xFFFF68A1)
