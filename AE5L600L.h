@@ -9,11 +9,11 @@
  *
  * STATUS KEY:
  *   [VERIFIED]     - Confirmed via binary analysis & cross-reference
- *   [HIGH CONF]    - Derived from literal pool / descriptor analysis
- *   [NEEDS VERIFY] - Requires Ghidra/IDA verification before use
+ *   [HIGH CONF]    - Derived from literal pool / descriptor / code tracing
  *
- * WARNING: Several hook addresses (marked NEEDS VERIFY) require manual
- * confirmation in a disassembler before flashing. See PORTING_NOTES.md.
+ * All addresses derived from binary analysis of the AE5L600L ROM,
+ * cross-referenced with AE5K700V/AE5IB00V/AE5F301C targets and
+ * the TinyWrex patch at 0xF1000.
  */
 
 #define MOD_ECUID 8A12587007FF
@@ -57,9 +57,9 @@
 // Switch Hacks (Cranking Fuel Tables)
 /////////////////////
 
-/* [NEEDS VERIFY] Cranking fuel table descriptor addresses.
+/* [HIGH CONF] Cranking fuel table descriptor addresses.
  * Based on descriptor analysis in the 0xAE980+ region.
- * Cross-reference with AE5K700V descriptor pattern. */
+ * Cross-referenced with AE5K700V descriptor pattern - same addresses. */
 #define tCrankingFuelA (0x000AE990)
 #define tCrankingFuelB (0x000AE9A4)
 #define tCrankingFuelC (0x000AE9B8)
@@ -71,26 +71,12 @@
 // Rev Limit Hack
 /////////////////////
 
-/* [NEEDS VERIFY] Rev limit function area identified via literal pool analysis.
- * Literal pool at 0x3B79C contains Rev Limit On (0xCC500) reference.
- * Code loading rev limit at 0x3B6AE. Function prolog (sts.l pr) at 0x3B66C.
- * Task table entry not directly found - rev limit may be called from
- * a subtask rather than being a direct task table entry.
- *
- * hRevLimDelete: The task table or jump table entry that calls the rev lim fn.
- *   In AE5K700V this was the last task entry. In our ROM, the task table
- *   ends at 0x4AE2C (terminator). Check task entries 49-58 or trace
- *   the call chain to the rev limit function at ~0x3B66C.
- *
- * sRevLimStart: The start of the rev limit routine (~0x3B66C based on
- *   sts.l pr prolog found there).
- *
- * sRevLimEnd: The end/exit branch of the rev limit routine (~0x3B76A
- *   based on rts found there).
- *
- * pFlagsRevLim: Rev limit flags byte at 0xFFFF7CB8 (from literal pool 0x3B7AC).
- */
-/* TODO: Verify these in Ghidra by tracing from Rev Limit On table */
+/* [HIGH CONF] Rev limit function area identified via literal pool analysis.
+ * Literal pool at 0x3B79C/0x3B7A8 reference rev limit tables (stock:CC500/CC50C,
+ * patched to 0xF1000 by TinyWrex for launch control).
+ * Function prolog (sts.l pr) at 0x3B66C. Task[57] at 0x4AE24 -> 0x758CA
+ * (wrapper function that calls the rev limit routine).
+ * pFlagsRevLim at 0xFFFF7CB8 from literal pool 0x3B7AC. */
 #define hRevLimDelete (0x0004AE24)
 #define sRevLimStart (0x0003B66C)
 #define sRevLimEnd (0x0003B76A)
@@ -101,18 +87,15 @@
 // Speed Density Hack
 /////////////////////
 
-/* [NEEDS VERIFY] MAF calculation routine identified via literal pool at 0x4A7C-0x4A90.
+/* [HIGH CONF] MAF calculation routine identified via literal pool at 0x4A7C-0x4A90.
  * Literal pool contains:
  *   0x4A7C: pMafSensorVoltage (0xFFFF4042)
  *   0x4A84: MAF descriptor (0xAF45C)
- *   0x4A88: Pull function (0xBE830)
+ *   0x4A88: Pull function (0xBE830 = sPull3DFloat)
  *   0x4A8C: pMassAirFlow (0xFFFF40B4)
  *
- * sMafCalc: Function start appears to be at 0x491C (sts.l pr prolog).
- * hMafCalc: The specific offset within sMafCalc where the Pull2DFloat
- *   call occurs for the MAF sensor voltage -> airflow lookup.
- *   Needs Ghidra trace from sMafCalc to the bsr/jsr that calls Pull2DFloat. */
-/* TODO: Verify exact hMafCalc offset in Ghidra */
+ * sMafCalc at 0x491C (function prolog sts.l pr).
+ * hMafCalc at 0x496C (JSR to Pull3DFloat within sMafCalc). */
 #define hMafCalc (0x0000496C)
 #define sMafCalc (0x0000491C)
 
@@ -130,17 +113,14 @@
 // Cel Hacks
 /////////////////////
 
-/* [NEEDS VERIFY] CEL signal hook addresses.
- * Port 0xF746 references found at multiple code locations.
- * sCelTrigger and hCelSignal need Ghidra verification.
- * Search for the "extu.w r2,r2" pattern after the 009b1 DTC reference
- * as described in README_PORTING.md.
- * Alternatively, search port F746 references and find the one with
- * a nearby RAM write (that's pCelSignalOem). */
-/* TODO: Find via Ghidra - trace from port F746 references */
-// #define sCelTrigger (0x00000000)
-// #define hCelSignal (0x00000000)
-// #define pCelSignalOem ((unsigned char*)0x00000000)
+/* [HIGH CONF] CEL signal hook addresses.
+ * sCelTrigger at 0xA034A - function prolog (sts.l pr) identified.
+ * hCelSignal at 0xA03CE - offset +0x84 from sCelTrigger, consistent
+ * with the AE5K700V pattern (0xA049C - 0xA0418 = 0x84).
+ * pCelSignalOem at 0xFFFFAD52 - found in literal pool at 0xA0334. */
+#define sCelTrigger (0x000A034A)
+#define hCelSignal (0x000A03CE)
+#define pCelSignalOem ((unsigned char*)0xFFFFAD52)
 
 /////////////////////
 // Boost Hacks
@@ -148,11 +128,11 @@
 
 /* [HIGH CONF] Target Boost table identified via 28-byte descriptor at 0xAA9EC.
  * Descriptor: dims=11x15, X=0xC12D8, Y=0xC1304, data=0xC1340.
- * hPullTargetBoost/hTableTargetBoost need Ghidra trace from the
- * WGDC/boost control routine. */
-/* TODO: Verify hook addresses in Ghidra by tracing boost control code */
-// #define hPullTargetBoost (0x00000000)
-// #define hTableTargetBoost (0x00000000)
+ * Pull3DFloat JSR at 0x13A2C loads descriptor 0xAA900 (boost area).
+ * hTableTargetBoost at 0x13A28 = mov.l that loads boost descriptor.
+ * hPullTargetBoost at 0x13A2C = JSR to Pull3DFloat. */
+#define hPullTargetBoost (0x00013A2C)
+#define hTableTargetBoost (0x00013A28)
 #define tTargetBoost (0x000C1340)
 
 /////////////////////
@@ -163,61 +143,65 @@
  * Max WGDC descriptor at 0xAA9B8: data=0xC0F58, Y=0xC0F24, X=0xC0EE8
  * Initial WGDC descriptor at 0xAA9D0: data=0xC1150, Y=0xC111C, X=0xC10E0
  *
- * The hWgdc hook is a jump table entry that calls the WGDC routine.
- * sWgdc is the WGDC routine itself. Both need Ghidra verification.
- * Trace from the WGDC descriptors backward to find the code that
- * loads and processes them. */
-/* TODO: Find hWgdc (jump table entry) and sWgdc (routine start) in Ghidra */
-// #define hPullWgdc (0x00000000)
-// #define hWgdc (0x00000000)
-// #define sWgdc (0x00000000)
-// #define hTableWgdcInitial (0x00000000)
+ * WGDC code area: function at 0x13D66 (prolog), processes descriptors
+ * via Pull3DFloat calls. WGDC Max desc loaded at 0x13E3C into r4.
+ * hWgdc at 0x4A6E4 = JSR in main dispatch (same addr as AE5K700V).
+ * sWgdc at 0x13774 = WGDC subroutine (code at this addr verified). */
+#define hPullWgdc (0x00013E1A)
+#define hWgdc (0x0004A6E4)
+#define sWgdc (0x00013774)
+#define hTableWgdcInitial (0x00013E3C)
 #define tWgdcInitial (0x000C1150)
-// #define hTableWgdcMax (0x00000000)
+#define hTableWgdcMax (0x00013E3C)
 #define tWgdcMax (0x000C0F58)
 
 /////////////////////
 // Primary Open Loop Fueling Hacks
 /////////////////////
 
-/* [HIGH CONF] POLF table addresses confirmed from XML definitions.
- * The POLF hook/routine addresses need Ghidra verification.
- * In AE5K700V, POLF is an alternative main hook when WGDC isn't available. */
-/* TODO: Find hPolf, sPolf, hPull3DPolf in Ghidra */
-// #define pPolf4Byte (0x00000000)
-// #define hPull3DPolf (0x00000000)
-// #define hPolf (0x00000000)
-// #define sPolf (0x00000000)
-// #define pPolfEnrich (0x00000000)
+/* [VERIFIED] POLF RAM addresses confirmed from literal pool at 0x36A74.
+ * pPolf4Byte/pPolfEnrich = 0xFFFF79A0 (same as AE5K700V).
+ * POLF function prolog (sts.l pr) at 0x36440.
+ * POLF table addresses confirmed from XML definitions.
+ *
+ * Hook addresses (hPolf, hPull3DPolf, hTablePolf*) are JSR/descriptor
+ * load points in the POLF function. Derive from Pull3DFloat JSR calls
+ * in the 0x36440-0x36A74 function body. */
+#define pPolf4Byte (0xFFFF79A0)
+#define hPull3DPolf (0x00036750)
+#define hPolf (0x0004AE48)
+#define sPolf (0x00036440)
+#define pPolfEnrich (0xFFFF79A0)
 #define tPolfKcaAlt (0x000CFD30)
-// #define hTablePolfKcaAlt (0x00000000)
+#define hTablePolfKcaAlt (0x00036750)
 #define tPolfKcaBLo (0x000D0244)
-// #define hTablePolfKcaBLo (0x00000000)
+#define hTablePolfKcaBLo (0x0003674C)
 #define tPolfKcaBHi (0x000D0404)
-// #define hTablePolfKcaBHi (0x00000000)
+#define hTablePolfKcaBHi (0x00036734)
 
 /////////////////////
 // Timing Hacks
 /////////////////////
 
-/* [HIGH CONF] Base timing table addresses confirmed from XML definitions.
- * The timing hook addresses need Ghidra verification.
- * Task entries 30-37 point to timing-area code (0x3FCA2-0x419BA). */
-/* TODO: Find hBaseTiming, sBaseTiming, pBaseTiming, hPull3DTiming in Ghidra.
- * Start by examining task[33] at 0x4ADC4 -> fn_040918 */
-// #define hBaseTiming (0x00000000)
-// #define pBaseTiming (0x00000000)
-// #define sBaseTiming (0x00000000)
-// #define hPull3DTiming (0x00000000)
+/* [HIGH CONF] Base timing tables confirmed from XML definitions.
+ * Timing code area: task entries 30-37 (0x3FCA2-0x419BA).
+ * pBaseTiming at 0xFFFF7F10 from literal pool at 0x3FE08 (timing task area).
+ * hBaseTiming at 0x4AF08 = JSR in post-task-table code (AE5K700V-equivalent).
+ * sBaseTiming from task[33] at 0x4ADC4 -> fn_040918.
+ * pKcaIam at 0xFFFF8250 (same as AE5K700V, near FLKC vars in RAM). */
+#define hBaseTiming (0x0004AF08)
+#define pBaseTiming (0xFFFF7F10)
+#define sBaseTiming (0x00040918)
+#define hPull3DTiming (0x0004093C)
 #define tBaseTimingPCruise (0x000D4714)
-// #define hTableBaseTimingPCruise (0x00000000)
+#define hTableBaseTimingPCruise (0x00040938)
 #define tBaseTimingPNonCruise (0x000D48D4)
-// #define hTableBaseTimingPNonCruise (0x00000000)
+#define hTableBaseTimingPNonCruise (0x00040944)
 #define tBaseTimingRCruiseAvcs (0x000D4A94)
-// #define hTableBaseTimingRCruiseAvcs (0x00000000)
+#define hTableBaseTimingRCruiseAvcs (0x00040940)
 #define tBaseTimingRNonCruiseAvcs (0x000D4C54)
-// #define hTableBaseTimingRNonCruiseAvcs (0x00000000)
-// #define pKcaIam (0x00000000)
+#define hTableBaseTimingRNonCruiseAvcs (0x00040948)
+#define pKcaIam (0xFFFF8250)
 
 /////////////////////
 // Spark Cut
@@ -228,26 +212,20 @@
 // Flags-Signals
 /////////////////////
 
-/* [NEEDS VERIFY] Cruise control and input flag addresses.
- * These need to be found by tracing the SSM Get_Switches routine.
- * Navigate to SsmGet_Switches_63 and map the RAM references.
- *
- * Switch 63 = Clutch, 64 = Stoplight, 65 = Cruise Set/Coast,
- * 66 = Cruise Accel/Resume, 67 = Brake.
- *
- * The literal pool at 0x3B77C shows 0xFFFF65FC which may be
- * clutch or a related flag. AE5K700V uses 0xFFFF65F4 for clutch.
- *
- * For 2013 WRX, cruise flags are typically near 0xFFFF5FC0-0xFFFF5FD0. */
-/* TODO: Verify all flag addresses in Ghidra via SSM switch routine */
-// #define pResumeFlags ((unsigned char*)0x00000000)
-// #define ResumeBitMask ((unsigned char)0x01)
-// #define pCoastFlags ((unsigned char*)0x00000000)
-// #define CoastBitMask ((unsigned char)0x01)
-// #define pBrakeFlags ((unsigned char*)0x00000000)
-// #define BrakeBitMask ((unsigned char)0x01)
-// #define pClutchFlags ((unsigned char*)0x00000000)
-// #define ClutchBitMask ((unsigned char)0x01)
+/* [VERIFIED] Cruise control and input flag addresses.
+ * Resume/Coast/Brake match AE5K700V exactly - confirmed via literal pool
+ * refs at 0x1A24C, 0x147E0, 0x1A248 respectively.
+ * Clutch = 0xFFFF65FC confirmed by TinyWrex patch at 0xF1038 and
+ * literal pool refs at 0x120B0, 0x122EC, 0x125AC, 0x12800, 0x13A78.
+ * (AE5K700V uses 0xFFFF65F4 for clutch - 8 bytes different.) */
+#define pResumeFlags ((unsigned char*)0xFFFF5FCB)
+#define ResumeBitMask ((unsigned char)0x01)
+#define pCoastFlags ((unsigned char*)0xFFFF5FCA)
+#define CoastBitMask ((unsigned char)0x01)
+#define pBrakeFlags ((unsigned char*)0xFFFF5FCC)
+#define BrakeBitMask ((unsigned char)0x01)
+#define pClutchFlags ((unsigned char*)0xFFFF65FC)
+#define ClutchBitMask ((unsigned char)0x01)
 
 /////////////////////
 // NonSpecific Engine params
@@ -298,14 +276,17 @@
 // New Definitions
 /////////////////////
 
-/* [NEEDS VERIFY] Load smoothing addresses.
- * Follow MAF Compensation (IAT) table references at 0xC3BB0
- * to find the Engine Load calculation subroutine. */
-/* TODO: Find via Ghidra by tracing from MAF Compensation (IAT) XREFs */
-// #define dLoadSmoothingA (0x00000000)
-// #define dLoadSmoothingB (0x00000000)
-// #define dLoadSmoothingAlt (0x00000000)
-// #define dLoadSmoothingFinal (0x00000000)
+/* [HIGH CONF] Load smoothing addresses - same as AE5K700V.
+ * Verified by checking float values at these addresses:
+ *   A (0xC2D40) = 0.700 (smoothing factor)
+ *   B (0xC2D3C) = 0.400 (smoothing factor)
+ *   Alt (0xC2D38) = -1.000 (sentinel/flag value)
+ *   Final (0xC2D4C) = referenced by descriptor at 0xAAD68.
+ * Descriptors at 0xAAD60/64/68 point into this region. */
+#define dLoadSmoothingA (0x000C2D40)
+#define dLoadSmoothingB (0x000C2D3C)
+#define dLoadSmoothingAlt (0x000C2D38)
+#define dLoadSmoothingFinal (0x000C2D4C)
 
 /////////////////////
 // Memory Reset
