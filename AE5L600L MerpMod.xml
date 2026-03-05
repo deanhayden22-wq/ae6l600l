@@ -1,0 +1,165 @@
+<rom>
+	<romid>
+		<xmlid>AE5L600L_MerpMod</xmlid>
+		<internalidaddress>2004</internalidaddress>
+		<internalidstring>AE5L600L</internalidstring>
+		<ecuid>8A12587007</ecuid>
+		<make>Subaru</make>
+		<market>USDM</market>
+		<model>Impreza</model>
+		<submodel>WRX</submodel>
+		<transmission>MT</transmission>
+		<year>13</year>
+		<flashmethod>subarucan</flashmethod>
+		<memmodel>SH7058</memmodel>
+		<checksummodule>subarudbw</checksummodule>
+	</romid>
+
+	<include>AE5L600L</include>
+
+	<!-- ================================================================ -->
+	<!-- MerpMod Scalings                                                 -->
+	<!-- ================================================================ -->
+
+	<scaling name="MerpModVE" units="VE (ratio)" toexpr="x*0.0000457763672" frexpr="x/0.0000457763672" format="%.4f" min="0" max="1.5" inc="0.001" storagetype="uint16" endian="big"/>
+	<scaling name="MerpModSDBlend" units="Blend (0=MAF,1=SD)" toexpr="x*0.003921568627451" frexpr="x/0.003921568627451" format="%.3f" min="0" max="1" inc="0.004" storagetype="uint8" endian="big"/>
+	<scaling name="MerpModAtmComp" units="Multiplier" toexpr="x*0.000061037" frexpr="x/0.000061037" format="%.4f" min="0" max="2" inc="0.001" storagetype="uint16" endian="big"/>
+	<scaling name="MerpModFloat" units="units" toexpr="x" frexpr="x" format="%.4f" min="-10000" max="100000" inc="0.01" storagetype="float" endian="big"/>
+	<scaling name="MerpModRPM" units="RPM" toexpr="x" frexpr="x" format="%.0f" min="0" max="12000" inc="50" storagetype="float" endian="big"/>
+	<scaling name="MerpModSpeed" units="km/h" toexpr="x" frexpr="x" format="%.1f" min="0" max="300" inc="1" storagetype="float" endian="big"/>
+	<scaling name="MerpModSpeedMPH" units="mph" toexpr="x*0.621371" frexpr="x/0.621371" format="%.1f" min="0" max="200" inc="1" storagetype="float" endian="big"/>
+	<scaling name="MerpModTemp" units="deg C" toexpr="x" frexpr="x" format="%.1f" min="-40" max="200" inc="1" storagetype="float" endian="big"/>
+	<scaling name="MerpModTempF" units="deg F" toexpr="(x*1.8)+32" frexpr="(x-32)/1.8" format="%.1f" min="-40" max="400" inc="1" storagetype="float" endian="big"/>
+	<scaling name="MerpModPressure" units="mmHg" toexpr="x" frexpr="x" format="%.0f" min="0" max="2500" inc="10" storagetype="float" endian="big"/>
+	<scaling name="MerpModUint8" units="units" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="uint8" endian="big"/>
+	<scaling name="MerpModPercent" units="%" toexpr="x" frexpr="x" format="%.1f" min="0" max="100" inc="0.5" storagetype="float" endian="big"/>
+	<scaling name="MerpModThreshold" units="units" toexpr="x" frexpr="x" format="%.2f" min="-100" max="100" inc="0.1" storagetype="float" endian="big"/>
+	<scaling name="MerpModGearRatio" units="ratio" toexpr="x" frexpr="x" format="%.3f" min="0" max="10" inc="0.001" storagetype="float" endian="big"/>
+	<scaling name="MerpModMafMode" storagetype="bloblist">
+		<data name="MAF Sensor" value="00"/>
+		<data name="Speed Density" value="01"/>
+		<data name="SD Blending" value="02"/>
+	</scaling>
+	<scaling name="MerpModRevLimMode" storagetype="bloblist">
+		<data name="Fuel Cut" value="01"/>
+		<data name="Spark Cut" value="02"/>
+	</scaling>
+	<scaling name="MerpModFFSMode" storagetype="bloblist">
+		<data name="Static" value="00"/>
+		<data name="Automatic (Gear-Based)" value="01"/>
+	</scaling>
+
+	<!-- ================================================================ -->
+	<!-- MerpMod Speed Density Tables                                     -->
+	<!-- ================================================================ -->
+
+	<table name="MerpMod VE Table 1" category="MerpMod Speed Density" address="db384" type="3D" level="4" scaling="MerpModVE">
+		<table name="Manifold Pressure (mmHg)" address="db864" type="X Axis" elements="24" scaling="MerpModPressure"/>
+		<table name="Engine Speed (RPM)" address="db804" type="Y Axis" elements="24" scaling="MerpModRPM"/>
+	</table>
+
+	<table name="MerpMod SD Blending Table" category="MerpMod Speed Density" address="db1fc" type="3D" level="3" scaling="MerpModSDBlend">
+		<table name="Manifold Pressure (mmHg)" address="db288" type="X Axis" elements="10" scaling="MerpModPressure"/>
+		<table name="Engine Speed (RPM)" address="db260" type="Y Axis" elements="10" scaling="MerpModRPM"/>
+	</table>
+
+	<table name="MerpMod Atmospheric Compensation" category="MerpMod Speed Density" address="db2cc" type="3D" level="3" scaling="MerpModAtmComp">
+		<table name="Manifold Pressure (mmHg)" address="db34c" type="X Axis" elements="7" scaling="MerpModPressure"/>
+		<table name="Atmospheric Pressure (mmHg)" address="db330" type="Y Axis" elements="7" scaling="MerpModPressure"/>
+	</table>
+
+	<table name="MerpMod Speed Density Mode" category="MerpMod Speed Density" address="db8d0" type="1D" level="1" scaling="MerpModMafMode"/>
+
+	<table name="MerpMod Engine Displacement" category="MerpMod Speed Density" address="db8c4" type="1D" level="1" scaling="MerpModFloat"/>
+
+	<table name="MerpMod Speed Density Constant" category="MerpMod Speed Density" address="db8c8" type="1D" level="1" scaling="MerpModFloat"/>
+
+	<table name="MerpMod Default SD Blend Ratio" category="MerpMod Speed Density" address="db8d4" type="1D" level="1" scaling="MerpModFloat"/>
+
+	<!-- ================================================================ -->
+	<!-- MerpMod Rev Limiter / Launch Control / Flat Foot Shift           -->
+	<!-- ================================================================ -->
+
+	<table name="MerpMod Rev Limit Mode" category="MerpMod Rev Limiter" address="db928" type="1D" level="1" scaling="MerpModRevLimMode"/>
+
+	<table name="MerpMod Rev Limit (Redline)" category="MerpMod Rev Limiter" address="db924" type="1D" level="1" scaling="MerpModRPM"/>
+
+	<table name="MerpMod Redline Hysteresis" category="MerpMod Rev Limiter" address="db920" type="1D" level="1" scaling="MerpModRPM"/>
+
+	<table name="MerpMod Launch Control RPM" category="MerpMod Rev Limiter" address="db908" type="1D" level="1" scaling="MerpModRPM"/>
+
+	<table name="MerpMod Launch Control Hysteresis" category="MerpMod Rev Limiter" address="db904" type="1D" level="1" scaling="MerpModRPM"/>
+
+	<table name="MerpMod LC Maximum Speed Threshold" category="MerpMod Rev Limiter" address="db90c" type="1D" level="1" scaling="MerpModSpeed"/>
+
+	<table name="MerpMod LC Minimum Throttle" category="MerpMod Rev Limiter" address="db8e0" type="1D" level="1" scaling="MerpModPercent"/>
+
+	<table name="MerpMod FFS Mode" category="MerpMod Flat Foot Shift" address="db900" type="1D" level="1" scaling="MerpModFFSMode"/>
+
+	<table name="MerpMod FFS Delta (Static Limit)" category="MerpMod Flat Foot Shift" address="db918" type="1D" level="1" scaling="MerpModRPM"/>
+
+	<table name="MerpMod FFS Delta (Automatic Limit)" category="MerpMod Flat Foot Shift" address="db8fc" type="1D" level="1" scaling="MerpModRPM"/>
+
+	<table name="MerpMod FFS Hysteresis" category="MerpMod Flat Foot Shift" address="db91c" type="1D" level="1" scaling="MerpModRPM"/>
+
+	<table name="MerpMod FFS Minimum Speed Threshold" category="MerpMod Flat Foot Shift" address="db914" type="1D" level="1" scaling="MerpModSpeed"/>
+
+	<table name="MerpMod FFS Minimum RPM Threshold" category="MerpMod Flat Foot Shift" address="db910" type="1D" level="1" scaling="MerpModRPM"/>
+
+	<table name="MerpMod FFS Minimum Throttle" category="MerpMod Flat Foot Shift" address="db8dc" type="1D" level="1" scaling="MerpModPercent"/>
+
+	<table name="MerpMod FFS Gear Ratios" category="MerpMod Flat Foot Shift" address="db8e4" type="2D" level="2" scaling="MerpModGearRatio">
+		<table name="Gear" type="Static Y Axis" elements="6"/>
+	</table>
+
+	<!-- ================================================================ -->
+	<!-- MerpMod CEL Flash                                                -->
+	<!-- ================================================================ -->
+
+	<table name="MerpMod FBKC Threshold" category="MerpMod CEL Flash" address="db93c" type="1D" level="1" scaling="MerpModThreshold"/>
+
+	<table name="MerpMod FBKC Flash Speed" category="MerpMod CEL Flash" address="db96c" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod FBKC Flash Count" category="MerpMod CEL Flash" address="db968" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod FBKC Severe Knock Threshold" category="MerpMod CEL Flash" address="db938" type="1D" level="1" scaling="MerpModThreshold"/>
+
+	<table name="MerpMod FBKC Severe Knock Flash Speed" category="MerpMod CEL Flash" address="db964" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod FBKC Severe Knock Flash Count" category="MerpMod CEL Flash" address="db960" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod FBKC Load Threshold" category="MerpMod CEL Flash" address="db934" type="1D" level="1" scaling="MerpModThreshold"/>
+
+	<table name="MerpMod IAM Flash Threshold" category="MerpMod CEL Flash" address="db948" type="1D" level="1" scaling="MerpModThreshold"/>
+
+	<table name="MerpMod IAM Flash Count" category="MerpMod CEL Flash" address="db944" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod IAM Flash Speed" category="MerpMod CEL Flash" address="db940" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod EGT Resistance Threshold" category="MerpMod CEL Flash" address="db92c" type="1D" level="1" scaling="MerpModFloat"/>
+
+	<table name="MerpMod EGT Flash Speed" category="MerpMod CEL Flash" address="db95c" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod EGT Flash Count" category="MerpMod CEL Flash" address="db958" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod EGT Load Threshold" category="MerpMod CEL Flash" address="db930" type="1D" level="1" scaling="MerpModThreshold"/>
+
+	<table name="MerpMod ECT Flash Temperature Threshold" category="MerpMod CEL Flash" address="db94c" type="1D" level="1" scaling="MerpModTempF"/>
+
+	<table name="MerpMod ECT Flash Speed" category="MerpMod CEL Flash" address="db954" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<table name="MerpMod ECT Flash Count" category="MerpMod CEL Flash" address="db950" type="1D" level="1" scaling="MerpModUint8"/>
+
+	<!-- ================================================================ -->
+	<!-- MerpMod Engine Load Smoothing (OEM ROM addresses)                -->
+	<!-- ================================================================ -->
+
+	<table name="MerpMod Engine Load Smoothing Factor A" category="MerpMod Engine" address="c2d40" type="1D" level="1" scaling="MerpModFloat"/>
+
+	<table name="MerpMod Engine Load Smoothing Factor B" category="MerpMod Engine" address="c2d3c" type="1D" level="1" scaling="MerpModFloat"/>
+
+	<table name="MerpMod Engine Load Smoothing Factor Alt" category="MerpMod Engine" address="c2d38" type="1D" level="1" scaling="MerpModFloat"/>
+
+	<table name="MerpMod Engine Load Smoothing Factor Final" category="MerpMod Engine" address="c2d4c" type="1D" level="1" scaling="MerpModFloat"/>
+
+</rom>
