@@ -115,11 +115,11 @@
 
 /* [HIGH CONF] CEL signal hook addresses.
  * sCelTrigger at 0xA034A - function prolog (sts.l pr) identified.
- * hCelSignal at 0xA03CE - offset +0x84 from sCelTrigger, consistent
- * with the AE5K700V pattern (0xA049C - 0xA0418 = 0x84).
+ * hCelSignal at 0xA0334 = literal pool containing pCelSignalOem (0xFFFFAD52).
+ * Replacing this redirects the CEL output to our RAM variable.
  * pCelSignalOem at 0xFFFFAD52 - found in literal pool at 0xA0334. */
 #define sCelTrigger (0x000A034A)
-#define hCelSignal (0x000A03CE)
+#define hCelSignal (0x000A0334)
 #define pCelSignalOem ((unsigned char*)0xFFFFAD52)
 
 /////////////////////
@@ -145,11 +145,12 @@
  *
  * WGDC code area: function at 0x13D66 (prolog), processes descriptors
  * via Pull3DFloat calls. WGDC Max desc loaded at 0x13E3C into r4.
- * hWgdc at 0x4A6E4 = JSR in main dispatch (same addr as AE5K700V).
- * sWgdc at 0x13774 = WGDC subroutine (code at this addr verified). */
+ * hWgdc literal pool at 0x4A8AC (referenced by mov.l at 0x4A6E2).
+ * OEM value = 0x6B4C4 (WGDC dispatch function).
+ * sWgdc at 0x6B4C4 = OEM WGDC function (literal pool value). */
 #define hPullWgdc (0x00013E1A)
-#define hWgdc (0x0004A6E4)
-#define sWgdc (0x00013774)
+#define hWgdc (0x0004A8AC)
+#define sWgdc (0x0006B4C4)
 #define hTableWgdcInitial (0x00013E3C)
 #define tWgdcInitial (0x000C1150)
 #define hTableWgdcMax (0x00013E3C)
@@ -292,13 +293,12 @@
 // Memory Reset
 /////////////////////
 
-/* [HIGH CONF] Memory reset routine identified via VBR vector trace.
- * Literal pool at 0x11CE4 contains 0xFFFF4000 (RAM clear start)
- * and 0x11CE8 contains 0xFFFFBF9F (RAM clear limit = pMemoryResetLimit).
- * sMemoryReset function starts at 0x101C4 (sts.l pr prolog found).
- * hMemoryReset at 0xFC20 area (references sMemoryReset).
- * hMemoryResetLimit at 0x11CE8 (the literal pool entry holding 0xFFFFBF9F). */
+/* Memory reset: sMemoryReset at 0x101C4 is not referenced by any literal pool
+ * in this ROM, so we cannot hook it via Replace4Bytes. Instead, initialization
+ * is handled at runtime via the WGDC main hook (first-run init check).
+ * hMemoryResetLimit at 0x11CE8 (literal pool with 0xFFFFBF9F) is also
+ * unreferenced. Both are defined but left unused by disabling MEMORY_HACKS. */
 #define sMemoryReset (0x000101C4)
-#define hMemoryReset (0x0000FC20)
+/* #define hMemoryReset - no valid hook point found */
 #define pMemoryResetLimit (0xFFFFBF9F)
 #define hMemoryResetLimit (0x00011CE8)
