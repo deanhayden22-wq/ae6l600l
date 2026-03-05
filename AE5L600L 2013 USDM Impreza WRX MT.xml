@@ -17,6 +17,12 @@
 
 	<include>32BITBASE</include>
 	<scaling name="AF3_Adder2" units="units" toexpr="x*0.000015258789" frexpr="x/0.000015258789" format="%.6f" min="0" max="255" inc="1e-05" storagetype="uint16" endian="big"/>
+	<scaling name="MapSwitchFloat" units="units" toexpr="x" frexpr="x" format="%.4f" min="-100" max="15000" inc="0.01" storagetype="float" endian="big"/>
+	<scaling name="MapSwitchRPM" units="RPM" toexpr="x" frexpr="x" format="%.0f" min="0" max="12000" inc="50" storagetype="float" endian="big"/>
+	<scaling name="MapSwitchTemp" units="deg F" toexpr="x" frexpr="x" format="%.1f" min="-50" max="300" inc="1" storagetype="float" endian="big"/>
+	<scaling name="MapSwitchRatio" units="ratio" toexpr="x" frexpr="x" format="%.4f" min="0" max="1" inc="0.01" storagetype="float" endian="big"/>
+	<scaling name="MapSwitchDegrees" units="degrees" toexpr="x" frexpr="x" format="%.1f" min="-50" max="100" inc="0.5" storagetype="float" endian="big"/>
+	<scaling name="MapSwitchCounter" units="counts" toexpr="x" frexpr="x" format="%.0f" min="0" max="65535" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="Post_Start_Enrich_Decay3" units="units" toexpr="x" frexpr="x" format="%.0f" min="0" max="65535" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="Post_Start_Enrich_Decay4" units="units" toexpr="x*0.0078125" frexpr="x/0.0078125" format="%.3f" min="0" max="511" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="LCRPM" units="Engine Speed (RPM)" toexpr="x" frexpr="x" format="%.0f" min="0" max="12000" inc="50" storagetype="float" endian="big"/>
@@ -1305,5 +1311,238 @@
 		<table name="TPS Opening %" type="Y Axis" elements="9" scaling="TargetThrottlePlateOpeningAngle(%)1"/>
 	</table>
 
+	<!-- ===== Map Switching / Cruise-Non-Cruise Parameters ===== -->
+	<!-- Primary Switching Conditions (0x0D2A08-0x0D2A38) -->
+	<!-- These thresholds determine when the ECU transitions between cruise and non-cruise modes -->
+	<!-- The map ratio (0.0=cruise, 1.0=non-cruise) is stored in RAM 0xFFFF7F60 -->
+	<!-- Blending formula: result = cruise_value + (noncruise_value - cruise_value) * ratio -->
+
+	<table name="Map Switching Engine Speed Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a08" type="1D" scaling="MapSwitchRPM">
+		<description>Engine speed threshold used in cruise/non-cruise map switching logic. When RPM exceeds this value, it contributes to transitioning toward non-cruise mode. Stock value: 2000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Requested Torque Ratio Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a0c" type="1D" scaling="MapSwitchRatio">
+		<description>Requested torque ratio threshold for cruise/non-cruise switching. When the torque ratio exceeds this value, the ECU moves toward non-cruise mode. Stock value: 0.8798.</description>
+	</table>
+
+	<table name="Map Switching MAF/Load Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a10" type="1D" scaling="MapSwitchFloat">
+		<description>MAF or engine load threshold for cruise/non-cruise switching. Stock value: 2.0 g/rev.</description>
+	</table>
+
+	<table name="Map Switching Vehicle Speed Low Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a14" type="1D" scaling="MapSwitchFloat">
+		<description>Lower vehicle speed threshold for map switching logic. Stock value: 550.</description>
+	</table>
+
+	<table name="Map Switching Vehicle Speed High Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a18" type="1D" scaling="MapSwitchFloat">
+		<description>Upper vehicle speed threshold for map switching logic. Stock value: 1300.</description>
+	</table>
+
+	<table name="Map Switching IAT Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a1c" type="1D" scaling="MapSwitchTemp">
+		<description>Intake air temperature threshold for cruise/non-cruise switching. Stock value: 80 deg F.</description>
+	</table>
+
+	<table name="Map Switching Idle Mode Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a34" type="1D" scaling="MapSwitchFloat">
+		<description>Idle mode threshold for map switching. Stock value: 0.0 (not in idle).</description>
+	</table>
+
+	<table name="Map Switching SI-Drive Mode Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a38" type="1D" scaling="MapSwitchFloat">
+		<description>SI-Drive mode threshold for map switching. Stock value: 4.0.</description>
+	</table>
+
+	<!-- ECT/IAT Ratio Modifiers (0x0D2A40-0x0D2A64) -->
+
+	<table name="Map Switching ECT Cold Threshold Low" category="Map Switching - Cruise/Non-Cruise" address="d2a40" type="1D" scaling="MapSwitchTemp">
+		<description>Lower ECT cold threshold for map switching ratio modification. Stock value: -39 deg F.</description>
+	</table>
+
+	<table name="Map Switching ECT Cold Threshold High" category="Map Switching - Cruise/Non-Cruise" address="d2a44" type="1D" scaling="MapSwitchTemp">
+		<description>Upper ECT cold threshold for map switching ratio modification. Stock value: -20 deg F.</description>
+	</table>
+
+	<table name="Map Switching ECT/IAT Hot Threshold A" category="Map Switching - Cruise/Non-Cruise" address="d2a50" type="1D" scaling="MapSwitchTemp">
+		<description>ECT/IAT hot threshold A for map switching. Stock value: 120 deg F.</description>
+	</table>
+
+	<table name="Map Switching ECT/IAT Hot Threshold B" category="Map Switching - Cruise/Non-Cruise" address="d2a54" type="1D" scaling="MapSwitchTemp">
+		<description>ECT/IAT hot threshold B for map switching. Stock value: 60 deg F.</description>
+	</table>
+
+	<table name="Map Switching Ratio Modifier Min" category="Map Switching - Cruise/Non-Cruise" address="d2a58" type="1D" scaling="MapSwitchFloat">
+		<description>Minimum value for the map switching ratio modifier. Stock value: 0.0.</description>
+	</table>
+
+	<table name="Map Switching Ratio Modifier Scale" category="Map Switching - Cruise/Non-Cruise" address="d2a5c" type="1D" scaling="MapSwitchFloat">
+		<description>Scale factor for the map switching ratio modifier. Stock value: 13.0.</description>
+	</table>
+
+	<table name="Map Switch Ramping Adder A" category="Map Switching - Cruise/Non-Cruise" address="d2a60" type="1D" scaling="MapSwitchRatio">
+		<description>Rate at which the map ratio ramps when transitioning toward cruise or non-cruise mode. Higher values = faster transitions. Stock value: 0.7.</description>
+	</table>
+
+	<table name="Map Switch Ramping Adder B" category="Map Switching - Cruise/Non-Cruise" address="d2a64" type="1D" scaling="MapSwitchRatio">
+		<description>Rate at which the map ratio ramps when transitioning toward cruise or non-cruise mode. Higher values = faster transitions. Stock value: 0.7.</description>
+	</table>
+
+	<!-- Secondary Conditions (0x0D2A68-0x0D2ABC) -->
+
+	<table name="Map Switching MAF Sensor Threshold A" category="Map Switching - Cruise/Non-Cruise" address="d2a68" type="1D" scaling="MapSwitchFloat">
+		<description>MAF sensor threshold A for secondary map switching condition evaluation. Stock value: 60.0 g/s.</description>
+	</table>
+
+	<table name="Map Switching MAF Sensor Threshold B" category="Map Switching - Cruise/Non-Cruise" address="d2a6c" type="1D" scaling="MapSwitchFloat">
+		<description>MAF sensor threshold B for secondary map switching condition evaluation. Stock value: 0.0.</description>
+	</table>
+
+	<table name="Map Switching Requested Torque Min" category="Map Switching - Cruise/Non-Cruise" address="d2a70" type="1D" scaling="MapSwitchFloat">
+		<description>Minimum requested torque threshold for map switching evaluation. Stock value: 5.0.</description>
+	</table>
+
+	<table name="Map Switching Per-Gear RPM Threshold 1" category="Map Switching - Cruise/Non-Cruise" address="d2a74" type="1D" scaling="MapSwitchRPM">
+		<description>Per-gear RPM threshold (gear 1) for map switching. All gears stock at 4000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Per-Gear RPM Threshold 2" category="Map Switching - Cruise/Non-Cruise" address="d2a78" type="1D" scaling="MapSwitchRPM">
+		<description>Per-gear RPM threshold (gear 2) for map switching. Stock value: 4000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Per-Gear RPM Threshold 3" category="Map Switching - Cruise/Non-Cruise" address="d2a7c" type="1D" scaling="MapSwitchRPM">
+		<description>Per-gear RPM threshold (gear 3) for map switching. Stock value: 4000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Per-Gear RPM Threshold 4" category="Map Switching - Cruise/Non-Cruise" address="d2a80" type="1D" scaling="MapSwitchRPM">
+		<description>Per-gear RPM threshold (gear 4) for map switching. Stock value: 4000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Per-Gear RPM Threshold 5" category="Map Switching - Cruise/Non-Cruise" address="d2a84" type="1D" scaling="MapSwitchRPM">
+		<description>Per-gear RPM threshold (gear 5) for map switching. Stock value: 4000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Per-Gear RPM Threshold 6" category="Map Switching - Cruise/Non-Cruise" address="d2a88" type="1D" scaling="MapSwitchRPM">
+		<description>Per-gear RPM threshold (gear 6) for map switching. Stock value: 4000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Base RPM Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a8c" type="1D" scaling="MapSwitchRPM">
+		<description>Base RPM threshold for secondary map switching conditions. Stock value: 2800 RPM.</description>
+	</table>
+
+	<table name="Map Switching ECT Compensation A" category="Map Switching - Cruise/Non-Cruise" address="d2a90" type="1D" scaling="MapSwitchFloat">
+		<description>ECT compensation value A for map switching. Stock value: 10.0.</description>
+	</table>
+
+	<table name="Map Switching ECT Compensation B" category="Map Switching - Cruise/Non-Cruise" address="d2a94" type="1D" scaling="MapSwitchFloat">
+		<description>ECT compensation value B for map switching. Stock value: 10.0.</description>
+	</table>
+
+	<table name="Map Switching ECT Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a98" type="1D" scaling="MapSwitchTemp">
+		<description>ECT threshold for secondary map switching conditions. Stock value: 69.7 deg F.</description>
+	</table>
+
+	<table name="Map Switching RPM Override Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a9c" type="1D" scaling="MapSwitchRPM">
+		<description>RPM above which the map switching ratio is overridden. Stock value: 12000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Load Override Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2aa0" type="1D" scaling="MapSwitchFloat">
+		<description>Load value above which the map switching ratio is overridden. Stock value: 5.0.</description>
+	</table>
+
+	<table name="Map Switching Speed/Load Check Value" category="Map Switching - Cruise/Non-Cruise" address="d2aa4" type="1D" scaling="MapSwitchFloat">
+		<description>Speed/load check value for map switching. Stock value: 10.0.</description>
+	</table>
+
+	<table name="Map Switching Engine Speed Hysteresis Low" category="Map Switching - Cruise/Non-Cruise" address="d2aa8" type="1D" scaling="MapSwitchRPM">
+		<description>Lower RPM hysteresis bound for map switching. Stock value: 7900 RPM.</description>
+	</table>
+
+	<table name="Map Switching Engine Speed Hysteresis High" category="Map Switching - Cruise/Non-Cruise" address="d2aac" type="1D" scaling="MapSwitchRPM">
+		<description>Upper RPM hysteresis bound for map switching. Stock value: 8000 RPM.</description>
+	</table>
+
+	<table name="Map Switching Ratio Minimum Bound" category="Map Switching - Cruise/Non-Cruise" address="d2ab0" type="1D" scaling="MapSwitchFloat">
+		<description>Minimum bound for the map switching ratio output. Stock value: 0.0.</description>
+	</table>
+
+	<table name="Map Switching Ratio Maximum Bound" category="Map Switching - Cruise/Non-Cruise" address="d2ab4" type="1D" scaling="MapSwitchFloat">
+		<description>Maximum bound for the map switching ratio output. Stock value: 20.0.</description>
+	</table>
+
+	<table name="Map Switching Percentage Ceiling" category="Map Switching - Cruise/Non-Cruise" address="d2abc" type="1D" scaling="MapSwitchFloat">
+		<description>Percentage ceiling for map switching calculation. Stock value: 100.0.</description>
+	</table>
+
+	<!-- Delay Counter Parameters (uint16, 0x0D29AC-0x0D29B2) -->
+
+	<table name="Map Switching Cruise Switch Counter A" category="Map Switching - Cruise/Non-Cruise" address="d29ac" type="1D" scaling="MapSwitchCounter">
+		<description>Delay counter A for cruise/non-cruise switching. Controls how many scheduler cycles before the switch is committed. Stock value: 50.</description>
+	</table>
+
+	<table name="Map Switching Cruise Switch Min Delay A" category="Map Switching - Cruise/Non-Cruise" address="d29ae" type="1D" scaling="MapSwitchCounter">
+		<description>Minimum delay A before cruise/non-cruise switch is permitted. Stock value: 38.</description>
+	</table>
+
+	<table name="Map Switching Cruise Switch Counter B" category="Map Switching - Cruise/Non-Cruise" address="d29b0" type="1D" scaling="MapSwitchCounter">
+		<description>Delay counter B for cruise/non-cruise switching. Stock value: 100.</description>
+	</table>
+
+	<table name="Map Switching Cruise Switch Min Delay B" category="Map Switching - Cruise/Non-Cruise" address="d29b2" type="1D" scaling="MapSwitchCounter">
+		<description>Minimum delay B before cruise/non-cruise switch is permitted. Stock value: 38.</description>
+	</table>
+
+	<!-- Timing Blend Parameters (0x0D2AE8-0x0D2B1C) -->
+
+	<table name="Timing Blend Lookup Input Threshold" category="Map Switching - Timing Blend" address="d2ae8" type="1D" scaling="MapSwitchFloat">
+		<description>Input threshold for the timing blend lookup. Stock value: 10.0.</description>
+	</table>
+
+	<table name="Timing Blend RPM Activation Threshold" category="Map Switching - Timing Blend" address="d2aec" type="1D" scaling="MapSwitchRPM">
+		<description>RPM threshold above which timing blending becomes active. Stock value: 700 RPM.</description>
+	</table>
+
+	<table name="Timing Blend RPM Secondary Threshold" category="Map Switching - Timing Blend" address="d2af0" type="1D" scaling="MapSwitchRPM">
+		<description>Secondary RPM threshold for timing blend logic. Stock value: 600 RPM.</description>
+	</table>
+
+	<table name="Timing Blend IAT Threshold A" category="Map Switching - Timing Blend" address="d2af4" type="1D" scaling="MapSwitchTemp">
+		<description>IAT threshold A for timing blend calculations. Stock value: 69.65 deg F.</description>
+	</table>
+
+	<table name="Timing Blend IAT Threshold B" category="Map Switching - Timing Blend" address="d2af8" type="1D" scaling="MapSwitchTemp">
+		<description>IAT threshold B for timing blend calculations. Stock value: 69.65 deg F.</description>
+	</table>
+
+	<table name="Timing Blend Correction Offset" category="Map Switching - Timing Blend" address="d2afc" type="1D" scaling="MapSwitchDegrees">
+		<description>Correction offset applied during timing blending. Stock value: -3.0 degrees.</description>
+	</table>
+
+	<table name="Timing Blend RPM Max for Blending" category="Map Switching - Timing Blend" address="d2b00" type="1D" scaling="MapSwitchRPM">
+		<description>Maximum RPM for timing blend operation. Stock value: 10000 RPM.</description>
+	</table>
+
+	<table name="Timing Blend Ramping Rate" category="Map Switching - Timing Blend" address="d2b04" type="1D" scaling="MapSwitchRatio">
+		<description>Rate/factor at which the timing blend ratio changes per cycle. Stock value: 0.35.</description>
+	</table>
+
+	<table name="Timing Blend Correction Threshold" category="Map Switching - Timing Blend" address="d2b08" type="1D" scaling="MapSwitchDegrees">
+		<description>Correction threshold for timing blend calculations. Stock value: 44.0 degrees.</description>
+	</table>
+
+	<table name="Timing Blend Half Ratio (Map Ratio E42)" category="Map Switching - Timing Blend" address="d2b0c" type="1D" scaling="MapSwitchRatio">
+		<description>Half-ratio value used in timing blend. Likely the Map Ratio E42 reference value. Stock value: 0.5.</description>
+	</table>
+
+	<table name="Timing Blend Minimum Ratio" category="Map Switching - Timing Blend" address="d2b10" type="1D" scaling="MapSwitchFloat">
+		<description>Minimum ratio value for timing blend. Stock value: 0.0.</description>
+	</table>
+
+	<table name="Timing Blend RPM Limit" category="Map Switching - Timing Blend" address="d2b14" type="1D" scaling="MapSwitchRPM">
+		<description>RPM limit for timing blend operation. Stock value: 6000 RPM.</description>
+	</table>
+
+	<table name="Timing Blend Ratio Floor" category="Map Switching - Timing Blend" address="d2b18" type="1D" scaling="MapSwitchFloat">
+		<description>Floor value for the timing blend ratio. Stock value: 0.0.</description>
+	</table>
+
+	<table name="Timing Blend Ratio Ceiling" category="Map Switching - Timing Blend" address="d2b1c" type="1D" scaling="MapSwitchRatio">
+		<description>Ceiling value for the timing blend ratio. Stock value: 1.0.</description>
+	</table>
 
 </rom>
