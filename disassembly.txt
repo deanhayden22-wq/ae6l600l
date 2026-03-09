@@ -460,6 +460,13 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ; ═════════════════════════════════════════════════════════════════════════════
 ; Found via gate function (0x043470) literal pool and 0xAE000 descriptor analysis.
 ;
+; ─── Code Functions ────────────────────────────────
+;   0x043470:  LowPW_GateFunction    - Gate check: RPM < max and IPW < max
+;   0x0BE874:  LowPW_TableProcessor  - Table lookup engine called by gate function
+;   0x0BECA8:  LowPW_AxisLookup      - Axis lookup / interpolation helper
+;
+; ─── Calibration Data ──────────────────────────────
+;   0xD2D20:  LowPW_GateThresh_FR8_Max  - Max FR8 gate threshold (float)
 ;   0xD3988:  Y axis - Base Pulse Width (8 x float32): 0.7 to 4.5 ms
 ;   0xD39A8:  Data - Low PW Fuel Injector Compensation (8 x uint8)
 ;             Scaling: InjectorPulseWidthCompensation
@@ -469,7 +476,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;             Currently = 10000 raw = 10.0 ms (feature effectively disabled)
 
 ; ─────────────────────────────────────────────────────
-; CALIBRATION TABLE DIRECTORY  (535+ tables)
+; CALIBRATION TABLE DIRECTORY  (590+ tables)
 ; ─────────────────────────────────────────────────────
 ; Address      Category                            Table Name
 ; ------------ ----------------------------------- ----------------------------------------
@@ -790,6 +797,8 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
               ; Diagnostic Trouble Codes  [1D]  
   000AAE20:  Engine Load Limit B Maximum (RPM) - Multiplier
               ; ALPHA Engine Load Limit B Multiplier  [2D]  (raw ecu value)
+  000C009E:  Wastegate Duty Cycle Frequency
+              ; Boost Control - Wastegate  [1D]  (frequency, scale=0.01)
   000C0BAD:  Boost Control Disable Delay (Fine Correction)
               ; Boost Control - Limits  [2D]  (counter threshold)
   000C0BC8:  Boost disable during fuel cut-Boost(psi) threshold
@@ -1235,16 +1244,132 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
               ;   [Y Axis]  (RPM)
   000D2560:  Boost Limit (Fuel Cut)_
               ; Boost Control - Limits  [3D]  (psi absolute)
+  000D29AC:  Map Switching Cruise Switch Counter A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (counts, uint16)
+  000D29AE:  Map Switching Cruise Switch Min Delay A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (counts, uint16)
+  000D29B0:  Map Switching Cruise Switch Counter B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (counts, uint16)
+  000D29B2:  Map Switching Cruise Switch Min Delay B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (counts, uint16)
   000D29DE:  Feedback Correction Negative Advance Delay
               ; Ignition Timing - Knock Control  [2D]  (counter threshold)
   000D29EE:  Fine Correction Advance Delay
               ; Ignition Timing - Knock Control  [2D]  (counter threshold)
   000D2ADC:  Base Timing Idle Minimum Vehicle Speed Enable
               ; Ignition Timing - Advance  [2D]  (Vehicle Speed (MPH))
+; ─── Map Switching - Cruise/Non-Cruise Parameters (0xD2A08-0xD2ABC) ────
+  000D2A08:  Map Switching Engine Speed Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A0C:  Map Switching Requested Torque Ratio Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (ratio, float)
+  000D2A10:  Map Switching MAF/Load Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A14:  Map Switching Vehicle Speed Low Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A18:  Map Switching Vehicle Speed High Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A1C:  Map Switching IAT Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A34:  Map Switching Idle Mode Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A38:  Map Switching SI-Drive Mode Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A40:  Map Switching ECT Cold Threshold Low
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A44:  Map Switching ECT Cold Threshold High
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A50:  Map Switching ECT/IAT Hot Threshold A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A54:  Map Switching ECT/IAT Hot Threshold B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A58:  Map Switching Ratio Modifier Min
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A5C:  Map Switching Ratio Modifier Scale
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A60:  Map Switch Ramping Adder A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (ratio, float)
+  000D2A64:  Map Switch Ramping Adder B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (ratio, float)
+  000D2A68:  Map Switching MAF Sensor Threshold A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A6C:  Map Switching MAF Sensor Threshold B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A70:  Map Switching Requested Torque Min
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A74:  Map Switching Per-Gear RPM Threshold 1
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A78:  Map Switching Per-Gear RPM Threshold 2
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A7C:  Map Switching Per-Gear RPM Threshold 3
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A80:  Map Switching Per-Gear RPM Threshold 4
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A84:  Map Switching Per-Gear RPM Threshold 5
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A88:  Map Switching Per-Gear RPM Threshold 6
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A8C:  Map Switching Base RPM Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A90:  Map Switching ECT Compensation A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A94:  Map Switching ECT Compensation B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A98:  Map Switching ECT Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A9C:  Map Switching RPM Override Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2AA0:  Map Switching Load Override Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2AA4:  Map Switching Speed/Load Check Value
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2AA8:  Map Switching Engine Speed Hysteresis Low
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2AAC:  Map Switching Engine Speed Hysteresis High
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2AB0:  Map Switching Ratio Minimum Bound
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2AB4:  Map Switching Ratio Maximum Bound
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2ABC:  Map Switching Percentage Ceiling
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+
+; ─── Map Switching - Timing Blend Parameters (0xD2AE8-0xD2B1C) ────────
+  000D2AE8:  Timing Blend Lookup Input Threshold
+              ; Map Switching - Timing Blend  [1D]  (units, float)
+  000D2AEC:  Timing Blend RPM Activation Threshold
+              ; Map Switching - Timing Blend  [1D]  (RPM, float)
+  000D2AF0:  Timing Blend RPM Secondary Threshold
+              ; Map Switching - Timing Blend  [1D]  (RPM, float)
+  000D2AF4:  Timing Blend IAT Threshold A
+              ; Map Switching - Timing Blend  [1D]  (deg F, float)
+  000D2AF8:  Timing Blend IAT Threshold B
+              ; Map Switching - Timing Blend  [1D]  (deg F, float)
+  000D2AFC:  Timing Blend Correction Offset
+              ; Map Switching - Timing Blend  [1D]  (degrees, float)  stock = -3.0
+  000D2B00:  Timing Blend RPM Max for Blending
+              ; Map Switching - Timing Blend  [1D]  (RPM, float)
+  000D2B04:  Timing Blend Ramping Rate
+              ; Map Switching - Timing Blend  [1D]  (ratio, float)
+  000D2B08:  Timing Blend Correction Threshold
+              ; Map Switching - Timing Blend  [1D]  (degrees, float)
+  000D2B0C:  Timing Blend Half Ratio (Map Ratio E42)
+              ; Map Switching - Timing Blend  [1D]  (ratio, float)
+  000D2B10:  Timing Blend Minimum Ratio
+              ; Map Switching - Timing Blend  [1D]  (units, float)
+  000D2B14:  Timing Blend RPM Limit
+              ; Map Switching - Timing Blend  [1D]  (RPM, float)
+  000D2B18:  Timing Blend Ratio Floor
+              ; Map Switching - Timing Blend  [1D]  (units, float)
+  000D2B1C:  Timing Blend Ratio Ceiling
+              ; Map Switching - Timing Blend  [1D]  (ratio, float)
+
   000D2CD8:  Timing Compensation B (IAT) Max Additive
               ; Ignition Timing - Compensation  [2D]  (degrees of correction)
   000D2CF4:  Timing Compensation B (IAT) IAM Activation
               ; Ignition Timing - Compensation  [2D]  (Ignition Advance Multiplier (IAM))
+  000D2D20:  Low PW Fuel Injector Comp Gate Threshold (FR8 Max)
+              ; ALPHA Low PW Injector Comp  [1D]  (float, gate threshold)
   000D2D28:  Low PW Fuel Injector Comp Maximum RPM
               ; ALPHA Low PW Injector Comp  [2D]  (Engine Speed (RPM))  currently 10000 = disabled
   000D2D2C:  Low PW Fuel Injector Comp Maximum IPW
@@ -1520,8 +1645,11 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
   000DAC34:  Intake Cam Advance Angle Non-Cruise (AVCS)
               ; Variable Valve Timing (AVCS)  [3D]  (Advance (degrees))
   000F104C:  LC disable speed(MPH)threshold
+              ; tinywrex patches  [1D]  (Vehicle Speed (MPH))
   000F1050:  LC RPM delta
+              ; tinywrex patches  [1D]  (RPM delta)
   000F1054:  FFS RPM delta
+              ; tinywrex patches  [1D]  (RPM delta)
   000F8948:  Speed Limiting A (Throttle) SI-DRIVE Sport/Sport Sharp
               ; Miscellaneous - Limits  [2D]  (Vehicle Speed (MPH))
   000F8954:  Speed Limiting (Throttle) SI-DRIVE Intelligent
@@ -1624,10 +1752,13 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   0x00000BAC-0x00000BFC:  NMI handler + default exception handler
 ;   0x00000C0C-0x00000D36:  Reset / startup initialization
 ;   0x0000E628:             Scheduler table
-;   0x00014004-0x000F9EE0:  Calibration tables (535+)
+;   0x00014004-0x000F9EE0:  Calibration tables (590+)
 ;   0x00029858:             Helper functions
 ;   0x00030674-0x00030A78:  Post Start Enrichment code function
 ;   0x00043470:             Low PW Injector Comp gate function
+;   0x0008D838:             Pointer table (ptr_table_8D838, purpose TBD)
+;   0x000BE874:             LowPW_TableProcessor (table lookup engine)
+;   0x000BECA8:             LowPW_AxisLookup (interpolation helper)
 ;   0x00043750-0x00043B62:  Knock detection (wrapper + detector)
 ;   0x00045BFE-0x00045DD8:  FLKC Path J (fast knock correction)
 ;   0x000463BA-0x000466A0:  FLKC Paths F/G (sustained knock correction)
@@ -1639,6 +1770,10 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   0x000AD848:             AVCS Exhaust descriptor
 ;   0x000AE000+:            Low PW Injector Comp descriptors
 ;   0x000C0000-0x000FFFFF:  Primary calibration data region
+;     0x000C009E:            Wastegate Duty Cycle Frequency
+;     0x000D29AC-0x000D29B3:  Map Switching cruise switch counters (4 x uint16)
+;     0x000D2A08-0x000D2ABC:  Map Switching cruise/non-cruise thresholds (37 params)
+;     0x000D2AE8-0x000D2B1C:  Timing Blend parameters (14 params)
 ;   0xFFFF8000-0xFFFFFFFF:  Internal RAM (32KB)
 
 ; ─────────────────────────────────────────────────────
