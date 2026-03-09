@@ -1,0 +1,88 @@
+REAR O2 SENSOR INVESTIGATION - AE5L600L Rev 20.2
+==================================================
+
+SUMMARY
+-------
+On this ROM (rev 20.2), unplugging the rear O2 sensor will NOT cause a rich
+loop or affect fueling in any way. The AF 3 correction system (the only code
+path where the rear O2 influences fueling) has been disabled by zeroing the
+correction limits.
+
+However, 4 diagnostic trouble codes remain enabled and could potentially
+throw a CEL.
+
+
+AF 3 CORRECTION SYSTEM (REAR O2 FUEL TRIM)
+-------------------------------------------
+The rear O2 sensor feeds into the ECU's "AF 3" correction loop, a secondary
+fuel trim that adjusts target AFR based on the rear (post-cat) O2 reading.
+This is the ONLY code path where the rear O2 influences fueling -- confirmed
+via disassembly analysis. All closed-loop fueling is driven by the front O2
+sensor only.
+
+AF 3 Correction Limits (0x35FFC) - DISABLED
+  + limit (max enrichment):  0.00%
+  - limit (max enleanment):  0.00%
+
+Both limits are zeroed, clamping AF 3 correction to 0%. Even if the ECU
+reads 0V from an unplugged sensor and interprets it as lean, it cannot
+apply any fuel correction.
+
+ROM description for this table:
+  "CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY OF THE
+   REAR O2 SENSOR INPUT ON TARGET AFR, THIS AFR TRIM 3 CAN CAUSE RICHER
+   THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF EXPERINCING RICHER THAN
+   IDEAL IDLES WHEN ALL OTHER SCALING IS VERIFYED CORRECT OR REAR O2
+   SENSOR DELETE."
+
+The AF 3 Correction Adder (Decrease) and AF 3 Correction Adder (Increase) B
+tables have no addresses mapped in the vehicle XML -- they are stub
+definitions. The "AF 3 Learning Limits" label at 0x36000 in the disassembly
+has no corresponding XML table definition either.
+
+
+WHY PEOPLE REPORT RICH RUNNING (STOCK ROMS)
+--------------------------------------------
+On a stock tune, the AF 3 Correction Limits are set to +/- several percent.
+When the rear O2 is unplugged:
+
+  1. Sensor reads 0V (grounded/no signal)
+  2. ECU interprets 0V as lean (narrowband O2 outputs ~0.5V at stoich)
+  3. AF 3 Correction Adder (Increase) table adds fuel to "fix" the lean reading
+  4. This creates observable rich running, especially at idle
+
+This does NOT apply to rev 20.2 because the correction limits are zeroed.
+
+
+DIAGNOSTIC TROUBLE CODES
+-------------------------
+
+DISABLED (9 codes) - will NOT throw CEL:
+
+  P0037  Rear O2 Sensor Low Input              0x9A7A2  DISABLED
+  P0038  Rear O2 Sensor High Input             0x9A7A0  DISABLED
+  P0137  Rear O2 Sensor Low Voltage            0x9A799  DISABLED
+  P0138  Rear O2 Sensor High Voltage           0x9A79C  DISABLED
+  P0140  Rear O2 Sensor No Activity            0x9A7E2  DISABLED
+  P0141  Rear O2 Sensor Malfunction            0x9A78A  DISABLED
+  P0420  Catalyst Efficiency Below Threshold   0x9A78D  DISABLED
+  P2096  Post Catalyst Too Lean B1             0x9A7B6  DISABLED
+  P2097  Post Catalyst Too Rich B1             0x9A7BD  DISABLED
+
+STILL ENABLED (4 codes) - could throw CEL:
+
+  P013A  O2 Slow Response Rich-to-Lean B1S2    0x9A815  ENABLED
+  P013B  O2 Slow Response Lean-to-Rich B1S2    0x9A814  ENABLED
+  P013E  O2 Delayed Response Rich-to-Lean B1S2 0x9A813  ENABLED
+  P013F  O2 Delayed Response Lean-to-Rich B1S2 0x9A812  ENABLED
+
+These are diagnostic only and do not affect fueling. To disable, set bytes
+at 0x9A812-0x9A815 to 0x00 in the ROM binary.
+
+
+CONCLUSION
+----------
+  Rich running / rich loop:              NO RISK - AF 3 correction zeroed
+  Fueling changes:                       NONE - rear O2 has no fuel influence
+  CEL from main rear O2 codes:           NO RISK - 9 DTCs disabled
+  CEL from slow/delayed response codes:  POSSIBLE - 4 DTCs still enabled
