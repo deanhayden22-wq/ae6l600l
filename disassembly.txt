@@ -460,6 +460,13 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ; ═════════════════════════════════════════════════════════════════════════════
 ; Found via gate function (0x043470) literal pool and 0xAE000 descriptor analysis.
 ;
+; ─── Code Functions ────────────────────────────────
+;   0x043470:  LowPW_GateFunction    - Gate check: RPM < max and IPW < max
+;   0x0BE874:  LowPW_TableProcessor  - Table lookup engine called by gate function
+;   0x0BECA8:  LowPW_AxisLookup      - Axis lookup / interpolation helper
+;
+; ─── Calibration Data ──────────────────────────────
+;   0xD2D20:  LowPW_GateThresh_FR8_Max  - Max FR8 gate threshold (float)
 ;   0xD3988:  Y axis - Base Pulse Width (8 x float32): 0.7 to 4.5 ms
 ;   0xD39A8:  Data - Low PW Fuel Injector Compensation (8 x uint8)
 ;             Scaling: InjectorPulseWidthCompensation
@@ -1361,6 +1368,8 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
               ; Ignition Timing - Compensation  [2D]  (degrees of correction)
   000D2CF4:  Timing Compensation B (IAT) IAM Activation
               ; Ignition Timing - Compensation  [2D]  (Ignition Advance Multiplier (IAM))
+  000D2D20:  Low PW Fuel Injector Comp Gate Threshold (FR8 Max)
+              ; ALPHA Low PW Injector Comp  [1D]  (float, gate threshold)
   000D2D28:  Low PW Fuel Injector Comp Maximum RPM
               ; ALPHA Low PW Injector Comp  [2D]  (Engine Speed (RPM))  currently 10000 = disabled
   000D2D2C:  Low PW Fuel Injector Comp Maximum IPW
@@ -1747,6 +1756,9 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   0x00029858:             Helper functions
 ;   0x00030674-0x00030A78:  Post Start Enrichment code function
 ;   0x00043470:             Low PW Injector Comp gate function
+;   0x0008D838:             Pointer table (ptr_table_8D838, purpose TBD)
+;   0x000BE874:             LowPW_TableProcessor (table lookup engine)
+;   0x000BECA8:             LowPW_AxisLookup (interpolation helper)
 ;   0x00043750-0x00043B62:  Knock detection (wrapper + detector)
 ;   0x00045BFE-0x00045DD8:  FLKC Path J (fast knock correction)
 ;   0x000463BA-0x000466A0:  FLKC Paths F/G (sustained knock correction)
