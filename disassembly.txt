@@ -1,11 +1,78 @@
 ================================================================================
 SH7058 ECU ROM Disassembly
 ROM: 2013 USDM Subaru Impreza WRX MT  |  Part: AE5L600L
-MCU: Renesas SH7058  |  Arch: SH2 Big-Endian  |  ROM Base: 0x00000000
+MCU: Renesas SH7058  |  Arch: SH-2A Big-Endian  |  ROM Base: 0x00000000
 RAM: 0xFFFF8000-0xFFFFFFFF (32KB)  |  ROM Size: 1MB (0x100000)
 ECU ID: 8A12587007  |  Flash Method: subarucan  |  Checksum: subarudbw
+ROM Variant: rev 20.2 "tiny wrex"  |  Ghidra: 12.0.2 SuperH:BE:32:SH-2A
 Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ================================================================================
+
+; ═════════════════════════════════════════════════════════════════════════════
+; GHIDRA ANALYSIS SUMMARY (SuperH:BE:32:SH-2A)
+; ═════════════════════════════════════════════════════════════════════════════
+; Processor: SuperH:BE:32:SH-2A:default (upgrade from SH-2 for 32-bit branch
+;            instructions, FPU ops, and wider opcode coverage)
+; Tool: Ghidra 12.0.2  |  Exported: 2026-03-08
+;
+; ─── Analysis Statistics ───────────────────────────────
+;   Total functions:          3,642  (SH-2 found 2,582 — +41% improvement)
+;   Auto-named (FUN_*):      3,531
+;   Thunk functions:            101  (indirect jump trampolines)
+;   User-named functions:        10
+;   Code blocks:              3,776  (SH-2 found 2,975 — +27%)
+;   Defined data items:      36,716  (SH-2 found 27,531 — +33%)
+;   User-defined symbols:       139  (+ 21 RAM variables applied by import script)
+;   Comments (EOL):              41
+;   Bookmarks (total):        4,690
+;     Aggressive Instr Finder: 2,351
+;     Address Table:           2,290
+;     Found Code:                 23
+;     Non-Returning Function:     13
+;     Bad Instruction (Error):    13
+;
+; ─── User-Named Functions ──────────────────────────────
+;   0x00000BFA  DefaultExceptionHandler
+;   0x00043750  knock_wrapper
+;   0x00043782  knock_detector
+;   0x00043D68  fn_043D68            (task [12])
+;   0x0004438C  fn_04438C            (task [11])
+;   0x00045BFE  flkc_path_J          (task [18])
+;   0x000463BA  flkc_paths_FG        (task [25])
+;   0x0004A94C  sched_periodic_dispatch
+;   0x000BE874  LowPW_TableProcessor
+;   0x000BECA8  LowPW_AxisLookup
+;
+; ─── Bad Instruction Errors (13) ───────────────────────
+;   These are data-in-code conflicts, not SH-2A decoder failures.
+;   0x001034  conflicting data (flow from 0x001032)
+;   0x001050  conflicting data (flow from 0x00104E)
+;   0x00760A  conflicting data (flow from self)
+;   0x007F7E  conflicting instruction at 0x007F7F (flow from 0x007F7C)
+;   0x01A00C  conflicting data (flow from 0x01A00A)
+;   0x023A3C  conflicting data (flow from 0x023A3A)
+;   0x029A24  conflicting data (flow from 0x029A22)
+;   0x034B98  conflicting data (flow from 0x034B96)
+;   0x03A1E0  conflicting data (flow from 0x03A1DE)
+;   0x045834  conflicting data (flow from 0x045832)
+;   0x057026  conflicting data at 0x057028 (flow from 0x057024)
+;   0x05702E  conflicting data at 0x05702C (flow from 0x057024)
+;   0x0BE910  conflicting data (flow from 0x0BE90E)
+;
+; ─── Non-Returning Functions (13) ──────────────────────
+;   0x0317C  0x04912  0x22CF4  0x22F92  0x332A2  0x582AC  0x582D2
+;   0x584C8  0x9EE48  0xA95BA  0xBE81C  0xBE9A0  0xBEA6C
+;
+; ─── Thunk Functions (101) ─────────────────────────────
+;   SH-2A's wider instruction set enables Ghidra to identify indirect jump
+;   trampolines that SH-2 could not follow. Notable multi-target thunks:
+;     FUN_00022CB6 <- 4 thunks (0x2271C, 0x22720, 0x22724, 0x22728)
+;     FUN_00006316 <- 2 thunks (0x0F694, 0x0F772)
+;     FUN_00058964 <- 2 thunks (0x588FA, 0x588FE)
+;     FUN_0005EC76 <- 2 thunks (0x4B4E4, 0x5AA24)
+;     FUN_0005ED02 <- 2 thunks (0x4B4EA, 0x5AA2A)
+;     FUN_000238EA <- 2 thunks (0x23270, 0x23274)
+;   Full thunk list: see Ghidra XML export (thunk_FUN_* entries)
 
 ; ─────────────────────────────────────────────────────
 ; EXCEPTION VECTOR TABLE  @ 0x00000000
@@ -250,7 +317,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ; ═════════════════════════════════════════════════════════════════════════════
 ; KNOCK DETECTION & FLKC (Fine Learning Knock Correction) ANALYSIS
 ; ═════════════════════════════════════════════════════════════════════════════
-; Reverse-engineered from Ghidra analysis of the knock correction system.
+; Reverse-engineered from Ghidra SH-2A analysis of the knock correction system.
 ; Two GBR contexts: knock_detector uses GBR=0xFFFF80FC,
 ;                   flkc_paths_FG uses GBR=0xFFFF8290.
 ;
@@ -1771,11 +1838,23 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   0x000AE000+:            Low PW Injector Comp descriptors
 ;   0x000C0000-0x000FFFFF:  Primary calibration data region
 ;     0x000C009E:            Wastegate Duty Cycle Frequency
+;     0x000C0BC8:            Boost disable during fuel cut (tiny wrex patch)
 ;     0x000D29AC-0x000D29B3:  Map Switching cruise switch counters (4 x uint16)
 ;     0x000D2A08-0x000D2ABC:  Map Switching cruise/non-cruise thresholds (37 params)
 ;     0x000D2AE8-0x000D2B1C:  Timing Blend parameters (14 params)
+;     0x000F104C-0x000F1054:  tiny wrex patches (LC speed, LC RPM delta, FFS RPM delta)
 ;   0xFFFF8000-0xFFFFFFFF:  Internal RAM (32KB)
+;
+; ─── Ghidra SH-2A Coverage ─────────────────────────────
+;   3,642 functions identified across 3,776 code blocks
+;   101 thunk functions (indirect call trampolines)
+;   36,716 defined data items
+;   139 user-defined symbols + 21 RAM variable labels
+;   41 end-of-line comments
+;   13 bad instruction errors (data-in-code conflicts)
+;   13 non-returning functions
 
 ; ─────────────────────────────────────────────────────
-; End of disassembly  |  ROM size: 1048576 bytes
+; End of disassembly  |  ROM: AE5L600L rev 20.2  |  1,048,576 bytes
+; Arch: SH-2A BE  |  Ghidra 12.0.2  |  SuperH:BE:32:SH-2A:default
 ; ─────────────────────────────────────────────────────

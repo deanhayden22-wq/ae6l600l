@@ -3,11 +3,12 @@
 //   1. Create new Ghidra project
 //   2. Import the raw ROM binary:
 //        File > Import File > select AE5L600L.bin
-//        Language: SuperH:BE:32:SH-2  (or SH-2A if available)
+//        Language: SuperH:BE:32:SH-2A  (recommended — finds 41% more functions than SH-2)
 //        Address: 0x00000000
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
+// Verified against Ghidra 12.0.2 SH-2A export (rev 20.2, 139 symbols + 41 comments).
 //
 //@author  AE5L600L disassembly project
 //@category Data
