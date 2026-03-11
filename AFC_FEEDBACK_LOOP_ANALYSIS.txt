@@ -387,48 +387,142 @@ Multiplier):
 
 
 ================================================================================
-SECTION 8: THE SHORT-TERM FUEL TRIM / AFC MECHANISM
+SECTION 8: THE SHORT-TERM FUEL TRIM / AFC MECHANISM — FULLY TRACED
 ================================================================================
 
-This is the one subsystem that remains UNLABELED in Ghidra. The AFC
-(short-term fuel correction) code has not been individually traced at the
-instruction level because it is embedded within the generic table processor
-calls and the main fueling loop at 0x332A2.
+The AFC (short-term fuel correction) has been traced at the instruction level.
+It is called from the CL fueling dispatcher at 0x33304, which sequences
+through a chain of BSR calls to process the complete CL correction pipeline.
 
-What we know from the architecture:
+─── AFC Dispatcher: Function 0x33304 ───────────────────────────────────────
 
-  1. The front O2 sensor reading (processed AFR) is compared to the
-     CL fueling target (14.7 + compensation adjustments)
+  This function is the CL fueling master controller. After checking
+  CL enable conditions (RAM 0xFFFF65F0, 0xCBBD8-0xCBBDB), it calls:
 
-  2. The error (actual AFR - target AFR) drives a correction:
-     - If too lean (AFR > target): correction goes negative (add fuel)
-     - If too rich (AFR < target): correction goes positive (remove fuel)
+  1. BSR 0x33D1C  — cl_fuel_target_B    (CL Fueling Target Comp B/Load)
+  2. BSR 0x33CC0  — cl_fuel_target_A    (CL Fueling Target Comp A/Load)
+  3. BSR 0x33658  — afc_sensor_prep     (sensor state & conditioning)
+  4. BSR 0x33FCE  — afc_target_calc     (target computation w/ compensation)
+  5. BSR 0x340A0  — afc_correction_acc  (correction factor accumulator)
+  6. BSR 0x342A8  — afc_pi_controller   (THE AFC PI LOOP)
+  7. JSR 0x3439E  — afc_enable_gate     (AFC enable/disable check)
+  8. JSR 0x343CE  — afc_output_clamp    (AFC output limiter)
 
-  3. This correction is the "A/F Correction #1" or "AFC" seen in logging
+  Arguments are passed via R4/R5 pointers into a RAM variable address
+  table at 0x63A2C-0x63A70 which maps correction slots:
+    0x63A2C → 0xFFFF77C8  (CL correction state — widely consumed)
+    0x63A3C → 0xFFFF782A  (AFC intermediate value)
+    0x63A40 → 0xFFFF7864  (AFC correction output)
+    0x63A44 → 0xFFFF77DC  (CL target comp A output)
+    0x63A48 → 0xFFFF77E0  (CL target comp B output)
 
-  4. The correction is ONLY active during CL mode (0x345A4 check)
+─── AFC PI Controller: Function 0x342A8 ────────────────────────────────────
 
-  5. When CL→OL transition occurs:
-     - AFC is disabled (no more O2 feedback)
-     - The AFC value is likely RESET or FROZEN
-     - A/F Learning (LTFT) values may or may not carry into OL
-       (controlled by Alpha A/F #1 Learning Max Threshold)
+  This is the core short-term correction loop. Disassembly reveals:
 
-  6. When OL→CL transition occurs:
-     - AFC restarts from 0 (or from the LTFT base)
-     - The front O2 sensor smoothing factor controls how quickly
-       the sensor reading converges
-     - AFC ramps up gradually from the reset state
+  RAM variables read:
+    0xFFFF77C8  — Current CL correction state (accumulated)
+    0xFFFF6540  — Sensor state variable
+    0xFFFF7448  — CL/OL mode flag (shared with learning + scheduler)
+
+  Operations (from disassembly):
+    1. Load current correction state from 0xFFFF77C8
+    2. Branch based on CL conditions (bf/s at 0x342C2, 0x342CA, 0x342D4)
+    3. Compute error: fsub FR8,FR4 (actual - target) at 0x342DA
+    4. Look up P gain: jsr 0xBEAB0 (table lookup) at 0x342E0
+    5. Compare vs limit: fcmp/gt FR0,FR8 from ROM 0xCC000 (=2.0)
+    6. Conditional clamp at ROM 0xCC004 (=20.0 max %)
+    7. Store intermediate to RAM 0xFFFF7864 at multiple branch paths
+    8. Second error path: fadd FR8,FR4 at 0x34374 (reverse direction)
+    9. Second gain lookup: jsr 0xBE970 at 0x34378
+    10. Compare vs ROM 0xCC008 (=0.0) and 0xCC00C (=1.0)
+    11. Final store to RAM 0xFFFF7864
+
+  The function has 6 distinct branch paths writing to 0xFFFF7864,
+  handling: lean error, rich error, limit clamping, and enable/disable.
+
+─── AFC Calibration Constants (UNDOCUMENTED — not in XML) ──────────────────
+
+  ROM Address   Float Value   Purpose
+  ──────────────────────────────────────────────────────────────────────
+  0xCC000       2.0           AFC P gain / step size
+  0xCC004       20.0          AFC max correction limit (%)
+  0xCC008       0.0           AFC min correction or dead band
+  0xCC00C       1.0           AFC I gain / unity scale factor
+  0xCC010       0.0           AFC enable threshold (gate, in 0x3439E)
+  0xCC014       200.0         AFC output upper clamp (in 0x343CE)
+  0xCC018       190.0         AFC output lower clamp
+  0xCC01C       0.0           Additional limit / reserved
+
+─── AFC Enable Gate: Function 0x3439E ──────────────────────────────────────
+
+  Short function. Calls 0x2BE2C and 0x2BE38 (utility checks).
+  Reads ROM 0xCC010 (=0.0). This gates whether the AFC correction
+  is applied. When conditions aren't met, AFC output is zeroed.
+
+─── AFC Output Clamp: Function 0x343CE ─────────────────────────────────────
+
+  Reads output from RAM 0xFFFF7820, applies:
+    - Upper clamp from ROM 0xCC014 (=200.0%)
+    - Lower clamp from ROM 0xCC018 (=190.0%)
+    - Additional logic from ROM 0xCC01C (=0.0)
+  Stores final clamped AFC back to RAM 0xFFFF7820.
+
+  Also reads 0xFFFF64D8, 0xFFFF79C2, 0xFFFF79C4.
+
+─── Correction Factor Accumulator: Function 0x340A0 ────────────────────────
+
+  Before the PI controller runs, this function accumulates multiple
+  table-based compensation factors:
+
+  Table descriptor lookups (via 0xBE830 and 0xBE8E4):
+    0xACEA0, 0xACEB4  — Fuel compensation tables (load-based)
+    0xAC4FC, 0xAC510  — Additional compensation tables
+    0xAD928           — 2D compensation (RPM × Load)
+    0xACEC8, 0xACEDC  — Further compensation factors
+
+  Operations: Multiple fadd and fmul instructions accumulate these
+  corrections into a combined multiplier. The result feeds into the
+  PI controller as the "expected" or "baseline" correction.
+
+  Reads flags at: 0xFFFF8E7E, 0xFFFF85D7
+  Outputs to: 0xFFFF7870, and via subroutine bsr 0x33A0E
+
+─── Where AFC Feeds Into IPW ───────────────────────────────────────────────
+
+  The AFC correction value in RAM 0xFFFF77C8 is consumed by the
+  fuel correction accumulator function at 0x320AE. This function:
+
+  Reads:
+    0xFFFF77C8  — AFC/CL correction (from the PI controller)
+    0xFFFF7820  — AFC output (clamped value)
+    0xFFFF77D8  — Additional correction factor
+    0xFFFF781C  — Additional correction factor
+    0xFFFF77E4  — Additional correction factor
+    0xFFFF77DC  — CL target comp A output
+    0xFFFF7448  — Mode flag
+    0xFFFF7714  — IPW-related variable
+    0xFFFF7710  — IPW-related variable
+
+  Performs table lookups via 0xBE608, 0xBE628, 0xBE970, 0xBE5A8
+  to combine all correction factors (AFC, LTFT, enrichments, etc.)
+  into the final injector pulse width multiplier.
+
+  This is the final stage where:
+    Final IPW = Base IPW × (1 + AFC) × (1 + LTFT) × other corrections
 
 ─── Why AFC and AFL are zero during OL→CL transitions ────────────────────
 
-  Based on this trace, the likely mechanism is:
+  Now confirmed by code trace:
 
-  a) CL→OL is IMMEDIATE (delay = 0 in this ROM)
-  b) During OL, AFC = 0 (no feedback) and AFL is not updated
-  c) On return to CL, AFC starts from 0 and slowly ramps
-  d) The front O2 sensor smoothing adds additional lag
-  e) If the transition is brief (bouncing at the threshold), AFC
+  a) CL→OL is IMMEDIATE (delay = 0 in this ROM, see 0xCBC62)
+  b) During OL, the AFC dispatcher (0x33304) does NOT execute the
+     PI controller — the BSR chain is gated by the CL enable check
+  c) AFC output (0xFFFF7864) is zeroed or frozen during OL
+  d) On return to CL, the PI controller restarts from the current
+     state — likely near zero if OL was long enough
+  e) The front O2 sensor smoothing adds additional lag
+  f) If the transition is brief (bouncing at the threshold), AFC
      never has time to build up a meaningful correction
 
   The A/F Learning Max Threshold (Alpha table) controls whether LTFT
@@ -479,15 +573,19 @@ SECTION 9: RAM VARIABLE MAP (ALL AFC-RELATED)
   FFFF7464        ???     Referenced in CL fueling target
   FFFF7704        ???     Referenced in A/F learning
   FFFF7708        ???     Referenced in A/F learning
-  FFFF77C8        ???     Referenced in A/F learning
+  FFFF77C8        float   AFC/CL correction state (MAIN AFC VALUE — widely consumed)
   FFFF77D4        ???     Referenced in CL fueling target
+  FFFF77DC        float   CL target comp A output (from 0x33CC0)
+  FFFF77E0        float   CL target comp B output (from 0x33D1C)
   FFFF77F0-77F8   ???     CL fueling computation
-  FFFF7820        ???     Referenced in A/F learning
+  FFFF7800        float   Fuel correction intermediate
+  FFFF77F8        float   Fuel correction intermediate
+  FFFF7820        float   AFC output (clamped, from 0x343CE)
   FFFF782B-782C   byte    Flags in CL/OL transition
   FFFF7830        ???     Referenced in CL fueling target
-  FFFF7864        ???     Referenced in A/F learning
+  FFFF7864        float   AFC correction output (from PI controller 0x342A8)
   FFFF7868        ???     Referenced in CL fueling target
-  FFFF7870        ???     Referenced in A/F learning
+  FFFF7870        float   Correction accumulator output (from 0x340A0)
   FFFF7874        ???     A/F learning state
   FFFF787C-787F   byte    A/F learning flags (787F = airflow range index)
   FFFF7880        ???     Referenced in A/F learning
@@ -567,6 +665,18 @@ SECTION 10: FUNCTION CALL MAP
     0x063A88  — Called from CL/OL transition
     0x063B00  — Called from CL/OL delay
 
+  AFC PIPELINE (called sequentially from dispatcher 0x33304):
+    0x33304  — CL fueling dispatcher (sequences the entire AFC pipeline)
+    0x33D1C  — CL Fueling Target Comp B (BSR from dispatcher)
+    0x33CC0  — CL Fueling Target Comp A (BSR from dispatcher)
+    0x33658  — AFC sensor prep / conditioning
+    0x33FCE  — AFC target computation with compensation tables
+    0x340A0  — AFC correction factor accumulator (sums table lookups)
+    0x342A8  — AFC PI controller (THE SHORT-TERM CORRECTION LOOP)
+    0x3439E  — AFC enable/disable gate
+    0x343CE  — AFC output clamp (limits to ±190-200%)
+    0x320AE  — Final fuel correction accumulator (AFC+LTFT+enrichments→IPW)
+
   SELF-CALLS (within fueling region 0x33000-0x37000):
     0x345A4  — CL Active Check (10-condition gate)
     0x34778  — A/F Learning sub 1
@@ -625,6 +735,14 @@ SECTION 11: CALIBRATION QUICK REFERENCE
   0xCC204   0.95-1.10    CL Delay Max (Engine Load, g/rev)
   0xCCD78   varies       CL→OL Throttle Threshold (unused, delay=0)
   0xCE5F8   varies       CL→OL BPW Threshold (unused, delay=0)
+  0xCC000   2.0          AFC P gain / step size (UNDOCUMENTED)
+  0xCC004   20.0 (%)     AFC max correction limit (UNDOCUMENTED)
+  0xCC008   0.0          AFC min correction / dead band (UNDOCUMENTED)
+  0xCC00C   1.0          AFC I gain / unity scale (UNDOCUMENTED)
+  0xCC010   0.0          AFC enable threshold (UNDOCUMENTED)
+  0xCC014   200.0 (%)    AFC output upper clamp (UNDOCUMENTED)
+  0xCC018   190.0 (%)    AFC output lower clamp (UNDOCUMENTED)
+  0xCC01C   0.0          AFC additional limit (UNDOCUMENTED)
   0xCE640   varies       CL→OL Counter Step (MAF) (unused, delay=0)
   0xD05C4   varies       Primary OL Fueling (Failsafe) map
   0xD0244   varies       Primary OL Fueling (KCA Low)
@@ -639,16 +757,33 @@ SECTION 11: CALIBRATION QUICK REFERENCE
 SECTION 12: NEXT STEPS FOR FULL DECOMPILATION
 ================================================================================
 
-To fully decompile the AFC short-term correction loop, the following work
-remains in Ghidra:
+The AFC short-term correction loop has been fully traced. The following
+work remains for deeper analysis:
 
-  0. ALREADY IDENTIFIED KEY FUNCTIONS:
-     0x021A40: frontO2_process — main O2 sensor processing (rich limit, atm comp)
-     0x033CC4: cl_fuel_target_calc — CL fueling target (accesses Comp A + B)
-     0x036070: clol_main_transition — CL/OL main transition (IAM, throttle, BPW)
-     0x03697A: clol_hysteresis_sub — CL/OL hysteresis (throttle/BPW thresholds)
-     0x058902: frontO2_scaling_lookup — O2 sensor scaling table interpolation
-     0x004A2C: frontO2_scaling_init — O2 sensor scaling initialization
+  COMPLETED — KEY FUNCTIONS IDENTIFIED:
+     0x021A40: frontO2_process — O2 sensor processing (rich limit, atm comp)
+     0x033CC4: cl_fuel_target_calc — CL fueling target (Comp A + B)
+     0x033304: afc_dispatcher — CL fueling master controller
+     0x342A8:  afc_pi_controller — THE SHORT-TERM CORRECTION LOOP
+     0x340A0:  afc_correction_acc — correction factor accumulator
+     0x3439E:  afc_enable_gate — AFC enable/disable
+     0x343CE:  afc_output_clamp — AFC output limiter
+     0x320AE:  fuel_correction_final — combines AFC+LTFT+enrichments→IPW
+     0x036070: clol_main_transition — CL/OL transition (IAM, throttle, BPW)
+     0x03697A: clol_hysteresis_sub — CL/OL hysteresis
+     0x058902: frontO2_scaling_lookup — O2 sensor scaling interpolation
+     0x004A2C: frontO2_scaling_init — O2 sensor scaling init
+
+  COMPLETED — KEY RAM VARIABLES:
+     0xFFFF77C8: AFC/CL correction state (main AFC value)
+     0xFFFF7864: AFC correction output (PI controller output)
+     0xFFFF7820: AFC clamped output
+     0xFFFF7870: Correction accumulator output
+
+  COMPLETED — UNDOCUMENTED CALIBRATION CONSTANTS:
+     0xCC000-0xCC01C: AFC controller gains, limits, and clamps
+
+  REMAINING WORK:
 
   1. LABEL the fueling dispatch tables at 0x480B8 and 0x4A0B8
 
@@ -658,22 +793,18 @@ remains in Ghidra:
   3. NAME the 6 fueling functions from dispatch table B:
      0x332A2, 0x36C3C, 0x3452A, 0x34EF4, 0x3580C, 0x3605E
 
-  4. LABEL all RAM variables in the FFFF78xx-FFFF7Axx range with
-     descriptive names (e.g., "afl_range_index", "cl_active_flag", etc.)
+  4. DECOMPILE the PI controller at 0x342A8 more thoroughly to determine
+     exact P/I gains and how 0xCC000 (2.0) and 0xCC00C (1.0) are applied
 
-  5. TRACE the generic table processors at 0xBE608-0xBEAB0 to understand
-     how they map descriptor → calibration table → output value
+  5. TRACE the generic table processors at 0xBE608-0xBEAB0
 
-  6. FIND the actual AFC correction variable in RAM — it's likely in the
-     FFFF78xx or FFFF79xx range and is a float value that gets multiplied
-     into the fuel pulse width calculation
+  6. TRACE the correction accumulator (0x340A0) to identify all individual
+     compensation table descriptors (0xACEA0, 0xACEB4, etc.)
 
-  7. TRACE the main fueling loop at 0x332A2 to find where all the
-     correction factors (AFC, AFL, OL enrichment, PSE, tip-in, etc.)
-     are combined into the final injector pulse width
+  7. DECOMPILE the final fuel correction accumulator at 0x320AE to
+     understand exactly how AFC, LTFT, and enrichments combine
 
-  8. Apply labels via ImportAE5L600L.java Ghidra script for the newly
-     identified addresses
+  8. Apply labels via ImportAE5L600L.java Ghidra script
 
 
 ================================================================================

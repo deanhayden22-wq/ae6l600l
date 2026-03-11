@@ -97,6 +97,28 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00004A2C, "frontO2_scaling_init",
             "Front O2 sensor scaling initialization/read. Accesses descriptor near 0xAF45C.");
 
+        // AFC (Short-Term Fuel Correction) Pipeline
+        count += labelComment(0x00033304, "afc_dispatcher",
+            "CL fueling master controller. Sequences: target comp -> sensor prep -> PI controller -> clamp. Entry at 0x33304 with reg saves.");
+        count += labelComment(0x00033D1C, "cl_fuel_target_B",
+            "CL Fueling Target Comp B (load-based). Called from afc_dispatcher via BSR.");
+        count += labelComment(0x00033CC0, "cl_fuel_target_A",
+            "CL Fueling Target Comp A (load-based). Called from afc_dispatcher via BSR.");
+        count += labelComment(0x00033658, "afc_sensor_prep",
+            "AFC sensor state preparation/conditioning. Reads 0xFFFF7828, calls 0x22CF4.");
+        count += labelComment(0x00033FCE, "afc_target_calc",
+            "AFC target computation with compensation. Table lookups via 0xBE598/0xBE8E4. Outputs to 0xFFFF782C.");
+        count += labelComment(0x000340A0, "afc_correction_acc",
+            "AFC correction factor accumulator. Sums table lookups (0xACEA0,0xACEB4,0xAC4FC,0xAD928,etc). Outputs to 0xFFFF7870.");
+        count += labelComment(0x000342A8, "afc_pi_controller",
+            "AFC PI controller - THE SHORT-TERM CORRECTION. Computes error (fsub), looks up gain (0xBEAB0), clamps to limits. ROM 0xCC000-0xCC00C. Output: 0xFFFF7864.");
+        count += labelComment(0x0003439E, "afc_enable_gate",
+            "AFC enable/disable gate. Calls 0x2BE2C/0x2BE38. Reads ROM 0xCC010.");
+        count += labelComment(0x000343CE, "afc_output_clamp",
+            "AFC output clamp. Upper=200% (0xCC014), Lower=190% (0xCC018). Reads/writes 0xFFFF7820.");
+        count += labelComment(0x000320AE, "fuel_correction_final",
+            "Final fuel correction accumulator. Combines AFC (0xFFFF77C8) + LTFT + enrichments into IPW multiplier.");
+
         // Undocumented pointer table
         count += labelComment(0x0008D838, "ptr_table_8D838",
             "Pointer table - purpose TBD (found in Ghidra analysis)");
