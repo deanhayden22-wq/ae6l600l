@@ -76,24 +76,25 @@ def compare_tau_tables(rom1, rom2):
             print(f"  0x{addr:06X}: {t1:.4f} -> {t2:.4f}  ({pct:+.0f}%)")
 
     # ---------------------------------------------------------------
-    # 3. Tau-related float constants in 0xCC region
+    # 3. CL/OL Transition Parameters (NOT tau, but also changed)
     # ---------------------------------------------------------------
-    print("\n--- Tau / Transient Fueling Constants (0xCC region) ---")
-    float_addrs = [
-        (0xCC078, "Transient threshold A"),
-        (0xCC07C, "Transient threshold B"),
-        (0xCC174, "Transient gain/limit A"),
-        (0xCC178, "Transient gain/limit B"),
-        (0xCC1D8, "Transient decay constant"),
-        (0xCC204, "Transient scale factor A"),
-        (0xCC208, "Transient scale factor B"),
+    print("\n--- CL/OL Transition Parameters (also changed, not tau) ---")
+    clol_addrs = [
+        (0xCC078, "Unknown (unlabeled)"),
+        (0xCC07C, "Unknown (unlabeled)"),
+        (0xCC174, "CL->OL BPW Hysteresis"),
+        (0xCC178, "CL->OL Throttle Hysteresis (deg)"),
+        (0xCC1D8, "CL Delay Maximum - Throttle (deg)"),
+        (0xCC204, "CL Delay Maximum - Engine Load (g/rev)"),
+        (0xCC208, "CL Delay Maximum - Engine Load B (g/rev)"),
     ]
-    for addr, label in float_addrs:
+    for addr, label in clol_addrs:
         v1 = read_float(rom1, addr)
         v2 = read_float(rom2, addr)
         if v1 != v2:
             pct = ((v2 - v1) / abs(v1) * 100) if v1 != 0 else float("inf")
             print(f"  0x{addr:06X} [{label}]: {v1:.4f} -> {v2:.4f}  ({pct:+.1f}%)")
+    print("  NOTE: These affect when the ECU switches CL<->OL, not transient enrichment.")
 
     # ---------------------------------------------------------------
     # 4. RPM thresholds (0xCC180-0xCC1A4) - seem to be RPM breakpoints
@@ -233,16 +234,21 @@ def diagnosis(stats_9, stats_10):
     Higher tau = more enrichment during throttle changes.
 
   WHAT CHANGED (20.1 -> 20.2):
+    TAU CHANGES:
     1. Tau rising load multiplier values DOUBLED (~0.25 -> ~0.50)
     2. Engine load axis breakpoints LOWERED (2.0->1.5, 4.0->3.0)
        -> Tau now activates at LOWER loads than before
     3. RPM thresholds LOWERED by ~400-500 RPM across the board
        -> Tau now activates at LOWER RPMs too
-    4. Transient thresholds reduced (29->23, 60->40)
-    5. Transient scale factors reduced (1.15->0.95, 1.25->1.10)
-    6. Some CL fuel target values shifted richer
+    4. ECT-based tau tables slightly reduced (net -56 counts per table)
 
-  NET EFFECT: Significantly MORE transient enrichment, activating
+    OTHER CHANGES (not tau):
+    5. CL->OL BPW hysteresis increased (256->756)
+    6. CL->OL throttle hysteresis increased (3.9->8.4 deg)
+    7. CL delay maximums adjusted (throttle/load thresholds)
+    8. CL fuel target compensation table shifted
+
+  NET TAU EFFECT: Significantly MORE transient enrichment, activating
   in a WIDER operating range (lower RPM, lower load).
 """)
 
