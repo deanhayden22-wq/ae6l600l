@@ -108,8 +108,10 @@ public class ImportAE5L600L extends GhidraScript {
             "AFC sensor state preparation/conditioning. Reads 0xFFFF7828, calls 0x22CF4.");
         count += labelComment(0x00033FCE, "afc_target_calc",
             "AFC target computation with compensation. Table lookups via 0xBE598/0xBE8E4. Outputs to 0xFFFF782C.");
-        count += labelComment(0x000340A0, "afc_correction_acc",
-            "AFC correction factor accumulator. Sums table lookups (0xACEA0,0xACEB4,0xAC4FC,0xAD928,etc). Outputs to 0xFFFF7870.");
+        count += labelComment(0x00033DBE, "afc_cl_decision",
+            "CL/OL AFC decision & hysteresis. GBR=0xFFFF77F4. CL check via 0x22F92. Active: correction from 0xACE8C. Inactive: writes 0.0. Thresholds 0xCBFD0-0xCBFE4.");
+        count += labelComment(0x000340A0, "afc_pi_output",
+            "AFC PI output stage. P-gains: 0xACEA0(load),0xACEB4(RPM). I-gains: 0xACEC8(load),0xACEDC(RPM). Blend: out=P*alpha+I*(1-alpha). Output: 0xFFFF7870.");
         count += labelComment(0x000342A8, "afc_pi_controller",
             "AFC PI controller - THE SHORT-TERM CORRECTION. Computes error (fsub), looks up gain (0xBEAB0), clamps to limits. ROM 0xCC000-0xCC00C. Output: 0xFFFF7864.");
         count += labelComment(0x0003439E, "afc_enable_gate",

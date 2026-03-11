@@ -470,20 +470,36 @@ through a chain of BSR calls to process the complete CL correction pipeline.
 
   Also reads 0xFFFF64D8, 0xFFFF79C2, 0xFFFF79C4.
 
-─── Correction Factor Accumulator: Function 0x340A0 ────────────────────────
+─── CL/OL AFC Decision & Hysteresis: Function 0x033DBE ─────────────────────
 
-  Before the PI controller runs, this function accumulates multiple
-  table-based compensation factors:
+  This function decides whether AFC runs. Sets GBR = 0xFFFF77F4.
+  Calls 0x22F92 for CL enable check. When CL is active, it looks up
+  a correction from table descriptor 0xACE8C and stores to 0xFFFF77F4.
+  When CL is inactive, it writes 0.0 (AFC disabled).
 
-  Table descriptor lookups (via 0xBE830 and 0xBE8E4):
-    0xACEA0, 0xACEB4  — Fuel compensation tables (load-based)
-    0xAC4FC, 0xAC510  — Additional compensation tables
-    0xAD928           — 2D compensation (RPM × Load)
-    0xACEC8, 0xACEDC  — Further compensation factors
+  Hysteresis thresholds at ROM 0xCBFD0-0xCBFE4 control the switching
+  between CL active/inactive states to prevent oscillation.
 
-  Operations: Multiple fadd and fmul instructions accumulate these
-  corrections into a combined multiplier. The result feeds into the
-  PI controller as the "expected" or "baseline" correction.
+─── AFC PI Output Stage: Function 0x340A0 ──────────────────────────────────
+
+  This is the PI controller output stage with full P and I gain
+  table lookups. It computes the blended PI correction:
+
+  PROPORTIONAL path:
+    P_gain_A = table lookup from 0xACEA0 (indexed by load)
+    P_gain_B = table lookup from 0xACEB4 (indexed by RPM)
+    P_norm   = table lookup from 0xAC4FC (indexed by airflow)
+    proportional = (P_gain_A + P_gain_B) * P_norm
+
+  INTEGRAL path:
+    I_comp   = 2D table from 0xAD928 (indexed by coolant × AFR)
+    I_gain_A = table lookup from 0xACEC8 (indexed by load)
+    I_gain_B = table lookup from 0xACEDC (indexed by RPM)
+    I_norm   = table lookup from 0xAC510 (indexed by airflow)
+    integral = (I_comp + I_gain_A + I_gain_B) * I_norm
+
+  BLEND (classic PI):
+    output = proportional * alpha + integral * (1 - alpha)
 
   Reads flags at: 0xFFFF8E7E, 0xFFFF85D7
   Outputs to: 0xFFFF7870, and via subroutine bsr 0x33A0E
@@ -578,6 +594,7 @@ SECTION 9: RAM VARIABLE MAP (ALL AFC-RELATED)
   FFFF77DC        float   CL target comp A output (from 0x33CC0)
   FFFF77E0        float   CL target comp B output (from 0x33D1C)
   FFFF77F0-77F8   ???     CL fueling computation
+  FFFF77F4        float   AFC correction output / workspace base (GBR in 0x33DBE)
   FFFF7800        float   Fuel correction intermediate
   FFFF77F8        float   Fuel correction intermediate
   FFFF7820        float   AFC output (clamped, from 0x343CE)
@@ -670,8 +687,9 @@ SECTION 10: FUNCTION CALL MAP
     0x33D1C  — CL Fueling Target Comp B (BSR from dispatcher)
     0x33CC0  — CL Fueling Target Comp A (BSR from dispatcher)
     0x33658  — AFC sensor prep / conditioning
-    0x33FCE  — AFC target computation with compensation tables
-    0x340A0  — AFC correction factor accumulator (sums table lookups)
+    0x33DBE  — AFC CL/OL decision & hysteresis (GBR=0xFFFF77F4)
+    0x33FCE  — AFC error computation (actual - target, deadband check)
+    0x340A0  — AFC PI output stage (P+I gains by load/RPM/airflow, blend)
     0x342A8  — AFC PI controller (THE SHORT-TERM CORRECTION LOOP)
     0x3439E  — AFC enable/disable gate
     0x343CE  — AFC output clamp (limits to ±190-200%)
@@ -743,6 +761,20 @@ SECTION 11: CALIBRATION QUICK REFERENCE
   0xCC014   200.0 (%)    AFC output upper clamp (UNDOCUMENTED)
   0xCC018   190.0 (%)    AFC output lower clamp (UNDOCUMENTED)
   0xCC01C   0.0          AFC additional limit (UNDOCUMENTED)
+  0xCBFD0   varies       AFC CL hysteresis threshold pair 1 (UNDOCUMENTED)
+  0xCBFD4   varies       AFC CL hysteresis threshold pair 1 (UNDOCUMENTED)
+  0xCBFD8   varies       AFC CL hysteresis threshold pair 2 (UNDOCUMENTED)
+  0xCBFDC   varies       AFC CL hysteresis threshold pair 2 (UNDOCUMENTED)
+  0xCBFE0   varies       AFC CL RPM threshold pair (UNDOCUMENTED)
+  0xCBFE4   varies       AFC CL RPM threshold pair (UNDOCUMENTED)
+  0xACEA0   desc         AFC P-gain A (by load) table descriptor (UNDOCUMENTED)
+  0xACEB4   desc         AFC P-gain B (by RPM) table descriptor (UNDOCUMENTED)
+  0xAC4FC   desc         AFC P normalizer (by airflow) descriptor (UNDOCUMENTED)
+  0xAD928   desc         AFC I-component (2D coolant×AFR) descriptor (UNDOCUMENTED)
+  0xACEC8   desc         AFC I-gain A (by load) table descriptor (UNDOCUMENTED)
+  0xACEDC   desc         AFC I-gain B (by RPM) table descriptor (UNDOCUMENTED)
+  0xAC510   desc         AFC I normalizer (by airflow) descriptor (UNDOCUMENTED)
+  0xACE8C   desc         AFC correction lookup table descriptor (UNDOCUMENTED)
   0xCE640   varies       CL→OL Counter Step (MAF) (unused, delay=0)
   0xD05C4   varies       Primary OL Fueling (Failsafe) map
   0xD0244   varies       Primary OL Fueling (KCA Low)
