@@ -418,41 +418,51 @@ through a chain of BSR calls to process the complete CL correction pipeline.
 
 ─── AFC PI Controller: Function 0x342A8 ────────────────────────────────────
 
-  This is the core short-term correction loop. Disassembly reveals:
+  This is the core short-term correction loop. It is a STATE MACHINE
+  with 4 states. Disassembly reveals a critical zero-out behavior:
 
   RAM variables read:
     0xFFFF77C8  — Current CL correction state (accumulated)
     0xFFFF6540  — Sensor state variable
     0xFFFF7448  — CL/OL mode flag (shared with learning + scheduler)
+    0xFFFF7814  — PI correction value (float)
+    0xFFFF7818  — Accumulated output value (float)
 
   Operations (from disassembly):
     1. Load current correction state from 0xFFFF77C8
     2. Branch based on CL conditions (bf/s at 0x342C2, 0x342CA, 0x342D4)
     3. Compute error: fsub FR8,FR4 (actual - target) at 0x342DA
     4. Look up P gain: jsr 0xBEAB0 (table lookup) at 0x342E0
-    5. Compare vs limit: fcmp/gt FR0,FR8 from ROM 0xCC000 (=2.0)
-    6. Conditional clamp at ROM 0xCC004 (=20.0 max %)
-    7. Store intermediate to RAM 0xFFFF7864 at multiple branch paths
-    8. Second error path: fadd FR8,FR4 at 0x34374 (reverse direction)
-    9. Second gain lookup: jsr 0xBE970 at 0x34378
-    10. Compare vs ROM 0xCC008 (=0.0) and 0xCC00C (=1.0)
-    11. Final store to RAM 0xFFFF7864
+    5. Compare gain result vs threshold: fcmp/gt FR0,FR8 from ROM 0xCC000 (=2.0)
+       *** CRITICAL: If gain < 2.0 → FLDI0 → correction ZEROED (not clamped!) ***
+       If gain >= 2.0 → error value kept as correction
+    6. Bounds check on accumulated output (0xFFFF7818):
+       - If accumulated >= 20.0 (ROM 0xCC004) → State 2: subtract 1.0 (ramp down)
+       - If accumulated < 0.0 (ROM 0xCC008) → State 3: add 1.0 (ramp up)
+       - If 0.0 <= accumulated < 20.0 → State 4: ZERO OUT accumulated
+    7. State 1: Copy correction → accumulated output
+    8. Final store to RAM 0xFFFF7864
 
-  The function has 6 distinct branch paths writing to 0xFFFF7864,
-  handling: lean error, rich error, limit clamping, and enable/disable.
+  *** BUG/DESIGN FLAW: When the lean error is large enough that the gain
+  lookup returns < 2.0, the correction is hard-reset to 0.0. The system
+  then enters state 4 (accumulated in 0-20 range), which also zeros the
+  accumulated output. This creates an unrecoverable dead zone: the larger
+  the error, the less correction is applied — exactly backwards from what
+  a PI controller should do. Under boost with a lean condition, AFC zeros
+  out and stays dead while CL/OL flag remains at 8 (closed loop). ***
 
 ─── AFC Calibration Constants (UNDOCUMENTED — not in XML) ──────────────────
 
   ROM Address   Float Value   Purpose
   ──────────────────────────────────────────────────────────────────────
-  0xCC000       2.0           AFC P gain / step size
-  0xCC004       20.0          AFC max correction limit (%)
-  0xCC008       0.0           AFC min correction or dead band
-  0xCC00C       1.0           AFC I gain / unity scale factor
+  0xCC000       2.0           Gain threshold — if gain lookup < this, ZERO correction
+  0xCC004       20.0          Accumulated output upper bound (state 2 trigger)
+  0xCC008       0.0           Accumulated output lower bound (state 3 trigger)
+  0xCC00C       1.0           Ramp step size (states 2 and 3 use this)
   0xCC010       0.0           AFC enable threshold (gate, in 0x3439E)
-  0xCC014       200.0         AFC output upper clamp (in 0x343CE)
-  0xCC018       190.0         AFC output lower clamp
-  0xCC01C       0.0           Additional limit / reserved
+  0xCC014       200.0         AFC output upper threshold (in 0x343CE)
+  0xCC018       190.0         AFC output lower threshold
+  0xCC01C       0.0           Output correction override — ALWAYS 0.0 (makes 0x343CE a no-op)
 
 ─── AFC Enable Gate: Function 0x3439E ──────────────────────────────────────
 
@@ -460,13 +470,18 @@ through a chain of BSR calls to process the complete CL correction pipeline.
   Reads ROM 0xCC010 (=0.0). This gates whether the AFC correction
   is applied. When conditions aren't met, AFC output is zeroed.
 
-─── AFC Output Clamp: Function 0x343CE ─────────────────────────────────────
+─── AFC Output Clamp: Function 0x343CE (EFFECTIVELY A NO-OP) ──────────────
 
-  Reads output from RAM 0xFFFF7820, applies:
-    - Upper clamp from ROM 0xCC014 (=200.0%)
-    - Lower clamp from ROM 0xCC018 (=190.0%)
-    - Additional logic from ROM 0xCC01C (=0.0)
-  Stores final clamped AFC back to RAM 0xFFFF7820.
+  Reads output from RAM 0xFFFF64D8, checks against thresholds:
+    - Upper threshold from ROM 0xCC014 (=200.0)
+    - Lower threshold from ROM 0xCC018 (=190.0)
+  Three paths exist (above/below/in-range), but ALL paths end up
+  returning 0.0 in FR2 because ROM 0xCC01C = 0.0.
+
+  The 200/190 threshold mechanism and a flag byte at @(0x52,GBR) are
+  structurally present (code differentiates paths and stores flags),
+  but the end result is always zero. This function is a dead no-op
+  in the current calibration.
 
   Also reads 0xFFFF64D8, 0xFFFF79C2, 0xFFFF79C4.
 
@@ -476,6 +491,23 @@ through a chain of BSR calls to process the complete CL correction pipeline.
   Calls 0x22F92 for CL enable check. When CL is active, it looks up
   a correction from table descriptor 0xACE8C and stores to 0xFFFF77F4.
   When CL is inactive, it writes 0.0 (AFC disabled).
+
+  Hysteresis threshold values (ALL DISABLED in this calibration):
+    0xCBFD0 = 10000.0  (pair 1 high — unreachable, disabled)
+    0xCBFD4 = 10000.0  (pair 1 low — unreachable, disabled)
+    0xCBFD8 = 10000.0  (pair 2 high — unreachable, disabled)
+    0xCBFDC = 10000.0  (pair 2 low — unreachable, disabled)
+    0xCBFE0 = 0.0      (RPM pair — always true, disabled)
+    0xCBFE4 = 0.0      (RPM pair — always true, disabled)
+
+  Additional correction thresholds:
+    0xCBFF4 = 4.0      (correction enable threshold)
+    0xCBFF8 = 10.0     (correction clamp upper — +10%)
+    0xCBFFC = 10.0     (correction clamp lower — -10%)
+
+  NOTE: This function is NOT what kills AFC. All hysteresis thresholds
+  are disabled. The zero-out happens in the PI controller (0x342A8)
+  when the gain lookup drops below 2.0 at large error values.
 
   Hysteresis thresholds at ROM 0xCBFD0-0xCBFE4 control the switching
   between CL active/inactive states to prevent oscillation.
@@ -526,6 +558,43 @@ through a chain of BSR calls to process the complete CL correction pipeline.
 
   This is the final stage where:
     Final IPW = Base IPW × (1 + AFC) × (1 + LTFT) × other corrections
+
+─── OBSERVED BUG: AFC zeros under boost (Log 3-10, samples 29670-29696) ───
+
+  Starting at sample 29670, AFC is working normally in CL (CL/OL=8).
+  The car is lean (wbo2 ~15.3) and AFC is ramping up to compensate:
+
+    Sample  wbo2   AFC     load   RPM   State
+    29670   15.35  3.13    0.30   2198  AFC climbing, compensating lean
+    29673   15.35  4.69    0.54   2808  Load rising (acceleration)
+    29676   15.27  10.94   0.78   3699  AFC at 10.94%, near ±10% clamp
+    29677   16.07  15.63   0.81   3694  AFC peaks at 15.63%, wbo2 very lean
+    29678   16.53  0.00    0.83   3534  *** AFC HARD RESET TO ZERO ***
+                                         wbo2 at 16.53 = dangerously lean
+                                         CL/OL still = 8 (closed loop!)
+
+  After brief recovery (AFC=-7.03 correcting rich overshoot):
+
+    29686   13.79  0.00    0.79   3577  AFC zeros again
+    29687   13.71  0.00    0.84   3534  Stays dead as load climbs
+    29690   13.83  0.88    0.88   3496  Dead through boost
+    29694   13.75  0.00    1.04   3573  Load >1.0, FFB=12.53 (enrichment target)
+                                         wbo2=13.75 = 1.2 AFR lean of target
+                                         ZERO correction under boost
+
+  ROOT CAUSE: The PI controller at 0x342A8 has a gain threshold check
+  (ROM 0xCC000 = 2.0). When the error is large, the gain lookup at
+  0xBEAB0 returns a small value. If gain < 2.0, the correction is
+  HARD-RESET to 0.0 (FLDI0 instruction), NOT clamped to a limit.
+  The accumulated output then falls into the 0-20 normal range, which
+  triggers state 4 (zero out), creating an unrecoverable dead zone.
+
+  The CL/OL flag never changes because the CL decision gate (0x33DBE)
+  has all hysteresis thresholds disabled (set to 10000.0 / 0.0).
+
+  IMPACT: Under boost with a lean condition, AFC disappears exactly
+  when it is needed most. The car runs 1-2 AFR lean of target with
+  zero feedback correction while the ECU still reports closed-loop.
 
 ─── Why AFC and AFL are zero during OL→CL transitions ────────────────────
 
