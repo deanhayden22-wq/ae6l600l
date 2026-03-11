@@ -75,6 +75,28 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000463BA, "flkc_paths_FG",
             "Task [25] FLKC sustained-knock. GBR=0xFFFF8290. Requires 7 conditions. bank!=1->retard 1.01, bank==1->retard 2.80");
 
+        // Front O2 sensor processing
+        count += labelComment(0x00021A40, "frontO2_process",
+            "Front O2 sensor processing. Reads rich limit (0.75 lambda) inline, atm pressure comp via descriptor 0xAAE8C.");
+        count += labelComment(0x0001FE54, "frontO2_comp_atm",
+            "Front O2 atmospheric compensation sub-function. Accesses descriptor at 0xAAE78.");
+
+        // CL Fueling Target computation
+        count += labelComment(0x00033CC4, "cl_fuel_target_calc",
+            "CL Fueling Target computation. Accesses both Comp A (0xD14D0) and Comp B (0xD1740) via descriptors.");
+
+        // CL/OL transition sub-functions
+        count += labelComment(0x00036070, "clol_main_transition",
+            "CL/OL main transition function. Reads IAM vs 0xCC16C, CL->OL throttle and BPW thresholds.");
+        count += labelComment(0x0003697A, "clol_hysteresis_sub",
+            "CL/OL hysteresis sub-function. Reads CL->OL throttle and BPW descriptors.");
+
+        // Front O2 sensor scaling (ADC processing)
+        count += labelComment(0x00058902, "frontO2_scaling_lookup",
+            "Front O2 sensor scaling table lookup. Accesses descriptor near 0xAF468.");
+        count += labelComment(0x00004A2C, "frontO2_scaling_init",
+            "Front O2 sensor scaling initialization/read. Accesses descriptor near 0xAF45C.");
+
         // Undocumented pointer table
         count += labelComment(0x0008D838, "ptr_table_8D838",
             "Pointer table - purpose TBD (found in Ghidra analysis)");

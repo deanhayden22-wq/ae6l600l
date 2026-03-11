@@ -170,12 +170,31 @@ switching sensor. It reads pump current in milliamps and converts to AFR.
     Lower values = less smoothing = faster response.
     This smoothing factor directly affects how quickly AFC can respond.
 
-─── Sensor Processing Path ────────────────────────────────────────────────
+─── Sensor Processing Path (Code Functions) ───────────────────────────────
 
+  0x004A2C:  frontO2_scaling_init
+             Initializes/reads front O2 sensor scaling via descriptor @ 0xAF45C.
+
+  0x058902:  frontO2_scaling_lookup
+             Performs the 2D interpolation through the scaling table.
+             Accesses descriptor @ 0xAF468 (Y-axis at D8D74, data at D8DA8).
+
+  0x021A40:  frontO2_process (MAIN O2 PROCESSING FUNCTION)
+             - Loads rich limit (lambda 0.750) from inline literal pool at 0x21CAC
+               via mova @(0x230,PC),R0 + fmov.s @R0,FR12
+             - Accesses atmospheric compensation descriptor @ 0xAAE8C
+             - Applies formula: ((AFR - 14.7) × compensation) + 14.7
+             - Clamps result to rich limit
+
+  0x01FE54:  frontO2_comp_atm
+             Atmospheric pressure compensation sub-function.
+             Accesses descriptor @ 0xAAE78.
+
+  Processing pipeline:
   1. ADC reads wideband sensor pump current → raw mA value
-  2. 2D interpolation through scaling table → lambda value
-  3. Rich limit clamp (min lambda = 0.750 → AFR 11.02)
-  4. Atmospheric compensation applied
+  2. frontO2_scaling_init (0x4A2C) → initializes scaling
+  3. frontO2_scaling_lookup (0x58902) → 2D interpolation → lambda value
+  4. frontO2_process (0x21A40) → rich limit clamp + atm compensation
   5. Smoothing filter applied (Alpha table)
   6. Result stored in RAM for AFC feedback loop
 
@@ -622,6 +641,14 @@ SECTION 12: NEXT STEPS FOR FULL DECOMPILATION
 
 To fully decompile the AFC short-term correction loop, the following work
 remains in Ghidra:
+
+  0. ALREADY IDENTIFIED KEY FUNCTIONS:
+     0x021A40: frontO2_process — main O2 sensor processing (rich limit, atm comp)
+     0x033CC4: cl_fuel_target_calc — CL fueling target (accesses Comp A + B)
+     0x036070: clol_main_transition — CL/OL main transition (IAM, throttle, BPW)
+     0x03697A: clol_hysteresis_sub — CL/OL hysteresis (throttle/BPW thresholds)
+     0x058902: frontO2_scaling_lookup — O2 sensor scaling table interpolation
+     0x004A2C: frontO2_scaling_init — O2 sensor scaling initialization
 
   1. LABEL the fueling dispatch tables at 0x480B8 and 0x4A0B8
 
