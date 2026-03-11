@@ -331,6 +331,136 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x000D55D8, "TimingComp_CylC");
         count += label(0x000D5670, "TimingComp_CylD");
 
+        // =====================================================================
+        // AFC / CLOSED-LOOP FUELING — DISPATCH TABLES
+        // =====================================================================
+        count += labelComment(0x000480B8, "fuel_dispatch_table_A",
+            "Secondary dispatch table: 8 fueling function pointers (CL target, AFL, CL/OL transition)");
+        count += labelComment(0x0004A0B8, "fuel_dispatch_table_B",
+            "Secondary dispatch table: 6+ fueling function pointers (main loop, AFL core, OL map select)");
+
+        // =====================================================================
+        // AFC / CLOSED-LOOP FUELING — CODE FUNCTIONS
+        // =====================================================================
+        count += labelComment(0x000332A2, "fuel_main_entry",
+            "Main fueling entry (non-returning). Dispatched from fuel_dispatch_table_B.");
+        count += labelComment(0x00033278, "fuel_precalc",
+            "Fueling pre-calculation. Dispatched from fuel_dispatch_table_A.");
+        count += labelComment(0x0003452A, "afl_core_entry",
+            "A/F Learning core entry. Calls CL active check, range selection, value update. Dispatch B.");
+        count += labelComment(0x000344BA, "afl_range_loop",
+            "A/F Learning 4-range loop. Iterates ranges A-D at FFFF316C, 8-byte stride.");
+        count += labelComment(0x000344EE, "afl_validity_check",
+            "A/F Learning range validity check. Iterates 4 ranges, calls 0xBDCB6.");
+        count += labelComment(0x000345A4, "cl_active_check",
+            "CL Active Check: 10-condition gate. Returns 1=CL active (learning OK), 0=inactive. "
+            + "Checks FFFF8F24, CC020 (MAF<=70g/s), FFFF73A4, FFFF7354, FFFF7374, "
+            + "FFFF7A14, FFFF7A20, FFFF7D18, FFFF7BE2.");
+        count += labelComment(0x00034488, "afl_sub_dispatcher",
+            "A/F Learning sub-dispatcher. Dispatched from fuel_dispatch_table_A.");
+        count += labelComment(0x00034EC8, "afl_airflow_processor",
+            "A/F Learning airflow range processor. Dispatch A. Refs CC074-CC090.");
+        count += labelComment(0x00034EF4, "afl_airflow_update",
+            "A/F Learning airflow update. Dispatched from fuel_dispatch_table_B.");
+        count += labelComment(0x000357D0, "clol_transition_sub_B",
+            "CL/OL transition sub B. Dispatched from fuel_dispatch_table_A.");
+        count += labelComment(0x0003580C, "clol_transition_core",
+            "CL/OL transition core. Dispatched from fuel_dispatch_table_B.");
+        count += labelComment(0x00036008, "clol_delay_manager_A",
+            "CL/OL delay manager A. Dispatched from fuel_dispatch_table_A.");
+        count += labelComment(0x0003605E, "ol_fuel_map_selector",
+            "OL fuel map selector. Reads IAM from FFFF3234, compares vs CC16C (0.5). Dispatch B.");
+        count += labelComment(0x00036A98, "clol_hysteresis_handler",
+            "CL/OL hysteresis handler. Refs CC178 (throttle hyst), CC174 (BPW hyst). Dispatch A.");
+        count += labelComment(0x00036BF4, "clol_delay_manager_B",
+            "CL/OL delay manager B. Dispatched from fuel_dispatch_table_A.");
+        count += labelComment(0x00036C3C, "clol_state_cleanup",
+            "CL/OL state cleanup. Dispatched from fuel_dispatch_table_B.");
+        count += labelComment(0x00036E60, "fuel_post_transition",
+            "Post-transition handler. Dispatched from fuel_dispatch_table_A.");
+
+        // =====================================================================
+        // AFC / CLOSED-LOOP FUELING — CALIBRATION TABLES
+        // =====================================================================
+        count += labelComment(0x000CC064, "AFL_Limits_Min",
+            "A/F Learning #1 Limits Min = -0.250 (-25%). Float.");
+        count += labelComment(0x000CC068, "AFL_Limits_Max",
+            "A/F Learning #1 Limits Max = +0.250 (+25%). Float.");
+        count += labelComment(0x000CC074, "AFL_AirflowRanges",
+            "A/F Learning #1 Airflow Ranges: A=6-23, B=40-80, C=0.95-1.05, D=35-0(disabled) g/s. 8 floats.");
+        count += labelComment(0x000CC020, "CL_MAF_Threshold",
+            "MAF threshold for CL learning enable = 70.0 g/s. Float.");
+        count += labelComment(0x000CBF9C, "CL_FuelTarget_ECT_Disable",
+            "CL Fuel Target ECT Disable = 119.0 degF. Above this, ECT comp stops. Float.");
+        count += labelComment(0x000CBC62, "CL_to_OL_Delay",
+            "CL to OL Delay (base) = 0.0. ZERO = immediate CL->OL transition. Float.");
+        count += labelComment(0x000CBC5C, "CL_to_OL_Delay_SIDRIVE",
+            "CL to OL Delay SI-DRIVE Intelligent = 0.0. Float.");
+        count += labelComment(0x000CBC5A, "CL_Delay_EngLoadCounterThresh",
+            "CL Delay Engine Load Counter Threshold.");
+        count += labelComment(0x000CC178, "CLOL_Throttle_Hysteresis",
+            "CL->OL Throttle Hysteresis = 8.4 deg. Float.");
+        count += labelComment(0x000CC174, "CLOL_BPW_Hysteresis",
+            "CL->OL BPW Hysteresis = 756.0. Float.");
+        count += labelComment(0x000CC17C, "CL_Delay_Min_ECT",
+            "CL Delay Minimum ECT = -12.0 degF. Below this, CL delay cleared. Float.");
+        count += labelComment(0x000CC180, "CL_Delay_MaxRPM_PerGear",
+            "CL Delay Max Engine Speed Per Gear. 10 floats, 3200-3700 RPM.");
+        count += labelComment(0x000CC1A8, "CL_Delay_MaxRPM_Neutral",
+            "CL Delay Max Engine Speed Neutral. 6 floats, 6000-6100 RPM.");
+        count += labelComment(0x000CC1D8, "CL_Delay_Max_Throttle",
+            "CL Delay Max Throttle = 37.9-90.0 deg. 4 floats.");
+        count += labelComment(0x000CC1F4, "CL_Delay_Max_VehSpeed",
+            "CL Delay Max Vehicle Speed. 4 floats.");
+        count += labelComment(0x000CC204, "CL_Delay_Max_EngLoad",
+            "CL Delay Max Engine Load = 0.95-1.10 g/rev. 4 floats.");
+        count += label(0x000CCD78, "CLOL_Delay_Throttle_Threshold");
+        count += label(0x000CE5F8, "CLOL_Delay_BPW_Threshold");
+        count += label(0x000CE640, "CLOL_CounterStep_MAF");
+        count += labelComment(0x000D14D0, "CL_FuelTarget_CompA_Load",
+            "CL Fueling Target Comp A (Load). 3D table, AFR additive adj. Typical -0.01 to -0.61.");
+        count += label(0x000D1740, "CL_FuelTarget_CompB_Load");
+        count += label(0x000D13B0, "CL_FuelTarget_Comp_ImmCruise_ECT");
+        count += label(0x000D141C, "CL_FuelTarget_Comp_ImmNonCruise_ECT");
+
+        // Front O2 Sensor
+        count += labelComment(0x00021CAC, "FrontO2_RichLimit",
+            "Front Oxygen Sensor Rich Limit = lambda 0.750 (AFR 11.02). Float.");
+        count += labelComment(0x000D8D74, "FrontO2_Scaling_Yaxis",
+            "Front O2 sensor scaling Y-axis: 13 float mA values, -1.3 to 0.74 mA (wideband).");
+        count += labelComment(0x000D8DA8, "FrontO2_Scaling_Data",
+            "Front O2 sensor scaling: 13 float lambda values, 0.7586-1.3793 (AFR 11.15-20.28).");
+        count += labelComment(0x000C3708, "FrontO2_Comp_AtmPressure",
+            "Front O2 atmospheric pressure compensation. Formula: ((AFR-14.7)*comp)+14.7.");
+
+        // AF 3 Correction (rear O2 - disabled)
+        count += labelComment(0x00035FFC, "AF3_CorrectionLimits",
+            "AF 3 Correction Limits = 0.0/0.0 (DISABLED). Setting to 0 disables rear O2 input on target AFR.");
+
+        // =====================================================================
+        // AFC / CLOSED-LOOP FUELING — RAM VARIABLES
+        // =====================================================================
+        count += labelComment(0xFFFF316C, "afl_table_base",
+            "A/F Learning table base in RAM (4 ranges x 8 bytes = 32 bytes)");
+        count += labelComment(0xFFFF78A0, "afl_output_struct",
+            "A/F Learning output data structure base (~100 bytes). +3=CL active flag.");
+        count += labelComment(0xFFFF787F, "afl_airflow_range_idx",
+            "Current A/F Learning airflow range index (byte, 0-3: A/B/C/D)");
+        count += labelComment(0xFFFF8F24, "cl_global_enable",
+            "Global CL enable flag (byte). Must be non-zero for CL fueling.");
+        count += labelComment(0xFFFF7BE2, "cl_enable_final",
+            "CL enable final check flag (byte). Last gate in cl_active_check.");
+        count += labelComment(0xFFFF6350, "ram_RPM",
+            "Current engine RPM (float)");
+        count += labelComment(0xFFFF63F8, "ram_MAF",
+            "Mass air flow (float, g/s)");
+        count += labelComment(0xFFFF63CC, "ram_ECT",
+            "Coolant temperature / ECT (float)");
+        count += labelComment(0xFFFF6624, "ram_MAF_alt",
+            "MAF alternate/computed value (float, g/s)");
+        count += labelComment(0xFFFF3234, "ram_IAM",
+            "Ignition Advance Multiplier current value (float). Also used by FLKC.");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }
