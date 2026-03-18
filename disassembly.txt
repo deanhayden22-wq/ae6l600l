@@ -1,11 +1,78 @@
 ================================================================================
 SH7058 ECU ROM Disassembly
 ROM: 2013 USDM Subaru Impreza WRX MT  |  Part: AE5L600L
-MCU: Renesas SH7058  |  Arch: SH2 Big-Endian  |  ROM Base: 0x00000000
+MCU: Renesas SH7058  |  Arch: SH-2A Big-Endian  |  ROM Base: 0x00000000
 RAM: 0xFFFF8000-0xFFFFFFFF (32KB)  |  ROM Size: 1MB (0x100000)
 ECU ID: 8A12587007  |  Flash Method: subarucan  |  Checksum: subarudbw
+ROM Variant: rev 20.2 "tiny wrex"  |  Ghidra: 12.0.2 SuperH:BE:32:SH-2A
 Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ================================================================================
+
+; ═════════════════════════════════════════════════════════════════════════════
+; GHIDRA ANALYSIS SUMMARY (SuperH:BE:32:SH-2A)
+; ═════════════════════════════════════════════════════════════════════════════
+; Processor: SuperH:BE:32:SH-2A:default (upgrade from SH-2 for 32-bit branch
+;            instructions, FPU ops, and wider opcode coverage)
+; Tool: Ghidra 12.0.2  |  Exported: 2026-03-08
+;
+; ─── Analysis Statistics ───────────────────────────────
+;   Total functions:          3,642  (SH-2 found 2,582 — +41% improvement)
+;   Auto-named (FUN_*):      3,531
+;   Thunk functions:            101  (indirect jump trampolines)
+;   User-named functions:        10
+;   Code blocks:              3,776  (SH-2 found 2,975 — +27%)
+;   Defined data items:      36,716  (SH-2 found 27,531 — +33%)
+;   User-defined symbols:       139  (+ 21 RAM variables applied by import script)
+;   Comments (EOL):              41
+;   Bookmarks (total):        4,690
+;     Aggressive Instr Finder: 2,351
+;     Address Table:           2,290
+;     Found Code:                 23
+;     Non-Returning Function:     13
+;     Bad Instruction (Error):    13
+;
+; ─── User-Named Functions ──────────────────────────────
+;   0x00000BFA  DefaultExceptionHandler
+;   0x00043750  knock_wrapper
+;   0x00043782  knock_detector
+;   0x00043D68  fn_043D68            (task [12])
+;   0x0004438C  fn_04438C            (task [11])
+;   0x00045BFE  flkc_path_J          (task [18])
+;   0x000463BA  flkc_paths_FG        (task [25])
+;   0x0004A94C  sched_periodic_dispatch
+;   0x000BE874  LowPW_TableProcessor
+;   0x000BECA8  LowPW_AxisLookup
+;
+; ─── Bad Instruction Errors (13) ───────────────────────
+;   These are data-in-code conflicts, not SH-2A decoder failures.
+;   0x001034  conflicting data (flow from 0x001032)
+;   0x001050  conflicting data (flow from 0x00104E)
+;   0x00760A  conflicting data (flow from self)
+;   0x007F7E  conflicting instruction at 0x007F7F (flow from 0x007F7C)
+;   0x01A00C  conflicting data (flow from 0x01A00A)
+;   0x023A3C  conflicting data (flow from 0x023A3A)
+;   0x029A24  conflicting data (flow from 0x029A22)
+;   0x034B98  conflicting data (flow from 0x034B96)
+;   0x03A1E0  conflicting data (flow from 0x03A1DE)
+;   0x045834  conflicting data (flow from 0x045832)
+;   0x057026  conflicting data at 0x057028 (flow from 0x057024)
+;   0x05702E  conflicting data at 0x05702C (flow from 0x057024)
+;   0x0BE910  conflicting data (flow from 0x0BE90E)
+;
+; ─── Non-Returning Functions (13) ──────────────────────
+;   0x0317C  0x04912  0x22CF4  0x22F92  0x332A2  0x582AC  0x582D2
+;   0x584C8  0x9EE48  0xA95BA  0xBE81C  0xBE9A0  0xBEA6C
+;
+; ─── Thunk Functions (101) ─────────────────────────────
+;   SH-2A's wider instruction set enables Ghidra to identify indirect jump
+;   trampolines that SH-2 could not follow. Notable multi-target thunks:
+;     FUN_00022CB6 <- 4 thunks (0x2271C, 0x22720, 0x22724, 0x22728)
+;     FUN_00006316 <- 2 thunks (0x0F694, 0x0F772)
+;     FUN_00058964 <- 2 thunks (0x588FA, 0x588FE)
+;     FUN_0005EC76 <- 2 thunks (0x4B4E4, 0x5AA24)
+;     FUN_0005ED02 <- 2 thunks (0x4B4EA, 0x5AA2A)
+;     FUN_000238EA <- 2 thunks (0x23270, 0x23274)
+;   Full thunk list: see Ghidra XML export (thunk_FUN_* entries)
 
 ; ─────────────────────────────────────────────────────
 ; EXCEPTION VECTOR TABLE  @ 0x00000000
@@ -250,7 +317,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ; ═════════════════════════════════════════════════════════════════════════════
 ; KNOCK DETECTION & FLKC (Fine Learning Knock Correction) ANALYSIS
 ; ═════════════════════════════════════════════════════════════════════════════
-; Reverse-engineered from Ghidra analysis of the knock correction system.
+; Reverse-engineered from Ghidra SH-2A analysis of the knock correction system.
 ; Two GBR contexts: knock_detector uses GBR=0xFFFF80FC,
 ;                   flkc_paths_FG uses GBR=0xFFFF8290.
 ;
@@ -460,6 +527,13 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ; ═════════════════════════════════════════════════════════════════════════════
 ; Found via gate function (0x043470) literal pool and 0xAE000 descriptor analysis.
 ;
+; ─── Code Functions ────────────────────────────────
+;   0x043470:  LowPW_GateFunction    - Gate check: RPM < max and IPW < max
+;   0x0BE874:  LowPW_TableProcessor  - Table lookup engine called by gate function
+;   0x0BECA8:  LowPW_AxisLookup      - Axis lookup / interpolation helper
+;
+; ─── Calibration Data ──────────────────────────────
+;   0xD2D20:  LowPW_GateThresh_FR8_Max  - Max FR8 gate threshold (float)
 ;   0xD3988:  Y axis - Base Pulse Width (8 x float32): 0.7 to 4.5 ms
 ;   0xD39A8:  Data - Low PW Fuel Injector Compensation (8 x uint8)
 ;             Scaling: InjectorPulseWidthCompensation
@@ -469,7 +543,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;             Currently = 10000 raw = 10.0 ms (feature effectively disabled)
 
 ; ─────────────────────────────────────────────────────
-; CALIBRATION TABLE DIRECTORY  (535+ tables)
+; CALIBRATION TABLE DIRECTORY  (590+ tables)
 ; ─────────────────────────────────────────────────────
 ; Address      Category                            Table Name
 ; ------------ ----------------------------------- ----------------------------------------
@@ -790,6 +864,8 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
               ; Diagnostic Trouble Codes  [1D]  
   000AAE20:  Engine Load Limit B Maximum (RPM) - Multiplier
               ; ALPHA Engine Load Limit B Multiplier  [2D]  (raw ecu value)
+  000C009E:  Wastegate Duty Cycle Frequency
+              ; Boost Control - Wastegate  [1D]  (frequency, scale=0.01)
   000C0BAD:  Boost Control Disable Delay (Fine Correction)
               ; Boost Control - Limits  [2D]  (counter threshold)
   000C0BC8:  Boost disable during fuel cut-Boost(psi) threshold
@@ -1235,16 +1311,132 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
               ;   [Y Axis]  (RPM)
   000D2560:  Boost Limit (Fuel Cut)_
               ; Boost Control - Limits  [3D]  (psi absolute)
+  000D29AC:  Map Switching Cruise Switch Counter A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (counts, uint16)
+  000D29AE:  Map Switching Cruise Switch Min Delay A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (counts, uint16)
+  000D29B0:  Map Switching Cruise Switch Counter B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (counts, uint16)
+  000D29B2:  Map Switching Cruise Switch Min Delay B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (counts, uint16)
   000D29DE:  Feedback Correction Negative Advance Delay
               ; Ignition Timing - Knock Control  [2D]  (counter threshold)
   000D29EE:  Fine Correction Advance Delay
               ; Ignition Timing - Knock Control  [2D]  (counter threshold)
   000D2ADC:  Base Timing Idle Minimum Vehicle Speed Enable
               ; Ignition Timing - Advance  [2D]  (Vehicle Speed (MPH))
+; ─── Map Switching - Cruise/Non-Cruise Parameters (0xD2A08-0xD2ABC) ────
+  000D2A08:  Map Switching Engine Speed Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A0C:  Map Switching Requested Torque Ratio Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (ratio, float)
+  000D2A10:  Map Switching MAF/Load Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A14:  Map Switching Vehicle Speed Low Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A18:  Map Switching Vehicle Speed High Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A1C:  Map Switching IAT Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A34:  Map Switching Idle Mode Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A38:  Map Switching SI-Drive Mode Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A40:  Map Switching ECT Cold Threshold Low
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A44:  Map Switching ECT Cold Threshold High
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A50:  Map Switching ECT/IAT Hot Threshold A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A54:  Map Switching ECT/IAT Hot Threshold B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A58:  Map Switching Ratio Modifier Min
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A5C:  Map Switching Ratio Modifier Scale
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A60:  Map Switch Ramping Adder A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (ratio, float)
+  000D2A64:  Map Switch Ramping Adder B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (ratio, float)
+  000D2A68:  Map Switching MAF Sensor Threshold A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A6C:  Map Switching MAF Sensor Threshold B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A70:  Map Switching Requested Torque Min
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A74:  Map Switching Per-Gear RPM Threshold 1
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A78:  Map Switching Per-Gear RPM Threshold 2
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A7C:  Map Switching Per-Gear RPM Threshold 3
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A80:  Map Switching Per-Gear RPM Threshold 4
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A84:  Map Switching Per-Gear RPM Threshold 5
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A88:  Map Switching Per-Gear RPM Threshold 6
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A8C:  Map Switching Base RPM Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2A90:  Map Switching ECT Compensation A
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A94:  Map Switching ECT Compensation B
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2A98:  Map Switching ECT Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (deg F, float)
+  000D2A9C:  Map Switching RPM Override Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2AA0:  Map Switching Load Override Threshold
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2AA4:  Map Switching Speed/Load Check Value
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2AA8:  Map Switching Engine Speed Hysteresis Low
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2AAC:  Map Switching Engine Speed Hysteresis High
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (RPM, float)
+  000D2AB0:  Map Switching Ratio Minimum Bound
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2AB4:  Map Switching Ratio Maximum Bound
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+  000D2ABC:  Map Switching Percentage Ceiling
+              ; Map Switching - Cruise/Non-Cruise  [1D]  (units, float)
+
+; ─── Map Switching - Timing Blend Parameters (0xD2AE8-0xD2B1C) ────────
+  000D2AE8:  Timing Blend Lookup Input Threshold
+              ; Map Switching - Timing Blend  [1D]  (units, float)
+  000D2AEC:  Timing Blend RPM Activation Threshold
+              ; Map Switching - Timing Blend  [1D]  (RPM, float)
+  000D2AF0:  Timing Blend RPM Secondary Threshold
+              ; Map Switching - Timing Blend  [1D]  (RPM, float)
+  000D2AF4:  Timing Blend IAT Threshold A
+              ; Map Switching - Timing Blend  [1D]  (deg F, float)
+  000D2AF8:  Timing Blend IAT Threshold B
+              ; Map Switching - Timing Blend  [1D]  (deg F, float)
+  000D2AFC:  Timing Blend Correction Offset
+              ; Map Switching - Timing Blend  [1D]  (degrees, float)  stock = -3.0
+  000D2B00:  Timing Blend RPM Max for Blending
+              ; Map Switching - Timing Blend  [1D]  (RPM, float)
+  000D2B04:  Timing Blend Ramping Rate
+              ; Map Switching - Timing Blend  [1D]  (ratio, float)
+  000D2B08:  Timing Blend Correction Threshold
+              ; Map Switching - Timing Blend  [1D]  (degrees, float)
+  000D2B0C:  Timing Blend Half Ratio (Map Ratio E42)
+              ; Map Switching - Timing Blend  [1D]  (ratio, float)
+  000D2B10:  Timing Blend Minimum Ratio
+              ; Map Switching - Timing Blend  [1D]  (units, float)
+  000D2B14:  Timing Blend RPM Limit
+              ; Map Switching - Timing Blend  [1D]  (RPM, float)
+  000D2B18:  Timing Blend Ratio Floor
+              ; Map Switching - Timing Blend  [1D]  (units, float)
+  000D2B1C:  Timing Blend Ratio Ceiling
+              ; Map Switching - Timing Blend  [1D]  (ratio, float)
+
   000D2CD8:  Timing Compensation B (IAT) Max Additive
               ; Ignition Timing - Compensation  [2D]  (degrees of correction)
   000D2CF4:  Timing Compensation B (IAT) IAM Activation
               ; Ignition Timing - Compensation  [2D]  (Ignition Advance Multiplier (IAM))
+  000D2D20:  Low PW Fuel Injector Comp Gate Threshold (FR8 Max)
+              ; ALPHA Low PW Injector Comp  [1D]  (float, gate threshold)
   000D2D28:  Low PW Fuel Injector Comp Maximum RPM
               ; ALPHA Low PW Injector Comp  [2D]  (Engine Speed (RPM))  currently 10000 = disabled
   000D2D2C:  Low PW Fuel Injector Comp Maximum IPW
@@ -1520,8 +1712,11 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
   000DAC34:  Intake Cam Advance Angle Non-Cruise (AVCS)
               ; Variable Valve Timing (AVCS)  [3D]  (Advance (degrees))
   000F104C:  LC disable speed(MPH)threshold
+              ; tinywrex patches  [1D]  (Vehicle Speed (MPH))
   000F1050:  LC RPM delta
+              ; tinywrex patches  [1D]  (RPM delta)
   000F1054:  FFS RPM delta
+              ; tinywrex patches  [1D]  (RPM delta)
   000F8948:  Speed Limiting A (Throttle) SI-DRIVE Sport/Sport Sharp
               ; Miscellaneous - Limits  [2D]  (Vehicle Speed (MPH))
   000F8954:  Speed Limiting (Throttle) SI-DRIVE Intelligent
@@ -1624,10 +1819,13 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   0x00000BAC-0x00000BFC:  NMI handler + default exception handler
 ;   0x00000C0C-0x00000D36:  Reset / startup initialization
 ;   0x0000E628:             Scheduler table
-;   0x00014004-0x000F9EE0:  Calibration tables (535+)
+;   0x00014004-0x000F9EE0:  Calibration tables (590+)
 ;   0x00029858:             Helper functions
 ;   0x00030674-0x00030A78:  Post Start Enrichment code function
 ;   0x00043470:             Low PW Injector Comp gate function
+;   0x0008D838:             Pointer table (ptr_table_8D838, purpose TBD)
+;   0x000BE874:             LowPW_TableProcessor (table lookup engine)
+;   0x000BECA8:             LowPW_AxisLookup (interpolation helper)
 ;   0x00043750-0x00043B62:  Knock detection (wrapper + detector)
 ;   0x00045BFE-0x00045DD8:  FLKC Path J (fast knock correction)
 ;   0x000463BA-0x000466A0:  FLKC Paths F/G (sustained knock correction)
@@ -1639,8 +1837,871 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   0x000AD848:             AVCS Exhaust descriptor
 ;   0x000AE000+:            Low PW Injector Comp descriptors
 ;   0x000C0000-0x000FFFFF:  Primary calibration data region
+;     0x000C009E:            Wastegate Duty Cycle Frequency
+;     0x000C0BC8:            Boost disable during fuel cut (tiny wrex patch)
+;     0x000D29AC-0x000D29B3:  Map Switching cruise switch counters (4 x uint16)
+;     0x000D2A08-0x000D2ABC:  Map Switching cruise/non-cruise thresholds (37 params)
+;     0x000D2AE8-0x000D2B1C:  Timing Blend parameters (14 params)
+;     0x000F104C-0x000F1054:  tiny wrex patches (LC speed, LC RPM delta, FFS RPM delta)
 ;   0xFFFF8000-0xFFFFFFFF:  Internal RAM (32KB)
 
+
+
+================================================================================
+AFC / CLOSED-LOOP FUEL FEEDBACK SYSTEM — COMPLETE TRACE
+================================================================================
+ROM: AE5L600L (2013 USDM Impreza WRX MT)  |  MCU: SH7058 SH-2A BE
+Analysis: Ghidra 12.0.2 + binary cross-reference tracing
+================================================================================
+
+EXECUTIVE SUMMARY
+=================
+There is NO single table or function called "AFC" in this ECU. The Subaru
+closed-loop fuel system is decomposed into 5 subsystems:
+
+  1. CL/OL State Machine    — Decides when to run closed-loop vs open-loop
+  2. Front O2 Sensor Input   — Wideband lambda sensor reading → AFR
+  3. Short-Term Correction    — Real-time AFC adjustment (not yet labeled in Ghidra)
+  4. A/F Learning (LTFT)      — Long-term fuel trim stored in 4 airflow ranges
+  5. AF 3 Correction          — Rear O2 trim (DISABLED in this ROM — limits = 0%)
+
+The code lives in ROM 0x33000-0x37000 and is dispatched from two secondary
+task tables (NOT the 59-entry periodic scheduler used by knock/FLKC).
+
+
+================================================================================
+SECTION 1: DISPATCH — HOW THE FUELING CODE GETS CALLED
+================================================================================
+
+The fueling functions are invoked from two dispatch tables in the scheduler
+region, separate from the 59-task periodic table @ 0x4AD40:
+
+  DISPATCH TABLE A @ 0x480B8 (8 fueling entries):
+  ─────────────────────────────────────────────────
+  0x480B8: -> 0x33278   Main fueling pre-calc
+  0x480CC: -> 0x34488   A/F Learning sub-dispatcher
+  0x480D0: -> 0x357D0   CL/OL transition sub B
+  0x480D4: -> 0x34EC8   A/F Learning airflow range processor
+  0x480D8: -> 0x36008   CL/OL delay manager A
+  0x480DC: -> 0x36A98   CL/OL hysteresis handler
+  0x480E0: -> 0x36BF4   CL/OL delay manager B
+  0x480E4: -> 0x36E60   Post-transition handler
+
+  DISPATCH TABLE B @ 0x4A0B8 (6 fueling entries):
+  ─────────────────────────────────────────────────
+  0x4A0B8: -> 0x332A2   Main fueling entry (NON-RETURNING)
+  0x4A0E0: -> 0x36C3C   OL/CL state cleanup
+  0x4A0E8: -> 0x3452A   A/F Learning core (refs CC064)
+  0x4A0EC: -> 0x34EF4   A/F Learning airflow update
+  0x4A0F0: -> 0x3580C   CL/OL transition core
+  0x4A0F4: -> 0x3605E   OL fuel map selector (refs CC16C)
+
+  The main fueling entry at 0x332A2 is flagged as "non-returning" by Ghidra,
+  suggesting it's a persistent loop or state machine rather than a one-shot task.
+
+
+================================================================================
+SECTION 2: CL/OL STATE MACHINE — WHEN DOES AFC RUN?
+================================================================================
+
+AFC (closed-loop correction) only runs when the ECU is in Closed Loop (CL) mode.
+The CL/OL transition is a multi-condition state machine controlled by ~15
+calibration tables. The transition logic occupies ROM 0x35100-0x36C00.
+
+─── CL → OL Transition (AFC gets disabled) ───────────────────────────────
+
+The ECU transitions from CL to OL when ANY of these conditions clears the
+CL delay counter to zero:
+
+  CONDITION                          TABLE ADDRESS    VALUE IN THIS ROM
+  ───────────────────────────────────────────────────────────────────────
+  RPM >= Max (Per Gear)              0xCC180          3200-3700 RPM (gear-dep.)
+  RPM >= Max (Neutral)               0xCC1A8          6000-6100 RPM
+  Throttle >= Max                    0xCC1D8          37.9 / 90.0 deg
+  Vehicle Speed >= Max               0xCC1F4          141.7 / 144.9 km/h
+  Engine Load >= Max                 0xCC204          0.95 / 1.10 g/rev
+  ECT < Minimum                      0xCC17C          -12.0 °F
+
+  CRITICAL: CL to OL Delay @ 0xCBC62 = 0.0
+  ──────────────────────────────────────────
+  The base CL→OL delay counter is SET TO ZERO in this ROM.
+  This means there is NO delay — the transition to OL is IMMEDIATE when
+  any throttle or BPW threshold is exceeded. The SI-DRIVE Intelligent
+  delay (0xCBC5C) is also 0.0.
+
+  When the delay IS non-zero, the transition uses:
+    - Throttle threshold:  CL→OL Transition with Delay (Throttle) @ 0xCCD78
+    - BPW threshold:       CL→OL Transition with Delay (BPW) @ 0xCE5F8
+    - Counter increment:   CL→OL Counter Step Value (MAF) @ 0xCE640
+
+  The counter increments each cycle that throttle OR BPW exceeds the threshold.
+  When counter >= delay value, transition occurs.
+
+─── OL → CL Transition (AFC gets re-enabled) ─────────────────────────────
+
+  The ECU returns to CL when:
+    Throttle <= (CL→OL Throttle Threshold - Hysteresis)
+    AND
+    BPW <= (CL→OL BPW Threshold - BPW Hysteresis)
+
+  Hysteresis values:
+    Throttle hysteresis:  8.4 deg  (0xCC178)
+    BPW hysteresis:       756.0    (0xCC174)
+
+  NOTE: The large BPW hysteresis (756) means the ECU requires a significant
+  drop in fuel demand before returning to CL mode.
+
+─── Code Structure ────────────────────────────────────────────────────────
+
+  Literal pool clusters in the CL/OL transition code:
+
+  0x35120-0x351D8 (46 entries) — Initial CL/OL check
+    Reads: RPM (FFFF6350), MAF (FFFF6624), ECT (FFFF63CC),
+           Gear (FFFF5E94), Vehicle Speed
+    Refs:  CC0AC-CC0D0 calibration, multiple table processor calls
+
+  0x36278-0x362F8 (31 entries) — OL fuel map switch (IAM check)
+    Key ref: 0xCC16C (IAM threshold = 0.5)
+    Reads:  IAM value (FFFF3234), RPM, MAF
+    Calls:  0x22F92 (utility function)
+    Logic:  If IAM < 0.5 → switch to failsafe fuel maps
+
+  0x36534-0x365D8 (41 entries) — Per-gear RPM limit check
+    Refs:  CC180-CC1D4 (all 10 per-gear RPM thresholds)
+    Reads: Current gear (FFFF5E94/5E92/5E93/5DB5)
+    Logic: If RPM >= threshold for current gear → clear CL delay → OL
+
+  0x367B8-0x36824 (27 entries) — Multi-condition CL delay clear
+    Refs:  CC1A8 (Neutral RPM), CC1D8 (Throttle max), CC1F4 (Speed max),
+           CC204 (Load max), CC17C (ECT min), CBC5A (Load counter thresh),
+           CBC5C/CBC62 (CL/OL delay values), CBC60/CBC64
+    Logic: Checks each condition sequentially, clears delay if exceeded
+
+  0x36A0C-0x36A98 (33 entries) — Hysteresis and OL entry confirmation
+    Refs:  CC178 (Throttle hysteresis), CC174 (BPW hysteresis)
+    Reads: FFFF798C, FFFF79F8 (current throttle/BPW state)
+    Logic: Applies hysteresis to prevent CL/OL oscillation
+
+
+================================================================================
+SECTION 3: FRONT O2 SENSOR — THE FEEDBACK INPUT
+================================================================================
+
+The front O2 sensor is a WIDEBAND (air/fuel ratio) sensor, not a narrowband
+switching sensor. It reads pump current in milliamps and converts to AFR.
+
+─── Sensor Scaling Table @ 0xD8DA8 (Y-axis @ 0xD8D74) ───────────────────
+
+  Sensor Current (mA)   →   Lambda    →    AFR
+  ────────────────────────────────────────────────
+  -1.300 mA             →   0.7586    →   11.15
+  -0.870 mA             →   0.8276    →   12.17
+  -0.470 mA             →   0.8966    →   13.18
+  -0.140 mA             →   0.9655    →   14.19
+   0.000 mA             →   1.0000    →   14.70  ← stoichiometric
+   0.100 mA             →   1.0345    →   15.21
+   0.240 mA             →   1.1034    →   16.22
+   0.390 mA             →   1.1724    →   17.23
+   0.530 mA             →   1.2414    →   18.25
+   0.640 mA             →   1.3103    →   19.26
+   0.740 mA             →   1.3793    →   20.28
+
+  Rich limit:   AFR 11.02 (lambda 0.750) @ 0x21CAC
+  Lean limit:   AFR 29.40 (lambda 2.000) — hardcoded in compensation formula
+
+  Atmospheric compensation @ 0xC3708:
+    Formula: ((Front O2 AFR - 14.7) × Compensation) + 14.7
+    The compensation value adjusts for altitude/barometric pressure.
+
+  Front AF Sensor Smoothing (Alpha category):
+    A 4×4 table indexed by Smoothed MAF × Engine Load.
+    WARNING: "DO NOT SET TO 100% or higher!"
+    Lower values = less smoothing = faster response.
+    This smoothing factor directly affects how quickly AFC can respond.
+
+─── Sensor Processing Path (Code Functions) ───────────────────────────────
+
+  0x004A2C:  frontO2_scaling_init
+             Initializes/reads front O2 sensor scaling via descriptor @ 0xAF45C.
+
+  0x058902:  frontO2_scaling_lookup
+             Performs the 2D interpolation through the scaling table.
+             Accesses descriptor @ 0xAF468 (Y-axis at D8D74, data at D8DA8).
+
+  0x021A40:  frontO2_process (MAIN O2 PROCESSING FUNCTION)
+             - Loads rich limit (lambda 0.750) from inline literal pool at 0x21CAC
+               via mova @(0x230,PC),R0 + fmov.s @R0,FR12
+             - Accesses atmospheric compensation descriptor @ 0xAAE8C
+             - Applies formula: ((AFR - 14.7) × compensation) + 14.7
+             - Clamps result to rich limit
+
+  0x01FE54:  frontO2_comp_atm
+             Atmospheric pressure compensation sub-function.
+             Accesses descriptor @ 0xAAE78.
+
+  Processing pipeline:
+  1. ADC reads wideband sensor pump current → raw mA value
+  2. frontO2_scaling_init (0x4A2C) → initializes scaling
+  3. frontO2_scaling_lookup (0x58902) → 2D interpolation → lambda value
+  4. frontO2_process (0x21A40) → rich limit clamp + atm compensation
+  5. Smoothing filter applied (Alpha table)
+  6. Result stored in RAM for AFC feedback loop
+
+
+================================================================================
+SECTION 4: A/F LEARNING — LONG-TERM FUEL TRIM (LTFT)
+================================================================================
+
+The A/F Learning system stores long-term corrections in 4 airflow ranges.
+Code is at ROM 0x34490-0x34EC8, dispatched from 0x4A0E8 (entry: 0x3452A).
+
+─── Calibration Data ─────────────────────────────────────────────────────
+
+  A/F Learning #1 Limits @ 0xCC064:
+    Minimum: -0.250 (= -25%)
+    Maximum: +0.250 (= +25%)
+
+  A/F Learning #1 Airflow Ranges @ 0xCC074:
+    Range A:  6.0 - 23.0 g/s    (idle / light cruise)
+    Range B: 40.0 - 80.0 g/s    (moderate load)
+    Range C:  0.95 - 1.05 g/s   (deceleration / very low flow)
+    Range D: 35.0 -  0.0 g/s    (DISABLED — max < min)
+
+  A/F #1 Learning Max Threshold (Alpha): Controls the maximum MAF where
+    learning values are applied. Setting below D range prevents fuel
+    learnings from carrying into open loop fueling.
+
+  A/F #1 Learning Min Threshold (Alpha): Controls minimum MAF for learning.
+
+─── Code Analysis ─────────────────────────────────────────────────────────
+
+  Entry point: 0x3452A (called from dispatch table B @ 0x4A0E8)
+
+  Function structure (traced from disassembly):
+
+  0x3452A: Main A/F Learning entry
+    Saves r9, r13, r14, PR
+    Calls:
+      0x34D52  — Subroutine (purpose TBD, appears to be precondition check)
+      0x345A4  — CL Active Check (see below)
+      0x34778  — Subroutine (learning range selection?)
+      0x34884  — Subroutine (learning value update?)
+      0x34B1C  — Subroutine (learning value storage?)
+      0x34CC8  — Post-processing
+      0x34C18  — Cleanup
+    Reads RAM: FFFF7D68 (float), FFFF78A4 (output area)
+    Writes: FFFF78A0 region (A/F learning output data structure)
+
+  0x345A4: CL Active Check function
+    This function checks 8 conditions to determine if CL is active.
+    Returns 1 (CL active, learning OK) or 0 (not active, skip learning).
+
+    Conditions checked (all must pass for CL active):
+      1. RAM[FFFF8F24] — Global enable flag
+      2. Comparison vs calibration @ 0xCC020 (= 70.0) — likely MAF threshold
+         FFFF78A0[-20] (float) must be <= 70.0 g/s
+      3. RAM[FFFF73A4] — via BE608 table processor check
+      4. RAM[FFFF7354] — via BE608 table processor check
+      5. RAM[FFFF7374] — via BE608 table processor check
+      6. RAM[FFFF7A14] — via BE608 table processor check
+      7. RAM[FFFF7A20] — via BE608 table processor check
+      8. RAM[FFFF7D18] — Scheduler status (also used by FLKC)
+      9. r14 (FFFF8F24 flag again)
+     10. RAM[FFFF7BE2] — Final enable check
+
+    If ANY check fails → return 0 → skip A/F learning update
+    Result stored at FFFF78A0+3 (byte flag: CL learning active)
+
+  0x344BA: A/F Learning loop (4 iterations)
+    Iterates over 4 airflow ranges (r12 = 4, counter in r14)
+    For each range:
+      - Loads float from FFFF316C + offset (learning table base in RAM)
+      - Calls 0xBDBCC (likely a table interpolation/update function)
+      - Passes current learning value as fr14 parameter
+      - Updates at 8-byte intervals (float value + metadata per range)
+
+  0x344EE: Range validity check (4 iterations)
+    Same loop structure, calls 0xBDCB6 for each range
+    If ANY range returns non-zero → sets flag (r12 = 1)
+    This checks if learning values are within valid limits
+
+─── RAM Variables (A/F Learning) ──────────────────────────────────────────
+
+  0xFFFF316C:  A/F Learning table base in RAM (4 ranges × 8 bytes)
+  0xFFFF78A0:  A/F Learning output data structure (large, ~100 bytes)
+    +0x03:     CL active flag (byte, set by 0x345A4)
+    +0xD8(-40): Learning output value (float, written at 0x344B0)
+    +0xE4(-28): RPM snapshot (float)
+    +0xE8(-24): Load snapshot (float)
+    +0xEC(-20): AFR snapshot (float)
+    +0xF0(-16): Additional snapshot
+  0xFFFF78A4:  Learning output secondary area
+  0xFFFF7874:  Learning state flags
+  0xFFFF787F:  Current airflow range index (byte, 0-3)
+  0xFFFF8F24:  Global CL enable flag
+
+─── Key Literal Pool @ 0x34678 (38 entries) ───────────────────────────────
+
+  RAM variables:  FFFF6254, FFFF78A0, FFFF316C, FFFF787F, FFFF6350,
+                  FFFF78A4, FFFF6364, FFFF63FC, FFFF69FC, FFFF6A22,
+                  FFFF7D68, FFFF8F24, FFFF7324, FFFF733C, FFFF7448,
+                  FFFF94B1, FFFF7453, FFFFA56A, FFFFACE6
+  Calibration:    CC068 (AFL max), CC064 (AFL min), CC020 (MAF thresh)
+  Code calls:     022F92, 063A5C, 029BA4, 0BE56C, 0BDBCC, 0BDCB6, 0BE608
+
+
+================================================================================
+SECTION 5: AF 3 CORRECTION — REAR O2 TRIM (DISABLED)
+================================================================================
+
+  AF 3 Correction Limits @ 0x35FFC:
+    Minimum: 0.000000 → 0.00%
+    Maximum: 0.000000 → 0.00%
+
+  BOTH LIMITS ARE ZERO. The rear O2 sensor has NO influence on fuel trim
+  in this ROM. Per the XML definition:
+
+    "CHANGING THIS VALUE MIN-MAX TO 0 INPUT RESULTS IN THE DISABLITY
+     OF THE REAR O2 SENSOR INPUT ON TARGET AFR. THIS AFR TRIM 3 CAN
+     CAUSE RICHER THAT DISIRED IDLES WHEN LEFT ON. DISABLE IF
+     EXPERINCING RICHER THAN IDEAL IDLES."
+
+  This is an intentional tune choice, not a defect.
+
+
+================================================================================
+SECTION 6: CL FUELING TARGET — WHAT AFR DOES CL AIM FOR?
+================================================================================
+
+The CL fueling target is 14.7 AFR (stoichiometric) adjusted by compensation
+tables based on engine load and coolant temperature.
+
+─── Compensation Tables ───────────────────────────────────────────────────
+
+  CL Fueling Target Comp A (Load) @ 0xD14D0:
+    3D table (RPM × Load → AFR additive adjustment)
+    Typical values: -0.01 to -0.61 AFR
+    At high load: up to -0.61 AFR (target = 14.09)
+    At low load:  -0.01 AFR (target ≈ 14.69)
+
+  CL Fueling Target Comp B (Load) @ 0xD1740:
+    Same format, alternate calibration
+
+  CL Fueling Target Comp Imm. Cruise (ECT) @ 0xD13B0:
+    Coolant temperature compensation during cruise
+
+  CL Fueling Target Comp Imm. Non-Cruise (ECT) @ 0xD141C:
+    Coolant temperature compensation during non-cruise
+
+  CL Fueling Target Comp (ECT) Disable @ 0xCBF9C:
+    Threshold: 119.0 °F
+    Above this coolant temp, ECT compensation is no longer applied.
+
+  NOTE from XML: "Lean compensation in this table will potentially force
+  open loop during normally closed loop fueling conditions."
+
+
+================================================================================
+SECTION 7: OL FUEL MAP SELECTION — THE FAILSAFE PATH
+================================================================================
+
+When the ECU is in Open Loop, fuel is determined by lookup tables rather
+than O2 sensor feedback. Map selection depends on IAM (Ignition Advance
+Multiplier):
+
+  Primary OL Fuel Map Switch (IAM) @ 0xCC16C: threshold = 0.500
+
+  IAM >= 0.500:  Normal maps (KCA Low @ D0244, KCA High @ D0404,
+                              KCA Alternate @ CFD30)
+                 Max raw = 0x2B (43) → minimum AFR = 11.00
+
+  IAM < 0.500:   Begin failsafe transition
+  IAM < 0.050:   Full failsafe
+
+  Failsafe Map @ 0xD05C4:
+    Max raw = 0x46 (70) → minimum AFR = 9.50
+    At 2000 RPM / 2.60 g/rev: raw=0x3C (60)
+      AFR = 14.7 / (1 + 60 × 0.0078125) = 14.7 / 1.46875 = 10.02
+    THIS IS THE ROOT CAUSE OF THE OBSERVED "10.02 AFR Final Fueling Base"
+
+  Minimum Active Primary OL Enrichment @ 0xCC170: 0.050 (5%)
+    Ensures at least 5% enrichment when in OL mode.
+
+  Code at 0x3605E (dispatched from 0x4A0F4):
+    Reads IAM from RAM[FFFF3234]
+    Compares against threshold at CC16C
+    Selects appropriate fuel map set
+    Multiple descriptor pointers at AD674, AD690, AD6AC, AD6C8, AD6E4, AD700
+    point to the various OL fuel map descriptors
+
+
+================================================================================
+SECTION 8: THE SHORT-TERM FUEL TRIM / AFC MECHANISM — FULLY TRACED
+================================================================================
+
+The AFC (short-term fuel correction) has been traced at the instruction level.
+It is called from the CL fueling dispatcher at 0x33304, which sequences
+through a chain of BSR calls to process the complete CL correction pipeline.
+
+─── AFC Dispatcher: Function 0x33304 ───────────────────────────────────────
+
+  This function is the CL fueling master controller. After checking
+  CL enable conditions (RAM 0xFFFF65F0, 0xCBBD8-0xCBBDB), it calls:
+
+  1. BSR 0x33D1C  — cl_fuel_target_B    (CL Fueling Target Comp B/Load)
+  2. BSR 0x33CC0  — cl_fuel_target_A    (CL Fueling Target Comp A/Load)
+  3. BSR 0x33658  — afc_sensor_prep     (sensor state & conditioning)
+  4. BSR 0x33FCE  — afc_target_calc     (target computation w/ compensation)
+  5. BSR 0x340A0  — afc_correction_acc  (correction factor accumulator)
+  6. BSR 0x342A8  — afc_pi_controller   (THE AFC PI LOOP)
+  7. JSR 0x3439E  — afc_enable_gate     (AFC enable/disable check)
+  8. JSR 0x343CE  — afc_output_clamp    (AFC output limiter)
+
+  Arguments are passed via R4/R5 pointers into a RAM variable address
+  table at 0x63A2C-0x63A70 which maps correction slots:
+    0x63A2C → 0xFFFF77C8  (CL correction state — widely consumed)
+    0x63A3C → 0xFFFF782A  (AFC intermediate value)
+    0x63A40 → 0xFFFF7864  (AFC correction output)
+    0x63A44 → 0xFFFF77DC  (CL target comp A output)
+    0x63A48 → 0xFFFF77E0  (CL target comp B output)
+
+─── AFC PI Controller: Function 0x342A8 ────────────────────────────────────
+
+  This is the core short-term correction loop. Disassembly reveals:
+
+  RAM variables read:
+    0xFFFF77C8  — Current CL correction state (accumulated)
+    0xFFFF6540  — Sensor state variable
+    0xFFFF7448  — CL/OL mode flag (shared with learning + scheduler)
+
+  Operations (from disassembly):
+    1. Load current correction state from 0xFFFF77C8
+    2. Branch based on CL conditions (bf/s at 0x342C2, 0x342CA, 0x342D4)
+    3. Compute error: fsub FR8,FR4 (actual - target) at 0x342DA
+    4. Look up P gain: jsr 0xBEAB0 (table lookup) at 0x342E0
+    5. Compare vs limit: fcmp/gt FR0,FR8 from ROM 0xCC000 (=2.0)
+    6. Conditional clamp at ROM 0xCC004 (=20.0 max %)
+    7. Store intermediate to RAM 0xFFFF7864 at multiple branch paths
+    8. Second error path: fadd FR8,FR4 at 0x34374 (reverse direction)
+    9. Second gain lookup: jsr 0xBE970 at 0x34378
+    10. Compare vs ROM 0xCC008 (=0.0) and 0xCC00C (=1.0)
+    11. Final store to RAM 0xFFFF7864
+
+  The function has 6 distinct branch paths writing to 0xFFFF7864,
+  handling: lean error, rich error, limit clamping, and enable/disable.
+
+─── AFC Calibration Constants (UNDOCUMENTED — not in XML) ──────────────────
+
+  ROM Address   Float Value   Purpose
+  ──────────────────────────────────────────────────────────────────────
+  0xCC000       2.0           AFC P gain / step size
+  0xCC004       20.0          AFC max correction limit (%)
+  0xCC008       0.0           AFC min correction or dead band
+  0xCC00C       1.0           AFC I gain / unity scale factor
+  0xCC010       0.0           AFC enable threshold (gate, in 0x3439E)
+  0xCC014       200.0         AFC output upper clamp (in 0x343CE)
+  0xCC018       190.0         AFC output lower clamp
+  0xCC01C       0.0           Additional limit / reserved
+
+─── AFC Enable Gate: Function 0x3439E ──────────────────────────────────────
+
+  Short function. Calls 0x2BE2C and 0x2BE38 (utility checks).
+  Reads ROM 0xCC010 (=0.0). This gates whether the AFC correction
+  is applied. When conditions aren't met, AFC output is zeroed.
+
+─── AFC Output Clamp: Function 0x343CE ─────────────────────────────────────
+
+  Reads output from RAM 0xFFFF7820, applies:
+    - Upper clamp from ROM 0xCC014 (=200.0%)
+    - Lower clamp from ROM 0xCC018 (=190.0%)
+    - Additional logic from ROM 0xCC01C (=0.0)
+  Stores final clamped AFC back to RAM 0xFFFF7820.
+
+  Also reads 0xFFFF64D8, 0xFFFF79C2, 0xFFFF79C4.
+
+─── CL/OL AFC Decision & Hysteresis: Function 0x033DBE ─────────────────────
+
+  This function decides whether AFC runs. Sets GBR = 0xFFFF77F4.
+  Calls 0x22F92 for CL enable check. When CL is active, it looks up
+  a correction from table descriptor 0xACE8C and stores to 0xFFFF77F4.
+  When CL is inactive, it writes 0.0 (AFC disabled).
+
+  Hysteresis thresholds at ROM 0xCBFD0-0xCBFE4 control the switching
+  between CL active/inactive states to prevent oscillation.
+
+─── AFC PI Output Stage: Function 0x340A0 ──────────────────────────────────
+
+  This is the PI controller output stage with full P and I gain
+  table lookups. It computes the blended PI correction:
+
+  PROPORTIONAL path:
+    P_gain_A = table lookup from 0xACEA0 (indexed by load)
+    P_gain_B = table lookup from 0xACEB4 (indexed by RPM)
+    P_norm   = table lookup from 0xAC4FC (indexed by airflow)
+    proportional = (P_gain_A + P_gain_B) * P_norm
+
+  INTEGRAL path:
+    I_comp   = 2D table from 0xAD928 (indexed by coolant × AFR)
+    I_gain_A = table lookup from 0xACEC8 (indexed by load)
+    I_gain_B = table lookup from 0xACEDC (indexed by RPM)
+    I_norm   = table lookup from 0xAC510 (indexed by airflow)
+    integral = (I_comp + I_gain_A + I_gain_B) * I_norm
+
+  BLEND (classic PI):
+    output = proportional * alpha + integral * (1 - alpha)
+
+  Reads flags at: 0xFFFF8E7E, 0xFFFF85D7
+  Outputs to: 0xFFFF7870, and via subroutine bsr 0x33A0E
+
+─── Where AFC Feeds Into IPW ───────────────────────────────────────────────
+
+  The AFC correction value in RAM 0xFFFF77C8 is consumed by the
+  fuel correction accumulator function at 0x320AE. This function:
+
+  Reads:
+    0xFFFF77C8  — AFC/CL correction (from the PI controller)
+    0xFFFF7820  — AFC output (clamped value)
+    0xFFFF77D8  — Additional correction factor
+    0xFFFF781C  — Additional correction factor
+    0xFFFF77E4  — Additional correction factor
+    0xFFFF77DC  — CL target comp A output
+    0xFFFF7448  — Mode flag
+    0xFFFF7714  — IPW-related variable
+    0xFFFF7710  — IPW-related variable
+
+  Performs table lookups via 0xBE608, 0xBE628, 0xBE970, 0xBE5A8
+  to combine all correction factors (AFC, LTFT, enrichments, etc.)
+  into the final injector pulse width multiplier.
+
+  This is the final stage where:
+    Final IPW = Base IPW × (1 + AFC) × (1 + LTFT) × other corrections
+
+─── Why AFC and AFL are zero during OL→CL transitions ────────────────────
+
+  Now confirmed by code trace:
+
+  a) CL→OL is IMMEDIATE (delay = 0 in this ROM, see 0xCBC62)
+  b) During OL, the AFC dispatcher (0x33304) does NOT execute the
+     PI controller — the BSR chain is gated by the CL enable check
+  c) AFC output (0xFFFF7864) is zeroed or frozen during OL
+  d) On return to CL, the PI controller restarts from the current
+     state — likely near zero if OL was long enough
+  e) The front O2 sensor smoothing adds additional lag
+  f) If the transition is brief (bouncing at the threshold), AFC
+     never has time to build up a meaningful correction
+
+  The A/F Learning Max Threshold (Alpha table) controls whether LTFT
+  carries into OL. If set below the D range airflow, learnings are
+  completely excluded from OL fueling — the OL maps run "raw."
+
+
+================================================================================
+SECTION 9: RAM VARIABLE MAP (ALL AFC-RELATED)
+================================================================================
+
+  Address         Type    Purpose
+  ──────────────────────────────────────────────────────────────────────────
+  FFFF316C        float[] A/F Learning table base (4 ranges × 8 bytes)
+  FFFF3234        float   IAM (Ignition Advance Multiplier) current value
+  FFFF43FC        ???     Referenced in CL/OL transition
+  FFFF5DB5        byte    SI-DRIVE mode selector
+  FFFF5E92-5E94   byte    Current gear state (3 separate flags)
+  FFFF6254        byte    ECU state/mode flag
+  FFFF62DC        ???     Referenced in OL map selection
+  FFFF62F8        ???     Referenced in A/F learning
+  FFFF6350        float   Current RPM
+  FFFF6354        float   RPM (alternate/smoothed?)
+  FFFF6364        float   Engine load (calculated)
+  FFFF63C4        float   Engine load (alternate)
+  FFFF63CC        float   Coolant temperature (ECT)
+  FFFF63F8        float   MAF (mass air flow, g/s)
+  FFFF63FC        float   Additional airflow metric
+  FFFF64D8        ???     Referenced in A/F learning
+  FFFF6540        ???     Referenced in A/F learning
+  FFFF65C0-65C2   ???     Referenced in CL/OL transition
+  FFFF65FC        ???     Referenced in CL/OL and A/F learning
+  FFFF6624        float   MAF (alternate/computed)
+  FFFF67EC        ???     Referenced in A/F learning
+  FFFF6810        ???     Referenced in CL/OL transition
+  FFFF6898        ???     Referenced in CL/OL transition
+  FFFF68DC        ???     Referenced in A/F learning
+  FFFF69FC        float   Throttle-related value
+  FFFF6A22        word    Status word (read before call to 022F92)
+  FFFF6A28        ???     Referenced in CL/OL delay
+  FFFF7324        float   Referenced in A/F learning entry
+  FFFF733C        float   Referenced in A/F learning
+  FFFF7354        float   CL condition check variable #1
+  FFFF7374        float   CL condition check variable #2
+  FFFF73A4        float   CL condition check variable #3
+  FFFF7448        byte    Common flag (used by learning + scheduler)
+  FFFF7453        byte    Common flag
+  FFFF7464        ???     Referenced in CL fueling target
+  FFFF7704        ???     Referenced in A/F learning
+  FFFF7708        ???     Referenced in A/F learning
+  FFFF77C8        float   AFC/CL correction state (MAIN AFC VALUE — widely consumed)
+  FFFF77D4        ???     Referenced in CL fueling target
+  FFFF77DC        float   CL target comp A output (from 0x33CC0)
+  FFFF77E0        float   CL target comp B output (from 0x33D1C)
+  FFFF77F0-77F8   ???     CL fueling computation
+  FFFF77F4        float   AFC correction output / workspace base (GBR in 0x33DBE)
+  FFFF7800        float   Fuel correction intermediate
+  FFFF77F8        float   Fuel correction intermediate
+  FFFF7820        float   AFC output (clamped, from 0x343CE)
+  FFFF782B-782C   byte    Flags in CL/OL transition
+  FFFF7830        ???     Referenced in CL fueling target
+  FFFF7864        float   AFC correction output (from PI controller 0x342A8)
+  FFFF7868        ???     Referenced in CL fueling target
+  FFFF7870        float   Correction accumulator output (from 0x340A0)
+  FFFF7874        ???     A/F learning state
+  FFFF787C-787F   byte    A/F learning flags (787F = airflow range index)
+  FFFF7880        ???     Referenced in A/F learning
+  FFFF7888-789D   ???     A/F learning computation workspace
+  FFFF78A0        struct  A/F Learning output data structure base
+  FFFF78A4        struct  A/F Learning output secondary
+  FFFF78AC-78B4   ???     CL/OL transition state
+  FFFF78B0        ???     Referenced in A/F learning
+  FFFF7904-7913   ???     CL/OL transition state variables
+  FFFF7920-792C   ???     CL/OL transition computation
+  FFFF7940-7954   ???     CL/OL state variables
+  FFFF7984-798C   ???     CL/OL delay state
+  FFFF79A0-79FC   ???     CL/OL transition state (large block)
+  FFFF79C0-79C4   ???     Referenced in CL/OL transition
+  FFFF7A04        ???     CL delay computation
+  FFFF7A0C        ???     Referenced in CL/OL delay B
+  FFFF7A14        float   CL condition check variable #4
+  FFFF7A20        float   CL condition check variable #5
+  FFFF7A44        ???     CL fueling target area
+  FFFF7AB4        ???     Referenced in A/F learning
+  FFFF7BA8        ???     Referenced in A/F learning
+  FFFF7BE2        byte    CL enable final check flag
+  FFFF7C68        ???     Referenced in A/F learning + CL/OL
+  FFFF7D18        byte    Scheduler status (shared with FLKC)
+  FFFF7D68        float   Pre-computation result (used in learning)
+  FFFF7E90        ???     Referenced in CL/OL hysteresis
+  FFFF7F48        ???     Referenced in CL/OL hysteresis
+  FFFF7F6C        ???     Referenced in OL map selection
+  FFFF8200        ???     Referenced in OL map selection
+  FFFF8258        float   Also used by FLKC (flkc_fg_limit_FR15)
+  FFFF85D7        byte    Referenced in A/F learning
+  FFFF8E7E        byte    Referenced in A/F learning
+  FFFF8F24        byte    Global CL enable flag
+  FFFF90BE        ???     Referenced in CL fueling target
+  FFFF94B1        byte    Referenced in A/F learning
+  FFFF984D        byte    Referenced in CL/OL and A/F learning
+  FFFFA4DD        byte    Referenced in CL fueling target
+  FFFFA56A        byte    Referenced in A/F learning
+  FFFFA824-A825   byte    Referenced in CL/OL transition
+  FFFFACB6        ???     Referenced in A/F learning
+
+
+================================================================================
+SECTION 10: FUNCTION CALL MAP
+================================================================================
+
+  GENERIC TABLE PROCESSORS (called repeatedly by fueling code):
+    0x0BE608  — Table value comparison/lookup (5+ calls from A/F learning)
+    0x0BE830  — Table processor variant (used by CL/OL transition)
+    0x0BE874  — LowPW_TableProcessor (named in Ghidra)
+    0x0BE8AC  — Table processor variant
+    0x0BE8E4  — Table processor variant (descriptor-based)
+    0x0BE960  — Table processor variant
+    0x0BE970  — Table processor variant
+    0x0BEA40  — Table processor variant
+    0x0BEAB0  — Table processor variant
+    0x0BDBCC  — A/F Learning table interpolation/update
+    0x0BDCB6  — A/F Learning range validity check
+    0x0BE53C  — Table utility
+    0x0BE554  — Table utility
+    0x0BE56C  — Table processor (2-input comparison)
+    0x0BE598  — Table utility
+    0x0BE628  — Table utility
+
+  UTILITY FUNCTIONS:
+    0x022CF4  — Non-returning utility (error handler?)
+    0x022F92  — Non-returning utility (error handler?)
+    0x023E48  — Utility called from A/F learning
+    0x0278D2  — Utility called from A/F learning airflow
+    0x029824  — Utility called from A/F learning
+    0x0297F4  — Utility called from CL/OL transition
+    0x029804  — Utility called from CL/OL transition
+    0x029888  — Utility called from CL/OL transition
+    0x029898  — Utility called from CL/OL transition
+    0x029BA4  — Utility called from A/F learning entry
+    0x063A5C  — Called from A/F learning (post-processing)
+    0x063A88  — Called from CL/OL transition
+    0x063B00  — Called from CL/OL delay
+
+  AFC PIPELINE (called sequentially from dispatcher 0x33304):
+    0x33304  — CL fueling dispatcher (sequences the entire AFC pipeline)
+    0x33D1C  — CL Fueling Target Comp B (BSR from dispatcher)
+    0x33CC0  — CL Fueling Target Comp A (BSR from dispatcher)
+    0x33658  — AFC sensor prep / conditioning
+    0x33DBE  — AFC CL/OL decision & hysteresis (GBR=0xFFFF77F4)
+    0x33FCE  — AFC error computation (actual - target, deadband check)
+    0x340A0  — AFC PI output stage (P+I gains by load/RPM/airflow, blend)
+    0x342A8  — AFC PI controller (THE SHORT-TERM CORRECTION LOOP)
+    0x3439E  — AFC enable/disable gate
+    0x343CE  — AFC output clamp (limits to ±190-200%)
+    0x320AE  — Final fuel correction accumulator (AFC+LTFT+enrichments→IPW)
+
+  SELF-CALLS (within fueling region 0x33000-0x37000):
+    0x345A4  — CL Active Check (10-condition gate)
+    0x34778  — A/F Learning sub 1
+    0x34884  — A/F Learning sub 2
+    0x34B1C  — A/F Learning sub 3
+    0x34CC8  — A/F Learning sub 4
+    0x34C18  — A/F Learning sub 5
+    0x34C54  — A/F Learning sub 6
+    0x34D2E  — A/F Learning exit path A
+    0x34CEE  — A/F Learning exit path B
+    0x34D52  — A/F Learning precondition check
+    0x34DA6  — A/F Learning entry path variant
+    0x34DD6  — A/F Learning entry path variant
+    0x35F22  — CL/OL sub (called from transition code)
+    0x35F48  — CL/OL sub (called from transition code)
+    0x369A2  — CL/OL delay sub
+    0x368D8  — CL/OL delay sub
+    0x368E2  — CL/OL delay sub
+    0x36BD0  — CL/OL delay sub
+    0x36D46  — CL/OL delay sub
+    0x36D54  — CL/OL delay sub
+    0x36FF2  — CL/OL delay sub
+    0x37000  — CL/OL delay sub
+    0x3692A  — CL/OL delay sub
+
+
+================================================================================
+SECTION 11: CALIBRATION QUICK REFERENCE
+================================================================================
+
+  ADDRESS   VALUE        TABLE NAME
+  ──────────────────────────────────────────────────────────────────────────
+  0x21CAC   0.750 (λ)    Front O2 Rich Limit (AFR 11.02)
+  0x35FFC   0.000 (%)    AF 3 Correction Limits Min (DISABLED)
+  0x36000   0.000 (%)    AF 3 Correction Limits Max (DISABLED)
+  0xC3708   varies       Front O2 Comp (Atmospheric Pressure)
+  0xCBC5A   0xC80000     CL Delay Engine Load Counter Threshold
+  0xCBC5C   0.0          CL to OL Delay SI-DRIVE Intelligent
+  0xCBC62   0.0          CL to OL Delay (BASE) ← ZERO = IMMEDIATE
+  0xCBF9C   119.0 °F     CL Fuel Target ECT Disable
+  0xCC020   70.0 g/s     MAF threshold for CL learning enable
+  0xCC064   -0.250       A/F Learning #1 Limits Min (-25%)
+  0xCC068   +0.250       A/F Learning #1 Limits Max (+25%)
+  0xCC074   6/23/40/80   A/F Learning Airflow Ranges (A/B, g/s)
+  0xCC084   0.95/1.05    A/F Learning Airflow Range C (g/s)
+  0xCC08C   35.0/0.0     A/F Learning Airflow Range D (DISABLED)
+  0xCC16C   0.500        OL Fuel Map Switch (IAM threshold)
+  0xCC170   0.050        Min Active Primary OL Enrichment (5%)
+  0xCC174   756.0        CL→OL BPW Hysteresis
+  0xCC178   8.4 deg      CL→OL Throttle Hysteresis
+  0xCC17C   -12.0 °F     CL Delay Min (ECT)
+  0xCC180   3200-3700    CL Delay Max RPM (Per Gear)
+  0xCC1A8   6000-6100    CL Delay Max RPM (Neutral)
+  0xCC1D8   37.9-90.0    CL Delay Max (Throttle, deg)
+  0xCC1F4   141.7-910    CL Delay Max (Vehicle Speed, km/h)
+  0xCC204   0.95-1.10    CL Delay Max (Engine Load, g/rev)
+  0xCCD78   varies       CL→OL Throttle Threshold (unused, delay=0)
+  0xCE5F8   varies       CL→OL BPW Threshold (unused, delay=0)
+  0xCC000   2.0          AFC P gain / step size (UNDOCUMENTED)
+  0xCC004   20.0 (%)     AFC max correction limit (UNDOCUMENTED)
+  0xCC008   0.0          AFC min correction / dead band (UNDOCUMENTED)
+  0xCC00C   1.0          AFC I gain / unity scale (UNDOCUMENTED)
+  0xCC010   0.0          AFC enable threshold (UNDOCUMENTED)
+  0xCC014   200.0 (%)    AFC output upper clamp (UNDOCUMENTED)
+  0xCC018   190.0 (%)    AFC output lower clamp (UNDOCUMENTED)
+  0xCC01C   0.0          AFC additional limit (UNDOCUMENTED)
+  0xCBFD0   varies       AFC CL hysteresis threshold pair 1 (UNDOCUMENTED)
+  0xCBFD4   varies       AFC CL hysteresis threshold pair 1 (UNDOCUMENTED)
+  0xCBFD8   varies       AFC CL hysteresis threshold pair 2 (UNDOCUMENTED)
+  0xCBFDC   varies       AFC CL hysteresis threshold pair 2 (UNDOCUMENTED)
+  0xCBFE0   varies       AFC CL RPM threshold pair (UNDOCUMENTED)
+  0xCBFE4   varies       AFC CL RPM threshold pair (UNDOCUMENTED)
+  0xACEA0   desc         AFC P-gain A (by load) table descriptor (UNDOCUMENTED)
+  0xACEB4   desc         AFC P-gain B (by RPM) table descriptor (UNDOCUMENTED)
+  0xAC4FC   desc         AFC P normalizer (by airflow) descriptor (UNDOCUMENTED)
+  0xAD928   desc         AFC I-component (2D coolant×AFR) descriptor (UNDOCUMENTED)
+  0xACEC8   desc         AFC I-gain A (by load) table descriptor (UNDOCUMENTED)
+  0xACEDC   desc         AFC I-gain B (by RPM) table descriptor (UNDOCUMENTED)
+  0xAC510   desc         AFC I normalizer (by airflow) descriptor (UNDOCUMENTED)
+  0xACE8C   desc         AFC correction lookup table descriptor (UNDOCUMENTED)
+  0xCE640   varies       CL→OL Counter Step (MAF) (unused, delay=0)
+  0xD05C4   varies       Primary OL Fueling (Failsafe) map
+  0xD0244   varies       Primary OL Fueling (KCA Low)
+  0xD0404   varies       Primary OL Fueling (KCA High)
+  0xD14D0   varies       CL Fuel Target Comp A (Load)
+  0xD1740   varies       CL Fuel Target Comp B (Load)
+  0xD8D74   varies       Front O2 Sensor Y-axis (mA)
+  0xD8DA8   varies       Front O2 Sensor Scaling (AFR)
+
+
+================================================================================
+SECTION 12: NEXT STEPS FOR FULL DECOMPILATION
+================================================================================
+
+The AFC short-term correction loop has been fully traced. The following
+work remains for deeper analysis:
+
+  COMPLETED — KEY FUNCTIONS IDENTIFIED:
+     0x021A40: frontO2_process — O2 sensor processing (rich limit, atm comp)
+     0x033CC4: cl_fuel_target_calc — CL fueling target (Comp A + B)
+     0x033304: afc_dispatcher — CL fueling master controller
+     0x342A8:  afc_pi_controller — THE SHORT-TERM CORRECTION LOOP
+     0x340A0:  afc_correction_acc — correction factor accumulator
+     0x3439E:  afc_enable_gate — AFC enable/disable
+     0x343CE:  afc_output_clamp — AFC output limiter
+     0x320AE:  fuel_correction_final — combines AFC+LTFT+enrichments→IPW
+     0x036070: clol_main_transition — CL/OL transition (IAM, throttle, BPW)
+     0x03697A: clol_hysteresis_sub — CL/OL hysteresis
+     0x058902: frontO2_scaling_lookup — O2 sensor scaling interpolation
+     0x004A2C: frontO2_scaling_init — O2 sensor scaling init
+
+  COMPLETED — KEY RAM VARIABLES:
+     0xFFFF77C8: AFC/CL correction state (main AFC value)
+     0xFFFF7864: AFC correction output (PI controller output)
+     0xFFFF7820: AFC clamped output
+     0xFFFF7870: Correction accumulator output
+
+  COMPLETED — UNDOCUMENTED CALIBRATION CONSTANTS:
+     0xCC000-0xCC01C: AFC controller gains, limits, and clamps
+
+  REMAINING WORK:
+
+  1. LABEL the fueling dispatch tables at 0x480B8 and 0x4A0B8
+
+  2. NAME the 8 fueling functions from dispatch table A:
+     0x33278, 0x34488, 0x357D0, 0x34EC8, 0x36008, 0x36A98, 0x36BF4, 0x36E60
+
+  3. NAME the 6 fueling functions from dispatch table B:
+     0x332A2, 0x36C3C, 0x3452A, 0x34EF4, 0x3580C, 0x3605E
+
+  4. DECOMPILE the PI controller at 0x342A8 more thoroughly to determine
+     exact P/I gains and how 0xCC000 (2.0) and 0xCC00C (1.0) are applied
+
+  5. TRACE the generic table processors at 0xBE608-0xBEAB0
+
+  6. TRACE the correction accumulator (0x340A0) to identify all individual
+     compensation table descriptors (0xACEA0, 0xACEB4, etc.)
+
+  7. DECOMPILE the final fuel correction accumulator at 0x320AE to
+     understand exactly how AFC, LTFT, and enrichments combine
+
+  8. Apply labels via ImportAE5L600L.java Ghidra script
+
+
+================================================================================
+END OF ANALYSIS
+================================================================================
+;
+; ─── Ghidra SH-2A Coverage ─────────────────────────────
+;   3,642 functions identified across 3,776 code blocks
+;   101 thunk functions (indirect call trampolines)
+;   36,716 defined data items
+;   139 user-defined symbols + 21 RAM variable labels
+;   41 end-of-line comments
+;   13 bad instruction errors (data-in-code conflicts)
+;   13 non-returning functions
+
 ; ─────────────────────────────────────────────────────
-; End of disassembly  |  ROM size: 1048576 bytes
+; End of disassembly  |  ROM: AE5L600L rev 20.2  |  1,048,576 bytes
+; Arch: SH-2A BE  |  Ghidra 12.0.2  |  SuperH:BE:32:SH-2A:default
 ; ─────────────────────────────────────────────────────
