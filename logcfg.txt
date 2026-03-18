@@ -1,0 +1,169 @@
+type = adc
+
+paramname = wbo2
+paramid = 12
+scalingrpn = x,0.001934,*,10.17,+
+
+type = ssmcan
+
+;E124 - Final Fueling Base (2-byte)*(estimated AFR)
+paramname = FFB
+paramid = 0xFF6852
+databits = 16
+scalingrpn = 14.7,x,.0004882812,*,/
+
+;P56 - A/F Sensor #1 Resistance(ohm)
+paramname = EGT
+paramid = 0x000044
+scalingrpn = x
+
+;P3 - A/F Correction #1(%)
+paramname = AFC
+paramid = 0x000009
+scalingrpn = x,128,-,100,*,128,/
+
+;P4 - A/F Learning #1(%)
+paramname = AFL
+paramid = 0x00000A
+scalingrpn = x,128,-,100,*,128,/
+sampinterval = 5
+
+;P8 - Engine Speed(rpm)
+paramname = RPM
+paramid = 0x00000E
+databits = 16
+scalingrpn = x,4,/
+
+;P9 - Vehicle Speed(mph)
+paramname = MPH
+paramid = 0x000010
+scalingrpn = x,0.621371192,*
+sampinterval = 2
+
+;P10 - Ignition Total Timing(degrees)
+paramname = Timing
+paramid = 0x000011
+scalingrpn = x,128,-,2,/
+
+;P11 - Intake Air Temperature(F)
+paramname = IAT
+paramid = 0x000012
+scalingrpn = 32,9,x,40,-,*,5,/,+
+sampinterval = 20
+
+;P12 - Mass Airflow(g/s)
+paramname = MAF
+paramid = 0x000013
+databits = 16
+scalingrpn = x,100,/
+
+;P18 - Mass Airflow Sensor Voltage(V)
+paramname = MAF(V)
+paramid = 0x00001D
+scalingrpn = x,50,/
+
+;P30 – Accelerator Pedal Angle (%)
+paramname   = Accelerator
+paramid     = 0x000029        
+scalingrpn  = x,100,*,255,/ 
+
+;P13 - Throttle Opening Angle(%)
+paramname = Throttle
+paramid = 0x000015
+scalingrpn = x,100,*,255,/
+
+;E56 - Requested Torque*(raw ecu value)
+paramname = RQTQ
+paramid = 0xFF8558
+isfloat = 1
+scalingrpn = x
+
+;P24 - Atmospheric Pressure(psi)
+paramname = ATM(psi)
+paramid = 0x000023
+scalingrpn = x,37,*,255,/
+sampinterval = 60
+
+;P7 - Manifold Absolute Pressure(PSI)
+paramname = MAP
+paramid = 0x00000D
+scalingrpn = x,0.145,*
+
+;E120 - Target Boost Relative (4-byte)*(psi relative)
+paramname = Trgt_Boost
+paramid = 0xFF5CA4
+isfloat = 1
+scalingrpn = x,0.01933677,*
+
+;P90 - IAM(multiplier)
+paramname = IAM
+paramid = 0x0000F9
+scalingrpn = x,16,/
+sampinterval = 60
+
+;E33 - CL/OL Fueling*(status)
+paramname = CL/OL
+paramid = 0xFFAF71
+scalingrpn = x,6,+
+sampinterval = 60
+
+;P91 - Fine Learning Knock Correction(degrees)
+paramname = FLKC
+paramid = 0x000199
+scalingrpn = x,0.25,*,32,-
+
+;E39 - Feedback Knock Correction (4-byte)*(degrees)
+paramname = FBKC
+paramid = 0xFF81F0
+isfloat = 1
+scalingrpn = x
+
+;P49 - Intake VVT Advance Angle Left(degrees)
+paramname = avcs
+paramid = 0x00003D
+scalingrpn = x,50,-
+
+;P36 - Primary Wastegate Duty Cycle(%)
+paramname = wgdc
+paramid = 0x000030
+scalingrpn = x,100,*,255,/
+
+;E34 - Turbo Dynamics Integral (4-byte)*(absolute %)
+paramname = tdi
+paramid = 0xFF5CB0
+isfloat = 1
+scalingrpn = x
+
+;E37 - Turbo Dynamics Proportional (4-byte)*(absolute %)
+paramname = Tdp
+paramid = 0xFF5CAC
+isfloat = 1
+scalingrpn = x
+
+;P21 - Fuel Injector #1 Pulse Width(ms)
+paramname = IPW
+paramid = 0x000020
+scalingrpn = x,256,*,1000,/
+
+
+
+;-------------------------TRIGGER-------------------------;
+; Triggers allow us to start/stop and resume logging to   ;
+; a file.  A default configuration has been setup for     ;
+; you to start with.  This will start logging when the    ;
+; engine starts (RPM > 0).                                ;
+;                                                         ;
+; A second configuration is also available.  It will log  ;
+; when you press the defogger switch and will stop the    ;
+; log when you turn the defogger off.  In order to use    ;
+; that configuration, remove the ";" at the beginning of  ;
+; the "Defogger Switch" lines and add a ";" to the others ;
+;---------------------------------------------------------;
+
+; Start log when RPM > 0
+conditionrpn = RPM,0,>	
+action = start
+
+; Stop log when RPM = 0
+conditionrpn = RPM,0,==
+action = stop
