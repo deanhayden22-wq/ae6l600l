@@ -66,14 +66,145 @@ public class ImportAE5L600L extends GhidraScript {
             "Knock detection. GBR=0xFFFF80FC. Writes KNOCK_FLAG [0xFFFF81BA] and KNOCK_BANK_FLAG [0xFFFF81BB]");
         count += labelComment(0x00043470, "LowPW_GateFunction",
             "Low PW Injector Comp gate: checks RPM < max and IPW < max");
-        count += labelComment(0x0004438C, "fn_04438C",
-            "Task [11] - reads knock flag");
-        count += labelComment(0x00043D68, "fn_043D68",
-            "Task [12] - writes 0xFFFF81D9, NOT the knock flag");
+        count += labelComment(0x0004438C, "task11_knock_flag_read",
+            "Task [11] Knock flag consumer - reads KNOCK_FLAG+BANK_FLAG, dispatches knock response");
+        count += labelComment(0x00043D68, "task12_knock_post",
+            "Task [12] Knock post-process - writes 0xFFFF81D9, refs knock GBR base, cal 0xD2D60-74");
         count += labelComment(0x00045BFE, "flkc_path_J",
             "Task [18] FLKC fast-response. If KNOCK_FLAG!=0: FR13 -= base_step*0.5. ROM[0x045DD8]=0.5 multiplier.");
         count += labelComment(0x000463BA, "flkc_paths_FG",
             "Task [25] FLKC sustained-knock. GBR=0xFFFF8290. Requires 7 conditions. bank!=1->retard 1.01, bank==1->retard 2.80");
+
+        // ── Scheduler tasks: complete 59-entry map ──
+        // Timing / Per-Cylinder Compensation
+        count += labelComment(0x00044188, "task00_timing_percyl",
+            "Task [0] Per-cylinder timing comp. RPM+MAF, cal Timing Comp Max RPM/Min Load/Min ECT");
+        // Knock → Timing Feedback
+        count += labelComment(0x00045970, "task01_knock_timing_fb",
+            "Task [1] Post-knock timing adjustment. Knock corr state RAM 0x8204-821C");
+        // Knock Window Setup
+        count += labelComment(0x00045098, "task02_knock_window",
+            "Task [2] Knock window setup. KNOCK_FLAG+MAF, sets GBR, cal 0xD29E4/D2E60/D2E64");
+        count += labelComment(0x00045670, "task03_knock_thresh",
+            "Task [3] Knock threshold config. Feedback Corr Min Load (0xD2DA4), sets GBR");
+        count += labelComment(0x000455E6, "task04_knock_thresh",
+            "Task [4] Knock sensitivity config. MAF, cal 0xD2E9C-D2EB0, sets GBR");
+        // Knock Detection
+        count += labelComment(0x0004530A, "task05_knock_det",
+            "Task [5] Knock detection. KNOCK_FLAG+MAF+IAM, sets GBR");
+        count += labelComment(0x00045354, "task06_knock_det",
+            "Task [6] Knock detection. KNOCK_FLAG+MAF, sets GBR");
+        count += labelComment(0x000450AE, "task07_knock_det",
+            "Task [7] Knock detection. KNOCK_FLAG+MAF, sets GBR");
+        count += labelComment(0x00044E04, "task08_knock_window",
+            "Task [8] Knock window setup. IAM+RPM, cal 0xD2E1C-2C");
+        count += labelComment(0x00044DB0, "task09_knock_det",
+            "Task [9] Knock detection. KNOCK_FLAG+IAM+RPM, sets GBR");
+        count += labelComment(0x000448F4, "task10_knock_config",
+            "Task [10] Knock config dispatcher. RPM+MAF+sched, multi-RAM refs");
+        // Tasks 11/12 already labeled above
+        // Rough Correction
+        count += labelComment(0x00045A3E, "task13_rough_corr",
+            "Task [13] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
+        count += labelComment(0x00044834, "task14_knock_thresh_lu",
+            "Task [14] Knock threshold lookup. 8 cal params 0xD2DEC-0xD2E04");
+        count += labelComment(0x00045A84, "task15_rough_corr",
+            "Task [15] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
+        // FLKC Pipeline
+        count += labelComment(0x00045BBC, "task16_flkc_pre",
+            "Task [16] FLKC pre-process. KNOCK_FLAG+FLKC_BASE_STEP+IAM+MAF");
+        count += labelComment(0x00045B44, "task17_flkc_pre",
+            "Task [17] FLKC pre-process. FLKC_BASE_STEP+IAM, Advance Multiplier");
+        // Tasks 18/25 already labeled above (flkc_path_J, flkc_paths_FG)
+        count += labelComment(0x00045E96, "task19_flkc_post",
+            "Task [19] FLKC post-process. Advance Multiplier application");
+        count += labelComment(0x000459F6, "task20_knock_win_upd",
+            "Task [20] Knock window per-cyl update. IAM+MAF, sets GBR");
+        count += labelComment(0x000467AE, "task21_knock_win_upd",
+            "Task [21] Knock window per-cyl update. MAF+cyl index, sets GBR");
+        count += labelComment(0x000461D2, "task22_knock_percyl",
+            "Task [22] Knock per-cyl config. Cyl index (0xFFFF8298), sets GBR");
+        count += labelComment(0x000467F4, "task23_knock_cyl_track",
+            "Task [23] Knock cyl tracking. KNOCK_FLAG+cyl index tracking");
+        count += labelComment(0x000469A4, "task24_flkc_output",
+            "Task [24] FLKC output stage. flkc_output_table+cal 0xD29F0");
+        // Task 25 already labeled above
+        count += labelComment(0x00046978, "task26_flkc_output",
+            "Task [26] FLKC output stage. flkc output+cal 0xD29F0");
+        count += labelComment(0x00046296, "task27_knock_timing",
+            "Task [27] Knock timing correction. KNOCK_FLAG+timing output");
+        count += labelComment(0x00045DF8, "task28_flkc_recovery",
+            "Task [28] FLKC recovery. Advance recovery steps 0xD2EEC-0xD2F08");
+        // Timing Pipeline
+        count += labelComment(0x00044296, "task29_timing_percyl",
+            "Task [29] Per-cyl timing comp. Load+knock state, sets GBR");
+        count += labelComment(0x0003FCA2, "task30_base_timing",
+            "Task [30] Base timing lookup. RPM+MAF+ECT+ATM, 14+ RAM refs");
+        count += labelComment(0x0003FFD6, "task31_timing_blend_ratio",
+            "Task [31] Timing blend ratio. Blend Floor/Ceiling 0xD2B18/1C");
+        count += labelComment(0x0004004A, "task32_timing_blend_app",
+            "Task [32] Timing blend application. Blend Min Ratio+RPM Limit");
+        count += labelComment(0x00040918, "task33_timing_ws_init",
+            "Task [33] Timing workspace init. Multi-GBR-write, 3 BSR calls");
+        count += labelComment(0x00040516, "task34_timing_throttle",
+            "Task [34] Timing throttle comp. Throttle+MAF voltage+injector");
+        count += labelComment(0x000418AC, "task35_timing_corr",
+            "Task [35] Timing correction stage. Cal 0xD2C04, timing state RAM");
+        count += labelComment(0x000415B8, "task36_timing_percond",
+            "Task [36] Timing per-condition. RPM+MAF+throttle+fuel rate");
+        count += labelComment(0x000419BA, "task37_timing_multiaxis",
+            "Task [37] Timing multi-axis. RPM+MAF, 3 cal params, 3 BSR calls");
+        // Ignition Output
+        count += labelComment(0x00042A78, "task38_ign_output",
+            "Task [38] Ignition output. RPM+MAF+throttle, cal 0xD2CB0-CB8");
+        count += labelComment(0x00042B90, "task39_ign_maf_corr",
+            "Task [39] Ignition MAF correction. MAF, RAM 0xFFFF320C");
+        count += labelComment(0x00042D20, "task40_ign_calc_a",
+            "Task [40] Ignition calc A. MAF, cal 0xD2CC0-CCC");
+        count += labelComment(0x00042D54, "task41_ign_calc_b",
+            "Task [41] Ignition calc B. MAF, cal 0xD2CC8-CCC, BSR 0x42E6A");
+        count += labelComment(0x00042F48, "task42_timing_comp_b",
+            "Task [42] IAM-gated Timing Comp B. IAM+knock→Timing Comp B (IAT) activation");
+        count += labelComment(0x0004322A, "task43_timing_out_load",
+            "Task [43] Timing output with load. Load reference+descriptors");
+        count += labelComment(0x0004317A, "task44_timing_lu_a",
+            "Task [44] Timing lookup A. RPM+MAF, cal 0xD2D10");
+        count += labelComment(0x000431B0, "task45_timing_lu_b",
+            "Task [45] Timing lookup B. RPM+MAF, cal 0xD2D10");
+        count += labelComment(0x00043368, "task46_inj_mps_timing",
+            "Task [46] Injector/MPS timing comp. MAF V+MPS+boost, calls low_pw_table_proc");
+        count += labelComment(0x00043464, "task47_mapswitch_lowpw",
+            "Task [47] Map switch+Low PW. Map Switch thresholds+Low PW Injector Comp");
+        count += labelComment(0x0004359C, "task48_final_timing",
+            "Task [48] Final timing/injector output. Throttle+MAF+boost, 4 JSR");
+        // Base Advance
+        count += labelComment(0x0003F00C, "task49_base_advance",
+            "Task [49] Base timing advance. RPM+MAF+load+ATM, 16+ RAM refs");
+        count += labelComment(0x0003F368, "task50_timing_blend_int",
+            "Task [50] Timing blend integration. RPM+MAF+cl_enable, blend output");
+        // Boost / Wastegate
+        count += labelComment(0x00054852, "task51_boost_wg_calc",
+            "Task [51] Boost/WG target calc. Throttle+MAF V+ECT cal, sets GBR");
+        count += labelComment(0x000549FA, "task52_boost_feedback",
+            "Task [52] Boost feedback/trim. MAF, cal 0xD6748");
+        // Diagnostics
+        count += labelComment(0x000602DC, "task53_diag_monitor",
+            "Task [53] Diagnostic monitor. Diag state RAM, cal 0xD9A4C");
+        // Idle
+        count += labelComment(0x0004BC20, "task54_idle_control",
+            "Task [54] Idle speed control. Throttle RAM, no FPU, GBR state machine");
+        // MPS Diag
+        count += labelComment(0x000900B4, "task55_mps_diag",
+            "Task [55] MPS diagnostics. MPS scaling/CEL, ATM cross-check");
+        // EVAP
+        count += labelComment(0x00066580, "task56_evap_purge",
+            "Task [56] EVAP/purge control. No FPU, 2 BSR calls");
+        // EGR
+        count += labelComment(0x000758CA, "task57_egr_emissions",
+            "Task [57] EGR/emissions control. MAF, high-addr RAM, sets GBR");
+        // MAF Diag
+        count += labelComment(0x0006F0B8, "task58_maf_diag",
+            "Task [58] MAF sensor diagnostics. MAF+MPS cross-check");
 
         // Front O2 sensor processing
         count += labelComment(0x00021A40, "frontO2_process",
