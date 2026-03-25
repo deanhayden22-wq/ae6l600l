@@ -3,6 +3,7 @@
 Minimal SH-2A disassembler for tracing knock/FLKC functions.
 Decodes 16-bit SH instructions (big-endian) with GBR-relative addressing annotation.
 """
+import os
 import struct
 import sys
 
@@ -355,7 +356,7 @@ KNOWN_RAM = {
 
 
 def main():
-    rom_path = "/home/user/ae6l600l/AE5L600L 20g rev 20.3 tiny wrex.bin"
+    rom_path = os.path.join(os.path.dirname(__file__), "..", "rom", "AE5L600L 20g rev 20.3 tiny wrex.bin")
     with open(rom_path, 'rb') as f:
         rom = f.read()
 

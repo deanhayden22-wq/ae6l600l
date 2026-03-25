@@ -9,9 +9,10 @@ Tip-in Enrichment system and the Tau (Alpha Transient Fueling) system
 from the ECU ROM binary.
 """
 
+import os
 import struct
 
-ROM_PATH = "AE5L600L 20g rev 20.3 tiny wrex.bin"
+ROM_PATH = os.path.join(os.path.dirname(__file__), "..", "rom", "AE5L600L 20g rev 20.3 tiny wrex.bin")
 
 
 def read_rom():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Minimal SH-2 disassembler for Subaru ECU ROM analysis."""
-import struct, sys
+import os, struct, sys
 
 def disasm_sh2(opcode, pc):
     """Disassemble a single SH-2 16-bit opcode. Returns mnemonic string."""
@@ -389,7 +389,7 @@ def search_for_bytes(rom_data, pattern):
 
 
 if __name__ == "__main__":
-    rom_path = "/home/user/ae6l600l/AE5L600L 20g rev 20.2 tiny wrex.bin"
+    rom_path = os.path.join(os.path.dirname(__file__), "..", "rom", "AE5L600L 20g rev 20.3 tiny wrex.bin")
     with open(rom_path, "rb") as f:
         rom = f.read()
 

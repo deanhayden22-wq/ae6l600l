@@ -11,10 +11,11 @@ For each task, peek at the first ~32 instructions to identify:
 - Subroutine calls (bsr/jsr)
 - Float operations
 """
+import os
 import struct
 import sys
 
-ROM_PATH = "/home/user/ae6l600l/AE5L600L 20g rev 20.3 tiny wrex.bin"
+ROM_PATH = os.path.join(os.path.dirname(__file__), "..", "rom", "AE5L600L 20g rev 20.3 tiny wrex.bin")
 
 # Known function labels
 KNOWN_FUNCS = {
