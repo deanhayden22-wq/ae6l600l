@@ -700,6 +700,120 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ; NOTE: 32BITBASE.xml defines Decay3 and Decay4 as uint8, but this ROM stores uint16.
 
 ; ═════════════════════════════════════════════════════════════════════════════
+; TRANSIENT FUEL CONTROL — THREE INDEPENDENT SUBSYSTEMS
+; ═════════════════════════════════════════════════════════════════════════════
+;
+; The ECU uses three independent transient fuel compensation systems that
+; operate on different input signals and combine additively in the final
+; fuel correction accumulator (0x320AE):
+;
+;   1. TIP-IN ENRICHMENT — throttle-rate based (rising throttle only)
+;   2. TAU (ALPHA TRANSIENT) — load-rate based (rising AND falling load)
+;   3. OVERRUN FUEL CUTOFF — deceleration fuel cut with resume enrichment
+;
+; ─── Execution Order in Pipeline B ───────────────────
+;   0x37186  fuel_transient_comp    — Tip-in/out transient compensation
+;   0x37B68  fuel_injector_comp     — Injector compensation maps
+;   0x39528  fuel_wot_enrich_calc   — WOT enrichment factor
+;   0x3A222  fuel_per_cyl_trim      — Per-cylinder trim (4-cyl loop)
+;   0x3BB6C  fuel_accel_enrich      — Acceleration enrichment
+;   0x3CD34  fuel_warmup_enrich     — Warmup/cold-start enrichment
+;   0x3EB8C  fuel_overrun_cutoff    — Deceleration fuel cut
+;
+; ─── How Tip-In and Tau Interact ─────────────────────
+;   During a typical tip-in event:
+;   1. Driver stabs throttle -> tip-in fires FIRST (throttle moves before load)
+;      Adds IPW (ms) based on throttle angle change rate
+;   2. As turbo spools -> Tau fires SECOND (load follows throttle with lag)
+;      Adds enrichment multiplier based on load change rate (g/rev/cycle)
+;   3. During tip-OUT (throttle closing):
+;      Tip-in: INACTIVE (only responds to rising throttle)
+;      Tau falling load: ACTIVE (prevents rich spike on decel)
+;
+;   Both systems give MORE enrichment when engine is COLD:
+;     Tip-in ECT B: +250% at -40F, tapering to 0% at 140F+
+;     Tau Rising (1.75 g/r): 3.40x at -40F, tapering to 0.32x at 176F+
+;
+; ═════════════════════════════════════════════════════════════════════════════
+; SUBSYSTEM 1: TIP-IN ENRICHMENT (Throttle-Rate Based)
+; ═════════════════════════════════════════════════════════════════════════════
+;
+; Trigger:  delta(throttle_angle) per cycle
+; Output:   Additional Injector Pulse Width (ms) added to base IPW
+; Purpose:  Compensate for intake manifold fuel film lag on sudden throttle
+;           opening — prevents lean stumble during tip-in transients.
+; Code:     fuel_transient_comp @ 0x37186, fuel_accel_enrich @ 0x3BB6C
+;
+; ─── Primary Tables ──────────────────────────────────
+;   0xCED08:  TipIn_ThrottleAngleChange_Axis  (18 float32, throttle delta %)
+;   0xCED50:  TipInEnrichA                    (18 uint16, IPW adder ms, scale 0.004)
+;   0xCEDBC:  TipInEnrichB                    (alternate enrichment table)
+;
+; ─── Compensation Tables ─────────────────────────────
+;   0xCD0D8:  TipIn_RPMComp_Axis              (16 float32 RPM breakpoints)
+;   0xCD118:  TipIn_RPMComp                   (16 uint8, RPM scaling: low RPM = reduced)
+;   0xCD14C:  TipIn_BoostErrorComp            (boost error compensation)
+;   0xCD155:  TipIn_ECTComp_A                 (ECT variant A)
+;   0xCEDE0:  TipIn_ECTComp_B                 (ECT variant B, cold: +250%)
+;   0xCEE00:  TipIn_ECTComp_C                 (ECT variant C)
+;   0xCEE40:  TipIn_ECTComp_D                 (ECT variant D)
+;
+; ─── Activation & Disable Controls ───────────────────
+;   0xCC4A0:  TipIn_MinThrottleActivation     (min throttle angle change to fire)
+;   0xCC4A4:  TipIn_MinIPWActivation          (min IPW adder after compensations)
+;   0xCBC08:  TipIn_AppliedCounterReset       (counter reset cycles)
+;   0xCD165:  TipIn_DisableCounter_A          (applied counter threshold, ECT-indexed)
+;   0xCD175:  TipIn_DisableCounter_B          (applied counter threshold, ECT-indexed)
+;   0xCEE60:  TipIn_CumulativeThreshold_A     (cumulative throttle angle disable)
+;   0xCEE80:  TipIn_CumulativeThreshold_B     (cumulative throttle angle disable)
+;
+; ─── Acceleration Enrichment Gains ───────────────────
+;   0xCC51C:  AccelEnrich_TipInGain            (tip-in gain coefficient)
+;   0xCC530:  AccelEnrich_TipOutGain           (tip-out gain coefficient)
+;   0xCBC0B:  AccelEnrich_Cal_A                (accel enrich calibration A)
+;   0xCBC0C:  AccelEnrich_Cal_B                (accel enrich calibration B)
+;
+; ═════════════════════════════════════════════════════════════════════════════
+; SUBSYSTEM 2: TAU — ALPHA TRANSIENT FUELING (Load-Rate Based)
+; ═════════════════════════════════════════════════════════════════════════════
+;
+; Trigger:  delta(engine_load) per cycle (g/rev change rate)
+; Output:   Enrichment Adder Multiplier (dimensionless, scales a base adder)
+; Purpose:  Compensate for fuel film dynamics during load transients that
+;           may NOT correspond to throttle changes (e.g., boost spool,
+;           gear changes, altitude changes).
+; Code:     Integrated into fuel_transient_comp @ 0x37186
+;
+; ─── Rising Load Tables (engine load INCREASING) ─────
+;   0xCCDCC:  Tau_RisingLoad_Axis             (3 float32 engine load breakpoints, g/rev)
+;   0xCD6E6:  Tau_RisingLoad_A                (3x16 uint16 map, load x ECT)
+;             Scale: 0.00048828125. Cold=3.40x at -40F, warm=0.32x at 176F+
+;             ECT axis: shared PSE CT axis @ 0xCC624 (16 bins, -40 to 110 degF)
+;
+; ─── Falling Load Tables (engine load DECREASING) ────
+;   0xCD746:  Tau_FallingLoad                 (16 uint16, ECT-indexed)
+;   0xCD766:  Tau_FallingLoad_A               (variant A)
+;   0xCD848:  Tau_FallingLoad_B               (variant B)
+;   0xCD868:  Tau_FallingLoad_C               (variant C)
+;             Scale: 0.00048828125. Handles fuel film evaporation during
+;             falling load — prevents rich spike on decel/tip-out.
+;
+; ═════════════════════════════════════════════════════════════════════════════
+; SUBSYSTEM 3: OVERRUN FUEL CUTOFF (Deceleration Fuel Cut)
+; ═════════════════════════════════════════════════════════════════════════════
+;
+; Trigger:  RPM delta + airflow thresholds during deceleration
+; Output:   Fuel cut (injectors off) with controlled resume enrichment
+; Code:     fuel_overrun_cutoff @ 0x3EB8C, tail-calls 0x46BCC
+;
+; ─── Calibration Tables ──────────────────────────────
+;   0xCC498:  Overrun_RPMDelta_Activation     (RPM change threshold to trigger)
+;   0xCC49C:  Overrun_InitialEnrichment       (IPW adder on decel entry, ms)
+;   0xCC4EC:  Overrun_FuelCut_RPMThreshold    (RPM below which fuel cut applies)
+;   0xCEED0:  Overrun_FuelResume_RPMThreshold (RPM where fuel resumes after cut)
+;   0xD29AA:  Overrun_Cutoff_Cal              (overrun cutoff RPM/airflow map)
+
+; ═════════════════════════════════════════════════════════════════════════════
 ; AVCS (VARIABLE CAM TIMING) DUTY CORRECTION TABLES
 ; ═════════════════════════════════════════════════════════════════════════════
 ; Reverse-engineered from ECU descriptor structures (28-byte format).
