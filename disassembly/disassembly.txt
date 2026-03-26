@@ -5142,6 +5142,282 @@ END OF ANALYSIS
 ;     ... and ~30 more diagnostic/peripheral functions
 
 
+; ======================================================================
+; ADC / SENSOR INPUT PIPELINE
+; ======================================================================
+;
+; This section documents the complete analog sensor input chain:
+;   Hardware ADC registers -> ISR -> GBR-relative RAM -> sensor variables
+;
+; ── SH7058 ADC Hardware ──────────────────────────────────────────────
+;
+; The SH7058 has three independent A/D converter groups, each with its
+; own control/status register and set of data channels.  The ADC is a
+; 10-bit successive approximation converter.
+;
+; ADC Peripheral Register Map (from SH7055/SH7058 Hardware Manual):
+;
+;   Group 0 Data Registers:
+;     0xFFFFF800: ADDR0H/L    0xFFFFF802: ADDR1H/L
+;     0xFFFFF804: ADDR2H/L    0xFFFFF806: ADDR3H/L
+;     0xFFFFF808: ADDR4H/L    0xFFFFF80A: ADDR5H/L
+;     0xFFFFF80C: ADDR6H/L    0xFFFFF80E: ADDR7H/L
+;     0xFFFFF810: ADDR8H/L    0xFFFFF812: ADDR9H/L
+;     0xFFFFF814: ADDR10H/L   0xFFFFF816: ADDR11H/L
+;     0xFFFFF818: ADCSR0      (A/D Control/Status Register 0)
+;     0xFFFFF819: ADCR0       (A/D Control Register 0)
+;
+;   Group 1 Data Registers:
+;     0xFFFFF820: ADDR12H/L   0xFFFFF822: ADDR13H/L
+;     0xFFFFF824: ADDR14H/L   0xFFFFF826: ADDR15H/L
+;     0xFFFFF828: ADDR16H/L   0xFFFFF82A: ADDR17H/L
+;     0xFFFFF82C: ADDR18H/L   0xFFFFF82E: ADDR19H/L
+;     0xFFFFF830: ADDR20H/L   0xFFFFF832: ADDR21H/L
+;     0xFFFFF834: ADDR22H/L   0xFFFFF836: ADDR23H/L
+;     0xFFFFF838: ADCSR1      (A/D Control/Status Register 1)
+;     0xFFFFF839: ADCR1       (A/D Control Register 1)
+;
+;   Group 2 Data Registers:
+;     0xFFFFF840: ADDR24H/L   0xFFFFF842: ADDR25H/L
+;     0xFFFFF844: ADDR26H/L   0xFFFFF846: ADDR27H/L
+;     0xFFFFF848: ADDR28H/L   0xFFFFF84A: ADDR29H/L
+;     0xFFFFF84C: ADDR30H/L   0xFFFFF84E: ADDR31H/L
+;     0xFFFFF858: ADCSR2      (A/D Control/Status Register 2)
+;     0xFFFFF859: ADCR2       (A/D Control Register 2)
+;
+;   ADC Trigger Registers:
+;     0xFFFFF72E: ADTRGR1     0xFFFFF72F: ADTRGR2
+;     0xFFFFF76E: ADTRG0
+;
+; ADCSR Bit Layout:
+;   Bit 7: ADF  - A/D End Flag (1 = conversion complete, poll this)
+;   Bit 6: ADIE - A/D Interrupt Enable
+;   Bit 5: ADST - A/D Start (write 1 to begin conversion)
+;   Bits 4-3: Scan mode select
+;   Bits 2-0: Channel group select
+;
+; ADCR Bit Layout:
+;   Bit 5: TRGE - External trigger enable
+;   Bits 1-0: CKS - Clock select (conversion speed)
+;
+; ── Peripheral Interrupt Vector Table ────────────────────────────────
+;
+; VBR (Vector Base Register) = 0x000FFC50  (set at 0x0FA40)
+;
+; At boot, VBR=0 (vectors 0-13 at ROM 0x000-0x037).  During init,
+; VBR is changed to 0x000FFC50, relocating the peripheral interrupt
+; vector table to ROM offset 0xFFC50.
+;
+; Key peripheral interrupt vectors (VBR + vec*4):
+;
+;   Vec  64 IRQ0             -> 0x207C -> 0xE8D8   (external interrupt 0)
+;   Vec  65 IRQ1             -> 0x2094 -> 0xE8E4
+;   Vec  66 IRQ2             -> 0x20AC -> 0xE8F0
+;   Vec  67 IRQ3             -> 0x20C4 -> 0xE8FC
+;   Vec  68 IRQ4             -> 0x20DC -> 0xE908
+;   Vec  69 IRQ5             -> 0x20F4 -> 0xE914
+;   Vec  70 IRQ6             -> 0x210C -> 0xE920
+;   Vec  71 IRQ7             -> 0x2124 -> 0xE92C
+;   Vec  80 ATU_ITV          -> 0x219C -> 0xE970   (interval timer - scheduler tick)
+;   Vec 172 CMT_CMI0         -> 0x27E4 -> 0xF2F6   (compare match timer 0)
+;   Vec 176 ADI0             -> 0x2814 -> 0xF312   (A/D Group 0 conversion complete)
+;   Vec 177 ADI1             -> 0xE852              (shared handler - halt on error)
+;   Vec 204 WDT_ITI          -> 0x2904              (watchdog timer)
+;
+; All ISR stubs use a common pattern:
+;   push r0, r1, pr
+;   jsr  0x2B8C            ; ISR common dispatcher (saves full FPU context)
+;   load r1 = handler_addr
+;   jsr  @r2               ; call actual handler (r2 set by dispatcher)
+;
+; ISR Common Dispatcher @ 0x2B8C:
+;   - Saves r2-r7, fr0-fr11, FPSCR, mach, macl to stack
+;   - Reads interrupt nesting counter from 0xFFFF1288+8
+;   - Restores SR from context, increments nesting count
+;   - Returns to stub with r0 = 0x2BD4 (epilogue address)
+;   - Epilogue at 0x2BD4 restores all registers, decrements nesting count
+;
+; ── ADC Bulk Read Function @ 0x040E0 ────────────────────────────────
+;
+; This is the main ADC acquisition routine.  It configures all three
+; ADC groups, starts simultaneous conversions, polls for completion,
+; then bulk-copies all results to GBR-relative RAM.
+;
+; Called from the scheduler (not from ADI0 ISR).  Runs synchronously:
+; starts conversion, spins until all 3 groups finish, then reads.
+;
+; Phase 1: Configure ADC Groups (0x040E0-0x0415A)
+;
+;   r12 = 0xFFFFF818 (ADCSR0)  - loaded from literal pool @0x0424A
+;   r11 = 0xFFFFF838 (ADCSR1)  - loaded from literal pool @0x0424C
+;   r14 = 0xFFFFF858 (ADCSR2)  - loaded from literal pool @0x0424E
+;
+;   For each group:
+;     1. Clear ADCR bit 5 (disable trigger)
+;     2. Write channel select to ADCSR:
+;        - Group 0: 0x33 = scan AN0-AN3, multi-mode
+;        - Group 1: 0x33 = scan AN12-AN15, multi-mode
+;        - Group 2: 0x2B = scan AN24-AN27, single-scan
+;     3. Set ADCR bit 5 (enable), set scan mode bits
+;     4. Call setup function (0xBE81C or 0xBE82C)
+;
+; Phase 2: Start and Poll (0x0415A-0x04176)
+;
+;   0x0415C: GBR+128 = 2   (ADC state: "converting")
+;   0x04160: GBR+133 = 0   (clear result flag)
+;   0x04164: GBR+134 = 0xFF (set "all groups pending" mask)
+;
+;   Poll loop (0x04166-0x04176):
+;     while (ADCSR0.ADF == 0) spin;  // @r12 bit 7
+;     while (ADCSR1.ADF == 0) spin;  // @r11 bit 7
+;     while (ADCSR2.ADF == 0) spin;  // @r14 bit 7
+;
+; Phase 3: Bulk Read Group 0 (0x04178-0x041AC)
+;
+;   r14 = 0xFFFFF800 (ADDR0 base)
+;
+;   ADDR0  -> GBR+0     ADDR1  -> GBR+2     ADDR2  -> GBR+4
+;   ADDR3  -> GBR+6     ADDR4  -> GBR+8     ADDR5  -> GBR+10
+;   ADDR6  -> GBR+12    ADDR7  -> GBR+14    ADDR8  -> GBR+16
+;   ADDR9  -> GBR+18    ADDR10 -> GBR+20    ADDR11 -> GBR+22
+;
+; Phase 4: Bulk Read Group 1 (0x041AE-0x041DC)
+;
+;   r12 = 0xFFFFF820 (ADDR12 base, from earlier config)
+;   Reads @(8,r12) through @(30,r12) -> GBR+24 through GBR+46
+;   This corresponds to ADDR16-ADDR23 (channels 16-23)
+;
+; Phase 5: Bulk Read Group 2 (0x041DE+)
+;
+;   r11 = 0xFFFFF838 region -> reads remaining channels
+;   Stores to GBR+48+
+;
+; The GBR value during this function determines which RAM struct
+; receives the raw ADC data.  This is set by the calling context
+; (scheduler task).
+;
+; ── Knock ADC Snapshot @ 0x0437C ────────────────────────────────────
+;
+; Called during knock detection to re-read all ADC channels and store
+; them in a dedicated knock detection RAM struct.
+;
+; Group 0 Read (0x0437C-0x043C6):
+;   r6 = 0xFFFFF800 (ADDR0 base, via mov #-8,r6; shll8 r6)
+;   r5 = 0xFFFF4064 (destination struct, from literal pool @0x04628)
+;
+;   Reads ADDR11 downto ADDR0 and stores to 0xFFFF4064+offset:
+;     ADDR0  -> 0xFFFF4064    ADDR1  -> 0xFFFF4066
+;     ADDR2  -> 0xFFFF4068    ADDR3  -> 0xFFFF406A
+;     ADDR4  -> 0xFFFF406C    ADDR5  -> 0xFFFF406E
+;     ADDR6  -> 0xFFFF4070    ADDR7  -> 0xFFFF4072
+;     ADDR8  -> 0xFFFF4074    ADDR9  -> 0xFFFF4076
+;     ADDR10 -> 0xFFFF4078    ADDR11 -> 0xFFFF407A
+;
+; Group 1 Read (0x04410-0x04450):
+;   Dispatch by cylinder count byte @(0xFFFF40AD):
+;     12 -> read Group 1 (ADDR12-ADDR23) to 0xFFFF407C
+;      8 -> read channels 16-23
+;      4 -> read channels 20-23
+;      1 -> read channel 23 only
+;
+;   r6 = 0xFFFFF820 (ADDR12 base, via mov.w literal 0xF820 sign-extended)
+;   r5 = 0xFFFF407C (destination, from literal pool @0x04638)
+;
+;   Full Group 1:
+;     ADDR12 -> 0xFFFF407C    ADDR13 -> 0xFFFF407E
+;     ADDR14 -> 0xFFFF4080    ADDR15 -> 0xFFFF4082
+;     ADDR16 -> 0xFFFF4084    ADDR17 -> 0xFFFF4086
+;     ADDR18 -> 0xFFFF4088    ADDR19 -> 0xFFFF408A
+;     ADDR20 -> 0xFFFF408C    ADDR21 -> 0xFFFF408E
+;     ADDR22 -> 0xFFFF4090    ADDR23 -> 0xFFFF4092
+;
+; ── ADI0 Interrupt Handler @ 0xF312 ─────────────────────────────────
+;
+; The ADI0 ISR (A/D Group 0 conversion complete) is invoked via:
+;   Vector 176 -> stub at 0x2814 -> dispatcher 0x2B8C -> handler 0xF312
+;
+; Handler at 0xF312:
+;   1. Reads ADCSR0 status from 0xFFFFF6E8 (sign-extended 0xF6E8)
+;   2. Writes 14 (0x0E) to ADCSR0 -> clears ADF flag, sets next scan mode
+;   3. Calls ADC state machine dispatcher at 0xE774 with state code 0x00B0
+;
+; Second handler at 0xF320 (also called from ADI0 vector):
+;   1. Reads ADCSR0 status, writes 11 (0x0B) -> next state
+;   2. Calls three functions sequentially:
+;      - 0x7110: ADC data copy/processing
+;      - 0x7D26: sensor scaling/conversion
+;      - 0xBB6C: notification/flag setting
+;
+; The ADI0 path manages the ADC state machine that cycles through
+; different scan groups and conversion modes.  The actual sensor data
+; is read in the bulk read function (0x040E0), not in the ISR.
+;
+; ── Peripheral Access Summary ────────────────────────────────────────
+;
+; All peripheral register accesses in this ROM use the SH-2 pattern:
+;   mov  #imm, Rn    ; load sign-extended 8-bit immediate
+;   shll8 Rn         ; shift left 8 -> creates 0xFFFFxx00 base address
+;
+; Peripheral access locations by base address:
+;
+;   0xFFFFF000 (SCI - Serial Communication Interface):
+;     0x5A93E, 0x5A988
+;
+;   0xFFFFF700 (APC/CMT/IO/ADC Trigger Control):
+;     0x00058, 0x01014
+;
+;   0xFFFFF800 (ADC Data Registers):
+;     0x04178, 0x0437C, 0x04392, 0x043A8, 0x043BA
+;
+; INTC (Interrupt Controller) Registers:
+;   0xFFFFED00: IPRA   0xFFFFED02: IPRB   0xFFFFED04: IPRC
+;   0xFFFFED06: IPRD   0xFFFFED08: IPRE   0xFFFFED0A: IPRF
+;   0xFFFFED0C: IPRG   0xFFFFED0E: IPRH   0xFFFFED10: IPRI
+;   0xFFFFED12: IPRJ   0xFFFFED14: IPRK   0xFFFFED16: IPRL
+;   0xFFFFED18: ICR    0xFFFFED1A: ISR
+;
+; ── ADC RAM Structures ───────────────────────────────────────────────
+;
+; Primary ADC results (via bulk read to GBR-relative offsets):
+;   GBR+0x00 through GBR+0x16: Group 0 raw ADC (ADDR0-ADDR11), 16-bit each
+;   GBR+0x18 through GBR+0x2E: Group 1 raw ADC, 16-bit each
+;   GBR+0x30+:                 Group 2 raw ADC, 16-bit each
+;   GBR+0x80:                  ADC state byte (2=converting)
+;   GBR+0x85:                  Result ready flag
+;   GBR+0x86:                  Groups pending mask (0xFF=all pending)
+;
+; Knock ADC snapshot (fixed addresses, not GBR-relative):
+;   0xFFFF4064-0xFFFF407A: Group 0 raw ADC snapshot (12 channels x 2 bytes)
+;   0xFFFF407C-0xFFFF4092: Group 1 raw ADC snapshot (12 channels x 2 bytes)
+;   0xFFFF40AB:            Cylinder count dispatch byte
+;
+; ISR context block:
+;   0xFFFF1288:            ISR nesting context struct
+;   0xFFFF1288+8:          Interrupt nesting counter
+;   0xFFFF1288+16:         Saved SR for interrupt priority
+;
+; ── Key Functions ────────────────────────────────────────────────────
+;
+;   0x00002B8C  ISR_CommonDispatcher   - saves full FPU context for ISRs
+;   0x00002BD4  ISR_CommonEpilogue     - restores context, manages nesting
+;   0x000040E0  ADC_BulkRead           - synchronous read of all 32 ADC channels
+;   0x0000F312  ADI0_Handler           - ADC Group 0 conversion complete handler
+;   0x0000F320  ADI0_Handler2          - ADC state machine + sensor processing
+;   0x0000E774  ADC_StateMachine       - ADC conversion state dispatcher
+;   0x0000E852  ISR_SharedHalt         - shared error/unused interrupt handler
+;   0x00007110  ADC_DataCopy           - copy ADC results to working RAM
+;   0x00007D26  Sensor_Scaling         - raw ADC -> engineering units conversion
+;   0x0000BB6C  ADC_Notify             - set flags after ADC processing complete
+;
+; ── ADC Float Conversion Stats ───────────────────────────────────────
+;
+;   Total 'float FPUL,FRn' instructions in ROM: 192
+;   Total 'lds Rm,FPUL; float FPUL,FRn' (int->float) pairs: 135
+;   These represent points where raw integer ADC values are converted
+;   to IEEE 754 single-precision floats for use in the fuel, timing,
+;   and knock control algorithms.
+
+
 ; ─────────────────────────────────────────────────────
 ; End of disassembly  |  ROM: AE5L600L rev 20.2  |  1,048,576 bytes
 ; Arch: SH-2A BE  |  Ghidra 12.0.2  |  SuperH:BE:32:SH-2A:default
