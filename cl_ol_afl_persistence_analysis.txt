@@ -535,6 +535,67 @@ SECTION 14: RECOMMENDATIONS
   influence during OL completely. Option B is the simplest no-patch
   approach but may not fully solve the problem due to interpolation.
 
+================================================================================
+SECTION 14B: OPTION D IMPACT / BRICK RISK ASSESSMENT
+================================================================================
+
+  SHORT ANSWER:
+    Option D is generally a LOW brick-risk patch if implemented as a
+    small logic gate in code RAM/ROM hole with a conservative branch
+    hook and no changes to clocking, flash routines, watchdog control,
+    or interrupt vectors.
+
+  WHAT OPTION D CHANGES FUNCTIONALLY:
+    - It changes ONLY AFL *application* behavior (FFFF7AB4 multiplier)
+      when FFFF7448 indicates OL.
+    - It does NOT change:
+      * injector deadtime tables
+      * base fuel map values
+      * AFC PI control code
+      * boost / ignition / knock logic
+      * CL/OL decision logic itself (unless you intentionally do so)
+    - Net effect: in OL, commanded fuel follows OL model without
+      long-term trim carryover.
+
+  POSSIBLE SIDE EFFECTS TO EXPECT (NON-BRICK):
+    1) Seam behavior at CL->OL and OL->CL boundaries may change:
+       removing AFL multiplier in OL can create a visible step if OL
+       maps were previously tuned "with AFL in the loop".
+    2) If OL maps are currently lean and AFL was masking it, AFR may
+       shift richer or leaner depending on learned trim sign history.
+    3) Transient fueling feel may change slightly in early boost
+       because the multiplier path now hard-forces 1.0 in OL.
+
+  TRUE BRICK RISK DRIVERS (WHAT ACTUALLY BRICKS ECUS):
+    - Bad flash write (power interruption, cable disconnect, unstable
+      voltage, wrong target ECU ID/segment).
+    - Corrupt vector table / reset entry / checksum-critical regions.
+    - Branch hook to invalid address, wrong instruction alignment, or
+      clobbered register/FR state causing crash in scheduler context.
+    - Patch overlap with other custom code in ROM hole.
+
+  HOW TO KEEP OPTION D SAFE:
+    1) Patch hygiene:
+       - Preserve original overwritten instructions exactly in stub.
+       - Save/restore any GPR/FPR/status bits your stub touches.
+       - Keep stack usage minimal and deterministic.
+       - Ensure branch target is 2-byte aligned and in reachable range.
+    2) Flash hygiene:
+       - Use a stable charger/power supply (no battery-only flashing).
+       - Verify ROM ID and read-back compare after write.
+       - Keep a known-good stock binary and recovery procedure ready.
+    3) Calibration hygiene:
+       - Start with wastegate spring / low boost validation pulls.
+       - Monitor wideband AFR, IAM/knock correction, injector duty, EGT
+         (if available), and commanded vs measured lambda.
+       - Retune OL map and/or MAF scaling after patch if AFR shifts.
+
+  PRACTICAL RECOMMENDATION:
+    If your main goal is "no AFL effect in OL", Option D is the most
+    deterministic method and safer from a drivability standpoint than
+    trying to force table breakpoints to mimic a hard cutoff. The main
+    risk is implementation quality, not the strategy itself.
+
 
 ================================================================================
 SECTION 15: OPEN QUESTIONS
