@@ -578,9 +578,72 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x000CD366, "CrankingFuel_IPW_E");
         count += label(0x000CD386, "CrankingFuel_IPW_F");
 
-        // Tip-in enrichment
+        // =====================================================================
+        // TRANSIENT FUEL CONTROL — TIP-IN ENRICHMENT
+        // =====================================================================
+        // Throttle-rate based: fires on rising throttle angle change.
+        // Output: additional IPW (ms) added to base pulse width.
+        count += label(0x000CED08, "TipIn_ThrottleAngleChange_Axis");
         count += label(0x000CED50, "TipInEnrichA");
         count += label(0x000CEDBC, "TipInEnrichB");
+        count += label(0x000CD0D8, "TipIn_RPMComp_Axis");
+        count += label(0x000CD118, "TipIn_RPMComp");
+        count += label(0x000CD14C, "TipIn_BoostErrorComp");
+        count += label(0x000CD155, "TipIn_ECTComp_A");
+        count += label(0x000CEDE0, "TipIn_ECTComp_B");
+        count += label(0x000CEE00, "TipIn_ECTComp_C");
+        count += label(0x000CEE40, "TipIn_ECTComp_D");
+        count += label(0x000CC4A0, "TipIn_MinThrottleActivation");
+        count += label(0x000CC4A4, "TipIn_MinIPWActivation");
+        count += label(0x000CBC08, "TipIn_AppliedCounterReset");
+        count += label(0x000CD165, "TipIn_DisableCounter_A");
+        count += label(0x000CD175, "TipIn_DisableCounter_B");
+        count += label(0x000CEE60, "TipIn_CumulativeThreshold_A");
+        count += label(0x000CEE80, "TipIn_CumulativeThreshold_B");
+
+        // =====================================================================
+        // TRANSIENT FUEL CONTROL — TAU (ALPHA TRANSIENT FUELING)
+        // =====================================================================
+        // Load-rate based: fires on engine load changes (rising AND falling).
+        // Output: enrichment adder multiplier (dimensionless), scales base adder.
+        // Trigger: delta(engine_load) per cycle (g/rev change rate).
+        // Complements tip-in: tip-in fires first (throttle moves), tau fires
+        // second (load follows with turbo lag). Tau also handles tip-OUT
+        // (falling load) which tip-in does not.
+        count += labelComment(0x000CCDCC, "Tau_RisingLoad_Axis",
+            "Tau rising load axis: 3 float32 engine load breakpoints (g/rev).");
+        count += labelComment(0x000CD6E6, "Tau_RisingLoad_A",
+            "Tau rising load enrichment: 3x16 uint16 map (load x ECT). Scale 0.00048828125. "
+            + "Cold=3.40x at -40F, warm=0.32x at 176F+.");
+        count += labelComment(0x000CD746, "Tau_FallingLoad",
+            "Tau falling load (decel): 16 uint16, ECT-indexed. Scale 0.00048828125. "
+            + "Handles fuel film evaporation during falling load.");
+        count += label(0x000CD766, "Tau_FallingLoad_A");
+        count += label(0x000CD848, "Tau_FallingLoad_B");
+        count += label(0x000CD868, "Tau_FallingLoad_C");
+
+        // =====================================================================
+        // TRANSIENT FUEL CONTROL — ACCELERATION ENRICHMENT
+        // =====================================================================
+        // Separate from tip-in: applies additional fuel during accel events.
+        count += label(0x000CC51C, "AccelEnrich_TipInGain");
+        count += label(0x000CC530, "AccelEnrich_TipOutGain");
+        count += label(0x000CBC0B, "AccelEnrich_Cal_A");
+        count += label(0x000CBC0C, "AccelEnrich_Cal_B");
+
+        // =====================================================================
+        // TRANSIENT FUEL CONTROL — OVERRUN (DECELERATION) FUEL CUTOFF
+        // =====================================================================
+        // Monitors RPM delta and airflow to trigger fuel cut on deceleration.
+        count += labelComment(0x000CC498, "Overrun_RPMDelta_Activation",
+            "RPM change threshold to trigger decel fuel cut mode.");
+        count += labelComment(0x000CC49C, "Overrun_InitialEnrichment",
+            "Initial injector enrichment on decel entry (ms pulse width adder).");
+        count += labelComment(0x000CC4EC, "Overrun_FuelCut_RPMThreshold",
+            "RPM below which overrun fuel cut applies.");
+        count += labelComment(0x000CEED0, "Overrun_FuelResume_RPMThreshold",
+            "RPM at which fuel resumes after overrun cut.");
+        count += label(0x000D29AA, "Overrun_Cutoff_Cal");
 
         // Idle timing
         count += label(0x000D319D, "BaseTimingIdleMin");
@@ -647,6 +710,22 @@ public class ImportAE5L600L extends GhidraScript {
             "CL/OL state cleanup. Dispatched from fuel_dispatch_table_B.");
         count += labelComment(0x00036E60, "fuel_post_transition",
             "Post-transition handler. Dispatched from fuel_dispatch_table_A.");
+
+        // =====================================================================
+        // TRANSIENT FUEL CONTROL — CODE FUNCTIONS (Pipeline B)
+        // =====================================================================
+        count += labelComment(0x00037186, "fuel_transient_comp",
+            "Transient fuel compensation (tip-in/out). Reads FFFF7D68/6C, cal 0xC4200. Pipeline B.");
+        count += labelComment(0x00037B68, "fuel_injector_comp",
+            "Injector compensation. 2D maps 0xAC648/634, RPM/load indexed. Pipeline B.");
+        count += labelComment(0x00039528, "fuel_wot_enrich_calc",
+            "WOT enrichment factor calculation. 2D map 0xAD258. Pipeline B.");
+        count += labelComment(0x0003BB6C, "fuel_accel_enrich",
+            "Acceleration enrichment. Tip-in/out gains CC51C-530, cal 0xCBC0B/0C. Pipeline B.");
+        count += labelComment(0x0003CD34, "fuel_warmup_enrich",
+            "Warmup/cold-start enrichment. Reads ECT FFFF69FC, IAT FFFF69F0. Pipeline B.");
+        count += labelComment(0x0003EB8C, "fuel_overrun_cutoff",
+            "Overrun fuel cutoff. RPM/airflow thresholds, cal 0xD29AA, tail-calls 0x46BCC. Pipeline B.");
 
         // =====================================================================
         // AFC / CLOSED-LOOP FUELING — CALIBRATION TABLES
