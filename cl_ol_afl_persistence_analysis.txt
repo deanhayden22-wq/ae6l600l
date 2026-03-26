@@ -1,0 +1,573 @@
+================================================================================
+  AFL PERSISTENCE AND CL/OL TRANSITION DELAY ANALYSIS
+  Subaru ECU ROM AE5L600L (SH7055 / SH-2)
+  Stock ROM: ae5l600l.bin
+  Modified ROM: AE5L600L 20g rev 20.5 tiny wrex.bin
+  Date: 2026-03-26
+================================================================================
+
+PROBLEM STATEMENT
+
+  Despite CL-to-OL delay being set to 0 (CBC62=0), datalogs show:
+    1. A significant delay before OL behavior fully engages
+    2. AFC drops immediately on CL->OL transition (correct)
+    3. AFL lingers well into what should be OL operation
+    4. AFL persists past its max g/s boundary of 40.0 (CC07C)
+    5. The lingering AFL causes a lean condition during OL
+
+  This analysis traces the complete AFL and CL/OL transition codepath
+  to identify the root causes.
+
+
+================================================================================
+SECTION 1: THE TWO INDEPENDENT CL/OL PATHS
+================================================================================
+
+  CRITICAL FINDING: There are TWO completely separate mechanisms that
+  determine CL/OL behavior in this ECU. They operate independently and
+  can be out of sync:
+
+  PATH A — OL Enrichment State Machine (7-Phase Pipeline):
+    Controls: OL fuel enrichment computation
+    Delay control: counter_B at FFFF79C4, set by CBC62 (modified=0)
+    When delay=0: OL enrichment is computed immediately
+    Flags written: FFFF79F2 (OL active), FFFF79C6 (mode state, always 0)
+
+  PATH B — CL/OL Mode Flag (FFFF7448):
+    Controls: AFC feedback (PI controller at 0x342A8) and AFL learning
+    Writer: Single function at ROM 0x031528
+    Called from: Task scheduler dispatch at 0x049EA4
+    Inputs: FFFF8E98 -> FFFF744B (inhibit)
+            FFFF7452 (master readiness) + FFFF744E (mode) -> FFFF7449/744A
+    NO DEPENDENCY on CBC62 delay parameter
+
+  These two paths use DIFFERENT conditions to determine mode. Path A uses
+  the condition checker (FUN_0003643A) with throttle/RPM/load thresholds.
+  Path B uses a completely different set of flags (FFFF8E98, FFFF7452,
+  FFFF744E) derived from sensor processing functions.
+
+  When you set delay=0, you only affect Path A (OL enrichment). Path B
+  has its own timing determined by FFFF7452 (master readiness flag) which
+  has its own conditions and hysteresis at ROM 0x031966.
+
+
+================================================================================
+SECTION 2: WHY AFC DROPS IMMEDIATELY BUT AFL LINGERS
+================================================================================
+
+  AFC (A/F Correction) — GATED BY FFFF7448:
+    The AFC PI controller at 0x342A8 reads FFFF7448 every cycle.
+    When FFFF7448 = 0 (OL), AFC correction output = 0.
+    AFC drops immediately because FFFF7448 transitions to 0 promptly
+    (the FFFF7448 writer at 0x031528 clears it as soon as FFFF744B != 0
+    OR the mode conditions fail).
+
+  AFL (A/F Learning) — NOT GATED BY FFFF7448 FOR APPLICATION:
+
+    AFL has TWO separate operations:
+
+    1. AFL LEARNING (value update):
+       Function: 0x34884 (afl_value_update)
+       Gate: 10-condition check at 0x345A4 (cl_active_check)
+       CL/OL check: YES — function at 0x34C54 reads FFFF7448
+       When FFFF7448=0: Learning is FROZEN (no updates to stored values)
+       This works correctly.
+
+    2. AFL APPLICATION (applying learned values to fueling):
+       Function: 0x37B74 (afl_application)
+       Multiplier output: FFFF7AB4
+       CL/OL check: **NO** — DOES NOT read FFFF7448
+       Airflow gate: **NO** — no airflow comparison in application path
+       Only gates: FFFF726C (transient flag), FFFF7C68 (status flag)
+       When gating fails: writes 1.0 (no correction) to FFFF7AB4
+       When gating passes: writes learned AFL multiplier to FFFF7AB4
+
+       The fuel pulse width calculation at 0x0301E4 reads FFFF7AB4
+       and applies it unconditionally as a multiplier. There is NO
+       CL/OL mode check in the fuel calculation path.
+
+  RESULT: AFL learned values continue to be applied to fueling during
+  OL operation. This is by design in the stock ROM — Subaru's OEM logic
+  intentionally carries AFL corrections into OL. The base definition
+  confirms this: "These are the airflow ranges in which the different
+  long-term fuel trims are calculated in closed loop and applied to the
+  same airflow ranges for both closed loop and open loop."
+
+
+================================================================================
+SECTION 3: THE 40 G/S BOUNDARY (CC07C) — WHY IT DOESN'T CUT OFF AFL
+================================================================================
+
+  Modified ROM AFL airflow ranges (CC074):
+    Range A: 6.0 g/s  (stock: 5.6)
+    Range B: 23.0 g/s (stock: 10.0)
+    Range C: 40.0 g/s (stock: 50.0)  <-- user's "max g/s of 40"
+
+  These values at CC074 define the BREAKPOINTS of the AFL interpolation
+  table. They determine which airflow zones the 4 learning values
+  (FFFF316C/3174/317C/3184) correspond to. They do NOT define a cutoff.
+
+  How AFL application works:
+    1. Current airflow is read
+    2. The airflow is located within the range table (which range?)
+    3. The learning value for that range is interpolated
+    4. The interpolated value is applied as a multiplier
+
+  Above 40.0 g/s: The AFL function uses Range C and Range D values.
+  Range D has CC08C=35.0 and CC090=0.0 (disabled). But Range C (at
+  FFFF317C) may have a non-zero learned value. If it does, AFL continues
+  to apply above 40 g/s.
+
+  THERE IS NO "MAX AIRFLOW" GATE IN THE AFL APPLICATION PATH.
+
+  The "A/F #1 Learning Max Threshold" parameter exists in the 32BITBASE
+  definition (for newer ECU architectures), but it is NOT defined and
+  NOT present in the AE5L600L ROM. This ECU does not have an airflow-
+  based cutoff for AFL application.
+
+  The only way AFL application stops is:
+    - FFFF726C (transient flag) is set (rapid airflow change)
+    - FFFF7C68 (engine status flag) indicates abnormal condition
+    - Both of these bypass AFL and write 1.0 to FFFF7AB4
+
+
+================================================================================
+SECTION 4: THE LEAN CONDITION MECHANISM
+================================================================================
+
+  During steady-state CL operation (cruise, light load):
+    - O2 sensor feedback drives AFC correction
+    - AFL learns long-term trim corrections per airflow range
+    - If injectors are over-fueling, AFL learns a NEGATIVE correction
+      (pulling fuel to maintain stoich)
+    - If injectors are under-fueling, AFL learns a POSITIVE correction
+
+  On CL->OL transition (WOT, boost):
+    - AFC drops to 0 immediately (FFFF7448 clears)
+    - OL enrichment computation kicks in (Path A, delay=0)
+    - OL fuel maps provide the "correct" fuel for high-load operation
+    - BUT: AFL correction from CL is STILL applied as a multiplier
+
+  If AFL had learned a NEGATIVE correction (reducing fuel by, say, -5%):
+    - OL fuel = OL_map_value * (1.0 + AFL_trim)
+    - OL fuel = OL_map_value * (1.0 - 0.05) = OL_map_value * 0.95
+    - The fuel is 5% LEANER than the OL map intends
+    - This creates the observed lean condition
+
+  The lean persists for the entire OL event because:
+    1. AFL learning is frozen (no updates to correct the trim)
+    2. AFL application continues with the stale CL-learned value
+    3. There is no airflow gate to disable application at high airflow
+    4. The AFL value only changes when the ECU returns to CL and
+       the learning function updates it over many cycles
+
+
+================================================================================
+SECTION 5: FFFF7448 WRITER — COMPLETE LOGIC
+================================================================================
+
+  Single writer: Function at ROM 0x031528
+  Called from: Task scheduler at 0x049EA4 (dispatch table 0x04A0D0)
+
+  PHASE 1 — Input collection (0x03152E-0x031546):
+    FFFF744B <- FFFF8E98 (primary inhibit sensor flag)
+    FFFF744C <- FFFF8F08 (readiness A)
+    FFFF744D <- func_021D9A(FFFF8F24) (readiness B)
+    FFFF744E <- func_021D9A result (mode: 0, 1, or 2)
+
+  PHASE 2 — Derived flags (0x03154C-0x031558):
+    FFFF744A = (FFFF7452==1 AND FFFF744E==1) ? 1 : 0
+    FFFF7449 = (FFFF7452==1 AND FFFF744E==2) ? 1 : 0
+
+  PHASE 3 — Final FFFF7448 computation (0x03155C-0x03158E):
+
+    if (FFFF744B != 0):
+        FFFF7448 = 0                    // CL inhibited
+    else if (FFFF744D==1 AND FFFF744C!=0):
+        FFFF7448 = 0                    // Secondary forces OL
+    else if (FFFF7449==1 OR FFFF744A==1):
+        FFFF7448 = 1                    // ENTER CL
+    else:
+        FFFF7448 = 0                    // STAY OL
+
+  MASTER READINESS (FFFF7452):
+    Written at 0x031966 (GBR=FFFF7450)
+    Requires multiple simultaneous conditions:
+      - Throttle, load, RPM all within thresholds
+      - FFFF7BB0 == 0 (no active fault)
+      - Hysteresis logic satisfied
+    This has its OWN timing and conditions independent of the CL/OL
+    state machine delay parameter.
+
+
+================================================================================
+SECTION 6: FFFF79C6 (MODE STATE FLAG) — ALWAYS ZERO
+================================================================================
+
+  FFFF79C6 is NEVER WRITTEN anywhere in the stock ROM.
+  It is initialized to 0 by the SH7055 startup RAM clear.
+
+  FUN_0003606C reads it at 0x0361EC and switches on the value:
+    - Value 1 (CL path): copies enrichment directly  -> DEAD CODE
+    - Value 2 (blending path): MAC blending          -> DEAD CODE
+    - Value 0 (default): normal enrichment path      -> ALWAYS TAKEN
+
+  The mode_state==1 and mode_state==2 paths in FUN_0003606C are
+  unreachable code in the stock and modified ROMs. They appear to be
+  hooks for aftermarket ECU patches that could inject mode overrides
+  by writing to this RAM address.
+
+
+================================================================================
+SECTION 7: AFL SYSTEM ARCHITECTURE
+================================================================================
+
+  DISPATCH TABLE A (0x480B8):
+    Entry [5] = 0x34488 — AFL sub-dispatcher
+    Entry [7] = 0x34EC8 — AFL airflow processor
+
+  AFL CORE FUNCTION (0x3452A) — Called from sub-dispatcher:
+    Step 1: bsr 0x34D52 — Airflow range determination (selects range 0-3)
+    Step 2: bsr 0x345A4 — CL active check (10-condition gate)
+    Step 3: bsr 0x34778 — Range selection (additional enable logic)
+    Step 4: bsr 0x34884 — Value update (actual learning adjustment)
+    Step 5: bsr 0x34B1C — Value store (clamp + write to array)
+    Step 6: bsr 0x34CC8 — Max airflow check (35 g/s rate boundary)
+    Step 7: bsr 0x34C18 — CL/OL transition handler
+
+  CL ACTIVE CHECK (0x345A4) — 10 CONDITIONS:
+    1. FFFF8F24 != 0 -> fail (global inhibit)
+    2. MAF > 70.0 g/s (CC020) -> fail (max airflow for learning)
+    3. FFFF73A4 check (threshold 0.003906)
+    4. FFFF7354 check (threshold 0.000244)
+    5. FFFF7374 check (threshold 0.000244)
+    6. FFFF7A14 check (threshold 0.000977) — transition output, always 0.0
+    7. FFFF7A20 check (threshold 0.003906) — blending rate, always 0.1
+    8. FFFF7D18 must be 0
+    9. FFFF8F24 recheck
+    10. FFFF7BE2 must be 0
+
+  NOTE ON CONDITION 7: FFFF7A20 is always 0.1 (written by FUN_36E60
+  sub-A). 0.1 > 0.003906, so this condition may ALWAYS FAIL, which
+  would mean AFL learning is permanently frozen. This needs further
+  investigation — either:
+    a) 0xBE608 implements an inverse comparison (value < threshold = fail)
+    b) FFFF7A20 is modified by other code not yet traced
+    c) The condition is checking abs(value - target) < threshold
+
+  AFL LEARNING RATES:
+    Airflow < 35.0 g/s (CC08C): delay counter threshold = 88 ticks
+    Airflow >= 35.0 g/s: delay counter threshold = 244 ticks (~2.8x slower)
+    Step size: 0.001 (CC05C) per update cycle
+    Limits: +/- 25% (CC064/CC068)
+
+  AFL STORAGE:
+    4 learning values at FFFF316C + (range * 8):
+      Range 0 (FFFF316C): 0 - 6.0 g/s (idle)
+      Range 1 (FFFF3174): 6.0 - 23.0 g/s (light cruise)
+      Range 2 (FFFF317C): 23.0 - 40.0 g/s (normal driving)
+      Range 3 (FFFF3184): 40.0 - 80.0 g/s (heavy load, partially in OL)
+
+  AFL APPLICATION (0x37B74):
+    Reads interpolated AFL from FFFF31AC (primary) and FFFF31A4 (secondary)
+    Computes multiplier using calibration weights CC2F4 and CC2FC
+    Writes final multiplier to FFFF7AB4
+    DOES NOT CHECK: FFFF7448 (CL/OL mode)
+    DOES NOT CHECK: Current airflow against any max threshold
+    Only checks: FFFF726C (transient flag), FFFF7C68 (status flag)
+    Skip path writes 1.0 to FFFF7AB4 (no correction)
+
+  FUEL PULSE WIDTH CALCULATION (0x0301E4):
+    Reads FFFF7AB4 (AFL multiplier)
+    Applies as direct multiplier to corrected base fuel value at 0x030230
+    NO CL/OL check in fuel calc path
+
+
+================================================================================
+SECTION 8: MODIFIED ROM AFL CALIBRATION CHANGES
+================================================================================
+
+  +-----------------------------+----------+----------+--------------------------+
+  | Parameter                   | Stock    | Modified | Effect                   |
+  +-----------------------------+----------+----------+--------------------------+
+  | CC074 (Range A breakpoint)  | 5.6 g/s  | 6.0 g/s  | Slightly higher idle     |
+  | CC078 (Range B breakpoint)  | 10.0 g/s | 23.0 g/s | Much wider low range     |
+  | CC07C (Range C breakpoint)  | 50.0 g/s | 40.0 g/s | OL learning boundary     |
+  +-----------------------------+----------+----------+--------------------------+
+
+  All other AFL calibration values are UNCHANGED from stock:
+    CC020 = 70.0 g/s (learning max airflow)
+    CC064 = -25% (min limit)
+    CC068 = +25% (max limit)
+    CC05C = 0.001 (step size)
+    CC08C = 35.0 g/s (learning rate boundary)
+    CC090 = 0.0 (Range D disabled)
+    CC080 = 80.0 g/s (Range C high)
+
+
+================================================================================
+SECTION 9: ROOT CAUSE ANALYSIS
+================================================================================
+
+  THE AFL LEAN CONDITION HAS THREE ROOT CAUSES:
+
+  ROOT CAUSE 1 — AFL Application Has No CL/OL Gate:
+    The AFL application function (0x37B74) applies the learned AFL
+    multiplier to fueling regardless of whether the ECU is in CL or OL.
+    This is stock Subaru behavior by design. In stock calibration this
+    is less problematic because:
+      - Stock OL thresholds are much higher (91% throttle, 4.8 g/rev load)
+      - Transitions to OL happen at high RPM/load where AFL corrections
+        are small
+      - Stock hysteresis values are smaller, so return to CL is quicker
+
+    In the modified calibration:
+      - OL engages at 37.884% throttle and 0.95 g/rev load
+      - AFL corrections learned during CL at moderate loads carry into OL
+      - OL fuel maps assume no AFL correction, so the AFL trim creates
+        a lean (or rich) offset that persists for the entire OL event
+
+  ROOT CAUSE 2 — AFL Values Persist (No Reset on Transition):
+    When CL->OL transition occurs:
+      - AFL learning freezes (correct, function at 0x34C54 checks FFFF7448)
+      - AFL stored values at FFFF316C-3184 are NOT zeroed
+      - The last-learned values continue to be applied
+    When OL->CL transition occurs:
+      - AFL learning resumes from the previously stored values
+      - The stale OL-period values gradually get updated by CL feedback
+
+  ROOT CAUSE 3 — No Airflow-Based Application Cutoff:
+    The user's CC07C=40.0 g/s defines the learning RANGE BOUNDARY, not
+    an application cutoff. Above 40 g/s, the AFL function uses Range 3
+    values (FFFF3184). If Range 3 has any learned correction, it gets
+    applied above 40 g/s.
+
+    The "A/F #1 Learning Max Threshold" parameter (which would provide
+    an airflow-based application cutoff) exists in the 32BITBASE
+    definition for newer ECU architectures but is NOT DEFINED and NOT
+    PRESENT in the AE5L600L ROM. This ECU has no mechanism to disable
+    AFL application based on airflow.
+
+
+================================================================================
+SECTION 10: THE "DELAY" MISCONCEPTION
+================================================================================
+
+  The perceived delay in CL->OL transition is NOT caused by the CL-to-OL
+  delay parameter (CBC62=0). That parameter correctly zeroes counter_B,
+  allowing immediate OL enrichment computation.
+
+  The perceived delay is actually AFL persistence:
+
+  Timeline of a WOT event:
+    t=0.000s: Throttle exceeds 37.884 deg, condition checker fires
+    t=0.000s: counter_B = 0, OL enrichment computed immediately (Path A)
+    t=0.000s: FFFF7448 clears (Path B), AFC drops to 0
+    t=0.000s: AFL learning freezes
+    t=0.000s: AFL APPLICATION continues with last CL-learned values
+    t=0.000s+: OL fuel = OL_map * (1.0 + AFL_trim_from_CL)
+              If AFL_trim was -3%, OL fuel is 3% lean
+    t=entire_event: AFL trim persists unchanged for entire OL event
+
+  What the datalog shows as "AFL lingering" is the AFL correction value
+  being APPLIED to fueling. It's not a transition delay — it's the
+  normal behavior of this ECU applying learned corrections during OL.
+
+  AFC drops immediately because it is directly gated by FFFF7448.
+  AFL "lingers" because it has NO such gate.
+
+
+================================================================================
+SECTION 11: RAM ADDRESS MAP (NEW ADDRESSES TRACED)
+================================================================================
+
+  Address       Size   Description
+  ----------    ----   -------------------------------------------------
+  FFFF316C      float  AFL Range 0 learning value (idle zone)
+  FFFF3174      float  AFL Range 1 learning value (light cruise)
+  FFFF317C      float  AFL Range 2 learning value (normal driving)
+  FFFF3184      float  AFL Range 3 learning value (heavy load)
+  FFFF31A4      float  AFL secondary interpolated output
+  FFFF31AC      float  AFL primary interpolated output
+  FFFF726C      byte   Transient state flag (gates AFL application)
+  FFFF7448      byte   CL/OL mode flag (1=CL, 0=OL) — gates AFC + AFL learning
+  FFFF7449      byte   CL mode condition A (FFFF7452==1 AND FFFF744E==2)
+  FFFF744A      byte   CL mode condition B (FFFF7452==1 AND FFFF744E==1)
+  FFFF744B      byte   CL inhibit (copy of FFFF8E98 sensor flag)
+  FFFF744C      byte   Readiness A (copy of FFFF8F08)
+  FFFF744D      byte   Readiness B (from func_021D9A)
+  FFFF744E      byte   Mode state (0/1/2 from func_021D9A of FFFF8F24)
+  FFFF7452      byte   Master CL readiness flag (written at 0x031966)
+  FFFF787F      byte   Current AFL range index (0-3)
+  FFFF78A0      byte   AFL status (bit 0 = CL active from cl_active_check)
+  FFFF78F3      byte   cl_active_check result
+  FFFF7AB4      float  AFL multiplier output (consumed by fuel PW calc)
+  FFFF7C68      byte   Engine status flag (gates AFL application)
+  FFFF8E98      byte   Primary CL inhibit sensor flag
+  FFFF8F08      byte   CL readiness sensor A
+  FFFF8F24      byte   CL readiness sensor B / mode input
+
+
+================================================================================
+SECTION 12: AFL FUNCTION ADDRESS MAP
+================================================================================
+
+  ROM Address   Function
+  ----------    -------------------------------------------------
+  0x034488      AFL sub-dispatcher (Dispatch A entry [5])
+  0x344BA       AFL range loop (iterates 4 learning ranges)
+  0x344EE       AFL validity check
+  0x3452A       AFL core entry (orchestrates full learning cycle)
+  0x345A4       CL active check (10-condition gate)
+  0x34778       AFL range selection (additional enable logic)
+  0x34884       AFL value update (actual learning adjustment)
+  0x34B1C       AFL value store (clamp + write)
+  0x34C18       AFL CL/OL transition handler (calls 0x34C54)
+  0x34C54       AFL CL/OL mode check (reads FFFF7448)
+  0x34CC8       AFL max airflow learning rate check (35 g/s)
+  0x34D52       AFL airflow range determination
+  0x34EC8       AFL airflow processor (Dispatch A entry [7])
+  0x34EF4       AFL airflow update (Dispatch B)
+  0x37ABA       Injector trim application
+  0x37B74       AFL application (writes FFFF7AB4 multiplier)
+  0x37F00       AFL multiplier computation subroutine
+  0x0301E4      Fuel pulse width calculation (reads FFFF7AB4)
+  0x031528      FFFF7448 writer (CL/OL mode flag)
+  0x031590      FFFF7449 computation
+  0x0315BA      FFFF744A computation
+  0x031966      FFFF7452 master readiness writer
+
+
+================================================================================
+SECTION 13: CALIBRATION ADDRESS MAP (AFL-RELATED)
+================================================================================
+
+  Address    Type    Stock    Modified  Description
+  --------   -----   -------  --------  -----------------------------------------
+  0xCC020    float   70.0     70.0      AFL learning max airflow (g/s)
+  0xCC024    float   75.0     75.0      RPM check low threshold
+  0xCC028    float   95.0     95.0      RPM check high threshold
+  0xCC02C    float   0.012    0.012     Interpolation check threshold
+  0xCC040    float   10000.0  10000.0   AFL high limit threshold
+  0xCC044    float   0.020    0.020     AFL update check threshold
+  0xCC048    float   0.050    0.050     AFL update threshold 2
+  0xCC04C    float   (limit)  (limit)   AFL inner limit low
+  0xCC050    float   (limit)  (limit)   AFL inner limit high
+  0xCC054    float   0.990    0.990     AFL ratio low threshold
+  0xCC058    float   1.010    1.010     AFL ratio high threshold
+  0xCC05C    float   0.001    0.001     AFL step size
+  0xCC060    float   0.020    0.020     AFL BEAB0 output threshold
+  0xCC064    float   -0.25    -0.25     AFL limit min (-25%)
+  0xCC068    float   +0.25    +0.25     AFL limit max (+25%)
+  0xCC06C    float   0.0156   0.0156    AFL interpolation parameter
+  0xCC070    float   1.6      1.6       AFL airflow base boundary
+  0xCC074    float   5.6      6.0       AFL Range A breakpoint (g/s) *
+  0xCC078    float   10.0     23.0      AFL Range B breakpoint (g/s) *
+  0xCC07C    float   50.0     40.0      AFL Range C breakpoint (g/s) *
+  0xCC080    float   80.0     80.0      AFL Range C high boundary
+  0xCC084    float   0.95     0.95      AFL airflow ratio low
+  0xCC088    float   1.05     1.05      AFL airflow ratio high
+  0xCC08C    float   35.0     35.0      AFL learning rate boundary (g/s)
+  0xCC090    float   0.0      0.0       AFL Range D (disabled)
+  0xCC2F4    desc    (table)  (table)   AFL multiplier weight table A
+  0xCC2FC    desc    (table)  (table)   AFL multiplier weight table B
+
+  * = changed from stock
+
+
+================================================================================
+SECTION 14: RECOMMENDATIONS
+================================================================================
+
+  OPTION A — Accept AFL in OL (Minimal Change):
+    The stock ECU design intentionally applies AFL in OL. If your OL
+    fuel maps are calibrated with AFL at zero, the AFL trim during OL
+    is unwanted. But if calibrated with typical AFL values in mind,
+    the trim is harmless.
+
+    Action: Verify that OL fuel map targets account for typical AFL
+    correction values. If AFL typically learns +/- 3%, build that
+    margin into OL targets.
+
+  OPTION B — Zero AFL Ranges for OL Airflows:
+    Set the AFL Range C breakpoint (CC07C) back to a high value (e.g.,
+    80+ g/s) so that all OL-relevant airflows fall in Range D (which
+    is disabled at CC090=0.0). This prevents AFL from LEARNING values
+    at airflows where you'll be in OL.
+
+    Limitation: This doesn't prevent already-learned lower-range values
+    from being interpolated/extrapolated into higher airflow zones.
+
+  OPTION C — Widen AFL Step to Drain Faster (NOT RECOMMENDED):
+    Increasing CC05C (step size) would make AFL update faster when
+    returning to CL, but it won't help during OL events because
+    learning is frozen. This doesn't address the root cause.
+
+  OPTION D — ROM Patch: Gate AFL Application by FFFF7448:
+    The most complete solution. Modify the AFL application function at
+    0x37B74 to check FFFF7448 before writing the AFL multiplier.
+    If FFFF7448 == 0 (OL mode), force FFFF7AB4 = 1.0 (no correction).
+
+    Implementation sketch (SH-2 assembly):
+      ; At 0x37B74 or before the FFFF7AB4 write:
+      mov.l @(ptr_7448,PC),R2    ; load address of FFFF7448
+      mov.b @R2,R0               ; read CL/OL flag
+      tst R0,R0                  ; is it 0 (OL)?
+      bf .cl_path                ; if nonzero (CL), apply AFL normally
+      fldi1 FR0                  ; OL: force multiplier = 1.0
+      mov.l @(ptr_7AB4,PC),R2   ; load address of FFFF7AB4
+      fmov.s FR0,@R2            ; write 1.0 (no AFL correction)
+      bra .skip_afl              ; skip normal AFL application
+      nop
+    .cl_path:
+      ; ... existing AFL application code ...
+
+    This patch would need to be placed in the ROM hole (0x0DB000+)
+    with a branch from the original function.
+
+  OPTION E — ROM Patch: Add Airflow Gate to AFL Application:
+    Similar to Option D but adds an airflow comparison:
+    If current_airflow > threshold, force FFFF7AB4 = 1.0.
+    This gives you a configurable max airflow for AFL application
+    without tying it strictly to the CL/OL flag.
+
+  RECOMMENDED APPROACH: Option D is cleanest. It eliminates AFL
+  influence during OL completely. Option B is the simplest no-patch
+  approach but may not fully solve the problem due to interpolation.
+
+
+================================================================================
+SECTION 15: OPEN QUESTIONS
+================================================================================
+
+  1. FFFF7A20 AND CL_ACTIVE_CHECK CONDITION 7:
+     FFFF7A20 (blending rate) is always 0.1. The cl_active_check at
+     0x345A4 passes this through 0xBE608 with threshold 0.003906.
+     If 0xBE608 returns "fail" when value > threshold, then FFFF7A20=0.1
+     would cause condition 7 to ALWAYS FAIL, meaning AFL learning is
+     PERMANENTLY FROZEN. This contradicts the fact that AFL does learn
+     in practice. Either:
+       a) 0xBE608 returns "pass" when value > threshold (inverted)
+       b) FFFF7A20 is modified by code we haven't traced
+       c) 0xBE608 compares abs(value - 1.0) < threshold or similar
+     Tracing 0xBE608 fully would resolve this.
+
+  2. FFFF7452 MASTER READINESS TIMING:
+     The master readiness flag at FFFF7452 (written at 0x031966) has
+     its own conditions and hysteresis. The exact timing of this flag's
+     response to CL/OL conditions has not been fully characterized.
+     It affects how quickly FFFF7448 switches modes.
+
+  3. TRANSIENT FLAG FFFF726C:
+     This flag gates AFL application. If it is set during WOT/rapid
+     throttle changes, it would temporarily disable AFL application
+     (write 1.0 to FFFF7AB4). The duration and conditions for this
+     flag have not been traced. If it stays active long enough, it
+     could partially mask the AFL persistence issue during the initial
+     transition, then clear (allowing AFL to resume) after things
+     stabilize — which could look like a "delayed" AFL return.
+
+
+================================================================================
+END OF ANALYSIS
+================================================================================
