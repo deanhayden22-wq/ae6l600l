@@ -894,6 +894,86 @@ public class ImportAE5L600L extends GhidraScript {
             "Ignition Advance Multiplier current value (float). Also used by FLKC.");
 
         // =====================================================================
+        // PERIPHERAL INTERRUPT VECTOR TABLE (VBR = 0x000FFC50)
+        // =====================================================================
+        count += labelComment(0x000FFC50, "VBR_VectorTable",
+            "Peripheral interrupt vector table base. VBR set to this address at 0x0FA40.");
+
+        // ISR stubs (vector table entries point here)
+        count += labelComment(0x0000207C, "ISR_IRQ0",
+            "IRQ0 external interrupt stub -> dispatches to 0xE8D8");
+        count += labelComment(0x00002094, "ISR_IRQ1",
+            "IRQ1 external interrupt stub -> dispatches to 0xE8E4");
+        count += labelComment(0x000020AC, "ISR_IRQ2",
+            "IRQ2 external interrupt stub -> dispatches to 0xE8F0");
+        count += labelComment(0x000020C4, "ISR_IRQ3",
+            "IRQ3 external interrupt stub -> dispatches to 0xE8FC");
+        count += labelComment(0x000020DC, "ISR_IRQ4",
+            "IRQ4 external interrupt stub");
+        count += labelComment(0x000020F4, "ISR_IRQ5",
+            "IRQ5 external interrupt stub");
+        count += labelComment(0x0000210C, "ISR_IRQ6",
+            "IRQ6 external interrupt stub");
+        count += labelComment(0x00002124, "ISR_IRQ7",
+            "IRQ7 external interrupt stub");
+        count += labelComment(0x0000219C, "ISR_ATU_ITV",
+            "ATU interval timer ISR stub -> dispatches to 0xE970 (scheduler tick)");
+        count += labelComment(0x000027E4, "ISR_CMT_CMI0",
+            "CMT compare match timer 0 ISR stub -> dispatches to 0xF2F6");
+        count += labelComment(0x00002814, "ISR_ADI0",
+            "ADI0 A/D Group 0 conversion complete ISR stub -> dispatches to 0xF312");
+        count += labelComment(0x00002904, "ISR_WDT",
+            "Watchdog timer interrupt ISR stub");
+
+        // ISR common dispatcher and epilogue
+        count += labelComment(0x00002B8C, "ISR_CommonDispatcher",
+            "ISR prologue: saves r2-r7, fr0-fr11, pr, mach, macl. Sets up epilogue.");
+        count += labelComment(0x00002BD4, "ISR_CommonEpilogue",
+            "ISR epilogue: restores all saved context, decrements nesting counter.");
+
+        // ISR nesting context
+        count += labelComment(0xFFFF1288, "ISR_NestingContext",
+            "ISR nesting context struct. +8=nesting counter, +16=saved SR.");
+
+        // =====================================================================
+        // ADC / SENSOR PIPELINE
+        // =====================================================================
+        count += labelComment(0x000040E0, "ADC_BulkRead",
+            "Synchronous ADC read: configures ADCSR0/1/2, starts all 3 groups, polls completion, bulk-reads all 32 channels to GBR-relative RAM.");
+        count += labelComment(0x0000F312, "ADI0_Handler",
+            "ADI0 actual handler: clears ADF flag, advances ADC state machine.");
+        count += labelComment(0x0000F320, "ADI0_Handler2",
+            "ADI0 second handler: calls ADC_DataCopy(0x7110), Sensor_Scaling(0x7D26), ADC_Notify(0xBB6C).");
+        count += labelComment(0x0000E774, "ADC_StateMachine",
+            "ADC conversion state machine dispatcher. Called from ISR and bulk read paths.");
+        count += labelComment(0x0000E852, "ISR_SharedHalt",
+            "Shared ISR handler for unused/error interrupts. Halts with infinite loop after logging error code.");
+        count += labelComment(0x00007110, "ADC_DataCopy",
+            "Copy ADC conversion results to working RAM structures.");
+        count += labelComment(0x00007D26, "Sensor_Scaling",
+            "Raw ADC value to engineering units conversion (int->float scaling).");
+        count += labelComment(0x0000BB6C, "ADC_Notify",
+            "Set flags/notifications after ADC processing complete.");
+
+        // Knock ADC snapshot
+        count += labelComment(0x0000437C, "Knock_ADC_ReadGroup0",
+            "Re-reads all 12 Group 0 ADC channels for knock detection. Stores to 0xFFFF4064.");
+        count += labelComment(0x00004410, "Knock_ADC_ReadGroup1",
+            "Reads Group 1 ADC channels for knock detection. Stores to 0xFFFF407C. Dispatch by cylinder count.");
+
+        // Knock ADC RAM structures
+        count += labelComment(0xFFFF4064, "knock_adc_group0",
+            "Knock ADC Group 0 snapshot: ADDR0-ADDR11 raw 16-bit values (24 bytes).");
+        count += labelComment(0xFFFF407C, "knock_adc_group1",
+            "Knock ADC Group 1 snapshot: ADDR12-ADDR23 raw 16-bit values (24 bytes).");
+        count += labelComment(0xFFFF40AB, "knock_cylinder_count",
+            "Cylinder count dispatch byte for knock ADC Group 1 read (1/4/8/12).");
+        count += labelComment(0xFFFF4024, "knock_adc_working",
+            "Knock ADC working copy (channels copied from snapshot during processing).");
+
+        // VBR setup location
+        count += labelComment(0x0000FA40, "VBR_Setup",
+            "Sets VBR = 0x000FFC50 (peripheral interrupt vector table base). ldc r2,VBR.");
         // AFL / CL/OL PERSISTENCE ANALYSIS — ROM Functions
         // (from cl_ol_afl_persistence_analysis.txt)
         // =====================================================================
