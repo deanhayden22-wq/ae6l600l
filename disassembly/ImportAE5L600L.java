@@ -241,26 +241,94 @@ public class ImportAE5L600L extends GhidraScript {
             "AFC target computation with compensation. Table lookups via 0xBE598/0xBE8E4. Outputs to 0xFFFF782C.");
         count += labelComment(0x00033DBE, "afc_cl_decision",
             "CL/OL AFC decision & hysteresis. GBR=0xFFFF77F4. CL check via 0x22F92. Active: correction from 0xACE8C. Inactive: writes 0.0. Thresholds 0xCBFD0-0xCBFE4.");
-        count += labelComment(0x000340A0, "afc_pi_output",
-            "AFC PI output stage. P-gains: 0xACEA0(load),0xACEB4(RPM). I-gains: 0xACEC8(load),0xACEDC(RPM). Blend: out=P*alpha+I*(1-alpha). Output: 0xFFFF7870.");
+        count += labelComment(0x000340A0, "afc_pi_output_stage",
+            "AFC PI output stage. Computes P and I gain coefficients from 7 table lookups. "
+            + "P = (P_gain_A[0xACEA0] + P_gain_B[0xACEB4]) * P_norm[0xAC4FC]. "
+            + "I = (I_comp_2D[0xAD928] + I_gain_A[0xACEC8] + I_gain_B[0xACEDC]) * I_norm[0xAC510]. "
+            + "Inputs: RPM(FFFF6350), MAF(FFFF63F8/6624), load(FFFF68DC), CL_state(FFFF78B0). "
+            + "Gated by flag FFFF8E7E==1. Blend: P_out=proportional*alpha, I via FPUL. "
+            + "Alpha evolves: first cycle from FPUL, then +/-10.0(CBFF8/CBFFC) re-interpolated "
+            + "via 0xBE960(rich)/0xBE970(lean). CL_state>4.0(CBFF4) selects lean path. "
+            + "Workspace: FFFF7804(P), 7808(I), 780C(alpha), 7810(output). Flag: FFFF7871.");
         count += labelComment(0x000342A8, "afc_pi_controller",
-            "AFC PI controller - THE SHORT-TERM CORRECTION. Computes error (fsub), looks up gain (0xBEAB0), clamps to limits. ROM 0xCC000-0xCC00C. Output: 0xFFFF7864.");
+            "AFC PI controller — 5-state error machine. GBR=FFFF77C8. "
+            + "error = O2_sensor(FFFF6540) - correction(FFFF77C8). "
+            + "P lookup via 0xBEAB0, threshold 2.0(CC000). "
+            + "States: 0=fresh CL entry, 1=normal update, 2=rich step-down(CC00C=1.0 via 0xBE960), "
+            + "3=lean step-up(CC00C=1.0 via 0xBE970), 4=disabled/frozen. "
+            + "Limits: max=20%(CC004), min=0%(CC008). Output: FFFF7814/7818.");
         count += labelComment(0x0003439E, "afc_enable_gate",
-            "AFC enable/disable gate. Calls 0x2BE2C/0x2BE38. Reads ROM 0xCC010.");
+            "AFC enable/disable gate. Param-dependent call to 0x2BE2C or 0x2BE38 (engine readiness checks). "
+            + "If gate closed: output = 0.0 from CC010, zeroing all AFC correction. "
+            + "If gate open: output = FPUL passthrough.");
         count += labelComment(0x000343CE, "afc_output_clamp",
-            "AFC output clamp. Upper=200% (0xCC014), Lower=190% (0xCC018). Reads/writes 0xFFFF7820.");
+            "AFC output clamp with hysteresis. GBR=FFFF7820. Reads raw AFC from FFFF64D8. "
+            + "Upper limit=200%(CC014), lower hysteresis=190%(CC018). "
+            + "Sets clamp flag at FFFF7872. Prevents oscillation at clamp boundary.");
         count += labelComment(0x000320AE, "fuel_correction_final",
-            "Final fuel correction accumulator. Combines AFC (0xFFFF77C8) + LTFT + enrichments into IPW multiplier.");
+            "Final fuel correction accumulator. 42-element loop combining all corrections into IPW multiplier. "
+            + "Loads base values via R6 struct, correction values via R5 struct. "
+            + "Initial: result=(base_A+base_B+FPUL)/sum if deadband_check(0xBE608) passes. "
+            + "Loop: 4 modes per element — direct copy, threshold-gated, multiply-accumulate, "
+            + "or full calc via 0x32892. Output at [R4/R9].");
+        count += labelComment(0x00032892, "fuel_correction_element_calc",
+            "Per-element correction calculator called from fuel_correction_final loop. "
+            + "Applies individual compensation factor for each of 42 correction elements.");
 
         // Undocumented pointer table
         count += labelComment(0x0008D838, "ptr_table_8D838",
             "Pointer table - purpose TBD (found in Ghidra analysis)");
 
-        // Low PW helper functions
-        count += labelComment(0x000BE874, "LowPW_TableProcessor",
-            "Table lookup engine called by LowPW_GateFunction");
-        count += labelComment(0x000BECA8, "LowPW_AxisLookup",
-            "Axis lookup / interpolation helper for Low PW table processing");
+        // =====================================================================
+        // GENERIC TABLE PROCESSORS (0xBE5A8-0xBEAB0)
+        // =====================================================================
+        count += labelComment(0x000BE5A8, "axis_position_calc_u8",
+            "Axis position calculator (uint8). Computes fractional index of input within axis, "
+            + "clamps to 0-255. Used for 1D table lookups with byte-sized data.");
+        count += labelComment(0x000BE5D8, "axis_position_calc_u16",
+            "Axis position calculator (uint16). Same as 0xBE5A8 but clamps to 0-65535.");
+        count += labelComment(0x000BE608, "deadband_check",
+            "Deadband/window check. Returns 1 if |FR4-FR5| < FR6 (input within tolerance of target). "
+            + "Used to gate corrections — only apply when value is within expected range.");
+        count += labelComment(0x000BE628, "normalize_ratio",
+            "Normalization/ratio. Computes FR4/FR5 with edge-case handling. "
+            + "Returns identity or clamped value when inputs match FPUL.");
+        count += labelComment(0x000BE830, "interp_1D",
+            "Primary 1D table interpolator. Descriptor-driven: reads element count from desc[0-1], "
+            + "axis from desc[4-7], data from desc[8-11]. Type byte desc[2] dispatches to data reader "
+            + "via GBR function table (0x04=float32, 0x08=alternate). Falls back to desc[12-19] defaults "
+            + "when type==0. Calls axis_search(0xBECA8) then type-specific reader.");
+        count += labelComment(0x000BE874, "interp_1D_u8",
+            "1D interpolation variant for uint8-scaled data. Calls axis_search(0xBECA8) "
+            + "then data reader at 0xBEB20. Returns extu.b result.");
+        count += labelComment(0x000BE890, "interp_1D_2input",
+            "1D interpolation with two inputs (FR4=primary, FR5=secondary). "
+            + "Uses axis search variant 0xBECDC. Data reader at 0xBEB40.");
+        count += labelComment(0x000BE8AC, "interp_1D_u16",
+            "1D interpolation returning uint16 result. Calls axis_search(0xBECA8) "
+            + "then reader at 0xBEB6C. Returns extu.w result.");
+        count += labelComment(0x000BE8E4, "interp_2D",
+            "Primary 2D table interpolator. Calls 2D axis search (0xBED98) for both dims, "
+            + "then type-dispatched data reader via GBR table. Desc format: "
+            + "byte1=cols, byte3=rows, ptrs at +4/+8/+12. Falls back to desc[20-27] defaults.");
+        count += labelComment(0x000BE960, "clamp_min",
+            "Clamp to minimum: returns min(FR4, FR5). Used for rich-direction limiting. "
+            + "Called from PI output stage alpha adjustment.");
+        count += labelComment(0x000BE970, "clamp_max",
+            "Clamp to maximum: returns max(FR4, FR5). Used for lean-direction limiting. "
+            + "Called from PI output stage alpha adjustment.");
+        count += labelComment(0x000BEAB0, "subtract_simple",
+            "Simple subtraction: FR0 = FR4 - FR5, also stores in FPUL. "
+            + "Used as error computation in PI controller (0x342A8).");
+        count += labelComment(0x000BECA8, "axis_search_1D",
+            "1D axis search. Walks sorted float axis array comparing input (FR0) against elements. "
+            + "Returns fractional position for interpolation. Called by all 1D interp functions.");
+        count += labelComment(0x000BECDC, "axis_search_2input",
+            "Axis search variant for two inputs. Takes R2 as secondary value. "
+            + "Used by interp_1D_2input (0xBE890).");
+        count += labelComment(0x000BED98, "axis_search_2D",
+            "Full 2D axis search. Finds position in both row and column axes. "
+            + "Called by interp_2D (0xBE8E4).");
 
         // =====================================================================
         // ROM CONSTANTS (FLKC literal pool)
@@ -509,52 +577,178 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x000D5670, "TimingComp_CylD");
 
         // =====================================================================
-        // AFC / CLOSED-LOOP FUELING — DISPATCH TABLES
+        // FUELING PIPELINE FUNCTIONS (called from main loop)
         // =====================================================================
-        count += labelComment(0x000480B8, "fuel_dispatch_table_A",
-            "Secondary dispatch table: 8 fueling function pointers (CL target, AFL, CL/OL transition)");
-        count += labelComment(0x0004A0B8, "fuel_dispatch_table_B",
-            "Secondary dispatch table: 6+ fueling function pointers (main loop, AFL core, OL map select)");
+        count += labelComment(0x00047C40, "fuel_pipeline_A",
+            "Fueling pipeline A. 46 sequential JSR calls: base fuel, AFC, CL/OL, IPW calc, LTFT. Called from 0xE108.");
+        count += labelComment(0x00049CF0, "fuel_pipeline_B",
+            "Fueling pipeline B. Parallel fuel chain: corrections, per-cyl trim, WOT/accel enrich, overrun. Called from 0xE556.");
 
-        // =====================================================================
-        // AFC / CLOSED-LOOP FUELING — CODE FUNCTIONS
-        // =====================================================================
-        count += labelComment(0x000332A2, "fuel_main_entry",
-            "Main fueling entry (non-returning). Dispatched from fuel_dispatch_table_B.");
-        count += labelComment(0x00033278, "fuel_precalc",
-            "Fueling pre-calculation. Dispatched from fuel_dispatch_table_A.");
-        count += labelComment(0x0003452A, "afl_core_entry",
-            "A/F Learning core entry. Calls CL active check, range selection, value update. Dispatch B.");
+        // ── Pipeline A: Pre-fuel setup (entries 19-27) ──
+        count += labelComment(0x0002FF74, "fuel_base_store",
+            "Stores base fuel parameter to FFFF7340. Pipeline A entry 19.");
+        count += labelComment(0x000303C0, "fuel_warmup_enrichment",
+            "Warmup enrichment. Table lookup via 0xAD7E0, stores FFFF7350. Pipeline A entry 20.");
+        count += labelComment(0x0002EF08, "fuel_condition_dispatch",
+            "Fuel mode condition dispatcher. Multi-path via 0x22F92 check, flag FFFF65F1. Pipeline A entry 21.");
+        count += labelComment(0x0003CD00, "fuel_init_workspace",
+            "Fuel workspace init. Writes -1 to FFFF7D74, loads defaults from CC56C. Pipeline A entry 22.");
+        count += labelComment(0x0002FA68, "fuel_cond_gate_A",
+            "Conditional gate A. Calls 0x22F92 enable check. Pipeline A entry 23.");
+        count += labelComment(0x0002FB68, "fuel_cond_gate_B",
+            "Conditional gate B. Calls 0x22F92 enable check. Pipeline A entry 24.");
+        count += labelComment(0x00030430, "fuel_status_copy",
+            "Copies status byte FFFF726C -> FFFF7370. Pipeline A entry 25.");
+        count += labelComment(0x00030744, "fuel_sensor_prep",
+            "Sensor prep. Calls 0x23E48, stores to FFFF73A2. Pipeline A entry 26.");
+        count += labelComment(0x00030B68, "fuel_base_table_calc",
+            "Base fuel table calc. Dual 1D lookups via descs 0xACD7C+0xACD90, output FFFF7400. Pipeline A entry 27.");
+
+        // ── Pipeline A: AFC init thunk (entry 28) ──
+        count += labelComment(0x00033278, "afc_init_thunk",
+            "AFC init thunk. Sets PI step-size defaults (0.05/0.025/0.015 from CBFB8-C8), then enters afc_dispatcher. Pipeline A entry 28.");
+
+        // ── Pipeline A: Fuel correction init (entries 29-32) ──
+        count += labelComment(0x00031600, "fuel_init_flag",
+            "Writes -1 to FFFF745B (init flag). Pipeline A entry 29.");
+        count += labelComment(0x00032AA8, "fuel_correction_array_update",
+            "Fuel correction array. Manages 29-element array at FFFF7730. Gear-dependent cal IDs CBBD8. Pipeline A+B shared.");
+        count += labelComment(0x00031C9C, "fuel_cyl_arrays_init",
+            "Per-cylinder array init. Zeros 3x42-element float arrays at FFFF74C8/757C/7630. Pipeline A+B shared.");
+        count += labelComment(0x00032958, "fuel_corr_filter_init",
+            "Correction filter init. Zeros 3 floats at FFFF770C. Pipeline A+B shared.");
+
+        // ── Pipeline A: AFC/AFL/CL-OL sub-functions (entries 33-39) ──
+        count += labelComment(0x00034488, "afl_value_retrieve",
+            "A/F Learning value retrieval. Reads FFFF316C indexed by FFFF787F, clamps +/-25% (CC064/CC068). Pipeline A entry 33.");
         count += labelComment(0x000344BA, "afl_range_loop",
             "A/F Learning 4-range loop. Iterates ranges A-D at FFFF316C, 8-byte stride.");
         count += labelComment(0x000344EE, "afl_validity_check",
             "A/F Learning range validity check. Iterates 4 ranges, calls 0xBDCB6.");
         count += labelComment(0x000345A4, "cl_active_check",
-            "CL Active Check: 10-condition gate. Returns 1=CL active (learning OK), 0=inactive. "
+            "CL Active Check: 10-condition gate. Returns 1=CL active, 0=inactive. "
             + "Checks FFFF8F24, CC020 (MAF<=70g/s), FFFF73A4, FFFF7354, FFFF7374, "
             + "FFFF7A14, FFFF7A20, FFFF7D18, FFFF7BE2.");
-        count += labelComment(0x00034488, "afl_sub_dispatcher",
-            "A/F Learning sub-dispatcher. Dispatched from fuel_dispatch_table_A.");
-        count += labelComment(0x00034EC8, "afl_airflow_processor",
-            "A/F Learning airflow range processor. Dispatch A. Refs CC074-CC090.");
-        count += labelComment(0x00034EF4, "afl_airflow_update",
-            "A/F Learning airflow update. Dispatched from fuel_dispatch_table_B.");
-        count += labelComment(0x000357D0, "clol_transition_sub_B",
-            "CL/OL transition sub B. Dispatched from fuel_dispatch_table_A.");
-        count += labelComment(0x0003580C, "clol_transition_core",
-            "CL/OL transition core. Dispatched from fuel_dispatch_table_B.");
-        count += labelComment(0x00036008, "clol_delay_manager_A",
-            "CL/OL delay manager A. Dispatched from fuel_dispatch_table_A.");
-        count += labelComment(0x0003605E, "ol_fuel_map_selector",
-            "OL fuel map selector. Reads IAM from FFFF3234, compares vs CC16C (0.5). Dispatch B.");
-        count += labelComment(0x00036A98, "clol_hysteresis_handler",
-            "CL/OL hysteresis handler. Refs CC178 (throttle hyst), CC174 (BPW hyst). Dispatch A.");
-        count += labelComment(0x00036BF4, "clol_delay_manager_B",
-            "CL/OL delay manager B. Dispatched from fuel_dispatch_table_A.");
+        count += labelComment(0x000357D0, "clol_init_state",
+            "CL/OL state init. Calls 0x35E88, writes -1 to FFFF7986, 0x200 to FFFF794C. Pipeline A entry 34.");
+        count += labelComment(0x00034EC8, "clol_conditions_calc",
+            "CL/OL conditions calc. Dual entry (also 0x34EF4). ECT/load/desc 0xAD054, 7+ BSR sub-calls. Pipeline A entry 35.");
+        count += labelComment(0x00034EF4, "clol_conditions_calc_B",
+            "CL/OL conditions calc entry B. ECT+FFFF984D, chains 7 condition BSR calls. Pipeline B shared.");
+        count += labelComment(0x00036008, "clol_transition_exec",
+            "CL/OL transition exec. Desc 0xAD998, calls 0x36962/0x3643A/0x36978. Pipeline A entry 36.");
+        count += labelComment(0x00036A98, "clol_status_write",
+            "CL/OL status write. Copies engine run state FFFF65C0 to workspace FFFF7A0C. Pipeline A entry 37.");
+        count += labelComment(0x00036BF4, "clol_ect_gate",
+            "CL/OL ECT gate. RPM FFFF6350, ECT thresholds CC234(79C)/CC23C(70C), sets FFFF7A18. Pipeline A entry 38.");
+        count += labelComment(0x00036E60, "clol_alt_condition",
+            "CL/OL secondary condition. Loads 0.1 factor from CC284/CC288 -> FFFF7A38. Pipeline A entry 39.");
+
+        // ── Pipeline A: Fuel trim / injector (entries 40-42) ──
+        count += labelComment(0x00037156, "fuel_trim_input_setup",
+            "Fuel trim input. Reads FFFF69F4 (A/F ratio) -> FFFF7A74, flags FFFF7A50. Pipeline A entry 40.");
+        count += labelComment(0x0003756C, "injector_trim_init",
+            "Injector trim init. Reads FFFF895C, zeros 4 slots at FFFF7AB0. Pipeline A entry 41.");
+        count += labelComment(0x00037ABA, "injector_trim_calc",
+            "Injector trim calc. RPM/secondary via 2D interp (0xBEA40), A/F learning FFFF31A4/31AC. Pipeline A entry 42.");
+
+        // ── Pipeline A: Main IPW calculator (entry 43) ──
+        count += labelComment(0x00038158, "ipw_calc_main",
+            "Main IPW calculator. Integrates all corrections: CL/OL state, load (FFFF6354), WOT thresholds (CC354-358). Pipeline A entry 43.");
+
+        // ── Pipeline A: LTFT learning (entries 44-45) ──
+        count += labelComment(0x00038D16, "ltft_learning_init",
+            "LTFT learning init. Step-size 0.001 from CC3B0, workspace FFFF7B60. Pipeline A entry 44.");
+        count += labelComment(0x00038E30, "ltft_learning_calc",
+            "LTFT learning algorithm. Calls 0x392A4, status flags FFFF7B9F. RPM threshold 3600 (CC3C4). Pipeline A entry 45.");
+
+        // ── Pipeline A: Default output (entry 46) ──
+        count += labelComment(0x000399EE, "fuel_output_default",
+            "Default fuel output multiplier. Loads 1.05 from CBF40 -> FFFF7BDC (5% enrichment). Pipeline A entry 46.");
+
+        // ── Pipeline B unique functions ──
+        count += labelComment(0x000332A2, "fuel_main_entry",
+            "Main fueling entry. Called from Pipeline B. Near afc_dispatcher (0x33304).");
+        count += labelComment(0x00031528, "fuel_enable_state_update",
+            "Sensor validity check. Reads FFFF8E98/8F08/8F24, calls 0x21D9A, writes FFFF744B. Pipeline B.");
+        count += labelComment(0x0003160A, "fuel_correction_calc",
+            "Major correction aggregator. Reads RPM/MAF/lambda/enrichment, desc 0xACDF4, cal 0xCBE68-70. Pipeline B.");
+        count += labelComment(0x00031A4C, "fuel_trim_init",
+            "Fuel trim init. Writes FFFF7464, checks cal IDs CBBD8-DB, desc 0xAC450. Pipeline B.");
+        count += labelComment(0x0003CD34, "fuel_warmup_enrich",
+            "Warmup/cold-start enrichment. Reads ECT FFFF69FC, IAT FFFF69F0, CL state FFFF7C68. Pipeline B.");
+        count += labelComment(0x00039528, "fuel_wot_enrich_calc",
+            "WOT enrichment calc. Reads FFFF77D8/DC, 2D map 0xAD258, stores FFFF7BC0. Pipeline B.");
+        count += labelComment(0x00030ACC, "fuel_base_map_combine",
+            "Base fuel map combiner. 2D map 0xAC3E0 + descs 0xAD604/5E8, output FFFF73AC. Pipeline B.");
         count += labelComment(0x00036C3C, "clol_state_cleanup",
-            "CL/OL state cleanup. Dispatched from fuel_dispatch_table_B.");
-        count += labelComment(0x00036E60, "fuel_post_transition",
-            "Post-transition handler. Dispatched from fuel_dispatch_table_A.");
+            "CL/OL state cleanup. Pipeline B.");
+        count += labelComment(0x0003452A, "afl_core_entry",
+            "A/F Learning core. CL active check, range selection, value update. Pipeline B.");
+        count += labelComment(0x0003580C, "clol_transition_core",
+            "CL/OL transition core. Pipeline B.");
+        count += labelComment(0x0003605E, "ol_fuel_map_selector",
+            "OL fuel map selector. Reads IAM FFFF3234 vs CC16C (0.5). Pipeline B.");
+        count += labelComment(0x00037186, "fuel_transient_comp",
+            "Transient fuel compensation. Reads FFFF7D68/6C, tip-in/out via cal 0xC4200. Pipeline B.");
+        count += labelComment(0x00037B68, "fuel_injector_comp",
+            "Injector compensation. 2D maps 0xAC648/634, RPM/load indexed. Pipeline B.");
+        count += labelComment(0x0003A222, "fuel_per_cyl_trim",
+            "Per-cylinder fuel trim. 4-iteration loop with desc 0xBE970, output FFFF7C10. Pipeline B.");
+        count += labelComment(0x0003EB8C, "fuel_overrun_cutoff",
+            "Overrun fuel cutoff. RPM/airflow thresholds, cal 0xD29AA, tail-calls 0x46BCC. Pipeline B.");
+        count += labelComment(0x0003BB6C, "fuel_accel_enrich",
+            "Acceleration enrichment. Tip-in/out gains CC51C-530, cal 0xCBC0B/0C. Pipeline B.");
+
+        // =====================================================================
+        // AFC PI CONTROLLER — GAIN TABLE DESCRIPTORS
+        // =====================================================================
+        count += labelComment(0x000ACEA0, "PI_P_gain_A_desc",
+            "P-gain component A descriptor. 16-element 1D table, axis=ECT(-40..110C) at CC624. "
+            + "Data at CE05C. Values: 0 when cold, ramps 0.5->1.2 at 40-110C. "
+            + "Effectively constant 1.2 during normal operation (RPM always > axis max).");
+        count += labelComment(0x000ACEB4, "PI_P_gain_B_desc",
+            "P-gain component B descriptor. 11-element 1D table, axis=load(0.5..1.5) at CE07C. "
+            + "Data at CE0A8. ALL ZERO in this ROM — load-dependent P gain unused.");
+        count += labelComment(0x000AC4FC, "PI_P_norm_desc",
+            "P-gain normalizer descriptor. 11-element 1D table, axis=RPM(0..10000) at CCB60. "
+            + "Data at CCB8C. Zero below 3000 RPM, ramps 1000-7000 at 4000-10000 RPM.");
+        count += labelComment(0x000AD928, "PI_I_comp_2D_desc",
+            "I-gain 2D compensation descriptor. 11x10 table, axes: lambda(0.2..1.4) x RPM(800..5000). "
+            + "Axis1 at D1A14, axis2 at D1A40, data at D1A68. Mostly zero — small I correction.");
+        count += labelComment(0x000ACEC8, "PI_I_gain_A_desc",
+            "I-gain component A descriptor. 16-element 1D table, axis=ECT(-40..110C) at CC624. "
+            + "Data at CE0BE. Flat value across ECT range.");
+        count += labelComment(0x000ACEDC, "PI_I_gain_B_desc",
+            "I-gain component B descriptor. 11-element 1D table, axis=load(0.5..1.5) at CE0E0. "
+            + "Data at CE10C. Values: 0 below 1.1, ramps 0.03125-0.125 at 1.1-1.5.");
+        count += labelComment(0x000AC510, "PI_I_norm_desc",
+            "I-gain normalizer descriptor. 11-element 1D table, axis=RPM(0..10000) at CCB98. "
+            + "Data at CCBC4. Zero below 3000, peak 0.15625 at 8000, zero above 9000 RPM.");
+
+        // =====================================================================
+        // AFC PI CONTROLLER — ROM CONSTANTS
+        // =====================================================================
+        count += labelComment(0x000CC000, "AFC_P_Threshold",
+            "AFC P-gain threshold = 2.0. If P lookup > 2.0, raw FPUL used instead. Float.");
+        count += labelComment(0x000CC004, "AFC_Max_Correction",
+            "AFC max correction = 20.0%. Upper limit for PI state machine. Float.");
+        count += labelComment(0x000CC008, "AFC_Min_Correction",
+            "AFC min correction / dead band = 0.0. Lower limit for PI state machine. Float.");
+        count += labelComment(0x000CC00C, "AFC_Step_Size",
+            "AFC rich/lean step size = 1.0. Added/subtracted per cycle in states 2/3. Float.");
+        count += labelComment(0x000CC010, "AFC_Enable_Threshold",
+            "AFC enable gate value = 0.0. Output when AFC gate is closed (zeroes correction). Float.");
+        count += labelComment(0x000CC014, "AFC_Clamp_Upper",
+            "AFC output upper clamp = 200.0%. Hysteresis upper bound. Float.");
+        count += labelComment(0x000CC018, "AFC_Clamp_Lower",
+            "AFC output lower hysteresis = 190.0%. Clamp clears below this. Float.");
+        count += labelComment(0x000CBFF4, "AFC_CL_State_Threshold",
+            "CL state threshold = 4.0. Above this, lean blend path is selected in PI output stage. Float.");
+        count += labelComment(0x000CBFF8, "AFC_Lean_Alpha_Step",
+            "Lean alpha adjustment = 10.0. Added to alpha before re-interpolation via 0xBE970. Float.");
+        count += labelComment(0x000CBFFC, "AFC_Rich_Alpha_Step",
+            "Rich alpha adjustment = 10.0. Subtracted from alpha before re-interpolation via 0xBE960. Float.");
 
         // =====================================================================
         // AFC / CLOSED-LOOP FUELING — CALIBRATION TABLES
@@ -613,6 +807,100 @@ public class ImportAE5L600L extends GhidraScript {
         // AF 3 Correction (rear O2 - disabled)
         count += labelComment(0x00035FFC, "AF3_CorrectionLimits",
             "AF 3 Correction Limits = 0.0/0.0 (DISABLED). Setting to 0 disables rear O2 input on target AFR.");
+
+        // =====================================================================
+        // FUELING PIPELINE — ADDITIONAL RAM VARIABLES
+        // =====================================================================
+        count += labelComment(0xFFFF7340, "fuel_base_param",
+            "Base fuel parameter (float). Written by fuel_base_store.");
+        count += labelComment(0xFFFF7350, "fuel_warmup_output",
+            "Warmup enrichment output (float). Written by fuel_warmup_enrichment.");
+        count += labelComment(0xFFFF7370, "fuel_status_byte",
+            "Fuel status byte. Copied from engine status FFFF726C.");
+        count += labelComment(0xFFFF73A2, "fuel_sensor_value",
+            "Conditioned sensor value (word). Written by fuel_sensor_prep.");
+        count += labelComment(0xFFFF73AC, "fuel_base_map_output",
+            "Base fuel map combined output (float array). Written by fuel_base_map_combine.");
+        count += labelComment(0xFFFF7400, "fuel_base_table_output",
+            "Base fuel table output (float). Written by fuel_base_table_calc.");
+        count += labelComment(0xFFFF7448, "fuel_cl_enable",
+            "CL fueling enable byte. Read by ipw_calc_main and many pipeline functions.");
+        count += labelComment(0xFFFF745B, "fuel_init_done",
+            "Fuel init done flag (byte). Set to -1 by fuel_init_flag.");
+        count += labelComment(0xFFFF7464, "fuel_trim_var",
+            "CL fueling variable. Written by fuel_trim_init.");
+        count += labelComment(0xFFFF74C8, "fuel_cyl_array_1",
+            "Per-cylinder fuel array 1 (42 floats = 168 bytes).");
+        count += labelComment(0xFFFF757C, "fuel_cyl_array_2",
+            "Per-cylinder fuel array 2 (42 floats = 168 bytes).");
+        count += labelComment(0xFFFF7630, "fuel_cyl_array_3",
+            "Per-cylinder fuel array 3 (42 floats = 168 bytes).");
+        count += labelComment(0xFFFF770C, "fuel_corr_filter",
+            "Correction filter state (3 floats). Written by fuel_corr_filter_init.");
+        count += labelComment(0xFFFF7730, "fuel_corr_array",
+            "Correction factor array (29 floats = 116 bytes). Managed by fuel_correction_array_update.");
+        count += labelComment(0xFFFF77D8, "fuel_correction_state_A",
+            "Fuel correction state A (float). Read by fuel_wot_enrich_calc.");
+        count += labelComment(0xFFFF77DC, "fuel_correction_state_B",
+            "Fuel correction state B (float). Read by fuel_wot_enrich_calc.");
+        count += labelComment(0xFFFF798C, "clol_state_byte",
+            "CL/OL state byte. Read by ipw_calc_main.");
+        count += labelComment(0xFFFF7A0C, "clol_workspace",
+            "CL/OL workspace base. Status + engine state. Written by clol_status_write.");
+        count += labelComment(0xFFFF7A18, "clol_ect_permission",
+            "CL/OL ECT permission multiplier (float). Set by clol_ect_gate.");
+        count += labelComment(0xFFFF7A38, "clol_alt_factor",
+            "CL/OL secondary condition factor (float). Set by clol_alt_condition.");
+        count += labelComment(0xFFFF7A50, "fuel_trim_update_flag",
+            "Fuel trim update flag (byte). Set to -1 by fuel_trim_input_setup.");
+        count += labelComment(0xFFFF7A74, "fuel_trim_input",
+            "Fuel trim input A/F ratio (float). Copied from FFFF69F4.");
+        count += labelComment(0xFFFF7AB0, "injector_trim_workspace",
+            "Injector trim workspace (4 floats for 4 cylinders).");
+        count += labelComment(0xFFFF7AB4, "injector_trim_output",
+            "Injector trim calculated output (float).");
+        count += labelComment(0xFFFF7AF8, "ipw_workspace",
+            "IPW calculation workspace. Written by ipw_calc_main.");
+        count += labelComment(0xFFFF7B60, "ltft_workspace",
+            "LTFT learning workspace. Step-size at offsets -4/-8/-12.");
+        count += labelComment(0xFFFF7B9F, "ltft_status_flags",
+            "LTFT status flags (byte). Bits 7/5/3 set during learning.");
+        count += labelComment(0xFFFF7BA0, "ltft_learning_state",
+            "LTFT learning state workspace (floats).");
+        count += labelComment(0xFFFF7BC0, "fuel_wot_enrich_output",
+            "WOT enrichment output (float). Written by fuel_wot_enrich_calc.");
+        count += labelComment(0xFFFF7BDC, "fuel_output_multiplier",
+            "Default fuel output multiplier (float). Set to 1.05 by fuel_output_default.");
+        count += labelComment(0xFFFF7C10, "fuel_percyl_trim_output",
+            "Per-cylinder trim output array. Written by fuel_per_cyl_trim.");
+        count += labelComment(0xFFFF7D68, "fuel_transient_state_A",
+            "Transient fuel state A. Read by fuel_transient_comp.");
+        count += labelComment(0xFFFF7D74, "fuel_workspace_init_flag",
+            "Fuel workspace init flag (word). Set to -1 by fuel_init_workspace.");
+        count += labelComment(0xFFFF7E8C, "fuel_overrun_enable",
+            "Overrun fuel cut enable (byte). Written by fuel_overrun_cutoff.");
+
+        // =====================================================================
+        // FUELING PIPELINE — ADDITIONAL CALIBRATION CONSTANTS
+        // =====================================================================
+        count += labelComment(0x000CBFB8, "AFC_PI_StepSize_P",
+            "AFC PI proportional step-size default = 0.05. Float.");
+        count += labelComment(0x000CBFC0, "AFC_PI_StepSize_I1",
+            "AFC PI integral step-size 1 = 0.025. Float.");
+        count += labelComment(0x000CBFC8, "AFC_PI_StepSize_I2",
+            "AFC PI integral step-size 2 = 0.015. Float.");
+        count += labelComment(0x000CBF40, "FuelOutput_Default_Mult",
+            "Default fuel output multiplier = 1.05 (5% enrichment). Float.");
+        count += labelComment(0x000CC234, "CLOL_ECT_Upper",
+            "CL/OL ECT upper threshold = 79.0 deg C. Float.");
+        count += labelComment(0x000CC23C, "CLOL_ECT_Lower",
+            "CL/OL ECT lower threshold = 70.0 deg C. Float.");
+        count += labelComment(0x000CC3B0, "LTFT_StepSize",
+            "LTFT learning step-size = 0.001. Float.");
+        count += labelComment(0x000CC3C4, "LTFT_RPM_Threshold",
+            "LTFT RPM threshold = 3600.0. Float.");
+        count += labelComment(0x000CC56C, "FuelWorkspace_Default",
+            "Fuel workspace default constant. Float. Loaded by fuel_init_workspace.");
 
         // =====================================================================
         // AFC / CLOSED-LOOP FUELING — RAM VARIABLES
