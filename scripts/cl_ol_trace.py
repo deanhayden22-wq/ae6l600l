@@ -6,6 +6,7 @@ Traces all 11 writes to RAM FFFF7448 and identifies conditions/values.
 import os, struct, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sh2_disasm import decode_insn
 from sh2_disasm import disasm_sh2
 
 ROM_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rom", "ae5l600l.bin")
@@ -112,6 +113,7 @@ while addr < END:
 
     marker = ">>>" if addr in WRITE_ADDRS else "   "
     op = struct.unpack(">H", rom[addr:addr+2])[0]
+    mnem, _ = decode_insn(op, addr, rom)
     mnem = disasm_sh2(op, addr)
 
     comment = ""
