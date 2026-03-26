@@ -2865,28 +2865,629 @@ work remains for deeper analysis:
   COMPLETED — UNDOCUMENTED CALIBRATION CONSTANTS:
      0xCC000-0xCC01C: AFC controller gains, limits, and clamps
 
+================================================================================
+SECTION 10: PI CONTROLLER FULL DECOMPILATION
+================================================================================
+
+  Three tightly-coupled functions implement the AFC closed-loop PI controller:
+    0x340A0  afc_pi_output_stage  — computes P and I gain coefficients
+    0x342A8  afc_pi_controller    — error computation and state machine
+    0x3439E  afc_enable_gate      — conditional enable/disable
+    0x343CE  afc_output_clamp     — final output clamping
+
+─── 0x342A8: afc_pi_controller — ERROR + STATE MACHINE ─────────────────────
+
+  ENTRY:
+    GBR = 0xFFFF77C8           ; AFC correction state base
+    FR4 = [FFFF6540]           ; sensor input (front O2 signal)
+
+  PSEUDOCODE:
+
+    mode = byte[FFFF7448]          ; CL/OL mode flag (1=CL, else=OL)
+    prev_state = byte[GBR+0x9D]   ; previous PI state (FFFF7865)
+    sub_state = byte[GBR+0x60]    ; sub-state (FFFF7828)
+    current_corr = float[FFFF77C8] ; current AFC correction accumulator
+
+    if (mode != 1) goto STATE_OL   ; not in CL → skip PI
+
+    ; ── CL MODE ──
+    if (prev_state != 0) {
+        ; EXISTING CORRECTION — check limits
+        limit_hi = float[CC004]     ; = 20.0 (max AFC correction %)
+        current_out = float[FFFF7814]  ; current PI output
+        if (current_out > limit_hi) {
+            state = 2               ; needs rich correction
+            goto CHECK_LOW
+        }
+    CHECK_LOW:
+        limit_lo = float[CC008]     ; = 0.0 (min / dead band)
+        if (limit_lo > current_out) {
+            state = 3               ; needs lean correction
+        } else {
+            state = 4               ; within limits, no action
+        }
+    } else {
+        ; FRESH CL ENTRY (prev_state == 0)
+        if (sub_state != 1) goto FINALIZE
+
+        ; ── COMPUTE ERROR ──
+        error = sensor_input - current_corr     ; fsub at 0x342DA
+        [stack] = error                          ; save for later
+
+        ; ── P GAIN LOOKUP ──
+        P_correction = table_lookup_BEAB0(error) ; jsr 0xBEAB0
+        threshold = float[CC000]                 ; = 2.0
+        if (P_correction > threshold) {
+            ; P correction exceeds 2.0 → use raw FPUL
+            output = FPUL
+        } else {
+            ; P correction <= 2.0 → use error directly
+            output = error
+        }
+        [FFFF7814] = output              ; store PI output
+        state = 1                         ; normal update
+    }
+
+  STATE_OL:                               ; mode != 1
+    if (sub_state == 1) {
+        [FFFF7814] = FPUL                 ; freeze current value
+    }
+    state = 4                             ; disabled
+
+  FINALIZE (switch on state):
+    case 1:  ; Normal PI update
+        [FFFF7818] = [FFFF7814]           ; copy output to accumulator
+        byte[GBR+0x62] = 1               ; FFFF782A = active flag
+    case 2:  ; Rich correction needed
+        correction = [FFFF7818]
+        correction = correction - 1.0     ; subtract CC00C (=1.0)
+        result = table_lookup_BE960(correction)  ; rich interp
+        [FFFF7818] = result
+    case 3:  ; Lean correction needed
+        correction = [FFFF7818]
+        correction = correction + 1.0     ; add CC00C (=1.0)
+        result = table_lookup_BE970(correction)  ; lean interp
+        [FFFF7818] = result
+    case 4:  ; Disabled / no correction
+        [FFFF7818] = FPUL                 ; store current FPUL
+
+    byte[GBR+0x9D] = mode                ; save state for next cycle (FFFF7865)
+    return
+
+  KEY INSIGHT: The PI controller uses the error between sensor input and
+  current correction (not between sensor and target AFR). The 2.0 threshold
+  at CC000 acts as a P-gain limiter — if the table lookup returns > 2.0,
+  the raw FPUL value is used instead of the computed error. The 1.0 value
+  at CC00C is the step size for rich/lean correction ramp.
+
+  STATE MACHINE SUMMARY:
+    State 0: First CL entry — compute fresh error, do P lookup
+    State 1: Normal — copy new output to accumulator
+    State 2: Rich limit exceeded (>20%) — step down by 1.0, re-interpolate
+    State 3: Lean limit exceeded (<0%) — step up by 1.0, re-interpolate
+    State 4: Disabled or within deadband — freeze output
+
+─── 0x340A0: afc_pi_output_stage — P AND I GAIN COMPUTATION ───────────────
+
+  INPUTS (loaded at entry):
+    FR12 = [FFFF6624]     MAF (alternate/computed)
+    FR15 = [FFFF6350]     RPM
+    FR14 = [FFFF63F8]     MAF (primary sensor)
+    FR13 = [FFFF68DC]     load variable
+    FR9  = [FFFF78B0]     CL/OL state variable (saved to stack)
+    FR8  = [FFFF65FC]     condition variable (saved to stack)
+
+  ENABLE CHECK:
+    flag_A = byte[FFFF8E7E]
+    flag_B = byte[FFFF85D7]
+    if (flag_A != 1) skip entire PI computation → jump to 0x3427E
+
+  PSEUDOCODE:
+
+    ; ── PROPORTIONAL PATH ──
+    ; Each lookup calls interpolation function at 0xBE830
+    P_gain_A = interp_1D(desc=0xACEA0, input=RPM)        ; ECT-axis table
+    P_gain_B = interp_1D(desc=0xACEB4, input=load_var)    ; load-axis table
+    P_norm   = interp_1D(desc=0xAC4FC, input=CL_state)    ; airflow/state-axis
+
+    proportional = (P_gain_A + P_gain_B) * P_norm
+
+    ; ── INTEGRAL PATH ──
+    I_comp   = interp_2D(desc=0xAD928, x=MAF, y=MAF_alt)  ; 2D via 0xBE8E4
+    I_gain_A = interp_1D(desc=0xACEC8, input=RPM)
+    I_gain_B = interp_1D(desc=0xACEDC, input=load_var)
+    I_norm   = interp_1D(desc=0xAC510, input=CL_state)
+
+    integral = (I_comp + I_gain_A + I_gain_B) * I_norm
+
+    ; ── STORE INTERMEDIATES ──
+    [FFFF7804] = proportional     ; @(base-108)
+    [FFFF7808] = integral         ; @(base-104)
+
+    ; ── CONDITIONAL BLENDING ──
+    blend_flag = byte[FFFF7871]
+    if (blend_flag != 0) → secondary path at 0x34228
+    if (flag_B == 1 && CL_state > 4.0) {
+        ; Special high-CL-state path
+        [FFFF780C] = FPUL
+        → blend
+    }
+    ; Normal blend path continues...
+
+  TABLE DESCRIPTORS AND CURRENT VALUES:
+
+    0xACEA0: P_gain_A — 16 elements, axis = ECT (-40 to 110°C)
+             Data: 0.0 below 30°C, ramps 0.5→1.2 from 40→110°C
+             Purpose: Suppress P gain when engine is cold
+
+    0xACEB4: P_gain_B — 11 elements, axis = load (0.5 to 1.5)
+             Data: ALL ZERO in this ROM
+             Purpose: Load-dependent P gain (unused/factory reserved)
+
+    0xAC4FC: P_norm — 11 elements, axis = RPM (0 to 10000)
+             Data: 0 below 3000, then 1000→7000 from 4000→10000
+             Purpose: RPM-dependent P scaling (high RPM only)
+             NOTE: Large values suggest this is a numerator, divided later
+
+    0xACEC8: I_gain_A — 16 elements, axis = ECT (-40 to 110°C)
+             Data: flat value across range
+             Purpose: ECT-dependent I gain component
+
+    0xACEDC: I_gain_B — 11 elements, axis = load (0.5 to 1.5)
+             Data: 0→0.125 ramp above load=1.1
+             Purpose: Load-dependent I gain (small corrections at high load)
+
+    0xAC510: I_norm — 11 elements, axis = RPM (0 to 10000)
+             Data: 0 below 3000, peak 0.15625 at 8000, 0 above 9000
+             Purpose: RPM-dependent I scaling, active only mid-range RPM
+
+    0xAD928: I_comp — 2D table (11 cols × 10 rows)
+             Axes: lambda (0.2→1.4) × RPM (800→5000)
+             Purpose: Base integral compensation vs lambda and RPM
+             NOTE: Table data appears mostly zero — I gain is small
+
+  IMPORTANT: The P_gain tables use the same axis as ECT (-40 to 110°C)
+  but the code passes RPM in FR4. The interpolation function at 0xBE830
+  clamps out-of-range inputs, so at any RPM > 110 (which is always),
+  these tables return their last element value. This means P_gain_A is
+  effectively a constant 1.2 during normal operation. The ECT axis only
+  matters during very low RPM cranking scenarios (<110 RPM).
+
+─── 0x3439E: afc_enable_gate ──────────────────────────────────────────────
+
+  PSEUDOCODE:
+    if (param_2 == 0) {
+        result = utility_check_A(0x2BE2C)
+    } else {
+        result = utility_check_B(0x2BE38)
+    }
+    if (result != 1) {
+        ; Gate CLOSED — load disable value
+        output = float[CC010]    ; = 0.0 (AFC zeroed)
+    } else {
+        ; Gate OPEN — pass through FPUL
+        output = FPUL
+    }
+    [param_1] = output           ; write to caller's destination
+    return
+
+  When the enable gate returns 0.0, all AFC correction is disabled.
+  The two utility functions at 0x2BE2C/0x2BE38 check engine state
+  conditions to determine if CL fuel control is safe to run.
+
+─── 0x343CE: afc_output_clamp ─────────────────────────────────────────────
+
+  GBR = 0xFFFF7820            ; AFC output base
+
+  PSEUDOCODE:
+    afc_raw = float[FFFF64D8]  ; unclamped AFC value
+    flag_A = word[FFFF79C2]
+    flag_B = word[FFFF79C4]
+
+    upper_limit = float[CC014]  ; = 200.0%
+    if (afc_raw > upper_limit) {
+        byte[GBR+0x52] = 1     ; FFFF7872 = clamp flag set
+    } else {
+        lower_limit = float[CC018]  ; = 190.0%
+        if (afc_raw > lower_limit) {
+            ; Between 190-200%: no clamp flag change
+        } else {
+            byte[GBR+0x52] = 0      ; FFFF7872 = clamp flag clear
+        }
+    }
+    ; Continue with clamped output...
+
+  NOTE: The 190/200 values (CC014/CC018) create a hysteresis band for
+  the clamp flag. AFC must exceed 200% to trigger clamping, but won't
+  clear the clamp until it drops below 190%. This prevents oscillation
+  at the clamp boundary.
+
+─── 0x340A0: BLEND LOGIC (0x34160-0x342A6) — FULL DECOMPILATION ────────────
+
+  After computing proportional (FFFF7804) and integral (FFFF7808),
+  the function blends them using a conditional alpha factor.
+
+  R11 = 0xFFFF7870 (workspace base)
+  Workspace map:
+    FFFF7804  (base-108)  proportional = (P_gain_A + P_gain_B) * P_norm
+    FFFF7808  (base-104)  integral = (I_comp + I_gain_A + I_gain_B) * I_norm
+    FFFF780C  (base-100)  alpha (blend factor)
+    FFFF7810  (base-96)   final P output = proportional * alpha
+    FFFF7838  (base-56)   P_gain_A raw lookup
+    FFFF783C  (base-52)   P_gain_B raw lookup
+    FFFF7840  (base-48)   P_norm raw lookup
+    FFFF7844  (base-44)   I_comp raw lookup
+    FFFF7848  (base-40)   I_gain_A raw lookup
+    FFFF784C  (base-36)   I_gain_B raw lookup
+    FFFF7850  (base-32)   I_norm raw lookup
+    FFFF7871  (base+1)    blend state flag (byte)
+
+  PSEUDOCODE:
+
+    blend_flag = byte[FFFF7871]    ; saved from previous cycle
+    flag_B = byte[FFFF85D7]        ; secondary enable flag
+    CL_state = float[FFFF65FC]     ; CL state variable (from stack)
+
+    if (blend_flag != 0) goto SECONDARY_PATH
+
+    ; ── PRIMARY PATH (blend_flag == 0, first cycle) ──
+    if (flag_B == 1 && CL_state > 4.0) {
+        alpha = FPUL                 ; special high-CL-state alpha
+    } else {
+        alpha = FPUL                 ; default alpha
+    }
+    [FFFF780C] = alpha
+    goto FINAL_BLEND
+
+  SECONDARY_PATH:    ; blend_flag != 0 (subsequent cycles)
+    if (flag_B == 1 && CL_state > 4.0) {
+        ; High CL state: lean-adjust alpha
+        alpha = [FFFF780C]           ; load current alpha
+        alpha = alpha + 10.0         ; add CBFF8 (=10.0)
+        alpha = interp_BE970(alpha)  ; lean interpolation
+        [FFFF780C] = alpha
+    } else {
+        ; Default: rich-adjust alpha
+        alpha = [FFFF780C]           ; load current alpha
+        alpha = alpha - 10.0         ; subtract CBFFC (=10.0)
+        alpha = interp_BE960(alpha)  ; rich interpolation
+        [FFFF780C] = alpha
+    }
+
+  FINAL_BLEND:  ; at 0x34262
+    P_output = proportional * alpha           ; FFFF7804 * FFFF780C
+    [FFFF7810] = P_output                     ; store final P output
+    FPUL = integral                           ; pass I through FPUL to caller
+    byte[FFFF7871] = flag_A                   ; save state for next cycle
+
+  DISABLED PATH:  ; at 0x3427E (when flag_A at FFFF8E7E != 1)
+    [FFFF7810] = FPUL     ; zero/freeze P output
+    [FFFF7804] = FPUL     ; zero proportional
+    [FFFF7808] = FPUL     ; zero integral
+    byte[FFFF7871] = flag_A
+    return
+
+  ADDITIONAL ROM CONSTANTS:
+    CBFF4 = 4.0      CL state threshold for high-state path
+    CBFF8 = 10.0     Lean alpha adjustment (additive before interp)
+    CBFFC = 10.0     Rich alpha adjustment (subtractive before interp)
+
+  KEY INSIGHTS:
+  - The blend is NOT a simple alpha*(P) + (1-alpha)*I mix
+  - Proportional output is scaled by alpha: P_output = P * alpha
+  - Integral is passed through FPUL to the calling function (0x342A8)
+  - Alpha evolves over cycles: starts from FPUL, then is adjusted by
+    +/-10.0 and re-interpolated each cycle through 0xBE960/0xBE970
+  - When CL state (FFFF65FC) exceeds 4.0, the lean interp path is used;
+    otherwise the rich interp path applies
+  - The blend_flag at FFFF7871 differentiates first-cycle (initialize
+    alpha from FPUL) vs subsequent cycles (evolve alpha via interp)
+
+─── AFC PI SYSTEM FLOW SUMMARY ────────────────────────────────────────────
+
+  1. afc_pi_output_stage (0x340A0):
+     a) Compute P and I GAIN COEFFICIENTS from 7 table lookups
+        → proportional = (P_gain_A + P_gain_B) × P_norm
+        → integral = (I_comp + I_gain_A + I_gain_B) × I_norm
+     b) Evolve blend alpha:
+        → First cycle: alpha = FPUL
+        → Subsequent: alpha ±= 10.0, re-interpolated via 0xBE960/0xBE970
+     c) Compute final output:
+        → P_output = proportional × alpha (stored FFFF7810)
+        → I passed through FPUL to caller
+
+  2. afc_pi_controller (0x342A8):
+     Compute ERROR and apply state machine
+     → error = O2_sensor - current_correction
+     → P_output = table_lookup(error)
+     → state machine: clamp, step rich/lean by ±1.0, or freeze
+
+  3. afc_enable_gate (0x3439E):
+     Gate the output based on engine readiness conditions
+
+  4. afc_output_clamp (0x343CE):
+     Clamp final AFC to 190-200% range with hysteresis
+
+  5. Result stored at FFFF77C8 (consumed by fuel correction at 0x320AE)
+
+  AFC CALIBRATION CONSTANTS:
+    CC000 = 2.0     P-gain threshold (if lookup > 2.0, use raw value)
+    CC004 = 20.0    Max AFC correction (%)
+    CC008 = 0.0     Min AFC / dead band
+    CC00C = 1.0     Rich/lean step size
+    CC010 = 0.0     Enable gate threshold (0 = gates to zero when disabled)
+    CC014 = 200.0   Upper clamp limit (%)
+    CC018 = 190.0   Lower clamp hysteresis (%)
+    CC01C = 0.0     Reserved
+    CBFF4 = 4.0     CL state threshold for blend path selection
+    CBFF8 = 10.0    Lean alpha step (+10.0 before interp)
+    CBFFC = 10.0    Rich alpha step (-10.0 before interp)
+
+  INTERPOLATION FUNCTIONS USED:
+    0xBE830  — 1D table interpolation (P and I gain lookups)
+    0xBE8E4  — 2D table interpolation (I_comp 2D lookup)
+    0xBE960  — Rich-direction interpolation (alpha adjustment)
+    0xBE970  — Lean-direction interpolation (alpha adjustment)
+    0xBEAB0  — Error-to-correction lookup (P controller in 0x342A8)
+
+
+================================================================================
+SECTION 11: FINAL FUEL CORRECTION ACCUMULATOR (0x320AE)
+================================================================================
+
+  This function combines ALL correction factors into the final IPW
+  multiplier. It processes a 42-element correction array, applying
+  different correction modes to each element.
+
+─── 0x320AE: fuel_correction_final ────────────────────────────────────────
+
+  PARAMETERS (passed via struct pointers):
+    R4/R9 = context struct pointer (output destination at [R9])
+    R5 = input descriptor struct (correction values)
+    R6 = base value descriptor struct
+
+  INPUTS LOADED:
+    FR15 = [R6+8]   → base_value_A (e.g., base IPW)
+    FR12 = [R6+12]  → base_value_B (e.g., AFC correction FFFF77C8)
+    FR4  = [R5+20]  → correction_A (e.g., FFFF77D8)
+    FR7  = [R5+24]  → correction_B (e.g., FFFF781C)
+    FR2  = [R5+8]   → correction_C (e.g., FFFF77E4)
+    FR9  = [R5+4]   → correction_D (e.g., FFFF77DC)
+
+  INITIAL COMPUTATION:
+    sum = correction_A + correction_B
+    range_result = deadband_check(sum, FPUL, GBR_value)  ; via 0xBE608
+    if (range_result != 0) {
+        ; Within deadband — compute normalized result
+        result = (base_A + base_B + FPUL) / sum
+        [output] = result
+    }
+
+  LOOP SETUP:
+    intermediate values derived from corrections:
+      FR14 = 1.0 - base_A - correction_D      ; residual after base and D
+      FR15 = correction_D + FPUL               ; D + current value
+      FR13 = correction_D - base_B             ; D - B delta
+      FR12 = FPUL (re-assigned)
+    loop_count = 42                              ; R8 = 42
+    element_index = 1                            ; R14 starts at 1
+    stride = 4 bytes (float)                     ; R13 increments by 4
+
+  CORRECTION LOOP (42 iterations):
+    For each element i (1 to 42):
+      output_array = [R9+16]                     ; output array base
+
+      switch (correction_mode):
+        case 1:   ; DIRECT COPY
+          output_array[i] = FR14                 ; write residual directly
+
+        case 2:   ; THRESHOLD COMPARE
+          if (correction_C > threshold) {
+              output_array[i] = FR13 (delta)     ; D-B delta
+              FPUL = FR15                        ; update accumulator
+          } else {
+              goto DEFAULT                       ; fall through to default
+          }
+
+        case (i > remaining_count):
+          if (i > 1) {
+              ; MULTIPLY + ACCUMULATE
+              temp = output_array[i-1] * FR12    ; prev * factor
+              prev_val = output_array[i-2]       ; load 2-back
+              FPUL = FR15
+              output_array[i] = temp             ; store
+          } else if (i == 2) {
+              goto DEFAULT
+          } else {
+              ; DIRECT FPUL STORE
+              output_array[i] = FPUL
+          }
+
+        default:  ; FULL CORRECTION CALC (via bsr 0x32892)
+          output_array[i] = correction_calc(
+              R4=context, FR4=stack[0], FR5=stack[12],
+              FR6=stack[0], FR7=stack[4])
+
+      element_index++
+      stride advances by 4
+
+  The sub-function at 0x32892 performs the per-element correction
+  calculation, reading from the context struct and applying individual
+  compensation factors.
+
+  KEY INSIGHT: The 42-element array corresponds to the per-cylinder
+  and per-condition correction factors. Each element can be:
+  - Directly set (mode 1)
+  - Threshold-gated (mode 2)
+  - Multiplied from previous elements
+  - Fully calculated via the sub-function
+
+  The final output at [R9] contains the combined correction multiplier
+  that scales base IPW into the final injector pulse width.
+
+
+================================================================================
+SECTION 12: GENERIC TABLE PROCESSORS (0xBE5A8-0xBEAB0)
+================================================================================
+
+  The ROM uses a unified table lookup system with descriptor-driven
+  dispatch. All interpolation is routed through these common functions.
+
+─── TABLE DESCRIPTOR FORMAT (20 bytes) ────────────────────────────────────
+
+  For 1D tables:
+    Byte 0:    0x00 (1D indicator)
+    Byte 1:    Element count (N)
+    Byte 2:    Data type selector (dispatches to reader function)
+               0x04 = float32 data (4 bytes per element)
+               0x08 = alternate format (possibly uint16 scaled)
+    Byte 3:    0x00
+    Byte 4-7:  Axis pointer (ROM address, N floats)
+    Byte 8-11: Data pointer (ROM address, N elements)
+    Byte 12-15: Default low value (float, returned when type==0)
+    Byte 16-19: Default high value (float)
+
+  For 2D tables:
+    Byte 0:    0x00
+    Byte 1:    Column count
+    Byte 2:    0x00
+    Byte 3:    Row count
+    Byte 4-7:  Row axis pointer (ROM address)
+    Byte 8-11: Column axis pointer (ROM address)
+    Byte 12-15: Data pointer (ROM address, rows*cols elements)
+    Byte 16-19: Type/flags
+
+  EXAMPLES FROM THIS ROM:
+    0xACEA0: 00 10 08 00 ... → 1D, 16 elements, type 0x08
+    0xAC4FC: 00 0B 04 00 ... → 1D, 11 elements, type 0x04 (float32)
+    0xAD928: 00 0B 00 0A ... → 2D, 11 cols × 10 rows
+
+─── FUNCTION CATALOG ──────────────────────────────────────────────────────
+
+  0xBE5A8: axis_position_calc_u8
+    Computes fractional position of input within axis range.
+    Clamps result to 0..255 (uint8).
+    formula: index = (input - axis[i]) / (axis[i+1] - axis[i]) + offset
+    Returns clamped integer index in R0.
+
+  0xBE5D8: axis_position_calc_u16
+    Same as 0xBE5A8 but clamps to 0..65535 (uint16).
+
+  0xBE608: deadband_check
+    Returns 1 if input is within tolerance band of target.
+    PSEUDOCODE:
+      lower = target - tolerance       ; FR5 - FR6
+      upper = target + tolerance       ; FR5 + FR6
+      if (input > lower && input < upper)
+          return 1    ; within deadband
+      else
+          return 0    ; outside deadband
+
+  0xBE628: normalize_ratio
+    Computes ratio FR4/FR5 with special-case handling.
+    PSEUDOCODE:
+      if (FR5 == FPUL) {
+          return FR4 / FR5              ; normal division
+      } else if (FR4 == FPUL) {
+          return FPUL                   ; identity
+      } else {
+          ; edge case: load from GBR-relative table
+          if (FR4 > FPUL)
+              return FPUL               ; clamp
+          else
+              return loaded_value
+      }
+
+  0xBE830: interp_1D (MAIN 1D INTERPOLATOR)
+    Primary 1D table interpolation with type dispatch.
+    PSEUDOCODE:
+      count = word[desc+0]             ; element count
+      axis_ptr = [desc+4]             ; axis array
+      index = axis_search(input, axis_ptr, count)  ; bsr 0xBECA8
+      data_type = byte[desc+2]        ; type selector
+      reader_func = dispatch_table[data_type]  ; via GBR vtable
+      result = reader_func(index, [desc+8])    ; read+interpolate data
+      if (data_type == 0) {
+          ; No data type → use defaults
+          FR0 = float[desc+12]         ; default low
+          FR1 = float[desc+16]         ; default high
+          FPUL = interpolated
+      }
+      return FR0
+
+  0xBE874: interp_1D_variant
+    Variant of 0xBE830 that calls a different data reader (0xBEB20).
+    Used for uint8-scaled data (extu.b result at end).
+
+  0xBE890: interp_1D_2input
+    1D interpolation with two inputs (FR4=primary, FR5=secondary).
+    Uses axis search variant at 0xBECDC that takes two values.
+    Data reader at 0xBEB40.
+
+  0xBE8AC: interp_1D_u16
+    1D interpolation returning uint16 result (extu.w at end).
+
+  0xBE8E4: interp_2D (MAIN 2D INTERPOLATOR)
+    2D table interpolation.
+    PSEUDOCODE:
+      bsr 0xBED98                     ; 2D axis search (both dims)
+      row_type = byte[desc+16]        ; data type
+      reader_func = dispatch[row_type]
+      result = reader_func(indices, [desc+12])  ; read+interp 2D data
+      if (row_type == 0) {
+          FR0 = float[desc+20]
+          FR1 = float[desc+24]        ; defaults
+      }
+      return FR0
+
+  0xBE960: clamp_min (RICH DIRECTION)
+    Returns min(FR4, FR5).
+    PSEUDOCODE:
+      if (FR5 > FR4): return FR4       ; FR4 is smaller
+      else: return FR5                 ; FR5 is smaller
+
+  0xBE970: clamp_max (LEAN DIRECTION)
+    Returns max(FR4, FR5).
+    PSEUDOCODE:
+      if (FR4 > FR5): return FR4       ; FR4 is larger
+      else: return FR5                 ; FR5 is larger
+
+  0xBEAB0: subtract
+    Simple subtraction: return FR4 - FR5, also stores in FPUL.
+
+  0xBECA8: axis_search (1D)
+    Binary/linear search for input value position within sorted axis.
+    Walks axis array comparing FR0 against each float element.
+    Returns fractional position for interpolation.
+
+  0xBECDC: axis_search_2input
+    Axis search variant taking two input values (R2=secondary).
+    Used for 2D interpolation first-dimension search.
+
+  0xBED98: axis_search_2D
+    Full 2D axis search. Finds position in both row and column axes.
+
+─── DATA TYPE DISPATCH ────────────────────────────────────────────────────
+
+  The byte at descriptor offset 2 selects how data is read:
+
+    Type 0x00: No data — return default floats from bytes 12-19
+    Type 0x04: float32 — 4 bytes per element, direct FPU load
+    Type 0x08: Alternate — likely fixed-point or scaled integer
+               (data pointers at unaligned addresses suggest 2-byte data)
+
+  The dispatch is done via a GBR-relative function pointer table:
+    C706 = mov.l @(0x18,GBR),R0 → reader for one type
+    C707 = mov.l @(0x1C,GBR),R0 → reader for another type
+    C708 = mov.l @(0x20,GBR),R0 → reader for yet another type
+
+  The reader functions at 0xBEACC, 0xBEB00, 0xBEB20 handle the actual
+  data loading and delta computation for interpolation.
+
+
   REMAINING WORK:
 
-  1. LABEL the fueling dispatch tables at 0x480B8 and 0x4A0B8
-
-  2. NAME the 8 fueling functions from dispatch table A:
-     0x33278, 0x34488, 0x357D0, 0x34EC8, 0x36008, 0x36A98, 0x36BF4, 0x36E60
-
-  3. NAME the 6 fueling functions from dispatch table B:
-     0x332A2, 0x36C3C, 0x3452A, 0x34EF4, 0x3580C, 0x3605E
-
-  4. DECOMPILE the PI controller at 0x342A8 more thoroughly to determine
-     exact P/I gains and how 0xCC000 (2.0) and 0xCC00C (1.0) are applied
-
-  5. TRACE the generic table processors at 0xBE608-0xBEAB0
-
-  6. TRACE the correction accumulator (0x340A0) to identify all individual
-     compensation table descriptors (0xACEA0, 0xACEB4, etc.)
-
-  7. DECOMPILE the final fuel correction accumulator at 0x320AE to
-     understand exactly how AFC, LTFT, and enrichments combine
-
-  8. Apply labels via ImportAE5L600L.java Ghidra script
+  1. Apply labels via ImportAE5L600L.java Ghidra script
 
 
 ================================================================================
@@ -2901,6 +3502,127 @@ END OF ANALYSIS
 ;   41 end-of-line comments
 ;   13 bad instruction errors (data-in-code conflicts)
 ;   13 non-returning functions
+
+; ======================================================================
+; FUELING PIPELINE A (0x47C40) — Main Fuel Calculation Chain
+; Called from main loop at 0xE108
+; 46 sequential JSR calls through literal pools
+; ======================================================================
+;
+; Pipeline A executes the complete fuel calculation chain in order:
+;
+;   Stage 1: Pre-fuel setup & sensor conditioning
+;     0x22688  - (peripheral init)
+;     0x2269A  - (peripheral init)
+;     0x226A2  - (peripheral init)
+;     0x588F0  - (sensor read)
+;     0x13330  - (sensor read)
+;     0x9EB62  - (diagnostic)
+;     0x9DE08  - (diagnostic)
+;     0xA6B90  - (diagnostic)
+;     0xA9902  - (diagnostic)
+;     0x990EA  - (diagnostic)
+;     0x58A84  - (sensor read)
+;     0x9DCCC  - (diagnostic)
+;     0x9CA10  - (diagnostic)
+;     0x9CDE0  - (diagnostic)
+;     0x9CC1C  - (diagnostic)
+;     0x4C086  - (idle control related)
+;     0x4E902  - (idle control related)
+;     0x5CE6C  - (auxiliary)
+;
+;   Stage 2: Base fuel parameters
+;     0x2FF74  fuel_base_store         — Store base fuel param -> FFFF7340
+;     0x303C0  fuel_warmup_enrichment  — Warmup enrichment via desc 0xAD7E0
+;     0x2EF08  fuel_condition_dispatch — Multi-path fuel mode selector
+;     0x3CD00  fuel_init_workspace     — Init workspace, defaults from CC56C
+;     0x2FA68  fuel_cond_gate_A        — Enable gate A (0x22F92 check)
+;     0x2FB68  fuel_cond_gate_B        — Enable gate B (0x22F92 check)
+;     0x30430  fuel_status_copy        — Copy status FFFF726C -> FFFF7370
+;     0x30744  fuel_sensor_prep        — Condition sensor -> FFFF73A2
+;     0x30B68  fuel_base_table_calc    — Dual 1D table lookups -> FFFF7400
+;
+;   Stage 3: AFC (Short-term fuel correction)
+;     0x33278  afc_init_thunk          — Set PI step defaults (0.05/0.025/0.015)
+;                                        then fall into afc_dispatcher (0x33304)
+;
+;   Stage 4: Fuel correction workspace init
+;     0x31600  fuel_init_flag          — Set init flag FFFF745B
+;     0x32AA8  fuel_correction_array_update — 29-element array at FFFF7730 [shared w/ B]
+;     0x31C9C  fuel_cyl_arrays_init    — 3x42-float arrays FFFF74C8/757C/7630 [shared w/ B]
+;     0x32958  fuel_corr_filter_init   — 3-float filter at FFFF770C [shared w/ B]
+;
+;   Stage 5: A/F Learning & CL/OL transition
+;     0x34488  afl_value_retrieve      — Read A/F Learning +/-25% clamp
+;     0x357D0  clol_init_state         — Init CL/OL state machine
+;     0x34EC8  clol_conditions_calc    — Master CL/OL condition evaluator
+;     0x36008  clol_transition_exec    — Execute CL/OL transition
+;     0x36A98  clol_status_write       — Copy engine state to CL/OL workspace
+;     0x36BF4  clol_ect_gate           — ECT-based CL gate (79C/70C thresholds)
+;     0x36E60  clol_alt_condition      — Secondary CL/OL factor (0.1)
+;
+;   Stage 6: Fuel trim & injector compensation
+;     0x37156  fuel_trim_input_setup   — Copy A/F ratio -> FFFF7A74
+;     0x3756C  injector_trim_init      — Init 4-cyl trim workspace
+;     0x37ABA  injector_trim_calc      — 2D interp with A/F learning tables
+;
+;   Stage 7: Main IPW calculation
+;     0x38158  ipw_calc_main           — Central IPW computation
+;                                        Integrates all corrections, checks WOT load (118-119)
+;
+;   Stage 8: Long-term fuel trim learning
+;     0x38D16  ltft_learning_init      — Step-size 0.001, workspace FFFF7B60
+;     0x38E30  ltft_learning_calc      — LTFT algorithm, RPM thresh 3600
+;
+;   Stage 9: Default output
+;     0x399EE  fuel_output_default     — Set 1.05 multiplier (5% enrichment)
+;
+; RAM workspace: FFFF7340 - FFFF7BDC (continuous ~2000 bytes)
+
+
+; ======================================================================
+; FUELING PIPELINE B (0x49CF0) — Parallel Fuel Chain
+; Called from main loop at 0xE556
+; ======================================================================
+;
+; Pipeline B handles corrections, per-cylinder trim, and special modes:
+;
+;   Shared with Pipeline A:
+;     0x32AA8  fuel_correction_array_update
+;     0x31C9C  fuel_cyl_arrays_init
+;     0x32958  fuel_corr_filter_init
+;
+;   Unique to Pipeline B:
+;     0x332A2  fuel_main_entry           — Main fueling entry
+;     0x31528  fuel_enable_state_update   — Sensor validity -> FFFF744B
+;     0x3160A  fuel_correction_calc       — Major correction aggregator
+;     0x31A4C  fuel_trim_init             — Fuel trim init, gear-dep cal IDs
+;     0x30ACC  fuel_base_map_combine      — Dual 2D map combiner -> FFFF73AC
+;     0x3452A  afl_core_entry             — A/F Learning core
+;     0x34EF4  clol_conditions_calc_B     — CL/OL conditions (entry B)
+;     0x3580C  clol_transition_core       — CL/OL transition core
+;     0x3605E  ol_fuel_map_selector       — OL map: IAM vs 0.5 threshold
+;     0x36C3C  clol_state_cleanup         — CL/OL state cleanup
+;     0x37186  fuel_transient_comp        — Transient fuel (tip-in/out)
+;     0x37B68  fuel_injector_comp         — Injector compensation maps
+;     0x39528  fuel_wot_enrich_calc       — WOT enrichment factor
+;     0x3A222  fuel_per_cyl_trim          — Per-cylinder trim (4-cyl loop)
+;     0x3BB6C  fuel_accel_enrich          — Acceleration enrichment
+;     0x3CD34  fuel_warmup_enrich         — Warmup/cold-start enrichment
+;     0x3EB8C  fuel_overrun_cutoff        — Deceleration fuel cut
+;
+;   Also calls (non-fuel subsystems from Pipeline B):
+;     0x403C4  - (timing related)
+;     0x419CC  - (timing related)
+;     0x4FD5E  - (boost control)
+;     0x4F368  - (boost control)
+;     0x4F206  - (boost control)
+;     0x56AAA  - (emissions)
+;     0x5CE9C  - (auxiliary)
+;     0x5AB44  - (auxiliary)
+;     0x5F87A  - (auxiliary)
+;     ... and ~30 more diagnostic/peripheral functions
+
 
 ; ─────────────────────────────────────────────────────
 ; End of disassembly  |  ROM: AE5L600L rev 20.2  |  1,048,576 bytes
