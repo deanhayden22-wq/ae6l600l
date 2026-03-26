@@ -893,6 +893,117 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF3234, "ram_IAM",
             "Ignition Advance Multiplier current value (float). Also used by FLKC.");
 
+        // =====================================================================
+        // AFL / CL/OL PERSISTENCE ANALYSIS — ROM Functions
+        // (from cl_ol_afl_persistence_analysis.txt)
+        // =====================================================================
+
+        // CL/OL Mode Flag Writer (Path B)
+        count += labelComment(0x00031528, "clol_mode_flag_writer",
+            "FFFF7448 writer. CL/OL mode flag (1=CL, 0=OL). Gates AFC + AFL learning. Called from task scheduler at 0x049EA4.");
+        count += labelComment(0x00031590, "clol_cond_A_calc",
+            "FFFF7449 computation: (FFFF7452==1 AND FFFF744E==2) ? 1 : 0");
+        count += labelComment(0x000315BA, "clol_cond_B_calc",
+            "FFFF744A computation: (FFFF7452==1 AND FFFF744E==1) ? 1 : 0");
+        count += labelComment(0x00031966, "clol_master_readiness_writer",
+            "FFFF7452 master CL readiness flag writer. GBR=FFFF7450. Throttle/load/RPM thresholds + hysteresis.");
+
+        // OL Enrichment State Machine (Path A)
+        count += labelComment(0x0003643A, "ol_condition_checker",
+            "OL enrichment condition checker. Throttle/RPM/load thresholds for Path A (7-phase pipeline).");
+        count += labelComment(0x0003606C, "ol_enrichment_dispatch",
+            "OL enrichment dispatch. Reads FFFF79C6 mode state (always 0). Values 1/2 are dead code hooks.");
+
+        // AFL Core Functions
+        count += labelComment(0x00034488, "afl_sub_dispatcher",
+            "AFL sub-dispatcher. Dispatch Table A entry [5]. Orchestrates AFL learning cycle.");
+        count += labelComment(0x000344BA, "afl_range_loop",
+            "AFL range loop. Iterates 4 learning ranges (0-3).");
+        count += labelComment(0x000344EE, "afl_validity_check",
+            "AFL validity check before learning cycle.");
+        count += labelComment(0x0003452A, "afl_core_entry",
+            "AFL core entry. Calls: airflow range -> CL check -> range select -> value update -> store -> max check -> transition.");
+        count += labelComment(0x000345A4, "afl_cl_active_check",
+            "AFL CL active check. 10-condition gate including FFFF8F24, MAF>70g/s, FFFF7BE2, etc.");
+        count += labelComment(0x00034778, "afl_range_selection",
+            "AFL range selection with additional enable logic.");
+        count += labelComment(0x00034884, "afl_value_update",
+            "AFL value update. Actual learning adjustment. Step size 0.001 (CC05C). Limits +/-25% (CC064/CC068).");
+        count += labelComment(0x00034B1C, "afl_value_store",
+            "AFL value store. Clamp + write to FFFF316C+(range*8) array.");
+        count += labelComment(0x00034C18, "afl_clol_transition_handler",
+            "AFL CL/OL transition handler. Calls afl_clol_mode_check at 0x34C54.");
+        count += labelComment(0x00034C54, "afl_clol_mode_check",
+            "AFL CL/OL mode check. Reads FFFF7448. When 0 (OL): AFL learning FROZEN.");
+        count += labelComment(0x00034CC8, "afl_max_airflow_rate_check",
+            "AFL max airflow learning rate check. <35g/s: 88 ticks, >=35g/s: 244 ticks (~2.8x slower).");
+        count += labelComment(0x00034D52, "afl_airflow_range_determination",
+            "AFL airflow range determination. Selects range 0-3 from breakpoints at CC074-CC07C.");
+        count += labelComment(0x00034EC8, "afl_airflow_processor",
+            "AFL airflow processor. Dispatch Table A entry [7].");
+        count += labelComment(0x00034EF4, "afl_airflow_update",
+            "AFL airflow update (Dispatch B entry).");
+
+        // AFL Application (KEY: no CL/OL gate!)
+        count += labelComment(0x00037ABA, "injector_trim_application",
+            "Injector trim application. Uses A/F learning tables.");
+        count += labelComment(0x00037B74, "afl_application",
+            "AFL APPLICATION. Writes FFFF7AB4 multiplier. WARNING: Does NOT check FFFF7448 CL/OL mode. Does NOT check airflow max. Only gates: FFFF726C (transient), FFFF7C68 (status). AFL persists into OL.");
+        count += labelComment(0x00037F00, "afl_multiplier_computation",
+            "AFL multiplier computation subroutine. Reads FFFF31AC (primary) and FFFF31A4 (secondary) with weights CC2F4/CC2FC.");
+
+        // Fuel Pulse Width (consumes AFL)
+        count += labelComment(0x000301E4, "fuel_pulse_width_calc",
+            "Fuel pulse width calculation. Reads FFFF7AB4 (AFL multiplier) at 0x030230. No CL/OL check — AFL applied unconditionally.");
+
+        // AFC PI Controller
+        count += labelComment(0x000342A8, "afc_pi_controller",
+            "AFC PI controller. Reads FFFF7448 every cycle. When FFFF7448=0 (OL): AFC output=0. Drops immediately on CL->OL.");
+
+        // =====================================================================
+        // AFL / CL/OL PERSISTENCE ANALYSIS — RAM Addresses
+        // =====================================================================
+        count += labelComment(0xFFFF316C, "afl_range0_value",
+            "AFL Range 0 learning value (float). Idle zone: 0-6.0 g/s.");
+        count += labelComment(0xFFFF3174, "afl_range1_value",
+            "AFL Range 1 learning value (float). Light cruise: 6.0-23.0 g/s.");
+        count += labelComment(0xFFFF317C, "afl_range2_value",
+            "AFL Range 2 learning value (float). Normal driving: 23.0-40.0 g/s.");
+        count += labelComment(0xFFFF3184, "afl_range3_value",
+            "AFL Range 3 learning value (float). Heavy load: 40.0-80.0 g/s (partially OL).");
+        count += labelComment(0xFFFF31A4, "afl_interp_secondary",
+            "AFL secondary interpolated output (float).");
+        count += labelComment(0xFFFF31AC, "afl_interp_primary",
+            "AFL primary interpolated output (float).");
+        count += labelComment(0xFFFF726C, "transient_state_flag",
+            "Transient state flag (byte). Gates AFL application — when set, forces FFFF7AB4=1.0.");
+        count += labelComment(0xFFFF7448, "clol_mode_flag",
+            "CL/OL mode flag (byte). 1=CL, 0=OL. Gates AFC + AFL learning. Written by 0x031528. Does NOT gate AFL application.");
+        count += labelComment(0xFFFF7449, "clol_cond_A",
+            "CL mode condition A (byte). (FFFF7452==1 AND FFFF744E==2) ? 1 : 0");
+        count += labelComment(0xFFFF744A, "clol_cond_B",
+            "CL mode condition B (byte). (FFFF7452==1 AND FFFF744E==1) ? 1 : 0");
+        count += labelComment(0xFFFF744B, "cl_inhibit",
+            "CL inhibit flag (byte). Copy of FFFF8E98 sensor flag. When !=0: FFFF7448=0.");
+        count += labelComment(0xFFFF744C, "cl_readiness_A",
+            "CL readiness A (byte). Copy of FFFF8F08.");
+        count += labelComment(0xFFFF744D, "cl_readiness_B",
+            "CL readiness B (byte). From func_021D9A.");
+        count += labelComment(0xFFFF744E, "cl_mode_state",
+            "CL mode state (byte). 0/1/2 from func_021D9A of FFFF8F24.");
+        count += labelComment(0xFFFF7452, "cl_master_readiness",
+            "Master CL readiness flag (byte). Written at 0x031966. Multiple conditions + hysteresis.");
+        count += labelComment(0xFFFF79C4, "ol_delay_counter_B",
+            "OL enrichment delay counter_B. Set by CBC62 (modified=0 for immediate OL enrichment).");
+        count += labelComment(0xFFFF79C6, "ol_mode_state",
+            "OL mode state flag (byte). NEVER WRITTEN — always 0. Values 1/2 are dead code hooks in FUN_0003606C.");
+        count += labelComment(0xFFFF79F2, "ol_active_flag",
+            "OL active flag (byte). Written by Path A state machine.");
+        count += labelComment(0xFFFF7AB4, "afl_multiplier_output",
+            "AFL multiplier output (float). Written by afl_application at 0x37B74. Consumed by fuel PW calc at 0x0301E4. Applied unconditionally in CL and OL.");
+        count += labelComment(0xFFFF7C68, "engine_status_flag",
+            "Engine status flag (byte). Gates AFL application — abnormal condition forces FFFF7AB4=1.0.");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }
