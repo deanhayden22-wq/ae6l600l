@@ -1,0 +1,1000 @@
+
+################################################################################
+#                                                                              #
+#  ANALYSIS: Function 0x3162C - FFFF7452 Master CL Readiness Flag             #
+#                                                                              #
+################################################################################
+
+OVERVIEW
+========
+This function computes four output bytes:
+  FFFF7452 - Master CL readiness flag (the primary output)
+  FFFF7450 - Secondary flag (speed-related CL condition)
+  FFFF7451 - Secondary flag (speed + coolant CL condition)
+  FFFF7453 - Tertiary flag (most restrictive, includes AFR stability)
+
+GBR is set to 0xFFFF7450 at function entry, confirmed by the mov.l/ldc sequence
+at 0x31638/0x3163A loading 0xFFFF7450 from pool 0x317E8.
+  GBR+0x00 = FFFF7450    GBR+0x02 = FFFF7452
+  GBR+0x01 = FFFF7451    GBR+0x03 = FFFF7453
+
+
+REGISTER ASSIGNMENTS AT ENTRY TO MAIN LOGIC
+============================================
+  FR8/stack[0]   = float@FFFF6350  (loaded then overwritten; FR8 reused heavily)
+  FR5/stack[4]   = float@FFFF6354
+  FR14           = float@FFFF6898  (RPM - later modified: FR14 = RPM - FR12)
+  FR12           = float@FFFF620C  (speed? used as comparison base)
+  FR15           = float@FFFF6624  (another RPM/frequency value)
+  FR9/stack[8]   = float@FFFF77DC  (overwritten from FFFF77DC)
+  FR8/stack[12]  = float@FFFF7BA8  (the AFR value - key gate)
+  FR7/stack[16]  = float@FFFF7800
+  R8             = word@FFFF67EC   (speed value, unsigned 16-bit)
+  R12            = byte@FFFF7828   (coolant-related flag)
+  R9             = byte@FFFF7829   (speed condition flag)
+  R10            = byte@FFFF72A1   (passed to sub 0x22F92)
+  R5/stack[20]   = result of JSR 0x22F92(R10) then JSR 0x29BA4
+  R14            = byte@FFFFA56B   (engine running/cranking flag)
+  R13            = byte@FFFFACF0   (another condition flag)
+  R6/stack[24]   = result of JSR 0x1CF46  (bit3 of FFFF61F4 test)
+  FR13           = float@FFFF77C0  (coolant temp)
+  FR8/stack[28]  = float@FFFF77C8
+
+
+SUBROUTINE CALLS
+================
+  0x22F92 - Called with R10=byte@FFFF72A1. Returns a flag in R0.
+  0x29BA4 - Called after 0x22F92. Result stored at stack[20].
+  0x1CF46 - Tests bit 3 of byte@FFFF61F4. Returns 1 if bit3 SET.
+            Result stored at stack[24]. This is the EARLY EXIT gate.
+  0x3160E - Wrapper sub, calls 0xBE8AC with R4=table@0xACDF4 and FR4=FR5
+            (BSR from code block 2). Computes speed lookup. Returns word in R0.
+  0xBE830 - Table lookup subroutine (R4=table@0xAD458, FR4=FR15=RPM value).
+            Returns float in FR0.
+  0xBE8AC - Another table lookup (used for speed computation).
+  0xBE608 - Range check subroutine. Called with FR4=input, FR5=0.0, FR6=tolerance.
+            Returns 1 in R0 if input is within range (passes check), 0 if fails.
+
+
+INTERMEDIATE FLAGS (GBR-relative working variables)
+====================================================
+  FFFF7458 - RPM delta hysteresis flag (FR14 = FFFF6898 - FFFF620C)
+             Set to 1 if FR14 > CAL@0xCBE68 (570.0)
+             Cleared to 0 if FR14 > CAL@0xCBE6C (580.0)  [hysteresis band]
+
+  FFFF745D - RPM/frequency hysteresis flag (FR15 = float@FFFF6624)
+             Set to 1 if FR15 > CAL@0xCBE70 (1000.0)
+             Cleared to 0 if FR15 > CAL@0xCBE74 (1100.0)
+
+  FFFF745E - Speed table lookup hysteresis flag
+             Set to 1 if table_result > FR12
+             Cleared to 0 if (table_result - CAL@0xCBEA0=20.0) > FR12
+
+  FFFF7459 - Previous value of R14 (FFFFA56B engine flag)
+  FFFF745A - Previous value of R13 (FFFFACF0 flag)
+
+  FFFF745B - Delay counter 1 (engine flag transition)
+             Reset to 0 when FFFF7459==1 and R14==0 (flag just turned off)
+             Incremented otherwise, up to threshold CAL@0xCBBD6 = 4
+
+  FFFF745C - Delay counter 2 (second flag transition)
+             Reset to 0 when FFFF745A==0 and R13==1 (flag just turned on)
+             Incremented otherwise, up to threshold CAL@0xCBBD6 = 4
+
+  R11      - Combined delay OK flag: 1 if BOTH counters >= threshold (4)
+
+  FFFF745F - Coolant temp low hysteresis
+             Set to 0 if FR13 > CAL@0xCBE8C (0.5)  [below threshold]
+             Set to 1 if FR13 <= CAL@0xCBE90 (0.5)  [above threshold]
+             (Note: both thresholds are 0.5, making this a pure comparison)
+
+  FFFF7460 - Coolant temp high hysteresis
+             Set to 1 if FR13 > CAL@0xCBE94 (5.0) [above threshold]
+             Set to 0 if FR13 <= CAL@0xCBE98 (5.0) [below threshold]
+
+  R14      - Coolant OK composite flag (re-assigned at 0x317B0-0x317C8):
+             R14 = 1 if: R12==0 (tst R12,R12 => bt)
+                    OR  (FFFF745F==1 AND FFFF7460==1)
+             R14 = 0 otherwise
+
+  FFFF7454 - Speed threshold 1 (word, from BSR 0x3160E)
+  FFFF7456 - Speed threshold 2 (word, from JSR 0xBE8AC)
+
+
+EARLY EXIT PATH (0x317CA-0x317DA)
+=================================
+  Load stack[24] (result of sub 0x1CF46)
+  If stack[24] == 1 (bit 3 of byte@FFFF61F4 is SET):
+    FFFF7452 = 0
+    FFFF7450 = 0
+    FFFF7451 = 0
+    Jump to epilogue (0x319E4)
+  Else: fall through to code block 2 at 0x3186C
+
+
+CODE BLOCK 2 - SPEED AND MAIN CONDITION CHECKS (0x3186C-0x319E6)
+==================================================================
+
+Speed condition check (0x3186C-0x318F8):
+  1. Computes speed lookup values into FFFF7454 and FFFF7456
+  2. Checks if temp (stack[0] = float@FFFF6350) > CAL@0xCBE64 (-15.0)
+     If temp <= -15.0: speed_ok = 0 (too cold, skip speed check)
+  3. If R9 (byte@FFFF7829) == 0:
+       Check: R8 (word@FFFF67EC) >= FFFF7454 (speed threshold)
+       If yes: speed_ok (branch to range checks)
+  4. If R9 == 1:
+       Check: R8 >= FFFF7456 (alternate speed threshold)
+       If no: speed_ok = 0
+  5. Range check 1: sub 0xBE608(FR4=float@FFFF798C, FR5=0.0, FR6=3.05e-5)
+     Tests if FFFF798C is near zero (within 3.05e-5)
+     If nonzero result: speed_ok = 0
+  6. Range check 2: sub 0xBE608(FR4=float@FFFF7A20, FR5=0.0, FR6=0.00390625)
+     Tests if FFFF7A20 is near zero (within 0.00390625)
+     If nonzero result: speed_ok = 0
+  7. Check byte@FFFF7D18 == 0 (must be zero)
+     If nonzero: speed_ok = 0
+  8. Check stack[28] (float@FFFF77C8) > CAL@0xCBEA4 (-1.0)
+     If <= -1.0: speed_ok = 0
+
+  R6 = speed_ok (1 if all pass, 0 if any fail)
+  This becomes R4 later.
+
+Throttle/hysteresis condition check (0x318FA-0x31930):
+  Check if ANY of these three flags == 1:
+    - FFFF7458 (RPM delta hysteresis)
+    - FFFF745D (RPM frequency hysteresis)
+    - FFFF745E (speed table hysteresis)
+  If any == 1: check passes (branch to next check)
+  If none == 1:
+    Check stack[20] (result of sub 0x29BA4) == 1
+    If yes: check fails
+    Check byte@FFFF7464 == 0
+    If yes and above passed: R1 = 1
+    Else: R1 = 0
+
+
+FFFF7452 MASTER CL READINESS (0x31932-0x31966)
+================================================
+  FFFF7452 = 1 REQUIRES ALL OF:
+    1. R6 == 1  (speed_ok, renamed to R4)
+    2. R1 == 1  (throttle/hysteresis condition)
+    3. float@FFFF7BA8 (stack[12]) < CAL@0xCBE78 (0.11)
+    4. byte@FFFF7BB0 == 0
+    5. R11 == 1  (both delay counters >= 4)
+    6. R14 == 1  (coolant OK)
+
+  If ANY condition fails: FFFF7452 = 0
+
+
+FFFF7450 FLAG (0x31968-0x31980)
+================================
+  FFFF7450 = 1 REQUIRES ALL OF:
+    1. R4 == 1  (speed_ok)
+    2. stack[20] != 1  (sub 0x29BA4 result)
+    3. R12 == 0  (byte@FFFF7828)
+
+
+FFFF7451 FLAG (0x31982-0x31998)
+================================
+  FFFF7451 = 1 REQUIRES ALL OF:
+    1. R4 == 1  (speed_ok)
+    2. R1 == 1  (throttle/hysteresis condition)
+    3. R12 == 0  (byte@FFFF7828)
+
+
+FFFF7453 FLAG (0x3199A-0x319E6) - MOST RESTRICTIVE
+====================================================
+  FFFF7453 = 1 REQUIRES ALL OF:
+    1. R4 == 1  (speed_ok)
+    2. R1 == 1  (throttle/hysteresis condition)
+    3. float@FFFF7BA8 < 0.11
+    4. float@FFFF77DC (stack[8]) > CAL@0xCBE7C (-0.03)
+       AND float@FFFF77DC < CAL@0xCBE80 (0.0)  (i.e., -0.03 < val < 0.0)
+    5. float@FFFF7800 (stack[16]) > CAL@0xCBE84 (-5.0)
+       AND float@FFFF7800 < CAL@0xCBE88 (5.0)   (i.e., -5.0 < val < 5.0)
+    6. R11 == 1  (both delay counters >= 4)
+
+
+SUMMARY: CONDITIONS FOR FFFF7452 = 1
+======================================
+All of the following must be true simultaneously:
+
+  1. Bit 3 of byte@FFFF61F4 must be CLEAR (sub 0x1CF46 returns 0)
+     -- Confirmed at 0x317CA-0x317D0: early exit sets 7452=0 if bit3 set
+
+  2. Speed condition (R6/R4 = 1):
+     a. float@FFFF6350 > -15.0 (temperature not too cold)
+     b. Speed (R8=word@FFFF67EC) >= speed threshold (FFFF7454 or FFFF7456,
+        depending on byte@FFFF7829)
+     c. float@FFFF798C near zero (within 3.05e-5)
+     d. float@FFFF7A20 near zero (within 0.00390625)
+     e. byte@FFFF7D18 == 0
+     f. float@FFFF77C8 > -1.0
+
+  3. Throttle condition (R1 = 1):
+     At least one of FFFF7458/FFFF745D/FFFF745E == 1 (hysteresis flags)
+     OR (sub_0x29BA4_result != 1 AND byte@FFFF7464 == 0)
+
+  4. float@FFFF7BA8 < 0.11 (CAL@0xCBE78)  -- confirmed
+
+  5. byte@FFFF7BB0 == 0 -- THE KEY GATE, confirmed at 0x3194C-0x31952
+
+  6. Both delay counters >= 4 (R11 = 1):
+     FFFF745B >= CAL@0xCBBD6 (4)  AND  FFFF745C >= CAL@0xCBBD6 (4)
+
+  7. Coolant OK (R14 = 1):
+     Either byte@FFFF7828 == 0
+     OR (FFFF745F == 1 AND FFFF7460 == 1)
+     Which means coolant temp FR13 (float@FFFF77C0) is in range:
+       FR13 >= 0.5 AND FR13 >= 5.0 (effectively FR13 >= 5.0)
+       Note: the hysteresis bands collapse since both thresholds are equal.
+
+
+FFFF7BB0 ANALYSIS
+=================
+At 0x3194C-0x31952:
+  D63A  mov.l @(0x31A38,PC),R6    ; R6 = 0xFFFF7BB0
+  6260  mov.b @R6,R2               ; R2 = byte@FFFF7BB0
+  2228  tst   R2,R2                ; T = (R2 == 0)
+  8B07  bf    0x31964              ; if R2 != 0, branch to FFFF7452=0
+
+This is a hard gate: if FFFF7BB0 is nonzero, FFFF7452 is forced to 0
+regardless of all other conditions being met. This byte is not written
+anywhere in this function -- it must be set by another function externally.
+
+
+KEY RAM ADDRESSES
+=================
+  FFFF61F4 - System status byte (bit 3 = cranking/starting flag?)
+  FFFF620C - Comparison base value (loaded into FR12)
+  FFFF6350 - Temperature value (checked > -15.0)
+  FFFF6354 - Input to speed computation
+  FFFF6624 - RPM/frequency value (loaded into FR15)
+  FFFF6898 - RPM value (loaded into FR14, delta computed)
+  FFFF653C - (loaded but overwritten by FFFF77DC)
+  FFFF67EC - Vehicle speed (word, compared to thresholds)
+  FFFF72A1 - Input to sub 0x22F92
+  FFFF7450 - Output: secondary CL flag
+  FFFF7451 - Output: secondary CL flag (with coolant)
+  FFFF7452 - Output: MASTER CL READINESS FLAG
+  FFFF7453 - Output: most restrictive CL flag
+  FFFF7454 - Speed threshold 1 (computed, word)
+  FFFF7456 - Speed threshold 2 (computed, word)
+  FFFF7458 - RPM delta hysteresis flag
+  FFFF7459 - Previous engine running flag
+  FFFF745A - Previous condition flag
+  FFFF745B - Delay counter 1
+  FFFF745C - Delay counter 2
+  FFFF745D - RPM frequency hysteresis flag
+  FFFF745E - Speed lookup hysteresis flag
+  FFFF745F - Coolant temp low flag
+  FFFF7460 - Coolant temp high flag
+  FFFF7464 - External condition flag (must be 0)
+  FFFF77C0 - Coolant temperature (float)
+  FFFF77C8 - Some temperature/value (float, checked > -1.0)
+  FFFF77DC - AFR-related value (float, for FFFF7453: must be -0.03..0.0)
+  FFFF7800 - Another value (float, for FFFF7453: must be -5.0..5.0)
+  FFFF7828 - Coolant condition byte
+  FFFF7829 - Speed mode selector byte
+  FFFF798C - Must be near zero (within 3.05e-5)
+  FFFF7A20 - Must be near zero (within 0.00390625)
+  FFFF7BA8 - AFR readiness value (float, must be < 0.11) -- CONFIRMED
+  FFFF7BB0 - KEY GATE byte (must be 0) -- CONFIRMED
+  FFFF7D18 - Must be 0
+  FFFFA56B - Engine running/cranking flag
+  FFFFACF0 - Condition flag
+
+CALIBRATION VALUES
+==================
+  0x0CBE64 = -15.0   (min temp for speed check)
+  0x0CBE68 = 570.0   (RPM delta hysteresis ON threshold)
+  0x0CBE6C = 580.0   (RPM delta hysteresis OFF threshold)
+  0x0CBE70 = 1000.0  (RPM freq hysteresis ON threshold)
+  0x0CBE74 = 1100.0  (RPM freq hysteresis OFF threshold)
+  0x0CBE78 = 0.11    (AFR readiness threshold for FFFF7BA8)
+  0x0CBE7C = -0.03   (FFFF77DC lower bound for FFFF7453)
+  0x0CBE80 = 0.0     (FFFF77DC upper bound for FFFF7453)
+  0x0CBE84 = -5.0    (FFFF7800 lower bound for FFFF7453)
+  0x0CBE88 = 5.0     (FFFF7800 upper bound for FFFF7453)
+  0x0CBE8C = 0.5     (coolant low threshold)
+  0x0CBE90 = 0.5     (coolant low threshold - same, no hysteresis)
+  0x0CBE94 = 5.0     (coolant high threshold)
+  0x0CBE98 = 5.0     (coolant high threshold - same, no hysteresis)
+  0x0CBEA0 = 20.0    (speed hysteresis offset)
+  0x0CBEA4 = -1.0    (FFFF77C8 minimum)
+  0x0CBBD6 = 4 (byte) (delay counter threshold)
+  0x0AD458 = table    (speed lookup table 1)
+  0x0ACE00 = table    (speed lookup table 2)
+  0x0ACDF4 = table    (speed lookup table for wrapper sub)
+
+################################################################################
+#                          RAW DISASSEMBLY FOLLOWS                             #
+################################################################################
+
+==================================================================================================================================
+COMPLETE ANNOTATED DISASSEMBLY: Function at 0x3162C
+Purpose: Compute FFFF7452 master CL readiness flag
+ROM: C:/Users/Dean/Documents/GitHub/ae6l600l/rom/AE5L600L 20g rev 20.5 tiny wrex.bin
+Processor: SH7058 (SH-2), Big-endian, ROM base = 0x00000000, RAM = 0xFFFF0000-0xFFFFFFFF
+GBR = 0xFFFF7450
+GBR+0x02 = FFFF7452 (master CL readiness flag)
+Code block 1: 0x3162C - 0x317DC
+Literal pool 1: 0x317DC - 0x3186C
+Code block 2: 0x3186C - 0x31A06
+==================================================================================================================================
+
+;================================================================================
+; CODE BLOCK 1: 0x3162C - 0x317DC
+;================================================================================
+  3162C:  4F22    sts.l  PR,@-R15
+  3162E:  FFCB    fmov.s FR12,@-R15
+  31630:  FFDB    fmov.s FR13,@-R15
+  31632:  FFEB    fmov.s FR14,@-R15
+  31634:  FFFB    fmov.s FR15,@-R15
+  31636:  4F13    stc.l  GBR,@-R15
+  31638:  D06B    mov.l  @(0x317E8,PC),R0                           ; R0 = 0xFFFF7450 (RAM) [pool 0x317E8]
+  3163A:  401E    ldc    R0,GBR
+  3163C:  7FB4    add    #-76,R15                                   ; SP adjust: SP += -76
+  3163E:  D26B    mov.l  @(0x317EC,PC),R2                           ; R2 = 0xFFFF6350 (RAM) [pool 0x317EC]
+  31640:  F828    fmov.s @R2,FR8
+  31642:  FF8A    fmov.s FR8,@R15
+  31644:  D26A    mov.l  @(0x317F0,PC),R2                           ; R2 = 0xFFFF6354 (RAM) [pool 0x317F0]
+  31646:  F528    fmov.s @R2,FR5
+  31648:  E004    mov    #4,R0                                      ; R0 = 4 (0x04)
+  3164A:  FF57    fmov.s FR5,@(R0,R15)
+  3164C:  D269    mov.l  @(0x317F4,PC),R2                           ; R2 = 0xFFFF6898 (RAM) [pool 0x317F4]
+  3164E:  FE28    fmov.s @R2,FR14
+  31650:  D269    mov.l  @(0x317F8,PC),R2                           ; R2 = 0xFFFF620C (RAM) [pool 0x317F8]
+  31652:  FC28    fmov.s @R2,FR12
+  31654:  D269    mov.l  @(0x317FC,PC),R2                           ; R2 = 0xFFFF6624 (RAM) [pool 0x317FC]
+  31656:  FF28    fmov.s @R2,FR15
+  31658:  D269    mov.l  @(0x31800,PC),R2                           ; R2 = 0xFFFF653C (RAM) [pool 0x31800]
+  3165A:  F928    fmov.s @R2,FR9
+  3165C:  D269    mov.l  @(0x31804,PC),R2                           ; R2 = 0xFFFF77DC (RAM) [pool 0x31804]
+  3165E:  F928    fmov.s @R2,FR9
+  31660:  E008    mov    #8,R0                                      ; R0 = 8 (0x08)
+  31662:  FF97    fmov.s FR9,@(R0,R15)
+  31664:  D268    mov.l  @(0x31808,PC),R2                           ; R2 = 0xFFFF7BA8 (RAM) [pool 0x31808]
+  31666:  F828    fmov.s @R2,FR8
+  31668:  E00C    mov    #12,R0                                     ; R0 = 12 (0x0C)
+  3166A:  FF87    fmov.s FR8,@(R0,R15)
+  3166C:  D267    mov.l  @(0x3180C,PC),R2                           ; R2 = 0xFFFF7800 (RAM) [pool 0x3180C]
+  3166E:  F728    fmov.s @R2,FR7
+  31670:  E010    mov    #16,R0                                     ; R0 = 16 (0x10)
+  31672:  FF77    fmov.s FR7,@(R0,R15)
+  31674:  D666    mov.l  @(0x31810,PC),R6                           ; R6 = 0xFFFF67EC (RAM) [pool 0x31810]
+  31676:  6861    mov.w  @R6,R8
+  31678:  D666    mov.l  @(0x31814,PC),R6                           ; R6 = 0xFFFF7828 (RAM) [pool 0x31814]
+  3167A:  6C60    mov.b  @R6,R12
+  3167C:  D666    mov.l  @(0x31818,PC),R6                           ; R6 = 0xFFFF7829 (RAM) [pool 0x31818]
+  3167E:  6960    mov.b  @R6,R9
+  31680:  D666    mov.l  @(0x3181C,PC),R6                           ; R6 = 0xFFFF72A1 (RAM) [pool 0x3181C]
+  31682:  D267    mov.l  @(0x31820,PC),R2                           ; R2 = 0x00022F92 (ROM) [pool 0x31820]
+  31684:  420B    jsr    @R2                                        ; call via R2
+  31686:  6A60    mov.b  @R6,R10
+  31688:  6503    mov    R0,R5
+  3168A:  E014    mov    #20,R0                                     ; R0 = 20 (0x14)
+  3168C:  D265    mov.l  @(0x31824,PC),R2                           ; R2 = 0x00029BA4 (ROM) [pool 0x31824]
+  3168E:  420B    jsr    @R2                                        ; call via R2
+  31690:  0F54    mov.b  R5,@(R0,R15)
+  31692:  D665    mov.l  @(0x31828,PC),R6                           ; R6 = 0xFFFFA56B (RAM) [pool 0x31828]
+  31694:  6E60    mov.b  @R6,R14
+  31696:  D665    mov.l  @(0x3182C,PC),R6                           ; R6 = 0xFFFFACF0 (RAM) [pool 0x3182C]
+  31698:  D265    mov.l  @(0x31830,PC),R2                           ; R2 = 0x0001CF46 (ROM) [pool 0x31830]
+  3169A:  420B    jsr    @R2                                        ; call via R2
+  3169C:  6D60    mov.b  @R6,R13
+  3169E:  6603    mov    R0,R6
+  316A0:  E018    mov    #24,R0                                     ; R0 = 24 (0x18)
+  316A2:  0F64    mov.b  R6,@(R0,R15)
+  316A4:  D263    mov.l  @(0x31834,PC),R2                           ; R2 = 0xFFFF77C0 (RAM) [pool 0x31834]
+  316A6:  FD28    fmov.s @R2,FR13
+  316A8:  D263    mov.l  @(0x31838,PC),R2                           ; R2 = 0xFFFF77C8 (RAM) [pool 0x31838]
+  316AA:  F828    fmov.s @R2,FR8
+  316AC:  E01C    mov    #28,R0                                     ; R0 = 28 (0x1C)
+  316AE:  FF87    fmov.s FR8,@(R0,R15)
+  316B0:  FEC1    fsub   FR12,FR14
+  316B2:  D262    mov.l  @(0x3183C,PC),R2                           ; R2 = 0x000CBE68 (CAL) [pool 0x3183C] float=570.0
+  316B4:  F828    fmov.s @R2,FR8
+  316B6:  FE85    fcmp/gt FR8,FR14
+  316B8:  8902    bt     0x316C0
+  316BA:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+  316BC:  A006    bra    0x316CC
+  316BE:  C008    mov.b  R0,@(0x08,GBR)                             ; write byte [FFFF7458]
+
+  loc_316C0:
+  316C0:  D25F    mov.l  @(0x31840,PC),R2                           ; R2 = 0x000CBE6C (CAL) [pool 0x31840] float=580.0
+  316C2:  F828    fmov.s @R2,FR8
+  316C4:  FE85    fcmp/gt FR8,FR14
+  316C6:  8B01    bf     0x316CC
+  316C8:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+  316CA:  C008    mov.b  R0,@(0x08,GBR)                             ; write byte [FFFF7458]
+
+  loc_316CC:
+  316CC:  D25D    mov.l  @(0x31844,PC),R2                           ; R2 = 0x000CBE70 (CAL) [pool 0x31844] float=1000.0
+  316CE:  F828    fmov.s @R2,FR8
+  316D0:  FF85    fcmp/gt FR8,FR15
+  316D2:  8902    bt     0x316DA
+  316D4:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+  316D6:  A006    bra    0x316E6
+  316D8:  C00D    mov.b  R0,@(0x0D,GBR)                             ; write byte [FFFF745D]
+
+  loc_316DA:
+  316DA:  D25B    mov.l  @(0x31848,PC),R2                           ; R2 = 0x000CBE74 (CAL) [pool 0x31848] float=1100.0
+  316DC:  F828    fmov.s @R2,FR8
+  316DE:  FF85    fcmp/gt FR8,FR15
+  316E0:  8B01    bf     0x316E6
+  316E2:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+  316E4:  C00D    mov.b  R0,@(0x0D,GBR)                             ; write byte [FFFF745D]
+
+  loc_316E6:
+  316E6:  D459    mov.l  @(0x3184C,PC),R4                           ; R4 = 0x000AD458 (CAL) [pool 0x3184C] float=1.8367099231598242e-40
+  316E8:  D259    mov.l  @(0x31850,PC),R2                           ; R2 = 0x000BE830 (CAL) [pool 0x31850] float=2726641664.0
+  316EA:  420B    jsr    @R2                                        ; call via R2
+  316EC:  F4FC    fmov   FR15,FR4
+  316EE:  F0C5    fcmp/gt FR12,FR0
+  316F0:  8902    bt     0x316F8
+  316F2:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+  316F4:  A007    bra    0x31706
+  316F6:  C00E    mov.b  R0,@(0x0E,GBR)                             ; write byte [FFFF745E]
+
+  loc_316F8:
+  316F8:  D256    mov.l  @(0x31854,PC),R2                           ; R2 = 0x000CBEA0 (CAL) [pool 0x31854] float=20.0
+  316FA:  F828    fmov.s @R2,FR8
+  316FC:  F081    fsub   FR8,FR0
+  316FE:  F0C5    fcmp/gt FR12,FR0
+  31700:  8B01    bf     0x31706
+  31702:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+  31704:  C00E    mov.b  R0,@(0x0E,GBR)                             ; write byte [FFFF745E]
+
+  loc_31706:
+  31706:  C409    mov.b  @(0x09,GBR),R0                             ; R0 = byte [FFFF7459]
+  31708:  1F08    mov.l  R0,@(32,R15)
+  3170A:  600C    extu.b R0,R0
+  3170C:  8801    cmp/eq #1,R0
+  3170E:  8F05    bf/s   0x3171C
+  31710:  EB01    mov    #1,R11                                     ; R11 = 1 (0x01)
+  31712:  2EE8    tst    R14,R14
+  31714:  8B02    bf     0x3171C
+  31716:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+  31718:  A00C    bra    0x31734
+  3171A:  C00B    mov.b  R0,@(0x0B,GBR)                             ; write byte [FFFF745B]
+
+  loc_3171C:
+  3171C:  C40B    mov.b  @(0x0B,GBR),R0                             ; R0 = byte [FFFF745B]
+  3171E:  1F09    mov.l  R0,@(36,R15)
+  31720:  640C    extu.b R0,R4
+  31722:  D54D    mov.l  @(0x31858,PC),R5                           ; R5 = 0x000CBBD6 (CAL) [pool 0x31858] float=1.8807920375128806e-36
+  31724:  6250    mov.b  @R5,R2
+  31726:  662C    extu.b R2,R6
+  31728:  3463    cmp/ge  R6,R4
+  3172A:  8903    bt     0x31734
+  3172C:  C40B    mov.b  @(0x0B,GBR),R0                             ; R0 = byte [FFFF745B]
+  3172E:  1F0A    mov.l  R0,@(40,R15)
+  31730:  7001    add    #1,R0
+  31732:  C00B    mov.b  R0,@(0x0B,GBR)                             ; write byte [FFFF745B]
+
+  loc_31734:
+  31734:  C40A    mov.b  @(0x0A,GBR),R0                             ; R0 = byte [FFFF745A]
+  31736:  2008    tst    R0,R0
+  31738:  8F06    bf/s   0x31748
+  3173A:  1F0B    mov.l  R0,@(44,R15)
+  3173C:  60DC    extu.b R13,R0
+  3173E:  8801    cmp/eq #1,R0
+  31740:  8B02    bf     0x31748
+  31742:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+  31744:  A00C    bra    0x31760
+  31746:  C00C    mov.b  R0,@(0x0C,GBR)                             ; write byte [FFFF745C]
+
+  loc_31748:
+  31748:  C40C    mov.b  @(0x0C,GBR),R0                             ; R0 = byte [FFFF745C]
+  3174A:  1F0C    mov.l  R0,@(48,R15)
+  3174C:  640C    extu.b R0,R4
+  3174E:  D542    mov.l  @(0x31858,PC),R5                           ; R5 = 0x000CBBD6 (CAL) [pool 0x31858] float=1.8807920375128806e-36
+  31750:  6250    mov.b  @R5,R2
+  31752:  662C    extu.b R2,R6
+  31754:  3463    cmp/ge  R6,R4
+  31756:  8903    bt     0x31760
+  31758:  C40C    mov.b  @(0x0C,GBR),R0                             ; R0 = byte [FFFF745C]
+  3175A:  1F0D    mov.l  R0,@(52,R15)
+  3175C:  7001    add    #1,R0
+  3175E:  C00C    mov.b  R0,@(0x0C,GBR)                             ; write byte [FFFF745C]
+
+  loc_31760:
+  31760:  60E3    mov    R14,R0
+  31762:  C009    mov.b  R0,@(0x09,GBR)                             ; write byte [FFFF7459]
+  31764:  60D3    mov    R13,R0
+  31766:  C00A    mov.b  R0,@(0x0A,GBR)                             ; write byte [FFFF745A]
+  31768:  C40B    mov.b  @(0x0B,GBR),R0                             ; R0 = byte [FFFF745B]
+  3176A:  D53B    mov.l  @(0x31858,PC),R5                           ; R5 = 0x000CBBD6 (CAL) [pool 0x31858] float=1.8807920375128806e-36
+  3176C:  6250    mov.b  @R5,R2
+  3176E:  3022    cmp/hs  R2,R0
+  31770:  8B03    bf     0x3177A
+  31772:  C40C    mov.b  @(0x0C,GBR),R0                             ; R0 = byte [FFFF745C]
+  31774:  6250    mov.b  @R5,R2
+  31776:  3022    cmp/hs  R2,R0
+  31778:  8900    bt     0x3177C
+
+  loc_3177A:
+  3177A:  EB00    mov    #0,R11                                     ; R11 = 0 (0x00)
+
+  loc_3177C:
+  3177C:  D237    mov.l  @(0x3185C,PC),R2                           ; R2 = 0x000CBE8C (CAL) [pool 0x3185C] float=0.5
+  3177E:  F828    fmov.s @R2,FR8
+  31780:  F8D5    fcmp/gt FR13,FR8
+  31782:  8B02    bf     0x3178A
+  31784:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+  31786:  A006    bra    0x31796
+  31788:  C00F    mov.b  R0,@(0x0F,GBR)                             ; write byte [FFFF745F]
+
+  loc_3178A:
+  3178A:  D235    mov.l  @(0x31860,PC),R2                           ; R2 = 0x000CBE90 (CAL) [pool 0x31860] float=0.5
+  3178C:  F828    fmov.s @R2,FR8
+  3178E:  F8D5    fcmp/gt FR13,FR8
+  31790:  8901    bt     0x31796
+  31792:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+  31794:  C00F    mov.b  R0,@(0x0F,GBR)                             ; write byte [FFFF745F]
+
+  loc_31796:
+  31796:  D233    mov.l  @(0x31864,PC),R2                           ; R2 = 0x000CBE94 (CAL) [pool 0x31864] float=5.0
+  31798:  F828    fmov.s @R2,FR8
+  3179A:  F8D5    fcmp/gt FR13,FR8
+  3179C:  8B02    bf     0x317A4
+  3179E:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+  317A0:  A006    bra    0x317B0
+  317A2:  C010    mov.b  R0,@(0x10,GBR)                             ; write byte [FFFF7460]
+
+  loc_317A4:
+  317A4:  D230    mov.l  @(0x31868,PC),R2                           ; R2 = 0x000CBE98 (CAL) [pool 0x31868] float=5.0
+  317A6:  F828    fmov.s @R2,FR8
+  317A8:  F8D5    fcmp/gt FR13,FR8
+  317AA:  8901    bt     0x317B0
+  317AC:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+  317AE:  C010    mov.b  R0,@(0x10,GBR)                             ; write byte [FFFF7460]
+
+  loc_317B0:
+  317B0:  2CC8    tst    R12,R12
+  317B2:  8909    bt     0x317C8
+  317B4:  C40F    mov.b  @(0x0F,GBR),R0                             ; R0 = byte [FFFF745F]
+  317B6:  8801    cmp/eq #1,R0
+  317B8:  8B04    bf     0x317C4
+  317BA:  C410    mov.b  @(0x10,GBR),R0                             ; R0 = byte [FFFF7460]
+  317BC:  1F0E    mov.l  R0,@(56,R15)
+  317BE:  600C    extu.b R0,R0
+  317C0:  8801    cmp/eq #1,R0
+  317C2:  8901    bt     0x317C8
+
+  loc_317C4:
+  317C4:  A001    bra    0x317CA
+  317C6:  EE00    mov    #0,R14                                     ; R14 = 0 (0x00)
+
+  loc_317C8:
+  317C8:  EE01    mov    #1,R14                                     ; R14 = 1 (0x01)
+
+  loc_317CA:
+  317CA:  E018    mov    #24,R0                                     ; R0 = 24 (0x18)
+  317CC:  00FC    mov.b  @(R0,R15),R0
+  317CE:  8801    cmp/eq #1,R0
+  317D0:  8B4C    bf     0x3186C
+  317D2:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+  317D4:  C002    mov.b  R0,@(0x02,GBR)                             ; write byte [FFFF7452]
+  317D6:  C000    mov.b  R0,@(0x00,GBR)                             ; write byte [FFFF7450]
+  317D8:  A104    bra    0x319E4
+  317DA:  C001    mov.b  R0,@(0x01,GBR)                             ; write byte [FFFF7451]
+
+;================================================================================
+; LITERAL POOL 1: 0x317DC - 0x3186C
+;================================================================================
+  317DC:  FFFF745B  RAM    <- RAM
+  317E0:  000ACDF4  CAL    <- CAL float=1.4722377977827966e-39
+  317E4:  000BE8AC  CAL    <- CAL float=2726641664.0
+  317E8:  FFFF7450  RAM    <- RAM
+  317EC:  FFFF6350  RAM    <- RAM
+  317F0:  FFFF6354  RAM    <- RAM
+  317F4:  FFFF6898  RAM    <- RAM
+  317F8:  FFFF620C  RAM    <- RAM
+  317FC:  FFFF6624  RAM    <- RAM
+  31800:  FFFF653C  RAM    <- RAM
+  31804:  FFFF77DC  RAM    <- RAM
+  31808:  FFFF7BA8  RAM    <- RAM
+  3180C:  FFFF7800  RAM    <- RAM
+  31810:  FFFF67EC  RAM    <- RAM
+  31814:  FFFF7828  RAM    <- RAM
+  31818:  FFFF7829  RAM    <- RAM
+  3181C:  FFFF72A1  RAM    <- RAM
+  31820:  00022F92  ROM    <- ROM
+  31824:  00029BA4  ROM    <- ROM
+  31828:  FFFFA56B  RAM    <- RAM
+  3182C:  FFFFACF0  RAM    <- RAM
+  31830:  0001CF46  ROM    <- ROM
+  31834:  FFFF77C0  RAM    <- RAM
+  31838:  FFFF77C8  RAM    <- RAM
+  3183C:  000CBE68  CAL    <- CAL float=570.0
+  31840:  000CBE6C  CAL    <- CAL float=580.0
+  31844:  000CBE70  CAL    <- CAL float=1000.0
+  31848:  000CBE74  CAL    <- CAL float=1100.0
+  3184C:  000AD458  CAL    <- CAL float=1.8367099231598242e-40
+  31850:  000BE830  CAL    <- CAL float=2726641664.0
+  31854:  000CBEA0  CAL    <- CAL float=20.0
+  31858:  000CBBD6  CAL    <- CAL float=1.8807920375128806e-36
+  3185C:  000CBE8C  CAL    <- CAL float=0.5
+  31860:  000CBE90  CAL    <- CAL float=0.5
+  31864:  000CBE94  CAL    <- CAL float=5.0
+  31868:  000CBE98  CAL    <- CAL float=5.0
+
+;================================================================================
+; CODE BLOCK 2: 0x3186C - 0x31A06
+;================================================================================
+
+  loc_3186C:
+  3186C:  E004    mov    #4,R0                                      ; R0 = 4 (0x04)
+  3186E:  F5F6    fmov.s @(R0,R15),FR5
+  31870:  F45C    fmov   FR5,FR4
+  31872:  BECC    bsr    0x3160E                                    ; call 0x3160E
+  31874:  64AC    extu.b R10,R4
+  31876:  C102    mov.w  R0,@(0x004,GBR)                            ; write word [FFFF7454]
+  31878:  D463    mov.l  @(0x31A08,PC),R4                           ; R4 = 0x000ACE00 (CAL) [pool 0x31A08] float=1.4722377977827966e-39
+  3187A:  D264    mov.l  @(0x31A0C,PC),R2                           ; R2 = 0x000BE8AC (CAL) [pool 0x31A0C] float=2726641664.0
+  3187C:  E004    mov    #4,R0                                      ; R0 = 4 (0x04)
+  3187E:  F5F6    fmov.s @(R0,R15),FR5
+  31880:  420B    jsr    @R2                                        ; call via R2
+  31882:  F45C    fmov   FR5,FR4
+  31884:  C103    mov.w  R0,@(0x006,GBR)                            ; write word [FFFF7456]
+  31886:  F6F8    fmov.s @R15,FR6
+  31888:  D261    mov.l  @(0x31A10,PC),R2                           ; R2 = 0x000CBE64 (CAL) [pool 0x31A10] float=-15.0
+  3188A:  F828    fmov.s @R2,FR8
+  3188C:  F865    fcmp/gt FR6,FR8
+  3188E:  8933    bt     0x318F8
+  31890:  649C    extu.b R9,R4
+  31892:  2448    tst    R4,R4
+  31894:  8B05    bf     0x318A2
+  31896:  C502    mov.w  @(0x004,GBR),R0                            ; R0 = word [FFFF7454]
+  31898:  660D    extu.w R0,R6
+  3189A:  628D    extu.w R8,R2
+  3189C:  3263    cmp/ge  R6,R2
+  3189E:  8D0B    bt/s   0x318B8
+  318A0:  1F0F    mov.l  R0,@(60,R15)
+
+  loc_318A2:
+  318A2:  6043    mov    R4,R0
+  318A4:  8801    cmp/eq #1,R0
+  318A6:  8B27    bf     0x318F8
+  318A8:  C503    mov.w  @(0x006,GBR),R0                            ; R0 = word [FFFF7456]
+  318AA:  6603    mov    R0,R6
+  318AC:  E040    mov    #64,R0                                     ; R0 = 64 (0x40)
+  318AE:  0F66    mov.l  R6,@(R0,R15)
+  318B0:  666D    extu.w R6,R6
+  318B2:  628D    extu.w R8,R2
+  318B4:  3263    cmp/ge  R6,R2
+  318B6:  8B1F    bf     0x318F8
+
+  loc_318B8:
+  318B8:  D656    mov.l  @(0x31A14,PC),R6                           ; R6 = 0x000BE608 (CAL) [pool 0x31A14] float=-1.7505517876329244e+31
+  318BA:  C757    mova   @(0x31A18,PC),R0                           ; R0 = 0x31A18 (-> 0x38000000)
+  318BC:  F608    fmov.s @R0,FR6
+  318BE:  F58D    fldi0  FR5
+  318C0:  D256    mov.l  @(0x31A1C,PC),R2                           ; R2 = 0xFFFF798C (RAM) [pool 0x31A1C]
+  318C2:  460B    jsr    @R6                                        ; call via R6
+  318C4:  F428    fmov.s @R2,FR4
+  318C6:  620C    extu.b R0,R2
+  318C8:  2228    tst    R2,R2
+  318CA:  8B15    bf     0x318F8
+  318CC:  D651    mov.l  @(0x31A14,PC),R6                           ; R6 = 0x000BE608 (CAL) [pool 0x31A14] float=-1.7505517876329244e+31
+  318CE:  F58D    fldi0  FR5
+  318D0:  C753    mova   @(0x31A20,PC),R0                           ; R0 = 0x31A20 (-> 0x3B800000)
+  318D2:  F608    fmov.s @R0,FR6
+  318D4:  D253    mov.l  @(0x31A24,PC),R2                           ; R2 = 0xFFFF7A20 (RAM) [pool 0x31A24]
+  318D6:  460B    jsr    @R6                                        ; call via R6
+  318D8:  F428    fmov.s @R2,FR4
+  318DA:  620C    extu.b R0,R2
+  318DC:  2228    tst    R2,R2
+  318DE:  8B0B    bf     0x318F8
+  318E0:  D651    mov.l  @(0x31A28,PC),R6                           ; R6 = 0xFFFF7D18 (RAM) [pool 0x31A28]
+  318E2:  6260    mov.b  @R6,R2
+  318E4:  2228    tst    R2,R2
+  318E6:  8B07    bf     0x318F8
+  318E8:  E01C    mov    #28,R0                                     ; R0 = 28 (0x1C)
+  318EA:  F9F6    fmov.s @(R0,R15),FR9
+  318EC:  D24F    mov.l  @(0x31A2C,PC),R2                           ; R2 = 0x000CBEA4 (CAL) [pool 0x31A2C] float=-1.0
+  318EE:  F828    fmov.s @R2,FR8
+  318F0:  F985    fcmp/gt FR8,FR9
+  318F2:  8B01    bf     0x318F8
+  318F4:  A001    bra    0x318FA
+  318F6:  E601    mov    #1,R6                                      ; R6 = 1 (0x01)
+
+  loc_318F8:
+  318F8:  E600    mov    #0,R6                                      ; R6 = 0 (0x00)
+
+  loc_318FA:
+  318FA:  C408    mov.b  @(0x08,GBR),R0                             ; R0 = byte [FFFF7458]
+  318FC:  8801    cmp/eq #1,R0
+  318FE:  890D    bt     0x3191C
+  31900:  C40D    mov.b  @(0x0D,GBR),R0                             ; R0 = byte [FFFF745D]
+  31902:  6203    mov    R0,R2
+  31904:  E044    mov    #68,R0                                     ; R0 = 68 (0x44)
+  31906:  0F26    mov.l  R2,@(R0,R15)
+  31908:  602C    extu.b R2,R0
+  3190A:  8801    cmp/eq #1,R0
+  3190C:  8906    bt     0x3191C
+  3190E:  C40E    mov.b  @(0x0E,GBR),R0                             ; R0 = byte [FFFF745E]
+  31910:  6203    mov    R0,R2
+  31912:  E048    mov    #72,R0                                     ; R0 = 72 (0x48)
+  31914:  0F26    mov.l  R2,@(R0,R15)
+  31916:  602C    extu.b R2,R0
+  31918:  8801    cmp/eq #1,R0
+  3191A:  8B09    bf     0x31930
+
+  loc_3191C:
+  3191C:  E014    mov    #20,R0                                     ; R0 = 20 (0x14)
+  3191E:  00FC    mov.b  @(R0,R15),R0
+  31920:  8801    cmp/eq #1,R0
+  31922:  8905    bt     0x31930
+  31924:  D542    mov.l  @(0x31A30,PC),R5                           ; R5 = 0xFFFF7464 (RAM) [pool 0x31A30]
+  31926:  6250    mov.b  @R5,R2
+  31928:  2228    tst    R2,R2
+  3192A:  8B01    bf     0x31930
+  3192C:  A001    bra    0x31932
+  3192E:  E101    mov    #1,R1                                      ; R1 = 1 (0x01)
+
+  loc_31930:
+  31930:  E100    mov    #0,R1                                      ; R1 = 0 (0x00)
+
+  loc_31932:
+  31932:  6063    mov    R6,R0
+  31934:  8801    cmp/eq #1,R0
+  31936:  8F15    bf/s   0x31964
+  31938:  6463    mov    R6,R4
+  3193A:  6013    mov    R1,R0
+  3193C:  8801    cmp/eq #1,R0
+  3193E:  8B11    bf     0x31964
+  31940:  E00C    mov    #12,R0                                     ; R0 = 12 (0x0C)
+  31942:  F1F6    fmov.s @(R0,R15),FR1
+  31944:  D23B    mov.l  @(0x31A34,PC),R2                           ; R2 = 0x000CBE78 (CAL) [pool 0x31A34] float=0.10999999940395355
+  31946:  F828    fmov.s @R2,FR8
+  31948:  F815    fcmp/gt FR1,FR8
+  3194A:  8B0B    bf     0x31964
+  3194C:  D63A    mov.l  @(0x31A38,PC),R6                           ; R6 = 0xFFFF7BB0 (RAM) [pool 0x31A38]
+  3194E:  6260    mov.b  @R6,R2
+  31950:  2228    tst    R2,R2
+  31952:  8B07    bf     0x31964
+  31954:  60B3    mov    R11,R0
+  31956:  8801    cmp/eq #1,R0
+  31958:  8B04    bf     0x31964
+  3195A:  60E3    mov    R14,R0
+  3195C:  8801    cmp/eq #1,R0
+  3195E:  8B01    bf     0x31964
+  31960:  A001    bra    0x31966
+  31962:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+
+  loc_31964:
+  31964:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+
+  loc_31966:
+  31966:  C002    mov.b  R0,@(0x02,GBR)                             ; write byte [FFFF7452]
+  31968:  6043    mov    R4,R0
+  3196A:  8801    cmp/eq #1,R0
+  3196C:  8B07    bf     0x3197E
+  3196E:  E014    mov    #20,R0                                     ; R0 = 20 (0x14)
+  31970:  00FC    mov.b  @(R0,R15),R0
+  31972:  8801    cmp/eq #1,R0
+  31974:  8903    bt     0x3197E
+  31976:  2CC8    tst    R12,R12
+  31978:  8B01    bf     0x3197E
+  3197A:  A001    bra    0x31980
+  3197C:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+
+  loc_3197E:
+  3197E:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+
+  loc_31980:
+  31980:  C000    mov.b  R0,@(0x00,GBR)                             ; write byte [FFFF7450]
+  31982:  6043    mov    R4,R0
+  31984:  8801    cmp/eq #1,R0
+  31986:  8B06    bf     0x31996
+  31988:  6013    mov    R1,R0
+  3198A:  8801    cmp/eq #1,R0
+  3198C:  8B03    bf     0x31996
+  3198E:  2CC8    tst    R12,R12
+  31990:  8B01    bf     0x31996
+  31992:  A001    bra    0x31998
+  31994:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+
+  loc_31996:
+  31996:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+
+  loc_31998:
+  31998:  C001    mov.b  R0,@(0x01,GBR)                             ; write byte [FFFF7451]
+  3199A:  6043    mov    R4,R0
+  3199C:  8801    cmp/eq #1,R0
+  3199E:  8B21    bf     0x319E4
+  319A0:  6013    mov    R1,R0
+  319A2:  8801    cmp/eq #1,R0
+  319A4:  8B1E    bf     0x319E4
+  319A6:  E00C    mov    #12,R0                                     ; R0 = 12 (0x0C)
+  319A8:  F1F6    fmov.s @(R0,R15),FR1
+  319AA:  D222    mov.l  @(0x31A34,PC),R2                           ; R2 = 0x000CBE78 (CAL) [pool 0x31A34] float=0.10999999940395355
+  319AC:  F828    fmov.s @R2,FR8
+  319AE:  F815    fcmp/gt FR1,FR8
+  319B0:  8B18    bf     0x319E4
+  319B2:  E008    mov    #8,R0                                      ; R0 = 8 (0x08)
+  319B4:  F8F6    fmov.s @(R0,R15),FR8
+  319B6:  D221    mov.l  @(0x31A3C,PC),R2                           ; R2 = 0x000CBE7C (CAL) [pool 0x31A3C] float=-0.029999999329447746
+  319B8:  F928    fmov.s @R2,FR9
+  319BA:  F985    fcmp/gt FR8,FR9
+  319BC:  8912    bt     0x319E4
+  319BE:  D220    mov.l  @(0x31A40,PC),R2                           ; R2 = 0x000CBE80 (CAL) [pool 0x31A40] float=0.0
+  319C0:  F928    fmov.s @R2,FR9
+  319C2:  F985    fcmp/gt FR8,FR9
+  319C4:  8B0E    bf     0x319E4
+  319C6:  E010    mov    #16,R0                                     ; R0 = 16 (0x10)
+  319C8:  F7F6    fmov.s @(R0,R15),FR7
+  319CA:  D21E    mov.l  @(0x31A44,PC),R2                           ; R2 = 0x000CBE84 (CAL) [pool 0x31A44] float=-5.0
+  319CC:  F828    fmov.s @R2,FR8
+  319CE:  F875    fcmp/gt FR7,FR8
+  319D0:  8908    bt     0x319E4
+  319D2:  D21D    mov.l  @(0x31A48,PC),R2                           ; R2 = 0x000CBE88 (CAL) [pool 0x31A48] float=5.0
+  319D4:  F828    fmov.s @R2,FR8
+  319D6:  F875    fcmp/gt FR7,FR8
+  319D8:  8B04    bf     0x319E4
+  319DA:  60B3    mov    R11,R0
+  319DC:  8801    cmp/eq #1,R0
+  319DE:  8B01    bf     0x319E4
+  319E0:  A001    bra    0x319E6
+  319E2:  E001    mov    #1,R0                                      ; R0 = 1 (0x01)
+
+  loc_319E4:
+  319E4:  E000    mov    #0,R0                                      ; R0 = 0 (0x00)
+
+  loc_319E6:
+  319E6:  C003    mov.b  R0,@(0x03,GBR)                             ; write byte [FFFF7453]
+  319E8:  7F4C    add    #76,R15                                    ; SP adjust: SP += 76
+  319EA:  4F17    ldc.l  @R15+,GBR
+  319EC:  FFF9    fmov.s @R15+,FR15
+  319EE:  FEF9    fmov.s @R15+,FR14
+  319F0:  FDF9    fmov.s @R15+,FR13
+  319F2:  FCF9    fmov.s @R15+,FR12
+  319F4:  4F26    lds.l  @R15+,PR
+  319F6:  6EF6    mov.l  @R15+,R14
+  319F8:  6DF6    mov.l  @R15+,R13
+  319FA:  6CF6    mov.l  @R15+,R12
+  319FC:  6BF6    mov.l  @R15+,R11
+  319FE:  6AF6    mov.l  @R15+,R10
+  31A00:  69F6    mov.l  @R15+,R9
+  31A02:  000B    rts                                               ; <<< RETURN >>>
+  31A04:  68F6    mov.l  @R15+,R8
+
+==================================================================================================================================
+ALL LITERAL POOL REFERENCES (resolved)
+==================================================================================================================================
+  Pool 0x317E8 -> 0xFFFF7450  RAM  <- RAM
+  Pool 0x317EC -> 0xFFFF6350  RAM  <- RAM
+  Pool 0x317F0 -> 0xFFFF6354  RAM  <- RAM
+  Pool 0x317F4 -> 0xFFFF6898  RAM  <- RAM
+  Pool 0x317F8 -> 0xFFFF620C  RAM  <- RAM
+  Pool 0x317FC -> 0xFFFF6624  RAM  <- RAM
+  Pool 0x31800 -> 0xFFFF653C  RAM  <- RAM
+  Pool 0x31804 -> 0xFFFF77DC  RAM  <- RAM
+  Pool 0x31808 -> 0xFFFF7BA8  RAM  <- RAM
+  Pool 0x3180C -> 0xFFFF7800  RAM  <- RAM
+  Pool 0x31810 -> 0xFFFF67EC  RAM  <- RAM
+  Pool 0x31814 -> 0xFFFF7828  RAM  <- RAM
+  Pool 0x31818 -> 0xFFFF7829  RAM  <- RAM
+  Pool 0x3181C -> 0xFFFF72A1  RAM  <- RAM
+  Pool 0x31820 -> 0x00022F92  ROM  <- ROM (subroutine?)
+  Pool 0x31824 -> 0x00029BA4  ROM  <- ROM (subroutine?)
+  Pool 0x31828 -> 0xFFFFA56B  RAM  <- RAM
+  Pool 0x3182C -> 0xFFFFACF0  RAM  <- RAM
+  Pool 0x31830 -> 0x0001CF46  ROM  <- ROM (subroutine?)
+  Pool 0x31834 -> 0xFFFF77C0  RAM  <- RAM
+  Pool 0x31838 -> 0xFFFF77C8  RAM  <- RAM
+  Pool 0x3183C -> 0x000CBE68  CAL  <- CAL float=570.0
+  Pool 0x31840 -> 0x000CBE6C  CAL  <- CAL float=580.0
+  Pool 0x31844 -> 0x000CBE70  CAL  <- CAL float=1000.0
+  Pool 0x31848 -> 0x000CBE74  CAL  <- CAL float=1100.0
+  Pool 0x3184C -> 0x000AD458  CAL  <- CAL float=1.8367099231598242e-40
+  Pool 0x31850 -> 0x000BE830  CAL  <- CAL float=2726641664.0
+  Pool 0x31854 -> 0x000CBEA0  CAL  <- CAL float=20.0
+  Pool 0x31858 -> 0x000CBBD6  CAL  <- CAL float=1.8807920375128806e-36
+  Pool 0x3185C -> 0x000CBE8C  CAL  <- CAL float=0.5
+  Pool 0x31860 -> 0x000CBE90  CAL  <- CAL float=0.5
+  Pool 0x31864 -> 0x000CBE94  CAL  <- CAL float=5.0
+  Pool 0x31868 -> 0x000CBE98  CAL  <- CAL float=5.0
+  Pool 0x31A08 -> 0x000ACE00  CAL  <- CAL float=1.4722377977827966e-39
+  Pool 0x31A0C -> 0x000BE8AC  CAL  <- CAL float=2726641664.0
+  Pool 0x31A10 -> 0x000CBE64  CAL  <- CAL float=-15.0
+  Pool 0x31A14 -> 0x000BE608  CAL  <- CAL float=-1.7505517876329244e+31
+  Pool 0x31A18 -> 0x38000000  CONST
+  Pool 0x31A1C -> 0xFFFF798C  RAM  <- RAM
+  Pool 0x31A20 -> 0x3B800000  CONST
+  Pool 0x31A24 -> 0xFFFF7A20  RAM  <- RAM
+  Pool 0x31A28 -> 0xFFFF7D18  RAM  <- RAM
+  Pool 0x31A2C -> 0x000CBEA4  CAL  <- CAL float=-1.0
+  Pool 0x31A30 -> 0xFFFF7464  RAM  <- RAM
+  Pool 0x31A34 -> 0x000CBE78  CAL  <- CAL float=0.10999999940395355
+  Pool 0x31A38 -> 0xFFFF7BB0  RAM  <- RAM
+  Pool 0x31A3C -> 0x000CBE7C  CAL  <- CAL float=-0.029999999329447746
+  Pool 0x31A40 -> 0x000CBE80  CAL  <- CAL float=0.0
+  Pool 0x31A44 -> 0x000CBE84  CAL  <- CAL float=-5.0
+  Pool 0x31A48 -> 0x000CBE88  CAL  <- CAL float=5.0
+
+==================================================================================================================================
+GBR-RELATIVE ADDRESSES ACCESSED (GBR = 0xFFFF7450)
+==================================================================================================================================
+  0x317D6: write.b     0xFFFF7450
+  0x31980: write.b     0xFFFF7450
+  0x317DA: write.b     0xFFFF7451
+  0x31998: write.b     0xFFFF7451
+  0x317D4: write.b     0xFFFF7452
+  0x31966: write.b     0xFFFF7452
+  0x319E6: write.b     0xFFFF7453
+  0x31876: write.w     0xFFFF7454
+  0x31896: read.w      0xFFFF7454
+  0x31884: write.w     0xFFFF7456
+  0x318A8: read.w      0xFFFF7456
+  0x316BE: write.b     0xFFFF7458
+  0x316CA: write.b     0xFFFF7458
+  0x318FA: read.b      0xFFFF7458
+  0x31706: read.b      0xFFFF7459
+  0x31762: write.b     0xFFFF7459
+  0x31734: read.b      0xFFFF745A
+  0x31766: write.b     0xFFFF745A
+  0x3171A: write.b     0xFFFF745B
+  0x3171C: read.b      0xFFFF745B
+  0x3172C: read.b      0xFFFF745B
+  0x31732: write.b     0xFFFF745B
+  0x31768: read.b      0xFFFF745B
+  0x31746: write.b     0xFFFF745C
+  0x31748: read.b      0xFFFF745C
+  0x31758: read.b      0xFFFF745C
+  0x3175E: write.b     0xFFFF745C
+  0x31772: read.b      0xFFFF745C
+  0x316D8: write.b     0xFFFF745D
+  0x316E4: write.b     0xFFFF745D
+  0x31900: read.b      0xFFFF745D
+  0x316F6: write.b     0xFFFF745E
+  0x31704: write.b     0xFFFF745E
+  0x3190E: read.b      0xFFFF745E
+  0x31788: write.b     0xFFFF745F
+  0x31794: write.b     0xFFFF745F
+  0x317B4: read.b      0xFFFF745F
+  0x317A2: write.b     0xFFFF7460
+  0x317AE: write.b     0xFFFF7460
+  0x317BA: read.b      0xFFFF7460
+
+==================================================================================================================================
+RAM ADDRESSES REFERENCED (via literal pool)
+==================================================================================================================================
+  RAM 0xFFFF620C
+  RAM 0xFFFF6350
+  RAM 0xFFFF6354
+  RAM 0xFFFF653C
+  RAM 0xFFFF6624
+  RAM 0xFFFF67EC
+  RAM 0xFFFF6898
+  RAM 0xFFFF72A1
+  RAM 0xFFFF7450
+  RAM 0xFFFF7464
+  RAM 0xFFFF77C0
+  RAM 0xFFFF77C8
+  RAM 0xFFFF77DC
+  RAM 0xFFFF7800
+  RAM 0xFFFF7828
+  RAM 0xFFFF7829
+  RAM 0xFFFF798C
+  RAM 0xFFFF7A20
+  RAM 0xFFFF7BA8
+  RAM 0xFFFF7BB0
+  RAM 0xFFFF7D18
+  RAM 0xFFFFA56B
+  RAM 0xFFFFACF0
+
+==================================================================================================================================
+SUBROUTINE CALLS
+==================================================================================================================================
+  0x31684: JSR -> 0x00022F92
+  0x3168E: JSR -> 0x00029BA4
+  0x3169A: JSR -> 0x0001CF46
+  0x316EA: JSR -> 0x000BE830
+  0x31880: JSR -> 0x000BE8AC
+  0x318C2: JSR -> 0x000BE608
+  0x318D6: JSR -> 0x000BE608
+  BSR -> 0x3160E
