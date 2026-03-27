@@ -1,0 +1,536 @@
+================================================================================
+  CL/OL TRANSITION & AFL PERSISTENCE — CONSOLIDATED ANALYSIS
+  Subaru ECU ROM AE5L600L (SH7058 / SH-2)
+  Stock ROM: ae5l600l.bin
+  Modified ROM: AE5L600L 20g rev 20.5 tiny wrex.bin
+================================================================================
+
+
+TABLE OF CONTENTS
+  1.  The Two Independent CL/OL Paths
+  2.  Path A — OL Enrichment State Machine (7-Phase Pipeline)
+  3.  Path B — FFFF7448 CL/OL Mode Flag Writer
+  4.  FFFF7452 Master CL Readiness — Full Logic
+  5.  The WOT Delay Problem — Root Cause
+  6.  AFL System Architecture
+  7.  AFL Application Function (0x37B74) — Gate Analysis
+  8.  AFL Ramp Multiplier (FFFF7AC0) — Dead by Calibration
+  9.  What the Datalog Actually Shows
+  10. Calibration Reference
+  11. Open Questions & Next Steps
+
+
+================================================================================
+SECTION 1: THE TWO INDEPENDENT CL/OL PATHS
+================================================================================
+
+  CRITICAL FINDING: There are TWO completely separate mechanisms that
+  determine CL/OL behavior. They operate independently and can be out
+  of sync:
+
+  PATH A — OL Enrichment State Machine (7-Phase Pipeline):
+    Controls: OL fuel enrichment computation
+    Condition checker: FUN_0003643A (throttle/RPM/load/BPW thresholds)
+    Delay control: counter_B at FFFF79C4, set by CBC62 (modified=0)
+    When delay=0: OL enrichment is computed immediately
+    Flags written: FFFF79F2 (OL active), FFFF79C6 (mode state, always 0)
+    NO EFFECT on CL/OL mode flag at FFFF7448
+
+  PATH B — CL/OL Mode Flag (FFFF7448):
+    Controls: AFC feedback (PI controller at 0x342A8) and AFL learning
+    Writer: Function at ROM 0x031528
+    Depends on: FFFF7452 (master readiness) — computed at 0x03162C
+    NO DEPENDENCY on CBC62 delay parameter or the condition checker
+
+  The SSM CL/OL parameter (7=off, 8=CL, 10=OL) is driven by Path B.
+  The condition checker (Path A) has zero effect on when the ECU
+  reports switching from CL to OL.
+
+
+================================================================================
+SECTION 2: PATH A — OL ENRICHMENT STATE MACHINE
+================================================================================
+
+  Dispatched from two periodic task tables each cycle:
+
+    Table B [14] FUN_0003580C — Phase 1: State Snapshot + OL Enrichment
+    Table B [15] FUN_0003605E — Phase 2: Condition Evaluation
+    Table A [6]  FUN_000357D0 — Phase 3: Initialization
+    Table A [8]  FUN_00036008 — Phase 4: Delay Manager A
+    Table A [9]  FUN_00036A98 — Phase 5: Hysteresis Handler
+    Table A [10] FUN_00036BF4 — Phase 6: Delay Manager B
+    Table A [11] FUN_00036E60 — Phase 7: Post-Transition Handler
+
+  The condition checker (FUN_0003643A) evaluates:
+    CHECK 1: Per-gear RPM limits (CC180-CC1A4) — checked FIRST
+    CHECK 2: Neutral RPM limits
+    CHECK 3: Throttle maximum (CC1D8) — stock 91.0 deg (108.3% display)
+    CHECK 4: Vehicle speed maximum
+    CHECK 5: Engine load maximum (CC204)
+    CHECK 6: ECT minimum
+    CHECK 7: Load counter threshold
+    CHECKS 8-11: Delay-based transitions
+
+  THREE OUTPUT PATHS from condition checker:
+    PATH A: Throttle exceeded → counter_B = 0, flag = 1, RETURN
+    PATH B: RPM/load/speed force → counter_B = 0, flag = 0, RETURN
+    PATH C: No conditions met → counter_B = delay_value (CBC62)
+
+  KEY INSIGHT: Paths A and B hard-set counter_B = 0 regardless of the
+  delay value at CBC62. The delay parameter only affects Path C
+  (fallthrough when nothing triggers). Setting CBC62 = 0 vs 1 has NO
+  effect on the throttle or RPM-triggered paths.
+
+  Stock throttle threshold (CC1D8) = 91.0 degrees = 108.3% display.
+  This is above physical WOT — unreachable by design. Stock Subaru
+  intended the delay-path throttle check to never fire. CL/OL
+  transitions in stock calibration rely entirely on per-gear RPM limits.
+
+  Modified throttle threshold = 37.884 degrees = 45.1% display.
+  The previous tuner lowered this to make throttle trigger OL, but
+  this only affects Path A (enrichment), not Path B (mode flag).
+
+
+================================================================================
+SECTION 3: PATH B — FFFF7448 CL/OL MODE FLAG WRITER
+================================================================================
+
+  Single writer: Function at ROM 0x031528
+  Called from: Task scheduler at 0x049EA4
+
+  PHASE 1 — Input collection:
+    FFFF744B <- FFFF8E98 (primary CL inhibit sensor flag)
+    FFFF744C <- FFFF8F08 (readiness A)
+    FFFF744D <- func_021D9A(FFFF8F24) (readiness B)
+    FFFF744E <- func_021D9A result (mode: 0, 1, or 2)
+
+  PHASE 2 — Derived flags:
+    FFFF744A = (FFFF7452==1 AND FFFF744E==1) ? 1 : 0
+    FFFF7449 = (FFFF7452==1 AND FFFF744E==2) ? 1 : 0
+
+  PHASE 3 — Final computation:
+    if (FFFF744B != 0):
+        FFFF7448 = 0                   // CL inhibited → OL
+    else if (FFFF744D==1 AND FFFF744C!=0):
+        FFFF7448 = 0                   // Secondary forces OL
+    else if (FFFF7449==1 OR FFFF744A==1):
+        FFFF7448 = 1                   // ENTER CL
+    else:
+        FFFF7448 = 0                   // STAY OL
+
+  FFFF7448 = 1 (CL) requires FFFF7452 = 1 (master readiness).
+  FFFF7452 is computed by a separate function at 0x03162C.
+
+
+================================================================================
+SECTION 4: FFFF7452 MASTER CL READINESS — FULL LOGIC
+================================================================================
+
+  Writer: Function at ROM 0x03162C (runs to 0x31A04)
+  GBR = 0xFFFF7450
+
+  FFFF7452 = 1 (CL ENABLED) requires ALL of these simultaneously:
+
+  1. EARLY EXIT NOT ACTIVE
+     Bit 3 of byte@FFFF61F4 must be clear
+     (sub_1CF46 at ROM 0x01CF46 checks this)
+
+  2. SPEED CONDITION (composite of many sub-checks):
+     a. RPM (FFFF6350) >= -15.0 (sanity check, always true)
+     b. Speed table check: word@FFFF67EC >= table_lookup(FFFF6354)
+        Table selected by byte@FFFF7829 (0=table1, 1=table2)
+     c. AF sensor 1 (FFFF798C) within +/- 3.05e-5 of zero
+     d. AF sensor 2 (FFFF7A20) within +/- 0.00390625 of zero
+     e. byte@FFFF7D18 == 0
+     f. float@FFFF77C8 > -1.0
+
+  3. THROTTLE CONDITION:
+     At least one of these hysteresis flags must be 1:
+       FFFF7458: RPM delta (FFFF6898-FFFF620C) <= 570 (hyst 570/580)
+       FFFF745D: MAF (FFFF6624) <= 1000 (hyst 1000/1100)
+       FFFF745E: MAF table lookup result vs threshold
+     AND byte@FFFF65F6 != 1 (engine started flag)
+     AND byte@FFFF7464 == 0
+
+  4. THROTTLE POSITION LOW
+     float@FFFF7BA8 < 0.11 (CAL 0x0CBE78)
+     *** THIS IS THE KEY GATE FOR WOT ***
+
+  5. NO ACTIVE FAULT
+     byte@FFFF7BB0 == 0
+
+  6. DELAY COUNTERS EXPIRED
+     Two counters (FFFF745B, FFFF745C) must both reach >= 4
+     Counter 1 resets on falling edge of byte@FFFFA56B
+     Counter 2 resets on rising edge of byte@FFFFACF0
+     Threshold: byte@0x0CBBD6 = 4
+
+  7. COOLANT OK
+     Either byte@FFFF7828 == 0 (bypass) or:
+     float@FFFF77C0 >= 0.5 AND float@FFFF77C0 < 5.0
+     (CAL 0xCBE8C/90/94/98)
+
+  If ANY condition fails → FFFF7452 = 0 → FFFF7448 = 0 → OL mode.
+
+  All calibration values are IDENTICAL between stock and modified ROM.
+  No values in this function were changed by the tuner.
+
+
+================================================================================
+SECTION 5: THE WOT DELAY PROBLEM — ROOT CAUSE
+================================================================================
+
+  OBSERVED: At WOT, CL/OL stays at 8 (CL) for ~1.68 seconds despite
+  100% throttle. OL only engages when RPM crosses ~3400.
+
+  ROOT CAUSE: Condition #4 in the FFFF7452 evaluator.
+
+  float@FFFF7BA8 must be < 0.11 for CL to be enabled. At WOT, this
+  value exceeds 0.11, so FFFF7452 drops to 0, which makes FFFF7448 = 0
+  (OL). However, there is a ~1.68 second delay between throttle
+  reaching 100% and the CL/OL mode actually switching.
+
+  LIKELY EXPLANATION: FFFF7BA8 is a filtered/smoothed/processed
+  throttle value, not the raw sensor. If it's smoothed, the value
+  would gradually climb from idle levels to WOT levels, only crossing
+  the 0.11 threshold after the smoothing catches up.
+
+  OPEN QUESTION: What writes FFFF7BA8? Tracing this address will
+  reveal the filtering mechanism and explain the delay. This is the
+  next step in the investigation.
+
+  The 0.11 threshold at CBE78 is unchanged from stock, and it's very
+  low — it should be crossed almost immediately at any significant
+  throttle opening. The delay strongly suggests filtering on the input.
+
+  NOTE: The condition checker (Path A) with its throttle/RPM/load
+  thresholds has NO EFFECT on this timing. The CBC62 delay value has
+  NO EFFECT on this timing. The per-gear RPM thresholds have NO EFFECT
+  on this timing (they affect Path A enrichment, not Path B mode flag).
+
+
+================================================================================
+SECTION 6: AFL SYSTEM ARCHITECTURE
+================================================================================
+
+  AFL has TWO separate operations:
+
+  1. AFL LEARNING (value update):
+     Function: 0x34884 via core at 0x3452A
+     Gate: 10-condition check at 0x345A4 (cl_active_check)
+     CL/OL check: YES — function at 0x34C54 reads FFFF7448
+     When FFFF7448=0: Learning FROZEN (no updates to stored values)
+     4 stored values at FFFF316C/3174/317C/3184 (per airflow range)
+
+  2. AFL APPLICATION (applying learned values to fueling):
+     Function: 0x37B74
+     Multiplier output: FFFF7AB4
+     CL/OL check: **NO** — does NOT read FFFF7448
+     Consumed by fuel PW calc at 0x0301E4 unconditionally
+
+  AFL learning ranges (breakpoints at CC074-CC07C):
+    Range 0: 0 - 6.0 g/s (idle)
+    Range 1: 6.0 - 23.0 g/s (light cruise)
+    Range 2: 23.0 - 40.0 g/s (normal driving)
+    Range 3: 40.0 - 80.0 g/s (heavy load)
+
+  SSM PID 0x0A ("A/F Learning #1"):
+    Getter function: 0x05D2DA
+    Reads float from RAM FFFF7878
+    Scaling: display% = float * 100
+    This shows the interpolated AFL value at current airflow, NOT
+    the per-range stored value or the applied multiplier at FFFF7AB4.
+
+
+================================================================================
+SECTION 7: AFL APPLICATION FUNCTION (0x37B74) — GATE ANALYSIS
+================================================================================
+
+  Function entry: 0x37B74, GBR = 0xFFFF7AB4
+  Calls four DTC flag readers, Pull3DFloat twice, three BSR subroutines.
+
+  GATE ORDER:
+
+  1. DTC FLAGS (0x37BD6-0x37BF2):
+     Reads FFFF9704, FFFF9705, FFFF9706 via ROM 0x297A0/B0/C0
+     Each returns 0 (normal) or 2 (fault active)
+     If any returns 2 → skip AFL, write 1.0 to FFFF7AB4
+
+  2. TRANSIENT FLAG (0x37BF4-0x37BF8):
+     Reads FFFF726C (copied to GBR+0x1C = FFFF7AD0)
+     If == 1 → skip AFL, write 1.0
+     Writer: unknown, likely transient fuel compensation path
+
+  3. AIRFLOW THRESHOLD (0x37BFA-0x37C04):
+     Compares against CAL@CC2F0 = 10,000 g/s
+     DEAD GATE — 10,000 g/s is physically impossible
+
+  4. ENGINE STATUS FLAG (0x37C06-0x37C0E):
+     Reads FFFF7C68 (copied to GBR+0x1E = FFFF7AD2)
+     If == 1 → skip AFL, write 1.0
+
+  If all gates pass → compute AFL multiplier and write to FFFF7AB4.
+  Skip path at 0x37C3A writes fldi1 (1.0) to FFFF7AB4 (no correction).
+
+  THREE BSR SUBROUTINES called before the gates:
+
+  sub_37D74 (GBR=FFFF7AB8):
+    Checks FFFF7AD0==0, FFFF7AD2==0, FFFF7ADD>=2, FFFF7ADE>=2
+    If all pass: 2D table lookup → correction value to FFFF7ABC
+    If any fail: FFFF7ABC = 0.0
+
+  sub_37DD2 (GBR=FFFF7AD0) — HYSTERESIS HANDLER:
+    Three hysteresis checks → master enable at FFFF7ADC:
+      Hyst 1: FFFF63C4 (load) vs CC314/CC318 = 0.0/0.0 (DEAD)
+      Hyst 2: FFFF7AD8 vs CC31C/CC320 = 118.0/119.0 (unknown param)
+      Hyst 3: FFFF65FC (BPW) vs CC324/CC328 = 0.0/0.0 (DEAD)
+    FFFF7ADC = 1 only if all three pass AND FFFF7AD0==0 AND FFFF7AD2==0
+
+  sub_37E70 (GBR=FFFF7AC0) — RAMP MULTIPLIER:
+    See Section 8.
+
+
+================================================================================
+SECTION 8: AFL RAMP MULTIPLIER (FFFF7AC0) — DEAD BY CALIBRATION
+================================================================================
+
+  Written by sub_37E70. Controls a 0.0-to-1.0 multiplier on AFL.
+
+  FIVE PATHS:
+    1. FFFF7AD0==1 → immediate 0.0
+    2. FFFF7ADC==1 + (FFFF7AD1==1 AND FFFF7AD0==0) → immediate 1.0
+    3. FFFF7ADC==1 + (FFFF7AD3==1 AND FFFF7AD2==0) → immediate 1.0
+    4. FFFF7ADC==1 + neither flag combo → ramp UP by CC32C (= 0.0)
+    5. FFFF7ADC!=1 + (FFFF7AD3==1 AND FFFF7AD2==0) → immediate 0.0
+    6. FFFF7ADC!=1 + flag combo doesn't match → ramp DOWN by CC330 (= 0.0)
+
+  Ramp step sizes (verified from both ROMs via literal pool trace):
+    CC32C (ramp-up step):   0.0 in both stock and modified
+    CC330 (ramp-down step): 0.0 in both stock and modified
+
+  The ramp-up and ramp-down paths are NO-OPS. FFFF7AC0 can only change
+  via the immediate 0.0 or immediate 1.0 paths, making it a binary
+  switch rather than a smooth ramp.
+
+  FFFF7AD1 and FFFF7AD3 writers have NOT been traced. These control
+  whether the immediate paths fire or the (dead) ramp paths are taken.
+
+
+================================================================================
+SECTION 9: WHAT THE DATALOG ACTUALLY SHOWS
+================================================================================
+
+  WOT pull from log0003.csv, samples 4176-4240:
+
+  - Sample 4177: Throttle hits 100%, CL/OL stays at 8 (CL)
+  - Samples 4177-4217: Full WOT, still CL (mode 8)
+    AFL moves: -7.03 → -6.25 → -5.47 → -4.69 → -3.91
+    Each step = 0.78125% (1 LSB of SSM byte encoding)
+    This is NORMAL CL AFL LEARNING — O2 sensor sees lean (~12-13:1),
+    AFL adjusts toward zero. AFC drops to 0 at WOT but AFL keeps
+    learning because FFFF7448 is still 1 (CL mode via Path B).
+
+  - Sample 4218: CL/OL switches to 10 (OL) at RPM ~3399
+    This is when FFFF7452 finally drops to 0 via Path B
+
+  - Samples 4218+: AFL continues changing slightly (-3.91 → -3.125)
+    This is likely the SSM interpolated value shifting as airflow
+    changes across learning ranges, not active learning.
+
+  KEY INSIGHT: The "AFL fade" during WOT is not a special mechanism —
+  it's normal CL learning happening because the ECU stays in CL for
+  1.68 seconds at WOT before Path B switches to OL.
+
+
+================================================================================
+SECTION 10: CALIBRATION REFERENCE
+================================================================================
+
+  --- Path A (Condition Checker) Thresholds ---
+
+  Address   Parameter                    Stock      Modified
+  -------   ---------                    -----      --------
+  CC1D8     CL Delay Max Throttle [0]    91.0 deg   37.884 deg
+  CC204     Max Engine Load [0]          4.80 g/r   0.95 g/r
+  CC208     Max Engine Load [1]          4.90 g/r   1.10 g/r
+  CBC62     CL to OL Delay               750        0
+  CBC5A     CL Delay Load Threshold      313        200
+  CC174     BPW Hysteresis               256.0      756.0
+  CC178     Throttle Hysteresis          3.9        8.4
+  CC180-A4  Per-Gear RPM ON/OFF          (see comprehensive review)
+
+  --- Path B (FFFF7452 Readiness) Thresholds ---
+  ALL UNCHANGED between stock and modified ROM.
+
+  Address   Value    Description
+  -------   -----    -----------
+  CBE64     -15.0    RPM lower sanity bound
+  CBE68     570.0    RPM delta hysteresis ON
+  CBE6C     580.0    RPM delta hysteresis OFF
+  CBE70     1000.0   MAF hysteresis ON (g/s)
+  CBE74     1100.0   MAF hysteresis OFF (g/s)
+  CBE78     0.11     FFFF7BA8 upper bound for CL readiness
+  CBE7C     -0.03    FFFF77DC lower bound (FFFF7453 only)
+  CBE80     0.0      FFFF77DC upper bound (FFFF7453 only)
+  CBE84     -5.0     FFFF7800 lower bound (FFFF7453 only)
+  CBE88     5.0      FFFF7800 upper bound (FFFF7453 only)
+  CBE8C     0.5      Coolant flag 1 OFF
+  CBE90     0.5      Coolant flag 1 ON
+  CBE94     5.0      Coolant flag 2 ON
+  CBE98     5.0      Coolant flag 2 OFF
+  CBEA0     20.0     MAF table hysteresis offset
+  CBEA4     -1.0     FFFF77C8 lower threshold
+  CBBD6     4 (byte) Delay counter threshold
+
+  --- AFL Application (0x37B74) Calibration ---
+  ALL UNCHANGED between stock and modified ROM.
+
+  Address   Value      Description
+  -------   -----      -----------
+  CC2F0     10000.0    Airflow gate (dead — physically impossible)
+  CC314     0.0        Load hysteresis upper (dead)
+  CC318     0.0        Load hysteresis lower (dead)
+  CC31C     118.0      FFFF7AD8 hysteresis lower
+  CC320     119.0      FFFF7AD8 hysteresis upper
+  CC324     0.0        BPW hysteresis upper (dead)
+  CC328     0.0        BPW hysteresis lower (dead)
+  CC32C     0.0        Ramp-up step (dead)
+  CC330     0.0        Ramp-down step (dead)
+
+
+================================================================================
+SECTION 11: OPEN QUESTIONS & NEXT STEPS
+================================================================================
+
+  1. WHAT IS FFFF7BA8 AND WHO WRITES IT?
+     This is the most critical open question. FFFF7452 (Path B master
+     readiness) requires FFFF7BA8 < 0.11 for CL. At WOT, this value
+     must exceed 0.11 to trigger OL, but the 1.68s delay suggests it's
+     filtered or smoothed. Tracing the writer of FFFF7BA8 will explain
+     the CL→OL transition delay and reveal whether it can be tuned.
+
+  2. WHAT ARE FFFF7AD1 AND FFFF7AD3?
+     These flags control whether the AFL ramp multiplier (FFFF7AC0)
+     takes the immediate 0.0/1.0 paths or the dead ramp paths. Their
+     writers have not been traced.
+
+  3. IS FFFF7BA8 DEFINED IN ECUFLASH?
+     If it's a known parameter, it may be tunable. The threshold at
+     CBE78 (0.11) is also potentially tunable if defined.
+
+  4. AFL APPLICATION PATCH (OPTION D):
+     Once the transition timing is understood, a ROM patch could add
+     a FFFF7448 check to the AFL application function at 0x37B74.
+     This would force FFFF7AB4 = 1.0 during OL, preventing stale
+     AFL corrections from affecting OL fueling. The existing ramp
+     infrastructure (CC32C/CC330) could be enabled with non-zero
+     step sizes to provide a smooth AFL fade-out instead of a hard cut.
+
+  5. CBC62 DELAY VALUE:
+     Setting CBC62 from 0 to a non-zero value (e.g., 1) only affects
+     Path A (OL enrichment timing via the condition checker fallthrough
+     path). It has NO effect on Path B (FFFF7448 mode flag timing).
+     However, it may still be worth setting to 1 to ensure the
+     throttle/load-based enrichment paths in Path A function as the
+     tuner intended when they lowered those thresholds.
+
+
+================================================================================
+RAM ADDRESS MAP (ALL TRACED ADDRESSES)
+================================================================================
+
+  --- Path A (CL/OL State Machine) ---
+  FFFF79C2   word    counter_A (system counter)
+  FFFF79C4   word    counter_B (condition checker output)
+  FFFF79C6   byte    Mode state flag (always 0 — dead code)
+  FFFF79C7   byte    Diagnostic flag (SSM only, no effect on fueling)
+  FFFF79F2   byte    OL active flag
+
+  --- Path B (Mode Flag) ---
+  FFFF7448   byte    CL/OL mode flag (1=CL, 0=OL) — gates AFC + AFL learning
+  FFFF7449   byte    CL condition A (FFFF7452==1 AND FFFF744E==2)
+  FFFF744A   byte    CL condition B (FFFF7452==1 AND FFFF744E==1)
+  FFFF744B   byte    CL inhibit (from FFFF8E98)
+  FFFF744C   byte    Readiness A (from FFFF8F08)
+  FFFF744D   byte    Readiness B (from func_021D9A)
+  FFFF744E   byte    Mode (0/1/2 from func_021D9A)
+
+  --- FFFF7452 Readiness Function ---
+  FFFF7450   byte    Speed + engine_started + coolant_bypass
+  FFFF7451   byte    Speed + throttle + coolant_bypass
+  FFFF7452   byte    MASTER CL READINESS (the critical flag)
+  FFFF7453   byte    Tight-band CL readiness
+  FFFF7454   word    Speed table 1 lookup result
+  FFFF7456   word    Speed table 2 lookup result
+  FFFF7458   byte    RPM delta hysteresis flag
+  FFFF745B   byte    Delay counter 1 (FFFFA56B edge detector)
+  FFFF745C   byte    Delay counter 2 (FFFFACF0 edge detector)
+  FFFF745D   byte    MAF hysteresis flag
+  FFFF745E   byte    MAF table hysteresis flag
+  FFFF745F   byte    Coolant flag 1
+  FFFF7460   byte    Coolant flag 2
+  FFFF7BA8   float   Throttle/load — must be < 0.11 for CL (KEY UNKNOWN)
+  FFFF7BB0   byte    Fault flag — must be 0 for CL
+
+  --- AFL Application ---
+  FFFF7AB4   float   AFL multiplier output (consumed by fuel PW calc)
+  FFFF7AC0   float   AFL ramp multiplier (0.0-1.0, binary with zero steps)
+  FFFF7ADC   byte    AFL master enable (from hysteresis handler)
+  FFFF7AD0   byte    Copy of FFFF726C (transient flag)
+  FFFF7AD1   byte    Unknown flag (controls ramp immediate path)
+  FFFF7AD2   byte    Copy of FFFF7C68 (engine status flag)
+  FFFF7AD3   byte    Unknown flag (controls ramp immediate path)
+  FFFF726C   byte    Transient state flag (writer unknown)
+  FFFF7C68   byte    Engine status flag (writer unknown)
+  FFFF7878   float   SSM AFL display value (PID 0x0A reads this)
+
+  --- AFL Storage ---
+  FFFF316C   float   AFL Range 0 value (0-6 g/s)
+  FFFF3174   float   AFL Range 1 value (6-23 g/s)
+  FFFF317C   float   AFL Range 2 value (23-40 g/s)
+  FFFF3184   float   AFL Range 3 value (40-80 g/s)
+  FFFF31A4   float   AFL secondary interpolated output
+  FFFF31AC   float   AFL primary interpolated output
+
+
+================================================================================
+ROM FUNCTION MAP
+================================================================================
+
+  --- Path A ---
+  0x0003643A  Condition checker (throttle/RPM/load/BPW evaluation)
+  0x0003580C  Phase 1: State snapshot + OL enrichment
+  0x000357D0  Phase 3: Initialization
+  0x00036008  Phase 4: Delay manager A
+  0x00036A98  Phase 5: Hysteresis handler
+  0x00036BF4  Phase 6: Delay manager B
+  0x00036E60  Phase 7: Post-transition handler
+
+  --- Path B ---
+  0x00031528  FFFF7448 writer
+  0x0003162C  FFFF7452 master readiness evaluator (~800 bytes)
+  0x00031966  FFFF7452 write point (within 0x3162C function)
+
+  --- AFL ---
+  0x00034488  AFL sub-dispatcher
+  0x0003452A  AFL core (orchestrates learning cycle)
+  0x000345A4  CL active check (10-condition gate for learning)
+  0x00034C54  AFL CL/OL mode check (reads FFFF7448)
+  0x00037B74  AFL application (writes FFFF7AB4 — NO CL/OL check)
+  0x00037D74  AFL sub: condition check + 2D table lookup
+  0x00037DD2  AFL sub: hysteresis handler → FFFF7ADC
+  0x00037E70  AFL sub: ramp multiplier → FFFF7AC0
+  0x00037F00  AFL multiplier computation subroutine
+  0x000301E4  Fuel PW calc (reads FFFF7AB4 unconditionally)
+  0x0005D2DA  SSM PID 0x0A getter (reads FFFF7878)
+
+  --- Utility ---
+  0x000BE608  Range check (Pull2DFloat)
+  0x000BE830  Table interpolation (Pull3DFloat)
+  0x000BE960  Clamp lower (max)
+  0x000BE970  Clamp upper (min)
+
+
+================================================================================
+END OF CONSOLIDATED ANALYSIS
+================================================================================
