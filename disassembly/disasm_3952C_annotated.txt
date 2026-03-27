@@ -1,0 +1,737 @@
+================================================================================
+COMPLETE ANNOTATED DISASSEMBLY: FUNCTION AT ROM 0x39524
+================================================================================
+Processor: SH7058 (SH-2), Big-endian
+ROM base: 0x00000000
+RAM range: 0xFFFF0000 - 0xFFFFFFFF
+GBR: 0xFFFF7450
+ROM file: AE5L600L 20g rev 20.5 tiny wrex.bin
+
+This file contains THREE related functions:
+  1. Entry trampoline at 0x39524 (dispatches to func_3952C or func_39668)
+  2. func_3952C: Main computation function (0x3952C - 0x3961A)
+  3. sub_3961C: Helper subroutine called by func_3952C (0x3961C - 0x39666)
+  4. func_39668: Initialization/setup function (0x39668 - 0x3972A)
+================================================================================
+
+================================================================================
+LITERAL POOL REFERENCE (all 32-bit values loaded via mov.l @(disp,PC))
+================================================================================
+Pool Addr  Value        Type   Description
+---------  ----------   -----  ------------------------------------------------
+0x3972C    0xFFFF77D8   RAM    loaded into R2 -> FR4  (input float A)
+0x39730    0xFFFF77DC   RAM    loaded into R2 -> FR5  (input float B)
+0x39734    0xFFFF7448   RAM    loaded into R6 -> R14  (byte flag)
+0x39738    0xFFFF798C   RAM    loaded into R2 -> FR12 (input float C)
+0x3973C    0xFFFF7800   RAM    loaded into R2 -> FR9  (input float D)
+0x39740    0xFFFF6354   RAM    loaded into R2 -> FR15 (input float E)
+0x39744    0xFFFF782C   RAM    loaded into R2 -> R13  (byte flag)
+0x39748    0xFFFF7BAC   RAM    loaded into R4 (passed to sub_3961C)
+0x3974C    0x000BE608   ROM    subroutine: fcmp_range or similar
+0x39750    0x39000000   float  inline constant = 0.0001220703125
+0x39754    0xFFFF7BC0   RAM    base pointer for output struct
+0x39758    0x000BE628   ROM    subroutine: interpolation/ratio
+0x3975C    0x000AD258   ROM    table descriptor (axis/map pointer)
+0x39760    0x000BE830   ROM    subroutine: table lookup (2D/3D)
+0x39764    0x000CC3EC   CAL    float = 0.0
+0x39768    0x000CC3F0   CAL    float = 0.0
+0x3976C    0x000BE56C   ROM    subroutine: clamp/limit
+0x39770    0x38000000   float  inline constant = 3.0517578125e-05
+0x39774    0x000CC3E8   CAL    float = 0.03 (used in sub_3961C)
+0x39778    0xFFFF43FC   RAM    loaded into R2 -> FR8 (float input)
+0x3977C    0xFFFF7BB8   RAM    base pointer for output struct (func_39668)
+0x39780    0x00029888   ROM    subroutine
+0x39784    0x0001FD7C   ROM    subroutine
+0x39788    0x00021D9A   ROM    subroutine
+0x3978C    0xFFFF7453   RAM    byte flag
+0x39790    0x00063B54   ROM    table-of-pointers (6 RAM addrs + 1 ROM)
+0x39794    0xFFFF7BB2   RAM    word (counter)
+0x39798    0xFFFF7BB0   RAM    byte (mode flag)
+0x3979C    0x000CC3F4   CAL    float = 0.0  (threshold)
+0x397A0    0x000BE554   ROM    subroutine: saturating add
+0x397A4    0x000CBC8C   CAL    word = 0 (counter threshold)
+0x397A8    0x000CC3F8   CAL    float = 1.0  (threshold)
+
+================================================================================
+CALIBRATION DATA VALUES
+================================================================================
+Address      Raw          Float Value    Usage
+---------    ----------   -----------    -----
+0x000CC3E8   0x3CF5C28F   0.03           sub_3961C clamp max
+0x000CC3EC   0x00000000   0.0            func_3952C path A clamp max
+0x000CC3F0   0x00000000   0.0            func_3952C path B clamp max
+0x000CC3F4   0x00000000   0.0            func_39668 comparison threshold
+0x000CC3F8   0x3F800000   1.0            func_39668 comparison threshold
+0x000CBC8C   0x0000       word = 0       func_39668 counter threshold
+
+================================================================================
+TABLE OF POINTERS at 0x00063B54 (used by func_39668 second half)
+================================================================================
+Offset  Address      Points to      Description
+------  ----------   ----------     --------------------------------
++0      0x00063B54   0xFFFF7BB4     RAM byte -> float ptr (table @(0,R14))
++4      0x00063B58   0xFFFF7BB8     RAM byte (flag)
++8      0x00063B5C   0xFFFF7BB9     RAM byte (flag)
++12     0x00063B60   0xFFFF7BBA     RAM byte (flag)
++16     0x00063B64   0xFFFF7BBB     RAM byte (flag)
++20     0x00063B68   0xFFFF7BBC     RAM byte (flag)
++24     0x00063B6C   0x00020103     ROM (misc)
+
+================================================================================
+EFFECTIVE RAM ADDRESSES (R6=0xFFFF7BC0 base, accessed via @(R0,R6))
+================================================================================
+  R0 = -20 (0xEC):  EA = 0xFFFF7BAC    (output float slot 0)
+  R0 = -24 (0xE8):  EA = 0xFFFF7BA8    (output float slot 1)
+  R0 = -28 (0xE4):  EA = 0xFFFF7BA4    (output float slot 2)
+  R6 direct @R6:    EA = 0xFFFF7BC0    (output float main)
+
+================================================================================
+SUBROUTINE CALLS
+================================================================================
+  0x000BE608  - Likely: float comparison/range check (returns bool in R0.b)
+               Called with FR4=value, FR5=0, FR6=tolerance
+  0x000BE628  - Likely: ratio/interpolation (FR4=1.0, FR5=input)
+               Returns float result in FR0
+  0x000BE830  - Likely: 2D table lookup (R4=table_desc, FR4=axis_input)
+               Returns float result in FR0
+  0x000BE56C  - Likely: float clamp (FR4=value, FR5=min, FR6=max)
+               Returns clamped float in FR0
+  0x000BE554  - Likely: saturating increment (R4=current_word, R5=increment)
+               Returns new word in R0
+  0x00029888  - Called from func_39668 init
+  0x0001FD7C  - Called from func_39668 init
+  0x00021D9A  - Called from func_39668 init
+
+================================================================================
+DISASSEMBLY: ENTRY TRAMPOLINE (0x39524)
+================================================================================
+
+  39524:  A002    bra    0x3952C                 ; -> func_3952C (main function)
+  39526:  0009    nop                            ; (delay slot)
+  39528:  A09E    bra    0x39668                 ; -> func_39668 (init function)
+  3952A:  0009    nop                            ; (delay slot)
+
+  NOTE: 0x39524 is one entry point (jumps to func_3952C).
+        0x39528 is a separate entry point (jumps to func_39668).
+        Both are reached via indirect calls from elsewhere.
+
+================================================================================
+DISASSEMBLY: func_3952C - MAIN COMPUTATION (0x3952C - 0x3961A)
+================================================================================
+; Prologue: save R13, R14, PR, FR12, FR14, FR15, allocate 8 bytes on stack
+
+loc_3952C:
+  3952C:  2FD6    mov.l  R13,@-R15               ; push R13
+  3952E:  2FE6    mov.l  R14,@-R15               ; push R14
+  39530:  4F22    sts.l  PR,@-R15                ; push PR (return address)
+  39532:  FFCB    fmov.s FR12,@-R15              ; push FR12
+  39534:  FFEB    fmov.s FR14,@-R15              ; push FR14
+  39536:  FFFB    fmov.s FR15,@-R15              ; push FR15
+  39538:  7FF8    add    #-8,R15                  ; SP -= 8 (local vars: [SP+0]=float, [SP+4]=float)
+
+; Load inputs from RAM
+  3953A:  D27C    mov.l  @(0x3972C,PC),R2        ; R2 = 0xFFFF77D8 [pool 0x3972C]
+  3953C:  F428    fmov.s @R2,FR4                 ; FR4 = float[0xFFFF77D8]
+  3953E:  D27C    mov.l  @(0x39730,PC),R2        ; R2 = 0xFFFF77DC [pool 0x39730]
+  39540:  F528    fmov.s @R2,FR5                 ; FR5 = float[0xFFFF77DC]
+  39542:  D67C    mov.l  @(0x39734,PC),R6        ; R6 = 0xFFFF7448 [pool 0x39734]
+  39544:  6E60    mov.b  @R6,R14                 ; R14 = byte[0xFFFF7448] (sign-extended)
+  39546:  D27C    mov.l  @(0x39738,PC),R2        ; R2 = 0xFFFF798C [pool 0x39738]
+  39548:  FC28    fmov.s @R2,FR12                ; FR12 = float[0xFFFF798C]
+  3954A:  D27C    mov.l  @(0x3973C,PC),R2        ; R2 = 0xFFFF7800 [pool 0x3973C]
+  3954C:  F928    fmov.s @R2,FR9                 ; FR9 = float[0xFFFF7800]
+  3954E:  D27C    mov.l  @(0x39740,PC),R2        ; R2 = 0xFFFF6354 [pool 0x39740]
+  39550:  FF28    fmov.s @R2,FR15                ; FR15 = float[0xFFFF6354]
+  39552:  D27C    mov.l  @(0x39744,PC),R2        ; R2 = 0xFFFF782C [pool 0x39744]
+  39554:  6D20    mov.b  @R2,R13                 ; R13 = byte[0xFFFF782C] (sign-extended)
+
+; Test R13 flag
+  39556:  2DD8    tst    R13,R13                 ; T = (R13 == 0)?
+  39558:  8B04    bf     loc_39564               ; if R13 != 0, goto loc_39564
+                                                  ;   (R13 != 0 means "flag set" path)
+
+; --- PATH A: R13 == 0 ---
+  3955A:  D47B    mov.l  @(0x39748,PC),R4        ; R4 = 0xFFFF7BAC [pool 0x39748]
+  3955C:  B05E    bsr    sub_3961C               ; call sub_3961C(R4=0xFFFF7BAC)
+  3955E:  0009    nop                            ; (delay slot)
+  39560:  A035    bra    loc_395CE               ; goto loc_395CE (skip flag-set path)
+  39562:  0009    nop                            ; (delay slot)
+
+; --- PATH B: R13 != 0 (flag is set) ---
+loc_39564:
+  39564:  F79D    fldi1  FR7                     ; FR7 = 1.0
+  39566:  F47C    fmov   FR7,FR4                 ; FR4 = 1.0
+  39568:  F491    fsub   FR9,FR4                 ; FR4 = 1.0 - FR9 = 1.0 - float[0xFFFF7800]
+  3956A:  FE4C    fmov   FR4,FR14                ; FR14 = FR4 (save: 1.0 - FR9)
+
+; Call range check: is FR4 within tolerance of 0?
+  3956C:  D277    mov.l  @(0x3974C,PC),R2        ; R2 = 0x000BE608 [pool 0x3974C] (range_check func)
+  3956E:  C778    mova   @(0x39750,PC),R0        ; R0 = 0x39750 (address of float constant)
+  39570:  F608    fmov.s @R0,FR6                 ; FR6 = float[0x39750] = 0.0001220703125 (tolerance)
+  39572:  420B    jsr    @R2                     ; call range_check(FR4=1.0-FR9, FR5=??, FR6=tolerance)
+  39574:  F58D    fldi0  FR5                     ; (delay slot) FR5 = 0.0
+
+; Check result
+  39576:  620C    extu.b R0,R2                   ; R2 = R0 & 0xFF (bool result)
+  39578:  2228    tst    R2,R2                   ; T = (R2 == 0)?
+  3957A:  8B04    bf     loc_39586               ; if R2 != 0 (in range), goto loc_39586
+
+; --- PATH B1: (1.0 - FR9) is OUT of range (near zero, i.e. FR9 ~ 1.0) ---
+  3957C:  F98D    fldi0  FR9                     ; FR9 = 0.0
+  3957E:  D675    mov.l  @(0x39754,PC),R6        ; R6 = 0xFFFF7BC0 [pool 0x39754]
+  39580:  E0EC    mov    #-20,R0                 ; R0 = -20 (signed) = 0xFFFFFFEC
+  39582:  A024    bra    loc_395CE               ; goto loc_395CE
+  39584:  F697    fmov.s FR9,@(R0,R6)            ; (delay slot) float[0xFFFF7BAC] = 0.0
+                                                  ;   EA: R6 + R0 = 0xFFFF7BC0 + 0xFFFFFFEC = 0xFFFF7BAC
+
+; --- PATH B2: (1.0 - FR9) is IN range (not near zero) ---
+loc_39586:
+; Call interpolation/ratio function
+  39586:  D274    mov.l  @(0x39758,PC),R2        ; R2 = 0x000BE628 [pool 0x39758] (ratio func)
+  39588:  F79D    fldi1  FR7                     ; FR7 = 1.0
+  3958A:  F47C    fmov   FR7,FR4                 ; FR4 = 1.0
+  3958C:  420B    jsr    @R2                     ; call ratio(FR4=1.0, FR5=FR14=1.0-FR9)
+  3958E:  F5EC    fmov   FR14,FR5                ; (delay slot) FR5 = FR14 = 1.0 - FR9
+                                                  ; Returns FR0 = result
+
+; FR0 = ratio result; compute FR0 = FR0 - 1.0
+  39590:  F69D    fldi1  FR6                     ; FR6 = 1.0
+  39592:  F64D    fneg   FR6                     ; FR6 = -1.0
+  39594:  F060    fadd   FR6,FR0                 ; FR0 = FR0 + (-1.0) = FR0 - 1.0
+  39596:  FF0A    fmov.s FR0,@R15                ; [SP+0] = FR0 (save to local var)
+
+; Table lookup: lookup FR15 in table at 0x000AD258
+  39598:  D470    mov.l  @(0x3975C,PC),R4        ; R4 = 0x000AD258 [pool 0x3975C] (table descriptor)
+  3959A:  D271    mov.l  @(0x39760,PC),R2        ; R2 = 0x000BE830 [pool 0x39760] (table_lookup func)
+  3959C:  420B    jsr    @R2                     ; call table_lookup(R4=table_desc, FR4=FR15)
+  3959E:  F4FC    fmov   FR15,FR4                ; (delay slot) FR4 = FR15 = float[0xFFFF6354]
+                                                  ; Returns FR0 = looked-up value
+
+; Store table result to [0xFFFF7BC0]
+  395A0:  D66C    mov.l  @(0x39754,PC),R6        ; R6 = 0xFFFF7BC0 [pool 0x39754]
+  395A2:  F60A    fmov.s FR0,@R6                 ; float[0xFFFF7BC0] = FR0 (table lookup result)
+
+; Branch based on flag in R14 (byte[0xFFFF7448])
+  395A4:  60EC    extu.b R14,R0                  ; R0 = R14 & 0xFF
+  395A6:  8801    cmp/eq #1,R0                   ; T = (R0 == 1)?
+  395A8:  8F05    bf/s   loc_395B6               ; if R0 != 1, goto loc_395B6
+  395AA:  F4F8    fmov.s @R15,FR4                ; (delay slot) FR4 = [SP+0] (ratio result - 1.0)
+
+; --- PATH B2a: R14 == 1 ---
+  395AC:  E004    mov    #4,R0                   ; R0 = 4
+  395AE:  FF47    fmov.s FR4,@(R0,R15)           ; [SP+4] = FR4 (save ratio-1.0 to local)
+  395B0:  D26C    mov.l  @(0x39764,PC),R2        ; R2 = 0x000CC3EC [pool 0x39764]
+  395B2:  A006    bra    loc_395C2               ; goto loc_395C2 (common clamp path)
+  395B4:  F628    fmov.s @R2,FR6                 ; (delay slot) FR6 = float[0x000CC3EC] = 0.0 (clamp max)
+
+; --- PATH B2b: R14 != 1 ---
+loc_395B6:
+  395B6:  F968    fmov.s @R6,FR9                 ; FR9 = float[0xFFFF7BC0] (table lookup result)
+  395B8:  F492    fmul   FR9,FR4                 ; FR4 = FR4 * FR9 = (ratio-1.0) * table_result
+  395BA:  E004    mov    #4,R0                   ; R0 = 4
+  395BC:  FF47    fmov.s FR4,@(R0,R15)           ; [SP+4] = FR4
+  395BE:  D26A    mov.l  @(0x39768,PC),R2        ; R2 = 0x000CC3F0 [pool 0x39768]
+  395C0:  F628    fmov.s @R2,FR6                 ; FR6 = float[0x000CC3F0] = 0.0 (clamp max)
+
+; --- Common path: clamp the result ---
+loc_395C2:
+; FR4 = value to clamp (from [SP+4] loaded earlier in delay slot at 395AA)
+; Actually FR4 was loaded in the bf/s delay slot at 395AA, then paths diverge:
+;   Path B2a: FR4 = ratio-1.0 (unmodified), FR6 = 0.0
+;   Path B2b: FR4 = (ratio-1.0)*table_result, FR6 = 0.0
+; Now load FR4 from [SP+4] for the clamp call:
+  395C2:  D26A    mov.l  @(0x3976C,PC),R2        ; R2 = 0x000BE56C [pool 0x3976C] (clamp func)
+  395C4:  420B    jsr    @R2                     ; call clamp(FR4=value, FR5=0.0, FR6=max)
+  395C6:  F58D    fldi0  FR5                     ; (delay slot) FR5 = 0.0 (clamp min)
+                                                  ; Returns FR0 = clamped value
+
+; Store clamped result to [0xFFFF7BAC]
+  395C8:  D662    mov.l  @(0x39754,PC),R6        ; R6 = 0xFFFF7BC0 [pool 0x39754]
+  395CA:  E0EC    mov    #-20,R0                 ; R0 = -20 -> EA = 0xFFFF7BC0 + (-20) = 0xFFFF7BAC
+  395CC:  F607    fmov.s FR0,@(R0,R6)            ; float[0xFFFF7BAC] = FR0 (clamped result)
+
+; ==========================================
+; SECOND HALF: Post-processing (both paths merge here)
+; ==========================================
+loc_395CE:
+  395CE:  2DD8    tst    R13,R13                 ; T = (R13 == 0)?
+  395D0:  8B0A    bf     loc_395E8               ; if R13 != 0, goto loc_395E8
+
+; --- R13 == 0: check if FR12 is within tolerance ---
+  395D2:  D25E    mov.l  @(0x3974C,PC),R2        ; R2 = 0x000BE608 [pool 0x3974C] (range_check func)
+  395D4:  F4CC    fmov   FR12,FR4                ; FR4 = FR12 = float[0xFFFF798C]
+  395D6:  F58D    fldi0  FR5                     ; FR5 = 0.0
+  395D8:  C765    mova   @(0x39770,PC),R0        ; R0 = 0x39770 (float constant address)
+  395DA:  420B    jsr    @R2                     ; call range_check(FR4=FR12, FR5=0.0, FR6=tolerance)
+  395DC:  F608    fmov.s @R0,FR6                 ; (delay slot) FR6 = float[0x39770] = 3.05e-05 (tolerance)
+
+  395DE:  620C    extu.b R0,R2                   ; R2 = R0 & 0xFF (bool result)
+  395E0:  2228    tst    R2,R2                   ; T = (R2 == 0)?
+  395E2:  8906    bt     loc_395F2               ; if R2 == 0 (NOT in range), goto loc_395F2
+  395E4:  A00E    bra    loc_39604               ; else (in range), goto loc_39604
+  395E6:  0009    nop                            ; (delay slot)
+
+; --- R13 != 0: compare [0xFFFF7BAC] > FR12 ---
+loc_395E8:
+  395E8:  D65A    mov.l  @(0x39754,PC),R6        ; R6 = 0xFFFF7BC0 [pool 0x39754]
+  395EA:  E0EC    mov    #-20,R0                 ; R0 = -20 -> EA = 0xFFFF7BAC
+  395EC:  F866    fmov.s @(R0,R6),FR8            ; FR8 = float[0xFFFF7BAC]
+  395EE:  F8C5    fcmp/gt FR12,FR8               ; T = (FR8 > FR12)?
+  395F0:  8B08    bf     loc_39604               ; if FR8 <= FR12, goto loc_39604
+
+; --- Copy [0xFFFF7BAC] -> [0xFFFF7BA8] -> [0xFFFF7BA4] ---
+loc_395F2:
+  395F2:  D658    mov.l  @(0x39754,PC),R6        ; R6 = 0xFFFF7BC0 [pool 0x39754]
+  395F4:  E0EC    mov    #-20,R0                 ; R0 = -20 -> EA = 0xFFFF7BAC
+  395F6:  F866    fmov.s @(R0,R6),FR8            ; FR8 = float[0xFFFF7BAC]
+  395F8:  E0E8    mov    #-24,R0                 ; R0 = -24 -> EA = 0xFFFF7BA8
+  395FA:  F687    fmov.s FR8,@(R0,R6)            ; float[0xFFFF7BA8] = FR8
+  395FC:  F866    fmov.s @(R0,R6),FR8            ; FR8 = float[0xFFFF7BA8] (re-read, same value)
+  395FE:  E0E4    mov    #-28,R0                 ; R0 = -28 -> EA = 0xFFFF7BA4
+  39600:  A004    bra    loc_3960C               ; goto epilogue
+  39602:  F687    fmov.s FR8,@(R0,R6)            ; (delay slot) float[0xFFFF7BA4] = FR8
+
+; --- Zero out [0xFFFF7BA8] ---
+loc_39604:
+  39604:  F98D    fldi0  FR9                     ; FR9 = 0.0
+  39606:  D653    mov.l  @(0x39754,PC),R6        ; R6 = 0xFFFF7BC0 [pool 0x39754]
+  39608:  E0E8    mov    #-24,R0                 ; R0 = -24 -> EA = 0xFFFF7BA8
+  3960A:  F697    fmov.s FR9,@(R0,R6)            ; float[0xFFFF7BA8] = 0.0
+
+; Epilogue: restore and return
+loc_3960C:
+  3960C:  7F08    add    #8,R15                  ; SP += 8 (free local vars)
+  3960E:  FFF9    fmov.s @R15+,FR15              ; pop FR15
+  39610:  FEF9    fmov.s @R15+,FR14              ; pop FR14
+  39612:  FCF9    fmov.s @R15+,FR12              ; pop FR12
+  39614:  4F26    lds.l  @R15+,PR                ; pop PR
+  39616:  6EF6    mov.l  @R15+,R14               ; pop R14
+  39618:  000B    rts                            ; return
+  3961A:  6DF6    mov.l  @R15+,R13               ; (delay slot) pop R13
+
+================================================================================
+DISASSEMBLY: sub_3961C - HELPER SUBROUTINE (0x3961C - 0x39666)
+================================================================================
+; Called from func_3952C with R4 = pointer to output float (0xFFFF7BAC)
+; Uses FR4, FR5 as inherited from caller's context
+
+sub_3961C:
+; Prologue
+  3961C:  2FE6    mov.l  R14,@-R15               ; push R14
+  3961E:  4F22    sts.l  PR,@-R15                ; push PR
+  39620:  FFEB    fmov.s FR14,@-R15              ; push FR14
+  39622:  6E43    mov    R4,R14                  ; R14 = R4 (output pointer, e.g. 0xFFFF7BAC)
+
+; Compute: FR5 = FR4 + FR5 + 1.0
+  39624:  F540    fadd   FR4,FR5                 ; FR5 = FR4 + FR5
+  39626:  F89D    fldi1  FR8                     ; FR8 = 1.0
+  39628:  F580    fadd   FR8,FR5                 ; FR5 = FR5 + 1.0
+  3962A:  FE5C    fmov   FR5,FR14                ; FR14 = FR5 (save sum)
+
+; Range check: is FR5 near zero?
+  3962C:  D247    mov.l  @(0x3974C,PC),R2        ; R2 = 0x000BE608 [pool 0x3974C] (range_check)
+  3962E:  F45C    fmov   FR5,FR4                 ; FR4 = FR5 (the sum)
+  39630:  C747    mova   @(0x39750,PC),R0        ; R0 = 0x39750 (float constant addr)
+  39632:  F608    fmov.s @R0,FR6                 ; FR6 = 0.0001220703125 (tolerance)
+  39634:  420B    jsr    @R2                     ; call range_check(FR4=sum, FR5=0.0, FR6=tolerance)
+  39636:  F58D    fldi0  FR5                     ; (delay slot) FR5 = 0.0
+
+  39638:  620C    extu.b R0,R2                   ; R2 = R0 & 0xFF (bool)
+  3963A:  2228    tst    R2,R2                   ; T = (R2 == 0)?
+  3963C:  8B02    bf     loc_39644               ; if result != 0, goto loc_39644
+
+; --- Sum IS near zero: store 0.0 ---
+  3963E:  F98D    fldi0  FR9                     ; FR9 = 0.0
+  39640:  A00E    bra    loc_39660               ; goto epilogue
+  39642:  FE9A    fmov.s FR9,@R14                ; (delay slot) float[R14] = 0.0
+
+; --- Sum is NOT near zero: compute ratio ---
+loc_39644:
+  39644:  D244    mov.l  @(0x39758,PC),R2        ; R2 = 0x000BE628 [pool 0x39758] (ratio func)
+  39646:  F49D    fldi1  FR4                     ; FR4 = 1.0
+  39648:  420B    jsr    @R2                     ; call ratio(FR4=1.0, FR5=FR14=sum)
+  3964A:  F5EC    fmov   FR14,FR5                ; (delay slot) FR5 = FR14 (the sum)
+                                                  ; Returns FR0 = ratio result
+
+; FR0 = FR0 - 1.0
+  3964C:  F89D    fldi1  FR8                     ; FR8 = 1.0
+  3964E:  F84D    fneg   FR8                     ; FR8 = -1.0
+  39650:  F080    fadd   FR8,FR0                 ; FR0 = FR0 - 1.0
+
+; Clamp FR0 between 0 and cal[0x000CC3E8]=0.03
+  39652:  D246    mov.l  @(0x3976C,PC),R2        ; R2 = 0x000BE56C [pool 0x3976C] (clamp func)
+  39654:  F58D    fldi0  FR5                     ; FR5 = 0.0 (min)
+  39656:  D647    mov.l  @(0x39774,PC),R6        ; R6 = 0x000CC3E8 [pool 0x39774]
+  39658:  F668    fmov.s @R6,FR6                 ; FR6 = float[0x000CC3E8] = 0.03 (max)
+  3965A:  420B    jsr    @R2                     ; call clamp(FR4=FR0, FR5=0.0, FR6=0.03)
+  3965C:  F40C    fmov   FR0,FR4                 ; (delay slot) FR4 = FR0
+                                                  ; Returns FR0 = clamped value
+
+; Store result
+  3965E:  FE0A    fmov.s FR0,@R14                ; float[R14] = FR0 (clamped result)
+
+; Epilogue
+loc_39660:
+  39660:  FEF9    fmov.s @R15+,FR14              ; pop FR14
+  39662:  4F26    lds.l  @R15+,PR                ; pop PR
+  39664:  000B    rts                            ; return
+  39666:  6EF6    mov.l  @R15+,R14               ; (delay slot) pop R14
+
+================================================================================
+DISASSEMBLY: func_39668 - INIT / STATE MACHINE (0x39668 - 0x3972A)
+================================================================================
+; This function has two logical parts:
+;   Part 1 (0x39668-0x396A0): Initialization of several RAM bytes
+;   Part 2 (0x396A2-0x3972A): Table-driven state machine / condition checker
+; Part 1's epilogue merges directly into Part 2's prologue (tail-call style).
+
+; ---- PART 1: Initialization ----
+loc_39668:
+; Prologue
+  39668:  2FE6    mov.l  R14,@-R15               ; push R14
+  3966A:  4F22    sts.l  PR,@-R15                ; push PR
+
+; Load float from RAM and store to output struct
+  3966C:  D242    mov.l  @(0x39778,PC),R2        ; R2 = 0xFFFF43FC [pool 0x39778]
+  3966E:  F828    fmov.s @R2,FR8                 ; FR8 = float[0xFFFF43FC]
+  39670:  DE42    mov.l  @(0x3977C,PC),R14       ; R14 = 0xFFFF7BB8 [pool 0x3977C]
+  39672:  E0FC    mov    #-4,R0                  ; R0 = -4 -> EA = 0xFFFF7BB8 + (-4) = 0xFFFF7BB4
+  39674:  D242    mov.l  @(0x39780,PC),R2        ; R2 = 0x00029888 [pool 0x39780] (subroutine)
+  39676:  420B    jsr    @R2                     ; call sub_29888(...)
+  39678:  FE87    fmov.s FR8,@(R0,R14)           ; (delay slot) float[0xFFFF7BB4] = FR8
+
+; Call sub_1FD7C, store result byte
+  3967A:  D242    mov.l  @(0x39784,PC),R2        ; R2 = 0x0001FD7C [pool 0x39784] (subroutine)
+  3967C:  420B    jsr    @R2                     ; call sub_1FD7C(...)
+  3967E:  2E00    mov.b  R0,@R14                 ; (delay slot) byte[0xFFFF7BB8] = R0 (prev call result)
+  39680:  80E1    mov.b  R0,@(1,R14)             ; byte[0xFFFF7BB9] = R0 (this call's result)
+
+; Read flag, call sub_21D9A, store results
+  39682:  D62C    mov.l  @(0x39734,PC),R6        ; R6 = 0xFFFF7448 [pool 0x39734]
+  39684:  6060    mov.b  @R6,R0                  ; R0 = byte[0xFFFF7448]
+  39686:  D240    mov.l  @(0x39788,PC),R2        ; R2 = 0x00021D9A [pool 0x39788] (subroutine)
+  39688:  420B    jsr    @R2                     ; call sub_21D9A(R0=flag)
+  3968A:  80E2    mov.b  R0,@(2,R14)             ; (delay slot) byte[0xFFFF7BBA] = R0 (prev result)
+  3968C:  80E3    mov.b  R0,@(3,R14)             ; byte[0xFFFF7BBB] = R0 (this call's result)
+
+; Store another flag byte
+  3968E:  D63F    mov.l  @(0x3978C,PC),R6        ; R6 = 0xFFFF7453 [pool 0x3978C]
+  39690:  6060    mov.b  @R6,R0                  ; R0 = byte[0xFFFF7453]
+  39692:  80E4    mov.b  R0,@(4,R14)             ; byte[0xFFFF7BBC] = R0
+
+; Set up arguments for Part 2
+  39694:  D73E    mov.l  @(0x39790,PC),R7        ; R7 = 0x00063B54 [pool 0x39790] (table of ptrs)
+  39696:  D63F    mov.l  @(0x39794,PC),R6        ; R6 = 0xFFFF7BB2 [pool 0x39794] (counter word)
+  39698:  D53F    mov.l  @(0x39798,PC),R5        ; R5 = 0xFFFF7BB0 [pool 0x39798] (mode flag byte)
+  3969A:  7EF0    add    #-16,R14                ; R14 = 0xFFFF7BB8 - 16 = 0xFFFF7BA8
+  3969C:  64E3    mov    R14,R4                  ; R4 = R14 = 0xFFFF7BA8
+
+; Pop Part 1's frame, then fall through to Part 2
+  3969E:  4F26    lds.l  @R15+,PR                ; pop PR
+  396A0:  6EF6    mov.l  @R15+,R14               ; pop R14
+
+; ---- PART 2: State Machine / Condition Checker ----
+; Arguments: R4=0xFFFF7BA8(float ptr), R5=0xFFFF7BB0(mode byte),
+;            R6=0xFFFF7BB2(counter word), R7=0x00063B54(table of RAM ptrs)
+
+; Prologue
+  396A2:  2FC6    mov.l  R12,@-R15               ; push R12
+  396A4:  2FD6    mov.l  R13,@-R15               ; push R13
+  396A6:  2FE6    mov.l  R14,@-R15               ; push R14
+  396A8:  4F22    sts.l  PR,@-R15                ; push PR
+
+  396AA:  6E73    mov    R7,R14                  ; R14 = 0x00063B54 (table base)
+  396AC:  6D63    mov    R6,R13                  ; R13 = 0xFFFF7BB2 (counter ptr)
+  396AE:  6050    mov.b  @R5,R0                  ; R0 = byte[0xFFFF7BB0] (mode flag)
+  396B0:  8801    cmp/eq #1,R0                   ; T = (mode == 1)?
+  396B2:  8F0B    bf/s   loc_396CC               ; if mode != 1, goto loc_396CC
+  396B4:  6C53    mov    R5,R12                  ; (delay slot) R12 = R5 = 0xFFFF7BB0
+
+; --- MODE == 1 path ---
+; Check table[+20] -> byte[0xFFFF7BBC]
+  396B6:  56E5    mov.l  @(20,R14),R6            ; R6 = [0x00063B68] = 0xFFFF7BBC
+  396B8:  6060    mov.b  @R6,R0                  ; R0 = byte[0xFFFF7BBC]
+  396BA:  8801    cmp/eq #1,R0                   ; T = (R0 == 1)?
+  396BC:  8B06    bf     loc_396CC               ; if byte[0xFFFF7BBC] != 1, goto loc_396CC
+
+; Check table[+16] -> byte[0xFFFF7BBB]
+  396BE:  52E4    mov.l  @(16,R14),R2            ; R2 = [0x00063B64] = 0xFFFF7BBB
+  396C0:  6620    mov.b  @R2,R6                  ; R6 = byte[0xFFFF7BBB]
+  396C2:  2668    tst    R6,R6                   ; T = (R6 == 0)?
+  396C4:  8902    bt     loc_396CC               ; if byte[0xFFFF7BBB] == 0, goto loc_396CC
+
+; All conditions met -> set mode=0, reset counter, return
+  396C6:  E200    mov    #0,R2                   ; R2 = 0
+  396C8:  A029    bra    loc_3971E               ; goto loc_3971E (set mode=0)
+  396CA:  2C20    mov.b  R2,@R12                 ; (delay slot) byte[0xFFFF7BB0] = 0 (mode = 0)
+
+; --- MODE != 1 (or conditions not met) path ---
+loc_396CC:
+; Check table[+12] -> byte[0xFFFF7BBA]
+  396CC:  56E3    mov.l  @(12,R14),R6            ; R6 = [0x00063B60] = 0xFFFF7BBA
+  396CE:  6060    mov.b  @R6,R0                  ; R0 = byte[0xFFFF7BBA]
+  396D0:  8801    cmp/eq #1,R0                   ; T = (R0 == 1)?
+  396D2:  8B24    bf     loc_3971E               ; if byte[0xFFFF7BBA] != 1, goto loc_3971E (exit)
+
+; Check table[+20] -> byte[0xFFFF7BBC]
+  396D4:  52E5    mov.l  @(20,R14),R2            ; R2 = [0x00063B68] = 0xFFFF7BBC
+  396D6:  6620    mov.b  @R2,R6                  ; R6 = byte[0xFFFF7BBC]
+  396D8:  2668    tst    R6,R6                   ; T = (R6 == 0)?
+  396DA:  8B20    bf     loc_3971E               ; if byte[0xFFFF7BBC] != 0, goto loc_3971E (exit)
+
+; Check table[+4] -> byte[0xFFFF7BB8]
+  396DC:  56E1    mov.l  @(4,R14),R6             ; R6 = [0x00063B58] = 0xFFFF7BB8
+  396DE:  6260    mov.b  @R6,R2                  ; R2 = byte[0xFFFF7BB8]
+  396E0:  2228    tst    R2,R2                   ; T = (R2 == 0)?
+  396E2:  8B1C    bf     loc_3971E               ; if byte[0xFFFF7BB8] != 0, goto loc_3971E (exit)
+
+; Check table[+8] -> byte[0xFFFF7BB9]
+  396E4:  56E2    mov.l  @(8,R14),R6             ; R6 = [0x00063B5C] = 0xFFFF7BB9
+  396E6:  6060    mov.b  @R6,R0                  ; R0 = byte[0xFFFF7BB9]
+  396E8:  8802    cmp/eq #2,R0                   ; T = (R0 == 2)?
+  396EA:  8B18    bf     loc_3971E               ; if byte[0xFFFF7BB9] != 2, goto loc_3971E (exit)
+
+; Check float at R4 (0xFFFF7BA8) vs cal threshold
+  396EC:  F848    fmov.s @R4,FR8                 ; FR8 = float[0xFFFF7BA8]
+  396EE:  D22B    mov.l  @(0x3979C,PC),R2        ; R2 = 0x000CC3F4 [pool 0x3979C]
+  396F0:  F928    fmov.s @R2,FR9                 ; FR9 = float[0x000CC3F4] = 0.0 (threshold)
+  396F2:  F985    fcmp/gt FR8,FR9                ; T = (FR9 > FR8)?
+  396F4:  8913    bt     loc_3971E               ; if threshold > value, goto loc_3971E (exit)
+
+; Increment counter at R13 (0xFFFF7BB2)
+  396F6:  64D1    mov.w  @R13,R4                 ; R4 = word[0xFFFF7BB2] (counter)
+  396F8:  D229    mov.l  @(0x397A0,PC),R2        ; R2 = 0x000BE554 [pool 0x397A0] (sat_add func)
+  396FA:  644D    extu.w R4,R4                   ; R4 = R4 & 0xFFFF (zero-extend word)
+  396FC:  420B    jsr    @R2                     ; call sat_add(R4=counter, R5=1)
+  396FE:  E501    mov    #1,R5                   ; (delay slot) R5 = 1
+  39700:  2D01    mov.w  R0,@R13                 ; word[0xFFFF7BB2] = R0 (new counter)
+
+; Compare counter to threshold
+  39702:  66D1    mov.w  @R13,R6                 ; R6 = word[0xFFFF7BB2] (updated counter)
+  39704:  D527    mov.l  @(0x397A4,PC),R5        ; R5 = 0x000CBC8C [pool 0x397A4]
+  39706:  6251    mov.w  @R5,R2                  ; R2 = word[0x000CBC8C] = 0 (counter threshold)
+  39708:  3622    cmp/hs  R2,R6                  ; T = (R6 >= R2)? (unsigned)
+  3970A:  8B0A    bf     loc_39722               ; if counter < threshold, goto loc_39722 (exit)
+
+; Counter >= threshold: check final float condition
+  3970C:  62E2    mov.l  @R14,R2                 ; R2 = [0x00063B54] = 0xFFFF7BB4
+  3970E:  F828    fmov.s @R2,FR8                 ; FR8 = float[0xFFFF7BB4]
+  39710:  D225    mov.l  @(0x397A8,PC),R2        ; R2 = 0x000CC3F8 [pool 0x397A8]
+  39712:  F928    fmov.s @R2,FR9                 ; FR9 = float[0x000CC3F8] = 1.0
+  39714:  F895    fcmp/gt FR9,FR8                ; T = (FR8 > FR9)?
+  39716:  8904    bt     loc_39722               ; if float[0xFFFF7BB4] > 1.0, goto loc_39722 (exit)
+
+; All conditions met -> set mode = 1
+  39718:  E201    mov    #1,R2                   ; R2 = 1
+  3971A:  A002    bra    loc_39722               ; goto loc_39722
+  3971C:  2C20    mov.b  R2,@R12                 ; (delay slot) byte[0xFFFF7BB0] = 1 (mode = 1)
+
+; --- Reset counter ---
+loc_3971E:
+  3971E:  E200    mov    #0,R2                   ; R2 = 0
+  39720:  2D21    mov.w  R2,@R13                 ; word[0xFFFF7BB2] = 0 (reset counter)
+
+; Epilogue
+loc_39722:
+  39722:  4F26    lds.l  @R15+,PR                ; pop PR
+  39724:  6EF6    mov.l  @R15+,R14               ; pop R14
+  39726:  6DF6    mov.l  @R15+,R13               ; pop R13
+  39728:  000B    rts                            ; return
+  3972A:  6CF6    mov.l  @R15+,R12               ; (delay slot) pop R12
+
+================================================================================
+CONTROL FLOW SUMMARY
+================================================================================
+
+func_3952C CONTROL FLOW:
+-------------------------
+
+  Entry -> Load inputs from RAM
+        |
+        v
+  Test R13 (byte[0xFFFF782C])
+        |
+   +----+----+
+   |         |
+  R13==0    R13!=0
+   |         |
+   v         v
+  call      FR4 = 1.0 - float[0xFFFF7800]
+  sub_3961C  |
+  (R4=       v
+  0xFFFF7BAC) range_check(FR4, 0, 0.000122)
+   |         |
+   |    +----+----+
+   |    |         |
+   |  result==0  result!=0
+   |  (near 0)   (not near 0)
+   |    |         |
+   |    v         v
+   |  store 0.0  ratio(1.0, 1.0-FR9)
+   |  @0xFFFF7BAC FR0 = result - 1.0
+   |    |        table_lookup(FR15, table)
+   |    |        store table_result @0xFFFF7BC0
+   |    |         |
+   |    |    +----+----+
+   |    |    |         |
+   |    |  R14==1    R14!=1
+   |    |    |         |
+   |    |    v         v
+   |    |  FR4=      FR4=(ratio-1)*
+   |    |  ratio-1   table_result
+   |    |  clampMax=  clampMax=
+   |    |  cal[CC3EC] cal[CC3F0]
+   |    |    |         |
+   |    |    +----+----+
+   |    |         |
+   |    |         v
+   |    |  clamp(FR4, 0, max)
+   |    |  store @0xFFFF7BAC
+   |    |         |
+   +----+---------+
+        |
+        v
+   Test R13 again
+        |
+   +----+----+
+   |         |
+  R13==0    R13!=0
+   |         |
+   v         v
+  range_check load [0xFFFF7BAC]
+  (FR12,0,   compare > FR12
+  3.05e-5)    |
+   |       +--+--+
+   |       |     |
+   |    <=FR12 >FR12
+   |       |     |
+   +---+---+     |
+       |         |
+       v         v
+  store 0.0    copy [7BAC]->[7BA8]->[7BA4]
+  @0xFFFF7BA8    |
+       |         |
+       +---------+
+            |
+            v
+         return
+
+
+func_39668 CONTROL FLOW:
+-------------------------
+
+  Entry -> Init: store float[0xFFFF43FC] -> [0xFFFF7BB4]
+        -> call sub_29888
+        -> call sub_1FD7C -> store to [7BB8], [7BB9]
+        -> call sub_21D9A -> store to [7BBA], [7BBB]
+        -> store byte[7453] -> [7BBC]
+        -> Set up R4,R5,R6,R7 and fall into Part 2
+        |
+        v
+   Read mode = byte[0xFFFF7BB0]
+        |
+   +----+----+
+   |         |
+  mode==1   mode!=1
+   |         |
+   v         |
+  Check      |
+  [7BBC]==1  |
+  [7BBB]!=0  |
+   |         |
+  all met?   |
+  yes->      |
+  mode=0     |
+  reset ctr  |
+  return     |
+   |         |
+  no --------+
+             |
+             v
+        Check [7BBA]==1?
+        no -> reset counter, return
+             |
+            yes
+             v
+        Check [7BBC]==0?
+        no -> reset counter, return
+             |
+            yes
+             v
+        Check [7BB8]==0?
+        no -> reset counter, return
+             |
+            yes
+             v
+        Check [7BB9]==2?
+        no -> reset counter, return
+             |
+            yes
+             v
+        Check float[7BA8] >= cal[CC3F4]=0.0?
+        no -> reset counter, return
+             |
+            yes
+             v
+        Increment counter word[7BB2]
+        Counter >= cal_word[CBC8C]=0?
+        no -> return (keep counter)
+             |
+            yes
+             v
+        Check float[7BB4] <= cal[CC3F8]=1.0?
+        no -> return
+             |
+            yes
+             v
+        Set mode = 1 (byte[7BB0] = 1)
+        return (counter preserved)
+
+
+================================================================================
+COMPLETE RAM ADDRESS MAP
+================================================================================
+Address        Size   Read/Write  Function        Description
+----------     ----   ----------  -----------     -------------------------
+0xFFFF43FC     float  R           func_39668      Input copied to [7BB4]
+0xFFFF6354     float  R           func_3952C      FR15 input (table lookup axis)
+0xFFFF7448     byte   R           func_3952C/668  Flag loaded into R14
+0xFFFF7453     byte   R           func_39668      Copied to [7BBC]
+0xFFFF77D8     float  R           func_3952C      FR4 input
+0xFFFF77DC     float  R           func_3952C      FR5 input
+0xFFFF7800     float  R           func_3952C      FR9 input
+0xFFFF782C     byte   R           func_3952C      R13 flag (major branch)
+0xFFFF798C     float  R           func_3952C      FR12 input
+0xFFFF7BA4     float  W           func_3952C      Output slot 2 (copy of slot 1)
+0xFFFF7BA8     float  R/W         func_3952C/668  Output slot 1
+0xFFFF7BAC     float  R/W         func_3952C      Output slot 0
+0xFFFF7BB0     byte   R/W         func_39668      Mode flag (0 or 1)
+0xFFFF7BB2     word   R/W         func_39668      Counter
+0xFFFF7BB4     float  R/W         func_39668      Float (from [43FC])
+0xFFFF7BB8     byte   W/R         func_39668      Init flag / condition
+0xFFFF7BB9     byte   W/R         func_39668      Init flag / condition
+0xFFFF7BBA     byte   W/R         func_39668      Init flag / condition
+0xFFFF7BBB     byte   R           func_39668      Condition check
+0xFFFF7BBC     byte   W/R         func_39668      Condition check (from [7453])
+0xFFFF7BC0     float  W           func_3952C      Table lookup result stored
+
+================================================================================
+CALIBRATION / ROM TABLE REFERENCE MAP
+================================================================================
+Address        Type    Value    Usage
+----------     -----   ------   -----
+0x000AD258     table   ---      2D table descriptor (axis+map pointers)
+0x000CBC8C     word    0        Counter threshold (func_39668)
+0x000CC3E8     float   0.03     Clamp max in sub_3961C
+0x000CC3EC     float   0.0      Clamp max path B2a (R14==1)
+0x000CC3F0     float   0.0      Clamp max path B2b (R14!=1)
+0x000CC3F4     float   0.0      Float comparison threshold (func_39668)
+0x000CC3F8     float   1.0      Float comparison threshold (func_39668)
+
+Inline float constants:
+0x039750       float   0.000122  Tolerance for range_check in func_3952C
+0x039770       float   3.05e-05  Tolerance for range_check in post-processing
+
+================================================================================
+END OF DISASSEMBLY
+================================================================================

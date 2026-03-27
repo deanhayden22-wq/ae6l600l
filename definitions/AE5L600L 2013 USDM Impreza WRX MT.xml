@@ -24,6 +24,7 @@
 	<scaling name="MapSwitchDegrees" units="degrees" toexpr="x" frexpr="x" format="%.1f" min="-50" max="100" inc="0.5" storagetype="float" endian="big"/>
 	<scaling name="MapSwitchCounter" units="counts" toexpr="x" frexpr="x" format="%.0f" min="0" max="65535" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="Post_Start_Enrich_Decay3" units="units" toexpr="x" frexpr="x" format="%.0f" min="0" max="65535" inc="1" storagetype="uint16" endian="big"/>
+	<scaling name="AFLDecayRate" units="decay rate (higher = faster CL-&gt;OL)" toexpr="x*0.000030517578125" frexpr="x/0.000030517578125" format="%.6f" min="0" max="1" inc="0.000030517578125" storagetype="uint16" endian="big"/>
 	<scaling name="Post_Start_Enrich_Decay4" units="units" toexpr="x*0.0078125" frexpr="x/0.0078125" format="%.3f" min="0" max="511" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="LCRPM" units="Engine Speed (RPM)" toexpr="x" frexpr="x" format="%.0f" min="0" max="12000" inc="50" storagetype="float" endian="big"/>
 	<scaling name="LCSPEED(KMH)" units="Vehicle Speed (KMH)" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="float" endian="big"/>
@@ -1543,6 +1544,11 @@
 
 	<table name="Timing Blend Ratio Ceiling" category="Map Switching - Timing Blend" address="d2b1c" type="1D" scaling="MapSwitchRatio">
 		<description>Ceiling value for the timing blend ratio. Stock value: 1.0.</description>
+	</table>
+
+	<table name="AFL Decay Rate (CL to OL Transition Speed)" category="Fueling - CL/OL Transition" address="ce5a4" type="2D" level="3" scaling="AFLDecayRate">
+		<description>Controls how quickly the A/F Learning (AFL) correction decays toward zero when transitioning from closed loop to open loop. This is an additive decay applied each ECU cycle to the internal AFL accumulator (FFFF798C). When the accumulator reaches near-zero the CL to OL mode switch fires. Higher values = faster decay = faster CL to OL transition. Stock value at low RPM (0-4000): 0.003052 (~1.68s transition at WOT from ~2900 RPM). The axis is engine speed (RPM). Note: this table controls the natural transition timing built into the ECU - it is NOT the CL to OL Delay counter parameter.</description>
+		<table name="Engine Speed" type="X Axis" address="ce580" elements="9" scaling="RPM"/>
 	</table>
 
 </rom>
