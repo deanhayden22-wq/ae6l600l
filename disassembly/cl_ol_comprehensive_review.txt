@@ -1068,11 +1068,39 @@ WRITE 3 — ROM 0x36236: MULTIPLY-ACCUMULATE (when mode state = 2)
     36230: F89E  fmac   FR0,FR9,FR8    ; FR8 = FR8 + FR0*FR9
     36236: FC87  fmov.s FR8,@(R0,R12)  ; delay slot: FFFF798C = FR8
 
-WRITE 4 — ROM 0x36306: FILTERED UPDATE (else path, mode != 1 and != 2)
-  The else branch (0x36238-0x36306) performs a more complex filtered
-  computation before writing to FFFF798C. This is the normal run-time
-  update path. The exact filtering algorithm was not fully disassembled
-  but involves multiple fmov/fmac operations on the struct fields.
+WRITE 4 — ROM 0x36238-0x36306: FILTERED UPDATE (else path, mode = 0)
+  The normal run-time update path. Now fully disassembled.
+
+  TWO INPUTS computed just before the mode switch:
+    stack[32] = range_check(enrichment, 0.0, tol) — enrichment near zero?
+    stack[36] = range_check(FFFF798C, FFFF7990, tol) — acc at target?
+
+  NOTE ON RANGE_CHECK (0xBE608):
+    Returns 0 when value IS within tolerance (in range).
+    Returns nonzero when value is OUT of range (not near target).
+
+  CONTROL FLOW at 0x36238:
+    if enrichment near zero (stack[32]==0):
+      if accumulator at target (stack[36]==0) → DIRECT_ASSIGN
+      else → FILTERED_UPDATE
+    if enrichment NOT near zero (stack[32]!=0):
+      if FFFF79F2 (OL active) == 0 → FILTERED_UPDATE
+      else → check stack[36] for DIRECT_ASSIGN or FILTERED_UPDATE
+
+  FILTERED_UPDATE (0x36250-0x36270):
+    FFFF7990 = FR15 * [FFFF79A0]          ; target × blend coefficient
+    FR4 = [FFFF798C] + [FFFF79E0]         ; current + decay delta (negative)
+    [FFFF798C] = max(FR4, [FFFF7990])     ; clamp via 0xBE970
+    This is exponential decay with a floor clamp at the blended target.
+
+  DIRECT_ASSIGN (0x362F8-0x36306):
+    FFFF7990 = FR15 * [FFFF79A0]          ; target × blend coefficient
+    [FFFF798C] = [FFFF7990]               ; snap to target directly
+
+  RESPONSE TIME: When Path A fires, FFFF798C jumps from 0.0 to
+  ~0.03 (FR15 × blend_coeff) in ONE task cycle. This vastly exceeds
+  the 3.05e-5 tolerance used by Path B's FFFF7452 condition 2c,
+  causing Path B to switch to OL within 1-2 cycles of Path A firing.
 
 NOTE: The GBR-relative mov.w writes at ROM 0x36380, 0x363CA, 0x3640A,
 0x3640E appear to target FFFF798C at first glance because GBR is set to

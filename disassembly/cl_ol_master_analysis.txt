@@ -177,36 +177,50 @@ SECTION 4: FFFF7452 MASTER CL READINESS — FULL LOGIC
 
 
 ================================================================================
-SECTION 5: THE WOT DELAY PROBLEM — ROOT CAUSE
+SECTION 5: THE WOT DELAY PROBLEM — ROOT CAUSE (RESOLVED)
 ================================================================================
 
   OBSERVED: At WOT, CL/OL stays at 8 (CL) for ~1.68 seconds despite
   100% throttle. OL only engages when RPM crosses ~3400.
 
-  ROOT CAUSE: Condition #4 in the FFFF7452 evaluator.
+  PREVIOUS HYPOTHESIS (WRONG): FFFF7BA8 exceeds 0.11, causing the
+  delay via condition #4 in the FFFF7452 evaluator.
 
-  float@FFFF7BA8 must be < 0.11 for CL to be enabled. At WOT, this
-  value exceeds 0.11, so FFFF7452 drops to 0, which makes FFFF7448 = 0
-  (OL). However, there is a ~1.68 second delay between throttle
-  reaching 100% and the CL/OL mode actually switching.
+  CORRECTED ANALYSIS: FFFF7BA8 is written by func_3952C at ROM
+  0x39524. The computation clamps FFFF7BA8 to a maximum of 0.03
+  (via sub_3961C clamp at CAL 0xCC3E8). Since 0.03 < 0.11, condition
+  #4 (FFFF7BA8 < 0.11) is ALWAYS satisfied. It is never the blocking
+  factor for CL→OL transitions.
 
-  LIKELY EXPLANATION: FFFF7BA8 is a filtered/smoothed/processed
-  throttle value, not the raw sensor. If it's smoothed, the value
-  would gradually climb from idle levels to WOT levels, only crossing
-  the 0.11 threshold after the smoothing catches up.
+  ACTUAL ROOT CAUSE: Dead thresholds in Path A's condition checker.
 
-  OPEN QUESTION: What writes FFFF7BA8? Tracing this address will
-  reveal the filtering mechanism and explain the delay. This is the
-  next step in the investigation.
+  The stock ROM had unreachable thresholds:
+    - Engine load (CC204): 4.8 g/rev (never reached at WOT)
+    - Throttle max (CC1D8): 91.0 deg = 108% TPS (physically impossible)
 
-  The 0.11 threshold at CBE78 is unchanged from stock, and it's very
-  low — it should be crossed almost immediately at any significant
-  throttle opening. The delay strongly suggests filtering on the input.
+  With these dead values, ONLY the per-gear RPM thresholds (CC180+)
+  could trigger Path A's OL enrichment. At WOT starting from low RPM,
+  RPM took ~1.68 seconds to climb to the per-gear threshold (~3400).
 
-  NOTE: The condition checker (Path A) with its throttle/RPM/load
-  thresholds has NO EFFECT on this timing. The CBC62 delay value has
-  NO EFFECT on this timing. The per-gear RPM thresholds have NO EFFECT
-  on this timing (they affect Path A enrichment, not Path B mode flag).
+  During this time:
+    1. Path A never fired → FFFF798C (OL enrichment blend) stayed at 0
+    2. FFFF798C near zero → Path B condition 2c passed → FFFF7452 = 1
+    3. FFFF7448 stayed at 1 (CL mode) for the entire 1.68s
+
+  The CL→OL transition mechanism via Path B:
+    Path A fires → FFFF798C deviates from zero → Path B condition 2c
+    fails (FFFF798C not near zero within 3.05e-5 tolerance) →
+    FFFF7452 = 0 → FFFF7448 = 0 → OL mode.
+
+  FFFF798C is the BRIDGE between Path A and Path B. Path B cannot
+  switch to OL until Path A has actually started OL enrichment.
+
+  With corrected thresholds (load=1.15 g/rev, TPS=50%), Path A fires
+  almost immediately at WOT (throttle > 50%), FFFF798C jumps within
+  1-2 task cycles via the WRITE 4 filter, and Path B switches to OL
+  within ~10-20ms. The 1.68s delay is eliminated.
+
+  THIS WAS A CALIBRATION PROBLEM, NOT A CODE LIMITATION.
 
 
 ================================================================================
@@ -399,40 +413,228 @@ SECTION 10: CALIBRATION REFERENCE
 
 
 ================================================================================
-SECTION 11: OPEN QUESTIONS & NEXT STEPS
+SECTION 11: OPEN QUESTIONS — ALL RESOLVED
 ================================================================================
 
-  1. WHAT IS FFFF7BA8 AND WHO WRITES IT?
-     This is the most critical open question. FFFF7452 (Path B master
-     readiness) requires FFFF7BA8 < 0.11 for CL. At WOT, this value
-     must exceed 0.11 to trigger OL, but the 1.68s delay suggests it's
-     filtered or smoothed. Tracing the writer of FFFF7BA8 will explain
-     the CL→OL transition delay and reveal whether it can be tuned.
+  1. WHAT IS FFFF7BA8 AND WHO WRITES IT? — RESOLVED
+     Writer: func_3952C at ROM 0x39524 (see Section 12).
+     FFFF7BA8 is an AFR deviation metric computed from FFFF77D8
+     ("additional correction factor") + FFFF77DC ("CL target comp A
+     output"). The value is clamped to [0, 0.03] by sub_3961C (clamp
+     max at CAL 0xCC3E8 = 0.03). Since 0.03 < 0.11, condition #4 in
+     FFFF7452 (FFFF7BA8 < 0.11) is NEVER the blocking factor.
+     The 1.68s WOT delay was caused by dead Path A thresholds, not
+     FFFF7BA8 — see Section 5.
 
-  2. WHAT ARE FFFF7AD1 AND FFFF7AD3?
-     These flags control whether the AFL ramp multiplier (FFFF7AC0)
-     takes the immediate 0.0/1.0 paths or the dead ramp paths. Their
-     writers have not been traced.
+  2. WHAT ARE FFFF7AD1 AND FFFF7AD3? — LOW PRIORITY
+     These flags control the AFL ramp multiplier immediate paths.
+     They don't affect CL/OL transition timing or enrichment logic.
+     The ramp infrastructure (CC32C/CC330 = 0.0) is dead regardless.
 
-  3. IS FFFF7BA8 DEFINED IN ECUFLASH?
-     If it's a known parameter, it may be tunable. The threshold at
-     CBE78 (0.11) is also potentially tunable if defined.
+  3. IS FFFF7BA8 DEFINED IN ECUFLASH? — MOOT
+     Irrelevant since FFFF7BA8 never blocks CL. The threshold at
+     CBE78 (0.11) could theoretically be tuned but has no practical
+     effect given the 0.03 max clamp on FFFF7BA8.
 
-  4. AFL APPLICATION PATCH (OPTION D):
-     Once the transition timing is understood, a ROM patch could add
-     a FFFF7448 check to the AFL application function at 0x37B74.
-     This would force FFFF7AB4 = 1.0 during OL, preventing stale
-     AFL corrections from affecting OL fueling. The existing ramp
-     infrastructure (CC32C/CC330) could be enabled with non-zero
-     step sizes to provide a smooth AFL fade-out instead of a hard cut.
+  4. AFL APPLICATION PATCH — STILL VIABLE
+     The analysis stands: AFL application at 0x37B74 does NOT check
+     FFFF7448, so stale AFL corrections apply during OL. A ROM patch
+     adding a FFFF7448 check remains a valid option if needed.
 
-  5. CBC62 DELAY VALUE:
-     Setting CBC62 from 0 to a non-zero value (e.g., 1) only affects
-     Path A (OL enrichment timing via the condition checker fallthrough
-     path). It has NO effect on Path B (FFFF7448 mode flag timing).
-     However, it may still be worth setting to 1 to ensure the
-     throttle/load-based enrichment paths in Path A function as the
-     tuner intended when they lowered those thresholds.
+  5. CBC62 DELAY VALUE — CONFIRMED
+     Setting CBC62 from 0 to a non-zero value only affects Path A
+     (OL enrichment timing). It has NO effect on Path B (mode flag).
+     With corrected load/TPS thresholds, Path A fires immediately at
+     WOT regardless of the delay value.
+
+
+================================================================================
+SECTION 12: WRITE 4 FILTER — FFFF798C UPDATE ALGORITHM (0x36238-0x36306)
+================================================================================
+
+  FFFF798C is the OL enrichment accumulator and the BRIDGE between
+  Path A (OL enrichment) and Path B (CL/OL mode flag). Path B checks
+  if FFFF798C is near zero (within 3.05e-5) to allow CL mode.
+
+  WRITE 4 runs inside Phase 2 (FUN_0003605E) when mode state
+  (FFFF79C6) is 0 — the normal runtime state.
+
+  TWO INPUTS determine the path:
+    stack[32] = range_check(enrichment_value, 0.0, tolerance)
+               0 = enrichment IS near zero (CL conditions)
+               nonzero = enrichment NOT near zero (OL active)
+    stack[36] = range_check(FFFF798C, FFFF7990, tolerance)
+               0 = accumulator at target (settled)
+               nonzero = accumulator NOT at target (still ramping)
+
+  CONTROL FLOW:
+    if enrichment near zero AND accumulator at target → DIRECT_ASSIGN
+    if enrichment near zero AND accumulator NOT at target → FILTERED
+    if enrichment NOT near zero AND OL NOT active → FILTERED
+    if enrichment NOT near zero AND OL active → check settled → either
+
+  FILTERED_UPDATE path (0x36250-0x36270):
+    FFFF7990 = FR15 * FFFF79A0         // target × blend coefficient
+    FR4 = FFFF798C + FFFF79E0          // current + decay delta (negative)
+    FFFF798C = max(FR4, FFFF7990)      // clamp: don't drop below target
+    // Subroutine 0xBE970 (clamp_lower) computes the max()
+
+  DIRECT_ASSIGN path (0x362F8-0x36306):
+    FFFF7990 = FR15 * FFFF79A0         // target × blend coefficient
+    FFFF798C = FFFF7990                // snap to blended target
+
+  RESPONSE TIME: When Path A fires at WOT, FFFF798C jumps from 0.0
+  to the blended enrichment target in ONE task cycle (~10ms). The
+  blend coefficient (FFFF79A0, ~0.1 from CC284) times a typical OL
+  enrichment of 0.3 gives 0.03, which vastly exceeds the 3.05e-5
+  tolerance in Path B's near-zero check. Path B switches within 1-2
+  cycles of Path A firing.
+
+
+================================================================================
+SECTION 13: AFC PIPELINE — COMPLETE ARCHITECTURE
+================================================================================
+
+  The AFC (short-term fuel correction) pipeline is dispatched from
+  function 0x33304 (CL fueling master controller). It runs 9 stages
+  sequentially, gated by CL mode at FFFF65F0.
+
+  GATE: byte@FFFF65F0 must match one of: 0x00, 0x06, 0x0C, 0x12
+  (valid CL mode values at CAL 0xCBBD8). If no match, the entire
+  pipeline is skipped.
+
+  PIPELINE STAGES:
+    1. BSR 0x33D1C  cl_fuel_target_B   → writes FFFF77E0
+    2. BSR 0x33CC0  cl_fuel_target_A   → writes FFFF77DC
+    3. BSR 0x33658  afc_sensor_prep    (sensor conditioning)
+    4. BSR 0x33FCE  afc_target_calc    (error computation)
+    5. BSR 0x340A0  afc_correction_acc (PI output stage)
+    6. BSR 0x342A8  afc_pi_controller  (THE PI LOOP)
+    7. JSR 0x3439E  afc_enable_gate    (enable/disable check)
+    8. JSR 0x343CE  afc_output_clamp   (limits to ±190-200%)
+    9. BRA 0x33460  tail-call aggregator
+
+  --- cl_fuel_target_A (0x33CC0, 24 instructions) ---
+  Pure 2D table lookup: RPM (FFFF63F8) × Engine Load (FFFF6624).
+  Selects one of 4 table descriptors by mode × AT/MT flag:
+    0xAD8D4 / 0xAD8B8 (MT, mode 1/0)
+    0xAD90C / 0xAD8F0 (AT, mode 1/0)
+  Calls interpolation at 0xBE8E4. Output → FFFF77DC.
+  NO FILTERING — responds instantly to RPM/load changes.
+
+  --- cl_fuel_target_B (0x33D1C, ~54 instructions) ---
+  PID-like rate controller with gains from CAL:
+    P gain: 0.050 (CBFB8/CBFBC)
+    D gain: 0.025 (CBFC0) or table lookup (0xACE6C) for AT
+    I gain: 0.015 (CBFC8/CBFCC)
+    Blend:  0.125 (CBFC4)
+  Reads CL integral from FFFF7A44. Output → FFFF77E0.
+  HAS FILTERING — rate-limited and blended.
+
+  --- AFC PI Controller (0x342A8, 125 instructions) ---
+  Two-phase architecture:
+
+  Phase 1 (0x342C0-0x34330): Evaluate conditions, set path code 1-4.
+    Reads: FFFF7448 (CL/OL mode), FFFF7828 (AFC enable state)
+    Detects CL→OL transitions via saved mode at FFFF7865.
+
+  Phase 2 (0x34332-0x3438E): Dispatch on path code:
+    Path A: P_gain (2.0) > table_result → zero correction (FFFF7814)
+    Path B: P_gain ≤ table_result → write error to FFFF7814
+    Path 1: First activation → copy FFFF7814 → FFFF7818
+    Path 2: I-term ≥ 20.0 → I-term -= 1.0, clamp (0xBE960)
+    Path 3: I-term < 0.0 → I-term += 1.0, clamp (0xBE970)
+    Path 4: Disabled → zero FFFF7818
+    Path 6: CL→OL transition → zero both FFFF7814 and FFFF7818
+
+  Calibration:
+    CC000 = 2.0   P gain / dead-zone threshold
+    CC004 = 20.0  I-term upper clamp (%)
+    CC008 = 0.0   I-term lower clamp / dead band
+    CC00C = 1.0   I-term step size
+
+  Subroutines: 0xBEAB0 (table lookup), 0xBE960 (clamp after subtract),
+  0xBE970 (clamp after add).
+
+
+================================================================================
+SECTION 14: UTILITY FUNCTIONS — FULLY TRACED
+================================================================================
+
+  --- sub_1FD7C (ECU state flag mapper) ---
+  ROM: 0x1FD7C (7 instructions, leaf function)
+  Input: none (reads RAM directly)
+  Output: R0 = 0 or 2
+
+    if (byte[FFFF63A4] == 1) return 2;
+    else return 0;
+
+  Called by: func_39668 → stores result to FFFF7BB8 and FFFF7BB9.
+  The func_39668 state machine requires byte[7BB9] == 2 to set
+  FFFF7BB0 = 1 (block CL). So FFFF63A4 == 1 is a prerequisite for
+  the CL inhibit mechanism.
+
+  --- sub_21D9A (Two-level priority flag classifier) ---
+  ROM: 0x21D9A (10 instructions, leaf function)
+  Input: none (ignores R0, reads RAM directly)
+  Output: R0 = 0, 1, or 2
+
+    if (byte[FFFF6552] == 1) return 2;   // primary condition
+    if (byte[FFFF6553] == 1) return 1;   // secondary condition
+    return 0;                             // neither active
+
+  Called by:
+    func_031528 → FFFF744E gets 0/1/2 (gates FFFF7448 CL decision)
+    func_39668  → FFFF7BBA gets 0/1/2 (state machine needs == 1)
+
+  --- sub_22F92 (Engine started flag check) ---
+  ROM: 0x22F92 (5 instructions, leaf function)
+  Input: none (reads RAM directly)
+  Output: R0 = 0 or 1 (via movt instruction)
+
+    return (byte[FFFF65F6] == 1) ? 1 : 0;
+
+  Called by:
+    WRITE 1 reset (returns 1 → FFFF798C reset to zero)
+    func_3162C condition 3 (throttle check gate)
+    func_33DBE (AFC CL/OL decision)
+
+  FFFF65F6 is an engine started/running flag. When the engine is not
+  running, CL is disabled system-wide via this single flag.
+
+
+================================================================================
+SECTION 15: FFFF798C — THE BRIDGE BETWEEN PATH A AND PATH B
+================================================================================
+
+  CRITICAL FINDING: FFFF798C (OL enrichment accumulator) is the sole
+  mechanism linking Path A (OL enrichment computation) to Path B
+  (CL/OL mode flag at FFFF7448).
+
+  Path B's FFFF7452 master readiness evaluator (0x3162C) checks
+  FFFF798C in condition 2c:
+
+    range_check(FFFF798C, 0.0, 3.05e-5)
+    If FFFF798C is NOT near zero → speed_ok = 0 → FFFF7452 = 0 → OL
+
+  RANGE_CHECK RETURN CONVENTION (0xBE608):
+    Returns 0 when value IS within tolerance (in range)
+    Returns nonzero when value is OUT of range (not near target)
+
+  NOTE: Previous annotations in some files incorrectly described the
+  return convention as "nonzero = in range." This has been corrected.
+
+  THE CHAIN AT WOT:
+    1. WOT applied (throttle > 50%)
+    2. Path A condition checker fires immediately (throttle threshold)
+    3. OL enrichment computed, FFFF798C starts ramping via WRITE 4
+    4. FFFF798C exceeds 3.05e-5 within 1-2 task cycles
+    5. Path B condition 2c fails → FFFF7452 = 0 → FFFF7448 = 0 → OL
+
+  This means Path B CANNOT switch to OL until Path A has actually
+  started OL enrichment. The effective CL→OL trigger for the SSM
+  parameter (7/8/10) is Path A's condition checker thresholds, even
+  though the SSM value is driven by Path B's FFFF7448.
 
 
 ================================================================================
@@ -469,8 +671,23 @@ RAM ADDRESS MAP (ALL TRACED ADDRESSES)
   FFFF745E   byte    MAF table hysteresis flag
   FFFF745F   byte    Coolant flag 1
   FFFF7460   byte    Coolant flag 2
-  FFFF7BA8   float   Throttle/load — must be < 0.11 for CL (KEY UNKNOWN)
-  FFFF7BB0   byte    Fault flag — must be 0 for CL
+  FFFF7BA8   float   AFR deviation metric (from func_3952C, max 0.03, always < 0.11)
+  FFFF7BAC   float   AFR deviation intermediate (computed by func_3952C)
+  FFFF7BB0   byte    CL inhibit mode (0=CL allowed, 1=CL blocked, set by func_39668)
+  FFFF7BB2   word    CL inhibit counter (func_39668 state machine)
+  FFFF7BB4   float   CL inhibit float input (from FFFF43FC via func_39668)
+  FFFF7BB8   byte    ECU state flag copy (from sub_1FD7C: 0 or 2)
+  FFFF7BB9   byte    ECU state flag copy (same, must == 2 for CL inhibit)
+  FFFF7BBA   byte    Priority flag copy (from sub_21D9A: 0/1/2, must == 1)
+  FFFF7BBB   byte    Priority flag copy (from sub_21D9A, used for CL release)
+  FFFF7BBC   byte    CL readiness copy (from FFFF7453, tight-band flag)
+  FFFF7BC0   float   Table lookup result (from func_3952C)
+
+  --- Path B Input Flags ---
+  FFFF63A4   byte    ECU state flag (sub_1FD7C reads: ==1 → return 2)
+  FFFF6552   byte    Primary CL condition (sub_21D9A reads: ==1 → return 2)
+  FFFF6553   byte    Secondary CL condition (sub_21D9A reads: ==1 → return 1)
+  FFFF65F6   byte    Engine started/running flag (sub_22F92 reads: ==1 → return 1)
 
   --- AFL Application ---
   FFFF7AB4   float   AFL multiplier output (consumed by fuel PW calc)
@@ -510,6 +727,10 @@ ROM FUNCTION MAP
   0x00031528  FFFF7448 writer
   0x0003162C  FFFF7452 master readiness evaluator (~800 bytes)
   0x00031966  FFFF7452 write point (within 0x3162C function)
+  0x00039524  FFFF7BA8 writer (entry trampoline, dispatches to 3952C/39668)
+  0x0003952C  FFFF7BA8 main computation (AFR deviation metric)
+  0x0003961C  FFFF7BA8 helper sub (ratio + clamp to 0.03)
+  0x00039668  FFFF7BB0 CL inhibit state machine (manages CL block flag)
 
   --- AFL ---
   0x00034488  AFL sub-dispatcher
@@ -524,11 +745,35 @@ ROM FUNCTION MAP
   0x000301E4  Fuel PW calc (reads FFFF7AB4 unconditionally)
   0x0005D2DA  SSM PID 0x0A getter (reads FFFF7878)
 
-  --- Utility ---
-  0x000BE608  Range check (Pull2DFloat)
+  --- AFC Pipeline ---
+  0x00033304  CL fueling dispatcher (9-stage pipeline, gated by FFFF65F0)
+  0x00033CC0  cl_fuel_target_A (2D table: RPM×Load → FFFF77DC, instant)
+  0x00033D1C  cl_fuel_target_B (PID rate controller → FFFF77E0)
+  0x00033658  afc_sensor_prep (sensor conditioning)
+  0x00033DBE  afc_cl_ol_decision (CL/OL hysteresis, GBR=FFFF77F4)
+  0x00033FCE  afc_target_calc (error computation)
+  0x000340A0  afc_correction_acc (PI output stage: P+I gains × load/RPM)
+  0x000342A8  afc_pi_controller (6-path PI loop → FFFF7814/7818)
+  0x0003439E  afc_enable_gate (enable/disable check)
+  0x000343CE  afc_output_clamp (limits to ±190-200%)
+
+  --- Utility Functions ---
+  0x0001FD7C  sub_1FD7C: ECU state flag (FFFF63A4 → 0 or 2)
+  0x00021D9A  sub_21D9A: Priority flag classifier (FFFF6552/6553 → 0/1/2)
+  0x00022F92  sub_22F92: Engine started check (FFFF65F6 → 0 or 1)
+  0x0001CF46  sub_1CF46: Bit 3 of FFFF61F4 test (early exit gate)
+
+  --- Table Processors ---
+  0x000BE608  Range check (returns 0=in range, nonzero=out of range)
+  0x000BE628  Ratio/interpolation
+  0x000BE56C  Float clamp (FR4=value, FR5=min, FR6=max)
+  0x000BE554  Saturating word add
   0x000BE830  Table interpolation (Pull3DFloat)
+  0x000BE8E4  2D table interpolation (RPM×Load style)
   0x000BE960  Clamp lower (max)
   0x000BE970  Clamp upper (min)
+  0x000BEA40  Blend/clamp
+  0x000BEAB0  Table lookup (error scaling)
 
 
 ================================================================================
