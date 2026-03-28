@@ -127,10 +127,13 @@ Speed condition check (0x3186C-0x318F8):
        If no: speed_ok = 0
   5. Range check 1: sub 0xBE608(FR4=float@FFFF798C, FR5=0.0, FR6=3.05e-5)
      Tests if FFFF798C is near zero (within 3.05e-5)
-     If nonzero result: speed_ok = 0
+     0xBE608 returns 0 = in range, nonzero = OUT of range
+     If nonzero (FFFF798C NOT near zero): speed_ok = 0
+     FFFF798C must be near zero (no OL enrichment active) for CL.
+     This is the BRIDGE between Path A and Path B — see master analysis.
   6. Range check 2: sub 0xBE608(FR4=float@FFFF7A20, FR5=0.0, FR6=0.00390625)
      Tests if FFFF7A20 is near zero (within 0.00390625)
-     If nonzero result: speed_ok = 0
+     If nonzero (FFFF7A20 NOT near zero): speed_ok = 0
   7. Check byte@FFFF7D18 == 0 (must be zero)
      If nonzero: speed_ok = 0
   8. Check stack[28] (float@FFFF77C8) > CAL@0xCBEA4 (-1.0)
@@ -206,7 +209,9 @@ All of the following must be true simultaneously:
      a. float@FFFF6350 > -15.0 (temperature not too cold)
      b. Speed (R8=word@FFFF67EC) >= speed threshold (FFFF7454 or FFFF7456,
         depending on byte@FFFF7829)
-     c. float@FFFF798C near zero (within 3.05e-5)
+     c. float@FFFF798C near zero (within 3.05e-5) — BRIDGE to Path A
+        (0xBE608 returns 0=in range, nonzero=out of range;
+         bf branches on nonzero → speed_ok=0 when NOT near zero)
      d. float@FFFF7A20 near zero (within 0.00390625)
      e. byte@FFFF7D18 == 0
      f. float@FFFF77C8 > -1.0
@@ -217,7 +222,7 @@ All of the following must be true simultaneously:
 
   4. float@FFFF7BA8 < 0.11 (CAL@0xCBE78)  -- confirmed
 
-  5. byte@FFFF7BB0 == 0 -- THE KEY GATE, confirmed at 0x3194C-0x31952
+  5. byte@FFFF7BB0 == 0 -- CL inhibit gate (set by func_39668 state machine)
 
   6. Both delay counters >= 4 (R11 = 1):
      FFFF745B >= CAL@0xCBBD6 (4)  AND  FFFF745C >= CAL@0xCBBD6 (4)
@@ -278,8 +283,8 @@ KEY RAM ADDRESSES
   FFFF7829 - Speed mode selector byte
   FFFF798C - Must be near zero (within 3.05e-5)
   FFFF7A20 - Must be near zero (within 0.00390625)
-  FFFF7BA8 - AFR readiness value (float, must be < 0.11) -- CONFIRMED
-  FFFF7BB0 - KEY GATE byte (must be 0) -- CONFIRMED
+  FFFF7BA8 - AFR deviation metric (float, must be < 0.11) -- max is 0.03, never blocks
+  FFFF7BB0 - CL inhibit mode (must be 0) -- set by func_39668 state machine
   FFFF7D18 - Must be 0
   FFFFA56B - Engine running/cranking flag
   FFFFACF0 - Condition flag
