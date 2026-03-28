@@ -1,0 +1,3890 @@
+================================================================================
+  COMPLETE CL/OL STATE MACHINE DISASSEMBLY AND TRACE
+  Subaru ECU ROM AE5L600L - Renesas SH7055 (SH-2)
+  Stock ROM: ae5l600l.bin
+  Modified ROM: AE5L600L 20g rev 20.5 tiny wrex.bin
+================================================================================
+
+
+################################################################################
+# PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
+################################################################################
+
+==============================================================================
+  FUN_000357D0 - CL/OL transition sub B (dispatch table A entry)
+  Address range: 0x0357D0 - 0x0357F0 (32 bytes)
+==============================================================================
+  0x0357D0:  4F22    sts.l PR,@-R15
+  0x0357D2:  B359    bsr 0x035E88
+  0x0357D4:  0009    nop
+  0x0357D6:  E6FF    mov #-1,R6
+  0x0357D8:  D27F    mov.l @(0x0359D8),R2  ; =0xFFFF7986  (RAM 7986)
+  0x0357DA:  2260    mov.b R6,@R2
+  0x0357DC:  E602    mov #2,R6
+  0x0357DE:  4618    shll8 R6
+  0x0357E0:  D27E    mov.l @(0x0359DC),R2  ; =0xFFFF794C  (RAM 794C)
+  0x0357E2:  4F26    lds.l @R15+,PR
+  0x0357E4:  000B    rts
+  0x0357E6:  2261    mov.w R6,@R2
+  0x0357E8:  D47D    mov.l @(0x0359E0),R4  ; =0xFFFF318C  (RAM 318C)
+  0x0357EA:  D27E    mov.l @(0x0359E4),R2  ; =0x000BDBCC  (ROM @0x0BDBCC)
+  0x0357EC:  422B    jmp @R2
+  0x0357EE:  F48D    fldi0 FR4
+
+
+==============================================================================
+  FUN_000357F0 - CL/OL transition sub B helper
+  Address range: 0x0357F0 - 0x03580C (28 bytes)
+==============================================================================
+  0x0357F0:  2FE6    mov.l R14,@-R15
+  0x0357F2:  4F22    sts.l PR,@-R15
+  0x0357F4:  D47A    mov.l @(0x0359E0),R4  ; =0xFFFF318C  (RAM 318C)
+  0x0357F6:  D27C    mov.l @(0x0359E8),R2  ; =0x000BDCB6  (ROM @0x0BDCB6)
+  0x0357F8:  420B    jsr @R2  ; -> 0x000BDCB6
+  0x0357FA:  EE00    mov #0,R14
+  0x0357FC:  620E    exts.b R0,R2
+  0x0357FE:  2228    tst R2,R2
+  0x035800:  8900    bt 0x035804
+  0x035802:  EE01    mov #1,R14
+  0x035804:  60E3    mov R14,R0
+  0x035806:  4F26    lds.l @R15+,PR
+  0x035808:  000B    rts
+  0x03580A:  6EF6    mov.l @R15+,R14
+
+
+==============================================================================
+  FUN_0003580C - CL/OL transition CORE (dispatch table B entry) [part 1]
+  Address range: 0x03580C - 0x035900 (244 bytes)
+  GBR = 0xFFFF7954
+==============================================================================
+  0x03580C:  2FE6    mov.l R14,@-R15
+  0x03580E:  4F22    sts.l PR,@-R15
+  0x035810:  4F13    .word 0x4F13
+  0x035812:  D076    mov.l @(0x0359EC),R0  ; =0xFFFF7954  (RAM 7954)
+  0x035814:  401E    ldc R0,GBR  ; GBR = 0xFFFF7954
+  0x035816:  C432    mov.b @(50,GBR),R0  ; <- RAM 0xFFFF7986
+  0x035818:  D575    mov.l @(0x0359F0),R5  ; =0x000CBBEF  (CAL @0x0CBBEF)
+  0x03581A:  6250    mov.b @R5,R2
+  0x03581C:  3022    cmp/hs R2,R0
+  0x03581E:  8B35    bf 0x03588C
+  0x035820:  D274    mov.l @(0x0359F4),R2  ; =0xFFFF63CC  (RAM 63CC)
+  0x035822:  F828    fmov.s @R2,FR8
+  0x035824:  DE74    mov.l @(0x0359F8),R14  ; =0xFFFF7988  (RAM 7988)
+  0x035826:  E0D0    mov #-48,R0
+  0x035828:  FE87    fmov.s FR8,@(R0,R14)
+  0x03582A:  D274    mov.l @(0x0359FC),R2  ; =0xFFFF6350  (RAM 6350)
+  0x03582C:  F828    fmov.s @R2,FR8
+  0x03582E:  E0CC    mov #-52,R0
+  0x035830:  FE87    fmov.s FR8,@(R0,R14)
+  0x035832:  D273    mov.l @(0x035A00),R2  ; =0xFFFF69F0  (RAM 69F0)
+  0x035834:  F828    fmov.s @R2,FR8
+  0x035836:  E0D4    mov #-44,R0
+  0x035838:  FE87    fmov.s FR8,@(R0,R14)
+  0x03583A:  D272    mov.l @(0x035A04),R2  ; =0xFFFF63FC  (RAM 63FC)
+  0x03583C:  F428    fmov.s @R2,FR4
+  0x03583E:  D272    mov.l @(0x035A08),R2  ; =0x000BEAB0  (ROM @0x0BEAB0)
+  0x035840:  420B    jsr @R2  ; -> 0x000BEAB0
+  0x035842:  F58D    fldi0 FR5
+  0x035844:  E0D8    mov #-40,R0
+  0x035846:  FE07    fmov.s FR0,@(R0,R14)
+  0x035848:  D670    mov.l @(0x035A0C),R6  ; =0xFFFF6A22  (RAM 6A22)
+  0x03584A:  6061    mov.w @R6,R0
+  0x03584C:  C118    mov.w R0,@(48,GBR)  ; -> RAM 0xFFFF7984
+  0x03584E:  D670    mov.l @(0x035A10),R6  ; =0xFFFF6254  (RAM 6254)
+  0x035850:  6060    mov.b @R6,R0
+  0x035852:  C036    mov.b R0,@(54,GBR)  ; -> RAM 0xFFFF798A
+  0x035854:  D26F    mov.l @(0x035A14),R2  ; =0xFFFF6624  (RAM 6624)
+  0x035856:  F828    fmov.s @R2,FR8
+  0x035858:  E0DC    mov #-36,R0
+  0x03585A:  FE87    fmov.s FR8,@(R0,R14)
+  0x03585C:  D26E    mov.l @(0x035A18),R2  ; =0xFFFF65FC  (RAM 65FC)
+  0x03585E:  F828    fmov.s @R2,FR8
+  0x035860:  E0E0    mov #-32,R0
+  0x035862:  FE87    fmov.s FR8,@(R0,R14)
+  0x035864:  D26D    mov.l @(0x035A1C),R2  ; =0xFFFF63F8  (RAM 63F8)
+  0x035866:  F828    fmov.s @R2,FR8
+  0x035868:  E0E4    mov #-28,R0
+  0x03586A:  FE87    fmov.s FR8,@(R0,R14)
+  0x03586C:  D66C    mov.l @(0x035A20),R6  ; =0xFFFF8F24  (RAM 8F24)
+  0x03586E:  6060    mov.b @R6,R0
+  0x035870:  C037    mov.b R0,@(55,GBR)  ; -> RAM 0xFFFF798B
+  0x035872:  D26C    mov.l @(0x035A24),R2  ; =0xFFFF63C4  (RAM 63C4)
+  0x035874:  F828    fmov.s @R2,FR8
+  0x035876:  E0E8    mov #-24,R0
+  0x035878:  B012    bsr 0x0358A0
+  0x03587A:  FE87    fmov.s FR8,@(R0,R14)
+  0x03587C:  B092    bsr 0x0359A4
+  0x03587E:  0009    nop
+  0x035880:  B2B0    bsr 0x035DE4
+  0x035882:  0009    nop
+  0x035884:  B2D2    bsr 0x035E2C
+  0x035886:  0009    nop
+  0x035888:  E000    mov #0,R0
+  0x03588A:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF7986
+  0x03588C:  D266    mov.l @(0x035A28),R2  ; =0x000BE53C  (ROM @0x0BE53C)
+  0x03588E:  C432    mov.b @(50,GBR),R0  ; <- RAM 0xFFFF7986
+  0x035890:  640C    extu.b R0,R4
+  0x035892:  420B    jsr @R2  ; -> 0x000BE53C
+  0x035894:  E501    mov #1,R5
+  0x035896:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF7986
+  0x035898:  4F17    .word 0x4F17
+  0x03589A:  4F26    lds.l @R15+,PR
+  0x03589C:  A2E2    bra 0x035E64
+  0x03589E:  6EF6    mov.l @R15+,R14
+  0x0358A0:  D462    mov.l @(0x035A2C),R4  ; =0x00063B00  (ROM @0x063B00)
+  0x0358A2:  E500    mov #0,R5
+  0x0358A4:  2FD6    mov.l R13,@-R15
+  0x0358A6:  2FE6    mov.l R14,@-R15
+  0x0358A8:  4F22    sts.l PR,@-R15
+  0x0358AA:  FFEB    fmov.s FR14,@-R15
+  0x0358AC:  655C    extu.b R5,R5
+  0x0358AE:  2558    tst R5,R5
+  0x0358B0:  8F0E    bf/s 0x0358D0
+  0x0358B2:  6D43    mov R4,R13
+  0x0358B4:  D65E    mov.l @(0x035A30),R6  ; =0xFFFF7910  (RAM 7910)
+  0x0358B6:  D25F    mov.l @(0x035A34),R2  ; =0x000297F4  (ROM @0x0297F4)
+  0x0358B8:  420B    jsr @R2  ; -> 0x000297F4
+  0x0358BA:  6E61    mov.w @R6,R14
+  0x0358BC:  620C    extu.b R0,R2
+  0x0358BE:  D65E    mov.l @(0x035A38),R6  ; =0xFFFF7912  (RAM 7912)
+  0x0358C0:  6660    mov.b @R6,R6
+  0x0358C2:  D45E    mov.l @(0x035A3C),R4  ; =0xFFFF782B  (RAM 782B)
+  0x0358C4:  6440    mov.b @R4,R4
+  0x0358C6:  D55E    mov.l @(0x035A40),R5  ; =0xFFFF7D68  (RAM 7D68)
+  0x0358C8:  FE58    fmov.s @R5,FR14
+  0x0358CA:  D15E    mov.l @(0x035A44),R1  ; =0xFFFF984D  (RAM 984D)
+  0x0358CC:  A008    bra 0x0358E0
+  0x0358CE:  6110    mov.b @R1,R1
+  0x0358D0:  D25D    mov.l @(0x035A48),R2  ; =0x00029804  (ROM @0x029804)
+  0x0358D2:  420B    jsr @R2  ; -> 0x00029804
+  0x0358D4:  EE00    mov #0,R14
+  0x0358D6:  620C    extu.b R0,R2
+  0x0358D8:  66E3    mov R14,R6
+  0x0358DA:  64E3    mov R14,R4
+  0x0358DC:  FE8D    fldi0 FR14
+  0x0358DE:  61E3    mov R14,R1
+  0x0358E0:  606C    extu.b R6,R0
+  0x0358E2:  8801    cmp/eq #1,R0
+  0x0358E4:  8B56    bf 0x035994
+  0x0358E6:  D559    mov.l @(0x035A4C),R5  ; =0x000CBC48  (CAL @0x0CBC48)
+  0x0358E8:  6651    mov.w @R5,R6
+  0x0358EA:  676D    extu.w R6,R7
+  0x0358EC:  66ED    extu.w R14,R6
+  0x0358EE:  3673    cmp/ge R7,R6
+  0x0358F0:  8B50    bf 0x035994
+  0x0358F2:  D657    mov.l @(0x035A50),R6  ; =0x000CC110  (CAL @0x0CC110)
+  0x0358F4:  F968    fmov.s @R6,FR9
+  0x0358F6:  D557    mov.l @(0x035A54),R5  ; =0xFFFF7984  (RAM 7984)
+  0x0358F8:  E0D4    mov #-44,R0
+  0x0358FA:  F856    fmov.s @(R0,R5),FR8
+  0x0358FC:  F985    fcmp/gt FR8,FR9
+  0x0358FE:  8B49    bf 0x035994
+
+
+==============================================================================
+  FUN_00036008 - CL/OL delay manager A (dispatch table A entry)
+  Address range: 0x036008 - 0x03602A (34 bytes)
+==============================================================================
+  0x036008:  4F22    sts.l PR,@-R15
+  0x03600A:  C79A    mova @(0x036274),R0
+  0x03600C:  F808    fmov.s @R0,FR8
+  0x03600E:  D59A    mov.l @(0x036278),R5  ; =0xFFFF79F4  (RAM 79F4)
+  0x036010:  E0B0    mov #-80,R0
+  0x036012:  F587    fmov.s FR8,@(R0,R5)
+  0x036014:  D299    mov.l @(0x03627C),R2  ; =0x000AD998  (ROM @0x0AD998)
+  0x036016:  B4A4    bsr 0x036962
+  0x036018:  1521    mov.l R2,@(4,R5)
+  0x03601A:  B20E    bsr 0x03643A
+  0x03601C:  0009    nop
+  0x03601E:  B4AB    bsr 0x036978
+  0x036020:  0009    nop
+  0x036022:  D595    mov.l @(0x036278),R5  ; =0xFFFF79F4  (RAM 79F4)
+  0x036024:  4F26    lds.l @R15+,PR
+  0x036026:  000B    rts
+  0x036028:  2500    mov.b R0,@R5
+
+
+==============================================================================
+  FUN_0003602A - CL/OL delay manager A sub
+  Address range: 0x03602A - 0x036062 (56 bytes)
+==============================================================================
+  0x03602A:  4F22    sts.l PR,@-R15
+  0x03602C:  D294    mov.l @(0x036280),R2  ; =0x00022F92  (ROM @0x022F92)
+  0x03602E:  420B    jsr @R2  ; -> 0x00022F92
+  0x036030:  0009    nop
+  0x036032:  600C    extu.b R0,R0
+  0x036034:  8801    cmp/eq #1,R0
+  0x036036:  8B0D    bf 0x036054
+  0x036038:  F88D    fldi0 FR8
+  0x03603A:  D692    mov.l @(0x036284),R6  ; =0xFFFF79F0  (RAM 79F0)
+  0x03603C:  E09C    mov #-100,R0
+  0x03603E:  F687    fmov.s FR8,@(R0,R6)
+  0x036040:  E0A0    mov #-96,R0
+  0x036042:  F687    fmov.s FR8,@(R0,R6)
+  0x036044:  E0A8    mov #-88,R0
+  0x036046:  F687    fmov.s FR8,@(R0,R6)
+  0x036048:  E0AC    mov #-84,R0
+  0x03604A:  F687    fmov.s FR8,@(R0,R6)
+  0x03604C:  E0A4    mov #-92,R0
+  0x03604E:  F687    fmov.s FR8,@(R0,R6)
+  0x036050:  E000    mov #0,R0
+  0x036052:  8062    mov.b R0,@(98,R6)
+  0x036054:  4F26    lds.l @R15+,PR
+  0x036056:  000B    rts
+  0x036058:  0009    nop
+  0x03605A:  A162    bra 0x036322
+  0x03605C:  0009    nop
+  0x03605E:  A1EC    bra 0x03643A
+  0x036060:  0009    nop
+
+
+==============================================================================
+  FUN_00036062 - CL/OL delay manager A setup
+  Address range: 0x036062 - 0x03606C (10 bytes)
+==============================================================================
+  0x036062:  4F22    sts.l PR,@-R15
+  0x036064:  B47D    bsr 0x036962
+  0x036066:  0009    nop
+  0x036068:  A3EE    bra 0x036848
+  0x03606A:  4F26    lds.l @R15+,PR
+
+
+==============================================================================
+  FUN_0003606C - CL/OL condition caller (calls 0x3643A)
+  Address range: 0x03606C - 0x036278 (524 bytes)
+  GBR = 0xFFFF798C
+==============================================================================
+  0x03606C:  2FC6    mov.l R12,@-R15
+  0x03606E:  2FE6    mov.l R14,@-R15
+  0x036070:  4F22    sts.l PR,@-R15
+  0x036072:  FFCB    fmov.s FR12,@-R15
+  0x036074:  FFDB    fmov.s FR13,@-R15
+  0x036076:  FFEB    fmov.s FR14,@-R15
+  0x036078:  FFFB    fmov.s FR15,@-R15
+  0x03607A:  4F13    .word 0x4F13
+  0x03607C:  D082    mov.l @(0x036288),R0  ; =0xFFFF798C  (RAM 798C)
+  0x03607E:  401E    ldc R0,GBR  ; GBR = 0xFFFF798C
+  0x036080:  7FD4    add #-44,R15
+  0x036082:  D282    mov.l @(0x03628C),R2  ; =0xFFFF6624  (RAM 6624)
+  0x036084:  F828    fmov.s @R2,FR8
+  0x036086:  FF8A    fmov.s FR8,@R15
+  0x036088:  D281    mov.l @(0x036290),R2  ; =0xFFFF63F8  (RAM 63F8)
+  0x03608A:  F728    fmov.s @R2,FR7
+  0x03608C:  E004    mov #4,R0
+  0x03608E:  FF77    fmov.s FR7,@(R0,R15)
+  0x036090:  D280    mov.l @(0x036294),R2  ; =0xFFFF3234  (RAM 3234)
+  0x036092:  FD28    fmov.s @R2,FR13
+  0x036094:  D280    mov.l @(0x036298),R2  ; =0xFFFF62DC  (RAM 62DC)
+  0x036096:  F428    fmov.s @R2,FR4
+  0x036098:  D280    mov.l @(0x03629C),R2  ; =0xFFFF64D8  (RAM 64D8)
+  0x03609A:  FF28    fmov.s @R2,FR15
+  0x03609C:  D280    mov.l @(0x0362A0),R2  ; =0xFFFF8200  (RAM 8200)
+  0x03609E:  F828    fmov.s @R2,FR8
+  0x0360A0:  E008    mov #8,R0
+  0x0360A2:  FF87    fmov.s FR8,@(R0,R15)
+  0x0360A4:  D27F    mov.l @(0x0362A4),R2  ; =0xFFFF7F6C  (RAM 7F6C)
+  0x0360A6:  FC28    fmov.s @R2,FR12
+  0x0360A8:  C51B    mov.w @(54,GBR),R0  ; <- RAM 0xFFFF79C2
+  0x0360AA:  6603    mov R0,R6
+  0x0360AC:  C51C    mov.w @(56,GBR),R0  ; <- RAM 0xFFFF79C4
+  0x0360AE:  3602    cmp/hs R0,R6
+  0x0360B0:  8905    bt 0x0360BE
+  0x0360B2:  F58D    fldi0 FR5
+  0x0360B4:  FE5C    fmov FR5,FR14
+  0x0360B6:  F05C    fmov FR5,FR0
+  0x0360B8:  D57B    mov.l @(0x0362A8),R5  ; =0x000BE830  (ROM @0x0BE830)
+  0x0360BA:  A00A    bra 0x0360D2
+  0x0360BC:  1F53    mov.l R5,@(12,R15)
+  0x0360BE:  D47B    mov.l @(0x0362AC),R4  ; =0x000AC5D0  (ROM @0x0AC5D0)
+  0x0360C0:  D279    mov.l @(0x0362A8),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x0360C2:  1F23    mov.l R2,@(12,R15)
+  0x0360C4:  420B    jsr @R2  ; -> 0x000BE830
+  0x0360C6:  0009    nop
+  0x0360C8:  FE0C    fmov FR0,FR14
+  0x0360CA:  D479    mov.l @(0x0362B0),R4  ; =0x000AC5E4  (ROM @0x0AC5E4)
+  0x0360CC:  D276    mov.l @(0x0362A8),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x0360CE:  420B    jsr @R2  ; -> 0x000BE830
+  0x0360D0:  F4FC    fmov FR15,FR4
+  0x0360D2:  DC6C    mov.l @(0x036284),R12  ; =0xFFFF79F0  (RAM 79F0)
+  0x0360D4:  E0A8    mov #-88,R0
+  0x0360D6:  FCE7    fmov.s FR14,@(R0,R12)
+  0x0360D8:  E0AC    mov #-84,R0
+  0x0360DA:  FC07    fmov.s FR0,@(R0,R12)
+  0x0360DC:  C51B    mov.w @(54,GBR),R0  ; <- RAM 0xFFFF79C2
+  0x0360DE:  6603    mov R0,R6
+  0x0360E0:  C51C    mov.w @(56,GBR),R0  ; <- RAM 0xFFFF79C4
+  0x0360E2:  3602    cmp/hs R0,R6
+  0x0360E4:  8B69    bf 0x0361BA
+  0x0360E6:  D673    mov.l @(0x0362B4),R6  ; =0x000D299B  (CAL @0x0D299B)
+  0x0360E8:  6260    mov.b @R6,R2
+  0x0360EA:  2228    tst R2,R2
+  0x0360EC:  8B33    bf 0x036156
+  0x0360EE:  D672    mov.l @(0x0362B8),R6  ; =0x000CBBF2  (CAL @0x0CBBF2)
+  0x0360F0:  6060    mov.b @R6,R0
+  0x0360F2:  885A    cmp/eq #90,R0
+  0x0360F4:  8918    bt 0x036128
+  0x0360F6:  D471    mov.l @(0x0362BC),R4  ; =0x000AD674  (ROM @0x0AD674)
+  0x0360F8:  D271    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x0360FA:  F5F8    fmov.s @R15,FR5
+  0x0360FC:  E004    mov #4,R0
+  0x0360FE:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036100:  F4F6    fmov.s @(R0,R15),FR4
+  0x036102:  E010    mov #16,R0
+  0x036104:  FF07    fmov.s FR0,@(R0,R15)
+  0x036106:  D46F    mov.l @(0x0362C4),R4  ; =0x000AD6AC  (ROM @0x0AD6AC)
+  0x036108:  F5F8    fmov.s @R15,FR5
+  0x03610A:  E004    mov #4,R0
+  0x03610C:  D26C    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x03610E:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036110:  F4F6    fmov.s @(R0,R15),FR4
+  0x036112:  E0F4    mov #-12,R0
+  0x036114:  FC07    fmov.s FR0,@(R0,R12)
+  0x036116:  F79D    fldi1 FR7
+  0x036118:  F07C    fmov FR7,FR0
+  0x03611A:  F0D1    fsub FR13,FR0
+  0x03611C:  E010    mov #16,R0
+  0x03611E:  F5F6    fmov.s @(R0,R15),FR5
+  0x036120:  E0F4    mov #-12,R0
+  0x036122:  F9C6    fmov.s @(R0,R12),FR9
+  0x036124:  A045    bra 0x0361B2
+  0x036126:  F59E    fmac FR0,FR9,FR5
+  0x036128:  D467    mov.l @(0x0362C8),R4  ; =0x000AC5A8  (ROM @0x0AC5A8)
+  0x03612A:  55F3    mov.l @(12,R15),R5
+  0x03612C:  450B    jsr @R5  ; -> 0x000BE830
+  0x03612E:  F4CC    fmov FR12,FR4
+  0x036130:  E014    mov #20,R0
+  0x036132:  FF07    fmov.s FR0,@(R0,R15)
+  0x036134:  D265    mov.l @(0x0362CC),R2  ; =0x000CC16C  (CAL @0x0CC16C)
+  0x036136:  F828    fmov.s @R2,FR8
+  0x036138:  F8D5    fcmp/gt FR13,FR8
+  0x03613A:  D465    mov.l @(0x0362D0),R4  ; =0x000AD690  (ROM @0x0AD690)
+  0x03613C:  8900    bt 0x036140
+  0x03613E:  D45F    mov.l @(0x0362BC),R4  ; =0x000AD674  (ROM @0x0AD674)
+  0x036140:  D25F    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036142:  F5F8    fmov.s @R15,FR5
+  0x036144:  E004    mov #4,R0
+  0x036146:  F7F6    fmov.s @(R0,R15),FR7
+  0x036148:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x03614A:  F47C    fmov FR7,FR4
+  0x03614C:  E014    mov #20,R0
+  0x03614E:  F8F6    fmov.s @(R0,R15),FR8
+  0x036150:  F080    fadd FR8,FR0
+  0x036152:  A02E    bra 0x0361B2
+  0x036154:  F50C    fmov FR0,FR5
+  0x036156:  D45C    mov.l @(0x0362C8),R4  ; =0x000AC5A8  (ROM @0x0AC5A8)
+  0x036158:  55F3    mov.l @(12,R15),R5
+  0x03615A:  450B    jsr @R5  ; -> 0x000BE830
+  0x03615C:  F4CC    fmov FR12,FR4
+  0x03615E:  E018    mov #24,R0
+  0x036160:  FF07    fmov.s FR0,@(R0,R15)
+  0x036162:  D25A    mov.l @(0x0362CC),R2  ; =0x000CC16C  (CAL @0x0CC16C)
+  0x036164:  F828    fmov.s @R2,FR8
+  0x036166:  F8D5    fcmp/gt FR13,FR8
+  0x036168:  8909    bt 0x03617E
+  0x03616A:  D45A    mov.l @(0x0362D4),R4  ; =0x000AD6C8  (ROM @0x0AD6C8)
+  0x03616C:  D254    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x03616E:  F5F8    fmov.s @R15,FR5
+  0x036170:  E004    mov #4,R0
+  0x036172:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036174:  F4F6    fmov.s @(R0,R15),FR4
+  0x036176:  E01C    mov #28,R0
+  0x036178:  D457    mov.l @(0x0362D8),R4  ; =0x000AD6E4  (ROM @0x0AD6E4)
+  0x03617A:  A009    bra 0x036190
+  0x03617C:  FF07    fmov.s FR0,@(R0,R15)
+  0x03617E:  D457    mov.l @(0x0362DC),R4  ; =0x000AD700  (ROM @0x0AD700)
+  0x036180:  D24F    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036182:  F5F8    fmov.s @R15,FR5
+  0x036184:  E004    mov #4,R0
+  0x036186:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036188:  F4F6    fmov.s @(R0,R15),FR4
+  0x03618A:  E01C    mov #28,R0
+  0x03618C:  FF07    fmov.s FR0,@(R0,R15)
+  0x03618E:  D451    mov.l @(0x0362D4),R4  ; =0x000AD6C8  (ROM @0x0AD6C8)
+  0x036190:  F5F8    fmov.s @R15,FR5
+  0x036192:  E004    mov #4,R0
+  0x036194:  D24A    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036196:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036198:  F4F6    fmov.s @(R0,R15),FR4
+  0x03619A:  F80C    fmov FR0,FR8
+  0x03619C:  F09D    fldi1 FR0
+  0x03619E:  E008    mov #8,R0
+  0x0361A0:  F6F6    fmov.s @(R0,R15),FR6
+  0x0361A2:  F061    fsub FR6,FR0
+  0x0361A4:  E018    mov #24,R0
+  0x0361A6:  F5F6    fmov.s @(R0,R15),FR5
+  0x0361A8:  E01C    mov #28,R0
+  0x0361AA:  F7F6    fmov.s @(R0,R15),FR7
+  0x0361AC:  F57E    fmac FR0,FR7,FR5
+  0x0361AE:  F06C    fmov FR6,FR0
+  0x0361B0:  F58E    fmac FR0,FR8,FR5
+  0x0361B2:  D24B    mov.l @(0x0362E0),R2  ; =0x000CC170  (CAL @0x0CC170)
+  0x0361B4:  F828    fmov.s @R2,FR8
+  0x0361B6:  F855    fcmp/gt FR5,FR8
+  0x0361B8:  8B00    bf 0x0361BC
+  0x0361BA:  F58D    fldi0 FR5
+  0x0361BC:  E0A4    mov #-92,R0
+  0x0361BE:  FC57    fmov.s FR5,@(R0,R12)
+  0x0361C0:  D248    mov.l @(0x0362E4),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x0361C2:  E0A8    mov #-88,R0
+  0x0361C4:  F5C6    fmov.s @(R0,R12),FR5
+  0x0361C6:  E0A4    mov #-92,R0
+  0x0361C8:  420B    jsr @R2  ; -> 0x000BE960
+  0x0361CA:  F4C6    fmov.s @(R0,R12),FR4
+  0x0361CC:  F40C    fmov FR0,FR4
+  0x0361CE:  E0AC    mov #-84,R0
+  0x0361D0:  D244    mov.l @(0x0362E4),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x0361D2:  420B    jsr @R2  ; -> 0x000BE960
+  0x0361D4:  F5C6    fmov.s @(R0,R12),FR5
+  0x0361D6:  FF0C    fmov FR0,FR15
+  0x0361D8:  D243    mov.l @(0x0362E8),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x0361DA:  F58D    fldi0 FR5
+  0x0361DC:  C743    mova @(0x0362EC),R0
+  0x0361DE:  FE08    fmov.s @R0,FR14
+  0x0361E0:  F6EC    fmov FR14,FR6
+  0x0361E2:  420B    jsr @R2  ; -> 0x000BE608
+  0x0361E4:  F40C    fmov FR0,FR4
+  0x0361E6:  6603    mov R0,R6
+  0x0361E8:  E020    mov #32,R0
+  0x0361EA:  0F64    mov.b R6,@(R0,R15)
+  0x0361EC:  C43A    mov.b @(58,GBR),R0  ; <- RAM 0xFFFF79C6
+  0x0361EE:  6E03    mov R0,R14
+  0x0361F0:  D23D    mov.l @(0x0362E8),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x0361F2:  F6EC    fmov FR14,FR6
+  0x0361F4:  E0A0    mov #-96,R0
+  0x0361F6:  F5C6    fmov.s @(R0,R12),FR5
+  0x0361F8:  E09C    mov #-100,R0
+  0x0361FA:  420B    jsr @R2  ; -> 0x000BE608
+  0x0361FC:  F4C6    fmov.s @(R0,R12),FR4
+  0x0361FE:  6203    mov R0,R2
+  0x036200:  E024    mov #36,R0
+  0x036202:  0F24    mov.b R2,@(R0,R15)
+  0x036204:  D43A    mov.l @(0x0362F0),R4  ; =0x000AD090  (ROM @0x0AD090)
+  0x036206:  55F3    mov.l @(12,R15),R5
+  0x036208:  450B    jsr @R5  ; -> 0x000BE830
+  0x03620A:  F4F8    fmov.s @R15,FR4
+  0x03620C:  E0F0    mov #-16,R0
+  0x03620E:  FC07    fmov.s FR0,@(R0,R12)
+  0x036210:  60EC    extu.b R14,R0
+  0x036212:  8801    cmp/eq #1,R0
+  0x036214:  8B04    bf 0x036220
+  0x036216:  E0C8    mov #-56,R0
+  0x036218:  F8C6    fmov.s @(R0,R12),FR8
+  0x03621A:  E09C    mov #-100,R0
+  0x03621C:  A074    bra 0x036308
+  0x03621E:  FC87    fmov.s FR8,@(R0,R12)
+  0x036220:  8802    cmp/eq #2,R0
+  0x036222:  8B09    bf 0x036238
+  0x036224:  E0CC    mov #-52,R0
+  0x036226:  F8C6    fmov.s @(R0,R12),FR8
+  0x036228:  E0A4    mov #-92,R0
+  0x03622A:  F0C6    fmov.s @(R0,R12),FR0
+  0x03622C:  E0B0    mov #-80,R0
+  0x03622E:  F9C6    fmov.s @(R0,R12),FR9
+  0x036230:  F89E    fmac FR0,FR9,FR8
+  0x036232:  E09C    mov #-100,R0
+  0x036234:  A068    bra 0x036308
+  0x036236:  FC87    fmov.s FR8,@(R0,R12)
+  0x036238:  E020    mov #32,R0
+  0x03623A:  06FC    mov.b @(R0,R15),R6
+  0x03623C:  2668    tst R6,R6
+  0x03623E:  8903    bt 0x036248
+  0x036240:  C466    mov.b @(102,GBR),R0  ; <- RAM 0xFFFF79F2
+  0x036242:  2008    tst R0,R0
+  0x036244:  8D04    bt/s 0x036250
+  0x036246:  1F0A    mov.l R0,@(40,R15)
+  0x036248:  E024    mov #36,R0
+  0x03624A:  02FC    mov.b @(R0,R15),R2
+  0x03624C:  2228    tst R2,R2
+  0x03624E:  8953    bt 0x0362F8
+  0x036250:  E0B0    mov #-80,R0
+  0x036252:  F9C6    fmov.s @(R0,R12),FR9
+  0x036254:  FF92    fmul FR9,FR15
+  0x036256:  E0A0    mov #-96,R0
+  0x036258:  FCF7    fmov.s FR15,@(R0,R12)
+  0x03625A:  E09C    mov #-100,R0
+  0x03625C:  F4C6    fmov.s @(R0,R12),FR4
+  0x03625E:  E0F0    mov #-16,R0
+  0x036260:  F8C6    fmov.s @(R0,R12),FR8
+  0x036262:  F480    fadd FR8,FR4
+  0x036264:  D223    mov.l @(0x0362F4),R2  ; =0x000BE970  (ROM @0x0BE970)
+  0x036266:  E0A0    mov #-96,R0
+  0x036268:  420B    jsr @R2  ; -> 0x000BE970
+  0x03626A:  F5C6    fmov.s @(R0,R12),FR5
+  0x03626C:  E09C    mov #-100,R0
+  0x03626E:  A04B    bra 0x036308
+  0x036270:  FC07    fmov.s FR0,@(R0,R12)
+  0x036272:  0000    .word 0x0000
+  0x036274:  43B4    .word 0x43B4
+  0x036276:  0000    .word 0x0000
+
+
+==============================================================================
+  FUN_00036848 - Post-condition handler (after 0x3643A returns)
+  Address range: 0x036848 - 0x036962 (282 bytes)
+  GBR = 0xFFFF798C
+==============================================================================
+  0x036848:  2FD6    mov.l R13,@-R15
+  0x03684A:  4F22    sts.l PR,@-R15
+  0x03684C:  FFCB    fmov.s FR12,@-R15
+  0x03684E:  FFEB    fmov.s FR14,@-R15
+  0x036850:  FFFB    fmov.s FR15,@-R15
+  0x036852:  4F13    .word 0x4F13
+  0x036854:  D06F    mov.l @(0x036A14),R0  ; =0xFFFF798C  (RAM 798C)
+  0x036856:  401E    ldc R0,GBR  ; GBR = 0xFFFF798C
+  0x036858:  7FFC    add #-4,R15
+  0x03685A:  D26F    mov.l @(0x036A18),R2  ; =0xFFFF6624  (RAM 6624)
+  0x03685C:  FC28    fmov.s @R2,FR12
+  0x03685E:  D26F    mov.l @(0x036A1C),R2  ; =0xFFFF63F8  (RAM 63F8)
+  0x036860:  FF28    fmov.s @R2,FR15
+  0x036862:  DD6F    mov.l @(0x036A20),R13  ; =0xFFFF79F8  (RAM 79F8)
+  0x036864:  E0B4    mov #-76,R0
+  0x036866:  FED6    fmov.s @(R0,R13),FR14
+  0x036868:  D26E    mov.l @(0x036A24),R2  ; =0xFFFF7F48  (RAM 7F48)
+  0x03686A:  F828    fmov.s @R2,FR8
+  0x03686C:  D26E    mov.l @(0x036A28),R2  ; =0xFFFF8258  (RAM 8258)
+  0x03686E:  F628    fmov.s @R2,FR6
+  0x036870:  D26E    mov.l @(0x036A2C),R2  ; =0xFFFF7E90  (RAM 7E90)
+  0x036872:  F928    fmov.s @R2,FR9
+  0x036874:  F860    fadd FR6,FR8
+  0x036876:  F891    fsub FR9,FR8
+  0x036878:  E0BC    mov #-68,R0
+  0x03687A:  FD87    fmov.s FR8,@(R0,R13)
+  0x03687C:  D26C    mov.l @(0x036A30),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x03687E:  C76D    mova @(0x036A34),R0
+  0x036880:  F608    fmov.s @R0,FR6
+  0x036882:  F58D    fldi0 FR5
+  0x036884:  E094    mov #-108,R0
+  0x036886:  420B    jsr @R2  ; -> 0x000BE608
+  0x036888:  F4D6    fmov.s @(R0,R13),FR4
+  0x03688A:  620C    extu.b R0,R2
+  0x03688C:  2228    tst R2,R2
+  0x03688E:  8909    bt 0x0368A4
+  0x036890:  D469    mov.l @(0x036A38),R4  ; =0x000AD960  (ROM @0x0AD960)
+  0x036892:  D66A    mov.l @(0x036A3C),R6  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036894:  2F62    mov.l R6,@R15
+  0x036896:  F5CC    fmov FR12,FR5
+  0x036898:  460B    jsr @R6  ; -> 0x000BE8E4
+  0x03689A:  F4FC    fmov FR15,FR4
+  0x03689C:  E0DC    mov #-36,R0
+  0x03689E:  D468    mov.l @(0x036A40),R4  ; =0x000AC5F8  (ROM @0x0AC5F8)
+  0x0368A0:  A009    bra 0x0368B6
+  0x0368A2:  FD07    fmov.s FR0,@(R0,R13)
+  0x0368A4:  D467    mov.l @(0x036A44),R4  ; =0x000AD97C  (ROM @0x0AD97C)
+  0x0368A6:  D265    mov.l @(0x036A3C),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x0368A8:  2F22    mov.l R2,@R15
+  0x0368AA:  F5CC    fmov FR12,FR5
+  0x0368AC:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x0368AE:  F4FC    fmov FR15,FR4
+  0x0368B0:  E0DC    mov #-36,R0
+  0x0368B2:  FD07    fmov.s FR0,@(R0,R13)
+  0x0368B4:  D464    mov.l @(0x036A48),R4  ; =0x000AC60C  (ROM @0x0AC60C)
+  0x0368B6:  D665    mov.l @(0x036A4C),R6  ; =0x000BE830  (ROM @0x0BE830)
+  0x0368B8:  E0BC    mov #-68,R0
+  0x0368BA:  460B    jsr @R6  ; -> 0x000BE830
+  0x0368BC:  F4D6    fmov.s @(R0,R13),FR4
+  0x0368BE:  E0E0    mov #-32,R0
+  0x0368C0:  FD07    fmov.s FR0,@(R0,R13)
+  0x0368C2:  E0DC    mov #-36,R0
+  0x0368C4:  F8D6    fmov.s @(R0,R13),FR8
+  0x0368C6:  E0E0    mov #-32,R0
+  0x0368C8:  F9D6    fmov.s @(R0,R13),FR9
+  0x0368CA:  F892    fmul FR9,FR8
+  0x0368CC:  E0B4    mov #-76,R0
+  0x0368CE:  FD87    fmov.s FR8,@(R0,R13)
+  0x0368D0:  F8EC    fmov FR14,FR8
+  0x0368D2:  D25F    mov.l @(0x036A50),R2  ; =0x000CC224  (CAL @0x0CC224)
+  0x0368D4:  F928    fmov.s @R2,FR9
+  0x0368D6:  F890    fadd FR9,FR8
+  0x0368D8:  F9D6    fmov.s @(R0,R13),FR9
+  0x0368DA:  F985    fcmp/gt FR8,FR9
+  0x0368DC:  8B02    bf 0x0368E4
+  0x0368DE:  D05D    mov.l @(0x036A54),R0  ; =0x000AD998  (ROM @0x0AD998)
+  0x0368E0:  A010    bra 0x036904
+  0x0368E2:  C21B    mov.l R0,@(108,GBR)  ; -> RAM 0xFFFF79F8
+  0x0368E4:  D65C    mov.l @(0x036A58),R6  ; =0x000BEAB0  (ROM @0x0BEAB0)
+  0x0368E6:  F4D6    fmov.s @(R0,R13),FR4
+  0x0368E8:  460B    jsr @R6  ; -> 0x000BEAB0
+  0x0368EA:  F5EC    fmov FR14,FR5
+  0x0368EC:  D258    mov.l @(0x036A50),R2  ; =0x000CC224  (CAL @0x0CC224)
+  0x0368EE:  F828    fmov.s @R2,FR8
+  0x0368F0:  F085    fcmp/gt FR8,FR0
+  0x0368F2:  8B07    bf 0x036904
+  0x0368F4:  F828    fmov.s @R2,FR8
+  0x0368F6:  FE81    fsub FR8,FR14
+  0x0368F8:  E0B4    mov #-76,R0
+  0x0368FA:  F8D6    fmov.s @(R0,R13),FR8
+  0x0368FC:  FE85    fcmp/gt FR8,FR14
+  0x0368FE:  8B01    bf 0x036904
+  0x036900:  D056    mov.l @(0x036A5C),R0  ; =0x000AD9B4  (ROM @0x0AD9B4)
+  0x036902:  C21B    mov.l R0,@(108,GBR)  ; -> RAM 0xFFFF79F8
+  0x036904:  F5CC    fmov FR12,FR5
+  0x036906:  F4FC    fmov FR15,FR4
+  0x036908:  62F2    mov.l @R15,R2
+  0x03690A:  C61B    mov.l @(108,GBR),R0  ; <- RAM 0xFFFF79F8
+  0x03690C:  420B    jsr @R2  ; -> 0x000CC224
+  0x03690E:  6403    mov R0,R4
+  0x036910:  E0B8    mov #-72,R0
+  0x036912:  FD07    fmov.s FR0,@(R0,R13)
+  0x036914:  D652    mov.l @(0x036A60),R6  ; =0x000BEA40  (ROM @0x0BEA40)
+  0x036916:  E0B4    mov #-76,R0
+  0x036918:  F4D6    fmov.s @(R0,R13),FR4
+  0x03691A:  E0B8    mov #-72,R0
+  0x03691C:  F6D6    fmov.s @(R0,R13),FR6
+  0x03691E:  C751    mova @(0x036A64),R0
+  0x036920:  FE08    fmov.s @R0,FR14
+  0x036922:  F7EC    fmov FR14,FR7
+  0x036924:  E0AC    mov #-84,R0
+  0x036926:  460B    jsr @R6  ; -> 0x000BEA40
+  0x036928:  F5D6    fmov.s @(R0,R13),FR5
+  0x03692A:  E0AC    mov #-84,R0
+  0x03692C:  FD07    fmov.s FR0,@(R0,R13)
+  0x03692E:  D44E    mov.l @(0x036A68),R4  ; =0x000AD9D0  (ROM @0x0AD9D0)
+  0x036930:  F5CC    fmov FR12,FR5
+  0x036932:  62F2    mov.l @R15,R2
+  0x036934:  420B    jsr @R2  ; -> 0x000CC224
+  0x036936:  F4FC    fmov FR15,FR4
+  0x036938:  E0E4    mov #-28,R0
+  0x03693A:  FD07    fmov.s FR0,@(R0,R13)
+  0x03693C:  D648    mov.l @(0x036A60),R6  ; =0x000BEA40  (ROM @0x0BEA40)
+  0x03693E:  F7EC    fmov FR14,FR7
+  0x036940:  E0AC    mov #-84,R0
+  0x036942:  F4D6    fmov.s @(R0,R13),FR4
+  0x036944:  E0E4    mov #-28,R0
+  0x036946:  F6D6    fmov.s @(R0,R13),FR6
+  0x036948:  E0B0    mov #-80,R0
+  0x03694A:  460B    jsr @R6  ; -> 0x000BEA40
+  0x03694C:  F5D6    fmov.s @(R0,R13),FR5
+  0x03694E:  E0B0    mov #-80,R0
+  0x036950:  FD07    fmov.s FR0,@(R0,R13)
+  0x036952:  7F04    add #4,R15
+  0x036954:  4F17    .word 0x4F17
+  0x036956:  FFF9    fmov.s @R15+,FR15
+  0x036958:  FEF9    fmov.s @R15+,FR14
+  0x03695A:  FCF9    fmov.s @R15+,FR12
+  0x03695C:  4F26    lds.l @R15+,PR
+  0x03695E:  000B    rts
+  0x036960:  6DF6    mov.l @R15+,R13
+
+
+==============================================================================
+  FUN_00036962 - CL/OL sub
+  Address range: 0x036962 - 0x036978 (22 bytes)
+==============================================================================
+  0x036962:  4F22    sts.l PR,@-R15
+  0x036964:  D241    mov.l @(0x036A6C),R2  ; =0xFFFF6350  (RAM 6350)
+  0x036966:  F428    fmov.s @R2,FR4
+  0x036968:  D441    mov.l @(0x036A70),R4  ; =0x000AD0DC  (ROM @0x0AD0DC)
+  0x03696A:  D238    mov.l @(0x036A4C),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x03696C:  420B    jsr @R2  ; -> 0x000BE830
+  0x03696E:  0009    nop
+  0x036970:  D240    mov.l @(0x036A74),R2  ; =0xFFFF79A0  (RAM 79A0)
+  0x036972:  4F26    lds.l @R15+,PR
+  0x036974:  000B    rts
+  0x036976:  F20A    fmov.s FR0,@R2
+
+
+==============================================================================
+  FUN_00036978 - CL/OL sub 2
+  Address range: 0x036978 - 0x036A98 (288 bytes)
+  GBR = 0xFFFF79CC
+==============================================================================
+  0x036978:  2FE6    mov.l R14,@-R15
+  0x03697A:  4F22    sts.l PR,@-R15
+  0x03697C:  FFCB    fmov.s FR12,@-R15
+  0x03697E:  FFEB    fmov.s FR14,@-R15
+  0x036980:  FFFB    fmov.s FR15,@-R15
+  0x036982:  4F13    .word 0x4F13
+  0x036984:  D03C    mov.l @(0x036A78),R0  ; =0xFFFF79CC  (RAM 79CC)
+  0x036986:  401E    ldc R0,GBR  ; GBR = 0xFFFF79CC
+  0x036988:  D223    mov.l @(0x036A18),R2  ; =0xFFFF6624  (RAM 6624)
+  0x03698A:  FE28    fmov.s @R2,FR14
+  0x03698C:  D23B    mov.l @(0x036A7C),R2  ; =0xFFFF62DC  (RAM 62DC)
+  0x03698E:  FF28    fmov.s @R2,FR15
+  0x036990:  D23B    mov.l @(0x036A80),R2  ; =0xFFFF7348  (RAM 7348)
+  0x036992:  FC28    fmov.s @R2,FR12
+  0x036994:  D43B    mov.l @(0x036A84),R4  ; =0x000AC5BC  (ROM @0x0AC5BC)
+  0x036996:  D22D    mov.l @(0x036A4C),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x036998:  420B    jsr @R2  ; -> 0x000BE830
+  0x03699A:  F4EC    fmov FR14,FR4
+  0x03699C:  DE3A    mov.l @(0x036A88),R14  ; =0xFFFF79FC  (RAM 79FC)
+  0x03699E:  E0D0    mov #-48,R0
+  0x0369A0:  FE07    fmov.s FR0,@(R0,R14)
+  0x0369A2:  D43A    mov.l @(0x036A8C),R4  ; =0x000AD0A4  (ROM @0x0AD0A4)
+  0x0369A4:  D229    mov.l @(0x036A4C),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x0369A6:  420B    jsr @R2  ; -> 0x000BE830
+  0x0369A8:  F4EC    fmov FR14,FR4
+  0x0369AA:  E0D4    mov #-44,R0
+  0x0369AC:  FE07    fmov.s FR0,@(R0,R14)
+  0x0369AE:  E0D0    mov #-48,R0
+  0x0369B0:  F8E6    fmov.s @(R0,R14),FR8
+  0x0369B2:  D237    mov.l @(0x036A90),R2  ; =0x000CC178  (CAL @0x0CC178)
+  0x0369B4:  F928    fmov.s @R2,FR9
+  0x0369B6:  F891    fsub FR9,FR8
+  0x0369B8:  FF85    fcmp/gt FR8,FR15
+  0x0369BA:  8902    bt 0x0369C2
+  0x0369BC:  E001    mov #1,R0
+  0x0369BE:  A006    bra 0x0369CE
+  0x0369C0:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF79FE
+  0x0369C2:  E0D0    mov #-48,R0
+  0x0369C4:  F8E6    fmov.s @(R0,R14),FR8
+  0x0369C6:  FF85    fcmp/gt FR8,FR15
+  0x0369C8:  8B01    bf 0x0369CE
+  0x0369CA:  E000    mov #0,R0
+  0x0369CC:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF79FE
+  0x0369CE:  E0D4    mov #-44,R0
+  0x0369D0:  F8E6    fmov.s @(R0,R14),FR8
+  0x0369D2:  D230    mov.l @(0x036A94),R2  ; =0x000CC174  (CAL @0x0CC174)
+  0x0369D4:  F928    fmov.s @R2,FR9
+  0x0369D6:  F891    fsub FR9,FR8
+  0x0369D8:  FC85    fcmp/gt FR8,FR12
+  0x0369DA:  8902    bt 0x0369E2
+  0x0369DC:  E001    mov #1,R0
+  0x0369DE:  A006    bra 0x0369EE
+  0x0369E0:  C033    mov.b R0,@(51,GBR)  ; -> RAM 0xFFFF79FF
+  0x0369E2:  E0D4    mov #-44,R0
+  0x0369E4:  F8E6    fmov.s @(R0,R14),FR8
+  0x0369E6:  FC85    fcmp/gt FR8,FR12
+  0x0369E8:  8B01    bf 0x0369EE
+  0x0369EA:  E000    mov #0,R0
+  0x0369EC:  C033    mov.b R0,@(51,GBR)  ; -> RAM 0xFFFF79FF
+  0x0369EE:  C432    mov.b @(50,GBR),R0  ; <- RAM 0xFFFF79FE
+  0x0369F0:  8801    cmp/eq #1,R0
+  0x0369F2:  8B04    bf 0x0369FE
+  0x0369F4:  C433    mov.b @(51,GBR),R0  ; <- RAM 0xFFFF79FF
+  0x0369F6:  8801    cmp/eq #1,R0
+  0x0369F8:  8B01    bf 0x0369FE
+  0x0369FA:  A001    bra 0x036A00
+  0x0369FC:  E201    mov #1,R2
+  0x0369FE:  E200    mov #0,R2
+  0x036A00:  6023    mov R2,R0
+  0x036A02:  4F17    .word 0x4F17
+  0x036A04:  FFF9    fmov.s @R15+,FR15
+  0x036A06:  FEF9    fmov.s @R15+,FR14
+  0x036A08:  FCF9    fmov.s @R15+,FR12
+  0x036A0A:  4F26    lds.l @R15+,PR
+  0x036A0C:  000B    rts
+  0x036A0E:  6EF6    mov.l @R15+,R14
+  0x036A10:  000C    mov.b @(R0,R0),R0
+  0x036A12:  BC5E    bsr 0x0362D2
+  0x036A14:  FFFF    fpu_0xFFFF
+  0x036A16:  798C    add #-116,R9
+  0x036A18:  FFFF    fpu_0xFFFF
+  0x036A1A:  6624    mov.b @R2+,R6
+  0x036A1C:  FFFF    fpu_0xFFFF
+  0x036A1E:  63F8    swap.b R15,R3
+  0x036A20:  FFFF    fpu_0xFFFF
+  0x036A22:  79F8    add #-8,R9
+  0x036A24:  FFFF    fpu_0xFFFF
+  0x036A26:  7F48    add #72,R15
+  0x036A28:  FFFF    fpu_0xFFFF
+  0x036A2A:  8258    .word 0x8258
+  0x036A2C:  FFFF    fpu_0xFFFF
+  0x036A2E:  7E90    add #-112,R14
+  0x036A30:  000B    rts
+  0x036A32:  E608    mov #8,R6
+  0x036A34:  3800    cmp/eq R0,R8
+  0x036A36:  0000    .word 0x0000
+  0x036A38:  000A    .word 0x000A
+  0x036A3A:  D960    mov.l @(0x036BBC),R9  ; =0x00022CF4  (ROM @0x022CF4)
+  0x036A3C:  000B    rts
+  0x036A3E:  E8E4    mov #-28,R8
+  0x036A40:  000A    .word 0x000A
+  0x036A42:  C5F8    mov.w @(496,GBR),R0  ; <- RAM 0xFFFF7BBC
+  0x036A44:  000A    .word 0x000A
+  0x036A46:  D97C    mov.l @(0x036C38),R9  ; =0xA0040009
+  0x036A48:  000A    .word 0x000A
+  0x036A4A:  C60C    mov.l @(48,GBR),R0  ; <- RAM 0xFFFF79FC
+  0x036A4C:  000B    rts
+  0x036A4E:  E830    mov #48,R8
+  0x036A50:  000C    mov.b @(R0,R0),R0
+  0x036A52:  C224    mov.l R0,@(144,GBR)  ; -> RAM 0xFFFF7A5C
+  0x036A54:  000A    .word 0x000A
+  0x036A56:  D998    mov.l @(0x036CB8),R9  ; =0x89006271
+  0x036A58:  000B    rts
+  0x036A5A:  EAB0    mov #-80,R10
+  0x036A5C:  000A    .word 0x000A
+  0x036A5E:  D9B4    mov.l @(0x036D30),R9  ; =0x420B2F00  (float: 34.795898)
+  0x036A60:  000B    rts
+  0x036A62:  EA40    mov #64,R10
+  0x036A64:  3CBB    subv R11,R12
+  0x036A66:  8000    mov.b R0,@(0,R0)
+  0x036A68:  000A    .word 0x000A
+  0x036A6A:  D9D0    mov.l @(0x036DAC),R9  ; =0xF828D228
+  0x036A6C:  FFFF    fpu_0xFFFF
+  0x036A6E:  6350    mov.b @R5,R3
+  0x036A70:  000A    .word 0x000A
+  0x036A72:  D0DC    mov.l @(0x036DE4),R0  ; =0x000CC234  (CAL @0x0CC234)
+  0x036A74:  FFFF    fpu_0xFFFF
+  0x036A76:  79A0    add #-96,R9
+  0x036A78:  FFFF    fpu_0xFFFF
+  0x036A7A:  79CC    add #-52,R9
+  0x036A7C:  FFFF    fpu_0xFFFF
+  0x036A7E:  62DC    extu.b R13,R2
+  0x036A80:  FFFF    fpu_0xFFFF
+  0x036A82:  7348    add #72,R3
+  0x036A84:  000A    .word 0x000A
+  0x036A86:  C5BC    mov.w @(376,GBR),R0  ; <- RAM 0xFFFF7B44
+  0x036A88:  FFFF    fpu_0xFFFF
+  0x036A8A:  79FC    add #-4,R9
+  0x036A8C:  000A    .word 0x000A
+  0x036A8E:  D0A4    mov.l @(0x036D20),R0  ; =0xD6386D61
+  0x036A90:  000C    mov.b @(R0,R0),R0
+  0x036A92:  C178    mov.w R0,@(240,GBR)  ; -> RAM 0xFFFF7ABC
+  0x036A94:  000C    mov.b @(R0,R0),R0
+  0x036A96:  C174    mov.w R0,@(232,GBR)  ; -> RAM 0xFFFF7AB4
+
+
+==============================================================================
+  FUN_00036A98 - Hysteresis handler entry (dispatch table A)
+  Address range: 0x036A98 - 0x036AB2 (26 bytes)
+==============================================================================
+  0x036A98:  E000    mov #0,R0
+  0x036A9A:  D544    mov.l @(0x036BAC),R5  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036A9C:  8054    mov.b R0,@(84,R5)
+  0x036A9E:  8454    mov.b @(84,R5),R0
+  0x036AA0:  2500    mov.b R0,@R5
+  0x036AA2:  D643    mov.l @(0x036BB0),R6  ; =0xFFFF65C0  (RAM 65C0)
+  0x036AA4:  6060    mov.b @R6,R0
+  0x036AA6:  000B    rts
+  0x036AA8:  8055    mov.b R0,@(85,R5)
+  0x036AAA:  A002    bra 0x036AB2
+  0x036AAC:  0009    nop
+  0x036AAE:  A04B    bra 0x036B48
+  0x036AB0:  0009    nop
+
+
+==============================================================================
+  FUN_00036AB2 - Hysteresis handler main
+  Address range: 0x036AB2 - 0x036BF4 (322 bytes)
+==============================================================================
+  0x036AB2:  2FD6    mov.l R13,@-R15
+  0x036AB4:  4F22    sts.l PR,@-R15
+  0x036AB6:  FFEB    fmov.s FR14,@-R15
+  0x036AB8:  FFFB    fmov.s FR15,@-R15
+  0x036ABA:  7FFC    add #-4,R15
+  0x036ABC:  D23D    mov.l @(0x036BB4),R2  ; =0xFFFF6624  (RAM 6624)
+  0x036ABE:  FE28    fmov.s @R2,FR14
+  0x036AC0:  D23D    mov.l @(0x036BB8),R2  ; =0xFFFF65FC  (RAM 65FC)
+  0x036AC2:  FF28    fmov.s @R2,FR15
+  0x036AC4:  D63A    mov.l @(0x036BB0),R6  ; =0xFFFF65C0  (RAM 65C0)
+  0x036AC6:  D23D    mov.l @(0x036BBC),R2  ; =0x00022CF4  (ROM @0x022CF4)
+  0x036AC8:  420B    jsr @R2  ; -> 0x00022CF4
+  0x036ACA:  6D60    mov.b @R6,R13
+  0x036ACC:  2F00    mov.b R0,@R15
+  0x036ACE:  D23C    mov.l @(0x036BC0),R2  ; =0xFFFF67EC  (RAM 67EC)
+  0x036AD0:  6221    mov.w @R2,R2
+  0x036AD2:  D63C    mov.l @(0x036BC4),R6  ; =0x000CBC66  (CAL @0x0CBC66)
+  0x036AD4:  6561    mov.w @R6,R5
+  0x036AD6:  3252    cmp/hs R5,R2
+  0x036AD8:  8B08    bf 0x036AEC
+  0x036ADA:  D134    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036ADC:  8415    mov.b @(21,R1),R0
+  0x036ADE:  8801    cmp/eq #1,R0
+  0x036AE0:  8B07    bf 0x036AF2
+  0x036AE2:  2DD8    tst R13,R13
+  0x036AE4:  8B05    bf 0x036AF2
+  0x036AE6:  E001    mov #1,R0
+  0x036AE8:  A003    bra 0x036AF2
+  0x036AEA:  8016    mov.b R0,@(22,R1)
+  0x036AEC:  E000    mov #0,R0
+  0x036AEE:  D12F    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036AF0:  8016    mov.b R0,@(22,R1)
+  0x036AF2:  2DD8    tst R13,R13
+  0x036AF4:  8F06    bf/s 0x036B04
+  0x036AF6:  E000    mov #0,R0
+  0x036AF8:  D233    mov.l @(0x036BC8),R2  ; =0x000BE554  (ROM @0x0BE554)
+  0x036AFA:  E501    mov #1,R5
+  0x036AFC:  8511    mov.w @(34,R1),R0
+  0x036AFE:  420B    jsr @R2  ; -> 0x000BE554
+  0x036B00:  640D    extu.w R0,R4
+  0x036B02:  D12A    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036B04:  8111    mov.w R0,@(34,R1)
+  0x036B06:  66F0    mov.b @R15,R6
+  0x036B08:  2668    tst R6,R6
+  0x036B0A:  8B13    bf 0x036B34
+  0x036B0C:  D22F    mov.l @(0x036BCC),R2  ; =0x000CC228  (CAL @0x0CC228)
+  0x036B0E:  F828    fmov.s @R2,FR8
+  0x036B10:  F8E5    fcmp/gt FR14,FR8
+  0x036B12:  8B0F    bf 0x036B34
+  0x036B14:  2DD8    tst R13,R13
+  0x036B16:  8B0D    bf 0x036B34
+  0x036B18:  8416    mov.b @(22,R1),R0
+  0x036B1A:  8801    cmp/eq #1,R0
+  0x036B1C:  8B0A    bf 0x036B34
+  0x036B1E:  8511    mov.w @(34,R1),R0
+  0x036B20:  D52B    mov.l @(0x036BD0),R5  ; =0x000CBC68  (CAL @0x0CBC68)
+  0x036B22:  6251    mov.w @R5,R2
+  0x036B24:  3022    cmp/hs R2,R0
+  0x036B26:  8B05    bf 0x036B34
+  0x036B28:  D22A    mov.l @(0x036BD4),R2  ; =0x000CC22C  (CAL @0x0CC22C)
+  0x036B2A:  F828    fmov.s @R2,FR8
+  0x036B2C:  F8F5    fcmp/gt FR15,FR8
+  0x036B2E:  8901    bt 0x036B34
+  0x036B30:  A001    bra 0x036B36
+  0x036B32:  E201    mov #1,R2
+  0x036B34:  E200    mov #0,R2
+  0x036B36:  2120    mov.b R2,@R1
+  0x036B38:  60D3    mov R13,R0
+  0x036B3A:  8015    mov.b R0,@(21,R1)
+  0x036B3C:  7F04    add #4,R15
+  0x036B3E:  FFF9    fmov.s @R15+,FR15
+  0x036B40:  FEF9    fmov.s @R15+,FR14
+  0x036B42:  4F26    lds.l @R15+,PR
+  0x036B44:  000B    rts
+  0x036B46:  6DF6    mov.l @R15+,R13
+  0x036B48:  2FE6    mov.l R14,@-R15
+  0x036B4A:  4F22    sts.l PR,@-R15
+  0x036B4C:  D222    mov.l @(0x036BD8),R2  ; =0xFFFF6350  (RAM 6350)
+  0x036B4E:  F428    fmov.s @R2,FR4
+  0x036B50:  DE16    mov.l @(0x036BAC),R14  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036B52:  84E4    mov.b @(228,R14),R0
+  0x036B54:  2008    tst R0,R0
+  0x036B56:  8B09    bf 0x036B6C
+  0x036B58:  60E0    mov.b @R14,R0
+  0x036B5A:  8801    cmp/eq #1,R0
+  0x036B5C:  8B06    bf 0x036B6C
+  0x036B5E:  D41F    mov.l @(0x036BDC),R4  ; =0x000AC620  (ROM @0x0AC620)
+  0x036B60:  D21F    mov.l @(0x036BE0),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x036B62:  420B    jsr @R2  ; -> 0x000BE830
+  0x036B64:  0009    nop
+  0x036B66:  E0FC    mov #-4,R0
+  0x036B68:  A01B    bra 0x036BA2
+  0x036B6A:  FE07    fmov.s FR0,@(R0,R14)
+  0x036B6C:  D21D    mov.l @(0x036BE4),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x036B6E:  E0FC    mov #-4,R0
+  0x036B70:  F4E6    fmov.s @(R0,R14),FR4
+  0x036B72:  C71D    mova @(0x036BE8),R0
+  0x036B74:  F608    fmov.s @R0,FR6
+  0x036B76:  420B    jsr @R2  ; -> 0x000BE608
+  0x036B78:  F58D    fldi0 FR5
+  0x036B7A:  620C    extu.b R0,R2
+  0x036B7C:  2228    tst R2,R2
+  0x036B7E:  890D    bt 0x036B9C
+  0x036B80:  60E0    mov.b @R14,R0
+  0x036B82:  8801    cmp/eq #1,R0
+  0x036B84:  8B0A    bf 0x036B9C
+  0x036B86:  E0FC    mov #-4,R0
+  0x036B88:  F4E6    fmov.s @(R0,R14),FR4
+  0x036B8A:  D218    mov.l @(0x036BEC),R2  ; =0x000CC230  (CAL @0x0CC230)
+  0x036B8C:  F828    fmov.s @R2,FR8
+  0x036B8E:  F481    fsub FR8,FR4
+  0x036B90:  D217    mov.l @(0x036BF0),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036B92:  420B    jsr @R2  ; -> 0x000BE960
+  0x036B94:  F58D    fldi0 FR5
+  0x036B96:  E0FC    mov #-4,R0
+  0x036B98:  A003    bra 0x036BA2
+  0x036B9A:  FE07    fmov.s FR0,@(R0,R14)
+  0x036B9C:  F58D    fldi0 FR5
+  0x036B9E:  E0FC    mov #-4,R0
+  0x036BA0:  FE57    fmov.s FR5,@(R0,R14)
+  0x036BA2:  60E0    mov.b @R14,R0
+  0x036BA4:  80E4    mov.b R0,@(228,R14)
+  0x036BA6:  4F26    lds.l @R15+,PR
+  0x036BA8:  000B    rts
+  0x036BAA:  6EF6    mov.l @R15+,R14
+  0x036BAC:  FFFF    fpu_0xFFFF
+  0x036BAE:  7A0C    add #12,R10
+  0x036BB0:  FFFF    fpu_0xFFFF
+  0x036BB2:  65C0    mov.b @R12,R5
+  0x036BB4:  FFFF    fpu_0xFFFF
+  0x036BB6:  6624    mov.b @R2+,R6
+  0x036BB8:  FFFF    fpu_0xFFFF
+  0x036BBA:  65FC    extu.b R15,R5
+  0x036BBC:  0002    stc SR,R0
+  0x036BBE:  2CF4    mov.b R15,@-R12
+  0x036BC0:  FFFF    fpu_0xFFFF
+  0x036BC2:  67EC    extu.b R14,R7
+  0x036BC4:  000C    mov.b @(R0,R0),R0
+  0x036BC6:  BC66    bsr 0x036496
+  0x036BC8:  000B    rts
+  0x036BCA:  E554    mov #84,R5
+  0x036BCC:  000C    mov.b @(R0,R0),R0
+  0x036BCE:  C228    mov.l R0,@(160,GBR)
+  0x036BD0:  000C    mov.b @(R0,R0),R0
+  0x036BD2:  BC68    bsr 0x0364A6
+  0x036BD4:  000C    mov.b @(R0,R0),R0
+  0x036BD6:  C22C    mov.l R0,@(176,GBR)
+  0x036BD8:  FFFF    fpu_0xFFFF
+  0x036BDA:  6350    mov.b @R5,R3
+  0x036BDC:  000A    .word 0x000A
+  0x036BDE:  C620    mov.l @(128,GBR),R0
+  0x036BE0:  000B    rts
+  0x036BE2:  E830    mov #48,R8
+  0x036BE4:  000B    rts
+  0x036BE6:  E608    mov #8,R6
+  0x036BE8:  3A00    cmp/eq R0,R10
+  0x036BEA:  0000    .word 0x0000
+  0x036BEC:  000C    mov.b @(R0,R0),R0
+  0x036BEE:  C230    mov.l R0,@(192,GBR)
+  0x036BF0:  000B    rts
+  0x036BF2:  E960    mov #96,R9
+
+
+==============================================================================
+  FUN_00036B48 - Hysteresis sub
+  Address range: 0x036B48 - 0x036BF4 (172 bytes)
+==============================================================================
+  0x036B48:  2FE6    mov.l R14,@-R15
+  0x036B4A:  4F22    sts.l PR,@-R15
+  0x036B4C:  D222    mov.l @(0x036BD8),R2  ; =0xFFFF6350  (RAM 6350)
+  0x036B4E:  F428    fmov.s @R2,FR4
+  0x036B50:  DE16    mov.l @(0x036BAC),R14  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036B52:  84E4    mov.b @(228,R14),R0
+  0x036B54:  2008    tst R0,R0
+  0x036B56:  8B09    bf 0x036B6C
+  0x036B58:  60E0    mov.b @R14,R0
+  0x036B5A:  8801    cmp/eq #1,R0
+  0x036B5C:  8B06    bf 0x036B6C
+  0x036B5E:  D41F    mov.l @(0x036BDC),R4  ; =0x000AC620  (ROM @0x0AC620)
+  0x036B60:  D21F    mov.l @(0x036BE0),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x036B62:  420B    jsr @R2  ; -> 0x000BE830
+  0x036B64:  0009    nop
+  0x036B66:  E0FC    mov #-4,R0
+  0x036B68:  A01B    bra 0x036BA2
+  0x036B6A:  FE07    fmov.s FR0,@(R0,R14)
+  0x036B6C:  D21D    mov.l @(0x036BE4),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x036B6E:  E0FC    mov #-4,R0
+  0x036B70:  F4E6    fmov.s @(R0,R14),FR4
+  0x036B72:  C71D    mova @(0x036BE8),R0
+  0x036B74:  F608    fmov.s @R0,FR6
+  0x036B76:  420B    jsr @R2  ; -> 0x000BE608
+  0x036B78:  F58D    fldi0 FR5
+  0x036B7A:  620C    extu.b R0,R2
+  0x036B7C:  2228    tst R2,R2
+  0x036B7E:  890D    bt 0x036B9C
+  0x036B80:  60E0    mov.b @R14,R0
+  0x036B82:  8801    cmp/eq #1,R0
+  0x036B84:  8B0A    bf 0x036B9C
+  0x036B86:  E0FC    mov #-4,R0
+  0x036B88:  F4E6    fmov.s @(R0,R14),FR4
+  0x036B8A:  D218    mov.l @(0x036BEC),R2  ; =0x000CC230  (CAL @0x0CC230)
+  0x036B8C:  F828    fmov.s @R2,FR8
+  0x036B8E:  F481    fsub FR8,FR4
+  0x036B90:  D217    mov.l @(0x036BF0),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036B92:  420B    jsr @R2  ; -> 0x000BE960
+  0x036B94:  F58D    fldi0 FR5
+  0x036B96:  E0FC    mov #-4,R0
+  0x036B98:  A003    bra 0x036BA2
+  0x036B9A:  FE07    fmov.s FR0,@(R0,R14)
+  0x036B9C:  F58D    fldi0 FR5
+  0x036B9E:  E0FC    mov #-4,R0
+  0x036BA0:  FE57    fmov.s FR5,@(R0,R14)
+  0x036BA2:  60E0    mov.b @R14,R0
+  0x036BA4:  80E4    mov.b R0,@(228,R14)
+  0x036BA6:  4F26    lds.l @R15+,PR
+  0x036BA8:  000B    rts
+  0x036BAA:  6EF6    mov.l @R15+,R14
+  0x036BAC:  FFFF    fpu_0xFFFF
+  0x036BAE:  7A0C    add #12,R10
+  0x036BB0:  FFFF    fpu_0xFFFF
+  0x036BB2:  65C0    mov.b @R12,R5
+  0x036BB4:  FFFF    fpu_0xFFFF
+  0x036BB6:  6624    mov.b @R2+,R6
+  0x036BB8:  FFFF    fpu_0xFFFF
+  0x036BBA:  65FC    extu.b R15,R5
+  0x036BBC:  0002    stc SR,R0
+  0x036BBE:  2CF4    mov.b R15,@-R12
+  0x036BC0:  FFFF    fpu_0xFFFF
+  0x036BC2:  67EC    extu.b R14,R7
+  0x036BC4:  000C    mov.b @(R0,R0),R0
+  0x036BC6:  BC66    bsr 0x036496
+  0x036BC8:  000B    rts
+  0x036BCA:  E554    mov #84,R5
+  0x036BCC:  000C    mov.b @(R0,R0),R0
+  0x036BCE:  C228    mov.l R0,@(160,GBR)
+  0x036BD0:  000C    mov.b @(R0,R0),R0
+  0x036BD2:  BC68    bsr 0x0364A6
+  0x036BD4:  000C    mov.b @(R0,R0),R0
+  0x036BD6:  C22C    mov.l R0,@(176,GBR)
+  0x036BD8:  FFFF    fpu_0xFFFF
+  0x036BDA:  6350    mov.b @R5,R3
+  0x036BDC:  000A    .word 0x000A
+  0x036BDE:  C620    mov.l @(128,GBR),R0
+  0x036BE0:  000B    rts
+  0x036BE2:  E830    mov #48,R8
+  0x036BE4:  000B    rts
+  0x036BE6:  E608    mov #8,R6
+  0x036BE8:  3A00    cmp/eq R0,R10
+  0x036BEA:  0000    .word 0x0000
+  0x036BEC:  000C    mov.b @(R0,R0),R0
+  0x036BEE:  C230    mov.l R0,@(192,GBR)
+  0x036BF0:  000B    rts
+  0x036BF2:  E960    mov #96,R9
+
+
+==============================================================================
+  FUN_00036BF4 - Delay manager B (dispatch table A)
+  Address range: 0x036BF4 - 0x036E60 (620 bytes)
+==============================================================================
+  0x036BF4:  D279    mov.l @(0x036DDC),R2  ; =0xFFFF6350  (RAM 6350)
+  0x036BF6:  F828    fmov.s @R2,FR8
+  0x036BF8:  D279    mov.l @(0x036DE0),R2  ; =0xFFFF6364  (RAM 6364)
+  0x036BFA:  F928    fmov.s @R2,FR9
+  0x036BFC:  D279    mov.l @(0x036DE4),R2  ; =0x000CC234  (CAL @0x0CC234)
+  0x036BFE:  F628    fmov.s @R2,FR6
+  0x036C00:  F685    fcmp/gt FR8,FR6
+  0x036C02:  8908    bt 0x036C16
+  0x036C04:  D278    mov.l @(0x036DE8),R2  ; =0x000CC238  (CAL @0x0CC238)
+  0x036C06:  F628    fmov.s @R2,FR6
+  0x036C08:  F695    fcmp/gt FR9,FR6
+  0x036C0A:  8904    bt 0x036C16
+  0x036C0C:  D277    mov.l @(0x036DEC),R2  ; =0x000CC244  (CAL @0x0CC244)
+  0x036C0E:  F828    fmov.s @R2,FR8
+  0x036C10:  D277    mov.l @(0x036DF0),R2  ; =0xFFFF7A18  (RAM 7A18)
+  0x036C12:  A00C    bra 0x036C2E
+  0x036C14:  F28A    fmov.s FR8,@R2
+  0x036C16:  D277    mov.l @(0x036DF4),R2  ; =0x000CC23C  (CAL @0x0CC23C)
+  0x036C18:  F628    fmov.s @R2,FR6
+  0x036C1A:  F685    fcmp/gt FR8,FR6
+  0x036C1C:  8907    bt 0x036C2E
+  0x036C1E:  D276    mov.l @(0x036DF8),R2  ; =0x000CC240  (CAL @0x0CC240)
+  0x036C20:  F828    fmov.s @R2,FR8
+  0x036C22:  F895    fcmp/gt FR9,FR8
+  0x036C24:  8903    bt 0x036C2E
+  0x036C26:  D275    mov.l @(0x036DFC),R2  ; =0x000CC248  (CAL @0x0CC248)
+  0x036C28:  F828    fmov.s @R2,FR8
+  0x036C2A:  D271    mov.l @(0x036DF0),R2  ; =0xFFFF7A18  (RAM 7A18)
+  0x036C2C:  F28A    fmov.s FR8,@R2
+  0x036C2E:  D270    mov.l @(0x036DF0),R2  ; =0xFFFF7A18  (RAM 7A18)
+  0x036C30:  F828    fmov.s @R2,FR8
+  0x036C32:  E0FC    mov #-4,R0
+  0x036C34:  000B    rts
+  0x036C36:  F287    fmov.s FR8,@(R0,R2)
+  0x036C38:  A004    bra 0x036C44
+  0x036C3A:  0009    nop
+  0x036C3C:  A004    bra 0x036C48
+  0x036C3E:  0009    nop
+  0x036C40:  A068    bra 0x036D14
+  0x036C42:  0009    nop
+  0x036C44:  000B    rts
+  0x036C46:  0009    nop
+  0x036C48:  2FC6    mov.l R12,@-R15
+  0x036C4A:  2FD6    mov.l R13,@-R15
+  0x036C4C:  2FE6    mov.l R14,@-R15
+  0x036C4E:  4F22    sts.l PR,@-R15
+  0x036C50:  FFEB    fmov.s FR14,@-R15
+  0x036C52:  7FF8    add #-8,R15
+  0x036C54:  D66A    mov.l @(0x036E00),R6  ; =0xFFFF726C  (RAM 726C)
+  0x036C56:  6E60    mov.b @R6,R14
+  0x036C58:  D66A    mov.l @(0x036E04),R6  ; =0xFFFF67EC  (RAM 67EC)
+  0x036C5A:  6C61    mov.w @R6,R12
+  0x036C5C:  D26A    mov.l @(0x036E08),R2  ; =0xFFFF72A1  (RAM 72A1)
+  0x036C5E:  6620    mov.b @R2,R6
+  0x036C60:  D26A    mov.l @(0x036E0C),R2  ; =0x00022F92  (ROM @0x022F92)
+  0x036C62:  420B    jsr @R2  ; -> 0x00022F92
+  0x036C64:  0009    nop
+  0x036C66:  2F00    mov.b R0,@R15
+  0x036C68:  D269    mov.l @(0x036E10),R2  ; =0xFFFF7374  (RAM 7374)
+  0x036C6A:  FE28    fmov.s @R2,FR14
+  0x036C6C:  D269    mov.l @(0x036E14),R2  ; =0x00021D9A  (ROM @0x021D9A)
+  0x036C6E:  420B    jsr @R2  ; -> 0x00021D9A
+  0x036C70:  0009    nop
+  0x036C72:  D269    mov.l @(0x036E18),R2  ; =0x00021DAE  (ROM @0x021DAE)
+  0x036C74:  420B    jsr @R2  ; -> 0x00021DAE
+  0x036C76:  80F4    mov.b R0,@(244,R15)
+  0x036C78:  84F4    mov.b @(244,R15),R0
+  0x036C7A:  8802    cmp/eq #2,R0
+  0x036C7C:  0D29    .word 0x0D29
+  0x036C7E:  60E3    mov R14,R0
+  0x036C80:  8801    cmp/eq #1,R0
+  0x036C82:  8926    bt 0x036CD2
+  0x036C84:  60F0    mov.b @R15,R0
+  0x036C86:  8801    cmp/eq #1,R0
+  0x036C88:  8923    bt 0x036CD2
+  0x036C8A:  D264    mov.l @(0x036E1C),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x036C8C:  F4EC    fmov FR14,FR4
+  0x036C8E:  C764    mova @(0x036E20),R0
+  0x036C90:  F608    fmov.s @R0,FR6
+  0x036C92:  420B    jsr @R2  ; -> 0x000BE608
+  0x036C94:  F58D    fldi0 FR5
+  0x036C96:  620C    extu.b R0,R2
+  0x036C98:  2228    tst R2,R2
+  0x036C9A:  8B12    bf 0x036CC2
+  0x036C9C:  60D3    mov R13,R0
+  0x036C9E:  8801    cmp/eq #1,R0
+  0x036CA0:  8B0F    bf 0x036CC2
+  0x036CA2:  D260    mov.l @(0x036E24),R2  ; =0x000BE554  (ROM @0x0BE554)
+  0x036CA4:  D160    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CA6:  6611    mov.w @R1,R6
+  0x036CA8:  646D    extu.w R6,R4
+  0x036CAA:  420B    jsr @R2  ; -> 0x000BE554
+  0x036CAC:  E501    mov #1,R5
+  0x036CAE:  620D    extu.w R0,R2
+  0x036CB0:  D75E    mov.l @(0x036E2C),R7  ; =0x000CBC6A  (CAL @0x0CBC6A)
+  0x036CB2:  6671    mov.w @R7,R6
+  0x036CB4:  646D    extu.w R6,R4
+  0x036CB6:  3243    cmp/ge R4,R2
+  0x036CB8:  8900    bt 0x036CBC
+  0x036CBA:  6271    mov.w @R7,R2
+  0x036CBC:  D15A    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CBE:  A008    bra 0x036CD2
+  0x036CC0:  2121    mov.w R2,@R1
+  0x036CC2:  D258    mov.l @(0x036E24),R2  ; =0x000BE554  (ROM @0x0BE554)
+  0x036CC4:  E501    mov #1,R5
+  0x036CC6:  D158    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CC8:  6611    mov.w @R1,R6
+  0x036CCA:  420B    jsr @R2  ; -> 0x000BE554
+  0x036CCC:  646D    extu.w R6,R4
+  0x036CCE:  D156    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CD0:  2101    mov.w R0,@R1
+  0x036CD2:  D657    mov.l @(0x036E30),R6  ; =0xFFFF85D7  (RAM 85D7)
+  0x036CD4:  6560    mov.b @R6,R5
+  0x036CD6:  D257    mov.l @(0x036E34),R2  ; =0x000CBC6E  (CAL @0x0CBC6E)
+  0x036CD8:  6621    mov.w @R2,R6
+  0x036CDA:  666D    extu.w R6,R6
+  0x036CDC:  62CD    extu.w R12,R2
+  0x036CDE:  3263    cmp/ge R6,R2
+  0x036CE0:  8B0C    bf 0x036CFC
+  0x036CE2:  2558    tst R5,R5
+  0x036CE4:  8B0A    bf 0x036CFC
+  0x036CE6:  D254    mov.l @(0x036E38),R2  ; =0x000CC258  (CAL @0x0CC258)
+  0x036CE8:  F528    fmov.s @R2,FR5
+  0x036CEA:  D254    mov.l @(0x036E3C),R2  ; =0x000BE970  (ROM @0x0BE970)
+  0x036CEC:  D14E    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CEE:  E0FC    mov #-4,R0
+  0x036CF0:  420B    jsr @R2  ; -> 0x000BE970
+  0x036CF2:  F416    fmov.s @(R0,R1),FR4
+  0x036CF4:  D14C    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CF6:  E0F8    mov #-8,R0
+  0x036CF8:  A005    bra 0x036D06
+  0x036CFA:  F107    fmov.s FR0,@(R0,R1)
+  0x036CFC:  D14A    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CFE:  E0FC    mov #-4,R0
+  0x036D00:  F816    fmov.s @(R0,R1),FR8
+  0x036D02:  E0F8    mov #-8,R0
+  0x036D04:  F187    fmov.s FR8,@(R0,R1)
+  0x036D06:  7F08    add #8,R15
+  0x036D08:  FEF9    fmov.s @R15+,FR14
+  0x036D0A:  4F26    lds.l @R15+,PR
+  0x036D0C:  6EF6    mov.l @R15+,R14
+  0x036D0E:  6DF6    mov.l @R15+,R13
+  0x036D10:  000B    rts
+  0x036D12:  6CF6    mov.l @R15+,R12
+  0x036D14:  2FD6    mov.l R13,@-R15
+  0x036D16:  2FE6    mov.l R14,@-R15
+  0x036D18:  4F22    sts.l PR,@-R15
+  0x036D1A:  7FF8    add #-8,R15
+  0x036D1C:  D638    mov.l @(0x036E00),R6  ; =0xFFFF726C  (RAM 726C)
+  0x036D1E:  6E60    mov.b @R6,R14
+  0x036D20:  D638    mov.l @(0x036E04),R6  ; =0xFFFF67EC  (RAM 67EC)
+  0x036D22:  6D61    mov.w @R6,R13
+  0x036D24:  D238    mov.l @(0x036E08),R2  ; =0xFFFF72A1  (RAM 72A1)
+  0x036D26:  6620    mov.b @R2,R6
+  0x036D28:  D23A    mov.l @(0x036E14),R2  ; =0x00021D9A  (ROM @0x021D9A)
+  0x036D2A:  420B    jsr @R2  ; -> 0x00021D9A
+  0x036D2C:  0009    nop
+  0x036D2E:  D23A    mov.l @(0x036E18),R2  ; =0x00021DAE  (ROM @0x021DAE)
+  0x036D30:  420B    jsr @R2  ; -> 0x00021DAE
+  0x036D32:  2F00    mov.b R0,@R15
+  0x036D34:  D242    mov.l @(0x036E40),R2  ; =0x00029808  (ROM @0x029808)
+  0x036D36:  420B    jsr @R2  ; -> 0x00029808
+  0x036D38:  0009    nop
+  0x036D3A:  D242    mov.l @(0x036E44),R2  ; =0x00029818  (ROM @0x029818)
+  0x036D3C:  420B    jsr @R2  ; -> 0x00029818
+  0x036D3E:  80F4    mov.b R0,@(244,R15)
+  0x036D40:  66F0    mov.b @R15,R6
+  0x036D42:  2668    tst R6,R6
+  0x036D44:  0429    .word 0x0429
+  0x036D46:  84F4    mov.b @(244,R15),R0
+  0x036D48:  2008    tst R0,R0
+  0x036D4A:  0529    .word 0x0529
+  0x036D4C:  D63E    mov.l @(0x036E48),R6  ; =0xFFFF7C18  (RAM 7C18)
+  0x036D4E:  6060    mov.b @R6,R0
+  0x036D50:  8801    cmp/eq #1,R0
+  0x036D52:  8B0C    bf 0x036D6E
+  0x036D54:  D734    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036D56:  E0FC    mov #-4,R0
+  0x036D58:  F476    fmov.s @(R0,R7),FR4
+  0x036D5A:  D23C    mov.l @(0x036E4C),R2  ; =0x000CC254  (CAL @0x0CC254)
+  0x036D5C:  F828    fmov.s @R2,FR8
+  0x036D5E:  F481    fsub FR8,FR4
+  0x036D60:  D23B    mov.l @(0x036E50),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036D62:  420B    jsr @R2  ; -> 0x000BE960
+  0x036D64:  F58D    fldi0 FR5
+  0x036D66:  D730    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036D68:  E0FC    mov #-4,R0
+  0x036D6A:  A031    bra 0x036DD0
+  0x036D6C:  F707    fmov.s FR0,@(R0,R7)
+  0x036D6E:  60EC    extu.b R14,R0
+  0x036D70:  8801    cmp/eq #1,R0
+  0x036D72:  892D    bt 0x036DD0
+  0x036D74:  D72C    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036D76:  6671    mov.w @R7,R6
+  0x036D78:  D12C    mov.l @(0x036E2C),R1  ; =0x000CBC6A  (CAL @0x0CBC6A)
+  0x036D7A:  6211    mov.w @R1,R2
+  0x036D7C:  3622    cmp/hs R2,R6
+  0x036D7E:  8B27    bf 0x036DD0
+  0x036D80:  E0FC    mov #-4,R0
+  0x036D82:  F876    fmov.s @(R0,R7),FR8
+  0x036D84:  F58D    fldi0 FR5
+  0x036D86:  F855    fcmp/gt FR5,FR8
+  0x036D88:  8B18    bf 0x036DBC
+  0x036D8A:  D632    mov.l @(0x036E54),R6  ; =0x000CBC6C  (CAL @0x0CBC6C)
+  0x036D8C:  6261    mov.w @R6,R2
+  0x036D8E:  612D    extu.w R2,R1
+  0x036D90:  62DD    extu.w R13,R2
+  0x036D92:  3213    cmp/ge R1,R2
+  0x036D94:  8912    bt 0x036DBC
+  0x036D96:  6043    mov R4,R0
+  0x036D98:  8801    cmp/eq #1,R0
+  0x036D9A:  8B0F    bf 0x036DBC
+  0x036D9C:  6053    mov R5,R0
+  0x036D9E:  8801    cmp/eq #1,R0
+  0x036DA0:  8B0C    bf 0x036DBC
+  0x036DA2:  D22D    mov.l @(0x036E58),R2  ; =0x000CC24C  (CAL @0x0CC24C)
+  0x036DA4:  F528    fmov.s @R2,FR5
+  0x036DA6:  E0FC    mov #-4,R0
+  0x036DA8:  F476    fmov.s @(R0,R7),FR4
+  0x036DAA:  D22C    mov.l @(0x036E5C),R2  ; =0x000CC250  (CAL @0x0CC250)
+  0x036DAC:  F828    fmov.s @R2,FR8
+  0x036DAE:  D228    mov.l @(0x036E50),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036DB0:  420B    jsr @R2  ; -> 0x000BE960
+  0x036DB2:  F481    fsub FR8,FR4
+  0x036DB4:  D71C    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036DB6:  E0FC    mov #-4,R0
+  0x036DB8:  A00A    bra 0x036DD0
+  0x036DBA:  F707    fmov.s FR0,@(R0,R7)
+  0x036DBC:  E0FC    mov #-4,R0
+  0x036DBE:  F476    fmov.s @(R0,R7),FR4
+  0x036DC0:  D226    mov.l @(0x036E5C),R2  ; =0x000CC250  (CAL @0x0CC250)
+  0x036DC2:  F828    fmov.s @R2,FR8
+  0x036DC4:  D222    mov.l @(0x036E50),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036DC6:  420B    jsr @R2  ; -> 0x000BE960
+  0x036DC8:  F481    fsub FR8,FR4
+  0x036DCA:  D717    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036DCC:  E0FC    mov #-4,R0
+  0x036DCE:  F707    fmov.s FR0,@(R0,R7)
+  0x036DD0:  7F08    add #8,R15
+  0x036DD2:  4F26    lds.l @R15+,PR
+  0x036DD4:  6EF6    mov.l @R15+,R14
+  0x036DD6:  000B    rts
+  0x036DD8:  6DF6    mov.l @R15+,R13
+  0x036DDA:  0000    .word 0x0000
+  0x036DDC:  FFFF    fpu_0xFFFF
+  0x036DDE:  6350    mov.b @R5,R3
+  0x036DE0:  FFFF    fpu_0xFFFF
+  0x036DE2:  6364    mov.b @R6+,R3
+  0x036DE4:  000C    mov.b @(R0,R0),R0
+  0x036DE6:  C234    mov.l R0,@(208,GBR)
+  0x036DE8:  000C    mov.b @(R0,R0),R0
+  0x036DEA:  C238    mov.l R0,@(224,GBR)
+  0x036DEC:  000C    mov.b @(R0,R0),R0
+  0x036DEE:  C244    mov.l R0,@(272,GBR)
+  0x036DF0:  FFFF    fpu_0xFFFF
+  0x036DF2:  7A18    add #24,R10
+  0x036DF4:  000C    mov.b @(R0,R0),R0
+  0x036DF6:  C23C    mov.l R0,@(240,GBR)
+  0x036DF8:  000C    mov.b @(R0,R0),R0
+  0x036DFA:  C240    mov.l R0,@(256,GBR)
+  0x036DFC:  000C    mov.b @(R0,R0),R0
+  0x036DFE:  C248    mov.l R0,@(288,GBR)
+  0x036E00:  FFFF    fpu_0xFFFF
+  0x036E02:  726C    add #108,R2
+  0x036E04:  FFFF    fpu_0xFFFF
+  0x036E06:  67EC    extu.b R14,R7
+  0x036E08:  FFFF    fpu_0xFFFF
+  0x036E0A:  72A1    add #-95,R2
+  0x036E0C:  0002    stc SR,R0
+  0x036E0E:  2F92    mov.l R9,@R15
+  0x036E10:  FFFF    fpu_0xFFFF
+  0x036E12:  7374    add #116,R3
+  0x036E14:  0002    stc SR,R0
+  0x036E16:  1D9A    mov.l R9,@(40,R13)
+  0x036E18:  0002    stc SR,R0
+  0x036E1A:  1DAE    mov.l R10,@(56,R13)
+  0x036E1C:  000B    rts
+  0x036E1E:  E608    mov #8,R6
+  0x036E20:  3980    cmp/eq R8,R9
+  0x036E22:  0000    .word 0x0000
+  0x036E24:  000B    rts
+  0x036E26:  E554    mov #84,R5
+  0x036E28:  FFFF    fpu_0xFFFF
+  0x036E2A:  7A1C    add #28,R10
+  0x036E2C:  000C    mov.b @(R0,R0),R0
+  0x036E2E:  BC6A    bsr 0x036706
+  0x036E30:  FFFF    fpu_0xFFFF
+  0x036E32:  85D7    mov.w @(430,R13),R0
+  0x036E34:  000C    mov.b @(R0,R0),R0
+  0x036E36:  BC6E    bsr 0x036716
+  0x036E38:  000C    mov.b @(R0,R0),R0
+  0x036E3A:  C258    mov.l R0,@(352,GBR)
+  0x036E3C:  000B    rts
+  0x036E3E:  E970    mov #112,R9
+  0x036E40:  0002    stc SR,R0
+  0x036E42:  9808    mov.w @(0x036E54),R8  ; =0x000C (12)
+  0x036E44:  0002    stc SR,R0
+  0x036E46:  9818    mov.w @(0x036E78),R8  ; =0xD285 (53893)
+  0x036E48:  FFFF    fpu_0xFFFF
+  0x036E4A:  7C18    add #24,R12
+  0x036E4C:  000C    mov.b @(R0,R0),R0
+  0x036E4E:  C254    mov.l R0,@(336,GBR)
+  0x036E50:  000B    rts
+  0x036E52:  E960    mov #96,R9
+  0x036E54:  000C    mov.b @(R0,R0),R0
+  0x036E56:  BC6C    bsr 0x036732
+  0x036E58:  000C    mov.b @(R0,R0),R0
+  0x036E5A:  C24C    mov.l R0,@(304,GBR)
+  0x036E5C:  000C    mov.b @(R0,R0),R0
+  0x036E5E:  C250    mov.l R0,@(320,GBR)
+
+
+==============================================================================
+  FUN_00036E60 - Post-transition handler (dispatch table A)
+  Address range: 0x036E60 - 0x036FA0 (320 bytes)
+  GBR = 0xFFFF7A24
+==============================================================================
+  0x036E60:  4F22    sts.l PR,@-R15
+  0x036E62:  D288    mov.l @(0x037084),R2  ; =0x00022CF4  (ROM @0x022CF4)
+  0x036E64:  420B    jsr @R2  ; -> 0x00022CF4
+  0x036E66:  0009    nop
+  0x036E68:  600C    extu.b R0,R0
+  0x036E6A:  8801    cmp/eq #1,R0
+  0x036E6C:  8B02    bf 0x036E74
+  0x036E6E:  D286    mov.l @(0x037088),R2  ; =0x000CC288  (CAL @0x0CC288)
+  0x036E70:  A002    bra 0x036E78
+  0x036E72:  F828    fmov.s @R2,FR8
+  0x036E74:  D285    mov.l @(0x03708C),R2  ; =0x000CC284  (CAL @0x0CC284)
+  0x036E76:  F828    fmov.s @R2,FR8
+  0x036E78:  D285    mov.l @(0x037090),R2  ; =0xFFFF7A38  (RAM 7A38)
+  0x036E7A:  E0E8    mov #-24,R0
+  0x036E7C:  F287    fmov.s FR8,@(R0,R2)
+  0x036E7E:  F926    fmov.s @(R0,R2),FR9
+  0x036E80:  4F26    lds.l @R15+,PR
+  0x036E82:  000B    rts
+  0x036E84:  F29A    fmov.s FR9,@R2
+  0x036E86:  2FD6    mov.l R13,@-R15
+  0x036E88:  2FE6    mov.l R14,@-R15
+  0x036E8A:  4F22    sts.l PR,@-R15
+  0x036E8C:  FFEB    fmov.s FR14,@-R15
+  0x036E8E:  FFFB    fmov.s FR15,@-R15
+  0x036E90:  4F13    .word 0x4F13
+  0x036E92:  D080    mov.l @(0x037094),R0  ; =0xFFFF7A20  (RAM 7A20)
+  0x036E94:  401E    ldc R0,GBR  ; GBR = 0xFFFF7A20
+  0x036E96:  7FF4    add #-12,R15
+  0x036E98:  D67F    mov.l @(0x037098),R6  ; =0xFFFF67EC  (RAM 67EC)
+  0x036E9A:  6E61    mov.w @R6,R14
+  0x036E9C:  D27F    mov.l @(0x03709C),R2  ; =0xFFFF6350  (RAM 6350)
+  0x036E9E:  F828    fmov.s @R2,FR8
+  0x036EA0:  D17F    mov.l @(0x0370A0),R1  ; =0xFFFF7A3C  (RAM 7A3C)
+  0x036EA2:  E0F0    mov #-16,R0
+  0x036EA4:  F187    fmov.s FR8,@(R0,R1)
+  0x036EA6:  D27F    mov.l @(0x0370A4),R2  ; =0xFFFF62F8  (RAM 62F8)
+  0x036EA8:  F828    fmov.s @R2,FR8
+  0x036EAA:  E0F4    mov #-12,R0
+  0x036EAC:  F187    fmov.s FR8,@(R0,R1)
+  0x036EAE:  D27E    mov.l @(0x0370A8),R2  ; =0xFFFF6624  (RAM 6624)
+  0x036EB0:  F828    fmov.s @R2,FR8
+  0x036EB2:  E0F8    mov #-8,R0
+  0x036EB4:  D27D    mov.l @(0x0370AC),R2  ; =0x000297B0  (ROM @0x0297B0)
+  0x036EB6:  420B    jsr @R2  ; -> 0x000297B0
+  0x036EB8:  F187    fmov.s FR8,@(R0,R1)
+  0x036EBA:  D27D    mov.l @(0x0370B0),R2  ; =0x00029AA0  (ROM @0x029AA0)
+  0x036EBC:  420B    jsr @R2  ; -> 0x00029AA0
+  0x036EBE:  2F00    mov.b R0,@R15
+  0x036EC0:  80F4    mov.b R0,@(244,R15)
+  0x036EC2:  C408    mov.b @(8,GBR),R0  ; <- RAM 0xFFFF7A28
+  0x036EC4:  D26F    mov.l @(0x037084),R2  ; =0x00022CF4  (ROM @0x022CF4)
+  0x036EC6:  420B    jsr @R2  ; -> 0x00022CF4
+  0x036EC8:  6D03    mov R0,R13
+  0x036ECA:  600C    extu.b R0,R0
+  0x036ECC:  8801    cmp/eq #1,R0
+  0x036ECE:  8B04    bf 0x036EDA
+  0x036ED0:  D26D    mov.l @(0x037088),R2  ; =0x000CC288  (CAL @0x0CC288)
+  0x036ED2:  FE28    fmov.s @R2,FR14
+  0x036ED4:  D277    mov.l @(0x0370B4),R2  ; =0x000CC290  (CAL @0x0CC290)
+  0x036ED6:  A004    bra 0x036EE2
+  0x036ED8:  FF28    fmov.s @R2,FR15
+  0x036EDA:  D26C    mov.l @(0x03708C),R2  ; =0x000CC284  (CAL @0x0CC284)
+  0x036EDC:  FE28    fmov.s @R2,FR14
+  0x036EDE:  D276    mov.l @(0x0370B8),R2  ; =0x000CC28C  (CAL @0x0CC28C)
+  0x036EE0:  FF28    fmov.s @R2,FR15
+  0x036EE2:  B092    bsr 0x03700A
+  0x036EE4:  0009    nop
+  0x036EE6:  D675    mov.l @(0x0370BC),R6  ; =0x000CBC70  (CAL @0x0CBC70)
+  0x036EE8:  6261    mov.w @R6,R2
+  0x036EEA:  662D    extu.w R2,R6
+  0x036EEC:  62ED    extu.w R14,R2
+  0x036EEE:  3263    cmp/ge R6,R2
+  0x036EF0:  8B33    bf 0x036F5A
+  0x036EF2:  C41D    mov.b @(29,GBR),R0  ; <- RAM 0xFFFF7A3D
+  0x036EF4:  8801    cmp/eq #1,R0
+  0x036EF6:  8902    bt 0x036EFE
+  0x036EF8:  60F0    mov.b @R15,R0
+  0x036EFA:  8802    cmp/eq #2,R0
+  0x036EFC:  8B2D    bf 0x036F5A
+  0x036EFE:  C41C    mov.b @(28,GBR),R0  ; <- RAM 0xFFFF7A3C
+  0x036F00:  8801    cmp/eq #1,R0
+  0x036F02:  8902    bt 0x036F0A
+  0x036F04:  84F4    mov.b @(244,R15),R0
+  0x036F06:  8802    cmp/eq #2,R0
+  0x036F08:  8B27    bf 0x036F5A
+  0x036F0A:  C41E    mov.b @(30,GBR),R0  ; <- RAM 0xFFFF7A3E
+  0x036F0C:  1F02    mov.l R0,@(8,R15)
+  0x036F0E:  600C    extu.b R0,R0
+  0x036F10:  8801    cmp/eq #1,R0
+  0x036F12:  8B22    bf 0x036F5A
+  0x036F14:  60DC    extu.b R13,R0
+  0x036F16:  8801    cmp/eq #1,R0
+  0x036F18:  8B1F    bf 0x036F5A
+  0x036F1A:  D161    mov.l @(0x0370A0),R1  ; =0xFFFF7A3C  (RAM 7A3C)
+  0x036F1C:  E0F0    mov #-16,R0
+  0x036F1E:  F916    fmov.s @(R0,R1),FR9
+  0x036F20:  D267    mov.l @(0x0370C0),R2  ; =0x000CC278  (CAL @0x0CC278)
+  0x036F22:  F828    fmov.s @R2,FR8
+  0x036F24:  F895    fcmp/gt FR9,FR8
+  0x036F26:  8907    bt 0x036F38
+  0x036F28:  E0F8    mov #-8,R0
+  0x036F2A:  F916    fmov.s @(R0,R1),FR9
+  0x036F2C:  D265    mov.l @(0x0370C4),R2  ; =0x000CC27C  (CAL @0x0CC27C)
+  0x036F2E:  F828    fmov.s @R2,FR8
+  0x036F30:  F895    fcmp/gt FR9,FR8
+  0x036F32:  8B01    bf 0x036F38
+  0x036F34:  E0FC    mov #-4,R0
+  0x036F36:  F1F7    fmov.s FR15,@(R0,R1)
+  0x036F38:  E0F0    mov #-16,R0
+  0x036F3A:  F916    fmov.s @(R0,R1),FR9
+  0x036F3C:  D262    mov.l @(0x0370C8),R2  ; =0x000CC274  (CAL @0x0CC274)
+  0x036F3E:  F828    fmov.s @R2,FR8
+  0x036F40:  F895    fcmp/gt FR9,FR8
+  0x036F42:  8905    bt 0x036F50
+  0x036F44:  E0F8    mov #-8,R0
+  0x036F46:  F916    fmov.s @(R0,R1),FR9
+  0x036F48:  D260    mov.l @(0x0370CC),R2  ; =0x000CC280  (CAL @0x0CC280)
+  0x036F4A:  F828    fmov.s @R2,FR8
+  0x036F4C:  F895    fcmp/gt FR9,FR8
+  0x036F4E:  8901    bt 0x036F54
+  0x036F50:  E0FC    mov #-4,R0
+  0x036F52:  F1E7    fmov.s FR14,@(R0,R1)
+  0x036F54:  E0FC    mov #-4,R0
+  0x036F56:  A004    bra 0x036F62
+  0x036F58:  F816    fmov.s @(R0,R1),FR8
+  0x036F5A:  D151    mov.l @(0x0370A0),R1  ; =0xFFFF7A3C  (RAM 7A3C)
+  0x036F5C:  E0FC    mov #-4,R0
+  0x036F5E:  F1E7    fmov.s FR14,@(R0,R1)
+  0x036F60:  F88D    fldi0 FR8
+  0x036F62:  E0E4    mov #-28,R0
+  0x036F64:  F187    fmov.s FR8,@(R0,R1)
+  0x036F66:  7F0C    add #12,R15
+  0x036F68:  4F17    .word 0x4F17
+  0x036F6A:  FFF9    fmov.s @R15+,FR15
+  0x036F6C:  FEF9    fmov.s @R15+,FR14
+  0x036F6E:  4F26    lds.l @R15+,PR
+  0x036F70:  6EF6    mov.l @R15+,R14
+  0x036F72:  000B    rts
+  0x036F74:  6DF6    mov.l @R15+,R13
+  0x036F76:  4F22    sts.l PR,@-R15
+  0x036F78:  4F13    .word 0x4F13
+  0x036F7A:  D055    mov.l @(0x0370D0),R0  ; =0xFFFF7A24  (RAM 7A24)
+  0x036F7C:  401E    ldc R0,GBR  ; GBR = 0xFFFF7A24
+  0x036F7E:  7FF8    add #-8,R15
+  0x036F80:  D240    mov.l @(0x037084),R2  ; =0x00022CF4  (ROM @0x022CF4)
+  0x036F82:  420B    jsr @R2  ; -> 0x00022CF4
+  0x036F84:  0009    nop
+  0x036F86:  600C    extu.b R0,R0
+  0x036F88:  D647    mov.l @(0x0370A8),R6  ; =0xFFFF6624  (RAM 6624)
+  0x036F8A:  F568    fmov.s @R6,FR5
+  0x036F8C:  D651    mov.l @(0x0370D4),R6  ; =0xFFFF65FC  (RAM 65FC)
+  0x036F8E:  8801    cmp/eq #1,R0
+  0x036F90:  D451    mov.l @(0x0370D8),R4  ; =0x000AD9EC  (ROM @0x0AD9EC)
+  0x036F92:  8F01    bf/s 0x036F98
+  0x036F94:  F468    fmov.s @R6,FR4
+  0x036F96:  D451    mov.l @(0x0370DC),R4  ; =0x000ADA08  (ROM @0x0ADA08)
+  0x036F98:  D251    mov.l @(0x0370E0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036F9A:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036F9C:  0009    nop
+  0x036F9E:  D24C    mov.l @(0x0370D0),R2  ; =0xFFFF7A24  (RAM 7A24)
+
+
+################################################################################
+# EXTENDED DISASSEMBLY: FUN_0003580C - Full transition core
+# This is the main CL/OL transition function called from dispatch table B
+# Tracing from 0x3580C to function end (rts)
+################################################################################
+
+==============================================================================
+  FUN_0003580C - CL/OL transition CORE (FULL) - ends at 0x0359A4
+  Address range: 0x03580C - 0x0359A4 (408 bytes)
+==============================================================================
+  0x03580C:  2FE6    mov.l R14,@-R15
+  0x03580E:  4F22    sts.l PR,@-R15
+  0x035810:  4F13    .word 0x4F13
+  0x035812:  D076    mov.l @(0x0359EC),R0  ; =0xFFFF7954  (RAM 7954)
+  0x035814:  401E    ldc R0,GBR  ; GBR = 0xFFFF7954
+  0x035816:  C432    mov.b @(50,GBR),R0  ; <- RAM 0xFFFF7986
+  0x035818:  D575    mov.l @(0x0359F0),R5  ; =0x000CBBEF  (CAL @0x0CBBEF)
+  0x03581A:  6250    mov.b @R5,R2
+  0x03581C:  3022    cmp/hs R2,R0
+  0x03581E:  8B35    bf 0x03588C
+  0x035820:  D274    mov.l @(0x0359F4),R2  ; =0xFFFF63CC  (RAM 63CC)
+  0x035822:  F828    fmov.s @R2,FR8
+  0x035824:  DE74    mov.l @(0x0359F8),R14  ; =0xFFFF7988  (RAM 7988)
+  0x035826:  E0D0    mov #-48,R0
+  0x035828:  FE87    fmov.s FR8,@(R0,R14)
+  0x03582A:  D274    mov.l @(0x0359FC),R2  ; =0xFFFF6350  (RAM 6350)
+  0x03582C:  F828    fmov.s @R2,FR8
+  0x03582E:  E0CC    mov #-52,R0
+  0x035830:  FE87    fmov.s FR8,@(R0,R14)
+  0x035832:  D273    mov.l @(0x035A00),R2  ; =0xFFFF69F0  (RAM 69F0)
+  0x035834:  F828    fmov.s @R2,FR8
+  0x035836:  E0D4    mov #-44,R0
+  0x035838:  FE87    fmov.s FR8,@(R0,R14)
+  0x03583A:  D272    mov.l @(0x035A04),R2  ; =0xFFFF63FC  (RAM 63FC)
+  0x03583C:  F428    fmov.s @R2,FR4
+  0x03583E:  D272    mov.l @(0x035A08),R2  ; =0x000BEAB0  (ROM @0x0BEAB0)
+  0x035840:  420B    jsr @R2  ; -> 0x000BEAB0
+  0x035842:  F58D    fldi0 FR5
+  0x035844:  E0D8    mov #-40,R0
+  0x035846:  FE07    fmov.s FR0,@(R0,R14)
+  0x035848:  D670    mov.l @(0x035A0C),R6  ; =0xFFFF6A22  (RAM 6A22)
+  0x03584A:  6061    mov.w @R6,R0
+  0x03584C:  C118    mov.w R0,@(48,GBR)  ; -> RAM 0xFFFF7984
+  0x03584E:  D670    mov.l @(0x035A10),R6  ; =0xFFFF6254  (RAM 6254)
+  0x035850:  6060    mov.b @R6,R0
+  0x035852:  C036    mov.b R0,@(54,GBR)  ; -> RAM 0xFFFF798A
+  0x035854:  D26F    mov.l @(0x035A14),R2  ; =0xFFFF6624  (RAM 6624)
+  0x035856:  F828    fmov.s @R2,FR8
+  0x035858:  E0DC    mov #-36,R0
+  0x03585A:  FE87    fmov.s FR8,@(R0,R14)
+  0x03585C:  D26E    mov.l @(0x035A18),R2  ; =0xFFFF65FC  (RAM 65FC)
+  0x03585E:  F828    fmov.s @R2,FR8
+  0x035860:  E0E0    mov #-32,R0
+  0x035862:  FE87    fmov.s FR8,@(R0,R14)
+  0x035864:  D26D    mov.l @(0x035A1C),R2  ; =0xFFFF63F8  (RAM 63F8)
+  0x035866:  F828    fmov.s @R2,FR8
+  0x035868:  E0E4    mov #-28,R0
+  0x03586A:  FE87    fmov.s FR8,@(R0,R14)
+  0x03586C:  D66C    mov.l @(0x035A20),R6  ; =0xFFFF8F24  (RAM 8F24)
+  0x03586E:  6060    mov.b @R6,R0
+  0x035870:  C037    mov.b R0,@(55,GBR)  ; -> RAM 0xFFFF798B
+  0x035872:  D26C    mov.l @(0x035A24),R2  ; =0xFFFF63C4  (RAM 63C4)
+  0x035874:  F828    fmov.s @R2,FR8
+  0x035876:  E0E8    mov #-24,R0
+  0x035878:  B012    bsr 0x0358A0
+  0x03587A:  FE87    fmov.s FR8,@(R0,R14)
+  0x03587C:  B092    bsr 0x0359A4
+  0x03587E:  0009    nop
+  0x035880:  B2B0    bsr 0x035DE4
+  0x035882:  0009    nop
+  0x035884:  B2D2    bsr 0x035E2C
+  0x035886:  0009    nop
+  0x035888:  E000    mov #0,R0
+  0x03588A:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF7986
+  0x03588C:  D266    mov.l @(0x035A28),R2  ; =0x000BE53C  (ROM @0x0BE53C)
+  0x03588E:  C432    mov.b @(50,GBR),R0  ; <- RAM 0xFFFF7986
+  0x035890:  640C    extu.b R0,R4
+  0x035892:  420B    jsr @R2  ; -> 0x000BE53C
+  0x035894:  E501    mov #1,R5
+  0x035896:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF7986
+  0x035898:  4F17    .word 0x4F17
+  0x03589A:  4F26    lds.l @R15+,PR
+  0x03589C:  A2E2    bra 0x035E64
+  0x03589E:  6EF6    mov.l @R15+,R14
+  0x0358A0:  D462    mov.l @(0x035A2C),R4  ; =0x00063B00  (ROM @0x063B00)
+  0x0358A2:  E500    mov #0,R5
+  0x0358A4:  2FD6    mov.l R13,@-R15
+  0x0358A6:  2FE6    mov.l R14,@-R15
+  0x0358A8:  4F22    sts.l PR,@-R15
+  0x0358AA:  FFEB    fmov.s FR14,@-R15
+  0x0358AC:  655C    extu.b R5,R5
+  0x0358AE:  2558    tst R5,R5
+  0x0358B0:  8F0E    bf/s 0x0358D0
+  0x0358B2:  6D43    mov R4,R13
+  0x0358B4:  D65E    mov.l @(0x035A30),R6  ; =0xFFFF7910  (RAM 7910)
+  0x0358B6:  D25F    mov.l @(0x035A34),R2  ; =0x000297F4  (ROM @0x0297F4)
+  0x0358B8:  420B    jsr @R2  ; -> 0x000297F4
+  0x0358BA:  6E61    mov.w @R6,R14
+  0x0358BC:  620C    extu.b R0,R2
+  0x0358BE:  D65E    mov.l @(0x035A38),R6  ; =0xFFFF7912  (RAM 7912)
+  0x0358C0:  6660    mov.b @R6,R6
+  0x0358C2:  D45E    mov.l @(0x035A3C),R4  ; =0xFFFF782B  (RAM 782B)
+  0x0358C4:  6440    mov.b @R4,R4
+  0x0358C6:  D55E    mov.l @(0x035A40),R5  ; =0xFFFF7D68  (RAM 7D68)
+  0x0358C8:  FE58    fmov.s @R5,FR14
+  0x0358CA:  D15E    mov.l @(0x035A44),R1  ; =0xFFFF984D  (RAM 984D)
+  0x0358CC:  A008    bra 0x0358E0
+  0x0358CE:  6110    mov.b @R1,R1
+  0x0358D0:  D25D    mov.l @(0x035A48),R2  ; =0x00029804  (ROM @0x029804)
+  0x0358D2:  420B    jsr @R2  ; -> 0x00029804
+  0x0358D4:  EE00    mov #0,R14
+  0x0358D6:  620C    extu.b R0,R2
+  0x0358D8:  66E3    mov R14,R6
+  0x0358DA:  64E3    mov R14,R4
+  0x0358DC:  FE8D    fldi0 FR14
+  0x0358DE:  61E3    mov R14,R1
+  0x0358E0:  606C    extu.b R6,R0
+  0x0358E2:  8801    cmp/eq #1,R0
+  0x0358E4:  8B56    bf 0x035994
+  0x0358E6:  D559    mov.l @(0x035A4C),R5  ; =0x000CBC48  (CAL @0x0CBC48)
+  0x0358E8:  6651    mov.w @R5,R6
+  0x0358EA:  676D    extu.w R6,R7
+  0x0358EC:  66ED    extu.w R14,R6
+  0x0358EE:  3673    cmp/ge R7,R6
+  0x0358F0:  8B50    bf 0x035994
+  0x0358F2:  D657    mov.l @(0x035A50),R6  ; =0x000CC110  (CAL @0x0CC110)
+  0x0358F4:  F968    fmov.s @R6,FR9
+  0x0358F6:  D557    mov.l @(0x035A54),R5  ; =0xFFFF7984  (RAM 7984)
+  0x0358F8:  E0D4    mov #-44,R0
+  0x0358FA:  F856    fmov.s @(R0,R5),FR8
+  0x0358FC:  F985    fcmp/gt FR8,FR9
+  0x0358FE:  8B49    bf 0x035994
+  0x035900:  E0D4    mov #-44,R0
+  0x035902:  F956    fmov.s @(R0,R5),FR9
+  0x035904:  D654    mov.l @(0x035A58),R6  ; =0x000CC114  (CAL @0x0CC114)
+  0x035906:  F868    fmov.s @R6,FR8
+  0x035908:  F895    fcmp/gt FR9,FR8
+  0x03590A:  8943    bt 0x035994
+  0x03590C:  D653    mov.l @(0x035A5C),R6  ; =0x000CC118  (CAL @0x0CC118)
+  0x03590E:  F968    fmov.s @R6,FR9
+  0x035910:  E0D0    mov #-48,R0
+  0x035912:  F856    fmov.s @(R0,R5),FR8
+  0x035914:  F985    fcmp/gt FR8,FR9
+  0x035916:  893D    bt 0x035994
+  0x035918:  2228    tst R2,R2
+  0x03591A:  8B3B    bf 0x035994
+  0x03591C:  644C    extu.b R4,R4
+  0x03591E:  2448    tst R4,R4
+  0x035920:  8B38    bf 0x035994
+  0x035922:  611C    extu.b R1,R1
+  0x035924:  2118    tst R1,R1
+  0x035926:  8B35    bf 0x035994
+  0x035928:  D24D    mov.l @(0x035A60),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x03592A:  F58D    fldi0 FR5
+  0x03592C:  C74D    mova @(0x035A64),R0
+  0x03592E:  F608    fmov.s @R0,FR6
+  0x035930:  E0D8    mov #-40,R0
+  0x035932:  420B    jsr @R2  ; -> 0x000BE608
+  0x035934:  F456    fmov.s @(R0,R5),FR4
+  0x035936:  620C    extu.b R0,R2
+  0x035938:  2228    tst R2,R2
+  0x03593A:  8909    bt 0x035950
+  0x03593C:  D24A    mov.l @(0x035A68),R2  ; =0x000CC11C  (CAL @0x0CC11C)
+  0x03593E:  F828    fmov.s @R2,FR8
+  0x035940:  F8E5    fcmp/gt FR14,FR8
+  0x035942:  8B27    bf 0x035994
+  0x035944:  D543    mov.l @(0x035A54),R5  ; =0xFFFF7984  (RAM 7984)
+  0x035946:  6651    mov.w @R5,R6
+  0x035948:  D448    mov.l @(0x035A6C),R4  ; =0x000CBC4A  (CAL @0x0CBC4A)
+  0x03594A:  6241    mov.w @R4,R2
+  0x03594C:  3622    cmp/hs R2,R6
+  0x03594E:  8B21    bf 0x035994
+  0x035950:  D247    mov.l @(0x035A70),R2  ; =0x000CC120  (CAL @0x0CC120)
+  0x035952:  F928    fmov.s @R2,FR9
+  0x035954:  D53F    mov.l @(0x035A54),R5  ; =0xFFFF7984  (RAM 7984)
+  0x035956:  E0DC    mov #-36,R0
+  0x035958:  F856    fmov.s @(R0,R5),FR8
+  0x03595A:  F985    fcmp/gt FR8,FR9
+  0x03595C:  8B1A    bf 0x035994
+  0x03595E:  D245    mov.l @(0x035A74),R2  ; =0x000CC124  (CAL @0x0CC124)
+  0x035960:  F928    fmov.s @R2,FR9
+  0x035962:  E0E0    mov #-32,R0
+  0x035964:  F856    fmov.s @(R0,R5),FR8
+  0x035966:  F985    fcmp/gt FR8,FR9
+  0x035968:  8914    bt 0x035994
+  0x03596A:  F956    fmov.s @(R0,R5),FR9
+  0x03596C:  D242    mov.l @(0x035A78),R2  ; =0x000CC128  (CAL @0x0CC128)
+  0x03596E:  F828    fmov.s @R2,FR8
+  0x035970:  F895    fcmp/gt FR9,FR8
+  0x035972:  8B0F    bf 0x035994
+  0x035974:  8457    mov.b @(87,R5),R0
+  0x035976:  2008    tst R0,R0
+  0x035978:  8B0C    bf 0x035994
+  0x03597A:  D240    mov.l @(0x035A7C),R2  ; =0x000CC12C  (CAL @0x0CC12C)
+  0x03597C:  F928    fmov.s @R2,FR9
+  0x03597E:  E0E4    mov #-28,R0
+  0x035980:  F856    fmov.s @(R0,R5),FR8
+  0x035982:  F985    fcmp/gt FR8,FR9
+  0x035984:  8B06    bf 0x035994
+  0x035986:  D63E    mov.l @(0x035A80),R6  ; =0xFFFF7952  (RAM 7952)
+  0x035988:  6260    mov.b @R6,R2
+  0x03598A:  2228    tst R2,R2
+  0x03598C:  8B02    bf 0x035994
+  0x03598E:  52D5    mov.l @(20,R13),R2
+  0x035990:  A002    bra 0x035998
+  0x035992:  E601    mov #1,R6
+  0x035994:  52D5    mov.l @(20,R13),R2
+  0x035996:  E600    mov #0,R6
+  0x035998:  2260    mov.b R6,@R2
+  0x03599A:  FEF9    fmov.s @R15+,FR14
+  0x03599C:  4F26    lds.l @R15+,PR
+  0x03599E:  6EF6    mov.l @R15+,R14
+  0x0359A0:  000B    rts
+  0x0359A2:  6DF6    mov.l @R15+,R13
+
+
+  --- Literal Pool: after FUN_0003580C (0x0359A4-0x0359A8) ---
+  0x0359A4:  D421E500    .long =0xD421E500
+
+
+################################################################################
+# LITERAL POOLS for FUN_0003643A (condition checker, already disassembled)
+# GBR = 0xFFFF79A4 for this function
+################################################################################
+
+  --- Literal Pool: Pool A (per-gear RPM limit check) (0x036534-0x0365E0) ---
+  0x036534:  FFFF79C0    .long =0xFFFF79C0  (RAM 79C0)
+  0x036538:  FFFF63C4    .long =0xFFFF63C4  (RAM 63C4)
+  0x03653C:  000BE8AC    .long =0x000BE8AC  (ROM @0x0BE8AC)
+  0x036540:  FFFF7C68    .long =0xFFFF7C68  (RAM 7C68)
+  0x036544:  000AD0D0    .long =0x000AD0D0  (ROM @0x0AD0D0)
+  0x036548:  000AD0B8    .long =0x000AD0B8  (ROM @0x0AD0B8)
+  0x03654C:  000BE554    .long =0x000BE554  (ROM @0x0BE554)
+  0x036550:  000AD0C4    .long =0x000AD0C4  (ROM @0x0AD0C4)
+  0x036554:  FFFF79A4    .long =0xFFFF79A4  (RAM 79A4)
+  0x036558:  FFFF6624    .long =0xFFFF6624  (RAM 6624)
+  0x03655C:  FFFF62DC    .long =0xFFFF62DC  (RAM 62DC)
+  0x036560:  FFFF6350    .long =0xFFFF6350  (RAM 6350)
+  0x036564:  FFFF65FC    .long =0xFFFF65FC  (RAM 65FC)
+  0x036568:  FFFF6898    .long =0xFFFF6898  (RAM 6898)
+  0x03656C:  FFFF63F8    .long =0xFFFF63F8  (RAM 63F8)
+  0x036570:  00022CF4    .long =0x00022CF4  (ROM @0x022CF4)
+  0x036574:  FFFF5E94    .long =0xFFFF5E94  (RAM 5E94)
+  0x036578:  FFFF6810    .long =0xFFFF6810  (RAM 6810)
+  0x03657C:  FFFF5E92    .long =0xFFFF5E92  (RAM 5E92)
+  0x036580:  FFFF5E93    .long =0xFFFF5E93  (RAM 5E93)
+  0x036584:  FFFF5DB5    .long =0xFFFF5DB5  (RAM 5DB5)
+  0x036588:  000CC180    .long =0x000CC180  (CAL @0x0CC180)
+  0x03658C:  000CC184    .long =0x000CC184  (CAL @0x0CC184)
+  0x036590:  000CC188    .long =0x000CC188  (CAL @0x0CC188)
+  0x036594:  000CC18C    .long =0x000CC18C  (CAL @0x0CC18C)
+  0x036598:  000CC190    .long =0x000CC190  (CAL @0x0CC190)
+  0x03659C:  000CC194    .long =0x000CC194  (CAL @0x0CC194)
+  0x0365A0:  000CC198    .long =0x000CC198  (CAL @0x0CC198)
+  0x0365A4:  000CC19C    .long =0x000CC19C  (CAL @0x0CC19C)
+  0x0365A8:  000CC1A0    .long =0x000CC1A0  (CAL @0x0CC1A0)
+  0x0365AC:  000CC1A4    .long =0x000CC1A4  (CAL @0x0CC1A4)
+  0x0365B0:  000CC1B0    .long =0x000CC1B0  (CAL @0x0CC1B0)
+  0x0365B4:  000CC1B4    .long =0x000CC1B4  (CAL @0x0CC1B4)
+  0x0365B8:  000CC1B8    .long =0x000CC1B8  (CAL @0x0CC1B8)
+  0x0365BC:  000CC1BC    .long =0x000CC1BC  (CAL @0x0CC1BC)
+  0x0365C0:  000CC1C0    .long =0x000CC1C0  (CAL @0x0CC1C0)
+  0x0365C4:  000CC1C4    .long =0x000CC1C4  (CAL @0x0CC1C4)
+  0x0365C8:  000CC1C8    .long =0x000CC1C8  (CAL @0x0CC1C8)
+  0x0365CC:  000CC1CC    .long =0x000CC1CC  (CAL @0x0CC1CC)
+  0x0365D0:  000CC1D0    .long =0x000CC1D0  (CAL @0x0CC1D0)
+  0x0365D4:  000CC1D4    .long =0x000CC1D4  (CAL @0x0CC1D4)
+  0x0365D8:  D277F928    .long =0xD277F928
+  0x0365DC:  D277F628    .long =0xD277F628
+
+
+  --- Literal Pool: Pool B (multi-condition CL delay clear) (0x0367B8-0x036830) ---
+  0x0367B8:  000CC1A8    .long =0x000CC1A8  (CAL @0x0CC1A8)
+  0x0367BC:  000CC1AC    .long =0x000CC1AC  (CAL @0x0CC1AC)
+  0x0367C0:  000CC1E8    .long =0x000CC1E8  (CAL @0x0CC1E8)
+  0x0367C4:  000CC1E4    .long =0x000CC1E4  (CAL @0x0CC1E4)
+  0x0367C8:  000CC1F0    .long =0x000CC1F0  (CAL @0x0CC1F0)
+  0x0367CC:  000CC1EC    .long =0x000CC1EC  (CAL @0x0CC1EC)
+  0x0367D0:  000CC1F8    .long =0x000CC1F8  (CAL @0x0CC1F8)
+  0x0367D4:  000CC1F4    .long =0x000CC1F4  (CAL @0x0CC1F4)
+  0x0367D8:  000CC1E0    .long =0x000CC1E0  (CAL @0x0CC1E0)
+  0x0367DC:  000CC1DC    .long =0x000CC1DC  (CAL @0x0CC1DC)
+  0x0367E0:  000CC208    .long =0x000CC208  (CAL @0x0CC208)
+  0x0367E4:  000CC204    .long =0x000CC204  (CAL @0x0CC204)
+  0x0367E8:  000CC20C    .long =0x000CC20C  (CAL @0x0CC20C)
+  0x0367EC:  000CC210    .long =0x000CC210  (CAL @0x0CC210)
+  0x0367F0:  000CC214    .long =0x000CC214  (CAL @0x0CC214)
+  0x0367F4:  FFFF7A04    .long =0xFFFF7A04  (RAM 7A04)
+  0x0367F8:  000CC218    .long =0x000CC218  (CAL @0x0CC218)
+  0x0367FC:  000CC220    .long =0x000CC220  (CAL @0x0CC220)
+  0x036800:  000CC21C    .long =0x000CC21C  (CAL @0x0CC21C)
+  0x036804:  000BE554    .long =0x000BE554  (ROM @0x0BE554)
+  0x036808:  000CC1D8    .long =0x000CC1D8  (CAL @0x0CC1D8)
+  0x03680C:  000CC17C    .long =0x000CC17C  (CAL @0x0CC17C)
+  0x036810:  000CBC5A    .long =0x000CBC5A  (CAL @0x0CBC5A)
+  0x036814:  000CBC64    .long =0x000CBC64  (CAL @0x0CBC64)
+  0x036818:  000CBC5C    .long =0x000CBC5C  (CAL @0x0CBC5C)
+  0x03681C:  000CBC62    .long =0x000CBC62  (CAL @0x0CBC62)
+  0x036820:  000CBC60    .long =0x000CBC60  (CAL @0x0CBC60)
+  0x036824:  D67AA001    .long =0xD67AA001
+  0x036828:  6061E000    .long =0x6061E000
+  0x03682C:  C110E000    .long =0xC110E000  (float: -9.054688)
+
+
+  --- Literal Pool: Pool C (hysteresis and OL entry) (0x036A0C-0x036A98) ---
+  0x036A0C:  000B6EF6    .long =0x000B6EF6  (ROM @0x0B6EF6)
+  0x036A10:  000CBC5E    .long =0x000CBC5E  (CAL @0x0CBC5E)
+  0x036A14:  FFFF798C    .long =0xFFFF798C  (RAM 798C)
+  0x036A18:  FFFF6624    .long =0xFFFF6624  (RAM 6624)
+  0x036A1C:  FFFF63F8    .long =0xFFFF63F8  (RAM 63F8)
+  0x036A20:  FFFF79F8    .long =0xFFFF79F8  (RAM 79F8)
+  0x036A24:  FFFF7F48    .long =0xFFFF7F48  (RAM 7F48)
+  0x036A28:  FFFF8258    .long =0xFFFF8258  (RAM 8258)
+  0x036A2C:  FFFF7E90    .long =0xFFFF7E90  (RAM 7E90)
+  0x036A30:  000BE608    .long =0x000BE608  (ROM @0x0BE608)
+  0x036A34:  38000000    .long =0x38000000
+  0x036A38:  000AD960    .long =0x000AD960  (ROM @0x0AD960)
+  0x036A3C:  000BE8E4    .long =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036A40:  000AC5F8    .long =0x000AC5F8  (ROM @0x0AC5F8)
+  0x036A44:  000AD97C    .long =0x000AD97C  (ROM @0x0AD97C)
+  0x036A48:  000AC60C    .long =0x000AC60C  (ROM @0x0AC60C)
+  0x036A4C:  000BE830    .long =0x000BE830  (ROM @0x0BE830)
+  0x036A50:  000CC224    .long =0x000CC224  (CAL @0x0CC224)
+  0x036A54:  000AD998    .long =0x000AD998  (ROM @0x0AD998)
+  0x036A58:  000BEAB0    .long =0x000BEAB0  (ROM @0x0BEAB0)
+  0x036A5C:  000AD9B4    .long =0x000AD9B4  (ROM @0x0AD9B4)
+  0x036A60:  000BEA40    .long =0x000BEA40  (ROM @0x0BEA40)
+  0x036A64:  3CBB8000    .long =0x3CBB8000  (float: 0.022888)
+  0x036A68:  000AD9D0    .long =0x000AD9D0  (ROM @0x0AD9D0)
+  0x036A6C:  FFFF6350    .long =0xFFFF6350  (RAM 6350)
+  0x036A70:  000AD0DC    .long =0x000AD0DC  (ROM @0x0AD0DC)
+  0x036A74:  FFFF79A0    .long =0xFFFF79A0  (RAM 79A0)
+  0x036A78:  FFFF79CC    .long =0xFFFF79CC  (RAM 79CC)
+  0x036A7C:  FFFF62DC    .long =0xFFFF62DC  (RAM 62DC)
+  0x036A80:  FFFF7348    .long =0xFFFF7348  (RAM 7348)
+  0x036A84:  000AC5BC    .long =0x000AC5BC  (ROM @0x0AC5BC)
+  0x036A88:  FFFF79FC    .long =0xFFFF79FC  (RAM 79FC)
+  0x036A8C:  000AD0A4    .long =0x000AD0A4  (ROM @0x0AD0A4)
+  0x036A90:  000CC178    .long =0x000CC178  (CAL @0x0CC178)
+  0x036A94:  000CC174    .long =0x000CC174  (CAL @0x0CC174)
+
+
+################################################################################
+# EXTENDED: Full flow from FUN_0003606C through end of condition checking
+# This is the main CL/OL evaluation path
+################################################################################
+
+==============================================================================
+  FUN_0003606C extended - Full delay manager / condition evaluator
+  Address range: 0x03606C - 0x036278 (524 bytes)
+  GBR = 0xFFFF798C
+==============================================================================
+  0x03606C:  2FC6    mov.l R12,@-R15
+  0x03606E:  2FE6    mov.l R14,@-R15
+  0x036070:  4F22    sts.l PR,@-R15
+  0x036072:  FFCB    fmov.s FR12,@-R15
+  0x036074:  FFDB    fmov.s FR13,@-R15
+  0x036076:  FFEB    fmov.s FR14,@-R15
+  0x036078:  FFFB    fmov.s FR15,@-R15
+  0x03607A:  4F13    .word 0x4F13
+  0x03607C:  D082    mov.l @(0x036288),R0  ; =0xFFFF798C  (RAM 798C)
+  0x03607E:  401E    ldc R0,GBR  ; GBR = 0xFFFF798C
+  0x036080:  7FD4    add #-44,R15
+  0x036082:  D282    mov.l @(0x03628C),R2  ; =0xFFFF6624  (RAM 6624)
+  0x036084:  F828    fmov.s @R2,FR8
+  0x036086:  FF8A    fmov.s FR8,@R15
+  0x036088:  D281    mov.l @(0x036290),R2  ; =0xFFFF63F8  (RAM 63F8)
+  0x03608A:  F728    fmov.s @R2,FR7
+  0x03608C:  E004    mov #4,R0
+  0x03608E:  FF77    fmov.s FR7,@(R0,R15)
+  0x036090:  D280    mov.l @(0x036294),R2  ; =0xFFFF3234  (RAM 3234)
+  0x036092:  FD28    fmov.s @R2,FR13
+  0x036094:  D280    mov.l @(0x036298),R2  ; =0xFFFF62DC  (RAM 62DC)
+  0x036096:  F428    fmov.s @R2,FR4
+  0x036098:  D280    mov.l @(0x03629C),R2  ; =0xFFFF64D8  (RAM 64D8)
+  0x03609A:  FF28    fmov.s @R2,FR15
+  0x03609C:  D280    mov.l @(0x0362A0),R2  ; =0xFFFF8200  (RAM 8200)
+  0x03609E:  F828    fmov.s @R2,FR8
+  0x0360A0:  E008    mov #8,R0
+  0x0360A2:  FF87    fmov.s FR8,@(R0,R15)
+  0x0360A4:  D27F    mov.l @(0x0362A4),R2  ; =0xFFFF7F6C  (RAM 7F6C)
+  0x0360A6:  FC28    fmov.s @R2,FR12
+  0x0360A8:  C51B    mov.w @(54,GBR),R0  ; <- RAM 0xFFFF79C2
+  0x0360AA:  6603    mov R0,R6
+  0x0360AC:  C51C    mov.w @(56,GBR),R0  ; <- RAM 0xFFFF79C4
+  0x0360AE:  3602    cmp/hs R0,R6
+  0x0360B0:  8905    bt 0x0360BE
+  0x0360B2:  F58D    fldi0 FR5
+  0x0360B4:  FE5C    fmov FR5,FR14
+  0x0360B6:  F05C    fmov FR5,FR0
+  0x0360B8:  D57B    mov.l @(0x0362A8),R5  ; =0x000BE830  (ROM @0x0BE830)
+  0x0360BA:  A00A    bra 0x0360D2
+  0x0360BC:  1F53    mov.l R5,@(12,R15)
+  0x0360BE:  D47B    mov.l @(0x0362AC),R4  ; =0x000AC5D0  (ROM @0x0AC5D0)
+  0x0360C0:  D279    mov.l @(0x0362A8),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x0360C2:  1F23    mov.l R2,@(12,R15)
+  0x0360C4:  420B    jsr @R2  ; -> 0x000BE830
+  0x0360C6:  0009    nop
+  0x0360C8:  FE0C    fmov FR0,FR14
+  0x0360CA:  D479    mov.l @(0x0362B0),R4  ; =0x000AC5E4  (ROM @0x0AC5E4)
+  0x0360CC:  D276    mov.l @(0x0362A8),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x0360CE:  420B    jsr @R2  ; -> 0x000BE830
+  0x0360D0:  F4FC    fmov FR15,FR4
+  0x0360D2:  DC6C    mov.l @(0x036284),R12  ; =0xFFFF79F0  (RAM 79F0)
+  0x0360D4:  E0A8    mov #-88,R0
+  0x0360D6:  FCE7    fmov.s FR14,@(R0,R12)
+  0x0360D8:  E0AC    mov #-84,R0
+  0x0360DA:  FC07    fmov.s FR0,@(R0,R12)
+  0x0360DC:  C51B    mov.w @(54,GBR),R0  ; <- RAM 0xFFFF79C2
+  0x0360DE:  6603    mov R0,R6
+  0x0360E0:  C51C    mov.w @(56,GBR),R0  ; <- RAM 0xFFFF79C4
+  0x0360E2:  3602    cmp/hs R0,R6
+  0x0360E4:  8B69    bf 0x0361BA
+  0x0360E6:  D673    mov.l @(0x0362B4),R6  ; =0x000D299B  (CAL @0x0D299B)
+  0x0360E8:  6260    mov.b @R6,R2
+  0x0360EA:  2228    tst R2,R2
+  0x0360EC:  8B33    bf 0x036156
+  0x0360EE:  D672    mov.l @(0x0362B8),R6  ; =0x000CBBF2  (CAL @0x0CBBF2)
+  0x0360F0:  6060    mov.b @R6,R0
+  0x0360F2:  885A    cmp/eq #90,R0
+  0x0360F4:  8918    bt 0x036128
+  0x0360F6:  D471    mov.l @(0x0362BC),R4  ; =0x000AD674  (ROM @0x0AD674)
+  0x0360F8:  D271    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x0360FA:  F5F8    fmov.s @R15,FR5
+  0x0360FC:  E004    mov #4,R0
+  0x0360FE:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036100:  F4F6    fmov.s @(R0,R15),FR4
+  0x036102:  E010    mov #16,R0
+  0x036104:  FF07    fmov.s FR0,@(R0,R15)
+  0x036106:  D46F    mov.l @(0x0362C4),R4  ; =0x000AD6AC  (ROM @0x0AD6AC)
+  0x036108:  F5F8    fmov.s @R15,FR5
+  0x03610A:  E004    mov #4,R0
+  0x03610C:  D26C    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x03610E:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036110:  F4F6    fmov.s @(R0,R15),FR4
+  0x036112:  E0F4    mov #-12,R0
+  0x036114:  FC07    fmov.s FR0,@(R0,R12)
+  0x036116:  F79D    fldi1 FR7
+  0x036118:  F07C    fmov FR7,FR0
+  0x03611A:  F0D1    fsub FR13,FR0
+  0x03611C:  E010    mov #16,R0
+  0x03611E:  F5F6    fmov.s @(R0,R15),FR5
+  0x036120:  E0F4    mov #-12,R0
+  0x036122:  F9C6    fmov.s @(R0,R12),FR9
+  0x036124:  A045    bra 0x0361B2
+  0x036126:  F59E    fmac FR0,FR9,FR5
+  0x036128:  D467    mov.l @(0x0362C8),R4  ; =0x000AC5A8  (ROM @0x0AC5A8)
+  0x03612A:  55F3    mov.l @(12,R15),R5
+  0x03612C:  450B    jsr @R5  ; -> 0x000BE830
+  0x03612E:  F4CC    fmov FR12,FR4
+  0x036130:  E014    mov #20,R0
+  0x036132:  FF07    fmov.s FR0,@(R0,R15)
+  0x036134:  D265    mov.l @(0x0362CC),R2  ; =0x000CC16C  (CAL @0x0CC16C)
+  0x036136:  F828    fmov.s @R2,FR8
+  0x036138:  F8D5    fcmp/gt FR13,FR8
+  0x03613A:  D465    mov.l @(0x0362D0),R4  ; =0x000AD690  (ROM @0x0AD690)
+  0x03613C:  8900    bt 0x036140
+  0x03613E:  D45F    mov.l @(0x0362BC),R4  ; =0x000AD674  (ROM @0x0AD674)
+  0x036140:  D25F    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036142:  F5F8    fmov.s @R15,FR5
+  0x036144:  E004    mov #4,R0
+  0x036146:  F7F6    fmov.s @(R0,R15),FR7
+  0x036148:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x03614A:  F47C    fmov FR7,FR4
+  0x03614C:  E014    mov #20,R0
+  0x03614E:  F8F6    fmov.s @(R0,R15),FR8
+  0x036150:  F080    fadd FR8,FR0
+  0x036152:  A02E    bra 0x0361B2
+  0x036154:  F50C    fmov FR0,FR5
+  0x036156:  D45C    mov.l @(0x0362C8),R4  ; =0x000AC5A8  (ROM @0x0AC5A8)
+  0x036158:  55F3    mov.l @(12,R15),R5
+  0x03615A:  450B    jsr @R5  ; -> 0x000BE830
+  0x03615C:  F4CC    fmov FR12,FR4
+  0x03615E:  E018    mov #24,R0
+  0x036160:  FF07    fmov.s FR0,@(R0,R15)
+  0x036162:  D25A    mov.l @(0x0362CC),R2  ; =0x000CC16C  (CAL @0x0CC16C)
+  0x036164:  F828    fmov.s @R2,FR8
+  0x036166:  F8D5    fcmp/gt FR13,FR8
+  0x036168:  8909    bt 0x03617E
+  0x03616A:  D45A    mov.l @(0x0362D4),R4  ; =0x000AD6C8  (ROM @0x0AD6C8)
+  0x03616C:  D254    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x03616E:  F5F8    fmov.s @R15,FR5
+  0x036170:  E004    mov #4,R0
+  0x036172:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036174:  F4F6    fmov.s @(R0,R15),FR4
+  0x036176:  E01C    mov #28,R0
+  0x036178:  D457    mov.l @(0x0362D8),R4  ; =0x000AD6E4  (ROM @0x0AD6E4)
+  0x03617A:  A009    bra 0x036190
+  0x03617C:  FF07    fmov.s FR0,@(R0,R15)
+  0x03617E:  D457    mov.l @(0x0362DC),R4  ; =0x000AD700  (ROM @0x0AD700)
+  0x036180:  D24F    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036182:  F5F8    fmov.s @R15,FR5
+  0x036184:  E004    mov #4,R0
+  0x036186:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036188:  F4F6    fmov.s @(R0,R15),FR4
+  0x03618A:  E01C    mov #28,R0
+  0x03618C:  FF07    fmov.s FR0,@(R0,R15)
+  0x03618E:  D451    mov.l @(0x0362D4),R4  ; =0x000AD6C8  (ROM @0x0AD6C8)
+  0x036190:  F5F8    fmov.s @R15,FR5
+  0x036192:  E004    mov #4,R0
+  0x036194:  D24A    mov.l @(0x0362C0),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036196:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x036198:  F4F6    fmov.s @(R0,R15),FR4
+  0x03619A:  F80C    fmov FR0,FR8
+  0x03619C:  F09D    fldi1 FR0
+  0x03619E:  E008    mov #8,R0
+  0x0361A0:  F6F6    fmov.s @(R0,R15),FR6
+  0x0361A2:  F061    fsub FR6,FR0
+  0x0361A4:  E018    mov #24,R0
+  0x0361A6:  F5F6    fmov.s @(R0,R15),FR5
+  0x0361A8:  E01C    mov #28,R0
+  0x0361AA:  F7F6    fmov.s @(R0,R15),FR7
+  0x0361AC:  F57E    fmac FR0,FR7,FR5
+  0x0361AE:  F06C    fmov FR6,FR0
+  0x0361B0:  F58E    fmac FR0,FR8,FR5
+  0x0361B2:  D24B    mov.l @(0x0362E0),R2  ; =0x000CC170  (CAL @0x0CC170)
+  0x0361B4:  F828    fmov.s @R2,FR8
+  0x0361B6:  F855    fcmp/gt FR5,FR8
+  0x0361B8:  8B00    bf 0x0361BC
+  0x0361BA:  F58D    fldi0 FR5
+  0x0361BC:  E0A4    mov #-92,R0
+  0x0361BE:  FC57    fmov.s FR5,@(R0,R12)
+  0x0361C0:  D248    mov.l @(0x0362E4),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x0361C2:  E0A8    mov #-88,R0
+  0x0361C4:  F5C6    fmov.s @(R0,R12),FR5
+  0x0361C6:  E0A4    mov #-92,R0
+  0x0361C8:  420B    jsr @R2  ; -> 0x000BE960
+  0x0361CA:  F4C6    fmov.s @(R0,R12),FR4
+  0x0361CC:  F40C    fmov FR0,FR4
+  0x0361CE:  E0AC    mov #-84,R0
+  0x0361D0:  D244    mov.l @(0x0362E4),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x0361D2:  420B    jsr @R2  ; -> 0x000BE960
+  0x0361D4:  F5C6    fmov.s @(R0,R12),FR5
+  0x0361D6:  FF0C    fmov FR0,FR15
+  0x0361D8:  D243    mov.l @(0x0362E8),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x0361DA:  F58D    fldi0 FR5
+  0x0361DC:  C743    mova @(0x0362EC),R0
+  0x0361DE:  FE08    fmov.s @R0,FR14
+  0x0361E0:  F6EC    fmov FR14,FR6
+  0x0361E2:  420B    jsr @R2  ; -> 0x000BE608
+  0x0361E4:  F40C    fmov FR0,FR4
+  0x0361E6:  6603    mov R0,R6
+  0x0361E8:  E020    mov #32,R0
+  0x0361EA:  0F64    mov.b R6,@(R0,R15)
+  0x0361EC:  C43A    mov.b @(58,GBR),R0  ; <- RAM 0xFFFF79C6
+  0x0361EE:  6E03    mov R0,R14
+  0x0361F0:  D23D    mov.l @(0x0362E8),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x0361F2:  F6EC    fmov FR14,FR6
+  0x0361F4:  E0A0    mov #-96,R0
+  0x0361F6:  F5C6    fmov.s @(R0,R12),FR5
+  0x0361F8:  E09C    mov #-100,R0
+  0x0361FA:  420B    jsr @R2  ; -> 0x000BE608
+  0x0361FC:  F4C6    fmov.s @(R0,R12),FR4
+  0x0361FE:  6203    mov R0,R2
+  0x036200:  E024    mov #36,R0
+  0x036202:  0F24    mov.b R2,@(R0,R15)
+  0x036204:  D43A    mov.l @(0x0362F0),R4  ; =0x000AD090  (ROM @0x0AD090)
+  0x036206:  55F3    mov.l @(12,R15),R5
+  0x036208:  450B    jsr @R5  ; -> 0x000BE830
+  0x03620A:  F4F8    fmov.s @R15,FR4
+  0x03620C:  E0F0    mov #-16,R0
+  0x03620E:  FC07    fmov.s FR0,@(R0,R12)
+  0x036210:  60EC    extu.b R14,R0
+  0x036212:  8801    cmp/eq #1,R0
+  0x036214:  8B04    bf 0x036220
+  0x036216:  E0C8    mov #-56,R0
+  0x036218:  F8C6    fmov.s @(R0,R12),FR8
+  0x03621A:  E09C    mov #-100,R0
+  0x03621C:  A074    bra 0x036308
+  0x03621E:  FC87    fmov.s FR8,@(R0,R12)
+  0x036220:  8802    cmp/eq #2,R0
+  0x036222:  8B09    bf 0x036238
+  0x036224:  E0CC    mov #-52,R0
+  0x036226:  F8C6    fmov.s @(R0,R12),FR8
+  0x036228:  E0A4    mov #-92,R0
+  0x03622A:  F0C6    fmov.s @(R0,R12),FR0
+  0x03622C:  E0B0    mov #-80,R0
+  0x03622E:  F9C6    fmov.s @(R0,R12),FR9
+  0x036230:  F89E    fmac FR0,FR9,FR8
+  0x036232:  E09C    mov #-100,R0
+  0x036234:  A068    bra 0x036308
+  0x036236:  FC87    fmov.s FR8,@(R0,R12)
+  0x036238:  E020    mov #32,R0
+  0x03623A:  06FC    mov.b @(R0,R15),R6
+  0x03623C:  2668    tst R6,R6
+  0x03623E:  8903    bt 0x036248
+  0x036240:  C466    mov.b @(102,GBR),R0  ; <- RAM 0xFFFF79F2
+  0x036242:  2008    tst R0,R0
+  0x036244:  8D04    bt/s 0x036250
+  0x036246:  1F0A    mov.l R0,@(40,R15)
+  0x036248:  E024    mov #36,R0
+  0x03624A:  02FC    mov.b @(R0,R15),R2
+  0x03624C:  2228    tst R2,R2
+  0x03624E:  8953    bt 0x0362F8
+  0x036250:  E0B0    mov #-80,R0
+  0x036252:  F9C6    fmov.s @(R0,R12),FR9
+  0x036254:  FF92    fmul FR9,FR15
+  0x036256:  E0A0    mov #-96,R0
+  0x036258:  FCF7    fmov.s FR15,@(R0,R12)
+  0x03625A:  E09C    mov #-100,R0
+  0x03625C:  F4C6    fmov.s @(R0,R12),FR4
+  0x03625E:  E0F0    mov #-16,R0
+  0x036260:  F8C6    fmov.s @(R0,R12),FR8
+  0x036262:  F480    fadd FR8,FR4
+  0x036264:  D223    mov.l @(0x0362F4),R2  ; =0x000BE970  (ROM @0x0BE970)
+  0x036266:  E0A0    mov #-96,R0
+  0x036268:  420B    jsr @R2  ; -> 0x000BE970
+  0x03626A:  F5C6    fmov.s @(R0,R12),FR5
+  0x03626C:  E09C    mov #-100,R0
+  0x03626E:  A04B    bra 0x036308
+  0x036270:  FC07    fmov.s FR0,@(R0,R12)
+  0x036272:  0000    .word 0x0000
+  0x036274:  43B4    .word 0x43B4
+  0x036276:  0000    .word 0x0000
+
+
+  --- Literal Pool: Pool for FUN_0003606C (0x036278-0x036534) ---
+  0x036278:  FFFF79F4    .long =0xFFFF79F4  (RAM 79F4)
+  0x03627C:  000AD998    .long =0x000AD998  (ROM @0x0AD998)
+  0x036280:  00022F92    .long =0x00022F92  (ROM @0x022F92)
+  0x036284:  FFFF79F0    .long =0xFFFF79F0  (RAM 79F0)
+  0x036288:  FFFF798C    .long =0xFFFF798C  (RAM 798C)
+  0x03628C:  FFFF6624    .long =0xFFFF6624  (RAM 6624)
+  0x036290:  FFFF63F8    .long =0xFFFF63F8  (RAM 63F8)
+  0x036294:  FFFF3234    .long =0xFFFF3234  (RAM 3234)
+  0x036298:  FFFF62DC    .long =0xFFFF62DC  (RAM 62DC)
+  0x03629C:  FFFF64D8    .long =0xFFFF64D8  (RAM 64D8)
+  0x0362A0:  FFFF8200    .long =0xFFFF8200  (RAM 8200)
+  0x0362A4:  FFFF7F6C    .long =0xFFFF7F6C  (RAM 7F6C)
+  0x0362A8:  000BE830    .long =0x000BE830  (ROM @0x0BE830)
+  0x0362AC:  000AC5D0    .long =0x000AC5D0  (ROM @0x0AC5D0)
+  0x0362B0:  000AC5E4    .long =0x000AC5E4  (ROM @0x0AC5E4)
+  0x0362B4:  000D299B    .long =0x000D299B  (CAL @0x0D299B)
+  0x0362B8:  000CBBF2    .long =0x000CBBF2  (CAL @0x0CBBF2)
+  0x0362BC:  000AD674    .long =0x000AD674  (ROM @0x0AD674)
+  0x0362C0:  000BE8E4    .long =0x000BE8E4  (ROM @0x0BE8E4)
+  0x0362C4:  000AD6AC    .long =0x000AD6AC  (ROM @0x0AD6AC)
+  0x0362C8:  000AC5A8    .long =0x000AC5A8  (ROM @0x0AC5A8)
+  0x0362CC:  000CC16C    .long =0x000CC16C  (CAL @0x0CC16C)
+  0x0362D0:  000AD690    .long =0x000AD690  (ROM @0x0AD690)
+  0x0362D4:  000AD6C8    .long =0x000AD6C8  (ROM @0x0AD6C8)
+  0x0362D8:  000AD6E4    .long =0x000AD6E4  (ROM @0x0AD6E4)
+  0x0362DC:  000AD700    .long =0x000AD700  (ROM @0x0AD700)
+  0x0362E0:  000CC170    .long =0x000CC170  (CAL @0x0CC170)
+  0x0362E4:  000BE960    .long =0x000BE960  (ROM @0x0BE960)
+  0x0362E8:  000BE608    .long =0x000BE608  (ROM @0x0BE608)
+  0x0362EC:  38000000    .long =0x38000000
+  0x0362F0:  000AD090    .long =0x000AD090  (ROM @0x0AD090)
+  0x0362F4:  000BE970    .long =0x000BE970  (ROM @0x0BE970)
+  0x0362F8:  E0B0F9C6    .long =0xE0B0F9C6
+  0x0362FC:  FF92E0A0    .long =0xFF92E0A0
+  0x036300:  FCF7F8C6    .long =0xFCF7F8C6
+  0x036304:  E09CFC87    .long =0xE09CFC87
+  0x036308:  E02000FC    .long =0xE02000FC
+  0x03630C:  C0667F2C    .long =0xC0667F2C  (float: -3.601512)
+  0x036310:  4F17FFF9    .long =0x4F17FFF9
+  0x036314:  FEF9FDF9    .long =0xFEF9FDF9
+  0x036318:  FCF94F26    .long =0xFCF94F26
+  0x03631C:  6EF6000B    .long =0x6EF6000B
+  0x036320:  6CF64F22    .long =0x6CF64F22
+  0x036324:  FFEB4F13    .long =0xFFEB4F13
+  0x036328:  D082401E    .long =0xD082401E
+  0x03632C:  7FB8D282    .long =0x7FB8D282
+  0x036330:  B322FE28    .long =0xB322FE28
+  0x036334:  C033C502    .long =0xC033C502  (float: -2.808899)
+  0x036338:  20088B04    .long =0x20088B04
+  0x03633C:  E0FFC101    .long =0xE0FFC101
+  0x036340:  D27EA04D    .long =0xD27EA04D
+  0x036344:  2F22C433    .long =0x2F22C433
+  0x036348:  88018B1A    .long =0x88018B1A
+  0x03634C:  D67C6060    .long =0xD67C6060
+  0x036350:  8801E000    .long =0x8801E000
+  0x036354:  8D5CC101    .long =0x8D5CC101
+  0x036358:  D47AD278    .long =0xD47AD278
+  0x03635C:  420BF4EC    .long =0x420BF4EC  (float: 34.989182)
+  0x036360:  C116C500    .long =0xC116C500  (float: -9.423096)
+  0x036364:  1F01660D    .long =0x1F01660D
+  0x036368:  C516650D    .long =0xC516650D  (float: -2406.315674)
+  0x03636C:  36538F4D    .long =0x36538F4D
+  0x036370:  1F02C516    .long =0x1F02C516
+  0x036374:  66031F03    .long =0x66031F03
+  0x036378:  C5001F04    .long =0xC5001F04  (float: -2049.938477)
+  0x03637C:  3068A047    .long =0x3068A047
+  0x036380:  C100C434    .long =0xC100C434  (float: -8.047901)
+  0x036384:  1F05600C    .long =0x1F05600C
+  0x036388:  88018B03    .long =0x88018B03
+  0x03638C:  C5001F06    .long =0xC5001F06  (float: -2049.938965)
+  0x036390:  A03EC101    .long =0xA03EC101
+  0x036394:  D46CD669    .long =0xD46CD669
+  0x036398:  2F62460B    .long =0x2F62460B
+  0x03639C:  F4ECC114    .long =0xF4ECC114
+  0x0363A0:  C5011F07    .long =0xC5011F07  (float: -2065.939209)
+  0x0363A4:  650DC502    .long =0x650DC502
+  0x0363A8:  620D3523    .long =0x620D3523
+  0x0363AC:  8D0E1F08    .long =0x8D0E1F08
+  0x0363B0:  D266C501    .long =0xD266C501
+  0x0363B4:  1F09640D    .long =0x1F09640D
+  0x0363B8:  1F4AC514    .long =0x1F4AC514
+  0x0363BC:  1F0B420B    .long =0x1F0B420B
+  0x0363C0:  650DC101    .long =0x650DC101
+  0x0363C4:  C5011F0C    .long =0xC5011F0C  (float: -2065.940430)
+  0x0363C8:  A022C100    .long =0xA022C100
+  0x0363CC:  D65FC501    .long =0xD65FC501
+  0x0363D0:  1F0D640D    .long =0x1F0D640D
+  0x0363D4:  1F4EC514    .long =0x1F4EC514
+  0x0363D8:  1F0F460B    .long =0x1F0F460B
+  0x0363DC:  650DC101    .long =0x650DC101
+  0x0363E0:  D45B62F2    .long =0xD45B62F2
+  0x0363E4:  420BF4EC    .long =0x420BF4EC  (float: 34.989182)
+  0x0363E8:  C115C500    .long =0xC115C500  (float: -9.360596)
+  0x0363EC:  6603C515    .long =0x6603C515
+  0x0363F0:  36028B0B    .long =0x36028B0B
+  0x0363F4:  C5006203    .long =0xC5006203  (float: -2054.125732)
+  0x0363F8:  E0400F26    .long =0xE0400F26
+  0x0363FC:  C5156603    .long =0xC5156603  (float: -2390.375732)
+  0x036400:  E0440F66    .long =0xE0440F66
+  0x036404:  32686023    .long =0x32686023
+  0x036408:  A002C100    .long =0xA002C100
+  0x03640C:  E000C100    .long =0xE000C100
+  0x036410:  C501660D    .long =0xC501660D  (float: -2070.378174)
+  0x036414:  46158B06    .long =0x46158B06  (float: 9570.755859)
+  0x036418:  C5016603    .long =0xC5016603  (float: -2070.375732)
+  0x03641C:  C5023602    .long =0xC5023602  (float: -2083.375488)
+  0x036420:  8901A001    .long =0x8901A001
+  0x036424:  E001E000    .long =0xE001E000
+  0x036428:  C008C433    .long =0xC008C433  (float: -2.136975)
+  0x03642C:  C0347F48    .long =0xC0347F48  (float: -2.820269)
+  0x036430:  4F17FEF9    .long =0x4F17FEF9
+  0x036434:  4F26000B    .long =0x4F26000B
+  0x036438:  00092FC6    .long =0x00092FC6  (ROM @0x092FC6)
+  0x03643C:  2FD62FE6    .long =0x2FD62FE6
+  0x036440:  4F22FFCB    .long =0x4F22FFCB
+  0x036444:  FFDBFFEB    .long =0xFFDBFFEB
+  0x036448:  FFFB4F13    .long =0xFFFB4F13
+  0x03644C:  D041401E    .long =0xD041401E
+  0x036450:  7FD4D241    .long =0x7FD4D241
+  0x036454:  FE28D241    .long =0xFE28D241
+  0x036458:  FD28D241    .long =0xFD28D241
+  0x03645C:  F828FF8A    .long =0xF828FF8A
+  0x036460:  D240FF28    .long =0xD240FF28
+  0x036464:  D240FC28    .long =0xD240FC28
+  0x036468:  D240F828    .long =0xD240F828
+  0x03646C:  E004D240    .long =0xE004D240
+  0x036470:  420BFF87    .long =0x420BFF87  (float: 34.999538)
+  0x036474:  6E0CD53F    .long =0x6E0CD53F
+  0x036478:  6C50D63F    .long =0x6C50D63F
+  0x03647C:  6660D53F    .long =0x6660D53F
+  0x036480:  6550D43F    .long =0x6550D43F
+  0x036484:  6440D73F    .long =0x6440D73F
+  0x036488:  60E38801    .long =0x60E38801
+  0x03648C:  8F266D70    .long =0x8F266D70
+  0x036490:  606C8801    .long =0x606C8801
+  0x036494:  89098802    .long =0x89098802
+  0x036498:  890C8803    .long =0x890C8803
+  0x03649C:  890F8804    .long =0x890F8804
+  0x0364A0:  89128805    .long =0x89128805
+  0x0364A4:  8915A097    .long =0x8915A097
+  0x0364A8:  0009D237    .long =0x0009D237  (ROM @0x09D237)
+  0x0364AC:  F928D237    .long =0xF928D237
+  0x0364B0:  A096F628    .long =0xA096F628
+  0x0364B4:  D236F928    .long =0xD236F928
+  0x0364B8:  D236A091    .long =0xD236A091
+  0x0364BC:  F628D236    .long =0xF628D236
+  0x0364C0:  F928D236    .long =0xF928D236
+  0x0364C4:  A08CF628    .long =0xA08CF628
+  0x0364C8:  D235F928    .long =0xD235F928
+  0x0364CC:  D235A087    .long =0xD235A087
+  0x0364D0:  F628D235    .long =0xF628D235
+  0x0364D4:  F928D235    .long =0xF928D235
+  0x0364D8:  A082F628    .long =0xA082F628
+  0x0364DC:  665C624C    .long =0x665C624C
+  0x0364E0:  36238B00    .long =0x36238B00
+  0x0364E4:  6543605C    .long =0x6543605C
+  0x0364E8:  88018909    .long =0x88018909
+  0x0364EC:  8802890C    .long =0x8802890C
+  0x0364F0:  8803890F    .long =0x8803890F
+  0x0364F4:  88048912    .long =0x88048912
+  0x0364F8:  88058915    .long =0x88058915
+  0x0364FC:  A06C0009    .long =0xA06C0009
+  0x036500:  D22BF928    .long =0xD22BF928
+  0x036504:  D22BA06B    .long =0xD22BA06B
+  0x036508:  F628D22B    .long =0xF628D22B
+  0x03650C:  F928D22B    .long =0xF928D22B
+  0x036510:  A066F628    .long =0xA066F628
+  0x036514:  D22AF928    .long =0xD22AF928
+  0x036518:  D22AA061    .long =0xD22AA061
+  0x03651C:  F628D22A    .long =0xF628D22A
+  0x036520:  F928D22A    .long =0xF928D22A
+  0x036524:  A05CF628    .long =0xA05CF628
+  0x036528:  D229F928    .long =0xD229F928
+  0x03652C:  D229A057    .long =0xD229A057
+  0x036530:  F6280000    .long =0xF6280000
+
+
+==============================================================================
+  FUN_0003643A - Condition checker (first code section before pool)
+  Address range: 0x03643A - 0x036534 (250 bytes)
+  GBR = 0xFFFF79A4
+==============================================================================
+  0x03643A:  2FC6    mov.l R12,@-R15
+  0x03643C:  2FD6    mov.l R13,@-R15
+  0x03643E:  2FE6    mov.l R14,@-R15
+  0x036440:  4F22    sts.l PR,@-R15
+  0x036442:  FFCB    fmov.s FR12,@-R15
+  0x036444:  FFDB    fmov.s FR13,@-R15
+  0x036446:  FFEB    fmov.s FR14,@-R15
+  0x036448:  FFFB    fmov.s FR15,@-R15
+  0x03644A:  4F13    .word 0x4F13
+  0x03644C:  D041    mov.l @(0x036554),R0  ; =0xFFFF79A4  (RAM 79A4)
+  0x03644E:  401E    ldc R0,GBR  ; GBR = 0xFFFF79A4
+  0x036450:  7FD4    add #-44,R15
+  0x036452:  D241    mov.l @(0x036558),R2  ; =0xFFFF6624  (RAM 6624)
+  0x036454:  FE28    fmov.s @R2,FR14
+  0x036456:  D241    mov.l @(0x03655C),R2  ; =0xFFFF62DC  (RAM 62DC)
+  0x036458:  FD28    fmov.s @R2,FR13
+  0x03645A:  D241    mov.l @(0x036560),R2  ; =0xFFFF6350  (RAM 6350)
+  0x03645C:  F828    fmov.s @R2,FR8
+  0x03645E:  FF8A    fmov.s FR8,@R15
+  0x036460:  D240    mov.l @(0x036564),R2  ; =0xFFFF65FC  (RAM 65FC)
+  0x036462:  FF28    fmov.s @R2,FR15
+  0x036464:  D240    mov.l @(0x036568),R2  ; =0xFFFF6898  (RAM 6898)
+  0x036466:  FC28    fmov.s @R2,FR12
+  0x036468:  D240    mov.l @(0x03656C),R2  ; =0xFFFF63F8  (RAM 63F8)
+  0x03646A:  F828    fmov.s @R2,FR8
+  0x03646C:  E004    mov #4,R0
+  0x03646E:  D240    mov.l @(0x036570),R2  ; =0x00022CF4  (ROM @0x022CF4)
+  0x036470:  420B    jsr @R2  ; -> 0x00022CF4
+  0x036472:  FF87    fmov.s FR8,@(R0,R15)
+  0x036474:  6E0C    extu.b R0,R14
+  0x036476:  D53F    mov.l @(0x036574),R5  ; =0xFFFF5E94  (RAM 5E94)
+  0x036478:  6C50    mov.b @R5,R12
+  0x03647A:  D63F    mov.l @(0x036578),R6  ; =0xFFFF6810  (RAM 6810)
+  0x03647C:  6660    mov.b @R6,R6
+  0x03647E:  D53F    mov.l @(0x03657C),R5  ; =0xFFFF5E92  (RAM 5E92)
+  0x036480:  6550    mov.b @R5,R5
+  0x036482:  D43F    mov.l @(0x036580),R4  ; =0xFFFF5E93  (RAM 5E93)
+  0x036484:  6440    mov.b @R4,R4
+  0x036486:  D73F    mov.l @(0x036584),R7  ; =0xFFFF5DB5  (RAM 5DB5)
+  0x036488:  60E3    mov R14,R0
+  0x03648A:  8801    cmp/eq #1,R0
+  0x03648C:  8F26    bf/s 0x0364DC
+  0x03648E:  6D70    mov.b @R7,R13
+  0x036490:  606C    extu.b R6,R0
+  0x036492:  8801    cmp/eq #1,R0
+  0x036494:  8909    bt 0x0364AA
+  0x036496:  8802    cmp/eq #2,R0
+  0x036498:  890C    bt 0x0364B4
+  0x03649A:  8803    cmp/eq #3,R0
+  0x03649C:  890F    bt 0x0364BE
+  0x03649E:  8804    cmp/eq #4,R0
+  0x0364A0:  8912    bt 0x0364C8
+  0x0364A2:  8805    cmp/eq #5,R0
+  0x0364A4:  8915    bt 0x0364D2
+  0x0364A6:  A097    bra 0x0365D8
+  0x0364A8:  0009    nop
+  0x0364AA:  D237    mov.l @(0x036588),R2  ; =0x000CC180  (CAL @0x0CC180)
+  0x0364AC:  F928    fmov.s @R2,FR9
+  0x0364AE:  D237    mov.l @(0x03658C),R2  ; =0x000CC184  (CAL @0x0CC184)
+  0x0364B0:  A096    bra 0x0365E0
+  0x0364B2:  F628    fmov.s @R2,FR6
+  0x0364B4:  D236    mov.l @(0x036590),R2  ; =0x000CC188  (CAL @0x0CC188)
+  0x0364B6:  F928    fmov.s @R2,FR9
+  0x0364B8:  D236    mov.l @(0x036594),R2  ; =0x000CC18C  (CAL @0x0CC18C)
+  0x0364BA:  A091    bra 0x0365E0
+  0x0364BC:  F628    fmov.s @R2,FR6
+  0x0364BE:  D236    mov.l @(0x036598),R2  ; =0x000CC190  (CAL @0x0CC190)
+  0x0364C0:  F928    fmov.s @R2,FR9
+  0x0364C2:  D236    mov.l @(0x03659C),R2  ; =0x000CC194  (CAL @0x0CC194)
+  0x0364C4:  A08C    bra 0x0365E0
+  0x0364C6:  F628    fmov.s @R2,FR6
+  0x0364C8:  D235    mov.l @(0x0365A0),R2  ; =0x000CC198  (CAL @0x0CC198)
+  0x0364CA:  F928    fmov.s @R2,FR9
+  0x0364CC:  D235    mov.l @(0x0365A4),R2  ; =0x000CC19C  (CAL @0x0CC19C)
+  0x0364CE:  A087    bra 0x0365E0
+  0x0364D0:  F628    fmov.s @R2,FR6
+  0x0364D2:  D235    mov.l @(0x0365A8),R2  ; =0x000CC1A0  (CAL @0x0CC1A0)
+  0x0364D4:  F928    fmov.s @R2,FR9
+  0x0364D6:  D235    mov.l @(0x0365AC),R2  ; =0x000CC1A4  (CAL @0x0CC1A4)
+  0x0364D8:  A082    bra 0x0365E0
+  0x0364DA:  F628    fmov.s @R2,FR6
+  0x0364DC:  665C    extu.b R5,R6
+  0x0364DE:  624C    extu.b R4,R2
+  0x0364E0:  3623    cmp/ge R2,R6
+  0x0364E2:  8B00    bf 0x0364E6
+  0x0364E4:  6543    mov R4,R5
+  0x0364E6:  605C    extu.b R5,R0
+  0x0364E8:  8801    cmp/eq #1,R0
+  0x0364EA:  8909    bt 0x036500
+  0x0364EC:  8802    cmp/eq #2,R0
+  0x0364EE:  890C    bt 0x03650A
+  0x0364F0:  8803    cmp/eq #3,R0
+  0x0364F2:  890F    bt 0x036514
+  0x0364F4:  8804    cmp/eq #4,R0
+  0x0364F6:  8912    bt 0x03651E
+  0x0364F8:  8805    cmp/eq #5,R0
+  0x0364FA:  8915    bt 0x036528
+  0x0364FC:  A06C    bra 0x0365D8
+  0x0364FE:  0009    nop
+  0x036500:  D22B    mov.l @(0x0365B0),R2  ; =0x000CC1B0  (CAL @0x0CC1B0)
+  0x036502:  F928    fmov.s @R2,FR9
+  0x036504:  D22B    mov.l @(0x0365B4),R2  ; =0x000CC1B4  (CAL @0x0CC1B4)
+  0x036506:  A06B    bra 0x0365E0
+  0x036508:  F628    fmov.s @R2,FR6
+  0x03650A:  D22B    mov.l @(0x0365B8),R2  ; =0x000CC1B8  (CAL @0x0CC1B8)
+  0x03650C:  F928    fmov.s @R2,FR9
+  0x03650E:  D22B    mov.l @(0x0365BC),R2  ; =0x000CC1BC  (CAL @0x0CC1BC)
+  0x036510:  A066    bra 0x0365E0
+  0x036512:  F628    fmov.s @R2,FR6
+  0x036514:  D22A    mov.l @(0x0365C0),R2  ; =0x000CC1C0  (CAL @0x0CC1C0)
+  0x036516:  F928    fmov.s @R2,FR9
+  0x036518:  D22A    mov.l @(0x0365C4),R2  ; =0x000CC1C4  (CAL @0x0CC1C4)
+  0x03651A:  A061    bra 0x0365E0
+  0x03651C:  F628    fmov.s @R2,FR6
+  0x03651E:  D22A    mov.l @(0x0365C8),R2  ; =0x000CC1C8  (CAL @0x0CC1C8)
+  0x036520:  F928    fmov.s @R2,FR9
+  0x036522:  D22A    mov.l @(0x0365CC),R2  ; =0x000CC1CC  (CAL @0x0CC1CC)
+  0x036524:  A05C    bra 0x0365E0
+  0x036526:  F628    fmov.s @R2,FR6
+  0x036528:  D229    mov.l @(0x0365D0),R2  ; =0x000CC1D0  (CAL @0x0CC1D0)
+  0x03652A:  F928    fmov.s @R2,FR9
+  0x03652C:  D229    mov.l @(0x0365D4),R2  ; =0x000CC1D4  (CAL @0x0CC1D4)
+  0x03652E:  A057    bra 0x0365E0
+  0x036530:  F628    fmov.s @R2,FR6
+  0x036532:  0000    .word 0x0000
+
+
+==============================================================================
+  FUN_0003643A - Condition checker (second code section)
+  Address range: 0x0365E0 - 0x0367B8 (472 bytes)
+  GBR = 0xFFFF79A4
+==============================================================================
+  0x0365E0:  F6E5    fcmp/gt FR14,FR6
+  0x0365E2:  8902    bt 0x0365EA
+  0x0365E4:  E001    mov #1,R0
+  0x0365E6:  A004    bra 0x0365F2
+  0x0365E8:  C05C    mov.b R0,@(92,GBR)  ; -> RAM 0xFFFF7A00
+  0x0365EA:  F9E5    fcmp/gt FR14,FR9
+  0x0365EC:  8B01    bf 0x0365F2
+  0x0365EE:  E000    mov #0,R0
+  0x0365F0:  C05C    mov.b R0,@(92,GBR)  ; -> RAM 0xFFFF7A00
+  0x0365F2:  D273    mov.l @(0x0367C0),R2  ; =0x000CC1E8  (CAL @0x0CC1E8)
+  0x0365F4:  F828    fmov.s @R2,FR8
+  0x0365F6:  F8D5    fcmp/gt FR13,FR8
+  0x0365F8:  8902    bt 0x036600
+  0x0365FA:  E001    mov #1,R0
+  0x0365FC:  A006    bra 0x03660C
+  0x0365FE:  C05D    mov.b R0,@(93,GBR)  ; -> RAM 0xFFFF7A01
+  0x036600:  D270    mov.l @(0x0367C4),R2  ; =0x000CC1E4  (CAL @0x0CC1E4)
+  0x036602:  F828    fmov.s @R2,FR8
+  0x036604:  F8D5    fcmp/gt FR13,FR8
+  0x036606:  8B01    bf 0x03660C
+  0x036608:  E000    mov #0,R0
+  0x03660A:  C05D    mov.b R0,@(93,GBR)  ; -> RAM 0xFFFF7A01
+  0x03660C:  D26E    mov.l @(0x0367C8),R2  ; =0x000CC1F0  (CAL @0x0CC1F0)
+  0x03660E:  F828    fmov.s @R2,FR8
+  0x036610:  F8D5    fcmp/gt FR13,FR8
+  0x036612:  8902    bt 0x03661A
+  0x036614:  E001    mov #1,R0
+  0x036616:  A006    bra 0x036626
+  0x036618:  C05E    mov.b R0,@(94,GBR)  ; -> RAM 0xFFFF7A02
+  0x03661A:  D26C    mov.l @(0x0367CC),R2  ; =0x000CC1EC  (CAL @0x0CC1EC)
+  0x03661C:  F828    fmov.s @R2,FR8
+  0x03661E:  F8D5    fcmp/gt FR13,FR8
+  0x036620:  8B01    bf 0x036626
+  0x036622:  E000    mov #0,R0
+  0x036624:  C05E    mov.b R0,@(94,GBR)  ; -> RAM 0xFFFF7A02
+  0x036626:  D26A    mov.l @(0x0367D0),R2  ; =0x000CC1F8  (CAL @0x0CC1F8)
+  0x036628:  F828    fmov.s @R2,FR8
+  0x03662A:  F8F5    fcmp/gt FR15,FR8
+  0x03662C:  8902    bt 0x036634
+  0x03662E:  E001    mov #1,R0
+  0x036630:  A006    bra 0x036640
+  0x036632:  C060    mov.b R0,@(96,GBR)  ; -> RAM 0xFFFF7A04
+  0x036634:  D267    mov.l @(0x0367D4),R2  ; =0x000CC1F4  (CAL @0x0CC1F4)
+  0x036636:  F828    fmov.s @R2,FR8
+  0x036638:  F8F5    fcmp/gt FR15,FR8
+  0x03663A:  8B01    bf 0x036640
+  0x03663C:  E000    mov #0,R0
+  0x03663E:  C060    mov.b R0,@(96,GBR)  ; -> RAM 0xFFFF7A04
+  0x036640:  D265    mov.l @(0x0367D8),R2  ; =0x000CC1E0  (CAL @0x0CC1E0)
+  0x036642:  F828    fmov.s @R2,FR8
+  0x036644:  F8C5    fcmp/gt FR12,FR8
+  0x036646:  8902    bt 0x03664E
+  0x036648:  E001    mov #1,R0
+  0x03664A:  A006    bra 0x03665A
+  0x03664C:  C061    mov.b R0,@(97,GBR)  ; -> RAM 0xFFFF7A05
+  0x03664E:  D263    mov.l @(0x0367DC),R2  ; =0x000CC1DC  (CAL @0x0CC1DC)
+  0x036650:  F828    fmov.s @R2,FR8
+  0x036652:  F8C5    fcmp/gt FR12,FR8
+  0x036654:  8B01    bf 0x03665A
+  0x036656:  E000    mov #0,R0
+  0x036658:  C061    mov.b R0,@(97,GBR)  ; -> RAM 0xFFFF7A05
+  0x03665A:  E004    mov #4,R0
+  0x03665C:  F6F6    fmov.s @(R0,R15),FR6
+  0x03665E:  D260    mov.l @(0x0367E0),R2  ; =0x000CC208  (CAL @0x0CC208)
+  0x036660:  F828    fmov.s @R2,FR8
+  0x036662:  F865    fcmp/gt FR6,FR8
+  0x036664:  8902    bt 0x03666C
+  0x036666:  E001    mov #1,R0
+  0x036668:  A006    bra 0x036678
+  0x03666A:  C062    mov.b R0,@(98,GBR)  ; -> RAM 0xFFFF7A06
+  0x03666C:  D25D    mov.l @(0x0367E4),R2  ; =0x000CC204  (CAL @0x0CC204)
+  0x03666E:  F828    fmov.s @R2,FR8
+  0x036670:  F865    fcmp/gt FR6,FR8
+  0x036672:  8B01    bf 0x036678
+  0x036674:  E000    mov #0,R0
+  0x036676:  C062    mov.b R0,@(98,GBR)  ; -> RAM 0xFFFF7A06
+  0x036678:  D25B    mov.l @(0x0367E8),R2  ; =0x000CC20C  (CAL @0x0CC20C)
+  0x03667A:  F828    fmov.s @R2,FR8
+  0x03667C:  F8E5    fcmp/gt FR14,FR8
+  0x03667E:  8B02    bf 0x036686
+  0x036680:  D25A    mov.l @(0x0367EC),R2  ; =0x000CC210  (CAL @0x0CC210)
+  0x036682:  A002    bra 0x03668A
+  0x036684:  F828    fmov.s @R2,FR8
+  0x036686:  D25A    mov.l @(0x0367F0),R2  ; =0x000CC214  (CAL @0x0CC214)
+  0x036688:  F828    fmov.s @R2,FR8
+  0x03668A:  D65A    mov.l @(0x0367F4),R6  ; =0xFFFF7A04  (RAM 7A04)
+  0x03668C:  E0A0    mov #-96,R0
+  0x03668E:  F966    fmov.s @(R0,R6),FR9
+  0x036690:  F895    fcmp/gt FR9,FR8
+  0x036692:  8902    bt 0x03669A
+  0x036694:  E001    mov #1,R0
+  0x036696:  A009    bra 0x0366AC
+  0x036698:  C058    mov.b R0,@(88,GBR)  ; -> RAM 0xFFFF79FC
+  0x03669A:  D257    mov.l @(0x0367F8),R2  ; =0x000CC218  (CAL @0x0CC218)
+  0x03669C:  F928    fmov.s @R2,FR9
+  0x03669E:  F891    fsub FR9,FR8
+  0x0366A0:  E0A0    mov #-96,R0
+  0x0366A2:  F966    fmov.s @(R0,R6),FR9
+  0x0366A4:  F895    fcmp/gt FR9,FR8
+  0x0366A6:  8B01    bf 0x0366AC
+  0x0366A8:  E000    mov #0,R0
+  0x0366AA:  C058    mov.b R0,@(88,GBR)  ; -> RAM 0xFFFF79FC
+  0x0366AC:  D253    mov.l @(0x0367FC),R2  ; =0x000CC220  (CAL @0x0CC220)
+  0x0366AE:  F928    fmov.s @R2,FR9
+  0x0366B0:  D650    mov.l @(0x0367F4),R6  ; =0xFFFF7A04  (RAM 7A04)
+  0x0366B2:  E0A4    mov #-92,R0
+  0x0366B4:  F866    fmov.s @(R0,R6),FR8
+  0x0366B6:  F985    fcmp/gt FR8,FR9
+  0x0366B8:  8902    bt 0x0366C0
+  0x0366BA:  E001    mov #1,R0
+  0x0366BC:  A008    bra 0x0366D0
+  0x0366BE:  C059    mov.b R0,@(89,GBR)  ; -> RAM 0xFFFF79FD
+  0x0366C0:  E0A4    mov #-92,R0
+  0x0366C2:  F966    fmov.s @(R0,R6),FR9
+  0x0366C4:  D24E    mov.l @(0x036800),R2  ; =0x000CC21C  (CAL @0x0CC21C)
+  0x0366C6:  F828    fmov.s @R2,FR8
+  0x0366C8:  F895    fcmp/gt FR9,FR8
+  0x0366CA:  8B01    bf 0x0366D0
+  0x0366CC:  E000    mov #0,R0
+  0x0366CE:  C059    mov.b R0,@(89,GBR)  ; -> RAM 0xFFFF79FD
+  0x0366D0:  C462    mov.b @(98,GBR),R0  ; <- RAM 0xFFFF7A06
+  0x0366D2:  8801    cmp/eq #1,R0
+  0x0366D4:  8F05    bf/s 0x0366E2
+  0x0366D6:  E000    mov #0,R0
+  0x0366D8:  D24A    mov.l @(0x036804),R2  ; =0x000BE554  (ROM @0x0BE554)
+  0x0366DA:  C525    mov.w @(74,GBR),R0  ; <- RAM 0xFFFF79EE
+  0x0366DC:  640D    extu.w R0,R4
+  0x0366DE:  420B    jsr @R2  ; -> 0x000BE554
+  0x0366E0:  E501    mov #1,R5
+  0x0366E2:  C125    mov.w R0,@(74,GBR)  ; -> RAM 0xFFFF79EE
+  0x0366E4:  C458    mov.b @(88,GBR),R0  ; <- RAM 0xFFFF79FC
+  0x0366E6:  8801    cmp/eq #1,R0
+  0x0366E8:  8F05    bf/s 0x0366F6
+  0x0366EA:  E000    mov #0,R0
+  0x0366EC:  D245    mov.l @(0x036804),R2  ; =0x000BE554  (ROM @0x0BE554)
+  0x0366EE:  E501    mov #1,R5
+  0x0366F0:  C526    mov.w @(76,GBR),R0  ; <- RAM 0xFFFF79F0
+  0x0366F2:  420B    jsr @R2  ; -> 0x000BE554
+  0x0366F4:  640D    extu.w R0,R4
+  0x0366F6:  C126    mov.w R0,@(76,GBR)  ; -> RAM 0xFFFF79F0
+  0x0366F8:  2EE8    tst R14,R14
+  0x0366FA:  8F0D    bf/s 0x036718
+  0x0366FC:  E600    mov #0,R6
+  0x0366FE:  C461    mov.b @(97,GBR),R0  ; <- RAM 0xFFFF7A05
+  0x036700:  2008    tst R0,R0
+  0x036702:  8B02    bf 0x03670A
+  0x036704:  C45D    mov.b @(93,GBR),R0  ; <- RAM 0xFFFF7A01
+  0x036706:  A002    bra 0x03670E
+  0x036708:  1F02    mov.l R0,@(8,R15)
+  0x03670A:  C45E    mov.b @(94,GBR),R0  ; <- RAM 0xFFFF7A02
+  0x03670C:  1F03    mov.l R0,@(12,R15)
+  0x03670E:  600C    extu.b R0,R0
+  0x036710:  8801    cmp/eq #1,R0
+  0x036712:  8905    bt 0x036720
+  0x036714:  A005    bra 0x036722
+  0x036716:  0009    nop
+  0x036718:  D23B    mov.l @(0x036808),R2  ; =0x000CC1D8  (CAL @0x0CC1D8)
+  0x03671A:  F828    fmov.s @R2,FR8
+  0x03671C:  FD85    fcmp/gt FR8,FR13
+  0x03671E:  8B00    bf 0x036722
+  0x036720:  E601    mov #1,R6
+  0x036722:  6063    mov R6,R0
+  0x036724:  C05F    mov.b R0,@(95,GBR)  ; -> RAM 0xFFFF7A03
+  0x036726:  C45F    mov.b @(95,GBR),R0  ; <- RAM 0xFFFF7A03
+  0x036728:  8801    cmp/eq #1,R0
+  0x03672A:  8B03    bf 0x036734
+  0x03672C:  E000    mov #0,R0
+  0x03672E:  C110    mov.w R0,@(32,GBR)  ; -> RAM 0xFFFF79C4
+  0x036730:  A07E    bra 0x036830
+  0x036732:  E001    mov #1,R0
+  0x036734:  F7F8    fmov.s @R15,FR7
+  0x036736:  D235    mov.l @(0x03680C),R2  ; =0x000CC17C  (CAL @0x0CC17C)
+  0x036738:  F828    fmov.s @R2,FR8
+  0x03673A:  F875    fcmp/gt FR7,FR8
+  0x03673C:  8975    bt 0x03682A
+  0x03673E:  C45C    mov.b @(92,GBR),R0  ; <- RAM 0xFFFF7A00
+  0x036740:  1F04    mov.l R0,@(16,R15)
+  0x036742:  600C    extu.b R0,R0
+  0x036744:  8801    cmp/eq #1,R0
+  0x036746:  8970    bt 0x03682A
+  0x036748:  C460    mov.b @(96,GBR),R0  ; <- RAM 0xFFFF7A04
+  0x03674A:  1F05    mov.l R0,@(20,R15)
+  0x03674C:  600C    extu.b R0,R0
+  0x03674E:  8801    cmp/eq #1,R0
+  0x036750:  896B    bt 0x03682A
+  0x036752:  C462    mov.b @(98,GBR),R0  ; <- RAM 0xFFFF7A06
+  0x036754:  1F06    mov.l R0,@(24,R15)
+  0x036756:  600C    extu.b R0,R0
+  0x036758:  8801    cmp/eq #1,R0
+  0x03675A:  8B07    bf 0x03676C
+  0x03675C:  C525    mov.w @(74,GBR),R0  ; <- RAM 0xFFFF79EE
+  0x03675E:  1F07    mov.l R0,@(28,R15)
+  0x036760:  660D    extu.w R0,R6
+  0x036762:  D52B    mov.l @(0x036810),R5  ; =0x000CBC5A  (CAL @0x0CBC5A)
+  0x036764:  6251    mov.w @R5,R2
+  0x036766:  652D    extu.w R2,R5
+  0x036768:  3653    cmp/ge R5,R6
+  0x03676A:  895E    bt 0x03682A
+  0x03676C:  C458    mov.b @(88,GBR),R0  ; <- RAM 0xFFFF79FC
+  0x03676E:  1F08    mov.l R0,@(32,R15)
+  0x036770:  600C    extu.b R0,R0
+  0x036772:  8801    cmp/eq #1,R0
+  0x036774:  8B07    bf 0x036786
+  0x036776:  C526    mov.w @(76,GBR),R0  ; <- RAM 0xFFFF79F0
+  0x036778:  1F09    mov.l R0,@(36,R15)
+  0x03677A:  660D    extu.w R0,R6
+  0x03677C:  D525    mov.l @(0x036814),R5  ; =0x000CBC64  (CAL @0x0CBC64)
+  0x03677E:  6251    mov.w @R5,R2
+  0x036780:  652D    extu.w R2,R5
+  0x036782:  3653    cmp/ge R5,R6
+  0x036784:  8951    bt 0x03682A
+  0x036786:  C459    mov.b @(89,GBR),R0  ; <- RAM 0xFFFF79FD
+  0x036788:  1F0A    mov.l R0,@(40,R15)
+  0x03678A:  600C    extu.b R0,R0
+  0x03678C:  8801    cmp/eq #1,R0
+  0x03678E:  894C    bt 0x03682A
+  0x036790:  60DC    extu.b R13,R0
+  0x036792:  8803    cmp/eq #3,R0
+  0x036794:  8B05    bf 0x0367A2
+  0x036796:  D520    mov.l @(0x036818),R5  ; =0x000CBC5C  (CAL @0x0CBC5C)
+  0x036798:  6251    mov.w @R5,R2
+  0x03679A:  2228    tst R2,R2
+  0x03679C:  8901    bt 0x0367A2
+  0x03679E:  A045    bra 0x03682C
+  0x0367A0:  6051    mov.w @R5,R0
+  0x0367A2:  60E3    mov R14,R0
+  0x0367A4:  8801    cmp/eq #1,R0
+  0x0367A6:  8B02    bf 0x0367AE
+  0x0367A8:  D61C    mov.l @(0x03681C),R6  ; =0x000CBC62  (CAL @0x0CBC62)
+  0x0367AA:  A03F    bra 0x03682C
+  0x0367AC:  6061    mov.w @R6,R0
+  0x0367AE:  2CC8    tst R12,R12
+  0x0367B0:  8B38    bf 0x036824
+  0x0367B2:  D61B    mov.l @(0x036820),R6  ; =0x000CBC60  (CAL @0x0CBC60)
+  0x0367B4:  A03A    bra 0x03682C
+  0x0367B6:  6061    mov.w @R6,R0
+
+
+==============================================================================
+  FUN_00036830-0x36A0C - Post-condition and hysteresis prep
+  Address range: 0x036830 - 0x036A0C (476 bytes)
+  GBR = 0xFFFF79A4
+==============================================================================
+  0x036830:  C023    mov.b R0,@(35,GBR)  ; -> RAM 0xFFFF79C7
+  0x036832:  7F2C    add #44,R15
+  0x036834:  4F17    .word 0x4F17
+  0x036836:  FFF9    fmov.s @R15+,FR15
+  0x036838:  FEF9    fmov.s @R15+,FR14
+  0x03683A:  FDF9    fmov.s @R15+,FR13
+  0x03683C:  FCF9    fmov.s @R15+,FR12
+  0x03683E:  4F26    lds.l @R15+,PR
+  0x036840:  6EF6    mov.l @R15+,R14
+  0x036842:  6DF6    mov.l @R15+,R13
+  0x036844:  000B    rts
+  0x036846:  6CF6    mov.l @R15+,R12
+  0x036848:  2FD6    mov.l R13,@-R15
+  0x03684A:  4F22    sts.l PR,@-R15
+  0x03684C:  FFCB    fmov.s FR12,@-R15
+  0x03684E:  FFEB    fmov.s FR14,@-R15
+  0x036850:  FFFB    fmov.s FR15,@-R15
+  0x036852:  4F13    .word 0x4F13
+  0x036854:  D06F    mov.l @(0x036A14),R0  ; =0xFFFF798C  (RAM 798C)
+  0x036856:  401E    ldc R0,GBR  ; GBR = 0xFFFF798C
+  0x036858:  7FFC    add #-4,R15
+  0x03685A:  D26F    mov.l @(0x036A18),R2  ; =0xFFFF6624  (RAM 6624)
+  0x03685C:  FC28    fmov.s @R2,FR12
+  0x03685E:  D26F    mov.l @(0x036A1C),R2  ; =0xFFFF63F8  (RAM 63F8)
+  0x036860:  FF28    fmov.s @R2,FR15
+  0x036862:  DD6F    mov.l @(0x036A20),R13  ; =0xFFFF79F8  (RAM 79F8)
+  0x036864:  E0B4    mov #-76,R0
+  0x036866:  FED6    fmov.s @(R0,R13),FR14
+  0x036868:  D26E    mov.l @(0x036A24),R2  ; =0xFFFF7F48  (RAM 7F48)
+  0x03686A:  F828    fmov.s @R2,FR8
+  0x03686C:  D26E    mov.l @(0x036A28),R2  ; =0xFFFF8258  (RAM 8258)
+  0x03686E:  F628    fmov.s @R2,FR6
+  0x036870:  D26E    mov.l @(0x036A2C),R2  ; =0xFFFF7E90  (RAM 7E90)
+  0x036872:  F928    fmov.s @R2,FR9
+  0x036874:  F860    fadd FR6,FR8
+  0x036876:  F891    fsub FR9,FR8
+  0x036878:  E0BC    mov #-68,R0
+  0x03687A:  FD87    fmov.s FR8,@(R0,R13)
+  0x03687C:  D26C    mov.l @(0x036A30),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x03687E:  C76D    mova @(0x036A34),R0
+  0x036880:  F608    fmov.s @R0,FR6
+  0x036882:  F58D    fldi0 FR5
+  0x036884:  E094    mov #-108,R0
+  0x036886:  420B    jsr @R2  ; -> 0x000BE608
+  0x036888:  F4D6    fmov.s @(R0,R13),FR4
+  0x03688A:  620C    extu.b R0,R2
+  0x03688C:  2228    tst R2,R2
+  0x03688E:  8909    bt 0x0368A4
+  0x036890:  D469    mov.l @(0x036A38),R4  ; =0x000AD960  (ROM @0x0AD960)
+  0x036892:  D66A    mov.l @(0x036A3C),R6  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x036894:  2F62    mov.l R6,@R15
+  0x036896:  F5CC    fmov FR12,FR5
+  0x036898:  460B    jsr @R6  ; -> 0x000BE8E4
+  0x03689A:  F4FC    fmov FR15,FR4
+  0x03689C:  E0DC    mov #-36,R0
+  0x03689E:  D468    mov.l @(0x036A40),R4  ; =0x000AC5F8  (ROM @0x0AC5F8)
+  0x0368A0:  A009    bra 0x0368B6
+  0x0368A2:  FD07    fmov.s FR0,@(R0,R13)
+  0x0368A4:  D467    mov.l @(0x036A44),R4  ; =0x000AD97C  (ROM @0x0AD97C)
+  0x0368A6:  D265    mov.l @(0x036A3C),R2  ; =0x000BE8E4  (ROM @0x0BE8E4)
+  0x0368A8:  2F22    mov.l R2,@R15
+  0x0368AA:  F5CC    fmov FR12,FR5
+  0x0368AC:  420B    jsr @R2  ; -> 0x000BE8E4
+  0x0368AE:  F4FC    fmov FR15,FR4
+  0x0368B0:  E0DC    mov #-36,R0
+  0x0368B2:  FD07    fmov.s FR0,@(R0,R13)
+  0x0368B4:  D464    mov.l @(0x036A48),R4  ; =0x000AC60C  (ROM @0x0AC60C)
+  0x0368B6:  D665    mov.l @(0x036A4C),R6  ; =0x000BE830  (ROM @0x0BE830)
+  0x0368B8:  E0BC    mov #-68,R0
+  0x0368BA:  460B    jsr @R6  ; -> 0x000BE830
+  0x0368BC:  F4D6    fmov.s @(R0,R13),FR4
+  0x0368BE:  E0E0    mov #-32,R0
+  0x0368C0:  FD07    fmov.s FR0,@(R0,R13)
+  0x0368C2:  E0DC    mov #-36,R0
+  0x0368C4:  F8D6    fmov.s @(R0,R13),FR8
+  0x0368C6:  E0E0    mov #-32,R0
+  0x0368C8:  F9D6    fmov.s @(R0,R13),FR9
+  0x0368CA:  F892    fmul FR9,FR8
+  0x0368CC:  E0B4    mov #-76,R0
+  0x0368CE:  FD87    fmov.s FR8,@(R0,R13)
+  0x0368D0:  F8EC    fmov FR14,FR8
+  0x0368D2:  D25F    mov.l @(0x036A50),R2  ; =0x000CC224  (CAL @0x0CC224)
+  0x0368D4:  F928    fmov.s @R2,FR9
+  0x0368D6:  F890    fadd FR9,FR8
+  0x0368D8:  F9D6    fmov.s @(R0,R13),FR9
+  0x0368DA:  F985    fcmp/gt FR8,FR9
+  0x0368DC:  8B02    bf 0x0368E4
+  0x0368DE:  D05D    mov.l @(0x036A54),R0  ; =0x000AD998  (ROM @0x0AD998)
+  0x0368E0:  A010    bra 0x036904
+  0x0368E2:  C21B    mov.l R0,@(108,GBR)  ; -> RAM 0xFFFF79F8
+  0x0368E4:  D65C    mov.l @(0x036A58),R6  ; =0x000BEAB0  (ROM @0x0BEAB0)
+  0x0368E6:  F4D6    fmov.s @(R0,R13),FR4
+  0x0368E8:  460B    jsr @R6  ; -> 0x000BEAB0
+  0x0368EA:  F5EC    fmov FR14,FR5
+  0x0368EC:  D258    mov.l @(0x036A50),R2  ; =0x000CC224  (CAL @0x0CC224)
+  0x0368EE:  F828    fmov.s @R2,FR8
+  0x0368F0:  F085    fcmp/gt FR8,FR0
+  0x0368F2:  8B07    bf 0x036904
+  0x0368F4:  F828    fmov.s @R2,FR8
+  0x0368F6:  FE81    fsub FR8,FR14
+  0x0368F8:  E0B4    mov #-76,R0
+  0x0368FA:  F8D6    fmov.s @(R0,R13),FR8
+  0x0368FC:  FE85    fcmp/gt FR8,FR14
+  0x0368FE:  8B01    bf 0x036904
+  0x036900:  D056    mov.l @(0x036A5C),R0  ; =0x000AD9B4  (ROM @0x0AD9B4)
+  0x036902:  C21B    mov.l R0,@(108,GBR)  ; -> RAM 0xFFFF79F8
+  0x036904:  F5CC    fmov FR12,FR5
+  0x036906:  F4FC    fmov FR15,FR4
+  0x036908:  62F2    mov.l @R15,R2
+  0x03690A:  C61B    mov.l @(108,GBR),R0  ; <- RAM 0xFFFF79F8
+  0x03690C:  420B    jsr @R2  ; -> 0x000CC224
+  0x03690E:  6403    mov R0,R4
+  0x036910:  E0B8    mov #-72,R0
+  0x036912:  FD07    fmov.s FR0,@(R0,R13)
+  0x036914:  D652    mov.l @(0x036A60),R6  ; =0x000BEA40  (ROM @0x0BEA40)
+  0x036916:  E0B4    mov #-76,R0
+  0x036918:  F4D6    fmov.s @(R0,R13),FR4
+  0x03691A:  E0B8    mov #-72,R0
+  0x03691C:  F6D6    fmov.s @(R0,R13),FR6
+  0x03691E:  C751    mova @(0x036A64),R0
+  0x036920:  FE08    fmov.s @R0,FR14
+  0x036922:  F7EC    fmov FR14,FR7
+  0x036924:  E0AC    mov #-84,R0
+  0x036926:  460B    jsr @R6  ; -> 0x000BEA40
+  0x036928:  F5D6    fmov.s @(R0,R13),FR5
+  0x03692A:  E0AC    mov #-84,R0
+  0x03692C:  FD07    fmov.s FR0,@(R0,R13)
+  0x03692E:  D44E    mov.l @(0x036A68),R4  ; =0x000AD9D0  (ROM @0x0AD9D0)
+  0x036930:  F5CC    fmov FR12,FR5
+  0x036932:  62F2    mov.l @R15,R2
+  0x036934:  420B    jsr @R2  ; -> 0x000CC224
+  0x036936:  F4FC    fmov FR15,FR4
+  0x036938:  E0E4    mov #-28,R0
+  0x03693A:  FD07    fmov.s FR0,@(R0,R13)
+  0x03693C:  D648    mov.l @(0x036A60),R6  ; =0x000BEA40  (ROM @0x0BEA40)
+  0x03693E:  F7EC    fmov FR14,FR7
+  0x036940:  E0AC    mov #-84,R0
+  0x036942:  F4D6    fmov.s @(R0,R13),FR4
+  0x036944:  E0E4    mov #-28,R0
+  0x036946:  F6D6    fmov.s @(R0,R13),FR6
+  0x036948:  E0B0    mov #-80,R0
+  0x03694A:  460B    jsr @R6  ; -> 0x000BEA40
+  0x03694C:  F5D6    fmov.s @(R0,R13),FR5
+  0x03694E:  E0B0    mov #-80,R0
+  0x036950:  FD07    fmov.s FR0,@(R0,R13)
+  0x036952:  7F04    add #4,R15
+  0x036954:  4F17    .word 0x4F17
+  0x036956:  FFF9    fmov.s @R15+,FR15
+  0x036958:  FEF9    fmov.s @R15+,FR14
+  0x03695A:  FCF9    fmov.s @R15+,FR12
+  0x03695C:  4F26    lds.l @R15+,PR
+  0x03695E:  000B    rts
+  0x036960:  6DF6    mov.l @R15+,R13
+  0x036962:  4F22    sts.l PR,@-R15
+  0x036964:  D241    mov.l @(0x036A6C),R2  ; =0xFFFF6350  (RAM 6350)
+  0x036966:  F428    fmov.s @R2,FR4
+  0x036968:  D441    mov.l @(0x036A70),R4  ; =0x000AD0DC  (ROM @0x0AD0DC)
+  0x03696A:  D238    mov.l @(0x036A4C),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x03696C:  420B    jsr @R2  ; -> 0x000BE830
+  0x03696E:  0009    nop
+  0x036970:  D240    mov.l @(0x036A74),R2  ; =0xFFFF79A0  (RAM 79A0)
+  0x036972:  4F26    lds.l @R15+,PR
+  0x036974:  000B    rts
+  0x036976:  F20A    fmov.s FR0,@R2
+  0x036978:  2FE6    mov.l R14,@-R15
+  0x03697A:  4F22    sts.l PR,@-R15
+  0x03697C:  FFCB    fmov.s FR12,@-R15
+  0x03697E:  FFEB    fmov.s FR14,@-R15
+  0x036980:  FFFB    fmov.s FR15,@-R15
+  0x036982:  4F13    .word 0x4F13
+  0x036984:  D03C    mov.l @(0x036A78),R0  ; =0xFFFF79CC  (RAM 79CC)
+  0x036986:  401E    ldc R0,GBR  ; GBR = 0xFFFF79CC
+  0x036988:  D223    mov.l @(0x036A18),R2  ; =0xFFFF6624  (RAM 6624)
+  0x03698A:  FE28    fmov.s @R2,FR14
+  0x03698C:  D23B    mov.l @(0x036A7C),R2  ; =0xFFFF62DC  (RAM 62DC)
+  0x03698E:  FF28    fmov.s @R2,FR15
+  0x036990:  D23B    mov.l @(0x036A80),R2  ; =0xFFFF7348  (RAM 7348)
+  0x036992:  FC28    fmov.s @R2,FR12
+  0x036994:  D43B    mov.l @(0x036A84),R4  ; =0x000AC5BC  (ROM @0x0AC5BC)
+  0x036996:  D22D    mov.l @(0x036A4C),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x036998:  420B    jsr @R2  ; -> 0x000BE830
+  0x03699A:  F4EC    fmov FR14,FR4
+  0x03699C:  DE3A    mov.l @(0x036A88),R14  ; =0xFFFF79FC  (RAM 79FC)
+  0x03699E:  E0D0    mov #-48,R0
+  0x0369A0:  FE07    fmov.s FR0,@(R0,R14)
+  0x0369A2:  D43A    mov.l @(0x036A8C),R4  ; =0x000AD0A4  (ROM @0x0AD0A4)
+  0x0369A4:  D229    mov.l @(0x036A4C),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x0369A6:  420B    jsr @R2  ; -> 0x000BE830
+  0x0369A8:  F4EC    fmov FR14,FR4
+  0x0369AA:  E0D4    mov #-44,R0
+  0x0369AC:  FE07    fmov.s FR0,@(R0,R14)
+  0x0369AE:  E0D0    mov #-48,R0
+  0x0369B0:  F8E6    fmov.s @(R0,R14),FR8
+  0x0369B2:  D237    mov.l @(0x036A90),R2  ; =0x000CC178  (CAL @0x0CC178)
+  0x0369B4:  F928    fmov.s @R2,FR9
+  0x0369B6:  F891    fsub FR9,FR8
+  0x0369B8:  FF85    fcmp/gt FR8,FR15
+  0x0369BA:  8902    bt 0x0369C2
+  0x0369BC:  E001    mov #1,R0
+  0x0369BE:  A006    bra 0x0369CE
+  0x0369C0:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF79FE
+  0x0369C2:  E0D0    mov #-48,R0
+  0x0369C4:  F8E6    fmov.s @(R0,R14),FR8
+  0x0369C6:  FF85    fcmp/gt FR8,FR15
+  0x0369C8:  8B01    bf 0x0369CE
+  0x0369CA:  E000    mov #0,R0
+  0x0369CC:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF79FE
+  0x0369CE:  E0D4    mov #-44,R0
+  0x0369D0:  F8E6    fmov.s @(R0,R14),FR8
+  0x0369D2:  D230    mov.l @(0x036A94),R2  ; =0x000CC174  (CAL @0x0CC174)
+  0x0369D4:  F928    fmov.s @R2,FR9
+  0x0369D6:  F891    fsub FR9,FR8
+  0x0369D8:  FC85    fcmp/gt FR8,FR12
+  0x0369DA:  8902    bt 0x0369E2
+  0x0369DC:  E001    mov #1,R0
+  0x0369DE:  A006    bra 0x0369EE
+  0x0369E0:  C033    mov.b R0,@(51,GBR)  ; -> RAM 0xFFFF79FF
+  0x0369E2:  E0D4    mov #-44,R0
+  0x0369E4:  F8E6    fmov.s @(R0,R14),FR8
+  0x0369E6:  FC85    fcmp/gt FR8,FR12
+  0x0369E8:  8B01    bf 0x0369EE
+  0x0369EA:  E000    mov #0,R0
+  0x0369EC:  C033    mov.b R0,@(51,GBR)  ; -> RAM 0xFFFF79FF
+  0x0369EE:  C432    mov.b @(50,GBR),R0  ; <- RAM 0xFFFF79FE
+  0x0369F0:  8801    cmp/eq #1,R0
+  0x0369F2:  8B04    bf 0x0369FE
+  0x0369F4:  C433    mov.b @(51,GBR),R0  ; <- RAM 0xFFFF79FF
+  0x0369F6:  8801    cmp/eq #1,R0
+  0x0369F8:  8B01    bf 0x0369FE
+  0x0369FA:  A001    bra 0x036A00
+  0x0369FC:  E201    mov #1,R2
+  0x0369FE:  E200    mov #0,R2
+  0x036A00:  6023    mov R2,R0
+  0x036A02:  4F17    .word 0x4F17
+  0x036A04:  FFF9    fmov.s @R15+,FR15
+  0x036A06:  FEF9    fmov.s @R15+,FR14
+  0x036A08:  FCF9    fmov.s @R15+,FR12
+  0x036A0A:  4F26    lds.l @R15+,PR
+
+
+################################################################################
+# PART 2: ROM-WIDE SEARCH FOR ACCESSES TO 0xFFFF79C7
+# (GBR+0x23 with GBR=0xFFFF79A4 - the throttle exceeded flag)
+################################################################################
+
+--- Method 1: GBR-relative accesses ---
+
+--- Method 2: Direct address in literal pools ---
+  (none found)
+
+--- Method 3: Searching for nearby base addresses that could reach 0xFFFF79C7 ---
+  Base 0xFFFF7984 at pool 0x035A54, ref 0x035954 -> R5  (offset to 79C7: +0x43)
+  Base 0xFFFF7984 at pool 0x035A54, ref 0x035944 -> R5  (offset to 79C7: +0x43)
+  Base 0xFFFF7988 at pool 0x0359F8, ref 0x035824 -> R14  (offset to 79C7: +0x3F)
+  Base 0xFFFF7988 at pool 0x035D18, ref 0x035AA0 -> R10  (offset to 79C7: +0x3F)
+  Base 0xFFFF798C at pool 0x0246F8, ref 0x024554 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x030190, ref 0x02FFF4 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x031A1C, ref 0x0318C0 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x036288, ref 0x03607C -> R0  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x036A14, ref 0x036854 -> R0  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x0399C4, ref 0x0398E4 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x039C44, ref 0x039AB8 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x041934, ref 0x0418B4 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x044AF0, ref 0x0449A4 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x044DA8, ref 0x044D18 -> R6  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x082F60, ref 0x082D98 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF798C at pool 0x084594, ref 0x084480 -> R2  (offset to 79C7: +0x3B)
+  Base 0xFFFF79A0 at pool 0x036A74, ref 0x036970 -> R2  (offset to 79C7: +0x27)
+  Base 0xFFFF79A4 at pool 0x024700, ref 0x024564 -> R2  (offset to 79C7: +0x23)
+  Base 0xFFFF79A4 at pool 0x036554, ref 0x03644C -> R0  (offset to 79C7: +0x23)
+  Base 0xFFFF79A8 at pool 0x024704, ref 0x024568 -> R2  (offset to 79C7: +0x1F)
+  Base 0xFFFF79A8 at pool 0x04585C, ref 0x0457F4 -> R2  (offset to 79C7: +0x1F)
+  Base 0xFFFF79C0 at pool 0x036534, ref 0x036328 -> R0  (offset to 79C7: +0x7)
+  Base 0xFFFF79C4 at pool 0x07D7B4, ref 0x07D6CC -> R6  (offset to 79C7: +0x3)
+  Base 0xFFFF79C8 at pool 0x044ADC, ref 0x044974 -> R6  (offset to 79C7: +0x-1)
+  Base 0xFFFF79C8 at pool 0x044D98, ref 0x044CEC -> R2  (offset to 79C7: +0x-1)
+  Base 0xFFFF79CC at pool 0x036A78, ref 0x036984 -> R0  (offset to 79C7: +0x-5)
+
+--- Method 4: All GBR=0xFFFF79A4 accesses (showing offset range 0x20-0x2F) ---
+  0x0360AC: mov.w @(56,GBR),R0  [read word]  -> RAM 0xFFFF79C4 (GBR+0x20)
+  0x0360E0: mov.w @(56,GBR),R0  [read word]  -> RAM 0xFFFF79C4 (GBR+0x20)
+  0x036336: mov.w @(4,GBR),R0  [read word]  -> RAM 0xFFFF79C4 (GBR+0x20)
+  0x0363A6: mov.w @(4,GBR),R0  [read word]  -> RAM 0xFFFF79C4 (GBR+0x20)
+  0x03641C: mov.w @(4,GBR),R0  [read word]  -> RAM 0xFFFF79C4 (GBR+0x20)
+  0x0361EC: mov.b @(58,GBR),R0  [read byte]  -> RAM 0xFFFF79C6 (GBR+0x22)
+  0x036428: mov.b R0,@(8,GBR)  [write byte]  -> RAM 0xFFFF79C8 (GBR+0x24)
+
+
+################################################################################
+# PART 3: STOCK vs MODIFIED CALIBRATION VALUES (CL/OL related)
+################################################################################
+
+  0x0CBC5A: CL Delay Engine Load Counter Threshold
+    Stock: 313  Modified: 200  *** CHANGED ***
+
+  0x0CBC5C: CL to OL Delay/Switch SI-DRIVE Intelligent
+    Stock: 0  Modified: 0
+
+  0x0CBC62: CL to OL Delay
+    Stock: 750  Modified: 0  *** CHANGED ***
+
+  0x0CC16C: Primary Open Loop Fuel Map Switch (IAM)
+    Stock: 0.350000  Modified: 0.500000  *** CHANGED ***
+
+  0x0CC170: Minimum Active Primary Open Loop Enrichment
+    Stock: 0.050000  Modified: 0.050000
+
+  0x0CC174: CL to OL BPW Hysteresis
+    Stock: 256.000000  Modified: 756.000000  *** CHANGED ***
+
+  0x0CC178: CL to OL Throttle Hysteresis
+    Stock: 3.900000  Modified: 8.400000  *** CHANGED ***
+
+  0x0CC17C: CL Delay Minimum ECT
+    Stock: -12.000000  Modified: -12.000000
+
+  0x0CC180: CL Delay Max Engine Speed (Per Gear) - 10 values
+    [0] 0x0CC180: Stock=5300.0000  Mod=3600.0000  *** CHANGED ***
+    [1] 0x0CC184: Stock=5400.0000  Mod=3700.0000  *** CHANGED ***
+    [2] 0x0CC188: Stock=4300.0000  Mod=3500.0000  *** CHANGED ***
+    [3] 0x0CC18C: Stock=4400.0000  Mod=3600.0000  *** CHANGED ***
+    [4] 0x0CC190: Stock=4200.0000  Mod=3400.0000  *** CHANGED ***
+    [5] 0x0CC194: Stock=4300.0000  Mod=3500.0000  *** CHANGED ***
+    [6] 0x0CC198: Stock=4100.0000  Mod=3300.0000  *** CHANGED ***
+    [7] 0x0CC19C: Stock=4200.0000  Mod=3400.0000  *** CHANGED ***
+    [8] 0x0CC1A0: Stock=3700.0000  Mod=3200.0000  *** CHANGED ***
+    [9] 0x0CC1A4: Stock=3800.0000  Mod=3300.0000  *** CHANGED ***
+
+  0x0CC1A8: CL Delay Max Engine Speed (Neutral) - 10 values
+    [0] 0x0CC1A8: Stock=6000.0000  Mod=6000.0000
+    [1] 0x0CC1AC: Stock=6100.0000  Mod=6100.0000
+    [2] 0x0CC1B0: Stock=6000.0000  Mod=6000.0000
+    [3] 0x0CC1B4: Stock=6100.0000  Mod=6100.0000
+    [4] 0x0CC1B8: Stock=6000.0000  Mod=6000.0000
+    [5] 0x0CC1BC: Stock=6100.0000  Mod=6100.0000
+    [6] 0x0CC1C0: Stock=6000.0000  Mod=6000.0000
+    [7] 0x0CC1C4: Stock=6100.0000  Mod=6100.0000
+    [8] 0x0CC1C8: Stock=5700.0000  Mod=5700.0000
+    [9] 0x0CC1CC: Stock=5800.0000  Mod=5800.0000
+
+  0x0CC1D8: CL Delay Maximum (Throttle) - 7 values
+    [0] 0x0CC1D8: Stock=91.0000  Mod=37.8840  *** CHANGED ***
+    [1] 0x0CC1DC: Stock=691.9000  Mod=691.9000
+    [2] 0x0CC1E0: Stock=699.9000  Mod=699.9000
+    [3] 0x0CC1E4: Stock=90.0000  Mod=90.0000
+    [4] 0x0CC1E8: Stock=91.0000  Mod=91.0000
+    [5] 0x0CC1EC: Stock=90.0000  Mod=90.0000
+    [6] 0x0CC1F0: Stock=91.0000  Mod=91.0000
+
+  0x0CC1F4: CL Delay Maximum (Vehicle Speed)
+    Stock: 130.000000  Modified: 141.706924  *** CHANGED ***
+
+  0x0CC204: CL Delay Maximum (Engine Load)
+    Stock: 4.800000  Modified: 0.950000  *** CHANGED ***
+
+  0x0CCD78: CL to OL Transition with Delay (Throttle) - 4 values
+    [0] 0x0CCD78: Stock=-0.0000  Mod=-0.0000
+    [1] 0x0CCD7C: Stock=-0.0000  Mod=-0.0000
+    [2] 0x0CCD80: Stock=-0.0000  Mod=-0.0000
+    [3] 0x0CCD84: Stock=-0.0000  Mod=-0.0000
+
+  0x0CE5F8: CL to OL Transition with Delay (BPW) - 8 values
+    [0] 0x0CE5F8: Stock=0.0000  Mod=0.0000
+    [1] 0x0CE5FC: Stock=0.0000  Mod=0.0000
+    [2] 0x0CE600: Stock=0.0000  Mod=0.0000
+    [3] 0x0CE604: Stock=0.0000  Mod=0.0000
+    [4] 0x0CE608: Stock=0.0000  Mod=0.0000
+    [5] 0x0CE60C: Stock=0.0000  Mod=0.0000
+    [6] 0x0CE610: Stock=0.0000  Mod=0.0000
+    [7] 0x0CE614: Stock=0.0000  Mod=0.0000
+
+  0x0CE640: CL to OL Transition Counter Step Value (MAF) - 8 values
+    [0] 0x0CE640: Stock=0.0000  Mod=0.0000
+    [1] 0x0CE644: Stock=0.0000  Mod=0.0000
+    [2] 0x0CE648: Stock=0.0000  Mod=0.0000
+    [3] 0x0CE64C: Stock=0.0000  Mod=0.0000
+    [4] 0x0CE650: Stock=0.0000  Mod=0.0000
+    [5] 0x0CE654: Stock=1.0000  Mod=1.0000
+    [6] 0x0CE658: Stock=2.0000  Mod=2.0000
+    [7] 0x0CE65C: Stock=3.0000  Mod=3.0000
+
+
+################################################################################
+# PART 4: DISPATCH TABLE ENTRIES
+################################################################################
+
+--- Dispatch Table A @ 0x480B8 (fueling) ---
+  [ 0] 0x0480B8: 0x00033278
+  [ 1] 0x0480BC: 0x00031600
+  [ 2] 0x0480C0: 0x00032AA8
+  [ 3] 0x0480C4: 0x00031C9C
+  [ 4] 0x0480C8: 0x00032958
+  [ 5] 0x0480CC: 0x00034488
+  [ 6] 0x0480D0: 0x000357D0
+  [ 7] 0x0480D4: 0x00034EC8
+  [ 8] 0x0480D8: 0x00036008
+  [ 9] 0x0480DC: 0x00036A98
+  [10] 0x0480E0: 0x00036BF4
+  [11] 0x0480E4: 0x00036E60
+  [12] 0x0480E8: 0x00037156
+  [13] 0x0480EC: 0x0003756C
+  [14] 0x0480F0: 0x00037ABA
+  [15] 0x0480F4: 0x00038158
+  [16] 0x0480F8: 0x00038D16
+  [17] 0x0480FC: 0x00038E30
+  [18] 0x048100: 0x000399EE
+
+--- Dispatch Table B @ 0x4A0B8 ---
+  [ 0] 0x04A0B8: 0x000332A2
+  [ 1] 0x04A0BC: 0x00032AA8
+  [ 2] 0x04A0C0: 0x00031C9C
+  [ 3] 0x04A0C4: 0x00032958
+  [ 4] 0x04A0C8: 0x00031A4C
+  [ 5] 0x04A0CC: 0x0003160A
+  [ 6] 0x04A0D0: 0x00031528
+  [ 7] 0x04A0D4: 0x0003CD34
+  [ 8] 0x04A0D8: 0x00039528
+  [ 9] 0x04A0DC: 0x00030ACC
+  [10] 0x04A0E0: 0x00036C3C
+  [11] 0x04A0E4: 0x00037B68
+  [12] 0x04A0E8: 0x0003452A
+  [13] 0x04A0EC: 0x00034EF4
+  [14] 0x04A0F0: 0x0003580C
+  [15] 0x04A0F4: 0x0003605E
+  [16] 0x04A0F8: 0x00037186
+  [17] 0x04A0FC: 0x0003A222
+  [18] 0x04A100: 0x0003EB8C
+  [19] 0x04A104: 0x000403C4
+
+
+################################################################################
+# PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
+################################################################################
+
+--- Flag write at 0x36830 region (writes GBR+0x23) ---
+
+==============================================================================
+  Context around GBR+0x23 write (0xFFFF79C7)
+  Address range: 0x036820 - 0x036850 (48 bytes)
+  GBR = 0xFFFF79A4
+==============================================================================
+  0x036820:  000C    mov.b @(R0,R0),R0
+  0x036822:  BC60    bsr 0x0360E6
+  0x036824:  D67A    mov.l @(0x036A10),R6  ; =0x000CBC5E  (CAL @0x0CBC5E)
+  0x036826:  A001    bra 0x03682C
+  0x036828:  6061    mov.w @R6,R0
+  0x03682A:  E000    mov #0,R0
+  0x03682C:  C110    mov.w R0,@(32,GBR)  ; -> RAM 0xFFFF79C4
+  0x03682E:  E000    mov #0,R0
+  0x036830:  C023    mov.b R0,@(35,GBR)  ; -> RAM 0xFFFF79C7
+  0x036832:  7F2C    add #44,R15
+  0x036834:  4F17    .word 0x4F17
+  0x036836:  FFF9    fmov.s @R15+,FR15
+  0x036838:  FEF9    fmov.s @R15+,FR14
+  0x03683A:  FDF9    fmov.s @R15+,FR13
+  0x03683C:  FCF9    fmov.s @R15+,FR12
+  0x03683E:  4F26    lds.l @R15+,PR
+  0x036840:  6EF6    mov.l @R15+,R14
+  0x036842:  6DF6    mov.l @R15+,R13
+  0x036844:  000B    rts
+  0x036846:  6CF6    mov.l @R15+,R12
+  0x036848:  2FD6    mov.l R13,@-R15
+  0x03684A:  4F22    sts.l PR,@-R15
+  0x03684C:  FFCB    fmov.s FR12,@-R15
+  0x03684E:  FFEB    fmov.s FR14,@-R15
+
+--- Full hysteresis handler 0x36A98-0x36BF4 ---
+
+==============================================================================
+  FUN_00036A98/36AB2 - Hysteresis handler (COMPLETE)
+  Address range: 0x036A98 - 0x036BF4 (348 bytes)
+==============================================================================
+  0x036A98:  E000    mov #0,R0
+  0x036A9A:  D544    mov.l @(0x036BAC),R5  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036A9C:  8054    mov.b R0,@(84,R5)
+  0x036A9E:  8454    mov.b @(84,R5),R0
+  0x036AA0:  2500    mov.b R0,@R5
+  0x036AA2:  D643    mov.l @(0x036BB0),R6  ; =0xFFFF65C0  (RAM 65C0)
+  0x036AA4:  6060    mov.b @R6,R0
+  0x036AA6:  000B    rts
+  0x036AA8:  8055    mov.b R0,@(85,R5)
+  0x036AAA:  A002    bra 0x036AB2
+  0x036AAC:  0009    nop
+  0x036AAE:  A04B    bra 0x036B48
+  0x036AB0:  0009    nop
+  0x036AB2:  2FD6    mov.l R13,@-R15
+  0x036AB4:  4F22    sts.l PR,@-R15
+  0x036AB6:  FFEB    fmov.s FR14,@-R15
+  0x036AB8:  FFFB    fmov.s FR15,@-R15
+  0x036ABA:  7FFC    add #-4,R15
+  0x036ABC:  D23D    mov.l @(0x036BB4),R2  ; =0xFFFF6624  (RAM 6624)
+  0x036ABE:  FE28    fmov.s @R2,FR14
+  0x036AC0:  D23D    mov.l @(0x036BB8),R2  ; =0xFFFF65FC  (RAM 65FC)
+  0x036AC2:  FF28    fmov.s @R2,FR15
+  0x036AC4:  D63A    mov.l @(0x036BB0),R6  ; =0xFFFF65C0  (RAM 65C0)
+  0x036AC6:  D23D    mov.l @(0x036BBC),R2  ; =0x00022CF4  (ROM @0x022CF4)
+  0x036AC8:  420B    jsr @R2  ; -> 0x00022CF4
+  0x036ACA:  6D60    mov.b @R6,R13
+  0x036ACC:  2F00    mov.b R0,@R15
+  0x036ACE:  D23C    mov.l @(0x036BC0),R2  ; =0xFFFF67EC  (RAM 67EC)
+  0x036AD0:  6221    mov.w @R2,R2
+  0x036AD2:  D63C    mov.l @(0x036BC4),R6  ; =0x000CBC66  (CAL @0x0CBC66)
+  0x036AD4:  6561    mov.w @R6,R5
+  0x036AD6:  3252    cmp/hs R5,R2
+  0x036AD8:  8B08    bf 0x036AEC
+  0x036ADA:  D134    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036ADC:  8415    mov.b @(21,R1),R0
+  0x036ADE:  8801    cmp/eq #1,R0
+  0x036AE0:  8B07    bf 0x036AF2
+  0x036AE2:  2DD8    tst R13,R13
+  0x036AE4:  8B05    bf 0x036AF2
+  0x036AE6:  E001    mov #1,R0
+  0x036AE8:  A003    bra 0x036AF2
+  0x036AEA:  8016    mov.b R0,@(22,R1)
+  0x036AEC:  E000    mov #0,R0
+  0x036AEE:  D12F    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036AF0:  8016    mov.b R0,@(22,R1)
+  0x036AF2:  2DD8    tst R13,R13
+  0x036AF4:  8F06    bf/s 0x036B04
+  0x036AF6:  E000    mov #0,R0
+  0x036AF8:  D233    mov.l @(0x036BC8),R2  ; =0x000BE554  (ROM @0x0BE554)
+  0x036AFA:  E501    mov #1,R5
+  0x036AFC:  8511    mov.w @(34,R1),R0
+  0x036AFE:  420B    jsr @R2  ; -> 0x000BE554
+  0x036B00:  640D    extu.w R0,R4
+  0x036B02:  D12A    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036B04:  8111    mov.w R0,@(34,R1)
+  0x036B06:  66F0    mov.b @R15,R6
+  0x036B08:  2668    tst R6,R6
+  0x036B0A:  8B13    bf 0x036B34
+  0x036B0C:  D22F    mov.l @(0x036BCC),R2  ; =0x000CC228  (CAL @0x0CC228)
+  0x036B0E:  F828    fmov.s @R2,FR8
+  0x036B10:  F8E5    fcmp/gt FR14,FR8
+  0x036B12:  8B0F    bf 0x036B34
+  0x036B14:  2DD8    tst R13,R13
+  0x036B16:  8B0D    bf 0x036B34
+  0x036B18:  8416    mov.b @(22,R1),R0
+  0x036B1A:  8801    cmp/eq #1,R0
+  0x036B1C:  8B0A    bf 0x036B34
+  0x036B1E:  8511    mov.w @(34,R1),R0
+  0x036B20:  D52B    mov.l @(0x036BD0),R5  ; =0x000CBC68  (CAL @0x0CBC68)
+  0x036B22:  6251    mov.w @R5,R2
+  0x036B24:  3022    cmp/hs R2,R0
+  0x036B26:  8B05    bf 0x036B34
+  0x036B28:  D22A    mov.l @(0x036BD4),R2  ; =0x000CC22C  (CAL @0x0CC22C)
+  0x036B2A:  F828    fmov.s @R2,FR8
+  0x036B2C:  F8F5    fcmp/gt FR15,FR8
+  0x036B2E:  8901    bt 0x036B34
+  0x036B30:  A001    bra 0x036B36
+  0x036B32:  E201    mov #1,R2
+  0x036B34:  E200    mov #0,R2
+  0x036B36:  2120    mov.b R2,@R1
+  0x036B38:  60D3    mov R13,R0
+  0x036B3A:  8015    mov.b R0,@(21,R1)
+  0x036B3C:  7F04    add #4,R15
+  0x036B3E:  FFF9    fmov.s @R15+,FR15
+  0x036B40:  FEF9    fmov.s @R15+,FR14
+  0x036B42:  4F26    lds.l @R15+,PR
+  0x036B44:  000B    rts
+  0x036B46:  6DF6    mov.l @R15+,R13
+  0x036B48:  2FE6    mov.l R14,@-R15
+  0x036B4A:  4F22    sts.l PR,@-R15
+  0x036B4C:  D222    mov.l @(0x036BD8),R2  ; =0xFFFF6350  (RAM 6350)
+  0x036B4E:  F428    fmov.s @R2,FR4
+  0x036B50:  DE16    mov.l @(0x036BAC),R14  ; =0xFFFF7A0C  (RAM 7A0C)
+  0x036B52:  84E4    mov.b @(228,R14),R0
+  0x036B54:  2008    tst R0,R0
+  0x036B56:  8B09    bf 0x036B6C
+  0x036B58:  60E0    mov.b @R14,R0
+  0x036B5A:  8801    cmp/eq #1,R0
+  0x036B5C:  8B06    bf 0x036B6C
+  0x036B5E:  D41F    mov.l @(0x036BDC),R4  ; =0x000AC620  (ROM @0x0AC620)
+  0x036B60:  D21F    mov.l @(0x036BE0),R2  ; =0x000BE830  (ROM @0x0BE830)
+  0x036B62:  420B    jsr @R2  ; -> 0x000BE830
+  0x036B64:  0009    nop
+  0x036B66:  E0FC    mov #-4,R0
+  0x036B68:  A01B    bra 0x036BA2
+  0x036B6A:  FE07    fmov.s FR0,@(R0,R14)
+  0x036B6C:  D21D    mov.l @(0x036BE4),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x036B6E:  E0FC    mov #-4,R0
+  0x036B70:  F4E6    fmov.s @(R0,R14),FR4
+  0x036B72:  C71D    mova @(0x036BE8),R0
+  0x036B74:  F608    fmov.s @R0,FR6
+  0x036B76:  420B    jsr @R2  ; -> 0x000BE608
+  0x036B78:  F58D    fldi0 FR5
+  0x036B7A:  620C    extu.b R0,R2
+  0x036B7C:  2228    tst R2,R2
+  0x036B7E:  890D    bt 0x036B9C
+  0x036B80:  60E0    mov.b @R14,R0
+  0x036B82:  8801    cmp/eq #1,R0
+  0x036B84:  8B0A    bf 0x036B9C
+  0x036B86:  E0FC    mov #-4,R0
+  0x036B88:  F4E6    fmov.s @(R0,R14),FR4
+  0x036B8A:  D218    mov.l @(0x036BEC),R2  ; =0x000CC230  (CAL @0x0CC230)
+  0x036B8C:  F828    fmov.s @R2,FR8
+  0x036B8E:  F481    fsub FR8,FR4
+  0x036B90:  D217    mov.l @(0x036BF0),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036B92:  420B    jsr @R2  ; -> 0x000BE960
+  0x036B94:  F58D    fldi0 FR5
+  0x036B96:  E0FC    mov #-4,R0
+  0x036B98:  A003    bra 0x036BA2
+  0x036B9A:  FE07    fmov.s FR0,@(R0,R14)
+  0x036B9C:  F58D    fldi0 FR5
+  0x036B9E:  E0FC    mov #-4,R0
+  0x036BA0:  FE57    fmov.s FR5,@(R0,R14)
+  0x036BA2:  60E0    mov.b @R14,R0
+  0x036BA4:  80E4    mov.b R0,@(228,R14)
+  0x036BA6:  4F26    lds.l @R15+,PR
+  0x036BA8:  000B    rts
+  0x036BAA:  6EF6    mov.l @R15+,R14
+  0x036BAC:  FFFF    fpu_0xFFFF
+  0x036BAE:  7A0C    add #12,R10
+  0x036BB0:  FFFF    fpu_0xFFFF
+  0x036BB2:  65C0    mov.b @R12,R5
+  0x036BB4:  FFFF    fpu_0xFFFF
+  0x036BB6:  6624    mov.b @R2+,R6
+  0x036BB8:  FFFF    fpu_0xFFFF
+  0x036BBA:  65FC    extu.b R15,R5
+  0x036BBC:  0002    stc SR,R0
+  0x036BBE:  2CF4    mov.b R15,@-R12
+  0x036BC0:  FFFF    fpu_0xFFFF
+  0x036BC2:  67EC    extu.b R14,R7
+  0x036BC4:  000C    mov.b @(R0,R0),R0
+  0x036BC6:  BC66    bsr 0x036496
+  0x036BC8:  000B    rts
+  0x036BCA:  E554    mov #84,R5
+  0x036BCC:  000C    mov.b @(R0,R0),R0
+  0x036BCE:  C228    mov.l R0,@(160,GBR)
+  0x036BD0:  000C    mov.b @(R0,R0),R0
+  0x036BD2:  BC68    bsr 0x0364A6
+  0x036BD4:  000C    mov.b @(R0,R0),R0
+  0x036BD6:  C22C    mov.l R0,@(176,GBR)
+  0x036BD8:  FFFF    fpu_0xFFFF
+  0x036BDA:  6350    mov.b @R5,R3
+  0x036BDC:  000A    .word 0x000A
+  0x036BDE:  C620    mov.l @(128,GBR),R0
+  0x036BE0:  000B    rts
+  0x036BE2:  E830    mov #48,R8
+  0x036BE4:  000B    rts
+  0x036BE6:  E608    mov #8,R6
+  0x036BE8:  3A00    cmp/eq R0,R10
+  0x036BEA:  0000    .word 0x0000
+  0x036BEC:  000C    mov.b @(R0,R0),R0
+  0x036BEE:  C230    mov.l R0,@(192,GBR)
+  0x036BF0:  000B    rts
+  0x036BF2:  E960    mov #96,R9
+
+
+  --- Literal Pool: Pool after hysteresis (0x036BF4-0x036BF4) ---
+
+--- Full delay manager B 0x36BF4-0x36E60 ---
+
+==============================================================================
+  FUN_00036BF4 - Delay manager B (COMPLETE)
+  Address range: 0x036BF4 - 0x036E60 (620 bytes)
+==============================================================================
+  0x036BF4:  D279    mov.l @(0x036DDC),R2  ; =0xFFFF6350  (RAM 6350)
+  0x036BF6:  F828    fmov.s @R2,FR8
+  0x036BF8:  D279    mov.l @(0x036DE0),R2  ; =0xFFFF6364  (RAM 6364)
+  0x036BFA:  F928    fmov.s @R2,FR9
+  0x036BFC:  D279    mov.l @(0x036DE4),R2  ; =0x000CC234  (CAL @0x0CC234)
+  0x036BFE:  F628    fmov.s @R2,FR6
+  0x036C00:  F685    fcmp/gt FR8,FR6
+  0x036C02:  8908    bt 0x036C16
+  0x036C04:  D278    mov.l @(0x036DE8),R2  ; =0x000CC238  (CAL @0x0CC238)
+  0x036C06:  F628    fmov.s @R2,FR6
+  0x036C08:  F695    fcmp/gt FR9,FR6
+  0x036C0A:  8904    bt 0x036C16
+  0x036C0C:  D277    mov.l @(0x036DEC),R2  ; =0x000CC244  (CAL @0x0CC244)
+  0x036C0E:  F828    fmov.s @R2,FR8
+  0x036C10:  D277    mov.l @(0x036DF0),R2  ; =0xFFFF7A18  (RAM 7A18)
+  0x036C12:  A00C    bra 0x036C2E
+  0x036C14:  F28A    fmov.s FR8,@R2
+  0x036C16:  D277    mov.l @(0x036DF4),R2  ; =0x000CC23C  (CAL @0x0CC23C)
+  0x036C18:  F628    fmov.s @R2,FR6
+  0x036C1A:  F685    fcmp/gt FR8,FR6
+  0x036C1C:  8907    bt 0x036C2E
+  0x036C1E:  D276    mov.l @(0x036DF8),R2  ; =0x000CC240  (CAL @0x0CC240)
+  0x036C20:  F828    fmov.s @R2,FR8
+  0x036C22:  F895    fcmp/gt FR9,FR8
+  0x036C24:  8903    bt 0x036C2E
+  0x036C26:  D275    mov.l @(0x036DFC),R2  ; =0x000CC248  (CAL @0x0CC248)
+  0x036C28:  F828    fmov.s @R2,FR8
+  0x036C2A:  D271    mov.l @(0x036DF0),R2  ; =0xFFFF7A18  (RAM 7A18)
+  0x036C2C:  F28A    fmov.s FR8,@R2
+  0x036C2E:  D270    mov.l @(0x036DF0),R2  ; =0xFFFF7A18  (RAM 7A18)
+  0x036C30:  F828    fmov.s @R2,FR8
+  0x036C32:  E0FC    mov #-4,R0
+  0x036C34:  000B    rts
+  0x036C36:  F287    fmov.s FR8,@(R0,R2)
+  0x036C38:  A004    bra 0x036C44
+  0x036C3A:  0009    nop
+  0x036C3C:  A004    bra 0x036C48
+  0x036C3E:  0009    nop
+  0x036C40:  A068    bra 0x036D14
+  0x036C42:  0009    nop
+  0x036C44:  000B    rts
+  0x036C46:  0009    nop
+  0x036C48:  2FC6    mov.l R12,@-R15
+  0x036C4A:  2FD6    mov.l R13,@-R15
+  0x036C4C:  2FE6    mov.l R14,@-R15
+  0x036C4E:  4F22    sts.l PR,@-R15
+  0x036C50:  FFEB    fmov.s FR14,@-R15
+  0x036C52:  7FF8    add #-8,R15
+  0x036C54:  D66A    mov.l @(0x036E00),R6  ; =0xFFFF726C  (RAM 726C)
+  0x036C56:  6E60    mov.b @R6,R14
+  0x036C58:  D66A    mov.l @(0x036E04),R6  ; =0xFFFF67EC  (RAM 67EC)
+  0x036C5A:  6C61    mov.w @R6,R12
+  0x036C5C:  D26A    mov.l @(0x036E08),R2  ; =0xFFFF72A1  (RAM 72A1)
+  0x036C5E:  6620    mov.b @R2,R6
+  0x036C60:  D26A    mov.l @(0x036E0C),R2  ; =0x00022F92  (ROM @0x022F92)
+  0x036C62:  420B    jsr @R2  ; -> 0x00022F92
+  0x036C64:  0009    nop
+  0x036C66:  2F00    mov.b R0,@R15
+  0x036C68:  D269    mov.l @(0x036E10),R2  ; =0xFFFF7374  (RAM 7374)
+  0x036C6A:  FE28    fmov.s @R2,FR14
+  0x036C6C:  D269    mov.l @(0x036E14),R2  ; =0x00021D9A  (ROM @0x021D9A)
+  0x036C6E:  420B    jsr @R2  ; -> 0x00021D9A
+  0x036C70:  0009    nop
+  0x036C72:  D269    mov.l @(0x036E18),R2  ; =0x00021DAE  (ROM @0x021DAE)
+  0x036C74:  420B    jsr @R2  ; -> 0x00021DAE
+  0x036C76:  80F4    mov.b R0,@(244,R15)
+  0x036C78:  84F4    mov.b @(244,R15),R0
+  0x036C7A:  8802    cmp/eq #2,R0
+  0x036C7C:  0D29    .word 0x0D29
+  0x036C7E:  60E3    mov R14,R0
+  0x036C80:  8801    cmp/eq #1,R0
+  0x036C82:  8926    bt 0x036CD2
+  0x036C84:  60F0    mov.b @R15,R0
+  0x036C86:  8801    cmp/eq #1,R0
+  0x036C88:  8923    bt 0x036CD2
+  0x036C8A:  D264    mov.l @(0x036E1C),R2  ; =0x000BE608  (ROM @0x0BE608)
+  0x036C8C:  F4EC    fmov FR14,FR4
+  0x036C8E:  C764    mova @(0x036E20),R0
+  0x036C90:  F608    fmov.s @R0,FR6
+  0x036C92:  420B    jsr @R2  ; -> 0x000BE608
+  0x036C94:  F58D    fldi0 FR5
+  0x036C96:  620C    extu.b R0,R2
+  0x036C98:  2228    tst R2,R2
+  0x036C9A:  8B12    bf 0x036CC2
+  0x036C9C:  60D3    mov R13,R0
+  0x036C9E:  8801    cmp/eq #1,R0
+  0x036CA0:  8B0F    bf 0x036CC2
+  0x036CA2:  D260    mov.l @(0x036E24),R2  ; =0x000BE554  (ROM @0x0BE554)
+  0x036CA4:  D160    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CA6:  6611    mov.w @R1,R6
+  0x036CA8:  646D    extu.w R6,R4
+  0x036CAA:  420B    jsr @R2  ; -> 0x000BE554
+  0x036CAC:  E501    mov #1,R5
+  0x036CAE:  620D    extu.w R0,R2
+  0x036CB0:  D75E    mov.l @(0x036E2C),R7  ; =0x000CBC6A  (CAL @0x0CBC6A)
+  0x036CB2:  6671    mov.w @R7,R6
+  0x036CB4:  646D    extu.w R6,R4
+  0x036CB6:  3243    cmp/ge R4,R2
+  0x036CB8:  8900    bt 0x036CBC
+  0x036CBA:  6271    mov.w @R7,R2
+  0x036CBC:  D15A    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CBE:  A008    bra 0x036CD2
+  0x036CC0:  2121    mov.w R2,@R1
+  0x036CC2:  D258    mov.l @(0x036E24),R2  ; =0x000BE554  (ROM @0x0BE554)
+  0x036CC4:  E501    mov #1,R5
+  0x036CC6:  D158    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CC8:  6611    mov.w @R1,R6
+  0x036CCA:  420B    jsr @R2  ; -> 0x000BE554
+  0x036CCC:  646D    extu.w R6,R4
+  0x036CCE:  D156    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CD0:  2101    mov.w R0,@R1
+  0x036CD2:  D657    mov.l @(0x036E30),R6  ; =0xFFFF85D7  (RAM 85D7)
+  0x036CD4:  6560    mov.b @R6,R5
+  0x036CD6:  D257    mov.l @(0x036E34),R2  ; =0x000CBC6E  (CAL @0x0CBC6E)
+  0x036CD8:  6621    mov.w @R2,R6
+  0x036CDA:  666D    extu.w R6,R6
+  0x036CDC:  62CD    extu.w R12,R2
+  0x036CDE:  3263    cmp/ge R6,R2
+  0x036CE0:  8B0C    bf 0x036CFC
+  0x036CE2:  2558    tst R5,R5
+  0x036CE4:  8B0A    bf 0x036CFC
+  0x036CE6:  D254    mov.l @(0x036E38),R2  ; =0x000CC258  (CAL @0x0CC258)
+  0x036CE8:  F528    fmov.s @R2,FR5
+  0x036CEA:  D254    mov.l @(0x036E3C),R2  ; =0x000BE970  (ROM @0x0BE970)
+  0x036CEC:  D14E    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CEE:  E0FC    mov #-4,R0
+  0x036CF0:  420B    jsr @R2  ; -> 0x000BE970
+  0x036CF2:  F416    fmov.s @(R0,R1),FR4
+  0x036CF4:  D14C    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CF6:  E0F8    mov #-8,R0
+  0x036CF8:  A005    bra 0x036D06
+  0x036CFA:  F107    fmov.s FR0,@(R0,R1)
+  0x036CFC:  D14A    mov.l @(0x036E28),R1  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036CFE:  E0FC    mov #-4,R0
+  0x036D00:  F816    fmov.s @(R0,R1),FR8
+  0x036D02:  E0F8    mov #-8,R0
+  0x036D04:  F187    fmov.s FR8,@(R0,R1)
+  0x036D06:  7F08    add #8,R15
+  0x036D08:  FEF9    fmov.s @R15+,FR14
+  0x036D0A:  4F26    lds.l @R15+,PR
+  0x036D0C:  6EF6    mov.l @R15+,R14
+  0x036D0E:  6DF6    mov.l @R15+,R13
+  0x036D10:  000B    rts
+  0x036D12:  6CF6    mov.l @R15+,R12
+  0x036D14:  2FD6    mov.l R13,@-R15
+  0x036D16:  2FE6    mov.l R14,@-R15
+  0x036D18:  4F22    sts.l PR,@-R15
+  0x036D1A:  7FF8    add #-8,R15
+  0x036D1C:  D638    mov.l @(0x036E00),R6  ; =0xFFFF726C  (RAM 726C)
+  0x036D1E:  6E60    mov.b @R6,R14
+  0x036D20:  D638    mov.l @(0x036E04),R6  ; =0xFFFF67EC  (RAM 67EC)
+  0x036D22:  6D61    mov.w @R6,R13
+  0x036D24:  D238    mov.l @(0x036E08),R2  ; =0xFFFF72A1  (RAM 72A1)
+  0x036D26:  6620    mov.b @R2,R6
+  0x036D28:  D23A    mov.l @(0x036E14),R2  ; =0x00021D9A  (ROM @0x021D9A)
+  0x036D2A:  420B    jsr @R2  ; -> 0x00021D9A
+  0x036D2C:  0009    nop
+  0x036D2E:  D23A    mov.l @(0x036E18),R2  ; =0x00021DAE  (ROM @0x021DAE)
+  0x036D30:  420B    jsr @R2  ; -> 0x00021DAE
+  0x036D32:  2F00    mov.b R0,@R15
+  0x036D34:  D242    mov.l @(0x036E40),R2  ; =0x00029808  (ROM @0x029808)
+  0x036D36:  420B    jsr @R2  ; -> 0x00029808
+  0x036D38:  0009    nop
+  0x036D3A:  D242    mov.l @(0x036E44),R2  ; =0x00029818  (ROM @0x029818)
+  0x036D3C:  420B    jsr @R2  ; -> 0x00029818
+  0x036D3E:  80F4    mov.b R0,@(244,R15)
+  0x036D40:  66F0    mov.b @R15,R6
+  0x036D42:  2668    tst R6,R6
+  0x036D44:  0429    .word 0x0429
+  0x036D46:  84F4    mov.b @(244,R15),R0
+  0x036D48:  2008    tst R0,R0
+  0x036D4A:  0529    .word 0x0529
+  0x036D4C:  D63E    mov.l @(0x036E48),R6  ; =0xFFFF7C18  (RAM 7C18)
+  0x036D4E:  6060    mov.b @R6,R0
+  0x036D50:  8801    cmp/eq #1,R0
+  0x036D52:  8B0C    bf 0x036D6E
+  0x036D54:  D734    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036D56:  E0FC    mov #-4,R0
+  0x036D58:  F476    fmov.s @(R0,R7),FR4
+  0x036D5A:  D23C    mov.l @(0x036E4C),R2  ; =0x000CC254  (CAL @0x0CC254)
+  0x036D5C:  F828    fmov.s @R2,FR8
+  0x036D5E:  F481    fsub FR8,FR4
+  0x036D60:  D23B    mov.l @(0x036E50),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036D62:  420B    jsr @R2  ; -> 0x000BE960
+  0x036D64:  F58D    fldi0 FR5
+  0x036D66:  D730    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036D68:  E0FC    mov #-4,R0
+  0x036D6A:  A031    bra 0x036DD0
+  0x036D6C:  F707    fmov.s FR0,@(R0,R7)
+  0x036D6E:  60EC    extu.b R14,R0
+  0x036D70:  8801    cmp/eq #1,R0
+  0x036D72:  892D    bt 0x036DD0
+  0x036D74:  D72C    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036D76:  6671    mov.w @R7,R6
+  0x036D78:  D12C    mov.l @(0x036E2C),R1  ; =0x000CBC6A  (CAL @0x0CBC6A)
+  0x036D7A:  6211    mov.w @R1,R2
+  0x036D7C:  3622    cmp/hs R2,R6
+  0x036D7E:  8B27    bf 0x036DD0
+  0x036D80:  E0FC    mov #-4,R0
+  0x036D82:  F876    fmov.s @(R0,R7),FR8
+  0x036D84:  F58D    fldi0 FR5
+  0x036D86:  F855    fcmp/gt FR5,FR8
+  0x036D88:  8B18    bf 0x036DBC
+  0x036D8A:  D632    mov.l @(0x036E54),R6  ; =0x000CBC6C  (CAL @0x0CBC6C)
+  0x036D8C:  6261    mov.w @R6,R2
+  0x036D8E:  612D    extu.w R2,R1
+  0x036D90:  62DD    extu.w R13,R2
+  0x036D92:  3213    cmp/ge R1,R2
+  0x036D94:  8912    bt 0x036DBC
+  0x036D96:  6043    mov R4,R0
+  0x036D98:  8801    cmp/eq #1,R0
+  0x036D9A:  8B0F    bf 0x036DBC
+  0x036D9C:  6053    mov R5,R0
+  0x036D9E:  8801    cmp/eq #1,R0
+  0x036DA0:  8B0C    bf 0x036DBC
+  0x036DA2:  D22D    mov.l @(0x036E58),R2  ; =0x000CC24C  (CAL @0x0CC24C)
+  0x036DA4:  F528    fmov.s @R2,FR5
+  0x036DA6:  E0FC    mov #-4,R0
+  0x036DA8:  F476    fmov.s @(R0,R7),FR4
+  0x036DAA:  D22C    mov.l @(0x036E5C),R2  ; =0x000CC250  (CAL @0x0CC250)
+  0x036DAC:  F828    fmov.s @R2,FR8
+  0x036DAE:  D228    mov.l @(0x036E50),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036DB0:  420B    jsr @R2  ; -> 0x000BE960
+  0x036DB2:  F481    fsub FR8,FR4
+  0x036DB4:  D71C    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036DB6:  E0FC    mov #-4,R0
+  0x036DB8:  A00A    bra 0x036DD0
+  0x036DBA:  F707    fmov.s FR0,@(R0,R7)
+  0x036DBC:  E0FC    mov #-4,R0
+  0x036DBE:  F476    fmov.s @(R0,R7),FR4
+  0x036DC0:  D226    mov.l @(0x036E5C),R2  ; =0x000CC250  (CAL @0x0CC250)
+  0x036DC2:  F828    fmov.s @R2,FR8
+  0x036DC4:  D222    mov.l @(0x036E50),R2  ; =0x000BE960  (ROM @0x0BE960)
+  0x036DC6:  420B    jsr @R2  ; -> 0x000BE960
+  0x036DC8:  F481    fsub FR8,FR4
+  0x036DCA:  D717    mov.l @(0x036E28),R7  ; =0xFFFF7A1C  (RAM 7A1C)
+  0x036DCC:  E0FC    mov #-4,R0
+  0x036DCE:  F707    fmov.s FR0,@(R0,R7)
+  0x036DD0:  7F08    add #8,R15
+  0x036DD2:  4F26    lds.l @R15+,PR
+  0x036DD4:  6EF6    mov.l @R15+,R14
+  0x036DD6:  000B    rts
+  0x036DD8:  6DF6    mov.l @R15+,R13
+  0x036DDA:  0000    .word 0x0000
+  0x036DDC:  FFFF    fpu_0xFFFF
+  0x036DDE:  6350    mov.b @R5,R3
+  0x036DE0:  FFFF    fpu_0xFFFF
+  0x036DE2:  6364    mov.b @R6+,R3
+  0x036DE4:  000C    mov.b @(R0,R0),R0
+  0x036DE6:  C234    mov.l R0,@(208,GBR)
+  0x036DE8:  000C    mov.b @(R0,R0),R0
+  0x036DEA:  C238    mov.l R0,@(224,GBR)
+  0x036DEC:  000C    mov.b @(R0,R0),R0
+  0x036DEE:  C244    mov.l R0,@(272,GBR)
+  0x036DF0:  FFFF    fpu_0xFFFF
+  0x036DF2:  7A18    add #24,R10
+  0x036DF4:  000C    mov.b @(R0,R0),R0
+  0x036DF6:  C23C    mov.l R0,@(240,GBR)
+  0x036DF8:  000C    mov.b @(R0,R0),R0
+  0x036DFA:  C240    mov.l R0,@(256,GBR)
+  0x036DFC:  000C    mov.b @(R0,R0),R0
+  0x036DFE:  C248    mov.l R0,@(288,GBR)
+  0x036E00:  FFFF    fpu_0xFFFF
+  0x036E02:  726C    add #108,R2
+  0x036E04:  FFFF    fpu_0xFFFF
+  0x036E06:  67EC    extu.b R14,R7
+  0x036E08:  FFFF    fpu_0xFFFF
+  0x036E0A:  72A1    add #-95,R2
+  0x036E0C:  0002    stc SR,R0
+  0x036E0E:  2F92    mov.l R9,@R15
+  0x036E10:  FFFF    fpu_0xFFFF
+  0x036E12:  7374    add #116,R3
+  0x036E14:  0002    stc SR,R0
+  0x036E16:  1D9A    mov.l R9,@(40,R13)
+  0x036E18:  0002    stc SR,R0
+  0x036E1A:  1DAE    mov.l R10,@(56,R13)
+  0x036E1C:  000B    rts
+  0x036E1E:  E608    mov #8,R6
+  0x036E20:  3980    cmp/eq R8,R9
+  0x036E22:  0000    .word 0x0000
+  0x036E24:  000B    rts
+  0x036E26:  E554    mov #84,R5
+  0x036E28:  FFFF    fpu_0xFFFF
+  0x036E2A:  7A1C    add #28,R10
+  0x036E2C:  000C    mov.b @(R0,R0),R0
+  0x036E2E:  BC6A    bsr 0x036706
+  0x036E30:  FFFF    fpu_0xFFFF
+  0x036E32:  85D7    mov.w @(430,R13),R0
+  0x036E34:  000C    mov.b @(R0,R0),R0
+  0x036E36:  BC6E    bsr 0x036716
+  0x036E38:  000C    mov.b @(R0,R0),R0
+  0x036E3A:  C258    mov.l R0,@(352,GBR)
+  0x036E3C:  000B    rts
+  0x036E3E:  E970    mov #112,R9
+  0x036E40:  0002    stc SR,R0
+  0x036E42:  9808    mov.w @(0x036E54),R8  ; =0x000C (12)
+  0x036E44:  0002    stc SR,R0
+  0x036E46:  9818    mov.w @(0x036E78),R8  ; =0xD285 (53893)
+  0x036E48:  FFFF    fpu_0xFFFF
+  0x036E4A:  7C18    add #24,R12
+  0x036E4C:  000C    mov.b @(R0,R0),R0
+  0x036E4E:  C254    mov.l R0,@(336,GBR)
+  0x036E50:  000B    rts
+  0x036E52:  E960    mov #96,R9
+  0x036E54:  000C    mov.b @(R0,R0),R0
+  0x036E56:  BC6C    bsr 0x036732
+  0x036E58:  000C    mov.b @(R0,R0),R0
+  0x036E5A:  C24C    mov.l R0,@(304,GBR)
+  0x036E5C:  000C    mov.b @(R0,R0),R0
+  0x036E5E:  C250    mov.l R0,@(320,GBR)
+
+--- Post-transition handler 0x36E60 ---
+
+==============================================================================
+  FUN_00036E60 - Post-transition handler (ends 0x036E86)
+  Address range: 0x036E60 - 0x036E86 (38 bytes)
+==============================================================================
+  0x036E60:  4F22    sts.l PR,@-R15
+  0x036E62:  D288    mov.l @(0x037084),R2  ; =0x00022CF4  (ROM @0x022CF4)
+  0x036E64:  420B    jsr @R2  ; -> 0x00022CF4
+  0x036E66:  0009    nop
+  0x036E68:  600C    extu.b R0,R0
+  0x036E6A:  8801    cmp/eq #1,R0
+  0x036E6C:  8B02    bf 0x036E74
+  0x036E6E:  D286    mov.l @(0x037088),R2  ; =0x000CC288  (CAL @0x0CC288)
+  0x036E70:  A002    bra 0x036E78
+  0x036E72:  F828    fmov.s @R2,FR8
+  0x036E74:  D285    mov.l @(0x03708C),R2  ; =0x000CC284  (CAL @0x0CC284)
+  0x036E76:  F828    fmov.s @R2,FR8
+  0x036E78:  D285    mov.l @(0x037090),R2  ; =0xFFFF7A38  (RAM 7A38)
+  0x036E7A:  E0E8    mov #-24,R0
+  0x036E7C:  F287    fmov.s FR8,@(R0,R2)
+  0x036E7E:  F926    fmov.s @(R0,R2),FR9
+  0x036E80:  4F26    lds.l @R15+,PR
+  0x036E82:  000B    rts
+  0x036E84:  F29A    fmov.s FR9,@R2
+
+
+  --- Literal Pool: Pool after FUN_00036E60 (0x036E88-0x036F88) ---
+  0x036E88:  2FE64F22    .long =0x2FE64F22
+  0x036E8C:  FFEBFFFB    .long =0xFFEBFFFB
+  0x036E90:  4F13D080    .long =0x4F13D080
+  0x036E94:  401E7FF4    .long =0x401E7FF4  (float: 2.476560)
+  0x036E98:  D67F6E61    .long =0xD67F6E61
+  0x036E9C:  D27FF828    .long =0xD27FF828
+  0x036EA0:  D17FE0F0    .long =0xD17FE0F0
+  0x036EA4:  F187D27F    .long =0xF187D27F
+  0x036EA8:  F828E0F4    .long =0xF828E0F4
+  0x036EAC:  F187D27E    .long =0xF187D27E
+  0x036EB0:  F828E0F8    .long =0xF828E0F8
+  0x036EB4:  D27D420B    .long =0xD27D420B
+  0x036EB8:  F187D27D    .long =0xF187D27D
+  0x036EBC:  420B2F00    .long =0x420B2F00  (float: 34.795898)
+  0x036EC0:  80F4C408    .long =0x80F4C408
+  0x036EC4:  D26F420B    .long =0xD26F420B
+  0x036EC8:  6D03600C    .long =0x6D03600C
+  0x036ECC:  88018B04    .long =0x88018B04
+  0x036ED0:  D26DFE28    .long =0xD26DFE28
+  0x036ED4:  D277A004    .long =0xD277A004
+  0x036ED8:  FF28D26C    .long =0xFF28D26C
+  0x036EDC:  FE28D276    .long =0xFE28D276
+  0x036EE0:  FF28B092    .long =0xFF28B092
+  0x036EE4:  0009D675    .long =0x0009D675  (ROM @0x09D675)
+  0x036EE8:  6261662D    .long =0x6261662D
+  0x036EEC:  62ED3263    .long =0x62ED3263
+  0x036EF0:  8B33C41D    .long =0x8B33C41D
+  0x036EF4:  88018902    .long =0x88018902
+  0x036EF8:  60F08802    .long =0x60F08802
+  0x036EFC:  8B2DC41C    .long =0x8B2DC41C
+  0x036F00:  88018902    .long =0x88018902
+  0x036F04:  84F48802    .long =0x84F48802
+  0x036F08:  8B27C41E    .long =0x8B27C41E
+  0x036F0C:  1F02600C    .long =0x1F02600C
+  0x036F10:  88018B22    .long =0x88018B22
+  0x036F14:  60DC8801    .long =0x60DC8801
+  0x036F18:  8B1FD161    .long =0x8B1FD161
+  0x036F1C:  E0F0F916    .long =0xE0F0F916
+  0x036F20:  D267F828    .long =0xD267F828
+  0x036F24:  F8958907    .long =0xF8958907
+  0x036F28:  E0F8F916    .long =0xE0F8F916
+  0x036F2C:  D265F828    .long =0xD265F828
+  0x036F30:  F8958B01    .long =0xF8958B01
+  0x036F34:  E0FCF1F7    .long =0xE0FCF1F7
+  0x036F38:  E0F0F916    .long =0xE0F0F916
+  0x036F3C:  D262F828    .long =0xD262F828
+  0x036F40:  F8958905    .long =0xF8958905
+  0x036F44:  E0F8F916    .long =0xE0F8F916
+  0x036F48:  D260F828    .long =0xD260F828
+  0x036F4C:  F8958901    .long =0xF8958901
+  0x036F50:  E0FCF1E7    .long =0xE0FCF1E7
+  0x036F54:  E0FCA004    .long =0xE0FCA004
+  0x036F58:  F816D151    .long =0xF816D151
+  0x036F5C:  E0FCF1E7    .long =0xE0FCF1E7
+  0x036F60:  F88DE0E4    .long =0xF88DE0E4
+  0x036F64:  F1877F0C    .long =0xF1877F0C
+  0x036F68:  4F17FFF9    .long =0x4F17FFF9
+  0x036F6C:  FEF94F26    .long =0xFEF94F26
+  0x036F70:  6EF6000B    .long =0x6EF6000B
+  0x036F74:  6DF64F22    .long =0x6DF64F22
+  0x036F78:  4F13D055    .long =0x4F13D055
+  0x036F7C:  401E7FF8    .long =0x401E7FF8  (float: 2.476561)
+  0x036F80:  D240420B    .long =0xD240420B
+  0x036F84:  0009600C    .long =0x0009600C  (ROM @0x09600C)
+
+
+################################################################################
+# PART 6: EXTENDED SEARCH - All GBR=0xFFFF79A4 and nearby GBR values
+################################################################################
+
+--- All locations setting GBR = 0xFFFF79A4 ---
+
+--- All locations setting GBR = 0xFFFF7954 ---
+
+--- All locations setting GBR = 0xFFFF798C ---
+
+
+################################################################################
+# PART 7: Exhaustive search for reads of FFFF79C4/79C7
+# (counter word at GBR+0x20 and flag byte at GBR+0x23)
+################################################################################
+
+--- All accesses to 0xFFFF79C4 (counter word GBR+0x20) ---
+  0x0360AC: mov.w @(56,GBR),R0  [read word]  (GBR=0xFFFF798C)
+  0x0360E0: mov.w @(56,GBR),R0  [read word]  (GBR=0xFFFF798C)
+  0x036336: mov.w @(4,GBR),R0  [read word]  (GBR=0xFFFF79C0)
+  0x0363A6: mov.w @(4,GBR),R0  [read word]  (GBR=0xFFFF79C0)
+  0x03641C: mov.w @(4,GBR),R0  [read word]  (GBR=0xFFFF79C0)
+  Direct ref: pool 0x07D7B4, from 0x07D6CC -> R6
+
+--- All accesses to 0xFFFF79C7 (flag byte GBR+0x23) ---
+  (no GBR-relative hits)
+
+  Also: accesses to 0xFFFF79C0 (GBR+0x1C long):
+    0x036362: mov.w @(0,GBR),R0  [read word]
+    0x036378: mov.w @(0,GBR),R0  [read word]
+    0x036380: mov.w R0,@(0,GBR)  [write word]
+    0x03638C: mov.w @(0,GBR),R0  [read word]
+    0x0363CA: mov.w R0,@(0,GBR)  [write word]
+    0x0363EA: mov.w @(0,GBR),R0  [read word]
+    0x0363F4: mov.w @(0,GBR),R0  [read word]
+    0x03640A: mov.w R0,@(0,GBR)  [write word]
+    0x03640E: mov.w R0,@(0,GBR)  [write word]
+  Also: accesses to 0xFFFF79C4 (GBR+0x20 long):
+    0x0360AC: mov.w @(56,GBR),R0  [read word]
+    0x0360E0: mov.w @(56,GBR),R0  [read word]
+    0x036336: mov.w @(4,GBR),R0  [read word]
+    0x0363A6: mov.w @(4,GBR),R0  [read word]
+    0x03641C: mov.w @(4,GBR),R0  [read word]
+  Also: accesses to 0xFFFF79C8 (GBR+0x24 long):
+    0x036428: mov.b R0,@(8,GBR)  [write byte]
+
+
+################################################################################
+# PART 8: Search for tst.b/and.b/or.b/xor.b @(R0,GBR) patterns
+# that could access 0xFFFF79C7 with R0=offset
+################################################################################
+
+  Checking GBR=0xFFFF79A4 (needs R0=0x23):
+    (none found)
+  Checking GBR=0xFFFF798C (needs R0=0x3B):
+    (none found)
+  Checking GBR=0xFFFF7954 (needs R0=0x73):
+    (none found)

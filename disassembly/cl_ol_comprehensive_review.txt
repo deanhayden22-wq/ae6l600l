@@ -1,0 +1,1086 @@
+================================================================================
+  COMPREHENSIVE CL/OL STATE MACHINE REVIEW
+  Subaru ECU ROM AE5L600L (SH7055 / SH-2)
+  Stock ROM: ae5l600l.bin
+  Modified ROM: AE5L600L 20g rev 20.5 tiny wrex.bin
+  Date: 2026-03-25
+================================================================================
+
+TABLE OF CONTENTS
+  1.  Overview — How CL/OL Works in This ECU
+  2.  Execution Order — The 7-Phase Pipeline
+  3.  The Counter Mechanism (counter_A / counter_B)
+  4.  The Condition Checker (FUN_0003643A) — Complete Logic Map
+  5.  The Diagnostic Flag at 0xFFFF79C7 (GBR+0x23)
+  6.  The Hysteresis Mechanism — OL-to-CL Return Logic
+  7.  FUN_00036E60 — Post-Transition Handler (Full Disassembly Analysis)
+  8.  FUN_00036F76 — Secondary Post-Transition Handler
+  9.  FUN_0003700A — Threshold Comparator Subroutine
+  10. Stock vs Modified Calibration Changes
+  11. The Observed Problem (3-21.csv Log Analysis)
+  12. What We Still Do Not Fully Understand
+  13. Recommendations
+
+================================================================================
+SECTION 1: OVERVIEW — HOW CL/OL WORKS IN THIS ECU
+================================================================================
+
+The ECU operates in two fueling modes:
+
+  CLOSED LOOP (CL): The front O2 sensor provides feedback. A PI controller
+  adjusts fuel trim (AFC) to maintain stoichiometric AFR (~14.7:1). This is
+  the normal operating mode at cruise and light load.
+
+  OPEN LOOP (OL): The O2 sensor feedback is ignored. Fuel is determined
+  entirely by lookup tables (the "OL fuel maps"). The ECU runs rich to
+  protect the engine during high-load conditions. This is the mode you want
+  during WOT, boost, and heavy load.
+
+The CL/OL state machine is a multi-phase pipeline that runs every task cycle.
+It evaluates engine conditions, decides whether to switch modes, applies
+delay/hysteresis to prevent oscillation, and commits the final mode change.
+
+IMPORTANT: The SSM/diagnostic parameter that shows 7 (off), 8 (CL), or
+10 (OL) is NOT directly written by the CL/OL state machine code we traced.
+The state machine writes internal flags (0xFFFF79C6 mode state, 0xFFFF79F2
+OL active flag, 0xFFFF7448 CL/OL mode flag) that are consumed by separate
+SSM data formatting functions. The value "8" for CL and "10" for OL are
+produced by the SSM protocol handler, not by the transition code itself.
+
+
+================================================================================
+SECTION 2: EXECUTION ORDER — THE 7-PHASE PIPELINE
+================================================================================
+
+The CL/OL state machine runs from two dispatch tables each cycle:
+
+  Dispatch Table B @ 0x4A0B8 (runs FIRST):
+    [14] FUN_0003580C  — Phase 1: State Snapshot + OL Enrichment Computation
+    [15] FUN_0003605E  — Phase 2: Condition Evaluation (calls FUN_0003643A)
+
+  Dispatch Table A @ 0x480B8 (runs SECOND):
+    [6]  FUN_000357D0  — Phase 3: Initialization (re-arms snapshot counter)
+    [8]  FUN_00036008  — Phase 4: Delay Manager A (calls condition checker AGAIN)
+    [9]  FUN_00036A98  — Phase 5: Hysteresis Handler
+    [10] FUN_00036BF4  — Phase 6: Delay Manager B (counter-based delay)
+    [11] FUN_00036E60  — Phase 7: Post-Transition Handler (final commit)
+
+Per-cycle flow in pseudocode:
+
+  PHASE 1 — State Snapshot (FUN_0003580C):
+    if master_counter >= threshold(CAL@0xCBBEF):
+        snapshot ECT, RPM, throttle, MAP, MAF, BPW, load, gear
+        compute OL enrichment from fuel map tables
+        reset master_counter = 0
+    master_counter = clamp(master_counter + 1)
+
+  PHASE 2 — Condition Evaluation (FUN_0003643A, called via 0x3605E):
+    Check all CL-to-OL trigger conditions (RPM, throttle, load, etc.)
+    Write counter_B (delay threshold) and diagnostic flag
+
+  PHASE 3 — Initialization (FUN_000357D0):
+    Write 0xFF to master_counter at RAM[FFFF7986]
+    Write 0x200 to RAM[FFFF794C]
+    This re-arms Phase 1 for next cycle
+
+  PHASE 4 — Delay Manager A (FUN_00036008):
+    Calls condition checker (FUN_0003643A) AGAIN
+    Calls hysteresis sub (FUN_00036978) for throttle/BPW comparison
+    Updates mode state variables
+
+  PHASE 5 — Hysteresis Handler (FUN_00036A98):
+    Prevents rapid CL/OL oscillation
+    Checks throttle and BPW against thresholds minus hysteresis values
+    Both must be below threshold to allow OL-to-CL return
+
+  PHASE 6 — Delay Manager B (FUN_00036BF4):
+    Counter-based delay for CL-to-OL transition
+    In modified ROM: delay=0, so this is effectively bypassed
+    In stock ROM: delay=750, requires counter to accumulate
+
+  PHASE 7 — Post-Transition Handler (FUN_00036E60):
+    Commits final mode change
+    Snapshots RPM and sensor data for transition logic
+    Sets up threshold comparison flags for smooth transitions
+    NOT where FFFF7448 (CL/OL mode flag) is written
+    See Section 7 for full analysis
+
+
+================================================================================
+SECTION 3: THE COUNTER MECHANISM (counter_A / counter_B)
+================================================================================
+
+Two 16-bit counters at 0xFFFF79C2 and 0xFFFF79C4 are central to the CL/OL
+delay mechanism:
+
+  counter_A @ 0xFFFF79C2 (GBR+0x36 with GBR=0xFFFF798C)
+    - READ by the main evaluator FUN_0003606C at:
+        0x0360A8: mov.w @(54,GBR),R0  — reads counter_A
+        0x0360DC: mov.w @(54,GBR),R0  — reads counter_A again
+    - COMPARED against counter_B at:
+        0x0360AE: cmp/hs R0,R6  — is counter_A >= counter_B?
+    - NOT WRITTEN by any CL/OL state machine function
+    - Appears to be a system/scheduler counter maintained elsewhere
+    - Likely incremented by the task scheduler each execution cycle
+
+  counter_B @ 0xFFFF79C4 (GBR+0x38 with GBR=0xFFFF798C, or
+                           GBR+0x20 with GBR=0xFFFF79A4)
+    - WRITTEN by FUN_0003643A (condition checker) at multiple points:
+        0x036336, 0x0363A6, 0x03641C, 0x03682C
+    - READ by FUN_0003606C at 0x0360AC
+    - READ by FUN_0003643A itself for internal comparison
+    - READ by diagnostic function at 0x07D6CC
+    - This IS the "delay counter threshold" — the value the condition
+      checker outputs based on which trigger fired
+
+  THE COMPARISON LOGIC:
+    if (counter_A >= counter_B):
+        OL enrichment is computed from tables
+        Fresh OL fuel map lookups are performed
+    else:
+        OL enrichment = 0.0
+        No enrichment applied
+
+  WITH DELAY=0 (modified ROM):
+    counter_B is set to 0 on most paths
+    counter_A >= 0 is ALWAYS true (since counter_A is unsigned)
+    Therefore: OL enrichment is always computed when conditions are met
+    The delay mechanism is effectively disabled
+
+  WITH DELAY=750 (stock ROM):
+    counter_B is set to 750 (or other delay value)
+    counter_A must accumulate to 750+ before OL enrichment kicks in
+    This creates the "gradual transition" behavior
+
+
+================================================================================
+SECTION 4: THE CONDITION CHECKER (FUN_0003643A) — COMPLETE LOGIC MAP
+================================================================================
+
+ROM address: 0x0003643A - 0x00036846
+GBR: 0xFFFF79A4 (set at 0x03644E)
+Called from: FUN_00036008 (Phase 4) and FUN_0003605E (Phase 2)
+
+This function evaluates ALL conditions that trigger a CL-to-OL transition.
+It outputs two values:
+  - counter_B at GBR+0x20 (0xFFFF79C4): the delay threshold
+  - flag at GBR+0x23 (0xFFFF79C7): diagnostic indicator (1=throttle, 0=other)
+
+The function reads engine state variables:
+  FFFF5E94: gear position
+  FFFF6350: RPM
+  FFFF69F0: throttle position
+  FFFF63C4: engine load
+  FFFF65FC: base pulse width (BPW)
+  FFFF63CC: ECT (coolant temperature)
+  FFFF6624: MAF (mass airflow)
+
+INPUT VARIABLES AND WHAT THEY REPRESENT:
+  - Gear position determines which RPM threshold table to use
+  - RPM is the primary per-gear OL trigger
+  - Throttle position has its own maximum threshold (CC1D8)
+  - Engine load has its own threshold (CC204)
+  - BPW, MAF, and ECT are secondary triggers
+  - Vehicle speed has a separate maximum (CC1F4)
+
+COMPLETE LOGIC FLOW (pseudocode):
+
+  function evaluate_CL_OL_conditions():
+
+      // ---- CHECK 1: Per-Gear RPM Limits ----
+      gear = RAM[FFFF5E94]
+      RPM = float(RAM[FFFF6350])
+
+      // 10 threshold pairs at CAL[0xCC180 - 0xCC1A4]
+      // Each gear has ON and OFF thresholds (hysteresis pair)
+      rpm_on  = float(CAL[0xCC180 + gear * 8])
+      rpm_off = float(CAL[0xCC180 + gear * 8 + 4])
+
+      if RPM >= rpm_on:
+          --> PATH B: counter_B = 0, flag = 0
+          RETURN immediately (OL triggered by RPM)
+
+      // ---- CHECK 2: Neutral RPM Limits (if in neutral) ----
+      if gear == NEUTRAL:
+          rpm_on = float(CAL[0xCC1A8 + ...])
+          if RPM >= rpm_on:
+              --> PATH B: counter_B = 0, flag = 0
+              RETURN
+
+      // ---- CHECK 3: Throttle Maximum ----
+      throttle = float(RAM[...])
+      throttle_max = float(CAL[0xCC1D8])
+          // Stock: 91.0 degrees
+          // Modified: 37.884 degrees
+
+      if throttle >= throttle_max:
+          --> PATH A: counter_B = 0, flag = 1
+          RETURN immediately
+          // This is the ONLY path that sets flag=1
+          // It SHORT-CIRCUITS all remaining checks
+          // With modified value of 37.884, this fires at ~38% throttle
+
+      // ---- CHECK 4: Vehicle Speed Maximum ----
+      vspeed = RAM[...]
+      if vspeed >= float(CAL[0xCC1F4]):
+          // Stock: 130.0, Modified: 141.7
+          --> PATH B: counter_B = 0, flag = 0
+          RETURN
+
+      // ---- CHECK 5: Engine Load Maximum ----
+      load = float(RAM[...])
+      if load >= float(CAL[0xCC204]):
+          // Stock: 4.8 g/rev, Modified: 0.95 g/rev
+          --> PATH B: counter_B = 0, flag = 0
+          RETURN
+
+      // ---- CHECK 6: ECT Minimum ----
+      ECT = float(RAM[...])
+      if ECT < float(CAL[0xCC17C]):
+          // Threshold: -12.0 F (very cold engine)
+          --> PATH B: counter_B = 0, flag = 0
+          RETURN
+
+      // ---- CHECK 7: Engine Load Counter Threshold ----
+      if load_counter >= word(CAL[0xCBC5A]):
+          // Stock: 313, Modified: 200
+          --> PATH B: counter_B = 0, flag = 0
+          RETURN
+
+      // ---- CHECKS 8-11: Delay-Based Transition ----
+      // These use tables for gradual transition:
+      //   CAL[0xCCD78]: Throttle threshold with delay (all zeros in both ROMs)
+      //   CAL[0xCE5F8]: BPW threshold with delay (all zeros in both ROMs)
+      //   CAL[0xCE640]: MAF-based counter step [0,0,0,0,0,1,2,3]
+      // In modified ROM with delay=0, these are moot
+
+      // ---- NO CONDITION TRIGGERED ----
+      --> PATH C: counter_B = delay_value, flag = 0
+          // delay_value comes from cascade:
+          //   If CAL[0xCBC5C] (SI-DRIVE delay) != 0: use that
+          //   Else if CAL[0xCBC62] (main delay) != 0: use that
+          //     Stock: 750, Modified: 0
+          //   Else if CAL[0xCBC60] != 0: use that
+          //   Else: use CAL[0xCBC5E]
+
+  THREE OUTPUT PATHS:
+    PATH A (throttle exceeded):
+      counter_B = 0, flag = 1
+      RETURN immediately — skips all other checks
+      This is the fast path for high throttle
+
+    PATH B (force conditions like RPM/load/speed):
+      counter_B = 0, flag = 0
+      RETURN — one of the hard limits was hit
+
+    PATH C (no conditions met):
+      counter_B = delay_value from cascade (CBC5C/CBC62/CBC60/CBC5E)
+      flag = 0
+      With modified ROM delay=0: counter_B = 0
+      This means counter_A >= 0 is always true
+
+
+================================================================================
+SECTION 5: THE DIAGNOSTIC FLAG AT 0xFFFF79C7 (GBR+0x23)
+================================================================================
+
+This flag has been EXHAUSTIVELY traced through the entire ROM.
+
+WRITES:
+  - Written by FUN_0003643A at 0x036830 (epilogue): always writes 0
+  - Written EARLIER on the throttle exceeded path: writes 1
+  - On the throttle path, function exits before reaching the epilogue,
+    so the value of 1 is preserved
+
+READS:
+  - GBR-relative reads: NONE FOUND in entire ROM
+  - Direct address reads: ONLY at 0x013DD6 inside the SSM diagnostic
+    function at 0x013D58
+  - At 0x013F38: the flag is tested (cmp/eq #1)
+    If flag == 1: sets certain SSM output channel bits
+    If flag == 0: sets different SSM output channel bits
+
+CONCLUSION: The flag at 0xFFFF79C7 is a DIAGNOSTIC-ONLY variable.
+  - It tells the SSM/diagnostic interface WHY the CL-to-OL transition
+    occurred (throttle exceeded vs. other reason)
+  - It has ZERO effect on:
+    - Actual fueling calculations
+    - State machine transitions
+    - OL enrichment magnitude
+    - Map selection
+    - Timing of transitions
+  - You can ignore this flag for tuning purposes
+
+
+================================================================================
+SECTION 6: THE HYSTERESIS MECHANISM — OL-TO-CL RETURN LOGIC
+================================================================================
+
+Handled by FUN_00036978 (Phase 4 sub) and FUN_00036A98/B48 (Phase 5).
+
+PURPOSE: Once the ECU enters OL, the hysteresis mechanism prevents
+immediate return to CL when conditions briefly drop below threshold.
+This prevents oscillation at the boundary.
+
+HOW IT WORKS (FUN_00036978, GBR=0xFFFF79CC):
+
+  The function reads:
+    MAF from RAM[FFFF6624]
+    Sensor value from RAM[FFFF62DC] (secondary throttle/load metric)
+    Correction from RAM[FFFF7348]
+
+  It performs a table lookup via ROM@0xAC5BC using MAF, then:
+
+  // Throttle hysteresis check
+  throttle_lookup = table_result
+  throttle_with_hyst = throttle_lookup - CAL[0xCC178]
+      // Stock: 3.9 degrees, Modified: 8.4 degrees
+  if sensor_value > throttle_with_hyst:
+      throttle_ok = 1  // still above hysteresis band -> stay OL
+  else if sensor_value <= throttle_lookup:
+      throttle_ok = 0  // dropped below -> allow CL return
+
+  // BPW hysteresis check
+  bpw_lookup = table_result_2
+  bpw_with_hyst = bpw_lookup - CAL[0xCC174]
+      // Stock: 256.0, Modified: 756.0
+  if correction > bpw_with_hyst:
+      bpw_ok = 1  // still above -> stay OL
+  else if correction <= bpw_lookup:
+      bpw_ok = 0  // dropped below -> allow CL return
+
+  // BOTH must be satisfied to return to CL
+  if throttle_ok == 1 AND bpw_ok == 1:
+      return 1  // allow CL return
+  else:
+      return 0  // stay in OL
+
+EFFECT OF MODIFIED VALUES:
+  With throttle hysteresis increased from 3.9 to 8.4 degrees:
+    The throttle must drop 8.4 degrees BELOW the OL threshold before
+    CL is re-enabled. Stock only required a 3.9 degree drop.
+
+  With BPW hysteresis increased from 256 to 756:
+    The base pulse width must drop 756 counts below the OL threshold.
+    This is a very large band — nearly 3x stock.
+
+  Combined effect: The ECU stays in OL much longer during deceleration
+  from a WOT event. This is intentional: you want the engine to stay
+  rich during the entire pull, not flicker back to CL during brief
+  throttle lifts between shifts.
+
+
+================================================================================
+SECTION 7: FUN_00036E60 — POST-TRANSITION HANDLER (FULL DISASSEMBLY ANALYSIS)
+================================================================================
+
+ROM address: 0x00036E60 - 0x00036F76
+Dispatch: Table A entry [11] — the LAST function in the CL/OL pipeline
+GBR: 0xFFFF7A20 (set at 0x036E94)
+
+This function consists of TWO sub-functions at the entry point:
+
+--- SUB-FUNCTION A: 0x36E60 - 0x36E84 (short, returns via RTS) ---
+
+  Pseudocode:
+    engine_condition = call ROM@0x022CF4()
+        // This reads RAM[FFFF65C5] and returns 1 if == 1
+        // Likely: 1 = engine running normally
+
+    if engine_condition == 1:
+        FR8 = float(CAL[0xCC288])   // = 0.1
+    else:
+        FR8 = float(CAL[0xCC284])   // = 0.1
+
+    // Both values are 0.1 in both stock and modified ROMs
+    // This selects a smoothing/blending rate
+
+    R2 = RAM pointer 0xFFFF7A38
+    float(R2 + (-24)) = FR8        // Write to 0xFFFF7A20
+    FR9 = float(R2 + (-24))        // Read back from 0xFFFF7A20
+    float(R2) = FR9                 // Write to 0xFFFF7A38
+    RETURN
+
+  This sub-function writes a blending rate (0.1) to two RAM locations:
+    0xFFFF7A20: blending rate parameter
+    0xFFFF7A38: copy of blending rate
+
+--- SUB-FUNCTION B: 0x36E86 - 0x36F74 (main body) ---
+
+  GBR = 0xFFFF7A20
+  Saves: R13, R14, PR, FR14, FR15, old GBR
+
+  RAM READS:
+    FFFF67EC (word): RPM raw value (from engine speed sensor) -> R14
+    FFFF6350 (float): RPM (floating point) -> stored at 0xFFFF7A2C
+    FFFF62F8 (float): sensor value (likely secondary throttle) -> stored at 0xFFFF7A30
+    FFFF6624 (float): MAF -> stored at 0xFFFF7A34
+    FFFF7A28 (byte): GBR+8, state variable
+    FFFF7A3D (byte): GBR+29, condition flag A
+    FFFF7A3C (byte): GBR+28, condition flag B
+    FFFF7A3E (byte): GBR+30, condition flag C
+
+  RAM WRITES:
+    FFFF7A2C (float): RPM snapshot (via R1 + (-16))
+    FFFF7A30 (float): sensor snapshot (via R1 + (-12))
+    FFFF7A34 (float): MAF snapshot (via R1 + (-8))
+    FFFF7A38 (float): output value (via R1 + (-4))
+    FFFF7A14 (float): final output (via R1 + (-28))
+
+  ROM SUBROUTINE CALLS:
+    0x0297B0: DTC flag reader (reads RAM[FFFF9705])
+              Returns 0 or 2 based on flag state
+              Result stored to stack[0] and stack[4]
+    0x029AA0: DTC flag reader (reads RAM[FFFF972E])
+              Returns 0 or 2 based on flag state
+              Result stored to stack[4]
+    0x022CF4: Engine condition check (reads RAM[FFFF65C5])
+              Returns T=1 if byte == 1
+    0x03700A: Threshold comparator subroutine (see Section 9)
+
+  CALIBRATION VALUES REFERENCED:
+    CAL[0xCC284] = 0.1    (blending rate, non-condition path)
+    CAL[0xCC288] = 0.1    (blending rate, condition path)
+    CAL[0xCC28C] = 0.2    (upper blending rate, non-condition path)
+    CAL[0xCC290] = 0.2    (upper blending rate, condition path)
+    CAL[0xCBC70] = 1250   (counter threshold for main gate, word)
+    CAL[0xCC278] = 105.0  (RPM high threshold for enrichment gate)
+    CAL[0xCC27C] = 12000.0 (MAF high threshold for enrichment gate)
+    CAL[0xCC274] = 102.0  (RPM low threshold for enrichment gate)
+    CAL[0xCC280] = 12800.0 (MAF low threshold for enrichment gate)
+
+  NONE of these calibration values differ between stock and modified ROMs.
+
+  ALGORITHM (pseudocode):
+
+    // Step 1: Check DTC flags
+    dtc_flag_A = call 0x0297B0()  // checks FFFF9705
+    dtc_flag_B = call 0x029AA0()  // checks FFFF972E
+    stack[0] = dtc_flag_A
+    stack[4] = dtc_flag_B
+
+    // Step 2: Read GBR+8 state, check engine condition
+    state = byte(GBR + 8)         // RAM[FFFF7A28]
+    R13 = state                   // save for later
+    engine_ok = call 0x022CF4()   // checks FFFF65C5
+
+    // Step 3: Select blending rates based on engine condition
+    if engine_ok == 1:
+        FR14 = float(CAL[0xCC288])  // = 0.1 (lower rate)
+        FR15 = float(CAL[0xCC290])  // = 0.2 (upper rate)
+    else:
+        FR14 = float(CAL[0xCC284])  // = 0.1
+        FR15 = float(CAL[0xCC28C])  // = 0.2
+
+    // Step 4: Call threshold comparator subroutine
+    call FUN_0003700A()           // updates flags at GBR+16,17,18
+                                  // (FFFF7A3C, FFFF7A3D, FFFF7A3E)
+
+    // Step 5: Counter gate check
+    counter_threshold = word(CAL[0xCBC70])   // = 1250
+    if R14 (RPM raw word) < counter_threshold:
+        goto DEFAULT_PATH         // skip enrichment logic
+
+    // Step 6: Multi-condition gate (ALL must pass)
+    // Check condition flag A (GBR+29 = FFFF7A3D)
+    if GBR+29 == 1:
+        pass   // condition A met
+    else if stack[0] == 2:
+        pass   // DTC flag A indicates alternate condition
+    else:
+        goto DEFAULT_PATH         // fail
+
+    // Check condition flag B (GBR+28 = FFFF7A3C)
+    if GBR+28 == 1:
+        pass   // condition B met
+    else if stack[4] == 2:
+        pass   // DTC flag B indicates alternate condition
+    else:
+        goto DEFAULT_PATH         // fail
+
+    // Check condition flag C (GBR+30 = FFFF7A3E)
+    if GBR+30 != 1:
+        goto DEFAULT_PATH         // fail
+
+    // Check engine state (R13 = state from GBR+8)
+    if R13 != 1:
+        goto DEFAULT_PATH         // fail
+
+    // Step 7: ALL CONDITIONS PASSED — enrichment adjustment logic
+    R1 = 0xFFFF7A3C
+    RPM_snapshot = float(R1 + (-16))       // FFFF7A2C
+    MAF_snapshot = float(R1 + (-8))        // FFFF7A34
+
+    // Upper threshold check: RPM > 105.0 AND MAF > 12000.0
+    if RPM_snapshot > float(CAL[0xCC278]):  // RPM > 105.0?
+        // RPM exceeded upper threshold -> skip upper write
+    else if MAF_snapshot > float(CAL[0xCC27C]):  // MAF > 12000.0?
+        // MAF also not exceeded -> write upper rate
+        float(R1 + (-4)) = FR15            // FFFF7A38 = 0.2 (upper rate)
+
+    // Lower threshold check: RPM > 102.0 AND MAF > 12800.0
+    if RPM_snapshot > float(CAL[0xCC274]):  // RPM > 102.0?
+        // RPM exceeded lower threshold -> write lower rate
+        float(R1 + (-4)) = FR14            // FFFF7A38 = 0.1 (lower rate)
+    else if MAF_snapshot > float(CAL[0xCC280]):  // MAF > 12800.0?
+        // MAF not exceeded either -> write lower rate
+        float(R1 + (-4)) = FR14
+        // fall through (keep lower rate)
+    else:
+        // Neither RPM nor MAF exceeded lower threshold
+        float(R1 + (-4)) = FR14            // FFFF7A38 = 0.1
+
+    // Read back the value we just wrote
+    FR8 = float(R1 + (-4))                 // FFFF7A38
+    goto FINAL_WRITE
+
+  DEFAULT_PATH:
+    R1 = 0xFFFF7A3C
+    float(R1 + (-4)) = FR14                // FFFF7A38 = 0.1 (lower rate)
+    FR8 = 0.0                              // fldi0
+
+  FINAL_WRITE:
+    float(R1 + (-28)) = FR8                // FFFF7A14 = output value
+    // Restore registers and return
+
+  CRITICAL FINDING:
+    FUN_00036E60 does NOT write to FFFF7448 (the CL/OL mode flag).
+    FUN_00036E60 does NOT write to FFFF79C6 (the mode state flag).
+    FUN_00036E60 does NOT write to FFFF79F2 (the OL active flag).
+    FUN_00036E60 does NOT produce the SSM values 7, 8, or 10.
+
+    Instead, FUN_00036E60 manages TRANSITION SMOOTHING. It computes a
+    blending rate (0.1 or 0.2) that controls how quickly the enrichment
+    transitions between CL and OL states. The output at 0xFFFF7A14 is
+    consumed by downstream fuel calculation code as a transition factor.
+
+    The "mode commit" language in the dispatch table description is
+    somewhat misleading. This function commits the transition SMOOTHING
+    parameters, not the mode itself.
+
+
+================================================================================
+SECTION 8: FUN_00036F76 — SECONDARY POST-TRANSITION HANDLER
+================================================================================
+
+ROM address: 0x00036F76 - 0x00037008
+GBR: 0xFFFF7A24
+
+This function immediately follows FUN_36E60 and appears to be called from
+the same dispatch chain. It performs additional transition management.
+
+  GBR = 0xFFFF7A24
+
+  engine_ok = call 0x022CF4()
+
+  MAF = float(RAM[FFFF6624])
+  BPW = float(RAM[FFFF65FC])
+
+  // Select table descriptor based on engine condition
+  if engine_ok == 1:
+      table_desc = CAL[0xADA08]
+  else:
+      table_desc = CAL[0xAD9EC]
+
+  // 2D table lookup (MAF x BPW -> transition factor)
+  result = table_lookup_2d(table_desc, MAF, BPW)
+
+  // Store result
+  float(RAM[FFFF7A24]) = result
+
+  // Compare result against RPM threshold
+  RPM_threshold = float(RAM[FFFF6400])
+  if result <= RPM_threshold:
+      // Below threshold path
+      GBR+28 = 0                    // clear condition flag
+      counter = byte(GBR+27) + 1    // increment counter
+      counter = clamp(counter, 1)   // via call to 0xBE53C
+      GBR+27 = counter
+      if counter >= byte(CAL[0xCBBF3]):
+          GBR+4 = 1                 // set transition flag
+  else:
+      // Above threshold path
+      RPM = float(RAM[FFFF6350])
+      RPM_min = float(CAL[0xCC25C])
+      if RPM > RPM_min:
+          GBR+27 = 0               // reset counter
+          // Additional counter logic with second threshold
+          counter2 = byte(GBR+28) + 1
+          counter2 = clamp(counter2, 1)
+          GBR+28 = counter2
+          if counter2 >= byte(CAL[0xCBBF4]):
+              GBR+4 = 0            // clear transition flag
+      else:
+          GBR+28 = R0              // (R0 = 0 from bf/s delay slot)
+
+  This function manages a SECONDARY counter-based transition mechanism
+  with its own separate counter at GBR+27/+28 and thresholds from
+  CAL[0xCBBF3] and CAL[0xCBBF4].
+
+
+================================================================================
+SECTION 9: FUN_0003700A — THRESHOLD COMPARATOR SUBROUTINE
+================================================================================
+
+ROM address: 0x0003700A - 0x00037082
+GBR: 0xFFFF7A2C (set at 0x037012)
+Called from: FUN_00036E60 main body
+
+This subroutine performs three pairs of threshold comparisons on the
+sensor snapshots stored by FUN_36E60's main body.
+
+  R14 = 0xFFFF7A3C (pointer to sensor snapshot block)
+
+  // MAF table lookup
+  MAF_snapshot = float(R14 + (-8))         // FFFF7A34
+  FR0 = table_lookup(CAL@0xAD0F0, MAF_snapshot)
+
+  // --- Pair 1: Secondary sensor vs threshold ---
+  sensor_value = float(R14 + (-12))        // FFFF7A30
+  if FR0 > sensor_value:
+      GBR+16 = 1                           // FFFF7A3C = 1 (condition met)
+  if sensor_value > float(CAL[0xCC268]):   // > 8.96?
+      GBR+16 = 0                           // FFFF7A3C = 0 (condition not met)
+
+  // --- Pair 2: RPM vs threshold ---
+  RPM_value = float(R14 + (-16))           // FFFF7A2C
+  RPM_cal = float(CAL[0xCC264])            // = 101.0
+  if RPM_value > RPM_cal:
+      // RPM below threshold (inverted comparison)
+      // do nothing
+  else:
+      GBR+17 = 1                           // FFFF7A3D = 1
+
+  RPM_upper = float(CAL[0xCC260])          // = 100.0
+  if RPM_value > RPM_upper:
+      GBR+17 = 0                           // FFFF7A3D = 0
+
+  // --- Pair 3: MAF vs threshold ---
+  MAF_value = float(R14 + (-8))            // FFFF7A34
+  MAF_cal = float(CAL[0xCC270])            // = 0.0
+  if MAF_value > MAF_cal:
+      // do nothing
+  else:
+      GBR+18 = 1                           // FFFF7A3E = 1
+
+  MAF_upper = float(CAL[0xCC26C])          // = 0.0
+  if MAF_value > MAF_upper:
+      GBR+18 = 0                           // FFFF7A3E = 0
+
+  NOTE: With CAL[0xCC270] = 0.0 and CAL[0xCC26C] = 0.0, Pair 3 will
+  set GBR+18 = 1 only when MAF <= 0, then immediately clear it when
+  MAF > 0. In practice, MAF is always > 0 when the engine is running,
+  so GBR+18 (0xFFFF7A3E) will always be 0.
+
+  This means the condition flag C check in FUN_36E60's main body:
+      if GBR+30 != 1: goto DEFAULT_PATH
+  will ALWAYS fail (GBR+30 = 0xFFFF7A3E = 0), because the MAF threshold
+  is set to 0.0/0.0 in both stock and modified ROMs.
+
+  CONSEQUENCE: The enrichment adjustment logic in FUN_36E60 (Steps 5-7)
+  can NEVER execute in the current calibration. The function always takes
+  the DEFAULT_PATH, writing FR14 (0.1) to FFFF7A38 and 0.0 to FFFF7A14.
+
+  This subroutine appears designed for a feature that is disabled via
+  calibration in this ROM. The threshold values at CC260-CC270 would
+  need to be set to meaningful engine parameter ranges to enable it.
+
+
+================================================================================
+SECTION 10: STOCK vs MODIFIED CALIBRATION CHANGES
+================================================================================
+
+The following calibration values were changed from stock to modified:
+
+  +--------------------------+-----------+-----------+---------------------------+
+  | Parameter                | Stock     | Modified  | Effect                    |
+  +--------------------------+-----------+-----------+---------------------------+
+  | CL to OL Delay           | 750       | 0         | Instant OL transition     |
+  | (CBC62, word)            |           |           | (no counter accumulation) |
+  +--------------------------+-----------+-----------+---------------------------+
+  | CL Delay Load Threshold  | 313       | 200       | Lower load triggers OL    |
+  | (CBC5A, word)            |           |           | sooner                    |
+  +--------------------------+-----------+-----------+---------------------------+
+  | OL Map Switch IAM        | 0.35      | 0.50      | Higher IAM needed for     |
+  | (CC16C, float)           |           |           | normal OL maps            |
+  +--------------------------+-----------+-----------+---------------------------+
+  | BPW Hysteresis           | 256.0     | 756.0     | Much wider band before    |
+  | (CC174, float)           |           |           | returning to CL           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Throttle Hysteresis      | 3.9       | 8.4       | Wider throttle band       |
+  | (CC178, float)           |           |           | before CL return          |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 1st gear ON      | 5300      | 3600      | OL at much lower RPM     |
+  | (CC180, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 1st gear OFF     | 5400      | 3700      |                           |
+  | (CC184, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 2nd gear ON      | 4300      | 3500      |                           |
+  | (CC188, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 2nd gear OFF     | 4400      | 3600      |                           |
+  | (CC18C, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 3rd gear ON      | 4200      | 3400      |                           |
+  | (CC190, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 3rd gear OFF     | 4300      | 3500      |                           |
+  | (CC194, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 4th gear ON      | 4100      | 3300      |                           |
+  | (CC198, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 4th gear OFF     | 4200      | 3400      |                           |
+  | (CC19C, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 5th gear ON      | 3700      | 3200      |                           |
+  | (CC1A0, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max RPM 5th gear OFF     | 3800      | 3300      |                           |
+  | (CC1A4, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | CL Delay Max Throttle[0] | 91.0      | 37.884    | OL at ~38% throttle      |
+  | (CC1D8, float)           |           |           | (was ~91%)               |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max Vehicle Speed        | 130.0     | 141.7     | Slightly higher vspeed   |
+  | (CC1F4, float)           |           |           | threshold                |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max Engine Load [0]      | 4.80      | 0.95      | OL at much lower load    |
+  | (CC204, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+  | Max Engine Load [1]      | 4.90      | 1.10      |                           |
+  | (CC208, float)           |           |           |                           |
+  +--------------------------+-----------+-----------+---------------------------+
+
+  VALUES THAT DID NOT CHANGE (relevant to FUN_36E60):
+    CC284 = 0.1 (blending rate A) — same in both
+    CC288 = 0.1 (blending rate B) — same in both
+    CC28C = 0.2 (upper blending rate A) — same in both
+    CC290 = 0.2 (upper blending rate B) — same in both
+    CBC70 = 1250 (counter gate threshold) — same in both
+    CC274-CC280 (RPM/MAF enrichment thresholds) — same in both
+    CC260-CC270 (sub threshold pairs) — same in both
+
+  KEY INSIGHT: The modified ROM aggressively pushes the ECU into OL:
+    - Zero delay means instant OL transition
+    - Throttle threshold dropped from 91% to ~38% — OL at partial throttle
+    - Engine load threshold dropped from 4.8 to 0.95 g/rev
+    - Per-gear RPM limits lowered by 900-1700 RPM
+    - Wide hysteresis (756 BPW, 8.4 deg throttle) keeps it in OL longer
+
+
+================================================================================
+SECTION 11: THE OBSERVED PROBLEM (3-21.csv LOG ANALYSIS)
+================================================================================
+
+PROBLEM: At WOT (samples 41660-41702 in the 3-21.csv log), the ECU stays
+in CL for approximately 1.68 seconds despite 100% throttle and engine
+load exceeding 1.0 g/rev.
+
+The CL-to-OL transition only fires when RPM crosses the per-gear
+threshold at approximately 3399 RPM.
+
+WHY THIS HAPPENS — ANALYSIS FROM CODE:
+
+The condition checker (FUN_0003643A) evaluates conditions in a SPECIFIC
+ORDER. The order matters because some conditions EXIT EARLY:
+
+  1. Per-gear RPM limits — checked FIRST
+  2. Neutral RPM limits
+  3. Throttle maximum (CC1D8)
+  4. Vehicle speed maximum
+  5. Engine load maximum (CC204)
+  6. ECT minimum
+  7. Load counter threshold
+  8-11. Delay-based transitions
+
+The critical insight: With the modified ROM values:
+  - Throttle max = 37.884 degrees
+  - Load max = 0.95 g/rev
+  - Per-gear RPM ON thresholds: 3200-3600 depending on gear
+
+At WOT entry:
+  - Throttle jumps to 100% instantly (above 37.884 threshold)
+  - Load also exceeds 0.95 g/rev quickly
+  - RPM is ramping up from below the per-gear threshold
+
+EXPECTED BEHAVIOR: The throttle check (CHECK 3) should fire IMMEDIATELY
+at WOT, setting counter_B = 0 and flag = 1. The load check (CHECK 5)
+should also fire since load > 0.95 g/rev.
+
+OBSERVED BEHAVIOR: There is a 1.68-second delay before OL engages, and
+it only engages when RPM crosses the per-gear threshold.
+
+POSSIBLE EXPLANATIONS:
+
+  1. SNAPSHOT TIMING: The condition checker operates on SNAPSHOTTED data,
+     not live sensor data. Phase 1 (FUN_0003580C) snapshots engine state
+     only when the master counter reaches the threshold (CAL@0xCBBEF).
+     If the snapshot cycle is slow, there could be a delay between the
+     throttle actually exceeding 37.884 and the condition checker seeing
+     the updated value.
+
+  2. CONDITION CHECKER CALL ORDER: The condition checker is called TWICE
+     per cycle (Phase 2 and Phase 4). But the main evaluator
+     (FUN_0003606C) that actually applies the OL enrichment runs between
+     these calls. If the first call sets counter_B but the evaluator
+     has not yet processed it, there could be a one-cycle delay.
+
+  3. MULTIPLE GATE CONDITIONS: The mode state flag at FFFF79C6 has three
+     values (0=no change, 1=CL, 2=blending). The main evaluator checks
+     this flag. If the flag is in "CL mode" (1), the OL enrichment may
+     be suppressed even though counter_B = 0.
+
+  4. THROTTLE SENSOR FILTERING: If the throttle position sensor input
+     is filtered or averaged before being stored at the RAM address that
+     the condition checker reads, the effective throttle value could be
+     delayed relative to the physical pedal position.
+
+  5. THE RPM-FIRST EVALUATION: Since per-gear RPM limits are checked
+     BEFORE throttle in the condition checker, and the function returns
+     immediately when any condition triggers, the RPM check would NOT
+     cause a delay — it would trigger OL sooner if RPM was already above
+     threshold. The fact that OL fires at the RPM threshold suggests that
+     the throttle and load checks are NOT firing, despite the sensor
+     values exceeding the thresholds.
+
+  MOST LIKELY ROOT CAUSE: The throttle and load values used by the
+  condition checker may be derived from SNAPSHOTTED values (the state
+  block at FFFF7934-FFFF7950) rather than live sensor values. If the
+  snapshot was taken before WOT began, the condition checker would still
+  see the old (low) throttle and load values until the next snapshot
+  cycle. The per-gear RPM check may use a different (live) RPM source,
+  which is why it triggers correctly.
+
+  This would explain the ~1.68 second delay: it represents the time
+  between snapshot cycles. The first snapshot after WOT entry finally
+  shows the high throttle value, but by then RPM has already crossed
+  the per-gear threshold and triggers CHECK 1 instead.
+
+
+================================================================================
+SECTION 12: WHAT WE STILL DO NOT FULLY UNDERSTAND
+================================================================================
+
+  1. WHERE IS THE SSM CL/OL MODE VALUE (7/8/10) GENERATED?
+     We traced FUN_36E60 expecting it to write the 7/8/10 mode value.
+     It does not. It does not write to FFFF7448 either. The SSM mode
+     value (7=off, 8=CL, 10=OL) is produced by SSM protocol formatting
+     code, likely in the diagnostic function area around 0x013D58, based
+     on reading multiple state flags. We have not traced this formatting
+     to the specific instruction level.
+
+  2. WHAT EXACTLY IS RAM[FFFF7448] AND WHO WRITES IT?
+     We know FFFF7448 is referenced by ~20 functions in the ROM (the AFC
+     PI controller at 0x342A8, learning functions, etc.) as a CL/OL mode
+     flag (1=CL, else=OL). We have not traced which specific function
+     WRITES to this address. It is read by the AFC PI controller to
+     decide whether to run the feedback loop.
+
+  3. HOW EXACTLY DOES THE SNAPSHOT CYCLE WORK?
+     The master counter at FFFF7986 controls when Phase 1 takes a new
+     snapshot. It is reset to 0xFF by Phase 3 (FUN_357D0), then Phase 1
+     increments it and compares against threshold CAL@0xCBBEF. We do not
+     know the exact value of this threshold byte, which determines the
+     snapshot rate.
+
+  4. WHAT IS THE ROLE OF FUN_36E60 SUB-A vs SUB-B?
+     Sub-A (0x36E60-0x36E84) appears to be a separate, tiny function that
+     is likely called independently — it has its own RTS. It writes a
+     blending rate. Sub-B (0x36E86+) is the main body. They share literal
+     pool entries but are distinct functions. It is unclear if both are
+     called from the dispatch table entry or if one calls the other.
+
+  5. WHAT DO THE THRESHOLD VALUES CC260-CC280 ACTUALLY MEAN?
+     The names "RPM threshold" are inferred from the comparison context,
+     but the values (100, 101, 102, 105, 12000, 12800) seem unusual for
+     RPM. The value at CC264 = 101.0 and CC260 = 100.0 might be in a
+     different unit or might represent a percentage/scaling factor rather
+     than raw RPM.
+
+  6. THE FUN_36E60 ENRICHMENT PATH IS DEAD CODE
+     Due to CAL[CC270] = 0.0, the condition flag at FFFF7A3E is always 0,
+     which causes the enrichment adjustment logic (Steps 5-7) to always
+     take the DEFAULT_PATH. This means the threshold checks at CC274-CC280
+     and the upper/lower blending rate selection never execute. This
+     appears to be a disabled feature (perhaps for a different ECU
+     variant), but we cannot confirm this without Subaru engineering docs.
+
+  7. EXACTLY WHICH RAM ADDRESS IS THE "LIVE" vs "SNAPSHOT" THROTTLE?
+     The condition checker reads throttle from a specific RAM address.
+     We need to confirm whether this is the live sensor value (e.g.,
+     FFFF69F0) or the snapshot copy (FFFF793C). This distinction is
+     critical for understanding the WOT delay problem.
+
+
+================================================================================
+SECTION 13: RECOMMENDATIONS
+================================================================================
+
+Based on the code analysis, the following changes would address the slow
+CL-to-OL transition at WOT:
+
+  1. VERIFY THE THROTTLE INPUT SOURCE
+     The most important next step is to determine whether FUN_0003643A
+     reads the LIVE throttle value or the SNAPSHOT throttle value. If it
+     reads the snapshot, the delay is inherent to the snapshot cycle and
+     cannot be fixed by changing thresholds alone.
+
+     How to check: Disassemble FUN_0003643A fully around the throttle
+     comparison (CHECK 3) and trace the RAM address it reads. If it reads
+     from FFFF793C (snapshot block) rather than FFFF69F0 (live sensor),
+     that confirms the snapshot theory.
+
+  2. IF SNAPSHOT IS THE ISSUE — LOWER THE SNAPSHOT THRESHOLD
+     The master counter threshold at CAL@0xCBBEF controls how often
+     snapshots are taken. Lowering this value would make snapshots more
+     frequent, reducing the worst-case delay. However, this affects all
+     CL/OL functions, not just the transition speed.
+
+  3. IF THE THROTTLE CHECK IS USING LIVE DATA — INVESTIGATE THE AFC GATE
+     The AFC PI controller at 0x342A8 reads FFFF7448 to decide whether
+     to run CL correction. If FFFF7448 is not being cleared promptly
+     when the condition checker fires, the AFC could continue running
+     in CL mode even though the condition checker has determined OL.
+
+  4. CONSIDER LOWERING PER-GEAR RPM THRESHOLDS FURTHER
+     Since the RPM check is CHECK 1 (evaluated first) and appears to use
+     a live or more responsive RPM source, lowering the per-gear RPM
+     thresholds would cause OL to engage earlier in the RPM range. For
+     example, lowering 3rd gear ON from 3400 to 2800 would trigger OL
+     500 RPM sooner.
+
+     However, this has the side effect of making the ECU enter OL at
+     lower RPMs even during partial-throttle driving.
+
+  5. LOWER THE ENGINE LOAD THRESHOLD FURTHER
+     The load threshold (CC204) is already at 0.95 g/rev. At WOT, load
+     should exceed this quickly. If the load check (CHECK 5) is using
+     live data, it should fire within a few hundred milliseconds of WOT.
+     If it is not firing, the load value may also be snapshot-based.
+
+  6. ADD A DEDICATED FAST-TRANSITION PATH
+     The cleanest solution would be a very low throttle threshold that
+     fires before RPM even starts ramping. The current 37.884 degrees
+     should do this IF the condition checker sees the live throttle value.
+     The fact that it does not fire immediately at WOT strongly suggests
+     a snapshot/latency issue rather than a threshold issue.
+
+  7. DATALOG THE SNAPSHOT VARIABLES
+     If possible, log the snapshot addresses (FFFF793C for throttle,
+     FFFF7950 for load) alongside the live sensor addresses (FFFF69F0,
+     FFFF63C4) to confirm whether there is a time lag between them.
+     This would definitively answer the snapshot question.
+
+
+================================================================================
+APPENDIX A: RAM ADDRESS MAP FOR FUN_36E60 AND RELATED
+================================================================================
+
+  Address       Size   Description
+  ----------    ----   -------------------------------------------------
+  FFFF62F8      float  Sensor value (secondary throttle/load metric)
+  FFFF6350      float  RPM (floating point)
+  FFFF6400      float  RPM-related threshold value
+  FFFF6624      float  MAF (mass airflow)
+  FFFF65C0      byte   Engine running state
+  FFFF65C5      byte   Engine condition flag (1 = running normally)
+  FFFF65FC      float  BPW (base pulse width)
+  FFFF67EC      word   RPM raw value (from speed sensor)
+  FFFF7348      float  Correction value (BPW-related)
+  FFFF7448      byte   CL/OL mode flag (1=CL, else=OL) — NOT written by 36E60
+  FFFF79C2      word   counter_A (system/scheduler counter)
+  FFFF79C4      word   counter_B (delay threshold from condition checker)
+  FFFF79C6      byte   Mode state flag (0=none, 1=CL, 2=blending)
+  FFFF79C7      byte   Diagnostic flag (1=throttle, 0=other) — SSM only
+  FFFF79F2      byte   OL active flag
+  FFFF7A14      float  Transition output (written by FUN_36E60)
+  FFFF7A20      float  Blending rate parameter (written by FUN_36E60 sub-A)
+  FFFF7A24      float  Transition factor (written by FUN_36F76)
+  FFFF7A28      byte   State variable (read by FUN_36E60 as GBR+8)
+  FFFF7A2C      float  RPM snapshot (written by FUN_36E60)
+  FFFF7A30      float  Sensor snapshot (written by FUN_36E60)
+  FFFF7A34      float  MAF snapshot (written by FUN_36E60)
+  FFFF7A38      float  Blending rate output (written by FUN_36E60)
+  FFFF7A3C      byte   Condition flag B (set by FUN_3700A)
+  FFFF7A3D      byte   Condition flag A (set by FUN_3700A)
+  FFFF7A3E      byte   Condition flag C (set by FUN_3700A, always 0)
+  FFFF9705      byte   DTC flag A (read by 0x0297B0)
+  FFFF972E      byte   DTC flag B (read by 0x029AA0)
+
+
+================================================================================
+APPENDIX B: CALIBRATION ADDRESS MAP FOR FUN_36E60 AND RELATED
+================================================================================
+
+  Address    Type    Value (stock=mod)  Description
+  --------   -----   -----------------  -----------------------------------------
+  0xCC260    float   100.0              RPM threshold 3 (sub comparator)
+  0xCC264    float   101.0              RPM on threshold (sub comparator)
+  0xCC268    float   8.96               Sensor off threshold (sub comparator)
+  0xCC26C    float   0.0                MAF off threshold (sub comparator)
+  0xCC270    float   0.0                MAF on threshold (sub comparator)
+  0xCC274    float   102.0              RPM low threshold (enrichment gate)
+  0xCC278    float   105.0              RPM high threshold (enrichment gate)
+  0xCC27C    float   12000.0            MAF high threshold (enrichment gate)
+  0xCC280    float   12800.0            MAF low threshold (enrichment gate)
+  0xCC284    float   0.1                Blending rate A (non-condition)
+  0xCC288    float   0.1                Blending rate B (condition-1)
+  0xCC28C    float   0.2                Upper blending rate A
+  0xCC290    float   0.2                Upper blending rate B
+  0xCBC70    word    1250               Counter gate threshold
+  0xAD0F0    desc    (table descriptor) MAF lookup table for sub comparator
+
+
+================================================================================
+APPENDIX C: OL ENRICHMENT ACCUMULATOR (0xFFFF798C) — WRITE SITES
+================================================================================
+
+FFFF798C is the primary OL enrichment accumulator float. It is read with
+fmov.s throughout the OL computation and written by FUN_0003606C
+(GBR=0xFFFF798C). All writes use R12=0xFFFF79F0 with R0=-100 (effective
+address = FFFF79F0 - 100 = FFFF798C), via fmov.s FR8,@(R0,R12).
+
+WRITE 1 — ROM 0x3603E: RESET TO ZERO
+  Triggered when sub 0x22F92 returns 1 (reset/re-init condition).
+  FR8 = fldi0 (0.0)
+  Also resets FFFF7990, FFFF7994, FFFF7998, FFFF799C to 0.0 and clears
+  the OL active flag at FFFF79F2. This is a full struct reset.
+
+WRITE 2 — ROM 0x3621E: DIRECT COPY (when mode state = 1)
+  Reads FFFF79C6 (mode state byte). If == 1 (CL mode):
+    FFFF798C = float(FFFF79B8)    // direct assignment, no smoothing
+  Code:
+    36216: E0C8  mov    #-56,R0
+    36218: F8C6  fmov.s @(R0,R12),FR8  ; FR8 = [FFFF79F0-56] = [FFFF79B8]
+    3621A: E09C  mov    #-100,R0
+    3621C: A074  bra    0x36308
+    3621E: FC87  fmov.s FR8,@(R0,R12)  ; delay slot: FFFF798C = FR8
+
+WRITE 3 — ROM 0x36236: MULTIPLY-ACCUMULATE (when mode state = 2)
+  Reads FFFF79C6. If == 2 (blending):
+    FFFF798C = [FFFF79BC] + [FFFF7994] * [FFFF79A0]   // fmac
+  Code:
+    36226: F8C6  fmov.s @(R0,R12),FR8  ; FR8 = [FFFF79BC]
+    3622A: F0C6  fmov.s @(R0,R12),FR0  ; FR0 = [FFFF7994]
+    3622E: F9C6  fmov.s @(R0,R12),FR9  ; FR9 = [FFFF79A0]
+    36230: F89E  fmac   FR0,FR9,FR8    ; FR8 = FR8 + FR0*FR9
+    36236: FC87  fmov.s FR8,@(R0,R12)  ; delay slot: FFFF798C = FR8
+
+WRITE 4 — ROM 0x36306: FILTERED UPDATE (else path, mode != 1 and != 2)
+  The else branch (0x36238-0x36306) performs a more complex filtered
+  computation before writing to FFFF798C. This is the normal run-time
+  update path. The exact filtering algorithm was not fully disassembled
+  but involves multiple fmov/fmac operations on the struct fields.
+
+NOTE: The GBR-relative mov.w writes at ROM 0x36380, 0x363CA, 0x3640A,
+0x3640E appear to target FFFF798C at first glance because GBR is set to
+0xFFFF798C at 0x3607E. However, GBR is changed to 0xFFFF79C0 at 0x3632A
+(before these write sites). These mov.w instructions therefore write to
+FFFF79C0, not FFFF798C.
+
+
+================================================================================
+END OF COMPREHENSIVE REVIEW
+================================================================================

@@ -1,0 +1,892 @@
+================================================================================
+  CL/OL STATE MACHINE - COMPLETE ANALYSIS AND PSEUDOCODE
+  Subaru ECU ROM AE5L600L (SH7055 / SH-2)
+  Stock ROM: ae5l600l.bin
+  Modified ROM: AE5L600L 20g rev 20.5 tiny wrex.bin
+================================================================================
+
+TABLE OF CONTENTS
+  1.  Execution Order and Dispatch
+  2.  GBR Layout / RAM State Variables
+  3.  Per-Function Annotated Disassembly Summary
+  4.  Complete Pseudocode State Machine
+  5.  Flag at 0xFFFF79C7 (GBR+0x23) - Complete Trace
+  6.  Stock vs Modified Calibration Changes
+  7.  Key Findings
+
+================================================================================
+SECTION 1: EXECUTION ORDER AND DISPATCH
+================================================================================
+
+The CL/OL state machine is dispatched from two periodic task tables:
+
+  Dispatch Table A @ 0x480B8 (fueling task, executed periodically):
+    [6]  0x357D0  FUN_000357D0  CL/OL transition sub B (initialization)
+    [8]  0x36008  FUN_00036008  CL/OL delay manager A (main evaluator)
+    [9]  0x36A98  FUN_00036A98  CL/OL hysteresis handler
+    [10] 0x36BF4  FUN_00036BF4  CL/OL delay manager B
+    [11] 0x36E60  FUN_00036E60  Post-transition handler
+
+  Dispatch Table B @ 0x4A0B8 (secondary fueling task):
+    [14] 0x3580C  FUN_0003580C  CL/OL transition CORE (state snapshot + OL calc)
+    [15] 0x3605E  -> branches to FUN_0003643A (condition checker) then 0x36848
+
+  EXECUTION ORDER per cycle:
+    1. Table B[14]: 0x3580C  - Snapshots engine state, computes OL enrichment
+    2. Table B[15]: 0x3605E  - Evaluates CL/OL conditions via 0x3643A
+    3. Table A[6]:  0x357D0  - Transition sub B (counter management)
+    4. Table A[8]:  0x36008  - Delay manager A (calls condition checker 0x3643A again)
+    5. Table A[9]:  0x36A98  - Hysteresis handler (prevents CL/OL oscillation)
+    6. Table A[10]: 0x36BF4  - Delay manager B (counter-based delay)
+    7. Table A[11]: 0x36E60  - Post-transition handler (final mode commit)
+
+
+================================================================================
+SECTION 2: GBR LAYOUT / RAM STATE VARIABLES
+================================================================================
+
+Three distinct GBR base registers are used by the CL/OL subsystem:
+
+--- GBR = 0xFFFF7954 (set at 0x035814, used by FUN_0003580C) ---
+
+  +0x18 (0xFFFF796C): word    Counter/state (accessed indirectly via R14=0xFFFF7988)
+  +0x30 (0xFFFF7984): word    Gear ratio / RPM snapshot (written from FFFF6A22)
+  +0x32 (0xFFFF7986): byte    Master transition counter / mode indicator
+                               Written by FUN_357D0 (set to 0xFF = init)
+                               Written by FUN_3580C (set to 0 after processing)
+                               Read by FUN_3580C to gate state snapshot
+                               Value compared with CAL@0xCBBEF threshold
+  +0x34 (0xFFFF7988): base    R14 pointer for indirect float storage
+  +0x36 (0xFFFF798A): byte    Gear position snapshot (from FFFF6254)
+  +0x37 (0xFFFF798B): byte    Global CL enable flag (from FFFF8F24)
+
+  Indirect via R14=0xFFFF7988:
+  +0xD0 (-48, 0xFFFF7938): float  ECT snapshot (from FFFF63CC)
+  +0xCC (-52, 0xFFFF7934): float  RPM snapshot (from FFFF6350)
+  +0xD4 (-44, 0xFFFF793C): float  Throttle snapshot (from FFFF69F0)
+  +0xD8 (-40, 0xFFFF7940): float  BPW lookup result (from table processor)
+  +0xDC (-36, 0xFFFF7944): float  MAF snapshot (from FFFF6624)
+  +0xE0 (-32, 0xFFFF7948): float  Base pulse width (from FFFF65FC)
+  +0xE4 (-28, 0xFFFF794C): float  MAP snapshot (from FFFF63F8)
+  +0xE8 (-24, 0xFFFF7950): float  Engine load (from FFFF63C4)
+
+
+--- GBR = 0xFFFF798C (set at 0x03607E, 0x036856) ---
+    Used by FUN_0003606C and FUN_00036848
+
+  +0x1B (0xFFFF79A7): byte    (unnamed state)
+  +0x36 (0xFFFF79C2): word    CL/OL delay counter comparison A
+  +0x38 (0xFFFF79C4): word    CL/OL delay counter comparison B (= "counter value")
+  +0x3A (0xFFFF79C6): byte    CL/OL mode state flag
+                               0 = no change, 1 = CL mode, 2 = blending
+  +0x62 (0xFFFF79EE): byte    (unnamed)
+  +0x66 (0xFFFF79F2): byte    OL active flag
+
+  Indirect via R12=0xFFFF79F0:
+  +0x9C (-100, 0xFFFF7954): float  OL enrichment factor A
+  +0xA0 (-96, 0xFFFF7958): float  OL enrichment factor B
+  +0xA4 (-92, 0xFFFF795C): float  OL enrichment output (primary)
+  +0xA8 (-88, 0xFFFF7960): float  OL enrichment interpolation A
+  +0xAC (-84, 0xFFFF7964): float  OL enrichment interpolation B
+  +0xB0 (-80, 0xFFFF7968): float  OL enrichment blend factor
+  +0xF0 (-16, 0xFFFF79E0): float  Table lookup result
+  +0xF4 (-12, 0xFFFF79E4): float  OL compensation intermediate
+  +0xC8 (-56, 0xFFFF7990): float  (unnamed computation)
+  +0xCC (-52, 0xFFFF7994): float  (unnamed computation)
+
+
+--- GBR = 0xFFFF79A4 (set at 0x03644E) ---
+    Used by FUN_0003643A (condition checker)
+
+  +0x00 (0xFFFF79A4): word    Internal counter A (via sub-GBR 0xFFFF79C0+0x00)
+  +0x1C (0xFFFF79C0): GBR sub-base for counter operations
+  +0x20 (0xFFFF79C4): word    COUNTER VALUE (output from condition checker)
+                               Written by FUN_0003643A at multiple points
+                               Read by FUN_0003606C at 0x0360AC and 0x0360E0
+                               Read by FUN_0003643A itself at 0x036336, 0x0363A6, 0x03641C
+                               Read by diagnostic function at 0x07D6CC
+  +0x23 (0xFFFF79C7): byte    FLAG BYTE (throttle exceeded indicator)
+                               Written at 0x036830: always 0 in the visible path
+                               1 = throttle exceeded path (from condition checker)
+                               0 = other paths
+  +0x24 (0xFFFF79C8): byte    Post-condition state flag
+                               Written at 0x036428
+
+
+================================================================================
+SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
+================================================================================
+
+--- FUN_000357D0 (0x357D0-0x357E8) - CL/OL transition sub B ---
+  GBR: 0xFFFF7954 (inherited from caller context)
+  Purpose: Initialize CL/OL transition state, call subroutines
+  Actions:
+    1. Calls 0x35E88 (subroutine - likely state machine step)
+    2. Writes 0xFF to RAM[FFFF7986] (= set transition counter to max)
+    3. Writes 0x200 (512) to RAM[FFFF794C] as word
+    4. Returns
+  At 0x357E8: Tail-call to 0x0BDBCC (table utility) with R4=FFFF318C
+
+
+--- FUN_000357F0 (0x357F0-0x35808) - CL/OL transition sub B helper ---
+  Purpose: Check validity via table utility, return boolean
+  Actions:
+    1. Calls 0x0BDCB6 (A/F learning range validity check) with R4=FFFF318C
+    2. If result != 0: R14 = 1 (valid)
+    3. If result == 0: R14 = 0 (invalid)
+    4. Returns R14 in R0
+
+
+--- FUN_0003580C (0x3580C-0x3589E) - CL/OL Transition CORE ---
+  GBR: 0xFFFF7954 (set at 0x035814)
+  Purpose: Main state snapshot and OL enrichment computation
+  Critical RAM reads:
+    FFFF7986 (byte): Master counter, compared with CAL@0xCBBEF
+    FFFF63CC: ECT (coolant temp)
+    FFFF6350: RPM
+    FFFF69F0: Throttle position
+    FFFF63FC: MAP
+    FFFF6A22: Gear/RPM word
+    FFFF6254: Gear position byte
+    FFFF6624: MAF
+    FFFF65FC: Base pulse width
+    FFFF63F8: MAP (variant)
+    FFFF8F24: Global CL enable flag
+    FFFF63C4: Engine load
+
+  Algorithm:
+    1. Set GBR = 0xFFFF7954
+    2. Read RAM[FFFF7986] (master counter)
+    3. Compare with threshold at CAL[0xCBBEF]
+    4. If counter < threshold: skip to step 9
+    5. Snapshot all engine parameters to RAM block at FFFF7938-FFFF7950
+    6. Copy gear, MAF, BPW, MAP, ECT, global CL flag
+    7. Call subroutines: 0x358A0, 0x359A4, 0x35DE4, 0x35E2C
+       - These perform OL enrichment table lookups and blending
+    8. Clear counter: RAM[FFFF7986] = 0
+    9. Call 0x0BE53C (min/max utility) on counter value
+    10. Store result back to RAM[FFFF7986]
+    11. Return via tail-jump to 0x35E64
+
+  Sub-function 0x358A0 (called from 0x35878):
+    Sets up OL enrichment computation:
+    - Reads FFFF7910 (word), FFFF7912 (byte), FFFF782B (byte)
+    - Reads FFFF7D68 (float), FFFF984D (byte)
+    - Checks gear (R6 from FFFF7912): if byte == 1, enters main path
+    - Compares counter (R14) with threshold at CAL[0xCBC48]
+    - If counter >= threshold AND RPM > CAL[0xCC110]:
+      Process OL enrichment tables at 0xCC110 region
+    - Else: skip enrichment
+
+
+--- FUN_00036008 (0x36008-0x36028) - CL/OL Delay Manager A ---
+  Purpose: Main CL/OL evaluator entry point (dispatch table A)
+  Actions:
+    1. Store float from literal pool to RAM[FFFF79F4-0x50] (=FFFF79A4)
+    2. Store table descriptor pointer to RAM[FFFF79F4+4]
+    3. Call 0x36962 (CL/OL sub - saves GBR context)
+    4. Call 0x3643A (CONDITION CHECKER - the big one)
+    5. Call 0x36978 (CL/OL sub 2 - post-condition)
+    6. Write R0 result byte to RAM[FFFF79F4]
+    7. Return
+
+
+--- FUN_0003602A (0x3602A-0x36058) - CL/OL Delay Manager A Sub ---
+  Purpose: Reset OL state if certain conditions met
+  Actions:
+    1. Call 0x22F92 (utility function)
+    2. If result == 1 (condition met):
+       - Zero out 5 float values in FFFF79F0 region
+         (offsets -100, -96, -88, -84, -92 from 0xFFFF79F0)
+       - Clear byte at FFFF79F0+98 (=FFFF7A52)
+    3. Return
+
+
+--- FUN_00036062 (0x36062-0x3606C) - CL/OL Delay Manager A Setup ---
+  Purpose: Short wrapper - calls CL/OL sub then jumps to post-condition
+  Actions:
+    1. Call 0x36962 (CL/OL sub)
+    2. Jump to 0x36848 (post-condition handler)
+
+
+--- FUN_0003606C (0x3606C-0x36278) - CL/OL MAIN EVALUATOR ---
+  GBR: 0xFFFF798C (set at 0x03607E)
+  Purpose: The heart of the CL/OL decision logic
+
+  Reads:
+    FFFF6624: MAF (mass airflow sensor)
+    FFFF63F8: MAP
+    FFFF3234: IAM (ignition advance multiplier) -> FR13
+    FFFF62DC: (sensor value)
+    FFFF64D8: (sensor value)
+    FFFF8200: (state variable)
+    FFFF7F6C: (state variable)
+    FFFF79C2: CL/OL delay counter A (word, GBR+0x36)
+    FFFF79C4: CL/OL delay counter B (word, GBR+0x38)
+    FFFF79C6: CL/OL mode state flag (byte, GBR+0x3A)
+    FFFF79F2: OL active flag (byte, GBR+0x66)
+
+  Calibration references:
+    0x0AC5D0: Table descriptor (OL map A)
+    0x0AC5E4: Table descriptor (OL map B)
+    0x0AD090: Table descriptor (OL map C)
+    0x0AD674-0x0AD700: Multiple OL fuel map descriptors
+    0x0CC16C: Primary Open Loop Fuel Map Switch (IAM threshold)
+              Stock=0.35, Modified=0.50
+    0x0CC170: Minimum Active Primary Open Loop Enrichment (0.05)
+    0x0D299B: Calibration byte (OL mode selector)
+    0x0CBBF2: Calibration byte (compared with 90)
+
+  Algorithm (pseudocode):
+    GBR = 0xFFFF798C
+    MAF = RAM[FFFF6624]
+    MAP = RAM[FFFF63F8]
+    IAM = RAM[FFFF3234]   // float, Ignition Advance Multiplier
+
+    counter_A = GBR+0x36  // word at FFFF79C2 (delay counter A)
+    counter_B = GBR+0x38  // word at FFFF79C4 (delay counter B)
+
+    // FIRST COMPARISON: counter_A >= counter_B?
+    if (counter_A >= counter_B) {
+        // Counter has not exceeded threshold -> compute fresh OL enrichment
+        FR14 = 0.0   // OL enrichment = 0
+        FR0 = 0.0
+        R5 = table_processor(0xBE830)  // save function ptr
+    } else {
+        // Counter exceeded threshold -> look up OL enrichment from tables
+        OL_interp_A = table_lookup(0xAC5D0, FC_variable)  // via 0xBE830
+        FR14 = result
+        OL_interp_B = table_lookup(0xAC5E4, FR15)
+    }
+
+    // Store interpolation results
+    RAM[FFFF7960] = FR14  // OL enrichment interpolation A
+    RAM[FFFF7964] = FR0   // OL enrichment interpolation B
+
+    // SECOND COMPARISON: counter_A >= counter_B?
+    if (counter_A >= counter_B) {
+        // Mode state flag check
+        mode_selector = CAL[0x0D299B]  // byte
+        if (mode_selector == 0) {
+            // Standard OL enrichment path
+            if (CAL[0x0CBBF2] == 90) {
+                // Special path: IAM-based map selection
+                OL_base = table_lookup(0xAC5A8, FR12)
+                OL_raw = OL_base
+                IAM_threshold = CAL[0xCC16C]  // 0.35 stock, 0.50 modified
+                if (IAM >= IAM_threshold) {
+                    // Use normal OL map
+                    desc = 0xAD690
+                } else {
+                    // Use failsafe OL map (low IAM)
+                    desc = 0xAD674
+                }
+                OL_comp = table_lookup_2d(desc, MAF, MAP)
+                OL_enrichment = OL_raw + OL_comp
+            } else {
+                // Non-standard calibration byte:
+                // Multi-table blended computation
+                OL_comp1 = table_lookup_2d(0xAD674, MAF, MAP)
+                OL_comp2 = intermediate
+                OL_enrichment = (1.0 - IAM) * comp + IAM * base
+            }
+        } else {
+            // mode_selector != 0: Different OL map selection
+            OL_base = table_lookup(0xAC5A8, FR12)
+            IAM_threshold = CAL[0xCC16C]
+            if (IAM >= IAM_threshold) {
+                desc_a = 0xAD6C8; desc_b = 0xAD6E4
+            } else {
+                desc_a = 0xAD700; desc_b = 0xAD6C8
+            }
+            comp1 = table_lookup_2d(desc_a, MAF, MAP)
+            comp2 = table_lookup_2d(desc_b, MAF, MAP)
+            // Blend: result = (1 - blend_factor) * comp2 + blend_factor * comp1
+            OL_enrichment = fmac(blend, comp1, comp2)
+        }
+
+        // Apply minimum threshold
+        if (OL_enrichment < CAL[0xCC170]) {  // min 0.05
+            OL_enrichment = 0.0
+        }
+    }
+
+    // Store OL enrichment results
+    RAM[FFFF795C] = OL_enrichment  // primary OL enrichment output
+
+    // Compare/interpolate using BE960, BE608 (comparison utilities)
+    // Multiple table processor calls for final blending
+
+    // Check mode state flag
+    mode_flag = GBR+0x3A  // FFFF79C6
+    if (mode_flag == 1) {
+        // CL mode: copy existing value
+        RAM[FFFF7954] = RAM[FFFF7990]
+    } else if (mode_flag == 2) {
+        // Blending mode: interpolate between CL and OL
+        RAM[FFFF7954] = fmac(blend, OL_value, CL_value)
+    } else {
+        // Other modes: further condition checks
+        flag_from_BE608 = comparison_result
+        if (flag && RAM[FFFF79F2] != 0) {
+            // Use delayed transition logic
+            ...
+        }
+    }
+
+    // Additional OL map lookups (0xAD090, etc.)
+    // Final output computation and storage
+    // Return
+
+
+--- FUN_0003643A (0x3643A-0x36846) - CONDITION CHECKER ---
+  GBR: 0xFFFF79A4 (set at 0x03644E)
+  Purpose: Evaluate ALL CL/OL transition conditions
+  [Already fully disassembled by user - summary of outputs]
+
+  OUTPUTS:
+    GBR+0x20 (0xFFFF79C4): word - COUNTER VALUE
+      Set based on which condition triggered the CL->OL transition.
+      Represents the delay counter threshold.
+
+    GBR+0x23 (0xFFFF79C7): byte - FLAG
+      1 = throttle exceeded path (specific condition triggered transition)
+      0 = other paths (RPM, load, vehicle speed, etc.)
+
+    GBR+0x24 (0xFFFF79C8): byte - post-condition state flag
+
+  CONDITIONS CHECKED (in order):
+    1. Per-gear RPM limit (CAL[0xCC180-0xCC1A4], 10 values per gear)
+    2. Neutral RPM limit (CAL[0xCC1A8-0xCC1CC])
+    3. Throttle maximum (CAL[0xCC1D8-0xCC1F0])
+    4. Vehicle speed maximum (CAL[0xCC1F4])
+    5. Engine load maximum (CAL[0xCC204])
+    6. ECT minimum (CAL[0xCC17C])
+    7. Engine load counter threshold (CAL[0xCBC5A])
+    8. CL/OL delay values (CAL[0xCBC5C], CAL[0xCBC62])
+    9. BPW threshold with delay (CAL[0xCE5F8])
+    10. Throttle threshold with delay (CAL[0xCCD78])
+    11. MAF-based counter step (CAL[0xCE640])
+
+
+--- FUN_00036848 (0x36848-0x36962) - POST-CONDITION HANDLER ---
+  GBR: 0xFFFF798C (set at 0x036856)
+  Purpose: Process results from condition checker, set CL/OL mode
+
+  Algorithm:
+    GBR = 0xFFFF798C
+    // Read results from condition checker
+    // Process counter values and flags
+    // Determine final CL/OL mode state
+    // Update mode state variables
+
+
+--- FUN_00036962 (0x36962-0x36978) - CL/OL Sub ---
+  Purpose: Save/restore GBR context for condition checker
+
+  Algorithm:
+    // Save current GBR to stack
+    // Prepare state for condition evaluation
+    // Return
+
+
+--- FUN_00036978 (0x36978-0x36A98) - CL/OL Sub 2 ---
+  Purpose: Post-condition processing, update delay counters
+
+  Algorithm:
+    // Read condition checker results
+    // Update delay counter values
+    // Determine if transition should occur
+    // Return mode indicator
+
+
+--- FUN_00036A98 (0x36A98-0x36AB2) - HYSTERESIS HANDLER ENTRY ---
+  Purpose: Entry point for hysteresis logic (prevents CL/OL oscillation)
+
+  Actions:
+    1. Write 0 to RAM[FFFF7A0C+84] (=FFFF7A60)
+    2. Copy RAM[FFFF7A0C+84] to RAM[FFFF7A0C+0] (byte)
+    3. Read RAM[FFFF65C0] (byte) -> R13 (engine running state)
+    4. Write to RAM[FFFF7A0C+85] (=FFFF7A61)
+    5. Return
+
+
+--- FUN_00036AB2 (0x36AB2-0x36B48) - HYSTERESIS HANDLER MAIN ---
+  Purpose: Core hysteresis logic
+
+  Reads:
+    FFFF6624: MAF
+    FFFF65FC: Base pulse width
+    FFFF65C0: Engine running state -> R13
+    FFFF67EC: (word, state variable)
+    FFFF7A0C: Base pointer for hysteresis state block
+
+  Calibration references:
+    0x0CBC66: word - RPM threshold for hysteresis
+    0x0CC228: float array - Throttle hysteresis lookup table
+    0x0CC17C: float - CL delay minimum ECT
+
+  Algorithm:
+    engine_state = RAM[FFFF65C0]
+    RPM_raw = RAM[FFFF67EC]  // word
+    RPM_threshold = CAL[0xCBC66]  // word
+
+    if (RPM_raw >= RPM_threshold) {
+        // RPM above threshold
+        state = RAM[FFFF7A0C+21]  // byte at +0x15
+        if (state == 1 && engine_state == 0) {
+            // Set hysteresis engaged flag
+            RAM[FFFF7A0C+22] = 1
+        }
+    } else {
+        // RPM below threshold
+        RAM[FFFF7A0C+22] = 0
+    }
+
+    if (engine_state == 0) {
+        // Engine not running special: increment counter
+        counter = RAM[FFFF7A0C+34]  // word at +0x22
+        counter = min_clamp(counter + 1, 1)  // call 0xBE554
+        RAM[FFFF7A0C+34] = counter
+    }
+
+    running_flag = RAM[FFFF7A0C+0]  // byte at base
+    if (running_flag == 0) {
+        // Apply throttle hysteresis
+        throttle_hyst = table_lookup(0xCC228, ...)
+        bpw_hyst = CAL[0xCC174]  // BPW hysteresis value
+        // Compare current throttle vs (threshold - hysteresis)
+        // Compare current BPW vs (threshold - BPW_hysteresis)
+        // If BOTH below: remain in CL (or return to CL)
+        // If either above: remain in OL
+    } else {
+        // Different path based on running state
+        ...
+    }
+
+
+--- FUN_00036B48 (0x36B48-0x36BF4) - HYSTERESIS SUB ---
+  Purpose: Compute hysteresis comparison values
+  Calibration:
+    0x0CC228: Throttle hysteresis lookup
+    0x0CC174: BPW hysteresis (stock=256.0, modified=756.0)
+    0x0CC178: Throttle hysteresis (stock=3.9, modified=8.4)
+
+  Algorithm:
+    throttle_threshold = table_lookup(transition_throttle_table)
+    throttle_with_hyst = throttle_threshold - CAL[0xCC178]
+    bpw_threshold = table_lookup(transition_bpw_table)
+    bpw_with_hyst = bpw_threshold - CAL[0xCC174]
+
+    current_throttle = RAM[...]
+    current_bpw = RAM[...]
+
+    if (current_throttle <= throttle_with_hyst
+        AND current_bpw <= bpw_with_hyst) {
+        return CL  // safe to return to closed loop
+    } else {
+        return OL  // stay in open loop
+    }
+
+
+--- FUN_00036BF4 (0x36BF4-0x36E60) - DELAY MANAGER B ---
+  Purpose: Counter-based delay for CL->OL transition
+  GBR: (varies, uses multiple state bases)
+
+  Calibration:
+    0x0CBC62: CL to OL Delay (stock=750, modified=0)
+    0x0CBC5C: CL to OL Delay SI-DRIVE (stock=0, modified=0)
+    0x0CBC5A: CL Delay Engine Load Counter Threshold (stock=313, modified=200)
+    0x0CCD78: CL to OL Transition with Delay (Throttle) - all zeros
+    0x0CE5F8: CL to OL Transition with Delay (BPW) - all zeros
+    0x0CE640: CL to OL Counter Step Value (MAF) - [0,0,0,0,0,1,2,3]
+
+  Algorithm:
+    delay_value = CAL[0xCBC62]  // CL to OL Delay
+    if (delay_value == 0) {
+        // NO DELAY - immediate transition
+        // This is the modified ROM behavior (delay=0)
+        transition_immediately()
+        return
+    }
+
+    // Delay mode:
+    // Read current counter
+    // Compare throttle vs CAL[0xCCD78] threshold
+    // Compare BPW vs CAL[0xCE5F8] threshold
+    // If either exceeds threshold:
+    //   increment counter by CAL[0xCE640] step value (MAF-based)
+    //   if counter >= delay_value:
+    //     TRANSITION TO OL
+    // If neither exceeds:
+    //   decrement counter (or reset)
+
+
+--- FUN_00036E60 (0x36E60-0x36F6E) - POST-TRANSITION HANDLER ---
+  Purpose: Final mode commit and output generation
+  GBR: (uses state from previous functions)
+
+  Algorithm:
+    // Read final CL/OL mode state
+    // If transitioning to OL:
+    //   Set OL mode flags
+    //   Enable OL enrichment output
+    //   Disable AFC (closed loop correction)
+    // If transitioning to CL:
+    //   Clear OL mode flags
+    //   Re-enable AFC
+    //   Reset enrichment to 1.0 (stoich target)
+    // Apply transition smoothing
+
+
+================================================================================
+SECTION 4: COMPLETE PSEUDOCODE STATE MACHINE
+================================================================================
+
+============== MAIN CL/OL STATE MACHINE (per cycle) ==============
+
+function CL_OL_StateMachine_PerCycle():
+
+    // ===== PHASE 1: STATE SNAPSHOT (FUN_0003580C, Table B[14]) =====
+    GBR = 0xFFFF7954
+    master_counter = RAM[FFFF7986]  // byte
+    threshold = CAL[0x0CBBEF]       // byte threshold
+
+    if (master_counter >= threshold):
+        // Snapshot all engine parameters
+        state.ECT      = RAM[FFFF63CC]   // coolant temp
+        state.RPM      = RAM[FFFF6350]   // engine speed
+        state.throttle = RAM[FFFF69F0]   // throttle position
+        state.MAP      = RAM[FFFF63FC]   // manifold pressure
+        state.MAF      = RAM[FFFF6624]   // mass airflow
+        state.BPW      = RAM[FFFF65FC]   // base pulse width
+        state.load     = RAM[FFFF63C4]   // engine load
+        state.gear     = RAM[FFFF6254]   // gear position
+        state.CL_enable= RAM[FFFF8F24]   // global CL enable
+
+        // Store snapshots to FFFF7934-FFFF7950
+
+        // Compute OL enrichment tables
+        compute_OL_enrichment()  // sub 0x358A0
+        run_transition_logic()   // sub 0x359A4
+        finalize_enrichment()    // sub 0x35DE4, 0x35E2C
+
+        // Reset counter
+        RAM[FFFF7986] = 0
+
+    // Clamp counter
+    RAM[FFFF7986] = min(RAM[FFFF7986] + 1, max_value)
+
+
+    // ===== PHASE 2: CONDITION EVALUATION (Table B[15] -> FUN_0003643A) =====
+    // This calls the big condition checker
+    GBR = 0xFFFF79A4
+
+    evaluate_CL_OL_conditions():
+        //
+        // CHECK 1: Per-gear RPM limits
+        //
+        gear = RAM[FFFF5E94]
+        RPM = RAM[FFFF6350]
+        rpm_on  = CAL[0xCC180 + gear*8]     // on threshold
+        rpm_off = CAL[0xCC180 + gear*8 + 4]  // off threshold (hysteresis pair)
+
+        if (RPM >= rpm_on):
+            clear_CL_delay()
+            GBR+0x20 = counter_value   // set counter
+            goto OL_transition
+
+        //
+        // CHECK 2: Neutral RPM limits (if neutral)
+        //
+        if (gear == neutral):
+            rpm_on  = CAL[0xCC1A8 + ...]
+            if (RPM >= rpm_on):
+                clear_CL_delay()
+                goto OL_transition
+
+        //
+        // CHECK 3: Throttle maximum
+        //
+        throttle = RAM[...]
+        throttle_max = CAL[0xCC1D8]  // stock=91, modified=37.884
+        if (throttle >= throttle_max):
+            GBR+0x23 = 1   // ** SET FLAG: throttle exceeded **
+            GBR+0x20 = counter_value
+            goto OL_transition
+
+        //
+        // CHECK 4: Vehicle speed
+        //
+        vspeed = RAM[...]
+        if (vspeed >= CAL[0xCC1F4]):  // stock=130, modified=141.7
+            goto OL_transition
+
+        //
+        // CHECK 5: Engine load
+        //
+        load = RAM[...]
+        if (load >= CAL[0xCC204]):  // stock=4.8, modified=0.95
+            goto OL_transition
+
+        //
+        // CHECK 6: ECT minimum
+        //
+        ECT = RAM[...]
+        if (ECT < CAL[0xCC17C]):  // -12.0F
+            goto OL_transition
+
+        //
+        // CHECK 7: Engine load counter
+        //
+        if (load_counter >= CAL[0xCBC5A]):  // stock=313, modified=200
+            goto OL_transition
+
+        //
+        // CHECK 8-11: Delay-based transition
+        //   (Throttle w/delay, BPW w/delay, MAF counter step)
+        //   These use CAL[0xCCD78], CAL[0xCE5F8], CAL[0xCE640]
+        //   In stock ROM, CL to OL Delay = 750, so these matter
+        //   In modified ROM, CL to OL Delay = 0, so immediate
+        //
+
+        // If no condition triggered:
+        GBR+0x20 = 0     // counter = 0 (remain in CL)
+        GBR+0x23 = 0     // flag = 0
+
+    OL_transition:
+        GBR+0x20 = computed_counter_value
+        // GBR+0x23 already set (1 if throttle path, 0 otherwise)
+        return
+
+
+    // ===== PHASE 3: INITIALIZATION (FUN_000357D0, Table A[6]) =====
+    // Write 0xFF to FFFF7986 (reset master counter)
+    // Write 0x200 to FFFF794C
+    // This re-arms the state snapshot for next cycle
+
+
+    // ===== PHASE 4: DELAY MANAGER A (FUN_00036008, Table A[8]) =====
+    // Calls condition checker AGAIN (0x3643A)
+    // Processes results via 0x36978
+    // Updates delay counters and mode state
+
+
+    // ===== PHASE 5: HYSTERESIS (FUN_00036A98, Table A[9]) =====
+    // Prevents rapid CL<->OL oscillation
+    // Uses hysteresis values:
+    //   Throttle: CAL[0xCC178] (stock=3.9, modified=8.4 deg)
+    //   BPW:      CAL[0xCC174] (stock=256, modified=756)
+    //
+    // For OL->CL return:
+    //   Must be: throttle <= (OL_threshold - throttle_hysteresis)
+    //   AND:     BPW <= (OL_threshold - BPW_hysteresis)
+    //   BOTH conditions must be true simultaneously
+
+
+    // ===== PHASE 6: DELAY MANAGER B (FUN_00036BF4, Table A[10]) =====
+    // Counter-based delay for CL->OL transition
+    //
+    // IF delay_value (CAL[0xCBC62]) == 0:
+    //   IMMEDIATE TRANSITION (no delay)
+    //   This is the case in the modified ROM
+    //
+    // IF delay_value > 0 (stock ROM: 750):
+    //   Each cycle that throttle OR BPW exceeds threshold:
+    //     counter += step_value (from CAL[0xCE640], MAF-indexed)
+    //   When counter >= delay_value:
+    //     TRANSITION TO OL
+    //   When neither exceeds:
+    //     counter decreases or resets
+
+
+    // ===== PHASE 7: POST-TRANSITION (FUN_00036E60, Table A[11]) =====
+    // Commits the final CL/OL mode change
+    // Enables/disables AFC (air/fuel correction)
+    // Sets enrichment output values
+    // Applies transition smoothing
+
+
+================================================================================
+SECTION 5: FLAG AT 0xFFFF79C7 (GBR+0x23) - COMPLETE TRACE
+================================================================================
+
+FLAG BYTE: RAM address 0xFFFF79C7
+Accessed as: GBR+0x23 with GBR=0xFFFF79A4
+
+--- WRITES ---
+
+  Location: 0x036830 (inside FUN_0003643A epilogue)
+  Instruction: C023  mov.b R0,@(35,GBR)  ; -> RAM 0xFFFF79C7
+  Context:
+    0x03682C: C110  mov.w R0,@(32,GBR)   ; write counter to FFFF79C4
+    0x03682E: E000  mov #0,R0
+    0x036830: C023  mov.b R0,@(35,GBR)   ; write 0 to FFFF79C7 (DEFAULT PATH)
+    0x036832: [function epilogue follows]
+
+  The flag is written in the EPILOGUE of FUN_0003643A, just before the function
+  returns. At this point, R0 is always 0 (mov #0,R0 at 0x36832E).
+
+  HOWEVER: The flag is also written EARLIER in the function on the throttle
+  exceeded path. The user's prior analysis states:
+    - When throttle exceeds threshold: GBR+0x23 = 1
+    - All other paths: GBR+0x23 = 0
+
+  The epilogue at 0x036830 writes 0, but this is the FALLTHROUGH path.
+  On the throttle exceeded path, an earlier write of 1 occurs, and then
+  the function exits via a different path that skips the epilogue write.
+
+
+--- READS via GBR-relative ---
+
+  RESULT: ** NO GBR-RELATIVE READS OF 0xFFFF79C7 FOUND IN ENTIRE ROM **
+
+  The exhaustive search checked:
+  - All GBR values used anywhere in ROM (every ldc Rn,GBR instruction)
+  - All GBR-relative byte reads (mov.b @(disp,GBR),R0)
+  - All GBR-relative word reads that could overlap
+  - All tst.b/and.b/or.b/xor.b @(R0,GBR) patterns
+  None of these access 0xFFFF79C7.
+
+
+--- READS via direct address ---
+
+  Location: 0x013DD6 (inside diagnostic/logging function at ~0x013D58)
+  Instruction: D67A  mov.l @(0x013FC0),R6  ; =0xFFFF79C7
+               6260  mov.b @R6,R2           ; read the flag byte
+               E044  mov #68,R0
+               0F24  mov.b R2,@(68,R15)     ; store on stack at offset 0x44
+
+  This diagnostic function (GBR=0xFFFF5C98) reads many state variables
+  into a stack frame for logging/SSM output. It reads:
+    - FFFF79C8 (post-condition flag) at stack offset 0x40
+    - FFFF79C7 (throttle flag) at stack offset 0x44
+    - FFFF7BE0, FFFF7BE1, FFFF5E94, and many others
+
+  The flag is CONSUMED at 0x013F38:
+    E044  mov #68,R0
+    00FC  mov.b @(R0,R15),R0   ; read flag from stack
+    8801  cmp/eq #1,R0          ; is it 1?
+    8915  bt 0x013F6C           ; if yes, branch to "flag=1 path"
+
+  At 0x013F6C (flag=1 path):
+    E201  mov #1,R2
+    1F29  mov.l R2,@(36,R15)   ; set output[36] = 1
+    1F25  mov.l R2,@(20,R15)   ; set output[20] = 1
+
+  At 0x013F64 (flag=0 path or fallthrough):
+    E201  mov #1,R2
+    1F2A  mov.l R2,@(40,R15)   ; set output[40] = 1
+    1F27  mov.l R2,@(28,R15)   ; set output[28] = 1
+
+  These stack values are later used to zero out specific SSM/diagnostic
+  output channels. The function at 0x013D58 appears to be part of the
+  SSM (Subaru Select Monitor) data protocol handler - it determines which
+  diagnostic data fields to populate based on the current CL/OL state.
+
+
+--- READS via register-indirect ---
+
+  No register-indirect reads found. The only code that loads the address
+  0xFFFF79C4 via literal pool (at 0x07D6CC) reads it as a WORD, which
+  covers bytes at 0xFFFF79C4 and 0xFFFF79C5 only - NOT 0xFFFF79C7.
+
+
+--- SUMMARY ---
+
+  The flag at 0xFFFF79C7 is:
+  1. WRITTEN by FUN_0003643A (the condition checker) to indicate
+     which path triggered the CL->OL transition
+  2. READ ONLY by the diagnostic/SSM function at 0x013D58
+  3. NOT READ by any CL/OL state machine function
+  4. NOT READ by any fuel calculation function
+  5. NOT READ by any other control logic
+
+  CONCLUSION: The flag at GBR+0x23 (0xFFFF79C7) is a DIAGNOSTIC-ONLY
+  variable. It is used solely to report to the SSM/diagnostic interface
+  WHY the CL->OL transition occurred (throttle exceeded vs other reason).
+  It has NO effect on actual fueling behavior or state machine transitions.
+
+  The COUNTER VALUE at GBR+0x20 (0xFFFF79C4) is the operationally
+  significant output from the condition checker. It IS read by:
+  - FUN_0003606C at 0x0360AC and 0x0360E0 (delay manager comparison)
+  - FUN_0003643A itself at 0x036336, 0x0363A6, 0x03641C (internal)
+  - Diagnostic function at 0x07D6CC (logging)
+
+
+================================================================================
+SECTION 6: STOCK vs MODIFIED CALIBRATION CHANGES
+================================================================================
+
+  Calibration             Stock       Modified    Effect
+  ─────────────────────   ──────────  ──────────  ────────────────────────────────
+  CL to OL Delay          750         0           IMMEDIATE OL transition (no delay)
+  CL Delay Load Thresh    313         200         Lower load triggers OL sooner
+  OL Map Switch (IAM)     0.35        0.50        Higher IAM needed for normal maps
+  BPW Hysteresis          256.0       756.0       Much wider band before CL return
+  Throttle Hysteresis     3.9 deg     8.4 deg     Wider throttle band before CL return
+  Max RPM (1st gear on)   5300        3600        OL at much lower RPM
+  Max RPM (1st gear off)  5400        3700
+  Max RPM (2nd on)        4300        3500
+  Max RPM (2nd off)       4400        3600
+  Max RPM (3rd on)        4200        3400
+  Max RPM (3rd off)       4300        3500
+  Max RPM (4th on)        4100        3300
+  Max RPM (4th off)       4200        3400
+  Max RPM (5th on)        3700        3200
+  Max RPM (5th off)       3800        3300
+  Max Throttle [0]        91.0 deg    37.884 deg  OL at ~38% throttle (was 91%)
+  Max Vehicle Speed       130.0       141.7       Slightly higher vspeed threshold
+  Max Engine Load         4.80 g/rev  0.95 g/rev  OL at much lower engine load
+
+  KEY INSIGHT: The modified ROM aggressively pushes the ECU into Open Loop:
+  - Zero delay (instant OL transition)
+  - Much lower RPM thresholds per gear (~1700-900 RPM lower)
+  - Throttle threshold dropped from 91% to 37.9% (OL at partial throttle)
+  - Engine load threshold dropped from 4.8 to 0.95 g/rev
+  - Wider hysteresis prevents returning to CL too easily
+  - Higher IAM threshold means failsafe OL maps used more often
+
+
+================================================================================
+SECTION 7: KEY FINDINGS
+================================================================================
+
+1. EXECUTION ORDER: The state machine runs in 7 phases per cycle across
+   two dispatch tables (A and B). Table B runs first (snapshot + conditions),
+   then Table A runs (init, delay, hysteresis, delay B, post-transition).
+
+2. THE ACTUAL CL/OL MODE CHANGE occurs in:
+   - FUN_00036E60 (post-transition handler, Table A[11])
+   This is the final function that commits the mode change by writing
+   the OL/CL mode flags and enabling/disabling AFC.
+
+3. THE COUNTER at 0xFFFF79C4 (GBR+0x20) is the key state variable.
+   It represents the "delay counter" - when it reaches the threshold
+   (CAL[0xCBC62]), the transition from CL to OL occurs.
+
+4. THE FLAG at 0xFFFF79C7 (GBR+0x23) IS DIAGNOSTIC ONLY.
+   - Written by the condition checker to indicate WHY transition occurred
+   - Read ONLY by the SSM diagnostic function at 0x013D58
+   - Has NO effect on any fueling calculation or state machine logic
+   - Does NOT influence which OL maps are selected
+   - Does NOT affect timing or magnitude of OL enrichment
+
+5. THE HYSTERESIS MECHANISM uses two values:
+   - Throttle hysteresis: prevents return to CL until throttle drops
+     below (threshold - hysteresis_value)
+   - BPW hysteresis: prevents return to CL until BPW drops below
+     (threshold - hysteresis_value)
+   BOTH conditions must be simultaneously satisfied to return to CL.
+
+6. MODIFIED ROM BEHAVIOR:
+   With CL to OL Delay = 0, the transition is immediate.
+   With throttle max lowered to 37.9 deg, the ECU enters OL at
+   partial throttle. With the large BPW hysteresis (756 vs stock 256),
+   it stays in OL for much longer before returning to CL.
+   Per-gear RPM limits are reduced by ~900-1700 RPM, causing OL
+   engagement at much lower engine speeds.
+
+================================================================================
+END OF ANALYSIS
+================================================================================
