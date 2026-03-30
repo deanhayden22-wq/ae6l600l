@@ -1,0 +1,36 @@
+SH7058 INTERRUPT VECTOR TABLE -- AE5L600L
+================================================================================
+
+EXCEPTION VECTOR TABLE (ROM 0x000000)
+--------------------------------------------------------------------------------
+  0x0000  0x00000C0C  RESET_PC                  Power-on reset initial PC
+  0x0004  0xFFFFBFA0  RESET_SP                  Power-on reset initial SP
+  0x0008  0x00000C0C  MRESET_PC                 Manual reset initial PC
+  0x000C  0xFFFFBFA0  MRESET_SP                 Manual reset initial SP
+  0x0010  0x00000BFA  ILLEGAL_INSTR             Illegal instruction handler
+  0x0014  0x00000BFA  ILLEGAL_SLOT              Illegal slot instruction handler
+  0x0018  0x00000BFA  CPU_ADDR_ERR              CPU address error handler
+  0x001C  0x00000BFA  DMA_ADDR_ERR              DMA bus error handler
+  0x0020  0x00000BFA  NMI                       NMI handler
+  0x0024  0x00000BFA  USER_BREAK                User break / debug handler
+  0x0028  0x00000BFA  RESERVED_A                Reserved exception A
+  0x002C  0x00000BAC  RESERVED_B                Reserved exception B
+  0x0030  0x00000BFA  RESERVED_C                Reserved exception C
+
+PERIPHERAL ISR TABLE (VBR=0x00000000)
+--------------------------------------------------------------------------------
+  Vec   ROM Offset      Handler  ISR Name               Description
+--------------------------------------------------------------------------------
+   67  0x00010C  0x000B0009  IRQ3                   External interrupt IRQ3
+   74  0x000128  0x000B0009  DMAC1_DEI              DMA ch1 transfer end
+  103  0x00019C  0x00000FEC  MTU4_TGID4             MTU ch4 capture/compare D
+  104  0x0001A0  0x00000FF8  MTU4_TCIV4             MTU ch4 overflow
+  107  0x0001AC  0x00000040  MTU5_TGIW5             MTU ch5 input capture W
+  108  0x0001B0  0x00000FE4  POE0_OEI1              Port output enable INT1
+  136  0x000220  0x0009DA46  IIC0_TEI               IIC ch0 transmit end
+
+Total active ISRs: 7
+Unique handler addresses: 6
+
+Shared handlers:
+  0x0B0009  <- IRQ3, DMAC1_DEI

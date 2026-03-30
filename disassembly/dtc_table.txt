@@ -1,0 +1,110 @@
+AE5L600L DTC Definition Table
+==========================================================================================
+DTC Struct Table: 0x09A834 (93 entries x 20 bytes)
+DTC Enable Flags: 0x09A770 (93 bytes, 0x01=enabled, 0x00=disabled)
+
+DTC Struct Layout (20 bytes per entry):
+  +0x00: W0   (uint16) - Monitor class/type
+  +0x02: W1   (uint16) - Monitor ID / bitmask
+  +0x04: Code (uint16) - ISO 15031-6 P-code (big-endian)
+  +0x06: W3   (uint16) - Sub-type flags
+  +0x08: W4-W9 (6 x uint16) - Monitor parameters / thresholds
+
+ Idx     Addr  P-Code  En Description                                  
+---------------------------------------------------------------------------
+   0 0x9A834   P0335   Y Crankshaft Position Sensor A                 
+   1 0x9A848   P0336   Y CKP Sensor A Range/Perf                      
+   2 0x9A85C   P0604   Y Internal Control Module RAM                  
+   3 0x9A870   P0102   Y MAF Low                                      
+   4 0x9A884   P0103   Y MAF High                                     
+   5 0x9A898   P0500   Y Vehicle Speed Sensor                         
+   6 0x9A8AC   P0327   Y Knock Sensor 1 Low                           
+   7 0x9A8C0   P0328   Y Knock Sensor 1 High                          
+   8 0x9A8D4   P0122   Y TPS A Low                                    
+   9 0x9A8E8   P0123   Y TPS A High                                   
+  10 0x9A8FC   P0117   Y ECT Low                                      
+  11 0x9A910   P0118   Y ECT High                                     
+  12 0x9A924   P0125   Y ECT Insuff for CL                            
+  13 0x9A938   P0462   Y Fuel Level Sensor Low                        
+  14 0x9A94C   P0463   Y Fuel Level Sensor High                       
+  15 0x9A960   P0461   Y Fuel Level Sensor Range                      
+  16 0x9A974   P0851   Y Neutral Switch Low                           
+  17 0x9A988   P0852   Y Neutral Switch High                          
+  18 0x9A99C   P0506   Y Idle RPM Low                                 
+  19 0x9A9B0   P0507   Y Idle RPM High                                
+  20 0x9A9C4   P0011   Y Intake Cam Over-Adv B1                       
+  21 0x9A9D8   P0021   Y Intake Cam Over-Adv B2                       
+  22 0x9A9EC   P1400   Y Fuel Tank Pressure Sensor Low                
+  23 0x9AA00   P1420   Y Fuel Tank Pressure Sensor High               
+  24 0x9AA14   P0458   Y EVAP Purge Low                               
+  25 0x9AA28   P0459   Y EVAP Purge High                              
+  26 0x9AA3C   P0141   Y O2 Heater B1S2                               
+  27 0x9AA50   P0174   N System Too Lean B2                           
+  28 0x9AA64   P0175   N System Too Rich B2                           
+  29 0x9AA78   P0420   Y Catalyst Efficiency B1                       
+  30 0x9AA8C   P0456   Y EVAP Very Small Leak                         
+  31 0x9AAA0   P0171   Y System Too Lean B1                           
+  32 0x9AAB4   P0172   Y System Too Rich B1                           
+  33 0x9AAC8   P0301   Y Cylinder 1 Misfire                           
+  34 0x9AADC   P0302   Y Cylinder 2 Misfire                           
+  35 0x9AAF0   P0303   Y Cylinder 3 Misfire                           
+  36 0x9AB04   P0304   Y Cylinder 4 Misfire                           
+  37 0x9AB18   P0305   N Cylinder 5 Misfire (N/A)                     
+  38 0x9AB2C   P0306   N Cylinder 6 Misfire (N/A)                     
+  39 0x9AB40   P0000   Y                                              
+  40 0x9AB54   P0000   Y                                              
+  41 0x9AB68   P0137   Y O2 Low B1S2                                  
+  42 0x9AB7C   P0131   Y O2 Low B1S1                                  
+  43 0x9AB90   P0132   Y O2 High B1S1                                 
+  44 0x9ABA4   P0138   Y O2 High B1S2                                 
+  45 0x9ABB8   P0112   Y IAT Low                                      
+  46 0x9ABCC   P0113   Y IAT High                                     
+  47 0x9ABE0   P0111   Y IAT Range/Perf                               
+  48 0x9ABF4   P0038   Y HO2S Heater High B1S2                        
+  49 0x9AC08   P0032   Y HO2S Heater High B1S1                        
+  50 0x9AC1C   P0037   Y HO2S Heater Low B1S2                         
+  51 0x9AC30   P0031   Y HO2S Heater Low B1S1                         
+  52 0x9AC44   P0107   Y MAP Low                                      
+  53 0x9AC58   P0108   Y MAP High                                     
+  54 0x9AC6C   P0128   Y ECT Below Thermostat Regulating              
+  55 0x9AC80   P0245   Y Wastegate Solenoid A Low                     
+  56 0x9AC94   P0246   Y Wastegate Solenoid A High                    
+  57 0x9ACA8   P0244   Y Wastegate Solenoid A                         
+  58 0x9ACBC   P0230   Y Fuel Pump Primary Circuit                    
+  59 0x9ACD0   P0068   Y MAP/MAF Correlation                          
+  60 0x9ACE4   P0101   Y MAF Range/Perf                               
+  61 0x9ACF8   P0134   Y O2 No Activity B1S1                          
+  62 0x9AD0C   P0030   Y HO2S Heater Control B1S1                     
+  63 0x9AD20   P2109   Y TPS A Min Stop Performance                   
+  64 0x9AD34   P0222   Y TPS B Low                                    
+  65 0x9AD48   P0223   Y TPS B High                                   
+  66 0x9AD5C   P1160   Y Electronic Throttle System                   
+  67 0x9AD70   P2102   Y Throttle Actuator Control Motor Low          
+  68 0x9AD84   P2103   Y Throttle Actuator Control Motor High         
+  69 0x9AD98   P2101   Y Throttle Actuator Control Motor Range        
+  70 0x9ADAC   P2096   Y Post Cat Fuel Trim Too Lean B1               
+  71 0x9ADC0   P2138   Y TPS D/E Voltage Correlation                  
+  72 0x9ADD4   P2127   Y TPS E Low                                    
+  73 0x9ADE8   P2128   Y TPS E High                                   
+  74 0x9ADFC   P2122   Y TPS D Low                                    
+  75 0x9AE10   P2123   Y TPS D High                                   
+  76 0x9AE24   P2135   Y TPS A/B Voltage Correlation                  
+  77 0x9AE38   P2097   Y Post Cat Fuel Trim Too Rich B1               
+  78 0x9AE4C   P0390   N CMP Sensor B B2                              
+  79 0x9AE60   P0365   N CMP Sensor B B1                              
+  80 0x9AE74   P0345   Y CMP Sensor A B2                              
+  81 0x9AE88   P0340   Y Camshaft Position Sensor A B1                
+  82 0x9AE9C   P0605   Y Internal Control Module ROM                  
+  83 0x9AEB0   P2095   N TGV System B1 (Performance)                  
+  84 0x9AEC4   P2094   N TGV System B2 (Performance)                  
+  85 0x9AED8   P2091   N TGV Actuator B2 (Closed Pos)                 
+  86 0x9AEEC   P2090   N TGV Actuator B2 (Open Pos)                   
+  87 0x9AF00   P2093   Y TGV Actuator B2 Circuit                      
+  88 0x9AF14   P2092   Y TGV Actuator B1 Circuit                      
+  89 0x9AF28   P2089   Y TGV Actuator B1 (Closed Pos)                 
+  90 0x9AF3C   P2088   Y TGV Actuator B1 (Open Pos)                   
+  91 0x9AF50   P2099   N Post Cat Fuel Trim Too Rich B2               
+  92 0x9AF64   P2098   N Post Cat Fuel Trim Too Lean B2               
+
+Identified: 91/93 (97%)
+Enabled: 81 / 93
