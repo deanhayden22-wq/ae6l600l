@@ -1,0 +1,38 @@
+        // ============================================================
+        // SH7058 EXCEPTION + PERIPHERAL ISR ENTRY POINTS
+        // Exception table fixed at ROM 0x000000 (VBR=0 at reset)
+        // ============================================================
+
+        // Exception vector table entries (ROM 0x000-0x033)
+        count += labelComment(0x000000L, "vtbl_RESET_PC", "Power-on reset initial PC = 0x00000C0C");
+        count += labelComment(0x000004L, "vtbl_RESET_SP", "Power-on reset initial SP = 0xFFFFBFA0");
+        count += labelComment(0x000008L, "vtbl_MRESET_PC", "Manual reset initial PC = 0x00000C0C");
+        count += labelComment(0x00000CL, "vtbl_MRESET_SP", "Manual reset initial SP = 0xFFFFBFA0");
+        count += labelComment(0x000010L, "vtbl_ILLEGAL_INSTR", "Illegal instruction handler = 0x00000BFA");
+        count += labelComment(0x000014L, "vtbl_ILLEGAL_SLOT", "Illegal slot instruction handler = 0x00000BFA");
+        count += labelComment(0x000018L, "vtbl_CPU_ADDR_ERR", "CPU address error handler = 0x00000BFA");
+        count += labelComment(0x00001CL, "vtbl_DMA_ADDR_ERR", "DMA bus error handler = 0x00000BFA");
+        count += labelComment(0x000020L, "vtbl_NMI", "NMI handler = 0x00000BFA");
+        count += labelComment(0x000024L, "vtbl_USER_BREAK", "User break / debug handler = 0x00000BFA");
+        count += labelComment(0x000028L, "vtbl_RESERVED_A", "Reserved exception A = 0x00000BFA");
+        count += labelComment(0x00002CL, "vtbl_RESERVED_B", "Reserved exception B = 0x00000BAC");
+        count += labelComment(0x000030L, "vtbl_RESERVED_C", "Reserved exception C = 0x00000BFA");
+
+        // Exception handler entry points (code in ROM)
+        count += labelComment(0x000BFAL, "exc_ILLEGAL_INSTR", "Illegal instruction handler");
+        count += labelComment(0x000BFAL, "exc_ILLEGAL_SLOT", "Illegal slot instruction handler");
+        count += labelComment(0x000BFAL, "exc_CPU_ADDR_ERR", "CPU address error handler");
+        count += labelComment(0x000BFAL, "exc_DMA_ADDR_ERR", "DMA bus error handler");
+        count += labelComment(0x000BFAL, "exc_NMI", "NMI handler");
+        count += labelComment(0x000BFAL, "exc_USER_BREAK", "User break / debug handler");
+        count += labelComment(0x000BFAL, "exc_RESERVED_A", "Reserved exception A");
+        count += labelComment(0x000BACL, "exc_RESERVED_B", "Reserved exception B");
+        count += labelComment(0x000BFAL, "exc_RESERVED_C", "Reserved exception C");
+
+        // Peripheral ISR handlers (VBR=0x000000)
+        count += labelComment(0x000040L, "isr_MTU5_TGIW5", "vec107: MTU ch5 input capture W");
+        count += labelComment(0x000FE4L, "isr_POE0_OEI1", "vec108: Port output enable INT1");
+        count += labelComment(0x000FECL, "isr_MTU4_TGID4", "vec103: MTU ch4 capture/compare D");
+        count += labelComment(0x000FF8L, "isr_MTU4_TCIV4", "vec104: MTU ch4 overflow");
+        count += labelComment(0x09DA46L, "isr_IIC0_TEI", "vec136: IIC ch0 transmit end");
+        count += labelComment(0x0B0009L, "isr_IRQ3", "vec67: External interrupt IRQ3");

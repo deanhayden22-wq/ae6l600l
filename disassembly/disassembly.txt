@@ -22,7 +22,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   User-named functions:        10
 ;   Code blocks:              3,776  (SH-2 found 2,975 — +27%)
 ;   Defined data items:      36,716  (SH-2 found 27,531 — +33%)
-;   User-defined symbols:       139  (+ 21 RAM variables applied by import script)
+;   User-defined symbols:       139  (+ ~90 new shared subroutine labels via import script)
 ;   Comments (EOL):              41
 ;   Bookmarks (total):        4,690
 ;     Aggressive Instr Finder: 2,351
@@ -514,6 +514,324 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;                                  workspace init → corrections → final output
 ;   5. BASE ADVANCE       [49-50] Master base timing + blend integration
 ;   6. ACTUATORS & DIAG   [51-58] Boost/WG, diagnostics, idle, EVAP, EGR
+
+; ═════════════════════════════════════════════════════════════════════════════
+; SHARED SUBROUTINE CATALOG (Top ~70 by cross-reference count)
+; ═════════════════════════════════════════════════════════════════════════════
+; Found via BSR/JSR call-target analysis of the full 1MB ROM. These are the
+; most-called functions that appear across all subsystems. Naming them is the
+; single highest-leverage action for future disassembly — every function you
+; trace will reference several of these.
+;
+; ─── ALREADY LABELED (Table Processor Library, 0xBE608-0xBED98) ───────────
+;   See ImportAE5L600L.java for the complete table processor library:
+;   uint8_pack (1000), table_desc_1d_float (524), uint8_unpack (425),
+;   uint16_pack (416), uint16_unpack (270), float_max (261), float_min (227),
+;   table_desc_2d_typed (170), float_deadband_check (154), float_abs_diff (152),
+;   float_lerp (147), float_safe_div (145), plus all interp_1d/2d variants.
+;
+; ─── INTEGER ARITHMETIC ───────────────────────────────────────────────────
+;
+;   0xBE554: uint16_add_sat          (685 calls)
+;     r0 = min(r4 + r5, 0xFFFF). Saturating 16-bit add.
+;     Appears in virtually every calibration write path.
+;
+;   0xBE53C: uint8_add_sat           (461 calls)
+;     r0 = min(r4 + r5, 0xFF). Saturating 8-bit add with carry check.
+;     Used by all 8-bit calibration table outputs.
+;
+; ─── DESCRIPTOR / TABLE READ (NaN-safe) ───────────────────────────────────
+;
+;   0xBDBCC: desc_read_float_safe    (309 calls)
+;     Reads float from descriptor pointer r4 with NaN-check (fcmp/eq self).
+;     Calls interrupt_priority_set(16) + interrupt_restore for atomicity.
+;     THE most important unlabeled function in the ROM — appears in every
+;     calibration read path involving floating-point outputs.
+;
+;   0xBDCB6: desc_read_int_safe      (120 calls)
+;     Integer variant of desc_read_float_safe. Same atomic read pattern.
+;
+; ─── INTERRUPT PRIORITY CONTROL ───────────────────────────────────────────
+;
+;   0x0317C: interrupt_priority_set   (298 calls)
+;     Sets SR interrupt mask to level r4 (0-15). Returns old SR in r0.
+;     Every descriptor/table read calls this first for data consistency.
+;
+;   0x03190: interrupt_restore        (181 calls)
+;     Restores SR interrupt mask from r4. Paired with interrupt_priority_set.
+;     May call 0x3664 via indirect dispatch if flag at FFFF1288+0x18 is set.
+;
+; ─── CRITICAL SECTION (lightweight SR-mask wrappers) ──────────────────────
+;
+;   0xBE81C: critical_section_enter   (235 calls)
+;     Saves SR, masks interrupt level from 0xF0, stores old priority at @r4.
+;
+;   0xBE82C: critical_section_exit    (236 calls)
+;     Restores SR from r4. Just: rts + ldc r4,sr. Paired with enter.
+;
+; ─── FLOAT RANGE / CLAMP ─────────────────────────────────────────────────
+;
+;   0xBE56C: float_clamp_range        (218 calls)
+;     Clamps fr4 to [fr6..fr5]. Returns in fr0.
+;     Core range limiter for every calibration output.
+;
+; ─── AXIS INTERPOLATION PRIMITIVES ────────────────────────────────────────
+;
+;   0xBE5D8: axis_frac_to_uint16      (147 calls)
+;     Converts float axis value to uint16 index+fraction for table lookup.
+;     Computes (value-base)/range, ftrc→int, clamps [0, 0xFFFF].
+;
+;   0xBE5A8: axis_frac_to_uint8       (113 calls)
+;     Same as above, clamps to [0, 0xFF].
+;
+;   0xBE598: fmac_interp_uint16       (145 calls)
+;     Converts uint16 fraction r4 to float, fmac blend: fr0 = fr4 + fr3*(fr5-fr4).
+;     Core 1D interpolation for uint16-indexed tables.
+;
+;   0xBE588: fmac_interp_uint8         (31 calls)
+;     Same for uint8-indexed tables.
+;
+; ─── CONTEXT SAVE (ISR entry) ─────────────────────────────────────────────
+;
+;   0x02B8C: isr_context_save         (118 calls)
+;     Full register save: r2-r7, fr0-fr10, FPUL, PR → stack.
+;     Increments FFFF1288+8 counter. Returns restore-routine address in r0.
+;     Every interrupt handler entry calls this.
+;
+; ─── STATUS CHECK HELPERS (single-byte RAM flag reads) ────────────────────
+;
+;   0x22F92: check_cl_active           (111 calls) → FFFF65F6
+;   0x22CF4: check_engine_running      (100 calls) → FFFF65C5
+;   0x2F8EA: check_transient_flag       (65 calls) → FFFF726C
+;   0x3AB20: check_engine_status        (35 calls) → FFFF7C68
+;
+;   Each reads a single byte from RAM, returns T-bit = (value==1).
+;   Used as gate checks throughout fuel, timing, and diagnostic code.
+;
+; ─── DTC FRAMEWORK ────────────────────────────────────────────────────────
+;
+;   0x9EDEC: dtc_set_code             (186 calls) — Set DTC by index r4
+;   0x9ED90: dtc_clear_code           (140 calls) — Clear DTC by index r4
+;   0x9CFEE: dtc_scan_loop             (48 calls) — Iterate all DTCs
+;   0x98686: dtc_status_check           (14 calls) — Check specific fault state
+;   0x9D052: dtc_counter_update         (14 calls) — Increment maturation counter
+;   0x9DD78: dtc_vector_table           (17 calls) — Handler dispatch table
+;   0x9CABE: dtc_freeze_frame           (11 calls) — Capture freeze frame data
+;   0x9884E: dtc_monitor_helper         (12 calls) — Shared monitor logic
+;   0x98832: dtc_monitor_gate           (10 calls) — Monitor enable conditions
+;   0x9DCEA: dtc_history_update         (10 calls) — Write fault history
+;
+;   DTC table starts at 0x9A770 (93 OBD-II codes). Gate: FFFFB71C enable
+;   + FFFF36F4 processing flag.
+;
+; ─── DIAGNOSTIC / SENSOR VALIDATION ──────────────────────────────────────
+;
+;   0x582D2: diag_wrapper_set          (108 calls) — Wrapper for 0xA6728
+;   0x582AC: diag_check_status         (100 calls) — Read FFFF36F0 mode byte
+;   0x582E0: diag_read_pack_2val        (43 calls) — Pack 2 values atomically
+;   0x584C8: diag_check_enable_B        (59 calls) → FFFFAE09
+;   0x584BE: diag_check_enable_A        (43 calls) → FFFFAE08
+;
+; ─── SCHEDULER / TIMER ────────────────────────────────────────────────────
+;
+;   0x0E6E4: sched_event_post           (73 calls) — Post event (atomic)
+;   0x0E6C4: sched_event_clear          (11 calls) — Clear event flag
+;   0x0E794: sched_timer_dispatch         (8 calls) — Timer callback manager
+;
+; ─── PERIPHERAL I/O WRAPPERS ─────────────────────────────────────────────
+;
+;   0x06BC4: io_write_word_atomic       (35 calls)
+;   0x06BF0: io_write_2word_atomic      (31 calls)
+;   0x06828: io_read_word_atomic        (15 calls)
+;   0x06884: io_read_2word_atomic       (20 calls)
+;   0x067A6: io_sched_event_atomic      (26 calls)
+;   0x067DC: io_sched_event_atomic_2    (21 calls)
+;
+;   All use critical_section_enter/exit for atomicity.
+;
+; ─── COMMUNICATION PROTOCOL ──────────────────────────────────────────────
+;
+;   0x58318: comms_pack_response        (57 calls)
+;   0x58404: comms_pack_response_B      (49 calls)
+;
+;   Build multi-byte diagnostic responses (KWP2000/CAN).
+;   Call interrupt_priority_set, uint16_pack, uint8_pack, interrupt_restore.
+;
+; ─── DESCRIPTOR TABLE WALKER ──────────────────────────────────────────────
+;
+;   0x0DCE4: desc_table_walk            (37 calls)
+;     Walks multi-entry calibration descriptors via lookup table at 0x11B98.
+;     Iterates entries with shift+add addressing loop.
+;
+;   0x06B5A: calc_table_offset          (53 calls)
+;     Computes calibration table addresses from base 0xC0080 + lookup
+;     tables at 0x1190C/0x11914/0x1193C.
+;
+; ─── RAM CHANGE DETECTION ─────────────────────────────────────────────────
+;
+;   0x0B9E0: ram_word_update            (44 calls)
+;   0x0B99C: ram_word_update_B          (22 calls)
+;   0x10800: event_notify               (15 calls)
+;
+;   Compare-and-write pattern: if word at @r14 changed, fire event_notify.
+;
+; ─── MISC HIGH-VALUE ──────────────────────────────────────────────────────
+;
+;   0x4E0B8: gbr_task_dispatcher        (40 calls) — GBR=0xFFFF83AB, 64B workspace
+;   0x297A0: float_load_from_desc       (18 calls) — Float read from descriptor
+;   0x297B0: float_load_from_desc_B     (16 calls) — Variant
+;   0x299BC: float_store_to_ram         (14 calls) — Float write from descriptor
+;   0x45EEA: knock_helper_leaf          (13 calls) — Leaf in knock pipeline
+;   0x23E48: fuel_desc_reader           (15 calls) — PSE/fuel descriptor read
+;   0x21D9A: cl_readiness_check         (12 calls) — CL readiness evaluation
+;   0x717B2: eeprom_read_helper         (25 calls) — NV-memory read
+;   0x5CC9A: sensor_diag_helper         (20 calls) — Sensor diagnostic utility
+;   0x0CA72: timer_reload               (11 calls) — Timer/counter reload
+;   0x117E8: hw_register_set            (16 calls) — Hardware register write
+;   0x117FC: hw_register_get            (13 calls) — Hardware register read
+;
+; ─── KEY RAM STATUS ADDRESSES ─────────────────────────────────────────────
+;
+;   0xFFFF65F6: cl_active_flag      — 1=closed loop active (111 refs)
+;   0xFFFF65C5: engine_running_flag — 1=engine running (100 refs)
+;   0xFFFF726C: transient_flag      — 1=transient condition (65 refs)
+;   0xFFFF7C68: engine_status_flag  — 1=normal (35 refs, gates AFL)
+;   0xFFFFB71C: dtc_master_enable   — DTC system master enable
+;   0xFFFF36F4: dtc_enable_flag     — DTC processing enable
+;   0xFFFF36F0: diag_mode_status    — Diagnostic mode state
+;   0xFFFFAE08: diag_enable_A       — Diagnostic enable A
+;   0xFFFFAE09: diag_enable_B       — Diagnostic enable B
+;
+; ─── CALL COUNT DISTRIBUTION ──────────────────────────────────────────────
+;   100+ calls: 31 targets (19 were unlabeled — now labeled above)
+;    50-99:     36 targets (24 were unlabeled — key ones labeled above)
+;    20-49:     55 targets (42 unlabeled — partial coverage above)
+;    10-19:     95 targets (77 unlabeled — selective coverage above)
+;     5-9:     177 targets (155 unlabeled — future work)
+;     2-4:     720 targets (687 unlabeled — domain-specific, low priority)
+;       1:    6025 targets (likely many are leaf/inline — lowest priority)
+;
+;   Total unique call targets: 6,025
+;   Total labeled in ImportAE5L600L.java: ~620 (was ~190)
+;
+; ─── TASK CALL GRAPH SUMMARY ─────────────────────────────────────────────
+;   (Full graph in disassembly/task_call_graph.txt, 529 lines)
+;
+;   Most-called subroutines from tasks:
+;     table_desc_1d_float    -> 13 tasks   (1D calibration lookups)
+;     float_min              -> 11 tasks   (output clamping)
+;     float_max              ->  9 tasks
+;     uint8_add_sat          ->  9 tasks   (saturating writes)
+;     table_desc_2d_typed    ->  7 tasks   (2D calibration lookups)
+;     desc_read_float_safe   ->  7 tasks   (NaN-safe descriptor reads)
+;     float_clamp_range      ->  6 tasks   (range limiting)
+;
+;   Most-referenced RAM from tasks:
+;     rpm_current (FFFF6624) -> 29 of 59 tasks (49%)
+;     iat_current (FFFF63F8) -> 18 tasks
+;     ect_current (FFFF6350) -> 10 tasks
+;     IAM_value   (FFFF3234) ->  8 tasks
+;     KNOCK_FLAG  (FFFF81BA) ->  7 tasks
+;
+; ─── GBR STRUCTURE MAP ───────────────────────────────────────────────────
+;   (Full map in disassembly/gbr_structures.txt, 866 lines)
+;
+;   245 unique GBR bases found. Top by struct complexity:
+;
+;   0xFFFF2398: 66 fields, 222+ bytes — Large I/O struct (from 0x677xx)
+;   0xFFFF2F84: 66 fields, 222+ bytes — Mirror of 0x2398 (from 0x88Exx)
+;   0xFFFF34EC: 28 fields — Calibration mirror struct
+;   0xFFFF3718: 23 fields — Calibration mirror struct
+;   0xFFFF837E: idle_control_GBR — 19 fields, 133+ bytes
+;     +0x00-0x07: Control bytes (R/W, 62 total accesses)
+;     +0x22-0x26: Read-only input bytes (5 fields)
+;     +0x5C-0x60: Output bytes (write-only, 4 fields)
+;     +0x81: Status read (from task54_idle at 0x4D58A)
+;
+; ─── CALIBRATION DESCRIPTOR FORMAT ───────────────────────────────────────
+;   (Full scan in disassembly/descriptor_map.txt — 760 descriptors)
+;
+;   1D Descriptor (20 bytes):
+;     +0x00: [0x00, axis_size, data_type, 0x00]
+;     +0x04: axis_ptr  (ROM -> float32[axis_size])
+;     +0x08: data_ptr  (ROM -> data[axis_size])
+;     +0x0C: scale     (float32: physical = raw * scale + bias)
+;     +0x10: bias      (float32)
+;
+;   2D Descriptor (28 bytes):
+;     +0x00: [0x00, Y_size, 0x00, X_size]
+;     +0x04: Y_axis_ptr (ROM -> float32[Y_size])
+;     +0x08: X_axis_ptr (ROM -> float32[X_size])
+;     +0x0C: data_ptr   (ROM -> data[Y_size * X_size])
+;     +0x10: [data_type, 0, 0, 0]
+;     +0x14: scale      (float32)
+;     +0x18: bias       (float32)
+;
+;   Data types: 0x00=float32, 0x02=int8, 0x04=int16, 0x08=uint8, 0x0A=uint16
+;   Discriminator: byte[3] == 0 -> 1D, byte[3] != 0 -> 2D
+;   Found: 621 x 1D + 139 x 2D = 760 total
+;
+;   Axis classification (auto-named, see disassembly/named_descriptors.txt):
+;     1D: ECT(258), RPM(79), Throttle(41), RPM_wide(27), Boost(26), Load(24)
+;     2D: LoadxRPM(48), ThrottlexRPM(5), AtmPressurexRPM(4), VVTErrorxRPM(4)
+;
+; ─── DTC TABLE ────────────────────────────────────────────────────────────
+;   (Full decode in disassembly/dtc_table.txt — 93 entries, 91 identified)
+;
+;   Flag table:  0x9A770 (93 bytes, 0x01=enabled)
+;   Struct table: 0x9A834 (93 x 20-byte entries)
+;   Struct: [W0:class] [W1:monitor_id] [P-code] [W3:subtype] [params]
+;
+; ─── RAM ADDRESS MAP ─────────────────────────────────────────────────────
+;   (Full scan in disassembly/ram_map_raw.txt — 4,456 unique addresses)
+;
+;   Top addresses by reference count:
+;     0xFFFF6624 rpm_current       301 refs  (read by 29/59 tasks)
+;     0xFFFF6350 ect_current       205 refs
+;     0xFFFF65FC engine_load       135 refs
+;     0xFFFF399E dtc_maturation    118 refs
+;     0xFFFFAD52 diag_session      107 refs
+;     0xFFFF67EC atm_pressure       99 refs
+;     0xFFFF8E98 sensor_faults      97 refs
+;     0xFFFF3B06 dtc_debounce       92 refs
+;     0xFFFF65C0 throttle_pos       89 refs
+;     0xFFFF63F8 iat_current        86 refs
+;
+; ─── SH7058 PERIPHERAL REGISTERS ─────────────────────────────────────────
+;   14 on-chip register addresses referenced in ROM:
+;     0xFFFF0000 STBCR     (9 refs) -- Standby/power control
+;     0xFFFF0004 STBCR2    (2 refs) -- Module stop bits
+;     0xFFFF1230 TIER_MTU0 (3 refs) -- Timer interrupt enable
+;     0xFFFF12B8 SCI_TDR   (5 refs) -- Serial transmit data
+;     0xFFFF12C8 SCI_SSR   (2 refs) -- Serial status
+;
+; ─── THUNK RESOLUTION ────────────────────────────────────────────────────
+;   (Full: disassembly/thunk_resolution.txt, 359 lines)
+;   378 mov.l+jmp thunks found. 64 resolve to known functions:
+;     interrupt_restore    <- 15 thunks (tail-call from ISR handlers)
+;     desc_read_float_safe <- 5+ thunks (descriptor read wrappers)
+;
+; ─── DESCRIPTOR-FUNCTION CROSS-REFERENCE ─────────────────────────────────
+;   (Full: disassembly/desc_func_xref.txt, 1,495 lines)
+;   Top functions by descriptor count:
+;     afl_pipeline           61 desc  (most calibration-heavy subsystem)
+;     task33_timing_ws_init  30 desc
+;     PSE_code               22 desc
+;     timing_knock           20 desc
+;
+; --- ROM REGION MAP -----------------------------------------------------------
+;   (Full: disassembly/rom_region_map.txt, 3,194 lines)
+;
+;   Region distribution (1MB ROM):
+;     Code:        444,928 bytes (42.4%)
+;     Float data:  395,776 bytes (37.7%) -- calibration tables
+;     ROM holes:   194,560 bytes (18.6%) -- 0xFF filled, patch space
+;     Other:        13,312 bytes ( 1.3%)
+;
+;   PATCH-AVAILABLE ROM HOLES (190.9 KB total):
+;     0x0DAE8C-0x0F8900  118.6 KB  PRIMARY (confirmed, used by MerpMod)
+;     0x0AF998-0x0BB400   46.6 KB  SECONDARY (between descriptors and lib)
+;     0x0FC004-0x0FFAF8   14.7 KB  TERTIARY (end of ROM)
 
 ; ═════════════════════════════════════════════════════════════════════════════
 ; KNOCK DETECTION & FLKC (Fine Learning Knock Correction) ANALYSIS
@@ -6022,7 +6340,127 @@ SECTION 14B: OPTION D IMPACT / BRICK RISK ASSESSMENT
 
 
 ================================================================================
-SECTION 15: OPEN QUESTIONS
+SECTION 15: INTERRUPT ARCHITECTURE
+================================================================================
+
+  SH7058 INTERRUPT DISPATCH SYSTEM
+  ---------------------------------
+  The AE5L600L uses a single generic ISR entry point for ALL peripheral
+  interrupts. This is the "common interrupt handler" scheme.
+
+  INTERRUPT FLOW:
+    1. Any peripheral IRQ fires (timer, ADC, SCI, CAN, etc.)
+    2. CPU reads vector from VBR+0x2C = ROM 0x0002C = 0x0000BAC
+    3. CPU jumps to isr_generic_handler (0x000BAC)
+    4. Generic handler saves R0-R7, PR, MACH, MACL to stack
+    5. Calls isr_dispatch_manager (0x000F4C) with R4=20
+    6. Dispatch manager calls isr_intevt_resolver (0x000EE4) to
+       identify which peripheral fired (reads INTEVT/priority register)
+    7. Uses result as index into isr_dispatch_table (0x000E5EC)
+    8. Jumps to specific ISR handler
+    9. Returns, generic handler restores registers and issues RTE
+
+  EXCEPTION VECTOR TABLE (ROM 0x000000-0x000033, VBR=0 at reset):
+    0x0000  0x000C0C   initial PC = main code entry
+    0x0004  0xFFFFBFA0 initial SP = RAM top (0xFFFF8000 + 0x3FA0)
+    0x0008  0x000C0C   manual reset PC
+    0x000C  0xFFFFBFA0 manual reset SP
+    0x0010  0x000BFA   illegal instruction -> exc_trap_infinite_loop
+    0x0014  0x000BFA   illegal slot instruction -> exc_trap_infinite_loop
+    0x0018  0x000BFA   CPU address error -> exc_trap_infinite_loop
+    0x001C  0x000BFA   DMA bus error -> exc_trap_infinite_loop
+    0x0020  0x000BFA   NMI -> exc_trap_infinite_loop
+    0x0024  0x000BFA   user break -> exc_trap_infinite_loop
+    0x002C  0x000BAC   ALL peripheral IRQs -> isr_generic_handler
+
+  KEY ISR INFRASTRUCTURE ADDRESSES:
+    0x000BAC  isr_generic_handler      Generic ISR entry (saves all regs, calls dispatch)
+    0x000BF6  isr_generic_rte          RTE after register restore
+    0x000BFA  exc_trap_infinite_loop   Exception trap (AFFE = BRA self)
+    0x000F4C  isr_dispatch_manager     Identifies interrupt source, calls handler
+    0x000EE4  isr_intevt_resolver      Reads INTEVT register, returns dispatch index
+    0x000D78  isr_int_acknowledge      Interrupt acknowledge/clear
+    0x000E5EC isr_dispatch_table       54 function pointers (4 bytes each)
+
+  ISR DISPATCH TABLE (0x000E5EC, 54 entries x 4 bytes):
+    Index  Handler     Identity
+    -----  ----------  ----------------------------------------
+    [  0]  0x010A46    isr_handler_0
+    [  1]  0x00FC04    isr_handler_1
+    [  2]  0x005840    isr_handler_2   (accesses MTU timer regs 0xFFFF4024)
+    [  3]  0x00D658    isr_handler_3   (accesses MTU timer regs 0xFFFF4024)
+    [  4]  0x00CBAC    isr_handler_4
+    [  5]  0x04907C    isr_handler_5
+    [  6]  0x009A58    isr_handler_6
+    [  7]  0x00D268    isr_handler_7
+    [  8]  0x00CBEE    isr_handler_8
+    [  9]  0x0035A4    isr_handler_9
+    [ 10]  0x00FE22    isr_handler_10
+    [ 11]  0x00A878    isr_handler_11
+    [ 12]  0x00D940    isr_handler_12
+    [ 13]  0x009A14    isr_handler_13
+    [ 14]  0x008528    isr_handler_14
+    [ 15]  0x04A94C    isr_task_scheduler  *** task scheduler (59 tasks) ***
+    [ 16]  0x04AA58    isr_handler_16
+    [ 17]  0x009A34    isr_handler_17
+    [ 18]  0x0085AC    isr_handler_18
+    [ 19]  0x00D3DC    isr_handler_19
+    [ 20]  0x010D58    isr_handler_20
+    [ 21]  0x04793C    isr_rcan0           CAN controller ch0 (0xFFFF36BE/3D08)
+    [ 22]  0x048732    isr_rcan1           CAN controller ch1 (same regs)
+    [ 23]  0x01076A    isr_handler_23
+    [ 24]  0x004BCA    isr_handler_24
+    [ 25]  0x010124    isr_handler_25
+    [ 26]  0x047B66    isr_handler_26
+    [ 27]  0x049A7A    isr_handler_27
+    [ 28]  0x00C36C    isr_handler_28   (accesses 0xFFFF4024)
+    [ 29]  0x00A844    isr_handler_29
+    [ 30]  0x049BA4    isr_handler_30
+    [ 31]  0x00C370    isr_handler_31   (accesses 0xFFFF4024)
+    [ 32]  0x005798    isr_handler_32
+    [ 33]  0x049CF0    isr_handler_33
+    [ 34]  0x00D4FC    isr_handler_34   (accesses 0xFFFF4024)
+    [ 35]  0x00812C    isr_handler_35
+    [ 36]  0x00ACFC    isr_handler_36
+    [ 37]  0x04A03E    isr_handler_37
+    [ 38]  0x00658C    isr_handler_38
+    [ 39]  0x005980    isr_handler_39
+    [ 40]  0x0081C8    isr_handler_40
+    [ 41]  0x04A420    isr_handler_41
+    [ 42]  0x04A674    isr_handler_42
+    [ 43]  0x04A6C6    isr_handler_43
+    [ 44]  0x04A6FA    isr_handler_44
+    [ 45]  0x00D8D0    isr_handler_45   (accesses 0xFFFF4514/4510)
+    [ 46]  0x04AE7C    isr_handler_46
+    [ 47]  0x0099E4    isr_handler_47
+    [ 48]  0x00D1F4    isr_handler_48
+    [ 49]  0x0084D8    isr_handler_49
+    [ 50]  0x00A694    isr_handler_50
+    [ 51]  0x00BB32    isr_handler_51
+    [ 52]  0x007D12    isr_handler_52
+    [ 53]  0x04AE82    isr_handler_53
+
+  NEXT STEPS FOR ISR IDENTIFICATION:
+    - Trace 0xEE4 to understand how dispatch index maps to peripheral ID
+    - Trace handlers that access 0xFFFF4024 (MTU timer regs) for crank/cam ISR
+    - Identify ADC complete ISR (feeds rpm_current, ect_current, etc.)
+    - Trace scheduler tick ISR (entry [15] = 0x4A94C) timing source
+
+  CALIBRATION DESCRIPTOR LABELS (in ImportAE5L600L.java):
+    All 760 calibration descriptors now labeled. Format: desc_<type>_<addr>
+    Top groups:
+      1D_ECT  (258): coolant temp lookup tables (most common)
+      1D_RPM  (107): RPM-indexed tables
+      1D_range (91): other axis types
+      2D_LoadxRPM (49): 2D load x RPM tables (fuel/timing)
+      1D_Throttle (41): throttle-indexed tables
+      2D_range (29): other 2D tables
+      1D_Boost (26): boost pressure tables
+    Total: 621 1D + 139 2D = 760 descriptors
+
+
+================================================================================
+SECTION 16: OPEN QUESTIONS
 ================================================================================
 
   1. FFFF7A20 AND CL_ACTIVE_CHECK CONDITION 7:

@@ -1,0 +1,529 @@
+Loaded ROM: 1048576 bytes
+
+==========================================================================================
+TASK CALL GRAPH — 59 Scheduler Tasks
+==========================================================================================
+
+----------------------------------------------------------------------
+[ 0] task00_timing_percyl  @ 0x44188
+----------------------------------------------------------------------
+  Calls:    check_transient_flag, table_desc_2d_typed
+  RAM (known): rpm_current, iat_current, ect_current
+  RAM (new):   0xFFFF81E8
+  Descriptors: 0xAE5D8, 0xAE5F4, 0xAE610, 0xAE62C
+  Calibration: 0xD2D98, 0xD2D9C, 0xD2DA0
+
+----------------------------------------------------------------------
+[ 1] task01_knock_timing_fb  @ 0x45970
+----------------------------------------------------------------------
+  Calls:    table_desc_2d_typed
+  RAM (known): iat_current
+  RAM (new):   0xFFFF7F4C, 0xFFFF90A8, 0xFFFF826C, 0xFFFF8214, 0xFFFF8204, 0xFFFF821C, 0xFFFF8218
+  Descriptors: 0xAE680, 0xAE69C, 0xAE664
+  Calibration: 0xD299B
+
+----------------------------------------------------------------------
+[ 2] task02_knock_window  @ 0x45098
+----------------------------------------------------------------------
+  Calls:    float_min
+  RAM (new):   0xFFFF6364, 0xFFFF8210
+
+----------------------------------------------------------------------
+[ 3] task03_knock_thresh  @ 0x45670
+----------------------------------------------------------------------
+  Calls:    float_min
+  GBR:      0xFFFF821C
+  RAM (new):   0xFFFF821C, 0xFFFF8230
+  Calibration: 0xD29A3, 0xD2EB4, 0xD29A4, 0xD2EB8
+
+----------------------------------------------------------------------
+[ 4] task04_knock_thresh  @ 0x455E6
+----------------------------------------------------------------------
+  GBR:      0xFFFF81F8
+  RAM (known): rpm_current, fuel_system_state
+  RAM (new):   0xFFFF81F8
+  Calibration: 0xD2E9C, 0xD2EA0, 0xD2EA8, 0xD2EA4, 0xD2EAC, 0xD2EB0 (+1)
+
+----------------------------------------------------------------------
+[ 5] task05_knock_det  @ 0x4530A
+----------------------------------------------------------------------
+  Calls:    uint16_add_sat
+  RAM (known): rpm_current
+  RAM (new):   0xFFFF8584, 0xFFFF8224
+  Calibration: 0xD2E78
+
+----------------------------------------------------------------------
+[ 6] task06_knock_det  @ 0x45354
+----------------------------------------------------------------------
+  Calls:    table_desc_2d_typed, table_desc_1d_float, float_max, uint8_add_sat
+  GBR:      0xFFFF81F0
+  RAM (known): manifold_pressure, iat_current, rpm_current, KNOCK_FLAG
+  RAM (new):   0xFFFF81F0, 0xFFFF6364, 0xFFFF8244, 0xFFFF8268
+  Descriptors: 0xAE648, 0xAE120
+  Calibration: 0xD29A1, 0xD2E80, 0xD2E7C, 0xD2E8C, 0xD29E8, 0xD29EA (+1)
+
+----------------------------------------------------------------------
+[ 7] task07_knock_det  @ 0x450AE
+----------------------------------------------------------------------
+  Calls:    uint8_add_sat, uint16_add_sat
+  GBR:      0xFFFF81F0
+  RAM (known): rpm_current, iat_current, KNOCK_FLAG
+  RAM (new):   0xFFFF81F0, 0xFFFF6364, 0xFFFF620C, 0xFFFF8244, 0xFFFF826C, 0xFFFF825C
+  Calibration: 0xD2E60, 0xD2E64, 0xD29E4, 0xD2E4C, 0xD2E50, 0xD2E54 (+4)
+
+----------------------------------------------------------------------
+[ 8] task08_knock_window  @ 0x44E04
+----------------------------------------------------------------------
+  Calls:    uint8_add_sat
+  Unknown:  0x2F8FE, 0x58524
+  GBR:      0xFFFF8210
+  RAM (known): ect_current, manifold_pressure, IAM_value
+  RAM (new):   0xFFFF8210, 0xFFFF3244, 0xFFFF3248
+  Calibration: 0xD2E1C, 0xD2E20, 0xD2E2C, 0xD2E34, 0xD299C, 0xD2E3C (+3)
+
+----------------------------------------------------------------------
+[ 9] task09_knock_det  @ 0x44DB0
+----------------------------------------------------------------------
+  Calls:    float_lerp
+  RAM (known): iat_current
+  RAM (new):   0xFFFF81F8
+  Calibration: 0xD2E18
+
+----------------------------------------------------------------------
+[10] task10_knock_config  @ 0x448F4
+----------------------------------------------------------------------
+  Calls:    float_deadband_check
+  Unknown:  0x298C8, 0x29848, 0x2F8FE, 0x1CF2E, 0x457D2, 0x457F4
+  GBR:      0xFFFF81F8
+  RAM (known): rpm_current, ect_current
+  RAM (new):   0xFFFF81F8, 0xFFFF7A20, 0xFFFF653C, 0xFFFF90A8, 0xFFFF5BE2, 0xFFFF9124, 0xFFFF9125, 0xFFFF7D18 (+11)
+
+----------------------------------------------------------------------
+[11] task11_knock_flag  @ 0x4438C
+----------------------------------------------------------------------
+  Calls:    float_deadband_check, float_max
+  Unknown:  0x1CF22, 0x2F8FE, 0x29858, 0x2997C, 0x456E0, 0x4578C (+3)
+  GBR:      0xFFFF81F0
+  RAM (known): iat_current, rpm_current, KNOCK_FLAG, KNOCK_BANK_FLAG
+  RAM (new):   0xFFFF81F0, 0xFFFF7F10, 0xFFFF653C, 0xFFFF7BE2, 0xFFFF7E76, 0xFFFF81FC
+  Calibration: 0xD2995, 0xD2DC4, 0xD2DD4, 0xD2DD8, 0xD2DC8, 0xD2DE4 (+1)
+
+----------------------------------------------------------------------
+[12] task12_knock_post  @ 0x43D68
+----------------------------------------------------------------------
+  Calls:    table_desc_1d_float, float_safe_div, float_clamp_range, float_min, interrupt_priority_set, interrupt_restore, uint8_add_sat
+  Unknown:  0x0A638
+  GBR:      0xFFFF80FC
+  RAM (known): rpm_current
+  RAM (new):   0xFFFF80FC, 0xFFFF81F4, 0xFFFF8128, 0xFFFF81F8, 0xFFFF81D8
+  Descriptors: 0xAE0F8, 0xAE00C, 0xAE020, 0xAE10C, 0xAE26C, 0xAE278
+  Calibration: 0xD2D60, 0xD2D64, 0xD2D6C, 0xD2D74, 0xD2D68, 0xD2D70 (+3)
+
+----------------------------------------------------------------------
+[13] task13_rough_corr  @ 0x45A3E
+----------------------------------------------------------------------
+  Unknown:  0x45F9A
+  GBR:      0xFFFF8277
+  RAM (known): rpm_current, iat_current
+  RAM (new):   0xFFFF8277
+
+----------------------------------------------------------------------
+[14] task14_knock_thresh_lu  @ 0x44834
+----------------------------------------------------------------------
+  Calls:    float_deadband_check, uint8_add_sat
+  GBR:      0xFFFF81F0
+  RAM (known): rpm_current, iat_current
+  RAM (new):   0xFFFF81F0, 0xFFFF8254, 0xFFFF8258
+  Calibration: 0xD2DEC, 0xD2DF0, 0xD2DF4, 0xD2DF8, 0xD2DFC, 0xD2E00 (+2)
+
+----------------------------------------------------------------------
+[15] task15_rough_corr  @ 0x45A84
+----------------------------------------------------------------------
+  GBR:      0xFFFF8258
+  RAM (new):   0xFFFF8258, 0xFFFF3244, 0xFFFF8233
+  Calibration: 0xD2EDC
+
+----------------------------------------------------------------------
+[16] task16_flkc_pre  @ 0x45BBC
+----------------------------------------------------------------------
+  RAM (known): IAM_value
+  RAM (new):   0xFFFF822A, 0xFFFF827D
+  Calibration: 0xD29A5, 0xD29A6, 0xD2EE0
+
+----------------------------------------------------------------------
+[17] task17_flkc_pre  @ 0x45B44
+----------------------------------------------------------------------
+  Calls:    desc_read_float_safe
+  RAM (known): fuel_system_state, FLKC_BASE_STEP, IAM_value
+  RAM (new):   0xFFFF3244, 0xFFFF8274
+  Calibration: 0xD2EE4, 0xD2EE0
+
+----------------------------------------------------------------------
+[18] task18_flkc_J  @ 0x45BFE
+----------------------------------------------------------------------
+  Calls:    fmac_interp_uint8, table_desc_1d_uint16, float_min, uint16_add_sat, float_max, table_desc_1d_float, float_clamp_range, desc_read_float_safe
+  Unknown:  0x29858, 0x46A42, 0x45F12, 0x45F68
+  RAM (known): KNOCK_FLAG, rpm_current, FLKC_BASE_STEP, IAM_value
+  RAM (new):   0xFFFF7D18, 0xFFFF82A0, 0xFFFF8290, 0xFFFF8298, 0xFFFF8274
+  Descriptors: 0xAE134, 0xAE2CC
+
+----------------------------------------------------------------------
+[19] task19_flkc_post  @ 0x45E96
+----------------------------------------------------------------------
+  Calls:    desc_read_float_safe
+  Unknown:  0x2999C
+  RAM (known): IAM_value, FLKC_BASE_STEP
+  RAM (new):   0xFFFF65BD, 0xFFFF8286, 0xFFFF3244
+  Calibration: 0xD2EE0, 0xD2EE4
+
+----------------------------------------------------------------------
+[20] task20_knock_win_upd  @ 0x459F6
+----------------------------------------------------------------------
+  Calls:    table_desc_2d_typed
+  RAM (known): iat_current, IAM_value
+  RAM (new):   0xFFFF7F4C, 0xFFFF8268, 0xFFFF8200
+  Descriptors: 0xAE6B8
+  Calibration: 0xD299B
+
+----------------------------------------------------------------------
+[21] task21_knock_win_upd  @ 0x467AE
+----------------------------------------------------------------------
+  Unknown:  0x46A4A
+  GBR:      0xFFFF829E
+  RAM (known): rpm_current, iat_current
+  RAM (new):   0xFFFF829E
+
+----------------------------------------------------------------------
+[22] task22_knock_percyl  @ 0x461D2
+----------------------------------------------------------------------
+  GBR:      0xFFFF8298
+  RAM (known): iat_current, rpm_current
+  RAM (new):   0xFFFF8298
+  Calibration: 0xD2F24, 0xD2F38
+
+----------------------------------------------------------------------
+[23] task23_knock_cyl_track  @ 0x467F4
+----------------------------------------------------------------------
+  Calls:    desc_read_float_safe
+  Unknown:  0x2999C
+  RAM (new):   0xFFFF65BD, 0xFFFF82AB, 0xFFFF3248
+
+----------------------------------------------------------------------
+[24] task24_flkc_output  @ 0x469A4
+----------------------------------------------------------------------
+  RAM (new):   0xFFFF8296
+  Calibration: 0xD29F0
+
+----------------------------------------------------------------------
+[25] task25_flkc_FG  @ 0x463BA
+----------------------------------------------------------------------
+  Calls:    float_min, float_clamp_range, desc_read_float_safe, float_deadband_check, uint8_pack
+  Unknown:  0x29858, 0x45EEA
+  GBR:      0xFFFF8290
+  RAM (known): IAM_value, KNOCK_FLAG
+  RAM (new):   0xFFFF8290, 0xFFFF8258, 0xFFFF7D18, 0xFFFF3244, 0xFFFF3248, 0xFFFF8233, 0xFFFF3360
+  Calibration: 0xD29EE, 0xD2F40, 0xD2F48, 0xD2F44, 0xD2F4C, 0xD2F58 (+1)
+
+----------------------------------------------------------------------
+[26] task26_flkc_output  @ 0x46978
+----------------------------------------------------------------------
+  Calls:    uint16_add_sat
+  RAM (new):   0xFFFF8296, 0xFFFF82AC
+
+----------------------------------------------------------------------
+[27] task27_knock_timing  @ 0x46296
+----------------------------------------------------------------------
+  Calls:    float_min, float_lerp
+  RAM (known): KNOCK_FLAG
+  RAM (new):   0xFFFF822D, 0xFFFF3248, 0xFFFF8298, 0xFFFF6790, 0xFFFF826C, 0xFFFF8268
+  Calibration: 0xD2F3C
+
+----------------------------------------------------------------------
+[28] task28_flkc_recovery  @ 0x45DF8
+----------------------------------------------------------------------
+  RAM (new):   0xFFFF3244, 0xFFFF8274, 0xFFFF828C, 0xFFFF829D, 0xFFFF829F
+  Calibration: 0xD2F04, 0xD2EF0, 0xD2F08, 0xD2EF4, 0xD2EEC, 0xD2EF8 (+2)
+
+----------------------------------------------------------------------
+[29] task29_timing_percyl  @ 0x44296
+----------------------------------------------------------------------
+  Unknown:  0x29858, 0x2997C
+  RAM (known): maf_current
+  RAM (new):   0xFFFF81F0, 0xFFFF8260, 0xFFFF828C, 0xFFFF81EC
+
+----------------------------------------------------------------------
+[30] task30_base_timing  @ 0x3FCA2
+----------------------------------------------------------------------
+  Calls:    float_deadband_check, float_min, float_max, table_desc_1d_float
+  Unknown:  0x40314
+  GBR:      0xFFFF7F10
+  RAM (known): rpm_current, engine_load, ect_current, iat_current, manifold_pressure, atm_pressure
+  RAM (new):   0xFFFF7F10, 0xFFFF6354, 0xFFFF5DB8, 0xFFFF5BE2, 0xFFFF8BA1, 0xFFFF3158, 0xFFFF8910, 0xFFFF7F64
+  Descriptors: 0xADB38, 0xADB9C
+  Calibration: 0xD2AE0, 0xD2ADC, 0xD2AE4, 0xD2AE8, 0xD2AF0
+
+----------------------------------------------------------------------
+[31] task31_timing_blend_ratio  @ 0x3FFD6
+----------------------------------------------------------------------
+  Calls:    float_max
+  Unknown:  0x2999C
+  RAM (new):   0xFFFF9230, 0xFFFF9234, 0xFFFF9164, 0xFFFF9168, 0xFFFF91F9, 0xFFFF7F3C
+  Calibration: 0xD2B18, 0xD2B1C
+
+----------------------------------------------------------------------
+[32] task32_timing_blend_app  @ 0x4004A
+----------------------------------------------------------------------
+  Calls:    check_engine_running
+  GBR:      0xFFFF7F0C
+  RAM (known): rpm_current, iat_current
+  RAM (new):   0xFFFF7F0C, 0xFFFF90A8, 0xFFFF679C, 0xFFFF7BE2, 0xFFFF8075, 0xFFFF804C, 0xFFFF7F60
+  Calibration: 0xD2B14, 0xD2B10, 0xD29D4
+
+----------------------------------------------------------------------
+[33] task33_timing_ws_init  @ 0x40918
+----------------------------------------------------------------------
+  Unknown:  0x40A9C, 0x40AF6, 0x41030
+  GBR:      0xFFFF7FD4
+  RAM (known): throttle_pos, fuel_system_state
+  RAM (new):   0xFFFF7FD4, 0xFFFF90BE, 0xFFFF8E7E
+
+----------------------------------------------------------------------
+[34] task34_timing_throttle  @ 0x40516
+----------------------------------------------------------------------
+  Unknown:  0x40520
+  RAM (new):   0xFFFF7F82
+
+----------------------------------------------------------------------
+[35] task35_timing_corr  @ 0x418AC
+----------------------------------------------------------------------
+  Calls:    float_max, table_desc_1d_float
+  RAM (new):   0xFFFF7BE4, 0xFFFF798C, 0xFFFF8010
+  Descriptors: 0xAE164
+  Calibration: 0xD2C04
+
+----------------------------------------------------------------------
+[36] task36_timing_percond  @ 0x415B8
+----------------------------------------------------------------------
+  Calls:    table_desc_1d_float, table_desc_1d_uint16, fmac_interp_uint16, table_desc_2d_typed, uint8_add_sat, float_min, float_max
+  Unknown:  0x23E48, 0x299F0
+  GBR:      0xFFFF8000
+  RAM (known): engine_load, ect_current, iat_current, rpm_current, fuel_system_state
+  RAM (new):   0xFFFF8000, 0xFFFF78B0, 0xFFFF6354, 0xFFFF62DC, 0xFFFF67EE, 0xFFFF5BE3, 0xFFFF65C1, 0xFFFF801C (+2)
+  Descriptors: 0xAE0D8, 0xAE0EC, 0xAE488, 0xADDE0, 0xAE46C, 0xAE450 (+5)
+  Calibration: 0xD297F, 0xD2BF0, 0xD297E, 0xD2BF4, 0xD2BF8, 0xD2BFC (+1)
+
+----------------------------------------------------------------------
+[37] task37_timing_multiaxis  @ 0x419BA
+----------------------------------------------------------------------
+  Calls:    uint16_add_sat
+  Unknown:  0x41A02, 0x41A48, 0x41A7E
+  RAM (new):   0xFFFF7C9D, 0xFFFF802E
+
+----------------------------------------------------------------------
+[38] task38_ign_output  @ 0x42A78
+----------------------------------------------------------------------
+  Calls:    float_abs_diff
+  Unknown:  0x278D2
+  RAM (known): rpm_current, ect_current, injector_data, throttle_pos
+  RAM (new):   0xFFFF8910, 0xFFFF5BE2, 0xFFFF65BF, 0xFFFF8098, 0xFFFF80AE
+  Calibration: 0xD2985, 0xD2CB0, 0xD2CB4, 0xD2CB8, 0xD29D8
+
+----------------------------------------------------------------------
+[39] task39_ign_maf_corr  @ 0x42B90
+----------------------------------------------------------------------
+  Calls:    desc_read_float_safe, table_desc_1d_float
+  RAM (known): rpm_current, maf_correction
+  RAM (new):   0xFFFF8098, 0xFFFF6764, 0xFFFF6784, 0xFFFF80B0
+  Calibration: 0xD2CBC
+
+----------------------------------------------------------------------
+[40] task40_ign_calc_a  @ 0x42D20
+----------------------------------------------------------------------
+  RAM (known): rpm_current, iat_current
+  RAM (new):   0xFFFF8098
+  Calibration: 0xD2CC0, 0xD2CC4
+
+----------------------------------------------------------------------
+[41] task41_ign_calc_b  @ 0x42D54
+----------------------------------------------------------------------
+  Calls:    float_clamp_range
+  Unknown:  0x42E6A
+  RAM (known): rpm_current, maf_correction
+  RAM (new):   0xFFFF8098, 0xFFFF8088
+  Calibration: 0xD2CCC, 0xD2CC8
+
+----------------------------------------------------------------------
+[42] task42_timing_comp_b  @ 0x42F48
+----------------------------------------------------------------------
+  Calls:    float_max, table_desc_1d_float, float_min, float_clamp_range, desc_read_float_safe
+  RAM (known): IAM_value, KNOCK_FLAG
+  RAM (new):   0xFFFF6364, 0xFFFF322C, 0xFFFF7BE2, 0xFFFF7BE1, 0xFFFF7BE0, 0xFFFF80C0, 0xFFFF8258, 0xFFFF8260
+  Descriptors: 0xADFAC
+  Calibration: 0xD2CF4, 0xD2CE0, 0xD2986, 0xD2CE4, 0xD2CD8, 0xD2CDC (+2)
+
+----------------------------------------------------------------------
+[43] task43_timing_out_load  @ 0x4322A
+----------------------------------------------------------------------
+  Calls:    float_deadband_check, uint16_add_sat, table_desc_1d_float
+  RAM (known): iat_current, rpm_current, maf_current
+  RAM (new):   0xFFFF80C8
+  Descriptors: 0xADFD4
+  Calibration: 0xD29DA
+
+----------------------------------------------------------------------
+[44] task44_timing_lu_a  @ 0x4317A
+----------------------------------------------------------------------
+  Calls:    uint8_add_sat
+  RAM (new):   0xFFFF80C8, 0xFFFF80DA
+
+----------------------------------------------------------------------
+[45] task45_timing_lu_b  @ 0x431B0
+----------------------------------------------------------------------
+  Calls:    float_min, table_desc_1d_float, table_desc_2d_typed
+  RAM (known): rpm_current, ect_current
+  RAM (new):   0xFFFF6364, 0xFFFF80C8
+  Descriptors: 0xADFC0, 0xAE530
+  Calibration: 0xD2988, 0xD2D10, 0xD2987
+
+----------------------------------------------------------------------
+[46] task46_inj_mps_timing  @ 0x43368
+----------------------------------------------------------------------
+  Calls:    fmac_interp_uint8, table_desc_1d_float, LowPW_TableProcessor, float_clamp_range
+  RAM (new):   0xFFFF6650, 0xFFFF6810, 0xFFFF6790, 0xFFFF5FB8, 0xFFFF80E4, 0xFFFF6654, 0xFFFF668C
+  Descriptors: 0xAE260, 0xADFF4, 0xADFE8
+  Calibration: 0xD2D1C, 0xD2D18, 0xD2D14
+
+----------------------------------------------------------------------
+[47] task47_mapswitch_lowpw  @ 0x43464
+----------------------------------------------------------------------
+  Calls:    LowPW_TableProcessor
+  Unknown:  0x4346E
+  RAM (known): engine_load, rpm_current, ect_current
+  RAM (new):   0xFFFF62F8, 0xFFFF5BE3, 0xFFFF80EC
+  Descriptors: 0xAE000
+  Calibration: 0xD2A0C, 0xD2D20, 0xD2D24, 0xD2D28, 0xD2D2C, 0xD2A1C
+
+----------------------------------------------------------------------
+[48] task48_final_timing  @ 0x4359C
+----------------------------------------------------------------------
+  Calls:    check_engine_running, table_desc_2d_typed
+  Unknown:  0x299BC, 0x297A0, 0x1CF16, 0x436B6
+  RAM (known): rpm_current, iat_current, throttle_pos
+  RAM (new):   0xFFFF6812, 0xFFFF80F8
+  Descriptors: 0xAE54C, 0xAE568, 0xAE584, 0xAE5A0, 0xAE5BC
+  Calibration: 0xD2D48
+
+----------------------------------------------------------------------
+[49] task49_base_advance  @ 0x3F00C
+----------------------------------------------------------------------
+  Calls:    check_engine_status, float_deadband_check, float_min, uint8_add_sat, table_desc_1d_float
+  GBR:      0xFFFF7EC0
+  RAM (known): engine_load, rpm_current, iat_current, ect_current, fuel_system_state, throttle_pos
+  RAM (new):   0xFFFF7EC0, 0xFFFF62FC, 0xFFFF62F8, 0xFFFF805C, 0xFFFF7354, 0xFFFF6354, 0xFFFF73E8, 0xFFFF620C (+3)
+  Descriptors: 0xADAFC, 0xADB10
+  Calibration: 0xD2A50, 0xD2A54, 0xD29AC, 0xD2A58, 0xD2A5C, 0xD2A60 (+5)
+
+----------------------------------------------------------------------
+[50] task50_timing_blend_int  @ 0x3F368
+----------------------------------------------------------------------
+  Unknown:  0x5EB32
+  GBR:      0xFFFF7E90
+  RAM (known): rpm_current, engine_load, ect_current, fuel_system_state
+  RAM (new):   0xFFFF7E90, 0xFFFF62F8, 0xFFFF7F68, 0xFFFF8F16, 0xFFFF8F24, 0xFFFF5BE3, 0xFFFF65BF, 0xFFFF7D18 (+6)
+  Calibration: 0xD2974, 0xD2975, 0xD2A34, 0xD2A08, 0xD2A0C, 0xD2A10 (+4)
+
+----------------------------------------------------------------------
+[51] task51_boost_wg_calc  @ 0x54852
+----------------------------------------------------------------------
+  Calls:    check_engine_running, table_desc_1d_float, float_max, uint8_add_sat
+  GBR:      0xFFFF8B50
+  RAM (known): throttle_pos, engine_load, rpm_current
+  RAM (new):   0xFFFF8B50, 0xFFFF64F5, 0xFFFF6640, 0xFFFF6644, 0xFFFF8BD0
+  Descriptors: 0xAEFE4, 0xAEFF0, 0xAEFFC
+  Calibration: 0xD6720, 0xD6724, 0xD6718, 0xD671C, 0xD6185, 0xD670C (+2)
+
+----------------------------------------------------------------------
+[52] task52_boost_feedback  @ 0x549FA
+----------------------------------------------------------------------
+  Calls:    float_lerp
+  RAM (known): rpm_current
+  RAM (new):   0xFFFF8BC4
+  Calibration: 0xD6748
+
+----------------------------------------------------------------------
+[53] task53_diag_monitor  @ 0x602DC
+----------------------------------------------------------------------
+  Unknown:  0x6035A, 0x60392
+  RAM (known): throttle_pos
+  RAM (new):   0xFFFF4158, 0xFFFF9088, 0xFFFF9090
+
+----------------------------------------------------------------------
+[54] task54_idle_control  @ 0x4BC20
+----------------------------------------------------------------------
+  RAM (new):   0xFFFF8373
+
+----------------------------------------------------------------------
+[55] task55_mps_diag  @ 0x900B4
+----------------------------------------------------------------------
+  Calls:    check_cl_active
+  RAM (new):   0xFFFFABF4
+
+----------------------------------------------------------------------
+[56] task56_evap_purge  @ 0x66580
+----------------------------------------------------------------------
+  Calls:    diag_check_status
+
+----------------------------------------------------------------------
+[57] task57_egr_emissions  @ 0x758CA
+----------------------------------------------------------------------
+  Calls:    critical_section_enter, critical_section_exit
+  Unknown:  0x7BF3C, 0x7C242, 0x0BA84, 0x0BAC0
+  GBR:      0xFFFFA198
+  RAM (known): rpm_current
+  RAM (new):   0xFFFFA198, 0xFFFF4330, 0xFFFFA224, 0xFFFF43B1
+  Calibration: 0xC4755, 0xC4753
+
+----------------------------------------------------------------------
+[58] task58_maf_diag  @ 0x6F0B8
+----------------------------------------------------------------------
+  Unknown:  0x6F0CE
+  RAM (new):   0xFFFF96A5
+
+
+==========================================================================================
+CROSS-TASK ANALYSIS
+==========================================================================================
+
+Most-called subroutines from tasks:
+  table_desc_1d_float            called by 13 tasks
+  float_min                      called by 11 tasks
+  float_max                      called by 9 tasks
+  uint8_add_sat                  called by 9 tasks
+  table_desc_2d_typed            called by 7 tasks
+  float_deadband_check           called by 7 tasks
+  desc_read_float_safe           called by 7 tasks
+  uint16_add_sat                 called by 6 tasks
+  float_clamp_range              called by 6 tasks
+  0x29858                        called by 4 tasks
+  0x2F8FE                        called by 3 tasks
+  float_lerp                     called by 3 tasks
+  0x2999C                        called by 3 tasks
+  check_engine_running           called by 3 tasks
+  0x2997C                        called by 2 tasks
+
+Most-referenced RAM from tasks:
+  rpm_current                    read by 29 tasks
+  iat_current                    read by 18 tasks
+  ect_current                    read by 10 tasks
+  IAM_value                      read by 8 tasks
+  KNOCK_FLAG                     read by 7 tasks
+  0xFFFF3244                     read by 7 tasks
+  fuel_system_state              read by 6 tasks
+  0xFFFF8258                     read by 6 tasks
+  engine_load                    read by 6 tasks
+  throttle_pos                   read by 6 tasks
+  0xFFFF6364                     read by 5 tasks
+  0xFFFF81F0                     read by 5 tasks
+  0xFFFF826C                     read by 4 tasks
+  0xFFFF81F8                     read by 4 tasks
+  0xFFFF3248                     read by 4 tasks

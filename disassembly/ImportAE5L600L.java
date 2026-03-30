@@ -508,8 +508,13 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
         // DTC TABLE
         // =====================================================================
-        count += labelComment(0x0009A770, "DTC_Table_Start",
-            "93 OBD-II DTC entries (0x9A770-0x9A82B). First: P0335 Crankshaft Pos Sensor A");
+        count += labelComment(0x0009A770, "DTC_EnableFlags",
+            "93-byte DTC enable/disable table. 0x01=enabled, 0x00=disabled. Indexed by DTC slot (0-92).");
+        count += labelComment(0x0009A834, "DTC_DefinitionTable",
+            "93-entry DTC struct table. 20 bytes/entry: [W0:class][W1:monitor_id][P-code][W3:subtype][params]. "
+            + "P-codes: P0335(CKP), P0102(MAF-Lo), P0103(MAF-Hi), P0327(Knock-Lo), P0328(Knock-Hi), "
+            + "P0301-304(Misfire), P0122/123(TPS), P0117/118(ECT), P0420(Cat), P0456(EVAP), P0604(ECM RAM), etc. "
+            + "91/93 codes identified. See disassembly/dtc_table.txt for full decode.");
 
         // =====================================================================
         // CALIBRATION TABLES - KEY ENTRIES
@@ -1083,6 +1088,1504 @@ public class ImportAE5L600L extends GhidraScript {
             "AFL multiplier output (float). Written by afl_application at 0x37B74. Consumed by fuel PW calc at 0x0301E4. Applied unconditionally in CL and OL.");
         count += labelComment(0xFFFF7C68, "engine_status_flag",
             "Engine status flag (byte). Gates AFL application — abnormal condition forces FFFF7AB4=1.0.");
+
+        // =====================================================================
+        // HIGH-FREQUENCY SHARED SUBROUTINES (by cross-reference count)
+        // =====================================================================
+        // Found via BSR/JSR call-target analysis. These are the most-called
+        // unlabeled functions in the ROM — naming them unlocks readability
+        // across the entire firmware.
+
+        // ── Integer Arithmetic (saturating add/clamp) ──────────────────────
+        count += labelComment(0x000BE554, "uint16_add_sat",
+            "685 calls. r0 = min(r4+r5, 0xFFFF). Saturating uint16 add, returns in r0.");
+        count += labelComment(0x000BE53C, "uint8_add_sat",
+            "461 calls. r0 = min(r4+r5, 0xFF). Saturating uint8 add with carry check, returns in r0.");
+
+        // ── Float-to-Descriptor Processor (NaN-safe) ───────────────────────
+        count += labelComment(0x000BDBCC, "desc_read_float_safe",
+            "309 calls. Reads float from descriptor ptr r4, NaN-checks via fcmp/eq self, "
+            + "calls interrupt_priority_set(16) + interrupt_restore. Returns validated float or 0.");
+
+        // ── Interrupt Priority Control ─────────────────────────────────────
+        count += labelComment(0x0000317C, "interrupt_priority_set",
+            "298 calls. Sets SR interrupt mask to level r4 (0-15). Reads SR, masks with 0x00F0, "
+            + "shifts r4 into I-bits. Returns old SR in r0. Used by all descriptor reads for atomicity.");
+        count += labelComment(0x00003190, "interrupt_restore",
+            "181 calls. Restores SR interrupt mask from r4 (previously saved by interrupt_priority_set). "
+            + "Checks flag at FFFF1288+0x18, may call 0x3664. Paired with interrupt_priority_set.");
+
+        // ── Critical Section Enter/Exit ────────────────────────────────────
+        count += labelComment(0x000BE81C, "critical_section_enter",
+            "235 calls. Saves SR, sets interrupt level from mask 0xF0, stores old priority at @r4. "
+            + "Returns old SR in r5. Wraps descriptor/table reads for data consistency.");
+        count += labelComment(0x000BE82C, "critical_section_exit",
+            "236 calls. Restores SR interrupt mask. Just: rts + ldc r4,sr. "
+            + "Paired with critical_section_enter.");
+
+        // ── Float Clamp/Range ──────────────────────────────────────────────
+        count += labelComment(0x000BE56C, "float_clamp_range",
+            "218 calls. Clamps fr4 to [fr6, fr5]. If fr4>fr5: fr7=fr5; elif fr4<fr6: fr7=fr6; else fr7=fr4. "
+            + "Returns clamped value in fr0. Core range-limiter for calibration outputs.");
+
+        // ── Float Axis Interpolation (fraction calc) ───────────────────────
+        count += labelComment(0x000BE5D8, "axis_frac_to_uint16",
+            "147 calls. Converts float axis position to uint16 index+fraction. "
+            + "fr4=value, fr5=range divisor, fr6=axis base. Computes (value-base)/divisor, "
+            + "ftrc to int, clamps [0, 0xFFFF]. Used by all 1D/2D table lookups.");
+        count += labelComment(0x000BE5A8, "axis_frac_to_uint8",
+            "113 calls. Same as axis_frac_to_uint16 but clamps to [0, 0xFF]. "
+            + "Used by lower-resolution table lookups.");
+
+        // ── Float fmac Interpolation Primitives ────────────────────────────
+        count += labelComment(0x000BE598, "fmac_interp_uint16",
+            "145 calls. Converts uint16 r4 fraction to float, then fmac blend: "
+            + "fr0 = fr4 + fr3*(fr5-fr4). Core 1D interpolation for uint16-indexed tables.");
+        count += labelComment(0x000BE588, "fmac_interp_uint8",
+            "31 calls. Converts uint8 r4 fraction to float, then fmac blend. "
+            + "Same as fmac_interp_uint16 but for uint8-indexed tables.");
+
+        // ── DTC (Diagnostic Trouble Code) Framework ────────────────────────
+        count += labelComment(0x0009EDEC, "dtc_set_code",
+            "186 calls. Sets DTC by index r4. Checks FFFF36F4 enable, reads DTC_Table (0x9A770), "
+            + "calls 0xA58D6 and 0xA5ABC. DTC set dispatcher.");
+        count += labelComment(0x0009ED90, "dtc_clear_code",
+            "140 calls. Clears DTC by index r4. Same gate check as dtc_set_code. "
+            + "Calls 0xA1CC0 and 0xA240C. DTC clear dispatcher.");
+
+        // ── Descriptor Read (integer, no NaN check) ────────────────────────
+        count += labelComment(0x000BDCB6, "desc_read_int_safe",
+            "120 calls. Reads integer value from descriptor ptr r4. Calls interrupt_priority_set(16), "
+            + "reads data with boundary checks, calls interrupt_restore. Integer variant of desc_read_float_safe.");
+
+        // ── Context Save/Restore (ISR prologue) ────────────────────────────
+        count += labelComment(0x00002B8C, "isr_context_save",
+            "118 calls. Full register save for ISR: saves r2-r7, fr0-fr10, FPUL, PR to stack. "
+            + "Increments counter at FFFF1288+8. Returns address of restore routine in r0. "
+            + "Used at entry of all interrupt handlers.");
+
+        // ── CL/OL Mode Check Helpers ───────────────────────────────────────
+        count += labelComment(0x00022F92, "check_cl_active",
+            "111 calls. Reads FFFF65F6 byte, returns T-bit = (value==1). "
+            + "Quick CL-mode gate used throughout fuel/timing/diagnostic code.");
+        count += labelComment(0x00022CF4, "check_engine_running",
+            "100 calls. Reads FFFF65C5 byte, returns T-bit = (value==1). "
+            + "Engine-running gate used throughout fuel/timing/diagnostic code.");
+        count += labelComment(0x0002F8EA, "check_transient_flag",
+            "65 calls. Reads FFFF726C byte (transient flag), returns T-bit = (value==1). "
+            + "Transient condition gate for AFL/fuel corrections.");
+        count += labelComment(0x0003AB20, "check_engine_status",
+            "35 calls. Reads FFFF7C68 byte (engine status), returns T-bit = (value==1). "
+            + "Gates AFL application — forces multiplier=1.0 on abnormal.");
+
+        // ── Diagnostic / Sensor Validation Framework ───────────────────────
+        count += labelComment(0x000582D2, "diag_wrapper_set",
+            "108 calls. Wrapper: saves PR, calls 0xA6728, restores PR. "
+            + "Diagnostic flag set used by sensor monitor tasks.");
+        count += labelComment(0x000582AC, "diag_check_status",
+            "100 calls. Reads FFFF36F0, checks diagnostic mode byte. "
+            + "Returns r0=2 if mode active. Multi-condition diagnostic gate.");
+        count += labelComment(0x000582E0, "diag_read_pack_2val",
+            "43 calls. Reads descriptor, packs 2 values via uint16_pack/uint8_pack, "
+            + "calls interrupt_restore. Diagnostic data read with atomicity.");
+        count += labelComment(0x000584C8, "diag_check_enable_B",
+            "59 calls. Reads FFFFAE09 byte, returns T-bit = (value==1). "
+            + "Diagnostic enable gate B.");
+        count += labelComment(0x000584BE, "diag_check_enable_A",
+            "43 calls. Reads FFFFAE08 byte, returns T-bit = (value==1). "
+            + "Diagnostic enable gate A.");
+        count += labelComment(0x00058524, "diag_helper_C",
+            "11 calls. Diagnostic utility C. Short helper in diag framework.");
+
+        // ── Scheduler / Timer Utilities ────────────────────────────────────
+        count += labelComment(0x0000E6E4, "sched_event_post",
+            "73 calls. Posts event to scheduler: reads SR mask, checks event queue word at @r4, "
+            + "sets bits. Atomic scheduler event notification.");
+        count += labelComment(0x0000E6C4, "sched_event_clear",
+            "11 calls. Clears scheduler event flag. Paired with sched_event_post.");
+
+        // ── Address / Offset Calculation ───────────────────────────────────
+        count += labelComment(0x00006B5A, "calc_table_offset",
+            "53 calls. Complex offset computation using calibration base 0xC0080 "
+            + "and lookup tables at 0x1190C/0x11914/0x1193C. Returns computed address in r0. "
+            + "Used by calibration descriptor reads to resolve table pointers.");
+
+        // ── Peripheral I/O Wrappers ────────────────────────────────────────
+        count += labelComment(0x00006BC4, "io_write_word_atomic",
+            "35 calls. Atomic word write: critical_section_enter, "
+            + "BSR to formatter, BSR to writer, critical_section_exit. "
+            + "Used for peripheral register updates.");
+        count += labelComment(0x00006BF0, "io_write_2word_atomic",
+            "31 calls. Atomic 2-word write: critical_section_enter, "
+            + "write 2 values, critical_section_exit. Extended I/O update.");
+        count += labelComment(0x000067A6, "io_sched_event_atomic",
+            "26 calls. Atomic scheduler event + I/O: calls subroutines for "
+            + "event setup, sched_event_post, critical_section_exit.");
+        count += labelComment(0x00067DC, "io_sched_event_atomic_2",
+            "21 calls. Variant of io_sched_event_atomic with different event type.");
+
+        // ── RAM Word Compare-and-Write ─────────────────────────────────────
+        count += labelComment(0x0000B9E0, "ram_word_update",
+            "44 calls. Compares word at @r14 with r5, if different: "
+            + "calls 0x10800 with event code, writes new value. "
+            + "Used for state change detection with notification.");
+        count += labelComment(0x0000B99C, "ram_word_update_B",
+            "22 calls. Variant of ram_word_update with different event routing.");
+        count += labelComment(0x00010800, "event_notify",
+            "15 calls. Event notification dispatcher. Called by ram_word_update "
+            + "when state changes are detected.");
+
+        // ── DTC Table Iterator ─────────────────────────────────────────────
+        count += labelComment(0x0009CFEE, "dtc_scan_loop",
+            "48 calls. Iterates DTC entries, calls handler per-entry via r13 (0x9CCF8). "
+            + "Reads FFFFB6DF enable, checks DTC table. Bulk DTC processing.");
+
+        // ── Communication / Serial ─────────────────────────────────────────
+        count += labelComment(0x00058318, "comms_pack_response",
+            "57 calls. Packs diagnostic response: calls interrupt_priority_set, "
+            + "uint16_pack, uint8_pack multiple times, interrupt_restore. "
+            + "Builds multi-byte response for diagnostic protocol (KWP2000/CAN).");
+        count += labelComment(0x00058404, "comms_pack_response_B",
+            "49 calls. Variant of comms_pack_response with different field layout.");
+
+        // ── Descriptor / Table Walker ──────────────────────────────────────
+        count += labelComment(0x0000DCE4, "desc_table_walk",
+            "37 calls. Walks descriptor table: reads table pointer from lookup at 0x11B98, "
+            + "iterates entries, processes each via shift+add loop. "
+            + "Generic descriptor iterator for multi-entry calibration structures.");
+
+        // ── Miscellaneous High-Call-Count ───────────────────────────────────
+        count += labelComment(0x0004E0B8, "gbr_task_dispatcher",
+            "40 calls. Sets GBR=0xFFFF83AB, allocates 64-byte workspace, copies r4-r7 args. "
+            + "Writes multiple GBR-offset bytes from inputs. GBR-relative task setup.");
+        count += labelComment(0x000297A0, "float_load_from_desc",
+            "18 calls. Loads float from descriptor address. Small utility for descriptor access.");
+        count += labelComment(0x000297B0, "float_load_from_desc_B",
+            "16 calls. Variant of float_load_from_desc.");
+        count += labelComment(0x000299BC, "float_store_to_ram",
+            "14 calls. Stores float to RAM address from descriptor result.");
+        count += labelComment(0x0002999C, "float_compare_and_flag",
+            "10 calls. Compares float values and sets a RAM flag based on result.");
+
+        // ── Sensor Reading Helpers ─────────────────────────────────────────
+        count += labelComment(0x00045EEA, "knock_helper_leaf",
+            "13 calls. Leaf function in knock processing pipeline. Short helper called by multiple knock tasks.");
+        count += labelComment(0x00023E48, "fuel_desc_reader",
+            "15 calls. Reads fuel-related descriptor. Called from PSE and fuel correction code (0x304F4-0x30C66).");
+        count += labelComment(0x0001CF16, "engine_state_helper",
+            "10 calls. Engine state utility. Called from AFL/timing/boost contexts.");
+        count += labelComment(0x000281DC, "sensor_scale_helper",
+            "15 calls. Sensor scaling/conversion utility. Called from AFL, fuel, and O2 processing.");
+        count += labelComment(0x00021D9A, "cl_readiness_check",
+            "12 calls. CL readiness evaluation. Called from CL/OL transition, fuel, and AFL code. "
+            + "Referenced by clol_cond analysis.");
+        count += labelComment(0x000717B2, "eeprom_read_helper",
+            "25 calls. EEPROM/NV-memory read utility. Called from DTC and adaptation contexts.");
+        count += labelComment(0x0005CC9A, "sensor_diag_helper",
+            "20 calls. Sensor diagnostic utility. Called from O2 sensor, boost, and idle contexts.");
+
+        // ── BDD88 family (appears in multiple peripheral I/O contexts) ─────
+        count += labelComment(0x000BDD5A, "peripheral_io_read",
+            "20 calls. Peripheral register read utility. Groups of read calls in I/O driver code.");
+        count += labelComment(0x000BDD88, "peripheral_io_write",
+            "10 calls. Peripheral register write utility. Paired with peripheral_io_read.");
+        count += labelComment(0x000BDB92, "peripheral_io_init",
+            "17 calls. Peripheral I/O initialization. Called during startup and reconfiguration.");
+        count += labelComment(0x000BDC6A, "peripheral_io_config",
+            "10 calls. Peripheral I/O configuration. Sets up register access parameters.");
+
+        // ── Remaining High-Value Targets ───────────────────────────────────
+        count += labelComment(0x00006828, "io_read_word_atomic",
+            "15 calls. Atomic word read from I/O region with interrupt protection.");
+        count += labelComment(0x00006884, "io_read_2word_atomic",
+            "20 calls. Atomic 2-word read from I/O region.");
+        count += labelComment(0x0000CA72, "timer_reload",
+            "11 calls. Timer/counter reload function. Called in groups (0xCBC6-0xCBDA range).");
+        count += labelComment(0x0000E794, "sched_timer_dispatch",
+            "8 calls. Timer-based scheduler dispatch. Manages periodic callback timing.");
+        count += labelComment(0x00002EDC, "stack_frame_setup",
+            "8 calls. Stack frame setup utility for complex function prologues.");
+        count += labelComment(0x000117E8, "hw_register_set",
+            "16 calls. Hardware register write. Used for peripheral configuration.");
+        count += labelComment(0x000117FC, "hw_register_get",
+            "13 calls. Hardware register read. Paired with hw_register_set.");
+        count += labelComment(0x00098686, "dtc_status_check",
+            "14 calls. DTC status check for specific fault code. Returns fault state.");
+        count += labelComment(0x0009D052, "dtc_counter_update",
+            "14 calls. DTC maturation counter update. Increments fault detection counters.");
+        count += labelComment(0x0009DD78, "dtc_vector_table",
+            "17 calls. DTC handler vector dispatch. Called via pointer table from dtc_scan_loop.");
+        count += labelComment(0x0009CABE, "dtc_freeze_frame",
+            "11 calls. DTC freeze frame capture. Records operating conditions at fault time.");
+        count += labelComment(0x0009884E, "dtc_monitor_helper",
+            "12 calls. DTC monitor helper. Shared logic for OBD-II monitor routines.");
+        count += labelComment(0x00098832, "dtc_monitor_gate",
+            "10 calls. DTC monitor enable gate. Conditions check before monitor execution.");
+        count += labelComment(0x0009DCEA, "dtc_history_update",
+            "10 calls. DTC history memory update. Writes fault history for readout.");
+
+        // ── Known RAM: Status Check Addresses ──────────────────────────────
+        count += labelComment(0xFFFF65F6, "cl_active_flag",
+            "Byte: 1=closed loop active. Read by check_cl_active (0x22F92), 111 calls.");
+        count += labelComment(0xFFFF65C5, "engine_running_flag",
+            "Byte: 1=engine running. Read by check_engine_running (0x22CF4), 100 calls.");
+        count += labelComment(0xFFFFB71C, "dtc_master_enable",
+            "Byte: DTC system master enable. Read by dtc_set_code/dtc_clear_code.");
+        count += labelComment(0xFFFF36F0, "diag_mode_status",
+            "DWord: Diagnostic mode status. Read by diag_check_status (0x582AC).");
+        count += labelComment(0xFFFF36F4, "dtc_enable_flag",
+            "Byte: DTC processing enable. Read by dtc_set_code/dtc_clear_code.");
+        count += labelComment(0xFFFFAE08, "diag_enable_A",
+            "Byte: Diagnostic enable A. Read by diag_check_enable_A (0x584BE).");
+        count += labelComment(0xFFFFAE09, "diag_enable_B",
+            "Byte: Diagnostic enable B. Read by diag_check_enable_B (0x584C8).");
+
+        // =====================================================================
+        // HIGH-REFERENCE RAM ADDRESSES (from literal pool scan, 4456 unique)
+        // =====================================================================
+        // Top addresses by reference count, identified by function context.
+        // These appear in virtually every disassembly trace.
+
+        // ── ADC / Sensor Processed Values (0xFFFF6xxx) ─────────────────────
+        count += labelComment(0xFFFF6624, "rpm_current",
+            "301 refs. Current RPM (float). Read by frontO2, AFL, CL/OL, timing, knock, boost, idle, diag. "
+            + "THE most-referenced RAM address in the ROM.");
+        count += labelComment(0xFFFF6350, "ect_current",
+            "205 refs. Coolant temperature (float). Read by PSE, AFC, AFL, timing, idle, diag. "
+            + "Second most-referenced address.");
+        count += labelComment(0xFFFF65FC, "engine_load_current",
+            "135 refs. Engine load (float, g/rev). Read by AFL, CL/OL transition, timing, fuel.");
+        count += labelComment(0xFFFF67EC, "atm_pressure_current",
+            "99 refs. Atmospheric/barometric pressure (float). Read by frontO2, PSE, AFL, timing.");
+        count += labelComment(0xFFFF65C0, "throttle_position",
+            "89 refs. Throttle position (float). Read by AFL, timing tasks 34/38, boost, idle.");
+        count += labelComment(0xFFFF63F8, "iat_current",
+            "86 refs. Intake air temperature (float). Read by AFL, CL/OL, timing.");
+        count += labelComment(0xFFFF6354, "ect_raw_adc",
+            "69 refs. ECT raw ADC value or secondary ECT (float). Read by PSE, AFL.");
+        count += labelComment(0xFFFF6364, "ect_startup",
+            "48 refs. ECT at engine start (float). Read by AFL, knock window setup.");
+        count += labelComment(0xFFFF63C4, "ect_compensation",
+            "43 refs. ECT compensation factor (float). Read by AFC, AFL, CL/OL.");
+        count += labelComment(0xFFFF6254, "maf_current",
+            "51 refs. MAF sensor value (float, g/s). Read by AFL pipeline.");
+        count += labelComment(0xFFFF6228, "maf_voltage",
+            "22 refs. MAF sensor voltage (float). Read by timing, fuel.");
+        count += labelComment(0xFFFF61CC, "vehicle_speed",
+            "56 refs. Vehicle speed (float). Read by timing, CL/OL, boost.");
+        count += labelComment(0xFFFF62DC, "fuel_rate",
+            "20 refs. Fuel injection rate (float). Read by timing, boost.");
+        count += labelComment(0xFFFF6898, "manifold_pressure",
+            "48 refs. Manifold pressure (float). Read by frontO2, PSE, CL/OL, base timing.");
+        count += labelComment(0xFFFF69F0, "boost_pressure",
+            "32 refs. Boost pressure (float). Read by AFL. GBR base (5 uses).");
+        count += labelComment(0xFFFF6C48, "battery_voltage",
+            "34 refs. Battery voltage (float). Read by injector latency, diag.");
+
+        // ── ADC / Sensor Raw + Status (0xFFFF61xx-0xFFFF65xx) ──────────────
+        count += labelComment(0xFFFF6155, "adc_channel_status",
+            "36 refs. ADC channel status/index (byte). GBR base (4 uses).");
+        count += labelComment(0xFFFF64D8, "throttle_raw",
+            "29 refs. Throttle raw ADC or secondary throttle.");
+        count += labelComment(0xFFFF65BD, "engine_state_byte",
+            "34 refs. Engine state byte (cranking/running/etc).");
+        count += labelComment(0xFFFF653C, "o2_sensor_voltage",
+            "19 refs. O2 sensor voltage or lambda value.");
+
+        // ── Sensor / Input Block (0xFFFF4xxx) ──────────────────────────────
+        count += labelComment(0xFFFF4130, "ignition_switch_state",
+            "77 refs. Ignition/key switch state. Read by frontO2, idle, boost. 4th most-referenced.");
+        count += labelComment(0xFFFF4024, "sensor_group_base",
+            "56 refs. Sensor processing group base. GBR base (1 use). Read by frontO2.");
+        count += labelComment(0xFFFF43FC, "sensor_misc_state",
+            "25 refs. Misc sensor state.");
+
+        // ── Calibration Mirror Area (0xFFFF3xxx) ───────────────────────────
+        count += labelComment(0xFFFF399E, "dtc_maturation_timer",
+            "118 refs. DTC maturation timer/counter. Read primarily by DTC framework. 4th most-referenced.");
+        count += labelComment(0xFFFF3B06, "dtc_debounce_state",
+            "92 refs. DTC debounce state. Read by diag/DTC framework.");
+        count += labelComment(0xFFFF3836, "dtc_monitor_state",
+            "76 refs. DTC monitor state/counter. Read by DTC framework.");
+        count += labelComment(0xFFFF3480, "cal_mirror_base",
+            "45 refs. Calibration mirror base. Referenced by various subsystems.");
+        count += labelComment(0xFFFF366C, "timer_counter_A",
+            "41 refs. Timer/counter A.");
+        count += labelComment(0xFFFF367C, "timer_counter_B",
+            "25 refs. Timer/counter B.");
+        count += labelComment(0xFFFF3674, "timer_counter_C",
+            "25 refs. Timer/counter C.");
+        count += labelComment(0xFFFF25CC, "system_tick_counter",
+            "48 refs. System tick/event counter.");
+
+        // ── Knock / FLKC Workspace (0xFFFF8xxx) ────────────────────────────
+        count += labelComment(0xFFFF837E, "idle_control_GBR",
+            "39 refs. Idle control GBR base (19 GBR uses). Primary GBR for task54_idle.");
+        count += labelComment(0xFFFF83AC, "idle_workspace_GBR",
+            "26 refs. Secondary idle GBR workspace (7 GBR uses).");
+        count += labelComment(0xFFFF8E98, "sensor_fault_flags",
+            "97 refs. Sensor fault flag register. Read by frontO2, AFL, idle. "
+            + "Copied to cl_inhibit (FFFF744B). 8th most-referenced.");
+        count += labelComment(0xFFFF85D7, "fuel_system_state",
+            "60 refs. Fuel system state byte. Read by AFC, AFL, idle.");
+        count += labelComment(0xFFFF81F0, "knock_state_base",
+            "30 refs. Knock state workspace base. GBR base (5 uses). Read by task11 knock.");
+        count += labelComment(0xFFFF895C, "injector_data",
+            "37 refs. Injector data (pulse width or duty). Read by timing tasks.");
+        count += labelComment(0xFFFF87E4, "timing_correction_A",
+            "26 refs. Timing correction value A.");
+        count += labelComment(0xFFFF8C9C, "timing_workspace_A",
+            "17 refs. Timing workspace variable.");
+        count += labelComment(0xFFFF8EA8, "sched_control_GBR",
+            "14 refs. Scheduler control GBR base (5 GBR uses).");
+        count += labelComment(0xFFFF8E46, "fuel_mode_flags",
+            "39 refs. Fuel mode flags register.");
+
+        // ── Diagnostic State (0xFFFFAxxx) ──────────────────────────────────
+        count += labelComment(0xFFFFAD52, "diag_session_state",
+            "107 refs. Diagnostic session state. Read by diag/DTC framework. 6th most-referenced.");
+        count += labelComment(0xFFFFADAC, "diag_request_state",
+            "69 refs. Diagnostic request/response state. Read by DTC framework.");
+        count += labelComment(0xFFFFACE0, "diag_output_buffer",
+            "32 refs. Diagnostic output buffer pointer.");
+        count += labelComment(0xFFFFAC6C, "diag_protocol_GBR",
+            "13 refs. Diagnostic protocol GBR base (4 GBR uses).");
+        count += labelComment(0xFFFFA160, "diag_monitor_GBR",
+            "21 refs. Diagnostic monitor GBR base (6 GBR uses).");
+        count += labelComment(0xFFFFA198, "egr_diag_state",
+            "13 refs. EGR/emissions diagnostic state. GBR base (3 uses).");
+        count += labelComment(0xFFFFAF3B, "comms_state_byte",
+            "36 refs. Communications protocol state byte.");
+        count += labelComment(0xFFFFAF60, "comms_buffer_ptr",
+            "Referenced in dtc_set_code literal pool. Comms buffer pointer.");
+
+        // ── Scheduler / System (0xFFFF9xxx) ────────────────────────────────
+        count += labelComment(0xFFFF9094, "sched_task_GBR",
+            "36 refs. Scheduler task GBR base (6 GBR uses).");
+        count += labelComment(0xFFFF9058, "sched_state_A",
+            "32 refs. Scheduler state variable A.");
+        count += labelComment(0xFFFF9FC6, "sched_timer_base",
+            "22 refs. Scheduler timer base. GBR base (3 uses).");
+        count += labelComment(0xFFFF9FA8, "sched_timer_B",
+            "17 refs. Scheduler timer variable B.");
+        count += labelComment(0xFFFF91C4, "sched_queue_base",
+            "8 refs. Scheduler queue base. GBR base (3 uses).");
+        count += labelComment(0xFFFF980C, "sched_periodic_GBR",
+            "7 refs. Scheduler periodic timer GBR base (4 GBR uses).");
+
+        // ── Fuel / Timing Working (0xFFFF7xxx) ─────────────────────────────
+        count += labelComment(0xFFFF77C8, "afc_output",
+            "19 refs. AFC output value. Referenced in fuel_correction_final.");
+        count += labelComment(0xFFFF798C, "timing_state_var",
+            "17 refs. Timing state variable. Referenced by task35_timing_corr.");
+        count += labelComment(0xFFFF7E90, "timing_output_A",
+            "25 refs. Timing output value A.");
+        count += labelComment(0xFFFF7D68, "timing_blend_state",
+            "19 refs. Timing blend state variable.");
+        count += labelComment(0xFFFF7FBC, "timing_final_advance",
+            "14 refs. Final timing advance value.");
+        count += labelComment(0xFFFF7C9D, "fuel_state_byte",
+            "32 refs. Fuel state byte/flag.");
+
+        // ── Peripheral I/O Region (0xFFFF5xxx) ─────────────────────────────
+        count += labelComment(0xFFFF5BE3, "peripheral_status",
+            "33 refs. Peripheral status register.");
+        count += labelComment(0xFFFF5C98, "peripheral_control_GBR",
+            "15 refs. Peripheral control GBR base (3 uses).");
+        count += labelComment(0xFFFF5FFC, "io_state_register",
+            "23 refs. I/O state register.");
+
+        // ── System State (0xFFFF2xxx) ──────────────────────────────────────
+        count += labelComment(0xFFFF2004, "system_init_flags",
+            "23 refs. System initialization flags.");
+
+        // =====================================================================
+        // SH7058 ON-CHIP PERIPHERAL REGISTERS (0xFFFF0000-0xFFFF1FFF)
+        // =====================================================================
+        // From SH7058 hardware manual + cross-reference with code context.
+        // Only addresses actually referenced in the ROM are labeled.
+
+        count += labelComment(0xFFFF0000, "SH7058_STBCR",
+            "9 refs. Standby Control Register (power management). Module stop control bits.");
+        count += labelComment(0xFFFF0004, "SH7058_STBCR2",
+            "2 refs. Standby Control Register 2. Additional module stop bits.");
+        count += labelComment(0xFFFF0008, "SH7058_STBCR3",
+            "2 refs. Standby Control Register 3. Peripheral clock gating.");
+        count += labelComment(0xFFFF0020, "SH7058_SYSCR",
+            "2 refs. System Control Register. Bus width, endianness, clock divider.");
+        count += labelComment(0xFFFF1230, "SH7058_TIER_MTU0",
+            "3 refs. Timer Interrupt Enable Register (MTU channel 0). Used for periodic interrupts.");
+        count += labelComment(0xFFFF12B0, "SH7058_SCI_SMR",
+            "2 refs. Serial Mode Register (SCI). Baud rate, parity, data length config.");
+        count += labelComment(0xFFFF12B4, "SH7058_SCI_BRR",
+            "1 ref. Bit Rate Register (SCI). Baud rate divisor.");
+        count += labelComment(0xFFFF12B5, "SH7058_SCI_SCR",
+            "1 ref. Serial Control Register (SCI). TX/RX enable, interrupt enable.");
+        count += labelComment(0xFFFF12B8, "SH7058_SCI_TDR",
+            "5 refs. Transmit Data Register (SCI). Write byte to send.");
+        count += labelComment(0xFFFF12C8, "SH7058_SCI_SSR",
+            "2 refs. Serial Status Register (SCI). TX empty, RX full, error flags.");
+
+        // =====================================================================
+        // THUNK FUNCTIONS — Resolved Targets
+        // =====================================================================
+        // 378 mov.l+jmp thunks found, 64 resolve to known functions.
+        // Most common thunk targets:
+        //   interrupt_restore (15 thunks) — tail-call optimization from ISR handlers
+        //   desc_read_float_safe (5+ thunks) — inlined descriptor read wrappers
+        //   check_cl_active, check_engine_running — mode-check wrappers
+        //
+        // Full thunk resolution in disassembly/thunk_resolution.txt (359 lines)
+        //
+        // NOTE: Thunks are NOT labeled here individually — they are artifacts of
+        // the compiler's branch range optimization. In Ghidra, use "Follow Thunk"
+        // to resolve them. The 64 resolved thunks point to already-labeled functions.
+
+        // =====================================================================
+        // DESCRIPTOR-FUNCTION CROSS-REFERENCE SUMMARY
+        // =====================================================================
+        // Full cross-reference in disassembly/desc_func_xref.txt (1495 lines)
+        //
+        // Functions with most calibration descriptors:
+        //   afl_pipeline:           61 descriptors (17x18, 12x13, 16x6 2D tables)
+        //   task33_timing_ws_init:  30 descriptors
+        //   PSE_code:               22 descriptors
+        //   timing_knock:           20 descriptors
+        //   task37_timing_multiaxis:19 descriptors
+        //   task32_timing_blend:    14 descriptors
+        //   frontO2_area:           12 descriptors
+        //   knock_area:             12 descriptors
+        //   fuel_pw_calc:           11 descriptors
+        //   task36_timing_percond:  11 descriptors
+        //   task34_timing_throttle:  8 descriptors
+        //   afc_pi_output:           7 descriptors
+        //   task30_base_timing:      6 descriptors
+        //   task48_final_timing:     5 descriptors (all 5x3 2D)
+
+
+        // ============================================================
+        // SH7058 INTERRUPT ARCHITECTURE
+        // All peripheral IRQs share one generic ISR entry at 0x0BAC
+        // 0x0BAC: saves R0-R7,PR,MACH,MACL; calls 0x0F4C; restores; RTE
+        // 0x0F4C: reads interrupt ID; dispatches via table at 0x0E5EC
+        // 0x0EE4: interrupt ID resolver (reads INTEVT/priority register)
+        // 0x0D78: interrupt acknowledge/clear
+        // 0x0BFA: exception trap (illegal instr/addr error = infinite loop)
+        // Exception vector table: 0x000-0x033 (13 vectors x 4 bytes)
+        //   0x000: initial PC = 0x000C0C (main entry)
+        //   0x004: initial SP = 0xFFFFBFA0 (RAM top)
+        //   0x010-0x020: all exceptions -> 0x0BFA (trap loop)
+        //   0x02C: peripheral IRQ vector -> 0x0BAC (generic ISR)
+        // ============================================================
+
+        // Exception vector table entries (ROM 0x000-0x033)
+        count += labelComment(0x000000L, "vtbl_reset_pc", "Power-on reset initial PC = 0x000C0C (main entry) [val=0x00000C0C]");
+        count += labelComment(0x000004L, "vtbl_reset_sp", "Power-on reset initial SP = 0xFFFFBFA0 (RAM top) [val=0xFFFFBFA0]");
+        count += labelComment(0x000008L, "vtbl_mreset_pc", "Manual reset initial PC = 0x000C0C [val=0x00000C0C]");
+        count += labelComment(0x00000CL, "vtbl_mreset_sp", "Manual reset initial SP = 0xFFFFBFA0 [val=0xFFFFBFA0]");
+        count += labelComment(0x000010L, "vtbl_illegal_instr", "Illegal instruction -> 0x0BFA trap [val=0x00000BFA]");
+        count += labelComment(0x000014L, "vtbl_illegal_slot", "Illegal slot instruction -> 0x0BFA trap [val=0x00000BFA]");
+        count += labelComment(0x000018L, "vtbl_cpu_addr_err", "CPU address error -> 0x0BFA trap [val=0x00000BFA]");
+        count += labelComment(0x00001CL, "vtbl_dma_addr_err", "DMA bus error -> 0x0BFA trap [val=0x00000BFA]");
+        count += labelComment(0x000020L, "vtbl_nmi", "NMI -> 0x0BFA trap [val=0x00000BFA]");
+        count += labelComment(0x000024L, "vtbl_user_break", "User break/debug -> 0x0BFA trap [val=0x00000BFA]");
+        count += labelComment(0x00002CL, "vtbl_periph_irq", "All peripheral IRQs -> 0x0BAC generic ISR [val=0x00000BAC]");
+
+        // ISR dispatch infrastructure
+        count += labelComment(0x000BACL, "isr_generic_handler",
+            "Generic peripheral ISR: saves R0-R7/PR/MACH/MACL, calls isr_dispatch, RTE");
+        count += labelComment(0x000BF6L, "isr_generic_rte",
+            "Generic ISR RTE (return from interrupt) after register restore");
+        count += labelComment(0x000BFAL, "exc_trap_infinite_loop",
+            "Exception trap: illegal instruction / address error (infinite loop)");
+        count += labelComment(0x000F4CL, "isr_dispatch_manager",
+            "ISR sub-dispatch: identifies interrupt source, calls handler from isr_dispatch_table");
+        count += labelComment(0x000EE4L, "isr_intevt_resolver",
+            "Reads INTEVT/priority register to identify interrupt source, returns index");
+        count += labelComment(0x000D78L, "isr_int_acknowledge",
+            "Interrupt acknowledge/clear function");
+        count += labelComment(0x000E5ECL, "isr_dispatch_table",
+            "Interrupt dispatch table: 54 function pointers (4 bytes each)");
+
+        // ISR dispatch table entry labels (table at 0x0E5EC, 54 entries)
+        // Entry[N] address = 0x0E5EC + N*4 -> handler address
+        count += labelComment(0x00E5ECL, "dtbl_isr_handler_0", "Dispatch table[0] -> 0x010A46");
+        count += labelComment(0x010A46L, "isr_handler_0", "ISR dispatch table entry 0");
+        count += labelComment(0x00E5F0L, "dtbl_isr_handler_1", "Dispatch table[1] -> 0x00FC04");
+        count += labelComment(0x00FC04L, "isr_handler_1", "ISR dispatch table entry 1");
+        count += labelComment(0x00E5F4L, "dtbl_isr_handler_2", "Dispatch table[2] -> 0x005840");
+        count += labelComment(0x005840L, "isr_handler_2", "ISR dispatch table entry 2");
+        count += labelComment(0x00E5F8L, "dtbl_isr_handler_3", "Dispatch table[3] -> 0x00D658");
+        count += labelComment(0x00D658L, "isr_handler_3", "ISR dispatch table entry 3");
+        count += labelComment(0x00E5FCL, "dtbl_isr_handler_4", "Dispatch table[4] -> 0x00CBAC");
+        count += labelComment(0x00CBACL, "isr_handler_4", "ISR dispatch table entry 4");
+        count += labelComment(0x00E600L, "dtbl_isr_handler_5", "Dispatch table[5] -> 0x04907C");
+        count += labelComment(0x04907CL, "isr_handler_5", "ISR dispatch table entry 5");
+        count += labelComment(0x00E604L, "dtbl_isr_handler_6", "Dispatch table[6] -> 0x009A58");
+        count += labelComment(0x009A58L, "isr_handler_6", "ISR dispatch table entry 6");
+        count += labelComment(0x00E608L, "dtbl_isr_handler_7", "Dispatch table[7] -> 0x00D268");
+        count += labelComment(0x00D268L, "isr_handler_7", "ISR dispatch table entry 7");
+        count += labelComment(0x00E60CL, "dtbl_isr_handler_8", "Dispatch table[8] -> 0x00CBEE");
+        count += labelComment(0x00CBEEL, "isr_handler_8", "ISR dispatch table entry 8");
+        count += labelComment(0x00E610L, "dtbl_isr_handler_9", "Dispatch table[9] -> 0x0035A4");
+        count += labelComment(0x0035A4L, "isr_handler_9", "ISR dispatch table entry 9");
+        count += labelComment(0x00E614L, "dtbl_isr_handler_10", "Dispatch table[10] -> 0x00FE22");
+        count += labelComment(0x00FE22L, "isr_handler_10", "ISR dispatch table entry 10");
+        count += labelComment(0x00E618L, "dtbl_isr_handler_11", "Dispatch table[11] -> 0x00A878");
+        count += labelComment(0x00A878L, "isr_handler_11", "ISR dispatch table entry 11");
+        count += labelComment(0x00E61CL, "dtbl_isr_handler_12", "Dispatch table[12] -> 0x00D940");
+        count += labelComment(0x00D940L, "isr_handler_12", "ISR dispatch table entry 12");
+        count += labelComment(0x00E620L, "dtbl_isr_handler_13", "Dispatch table[13] -> 0x009A14");
+        count += labelComment(0x009A14L, "isr_handler_13", "ISR dispatch table entry 13");
+        count += labelComment(0x00E624L, "dtbl_isr_handler_14", "Dispatch table[14] -> 0x008528");
+        count += labelComment(0x008528L, "isr_handler_14", "ISR dispatch table entry 14");
+        count += labelComment(0x00E628L, "dtbl_isr_task_scheduler", "Dispatch table[15] -> 0x04A94C");
+        count += labelComment(0x04A94CL, "isr_task_scheduler", "ISR dispatch table entry 15");
+        count += labelComment(0x00E62CL, "dtbl_isr_handler_16", "Dispatch table[16] -> 0x04AA58");
+        count += labelComment(0x04AA58L, "isr_handler_16", "ISR dispatch table entry 16");
+        count += labelComment(0x00E630L, "dtbl_isr_handler_17", "Dispatch table[17] -> 0x009A34");
+        count += labelComment(0x009A34L, "isr_handler_17", "ISR dispatch table entry 17");
+        count += labelComment(0x00E634L, "dtbl_isr_handler_18", "Dispatch table[18] -> 0x0085AC");
+        count += labelComment(0x0085ACL, "isr_handler_18", "ISR dispatch table entry 18");
+        count += labelComment(0x00E638L, "dtbl_isr_handler_19", "Dispatch table[19] -> 0x00D3DC");
+        count += labelComment(0x00D3DCL, "isr_handler_19", "ISR dispatch table entry 19");
+        count += labelComment(0x00E63CL, "dtbl_isr_handler_20", "Dispatch table[20] -> 0x010D58");
+        count += labelComment(0x010D58L, "isr_handler_20", "ISR dispatch table entry 20");
+        count += labelComment(0x00E640L, "dtbl_isr_rcan0", "Dispatch table[21] -> 0x04793C");
+        count += labelComment(0x04793CL, "isr_rcan0", "ISR dispatch table entry 21");
+        count += labelComment(0x00E644L, "dtbl_isr_rcan1", "Dispatch table[22] -> 0x048732");
+        count += labelComment(0x048732L, "isr_rcan1", "ISR dispatch table entry 22");
+        count += labelComment(0x00E648L, "dtbl_isr_handler_23", "Dispatch table[23] -> 0x01076A");
+        count += labelComment(0x01076AL, "isr_handler_23", "ISR dispatch table entry 23");
+        count += labelComment(0x00E64CL, "dtbl_isr_handler_24", "Dispatch table[24] -> 0x004BCA");
+        count += labelComment(0x004BCAL, "isr_handler_24", "ISR dispatch table entry 24");
+        count += labelComment(0x00E650L, "dtbl_isr_handler_25", "Dispatch table[25] -> 0x010124");
+        count += labelComment(0x010124L, "isr_handler_25", "ISR dispatch table entry 25");
+        count += labelComment(0x00E654L, "dtbl_isr_handler_26", "Dispatch table[26] -> 0x047B66");
+        count += labelComment(0x047B66L, "isr_handler_26", "ISR dispatch table entry 26");
+        count += labelComment(0x00E658L, "dtbl_isr_handler_27", "Dispatch table[27] -> 0x049A7A");
+        count += labelComment(0x049A7AL, "isr_handler_27", "ISR dispatch table entry 27");
+        count += labelComment(0x00E65CL, "dtbl_isr_handler_28", "Dispatch table[28] -> 0x00C36C");
+        count += labelComment(0x00C36CL, "isr_handler_28", "ISR dispatch table entry 28");
+        count += labelComment(0x00E660L, "dtbl_isr_handler_29", "Dispatch table[29] -> 0x00A844");
+        count += labelComment(0x00A844L, "isr_handler_29", "ISR dispatch table entry 29");
+        count += labelComment(0x00E664L, "dtbl_isr_handler_30", "Dispatch table[30] -> 0x049BA4");
+        count += labelComment(0x049BA4L, "isr_handler_30", "ISR dispatch table entry 30");
+        count += labelComment(0x00E668L, "dtbl_isr_handler_31", "Dispatch table[31] -> 0x00C370");
+        count += labelComment(0x00C370L, "isr_handler_31", "ISR dispatch table entry 31");
+        count += labelComment(0x00E66CL, "dtbl_isr_handler_32", "Dispatch table[32] -> 0x005798");
+        count += labelComment(0x005798L, "isr_handler_32", "ISR dispatch table entry 32");
+        count += labelComment(0x00E670L, "dtbl_isr_handler_33", "Dispatch table[33] -> 0x049CF0");
+        count += labelComment(0x049CF0L, "isr_handler_33", "ISR dispatch table entry 33");
+        count += labelComment(0x00E674L, "dtbl_isr_handler_34", "Dispatch table[34] -> 0x00D4FC");
+        count += labelComment(0x00D4FCL, "isr_handler_34", "ISR dispatch table entry 34");
+        count += labelComment(0x00E678L, "dtbl_isr_handler_35", "Dispatch table[35] -> 0x00812C");
+        count += labelComment(0x00812CL, "isr_handler_35", "ISR dispatch table entry 35");
+        count += labelComment(0x00E67CL, "dtbl_isr_handler_36", "Dispatch table[36] -> 0x00ACFC");
+        count += labelComment(0x00ACFCL, "isr_handler_36", "ISR dispatch table entry 36");
+        count += labelComment(0x00E680L, "dtbl_isr_handler_37", "Dispatch table[37] -> 0x04A03E");
+        count += labelComment(0x04A03EL, "isr_handler_37", "ISR dispatch table entry 37");
+        count += labelComment(0x00E684L, "dtbl_isr_handler_38", "Dispatch table[38] -> 0x00658C");
+        count += labelComment(0x00658CL, "isr_handler_38", "ISR dispatch table entry 38");
+        count += labelComment(0x00E688L, "dtbl_isr_handler_39", "Dispatch table[39] -> 0x005980");
+        count += labelComment(0x005980L, "isr_handler_39", "ISR dispatch table entry 39");
+        count += labelComment(0x00E68CL, "dtbl_isr_handler_40", "Dispatch table[40] -> 0x0081C8");
+        count += labelComment(0x0081C8L, "isr_handler_40", "ISR dispatch table entry 40");
+        count += labelComment(0x00E690L, "dtbl_isr_handler_41", "Dispatch table[41] -> 0x04A420");
+        count += labelComment(0x04A420L, "isr_handler_41", "ISR dispatch table entry 41");
+        count += labelComment(0x00E694L, "dtbl_isr_handler_42", "Dispatch table[42] -> 0x04A674");
+        count += labelComment(0x04A674L, "isr_handler_42", "ISR dispatch table entry 42");
+        count += labelComment(0x00E698L, "dtbl_isr_handler_43", "Dispatch table[43] -> 0x04A6C6");
+        count += labelComment(0x04A6C6L, "isr_handler_43", "ISR dispatch table entry 43");
+        count += labelComment(0x00E69CL, "dtbl_isr_handler_44", "Dispatch table[44] -> 0x04A6FA");
+        count += labelComment(0x04A6FAL, "isr_handler_44", "ISR dispatch table entry 44");
+        count += labelComment(0x00E6A0L, "dtbl_isr_handler_45", "Dispatch table[45] -> 0x00D8D0");
+        count += labelComment(0x00D8D0L, "isr_handler_45", "ISR dispatch table entry 45");
+        count += labelComment(0x00E6A4L, "dtbl_isr_handler_46", "Dispatch table[46] -> 0x04AE7C");
+        count += labelComment(0x04AE7CL, "isr_handler_46", "ISR dispatch table entry 46");
+        count += labelComment(0x00E6A8L, "dtbl_isr_handler_47", "Dispatch table[47] -> 0x0099E4");
+        count += labelComment(0x0099E4L, "isr_handler_47", "ISR dispatch table entry 47");
+        count += labelComment(0x00E6ACL, "dtbl_isr_handler_48", "Dispatch table[48] -> 0x00D1F4");
+        count += labelComment(0x00D1F4L, "isr_handler_48", "ISR dispatch table entry 48");
+        count += labelComment(0x00E6B0L, "dtbl_isr_handler_49", "Dispatch table[49] -> 0x0084D8");
+        count += labelComment(0x0084D8L, "isr_handler_49", "ISR dispatch table entry 49");
+        count += labelComment(0x00E6B4L, "dtbl_isr_handler_50", "Dispatch table[50] -> 0x00A694");
+        count += labelComment(0x00A694L, "isr_handler_50", "ISR dispatch table entry 50");
+        count += labelComment(0x00E6B8L, "dtbl_isr_handler_51", "Dispatch table[51] -> 0x00BB32");
+        count += labelComment(0x00BB32L, "isr_handler_51", "ISR dispatch table entry 51");
+        count += labelComment(0x00E6BCL, "dtbl_isr_handler_52", "Dispatch table[52] -> 0x007D12");
+        count += labelComment(0x007D12L, "isr_handler_52", "ISR dispatch table entry 52");
+        count += labelComment(0x00E6C0L, "dtbl_isr_handler_53", "Dispatch table[53] -> 0x04AE82");
+        count += labelComment(0x04AE82L, "isr_handler_53", "ISR dispatch table entry 53");
+
+        // ============================================================
+        // CALIBRATION DESCRIPTOR LABELS (760 total, auto-generated)
+        // Format: desc_<type>_<dtype>_<size>[_<addr>] -> descriptor struct
+        // Each descriptor struct points to axis data + calibration table
+        // ============================================================
+
+        // --- 1D_AtmPressure (6 descriptors) ---
+        count += label(0x0AABB8L, "desc_1D_AtmPressure_u8_4");
+        count += label(0x0AAEF4L, "desc_1D_AtmPressure_u8_8");
+        count += label(0x0AB1A4L, "desc_1D_AtmPressure_u8_6_AB1A4");
+        count += label(0x0AB1B8L, "desc_1D_AtmPressure_u8_6_AB1B8");
+        count += label(0x0AB444L, "desc_1D_AtmPressure_i16_7");
+        count += label(0x0ADDB8L, "desc_1D_AtmPressure_i16_6");
+
+        // --- 1D_Boost (26 descriptors) ---
+        count += label(0x0AA820L, "desc_1D_Boost_u8_5");
+        count += label(0x0AB430L, "desc_1D_Boost_i16_16_AB430");
+        count += label(0x0AB674L, "desc_1D_Boost_u8_8");
+        count += label(0x0AC2D0L, "desc_1D_Boost_i16_16_AC2D0");
+        count += label(0x0AC2E8L, "desc_1D_Boost_i16_16_AC2E8");
+        count += label(0x0AC300L, "desc_1D_Boost_i16_16_AC300");
+        count += label(0x0AC318L, "desc_1D_Boost_i16_16_AC318");
+        count += label(0x0AC498L, "desc_1D_Boost_i16_16_AC498");
+        count += label(0x0AC56CL, "desc_1D_Boost_i16_9_AC56C");
+        count += label(0x0AC594L, "desc_1D_Boost_i16_9_AC594");
+        count += label(0x0AC698L, "desc_1D_Boost_i16_16_AC698");
+        count += label(0x0AC6ACL, "desc_1D_Boost_i16_16_AC6AC");
+        count += label(0x0AC6D4L, "desc_1D_Boost_i16_16_AC6D4");
+        count += label(0x0ACCBCL, "desc_1D_Boost_u8_11_ACCBC");
+        count += label(0x0ACCD0L, "desc_1D_Boost_u8_11_ACCD0");
+        count += label(0x0ACCE4L, "desc_1D_Boost_u8_11_ACCE4");
+        count += label(0x0ACCF8L, "desc_1D_Boost_u8_11_ACCF8");
+        count += label(0x0ACD0CL, "desc_1D_Boost_u8_11_ACD0C");
+        count += label(0x0ACD20L, "desc_1D_Boost_u8_11_ACD20");
+        count += label(0x0AD37CL, "desc_1D_Boost_u8_18");
+        count += label(0x0AD47CL, "desc_1D_Boost_f32_16_AD47C");
+        count += label(0x0AD494L, "desc_1D_Boost_f32_16_AD494");
+        count += label(0x0AD4ACL, "desc_1D_Boost_f32_16_AD4AC");
+        count += label(0x0ADAFCL, "desc_1D_Boost_i16_8");
+        count += label(0x0ADDCCL, "desc_1D_Boost_i16_7");
+        count += label(0x0AE14CL, "desc_1D_Boost_f32_16_AE14C");
+
+        // --- 1D_Degrees (3 descriptors) ---
+        count += label(0x0AAB18L, "desc_1D_Degrees_u8_15");
+        count += label(0x0AEE80L, "desc_1D_Degrees_u8_12_AEE80");
+        count += label(0x0AEE94L, "desc_1D_Degrees_u8_12_AEE94");
+
+        // --- 1D_ECT (258 descriptors) ---
+        count += label(0x0AA888L, "desc_1D_ECT_i16_16_AA888");
+        count += label(0x0AA89CL, "desc_1D_ECT_i16_16_AA89C");
+        count += label(0x0AA8B0L, "desc_1D_ECT_i16_16_AA8B0");
+        count += label(0x0AA8C4L, "desc_1D_ECT_i16_16_AA8C4");
+        count += label(0x0AA8D8L, "desc_1D_ECT_i16_16_AA8D8");
+        count += label(0x0AA8ECL, "desc_1D_ECT_i16_16_AA8EC");
+        count += label(0x0AA900L, "desc_1D_ECT_i16_16_AA900");
+        count += label(0x0AADECL, "desc_1D_ECT_u8_16_AADEC");
+        count += label(0x0AAE00L, "desc_1D_ECT_u8_16_AAE00");
+        count += label(0x0AAE28L, "desc_1D_ECT_u8_16_AAE28");
+        count += label(0x0AAE50L, "desc_1D_ECT_u8_16_AAE50");
+        count += label(0x0AAEA0L, "desc_1D_ECT_u8_16_AAEA0");
+        count += label(0x0AAEC0L, "desc_1D_ECT_u8_16_AAEC0");
+        count += label(0x0AAEE0L, "desc_1D_ECT_u8_16_AAEE0");
+        count += label(0x0AAF48L, "desc_1D_ECT_u8_16_AAF48");
+        count += label(0x0AAF5CL, "desc_1D_ECT_u8_16_AAF5C");
+        count += label(0x0AAF70L, "desc_1D_ECT_u8_16_AAF70");
+        count += label(0x0AB41CL, "desc_1D_ECT_i16_16_AB41C");
+        count += label(0x0AB7CCL, "desc_1D_ECT_f32_16_AB7CC");
+        count += label(0x0AB7E4L, "desc_1D_ECT_f32_16_AB7E4");
+        count += label(0x0AB7FCL, "desc_1D_ECT_f32_16_AB7FC");
+        count += label(0x0AB994L, "desc_1D_ECT_f32_16_AB994");
+        count += label(0x0AB9ACL, "desc_1D_ECT_f32_16_AB9AC");
+        count += label(0x0AB9C4L, "desc_1D_ECT_f32_16_AB9C4");
+        count += label(0x0AC2B0L, "desc_1D_ECT_f32_16_AC2B0");
+        count += label(0x0AC338L, "desc_1D_ECT_i16_16_AC338");
+        count += label(0x0AC374L, "desc_1D_ECT_i16_5");
+        count += label(0x0AC388L, "desc_1D_ECT_i16_16_AC388");
+        count += label(0x0AC3A0L, "desc_1D_ECT_i16_16_AC3A0");
+        count += label(0x0AC3B8L, "desc_1D_ECT_i16_16_AC3B8");
+        count += label(0x0AC3CCL, "desc_1D_ECT_i16_16_AC3CC");
+        count += label(0x0AC3E0L, "desc_1D_ECT_i16_16_AC3E0");
+        count += label(0x0AC41CL, "desc_1D_ECT_i16_16_AC41C");
+        count += label(0x0AC430L, "desc_1D_ECT_i16_16_AC430");
+        count += label(0x0AC470L, "desc_1D_ECT_i16_16_AC470");
+        count += label(0x0AC484L, "desc_1D_ECT_i16_16_AC484");
+        count += label(0x0AC620L, "desc_1D_ECT_i16_16_AC620");
+        count += label(0x0AC648L, "desc_1D_ECT_i16_16_AC648");
+        count += label(0x0AC65CL, "desc_1D_ECT_i16_16_AC65C");
+        count += label(0x0AC670L, "desc_1D_ECT_i16_16_AC670");
+        count += label(0x0AC684L, "desc_1D_ECT_i16_16_AC684");
+        count += label(0x0AC6C0L, "desc_1D_ECT_i16_16_AC6C0");
+        count += label(0x0AC6E8L, "desc_1D_ECT_i16_16_AC6E8");
+        count += label(0x0AC774L, "desc_1D_ECT_i16_16_AC774");
+        count += label(0x0AC7D8L, "desc_1D_ECT_i16_16_AC7D8");
+        count += label(0x0AC7ECL, "desc_1D_ECT_i16_16_AC7EC");
+        count += label(0x0AC804L, "desc_1D_ECT_u8_16_AC804");
+        count += label(0x0AC818L, "desc_1D_ECT_u8_16_AC818");
+        count += label(0x0AC82CL, "desc_1D_ECT_u8_16_AC82C");
+        count += label(0x0AC840L, "desc_1D_ECT_u8_16_AC840");
+        count += label(0x0AC854L, "desc_1D_ECT_u8_16_AC854");
+        count += label(0x0AC868L, "desc_1D_ECT_u8_16_AC868");
+        count += label(0x0AC87CL, "desc_1D_ECT_u8_16_AC87C");
+        count += label(0x0AC890L, "desc_1D_ECT_u8_16_AC890");
+        count += label(0x0AC8A4L, "desc_1D_ECT_u8_16_AC8A4");
+        count += label(0x0AC8B8L, "desc_1D_ECT_u8_16_AC8B8");
+        count += label(0x0AC8D0L, "desc_1D_ECT_u8_16_AC8D0");
+        count += label(0x0AC8E4L, "desc_1D_ECT_u8_16_AC8E4");
+        count += label(0x0AC8F8L, "desc_1D_ECT_u8_16_AC8F8");
+        count += label(0x0AC90CL, "desc_1D_ECT_u8_16_AC90C");
+        count += label(0x0AC920L, "desc_1D_ECT_u8_16_AC920");
+        count += label(0x0AC934L, "desc_1D_ECT_u8_16_AC934");
+        count += label(0x0AC948L, "desc_1D_ECT_u8_16_AC948");
+        count += label(0x0AC95CL, "desc_1D_ECT_u8_16_AC95C");
+        count += label(0x0AC970L, "desc_1D_ECT_u8_16_AC970");
+        count += label(0x0AC984L, "desc_1D_ECT_u8_16_AC984");
+        count += label(0x0AC998L, "desc_1D_ECT_u8_16_AC998");
+        count += label(0x0AC9B8L, "desc_1D_ECT_u8_16_AC9B8");
+        count += label(0x0AC9CCL, "desc_1D_ECT_u8_16_AC9CC");
+        count += label(0x0AC9E0L, "desc_1D_ECT_u8_16_AC9E0");
+        count += label(0x0AC9F4L, "desc_1D_ECT_u8_16_AC9F4");
+        count += label(0x0ACA08L, "desc_1D_ECT_u8_16_ACA08");
+        count += label(0x0ACA1CL, "desc_1D_ECT_u8_16_ACA1C");
+        count += label(0x0ACA30L, "desc_1D_ECT_u8_16_ACA30");
+        count += label(0x0ACA44L, "desc_1D_ECT_u8_16_ACA44");
+        count += label(0x0ACA58L, "desc_1D_ECT_u8_16_ACA58");
+        count += label(0x0ACA6CL, "desc_1D_ECT_u8_16_ACA6C");
+        count += label(0x0ACA8CL, "desc_1D_ECT_u8_16_ACA8C");
+        count += label(0x0ACAA0L, "desc_1D_ECT_u8_16_ACAA0");
+        count += label(0x0ACAB4L, "desc_1D_ECT_u8_16_ACAB4");
+        count += label(0x0ACAC8L, "desc_1D_ECT_u8_16_ACAC8");
+        count += label(0x0ACADCL, "desc_1D_ECT_u8_16_ACADC");
+        count += label(0x0ACAF0L, "desc_1D_ECT_u8_16_ACAF0");
+        count += label(0x0ACB04L, "desc_1D_ECT_u8_16_ACB04");
+        count += label(0x0ACB18L, "desc_1D_ECT_u8_16_ACB18");
+        count += label(0x0ACB2CL, "desc_1D_ECT_u8_16_ACB2C");
+        count += label(0x0ACB40L, "desc_1D_ECT_u8_16_ACB40");
+        count += label(0x0ACB54L, "desc_1D_ECT_u8_16_ACB54");
+        count += label(0x0ACB68L, "desc_1D_ECT_u8_16_ACB68");
+        count += label(0x0ACB7CL, "desc_1D_ECT_u8_16_ACB7C");
+        count += label(0x0ACB90L, "desc_1D_ECT_u8_16_ACB90");
+        count += label(0x0ACBCCL, "desc_1D_ECT_u8_16_ACBCC");
+        count += label(0x0ACBE0L, "desc_1D_ECT_u8_16_ACBE0");
+        count += label(0x0ACC1CL, "desc_1D_ECT_u8_16_ACC1C");
+        count += label(0x0ACC30L, "desc_1D_ECT_u8_16_ACC30");
+        count += label(0x0ACC44L, "desc_1D_ECT_u8_16_ACC44");
+        count += label(0x0ACC58L, "desc_1D_ECT_u8_16_ACC58");
+        count += label(0x0ACD48L, "desc_1D_ECT_u8_16_ACD48");
+        count += label(0x0ACD68L, "desc_1D_ECT_u8_16_ACD68");
+        count += label(0x0ACD7CL, "desc_1D_ECT_u8_16_ACD7C");
+        count += label(0x0ACD90L, "desc_1D_ECT_u8_16_ACD90");
+        count += label(0x0ACDA4L, "desc_1D_ECT_u8_16_ACDA4");
+        count += label(0x0ACDB8L, "desc_1D_ECT_u8_16_ACDB8");
+        count += label(0x0ACDCCL, "desc_1D_ECT_u8_16_ACDCC");
+        count += label(0x0ACDE0L, "desc_1D_ECT_u8_16_ACDE0");
+        count += label(0x0ACDF4L, "desc_1D_ECT_u8_16_ACDF4");
+        count += label(0x0ACE80L, "desc_1D_ECT_u8_16_ACE80");
+        count += label(0x0ACEA0L, "desc_1D_ECT_u8_16_ACEA0");
+        count += label(0x0ACEC8L, "desc_1D_ECT_u8_16_ACEC8");
+        count += label(0x0ACF08L, "desc_1D_ECT_u8_16_ACF08");
+        count += label(0x0AD054L, "desc_1D_ECT_u8_16_AD054");
+        count += label(0x0AD118L, "desc_1D_ECT_u8_7_AD118");
+        count += label(0x0AD12CL, "desc_1D_ECT_u8_7_AD12C");
+        count += label(0x0AD140L, "desc_1D_ECT_u8_7_AD140");
+        count += label(0x0AD154L, "desc_1D_ECT_u8_7_AD154");
+        count += label(0x0AD1B8L, "desc_1D_ECT_u8_7_AD1B8");
+        count += label(0x0AD1CCL, "desc_1D_ECT_u8_7_AD1CC");
+        count += label(0x0AD1E0L, "desc_1D_ECT_u8_7_AD1E0");
+        count += label(0x0AD1F4L, "desc_1D_ECT_u8_7_AD1F4");
+        count += label(0x0AD258L, "desc_1D_ECT_u8_16_AD258");
+        count += label(0x0AD26CL, "desc_1D_ECT_u8_16_AD26C");
+        count += label(0x0AD280L, "desc_1D_ECT_u8_16_AD280");
+        count += label(0x0AD294L, "desc_1D_ECT_u8_16_AD294");
+        count += label(0x0AD2A8L, "desc_1D_ECT_u8_16_AD2A8");
+        count += label(0x0AD2BCL, "desc_1D_ECT_u8_16_AD2BC");
+        count += label(0x0AD2D0L, "desc_1D_ECT_u8_16_AD2D0");
+        count += label(0x0AD2E4L, "desc_1D_ECT_u8_16_AD2E4");
+        count += label(0x0AD2F8L, "desc_1D_ECT_u8_16_AD2F8");
+        count += label(0x0AD30CL, "desc_1D_ECT_u8_16_AD30C");
+        count += label(0x0AD320L, "desc_1D_ECT_u8_16_AD320");
+        count += label(0x0AD334L, "desc_1D_ECT_u8_16_AD334");
+        count += label(0x0AD348L, "desc_1D_ECT_u8_16_AD348");
+        count += label(0x0AD35CL, "desc_1D_ECT_u8_16_AD35C");
+        count += label(0x0AD390L, "desc_1D_ECT_u8_16_AD390");
+        count += label(0x0AD3A4L, "desc_1D_ECT_u8_16_AD3A4");
+        count += label(0x0AD3B8L, "desc_1D_ECT_u8_16_AD3B8");
+        count += label(0x0AD3D8L, "desc_1D_ECT_u8_16_AD3D8");
+        count += label(0x0AD3ECL, "desc_1D_ECT_u8_16_AD3EC");
+        count += label(0x0AD420L, "desc_1D_ECT_u8_16_AD420");
+        count += label(0x0AD4C4L, "desc_1D_ECT_f32_16_AD4C4");
+        count += label(0x0ADA98L, "desc_1D_ECT_i16_16_ADA98");
+        count += label(0x0ADAACL, "desc_1D_ECT_i16_16_ADAAC");
+        count += label(0x0ADB4CL, "desc_1D_ECT_i16_16_ADB4C");
+        count += label(0x0ADB60L, "desc_1D_ECT_i16_16_ADB60");
+        count += label(0x0ADB74L, "desc_1D_ECT_i16_16_ADB74");
+        count += label(0x0ADB88L, "desc_1D_ECT_i16_16_ADB88");
+        count += label(0x0ADB9CL, "desc_1D_ECT_i16_16_ADB9C");
+        count += label(0x0ADBB0L, "desc_1D_ECT_i16_16_ADBB0");
+        count += label(0x0ADBC4L, "desc_1D_ECT_i16_16_ADBC4");
+        count += label(0x0ADBD8L, "desc_1D_ECT_i16_16_ADBD8");
+        count += label(0x0ADBECL, "desc_1D_ECT_i16_16_ADBEC");
+        count += label(0x0ADC00L, "desc_1D_ECT_i16_16_ADC00");
+        count += label(0x0ADC14L, "desc_1D_ECT_i16_16_ADC14");
+        count += label(0x0ADD90L, "desc_1D_ECT_i16_16_ADD90");
+        count += label(0x0ADDA4L, "desc_1D_ECT_i16_16_ADDA4");
+        count += label(0x0ADE08L, "desc_1D_ECT_i16_16_ADE08");
+        count += label(0x0ADF34L, "desc_1D_ECT_i16_16_ADF34");
+        count += label(0x0ADF48L, "desc_1D_ECT_i16_16_ADF48");
+        count += label(0x0ADFACL, "desc_1D_ECT_i16_16_ADFAC");
+        count += label(0x0AE034L, "desc_1D_ECT_u8_16_AE034");
+        count += label(0x0AE054L, "desc_1D_ECT_u8_16_AE054");
+        count += label(0x0AE068L, "desc_1D_ECT_u8_16_AE068");
+        count += label(0x0AE07CL, "desc_1D_ECT_u8_16_AE07C");
+        count += label(0x0AE090L, "desc_1D_ECT_u8_16_AE090");
+        count += label(0x0AE0A4L, "desc_1D_ECT_u8_16_AE0A4");
+        count += label(0x0AE0C4L, "desc_1D_ECT_u8_16_AE0C4");
+        count += label(0x0AE0D8L, "desc_1D_ECT_u8_16_AE0D8");
+        count += label(0x0AE0ECL, "desc_1D_ECT_u8_16_AE0EC");
+        count += label(0x0AE88CL, "desc_1D_ECT_u8_16_AE88C");
+        count += label(0x0AE8A0L, "desc_1D_ECT_u8_16_AE8A0");
+        count += label(0x0AE8C8L, "desc_1D_ECT_u8_16_AE8C8");
+        count += label(0x0AE8DCL, "desc_1D_ECT_u8_16_AE8DC");
+        count += label(0x0AE8F0L, "desc_1D_ECT_u8_16_AE8F0");
+        count += label(0x0AE904L, "desc_1D_ECT_u8_16_AE904");
+        count += label(0x0AE918L, "desc_1D_ECT_u8_16_AE918");
+        count += label(0x0AE92CL, "desc_1D_ECT_u8_16_AE92C");
+        count += label(0x0AE940L, "desc_1D_ECT_u8_16_AE940");
+        count += label(0x0AE954L, "desc_1D_ECT_u8_16_AE954");
+        count += label(0x0AE968L, "desc_1D_ECT_u8_16_AE968");
+        count += label(0x0AE97CL, "desc_1D_ECT_u8_16_AE97C");
+        count += label(0x0AE990L, "desc_1D_ECT_u8_16_AE990");
+        count += label(0x0AE9A4L, "desc_1D_ECT_u8_16_AE9A4");
+        count += label(0x0AE9B8L, "desc_1D_ECT_u8_16_AE9B8");
+        count += label(0x0AE9CCL, "desc_1D_ECT_u8_16_AE9CC");
+        count += label(0x0AE9E0L, "desc_1D_ECT_u8_16_AE9E0");
+        count += label(0x0AE9F4L, "desc_1D_ECT_u8_16_AE9F4");
+        count += label(0x0AEA08L, "desc_1D_ECT_u8_16_AEA08");
+        count += label(0x0AEA1CL, "desc_1D_ECT_u8_16_AEA1C");
+        count += label(0x0AEA30L, "desc_1D_ECT_u8_16_AEA30");
+        count += label(0x0AEA44L, "desc_1D_ECT_u8_16_AEA44");
+        count += label(0x0AEA58L, "desc_1D_ECT_u8_16_AEA58");
+        count += label(0x0AEA6CL, "desc_1D_ECT_u8_16_AEA6C");
+        count += label(0x0AEA80L, "desc_1D_ECT_u8_16_AEA80");
+        count += label(0x0AEA94L, "desc_1D_ECT_u8_16_AEA94");
+        count += label(0x0AEAA8L, "desc_1D_ECT_u8_16_AEAA8");
+        count += label(0x0AEABCL, "desc_1D_ECT_u8_16_AEABC");
+        count += label(0x0AEAE4L, "desc_1D_ECT_u8_16_AEAE4");
+        count += label(0x0AEAF8L, "desc_1D_ECT_u8_16_AEAF8");
+        count += label(0x0AEB0CL, "desc_1D_ECT_u8_16_AEB0C");
+        count += label(0x0AEB20L, "desc_1D_ECT_u8_16_AEB20");
+        count += label(0x0AEB34L, "desc_1D_ECT_u8_16_AEB34");
+        count += label(0x0AEB48L, "desc_1D_ECT_u8_16_AEB48");
+        count += label(0x0AEB5CL, "desc_1D_ECT_u8_16_AEB5C");
+        count += label(0x0AEB70L, "desc_1D_ECT_u8_16_AEB70");
+        count += label(0x0AEB84L, "desc_1D_ECT_u8_16_AEB84");
+        count += label(0x0AEB98L, "desc_1D_ECT_u8_16_AEB98");
+        count += label(0x0AEBACL, "desc_1D_ECT_u8_16_AEBAC");
+        count += label(0x0AEBC0L, "desc_1D_ECT_u8_16_AEBC0");
+        count += label(0x0AEBD4L, "desc_1D_ECT_u8_16_AEBD4");
+        count += label(0x0AEBE8L, "desc_1D_ECT_u8_16_AEBE8");
+        count += label(0x0AEC10L, "desc_1D_ECT_u8_16_AEC10");
+        count += label(0x0AEC24L, "desc_1D_ECT_u8_16_AEC24");
+        count += label(0x0AEC38L, "desc_1D_ECT_u8_16_AEC38");
+        count += label(0x0AEC88L, "desc_1D_ECT_u8_16_AEC88");
+        count += label(0x0AEC9CL, "desc_1D_ECT_u8_16_AEC9C");
+        count += label(0x0AECB0L, "desc_1D_ECT_u8_16_AECB0");
+        count += label(0x0AECC4L, "desc_1D_ECT_u8_16_AECC4");
+        count += label(0x0AECD8L, "desc_1D_ECT_u8_16_AECD8");
+        count += label(0x0AECECL, "desc_1D_ECT_u8_16_AECEC");
+        count += label(0x0AED0CL, "desc_1D_ECT_u8_16_AED0C");
+        count += label(0x0AED20L, "desc_1D_ECT_u8_16_AED20");
+        count += label(0x0AED34L, "desc_1D_ECT_u8_16_AED34");
+        count += label(0x0AED48L, "desc_1D_ECT_u8_16_AED48");
+        count += label(0x0AED5CL, "desc_1D_ECT_u8_16_AED5C");
+        count += label(0x0AED70L, "desc_1D_ECT_u8_16_AED70");
+        count += label(0x0AED84L, "desc_1D_ECT_u8_16_AED84");
+        count += label(0x0AED98L, "desc_1D_ECT_u8_16_AED98");
+        count += label(0x0AEDACL, "desc_1D_ECT_u8_16_AEDAC");
+        count += label(0x0AEDC0L, "desc_1D_ECT_u8_16_AEDC0");
+        count += label(0x0AEDE0L, "desc_1D_ECT_u8_16_AEDE0");
+        count += label(0x0AEDF4L, "desc_1D_ECT_u8_16_AEDF4");
+        count += label(0x0AEE08L, "desc_1D_ECT_u8_16_AEE08");
+        count += label(0x0AEEA8L, "desc_1D_ECT_u8_16_AEEA8");
+        count += label(0x0AEEBCL, "desc_1D_ECT_u8_16_AEEBC");
+        count += label(0x0AEED0L, "desc_1D_ECT_u8_16_AEED0");
+        count += label(0x0AEEF8L, "desc_1D_ECT_u8_16_AEEF8");
+        count += label(0x0AEFC0L, "desc_1D_ECT_f32_16_AEFC0");
+        count += label(0x0AEFD8L, "desc_1D_ECT_f32_16_AEFD8");
+        count += label(0x0AF3D4L, "desc_1D_ECT_u8_16_AF3D4");
+        count += label(0x0AF3F4L, "desc_1D_ECT_u8_16_AF3F4");
+        count += label(0x0AF408L, "desc_1D_ECT_u8_16_AF408");
+        count += label(0x0AF4F0L, "desc_1D_ECT_i16_16_AF4F0");
+        count += label(0x0AF504L, "desc_1D_ECT_f32_16_AF504");
+        count += label(0x0AF56CL, "desc_1D_ECT_u8_16_AF56C");
+        count += label(0x0AF580L, "desc_1D_ECT_f32_16_AF580");
+        count += label(0x0AF5A0L, "desc_1D_ECT_f32_16_AF5A0");
+        count += label(0x0AF5CCL, "desc_1D_ECT_u8_16_AF5CC");
+        count += label(0x0AF6D8L, "desc_1D_ECT_i16_16_AF6D8");
+        count += label(0x0AF6ECL, "desc_1D_ECT_i16_16_AF6EC");
+        count += label(0x0AF700L, "desc_1D_ECT_i16_16_AF700");
+        count += label(0x0AF714L, "desc_1D_ECT_i16_16_AF714");
+        count += label(0x0AF750L, "desc_1D_ECT_i16_16_AF750");
+        count += label(0x0AF764L, "desc_1D_ECT_i16_16_AF764");
+        count += label(0x0AF778L, "desc_1D_ECT_i16_16_AF778");
+        count += label(0x0AF78CL, "desc_1D_ECT_u8_16_AF78C");
+        count += label(0x0AF7A0L, "desc_1D_ECT_u8_16_AF7A0");
+        count += label(0x0AF7B4L, "desc_1D_ECT_u8_16_AF7B4");
+        count += label(0x0AF7CCL, "desc_1D_ECT_u8_16_AF7CC");
+
+        // --- 1D_IAT (5 descriptors) ---
+        count += label(0x0AB660L, "desc_1D_IAT_u8_11_AB660");
+        count += label(0x0AB688L, "desc_1D_IAT_u8_10");
+        count += label(0x0AB69CL, "desc_1D_IAT_u8_11_AB69C");
+        count += label(0x0AB76CL, "desc_1D_IAT_f32_4");
+        count += label(0x0AF008L, "desc_1D_IAT_f32_11");
+
+        // --- 1D_IPW (12 descriptors) ---
+        count += label(0x0AABE0L, "desc_1D_IPW_f32_6_AABE0");
+        count += label(0x0AABF8L, "desc_1D_IPW_f32_6_AABF8");
+        count += label(0x0AB17CL, "desc_1D_IPW_i16_10");
+        count += label(0x0AC5F8L, "desc_1D_IPW_i16_6_AC5F8");
+        count += label(0x0AC60CL, "desc_1D_IPW_i16_6_AC60C");
+        count += label(0x0ACE20L, "desc_1D_IPW_u8_13");
+        count += label(0x0AD0B8L, "desc_1D_IPW_f32_10_AD0B8");
+        count += label(0x0AD0D0L, "desc_1D_IPW_f32_10_AD0D0");
+        count += label(0x0AD434L, "desc_1D_IPW_f32_9");
+        count += label(0x0ADFE8L, "desc_1D_IPW_f32_5");
+        count += label(0x0AF450L, "desc_1D_IPW_f32_16");
+        count += label(0x0AF480L, "desc_1D_IPW_f32_30");
+
+        // --- 1D_KnockIdx (4 descriptors) ---
+        count += label(0x0AB56CL, "desc_1D_KnockIdx_u8_7_AB56C");
+        count += label(0x0AB580L, "desc_1D_KnockIdx_u8_7_AB580");
+        count += label(0x0ADC28L, "desc_1D_KnockIdx_i16_8");
+        count += label(0x0AF1CCL, "desc_1D_KnockIdx_f32_24");
+
+        // --- 1D_Load (24 descriptors) ---
+        count += label(0x0AAA4CL, "desc_1D_Load_f32_16_AAA4C");
+        count += label(0x0AB498L, "desc_1D_Load_u8_4");
+        count += label(0x0AB9DCL, "desc_1D_Load_f32_5");
+        count += label(0x0ABA0CL, "desc_1D_Load_f32_7_ABA0C");
+        count += label(0x0ABA24L, "desc_1D_Load_f32_7_ABA24");
+        count += label(0x0ACE0CL, "desc_1D_Load_u8_10");
+        count += label(0x0ACE34L, "desc_1D_Load_f32_16_ACE34");
+        count += label(0x0ACEB4L, "desc_1D_Load_u8_11_ACEB4");
+        count += label(0x0ACEDCL, "desc_1D_Load_u8_11_ACEDC");
+        count += label(0x0AD168L, "desc_1D_Load_u8_7_AD168");
+        count += label(0x0AD17CL, "desc_1D_Load_u8_7_AD17C");
+        count += label(0x0AD190L, "desc_1D_Load_u8_7_AD190");
+        count += label(0x0AD1A4L, "desc_1D_Load_u8_7_AD1A4");
+        count += label(0x0AE194L, "desc_1D_Load_f32_4_AE194");
+        count += label(0x0AE1ACL, "desc_1D_Load_f32_4_AE1AC");
+        count += label(0x0AE1C4L, "desc_1D_Load_f32_4_AE1C4");
+        count += label(0x0AE1DCL, "desc_1D_Load_f32_4_AE1DC");
+        count += label(0x0AE1F4L, "desc_1D_Load_f32_4_AE1F4");
+        count += label(0x0AE20CL, "desc_1D_Load_f32_4_AE20C");
+        count += label(0x0AE224L, "desc_1D_Load_f32_4_AE224");
+        count += label(0x0AE23CL, "desc_1D_Load_f32_4_AE23C");
+        count += label(0x0AE254L, "desc_1D_Load_f32_4_AE254");
+        count += label(0x0AE2D8L, "desc_1D_Load_f32_8");
+        count += label(0x0AF438L, "desc_1D_Load_f32_17");
+
+        // --- 1D_MAF (2 descriptors) ---
+        count += label(0x0AB21CL, "desc_1D_MAF_u8_14");
+        count += label(0x0AC7C4L, "desc_1D_MAF_i16_9");
+
+        // --- 1D_Pressure (11 descriptors) ---
+        count += label(0x0AAAF0L, "desc_1D_Pressure_u8_6_AAAF0");
+        count += label(0x0AAB04L, "desc_1D_Pressure_u8_6_AAB04");
+        count += label(0x0AAB2CL, "desc_1D_Pressure_u8_9_AAB2C");
+        count += label(0x0AAB54L, "desc_1D_Pressure_u8_4_AAB54");
+        count += label(0x0AAB68L, "desc_1D_Pressure_u8_9_AAB68");
+        count += label(0x0AAB90L, "desc_1D_Pressure_u8_9_AAB90");
+        count += label(0x0AAC64L, "desc_1D_Pressure_f32_4_AAC64");
+        count += label(0x0AAC7CL, "desc_1D_Pressure_f32_4_AAC7C");
+        count += label(0x0ABAE4L, "desc_1D_Pressure_f32_6");
+        count += label(0x0ABB74L, "desc_1D_Pressure_f32_4_ABB74");
+        count += label(0x0AEAD0L, "desc_1D_Pressure_u8_4_AEAD0");
+
+        // --- 1D_RPM (107 descriptors) ---
+        count += label(0x0AA7C4L, "desc_1D_RPM_wide_u8_4_AA7C4");
+        count += label(0x0AA7F8L, "desc_1D_RPM_wide_u8_4_AA7F8");
+        count += label(0x0AA950L, "desc_1D_RPM_f32_5_AA950");
+        count += label(0x0AA968L, "desc_1D_RPM_f32_5_AA968");
+        count += label(0x0AAA20L, "desc_1D_RPM_i16_10_AAA20");
+        count += label(0x0AAA34L, "desc_1D_RPM_f32_15_AAA34");
+        count += label(0x0AAF84L, "desc_1D_RPM_u8_15_AAF84");
+        count += label(0x0AAFACL, "desc_1D_RPM_f32_10_AAFAC");
+        count += label(0x0AAFC4L, "desc_1D_RPM_f32_7");
+        count += label(0x0AB168L, "desc_1D_RPM_i16_10_AB168");
+        count += label(0x0AB2D8L, "desc_1D_RPM_i16_14_AB2D8");
+        count += label(0x0AB2ECL, "desc_1D_RPM_i16_14_AB2EC");
+        count += label(0x0AB300L, "desc_1D_RPM_i16_14_AB300");
+        count += label(0x0AB314L, "desc_1D_RPM_i16_14_AB314");
+        count += label(0x0AB328L, "desc_1D_RPM_wide_f32_13");
+        count += label(0x0AB340L, "desc_1D_RPM_i16_13_AB340");
+        count += label(0x0AB354L, "desc_1D_RPM_i16_13_AB354");
+        count += label(0x0AB368L, "desc_1D_RPM_i16_14_AB368");
+        count += label(0x0AB37CL, "desc_1D_RPM_i16_14_AB37C");
+        count += label(0x0AB390L, "desc_1D_RPM_i16_14_AB390");
+        count += label(0x0AB3A4L, "desc_1D_RPM_i16_14_AB3A4");
+        count += label(0x0AB3B8L, "desc_1D_RPM_i16_14_AB3B8");
+        count += label(0x0AB3CCL, "desc_1D_RPM_i16_14_AB3CC");
+        count += label(0x0AB3E0L, "desc_1D_RPM_i16_14_AB3E0");
+        count += label(0x0AB3F4L, "desc_1D_RPM_i16_14_AB3F4");
+        count += label(0x0AB408L, "desc_1D_RPM_i16_14_AB408");
+        count += label(0x0AB558L, "desc_1D_RPM_u8_10_AB558");
+        count += label(0x0AB784L, "desc_1D_RPM_f32_14_AB784");
+        count += label(0x0AB79CL, "desc_1D_RPM_f32_14_AB79C");
+        count += label(0x0AB7B4L, "desc_1D_RPM_f32_14_AB7B4");
+        count += label(0x0AB82CL, "desc_1D_RPM_f32_14_AB82C");
+        count += label(0x0AB85CL, "desc_1D_RPM_f32_14_AB85C");
+        count += label(0x0AB880L, "desc_1D_RPM_f32_10_AB880");
+        count += label(0x0AB8A4L, "desc_1D_RPM_f32_10_AB8A4");
+        count += label(0x0AB8C8L, "desc_1D_RPM_f32_14_AB8C8");
+        count += label(0x0AB8E0L, "desc_1D_RPM_f32_14_AB8E0");
+        count += label(0x0AB8F8L, "desc_1D_RPM_f32_14_AB8F8");
+        count += label(0x0AB910L, "desc_1D_RPM_f32_14_AB910");
+        count += label(0x0AB928L, "desc_1D_RPM_f32_14_AB928");
+        count += label(0x0AB940L, "desc_1D_RPM_f32_14_AB940");
+        count += label(0x0AB964L, "desc_1D_RPM_f32_14_AB964");
+        count += label(0x0AB97CL, "desc_1D_RPM_f32_13");
+        count += label(0x0AC450L, "desc_1D_RPM_f32_4");
+        count += label(0x0AC4ACL, "desc_1D_RPM_wide_i16_16_AC4AC");
+        count += label(0x0AC4FCL, "desc_1D_RPM_wide_i16_11_AC4FC");
+        count += label(0x0AC510L, "desc_1D_RPM_wide_i16_11_AC510");
+        count += label(0x0AC5BCL, "desc_1D_RPM_wide_i16_16_AC5BC");
+        count += label(0x0AC634L, "desc_1D_RPM_wide_i16_16_AC634");
+        count += label(0x0AC710L, "desc_1D_RPM_i16_7_AC710");
+        count += label(0x0AC724L, "desc_1D_RPM_i16_7_AC724");
+        count += label(0x0AC738L, "desc_1D_RPM_i16_7_AC738");
+        count += label(0x0AC74CL, "desc_1D_RPM_i16_7_AC74C");
+        count += label(0x0AC7B0L, "desc_1D_RPM_wide_i16_16_AC7B0");
+        count += label(0x0ACBA4L, "desc_1D_RPM_wide_u8_16_ACBA4");
+        count += label(0x0ACBB8L, "desc_1D_RPM_wide_u8_16_ACBB8");
+        count += label(0x0ACBF4L, "desc_1D_RPM_wide_u8_16_ACBF4");
+        count += label(0x0ACC08L, "desc_1D_RPM_wide_u8_16_ACC08");
+        count += label(0x0ACC6CL, "desc_1D_RPM_wide_u8_16_ACC6C");
+        count += label(0x0ACC80L, "desc_1D_RPM_wide_u8_16_ACC80");
+        count += label(0x0ACD34L, "desc_1D_RPM_u8_8");
+        count += label(0x0ACE54L, "desc_1D_RPM_wide_f32_6_ACE54");
+        count += label(0x0AD090L, "desc_1D_RPM_wide_u8_9");
+        count += label(0x0AD0A4L, "desc_1D_RPM_wide_u8_16_AD0A4");
+        count += label(0x0AD0F0L, "desc_1D_RPM_wide_u8_16_AD0F0");
+        count += label(0x0AD208L, "desc_1D_RPM_u8_7_AD208");
+        count += label(0x0AD21CL, "desc_1D_RPM_u8_7_AD21C");
+        count += label(0x0AD230L, "desc_1D_RPM_u8_7_AD230");
+        count += label(0x0AD244L, "desc_1D_RPM_u8_7_AD244");
+        count += label(0x0AD400L, "desc_1D_RPM_f32_8_AD400");
+        count += label(0x0ADA84L, "desc_1D_RPM_i16_8");
+        count += label(0x0ADDE0L, "desc_1D_RPM_i16_7_ADDE0");
+        count += label(0x0ADDF4L, "desc_1D_RPM_i16_7_ADDF4");
+        count += label(0x0ADE30L, "desc_1D_RPM_i16_13_ADE30");
+        count += label(0x0ADFC0L, "desc_1D_RPM_wide_i16_16_ADFC0");
+        count += label(0x0ADFD4L, "desc_1D_RPM_wide_i16_16_ADFD4");
+        count += label(0x0AE000L, "desc_1D_RPM_f32_8_AE000");
+        count += label(0x0AE10CL, "desc_1D_RPM_u8_7_AE10C");
+        count += label(0x0AE120L, "desc_1D_RPM_wide_u8_16_AE120");
+        count += label(0x0AE134L, "desc_1D_RPM_f32_10_AE134");
+        count += label(0x0AE17CL, "desc_1D_RPM_f32_6");
+        count += label(0x0AE26CL, "desc_1D_RPM_f32_18");
+        count += label(0x0AE290L, "desc_1D_RPM_f32_10_AE290");
+        count += label(0x0AE2A8L, "desc_1D_RPM_f32_10_AE2A8");
+        count += label(0x0AE2C0L, "desc_1D_RPM_f32_10_AE2C0");
+        count += label(0x0AE7D8L, "desc_1D_RPM_wide_i16_20_AE7D8");
+        count += label(0x0AE7ECL, "desc_1D_RPM_wide_i16_20_AE7EC");
+        count += label(0x0AEC60L, "desc_1D_RPM_wide_u8_20");
+        count += label(0x0AEF60L, "desc_1D_RPM_f32_8_AEF60");
+        count += label(0x0AEF78L, "desc_1D_RPM_wide_f32_8");
+        count += label(0x0AEFF0L, "desc_1D_RPM_wide_f32_6_AEFF0");
+        count += label(0x0AF144L, "desc_1D_RPM_u8_16_AF144");
+        count += label(0x0AF158L, "desc_1D_RPM_u8_16_AF158");
+        count += label(0x0AF16CL, "desc_1D_RPM_u8_16_AF16C");
+        count += label(0x0AF180L, "desc_1D_RPM_u8_16_AF180");
+        count += label(0x0AF1A8L, "desc_1D_RPM_f32_8_AF1A8");
+        count += label(0x0AF3C0L, "desc_1D_RPM_mid_u8_5");
+        count += label(0x0AF498L, "desc_1D_RPM_f32_15_AF498");
+        count += label(0x0AF4D8L, "desc_1D_RPM_f32_15_AF4D8");
+        count += label(0x0AF51CL, "desc_1D_RPM_u8_10_AF51C");
+        count += label(0x0AF530L, "desc_1D_RPM_f32_10_AF530");
+        count += label(0x0AF630L, "desc_1D_RPM_u8_16_AF630");
+        count += label(0x0AF644L, "desc_1D_RPM_u8_16_AF644");
+        count += label(0x0AF658L, "desc_1D_RPM_u8_16_AF658");
+        count += label(0x0AF66CL, "desc_1D_RPM_u8_16_AF66C");
+        count += label(0x0AF680L, "desc_1D_RPM_u8_16_AF680");
+        count += label(0x0AF694L, "desc_1D_RPM_u8_16_AF694");
+        count += label(0x0AF7E0L, "desc_1D_RPM_u8_15_AF7E0");
+
+        // --- 1D_SmallRatio (5 descriptors) ---
+        count += label(0x0AAB7CL, "desc_1D_SmallRatio_u8_15");
+        count += label(0x0ACC94L, "desc_1D_SmallRatio_u8_13_ACC94");
+        count += label(0x0ACCA8L, "desc_1D_SmallRatio_u8_13_ACCA8");
+        count += label(0x0AE020L, "desc_1D_SmallRatio_i16_5");
+        count += label(0x0AF468L, "desc_1D_SmallRatio_f32_13");
+
+        // --- 1D_Throttle (41 descriptors) ---
+        count += label(0x0AA760L, "desc_1D_Throttle_u8_16_AA760");
+        count += label(0x0AA774L, "desc_1D_Throttle_u8_16_AA774");
+        count += label(0x0AAA0CL, "desc_1D_Throttle_i16_6_AAA0C");
+        count += label(0x0AABCCL, "desc_1D_Throttle_u8_5");
+        count += label(0x0AAC10L, "desc_1D_Throttle_f32_10_AAC10");
+        count += label(0x0AACACL, "desc_1D_Throttle_f32_10_AACAC");
+        count += label(0x0AACC4L, "desc_1D_Throttle_f32_10_AACC4");
+        count += label(0x0AAF08L, "desc_1D_Throttle_u8_21");
+        count += label(0x0AAF1CL, "desc_1D_Throttle_f32_4");
+        count += label(0x0AB11CL, "desc_1D_Throttle_f32_10_AB11C");
+        count += label(0x0AB134L, "desc_1D_Throttle_f32_10_AB134");
+        count += label(0x0AB638L, "desc_1D_Throttle_u8_9_AB638");
+        count += label(0x0AB64CL, "desc_1D_Throttle_u8_9_AB64C");
+        count += label(0x0ABA54L, "desc_1D_Throttle_f32_13");
+        count += label(0x0AC360L, "desc_1D_Throttle_i16_10_AC360");
+        count += label(0x0AC544L, "desc_1D_Throttle_i16_8_AC544");
+        count += label(0x0AC5E4L, "desc_1D_Throttle_i16_6_AC5E4");
+        count += label(0x0ADE1CL, "desc_1D_Throttle_i16_7");
+        count += label(0x0ADE44L, "desc_1D_Throttle_i16_8_ADE44");
+        count += label(0x0ADE58L, "desc_1D_Throttle_i16_8_ADE58");
+        count += label(0x0ADE6CL, "desc_1D_Throttle_i16_8_ADE6C");
+        count += label(0x0ADE80L, "desc_1D_Throttle_i16_8_ADE80");
+        count += label(0x0ADE94L, "desc_1D_Throttle_i16_8_ADE94");
+        count += label(0x0ADEA8L, "desc_1D_Throttle_i16_8_ADEA8");
+        count += label(0x0ADEBCL, "desc_1D_Throttle_i16_8_ADEBC");
+        count += label(0x0ADED0L, "desc_1D_Throttle_i16_8_ADED0");
+        count += label(0x0ADEE4L, "desc_1D_Throttle_i16_8_ADEE4");
+        count += label(0x0ADEF8L, "desc_1D_Throttle_i16_8_ADEF8");
+        count += label(0x0ADF0CL, "desc_1D_Throttle_i16_8_ADF0C");
+        count += label(0x0ADF20L, "desc_1D_Throttle_i16_8_ADF20");
+        count += label(0x0AE7C4L, "desc_1D_Throttle_i16_11");
+        count += label(0x0AE800L, "desc_1D_Throttle_i16_10_AE800");
+        count += label(0x0AE814L, "desc_1D_Throttle_i16_10_AE814");
+        count += label(0x0AE8B4L, "desc_1D_Throttle_u8_11_AE8B4");
+        count += label(0x0AEF18L, "desc_1D_Throttle_f32_6_AEF18");
+        count += label(0x0AEF30L, "desc_1D_Throttle_f32_6_AEF30");
+        count += label(0x0AEF48L, "desc_1D_Throttle_f32_6_AEF48");
+        count += label(0x0AF5E0L, "desc_1D_Throttle_i16_5_AF5E0");
+        count += label(0x0AF5F4L, "desc_1D_Throttle_i16_5_AF5F4");
+        count += label(0x0AF6A8L, "desc_1D_Throttle_u8_11_AF6A8");
+        count += label(0x0AF81CL, "desc_1D_Throttle_u8_12");
+
+        // --- 1D_TimingAdv (13 descriptors) ---
+        count += label(0x0ABB44L, "desc_1D_TimingAdv_f32_7");
+        count += label(0x0AC4E8L, "desc_1D_TimingAdv_i16_16");
+        count += label(0x0ACF64L, "desc_1D_TimingAdv_u8_9_ACF64");
+        count += label(0x0ACF78L, "desc_1D_TimingAdv_u8_9_ACF78");
+        count += label(0x0ACFDCL, "desc_1D_TimingAdv_u8_9_ACFDC");
+        count += label(0x0ACFF0L, "desc_1D_TimingAdv_u8_9_ACFF0");
+        count += label(0x0AD004L, "desc_1D_TimingAdv_u8_9_AD004");
+        count += label(0x0AD018L, "desc_1D_TimingAdv_u8_9_AD018");
+        count += label(0x0AD02CL, "desc_1D_TimingAdv_u8_9_AD02C");
+        count += label(0x0AD040L, "desc_1D_TimingAdv_u8_9_AD040");
+        count += label(0x0AD068L, "desc_1D_TimingAdv_u8_8_AD068");
+        count += label(0x0AD07CL, "desc_1D_TimingAdv_u8_8_AD07C");
+        count += label(0x0AEBFCL, "desc_1D_TimingAdv_u8_7");
+
+        // --- 1D_VehSpd (11 descriptors) ---
+        count += label(0x0AA93CL, "desc_1D_VehSpd_u8_9_AA93C");
+        count += label(0x0AB9F4L, "desc_1D_VehSpd_f32_8_AB9F4");
+        count += label(0x0ABBBCL, "desc_1D_VehSpd_f32_8_ABBBC");
+        count += label(0x0AC4C0L, "desc_1D_VehSpd_i16_9_AC4C0");
+        count += label(0x0AC4D4L, "desc_1D_VehSpd_i16_9_AC4D4");
+        count += label(0x0AC788L, "desc_1D_VehSpd_i16_7_AC788");
+        count += label(0x0AC79CL, "desc_1D_VehSpd_i16_7_AC79C");
+        count += label(0x0AE79CL, "desc_1D_VehSpd_i16_10_AE79C");
+        count += label(0x0AE7B0L, "desc_1D_VehSpd_i16_10_AE7B0");
+        count += label(0x0AEE1CL, "desc_1D_VehSpd_u8_9_AEE1C");
+        count += label(0x0AEE30L, "desc_1D_VehSpd_u8_9_AEE30");
+
+        // --- 1D_Voltage (2 descriptors) ---
+        count += label(0x0AA788L, "desc_1D_Voltage_i16_5");
+        count += label(0x0AF5B8L, "desc_1D_Voltage_u8_11");
+
+        // --- 1D_range (91 descriptors) ---
+        count += label(0x0AA79CL, "desc_1D_range_20_4096_u8_5");
+        count += label(0x0AA7B0L, "desc_1D_range_0_3500_u8_8");
+        count += label(0x0AA7D8L, "desc_1D_range_40_20_f32_12");
+        count += label(0x0AA80CL, "desc_1D_range_40_20_u8_12");
+        count += label(0x0AA914L, "desc_1D_range_160_160_u8_9");
+        count += label(0x0AA928L, "desc_1D_range_240_0_u8_9");
+        count += label(0x0AABA4L, "desc_1D_range_100_760_u8_5");
+        count += label(0x0AAC94L, "desc_1D_range_20_0_f32_6");
+        count += label(0x0AAE64L, "desc_1D_range_4000_7500_u8_8");
+        count += label(0x0AAE78L, "desc_1D_range_3200_6000_u8_8");
+        count += label(0x0AAE8CL, "desc_1D_range_524_758_u8_4");
+        count += label(0x0AAFDCL, "desc_1D_range_15_60_f32_4");
+        count += label(0x0AB154L, "desc_1D_range_20_80_i16_7");
+        count += label(0x0AB190L, "desc_1D_range_0_0_u8_7_AB190");
+        count += label(0x0AB230L, "desc_1D_range_200_1100_u8_10_AB230");
+        count += label(0x0AB244L, "desc_1D_range_200_1100_u8_10_AB244");
+        count += label(0x0AB258L, "desc_1D_range_200_1100_u8_10_AB258");
+        count += label(0x0AB2A4L, "desc_1D_range_20_20_f32_4");
+        count += label(0x0AB464L, "desc_1D_range_30_20_f32_6");
+        count += label(0x0AB484L, "desc_1D_range_15_45_u8_5_AB484");
+        count += label(0x0AB4ACL, "desc_1D_range_15_45_u8_5_AB4AC");
+        count += label(0x0AB4C0L, "desc_1D_range_0_1000_u8_6");
+        count += label(0x0AB4E0L, "desc_1D_range_0_1600_u8_12");
+        count += label(0x0AB4F4L, "desc_1D_range_100_1000_u8_9");
+        count += label(0x0AB5D4L, "desc_1D_range_7_25_u8_4_AB5D4");
+        count += label(0x0AB5E8L, "desc_1D_range_7_27_u8_4");
+        count += label(0x0AB5FCL, "desc_1D_range_7_25_u8_4_AB5FC");
+        count += label(0x0AB610L, "desc_1D_range_7_25_u8_4_AB610");
+        count += label(0x0AB624L, "desc_1D_range_7_25_u8_4_AB624");
+        count += label(0x0AB754L, "desc_1D_range_20_20_f32_5");
+        count += label(0x0ABA3CL, "desc_1D_range_7_30_f32_4");
+        count += label(0x0ABA6CL, "desc_1D_range_7_26_f32_9");
+        count += label(0x0ABA84L, "desc_1D_range_7_25_f32_4_ABA84");
+        count += label(0x0ABA9CL, "desc_1D_range_7_25_f32_4_ABA9C");
+        count += label(0x0ABAB4L, "desc_1D_range_7_35_f32_7");
+        count += label(0x0ABACCL, "desc_1D_range_7_35_f32_6");
+        count += label(0x0ABAFCL, "desc_1D_range_500_1000_f32_6");
+        count += label(0x0ABB14L, "desc_1D_range_520_760_f32_7");
+        count += label(0x0ABB2CL, "desc_1D_range_0_20000_f32_5");
+        count += label(0x0ABB5CL, "desc_1D_range_520_840_f32_9");
+        count += label(0x0ABB8CL, "desc_1D_range_525_750_f32_4_ABB8C");
+        count += label(0x0ABBA4L, "desc_1D_range_525_750_f32_4_ABBA4");
+        count += label(0x0AC26CL, "desc_1D_range_8_24_f32_4");
+        count += label(0x0AC284L, "desc_1D_range_7_30_u8_5");
+        count += label(0x0AC298L, "desc_1D_range_0_0_f32_24");
+        count += label(0x0AC34CL, "desc_1D_range_184_760_i16_10");
+        count += label(0x0AC3F4L, "desc_1D_range_3600_7200_i16_10_AC3F4");
+        count += label(0x0AC408L, "desc_1D_range_3600_7200_i16_10_AC408");
+        count += label(0x0AC524L, "desc_1D_range_0_0_f32_6_AC524");
+        count += label(0x0AC558L, "desc_1D_range_0_110000_i16_12_AC558");
+        count += label(0x0AC580L, "desc_1D_range_0_110000_i16_12_AC580");
+        count += label(0x0AC5A8L, "desc_1D_range_10_0_i16_6");
+        count += label(0x0AC5D0L, "desc_1D_range_11_89_i16_6");
+        count += label(0x0AC760L, "desc_1D_range_300_650_i16_8");
+        count += label(0x0ACE6CL, "desc_1D_range_0_0_u8_9");
+        count += label(0x0ACEF0L, "desc_1D_range_0_0_f32_6_ACEF0");
+        count += label(0x0ACF28L, "desc_1D_range_10_50_u8_5_ACF28");
+        count += label(0x0ACF3CL, "desc_1D_range_0_110000_u8_12_ACF3C");
+        count += label(0x0ACF50L, "desc_1D_range_0_110000_u8_12_ACF50");
+        count += label(0x0ACF8CL, "desc_1D_range_0_110000_u8_12_ACF8C");
+        count += label(0x0ACFA0L, "desc_1D_range_0_110000_u8_12_ACFA0");
+        count += label(0x0ACFB4L, "desc_1D_range_10_50_u8_5_ACFB4");
+        count += label(0x0ACFC8L, "desc_1D_range_10_50_u8_5_ACFC8");
+        count += label(0x0AD104L, "desc_1D_range_0_0_u8_7_AD104");
+        count += label(0x0AD44CL, "desc_1D_range_700_800_f32_16");
+        count += label(0x0AD464L, "desc_1D_range_700_2500_f32_7");
+        count += label(0x0ADAC0L, "desc_1D_range_1600_3200_i16_5_ADAC0");
+        count += label(0x0ADAD4L, "desc_1D_range_1600_3200_i16_5_ADAD4");
+        count += label(0x0ADAE8L, "desc_1D_range_1600_3200_i16_5_ADAE8");
+        count += label(0x0ADB10L, "desc_1D_range_0_1500_i16_16");
+        count += label(0x0ADB24L, "desc_1D_range_515_795_i16_5");
+        count += label(0x0ADB38L, "desc_1D_range_400_2000_i16_9");
+        count += label(0x0ADF5CL, "desc_1D_range_20_20_i16_21_ADF5C");
+        count += label(0x0ADF70L, "desc_1D_range_20_20_i16_21_ADF70");
+        count += label(0x0ADF84L, "desc_1D_range_20_20_i16_21_ADF84");
+        count += label(0x0ADF98L, "desc_1D_range_20_20_i16_21_ADF98");
+        count += label(0x0AE164L, "desc_1D_range_0_0_f32_5");
+        count += label(0x0AE83CL, "desc_1D_range_146_146_u8_15");
+        count += label(0x0AE850L, "desc_1D_range_0_0_f32_4_AE850");
+        count += label(0x0AE868L, "desc_1D_range_0_0_f32_4_AE868");
+        count += label(0x0AEC4CL, "desc_1D_range_400_1400_u8_6");
+        count += label(0x0AEC74L, "desc_1D_range_200_200_u8_9");
+        count += label(0x0AEE44L, "desc_1D_range_100_350_u8_10");
+        count += label(0x0AEE58L, "desc_1D_range_60_0_u8_10_AEE58");
+        count += label(0x0AEE6CL, "desc_1D_range_60_0_u8_10_AEE6C");
+        count += label(0x0AEEE4L, "desc_1D_range_100_1000_u8_7");
+        count += label(0x0AEF90L, "desc_1D_range_15_80_f32_5");
+        count += label(0x0AEFA8L, "desc_1D_range_0_1400_f32_10");
+        count += label(0x0AF194L, "desc_1D_range_504_760_u8_5");
+        count += label(0x0AF7F4L, "desc_1D_range_0_0_u8_13_AF7F4");
+        count += label(0x0AF808L, "desc_1D_range_0_0_u8_13_AF808");
+
+        // --- 2D_AtmPressurexRPM (4 descriptors) ---
+        count += label(0x0AA99CL, "desc_2D_AtmPressurexRPM_i16_6x6");
+        count += label(0x0ABE7CL, "desc_2D_AtmPressurexRPM_u8_7x14_ABE7C");
+        count += label(0x0ABE98L, "desc_2D_AtmPressurexRPM_u8_7x14_ABE98");
+        count += label(0x0ADA24L, "desc_2D_AtmPressurexRPM_u8_6x6");
+
+        // --- 2D_AtmPressurexrange (1 descriptors) ---
+        count += label(0x0AA980L, "desc_2D_AtmPressurexrange_4000_7000_i16_6x4");
+
+        // --- 2D_Boostxrange (2 descriptors) ---
+        count += label(0x0AF058L, "desc_2D_Boostxrange_0_2000_i16_8x6_AF058");
+        count += label(0x0AF074L, "desc_2D_Boostxrange_0_2000_i16_8x6_AF074");
+
+        // --- 2D_ECTxECT (1 descriptors) ---
+        count += label(0x0AE530L, "desc_2D_ECTxECT_i16_16x7");
+
+        // --- 2D_ECTxIAT (1 descriptors) ---
+        count += label(0x0AF0E4L, "desc_2D_ECTxIAT_u8_16x6");
+
+        // --- 2D_ECTxLoad (3 descriptors) ---
+        count += label(0x0AD5E8L, "desc_2D_ECTxLoad_i16_16x8");
+        count += label(0x0AD604L, "desc_2D_ECTxLoad_i16_16x9");
+        count += label(0x0AE46CL, "desc_2D_ECTxLoad_i16_16x6");
+
+        // --- 2D_IATxIAT (1 descriptors) ---
+        count += label(0x0AA834L, "desc_2D_IATxIAT_u8_18x17");
+
+        // --- 2D_IATxrange (3 descriptors) ---
+        count += label(0x0AD7A8L, "desc_2D_IATxrange_0_20000_i16_10x12");
+        count += label(0x0AF11CL, "desc_2D_IATxrange_50_300_f32_11x8");
+        count += label(0x0AF550L, "desc_2D_IATxrange_0_20000_u8_9x11");
+
+        // --- 2D_KnockIdxxrange (2 descriptors) ---
+        count += label(0x0AF020L, "desc_2D_KnockIdxxrange_0_2000_i16_8x6_AF020");
+        count += label(0x0AF03CL, "desc_2D_KnockIdxxrange_0_2000_i16_8x6_AF03C");
+
+        // --- 2D_LoadxRPM (49 descriptors) ---
+        count += label(0x0AAA64L, "desc_2D_LoadxRPM_u8_16x16_AAA64");
+        count += label(0x0AAA80L, "desc_2D_LoadxRPM_u8_16x16_AAA80");
+        count += label(0x0AAA9CL, "desc_2D_LoadxRPM_u8_16x16_AAA9C");
+        count += label(0x0AAAB8L, "desc_2D_LoadxRPM_u8_16x16_AAAB8");
+        count += label(0x0ABC1CL, "desc_2D_LoadxRPM_f32_10x14");
+        count += label(0x0ABDD4L, "desc_2D_LoadxRPM_u8_7x14_ABDD4");
+        count += label(0x0ABDF0L, "desc_2D_LoadxRPM_u8_7x14_ABDF0");
+        count += label(0x0ABE0CL, "desc_2D_LoadxRPM_u8_7x14_ABE0C");
+        count += label(0x0ABE28L, "desc_2D_LoadxRPM_u8_7x14_ABE28");
+        count += label(0x0ABE44L, "desc_2D_LoadxRPM_u8_7x14_ABE44");
+        count += label(0x0ABE60L, "desc_2D_LoadxRPM_u8_7x14_ABE60");
+        count += label(0x0AC014L, "desc_2D_LoadxRPM_f32_24x13_AC014");
+        count += label(0x0AC064L, "desc_2D_LoadxRPM_f32_24x13_AC064");
+        count += label(0x0AC08CL, "desc_2D_LoadxRPM_f32_18x14_AC08C");
+        count += label(0x0AC0B4L, "desc_2D_LoadxRPM_f32_18x14_AC0B4");
+        count += label(0x0AC0DCL, "desc_2D_LoadxRPM_f32_18x14_AC0DC");
+        count += label(0x0AC104L, "desc_2D_LoadxRPM_f32_18x16");
+        count += label(0x0AC12CL, "desc_2D_LoadxRPM_f32_18x14_AC12C");
+        count += label(0x0AD4ECL, "desc_2D_LoadxRPM_i16_16x9_AD4EC");
+        count += label(0x0AD508L, "desc_2D_LoadxRPM_i16_16x9_AD508");
+        count += label(0x0AD658L, "desc_2D_LoadxRPM_wide_i16_16x10");
+        count += label(0x0AD674L, "desc_2D_LoadxRPM_i16_17x18_AD674");
+        count += label(0x0AD690L, "desc_2D_LoadxRPM_i16_17x18_AD690");
+        count += label(0x0AD6ACL, "desc_2D_LoadxRPM_i16_15x18_AD6AC");
+        count += label(0x0AD6C8L, "desc_2D_LoadxRPM_i16_17x18_AD6C8");
+        count += label(0x0AD6E4L, "desc_2D_LoadxRPM_i16_17x18_AD6E4");
+        count += label(0x0AD700L, "desc_2D_LoadxRPM_i16_17x18_AD700");
+        count += label(0x0AD8B8L, "desc_2D_LoadxRPM_u8_11x10_AD8B8");
+        count += label(0x0AD8D4L, "desc_2D_LoadxRPM_u8_11x10_AD8D4");
+        count += label(0x0AD8F0L, "desc_2D_LoadxRPM_u8_13x12_AD8F0");
+        count += label(0x0AD90CL, "desc_2D_LoadxRPM_u8_13x12_AD90C");
+        count += label(0x0AD928L, "desc_2D_LoadxRPM_u8_11x10_AD928");
+        count += label(0x0AD960L, "desc_2D_LoadxRPM_u8_12x15_AD960");
+        count += label(0x0AD97CL, "desc_2D_LoadxRPM_u8_12x15_AD97C");
+        count += label(0x0AD998L, "desc_2D_LoadxRPM_u8_12x13_AD998");
+        count += label(0x0AD9B4L, "desc_2D_LoadxRPM_u8_12x13_AD9B4");
+        count += label(0x0AD9D0L, "desc_2D_LoadxRPM_u8_12x13_AD9D0");
+        count += label(0x0AE31CL, "desc_2D_LoadxRPM_i16_17x18_AE31C");
+        count += label(0x0AE338L, "desc_2D_LoadxRPM_i16_17x18_AE338");
+        count += label(0x0AE354L, "desc_2D_LoadxRPM_i16_17x18_AE354");
+        count += label(0x0AE370L, "desc_2D_LoadxRPM_i16_17x18_AE370");
+        count += label(0x0AE664L, "desc_2D_LoadxRPM_i16_15x18_AE664");
+        count += label(0x0AE680L, "desc_2D_LoadxRPM_i16_17x18_AE680");
+        count += label(0x0AE69CL, "desc_2D_LoadxRPM_i16_17x18_AE69C");
+        count += label(0x0AF22CL, "desc_2D_LoadxRPM_u8_16x16_AF22C");
+        count += label(0x0AF248L, "desc_2D_LoadxRPM_u8_16x16_AF248");
+        count += label(0x0AF264L, "desc_2D_LoadxRPM_u8_16x16_AF264");
+        count += label(0x0AF8D8L, "desc_2D_LoadxRPM_u8_18x16_AF8D8");
+        count += label(0x0AF8F4L, "desc_2D_LoadxRPM_u8_18x16_AF8F4");
+
+        // --- 2D_Loadxrange (3 descriptors) ---
+        count += label(0x0AC1A4L, "desc_2D_Loadxrange_0_4500_f32_9x9");
+        count += label(0x0AC1CCL, "desc_2D_Loadxrange_0_2000_f32_6x8");
+        count += label(0x0ADA5CL, "desc_2D_Loadxrange_0_4000_f32_16x6");
+
+        // --- 2D_PressurexIPW (2 descriptors) ---
+        count += label(0x0AAD08L, "desc_2D_PressurexIPW_u8_11x6_AAD08");
+        count += label(0x0AAD24L, "desc_2D_PressurexIPW_u8_11x6_AAD24");
+
+        // --- 2D_PressurexLoad (1 descriptors) ---
+        count += label(0x0AB26CL, "desc_2D_PressurexLoad_u8_7x5");
+
+        // --- 2D_PressurexRPM (2 descriptors) ---
+        count += label(0x0AA9F0L, "desc_2D_PressurexRPM_u8_11x15");
+        count += label(0x0AD9ECL, "desc_2D_PressurexRPM_u8_10x7");
+
+        // --- 2D_PressurexSmallRatio (2 descriptors) ---
+        count += label(0x0AAD5CL, "desc_2D_PressurexSmallRatio_u8_5x5");
+        count += label(0x0AADCCL, "desc_2D_PressurexSmallRatio_f32_4x5");
+
+        // --- 2D_PressurexThrottle (1 descriptors) ---
+        count += label(0x0AD7C4L, "desc_2D_PressurexThrottle_i16_15x16");
+
+        // --- 2D_Pressurexrange (1 descriptors) ---
+        count += label(0x0AF37CL, "desc_2D_Pressurexrange_800_2000_u8_8x4");
+
+        // --- 2D_RPM (7 descriptors) ---
+        count += label(0x0AE38CL, "desc_2D_RPM_widexLoad_i16_8x8");
+        count += label(0x0AE514L, "desc_2D_RPM_midxLoad_i16_7x4");
+        count += label(0x0AE5D8L, "desc_2D_RPM_midxLoad_i16_14x5_AE5D8");
+        count += label(0x0AE5F4L, "desc_2D_RPM_midxLoad_i16_14x5_AE5F4");
+        count += label(0x0AE610L, "desc_2D_RPM_midxLoad_i16_14x5_AE610");
+        count += label(0x0AE62CL, "desc_2D_RPM_midxLoad_i16_14x6");
+        count += label(0x0AF41CL, "desc_2D_RPM_widexLoad_u8_6x6");
+
+        // --- 2D_RPMxBoost (1 descriptors) ---
+        count += label(0x0AB058L, "desc_2D_RPMxBoost_u8_9x7");
+
+        // --- 2D_RPMxIPW (2 descriptors) ---
+        count += label(0x0AF29CL, "desc_2D_RPMxIPW_u8_16x6_AF29C");
+        count += label(0x0AF2B8L, "desc_2D_RPMxIPW_u8_16x6_AF2B8");
+
+        // --- 2D_RPMxLoad (1 descriptors) ---
+        count += label(0x0AA86CL, "desc_2D_RPMxLoad_u8_6x6");
+
+        // --- 2D_RPMxPressure (1 descriptors) ---
+        count += label(0x0AF100L, "desc_2D_RPMxPressure_u8_16x16");
+
+        // --- 2D_RPMxThrottle (1 descriptors) ---
+        count += label(0x0AAD94L, "desc_2D_RPMxThrottle_u8_7x11");
+
+        // --- 2D_RPMxVoltage (1 descriptors) ---
+        count += label(0x0AF4B0L, "desc_2D_RPMxVoltage_f32_16x5");
+
+        // --- 2D_RPMxrange (1 descriptors) ---
+        count += label(0x0AB03CL, "desc_2D_RPMxrange_11_84_i16_15x31");
+
+        // --- 2D_SmallRatioxrange (1 descriptors) ---
+        count += label(0x0AAD78L, "desc_2D_SmallRatioxrange_5_2_u8_11x9");
+
+        // --- 2D_ThrottlexMAF (1 descriptors) ---
+        count += label(0x0AC154L, "desc_2D_ThrottlexMAF_f32_5x5");
+
+        // --- 2D_ThrottlexRPM (5 descriptors) ---
+        count += label(0x0AD620L, "desc_2D_ThrottlexRPM_i16_10x9");
+        count += label(0x0AD848L, "desc_2D_ThrottlexRPM_u8_10x9");
+        count += label(0x0AF2D4L, "desc_2D_ThrottlexRPM_u8_15x17_AF2D4");
+        count += label(0x0AF2F0L, "desc_2D_ThrottlexRPM_u8_15x17_AF2F0");
+        count += label(0x0AF30CL, "desc_2D_ThrottlexRPM_u8_15x17_AF30C");
+
+        // --- 2D_ThrottlexThrottle (2 descriptors) ---
+        count += label(0x0AF1F4L, "desc_2D_ThrottlexThrottle_i16_8x8_AF1F4");
+        count += label(0x0AF210L, "desc_2D_ThrottlexThrottle_i16_8x8_AF210");
+
+        // --- 2D_TimingAdvxRPM (1 descriptors) ---
+        count += label(0x0AF398L, "desc_2D_TimingAdvxRPM_f32_16x13");
+
+        // --- 2D_TimingAdvxrange (1 descriptors) ---
+        count += label(0x0ABFD8L, "desc_2D_TimingAdvxrange_20_20_f32_8x5");
+
+        // --- 2D_VVTErrorxRPM (4 descriptors) ---
+        count += label(0x0AF830L, "desc_2D_VVTErrorxRPM_u8_9x9_AF830");
+        count += label(0x0AF84CL, "desc_2D_VVTErrorxRPM_u8_9x9_AF84C");
+        count += label(0x0AF868L, "desc_2D_VVTErrorxRPM_u8_9x9_AF868");
+        count += label(0x0AF884L, "desc_2D_VVTErrorxRPM_u8_9x9_AF884");
+
+        // --- 2D_VehSpdxSmallRatio (1 descriptors) ---
+        count += label(0x0AAD40L, "desc_2D_VehSpdxSmallRatio_u8_5x5");
+
+        // --- 2D_range (29 descriptors) ---
+        count += label(0x0AA850L, "desc_2D_range_30_20_xrange_0_1400_u8_11x29");
+        count += label(0x0AA9B8L, "desc_2D_range_120_350_xRPM_mid_u8_15x13_AA9B8");
+        count += label(0x0AA9D4L, "desc_2D_range_120_350_xRPM_mid_u8_15x13_AA9D4");
+        count += label(0x0AACECL, "desc_2D_range_200_800_xRPM_mid_u8_5x5");
+        count += label(0x0AB004L, "desc_2D_range_210_960_xRPM_i16_11x14_AB004");
+        count += label(0x0AB020L, "desc_2D_range_210_960_xRPM_i16_11x14_AB020");
+        count += label(0x0AB088L, "desc_2D_range_520_760_xIAT_u8_4x5");
+        count += label(0x0AB288L, "desc_2D_range_39_508_xLoad_u8_13x13");
+        count += label(0x0ABED0L, "desc_2D_range_10_40_xrange_0_3001_f32_4x5");
+        count += label(0x0ABF00L, "desc_2D_range_520_1120_xrange_520_1120_u8_16x16");
+        count += label(0x0AC1F4L, "desc_2D_range_40_70_xrange_7_31_f32_5x10");
+        count += label(0x0AC244L, "desc_2D_range_10_26_xrange_11_14_f32_5x4");
+        count += label(0x0AD524L, "desc_2D_range_115_515_xrange_30_0_i16_5x7_AD524");
+        count += label(0x0AD540L, "desc_2D_range_115_515_xrange_30_0_i16_5x7_AD540");
+        count += label(0x0AD55CL, "desc_2D_range_115_515_xrange_30_0_i16_5x7_AD55C");
+        count += label(0x0AD578L, "desc_2D_range_115_515_xTimingAdv_i16_5x7");
+        count += label(0x0AD594L, "desc_2D_range_504_760_xrange_30_0_i16_5x4_AD594");
+        count += label(0x0AD5B0L, "desc_2D_range_600_600_xIAT_i16_13x12");
+        count += label(0x0AD5CCL, "desc_2D_range_504_760_xrange_30_0_i16_5x4_AD5CC");
+        count += label(0x0AD63CL, "desc_2D_range_0_500000_xECT_i16_16x10");
+        count += label(0x0AD738L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD738");
+        count += label(0x0AD754L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD754");
+        count += label(0x0AD770L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD770");
+        count += label(0x0AD78CL, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD78C");
+        count += label(0x0AD864L, "desc_2D_range_4_60_xRPM_u8_8x9");
+        count += label(0x0AE3E0L, "desc_2D_range_200_200_xrange_20_20_i16_9x9_AE3E0");
+        count += label(0x0AE3FCL, "desc_2D_range_200_200_xrange_20_20_i16_9x9_AE3FC");
+        count += label(0x0AF0ACL, "desc_2D_range_150_600_xIAT_u8_17x9_AF0AC");
+        count += label(0x0AF0C8L, "desc_2D_range_150_600_xIAT_u8_17x9_AF0C8");
+
 
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");

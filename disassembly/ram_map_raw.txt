@@ -1,0 +1,726 @@
+Loaded ROM: 1048576 bytes
+
+Phase 1: Scanning literal pool mov.l for RAM addresses...
+  Found 4456 unique RAM addresses referenced via literal pool
+
+Phase 2: Scanning for GBR base addresses...
+  Found 459 unique GBR bases
+
+Total unique RAM addresses: 4456
+
+Region distribution:
+  diag_state            639 addresses
+  knock_flkc            632 addresses
+  sensor_data           600 addresses
+  scheduler             526 addresses
+  cal_mirrors           514 addresses
+  system_state          508 addresses
+  adc_processed         503 addresses
+  fuel_timing           435 addresses
+  stack_area             93 addresses
+  peripheral_regs         5 addresses
+  other                   1 addresses
+
+====================================================================================================
+TOP RAM ADDRESSES BY REFERENCE COUNT (unlabeled only)
+====================================================================================================
+Rank      Address  LitPool  GBR Region               Known Label                   
+----------------------------------------------------------------------------------------------------
+   1 0xFFFF6624      301    1 adc_processed       
+   2 0xFFFF6350      205    1 adc_processed       
+   3 0xFFFF65FC      135    0 adc_processed       
+   4 0xFFFF399E      118    0 cal_mirrors         
+   5 0xFFFF837E       20   19 knock_flkc          
+   6 0xFFFFAD52      107    0 diag_state          
+   7 0xFFFF67EC       99    0 adc_processed       
+   8 0xFFFF8E98       97    0 knock_flkc          
+   9 0xFFFF3B06       92    0 cal_mirrors         
+  10 0xFFFF65C0       89    0 adc_processed       
+  11 0xFFFF63F8       86    0 adc_processed       
+  12 0xFFFF4130       77    0 sensor_data         
+  13 0xFFFF3836       76    0 cal_mirrors         
+  14 0xFFFF6354       69    0 adc_processed       
+  15 0xFFFFADAC       69    0 diag_state          
+  16 0xFFFF4024       56    1 sensor_data         
+  17 0xFFFF85D7       60    0 knock_flkc          
+  18 0xFFFF9094       30    6 scheduler           
+  19 0xFFFF69F0       32    5 adc_processed       
+  20 0xFFFF6155       36    4 adc_processed       
+  21 0xFFFF61CC       56    0 adc_processed       
+  22 0xFFFF81F0       30    5 knock_flkc          
+  23 0xFFFF3480       45    2 cal_mirrors         
+  24 0xFFFF83AC       19    7 knock_flkc          
+  25 0xFFFF6254       51    0 adc_processed       
+  26 0xFFFF6364       48    0 adc_processed       
+  27 0xFFFF63C4       43    1 adc_processed       
+  28 0xFFFF25CC       48    0 system_state        
+  29 0xFFFF6898       48    0 adc_processed       
+  30 0xFFFFA160       15    6 diag_state          
+  31 0xFFFF620C       43    0 adc_processed       
+  32 0xFFFFAF3B       36    1 diag_state          
+  33 0xFFFF366C       41    0 cal_mirrors         
+  34 0xFFFF8E46       39    0 knock_flkc          
+  35 0xFFFF837B       13    5 knock_flkc          
+  36 0xFFFF8387       13    5 knock_flkc          
+  37 0xFFFF895C       37    0 knock_flkc          
+  38 0xFFFF9FC6       22    3 scheduler           
+  39 0xFFFF8EA8        9    5 knock_flkc          
+  40 0xFFFF64D8       29    1 adc_processed       
+  41 0xFFFF65BD       34    0 adc_processed       
+  42 0xFFFF6C48       34    0 adc_processed       
+  43 0xFFFF5BE3       33    0 sensor_data         
+  44 0xFFFFAC6C       13    4 diag_state          
+  45 0xFFFF9058       32    0 scheduler           
+  46 0xFFFFACE0       32    0 diag_state          
+  47 0xFFFF35E4        7    5 cal_mirrors         
+  48 0xFFFF7C9D       32    0 fuel_timing         
+  49 0xFFFF3718        6    5 cal_mirrors         
+  50 0xFFFF5C98       15    3 sensor_data         
+  51 0xFFFF367C       25    1 cal_mirrors         
+  52 0xFFFF7E90       25    1 fuel_timing         
+  53 0xFFFF5FFC       23    1 sensor_data         
+  54 0xFFFFA198       13    3 diag_state          
+  55 0xFFFF8C9C       17    2 knock_flkc          
+  56 0xFFFF980C        7    4 scheduler           
+  57 0xFFFF9FA8       17    2 scheduler           
+  58 0xFFFF6228       22    1 adc_processed       
+  59 0xFFFF3682        7    4 cal_mirrors         
+  60 0xFFFF798C       17    2 fuel_timing         
+  61 0xFFFF87E4       26    0 knock_flkc          
+  62 0xFFFF8EC7        6    4 knock_flkc          
+  63 0xFFFF43FC       25    0 sensor_data         
+  64 0xFFFF62DC       20    1 adc_processed       
+  65 0xFFFF3674       25    0 cal_mirrors         
+  66 0xFFFF653C       19    1 adc_processed       
+  67 0xFFFF77C8       19    1 fuel_timing         
+  68 0xFFFF7D68       19    1 fuel_timing         
+  69 0xFFFF7FBC       14    2 fuel_timing         
+  70 0xFFFF91C4        8    3 scheduler           
+  71 0xFFFF2004       23    0 system_state        
+  72 0xFFFF24A8        8    3 system_state        
+  73 0xFFFF65A9       23    0 adc_processed       
+  74 0xFFFF8080       22    0 knock_flkc          
+  75 0xFFFF5D14       22    0 sensor_data         
+  76 0xFFFF5FC2        7    3 sensor_data         
+  77 0xFFFF6810       22    0 adc_processed       
+  78 0xFFFF682C       22    0 adc_processed       
+  79 0xFFFF2EF4        7    3 system_state        
+  80 0xFFFF71EA       22    0 fuel_timing         
+  81 0xFFFF34D8       22    0 cal_mirrors         
+  82 0xFFFF83A5       21    0 knock_flkc          
+  83 0xFFFF8D2C        6    3 knock_flkc          
+  84 0xFFFF6134        6    3 adc_processed       
+  85 0xFFFF613C        6    3 adc_processed       
+  86 0xFFFFAD50       21    0 diag_state          
+  87 0xFFFF2F84        6    3 system_state        
+  88 0xFFFF7BE4       11    2 fuel_timing         
+  89 0xFFFF4144       20    0 sensor_data         
+  90 0xFFFF8A74       20    0 knock_flkc          
+  91 0xFFFF8F28        5    3 knock_flkc          
+  92 0xFFFF233C       20    0 system_state        
+  93 0xFFFF6490        5    3 adc_processed       
+  94 0xFFFFA59D       15    1 diag_state          
+  95 0xFFFF65BF       20    0 adc_processed       
+  96 0xFFFF7D04       10    2 fuel_timing         
+  97 0xFFFF7F08       20    0 fuel_timing         
+  98 0xFFFF40C8       19    0 sensor_data         
+  99 0xFFFF89E8       14    1 knock_flkc          
+ 100 0xFFFF8C98        9    2 knock_flkc          
+ 101 0xFFFF9070       19    0 scheduler           
+ 102 0xFFFF5BE2       14    1 sensor_data         
+ 103 0xFFFF2398        4    3 system_state        
+ 104 0xFFFF6430       19    0 adc_processed       
+ 105 0xFFFF2E48        4    3 system_state        
+ 106 0xFFFF30E4        4    3 cal_mirrors         
+ 107 0xFFFF34EC        4    3 cal_mirrors         
+ 108 0xFFFF365C       19    0 cal_mirrors         
+ 109 0xFFFF8366       18    0 knock_flkc          
+ 110 0xFFFF8391       18    0 knock_flkc          
+ 111 0xFFFF8D14        3    3 knock_flkc          
+ 112 0xFFFF903C       13    1 scheduler           
+ 113 0xFFFF5E40       18    0 sensor_data         
+ 114 0xFFFF9F80        3    3 scheduler           
+ 115 0xFFFFA6E8        8    2 diag_state          
+ 116 0xFFFFAC68        3    3 diag_state          
+ 117 0xFFFF3158       18    0 cal_mirrors         
+ 118 0xFFFFB6E1       18    0 stack_area          
+ 119 0xFFFF7E68       18    0 fuel_timing         
+ 120 0xFFFF7EC0        3    3 fuel_timing         
+ 121 0xFFFF81F8        7    2 knock_flkc          
+ 122 0xFFFF8318       17    0 knock_flkc          
+ 123 0xFFFF83AA       17    0 knock_flkc          
+ 124 0xFFFF8E7E       17    0 knock_flkc          
+ 125 0xFFFF90A8       12    1 scheduler           
+ 126 0xFFFF9FBC        7    2 scheduler           
+ 127 0xFFFF20F4       17    0 system_state        
+ 128 0xFFFFA176        7    2 diag_state          
+ 129 0xFFFF61AC       17    0 adc_processed       
+ 130 0xFFFF6540       12    1 adc_processed       
+ 131 0xFFFF69FC        7    2 adc_processed       
+ 132 0xFFFF2AB4       17    0 system_state        
+ 133 0xFFFF36C0       17    0 cal_mirrors         
+ 134 0xFFFF3C80       12    1 cal_mirrors         
+ 135 0xFFFF8210        6    2 knock_flkc          
+ 136 0xFFFF8570        6    2 knock_flkc          
+ 137 0xFFFF8910       16    0 knock_flkc          
+ 138 0xFFFF8998       11    1 knock_flkc          
+ 139 0xFFFF8E38        6    2 knock_flkc          
+ 140 0xFFFF922C       16    0 scheduler           
+ 141 0xFFFF9358        6    2 scheduler           
+ 142 0xFFFF5C75        6    2 sensor_data         
+ 143 0xFFFF5DB5       11    1 sensor_data         
+ 144 0xFFFF5FC0       16    0 sensor_data         
+ 145 0xFFFF20D4       16    0 system_state        
+ 146 0xFFFF61FC       11    1 adc_processed       
+ 147 0xFFFFA26C       11    1 diag_state          
+ 148 0xFFFFA290       16    0 diag_state          
+ 149 0xFFFF63B0       16    0 adc_processed       
+ 150 0xFFFF63CC       16    0 adc_processed       
+
+====================================================================================================
+ALREADY LABELED (46 addresses)
+====================================================================================================
+  0xFFFF1288     12+0G  isr_state_base
+  0xFFFF3234     21+0G  flkc_fg_ref_FR14
+  0xFFFF323C      6+0G  FLKC_BASE_STEP
+  0xFFFF3244     20+0G  flkc_fg_R0_init
+  0xFFFF3248     10+0G  flkc_fg_var_3248
+  0xFFFF3360     10+0G  flkc_output_table
+  0xFFFF36F0     27+2G  diag_mode_status
+  0xFFFF36F4     41+0G  dtc_enable_flag
+  0xFFFF65C5      8+0G  engine_running_flag
+  0xFFFF65F6     20+0G  cl_active_flag
+  0xFFFF726C     26+3G  transient_flag
+  0xFFFF7448     21+0G  clol_mode_flag
+  0xFFFF7449      8+0G  clol_cond_A
+  0xFFFF744A      0+0G  clol_cond_B
+  0xFFFF744B      3+0G  cl_inhibit
+  0xFFFF744C      0+0G  cl_readiness_A
+  0xFFFF744D      0+0G  cl_readiness_B
+  0xFFFF744E      0+0G  cl_mode_state
+  0xFFFF7452      3+0G  cl_master_readiness
+  0xFFFF7814      0+0G  afc_p_term
+  0xFFFF79C4      2+0G  ol_delay_counter_B
+  0xFFFF79C6      0+0G  ol_mode_state
+  0xFFFF79F2      0+0G  ol_active_flag
+  0xFFFF7AB4      5+2G  afl_multiplier_output
+  0xFFFF7C68     11+0G  engine_status_flag
+  0xFFFF7D18     13+0G  sched_status_R1
+  0xFFFF80FC      5+3G  knock_det_GBR_base
+  0xFFFF81BA     11+0G  KNOCK_FLAG
+  0xFFFF81BB      2+0G  KNOCK_BANK_FLAG
+  0xFFFF81D9      0+0G  fn_043d68_output
+  0xFFFF8233      3+0G  flkc_fg_flag_8233
+  0xFFFF8258     12+1G  flkc_fg_limit_FR15
+  0xFFFF8290      7+1G  flkc_fg_GBR_base
+  0xFFFF8294      2+0G  flkc_fg_counter
+  0xFFFF8298      5+1G  flkc_fg_cyl_index
+  0xFFFF829C      2+0G  flkc_fg_active
+  0xFFFF829D      3+0G  flkc_fg_retard_done
+  0xFFFF829E      3+1G  flkc_fg_enable
+  0xFFFF82A0      2+0G  flkc_fg_exit_flag
+  0xFFFF82A1      0+0G  flkc_fg_bank_route
+  0xFFFF82AA      2+0G  flkc_fg_prev_cyl
+  0xFFFF8EDC     33+0G  sched_disable_flag
+  0xFFFF8F24     16+0G  cl_global_enable
+  0xFFFFAE08      4+0G  diag_enable_A
+  0xFFFFAE09      2+0G  diag_enable_B
+  0xFFFFB71C     12+0G  dtc_master_enable
+
+====================================================================================================
+GBR BASE ADDRESSES (used as GBR register base, ranked)
+====================================================================================================
+  0xFFFF837E ( 19 uses)  
+  0xFFFF83AC (  7 uses)  
+  0xFFFF9094 (  6 uses)  
+  0xFFFFA160 (  6 uses)  
+  0xFFFF69F0 (  5 uses)  
+  0xFFFF81F0 (  5 uses)  
+  0xFFFF837B (  5 uses)  
+  0xFFFF8387 (  5 uses)  
+  0xFFFF8EA8 (  5 uses)  
+  0xFFFF35E4 (  5 uses)  
+  0xFFFF3718 (  5 uses)  
+  0xFFFF6155 (  4 uses)  
+  0xFFFF3682 (  4 uses)  
+  0xFFFF8EC7 (  4 uses)  
+  0xFFFF980C (  4 uses)  
+  0xFFFFAC6C (  4 uses)  
+  0xFFFF5C98 (  3 uses)  
+  0xFFFF5FC2 (  3 uses)  
+  0xFFFF6134 (  3 uses)  
+  0xFFFF613C (  3 uses)  
+  0xFFFF6490 (  3 uses)  
+  0xFFFF726C (  3 uses)  transient_flag
+  0xFFFF7EC0 (  3 uses)  
+  0xFFFF80FC (  3 uses)  knock_det_GBR_base
+  0xFFFF8D14 (  3 uses)  
+  0xFFFF8D2C (  3 uses)  
+  0xFFFF8F28 (  3 uses)  
+  0xFFFF91C4 (  3 uses)  
+  0xFFFF2398 (  3 uses)  
+  0xFFFF24A8 (  3 uses)  
+  0xFFFFA198 (  3 uses)  
+  0xFFFF9FC6 (  3 uses)  
+  0xFFFF9F80 (  3 uses)  
+  0xFFFF2E48 (  3 uses)  
+  0xFFFF2EF4 (  3 uses)  
+  0xFFFF2F84 (  3 uses)  
+  0xFFFF30E4 (  3 uses)  
+  0xFFFFAC68 (  3 uses)  
+  0xFFFF34EC (  3 uses)  
+  0xFFFF5BD8 (  2 uses)  
+
+====================================================================================================
+RAM CLUSTERS (groups of adjacent addresses = likely data structures)
+====================================================================================================
+
+  0xFFFF2D38-0xFFFF3140 (291 addrs, 1032 bytes, 849 refs, 0 labeled) [system_state]
+    0xFFFF2D38:   5 refs
+    0xFFFF2D40:   5 refs
+    0xFFFF2D48:   2 refs
+    0xFFFF2D50:   2 refs
+    0xFFFF2D58:   2 refs
+    0xFFFF2D60:   2 refs
+    0xFFFF2D68:   2 refs
+    0xFFFF2D70:   2 refs
+    0xFFFF2D78:   2 refs
+    0xFFFF2D80:   2 refs
+    0xFFFF2D88:   2 refs
+    0xFFFF2D8C:   1 refs
+    ... +279 more
+
+  0xFFFF2358-0xFFFF25CC (177 addrs, 628 bytes, 540 refs, 0 labeled) [system_state]
+    0xFFFF2358:   3 refs
+    0xFFFF235C:   2 refs
+    0xFFFF2360:   2 refs
+    0xFFFF2364:   2 refs
+    0xFFFF2368:   5 refs
+    0xFFFF236C:   2 refs
+    0xFFFF2370:   2 refs
+    0xFFFF2374:   1 refs
+    0xFFFF2378:   2 refs
+    0xFFFF237C:   1 refs
+    0xFFFF2380:   2 refs
+    0xFFFF2382:   1 refs
+    ... +165 more
+
+  0xFFFF3648-0xFFFF3800 (175 addrs, 440 bytes, 566 refs, 2 labeled) [cal_mirrors]
+    0xFFFF3648:   1 refs
+    0xFFFF364C:   4 refs
+    0xFFFF3654:   5 refs
+    0xFFFF365C:  19 refs
+    0xFFFF3660:   4 refs
+    0xFFFF3664:   2 refs
+    0xFFFF3666:   4 refs
+    0xFFFF3668:   5 refs
+    0xFFFF366A:   2 refs
+    0xFFFF366C:  41 refs
+    0xFFFF366E:   5 refs
+    0xFFFF3670:   4 refs
+    ... +163 more
+
+  0xFFFF341A-0xFFFF3612 (152 addrs, 504 bytes, 406 refs, 0 labeled) [cal_mirrors]
+    0xFFFF341A:   5 refs
+    0xFFFF341C:   7 refs
+    0xFFFF3420:  15 refs
+    0xFFFF3422:   1 refs
+    0xFFFF3428:   4 refs
+    0xFFFF3430:   4 refs
+    0xFFFF3438:   7 refs
+    0xFFFF3440:   3 refs
+    0xFFFF3444:   9 refs
+    0xFFFF3446:   1 refs
+    0xFFFF3448:   1 refs
+    0xFFFF344C:   2 refs
+    ... +140 more
+
+  0xFFFF40A4-0xFFFF41A0 (92 addrs, 252 bytes, 402 refs, 0 labeled) [sensor_data]
+    0xFFFF40A4:   2 refs
+    0xFFFF40A5:   2 refs
+    0xFFFF40A8:   1 refs
+    0xFFFF40A9:   1 refs
+    0xFFFF40AB:   6 refs
+    0xFFFF40AD:   1 refs
+    0xFFFF40AF:   1 refs
+    0xFFFF40B4:   2 refs
+    0xFFFF40B8:   1 refs
+    0xFFFF40BC:   1 refs
+    0xFFFF40C0:   3 refs
+    0xFFFF40C4:   3 refs
+    ... +80 more
+
+  0xFFFF20A0-0xFFFF227C (88 addrs, 476 bytes, 469 refs, 0 labeled) [system_state]
+    0xFFFF20A0:   5 refs
+    0xFFFF20A4:   1 refs
+    0xFFFF20A8:   1 refs
+    0xFFFF20AC:   6 refs
+    0xFFFF20B0:   4 refs
+    0xFFFF20B8:   4 refs
+    0xFFFF20BC:   6 refs
+    0xFFFF20BE:   3 refs
+    0xFFFF20C0:  10 refs
+    0xFFFF20C2:   2 refs
+    0xFFFF20C4:   6 refs
+    0xFFFF20CC:  15 refs
+    ... +76 more
+
+  0xFFFF9700-0xFFFF975C (71 addrs, 92 bytes, 104 refs, 0 labeled) [scheduler]
+    0xFFFF9700:   2 refs
+    0xFFFF9704:   4 refs
+    0xFFFF9705:   1 refs
+    0xFFFF9706:   1 refs
+    0xFFFF9707:   1 refs
+    0xFFFF9708:   1 refs
+    0xFFFF9709:   1 refs
+    0xFFFF970A:   1 refs
+    0xFFFF970B:   1 refs
+    0xFFFF970C:   1 refs
+    0xFFFF970D:   1 refs
+    0xFFFF970E:   1 refs
+    ... +59 more
+
+  0xFFFF85D0-0xFFFF86C0 (58 addrs, 240 bytes, 174 refs, 0 labeled) [knock_flkc]
+    0xFFFF85D0:   4 refs
+    0xFFFF85D4:   2 refs
+    0xFFFF85D7:  60 refs
+    0xFFFF85D8:   2 refs
+    0xFFFF85DC:   9 refs
+    0xFFFF85E3:   1 refs
+    0xFFFF85E4:  11 refs
+    0xFFFF85EC:   3 refs
+    0xFFFF85F4:   3 refs
+    0xFFFF85FC:   5 refs
+    0xFFFF8604:   1 refs
+    0xFFFF8608:   1 refs
+    ... +46 more
+
+  0xFFFF8EDC-0xFFFF8F45 (52 addrs, 105 bytes, 255 refs, 2 labeled) [knock_flkc]
+    0xFFFF8EDC:  33 refs  <- sched_disable_flag
+    0xFFFF8EDE:   9 refs
+    0xFFFF8EE0:   1 refs
+    0xFFFF8EE6:   1 refs
+    0xFFFF8EED:   4 refs
+    0xFFFF8EF2:   2 refs
+    0xFFFF8EF3:   1 refs
+    0xFFFF8EF6:   2 refs
+    0xFFFF8EF8:   6 refs
+    0xFFFF8EFC:   4 refs
+    0xFFFF8F04:   3 refs
+    0xFFFF8F08:   7 refs
+    ... +40 more
+
+  0xFFFF5F91-0xFFFF5FDC (46 addrs, 75 bytes, 185 refs, 0 labeled) [sensor_data]
+    0xFFFF5F91:   1 refs
+    0xFFFF5F92:   2 refs
+    0xFFFF5F94:   5 refs
+    0xFFFF5F95:   5 refs
+    0xFFFF5F96:   2 refs
+    0xFFFF5F97:   5 refs
+    0xFFFF5F98:   5 refs
+    0xFFFF5F99:   5 refs
+    0xFFFF5F9B:   1 refs
+    0xFFFF5F9D:   1 refs
+    0xFFFF5F9F:   1 refs
+    0xFFFF5FA0:   2 refs
+    ... +34 more
+
+  0xFFFF9848-0xFFFF988C (46 addrs, 68 bytes, 59 refs, 0 labeled) [scheduler]
+    0xFFFF9848:   1 refs
+    0xFFFF984A:   1 refs
+    0xFFFF984C:   2 refs
+    0xFFFF984D:   5 refs
+    0xFFFF9854:   2 refs
+    0xFFFF9855:   1 refs
+    0xFFFF9856:   1 refs
+    0xFFFF9857:   1 refs
+    0xFFFF9858:   1 refs
+    0xFFFF9859:   1 refs
+    0xFFFF985A:   1 refs
+    0xFFFF985B:   1 refs
+    ... +34 more
+
+  0xFFFF6590-0xFFFF65DA (45 addrs, 74 bytes, 378 refs, 1 labeled) [adc_processed]
+    0xFFFF6590:   1 refs
+    0xFFFF6594:   5 refs
+    0xFFFF6598:   8 refs
+    0xFFFF659C:   4 refs
+    0xFFFF659E:   1 refs
+    0xFFFF65A0:   2 refs
+    0xFFFF65A1:   3 refs
+    0xFFFF65A2:  10 refs
+    0xFFFF65A8:   1 refs
+    0xFFFF65A9:  23 refs
+    0xFFFF65AA:   1 refs
+    0xFFFF65AB:   7 refs
+    ... +33 more
+
+  0xFFFFAF70-0xFFFFAFAB (43 addrs, 59 bytes, 144 refs, 0 labeled) [diag_state]
+    0xFFFFAF70:   4 refs
+    0xFFFFAF71:   4 refs
+    0xFFFFAF72:   4 refs
+    0xFFFFAF73:  13 refs
+    0xFFFFAF74:   4 refs
+    0xFFFFAF75:   4 refs
+    0xFFFFAF76:   4 refs
+    0xFFFFAF77:   4 refs
+    0xFFFFAF78:   4 refs
+    0xFFFFAF7A:   4 refs
+    0xFFFFAF7B:   4 refs
+    0xFFFFAF7C:   4 refs
+    ... +31 more
+
+  0xFFFFA156-0xFFFFA18D (41 addrs, 55 bytes, 135 refs, 0 labeled) [diag_state]
+    0xFFFFA156:   2 refs
+    0xFFFFA157:   1 refs
+    0xFFFFA158:   1 refs
+    0xFFFFA15B:   1 refs
+    0xFFFFA160:  15 refs
+    0xFFFFA161:   3 refs
+    0xFFFFA162:   3 refs
+    0xFFFFA163:  11 refs
+    0xFFFFA164:   2 refs
+    0xFFFFA166:   1 refs
+    0xFFFFA168:   1 refs
+    0xFFFFA169:   1 refs
+    ... +29 more
+
+  0xFFFFA32C-0xFFFFA39F (39 addrs, 115 bytes, 132 refs, 0 labeled) [diag_state]
+    0xFFFFA32C:   2 refs
+    0xFFFFA330:   3 refs
+    0xFFFFA338:   1 refs
+    0xFFFFA340:   5 refs
+    0xFFFFA344:   3 refs
+    0xFFFFA34C:   2 refs
+    0xFFFFA350:   4 refs
+    0xFFFFA351:   4 refs
+    0xFFFFA352:   4 refs
+    0xFFFFA354:   4 refs
+    0xFFFFA35B:   1 refs
+    0xFFFFA35C:   1 refs
+    ... +27 more
+
+  0xFFFF3C70-0xFFFF3D1C (36 addrs, 172 bytes, 102 refs, 0 labeled) [cal_mirrors]
+    0xFFFF3C70:   6 refs
+    0xFFFF3C78:   3 refs
+    0xFFFF3C80:  12 refs
+    0xFFFF3C88:   5 refs
+    0xFFFF3C90:   5 refs
+    0xFFFF3C94:   1 refs
+    0xFFFF3C98:   5 refs
+    0xFFFF3C9A:   1 refs
+    0xFFFF3C9C:   2 refs
+    0xFFFF3C9E:   1 refs
+    0xFFFF3CA0:   4 refs
+    0xFFFF3CA2:   1 refs
+    ... +24 more
+
+  0xFFFF4252-0xFFFF4284 (35 addrs, 50 bytes, 115 refs, 0 labeled) [sensor_data]
+    0xFFFF4252:   2 refs
+    0xFFFF4253:   2 refs
+    0xFFFF4254:   9 refs
+    0xFFFF4255:   3 refs
+    0xFFFF4258:   2 refs
+    0xFFFF425A:   3 refs
+    0xFFFF425C:   1 refs
+    0xFFFF425D:   2 refs
+    0xFFFF425E:   3 refs
+    0xFFFF425F:   8 refs
+    0xFFFF4260:   3 refs
+    0xFFFF4262:   2 refs
+    ... +23 more
+
+  0xFFFF6118-0xFFFF6173 (35 addrs, 91 bytes, 120 refs, 0 labeled) [adc_processed]
+    0xFFFF6118:   2 refs
+    0xFFFF6120:   1 refs
+    0xFFFF6128:   2 refs
+    0xFFFF6129:   1 refs
+    0xFFFF612C:   4 refs
+    0xFFFF6130:   1 refs
+    0xFFFF6134:   6 refs
+    0xFFFF6138:   4 refs
+    0xFFFF613C:   6 refs
+    0xFFFF6144:   1 refs
+    0xFFFF6148:   3 refs
+    0xFFFF614A:   2 refs
+    ... +23 more
+
+  0xFFFF6A94-0xFFFF6AE4 (35 addrs, 80 bytes, 81 refs, 0 labeled) [adc_processed]
+    0xFFFF6A94:   4 refs
+    0xFFFF6A96:   1 refs
+    0xFFFF6A98:   2 refs
+    0xFFFF6A9C:   1 refs
+    0xFFFF6AA0:   1 refs
+    0xFFFF6AA4:   3 refs
+    0xFFFF6AA5:   1 refs
+    0xFFFF6AA6:   3 refs
+    0xFFFF6AA8:   4 refs
+    0xFFFF6AAC:   1 refs
+    0xFFFF6AB0:   1 refs
+    0xFFFF6AB1:   4 refs
+    ... +23 more
+
+  0xFFFF9FDF-0xFFFFA008 (35 addrs, 41 bytes, 70 refs, 0 labeled) [scheduler]
+    0xFFFF9FDF:   8 refs
+    0xFFFF9FE0:  11 refs
+    0xFFFF9FE2:   6 refs
+    0xFFFF9FE3:   1 refs
+    0xFFFF9FE4:  12 refs
+    0xFFFF9FE5:   1 refs
+    0xFFFF9FE6:   1 refs
+    0xFFFF9FE7:   1 refs
+    0xFFFF9FE8:   2 refs
+    0xFFFF9FE9:   1 refs
+    0xFFFF9FEA:   1 refs
+    0xFFFF9FEB:   1 refs
+    ... +23 more
+
+  0xFFFF8CE0-0xFFFF8D54 (31 addrs, 116 bytes, 98 refs, 0 labeled) [knock_flkc]
+    0xFFFF8CE0:   9 refs
+    0xFFFF8CE4:   5 refs
+    0xFFFF8CE8:   1 refs
+    0xFFFF8CEC:   1 refs
+    0xFFFF8CF0:   1 refs
+    0xFFFF8CF4:   3 refs
+    0xFFFF8CF8:   3 refs
+    0xFFFF8CFC:   7 refs
+    0xFFFF8D04:   6 refs
+    0xFFFF8D08:   2 refs
+    0xFFFF8D0C:   1 refs
+    0xFFFF8D14:   3 refs
+    ... +19 more
+
+  0xFFFF5DD0-0xFFFF5DFD (30 addrs, 45 bytes, 54 refs, 0 labeled) [sensor_data]
+    0xFFFF5DD0:   4 refs
+    0xFFFF5DD2:   1 refs
+    0xFFFF5DD3:   1 refs
+    0xFFFF5DD4:   1 refs
+    0xFFFF5DD5:   1 refs
+    0xFFFF5DD6:   1 refs
+    0xFFFF5DD7:   4 refs
+    0xFFFF5DD8:   2 refs
+    0xFFFF5DD9:   1 refs
+    0xFFFF5DDA:   2 refs
+    0xFFFF5DDB:   2 refs
+    0xFFFF5DDC:   2 refs
+    ... +18 more
+
+  0xFFFFA2A0-0xFFFFA308 (30 addrs, 104 bytes, 32 refs, 0 labeled) [diag_state]
+    0xFFFFA2A0:   1 refs
+    0xFFFFA2A4:   1 refs
+    0xFFFFA2A5:   1 refs
+    0xFFFFA2A6:   2 refs
+    0xFFFFA2A7:   2 refs
+    0xFFFFA2A8:   1 refs
+    0xFFFFA2AC:   1 refs
+    0xFFFFA2B0:   1 refs
+    0xFFFFA2B4:   1 refs
+    0xFFFFA2B8:   1 refs
+    0xFFFFA2BC:   1 refs
+    0xFFFFA2C0:   1 refs
+    ... +18 more
+
+  0xFFFFAD14-0xFFFFAD52 (29 addrs, 62 bytes, 268 refs, 0 labeled) [diag_state]
+    0xFFFFAD14:  14 refs
+    0xFFFFAD18:  12 refs
+    0xFFFFAD1C:  14 refs
+    0xFFFFAD20:  12 refs
+    0xFFFFAD24:  12 refs
+    0xFFFFAD28:  12 refs
+    0xFFFFAD2C:   1 refs
+    0xFFFFAD2E:   4 refs
+    0xFFFFAD30:   1 refs
+    0xFFFFAD34:   5 refs
+    0xFFFFAD35:   1 refs
+    0xFFFFAD36:   1 refs
+    ... +17 more
+
+  0xFFFFB6B4-0xFFFFB6E8 (28 addrs, 52 bytes, 120 refs, 0 labeled) [stack_area]
+    0xFFFFB6B4:   5 refs
+    0xFFFFB6B5:   2 refs
+    0xFFFFB6B6:   1 refs
+    0xFFFFB6BC:   5 refs
+    0xFFFFB6BD:   2 refs
+    0xFFFFB6C4:   3 refs
+    0xFFFFB6C8:   7 refs
+    0xFFFFB6C9:   1 refs
+    0xFFFFB6CC:   6 refs
+    0xFFFFB6CD:   4 refs
+    0xFFFFB6CE:   2 refs
+    0xFFFFB6D0:   1 refs
+    ... +16 more
+
+  0xFFFF447A-0xFFFF44C4 (27 addrs, 74 bytes, 92 refs, 0 labeled) [sensor_data]
+    0xFFFF447A:   2 refs
+    0xFFFF447B:   8 refs
+    0xFFFF447C:   5 refs
+    0xFFFF447E:   4 refs
+    0xFFFF4480:   3 refs
+    0xFFFF4482:   4 refs
+    0xFFFF4483:   4 refs
+    0xFFFF4484:   3 refs
+    0xFFFF4486:   2 refs
+    0xFFFF4488:   2 refs
+    0xFFFF448A:   2 refs
+    0xFFFF448C:   2 refs
+    ... +15 more
+
+  0xFFFF9775-0xFFFF97CC (27 addrs, 87 bytes, 68 refs, 0 labeled) [scheduler]
+    0xFFFF9775:   3 refs
+    0xFFFF9778:   4 refs
+    0xFFFF977C:   2 refs
+    0xFFFF977D:   1 refs
+    0xFFFF9780:   3 refs
+    0xFFFF9781:   3 refs
+    0xFFFF9788:   3 refs
+    0xFFFF978C:   1 refs
+    0xFFFF978E:   4 refs
+    0xFFFF9790:   3 refs
+    0xFFFF9794:   2 refs
+    0xFFFF9795:   1 refs
+    ... +15 more
+
+  0xFFFFAB76-0xFFFFABC5 (27 addrs, 79 bytes, 66 refs, 0 labeled) [diag_state]
+    0xFFFFAB76:   2 refs
+    0xFFFFAB77:   2 refs
+    0xFFFFAB78:   3 refs
+    0xFFFFAB79:   2 refs
+    0xFFFFAB7C:   1 refs
+    0xFFFFAB82:   2 refs
+    0xFFFFAB88:   2 refs
+    0xFFFFAB89:   2 refs
+    0xFFFFAB8A:   1 refs
+    0xFFFFAB8B:   1 refs
+    0xFFFFAB90:   1 refs
+    0xFFFFAB96:   9 refs
+    ... +15 more
+
+  0xFFFF7858-0xFFFF78B8 (26 addrs, 96 bytes, 76 refs, 0 labeled) [fuel_timing]
+    0xFFFF7858:   3 refs
+    0xFFFF785C:   4 refs
+    0xFFFF7864:  10 refs
+    0xFFFF7868:   1 refs
+    0xFFFF7870:   2 refs
+    0xFFFF7874:   3 refs
+    0xFFFF7878:   7 refs
+    0xFFFF787C:   4 refs
+    0xFFFF787E:   2 refs
+    0xFFFF787F:   4 refs
+    0xFFFF7880:   1 refs
+    0xFFFF7883:   1 refs
+    ... +14 more
+
+  0xFFFF97E4-0xFFFF9814 (25 addrs, 48 bytes, 57 refs, 0 labeled) [scheduler]
+    0xFFFF97E4:   4 refs
+    0xFFFF97E8:   4 refs
+    0xFFFF97EC:   4 refs
+    0xFFFF97F0:   3 refs
+    0xFFFF97F1:   5 refs
+    0xFFFF97F2:   3 refs
+    0xFFFF97F3:   2 refs
+    0xFFFF97F4:   2 refs
+    0xFFFF97F5:   2 refs
+    0xFFFF97F6:   4 refs
+    0xFFFF97F7:   4 refs
+    0xFFFF97F8:   1 refs
+    ... +13 more
