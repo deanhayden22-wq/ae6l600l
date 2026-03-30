@@ -1,0 +1,670 @@
+================================================================================
+FUEL INJECTION TIMING — END-TO-END ANALYSIS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2A)
+================================================================================
+
+OVERVIEW
+--------
+This document traces the complete fuel injection pipeline from software
+fuel calculation through to hardware injector output. The pipeline has
+three distinct stages:
+
+  1. Software fuel calculation (floating-point, scheduler tasks)
+  2. Hardware timer configuration (ATU/InternalIO register writes)
+  3. ISR-driven injection events (crank-angle synchronized)
+
+KEY CORRECTION: Scheduler tasks 46-48 are IGNITION timing compensation,
+NOT fuel injection. The fuel injection output path uses a different mechanism
+through the ATU (Advanced Timer Unit) and InternalIO registers.
+
+
+================================================================================
+STAGE 1: SOFTWARE FUEL CALCULATION PIPELINE
+================================================================================
+
+The fuel calculation runs as a chain of function calls within the scheduler,
+NOT as individual scheduler tasks. The chain is:
+
+  CL_fuel_dispatcher (0x33304)
+    -> 9-stage AFC pipeline (stages at 0x33658..0x343CE)
+       -> Stage 6: AFC_PI_controller (0x342A8)
+    -> fuel_aggregator_tail (0x33460)  [tail-call at end of dispatcher]
+
+  Separately called (from higher-level fuel task):
+    -> injector_trim_application (0x37ABA)  [AFL learning table update]
+    -> afl_application (0x37B74)            [computes AFL multiplier]
+    -> fuel_pulse_width_calc (0x301E4)      [final per-cylinder IPW]
+
+
+1.1  CL_fuel_dispatcher @ 0x33304
+     - Entry point for closed-loop fuel control
+     - Dispatches 9 AFC pipeline stages (subroutines)
+     - Ends with BRA to fuel_aggregator_tail (0x33460)
+
+1.2  fuel_aggregator_tail @ 0x33460 (620 bytes)
+     - GBR = 0xFFFF77BC (fuel pipeline struct base)
+     - Uses R9 = 0xFFFF7828 as major struct base with offsets -108 to -12
+     - INPUTS:
+       0xFFFF63C4  - processed sensor value (float)
+       0xFFFF68D8  - secondary sensor (float)
+       0xFFFF7828  - aggregator struct (many float fields)
+       0xFFFF8E7E  - operating mode flag (byte)
+       0xFFFF7BEC  - AFC status (byte)
+       0xFFFF6574  - filtered sensor (float)
+       0xFFFF7BE4  - AFC working value (float)
+       0xFFFF8E46  - condition flag (byte)
+       0xFFFF68D0  - another sensor (float)
+       0xFFFF85D7  - status byte
+       0xFFFF7904  - prior aggregator output (float)
+     - COMPUTATION:
+       FR14 = [0xFFFF7904]              ; previous output
+       FR14 += [R9-92]                  ; timing add
+       FR14 += interpolation_result     ; from 0xBE970 call
+       FR14 -= [R9-68]                  ; timing subtract
+       FR14 += [0xCBF4C]               ; cal constant offset
+       FR14 += [R9-52]                  ; additional offset
+       FR14 += 1.0                      ; base of 1.0
+       Clamped to [0.75, 1.25]          ; via float_clamp_apply
+     - Then complex mode-switching logic based on operating flags
+     - OUTPUTS:
+       [R9-100] = working fuel correction factor
+       [R9-96]  = final fuel correction factor
+       GBR+0x6C (0xFFFF74BC) = fuel correction mode flag
+       GBR+0x6D (0xFFFF74BD) = fuel correction status flag
+
+1.3  afl_application @ 0x37B74 (222 bytes)
+     - GBR = 0xFFFF7AB4 (afl_multiplier_output)
+     - R13 = 0xFFFF7AD8 (AFL working struct)
+     - GATE CONDITIONS (skip AFL if any true):
+       a) Any of three sub results (0x297C0, 0x297A0, 0x2997EC) == 2 (transient)
+       b) Transient flag (0xFFFF726C) == 1
+       c) Engine status flag (0xFFFF7C68) == 1
+       d) Engine load (0xFFFF6624) < threshold at 0xCC2F0
+     - COMPUTATION (when gates pass):
+       FR4 = 1.0 + ([R13-28] * [R13-24] * [R13-20] * [R13-16])
+       FMAC: accumulate corrections from table lookups
+       Clamp result
+       Store to [R13-36]
+     - FALLBACK: writes 1.0 (no correction)
+
+1.4  fuel_pulse_width_calc @ 0x301E4 (344 bytes)
+     - The FINAL calculation stage before hardware interface
+     - INPUTS (all float):
+       0xFFFF7348  - base fuel factor (stack[0], used as multiplier)
+       0xFFFF7AB4  - AFL multiplier output (stack[4])
+       0xFFFF73A4  - fuel correction A
+       0xFFFF7A08  - fuel correction B
+       0xFFFF7BC4  - fuel correction C (used as global scaler FR12)
+       0xFFFF76D4  - fuel enrichment A
+       0xFFFF7878  - fuel enrichment B
+       0xFFFF7AE4  - fuel enrichment C
+       0xFFFF7344  - fuel struct base pointer (R13, for per-cylinder data)
+       0xFFFF7B6C..7B78 - fuel blend factors (4 floats)
+     - COMPUTATION:
+       Step 1: FR8 = enrichA + enrichB + enrichC    (sum of enrichment terms)
+       Step 2: FR8 = FR8 * base_factor              (scale by base)
+       Step 3: FR13 = FR8 (intermediate result)
+       Step 4: FR13 *= [struct-56]                   (additional scaler)
+       Step 5: FR9 = AFL_multiplier * FR8            (AFL applied at 0x30230)
+       Step 6: Multiple per-cylinder corrections via struct offsets
+       Step 7: Calls float_clamp_apply (0xBE56C) 8 TIMES
+               with blend factors for per-cylinder pulse width computation
+       Step 8: Results stored to fuel_struct_base (0xFFFF7344) at offsets
+               -36, 0, -32, -12, -28, -24, -20, -16
+               These are 8 per-cylinder pulse width values
+     - OUTPUT:
+       8 float values in the 0xFFFF7344 struct (4 cylinders x 2 banks?)
+       These feed into the hardware interface
+
+1.5  injector_trim_application @ 0x37ABA (146 bytes)
+     - Handles AFL learning table updates
+     - INPUTS:
+       0xFFFF6364  - RPM (float)
+       0xFFFF6350  - ECT (float)
+       0xFFFF31AC  - primary AFL learning data
+       0xFFFF31A4  - secondary AFL learning data
+     - Gate: RPM > threshold (0xCC308), ECT within range (0xCC30C)
+     - Calls 0xBEA40 (interpolation) twice with different parameters
+     - Calls 0xBDBCC (learning table write) twice
+     - Calls 0x37F00 (afl_multiplier_computation)
+     - Writes 1.0 to afl_multiplier_output (0xFFFF7AB4) as reset
+
+1.6  InjectorFlowScaling @ 0xCBE0C
+     - Value: 4916.0 (both stock and mod)
+     - Nearby calibration constants:
+       0xCBE00: 0.65  (duty cycle limit?)
+       0xCBE04: 0.52  (another limit)
+       0xCBE08: 300.0 (RPM threshold?)
+       0xCBE10: 119.0 (temperature?)
+       0xCBE14: 10000.0 (max RPM disable)
+
+1.7  CrankingFuel_IPW_A @ 0xCD2E6
+     - 16-entry ECT-indexed table for cold-start injection pulse width
+     - Range: 68.4ms (cold) down to 2.4ms (hot)
+     - Stock and mod values identical (not tuned)
+
+
+================================================================================
+STAGE 2: HARDWARE INTERFACE — ATU & TIMER REGISTERS
+================================================================================
+
+The SH7058 uses an Advanced Timer Unit (ATU) at 0xFFFF4000-0xFFFF40FF
+for crank-angle synchronized injection and ignition events.
+
+2.1  Key ATU Registers Identified
+
+  ADDRESS       REFS  LIKELY FUNCTION
+  0xFFFF4024     36   Primary ATU control register (master timing)
+  0xFFFF40C8     17   ATU compare register (injection window timing)
+  0xFFFF40E0      5   ATU output register (injection/ignition output control)
+  0xFFFF40C0      3   ATU counter register
+  0xFFFF40C4      2   ATU compare register B
+  0xFFFF40D0      2   ATU control extension
+  0xFFFF40D4      2   ATU mode register
+  0xFFFF40D8      2   ATU configuration
+  0xFFFF40B4      2   ATU channel control
+
+2.2  InternalIO Registers (0xFFFF2000-0xFFFF3FFF)
+
+  These are the SH7058's extended I/O registers controlling port output,
+  injection driver enable, and diagnostic multiplexing.
+
+  MOST REFERENCED:
+  0xFFFF3B06     44   Likely injection/ignition output port control
+  0xFFFF399E     33   Port status/configuration
+  0xFFFF366C     31   Injection driver control register
+  0xFFFF3836     31   Ignition driver control register
+  0xFFFF251C     30   ATU/port enable register
+  0xFFFF36F4     19   Output timing register
+  0xFFFF36F0     18   Output timing register
+  0xFFFF3480     18   Port output data register
+  0xFFFF233C     16   Timer configuration
+  0xFFFF25CC     16   Output compare configuration
+
+2.3  ISR Dispatch Table @ 0x0E5EC (54 handlers)
+
+  The ISR system uses a dispatch table to route interrupts to handlers.
+  Key injection/ignition-relevant handlers:
+
+  INDEX  HANDLER     ROM REGION    LIKELY FUNCTION
+  [ 2]   0x005840    Low ROM       ATU/timer ISR (accesses 0xFFFF4024)
+  [ 3]   0x00D658    Low ROM       ATU timing ISR
+  [15]   0x04A94C    Scheduler     Task scheduler dispatch
+  [21]   0x04793C    Scheduler     Injection timing event?
+  [22]   0x048732    Scheduler     Injection output event?
+  [26]   0x047B66    Scheduler     Injection window handler?
+  [27]   0x049A7A    Scheduler     Output scheduling
+  [28]   0x00C36C    Low ROM       ATU capture ISR
+  [30]   0x049BA4    Scheduler     Secondary output
+  [31]   0x00C370    Low ROM       ATU capture ISR (paired with [28])
+  [34]   0x00D4FC    Low ROM       ATU compare ISR
+  [37]   0x04A03E    Scheduler     Timing completion handler
+  [41]   0x04A420    Scheduler     Output driver control
+  [42]   0x04A674    Scheduler     Output driver A
+  [43]   0x04A6C6    Scheduler     Output driver B
+  [44]   0x04A6FA    Scheduler     Output driver C
+
+
+================================================================================
+STAGE 3: ISR-DRIVEN INJECTION EVENTS
+================================================================================
+
+3.1  Active Exception Vectors (hardware interrupts)
+
+  VEC 103 - MTU4_TGID4  @ 0x00000FEC  (timer compare match D, channel 4)
+  VEC 104 - MTU4_TCIV4  @ 0x00000FF8  (timer overflow, channel 4)
+  VEC 107 - MTU5_TGIW5  @ 0x00000040  (input capture W, channel 5)
+  VEC 108 - POE0_OEI1   @ 0x00000FE4  (port output enable interrupt)
+
+  Additional SH7058-specific vectors:
+  VEC 202 @ 0x00000DA8  (ATU channel interrupt)
+  VEC 204 @ 0x00000DE4  (ATU channel interrupt)
+  VEC 206 @ 0x00000DCC  (ATU channel interrupt)
+
+3.2  Injection Timing Flow (reconstructed)
+
+  1. CRANK SYNC: MTU5 input capture (Vec 107 @ 0x40) captures crank
+     position from sensor signal. This establishes engine position.
+
+  2. ANGLE CALCULATION: ISR handlers compute injection start angle
+     based on: engine speed, calculated pulse width, injection advance.
+
+  3. TIMER ARMING: ATU compare registers (0xFFFF40C8, 0xFFFF40C0)
+     are loaded with the computed angle count. When the crank reaches
+     this position, the compare match fires.
+
+  4. INJECTION START: Compare match ISR (likely handler [21] or [22]
+     at 0x47xxx) activates the injector driver via InternalIO port
+     writes (0xFFFF366C, 0xFFFF3B06).
+
+  5. INJECTION END: A second timer event (overflow or second compare)
+     deactivates the driver after the calculated pulse width time.
+
+  6. PORT OUTPUT ENABLE: POE (Vec 108 @ 0xFE4) provides hardware
+     safety — if the CPU loses control, POE automatically disables
+     injector outputs to prevent flooding/damage.
+
+3.3  injector_data @ 0xFFFF895C (28 pool references)
+
+  This widely-referenced float value is consumed by multiple subsystems:
+  - Task 38 (ign_output @ 0x42A78) — uses it for ignition decisions
+  - Code at 0x023D, 0x0248, 0x02B7, 0x0306, 0x0377, 0x0383, 0x038A,
+    0x03AD, 0x03EB regions
+
+  Despite its name, injector_data appears to be a SHARED fuel system
+  state variable read by both fuel injection AND ignition timing code.
+  It likely holds the current effective fuel multiplier or commanded
+  pulse width used to coordinate ignition timing with fuel delivery.
+
+
+================================================================================
+TASK 46-48 CORRECTION: THESE ARE IGNITION TIMING
+================================================================================
+
+Previous analysis incorrectly classified tasks 46-48 as injection
+timing. They are actually IGNITION timing compensation:
+
+Task 46 "inj_mps_timing" @ 0x43368 (156 bytes)
+  ACTUAL FUNCTION: MPS-based ignition timing compensation
+  - Reads MAF voltage, boost pressure, manifold pressure
+  - Does table_desc_lookup on descriptor 0xAE260 (timing comp table)
+  - Applies LowPW_TableProcessor for low-load timing adjustment
+  - Reads indexed timing arrays from maf_voltage_b/inj_timing_state
+  - FMAC computation with calibration at 0xD2D1C (timing gain)
+  - Clamps result (bounds from 0xD2D18, 0xD2D14)
+  - Writes to inj_pw_primary @ 0xFFFF80E4 (should be renamed
+    "timing_comp_mps")
+
+Task 47 "mapswitch_lowpw" @ 0x43464 (190 bytes)
+  ACTUAL FUNCTION: Map switch + low-load timing deactivation
+  - Gate conditions: engine_load in range, ECT byte, various status flags
+  - Calls LowPW_TableProcessor on descriptor 0xAE000
+  - Manages counter at inj_comp_state @ 0xFFFF80EC
+  - Second half: adjusts stored timing value based on counter state
+
+Task 48 "final_timing" @ 0x4359C (328 bytes)
+  ACTUAL FUNCTION: Final ignition timing output with gear-based selection
+  - Reads engine_load_float, RPM_float
+  - sub_436B6: hysteresis threshold check on engine_load/RPM
+    sets final_timing_output[0] and [1] flags
+  - SWITCH on boost_pressure_w (0xFFFF6812) values 1-5:
+    Each selects a DIFFERENT ignition timing map descriptor:
+      Mode 1: desc 0xAE54C
+      Mode 2: desc 0xAE568
+      Mode 3: desc 0xAE584
+      Mode 4: desc 0xAE5A0
+      Mode 5: desc 0xAE5BC
+    These are likely per-gear or per-operating-mode timing maps
+  - Each calls 0xBE8E4 (2D table lookup) with load x RPM
+  - Final result multiplied by cal at 0xD2D48 (timing scaler)
+  - Writes to final_timing_output @ 0xFFFF80F8
+
+
+================================================================================
+KEY RAM ADDRESSES — COMPLETE FUEL INJECTION PIPELINE
+================================================================================
+
+  ADDRESS      TYPE    NAME                    DESCRIPTION
+  ----------   -----   ----------------------  ----------------------------------
+  SOFTWARE FUEL CALCULATION:
+  0xFFFF77BC   struct  fuel_pipeline_base      GBR base for aggregator
+  0xFFFF7828   struct  aggregator_struct       Main fuel aggregation working area
+  0xFFFF7904   float   aggregator_output       Fuel correction output
+  0xFFFF7344   struct  fuel_per_cyl_struct     Per-cylinder pulse width outputs
+  0xFFFF7348   float   fuel_base_factor        Base fuel factor
+  0xFFFF7AB4   float   afl_multiplier_output   AFL correction multiplier
+  0xFFFF73A4   float   fuel_correction_A       Fuel correction term A
+  0xFFFF7A08   float   fuel_correction_B       Fuel correction term B
+  0xFFFF7BC4   float   fuel_correction_C       Global scaler (FR12)
+  0xFFFF76D4   float   fuel_enrichment_A       Enrichment term A
+  0xFFFF7878   float   fuel_enrichment_B       Enrichment term B
+  0xFFFF7AE4   float   fuel_enrichment_C       Enrichment term C
+  0xFFFF7B6C   float   fuel_blend_A            Per-cyl blend factor A
+  0xFFFF7B70   float   fuel_blend_B            Per-cyl blend factor B
+  0xFFFF7B74   float   fuel_blend_C            Per-cyl blend factor C
+  0xFFFF7B78   float   fuel_blend_D            Per-cyl blend factor D
+
+  SHARED STATE:
+  0xFFFF895C   float   injector_data           Fuel system state (shared w/ ign)
+  0xFFFF74BC   byte    fuel_corr_mode          Aggregator mode flag
+  0xFFFF74BD   byte    fuel_corr_status        Aggregator status flag
+
+  AFL LEARNING:
+  0xFFFF31A4   struct  afl_learning_secondary  Secondary AFL table data
+  0xFFFF31AC   struct  afl_learning_primary    Primary AFL table data
+  0xFFFF7AD8   struct  afl_working_struct      AFL computation workspace
+  0xFFFF726C   byte    transient_flag          Gates AFL application
+  0xFFFF7C68   byte    engine_status_flag      Abnormal condition flag
+
+  IGNITION TIMING (renamed from injection):
+  0xFFFF80E4   struct  timing_comp_mps         MPS timing compensation output
+  0xFFFF80EC   struct  timing_comp_lowpw       Low-PW timing state/counter
+  0xFFFF80F8   struct  final_timing_output     Final ignition timing + flags
+
+
+================================================================================
+KEY CALIBRATION TABLES
+================================================================================
+
+  ADDRESS     NAME                    FORMAT      DESCRIPTION
+  ---------   ----------------------  ----------  -----------------------------
+  0xCBE0C     InjectorFlowScaling     float32     4916.0 (injector flow rate)
+  0xCBE00     DutyCycleLimit?         float32     0.65
+  0xCBE04     DutyCycleLimitB?        float32     0.52
+  0xCBE08     RPMThreshold?           float32     300.0
+  0xCBF3C     FuelClampLow            float32     (lower bound for fuel corr)
+  0xCBF4C     FuelCorrOffset          float32     (additive fuel offset)
+  0xCBF50..68 FuelModeThresholds      float32×7   (mode-switching thresholds)
+  0xCC2F0     AFLLoadThreshold        float32     (min load for AFL)
+  0xCC308     AFLRPMThreshold         float32     (min RPM for AFL trim)
+  0xCC30C     AFLECTThreshold         float32     (ECT gate for AFL)
+  0xCD2E6     CrankingFuel_IPW_A      uint16×16   68.4ms-2.4ms (ECT indexed)
+  0xD106C     InjectorLatency         uint16×15   Dead-time table (3×5, voltage)
+  0xD108C     InjLatencyAxis          float32×3   Voltage axis: 5.0, 7.0, 10.0V
+
+  IGNITION TIMING:
+  0xD2D14     TimingCompClampLow      float32     MPS timing lower bound
+  0xD2D18     TimingCompClampHigh     float32     MPS timing upper bound
+  0xD2D1C     TimingCompGain          float32     MPS timing FMAC gain
+  0xD2D38     EngLoadThreshHigh       float32     Task48 hysteresis high
+  0xD2D3C     EngLoadThreshLow        float32     Task48 hysteresis low
+  0xD2D40     RPMThreshHigh           float32     Task48 RPM hysteresis high
+  0xD2D44     RPMThreshLow            float32     Task48 RPM hysteresis low
+  0xD2D48     TimingScaler            float32     Final timing multiplier
+
+  DESCRIPTORS (ignition timing maps, per-gear):
+  0xAE54C     TimingMap_Mode1         2D RPM×Load (gear 1 or mode 1)
+  0xAE568     TimingMap_Mode2         2D RPM×Load
+  0xAE584     TimingMap_Mode3         2D RPM×Load
+  0xAE5A0     TimingMap_Mode4         2D RPM×Load
+  0xAE5BC     TimingMap_Mode5         2D RPM×Load
+
+
+================================================================================
+REMAINING WORK / OPEN QUESTIONS
+================================================================================
+
+1. INJECTION DRIVER OUTPUT CODE: The ISR handlers at 0x047xxx and the
+   InternalIO writes at 0xFFFF366C/0xFFFF3B06 need full disassembly to
+   understand per-cylinder sequencing and injection-end detection.
+
+2. ATU REGISTER SEMANTICS: The 36 references to 0xFFFF4024 span many
+   functions. Need to determine which ATU channels control injection vs
+   ignition, and how angle-to-time conversion works.
+
+3. DEAD TIME APPLICATION: InjectorLatency at 0xD106C uses a 3-row ×
+   5-column uint16 format indexed by voltage. Need to trace where in
+   the code this table is read and added to the pulse width.
+
+4. PER-CYLINDER SEQUENCING: fuel_pulse_width_calc outputs 8 values.
+   How these map to the 4-cylinder EJ255 firing order (1-3-2-4) needs
+   clarification. May be: 4 cylinders × 2 injection events (sequential
+   injection with primary + secondary, or paired injection).
+
+5. INJECTOR_DATA TRUE NATURE: The 28-reference float at 0xFFFF895C
+   is shared between fuel and ignition systems. Its exact semantic
+   (commanded IPW? fuel multiplier? effective lambda?) needs tracing
+   from its write site.
+
+6. BOOST_PRESSURE_W MODES: Task 48 switches on values 1-5 from
+   0xFFFF6812. Need to determine what sets these values (gear detection?
+   boost modes? operating states?) to understand the timing map selection.
+
+
+================================================================================
+STAGE 3 DEEP DIVE: ISR HANDLERS — CRANK-ANGLE INJECTION ENGINE
+================================================================================
+
+3.4  ISR[2] @ 0x5840 — CRANK-ANGLE INTERPOLATION ENGINE (268 bytes)
+
+  This is the CORE angle-to-time conversion function that makes hardware
+  injection timing work. Called from the ISR dispatch table.
+
+  HARDWARE REGISTERS:
+    R4 = ATU_primary_ctrl (0xFFFF4024) — master timing register
+    R12 = 0xFFFF4120 — ATU output timing channel A
+    R10 = 0xFFFF4124 — ATU output timing channel B
+
+  ALGORITHM:
+    1. Read timer capture values: ATU+18 (0xFFFF4036), ATU+20 (0xFFFF4038)
+       These are crank tooth arrival timestamps from hardware capture.
+
+    2. Compare against threshold pairs:
+       0xFFFF8DA8 — upper threshold (per-channel, 2 entries)
+       0xFFFF8DAC — lower threshold (per-channel, 2 entries)
+
+    3. Counter management at 0xFFFF4124+channel:
+       Increments on threshold match (max 255)
+       Resets on threshold miss
+
+    4. ANGLE-TO-TIME INTERPOLATION (the key operation at 0x58D4):
+       - Read float calibration from 0xC008C (ROM)
+       - Read float state from 0xFFFF8DA0 (per-channel)
+       - Convert timer uint16 to float
+       - FMAC: FR2 = FR2 + FR0 * FR3
+         This interpolates between two crank tooth positions to compute
+         the exact injection/ignition event time within a tooth period.
+       - Write result to 0xFFFF4118+offset (ATU output timing)
+
+    5. Loop processes 2 channels (R4 counts 0→1→done)
+       This handles two independent output events per interrupt cycle.
+
+  SIGNIFICANCE:
+    This function bridges crank position sensing to injection/ignition
+    output timing. The FMAC interpolation gives sub-tooth-period precision
+    (~0.1 degree resolution at typical crank speeds).
+
+
+3.5  ISR[3] @ 0xD658 — SECOND ATU CHANNEL SET (192 bytes)
+
+  Same algorithm as ISR[2] but operates on different ATU channels:
+    R12 = 0xFFFF44BC — ATU output timing channel C
+    R10 = 0xFFFF44C0 — ATU output timing channel D
+
+  This provides a second pair of injection/ignition output channels,
+  giving the ECU 4 independent crank-angle-synchronized outputs total
+  (matching the 4-cylinder EJ255 engine).
+
+
+3.6  ISR[21] @ 0x4793C — INJECTION ENABLE/GATE LOGIC (616 bytes)
+
+  High-level injection dispatch handler with extensive safety gating.
+
+  STARTUP SEQUENCE:
+    1. Call 0x5B5D8 — sensor processing
+    2. Call 0x5B690 — sensor validation
+    3. Call 0x951F8 — diagnostic check
+    4. Call 0x5B73C — engine state update
+    5. Call 0x5CB1C — timing state update
+
+  DESCRIPTOR LOOP A (8-byte stride, 0xFFFF3D08→0xFFFF3D10):
+    Calls desc_read_float_safe (0xBDBCC) on each descriptor entry.
+    If ANY entry is non-zero (signed test), sets R11=1 (fault flag).
+
+  DESCRIPTOR LOOP B (2-byte stride, 0xFFFF3D18→0xFFFF3D1C):
+    Calls 0xBE980 on each entry.
+    If ANY entry is non-zero, sets R12=1 (fault flag).
+
+  GATE CHAIN (8 sequential checks, any failure → abort at 0x47B50):
+    1. R11 (descriptor fault A) → if set, abort
+    2. R12 (descriptor fault B) → if set, abort
+    3. Call 0x4BEC — engine running check
+    4. Call 0x983B4 — diagnostic status check
+    5. Call 0x9845C — sensor validity check
+    6. Call 0x11E4C — timing reference check
+    7. Call 0x128D8 — crank sync check
+    8. Call 0x14274 — additional safety check
+
+  If all gates pass: proceeds to injection event scheduling.
+  If ANY gate fails: jumps to 0x47B50 (injection disabled).
+
+  READS: io_reg_36BE (0xFFFF36BE) — port status for injection driver
+
+
+3.7  ISR[22] @ 0x48732 — INJECTION PULSE WIDTH APPLICATION (426 bytes)
+
+  Converts computed fuel pulse width to hardware timer values.
+
+  Contains embedded data tables (jump table at 0x04874A-0x047BA2 with
+  subroutine addresses and calibration offsets for per-cylinder control).
+
+  READS: 0xFFFF36BE (port status), 0xFFFF3D08 struct (fuel state)
+  USES: Floating-point operations (fadd, fmov.s, fcmp) for pulse width
+        scaling and conversion to timer counts.
+
+  Key subroutine calls at offsets in the jump table:
+    0x06CDDC, 0x07F02C, 0x08E3E4, 0x081A64, 0x082A9C, 0x0839F8,
+    0x0843AC, 0x084A28, 0x08C31E
+
+  These are likely per-cylinder injection output functions.
+
+
+3.8  Vec 202 @ 0xDA8 — ATU STATUS ACKNOWLEDGE (36 bytes)
+
+  Short ISR handler that:
+    1. Sets bit 0 of ATU status word at @R4
+    2. Polls bit 3 of @R5 (busy flag) with 290-iteration timeout
+    3. Clears bit 0 via AND with 0xFFFE
+  This is standard hardware interrupt acknowledge + busy-wait.
+
+
+3.9  Vec 204 @ 0xDE4 — ATU EVENT SETUP (160 bytes)
+
+  Configures ATU compare registers for injection/ignition events:
+    1. Creates bit mask from channel number (R4) via shift loop
+    2. Reads ATU output configuration word, modifies channel bits
+    3. Handles two paths:
+       a) Direct: write 16-bit timing value to @R12 (ATU compare)
+       b) Split: separate high/low word handling for 32-bit timing
+    4. Writes port control value at R12+4 (enable output)
+    5. Zeros 8 bytes at R13 (clear counter/status area)
+  This is the function that ARMS the injection hardware — it loads
+  the computed timing into ATU compare registers so the hardware
+  fires the injector at the correct crank angle.
+
+
+3.10  Vec 206 @ 0xDCC — ATU BUSY-WAIT (24 bytes)
+
+  Same polling pattern as Vec 202: wait for ATU bit 3 with 290
+  iteration timeout. Used for synchronization between ATU channels.
+
+
+================================================================================
+COMPLETE INJECTION PIPELINE — END TO END
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │ SOFTWARE FUEL CALCULATION (scheduler, floating-point)       │
+  │                                                             │
+  │ CL_fuel_dispatcher (0x33304)                                │
+  │   └→ 9-stage AFC pipeline                                   │
+  │       └→ fuel_aggregator_tail (0x33460)                     │
+  │           Output: fuel correction factor [0.75, 1.25]       │
+  │                                                             │
+  │ afl_application (0x37B74)                                   │
+  │   Output: afl_multiplier @ 0xFFFF7AB4                       │
+  │                                                             │
+  │ fuel_pulse_width_calc (0x301E4)                             │
+  │   Inputs: enrichment + base factor + AFL multiplier         │
+  │   Output: 8 per-cylinder PW values @ 0xFFFF7344 struct      │
+  └──────────────────────┬──────────────────────────────────────┘
+                         │
+                         ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ ISR INJECTION GATE (ISR[21] @ 0x4793C)                      │
+  │                                                             │
+  │ 8 safety checks: engine running, sensors valid,             │
+  │ crank sync OK, diagnostics clear, timing reference valid    │
+  │ If ANY fail → injection disabled                            │
+  └──────────────────────┬──────────────────────────────────────┘
+                         │ (all gates pass)
+                         ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ PULSE WIDTH APPLICATION (ISR[22] @ 0x48732)                 │
+  │                                                             │
+  │ Converts float PW → hardware timer counts                   │
+  │ Per-cylinder dispatch via embedded jump table                │
+  │ Applies dead time (InjectorLatency) and voltage comp        │
+  └──────────────────────┬──────────────────────────────────────┘
+                         │
+                         ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ ATU EVENT SETUP (Vec 204 @ 0xDE4)                           │
+  │                                                             │
+  │ Loads timing value → ATU compare register                   │
+  │ Configures output port enable bits                          │
+  │ Arms hardware for injection event                           │
+  └──────────────────────┬──────────────────────────────────────┘
+                         │
+                         ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ CRANK-ANGLE INTERPOLATION (ISR[2] @ 0x5840, ISR[3] @ 0xD658)│
+  │                                                              │
+  │ Reads crank tooth captures from ATU_primary_ctrl+18/+20      │
+  │ FMAC interpolation for sub-tooth-period precision            │
+  │ Writes precise timing to ATU output registers:               │
+  │   Channels A+B: 0xFFFF4118-0xFFFF4120 (ISR[2])              │
+  │   Channels C+D: 0xFFFF44BC-0xFFFF44C0 (ISR[3])              │
+  │ = 4 independent channels for 4 cylinders                     │
+  └──────────────────────┬──────────────────────────────────────┘
+                         │
+                         ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ HARDWARE OUTPUT (ATU compare match → port pin toggle)        │
+  │                                                             │
+  │ ATU compare match fires → toggles injector driver pin       │
+  │ InternalIO ports: 0xFFFF366C (injection), 0xFFFF3836 (ign)  │
+  │ POE safety (Vec 108): emergency injector disable            │
+  │                                                             │
+  │ 4 channels → 4 cylinders (EJ255 firing order: 1-3-2-4)     │
+  └─────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+ATU REGISTER MAP (reconstructed)
+================================================================================
+
+  Base: 0xFFFF4024 (ATU_primary_ctrl, 36 code refs)
+
+  OFFSET  ADDRESS       REFS  FUNCTION
+  +0x00   0xFFFF4024     36   Control/status register (master)
+  +0x12   0xFFFF4036      -   Timer capture A (read by ISR[2])
+  +0x14   0xFFFF4038      -   Timer capture B (read by ISR[2])
+
+  Related ATU registers:
+  0xFFFF4118      -   Output timing channel A (written by ISR[2])
+  0xFFFF4120      -   Output timing channel B (written by ISR[2])
+  0xFFFF4124      -   Counter/threshold channel (ISR[2])
+
+  Second channel set (ISR[3]):
+  0xFFFF44BC      -   Output timing channel C
+  0xFFFF44C0      -   Output timing channel D
+
+  ATU compare/output:
+  0xFFFF40C0      3   Counter register
+  0xFFFF40C4      2   Compare register B
+  0xFFFF40C8     17   Compare register (injection/ignition window)
+  0xFFFF40E0      5   Output control register
+
+  Working RAM:
+  0xFFFF8DA0      -   Per-channel float state (ISR[2] interpolation)
+  0xFFFF8DA8      -   Upper threshold array (2×uint16)
+  0xFFFF8DAC      -   Lower threshold array (2×uint16)
+
+  Injection state:
+  0xFFFF3D08      -   Injection descriptor struct (8-byte entries)
+  0xFFFF3D10      -   Injection descriptor end pointer
+  0xFFFF3D18      -   Injection status array (2-byte entries)
+  0xFFFF3D1C      -   Injection status end pointer
+  0xFFFF36BE      -   Injection/ignition port status word
+
+
+================================================================================
+SCRIPTS PRODUCED
+================================================================================
+
+  disasm_fuel_pw_calc.py    - Layer 1: fuel_pulse_width_calc @ 0x301E4
+  disasm_injector_comp.py   - Layer 2: injector comp, AFL, trim, latency table
+  disasm_inj_tasks.py       - Layer 3+4: Tasks 46-48, aggregator, task38
+  disasm_inj_output.py      - Layer 5+6: HW register scan, ISR table, vectors
+  disasm_inj_isr.py         - Layer 6+: ISR handlers, ATU write sites, port writes

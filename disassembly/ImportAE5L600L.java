@@ -2587,6 +2587,196 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AF0C8L, "desc_2D_range_150_600_xIAT_u8_17x9_AF0C8");
 
 
+        // =====================================================================
+        // FUEL INJECTION TIMING ANALYSIS — New labels from end-to-end trace
+        // =====================================================================
+
+        // -- Fuel Aggregation --
+        count += labelComment(0x00033460, "fuel_aggregator_tail",
+            "Fuel correction aggregator (620 bytes). GBR=FFFF77BC. Uses FFFF7828 struct. "
+            + "Computes final fuel correction factor, clamps [0.75, 1.25]. Writes to FFFF74BC/BD mode flags.");
+
+        // -- Fuel Pipeline RAM --
+        count += labelComment(0xFFFF77BC, "fuel_pipeline_base",
+            "GBR base for fuel aggregator pipeline. Struct contains fuel correction state.");
+        count += labelComment(0xFFFF7828, "aggregator_struct_base",
+            "Major struct base for fuel aggregation (R9 in aggregator). Offsets -108 to -12 hold working values.");
+        count += labelComment(0xFFFF7904, "aggregator_fuel_output",
+            "Fuel correction output (float). Written by aggregator_tail. Prior cycle value read as input.");
+        count += labelComment(0xFFFF7344, "fuel_per_cyl_struct",
+            "Per-cylinder pulse width struct. 8 float outputs written by fuel_pulse_width_calc at offsets -36,0,-32,-12,-28,-24,-20,-16.");
+        count += labelComment(0xFFFF7348, "fuel_base_factor",
+            "Base fuel factor (float). Input to fuel_pulse_width_calc — multiplied by enrichment sum.");
+        count += labelComment(0xFFFF73A4, "fuel_correction_A",
+            "Fuel correction term A (float). Input to fuel_pulse_width_calc.");
+        count += labelComment(0xFFFF7A08, "fuel_correction_B",
+            "Fuel correction term B (float). Input to fuel_pulse_width_calc.");
+        count += labelComment(0xFFFF7BC4, "fuel_correction_C",
+            "Fuel correction C / global scaler (float). Used as FR12 in fuel_pulse_width_calc — multiplied into every term.");
+        count += labelComment(0xFFFF76D4, "fuel_enrichment_A",
+            "Fuel enrichment term A (float). Summed with B+C then multiplied by base factor.");
+        count += labelComment(0xFFFF7878, "fuel_enrichment_B",
+            "Fuel enrichment term B (float). Summed with A+C.");
+        count += labelComment(0xFFFF7AE4, "fuel_enrichment_C",
+            "Fuel enrichment term C (float). Summed with A+B.");
+        count += labelComment(0xFFFF7B6C, "fuel_blend_A",
+            "Per-cylinder fuel blend factor A (float). Used by float_clamp_apply in PW calc.");
+        count += labelComment(0xFFFF7B70, "fuel_blend_B",
+            "Per-cylinder fuel blend factor B (float).");
+        count += labelComment(0xFFFF7B74, "fuel_blend_C",
+            "Per-cylinder fuel blend factor C (float).");
+        count += labelComment(0xFFFF7B78, "fuel_blend_D",
+            "Per-cylinder fuel blend factor D (float).");
+        count += labelComment(0xFFFF74BC, "fuel_corr_mode_flag",
+            "Fuel correction mode flag (byte). Written by aggregator at GBR+0x6C.");
+        count += labelComment(0xFFFF74BD, "fuel_corr_status_flag",
+            "Fuel correction status flag (byte). Written by aggregator at GBR+0x6D.");
+
+        // -- AFL Working RAM --
+        count += labelComment(0xFFFF7AD8, "afl_working_struct",
+            "AFL computation workspace struct. R13 base in afl_application. Engine load stored at -4, ECT at +0.");
+
+        // -- Ignition Timing Corrections (RENAMED from inj_*) --
+        count += labelComment(0xFFFF80E4, "timing_comp_mps",
+            "MPS-based ignition timing compensation (struct). Written by task46. NOT injection PW.");
+        count += labelComment(0xFFFF80EC, "timing_comp_lowpw_state",
+            "Low-PW ignition timing deactivation state (struct). Written by task47. Counter + flags.");
+        count += labelComment(0xFFFF80F8, "final_ign_timing_output",
+            "Final ignition timing output (struct). Written by task48. [0]=load flag, [1]=RPM flag, [-4]=timing value, [-8]=scaled output.");
+
+        // -- Task Corrections --
+        count += labelComment(0x00043368, "task46_ign_timing_mps",
+            "IGNITION timing MPS compensation. Reads MAF/boost/MPS, writes timing_comp_mps. NOT fuel injection.");
+        count += labelComment(0x00043464, "task47_ign_timing_lowpw",
+            "IGNITION timing low-PW deactivation + map switch. Gate logic for timing comp. NOT fuel injection.");
+        count += labelComment(0x0004359C, "task48_ign_timing_final",
+            "IGNITION final timing output. Switch on boost_pressure_w (1-5) selects per-mode timing maps. NOT fuel injection.");
+        count += labelComment(0x000436B6, "task48_load_rpm_hysteresis",
+            "Task48 subroutine: engine_load/RPM hysteresis check. Sets flags at final_ign_timing_output[0,1].");
+
+        // -- ATU Hardware --
+        count += labelComment(0xFFFF4024, "ATU_primary_ctrl",
+            "ATU primary control register. 36 code refs — master injection/ignition angle timing.");
+        count += labelComment(0xFFFF40C8, "ATU_compare_reg",
+            "ATU compare register. 17 code refs — injection/ignition window timing.");
+        count += labelComment(0xFFFF40E0, "ATU_output_ctrl",
+            "ATU output control register. 5 refs — injection/ignition driver output control.");
+
+        // -- InternalIO Ports (injection/ignition driver) --
+        count += labelComment(0xFFFF3B06, "io_inj_ign_port_ctrl",
+            "InternalIO port control (44 refs). Likely injection/ignition output port enable.");
+        count += labelComment(0xFFFF366C, "io_inj_driver_ctrl",
+            "InternalIO injection driver control register (31 refs).");
+        count += labelComment(0xFFFF3836, "io_ign_driver_ctrl",
+            "InternalIO ignition driver control register (31 refs).");
+
+        // -- Calibration --
+        count += labelComment(0x000CBF4C, "fuel_corr_offset",
+            "Fuel correction additive offset (float). Added in aggregator.");
+        count += labelComment(0x000CBF3C, "fuel_clamp_low",
+            "Fuel correction lower clamp bound (float).");
+        count += labelComment(0x000D2D38, "ign_engload_thresh_high",
+            "Task48 engine load hysteresis high threshold (float).");
+        count += labelComment(0x000D2D3C, "ign_engload_thresh_low",
+            "Task48 engine load hysteresis low threshold (float).");
+        count += labelComment(0x000D2D40, "ign_rpm_thresh_high",
+            "Task48 RPM hysteresis high threshold (float).");
+        count += labelComment(0x000D2D44, "ign_rpm_thresh_low",
+            "Task48 RPM hysteresis low threshold (float).");
+        count += labelComment(0x000D2D48, "ign_timing_scaler",
+            "Final ignition timing scaler (float). Multiplied with timing map output in task48.");
+
+        // -- Ignition Timing Map Descriptors (per-mode) --
+        count += labelComment(0x000AE54C, "desc_ign_timing_mode1",
+            "Ignition timing map, mode/gear 1. 2D RPM x Load lookup.");
+        count += labelComment(0x000AE568, "desc_ign_timing_mode2",
+            "Ignition timing map, mode/gear 2. 2D RPM x Load lookup.");
+        count += labelComment(0x000AE584, "desc_ign_timing_mode3",
+            "Ignition timing map, mode/gear 3. 2D RPM x Load lookup.");
+        count += labelComment(0x000AE5A0, "desc_ign_timing_mode4",
+            "Ignition timing map, mode/gear 4. 2D RPM x Load lookup.");
+        count += labelComment(0x000AE5BC, "desc_ign_timing_mode5",
+            "Ignition timing map, mode/gear 5. 2D RPM x Load lookup.");
+
+        // -- ISR Dispatch Table --
+        count += labelComment(0x0000E5EC, "isr_dispatch_table",
+            "ISR dispatch table (54 entries x 4 bytes). Maps ISR index to handler address.");
+
+        // -- Shared Fuel/Ignition State --
+        count += labelComment(0xFFFF895C, "fuel_ign_shared_state",
+            "Shared fuel/ignition state (float). 28 pool refs. Read by task38_ign_output. "
+            + "Previously labeled injector_data — used by BOTH fuel injection and ignition timing systems.");
+
+        // =====================================================================
+        // ISR HANDLERS — Injection/Ignition Hardware Interface
+        // =====================================================================
+
+        // -- Crank-Angle Interpolation Engine --
+        count += labelComment(0x00005840, "isr2_crank_angle_interp_AB",
+            "ISR[2]: Crank-angle interpolation engine for channels A+B (268 bytes). "
+            + "Reads ATU captures at +18/+20, compares thresholds at FFFF8DA8/8DAC, "
+            + "FMAC interpolates between crank teeth, writes to FFFF4118/4120. "
+            + "This is the core angle-to-time conversion for injection/ignition.");
+        count += labelComment(0x0000D658, "isr3_crank_angle_interp_CD",
+            "ISR[3]: Same as ISR[2] but for channels C+D (192 bytes). "
+            + "Uses FFFF44BC/44C0 output registers. Together with ISR[2] provides 4 channels for 4 cylinders.");
+
+        // -- Injection Enable/Gate --
+        count += labelComment(0x0004793C, "isr21_injection_gate_logic",
+            "ISR[21]: Injection enable/gate logic (616 bytes). Calls 5 sensor/state update subs, "
+            + "loops through descriptors at FFFF3D08-3D10, runs 8 sequential safety gate checks. "
+            + "ALL gates must pass for injection to proceed. Any failure → injection disabled at 047B50.");
+        count += labelComment(0x00048732, "isr22_injection_pw_apply",
+            "ISR[22]: Injection pulse width application (426 bytes). Converts float PW to timer counts. "
+            + "Contains embedded per-cylinder jump table. Reads port status FFFF36BE and fuel state FFFF3D08.");
+        count += labelComment(0x00047B66, "isr26_injection_window",
+            "ISR[26]: Injection window handler (62 bytes).");
+
+        // -- ATU Event Handlers (exception vectors) --
+        count += labelComment(0x00000DA8, "vec202_atu_status_ack",
+            "Vec 202: ATU status acknowledge + busy-wait. Sets bit 0, polls bit 3 with 290-iter timeout, clears bit 0.");
+        count += labelComment(0x00000DE4, "vec204_atu_event_setup",
+            "Vec 204: ATU event setup (160 bytes). Creates channel bit mask, loads timing into ATU compare register, "
+            + "configures output port enable, zeros 8-byte status area. This ARMS the injection hardware.");
+        count += labelComment(0x00000DCC, "vec206_atu_busy_wait",
+            "Vec 206: ATU busy-wait polling. Same 290-iter pattern as Vec 202. Synchronization between ATU channels.");
+
+        // -- ATU Working RAM --
+        count += labelComment(0xFFFF4118, "atu_output_timing_chA",
+            "ATU output timing channel A (float). Written by ISR[2] crank-angle interpolation.");
+        count += labelComment(0xFFFF4120, "atu_output_timing_chB",
+            "ATU output timing channel B. Written by ISR[2].");
+        count += labelComment(0xFFFF4124, "atu_counter_threshold",
+            "ATU counter/threshold channel. Used by ISR[2] for timing validation.");
+        count += labelComment(0xFFFF44BC, "atu_output_timing_chC",
+            "ATU output timing channel C. Written by ISR[3].");
+        count += labelComment(0xFFFF44C0, "atu_output_timing_chD",
+            "ATU output timing channel D. Written by ISR[3].");
+        count += labelComment(0xFFFF8DA0, "atu_interp_float_state",
+            "Per-channel float state for crank-angle interpolation (array). Read by ISR[2].");
+        count += labelComment(0xFFFF8DA8, "atu_upper_threshold",
+            "ATU upper threshold array (2×uint16). Compared against timer captures in ISR[2].");
+        count += labelComment(0xFFFF8DAC, "atu_lower_threshold",
+            "ATU lower threshold array (2×uint16). Compared against timer captures in ISR[2].");
+
+        // -- Injection State RAM --
+        count += labelComment(0xFFFF3D08, "inj_descriptor_struct",
+            "Injection descriptor struct (8-byte entries). Read by ISR[21] gate logic.");
+        count += labelComment(0xFFFF3D10, "inj_descriptor_end",
+            "End pointer for injection descriptor struct.");
+        count += labelComment(0xFFFF3D18, "inj_status_array",
+            "Injection status array (2-byte entries). Read by ISR[21] gate logic.");
+        count += labelComment(0xFFFF3D1C, "inj_status_end",
+            "End pointer for injection status array.");
+        count += labelComment(0xFFFF36BE, "inj_ign_port_status",
+            "Injection/ignition port status word. Read by ISR[21] and ISR[22].");
+
+        // -- Calibration for ATU --
+        count += labelComment(0x000C008C, "atu_interp_cal_table",
+            "ATU interpolation calibration (float array). Used by ISR[2] FMAC computation.");
+        count += labelComment(0x000C0094, "atu_capture_threshold_cal",
+            "ATU capture threshold calibration (byte). Compared against counter in ISR[2].");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }
