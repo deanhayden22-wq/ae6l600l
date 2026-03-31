@@ -1,0 +1,249 @@
+ROM loaded: 1048576 bytes (1024 KB)
+====================================================================================================
+  AE5L600L COMPLETE ADC CHANNEL MAP
+  Bulk reader: 0x040DE | GBR base: 0xFFFF4024 | 32 channels
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+  Group 0 (ADDR0-11)
+----------------------------------------------------------------------------------------------------
+  ADDR 0  raw=0xFFFF4024  filt=    ---       out=    ---       [HIGH]       Knock/Sensor Group 0 Base
+  ADDR 1  raw=0xFFFF4026  filt=    ---       out=    ---       [MED]        Knock Channel 1
+  ADDR 2  raw=0xFFFF4028  filt=    ---       out=    ---       [MED]        Knock Channel 2
+  ADDR 3  raw=0xFFFF402A  filt=    ---       out=    ---       [MED]        Knock Channel 3
+  ADDR 4  raw=0xFFFF402C  filt=0xFFFF4134  out=0xFFFF4130  [MED]        Atmospheric Pressure (Baro)
+  ADDR 5  raw=0xFFFF402E  filt=0xFFFF410C  out=0xFFFF4108  [MED]        TPS / Throttle Position A
+  ADDR 6  raw=0xFFFF4030  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 6
+  ADDR 7  raw=0xFFFF4032  filt=0xFFFF41E4  out=0xFFFF41E0  [MED]        Battery Voltage
+  ADDR 8  raw=0xFFFF4034  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 8
+  ADDR 9  raw=0xFFFF4036  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 9
+  ADDR10  raw=0xFFFF4038  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 10
+  ADDR11  raw=0xFFFF403A  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 11
+
+----------------------------------------------------------------------------------------------------
+  Group 1 (ADDR12-23)
+----------------------------------------------------------------------------------------------------
+  ADDR12  raw=0xFFFF403C  filt=    ---       out=0xFFFF40D0  [MED]        TGV Position / APP Indexed
+  ADDR13  raw=0xFFFF403E  filt=    ---       out=    ---       [LOW]        Group 1 Ch 13
+  ADDR14  raw=0xFFFF4040  filt=0xFFFF4300  out=0xFFFF42FC  [HIGH]       MAP Sensor (Barometric)
+  ADDR15  raw=0xFFFF4042  filt=    ---       out=0xFFFF40B4  [CONFIRMED]  MAF Sensor Voltage
+  ADDR16  raw=0xFFFF4044  filt=    ---       out=0xFFFF40B8  [MED]        TGV Position / APP Indexed B
+  ADDR17  raw=0xFFFF4046  filt=    ---       out=    ---       [LOW]        Group 1 Ch 17 (unused)
+  ADDR18  raw=0xFFFF4048  filt=    ---       out=    ---       [LOW]        Group 1 Ch 18 (unused)
+  ADDR19  raw=0xFFFF404A  filt=    ---       out=    ---       [LOW]        Group 1 Ch 19 (unused)
+  ADDR20  raw=0xFFFF404C  filt=    ---       out=    ---       [LOW]        Group 1 Ch 20 (unused)
+  ADDR21  raw=0xFFFF404E  filt=    ---       out=    ---       [LOW]        Group 1 Ch 21 (unused)
+  ADDR22  raw=0xFFFF4050  filt=    ---       out=0xFFFF43FC  [HIGH]       MAP Sensor (Manifold Pressure)
+  ADDR23  raw=0xFFFF4052  filt=    ---       out=    ---       [LOW]        Group 1 Ch 23 (unused)
+
+----------------------------------------------------------------------------------------------------
+  Group 2 (ADDR24-31)
+----------------------------------------------------------------------------------------------------
+  ADDR24  raw=0xFFFF4054  filt=    ---       out=    ---       [LOW]        Group 2 Ch 24 (unused)
+  ADDR25  raw=0xFFFF4056  filt=    ---       out=    ---       [LOW]        Group 2 Ch 25 (unused)
+  ADDR26  raw=0xFFFF4058  filt=0xFFFF41EC  out=0xFFFF41E8  [HIGH]       Fuel Temperature
+  ADDR27  raw=0xFFFF405A  filt=    ---       out=    ---       [MED]        Switch Input (A/C or PS)
+  ADDR28  raw=0xFFFF405C  filt=0xFFFF4114  out=0xFFFF4110  [MED]        Front O2 / A-F Sensor
+  ADDR29  raw=0xFFFF405E  filt=0xFFFF4148  out=0xFFFF4144  [CONFIRMED]  Coolant Temperature (ECT)
+  ADDR30  raw=0xFFFF4060  filt=0xFFFF412C  out=0xFFFF4128  [HIGH]       Intake Air Temperature (IAT)
+  ADDR31  raw=0xFFFF4062  filt=    ---       out=0xFFFF4311  [MED]        MAP/Pressure Threshold
+
+====================================================================================================
+  ADC DATA FLOW PIPELINE
+====================================================================================================
+
+  +-------------------------------------------------------------------------+
+  |  SH7058 ADC Hardware                                                    |
+  |  +----------+  +----------+  +----------+                              |
+  |  | Group 0  |  | Group 1  |  | Group 2  |                              |
+  |  | ADDR0-11 |  | ADDR12-23|  | ADDR24-31|                              |
+  |  | 0xF800   |  | 0xF820   |  | 0xF840   |                              |
+  |  +----+-----+  +----+-----+  +----+-----+                              |
+  +-------+-------------+-------------+------------------------------------+
+          |              |              |
+          v              v              v
+  +-----------------------------------------------------------------------+
+  |  Bulk Reader (0x040DE)                                                 |
+  |  GBR = 0xFFFF4024                                                      |
+  |  Polls ADCSR0/1/2 for conversion complete                              |
+  |  Reads all 32 channels to GBR+0..GBR+62                                |
+  |                                                                        |
+  |  ADDR0  -> 0xFFFF4024    ADDR12 -> 0xFFFF403C    ADDR24 -> 0xFFFF4054  |
+  |  ADDR5  -> 0xFFFF402E    ADDR15 -> 0xFFFF4042    ADDR29 -> 0xFFFF405E  |
+  |  ADDR7  -> 0xFFFF4032    ADDR22 -> 0xFFFF4050    ADDR30 -> 0xFFFF4060  |
+  |  ...                     ...                     ...                   |
+  +----------------------------+-------------------------------------------+
+                               |
+          +--------------------+--------------------+
+          v                    v                    v
+  +--------------+   +--------------+   +---------------+
+  | IIR Filter   |   | Direct Float |   | Threshold     |
+  | (0xBEA6C)    |   | Conversion   |   | Comparison    |
+  |              |   |              |   |               |
+  | ECT, IAT,    |   | MAP (ADDR22) |   | ADDR27: switch|
+  | Fuel Temp,   |   | raw * 1/32768|   | ADDR31: MAP   |
+  | Battery,     |   | -> float     |   | threshold     |
+  | O2, TPS,     |   | -> 0xFFFF43FC|   | -> discrete   |
+  | Baro         |   |              |   | state 0-3     |
+  +------+-------+   +------+-------+   +-------+-------+
+         |                  |                    |
+         v                  |                    |
+  +--------------+          |                    |
+  | Lookup Table |          |                    |
+  | (descriptor) |          |                    |
+  |              |          |                    |
+  | Pull3DFloat  |          |                    |
+  | or float_1D  |          |                    |
+  | interpolation|          |                    |
+  +------+-------+          |                    |
+         |                  |                    |
+         v                  v                    v
+  +-----------------------------------------------------------------------+
+  |  Processed Sensor Variables (RAM)                                      |
+  |                                                                        |
+  |  pMafSensorVoltage = 0xFFFF4042 (raw short, ADDR15)                    |
+  |  MAF (g/s)         = 0xFFFF40B4 (float, via Pull3DFloat)               |
+  |  MAP (normalized)  = 0xFFFF43FC (float, 25 consumers)                  |
+  |  pCoolantTemp      = 0xFFFF4144 (float, via ECT desc)                  |
+  |  IAT               = 0xFFFF4128 (float, via IAT desc)                  |
+  |  Fuel Temp          = 0xFFFF41F4 (float, via Fuel Temp desc)            |
+  |  Battery Voltage   = 0xFFFF41E0 (float, heavy filter)                  |
+  |  Baro/Atm Pressure = 0xFFFF42FC (float, MAP Scaling desc)              |
+  +-----------------------------------------------------------------------+
+
+====================================================================================================
+  SENSOR DESCRIPTOR CHAIN (ROM 0x0AF45C - 0x0AF498)
+====================================================================================================
+
+  Descriptor 0x0AF45C: MAF Sensor (ADDR15)
+    data@0x0D8BC4 MAF_Sensor
+    scale@0x0D8C9C MAF_Sensor_Scaling
+    Raw: 0x00360000 0x000D8BC4 0x000D8C9C 0x000D0000 0x000D8D74
+
+  Descriptor 0x0AF468: Front O2 Sensor (ADDR28?)
+    data@0x0D8D74 Front_O2_Sensor
+    scale@0x0D8DA8 Front_O2_Sensor_Scaling
+    Raw: 0x000D0000 0x000D8D74 0x000D8DA8 0x001C0000 0x000D8DDC
+
+  Descriptor 0x0AF474: Coolant Temp Sensor (ADDR29)
+    data@0x0D8DDC Coolant_Temp_Sensor
+    scale@0x0D8E4C Coolant_Temp_Sensor_Scaling
+    Raw: 0x001C0000 0x000D8DDC 0x000D8E4C 0x001E0000 0x000D8EBC
+
+  Descriptor 0x0AF480: Intake Temp Sensor (ADDR30)
+    data@0x0D8EBC Intake_Temp_Sensor
+    scale@0x0D8F34 Intake_Temp_Sensor_Scaling
+    Raw: 0x001E0000 0x000D8EBC 0x000D8F34 0x001E0000 0x000D8FAC
+
+  Descriptor 0x0AF48C: Fuel Temp Sensor (ADDR26)
+    data@0x0D8FAC Fuel_Temp_Sensor
+    scale@0x0D9024 Fuel_Temp_Sensor_Scaling
+    Raw: 0x001E0000 0x000D8FAC 0x000D9024 0x000F0000 0x000D909C
+
+====================================================================================================
+  IIR FILTER COEFFICIENTS (0xBEA6C)
+  Formula: filtered = old + (new - old) * coeff/65536
+====================================================================================================
+  0x0AF92C: 0x0001 (    1)  ratio=0.000015  ~65536 samples to settle  [Fast response]  ADDR28 Front O2/AF
+  0x0AF92E: 0x0040 (   64)  ratio=0.000977  ~1024 samples to settle  [Moderate]  ADDR29 Coolant Temp
+  0x0AF930: 0x0040 (   64)  ratio=0.000977  ~1024 samples to settle  [Moderate]  ADDR30 Intake Air Temp
+  0x0AF932: 0x0040 (   64)  ratio=0.000977  ~1024 samples to settle  [Moderate]  ADDR26 Fuel Temp
+  0x0C009C: 0x0100 (  256)  ratio=0.003906  ~256 samples to settle  [Moderate]  ADDR4  Atm. Pressure
+  0x0C00B8: 0x0100 (  256)  ratio=0.003906  ~256 samples to settle  [Moderate]  ADDR14 MAP/Baro
+  0x0C00BA: 0x0100 (  256)  ratio=0.003906  ~256 samples to settle  [Moderate]  ADDR5  TPS/Throttle A
+  0x0C0104: 0x0010 (   16)  ratio=0.000244  ~4096 samples to settle  [Very slow]  ADDR7  Battery Voltage
+
+====================================================================================================
+  KNOCK ADC SNAPSHOT (0x0437C)
+  Separate fast-path read of Group 0 for knock detection
+====================================================================================================
+  Destination struct: 0xFFFF4064
+    ADDR 0 (0xFFFFF800) -> 0xFFFF4064
+    ADDR 1 (0xFFFFF802) -> 0xFFFF4066
+    ADDR 2 (0xFFFFF804) -> 0xFFFF4068
+    ADDR 3 (0xFFFFF806) -> 0xFFFF406A
+    ADDR 4 (0xFFFFF808) -> 0xFFFF406C
+    ADDR 5 (0xFFFFF80A) -> 0xFFFF406E
+    ADDR 6 (0xFFFFF80C) -> 0xFFFF4070
+    ADDR 7 (0xFFFFF80E) -> 0xFFFF4072
+    ADDR 8 (0xFFFFF810) -> 0xFFFF4074
+    ADDR 9 (0xFFFFF812) -> 0xFFFF4076
+    ADDR10 (0xFFFFF814) -> 0xFFFF4078
+    ADDR11 (0xFFFFF816) -> 0xFFFF407A
+
+  Group 1 knock read (0x04410):
+  Destination struct: 0xFFFF407C
+    ADDR12 (0xFFFFF820) -> 0xFFFF407C
+    ADDR13 (0xFFFFF822) -> 0xFFFF407E
+    ADDR14 (0xFFFFF824) -> 0xFFFF4080
+    ADDR15 (0xFFFFF826) -> 0xFFFF4082
+    ADDR16 (0xFFFFF828) -> 0xFFFF4084
+    ADDR17 (0xFFFFF82A) -> 0xFFFF4086
+    ADDR18 (0xFFFFF82C) -> 0xFFFF4088
+    ADDR19 (0xFFFFF82E) -> 0xFFFF408A
+    ADDR20 (0xFFFFF830) -> 0xFFFF408C
+    ADDR21 (0xFFFFF832) -> 0xFFFF408E
+    ADDR22 (0xFFFFF834) -> 0xFFFF4090
+    ADDR23 (0xFFFFF836) -> 0xFFFF4092
+
+====================================================================================================
+  ADC INTERRUPT SERVICE ROUTINE CHAIN
+====================================================================================================
+
+  VBR = 0x000FFC50 (set at 0x0FA40)
+
+  Vec 176 (ADI0 - Group 0 complete):
+    VBR + 0x2C0 = ROM 0xFFF10 -> handler 0x2814
+
+    0x2814: mov.l r0,@-r15          ; push r0
+            mov.l @(lit),r0         ; r0 = 0x2B8C (common ISR entry)
+            sts.l pr,@-r15          ; push PR
+            jsr   @r0               ; call common_entry (saves all regs + FPU)
+            mov.l r1,@-r15          ; push r1 (delay slot)
+            mov.l @(lit),r1         ; r1 = 0xF312 (ADI0 handler)
+            jmp   @r1               ; jump to ADI0 handler
+            lds   r0,pr             ; restore PR (delay slot)
+
+  ADI0 Handler (0xF312):
+    Reads ADTSR at 0xFFFFF6E8 (save old status)
+    Writes #14 to ADTSR (configure next conversion mode)
+    Loads r4 = 0x00B0 (parameter)
+    Branches to 0xE774 (ISR dispatcher)
+
+  ISR Dispatcher (0xE774):
+    Adjusts interrupt priority (SR register)
+    Calls 0x10800 (event processing)
+    Calls 0xFBA4 (ISR exit/restore)
+    Calls 0xBEAB8 (post-processing with FPU save/restore)
+    Returns via RTE
+
+  Vec 177 (ADI1 - Group 1 complete):
+    VBR + 0x2C4 = ROM 0xFFF14 -> 0xE852 (default stub -> dispatches to 0xE774)
+
+
+====================================================================================================
+  SUMMARY
+====================================================================================================
+  Total ADC channels: 32
+  Confirmed/High confidence: 7
+  Medium confidence: 11
+  Likely unused: 8
+  Knock-related (Group 0): ~8 channels
+
+  KEY CONFIRMED SENSORS:
+    ADDR15 = MAF Sensor Voltage    -> 0xFFFF4042 (raw) -> 0xFFFF40B4 (g/s float)
+    ADDR22 = MAP Sensor            -> 0xFFFF4050 (raw) -> 0xFFFF43FC (normalized float)
+    ADDR29 = Coolant Temp (ECT)    -> 0xFFFF405E (raw) -> 0xFFFF4144 (°C float)
+    ADDR30 = Intake Air Temp (IAT) -> 0xFFFF4060 (raw) -> 0xFFFF4128 (°C float)
+    ADDR26 = Fuel Temperature      -> 0xFFFF4058 (raw) -> 0xFFFF41F4 (°C float)
+    ADDR14 = Atmospheric/Baro Pres -> 0xFFFF4040 (raw) -> 0xFFFF42FC (kPa float)
+
+  KEY RAM ADDRESSES FOR DOWNSTREAM USE:
+    0xFFFF4024 = ADC raw buffer base (32 x 16-bit words)
+    0xFFFF4064 = Knock snapshot Group 0 (12 x 16-bit)
+    0xFFFF407C = Knock snapshot Group 1 (12 x 16-bit)
+    0xFFFF40B4 = MAF (g/s, float)
+    0xFFFF4128 = IAT (°C, float)
+    0xFFFF4144 = ECT (°C, float) = pCoolantTemp
+    0xFFFF41F4 = Fuel Temp (°C, float)
+    0xFFFF43FC = MAP (normalized voltage, float)

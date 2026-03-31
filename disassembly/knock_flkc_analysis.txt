@@ -1,0 +1,2747 @@
+AE5L600L Knock / FLKC Disassembly Analysis
+==============================================================================
+ROM size: 0x100000 bytes
+
+
+[1] knock_detector (0x43782) - literal pool dump (0x439A0..0x439FC)
+  439A0:  [pool] 0xFFFF4308  -> knock_status_4308
+  439A4:  [pool] 0xFFFF81AC  -> knock_status_81AC
+  439A8:  [pool] 0xFFFF80FC  -> knock_det_GBR_base
+  439AC:  [pool] 0xFFFF6624  -> proc_6624
+  439B0:  [pool] 0xFFFF63F8  -> proc_63F8
+  439B4:  [pool] 0xFFFF67EC  -> proc_67EC_word
+  439B8:  [pool] 0xFFFF4304  -> knock_ref_level_fr
+  439BC:  [pool] 0xFFFF8158  -> knock_struct_8158
+  439C0:  [pool] 0x000AE284  
+  439C4:  [pool] 0x000BE830  -> Pull3DFloat
+  439C8:  [pool] 0x000D298B  
+  439CC:  [pool] 0x42200000  -> float 40
+  439D0:  [pool] 0x00063E58  
+  439D4:  [pool] 0x000BE8E4  
+  439D8:  [pool] 0x00063E68  
+  439DC:  [pool] 0x00063E48  
+  439E0:  [pool] 0x000D2D84  
+  439E4:  [pool] 0x000AE290  
+  439E8:  [pool] 0x66E37614  
+  439EC:  [pool] 0xC4B0600C  -> float -1411
+  439F0:  [pool] 0x4008F466  -> float 2.13992
+  439F4:  [pool] 0xE0ECF096  
+  439F8:  [pool] 0xE0A8F896  
+
+==============================================================================
+  knock_detector (0x43782) - continuation from 0x439FC  [0x439FC - 0x43DFC]
+==============================================================================
+  439FC: F48E  fmac   fr0,fr8,fr4                      
+  439FE: D29C  mov.l  @(0x43C70),r2  ; =0x000BE56C (clamp_float)
+  43A00: 420B  jsr    @r0                              
+  43A02: F6EC  fmov   fr14,fr6                         
+  43A04: 66E3  mov    r14,r6                           
+  43A06: 7614  add    #20,r6                           
+  43A08: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43A0A: 600C  extu.b  r0,r0                           
+  43A0C: 4008  shll2  r0                               
+  43A0E: F607  fmov.s fr0,@(r0,r6)                     
+  43A10: D598  mov.l  @(0x43C74),r5  ; =0x000BEA40     
+  43A12: F7CC  fmov   fr12,fr7                         
+  43A14: E0E0  mov    #-32,r0                          
+  43A16: F496  fmov.s @(r0,r9),fr4                     
+  43A18: E0AC  mov    #-84,r0                          
+  43A1A: F696  fmov.s @(r0,r9),fr6                     
+  43A1C: E0E4  mov    #-28,r0                          
+  43A1E: 450B  jsr    @r0                                ; CALL @ 0xFFFFFFE4
+  43A20: F596  fmov.s @(r0,r9),fr5                     
+  43A22: E0E4  mov    #-28,r0                          
+  43A24: F907  fmov.s fr0,@(r0,r9)                     
+  43A26: 66E3  mov    r14,r6                           
+  43A28: 7644  add    #68,r6                           
+  43A2A: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43A2C: 600C  extu.b  r0,r0                           
+  43A2E: 4008  shll2  r0                               
+  43A30: F866  fmov.s @(r0,r6),fr8                     
+  43A32: E0E4  mov    #-28,r0                          
+  43A34: F996  fmov.s @(r0,r9),fr9                     
+  43A36: F890  fadd  fr9,fr8                           
+  43A38: FC85  fcmp/gt  fr8,fr12                       
+  43A3A: 8F01  bf/s   0x43A40                          
+  43A3C: F98C  fmov   fr8,fr9                          
+  43A3E: F9CC  fmov   fr12,fr9                         
+  43A40: 66E3  mov    r14,r6                           
+  43A42: 7624  add    #36,r6                           
+  43A44: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43A46: 600C  extu.b  r0,r0                           
+  43A48: 4008  shll2  r0                               
+  43A4A: F697  fmov.s fr9,@(r0,r6)                     
+  43A4C: E0F0  mov    #-16,r0                          
+  43A4E: F997  fmov.s fr9,@(r0,r9)                     
+  43A50: E0E0  mov    #-32,r0                          
+  43A52: F496  fmov.s @(r0,r9),fr4                     
+  43A54: E0E4  mov    #-28,r0                          
+  43A56: F896  fmov.s @(r0,r9),fr8                     
+  43A58: F481  fsub  fr8,fr4                           
+  43A5A: F7CC  fmov   fr12,fr7                         
+  43A5C: E0E8  mov    #-24,r0                          
+  43A5E: F596  fmov.s @(r0,r9),fr5                     
+  43A60: D584  mov.l  @(0x43C74),r5  ; =0x000BEA40     
+  43A62: C785  mova   @(0x43C78),r0  ; =0x3D800000     
+  43A64: 450B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43A66: F608  fmov.s @r0,fr6                          
+  43A68: E0E8  mov    #-24,r0                          
+  43A6A: F907  fmov.s fr0,@(r0,r9)                     
+  43A6C: 66E3  mov    r14,r6                           
+  43A6E: 7614  add    #20,r6                           
+  43A70: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43A72: 600C  extu.b  r0,r0                           
+  43A74: 4008  shll2  r0                               
+  43A76: F966  fmov.s @(r0,r6),fr9                     
+  43A78: 66E3  mov    r14,r6                           
+  43A7A: 7604  add    #4,r6                            
+  43A7C: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43A7E: 600C  extu.b  r0,r0                           
+  43A80: 4008  shll2  r0                               
+  43A82: F866  fmov.s @(r0,r6),fr8                     
+  43A84: F981  fsub  fr8,fr9                           
+  43A86: FC95  fcmp/gt  fr9,fr12                       
+  43A88: 8B02  bf     0x43A90                          
+  43A8A: E0F4  mov    #-12,r0                          
+  43A8C: A005  bra    0x43A9A                          
+  43A8E: F9C7  fmov.s fr12,@(r0,r9)                    
+  43A90: F89D  fldi1  fr8                              
+  43A92: F880  fadd  fr8,fr8                           
+  43A94: F982  fmul  fr8,fr9                           
+  43A96: E0F4  mov    #-12,r0                          
+  43A98: F997  fmov.s fr9,@(r0,r9)                     
+  43A9A: 66E3  mov    r14,r6                           
+  43A9C: 7614  add    #20,r6                           
+  43A9E: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43AA0: 600C  extu.b  r0,r0                           
+  43AA2: 4008  shll2  r0                               
+  43AA4: F866  fmov.s @(r0,r6),fr8                     
+  43AA6: E0F4  mov    #-12,r0                          
+  43AA8: F996  fmov.s @(r0,r9),fr9                     
+  43AAA: F891  fsub  fr9,fr8                           
+  43AAC: FC85  fcmp/gt  fr8,fr12                       
+  43AAE: 8F01  bf/s   0x43AB4                          
+  43AB0: F98C  fmov   fr8,fr9                          
+  43AB2: F9CC  fmov   fr12,fr9                         
+  43AB4: E0F8  mov    #-8,r0                           
+  43AB6: F997  fmov.s fr9,@(r0,r9)                     
+  43AB8: E0F0  mov    #-16,r0                          
+  43ABA: F896  fmov.s @(r0,r9),fr8                     
+  43ABC: E0D4  mov    #-44,r0                          
+  43ABE: F096  fmov.s @(r0,r9),fr0                     
+  43AC0: E0F8  mov    #-8,r0                           
+  43AC2: F996  fmov.s @(r0,r9),fr9                     
+  43AC4: F89E  fmac   fr0,fr9,fr8                      
+  43AC6: D66D  mov.l  @(0x43C7C),r6  ; =0x000D2D88     
+  43AC8: F968  fmov.s @r6,fr9                          
+  43ACA: F985  fcmp/gt  fr8,fr9                        
+  43ACC: 8B01  bf     0x43AD2                          
+  43ACE: A005  bra    0x43ADC                          
+  43AD0: F868  fmov.s @r6,fr8                          
+  43AD2: D26B  mov.l  @(0x43C80),r2  ; =0x000D2D8C     
+  43AD4: F928  fmov.s @r2,fr9                          
+  43AD6: F895  fcmp/gt  fr9,fr8                        
+  43AD8: 8B00  bf     0x43ADC                          
+  43ADA: F828  fmov.s @r2,fr8                          
+  43ADC: E0FC  mov    #-4,r0                           
+  43ADE: F987  fmov.s fr8,@(r0,r9)                     
+  43AE0: E0F0  mov    #-16,r0                          
+  43AE2: F896  fmov.s @(r0,r9),fr8                     
+  43AE4: E0D8  mov    #-40,r0                          
+  43AE6: F096  fmov.s @(r0,r9),fr0                     
+  43AE8: E0D4  mov    #-44,r0                          
+  43AEA: F996  fmov.s @(r0,r9),fr9                     
+  43AEC: F092  fmul  fr9,fr0                           
+  43AEE: E0F8  mov    #-8,r0                           
+  43AF0: F996  fmov.s @(r0,r9),fr9                     
+  43AF2: F89E  fmac   fr0,fr9,fr8                      
+  43AF4: F968  fmov.s @r6,fr9                          
+  43AF6: F985  fcmp/gt  fr8,fr9                        
+  43AF8: 8B01  bf     0x43AFE                          
+  43AFA: A005  bra    0x43B08                          
+  43AFC: F868  fmov.s @r6,fr8                          
+  43AFE: D261  mov.l  @(0x43C84),r2  ; =0x000D2D90     
+  43B00: F928  fmov.s @r2,fr9                          
+  43B02: F895  fcmp/gt  fr9,fr8                        
+  43B04: 8B00  bf     0x43B08                          
+  43B06: F828  fmov.s @r2,fr8                          
+  43B08: F98A  fmov.s fr8,@r9                          
+  43B0A: E0FC  mov    #-4,r0                           
+  43B0C: F996  fmov.s @(r0,r9),fr9                     
+  43B0E: E0F8  mov    #-8,r0                           
+  43B10: F096  fmov.s @(r0,r9),fr0                     
+  43B12: D25D  mov.l  @(0x43C88),r2  ; =0x000D2D94     
+  43B14: F828  fmov.s @r2,fr8                          
+  43B16: F98E  fmac   fr0,fr8,fr9                      
+  43B18: 7D7F  add    #127,r13                         
+  43B1A: 7D3B  add    #59,r13                          
+  43B1C: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43B1E: 600C  extu.b  r0,r0                           
+  43B20: 06DC  mov.b  @(r0,r13),r6                     
+  43B22: 626C  extu.b  r6,r2                           
+  43B24: 425A  lds    r2,FPUL                          
+  43B26: F82D  float  FPUL,fr8                         
+  43B28: F981  fsub  fr8,fr9                           
+  43B2A: 7E34  add    #52,r14                          
+  43B2C: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43B2E: 600C  extu.b  r0,r0                           
+  43B30: 4008  shll2  r0                               
+  43B32: FE97  fmov.s fr9,@(r0,r14)                    
+  43B34: E0E0  mov    #-32,r0                          
+  43B36: F996  fmov.s @(r0,r9),fr9                     
+  43B38: E0FC  mov    #-4,r0                           
+  43B3A: F896  fmov.s @(r0,r9),fr8                     
+  43B3C: F895  fcmp/gt  fr9,fr8                        
+  43B3E: 890D  bt     0x43B5C                          
+  43B40: D652  mov.l  @(0x43C8C),r6  ; =0x000D29DC     
+  43B42: 6261  mov.w  @r6,r2                             ; @0x000D29DC
+  43B44: 652D  extu.w  r2,r5                           
+  43B46: 62BD  extu.w  r11,r2                          
+  43B48: 3253  cmp/ge  r5,r2                           
+  43B4A: 8B07  bf     0x43B5C                          
+  43B4C: E0E0  mov    #-32,r0                          
+  43B4E: F996  fmov.s @(r0,r9),fr9                     
+  43B50: F898  fmov.s @r9,fr8                          
+  43B52: F895  fcmp/gt  fr9,fr8                        
+  43B54: 8D03  bt/s   0x43B5E                          
+  43B56: E001  mov    #1,r0                            
+  43B58: A003  bra    0x43B62                          
+  43B5A: C0BE  mov.b  r0,@(190,GBR)                      ; @GBR+190 = 0xFFFF81BA (knock_event_flag)
+  43B5C: E000  mov    #0,r0                            
+  43B5E: C0BE  mov.b  r0,@(190,GBR)                      ; @GBR+190 = 0xFFFF81BA (knock_event_flag)
+  43B60: E000  mov    #0,r0                            
+  43B62: C0BF  mov.b  r0,@(191,GBR)                      ; @GBR+191 = 0xFFFF81BB (knock_flag_B)
+  43B64: 7F08  add    #8,r15                           
+  43B66: 4F17  ldc.l  @r15+,GBR                        
+  43B68: FFF9  fmov.s @r15+,fr15                       
+  43B6A: FEF9  fmov.s @r15+,fr14                       
+  43B6C: FCF9  fmov.s @r15+,fr12                       
+  43B6E: 4F26  lds.l  @r15+,pr                         
+  43B70: 6EF6  mov.l  @r15+,r14                        
+  43B72: 6DF6  mov.l  @r15+,r13                        
+  43B74: 6CF6  mov.l  @r15+,r12                        
+  43B76: 6BF6  mov.l  @r15+,r11                        
+  43B78: 000B  rts                                     
+  43B7A: 69F6  mov.l  @r15+,r9                         
+  43B7C: 2FE6  mov.l  r14,@-r15                        
+  43B7E: 4F13  stc.l  GBR,@-r15                        
+  43B80: D043  mov.l  @(0x43C90),r0  ; =0xFFFF81AC (knock_status_81AC)
+  43B82: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF81AC
+  43B84: 7FF0  add    #-16,r15                         
+  43B86: D243  mov.l  @(0x43C94),r2  ; =0xFFFF6624 (proc_6624)
+  43B88: F828  fmov.s @r2,fr8                          
+  43B8A: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43B8C: 7002  add    #2,r0                            
+  43B8E: D142  mov.l  @(0x43C98),r1  ; =0x000D2989     
+  43B90: 6610  mov.b  @r1,r6                             ; @0x000D2989
+  43B92: 646C  extu.b  r6,r4                           
+  43B94: 620C  extu.b  r0,r2                           
+  43B96: 3243  cmp/ge  r4,r2                           
+  43B98: 8F02  bf/s   0x43BA0                          
+  43B9A: 6503  mov    r0,r5                            
+  43B9C: 6210  mov.b  @r1,r2                             ; @0x000D2989
+  43B9E: 3528  sub  r2,r5                              
+  43BA0: D23E  mov.l  @(0x43C9C),r2  ; =0x000D2D58     
+  43BA2: F928  fmov.s @r2,fr9                          
+  43BA4: F985  fcmp/gt  fr8,fr9                        
+  43BA6: 8902  bt     0x43BAE                          
+  43BA8: E001  mov    #1,r0                            
+  43BAA: A006  bra    0x43BBA                          
+  43BAC: C02C  mov.b  r0,@(44,GBR)                       ; @GBR+44 = 0xFFFF81D8 (knock_rpmgate)
+  43BAE: D23C  mov.l  @(0x43CA0),r2  ; =0x000D2D54     
+  43BB0: F928  fmov.s @r2,fr9                          
+  43BB2: F985  fcmp/gt  fr8,fr9                        
+  43BB4: 8B01  bf     0x43BBA                          
+  43BB6: E000  mov    #0,r0                            
+  43BB8: C02C  mov.b  r0,@(44,GBR)                       ; @GBR+44 = 0xFFFF81D8 (knock_rpmgate)
+  43BBA: D63A  mov.l  @(0x43CA4),r6  ; =0x000D298B     
+  43BBC: 6260  mov.b  @r6,r2                             ; @0x000D298B
+  43BBE: 2228  tst  r2,r2                              
+  43BC0: 891D  bt     0x43BFE                          
+  43BC2: D639  mov.l  @(0x43CA8),r6  ; =0xFFFF818C (knock_percyl_float)
+  43BC4: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43BC6: 600C  extu.b  r0,r0                           
+  43BC8: 4008  shll2  r0                               
+  43BCA: F966  fmov.s @(r0,r6),fr9                     
+  43BCC: D530  mov.l  @(0x43C90),r5  ; =0xFFFF81AC (knock_status_81AC)
+  43BCE: 6253  mov    r5,r2                            
+  43BD0: 720A  add    #10,r2                           
+  43BD2: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43BD4: 600C  extu.b  r0,r0                           
+  43BD6: 062C  mov.b  @(r0,r2),r6                      
+  43BD8: 626C  extu.b  r6,r2                           
+  43BDA: 425A  lds    r2,FPUL                          
+  43BDC: F82D  float  FPUL,fr8                         
+  43BDE: F980  fadd  fr8,fr9                           
+  43BE0: D432  mov.l  @(0x43CAC),r4  ; =0x000D298A     
+  43BE2: 6640  mov.b  @r4,r6                             ; @0x000D298A
+  43BE4: 626C  extu.b  r6,r2                           
+  43BE6: 425A  lds    r2,FPUL                          
+  43BE8: F82D  float  FPUL,fr8                         
+  43BEA: C731  mova   @(0x43CB0),r0  ; =0x43600000     
+  43BEC: F608  fmov.s @r0,fr6                          
+  43BEE: F860  fadd  fr6,fr8                           
+  43BF0: F895  fcmp/gt  fr9,fr8                        
+  43BF2: 0029  movt   r0                               
+  43BF4: CA01  xor    #0x01,r0                         
+  43BF6: 6203  mov    r0,r2                            
+  43BF8: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43BFA: A004  bra    0x43C06                          
+  43BFC: 6103  mov    r0,r1                            
+  43BFE: C42C  mov.b  @(44,GBR),r0                       ; @GBR+44 = 0xFFFF81D8 (knock_rpmgate)
+  43C00: 6203  mov    r0,r2                            
+  43C02: 6153  mov    r5,r1                            
+  43C04: D522  mov.l  @(0x43C90),r5  ; =0xFFFF81AC (knock_status_81AC)
+  43C06: 622C  extu.b  r2,r2                           
+  43C08: 2228  tst  r2,r2                              
+  43C0A: 8B04  bf     0x43C16                          
+  43C0C: D229  mov.l  @(0x43CB4),r2  ; =0xFFFF8DB0     
+  43C0E: 611C  extu.b  r1,r1                           
+  43C10: 6013  mov    r1,r0                            
+  43C12: A004  bra    0x43C1E                          
+  43C14: 062C  mov.b  @(r0,r2),r6                      
+  43C16: D228  mov.l  @(0x43CB8),r2  ; =0xFFFF8DB4     
+  43C18: 611C  extu.b  r1,r1                           
+  43C1A: 6013  mov    r1,r0                            
+  43C1C: 062C  mov.b  @(r0,r2),r6                      
+  43C1E: 6253  mov    r5,r2                            
+  43C20: 7206  add    #6,r2                            
+  43C22: 0264  mov.b  r6,@(r0,r2)                      
+  43C24: 6253  mov    r5,r2                            
+  43C26: 7206  add    #6,r2                            
+  43C28: 6013  mov    r1,r0                            
+  43C2A: 002C  mov.b  @(r0,r2),r0                      
+  43C2C: 8802  cmp/eq #2,r0                            
+  43C2E: 6253  mov    r5,r2                            
+  43C30: 8F03  bf/s   0x43C3A                          
+  43C32: 720A  add    #10,r2                           
+  43C34: D41D  mov.l  @(0x43CAC),r4  ; =0x000D298A     
+  43C36: A001  bra    0x43C3C                          
+  43C38: 6640  mov.b  @r4,r6                             ; @0x000D298A
+  43C3A: E600  mov    #0,r6                            
+  43C3C: 6013  mov    r1,r0                            
+  43C3E: 0264  mov.b  r6,@(r0,r2)                      
+  43C40: D41E  mov.l  @(0x43CBC),r4  ; =0x000D2994     
+  43C42: 6240  mov.b  @r4,r2                             ; @0x000D2994
+  43C44: E6FF  mov    #-1,r6                           
+  43C46: 3260  cmp/eq  r6,r2                           
+  43C48: 8B54  bf     0x43CF4                          
+  43C4A: D617  mov.l  @(0x43CA8),r6  ; =0xFFFF818C (knock_percyl_float)
+  43C4C: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43C4E: 600C  extu.b  r0,r0                           
+  43C50: 4008  shll2  r0                               
+  43C52: F866  fmov.s @(r0,r6),fr8                     
+  43C54: C716  mova   @(0x43CB0),r0  ; =0x43600000     
+  43C56: F608  fmov.s @r0,fr6                          
+  43C58: F685  fcmp/gt  fr8,fr6                        
+  43C5A: 8902  bt     0x43C62                          
+  43C5C: E000  mov    #0,r0                            
+  43C5E: A06D  bra    0x43D3C                          
+  43C60: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43C62: C717  mova   @(0x43CC0),r0  ; =0x43200000     
+  43C64: F908  fmov.s @r0,fr9                          
+  43C66: F985  fcmp/gt  fr8,fr9                        
+  43C68: 892C  bt     0x43CC4                          
+  43C6A: E002  mov    #2,r0                            
+  43C6C: A064  bra    0x43D38                          
+  43C6E: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43C70: 000B  rts                                     
+  43C72: E56C  mov    #108,r5                          
+  43C74: 000B  rts                                     
+  43C76: EA40  mov    #64,r10                          
+  43C78: 3D80  cmp/eq  r8,r13                          
+  43C7A: 0000  ??       ; 0x0000                       
+  43C7C: 000D  mov.w  @(r0,r0),r0                      
+  43C7E: 2D88  tst  r8,r13                             
+  43C80: 000D  mov.w  @(r0,r0),r0                      
+  43C82: 2D8C  cmp/str  r8,r13                         
+  43C84: 000D  mov.w  @(r0,r0),r0                      
+  43C86: 2D90  mov.b  r9,@r13                          
+  43C88: 000D  mov.w  @(r0,r0),r0                      
+  43C8A: 2D94  mov.b  r9,@-r13                         
+  43C8C: 000D  mov.w  @(r0,r0),r0                      
+  43C8E: 29DC  cmp/str  r13,r9                         
+  43C90: FFFF  ??fpu    ; 0xFFFF                       
+  43C92: 81AC  mov.w  r0,@(24,r10)                     
+  43C94: FFFF  ??fpu    ; 0xFFFF                       
+  43C96: 6624  mov.b  @r2+,r6                          
+  43C98: 000D  mov.w  @(r0,r0),r0                      
+  43C9A: 2989  and  r8,r9                              
+  43C9C: 000D  mov.w  @(r0,r0),r0                      
+  43C9E: 2D58  tst  r5,r13                             
+  43CA0: 000D  mov.w  @(r0,r0),r0                      
+  43CA2: 2D54  mov.b  r5,@-r13                         
+  43CA4: 000D  mov.w  @(r0,r0),r0                      
+  43CA6: 298B  or  r8,r9                               
+  43CA8: FFFF  ??fpu    ; 0xFFFF                       
+  43CAA: 818C  mov.w  r0,@(24,r8)                      
+  43CAC: 000D  mov.w  @(r0,r0),r0                      
+  43CAE: 298A  xor  r8,r9                              
+  43CB0: 4360  ??       ; 0x4360 (grp4)                
+  43CB2: 0000  ??       ; 0x0000                       
+  43CB4: FFFF  ??fpu    ; 0xFFFF                       
+  43CB6: 8DB0  bt/s   0x43C1A                          
+  43CB8: FFFF  ??fpu    ; 0xFFFF                       
+  43CBA: 8DB4  bt/s   0x43C26                          
+  43CBC: 000D  mov.w  @(r0,r0),r0                      
+  43CBE: 2994  mov.b  r9,@-r9                          
+  43CC0: 4320  shal   r3                               
+  43CC2: 0000  ??       ; 0x0000                       
+  43CC4: C789  mova   @(0x43EEC),r0  ; =0x43000000     
+  43CC6: F908  fmov.s @r0,fr9                          
+  43CC8: F985  fcmp/gt  fr8,fr9                        
+  43CCA: 8902  bt     0x43CD2                          
+  43CCC: E004  mov    #4,r0                            
+  43CCE: A031  bra    0x43D34                          
+  43CD0: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CD2: C787  mova   @(0x43EF0),r0  ; =0x42C00000     
+  43CD4: F908  fmov.s @r0,fr9                          
+  43CD6: F985  fcmp/gt  fr8,fr9                        
+  43CD8: 8902  bt     0x43CE0                          
+  43CDA: E005  mov    #5,r0                            
+  43CDC: A028  bra    0x43D30                          
+  43CDE: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CE0: C784  mova   @(0x43EF4),r0  ; =0x42800000     
+  43CE2: F908  fmov.s @r0,fr9                          
+  43CE4: F985  fcmp/gt  fr8,fr9                        
+  43CE6: 8902  bt     0x43CEE                          
+  43CE8: E006  mov    #6,r0                            
+  43CEA: A01D  bra    0x43D28                          
+  43CEC: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CEE: E007  mov    #7,r0                            
+  43CF0: A01C  bra    0x43D2C                          
+  43CF2: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CF4: 6040  mov.b  @r4,r0                             ; @0x000D2994
+  43CF6: C907  and    #0x07,r0                         
+  43CF8: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CFA: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CFC: 2008  tst  r0,r0                              
+  43CFE: 891D  bt     0x43D3C                          
+  43D00: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D02: 2F02  mov.l  r0,@r15                          
+  43D04: 600C  extu.b  r0,r0                           
+  43D06: 8802  cmp/eq #2,r0                            
+  43D08: 8916  bt     0x43D38                          
+  43D0A: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D0C: 1F01  mov.l  r0,@(4,r15)                      
+  43D0E: 600C  extu.b  r0,r0                           
+  43D10: 8804  cmp/eq #4,r0                            
+  43D12: 890F  bt     0x43D34                          
+  43D14: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D16: 1F02  mov.l  r0,@(8,r15)                      
+  43D18: 600C  extu.b  r0,r0                           
+  43D1A: 8805  cmp/eq #5,r0                            
+  43D1C: 8908  bt     0x43D30                          
+  43D1E: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D20: 1F03  mov.l  r0,@(12,r15)                     
+  43D22: 600C  extu.b  r0,r0                           
+  43D24: 8806  cmp/eq #6,r0                            
+  43D26: 8B01  bf     0x43D2C                          
+  43D28: A009  bra    0x43D3E                          
+  43D2A: E406  mov    #6,r4                            
+  43D2C: A007  bra    0x43D3E                          
+  43D2E: E407  mov    #7,r4                            
+  43D30: A005  bra    0x43D3E                          
+  43D32: E405  mov    #5,r4                            
+  43D34: A003  bra    0x43D3E                          
+  43D36: E404  mov    #4,r4                            
+  43D38: A001  bra    0x43D3E                          
+  43D3A: E402  mov    #2,r4                            
+  43D3C: E400  mov    #0,r4                            
+  43D3E: 6253  mov    r5,r2                            
+  43D40: 7224  add    #36,r2                           
+  43D42: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43D44: 670C  extu.b  r0,r7                           
+  43D46: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D48: 6E03  mov    r0,r14                           
+  43D4A: 6073  mov    r7,r0                            
+  43D4C: 02E4  mov.b  r14,@(r0,r2)                     
+  43D4E: 7506  add    #6,r5                            
+  43D50: 6013  mov    r1,r0                            
+  43D52: 025C  mov.b  @(r0,r5),r2                      
+  43D54: D668  mov.l  @(0x43EF8),r6  ; =0xFFFF4309     
+  43D56: 0624  mov.b  r2,@(r0,r6)                      
+  43D58: D268  mov.l  @(0x43EFC),r2  ; =0xFFFF430D     
+  43D5A: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43D5C: 600C  extu.b  r0,r0                           
+  43D5E: 0244  mov.b  r4,@(r0,r2)                      
+  43D60: 7F10  add    #16,r15                          
+  43D62: 4F17  ldc.l  @r15+,GBR                        
+  43D64: 000B  rts                                     
+  43D66: 6EF6  mov.l  @r15+,r14                        
+  43D68: 2FB6  mov.l  r11,@-r15                        
+  43D6A: 2FC6  mov.l  r12,@-r15                        
+  43D6C: 2FD6  mov.l  r13,@-r15                        
+  43D6E: 2FE6  mov.l  r14,@-r15                        
+  43D70: 4F22  sts.l  pr,@-r15                         
+  43D72: FFCB  fmov.s fr12,@-r15                       
+  43D74: FFDB  fmov.s fr13,@-r15                       
+  43D76: FFEB  fmov.s fr14,@-r15                       
+  43D78: FFFB  fmov.s fr15,@-r15                       
+  43D7A: 4F13  stc.l  GBR,@-r15                        
+  43D7C: D060  mov.l  @(0x43F00),r0  ; =0xFFFF80FC (knock_det_GBR_base)
+  43D7E: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF80FC
+  43D80: 7FF0  add    #-16,r15                         
+  43D82: D260  mov.l  @(0x43F04),r2  ; =0xFFFF6624 (proc_6624)
+  43D84: FD28  fmov.s @r2,fr13                         
+  43D86: D260  mov.l  @(0x43F08),r2  ; =0xFFFF81F4     
+  43D88: FE28  fmov.s @r2,fr14                         
+  43D8A: DB60  mov.l  @(0x43F0C),r11  ; =0xFFFF8128    
+  43D8C: E0E0  mov    #-32,r0                          
+  43D8E: F8B6  fmov.s @(r0,r11),fr8                    
+  43D90: E0E4  mov    #-28,r0                          
+  43D92: FCB6  fmov.s @(r0,r11),fr12                   
+  43D94: D25E  mov.l  @(0x43F10),r2  ; =0xFFFF81F8     
+  43D96: FF28  fmov.s @r2,fr15                         
+  43D98: C4BE  mov.b  @(190,GBR),r0                      ; @GBR+190 = 0xFFFF81BA (knock_event_flag)
+  43D9A: D25E  mov.l  @(0x43F14),r2  ; =0x000D2D60     
+  43D9C: F928  fmov.s @r2,fr9                          
+  43D9E: F985  fcmp/gt  fr8,fr9                        
+  43DA0: 8F0A  bf/s   0x43DB8                          
+  43DA2: 6D03  mov    r0,r13                           
+  43DA4: D25C  mov.l  @(0x43F18),r2  ; =0x000D2D64     
+  43DA6: F828  fmov.s @r2,fr8                          
+  43DA8: F8C5  fcmp/gt  fr12,fr8                       
+  43DAA: 8B05  bf     0x43DB8                          
+  43DAC: D25B  mov.l  @(0x43F1C),r2  ; =0x000D2D6C     
+  43DAE: F928  fmov.s @r2,fr9                          
+  43DB0: FF9A  fmov.s fr9,@r15                         
+  43DB2: D25B  mov.l  @(0x43F20),r2  ; =0x000D2D74     
+  43DB4: A005  bra    0x43DC2                          
+  43DB6: F828  fmov.s @r2,fr8                          
+  43DB8: D25A  mov.l  @(0x43F24),r2  ; =0x000D2D68     
+  43DBA: F928  fmov.s @r2,fr9                          
+  43DBC: FF9A  fmov.s fr9,@r15                         
+  43DBE: D25A  mov.l  @(0x43F28),r2  ; =0x000D2D70     
+  43DC0: F828  fmov.s @r2,fr8                          
+  43DC2: E004  mov    #4,r0                            
+  43DC4: FF87  fmov.s fr8,@(r0,r15)                    
+  43DC6: D459  mov.l  @(0x43F2C),r4  ; =0x000AE0F8     
+  43DC8: DE59  mov.l  @(0x43F30),r14  ; =0x000BE830 (Pull3DFloat)
+  43DCA: 4E0B  jsr    @r0                                ; CALL @ 0x00004
+  43DCC: F4DC  fmov   fr13,fr4                         
+  43DCE: DC59  mov.l  @(0x43F34),r12  ; =0xFFFF81D8 (knock_rpmgate)
+  43DD0: E0E8  mov    #-24,r0                          
+  43DD2: FC07  fmov.s fr0,@(r0,r12)                    
+  43DD4: D458  mov.l  @(0x43F38),r4  ; =0x000AE00C     
+  43DD6: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43DD8: F4EC  fmov   fr14,fr4                         
+  43DDA: E0F0  mov    #-16,r0                          
+  43DDC: FC07  fmov.s fr0,@(r0,r12)                    
+  43DDE: D457  mov.l  @(0x43F3C),r4  ; =0x000AE020     
+  43DE0: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFF0
+  43DE2: F4FC  fmov   fr15,fr4                         
+  43DE4: E0F4  mov    #-12,r0                          
+  43DE6: FC07  fmov.s fr0,@(r0,r12)                    
+  43DE8: D255  mov.l  @(0x43F40),r2  ; =0x000D2D78     
+  43DEA: F828  fmov.s @r2,fr8                          
+  43DEC: F8C5  fcmp/gt  fr12,fr8                       
+  43DEE: 891D  bt     0x43E2C                          
+  43DF0: D454  mov.l  @(0x43F44),r4  ; =0x000AE10C     
+  43DF2: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43DF4: F4DC  fmov   fr13,fr4                         
+  43DF6: E0EC  mov    #-20,r0                          
+  43DF8: FC07  fmov.s fr0,@(r0,r12)                    
+  43DFA: F4C6  fmov.s @(r0,r12),fr4                    
+
+
+==============================================================================
+  knock_wrapper continuation (0x43B7C)  [0x43B7C - 0x43D7C]
+==============================================================================
+  43B7C: 2FE6  mov.l  r14,@-r15                        
+  43B7E: 4F13  stc.l  GBR,@-r15                        
+  43B80: D043  mov.l  @(0x43C90),r0  ; =0xFFFF81AC (knock_status_81AC)
+  43B82: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF81AC
+  43B84: 7FF0  add    #-16,r15                         
+  43B86: D243  mov.l  @(0x43C94),r2  ; =0xFFFF6624 (proc_6624)
+  43B88: F828  fmov.s @r2,fr8                          
+  43B8A: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43B8C: 7002  add    #2,r0                            
+  43B8E: D142  mov.l  @(0x43C98),r1  ; =0x000D2989     
+  43B90: 6610  mov.b  @r1,r6                             ; @0x000D2989
+  43B92: 646C  extu.b  r6,r4                           
+  43B94: 620C  extu.b  r0,r2                           
+  43B96: 3243  cmp/ge  r4,r2                           
+  43B98: 8F02  bf/s   0x43BA0                          
+  43B9A: 6503  mov    r0,r5                            
+  43B9C: 6210  mov.b  @r1,r2                             ; @0x000D2989
+  43B9E: 3528  sub  r2,r5                              
+  43BA0: D23E  mov.l  @(0x43C9C),r2  ; =0x000D2D58     
+  43BA2: F928  fmov.s @r2,fr9                          
+  43BA4: F985  fcmp/gt  fr8,fr9                        
+  43BA6: 8902  bt     0x43BAE                          
+  43BA8: E001  mov    #1,r0                            
+  43BAA: A006  bra    0x43BBA                          
+  43BAC: C02C  mov.b  r0,@(44,GBR)                       ; @GBR+44 = 0xFFFF81D8 (knock_rpmgate)
+  43BAE: D23C  mov.l  @(0x43CA0),r2  ; =0x000D2D54     
+  43BB0: F928  fmov.s @r2,fr9                          
+  43BB2: F985  fcmp/gt  fr8,fr9                        
+  43BB4: 8B01  bf     0x43BBA                          
+  43BB6: E000  mov    #0,r0                            
+  43BB8: C02C  mov.b  r0,@(44,GBR)                       ; @GBR+44 = 0xFFFF81D8 (knock_rpmgate)
+  43BBA: D63A  mov.l  @(0x43CA4),r6  ; =0x000D298B     
+  43BBC: 6260  mov.b  @r6,r2                             ; @0x000D298B
+  43BBE: 2228  tst  r2,r2                              
+  43BC0: 891D  bt     0x43BFE                          
+  43BC2: D639  mov.l  @(0x43CA8),r6  ; =0xFFFF818C (knock_percyl_float)
+  43BC4: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43BC6: 600C  extu.b  r0,r0                           
+  43BC8: 4008  shll2  r0                               
+  43BCA: F966  fmov.s @(r0,r6),fr9                     
+  43BCC: D530  mov.l  @(0x43C90),r5  ; =0xFFFF81AC (knock_status_81AC)
+  43BCE: 6253  mov    r5,r2                            
+  43BD0: 720A  add    #10,r2                           
+  43BD2: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43BD4: 600C  extu.b  r0,r0                           
+  43BD6: 062C  mov.b  @(r0,r2),r6                      
+  43BD8: 626C  extu.b  r6,r2                           
+  43BDA: 425A  lds    r2,FPUL                          
+  43BDC: F82D  float  FPUL,fr8                         
+  43BDE: F980  fadd  fr8,fr9                           
+  43BE0: D432  mov.l  @(0x43CAC),r4  ; =0x000D298A     
+  43BE2: 6640  mov.b  @r4,r6                             ; @0x000D298A
+  43BE4: 626C  extu.b  r6,r2                           
+  43BE6: 425A  lds    r2,FPUL                          
+  43BE8: F82D  float  FPUL,fr8                         
+  43BEA: C731  mova   @(0x43CB0),r0  ; =0x43600000     
+  43BEC: F608  fmov.s @r0,fr6                          
+  43BEE: F860  fadd  fr6,fr8                           
+  43BF0: F895  fcmp/gt  fr9,fr8                        
+  43BF2: 0029  movt   r0                               
+  43BF4: CA01  xor    #0x01,r0                         
+  43BF6: 6203  mov    r0,r2                            
+  43BF8: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43BFA: A004  bra    0x43C06                          
+  43BFC: 6103  mov    r0,r1                            
+  43BFE: C42C  mov.b  @(44,GBR),r0                       ; @GBR+44 = 0xFFFF81D8 (knock_rpmgate)
+  43C00: 6203  mov    r0,r2                            
+  43C02: 6153  mov    r5,r1                            
+  43C04: D522  mov.l  @(0x43C90),r5  ; =0xFFFF81AC (knock_status_81AC)
+  43C06: 622C  extu.b  r2,r2                           
+  43C08: 2228  tst  r2,r2                              
+  43C0A: 8B04  bf     0x43C16                          
+  43C0C: D229  mov.l  @(0x43CB4),r2  ; =0xFFFF8DB0     
+  43C0E: 611C  extu.b  r1,r1                           
+  43C10: 6013  mov    r1,r0                            
+  43C12: A004  bra    0x43C1E                          
+  43C14: 062C  mov.b  @(r0,r2),r6                      
+  43C16: D228  mov.l  @(0x43CB8),r2  ; =0xFFFF8DB4     
+  43C18: 611C  extu.b  r1,r1                           
+  43C1A: 6013  mov    r1,r0                            
+  43C1C: 062C  mov.b  @(r0,r2),r6                      
+  43C1E: 6253  mov    r5,r2                            
+  43C20: 7206  add    #6,r2                            
+  43C22: 0264  mov.b  r6,@(r0,r2)                      
+  43C24: 6253  mov    r5,r2                            
+  43C26: 7206  add    #6,r2                            
+  43C28: 6013  mov    r1,r0                            
+  43C2A: 002C  mov.b  @(r0,r2),r0                      
+  43C2C: 8802  cmp/eq #2,r0                            
+  43C2E: 6253  mov    r5,r2                            
+  43C30: 8F03  bf/s   0x43C3A                          
+  43C32: 720A  add    #10,r2                           
+  43C34: D41D  mov.l  @(0x43CAC),r4  ; =0x000D298A     
+  43C36: A001  bra    0x43C3C                          
+  43C38: 6640  mov.b  @r4,r6                             ; @0x000D298A
+  43C3A: E600  mov    #0,r6                            
+  43C3C: 6013  mov    r1,r0                            
+  43C3E: 0264  mov.b  r6,@(r0,r2)                      
+  43C40: D41E  mov.l  @(0x43CBC),r4  ; =0x000D2994     
+  43C42: 6240  mov.b  @r4,r2                             ; @0x000D2994
+  43C44: E6FF  mov    #-1,r6                           
+  43C46: 3260  cmp/eq  r6,r2                           
+  43C48: 8B54  bf     0x43CF4                          
+  43C4A: D617  mov.l  @(0x43CA8),r6  ; =0xFFFF818C (knock_percyl_float)
+  43C4C: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43C4E: 600C  extu.b  r0,r0                           
+  43C50: 4008  shll2  r0                               
+  43C52: F866  fmov.s @(r0,r6),fr8                     
+  43C54: C716  mova   @(0x43CB0),r0  ; =0x43600000     
+  43C56: F608  fmov.s @r0,fr6                          
+  43C58: F685  fcmp/gt  fr8,fr6                        
+  43C5A: 8902  bt     0x43C62                          
+  43C5C: E000  mov    #0,r0                            
+  43C5E: A06D  bra    0x43D3C                          
+  43C60: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43C62: C717  mova   @(0x43CC0),r0  ; =0x43200000     
+  43C64: F908  fmov.s @r0,fr9                          
+  43C66: F985  fcmp/gt  fr8,fr9                        
+  43C68: 892C  bt     0x43CC4                          
+  43C6A: E002  mov    #2,r0                            
+  43C6C: A064  bra    0x43D38                          
+  43C6E: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43C70: 000B  rts                                     
+  43C72: E56C  mov    #108,r5                          
+  43C74: 000B  rts                                     
+  43C76: EA40  mov    #64,r10                          
+  43C78: 3D80  cmp/eq  r8,r13                          
+  43C7A: 0000  ??       ; 0x0000                       
+  43C7C: 000D  mov.w  @(r0,r0),r0                      
+  43C7E: 2D88  tst  r8,r13                             
+  43C80: 000D  mov.w  @(r0,r0),r0                      
+  43C82: 2D8C  cmp/str  r8,r13                         
+  43C84: 000D  mov.w  @(r0,r0),r0                      
+  43C86: 2D90  mov.b  r9,@r13                          
+  43C88: 000D  mov.w  @(r0,r0),r0                      
+  43C8A: 2D94  mov.b  r9,@-r13                         
+  43C8C: 000D  mov.w  @(r0,r0),r0                      
+  43C8E: 29DC  cmp/str  r13,r9                         
+  43C90: FFFF  ??fpu    ; 0xFFFF                       
+  43C92: 81AC  mov.w  r0,@(24,r10)                     
+  43C94: FFFF  ??fpu    ; 0xFFFF                       
+  43C96: 6624  mov.b  @r2+,r6                          
+  43C98: 000D  mov.w  @(r0,r0),r0                      
+  43C9A: 2989  and  r8,r9                              
+  43C9C: 000D  mov.w  @(r0,r0),r0                      
+  43C9E: 2D58  tst  r5,r13                             
+  43CA0: 000D  mov.w  @(r0,r0),r0                      
+  43CA2: 2D54  mov.b  r5,@-r13                         
+  43CA4: 000D  mov.w  @(r0,r0),r0                      
+  43CA6: 298B  or  r8,r9                               
+  43CA8: FFFF  ??fpu    ; 0xFFFF                       
+  43CAA: 818C  mov.w  r0,@(24,r8)                      
+  43CAC: 000D  mov.w  @(r0,r0),r0                      
+  43CAE: 298A  xor  r8,r9                              
+  43CB0: 4360  ??       ; 0x4360 (grp4)                
+  43CB2: 0000  ??       ; 0x0000                       
+  43CB4: FFFF  ??fpu    ; 0xFFFF                       
+  43CB6: 8DB0  bt/s   0x43C1A                          
+  43CB8: FFFF  ??fpu    ; 0xFFFF                       
+  43CBA: 8DB4  bt/s   0x43C26                          
+  43CBC: 000D  mov.w  @(r0,r0),r0                      
+  43CBE: 2994  mov.b  r9,@-r9                          
+  43CC0: 4320  shal   r3                               
+  43CC2: 0000  ??       ; 0x0000                       
+  43CC4: C789  mova   @(0x43EEC),r0  ; =0x43000000     
+  43CC6: F908  fmov.s @r0,fr9                          
+  43CC8: F985  fcmp/gt  fr8,fr9                        
+  43CCA: 8902  bt     0x43CD2                          
+  43CCC: E004  mov    #4,r0                            
+  43CCE: A031  bra    0x43D34                          
+  43CD0: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CD2: C787  mova   @(0x43EF0),r0  ; =0x42C00000     
+  43CD4: F908  fmov.s @r0,fr9                          
+  43CD6: F985  fcmp/gt  fr8,fr9                        
+  43CD8: 8902  bt     0x43CE0                          
+  43CDA: E005  mov    #5,r0                            
+  43CDC: A028  bra    0x43D30                          
+  43CDE: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CE0: C784  mova   @(0x43EF4),r0  ; =0x42800000     
+  43CE2: F908  fmov.s @r0,fr9                          
+  43CE4: F985  fcmp/gt  fr8,fr9                        
+  43CE6: 8902  bt     0x43CEE                          
+  43CE8: E006  mov    #6,r0                            
+  43CEA: A01D  bra    0x43D28                          
+  43CEC: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CEE: E007  mov    #7,r0                            
+  43CF0: A01C  bra    0x43D2C                          
+  43CF2: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CF4: 6040  mov.b  @r4,r0                             ; @0x000D2994
+  43CF6: C907  and    #0x07,r0                         
+  43CF8: C005  mov.b  r0,@(5,GBR)                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CFA: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43CFC: 2008  tst  r0,r0                              
+  43CFE: 891D  bt     0x43D3C                          
+  43D00: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D02: 2F02  mov.l  r0,@r15                          
+  43D04: 600C  extu.b  r0,r0                           
+  43D06: 8802  cmp/eq #2,r0                            
+  43D08: 8916  bt     0x43D38                          
+  43D0A: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D0C: 1F01  mov.l  r0,@(4,r15)                      
+  43D0E: 600C  extu.b  r0,r0                           
+  43D10: 8804  cmp/eq #4,r0                            
+  43D12: 890F  bt     0x43D34                          
+  43D14: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D16: 1F02  mov.l  r0,@(8,r15)                      
+  43D18: 600C  extu.b  r0,r0                           
+  43D1A: 8805  cmp/eq #5,r0                            
+  43D1C: 8908  bt     0x43D30                          
+  43D1E: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D20: 1F03  mov.l  r0,@(12,r15)                     
+  43D22: 600C  extu.b  r0,r0                           
+  43D24: 8806  cmp/eq #6,r0                            
+  43D26: 8B01  bf     0x43D2C                          
+  43D28: A009  bra    0x43D3E                          
+  43D2A: E406  mov    #6,r4                            
+  43D2C: A007  bra    0x43D3E                          
+  43D2E: E407  mov    #7,r4                            
+  43D30: A005  bra    0x43D3E                          
+  43D32: E405  mov    #5,r4                            
+  43D34: A003  bra    0x43D3E                          
+  43D36: E404  mov    #4,r4                            
+  43D38: A001  bra    0x43D3E                          
+  43D3A: E402  mov    #2,r4                            
+  43D3C: E400  mov    #0,r4                            
+  43D3E: 6253  mov    r5,r2                            
+  43D40: 7224  add    #36,r2                           
+  43D42: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43D44: 670C  extu.b  r0,r7                           
+  43D46: C405  mov.b  @(5,GBR),r0                        ; @GBR+5 = 0xFFFF81B1 (knock_level_code)
+  43D48: 6E03  mov    r0,r14                           
+  43D4A: 6073  mov    r7,r0                            
+  43D4C: 02E4  mov.b  r14,@(r0,r2)                     
+  43D4E: 7506  add    #6,r5                            
+  43D50: 6013  mov    r1,r0                            
+  43D52: 025C  mov.b  @(r0,r5),r2                      
+  43D54: D668  mov.l  @(0x43EF8),r6  ; =0xFFFF4309     
+  43D56: 0624  mov.b  r2,@(r0,r6)                      
+  43D58: D268  mov.l  @(0x43EFC),r2  ; =0xFFFF430D     
+  43D5A: C400  mov.b  @(0,GBR),r0                        ; @GBR+0 = 0xFFFF81AC (knock_status_81AC)
+  43D5C: 600C  extu.b  r0,r0                           
+  43D5E: 0244  mov.b  r4,@(r0,r2)                      
+  43D60: 7F10  add    #16,r15                          
+  43D62: 4F17  ldc.l  @r15+,GBR                        
+  43D64: 000B  rts                                     
+  43D66: 6EF6  mov.l  @r15+,r14                        
+  43D68: 2FB6  mov.l  r11,@-r15                        
+  43D6A: 2FC6  mov.l  r12,@-r15                        
+  43D6C: 2FD6  mov.l  r13,@-r15                        
+  43D6E: 2FE6  mov.l  r14,@-r15                        
+  43D70: 4F22  sts.l  pr,@-r15                         
+  43D72: FFCB  fmov.s fr12,@-r15                       
+  43D74: FFDB  fmov.s fr13,@-r15                       
+  43D76: FFEB  fmov.s fr14,@-r15                       
+  43D78: FFFB  fmov.s fr15,@-r15                       
+  43D7A: 4F13  stc.l  GBR,@-r15                        
+
+
+==============================================================================
+  task12_knock_post (0x43D68)  [0x43D68 - 0x44068]
+==============================================================================
+  43D68: 2FB6  mov.l  r11,@-r15                        
+  43D6A: 2FC6  mov.l  r12,@-r15                        
+  43D6C: 2FD6  mov.l  r13,@-r15                        
+  43D6E: 2FE6  mov.l  r14,@-r15                        
+  43D70: 4F22  sts.l  pr,@-r15                         
+  43D72: FFCB  fmov.s fr12,@-r15                       
+  43D74: FFDB  fmov.s fr13,@-r15                       
+  43D76: FFEB  fmov.s fr14,@-r15                       
+  43D78: FFFB  fmov.s fr15,@-r15                       
+  43D7A: 4F13  stc.l  GBR,@-r15                        
+  43D7C: D060  mov.l  @(0x43F00),r0  ; =0xFFFF80FC (knock_det_GBR_base)
+  43D7E: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF80FC
+  43D80: 7FF0  add    #-16,r15                         
+  43D82: D260  mov.l  @(0x43F04),r2  ; =0xFFFF6624 (proc_6624)
+  43D84: FD28  fmov.s @r2,fr13                         
+  43D86: D260  mov.l  @(0x43F08),r2  ; =0xFFFF81F4     
+  43D88: FE28  fmov.s @r2,fr14                         
+  43D8A: DB60  mov.l  @(0x43F0C),r11  ; =0xFFFF8128    
+  43D8C: E0E0  mov    #-32,r0                          
+  43D8E: F8B6  fmov.s @(r0,r11),fr8                    
+  43D90: E0E4  mov    #-28,r0                          
+  43D92: FCB6  fmov.s @(r0,r11),fr12                   
+  43D94: D25E  mov.l  @(0x43F10),r2  ; =0xFFFF81F8     
+  43D96: FF28  fmov.s @r2,fr15                         
+  43D98: C4BE  mov.b  @(190,GBR),r0                      ; @GBR+190 = 0xFFFF81BA (knock_event_flag)
+  43D9A: D25E  mov.l  @(0x43F14),r2  ; =0x000D2D60     
+  43D9C: F928  fmov.s @r2,fr9                          
+  43D9E: F985  fcmp/gt  fr8,fr9                        
+  43DA0: 8F0A  bf/s   0x43DB8                          
+  43DA2: 6D03  mov    r0,r13                           
+  43DA4: D25C  mov.l  @(0x43F18),r2  ; =0x000D2D64     
+  43DA6: F828  fmov.s @r2,fr8                          
+  43DA8: F8C5  fcmp/gt  fr12,fr8                       
+  43DAA: 8B05  bf     0x43DB8                          
+  43DAC: D25B  mov.l  @(0x43F1C),r2  ; =0x000D2D6C     
+  43DAE: F928  fmov.s @r2,fr9                          
+  43DB0: FF9A  fmov.s fr9,@r15                         
+  43DB2: D25B  mov.l  @(0x43F20),r2  ; =0x000D2D74     
+  43DB4: A005  bra    0x43DC2                          
+  43DB6: F828  fmov.s @r2,fr8                          
+  43DB8: D25A  mov.l  @(0x43F24),r2  ; =0x000D2D68     
+  43DBA: F928  fmov.s @r2,fr9                          
+  43DBC: FF9A  fmov.s fr9,@r15                         
+  43DBE: D25A  mov.l  @(0x43F28),r2  ; =0x000D2D70     
+  43DC0: F828  fmov.s @r2,fr8                          
+  43DC2: E004  mov    #4,r0                            
+  43DC4: FF87  fmov.s fr8,@(r0,r15)                    
+  43DC6: D459  mov.l  @(0x43F2C),r4  ; =0x000AE0F8     
+  43DC8: DE59  mov.l  @(0x43F30),r14  ; =0x000BE830 (Pull3DFloat)
+  43DCA: 4E0B  jsr    @r0                                ; CALL @ 0x00004
+  43DCC: F4DC  fmov   fr13,fr4                         
+  43DCE: DC59  mov.l  @(0x43F34),r12  ; =0xFFFF81D8 (knock_rpmgate)
+  43DD0: E0E8  mov    #-24,r0                          
+  43DD2: FC07  fmov.s fr0,@(r0,r12)                    
+  43DD4: D458  mov.l  @(0x43F38),r4  ; =0x000AE00C     
+  43DD6: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43DD8: F4EC  fmov   fr14,fr4                         
+  43DDA: E0F0  mov    #-16,r0                          
+  43DDC: FC07  fmov.s fr0,@(r0,r12)                    
+  43DDE: D457  mov.l  @(0x43F3C),r4  ; =0x000AE020     
+  43DE0: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFF0
+  43DE2: F4FC  fmov   fr15,fr4                         
+  43DE4: E0F4  mov    #-12,r0                          
+  43DE6: FC07  fmov.s fr0,@(r0,r12)                    
+  43DE8: D255  mov.l  @(0x43F40),r2  ; =0x000D2D78     
+  43DEA: F828  fmov.s @r2,fr8                          
+  43DEC: F8C5  fcmp/gt  fr12,fr8                       
+  43DEE: 891D  bt     0x43E2C                          
+  43DF0: D454  mov.l  @(0x43F44),r4  ; =0x000AE10C     
+  43DF2: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43DF4: F4DC  fmov   fr13,fr4                         
+  43DF6: E0EC  mov    #-20,r0                          
+  43DF8: FC07  fmov.s fr0,@(r0,r12)                    
+  43DFA: F4C6  fmov.s @(r0,r12),fr4                    
+  43DFC: F4C2  fmul  fr12,fr4                          
+  43DFE: D252  mov.l  @(0x43F48),r2  ; =0x000BE628     
+  43E00: D652  mov.l  @(0x43F4C),r6  ; =0x000D2D80     
+  43E02: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFEC
+  43E04: F568  fmov.s @r6,fr5                          
+  43E06: F40C  fmov   fr0,fr4                          
+  43E08: D251  mov.l  @(0x43F50),r2  ; =0x000BE56C (clamp_float)
+  43E0A: E0E8  mov    #-24,r0                          
+  43E0C: F5C6  fmov.s @(r0,r12),fr5                    
+  43E0E: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43E10: F69D  fldi1  fr6                              
+  43E12: E0F0  mov    #-16,r0                          
+  43E14: F8C6  fmov.s @(r0,r12),fr8                    
+  43E16: F082  fmul  fr8,fr0                           
+  43E18: E0F4  mov    #-12,r0                          
+  43E1A: F8C6  fmov.s @(r0,r12),fr8                    
+  43E1C: F082  fmul  fr8,fr0                           
+  43E1E: F40C  fmov   fr0,fr4                          
+  43E20: D24C  mov.l  @(0x43F54),r2  ; =0x000BE970 (max_float)
+  43E22: D64D  mov.l  @(0x43F58),r6  ; =0x000D2D7C     
+  43E24: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43E26: F568  fmov.s @r6,fr5                          
+  43E28: A00C  bra    0x43E44                          
+  43E2A: 0009  nop                                     
+  43E2C: E0E8  mov    #-24,r0                          
+  43E2E: F4C6  fmov.s @(r0,r12),fr4                    
+  43E30: E0F0  mov    #-16,r0                          
+  43E32: F8C6  fmov.s @(r0,r12),fr8                    
+  43E34: F482  fmul  fr8,fr4                           
+  43E36: E0F4  mov    #-12,r0                          
+  43E38: F8C6  fmov.s @(r0,r12),fr8                    
+  43E3A: F482  fmul  fr8,fr4                           
+  43E3C: D244  mov.l  @(0x43F50),r2  ; =0x000BE56C (clamp_float)
+  43E3E: F69D  fldi1  fr6                              
+  43E40: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43E42: F58D  fldi0  fr5                              
+  43E44: FE0C  fmov   fr0,fr14                         
+  43E46: D245  mov.l  @(0x43F5C),r2  ; =0x0000317C     
+  43E48: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43E4A: E410  mov    #16,r4                           
+  43E4C: 6403  mov    r0,r4                            
+  43E4E: F8F8  fmov.s @r15,fr8                         
+  43E50: E0D4  mov    #-44,r0                          
+  43E52: FB87  fmov.s fr8,@(r0,r11)                    
+  43E54: E0D8  mov    #-40,r0                          
+  43E56: FBE7  fmov.s fr14,@(r0,r11)                   
+  43E58: E004  mov    #4,r0                            
+  43E5A: F9F6  fmov.s @(r0,r15),fr9                    
+  43E5C: E0DC  mov    #-36,r0                          
+  43E5E: D240  mov.l  @(0x43F60),r2  ; =0x00003190     
+  43E60: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFDC
+  43E62: FB97  fmov.s fr9,@(r0,r11)                    
+  43E64: D43F  mov.l  @(0x43F64),r4  ; =0x000AE26C     
+  43E66: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFDC
+  43E68: F4DC  fmov   fr13,fr4                         
+  43E6A: E0FC  mov    #-4,r0                           
+  43E6C: FB07  fmov.s fr0,@(r0,r11)                    
+  43E6E: D43E  mov.l  @(0x43F68),r4  ; =0x000AE278     
+  43E70: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  43E72: F4DC  fmov   fr13,fr4                         
+  43E74: FB0A  fmov.s fr0,@r11                         
+  43E76: D23D  mov.l  @(0x43F6C),r2  ; =0x0000A638     
+  43E78: E0FC  mov    #-4,r0                           
+  43E7A: F4B6  fmov.s @(r0,r11),fr4                    
+  43E7C: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  43E7E: F5B8  fmov.s @r11,fr5                         
+  43E80: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43E82: E604  mov    #4,r6                            
+  43E84: 3062  cmp/hs  r6,r0                           
+  43E86: 8925  bt     0x43ED4                          
+  43E88: D139  mov.l  @(0x43F70),r1  ; =0x00063E78     
+  43E8A: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43E8C: 600C  extu.b  r0,r0                           
+  43E8E: 4008  shll2  r0                               
+  43E90: 021E  mov.l  @(r0,r1),r2                      
+  43E92: 6420  mov.b  @r2,r4                             ; @0x0000A638
+  43E94: C4DD  mov.b  @(221,GBR),r0                      ; @GBR+221 = 0xFFFF81D9
+  43E96: 2008  tst  r0,r0                              
+  43E98: 8F07  bf/s   0x43EAA                          
+  43E9A: 644C  extu.b  r4,r4                           
+  43E9C: 60DC  extu.b  r13,r0                          
+  43E9E: 8801  cmp/eq #1,r0                            
+  43EA0: 8B03  bf     0x43EAA                          
+  43EA2: D234  mov.l  @(0x43F74),r2  ; =0x000BE53C     
+  43EA4: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  43EA6: E501  mov    #1,r5                            
+  43EA8: 640C  extu.b  r0,r4                           
+  43EAA: E6FF  mov    #-1,r6                           
+  43EAC: 666C  extu.b  r6,r6                           
+  43EAE: 3463  cmp/ge  r6,r4                           
+  43EB0: 8F08  bf/s   0x43EC4                          
+  43EB2: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
+  43EB4: 1F02  mov.l  r0,@(8,r15)                      
+  43EB6: 600C  extu.b  r0,r0                           
+  43EB8: 4008  shll2  r0                               
+  43EBA: D12D  mov.l  @(0x43F70),r1  ; =0x00063E78     
+  43EBC: 061E  mov.l  @(r0,r1),r6                      
+  43EBE: E200  mov    #0,r2                            
+  43EC0: A006  bra    0x43ED0                          
+  43EC2: 2620  mov.b  r2,@r6                             ; -> 0xFFFFFFFF
+  43EC4: 1F03  mov.l  r0,@(12,r15)                     
+  43EC6: 600C  extu.b  r0,r0                           
+  43EC8: 4008  shll2  r0                               
+  43ECA: D129  mov.l  @(0x43F70),r1  ; =0x00063E78     
+  43ECC: 061E  mov.l  @(r0,r1),r6                      
+  43ECE: 2640  mov.b  r4,@r6                             ; -> 0xFFFFFFFF
+  43ED0: 60D3  mov    r13,r0                           
+  43ED2: C0DD  mov.b  r0,@(221,GBR)                      ; @GBR+221 = 0xFFFF81D9
+  43ED4: 7F10  add    #16,r15                          
+  43ED6: 4F17  ldc.l  @r15+,GBR                        
+  43ED8: FFF9  fmov.s @r15+,fr15                       
+  43EDA: FEF9  fmov.s @r15+,fr14                       
+  43EDC: FDF9  fmov.s @r15+,fr13                       
+  43EDE: FCF9  fmov.s @r15+,fr12                       
+  43EE0: 4F26  lds.l  @r15+,pr                         
+  43EE2: 6EF6  mov.l  @r15+,r14                        
+  43EE4: 6DF6  mov.l  @r15+,r13                        
+  43EE6: 6CF6  mov.l  @r15+,r12                        
+  43EE8: 000B  rts                                     
+  43EEA: 6BF6  mov.l  @r15+,r11                        
+  43EEC: 4300  shll   r3                               
+  43EEE: 0000  ??       ; 0x0000                       
+  43EF0: 42C0  ??       ; 0x42C0 (grp4)                
+  43EF2: 0000  ??       ; 0x0000                       
+  43EF4: 4280  ??       ; 0x4280 (grp4)                
+  43EF6: 0000  ??       ; 0x0000                       
+  43EF8: FFFF  ??fpu    ; 0xFFFF                       
+  43EFA: 4309  shlr2  r3                               
+  43EFC: FFFF  ??fpu    ; 0xFFFF                       
+  43EFE: 430D  ??       ; 0x430D (grp4)                
+  43F00: FFFF  ??fpu    ; 0xFFFF                       
+  43F02: 80FC  mov.b  r0,@(12,r15)                     
+  43F04: FFFF  ??fpu    ; 0xFFFF                       
+  43F06: 6624  mov.b  @r2+,r6                          
+  43F08: FFFF  ??fpu    ; 0xFFFF                       
+  43F0A: 81F4  mov.w  r0,@(8,r15)                      
+  43F0C: FFFF  ??fpu    ; 0xFFFF                       
+  43F0E: 8128  mov.w  r0,@(16,r2)                      
+  43F10: FFFF  ??fpu    ; 0xFFFF                       
+  43F12: 81F8  mov.w  r0,@(16,r15)                     
+  43F14: 000D  mov.w  @(r0,r0),r0                      
+  43F16: 2D60  mov.b  r6,@r13                            ; -> 0xFFFFFFE4
+  43F18: 000D  mov.w  @(r0,r0),r0                      
+  43F1A: 2D64  mov.b  r6,@-r13                         
+  43F1C: 000D  mov.w  @(r0,r0),r0                      
+  43F1E: 2D6C  cmp/str  r6,r13                         
+  43F20: 000D  mov.w  @(r0,r0),r0                      
+  43F22: 2D74  mov.b  r7,@-r13                         
+  43F24: 000D  mov.w  @(r0,r0),r0                      
+  43F26: 2D68  tst  r6,r13                             
+  43F28: 000D  mov.w  @(r0,r0),r0                      
+  43F2A: 2D70  mov.b  r7,@r13                            ; -> 0xFFFFFFE4
+  43F2C: 000A  ??       ; 0x000A                       
+  43F2E: E0F8  mov    #-8,r0                           
+  43F30: 000B  rts                                     
+  43F32: E830  mov    #48,r8                           
+  43F34: FFFF  ??fpu    ; 0xFFFF                       
+  43F36: 81D8  mov.w  r0,@(16,r13)                     
+  43F38: 000A  ??       ; 0x000A                       
+  43F3A: E00C  mov    #12,r0                           
+  43F3C: 000A  ??       ; 0x000A                       
+  43F3E: E020  mov    #32,r0                           
+  43F40: 000D  mov.w  @(r0,r0),r0                      
+  43F42: 2D78  tst  r7,r13                             
+  43F44: 000A  ??       ; 0x000A                       
+  43F46: E10C  mov    #12,r1                           
+  43F48: 000B  rts                                     
+  43F4A: E628  mov    #40,r6                           
+  43F4C: 000D  mov.w  @(r0,r0),r0                      
+  43F4E: 2D80  mov.b  r8,@r13                            ; -> 0xFFFFFFE4
+  43F50: 000B  rts                                     
+  43F52: E56C  mov    #108,r5                          
+  43F54: 000B  rts                                     
+  43F56: E970  mov    #112,r9                          
+  43F58: 000D  mov.w  @(r0,r0),r0                      
+  43F5A: 2D7C  cmp/str  r7,r13                         
+  43F5C: 0000  ??       ; 0x0000                       
+  43F5E: 317C  add  r7,r1                              
+  43F60: 0000  ??       ; 0x0000                       
+  43F62: 3190  cmp/eq  r9,r1                           
+  43F64: 000A  ??       ; 0x000A                       
+  43F66: E26C  mov    #108,r2                          
+  43F68: 000A  ??       ; 0x000A                       
+  43F6A: E278  mov    #120,r2                          
+  43F6C: 0000  ??       ; 0x0000                       
+  43F6E: A638  bra    0x44BE2                          
+  43F70: 0006  mov.l  r0,@(r0,r0)                      
+  43F72: 3E78  sub  r7,r14                             
+  43F74: 000B  rts                                     
+  43F76: E53C  mov    #60,r5                           
+  43F78: 2FE6  mov.l  r14,@-r15                        
+  43F7A: 4F22  sts.l  pr,@-r15                         
+  43F7C: FFEB  fmov.s fr14,@-r15                       
+  43F7E: 7FFC  add    #-4,r15                          
+  43F80: D26E  mov.l  @(0x4413C),r2  ; =0xFFFF6624 (proc_6624)
+  43F82: FE28  fmov.s @r2,fr14                         
+  43F84: D26E  mov.l  @(0x44140),r2  ; =0x0000317C     
+  43F86: 420B  jsr    @r0                                ; CALL @ 0x00020
+  43F88: E410  mov    #16,r4                           
+  43F8A: 2F02  mov.l  r0,@r15                          
+  43F8C: F4EC  fmov   fr14,fr4                         
+  43F8E: DE6D  mov.l  @(0x44144),r14  ; =0xFFFF8120    
+  43F90: E0F0  mov    #-16,r0                          
+  43F92: F8E6  fmov.s @(r0,r14),fr8                    
+  43F94: F481  fsub  fr8,fr4                           
+  43F96: D26C  mov.l  @(0x44148),r2  ; =0x000BEAB0     
+  43F98: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF0
+  43F9A: F58D  fldi0  fr5                              
+  43F9C: E0E8  mov    #-24,r0                          
+  43F9E: FE07  fmov.s fr0,@(r0,r14)                    
+  43FA0: F4EC  fmov   fr14,fr4                         
+  43FA2: F8E8  fmov.s @r14,fr8                         
+  43FA4: F481  fsub  fr8,fr4                           
+  43FA6: D268  mov.l  @(0x44148),r2  ; =0x000BEAB0     
+  43FA8: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43FAA: F58D  fldi0  fr5                              
+  43FAC: E0EC  mov    #-20,r0                          
+  43FAE: FE07  fmov.s fr0,@(r0,r14)                    
+  43FB0: E0FC  mov    #-4,r0                           
+  43FB2: F8E6  fmov.s @(r0,r14),fr8                    
+  43FB4: FE8A  fmov.s fr8,@r14                         
+  43FB6: E0F8  mov    #-8,r0                           
+  43FB8: F8E6  fmov.s @(r0,r14),fr8                    
+  43FBA: E0FC  mov    #-4,r0                           
+  43FBC: FE87  fmov.s fr8,@(r0,r14)                    
+  43FBE: E0F4  mov    #-12,r0                          
+  43FC0: F8E6  fmov.s @(r0,r14),fr8                    
+  43FC2: E0F8  mov    #-8,r0                           
+  43FC4: FE87  fmov.s fr8,@(r0,r14)                    
+  43FC6: E0F0  mov    #-16,r0                          
+  43FC8: F8E6  fmov.s @(r0,r14),fr8                    
+  43FCA: E0F4  mov    #-12,r0                          
+  43FCC: FE87  fmov.s fr8,@(r0,r14)                    
+  43FCE: E0F0  mov    #-16,r0                          
+  43FD0: FEE7  fmov.s fr14,@(r0,r14)                   
+  43FD2: D25E  mov.l  @(0x4414C),r2  ; =0x00003190     
+  43FD4: 64F2  mov.l  @r15,r4                          
+  43FD6: 7F04  add    #4,r15                           
+  43FD8: FEF9  fmov.s @r15+,fr14                       
+  43FDA: 4F26  lds.l  @r15+,pr                         
+  43FDC: 422B  jsr    @r2                                ; CALL @ 0x03190
+  43FDE: 6EF6  mov.l  @r15+,r14                        
+  43FE0: 2F96  mov.l  r9,@-r15                         
+  43FE2: 2FA6  mov.l  r10,@-r15                        
+  43FE4: 2FB6  mov.l  r11,@-r15                        
+  43FE6: 2FC6  mov.l  r12,@-r15                        
+  43FE8: 2FD6  mov.l  r13,@-r15                        
+  43FEA: 2FE6  mov.l  r14,@-r15                        
+  43FEC: 4F22  sts.l  pr,@-r15                         
+  43FEE: 4F13  stc.l  GBR,@-r15                        
+  43FF0: D057  mov.l  @(0x44150),r0  ; =0xFFFF80FC (knock_det_GBR_base)
+  43FF2: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF80FC
+  43FF4: 7FFC  add    #-4,r15                          
+  43FF6: D257  mov.l  @(0x44154),r2  ; =0x00022F92     
+  43FF8: 420B  jsr    @r0                                ; CALL @ 0xFFFF80FC
+  43FFA: 0009  nop                                     
+  43FFC: 600C  extu.b  r0,r0                           
+  43FFE: 8801  cmp/eq #1,r0                            
+  44000: 8901  bt     0x44006                          
+  44002: A08C  bra    0x4411E                          
+  44004: 0009  nop                                     
+  44006: D24E  mov.l  @(0x44140),r2  ; =0x0000317C     
+  44008: 420B  jsr    @r0                                ; CALL @ 0xFFFF80FC
+  4400A: E410  mov    #16,r4                           
+  4400C: 2F02  mov.l  r0,@r15                          
+  4400E: D252  mov.l  @(0x44158),r2  ; =0x000D2D4C     
+  44010: F828  fmov.s @r2,fr8                          
+  44012: D652  mov.l  @(0x4415C),r6  ; =0xFFFF8158 (knock_struct_8158)
+  44014: E0CC  mov    #-52,r0                          
+  44016: F687  fmov.s fr8,@(r0,r6)                     
+  44018: D251  mov.l  @(0x44160),r2  ; =0x000D2D50     
+  4401A: F828  fmov.s @r2,fr8                          
+  4401C: E0D0  mov    #-48,r0                          
+  4401E: F687  fmov.s fr8,@(r0,r6)                     
+  44020: D250  mov.l  @(0x44164),r2  ; =0x0000A638     
+  44022: E0CC  mov    #-52,r0                          
+  44024: F466  fmov.s @(r0,r6),fr4                     
+  44026: E0D0  mov    #-48,r0                          
+  44028: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFD0
+  4402A: F566  fmov.s @(r0,r6),fr5                     
+  4402C: D247  mov.l  @(0x4414C),r2  ; =0x00003190     
+  4402E: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFD0
+  44030: 64F2  mov.l  @r15,r4                          
+  44032: F98D  fldi0  fr9                              
+  44034: DD49  mov.l  @(0x4415C),r13  ; =0xFFFF8158 (knock_struct_8158)
+  44036: E0DC  mov    #-36,r0                          
+  44038: FD97  fmov.s fr9,@(r0,r13)                    
+  4403A: D24B  mov.l  @(0x44168),r2  ; =0x000D2D5C     
+  4403C: F828  fmov.s @r2,fr8                          
+  4403E: E0D4  mov    #-44,r0                          
+  44040: FD87  fmov.s fr8,@(r0,r13)                    
+  44042: C74A  mova   @(0x4416C),r0  ; =0x447A0000     
+  44044: F808  fmov.s @r0,fr8                          
+  44046: E0D8  mov    #-40,r0                          
+  44048: FD87  fmov.s fr8,@(r0,r13)                    
+  4404A: C749  mova   @(0x44170),r0  ; =0x41200000     
+  4404C: F808  fmov.s @r0,fr8                          
+  4404E: E0F8  mov    #-8,r0                           
+  44050: FD87  fmov.s fr8,@(r0,r13)                    
+  44052: D948  mov.l  @(0x44174),r9  ; =0x000D2D88     
+  44054: F698  fmov.s @r9,fr6                          
+  44056: E0FC  mov    #-4,r0                           
+  44058: FD67  fmov.s fr6,@(r0,r13)                    
+  4405A: F698  fmov.s @r9,fr6                          
+  4405C: FD6A  fmov.s fr6,@r13                         
+  4405E: E0E8  mov    #-24,r0                          
+  44060: FD97  fmov.s fr9,@(r0,r13)                    
+  44062: E0E4  mov    #-28,r0                          
+  44064: FD97  fmov.s fr9,@(r0,r13)                    
+  44066: F69D  fldi1  fr6                              
+
+
+==============================================================================
+  task11_knock_flag_read (0x4438C)  [0x4438C - 0x4458C]
+==============================================================================
+  4438C: 2FB6  mov.l  r11,@-r15                        
+  4438E: 2FC6  mov.l  r12,@-r15                        
+  44390: 2FD6  mov.l  r13,@-r15                        
+  44392: 2FE6  mov.l  r14,@-r15                        
+  44394: 4F22  sts.l  pr,@-r15                         
+  44396: FFCB  fmov.s fr12,@-r15                       
+  44398: FFDB  fmov.s fr13,@-r15                       
+  4439A: FFEB  fmov.s fr14,@-r15                       
+  4439C: FFFB  fmov.s fr15,@-r15                       
+  4439E: 4F13  stc.l  GBR,@-r15                        
+  443A0: D06E  mov.l  @(0x4455C),r0  ; =0xFFFF81F0     
+  443A2: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF81F0
+  443A4: 7FA0  add    #-96,r15                         
+  443A6: D264  mov.l  @(0x44538),r2  ; =0xFFFF63F8 (proc_63F8)
+  443A8: FE28  fmov.s @r2,fr14                         
+  443AA: D264  mov.l  @(0x4453C),r2  ; =0xFFFF6624 (proc_6624)
+  443AC: FF28  fmov.s @r2,fr15                         
+  443AE: D26C  mov.l  @(0x44560),r2  ; =0x0001CF22     
+  443B0: 420B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443B2: 0009  nop                                     
+  443B4: D26B  mov.l  @(0x44564),r2  ; =0x0002F8FE     
+  443B6: 420B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443B8: 2F00  mov.b  r0,@r15                          
+  443BA: D26B  mov.l  @(0x44568),r2  ; =0x00029858     
+  443BC: 420B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443BE: 80F4  mov.b  r0,@(4,r15)                      
+  443C0: 80F8  mov.b  r0,@(8,r15)                      
+  443C2: D66A  mov.l  @(0x4456C),r6  ; =0xFFFF81BA (knock_event_flag)
+  443C4: 6B60  mov.b  @r6,r11                            ; @0xFFFF81BA (knock_event_flag)
+  443C6: D66A  mov.l  @(0x44570),r6  ; =0xFFFF81BB (knock_flag_B)
+  443C8: D26A  mov.l  @(0x44574),r2  ; =0x0002997C     
+  443CA: 420B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443CC: 6C60  mov.b  @r6,r12                            ; @0xFFFF81BB (knock_flag_B)
+  443CE: 80FC  mov.b  r0,@(12,r15)                     
+  443D0: D269  mov.l  @(0x44578),r2  ; =0xFFFF7F10     
+  443D2: FC28  fmov.s @r2,fr12                         
+  443D4: D269  mov.l  @(0x4457C),r2  ; =0xFFFF653C     
+  443D6: FD28  fmov.s @r2,fr13                         
+  443D8: D669  mov.l  @(0x44580),r6  ; =0xFFFF7BE2     
+  443DA: 6D60  mov.b  @r6,r13                            ; @0xFFFF7BE2
+  443DC: C43C  mov.b  @(60,GBR),r0                       ; @GBR+60 = 0xFFFF822C
+  443DE: 6E03  mov    r0,r14                           
+  443E0: D35A  mov.l  @(0x4454C),r3  ; =0x000456E0     
+  443E2: 430B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443E4: F4EC  fmov   fr14,fr4                         
+  443E6: D35A  mov.l  @(0x44550),r3  ; =0x0004578C     
+  443E8: 430B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443EA: F4FC  fmov   fr15,fr4                         
+  443EC: D365  mov.l  @(0x44584),r3  ; =0x0004581A     
+  443EE: 430B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443F0: 0009  nop                                     
+  443F2: D665  mov.l  @(0x44588),r6  ; =0x000D2995     
+  443F4: 6260  mov.b  @r6,r2                             ; @0x000D2995
+  443F6: 662C  extu.b  r2,r6                           
+  443F8: 62EC  extu.b  r14,r2                          
+  443FA: 3263  cmp/ge  r6,r2                           
+  443FC: 8B05  bf     0x4440A                          
+  443FE: C458  mov.b  @(88,GBR),r0                       ; @GBR+88 = 0xFFFF8248
+  44400: 2008  tst  r0,r0                              
+  44402: 8F03  bf/s   0x4440C                          
+  44404: E002  mov    #2,r0                            
+  44406: A001  bra    0x4440C                          
+  44408: E001  mov    #1,r0                            
+  4440A: E000  mov    #0,r0                            
+  4440C: C058  mov.b  r0,@(88,GBR)                       ; @GBR+88 = 0xFFFF8248
+  4440E: D25F  mov.l  @(0x4458C),r2  ; =0x000BE608 (Pull2DFloat)
+  44410: F4CC  fmov   fr12,fr4                         
+  44412: C75F  mova   @(0x44590),r0  ; =0x3B800000     
+  44414: F608  fmov.s @r0,fr6                          
+  44416: 420B  jsr    @r0                                ; CALL @ 0x00000
+  44418: F59D  fldi1  fr5                              
+  4441A: 620C  extu.b  r0,r2                           
+  4441C: 60F0  mov.b  @r15,r0                          
+  4441E: 8801  cmp/eq #1,r0                            
+  44420: 8F06  bf/s   0x44430                          
+  44422: EE00  mov    #0,r14                           
+  44424: E001  mov    #1,r0                            
+  44426: C043  mov.b  r0,@(67,GBR)                       ; @GBR+67 = 0xFFFF8233 (knock_active)
+  44428: F58D  fldi0  fr5                              
+  4442A: D64C  mov.l  @(0x4455C),r6  ; =0xFFFF81F0     
+  4442C: A1CD  bra    0x447CA                          
+  4442E: F65A  fmov.s fr5,@r6                          
+  44430: D558  mov.l  @(0x44594),r5  ; =0xFFFF7E76     
+  44432: 6050  mov.b  @r5,r0                             ; @0xFFFF7E76
+  44434: 8801  cmp/eq #1,r0                            
+  44436: 8B01  bf     0x4443C                          
+  44438: A1B5  bra    0x447A6                          
+  4443A: 0009  nop                                     
+  4443C: 6023  mov    r2,r0                            
+  4443E: 8801  cmp/eq #1,r0                            
+  44440: 8B01  bf     0x44446                          
+  44442: A1B0  bra    0x447A6                          
+  44444: 0009  nop                                     
+  44446: C45A  mov.b  @(90,GBR),r0                       ; @GBR+90 = 0xFFFF824A
+  44448: 1F05  mov.l  r0,@(20,r15)                     
+  4444A: 600C  extu.b  r0,r0                           
+  4444C: 8801  cmp/eq #1,r0                            
+  4444E: 8B01  bf     0x44454                          
+  44450: A1A9  bra    0x447A6                          
+  44452: 0009  nop                                     
+  44454: 84F8  mov.b  @(8,r15),r0                      
+  44456: 8802  cmp/eq #2,r0                            
+  44458: 8B06  bf     0x44468                          
+  4445A: E001  mov    #1,r0                            
+  4445C: C043  mov.b  r0,@(67,GBR)                       ; @GBR+67 = 0xFFFF8233 (knock_active)
+  4445E: D24E  mov.l  @(0x44598),r2  ; =0x000D2DC4     
+  44460: F828  fmov.s @r2,fr8                          
+  44462: D63E  mov.l  @(0x4455C),r6  ; =0xFFFF81F0     
+  44464: A1AB  bra    0x447BE                          
+  44466: F68A  fmov.s fr8,@r6                          
+  44468: 84FC  mov.b  @(12,r15),r0                     
+  4446A: 8802  cmp/eq #2,r0                            
+  4446C: 8B06  bf     0x4447C                          
+  4446E: E001  mov    #1,r0                            
+  44470: C043  mov.b  r0,@(67,GBR)                       ; @GBR+67 = 0xFFFF8233 (knock_active)
+  44472: D24A  mov.l  @(0x4459C),r2  ; =0x000D2DD4     
+  44474: F828  fmov.s @r2,fr8                          
+  44476: D639  mov.l  @(0x4455C),r6  ; =0xFFFF81F0     
+  44478: A1A1  bra    0x447BE                          
+  4447A: F68A  fmov.s fr8,@r6                          
+  4447C: C445  mov.b  @(69,GBR),r0                       ; @GBR+69 = 0xFFFF8235
+  4447E: 2008  tst  r0,r0                              
+  44480: 8F0A  bf/s   0x44498                          
+  44482: 1F06  mov.l  r0,@(24,r15)                     
+  44484: E001  mov    #1,r0                            
+  44486: C043  mov.b  r0,@(67,GBR)                       ; @GBR+67 = 0xFFFF8233 (knock_active)
+  44488: D245  mov.l  @(0x445A0),r2  ; =0xFFFF81FC     
+  4448A: F828  fmov.s @r2,fr8                          
+  4448C: D245  mov.l  @(0x445A4),r2  ; =0x000D2DD8     
+  4448E: F928  fmov.s @r2,fr9                          
+  44490: F892  fmul  fr9,fr8                           
+  44492: D632  mov.l  @(0x4455C),r6  ; =0xFFFF81F0     
+  44494: A199  bra    0x447CA                          
+  44496: F68A  fmov.s fr8,@r6                          
+  44498: C444  mov.b  @(68,GBR),r0                       ; @GBR+68 = 0xFFFF8234
+  4449A: 1F07  mov.l  r0,@(28,r15)                     
+  4449C: 600C  extu.b  r0,r0                           
+  4449E: 8801  cmp/eq #1,r0                            
+  444A0: 8B19  bf     0x444D6                          
+  444A2: C45B  mov.b  @(91,GBR),r0                       ; @GBR+91 = 0xFFFF824B
+  444A4: 1F08  mov.l  r0,@(32,r15)                     
+  444A6: 600C  extu.b  r0,r0                           
+  444A8: 8801  cmp/eq #1,r0                            
+  444AA: 8B14  bf     0x444D6                          
+  444AC: C45C  mov.b  @(92,GBR),r0                       ; @GBR+92 = 0xFFFF824C (ECT_raw)
+  444AE: 1F09  mov.l  r0,@(36,r15)                     
+  444B0: 600C  extu.b  r0,r0                           
+  444B2: 8801  cmp/eq #1,r0                            
+  444B4: 8B0F  bf     0x444D6                          
+  444B6: 60CC  extu.b  r12,r0                          
+  444B8: 8801  cmp/eq #1,r0                            
+  444BA: 8B0C  bf     0x444D6                          
+  444BC: 60DC  extu.b  r13,r0                          
+  444BE: 8801  cmp/eq #1,r0                            
+  444C0: 8B09  bf     0x444D6                          
+  444C2: E001  mov    #1,r0                            
+  444C4: C043  mov.b  r0,@(67,GBR)                       ; @GBR+67 = 0xFFFF8233 (knock_active)
+  444C6: D238  mov.l  @(0x445A8),r2  ; =0x000D2DC8     
+  444C8: F528  fmov.s @r2,fr5                          
+  444CA: F54D  fneg   fr5                              
+  444CC: D623  mov.l  @(0x4455C),r6  ; =0xFFFF81F0     
+  444CE: F468  fmov.s @r6,fr4                          
+  444D0: D236  mov.l  @(0x445AC),r2  ; =0x000D2DE4     
+  444D2: A01E  bra    0x44512                          
+  444D4: F828  fmov.s @r2,fr8                          
+  444D6: C444  mov.b  @(68,GBR),r0                       ; @GBR+68 = 0xFFFF8234
+  444D8: 1F0A  mov.l  r0,@(40,r15)                     
+  444DA: 600C  extu.b  r0,r0                           
+  444DC: 8801  cmp/eq #1,r0                            
+  444DE: 8B6F  bf     0x445C0                          
+  444E0: C45B  mov.b  @(91,GBR),r0                       ; @GBR+91 = 0xFFFF824B
+  444E2: 1F0B  mov.l  r0,@(44,r15)                     
+  444E4: 600C  extu.b  r0,r0                           
+  444E6: 8801  cmp/eq #1,r0                            
+  444E8: 8B6A  bf     0x445C0                          
+  444EA: C45C  mov.b  @(92,GBR),r0                       ; @GBR+92 = 0xFFFF824C (ECT_raw)
+  444EC: 1F0C  mov.l  r0,@(48,r15)                     
+  444EE: 600C  extu.b  r0,r0                           
+  444F0: 8801  cmp/eq #1,r0                            
+  444F2: 8B65  bf     0x445C0                          
+  444F4: 60BC  extu.b  r11,r0                          
+  444F6: 8801  cmp/eq #1,r0                            
+  444F8: 8B62  bf     0x445C0                          
+  444FA: 60DC  extu.b  r13,r0                          
+  444FC: 8801  cmp/eq #1,r0                            
+  444FE: 8B5F  bf     0x445C0                          
+  44500: E001  mov    #1,r0                            
+  44502: C043  mov.b  r0,@(67,GBR)                       ; @GBR+67 = 0xFFFF8233 (knock_active)
+  44504: D228  mov.l  @(0x445A8),r2  ; =0x000D2DC8     
+  44506: F528  fmov.s @r2,fr5                          
+  44508: F54D  fneg   fr5                              
+  4450A: D614  mov.l  @(0x4455C),r6  ; =0xFFFF81F0     
+  4450C: F468  fmov.s @r6,fr4                          
+  4450E: D228  mov.l  @(0x445B0),r2  ; =0x000D2DDC     
+  44510: F828  fmov.s @r2,fr8                          
+  44512: D228  mov.l  @(0x445B4),r2  ; =0x000BE960     
+  44514: 420B  jsr    @r0                                ; CALL @ 0x00001
+  44516: F481  fsub  fr8,fr4                           
+  44518: D610  mov.l  @(0x4455C),r6  ; =0xFFFF81F0     
+  4451A: D227  mov.l  @(0x445B8),r2  ; =0x000469C6     
+  4451C: 420B  jsr    @r0                                ; CALL @ 0x00001
+  4451E: F60A  fmov.s fr0,@r6                          
+  44520: D226  mov.l  @(0x445BC),r2  ; =0x00045EEA (FLKC_commit_write)
+  44522: 420B  jsr    @r0                                ; CALL @ 0x00001
+  44524: 0009  nop                                     
+  44526: E000  mov    #0,r0                            
+  44528: C047  mov.b  r0,@(71,GBR)                       ; @GBR+71 = 0xFFFF8237
+  4452A: A150  bra    0x447CE                          
+  4452C: EE01  mov    #1,r14                           
+  4452E: 0000  ??       ; 0x0000                       
+  44530: FFFF  ??fpu    ; 0xFFFF                       
+  44532: 8210  ??       ; 0x8210 (grp8)                
+  44534: FFFF  ??fpu    ; 0xFFFF                       
+  44536: 6364  mov.b  @r6+,r3                          
+  44538: FFFF  ??fpu    ; 0xFFFF                       
+  4453A: 63F8  swap.b  r15,r3                          
+  4453C: FFFF  ??fpu    ; 0xFFFF                       
+  4453E: 6624  mov.b  @r2+,r6                          
+  44540: 0002  ??       ; 0x0002                       
+  44542: 2F92  mov.l  r9,@r15                          
+  44544: FFFF  ??fpu    ; 0xFFFF                       
+  44546: 8224  ??       ; 0x8224 (grp8)                
+  44548: FFFF  ??fpu    ; 0xFFFF                       
+  4454A: 8235  ??       ; 0x8235 (grp8)                
+  4454C: 0004  mov.b  r0,@(r0,r0)                      
+  4454E: 56E0  mov.l  @(0,r14),r6                        ; @0x00000001
+  44550: 0004  mov.b  r0,@(r0,r0)                      
+  44552: 578C  mov.l  @(48,r8),r7                      
+  44554: 0004  mov.b  r0,@(r0,r0)                      
+  44556: 57D2  mov.l  @(8,r13),r7                      
+  44558: 0004  mov.b  r0,@(r0,r0)                      
+  4455A: 57F4  mov.l  @(16,r15),r7                     
+  4455C: FFFF  ??fpu    ; 0xFFFF                       
+  4455E: 81F0  mov.w  r0,@(0,r15)                      
+  44560: 0001  ??       ; 0x0001                       
+  44562: CF22  or.b   #0x22,@(r0,GBR)                  
+  44564: 0002  ??       ; 0x0002                       
+  44566: F8FE  fmac   fr0,fr15,fr8                     
+  44568: 0002  ??       ; 0x0002                       
+  4456A: 9858  mov.w  @(0x4461E),r8  ; =0x420B         
+  4456C: FFFF  ??fpu    ; 0xFFFF                       
+  4456E: 81BA  mov.w  r0,@(20,r11)                     
+  44570: FFFF  ??fpu    ; 0xFFFF                       
+  44572: 81BB  mov.w  r0,@(22,r11)                     
+  44574: 0002  ??       ; 0x0002                       
+  44576: 997C  mov.w  @(0x44672),r9  ; =0x0F54         
+  44578: FFFF  ??fpu    ; 0xFFFF                       
+  4457A: 7F10  add    #16,r15                          
+  4457C: FFFF  ??fpu    ; 0xFFFF                       
+  4457E: 653C  extu.b  r3,r5                           
+  44580: FFFF  ??fpu    ; 0xFFFF                       
+  44582: 7BE2  add    #-30,r11                         
+  44584: 0004  mov.b  r0,@(r0,r0)                      
+  44586: 581A  mov.l  @(40,r1),r8                      
+  44588: 000D  mov.w  @(r0,r0),r0                      
+  4458A: 2995  mov.w  r9,@-r9                          
+
+
+==============================================================================
+  flkc_path_J (0x45BFE) - fast-response knock retard  [0x45BFE - 0x45FFE]
+==============================================================================
+  45BFE: 2FB6  mov.l  r11,@-r15                        
+  45C00: 2FC6  mov.l  r12,@-r15                        
+  45C02: 2FD6  mov.l  r13,@-r15                        
+  45C04: 2FE6  mov.l  r14,@-r15                        
+  45C06: 4F22  sts.l  pr,@-r15                         
+  45C08: FFCB  fmov.s fr12,@-r15                       
+  45C0A: FFDB  fmov.s fr13,@-r15                       
+  45C0C: FFEB  fmov.s fr14,@-r15                       
+  45C0E: FFFB  fmov.s fr15,@-r15                       
+  45C10: 7FF8  add    #-8,r15                          
+  45C12: D267  mov.l  @(0x45DB0),r2  ; =0x00029858     
+  45C14: 420B  jsr    @r0                              
+  45C16: 0009  nop                                     
+  45C18: 2F00  mov.b  r0,@r15                          
+  45C1A: D666  mov.l  @(0x45DB4),r6  ; =0xFFFF81BA (knock_event_flag)
+  45C1C: 6D60  mov.b  @r6,r13                            ; @0xFFFF81BA (knock_event_flag)
+  45C1E: D666  mov.l  @(0x45DB8),r6  ; =0xFFFF7D18 (knock_suppress_flag)
+  45C20: 6E60  mov.b  @r6,r14                            ; @0xFFFF7D18 (knock_suppress_flag)
+  45C22: D666  mov.l  @(0x45DBC),r6  ; =0xFFFF82A0 (FLKC_load_flag)
+  45C24: 6C60  mov.b  @r6,r12                            ; @0xFFFF82A0 (FLKC_load_flag)
+  45C26: D266  mov.l  @(0x45DC0),r2  ; =0xFFFF6624 (proc_6624)
+  45C28: FE28  fmov.s @r2,fr14                         
+  45C2A: D257  mov.l  @(0x45D88),r2  ; =0xFFFF323C (FLKC_work_bank2)
+  45C2C: F828  fmov.s @r2,fr8                          
+  45C2E: E004  mov    #4,r0                            
+  45C30: FF87  fmov.s fr8,@(r0,r15)                    
+  45C32: E0F8  mov    #-8,r0                           
+  45C34: FD26  fmov.s @(r0,r2),fr13                    
+  45C36: D263  mov.l  @(0x45DC4),r2  ; =0xFFFF8290 (FLKC_FG_GBR_base)
+  45C38: FC28  fmov.s @r2,fr12                         
+  45C3A: D663  mov.l  @(0x45DC8),r6  ; =0xFFFF8298 (FLKC_cyl_idx)
+  45C3C: 6460  mov.b  @r6,r4                             ; @0xFFFF8298 (FLKC_cyl_idx)
+  45C3E: D263  mov.l  @(0x45DCC),r2  ; =0x000BE588     
+  45C40: 644C  extu.b  r4,r4                           
+  45C42: F58D  fldi0  fr5                              
+  45C44: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF8
+  45C46: F49D  fldi1  fr4                              
+  45C48: FF0C  fmov   fr0,fr15                         
+  45C4A: EB00  mov    #0,r11                           
+  45C4C: D460  mov.l  @(0x45DD0),r4  ; =0x000AE134     
+  45C4E: D261  mov.l  @(0x45DD4),r2  ; =0x000BE8AC     
+  45C50: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF8
+  45C52: F4EC  fmov   fr14,fr4                         
+  45C54: D14B  mov.l  @(0x45D84),r1  ; =0xFFFF8274 (FLKC_state_base)
+  45C56: 8118  mov.w  r0,@(16,r1)                      
+  45C58: 8414  mov.b  @(4,r1),r0                       
+  45C5A: 8801  cmp/eq #1,r0                            
+  45C5C: 8B07  bf     0x45C6E                          
+  45C5E: 60F0  mov.b  @r15,r0                          
+  45C60: 8802  cmp/eq #2,r0                            
+  45C62: 8B04  bf     0x45C6E                          
+  45C64: E000  mov    #0,r0                            
+  45C66: 8015  mov.b  r0,@(5,r1)                       
+  45C68: 2101  mov.w  r0,@r1                             ; -> 0xFFFF8274 (FLKC_state_base)
+  45C6A: A06A  bra    0x45D42                          
+  45C6C: 8012  mov.b  r0,@(2,r1)                       
+  45C6E: 60EC  extu.b  r14,r0                          
+  45C70: 8801  cmp/eq #1,r0                            
+  45C72: 8966  bt     0x45D42                          
+  45C74: 8414  mov.b  @(4,r1),r0                       
+  45C76: 8801  cmp/eq #1,r0                            
+  45C78: 8B49  bf     0x45D0E                          
+  45C7A: 2DD8  tst  r13,r13                            
+  45C7C: 8B29  bf     0x45CD2                          
+  45C7E: 6211  mov.w  @r1,r2                             ; @0xFFFF8274 (FLKC_state_base)
+  45C80: 8518  mov.w  @(16,r1),r0                      
+  45C82: 3202  cmp/hs  r0,r2                           
+  45C84: 8B1D  bf     0x45CC2                          
+  45C86: 8415  mov.b  @(5,r1),r0                       
+  45C88: 8801  cmp/eq #1,r0                            
+  45C8A: 8B0C  bf     0x45CA6                          
+  45C8C: 8417  mov.b  @(7,r1),r0                       
+  45C8E: 2008  tst  r0,r0                              
+  45C90: 8B09  bf     0x45CA6                          
+  45C92: E200  mov    #0,r2                            
+  45C94: 2121  mov.w  r2,@r1                             ; -> 0xFFFF8274 (FLKC_state_base)
+  45C96: E004  mov    #4,r0                            
+  45C98: F9F6  fmov.s @(r0,r15),fr9                    
+  45C9A: C74F  mova   @(0x45DD8),r0  ; =0x3F000000     
+  45C9C: F808  fmov.s @r0,fr8                          
+  45C9E: F982  fmul  fr8,fr9                           
+  45CA0: E004  mov    #4,r0                            
+  45CA2: A002  bra    0x45CAA                          
+  45CA4: FF97  fmov.s fr9,@(r0,r15)                    
+  45CA6: E200  mov    #0,r2                            
+  45CA8: 2121  mov.w  r2,@r1                             ; -> 0xFFFF8274 (FLKC_state_base)
+  45CAA: E004  mov    #4,r0                            
+  45CAC: F9F6  fmov.s @(r0,r15),fr9                    
+  45CAE: FD90  fadd  fr9,fr13                          
+  45CB0: F4DC  fmov   fr13,fr4                         
+  45CB2: D24A  mov.l  @(0x45DDC),r2  ; =0x000BE970 (max_float)
+  45CB4: 420B  jsr    @r0                                ; CALL @ 0x00004
+  45CB6: F59D  fldi1  fr5                              
+  45CB8: FD0C  fmov   fr0,fr13                         
+  45CBA: E001  mov    #1,r0                            
+  45CBC: D131  mov.l  @(0x45D84),r1  ; =0xFFFF8274 (FLKC_state_base)
+  45CBE: A021  bra    0x45D04                          
+  45CC0: 8017  mov.b  r0,@(7,r1)                       
+  45CC2: D247  mov.l  @(0x45DE0),r2  ; =0x000BE554     
+  45CC4: 6611  mov.w  @r1,r6                             ; @0xFFFF8274 (FLKC_state_base)
+  45CC6: 646D  extu.w  r6,r4                           
+  45CC8: 420B  jsr    @r0                                ; CALL @ 0x00001
+  45CCA: E501  mov    #1,r5                            
+  45CCC: D12D  mov.l  @(0x45D84),r1  ; =0xFFFF8274 (FLKC_state_base)
+  45CCE: A038  bra    0x45D42                          
+  45CD0: 2101  mov.w  r0,@r1                             ; -> 0xFFFF8274 (FLKC_state_base)
+  45CD2: 8415  mov.b  @(5,r1),r0                       
+  45CD4: 8801  cmp/eq #1,r0                            
+  45CD6: 8B09  bf     0x45CEC                          
+  45CD8: 8417  mov.b  @(7,r1),r0                       
+  45CDA: 8801  cmp/eq #1,r0                            
+  45CDC: 8B06  bf     0x45CEC                          
+  45CDE: E004  mov    #4,r0                            
+  45CE0: F9F6  fmov.s @(r0,r15),fr9                    
+  45CE2: C73D  mova   @(0x45DD8),r0  ; =0x3F000000     
+  45CE4: F808  fmov.s @r0,fr8                          
+  45CE6: F982  fmul  fr8,fr9                           
+  45CE8: E004  mov    #4,r0                            
+  45CEA: FF97  fmov.s fr9,@(r0,r15)                    
+  45CEC: E004  mov    #4,r0                            
+  45CEE: F9F6  fmov.s @(r0,r15),fr9                    
+  45CF0: FD91  fsub  fr9,fr13                          
+  45CF2: F4DC  fmov   fr13,fr4                         
+  45CF4: D23B  mov.l  @(0x45DE4),r2  ; =0x000BE960     
+  45CF6: 420B  jsr    @r0                                ; CALL @ 0x00004
+  45CF8: F58D  fldi0  fr5                              
+  45CFA: FD0C  fmov   fr0,fr13                         
+  45CFC: E000  mov    #0,r0                            
+  45CFE: D121  mov.l  @(0x45D84),r1  ; =0xFFFF8274 (FLKC_state_base)
+  45D00: 8017  mov.b  r0,@(7,r1)                       
+  45D02: 2101  mov.w  r0,@r1                             ; -> 0xFFFF8274 (FLKC_state_base)
+  45D04: EB01  mov    #1,r11                           
+  45D06: 60B3  mov    r11,r0                           
+  45D08: 8015  mov.b  r0,@(5,r1)                       
+  45D0A: A01C  bra    0x45D46                          
+  45D0C: 8016  mov.b  r0,@(6,r1)                       
+  45D0E: 60CC  extu.b  r12,r0                          
+  45D10: 8801  cmp/eq #1,r0                            
+  45D12: 8B18  bf     0x45D46                          
+  45D14: D434  mov.l  @(0x45DE8),r4  ; =0x000AE2CC     
+  45D16: D235  mov.l  @(0x45DEC),r2  ; =0x000BE830 (Pull3DFloat)
+  45D18: 420B  jsr    @r0                                ; CALL @ 0x00001
+  45D1A: F4FC  fmov   fr15,fr4                         
+  45D1C: D119  mov.l  @(0x45D84),r1  ; =0xFFFF8274 (FLKC_state_base)
+  45D1E: E00C  mov    #12,r0                           
+  45D20: F107  fmov.s fr0,@(r0,r1)                     
+  45D22: F916  fmov.s @(r0,r1),fr9                     
+  45D24: FC92  fmul  fr9,fr12                          
+  45D26: E0FC  mov    #-4,r0                           
+  45D28: F1C7  fmov.s fr12,@(r0,r1)                    
+  45D2A: F816  fmov.s @(r0,r1),fr8                     
+  45D2C: FD80  fadd  fr8,fr13                          
+  45D2E: D230  mov.l  @(0x45DF0),r2  ; =0x000BE56C (clamp_float)
+  45D30: F4DC  fmov   fr13,fr4                         
+  45D32: F58D  fldi0  fr5                              
+  45D34: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  45D36: F69D  fldi1  fr6                              
+  45D38: D22E  mov.l  @(0x45DF4),r2  ; =0x00046A42 (FLKC_output_write)
+  45D3A: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  45D3C: FD0C  fmov   fr0,fr13                         
+  45D3E: A002  bra    0x45D46                          
+  45D40: 0009  nop                                     
+  45D42: E000  mov    #0,r0                            
+  45D44: 8016  mov.b  r0,@(6,r1)                       
+  45D46: D410  mov.l  @(0x45D88),r4  ; =0xFFFF323C (FLKC_work_bank2)
+  45D48: D210  mov.l  @(0x45D8C),r2  ; =0x000BDBCC (write_float_ptr)
+  45D4A: E004  mov    #4,r0                            
+  45D4C: 420B  jsr    @r0                                ; CALL @ 0x00004
+  45D4E: F4F6  fmov.s @(r0,r15),fr4                    
+  45D50: D410  mov.l  @(0x45D94),r4  ; =0xFFFF3234 (FLKC_work_bank1)
+  45D52: D20E  mov.l  @(0x45D8C),r2  ; =0x000BDBCC (write_float_ptr)
+  45D54: 420B  jsr    @r0                                ; CALL @ 0x00004
+  45D56: F4DC  fmov   fr13,fr4                         
+  45D58: 60B3  mov    r11,r0                           
+  45D5A: 8801  cmp/eq #1,r0                            
+  45D5C: 8B03  bf     0x45D66                          
+  45D5E: B0D8  bsr    0x45F12                          
+  45D60: 0009  nop                                     
+  45D62: B101  bsr    0x45F68                          
+  45D64: 0009  nop                                     
+  45D66: 7F08  add    #8,r15                           
+  45D68: FFF9  fmov.s @r15+,fr15                       
+  45D6A: FEF9  fmov.s @r15+,fr14                       
+  45D6C: FDF9  fmov.s @r15+,fr13                       
+  45D6E: FCF9  fmov.s @r15+,fr12                       
+  45D70: 4F26  lds.l  @r15+,pr                         
+  45D72: 6EF6  mov.l  @r15+,r14                        
+  45D74: 6DF6  mov.l  @r15+,r13                        
+  45D76: 6CF6  mov.l  @r15+,r12                        
+  45D78: 000B  rts                                     
+  45D7A: 6BF6  mov.l  @r15+,r11                        
+  45D7C: FFFF  ??fpu    ; 0xFFFF                       
+  45D7E: 3244  div1  r4,r2                             
+  45D80: FFFF  ??fpu    ; 0xFFFF                       
+  45D82: 85D7  mov.w  @(14,r13),r0                     
+  45D84: FFFF  ??fpu    ; 0xFFFF                       
+  45D86: 8274  ??       ; 0x8274 (grp8)                
+  45D88: FFFF  ??fpu    ; 0xFFFF                       
+  45D8A: 323C  add  r3,r2                              
+  45D8C: 000B  rts                                     
+  45D8E: DBCC  mov.l  @(0x460C0),r11  ; =0xFFEBEE00    
+  45D90: 000D  mov.w  @(r0,r0),r0                      
+  45D92: 2EE4  mov.b  r14,@-r14                        
+  45D94: FFFF  ??fpu    ; 0xFFFF                       
+  45D96: 3234  div1  r3,r2                             
+  45D98: 000D  mov.w  @(r0,r0),r0                      
+  45D9A: 2EE0  mov.b  r14,@r14                         
+  45D9C: 0004  mov.b  r0,@(r0,r0)                      
+  45D9E: 69CE  exts.b  r12,r9                          
+  45DA0: FFFF  ??fpu    ; 0xFFFF                       
+  45DA2: 822A  ??       ; 0x822A (grp8)                
+  45DA4: 000D  mov.w  @(r0,r0),r0                      
+  45DA6: 29A5  mov.w  r10,@-r9                         
+  45DA8: 000D  mov.w  @(r0,r0),r0                      
+  45DAA: 29A6  mov.l  r10,@-r9                         
+  45DAC: FFFF  ??fpu    ; 0xFFFF                       
+  45DAE: 827D  ??       ; 0x827D (grp8)                
+  45DB0: 0002  ??       ; 0x0002                       
+  45DB2: 9858  mov.w  @(0x45E66),r8  ; =0x6060         
+  45DB4: FFFF  ??fpu    ; 0xFFFF                       
+  45DB6: 81BA  mov.w  r0,@(20,r11)                     
+  45DB8: FFFF  ??fpu    ; 0xFFFF                       
+  45DBA: 7D18  add    #24,r13                          
+  45DBC: FFFF  ??fpu    ; 0xFFFF                       
+  45DBE: 82A0  ??       ; 0x82A0 (grp8)                
+  45DC0: FFFF  ??fpu    ; 0xFFFF                       
+  45DC2: 6624  mov.b  @r2+,r6                          
+  45DC4: FFFF  ??fpu    ; 0xFFFF                       
+  45DC6: 8290  ??       ; 0x8290 (grp8)                
+  45DC8: FFFF  ??fpu    ; 0xFFFF                       
+  45DCA: 8298  ??       ; 0x8298 (grp8)                
+  45DCC: 000B  rts                                     
+  45DCE: E588  mov    #-120,r5                         
+  45DD0: 000A  ??       ; 0x000A                       
+  45DD2: E134  mov    #52,r1                           
+  45DD4: 000B  rts                                     
+  45DD6: E8AC  mov    #-84,r8                          
+  45DD8: 3F00  cmp/eq  r0,r15                          
+  45DDA: 0000  ??       ; 0x0000                       
+  45DDC: 000B  rts                                     
+  45DDE: E970  mov    #112,r9                          
+  45DE0: 000B  rts                                     
+  45DE2: E554  mov    #84,r5                           
+  45DE4: 000B  rts                                     
+  45DE6: E960  mov    #96,r9                           
+  45DE8: 000A  ??       ; 0x000A                       
+  45DEA: E2CC  mov    #-52,r2                          
+  45DEC: 000B  rts                                     
+  45DEE: E830  mov    #48,r8                           
+  45DF0: 000B  rts                                     
+  45DF2: E56C  mov    #108,r5                          
+  45DF4: 0004  mov.b  r0,@(r0,r0)                      
+  45DF6: 6A42  mov.l  @r4,r10                            ; @0xFFFF3234 (FLKC_work_bank1)
+  45DF8: D288  mov.l  @(0x4601C),r2  ; =0xFFFF3244 (FLKC_enable_byte)
+  45DFA: E0F0  mov    #-16,r0                          
+  45DFC: F726  fmov.s @(r0,r2),fr7                     
+  45DFE: D488  mov.l  @(0x46020),r4  ; =0xFFFF8274 (FLKC_state_base)
+  45E00: E0E4  mov    #-28,r0                          
+  45E02: F646  fmov.s @(r0,r4),fr6                     
+  45E04: D287  mov.l  @(0x46024),r2  ; =0xFFFF828C (TPS)
+  45E06: F928  fmov.s @r2,fr9                          
+  45E08: E600  mov    #0,r6                            
+  45E0A: F48D  fldi0  fr4                              
+  45E0C: F495  fcmp/gt  fr9,fr4                        
+  45E0E: 8D0B  bt/s   0x45E28                          
+  45E10: F86C  fmov   fr6,fr8                          
+  45E12: D285  mov.l  @(0x46028),r2  ; =0x000D2F04     
+  45E14: F528  fmov.s @r2,fr5                          
+  45E16: F852  fmul  fr5,fr8                           
+  45E18: F895  fcmp/gt  fr9,fr8                        
+  45E1A: 890F  bt     0x45E3C                          
+  45E1C: D283  mov.l  @(0x4602C),r2  ; =0x000D2EF0     
+  45E1E: F828  fmov.s @r2,fr8                          
+  45E20: F895  fcmp/gt  fr9,fr8                        
+  45E22: 8B0A  bf     0x45E3A                          
+  45E24: A00A  bra    0x45E3C                          
+  45E26: 0009  nop                                     
+  45E28: D281  mov.l  @(0x46030),r2  ; =0x000D2F08     
+  45E2A: F528  fmov.s @r2,fr5                          
+  45E2C: F852  fmul  fr5,fr8                           
+  45E2E: F985  fcmp/gt  fr8,fr9                        
+  45E30: 8904  bt     0x45E3C                          
+  45E32: D280  mov.l  @(0x46034),r2  ; =0x000D2EF4     
+  45E34: F828  fmov.s @r2,fr8                          
+  45E36: F985  fcmp/gt  fr8,fr9                        
+  45E38: 8900  bt     0x45E3C                          
+  45E3A: E601  mov    #1,r6                            
+  45E3C: D57E  mov.l  @(0x46038),r5  ; =0xFFFF829D (FLKC_state_29D)
+  45E3E: 6050  mov.b  @r5,r0                             ; @0xFFFF829D (FLKC_state_29D)
+  45E40: 8801  cmp/eq #1,r0                            
+  45E42: 8B0F  bf     0x45E64                          
+  45E44: 8443  mov.b  @(3,r4),r0                       
+  45E46: 8801  cmp/eq #1,r0                            
+  45E48: 8B0C  bf     0x45E64                          
+  45E4A: D27C  mov.l  @(0x4603C),r2  ; =0x000D2EEC     
+  45E4C: F828  fmov.s @r2,fr8                          
+  45E4E: F865  fcmp/gt  fr6,fr8                        
+  45E50: 8908  bt     0x45E64                          
+  45E52: 6063  mov    r6,r0                            
+  45E54: 8801  cmp/eq #1,r0                            
+  45E56: 8B05  bf     0x45E64                          
+  45E58: D279  mov.l  @(0x46040),r2  ; =0x000D2EF8     
+  45E5A: F828  fmov.s @r2,fr8                          
+  45E5C: F875  fcmp/gt  fr7,fr8                        
+  45E5E: 8B0D  bf     0x45E7C                          
+  45E60: F495  fcmp/gt  fr9,fr4                        
+  45E62: 8B0B  bf     0x45E7C                          
+  45E64: D677  mov.l  @(0x46044),r6  ; =0xFFFF829F     
+  45E66: 6060  mov.b  @r6,r0                             ; @0xFFFF829F
+  45E68: 8801  cmp/eq #1,r0                            
+  45E6A: 8B12  bf     0x45E92                          
+  45E6C: D276  mov.l  @(0x46048),r2  ; =0x000D2EFC     
+  45E6E: F828  fmov.s @r2,fr8                          
+  45E70: F875  fcmp/gt  fr7,fr8                        
+  45E72: 890E  bt     0x45E92                          
+  45E74: D275  mov.l  @(0x4604C),r2  ; =0x000D2F00     
+  45E76: F828  fmov.s @r2,fr8                          
+  45E78: F785  fcmp/gt  fr8,fr7                        
+  45E7A: 890A  bt     0x45E92                          
+  45E7C: D667  mov.l  @(0x4601C),r6  ; =0xFFFF3244 (FLKC_enable_byte)
+  45E7E: 6060  mov.b  @r6,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  45E80: C9FC  and    #0xFC,r0                         
+  45E82: CB02  or     #0x02,r0                         
+  45E84: 2600  mov.b  r0,@r6                             ; -> 0xFFFF3244 (FLKC_enable_byte)
+  45E86: 6060  mov.b  @r6,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  45E88: C9F3  and    #0xF3,r0                         
+  45E8A: CB08  or     #0x08,r0                         
+  45E8C: D270  mov.l  @(0x46050),r2  ; =0x00046A3A     
+  45E8E: 422B  jsr    @r2                                ; CALL @ 0x46A3A
+  45E90: 2600  mov.b  r0,@r6                             ; -> 0xFFFF3244 (FLKC_enable_byte)
+  45E92: 000B  rts                                     
+  45E94: 0009  nop                                     
+  45E96: 2FE6  mov.l  r14,@-r15                        
+  45E98: 4F22  sts.l  pr,@-r15                         
+  45E9A: 7FFC  add    #-4,r15                          
+  45E9C: D66D  mov.l  @(0x46054),r6  ; =0xFFFF65BD     
+  45E9E: D26E  mov.l  @(0x46058),r2  ; =0x0002999C     
+  45EA0: 420B  jsr    @r0                                ; CALL @ 0x00001
+  45EA2: 6E60  mov.b  @r6,r14                            ; @0xFFFF65BD
+  45EA4: 620C  extu.b  r0,r2                           
+  45EA6: 2F20  mov.b  r2,@r15                          
+  45EA8: D16C  mov.l  @(0x4605C),r1  ; =0xFFFF8286     
+  45EAA: 6010  mov.b  @r1,r0                             ; @0xFFFF8286
+  45EAC: 8802  cmp/eq #2,r0                            
+  45EAE: 8B01  bf     0x45EB4                          
+  45EB0: 2228  tst  r2,r2                              
+  45EB2: 8904  bt     0x45EBE                          
+  45EB4: 6023  mov    r2,r0                            
+  45EB6: 8802  cmp/eq #2,r0                            
+  45EB8: 8B10  bf     0x45EDC                          
+  45EBA: 2EE8  tst  r14,r14                            
+  45EBC: 8B0E  bf     0x45EDC                          
+  45EBE: D468  mov.l  @(0x46060),r4  ; =0xFFFF3234 (FLKC_work_bank1)
+  45EC0: D668  mov.l  @(0x46064),r6  ; =0x000BDBCC (write_float_ptr)
+  45EC2: D269  mov.l  @(0x46068),r2  ; =0x000D2EE0     
+  45EC4: 460B  jsr    @r0                                ; CALL @ 0x2999C
+  45EC6: F428  fmov.s @r2,fr4                          
+  45EC8: D468  mov.l  @(0x4606C),r4  ; =0xFFFF323C (FLKC_work_bank2)
+  45ECA: D666  mov.l  @(0x46064),r6  ; =0x000BDBCC (write_float_ptr)
+  45ECC: D268  mov.l  @(0x46070),r2  ; =0x000D2EE4     
+  45ECE: 460B  jsr    @r0                                ; CALL @ 0x2999C
+  45ED0: F428  fmov.s @r2,fr4                          
+  45ED2: D552  mov.l  @(0x4601C),r5  ; =0xFFFF3244 (FLKC_enable_byte)
+  45ED4: 6050  mov.b  @r5,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  45ED6: C9FC  and    #0xFC,r0                         
+  45ED8: CB02  or     #0x02,r0                         
+  45EDA: 2500  mov.b  r0,@r5                             ; -> 0xFFFF3244 (FLKC_enable_byte)
+  45EDC: 62F0  mov.b  @r15,r2                          
+  45EDE: D15F  mov.l  @(0x4605C),r1  ; =0xFFFF8286     
+  45EE0: 2120  mov.b  r2,@r1                             ; -> 0xFFFF8286
+  45EE2: 7F04  add    #4,r15                           
+  45EE4: 4F26  lds.l  @r15+,pr                         
+  45EE6: 000B  rts                                     
+  45EE8: 6EF6  mov.l  @r15+,r14                        
+  45EEA: E200  mov    #0,r2                            
+  45EEC: D661  mov.l  @(0x46074),r6  ; =0xFFFF8274 (FLKC_state_base)
+  45EEE: 000B  rts                                     
+  45EF0: 2621  mov.w  r2,@r6                             ; -> 0xFFFF8274 (FLKC_state_base)
+  45EF2: D64A  mov.l  @(0x4601C),r6  ; =0xFFFF3244 (FLKC_enable_byte)
+  45EF4: 6060  mov.b  @r6,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  45EF6: C9FC  and    #0xFC,r0                         
+  45EF8: CB02  or     #0x02,r0                         
+  45EFA: 000B  rts                                     
+  45EFC: 2600  mov.b  r0,@r6                             ; -> 0xFFFF3244 (FLKC_enable_byte)
+  45EFE: D647  mov.l  @(0x4601C),r6  ; =0xFFFF3244 (FLKC_enable_byte)
+  45F00: 6060  mov.b  @r6,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  45F02: C9F3  and    #0xF3,r0                         
+  45F04: CB08  or     #0x08,r0                         
+  45F06: 000B  rts                                     
+  45F08: 2600  mov.b  r0,@r6                             ; -> 0xFFFF3244 (FLKC_enable_byte)
+  45F0A: D455  mov.l  @(0x46060),r4  ; =0xFFFF3234 (FLKC_work_bank1)
+  45F0C: D255  mov.l  @(0x46064),r2  ; =0x000BDBCC (write_float_ptr)
+  45F0E: 422B  jsr    @r2                                ; CALL write_float_ptr @ 0xBDBCC
+  45F10: F48D  fldi0  fr4                              
+  45F12: 4F22  sts.l  pr,@-r15                         
+  45F14: FFEB  fmov.s fr14,@-r15                       
+  45F16: FFFB  fmov.s fr15,@-r15                       
+  45F18: 7FFC  add    #-4,r15                          
+  45F1A: D251  mov.l  @(0x46060),r2  ; =0xFFFF3234 (FLKC_work_bank1)
+  45F1C: F428  fmov.s @r2,fr4                          
+  45F1E: FE4C  fmov   fr4,fr14                         
+  45F20: D255  mov.l  @(0x46078),r2  ; =0x000BE608 (Pull2DFloat)
+  45F22: C756  mova   @(0x4607C),r0  ; =0x3D800000     
+  45F24: FF08  fmov.s @r0,fr15                         
+  45F26: F6FC  fmov   fr15,fr6                         
+  45F28: 420B  jsr    @r0                                ; CALL @ 0x2999C
+  45F2A: F58D  fldi0  fr5                              
+  45F2C: 2F00  mov.b  r0,@r15                          
+  45F2E: F4EC  fmov   fr14,fr4                         
+  45F30: D251  mov.l  @(0x46078),r2  ; =0x000BE608 (Pull2DFloat)
+  45F32: F6FC  fmov   fr15,fr6                         
+  45F34: 420B  jsr    @r0                                ; CALL @ 0x2999C
+  45F36: F59D  fldi1  fr5                              
+  45F38: 66F0  mov.b  @r15,r6                          
+  45F3A: 2668  tst  r6,r6                              
+  45F3C: 8D06  bt/s   0x45F4C                          
+  45F3E: 620C  extu.b  r0,r2                           
+  45F40: 2228  tst  r2,r2                              
+  45F42: 8903  bt     0x45F4C                          
+  45F44: E200  mov    #0,r2                            
+  45F46: D54E  mov.l  @(0x46080),r5  ; =0xFFFF8276     
+  45F48: A008  bra    0x45F5C                          
+  45F4A: 2520  mov.b  r2,@r5                             ; -> 0xFFFF8276
+  45F4C: D54C  mov.l  @(0x46080),r5  ; =0xFFFF8276     
+  45F4E: 6250  mov.b  @r5,r2                             ; @0xFFFF8276
+  45F50: E6FF  mov    #-1,r6                           
+  45F52: 3262  cmp/hs  r6,r2                           
+  45F54: 8902  bt     0x45F5C                          
+  45F56: 6250  mov.b  @r5,r2                             ; @0xFFFF8276
+  45F58: 7201  add    #1,r2                            
+  45F5A: 2520  mov.b  r2,@r5                             ; -> 0xFFFF8276
+  45F5C: 7F04  add    #4,r15                           
+  45F5E: FFF9  fmov.s @r15+,fr15                       
+  45F60: FEF9  fmov.s @r15+,fr14                       
+  45F62: 4F26  lds.l  @r15+,pr                         
+  45F64: 000B  rts                                     
+  45F66: 0009  nop                                     
+  45F68: D22C  mov.l  @(0x4601C),r2  ; =0xFFFF3244 (FLKC_enable_byte)
+  45F6A: E0F8  mov    #-8,r0                           
+  45F6C: F826  fmov.s @(r0,r2),fr8                     
+  45F6E: D245  mov.l  @(0x46084),r2  ; =0x000D2EE8     
+  45F70: F928  fmov.s @r2,fr9                          
+  45F72: F895  fcmp/gt  fr9,fr8                        
+  45F74: 8B0B  bf     0x45F8E                          
+  45F76: D642  mov.l  @(0x46080),r6  ; =0xFFFF8276     
+  45F78: 6660  mov.b  @r6,r6                             ; @0xFFFF8276
+  45F7A: D543  mov.l  @(0x46088),r5  ; =0x000D29A7     
+  45F7C: 6250  mov.b  @r5,r2                             ; @0x000D29A7
+  45F7E: 3622  cmp/hs  r2,r6                           
+  45F80: 8905  bt     0x45F8E                          
+  45F82: D626  mov.l  @(0x4601C),r6  ; =0xFFFF3244 (FLKC_enable_byte)
+  45F84: 6060  mov.b  @r6,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  45F86: C9FC  and    #0xFC,r0                         
+  45F88: CB02  or     #0x02,r0                         
+  45F8A: 000B  rts                                     
+  45F8C: 2600  mov.b  r0,@r6                             ; -> 0xFFFF3244 (FLKC_enable_byte)
+  45F8E: D623  mov.l  @(0x4601C),r6  ; =0xFFFF3244 (FLKC_enable_byte)
+  45F90: 6060  mov.b  @r6,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  45F92: C9FC  and    #0xFC,r0                         
+  45F94: CB01  or     #0x01,r0                         
+  45F96: 000B  rts                                     
+  45F98: 2600  mov.b  r0,@r6                             ; -> 0xFFFF3244 (FLKC_enable_byte)
+  45F9A: 2FE6  mov.l  r14,@-r15                        
+  45F9C: 4F22  sts.l  pr,@-r15                         
+  45F9E: FFEB  fmov.s fr14,@-r15                       
+  45FA0: FFFB  fmov.s fr15,@-r15                       
+  45FA2: FF5C  fmov   fr5,fr15                         
+  45FA4: FE4C  fmov   fr4,fr14                         
+  45FA6: D539  mov.l  @(0x4608C),r5  ; =0x000D2EC0     
+  45FA8: F658  fmov.s @r5,fr6                          
+  45FAA: D239  mov.l  @(0x46090),r2  ; =0x000D2EBC     
+  45FAC: F828  fmov.s @r2,fr8                          
+  45FAE: F681  fsub  fr8,fr6                           
+  45FB0: DE38  mov.l  @(0x46094),r14  ; =0xFFFF8287    
+  45FB2: 62E0  mov.b  @r14,r2                            ; @0xFFFF8287
+  45FB4: 642C  extu.b  r2,r4                           
+  45FB6: D638  mov.l  @(0x46098),r6  ; =0x000BE800     
+  45FB8: 460B  jsr    @r0                                ; CALL @ 0xFFFFFFF8
+  45FBA: F558  fmov.s @r5,fr5                          
+  45FBC: 8801  cmp/eq #1,r0                            
+  45FBE: 0229  movt   r2                               
+  45FC0: 2E20  mov.b  r2,@r14                            ; -> 0xFFFF8287
+  45FC2: D236  mov.l  @(0x4609C),r2  ; =0x000D2EC4     
+  45FC4: F828  fmov.s @r2,fr8                          
+  45FC6: F8E5  fcmp/gt  fr14,fr8                       
+  45FC8: 8B02  bf     0x45FD0                          
+  45FCA: E001  mov    #1,r0                            
+  45FCC: A006  bra    0x45FDC                          
+  45FCE: 80E1  mov.b  r0,@(1,r14)                      
+  45FD0: D233  mov.l  @(0x460A0),r2  ; =0x000D2EC8     
+  45FD2: F828  fmov.s @r2,fr8                          
+  45FD4: F8E5  fcmp/gt  fr14,fr8                       
+  45FD6: 8901  bt     0x45FDC                          
+  45FD8: E000  mov    #0,r0                            
+  45FDA: 80E1  mov.b  r0,@(1,r14)                      
+  45FDC: D531  mov.l  @(0x460A4),r5  ; =0x000D2ED0     
+  45FDE: F658  fmov.s @r5,fr6                          
+  45FE0: D231  mov.l  @(0x460A8),r2  ; =0x000D2ECC     
+  45FE2: F828  fmov.s @r2,fr8                          
+  45FE4: F681  fsub  fr8,fr6                           
+  45FE6: 84E2  mov.b  @(2,r14),r0                      
+  45FE8: 640C  extu.b  r0,r4                           
+  45FEA: F4FC  fmov   fr15,fr4                         
+  45FEC: D62A  mov.l  @(0x46098),r6  ; =0x000BE800     
+  45FEE: 460B  jsr    @r0                                ; CALL @ 0x00000
+  45FF0: F558  fmov.s @r5,fr5                          
+  45FF2: 8801  cmp/eq #1,r0                            
+  45FF4: 0029  movt   r0                               
+  45FF6: 80E2  mov.b  r0,@(2,r14)                      
+  45FF8: D22C  mov.l  @(0x460AC),r2  ; =0x000D2ED4     
+  45FFA: F828  fmov.s @r2,fr8                          
+  45FFC: F8F5  fcmp/gt  fr15,fr8                       
+
+
+==============================================================================
+  flkc_paths_FG (0x463BA) - sustained knock state machine  [0x463BA - 0x469BA]
+==============================================================================
+  463BA: 2FE6  mov.l  r14,@-r15                        
+  463BC: 4F22  sts.l  pr,@-r15                         
+  463BE: FFCB  fmov.s fr12,@-r15                       
+  463C0: FFEB  fmov.s fr14,@-r15                       
+  463C2: FFFB  fmov.s fr15,@-r15                       
+  463C4: 4F13  stc.l  GBR,@-r15                        
+  463C6: D080  mov.l  @(0x465C8),r0  ; =0xFFFF8290 (FLKC_FG_GBR_base)
+  463C8: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF8290
+  463CA: 7FB4  add    #-76,r15                         
+  463CC: D279  mov.l  @(0x465B4),r2  ; =0xFFFF8258 (knock_metric)
+  463CE: FF28  fmov.s @r2,fr15                         
+  463D0: D277  mov.l  @(0x465B0),r2  ; =0xFFFF3234 (FLKC_work_bank1)
+  463D2: FE28  fmov.s @r2,fr14                         
+  463D4: D27D  mov.l  @(0x465CC),r2  ; =0x00029858     
+  463D6: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  463D8: 0009  nop                                     
+  463DA: 660C  extu.b  r0,r6                           
+  463DC: D57C  mov.l  @(0x465D0),r5  ; =0xFFFF7D18 (knock_suppress_flag)
+  463DE: 6150  mov.b  @r5,r1                             ; @0xFFFF7D18 (knock_suppress_flag)
+  463E0: D57C  mov.l  @(0x465D4),r5  ; =0xFFFF81BA (knock_event_flag)
+  463E2: 6750  mov.b  @r5,r7                             ; @0xFFFF81BA (knock_event_flag)
+  463E4: D57C  mov.l  @(0x465D8),r5  ; =0xFFFF3244 (FLKC_enable_byte)
+  463E6: 6050  mov.b  @r5,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  463E8: C901  and    #0x01,r0                         
+  463EA: 6503  mov    r0,r5                            
+  463EC: C410  mov.b  @(16,GBR),r0                       ; @GBR+16 = 0xFFFF82A0 (FLKC_load_flag)
+  463EE: C01C  mov.b  r0,@(28,GBR)                       ; @GBR+28 = 0xFFFF82AC (FLKC_load_copy)
+  463F0: DE7A  mov.l  @(0x465DC),r14  ; =0xFFFF3248 (FLKC_percyl_arr)
+  463F2: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  463F4: 600C  extu.b  r0,r0                           
+  463F6: 4008  shll2  r0                               
+  463F8: 4000  shll   r0                               
+  463FA: F4E6  fmov.s @(r0,r14),fr4                    
+  463FC: FC9D  fldi1  fr12                             
+  463FE: FCE1  fsub  fr14,fr12                         
+  46400: FCF2  fmul  fr15,fr12                         
+  46402: F8FC  fmov   fr15,fr8                         
+  46404: F84D  fneg   fr8                              
+  46406: F8E2  fmul  fr14,fr8                          
+  46408: D475  mov.l  @(0x465E0),r4  ; =0xFFFF8233 (knock_active)
+  4640A: 6240  mov.b  @r4,r2                             ; @0xFFFF8233 (knock_active)
+  4640C: 2228  tst  r2,r2                              
+  4640E: 8F05  bf/s   0x4641C                          
+  46410: 6453  mov    r5,r4                            
+  46412: C40E  mov.b  @(14,GBR),r0                       ; @GBR+14 = 0xFFFF829E (FLKC_flag_29E)
+  46414: 8801  cmp/eq #1,r0                            
+  46416: 8B01  bf     0x4641C                          
+  46418: A001  bra    0x4641E                          
+  4641A: E201  mov    #1,r2                            
+  4641C: E200  mov    #0,r2                            
+  4641E: 6023  mov    r2,r0                            
+  46420: 8801  cmp/eq #1,r0                            
+  46422: 8F09  bf/s   0x46438                          
+  46424: 6523  mov    r2,r5                            
+  46426: 6063  mov    r6,r0                            
+  46428: 8802  cmp/eq #2,r0                            
+  4642A: 8B05  bf     0x46438                          
+  4642C: 6043  mov    r4,r0                            
+  4642E: 8801  cmp/eq #1,r0                            
+  46430: 8B02  bf     0x46438                          
+  46432: E000  mov    #0,r0                            
+  46434: A0B6  bra    0x465A4                          
+  46436: C102  mov.w  r0,@(4,GBR)                      
+  46438: 621C  extu.b  r1,r2                           
+  4643A: 6023  mov    r2,r0                            
+  4643C: 8801  cmp/eq #1,r0                            
+  4643E: 8B01  bf     0x46444                          
+  46440: A1A2  bra    0x46788                          
+  46442: 0009  nop                                     
+  46444: 2448  tst  r4,r4                              
+  46446: 8B01  bf     0x4644C                          
+  46448: A19E  bra    0x46788                          
+  4644A: 0009  nop                                     
+  4644C: 6053  mov    r5,r0                            
+  4644E: 8801  cmp/eq #1,r0                            
+  46450: 8901  bt     0x46456                          
+  46452: A1A2  bra    0x4679A                          
+  46454: 0009  nop                                     
+  46456: 6043  mov    r4,r0                            
+  46458: 8801  cmp/eq #1,r0                            
+  4645A: 8901  bt     0x46460                          
+  4645C: A19D  bra    0x4679A                          
+  4645E: 0009  nop                                     
+  46460: 2778  tst  r7,r7                              
+  46462: 8901  bt     0x46468                          
+  46464: A0D8  bra    0x46618                          
+  46466: 0009  nop                                     
+  46468: C40C  mov.b  @(12,GBR),r0                       ; @GBR+12 = 0xFFFF829C (FLKC_mode_29C)
+  4646A: 2008  tst  r0,r0                              
+  4646C: 8F02  bf/s   0x46474                          
+  4646E: 1F01  mov.l  r0,@(4,r15)                      
+  46470: A095  bra    0x4659E                          
+  46472: 0009  nop                                     
+  46474: C41A  mov.b  @(26,GBR),r0                       ; @GBR+26 = 0xFFFF82AA (FLKC_cyl_state)
+  46476: 1F02  mov.l  r0,@(8,r15)                      
+  46478: 660C  extu.b  r0,r6                           
+  4647A: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  4647C: 650C  extu.b  r0,r5                           
+  4647E: 3650  cmp/eq  r5,r6                           
+  46480: 8D02  bt/s   0x46488                          
+  46482: 1F03  mov.l  r0,@(12,r15)                     
+  46484: A08B  bra    0x4659E                          
+  46486: 0009  nop                                     
+  46488: C502  mov.w  @(4,GBR),r0                        ; @GBR+4 = 0xFFFF8294 (FLKC_counter)
+  4648A: 1F04  mov.l  r0,@(16,r15)                     
+  4648C: 660D  extu.w  r0,r6                           
+  4648E: D555  mov.l  @(0x465E4),r5  ; =0x000D29EE     
+  46490: 6251  mov.w  @r5,r2                             ; @0x000D29EE
+  46492: 652D  extu.w  r2,r5                           
+  46494: 3653  cmp/ge  r5,r6                           
+  46496: 8901  bt     0x4649C                          
+  46498: A17F  bra    0x4679A                          
+  4649A: 0009  nop                                     
+  4649C: D252  mov.l  @(0x465E8),r2  ; =0x000D2F40     
+  4649E: F828  fmov.s @r2,fr8                          
+  464A0: F8F5  fcmp/gt  fr15,fr8                       
+  464A2: 8947  bt     0x46534                          
+  464A4: F88D  fldi0  fr8                              
+  464A6: F485  fcmp/gt  fr8,fr4                        
+  464A8: 8B44  bf     0x46534                          
+  464AA: FC45  fcmp/gt  fr4,fr12                       
+  464AC: 8B42  bf     0x46534                          
+  464AE: D24F  mov.l  @(0x465EC),r2  ; =0x000D2F48     
+  464B0: F828  fmov.s @r2,fr8                          
+  464B2: F480  fadd  fr8,fr4                           
+  464B4: F54C  fmov   fr4,fr5                          
+  464B6: D240  mov.l  @(0x465B8),r2  ; =0x000BE970 (max_float)
+  464B8: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464BA: F4CC  fmov   fr12,fr4                         
+  464BC: F40C  fmov   fr0,fr4                          
+  464BE: D24C  mov.l  @(0x465F0),r2  ; =0x000BE56C (clamp_float)
+  464C0: D64C  mov.l  @(0x465F4),r6  ; =0x000D2F44     
+  464C2: F668  fmov.s @r6,fr6                          
+  464C4: D64C  mov.l  @(0x465F8),r6  ; =0x000D2F4C     
+  464C6: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464C8: F568  fmov.s @r6,fr5                          
+  464CA: F50C  fmov   fr0,fr5                          
+  464CC: FF0A  fmov.s fr0,@r15                         
+  464CE: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  464D0: 1F05  mov.l  r0,@(20,r15)                     
+  464D2: 620C  extu.b  r0,r2                           
+  464D4: 4208  shll2  r2                               
+  464D6: 4200  shll   r2                               
+  464D8: 3E2C  add  r2,r14                             
+  464DA: D248  mov.l  @(0x465FC),r2  ; =0x000BDBCC (write_float_ptr)
+  464DC: 64E3  mov    r14,r4                           
+  464DE: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464E0: F40C  fmov   fr0,fr4                          
+  464E2: D247  mov.l  @(0x46600),r2  ; =0x000BE608 (Pull2DFloat)
+  464E4: F4CC  fmov   fr12,fr4                         
+  464E6: C736  mova   @(0x465C0),r0  ; =0x3EB40000     
+  464E8: F608  fmov.s @r0,fr6                          
+  464EA: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464EC: F5F8  fmov.s @r15,fr5                         
+  464EE: 620C  extu.b  r0,r2                           
+  464F0: 2228  tst  r2,r2                              
+  464F2: 8B09  bf     0x46508                          
+  464F4: D243  mov.l  @(0x46604),r2  ; =0x000BE9A0     
+  464F6: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464F8: E401  mov    #1,r4                            
+  464FA: 6603  mov    r0,r6                            
+  464FC: D542  mov.l  @(0x46608),r5  ; =0xFFFF3360 (FLKC_percyl_result)
+  464FE: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  46500: 1F06  mov.l  r0,@(24,r15)                     
+  46502: 600C  extu.b  r0,r0                           
+  46504: 4000  shll   r0                               
+  46506: 0565  mov.w  r6,@(r0,r5)                      
+  46508: D240  mov.l  @(0x4660C),r2  ; =0x00045EEA (FLKC_commit_write)
+  4650A: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  4650C: 0009  nop                                     
+  4650E: E001  mov    #1,r0                            
+  46510: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
+  46512: E000  mov    #0,r0                            
+  46514: C102  mov.w  r0,@(4,GBR)                      
+  46516: C411  mov.b  @(17,GBR),r0                       ; @GBR+17 = 0xFFFF82A1 (FLKC_flag_A1)
+  46518: 1F07  mov.l  r0,@(28,r15)                     
+  4651A: 600C  extu.b  r0,r0                           
+  4651C: 8801  cmp/eq #1,r0                            
+  4651E: 8B04  bf     0x4652A                          
+  46520: D23B  mov.l  @(0x46610),r2  ; =0x000D2F58     
+  46522: F828  fmov.s @r2,fr8                          
+  46524: D228  mov.l  @(0x465C8),r2  ; =0xFFFF8290 (FLKC_FG_GBR_base)
+  46526: A105  bra    0x46734                          
+  46528: F28A  fmov.s fr8,@r2                          
+  4652A: D23A  mov.l  @(0x46614),r2  ; =0x000D2F54     
+  4652C: F828  fmov.s @r2,fr8                          
+  4652E: D226  mov.l  @(0x465C8),r2  ; =0xFFFF8290 (FLKC_FG_GBR_base)
+  46530: A100  bra    0x46734                          
+  46532: F28A  fmov.s fr8,@r2                          
+  46534: D22D  mov.l  @(0x465EC),r2  ; =0x000D2F48     
+  46536: F828  fmov.s @r2,fr8                          
+  46538: F480  fadd  fr8,fr4                           
+  4653A: F54C  fmov   fr4,fr5                          
+  4653C: D21E  mov.l  @(0x465B8),r2  ; =0x000BE970 (max_float)
+  4653E: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46540: F4CC  fmov   fr12,fr4                         
+  46542: F40C  fmov   fr0,fr4                          
+  46544: D22A  mov.l  @(0x465F0),r2  ; =0x000BE56C (clamp_float)
+  46546: D62B  mov.l  @(0x465F4),r6  ; =0x000D2F44     
+  46548: F668  fmov.s @r6,fr6                          
+  4654A: D62B  mov.l  @(0x465F8),r6  ; =0x000D2F4C     
+  4654C: 420B  jsr    @r0                                ; CALL @ 0x00000
+  4654E: F568  fmov.s @r6,fr5                          
+  46550: F50C  fmov   fr0,fr5                          
+  46552: FF0A  fmov.s fr0,@r15                         
+  46554: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  46556: 1F08  mov.l  r0,@(32,r15)                     
+  46558: 620C  extu.b  r0,r2                           
+  4655A: 4208  shll2  r2                               
+  4655C: 4200  shll   r2                               
+  4655E: 3E2C  add  r2,r14                             
+  46560: 64E3  mov    r14,r4                           
+  46562: D226  mov.l  @(0x465FC),r2  ; =0x000BDBCC (write_float_ptr)
+  46564: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46566: F40C  fmov   fr0,fr4                          
+  46568: D225  mov.l  @(0x46600),r2  ; =0x000BE608 (Pull2DFloat)
+  4656A: F4CC  fmov   fr12,fr4                         
+  4656C: C714  mova   @(0x465C0),r0  ; =0x3EB40000     
+  4656E: F608  fmov.s @r0,fr6                          
+  46570: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46572: F5F8  fmov.s @r15,fr5                         
+  46574: 620C  extu.b  r0,r2                           
+  46576: 2228  tst  r2,r2                              
+  46578: 8B09  bf     0x4658E                          
+  4657A: D222  mov.l  @(0x46604),r2  ; =0x000BE9A0     
+  4657C: 420B  jsr    @r0                                ; CALL @ 0x00000
+  4657E: E401  mov    #1,r4                            
+  46580: 6603  mov    r0,r6                            
+  46582: D521  mov.l  @(0x46608),r5  ; =0xFFFF3360 (FLKC_percyl_result)
+  46584: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  46586: 1F09  mov.l  r0,@(36,r15)                     
+  46588: 600C  extu.b  r0,r0                           
+  4658A: 4000  shll   r0                               
+  4658C: 0565  mov.w  r6,@(r0,r5)                      
+  4658E: D21F  mov.l  @(0x4660C),r2  ; =0x00045EEA (FLKC_commit_write)
+  46590: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46592: 0009  nop                                     
+  46594: E001  mov    #1,r0                            
+  46596: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
+  46598: E000  mov    #0,r0                            
+  4659A: A0FE  bra    0x4679A                          
+  4659C: C102  mov.w  r0,@(4,GBR)                      
+  4659E: E000  mov    #0,r0                            
+  465A0: C102  mov.w  r0,@(4,GBR)                      
+  465A2: E001  mov    #1,r0                            
+  465A4: D219  mov.l  @(0x4660C),r2  ; =0x00045EEA (FLKC_commit_write)
+  465A6: 420B  jsr    @r0                                ; CALL @ 0x00001
+  465A8: C00C  mov.b  r0,@(12,GBR)                       ; @GBR+12 = 0xFFFF829C (FLKC_mode_29C)
+  465AA: E000  mov    #0,r0                            
+  465AC: A0F5  bra    0x4679A                          
+  465AE: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
+  465B0: FFFF  ??fpu    ; 0xFFFF                       
+  465B2: 3234  div1  r3,r2                             
+  465B4: FFFF  ??fpu    ; 0xFFFF                       
+  465B6: 8258  ??       ; 0x8258 (grp8)                
+  465B8: 000B  rts                                     
+  465BA: E970  mov    #112,r9                          
+  465BC: 000B  rts                                     
+  465BE: EA40  mov    #64,r10                          
+  465C0: 3EB4  div1  r11,r14                           
+  465C2: 0000  ??       ; 0x0000                       
+  465C4: 000D  mov.w  @(r0,r0),r0                      
+  465C6: 2F3C  cmp/str  r3,r15                         
+  465C8: FFFF  ??fpu    ; 0xFFFF                       
+  465CA: 8290  ??       ; 0x8290 (grp8)                
+  465CC: 0002  ??       ; 0x0002                       
+  465CE: 9858  mov.w  @(0x46682),r8  ; =0x600C         
+  465D0: FFFF  ??fpu    ; 0xFFFF                       
+  465D2: 7D18  add    #24,r13                          
+  465D4: FFFF  ??fpu    ; 0xFFFF                       
+  465D6: 81BA  mov.w  r0,@(20,r11)                     
+  465D8: FFFF  ??fpu    ; 0xFFFF                       
+  465DA: 3244  div1  r4,r2                             
+  465DC: FFFF  ??fpu    ; 0xFFFF                       
+  465DE: 3248  sub  r4,r2                              
+  465E0: FFFF  ??fpu    ; 0xFFFF                       
+  465E2: 8233  ??       ; 0x8233 (grp8)                
+  465E4: 000D  mov.w  @(r0,r0),r0                      
+  465E6: 29EE  mulu.w  r14,r9                          
+  465E8: 000D  mov.w  @(r0,r0),r0                      
+  465EA: 2F40  mov.b  r4,@r15                          
+  465EC: 000D  mov.w  @(r0,r0),r0                      
+  465EE: 2F48  tst  r4,r15                             
+  465F0: 000B  rts                                     
+  465F2: E56C  mov    #108,r5                          
+  465F4: 000D  mov.w  @(r0,r0),r0                      
+  465F6: 2F44  mov.b  r4,@-r15                         
+  465F8: 000D  mov.w  @(r0,r0),r0                      
+  465FA: 2F4C  cmp/str  r4,r15                         
+  465FC: 000B  rts                                     
+  465FE: DBCC  mov.l  @(0x46930),r11  ; =0xF468D171    
+  46600: 000B  rts                                     
+  46602: E608  mov    #8,r6                            
+  46604: 000B  rts                                     
+  46606: E9A0  mov    #-96,r9                          
+  46608: FFFF  ??fpu    ; 0xFFFF                       
+  4660A: 3360  cmp/eq  r6,r3                           
+  4660C: 0004  mov.b  r0,@(r0,r0)                      
+  4660E: 5EEA  mov.l  @(40,r14),r14                      ; @0xFFFF3270
+  46610: 000D  mov.w  @(r0,r0),r0                      
+  46612: 2F58  tst  r5,r15                             
+  46614: 000D  mov.w  @(r0,r0),r0                      
+  46616: 2F54  mov.b  r5,@-r15                         
+  46618: E000  mov    #0,r0                            
+  4661A: C102  mov.w  r0,@(4,GBR)                      
+  4661C: C00C  mov.b  r0,@(12,GBR)                       ; @GBR+12 = 0xFFFF829C (FLKC_mode_29C)
+  4661E: D2A1  mov.l  @(0x468A4),r2  ; =0x000D2F40     
+  46620: F928  fmov.s @r2,fr9                          
+  46622: F9F5  fcmp/gt  fr15,fr9                       
+  46624: 8B01  bf     0x4662A                          
+  46626: A088  bra    0x4673A                          
+  46628: 0009  nop                                     
+  4662A: F485  fcmp/gt  fr8,fr4                        
+  4662C: 8901  bt     0x46632                          
+  4662E: A084  bra    0x4673A                          
+  46630: 0009  nop                                     
+  46632: F88D  fldi0  fr8                              
+  46634: F845  fcmp/gt  fr4,fr8                        
+  46636: 8901  bt     0x4663C                          
+  46638: A07F  bra    0x4673A                          
+  4663A: 0009  nop                                     
+  4663C: D69A  mov.l  @(0x468A8),r6  ; =0xFFFF81BB (knock_flag_B)
+  4663E: 6060  mov.b  @r6,r0                             ; @0xFFFF81BB (knock_flag_B)
+  46640: 8801  cmp/eq #1,r0                            
+  46642: 8B27  bf     0x46694                          
+  46644: D299  mov.l  @(0x468AC),r2  ; =0x000D2F64     
+  46646: F828  fmov.s @r2,fr8                          
+  46648: F481  fsub  fr8,fr4                           
+  4664A: D299  mov.l  @(0x468B0),r2  ; =0x000BE56C (clamp_float)
+  4664C: D699  mov.l  @(0x468B4),r6  ; =0x000D2F44     
+  4664E: F668  fmov.s @r6,fr6                          
+  46650: D699  mov.l  @(0x468B8),r6  ; =0x000D2F4C     
+  46652: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46654: F568  fmov.s @r6,fr5                          
+  46656: F40C  fmov   fr0,fr4                          
+  46658: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  4665A: 1F0A  mov.l  r0,@(40,r15)                     
+  4665C: 620C  extu.b  r0,r2                           
+  4665E: 4208  shll2  r2                               
+  46660: 4200  shll   r2                               
+  46662: 3E2C  add  r2,r14                             
+  46664: D295  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
+  46666: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46668: 64E3  mov    r14,r4                           
+  4666A: D295  mov.l  @(0x468C0),r2  ; =0x00045EEA (FLKC_commit_write)
+  4666C: 420B  jsr    @r0                                ; CALL @ 0x00000
+  4666E: 0009  nop                                     
+  46670: E001  mov    #1,r0                            
+  46672: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
+  46674: D293  mov.l  @(0x468C4),r2  ; =0x000BE9A0     
+  46676: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46678: E400  mov    #0,r4                            
+  4667A: 6603  mov    r0,r6                            
+  4667C: D592  mov.l  @(0x468C8),r5  ; =0xFFFF3360 (FLKC_percyl_result)
+  4667E: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  46680: 1F0B  mov.l  r0,@(44,r15)                     
+  46682: 600C  extu.b  r0,r0                           
+  46684: 4000  shll   r0                               
+  46686: 0565  mov.w  r6,@(r0,r5)                      
+  46688: D290  mov.l  @(0x468CC),r2  ; =0x000D2F68     
+  4668A: F928  fmov.s @r2,fr9                          
+  4668C: F94D  fneg   fr9                              
+  4668E: D290  mov.l  @(0x468D0),r2  ; =0xFFFF8290 (FLKC_FG_GBR_base)
+  46690: A050  bra    0x46734                          
+  46692: F29A  fmov.s fr9,@r2                          
+  46694: C411  mov.b  @(17,GBR),r0                       ; @GBR+17 = 0xFFFF82A1 (FLKC_flag_A1)
+  46696: 1F0C  mov.l  r0,@(48,r15)                     
+  46698: 600C  extu.b  r0,r0                           
+  4669A: 8801  cmp/eq #1,r0                            
+  4669C: D28D  mov.l  @(0x468D4),r2  ; =0x000D2F50     
+  4669E: F828  fmov.s @r2,fr8                          
+  466A0: F481  fsub  fr8,fr4                           
+  466A2: D283  mov.l  @(0x468B0),r2  ; =0x000BE56C (clamp_float)
+  466A4: D683  mov.l  @(0x468B4),r6  ; =0x000D2F44     
+  466A6: F668  fmov.s @r6,fr6                          
+  466A8: D683  mov.l  @(0x468B8),r6  ; =0x000D2F4C     
+  466AA: 8F21  bf/s   0x466F0                          
+  466AC: F568  fmov.s @r6,fr5                          
+  466AE: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466B0: 0009  nop                                     
+  466B2: F40C  fmov   fr0,fr4                          
+  466B4: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  466B6: 1F0D  mov.l  r0,@(52,r15)                     
+  466B8: 620C  extu.b  r0,r2                           
+  466BA: 4208  shll2  r2                               
+  466BC: 4200  shll   r2                               
+  466BE: 3E2C  add  r2,r14                             
+  466C0: D27E  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
+  466C2: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466C4: 64E3  mov    r14,r4                           
+  466C6: D27E  mov.l  @(0x468C0),r2  ; =0x00045EEA (FLKC_commit_write)
+  466C8: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466CA: 0009  nop                                     
+  466CC: E001  mov    #1,r0                            
+  466CE: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
+  466D0: D27C  mov.l  @(0x468C4),r2  ; =0x000BE9A0     
+  466D2: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466D4: E400  mov    #0,r4                            
+  466D6: 6603  mov    r0,r6                            
+  466D8: D57B  mov.l  @(0x468C8),r5  ; =0xFFFF3360 (FLKC_percyl_result)
+  466DA: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  466DC: 1F0E  mov.l  r0,@(56,r15)                     
+  466DE: 600C  extu.b  r0,r0                           
+  466E0: 4000  shll   r0                               
+  466E2: 0565  mov.w  r6,@(r0,r5)                      
+  466E4: D27C  mov.l  @(0x468D8),r2  ; =0x000D2F60     
+  466E6: F928  fmov.s @r2,fr9                          
+  466E8: F94D  fneg   fr9                              
+  466EA: D279  mov.l  @(0x468D0),r2  ; =0xFFFF8290 (FLKC_FG_GBR_base)
+  466EC: A022  bra    0x46734                          
+  466EE: F29A  fmov.s fr9,@r2                          
+  466F0: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466F2: 0009  nop                                     
+  466F4: F40C  fmov   fr0,fr4                          
+  466F6: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  466F8: 1F0F  mov.l  r0,@(60,r15)                     
+  466FA: 620C  extu.b  r0,r2                           
+  466FC: 4208  shll2  r2                               
+  466FE: 4200  shll   r2                               
+  46700: 3E2C  add  r2,r14                             
+  46702: D26E  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
+  46704: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46706: 64E3  mov    r14,r4                           
+  46708: D26D  mov.l  @(0x468C0),r2  ; =0x00045EEA (FLKC_commit_write)
+  4670A: 420B  jsr    @r0                                ; CALL @ 0x00001
+  4670C: 0009  nop                                     
+  4670E: E001  mov    #1,r0                            
+  46710: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
+  46712: D26C  mov.l  @(0x468C4),r2  ; =0x000BE9A0     
+  46714: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46716: E400  mov    #0,r4                            
+  46718: 6603  mov    r0,r6                            
+  4671A: D56B  mov.l  @(0x468C8),r5  ; =0xFFFF3360 (FLKC_percyl_result)
+  4671C: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  4671E: 6403  mov    r0,r4                            
+  46720: E040  mov    #64,r0                           
+  46722: 0F46  mov.l  r4,@(r0,r15)                     
+  46724: 604C  extu.b  r4,r0                           
+  46726: 4000  shll   r0                               
+  46728: 0565  mov.w  r6,@(r0,r5)                      
+  4672A: D26C  mov.l  @(0x468DC),r2  ; =0x000D2F5C     
+  4672C: F928  fmov.s @r2,fr9                          
+  4672E: F94D  fneg   fr9                              
+  46730: D267  mov.l  @(0x468D0),r2  ; =0xFFFF8290 (FLKC_FG_GBR_base)
+  46732: F29A  fmov.s fr9,@r2                          
+  46734: E001  mov    #1,r0                            
+  46736: A030  bra    0x4679A                          
+  46738: C010  mov.b  r0,@(16,GBR)                       ; @GBR+16 = 0xFFFF82A0 (FLKC_load_flag)
+  4673A: D266  mov.l  @(0x468D4),r2  ; =0x000D2F50     
+  4673C: F828  fmov.s @r2,fr8                          
+  4673E: F481  fsub  fr8,fr4                           
+  46740: D25B  mov.l  @(0x468B0),r2  ; =0x000BE56C (clamp_float)
+  46742: D65C  mov.l  @(0x468B4),r6  ; =0x000D2F44     
+  46744: F668  fmov.s @r6,fr6                          
+  46746: D65C  mov.l  @(0x468B8),r6  ; =0x000D2F4C     
+  46748: 420B  jsr    @r0                                ; CALL @ 0x00001
+  4674A: F568  fmov.s @r6,fr5                          
+  4674C: F40C  fmov   fr0,fr4                          
+  4674E: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  46750: 6603  mov    r0,r6                            
+  46752: E044  mov    #68,r0                           
+  46754: 0F66  mov.l  r6,@(r0,r15)                     
+  46756: 626C  extu.b  r6,r2                           
+  46758: 4208  shll2  r2                               
+  4675A: 4200  shll   r2                               
+  4675C: 3E2C  add  r2,r14                             
+  4675E: D257  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
+  46760: 420B  jsr    @r0                                ; CALL @ 0x00044
+  46762: 64E3  mov    r14,r4                           
+  46764: D256  mov.l  @(0x468C0),r2  ; =0x00045EEA (FLKC_commit_write)
+  46766: 420B  jsr    @r0                                ; CALL @ 0x00044
+  46768: 0009  nop                                     
+  4676A: E001  mov    #1,r0                            
+  4676C: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
+  4676E: D255  mov.l  @(0x468C4),r2  ; =0x000BE9A0     
+  46770: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46772: E400  mov    #0,r4                            
+  46774: 6603  mov    r0,r6                            
+  46776: D554  mov.l  @(0x468C8),r5  ; =0xFFFF3360 (FLKC_percyl_result)
+  46778: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  4677A: 6403  mov    r0,r4                            
+  4677C: E048  mov    #72,r0                           
+  4677E: 0F46  mov.l  r4,@(r0,r15)                     
+  46780: 604C  extu.b  r4,r0                           
+  46782: 4000  shll   r0                               
+  46784: A009  bra    0x4679A                          
+  46786: 0565  mov.w  r6,@(r0,r5)                      
+  46788: 6023  mov    r2,r0                            
+  4678A: 8801  cmp/eq #1,r0                            
+  4678C: 8B01  bf     0x46792                          
+  4678E: E000  mov    #0,r0                            
+  46790: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
+  46792: 2448  tst  r4,r4                              
+  46794: 8B01  bf     0x4679A                          
+  46796: B134  bsr    0x46A02                          
+  46798: 0009  nop                                     
+  4679A: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
+  4679C: C01A  mov.b  r0,@(26,GBR)                       ; @GBR+26 = 0xFFFF82AA (FLKC_cyl_state)
+  4679E: 7F4C  add    #76,r15                          
+  467A0: 4F17  ldc.l  @r15+,GBR                        
+  467A2: FFF9  fmov.s @r15+,fr15                       
+  467A4: FEF9  fmov.s @r15+,fr14                       
+  467A6: FCF9  fmov.s @r15+,fr12                       
+  467A8: 4F26  lds.l  @r15+,pr                         
+  467AA: 000B  rts                                     
+  467AC: 6EF6  mov.l  @r15+,r14                        
+  467AE: 4F22  sts.l  pr,@-r15                         
+  467B0: 4F13  stc.l  GBR,@-r15                        
+  467B2: D04B  mov.l  @(0x468E0),r0  ; =0xFFFF829E (FLKC_flag_29E)
+  467B4: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF829E
+  467B6: 7FF8  add    #-8,r15                          
+  467B8: D24A  mov.l  @(0x468E4),r2  ; =0xFFFF6624 (proc_6624)
+  467BA: F428  fmov.s @r2,fr4                          
+  467BC: D24A  mov.l  @(0x468E8),r2  ; =0xFFFF63F8 (proc_63F8)
+  467BE: B144  bsr    0x46A4A                          
+  467C0: F528  fmov.s @r2,fr5                          
+  467C2: C40F  mov.b  @(15,GBR),r0                       ; @GBR+15 = 0xFFFF82AD
+  467C4: 8801  cmp/eq #1,r0                            
+  467C6: 8B0E  bf     0x467E6                          
+  467C8: C410  mov.b  @(16,GBR),r0                       ; @GBR+16 = 0xFFFF82AE
+  467CA: 8801  cmp/eq #1,r0                            
+  467CC: 8B0B  bf     0x467E6                          
+  467CE: C411  mov.b  @(17,GBR),r0                       ; @GBR+17 = 0xFFFF82AF
+  467D0: 2F02  mov.l  r0,@r15                          
+  467D2: 600C  extu.b  r0,r0                           
+  467D4: 8801  cmp/eq #1,r0                            
+  467D6: 8B06  bf     0x467E6                          
+  467D8: C412  mov.b  @(18,GBR),r0                       ; @GBR+18 = 0xFFFF82B0 (IAT)
+  467DA: 1F01  mov.l  r0,@(4,r15)                      
+  467DC: 600C  extu.b  r0,r0                           
+  467DE: 8801  cmp/eq #1,r0                            
+  467E0: 8B01  bf     0x467E6                          
+  467E2: A001  bra    0x467E8                          
+  467E4: E001  mov    #1,r0                            
+  467E6: E000  mov    #0,r0                            
+  467E8: C000  mov.b  r0,@(0,GBR)                        ; @GBR+0 = 0xFFFF829E (FLKC_flag_29E)
+  467EA: 7F08  add    #8,r15                           
+  467EC: 4F17  ldc.l  @r15+,GBR                        
+  467EE: 4F26  lds.l  @r15+,pr                         
+  467F0: 000B  rts                                     
+  467F2: 0009  nop                                     
+  467F4: 2FC6  mov.l  r12,@-r15                        
+  467F6: 2FD6  mov.l  r13,@-r15                        
+  467F8: 2FE6  mov.l  r14,@-r15                        
+  467FA: 4F22  sts.l  pr,@-r15                         
+  467FC: FFEB  fmov.s fr14,@-r15                       
+  467FE: 7FFC  add    #-4,r15                          
+  46800: D23A  mov.l  @(0x468EC),r2  ; =0x0002999C     
+  46802: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46804: 0009  nop                                     
+  46806: 660C  extu.b  r0,r6                           
+  46808: 2F60  mov.b  r6,@r15                          
+  4680A: D539  mov.l  @(0x468F0),r5  ; =0xFFFF65BD     
+  4680C: 6250  mov.b  @r5,r2                             ; @0xFFFF65BD
+  4680E: D139  mov.l  @(0x468F4),r1  ; =0xFFFF82AB (FLKC_flag_AB)
+  46810: 6010  mov.b  @r1,r0                             ; @0xFFFF82AB (FLKC_flag_AB)
+  46812: 8802  cmp/eq #2,r0                            
+  46814: 8B01  bf     0x4681A                          
+  46816: 2668  tst  r6,r6                              
+  46818: 8904  bt     0x46824                          
+  4681A: 6063  mov    r6,r0                            
+  4681C: 8802  cmp/eq #2,r0                            
+  4681E: 8B10  bf     0x46842                          
+  46820: 2228  tst  r2,r2                              
+  46822: 8B0E  bf     0x46842                          
+  46824: EE00  mov    #0,r14                           
+  46826: 6DE3  mov    r14,r13                          
+  46828: EC23  mov    #35,r12                          
+  4682A: A007  bra    0x4683C                          
+  4682C: FE8D  fldi0  fr14                             
+  4682E: D432  mov.l  @(0x468F8),r4  ; =0xFFFF3248 (FLKC_percyl_arr)
+  46830: 34DC  add  r13,r4                             
+  46832: D222  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
+  46834: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46836: F4EC  fmov   fr14,fr4                         
+  46838: 7E01  add    #1,r14                           
+  4683A: 7D08  add    #8,r13                           
+  4683C: 62EC  extu.b  r14,r2                          
+  4683E: 32C3  cmp/ge  r12,r2                          
+  46840: 8BF5  bf     0x4682E                          
+  46842: 66F0  mov.b  @r15,r6                          
+  46844: D12B  mov.l  @(0x468F4),r1  ; =0xFFFF82AB (FLKC_flag_AB)
+  46846: 2160  mov.b  r6,@r1                             ; -> 0xFFFF82AB (FLKC_flag_AB)
+  46848: 7F04  add    #4,r15                           
+  4684A: FEF9  fmov.s @r15+,fr14                       
+  4684C: 4F26  lds.l  @r15+,pr                         
+  4684E: 6EF6  mov.l  @r15+,r14                        
+  46850: 6DF6  mov.l  @r15+,r13                        
+  46852: 000B  rts                                     
+  46854: 6CF6  mov.l  @r15+,r12                        
+  46856: D229  mov.l  @(0x468FC),r2  ; =0xFFFF81BA (knock_event_flag)
+  46858: 6620  mov.b  @r2,r6                             ; @0xFFFF81BA (knock_event_flag)
+  4685A: 2668  tst  r6,r6                              
+  4685C: 8B08  bf     0x46870                          
+  4685E: D528  mov.l  @(0x46900),r5  ; =0xFFFF8294 (FLKC_counter)
+  46860: 6251  mov.w  @r5,r2                             ; @0xFFFF8294 (FLKC_counter)
+  46862: E6FF  mov    #-1,r6                           
+  46864: 3262  cmp/hs  r6,r2                           
+  46866: 8906  bt     0x46876                          
+  46868: 6251  mov.w  @r5,r2                             ; @0xFFFF8294 (FLKC_counter)
+  4686A: 7201  add    #1,r2                            
+  4686C: 000B  rts                                     
+  4686E: 2521  mov.w  r2,@r5                             ; -> 0xFFFF8294 (FLKC_counter)
+  46870: E200  mov    #0,r2                            
+  46872: D523  mov.l  @(0x46900),r5  ; =0xFFFF8294 (FLKC_counter)
+  46874: 2521  mov.w  r2,@r5                             ; -> 0xFFFF8294 (FLKC_counter)
+  46876: 000B  rts                                     
+  46878: 0009  nop                                     
+  4687A: 4F22  sts.l  pr,@-r15                         
+  4687C: 7FF8  add    #-8,r15                          
+  4687E: D621  mov.l  @(0x46904),r6  ; =0xFFFF3244 (FLKC_enable_byte)
+  46880: 6060  mov.b  @r6,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
+  46882: C901  and    #0x01,r0                         
+  46884: 2008  tst  r0,r0                              
+  46886: 8B03  bf     0x46890                          
+  46888: E200  mov    #0,r2                            
+  4688A: D11F  mov.l  @(0x46908),r1  ; =0xFFFF8299     
+  4688C: A007  bra    0x4689E                          
+  4688E: 2120  mov.b  r2,@r1                             ; -> 0xFFFF8299
+  46890: D11D  mov.l  @(0x46908),r1  ; =0xFFFF8299     
+  46892: 8412  mov.b  @(2,r1),r0                       
+  46894: E623  mov    #35,r6                           
+  46896: 3062  cmp/hs  r6,r0                           
+  46898: 8B38  bf     0x4690C                          
+  4689A: 8411  mov.b  @(1,r1),r0                       
+  4689C: 2100  mov.b  r0,@r1                             ; -> 0xFFFF8299
+  4689E: E000  mov    #0,r0                            
+  468A0: A060  bra    0x46964                          
+  468A2: 8011  mov.b  r0,@(1,r1)                       
+  468A4: 000D  mov.w  @(r0,r0),r0                      
+  468A6: 2F40  mov.b  r4,@r15                          
+  468A8: FFFF  ??fpu    ; 0xFFFF                       
+  468AA: 81BB  mov.w  r0,@(22,r11)                     
+  468AC: 000D  mov.w  @(r0,r0),r0                      
+  468AE: 2F64  mov.b  r6,@-r15                         
+  468B0: 000B  rts                                     
+  468B2: E56C  mov    #108,r5                          
+  468B4: 000D  mov.w  @(r0,r0),r0                      
+  468B6: 2F44  mov.b  r4,@-r15                         
+  468B8: 000D  mov.w  @(r0,r0),r0                      
+  468BA: 2F4C  cmp/str  r4,r15                         
+  468BC: 000B  rts                                     
+  468BE: DBCC  mov.l  @(0x46BF0),r11  ; =0x640CD619    
+  468C0: 0004  mov.b  r0,@(r0,r0)                      
+  468C2: 5EEA  mov.l  @(40,r14),r14                      ; @0x00000029
+  468C4: 000B  rts                                     
+  468C6: E9A0  mov    #-96,r9                          
+  468C8: FFFF  ??fpu    ; 0xFFFF                       
+  468CA: 3360  cmp/eq  r6,r3                           
+  468CC: 000D  mov.w  @(r0,r0),r0                      
+  468CE: 2F68  tst  r6,r15                             
+  468D0: FFFF  ??fpu    ; 0xFFFF                       
+  468D2: 8290  ??       ; 0x8290 (grp8)                
+  468D4: 000D  mov.w  @(r0,r0),r0                      
+  468D6: 2F50  mov.b  r5,@r15                          
+  468D8: 000D  mov.w  @(r0,r0),r0                      
+  468DA: 2F60  mov.b  r6,@r15                          
+  468DC: 000D  mov.w  @(r0,r0),r0                      
+  468DE: 2F5C  cmp/str  r5,r15                         
+  468E0: FFFF  ??fpu    ; 0xFFFF                       
+  468E2: 829E  ??       ; 0x829E (grp8)                
+  468E4: FFFF  ??fpu    ; 0xFFFF                       
+  468E6: 6624  mov.b  @r2+,r6                          
+  468E8: FFFF  ??fpu    ; 0xFFFF                       
+  468EA: 63F8  swap.b  r15,r3                          
+  468EC: 0002  ??       ; 0x0002                       
+  468EE: 999C  mov.w  @(0x46A2A),r9  ; =0x32C3         
+  468F0: FFFF  ??fpu    ; 0xFFFF                       
+  468F2: 65BD  extu.w  r11,r5                          
+  468F4: FFFF  ??fpu    ; 0xFFFF                       
+  468F6: 82AB  ??       ; 0x82AB (grp8)                
+  468F8: FFFF  ??fpu    ; 0xFFFF                       
+  468FA: 3248  sub  r4,r2                              
+  468FC: FFFF  ??fpu    ; 0xFFFF                       
+  468FE: 81BA  mov.w  r0,@(20,r11)                     
+  46900: FFFF  ??fpu    ; 0xFFFF                       
+  46902: 8294  ??       ; 0x8294 (grp8)                
+  46904: FFFF  ??fpu    ; 0xFFFF                       
+  46906: 3244  div1  r4,r2                             
+  46908: FFFF  ??fpu    ; 0xFFFF                       
+  4690A: 8299  ??       ; 0x8299 (grp8)                
+  4690C: D575  mov.l  @(0x46AE4),r5  ; =0xFFFF3360 (FLKC_percyl_result)
+  4690E: 8412  mov.b  @(2,r1),r0                       
+  46910: 600C  extu.b  r0,r0                           
+  46912: 4000  shll   r0                               
+  46914: 065C  mov.b  @(r0,r5),r6                      
+  46916: 2F60  mov.b  r6,@r15                          
+  46918: D573  mov.l  @(0x46AE8),r5  ; =0xFFFF3248 (FLKC_percyl_arr)
+  4691A: 8412  mov.b  @(2,r1),r0                       
+  4691C: 600C  extu.b  r0,r0                           
+  4691E: 4008  shll2  r0                               
+  46920: 4000  shll   r0                               
+  46922: F856  fmov.s @(r0,r5),fr8                     
+  46924: E004  mov    #4,r0                            
+  46926: FF87  fmov.s fr8,@(r0,r15)                    
+  46928: D470  mov.l  @(0x46AEC),r4  ; =0x000AE2D8     
+  4692A: D271  mov.l  @(0x46AF0),r2  ; =0x000BE830 (Pull3DFloat)
+  4692C: D671  mov.l  @(0x46AF4),r6  ; =0xFFFF3234 (FLKC_work_bank1)
+  4692E: 420B  jsr    @r0                                ; CALL @ 0x00004
+  46930: F468  fmov.s @r6,fr4                          
+  46932: D171  mov.l  @(0x46AF8),r1  ; =0xFFFF8299     
+  46934: E00B  mov    #11,r0                           
+  46936: F107  fmov.s fr0,@(r0,r1)                     
+  46938: 60F0  mov.b  @r15,r0                          
+  4693A: 8801  cmp/eq #1,r0                            
+  4693C: 8B0C  bf     0x46958                          
+  4693E: E004  mov    #4,r0                            
+  46940: F8F6  fmov.s @(r0,r15),fr8                    
+  46942: E00B  mov    #11,r0                           
+  46944: F916  fmov.s @(r0,r1),fr9                     
+  46946: F985  fcmp/gt  fr8,fr9                        
+  46948: 8906  bt     0x46958                          
+  4694A: D26C  mov.l  @(0x46AFC),r2  ; =0x000BE53C     
+  4694C: 8411  mov.b  @(1,r1),r0                       
+  4694E: 640C  extu.b  r0,r4                           
+  46950: 420B  jsr    @r0                                ; CALL @ 0x0000B
+  46952: E501  mov    #1,r5                            
+  46954: D168  mov.l  @(0x46AF8),r1  ; =0xFFFF8299     
+  46956: 8011  mov.b  r0,@(1,r1)                       
+  46958: D268  mov.l  @(0x46AFC),r2  ; =0x000BE53C     
+  4695A: 8412  mov.b  @(2,r1),r0                       
+  4695C: 640C  extu.b  r0,r4                           
+  4695E: 420B  jsr    @r0                                ; CALL @ 0x0000B
+  46960: E501  mov    #1,r5                            
+  46962: D165  mov.l  @(0x46AF8),r1  ; =0xFFFF8299     
+  46964: 8012  mov.b  r0,@(2,r1)                       
+  46966: 6610  mov.b  @r1,r6                             ; @0xFFFF8299
+  46968: D565  mov.l  @(0x46B00),r5  ; =0x000D29A8     
+  4696A: 6250  mov.b  @r5,r2                             ; @0x000D29A8
+  4696C: 3622  cmp/hs  r2,r6                           
+  4696E: 0029  movt   r0                               
+  46970: 7F08  add    #8,r15                           
+  46972: 4F26  lds.l  @r15+,pr                         
+  46974: 000B  rts                                     
+  46976: 8016  mov.b  r0,@(6,r1)                       
+  46978: 4F22  sts.l  pr,@-r15                         
+  4697A: D162  mov.l  @(0x46B04),r1  ; =0xFFFF8296     
+  4697C: 841B  mov.b  @(11,r1),r0                      
+  4697E: 8801  cmp/eq #1,r0                            
+  46980: 8B0D  bf     0x4699E                          
+  46982: 841A  mov.b  @(10,r1),r0                      
+  46984: 8801  cmp/eq #1,r0                            
+  46986: 8B0A  bf     0x4699E                          
+  46988: D65F  mov.l  @(0x46B08),r6  ; =0xFFFF82AC (FLKC_load_copy)
+  4698A: 6260  mov.b  @r6,r2                             ; @0xFFFF82AC (FLKC_load_copy)
+  4698C: 2228  tst  r2,r2                              
+  4698E: 8B06  bf     0x4699E                          
+  46990: D25E  mov.l  @(0x46B0C),r2  ; =0x000BE554     
+  46992: E501  mov    #1,r5                            
+  46994: 6611  mov.w  @r1,r6                             ; @0xFFFF8296
+  46996: 420B  jsr    @r0                                ; CALL @ 0x0000B
+  46998: 646D  extu.w  r6,r4                           
+  4699A: D15A  mov.l  @(0x46B04),r1  ; =0xFFFF8296     
+  4699C: 2101  mov.w  r0,@r1                             ; -> 0xFFFF8296
+  4699E: 4F26  lds.l  @r15+,pr                         
+  469A0: 000B  rts                                     
+  469A2: 0009  nop                                     
+  469A4: D457  mov.l  @(0x46B04),r4  ; =0xFFFF8296     
+  469A6: 6641  mov.w  @r4,r6                             ; @0xFFFF8296
+  469A8: D559  mov.l  @(0x46B10),r5  ; =0x000D29F0     
+  469AA: 6251  mov.w  @r5,r2                             ; @0x000D29F0
+  469AC: 3622  cmp/hs  r2,r6                           
+  469AE: 8B02  bf     0x469B6                          
+  469B0: E000  mov    #0,r0                            
+  469B2: 000B  rts                                     
+  469B4: 804B  mov.b  r0,@(11,r4)                      
+  469B6: D657  mov.l  @(0x46B14),r6  ; =0xFFFF827C     
+  469B8: 6060  mov.b  @r6,r0                             ; @0xFFFF827C
+

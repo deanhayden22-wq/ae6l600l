@@ -1,0 +1,606 @@
+================================================================================
+  AE5L600L - Knock Detection & FLKC Analysis Report
+  2013 Subaru WRX MT (SH7058 / SH-2A)
+  Generated from disassembly sessions
+================================================================================
+
+OVERVIEW
+--------
+The knock and FLKC pipeline is event-driven, executing on every 4th cylinder
+firing event (cylinders 0, 6, 12, 18 in internal indexing = one full engine
+cycle). The pipeline stages are:
+
+  1. knock_wrapper   (0x043750)  - Cylinder gate + status guard
+  2. knock_detector  (0x043782)  - Signal processing & threshold comparison
+  3. knock_wrapper_cont (0x43B7C)- Post-detector: RPM gate + level code
+  4. task12_knock_post (0x43D68) - Per-cycle retard amount table lookups
+  5. flkc_path_J     (0x045BFE)  - FAST: per-event retard + counter recovery
+  6. flkc_paths_FG   (0x0463BA)  - SLOW: sustained knock state machine
+
+Concurrently:
+  7. task11_knock_flag_read (0x4438C) - Reads knock flag from a different path
+
+RAM layout for knock / FLKC working area:
+
+  0xFFFF4304  float   knock_ref_level_fr   - background/ref knock level (ADC)
+  0xFFFF4308  byte    knock_status_4308    - knock event status
+  0xFFFF430C  float   knock_raw_signal     - raw knock signal
+  0xFFFF4309  byte    (per-cylinder write from knock_wrapper_cont)
+  0xFFFF430D  byte[4] (per-cylinder FLKC code output array)
+
+  0xFFFF818C  float[4]  knock_percyl_float - per-cyl processed knock level
+  0xFFFF81AC  word      knock_status_81AC  - GBR base for knock_wrapper_cont
+  0xFFFF81BA  byte      knock_event_flag   - SET by knock_detector, READ by FLKC
+  0xFFFF81BB  byte      knock_flag_B       - secondary knock flag
+  0xFFFF81D8  byte      knock_rpmgate      - 1 = above ~7200 RPM (see below)
+  0xFFFF81B1  byte      knock_level_code   - 0/2/4/5/6/7 = intensity band
+
+  FLKC working variables:
+  0xFFFF3234  float   FLKC_work_bank1   - per-bank FLKC correction (positive = retard)
+  0xFFFF323C  float   FLKC_work_bank2   - bank2 FLKC correction
+  0xFFFF3244  byte    FLKC_enable_byte  - FLKC active status
+  0xFFFF3248  float[] FLKC_percyl_arr   - per-cylinder FLKC array (35 entries * 8 bytes)
+  0xFFFF3360  word[]  FLKC_percyl_result- per-cylinder output word array
+
+  FLKC state struct (0xFFFF8274, size ~18 bytes):
+  +0  word    recovery_counter        - increments each cycle during recovery
+  +2  byte    (mode byte)
+  +4  byte    mode_flag               - 1 = FLKC active mode
+  +5  byte    timing_state            - retard level state
+  +6  byte    output_flag
+  +7  byte    recovery_flag           - 1 = currently recovering
+  +12 float   step_table_result       - cached Pull3DFloat result
+  +14 word    axis_result
+  +16 word    rpm_threshold_val       - axis lookup result for RPM gate
+
+  FLKC_paths_FG GBR base: 0xFFFF8290
+  GBR+0  (0xFFFF8290): FLKC_FG_init_float  - initial float value
+  GBR+4  (0xFFFF8294): FLKC_counter        - word: recovery counter
+  GBR+8  (0xFFFF8298): FLKC_cyl_idx        - byte: current cylinder index
+  GBR+12 (0xFFFF829C): FLKC_mode_29C       - knock active mode
+  GBR+13 (0xFFFF829D): FLKC_state_29D      - 0=no knock, 1=knock active
+  GBR+14 (0xFFFF829E): FLKC_flag_29E
+  GBR+16 (0xFFFF82A0): FLKC_load_flag      - load/TGV status copy
+  GBR+17 (0xFFFF82A1): FLKC_flag_A1
+  GBR+26 (0xFFFF82AA): FLKC_cyl_state      - per-cylinder knock state counter
+  GBR+28 (0xFFFF82AC): FLKC_load_copy      - copy of load flag
+
+================================================================================
+STAGE 1: knock_wrapper (0x43750)
+================================================================================
+Purpose: Gate-checks cylinder event, guards against status overrun.
+
+  Entry: r4 = cylinder event index (from scheduler)
+
+  Logic:
+    extu.b r4,r0              ; r0 = cyl_index (0-based, 0..23)
+    if r0 not in {0, 6, 12, 18}: rts  ; only every 4th cylinder
+    r2 = @knock_status_4308   ; load current knock status
+    @knock_status_81AC = r2   ; copy to shadow
+    r2 = @knock_status_81AC   ; re-read
+    if r2 >= 4: rts           ; guard: skip if status >= 4 (already busy)
+    bsr knock_detector        ; call main detector
+    bra knock_wrapper_cont    ; then jump to continuation
+
+  Key: The {0,6,12,18} check means one call per engine cycle (4 cylinders).
+       Status check prevents re-entry if detector is still running.
+
+================================================================================
+STAGE 2: knock_detector (0x43782)
+================================================================================
+Purpose: Compute per-cylinder knock level vs RPM/load threshold.
+         Uses floating-point signal processing (IIR, 3D table lookups).
+
+  Prologue: saves r9, r11-r14, PR, fr12 (=0.0f), fr14, fr15
+  GBR = 0xFFFF80FC  (knock_det_GBR_base)
+
+  Key inputs:
+    fr15 = @0xFFFF6624  (proc_6624 - RPM-like scaled value, 301 refs in ROM)
+    fr14 = @0xFFFF63F8  (proc_63F8 - load/TPS-like value, 205 refs)
+    r11  = @0xFFFF67EC  (word: some timing/counter value)
+    fr8  = @knock_ref_level_fr (0xFFFF4304) - background ADC reference
+    r9   = 0xFFFF8158  (knock struct base)
+
+  Signal chain:
+    1. Clamp fr8 >= 0:   if fr8 < 0.0f: fr8 = 0.0f
+    2. Store fr8 to knock struct @(r9+offset)
+    3. Call Pull3DFloat(descriptor=0x000AE284, fr4=RPM, fr5=load)
+       -> table: RPM/load-indexed knock threshold table
+    4. Cylinder index: GBR+176 -> extu.b -> shll2 -> float array index
+       Per-cyl threshold arrays at offsets from r14 (r14=knock_det_GBR_base)
+       float[4] entries at r14+4, r14+20, r14+24, r14+36, r14+44, r14+68
+    5. Cylinder tracking: GBR+192 = cyl_changed_flag
+    6. Floating-point knock level:
+         signal - threshold -> abs value -> fmac (multiply-accumulate) steps
+       Uses 40.0f (0x42200000) as cylinder count/scaling constant
+    7. Two more Pull3DFloat calls using descriptor 0x000AE290
+    8. IIR per-cylinder accumulation via fmac fr0,frm,frn pattern
+    9. Additional float operations with tables at:
+         0x000D2D84, 0x00063E48, 0x00063E58, 0x00063E68, 0x000BE8E4
+   10. Results indexed by cylinder: per-cyl float[4] written to knock struct
+   11. Knock classification:
+         - Compare vs threshold at 0x000D298B
+         - Clamp result to [0x000D2D8C, 0x000D2D84] range
+   12. Final output:
+         GBR+190 (0xFFFF81BA) = knock_event_flag: 1 if knock detected
+         GBR+191 (0xFFFF81BB) = secondary flag
+
+  Key GBR+176 = cylinder index byte (0x000D2D84-indexed via cyl_idx * 4)
+
+  Literal pool (0x439A0-0x439FC):
+    0xFFFF4308  knock_status_4308
+    0xFFFF81AC  knock_status_81AC
+    0xFFFF80FC  knock_det_GBR_base
+    0xFFFF6624  proc_6624 (RPM-like)
+    0xFFFF63F8  proc_63F8 (load-like)
+    0xFFFF67EC  proc_67EC_word
+    0xFFFF4304  knock_ref_level_fr
+    0xFFFF8158  knock_struct_8158
+    0x000AE284  [3D table descriptor: RPM/load knock threshold]
+    0x000BE830  Pull3DFloat
+    0x000D298B  knock_enable_rom_flag
+    0x42200000  40.0f (cylinder scaling)
+    0x000AE290  [3D table descriptor: second knock table]
+    0xC4B0600C  float -1411.0 (knock signal scaling)
+    0x4008F466  float 2.140 (filter coefficient)
+
+================================================================================
+STAGE 3: knock_wrapper_cont (0x43B7C)
+================================================================================
+Purpose: Post-detector processing: RPM gate, knock level classification.
+         Reads knock_event_flag; classifies intensity into a level code (0-7).
+
+  GBR = 0xFFFF81AC  (knock_status_81AC base)
+
+  Step A: RPM gate check
+    fr8 = @0xFFFF6624 (proc_6624)
+    r5  = cyl_idx + 2  (from GBR+0 + 2)
+    Compare vs threshold @0x000D2989 (byte table)
+    Compare fr8 vs 12799.8f (0x000D2D54/58):
+      -> If fr8 > 12799.8: knock_rpmgate (GBR+44 = 0xFFFF81D8) = 1
+      -> else: knock_rpmgate = 0
+    Note: 12799.8 / ~1.778 = ~7200 RPM (RPM = proc_6624 / 1.778)
+
+  Step B: Knock enable check
+    Read @0x000D298B: byte knock_enable_flag
+    if == 0: jump to no-knock path (0x43BFE)
+
+  Step C: Per-cylinder knock level float (knock active path)
+    r6 = @0xFFFF818C + cyl_idx*4 (knock_percyl_float[cyl])
+    r2 = @(GBR+10 + cyl_idx) -> convert byte to float (lds r2,FPUL; float FPUL,fr8)
+    fr9 = knock_percyl_float[cyl] + float(byte_value)
+    fr8 += float(@0x000D298A) + 0x43600000 (= 224.0f offset)
+    Compare fr8 vs fr9:
+      - movt r0; xor #1,r0  -> r2 = (fr8 >= fr9) ? 0 : 1
+
+  Step D: Knock level classification (0x43C62-0x43CF4)
+    Float fr8 = knock_percyl_float[cyl] (from 0xFFFF818C)
+    Threshold cascade (compare fr8 vs float thresholds):
+      fr8 > 224.0f  -> knock_level_code (GBR+5) = 0   [above-limit]
+      fr8 > 160.0f  -> knock_level_code = 2
+      fr8 > 128.0f  -> knock_level_code = 4
+      fr8 > 96.0f   -> knock_level_code = 5
+      fr8 > 64.0f   -> knock_level_code = 6
+      else          -> knock_level_code = 7
+    Note: 0x43600000=224, 0x43200000=160, 0x43000000=128,
+          0x42C00000=96, 0x42800000=64. Likely in dB or ADC counts.
+
+    Additional: if @0x000D2994 != 0xFF: read value; knock_level_code = val & 7
+
+  Step E: FLKC code mapping (0x43D3E-0x43D66)
+    Map knock_level_code -> r4 (FLKC retard code):
+      code 0 -> r4=0   code 2 -> r4=2   code 4 -> r4=4
+      code 5 -> r4=5   code 6 -> r4=6   code 7 -> r4=7
+    Write:
+      @(0xFFFF4309 + cyl_idx) = per-cyl byte from knock struct
+      @(0xFFFF430D + cyl_idx) = r4 (FLKC retard code for this cylinder)
+    GBR restore (ldc.l @r15+,GBR)
+    rts
+
+================================================================================
+STAGE 4: task12_knock_post (0x43D68)
+================================================================================
+Purpose: Reads knock signal vs threshold, calls Pull3DFloat for retard amount.
+         Writes retard magnitude to FLKC struct area via 3D table lookups.
+
+  GBR = 0xFFFF80FC  (knock_det_GBR_base)
+
+  Inputs:
+    fr13 = @0xFFFF6624 (proc_6624 = RPM-like)
+    fr14 = @0xFFFF81F4 (some float)
+    r11  = 0xFFFF8128 (sub-struct base)
+    fr8  = @(r11-32)  (knock struct float)
+    fr12 = @(r11-28)  (another float)
+    fr15 = @0xFFFF81F8
+    r13  = knock_event_flag (GBR+190 = 0xFFFF81BA)
+
+  Threshold check (knock signal gate):
+    fr9 = @0x000D2D60 = 80.0f
+    fr8 > 80.0f  AND  fr12 > 100.0f  -> use "high knock" path
+    else -> use "low knock" path
+
+  High knock path (0x43DAC):
+    fr9 = @0x000D2D6C = 0.0625f  (small retard step)
+    fr8 = @0x000D2D74 = 0.0200f  (very small step)
+
+  Low knock path (0x43DB8):
+    fr9 = @0x000D2D68 = 0.250f   (larger retard step)
+    fr8 = @0x000D2D70 = 0.0625f  (medium step)
+
+  Three Pull3DFloat calls with descriptors:
+    1. 0x000AE0F8 with fr4=fr13 (RPM) -> stored to @(r12-24)
+    2. 0x000AE00C with fr4=fr14       -> stored to @(r12-16)
+    3. 0x000AE020 with fr4=fr15       -> stored to @(r12-12)
+
+  Additional Pull3DFloat: 0x000AE10C with fr4=fr13 -> @(r12-20)
+
+  Scalar check: @0x000D2D78 = 100.0f vs fr12 gates second set of lookups.
+
+================================================================================
+STAGE 5: flkc_path_J (0x045BFE) - Fast-Response FLKC
+================================================================================
+Purpose: Per-cylinder-event FLKC update. Handles:
+  - Detect and respond to new knock events (fast path)
+  - Counter-based recovery when no knock
+  - Recovery halving (0.5x step) on state transitions
+
+  Saves: r11-r14, pr, fr12-fr15
+  Stack temp: 8 bytes (-8 = state byte, +4 = FLKC_work_bank2 save)
+
+  Key register assignments:
+    r1    = 0xFFFF8274 (FLKC_state_base)
+    r13   = knock_event_flag (byte from 0xFFFF81BA)
+    r14   = knock_suppress_flag (byte from 0xFFFF7D18; 1 = suppress FLKC)
+    r12   = FLKC_load_flag (byte from 0xFFFF82A0)
+    fr14  = proc_6624 (RPM-like float)
+    fr8   = FLKC_work_bank2 (saved to @(4,r15))
+    fr13  = FLKC_work_bank1 (@0xFFFF3234)
+    fr12  = @0xFFFF8290
+    fr15  = output of 0x000BE588 call (cyl-indexed axis lookup result)
+    r11   = 0 initially, set to 1 if retard applied this cycle
+
+  Call at 0x45C14: 0x00029858 = tiny function:
+    Reads @pool_addr; if byte == 0: r0=0, else r0=2; rts
+    This returns a "mode byte" saved to @r15 (stack).
+
+  Axis lookup call at 0x45C4E: 0x000BE8AC with descriptor 0x000AE134
+    Input: fr4 = fr14 (RPM), result to @(16,r1) = FLKC_state_base+16
+    Purpose: RPM-indexed threshold for counter comparison
+
+  Main state machine branches:
+
+  BRANCH A (0x45C58): mode_flag (@(4,r1)) == 1  AND  stack_byte == 2
+    -> Reset: counter=0, mode_byte_2=0, timing_state=0, jump to epilogue
+    -> This handles an "abort" or "fuel cut" condition
+
+  BRANCH B (0x45C70): suppress_flag (r14) == 1
+    -> Jump to epilogue immediately: do not update FLKC
+
+  BRANCH C (0x45C78): mode_flag == 1  (FLKC active mode)
+    No-knock sub-path (r13==0, 0x45C7E):
+      counter = @(0,r1) (word)
+      threshold = @(16,r1) (RPM-based threshold)
+      if counter >= threshold:  -> trigger recovery step
+        if @(5,r1)==1 and @(7,r1)==0:  (recovery state, not already recovering)
+          counter = 0
+          fr9 = FLKC_work_bank2 (from @(4,r15))
+          fr8 = 0.5f (0x3F000000)
+          fr9 *= 0.5  -> HALF the current bank2 FLKC value
+          [fall through to accumulate fr9 into fr13 with clamp]
+
+      Knock sub-path (r13!=0, 0x45CD2):  -> new knock event
+        if @(5,r1)==1 and @(7,r1)==1:   (recovery state, recovering)
+          fr9 = @(4,r15) * 0.5          -> half recovery step
+          fr13 += fr9                   -> add to bank1 FLKC
+          fr13 = clamp_float(fr13, ...)
+          r11 = 1                       (mark retard applied)
+          jump to 0x45D04
+        else:
+          counter = @(0,r1)
+          r4 = extu.w(counter)
+          call 0x000BE554 with r4=counter, r5=1 -> returns decremented counter
+          @(0,r1) = r0 (new counter)
+          jump to epilogue (counter decrement only)
+
+    Accumulate + clamp (0x45CAA):
+      fr13 += fr9                  -> accumulate step into FLKC_work_bank1
+      fr4 = fr13
+      call 0x000BE970 (max_float: fr4=value, fr5=fr12 target) -> fr0=max(fr4,fr5)
+      fr13 = fr0
+      r11 = 1, set @(7,r1)=1, set @(5,r1)=1  -> mark recovery active
+      jump to 0x45D04
+
+  BRANCH D (0x45D0E): mode_flag != 1  (FLKC not in active mode)
+    r12 (load_flag) == 1  AND  0x000AE2CC descriptor:
+      Call Pull3DFloat(0x000AE2CC, fr4=fr15)  -> knock retard amount (RPM/load)
+      Store result to @(12,r1) = FLKC_state_base+12
+      fr9 = @(12,r1); fr12 *= fr9  -> scale fr12 by table result
+      @(-4,r1) = fr12
+      fr8 = @(-4,r1); fr13 += fr8
+      call 0x000BE56C (clamp_float):
+        fr4 = fr13, fr5 = fldi0 (0.0), fr6 = fldi1 (1.0) -> clamp to [0,1]
+      Actually: delay slot at 0x45D32 is `F58D fldi0 fr5` and at 0x45D36 `F69D fldi1 fr6`
+      So clamp(fr13, 0.0, 1.0) -> normalized FLKC factor
+      fr13 = fr0
+      call 0x00046A42 with fr4=fr0 -> FLKC output write function
+      -> bra to 0x45D46
+
+  Epilogue (0x45D46):
+    if r11 == 1: (retard was applied this cycle)
+      bsr 0x45F12  -> update FLKC_work_bank1 from state
+      bsr 0x45F68  -> update FLKC_enable_byte and secondary state
+    Restore fr12-fr15, pr, r11-r14; rts
+
+  Sub-function 0x45F12:
+    Saves fr14, fr15, pr; temp stack
+    fr4 = @0xFFFF3234 (FLKC_work_bank1) -> fr14
+    [processes and writes updated bank1 value]
+    Calls 0x000BDBCC (write_float_ptr) for IIR update
+
+  Sub-function 0x45F68:
+    Loads fr8 = @(0xFFFF3244 - 8) = @0xFFFF323C (FLKC_work_bank2)
+    fr9 = @0x000D2EE8 (recovery rate scalar)
+    Manipulates FLKC_enable_byte with AND/OR masks
+    Updates FLKC_enable_byte state bits
+
+================================================================================
+STAGE 6: flkc_paths_FG (0x0463BA) - Sustained Knock State Machine
+================================================================================
+Purpose: Called on a slower (periodic/task) basis. Handles sustained knock
+         state, per-cylinder FLKC accumulation, and recovery.
+
+  Saves: r14, pr, fr12, fr14, fr15; + stc.l GBR,@-r15
+  Stack temp: 76 bytes (0x4C)
+  GBR = 0xFFFF8290  (FLKC_FG_GBR_base)
+
+  Key inputs:
+    fr15 = @0xFFFF8258 (knock_metric - cumulative knock signal float)
+    fr14 = @0xFFFF3234 (FLKC_work_bank1 current value)
+    r1   = @0xFFFF7D18 (knock_suppress_flag)
+    r7   = @0xFFFF81BA (knock_event_flag)
+    r0   = @0xFFFF3244 & 1 (FLKC enable bit)
+    r14  = @0xFFFF3248 (per-cylinder FLKC array base, r14 used as array ptr)
+
+  Pre-computation:
+    fr12 = 1.0 - fr14  (where fr14 = current FLKC_work_bank1)
+    fr12 *= fr15       (= fr15 * (1 - FLKC_work_bank1) : recovery weight)
+    fr8  = -fr15
+    fr8  *= fr14       (= -fr15 * FLKC_work_bank1 : retard weight)
+    Note: This is a decay/approach formula for exponential FLKC control
+
+  State machine entry gates (all must pass to reach main loop):
+    - r2 (from @0xFFFF8233) check: not active condition A -> 0x465A4
+    - GBR+14 == 1: condition B -> 0x465A4 or 0x46788
+    - suppress_flag r1 == 1: -> 0x46788 (skip)
+    - r4 (from 0xFFFF8233) == 0: -> 0x46788 (skip)
+    - r5 (FLKC enable bit) == 1: pass; else -> 0x4679A
+    - r4 == 1: pass; else -> 0x4679A
+
+  Knock event present (r7 != 0): -> 0x46618
+    (separate knock-active processing path)
+
+  No-knock path (r7 == 0, arrives at 0x46468):
+    GBR+12 == 0: -> 0x4659E (no-knock cleanup: zero counters)
+    GBR+12 != 0: compare GBR+26 == GBR+8 (cylinder states)
+      If not equal: -> 0x4659E
+
+    GBR+4 counter >= @0x000D29EE threshold (= 0x007D = 125):
+      -> begin FLKC retard accumulation:
+
+      Gate: fr15 (knock_metric) > 100.0f (@0x000D2F40):
+        -> skip to 0x46534 (no retard if metric too high)
+      Gate: fr4 <= 0.0f:
+        -> skip to 0x46534 (fr4 must be positive knock contribution)
+      Gate: fr4 > fr12 (above recovery weight threshold):
+        -> skip to 0x46534
+
+      RETARD application (0x464AE):
+        fr8 = @0x000D2F48 = 0.35f  (FLKC retard step per event)
+        fr4 += 0.35f               (add retard step)
+        fr5 = fr4  (backup)
+        call max_float(fr4, fr12)  -> fr0 = max(fr4, fr12)
+        fr4 = fr0
+        call clamp_float(fr4, fr5=-11.75f, fr6=8.0f):
+          fr5 = @0x000D2F4C = -11.75f  (FLKC minimum = max retard)
+          fr6 = @0x000D2F44 = 8.0f     (FLKC maximum = recovery cap)
+        fr5 = fr0 (clamped result)
+        @r15 = fr0 (save to stack)
+
+        Cylinder indexing:
+          r2 = GBR+8 (cyl_idx); r2 = cyl_idx * 8 (via shll2 + shll)
+          r14 += r2 (r14 now points to percyl FLKC entry for this cyl)
+        call write_float_ptr(r4=r14, fr4=fr0):
+          -> writes FLKC value to @(0xFFFF3248 + cyl_idx*8)
+
+        call Pull2DFloat(0x000BE608, fr4=fr12, fr5=@r15, fr6=0.3516f):
+          0x3EB40000 = 0.35156f ~ 0.35 (same as step size, used as blend factor)
+          Returns r0 = 0 or 1 (whether to apply output)
+
+        if r0 == 1:
+          call 0x000BE9A0(r4=1) -> get word result r0
+          @(0xFFFF3360 + cyl_idx*2) = r0 (write per-cyl output word)
+
+        call FLKC_commit_write(0x00045EEA):
+          -> updates FLKC_state (GBR+13=1, GBR+4=0)
+
+  Recovery path (0x46520-0x46532):
+    if GBR+17 == 1:
+      fr8 = @0x000D2F58 = 0.35f   (recovery rate)
+    else:
+      fr8 = @0x000D2F54 = 0.35f   (also 0.35f - same value in both paths)
+    @0xFFFF8290 = fr8  (write recovery rate to GBR base)
+    jump to 0x46734
+
+  Reset path (0x46824-0x46840) - occurs on mode transitions:
+    Zero all 35 entries of FLKC_percyl_arr (0xFFFF3248):
+      loop: write_float_ptr(0xFFFF3248 + i*8, 0.0f) for i=0..34
+
+  Post-loop common path (0x4679A):
+    Calls helper at 0x46856 to check knock_event_flag
+    If no knock: counter = @0xFFFF8294 + 1 (unless overflow to 0xFFFF)
+    If knock: counter = 0
+
+================================================================================
+HELPER FUNCTIONS
+================================================================================
+
+  0x000BE56C  clamp_float(fr4, fr5=lo, fr6=hi) -> fr0
+    if fr4 <= fr5: return fr5  (clamped to lower bound)
+    if fr4 >= fr6: return fr6  (clamped to upper bound)
+    else: return fr4
+
+  0x000BE970  max_float(fr4, fr5) -> fr0
+    return max(fr4, fr5)
+
+  0x000BDBCC  write_float_ptr(r4=ptr, fr4=value) -> IIR write
+    r14 = r4 (destination pointer)
+    fr14 = fr4 (new value)
+    Checks mode/flag; applies with possible IIR blend
+    Calls sub-functions for actual store
+
+  0x00029858  get_mode_byte() -> r0
+    Loads byte from ROM constant; returns 0 or 2
+
+  0x000BE588  axis_lookup(r4=index, fr4=1.0, fr5=0.0) -> r0
+    Cylinder-indexed axis lookup (unsigned byte out)
+
+  0x000BE8AC  table_lookup(r4=descriptor, fr4=input) -> r0
+    Single-axis pull (similar to Pull2DFloat but different format)
+
+  0x00045EEA  FLKC_commit_write():
+    Writes GBR+13=1 (FLKC_state_29D = knock active)
+    Resets GBR+4=0 (FLKC_counter = 0)
+    AND/OR operations on FLKC_enable_byte (masks 0xFC, 0x02, 0xF3, 0x08)
+    Multiple branches based on enable byte state
+
+================================================================================
+KEY CALIBRATION TABLE VALUES (ROM constants)
+================================================================================
+
+  Address      Value     Description
+  ----------   -------   -----------------------------------------
+  0x000D2F40   100.0f    FLKC gate threshold (knock_metric max to allow retard)
+  0x000D2F44   8.0f      FLKC upper clamp limit (max recovery advance cap)
+  0x000D2F48   0.35f     FLKC retard step per knock event (degrees/event)
+  0x000D2F4C   -11.75f   FLKC lower clamp (max retard = -11.75 degrees)
+  0x000D2F54   0.35f     FLKC recovery rate, path 1 (degrees/cycle)
+  0x000D2F58   0.35f     FLKC recovery rate, path 2 (degrees/cycle)
+  0x000D2D54   12799.8f  RPM threshold for knock gating (~7200 RPM scaled)
+  0x000D2D58   12799.8f  RPM threshold (same value, 2nd compare)
+  0x000D2D60   80.0f     Knock signal lower threshold (task12_knock_post)
+  0x000D2D64   100.0f    Knock signal upper threshold (task12_knock_post)
+  0x000D2D68   0.250f    Low-knock retard step (task12)
+  0x000D2D6C   0.0625f   High-knock small step (task12)
+  0x000D2D70   0.0625f   High-knock step alt (task12)
+  0x000D2D74   0.020f    Very small step (task12)
+  0x000D2D78   100.0f    Secondary gate threshold (task12)
+  0x000D29DC   0x00FA/0x007D  RPM thresholds: 250, 125 (word array)
+  0x000D29EE   0x007D    FLKC counter threshold: 125 cycles before recovery
+  0x43600000   224.0f    Knock intensity band threshold (max)
+  0x43200000   160.0f    Knock intensity band threshold 2
+  0x43000000   128.0f    Knock intensity band threshold 3
+  0x42C00000   96.0f     Knock intensity band threshold 4
+  0x42800000   64.0f     Knock intensity band threshold 5
+
+  RPM SCALING: proc_6624 (0xFFFF6624) stores RPM * (16/9) ~= RPM * 1.7778
+    -> 12799.8 / 1.7778 = ~7200 RPM (redline gate threshold)
+
+  FLKC SIGN CONVENTION: Positive value = retard (contrary to RomRaider display)
+    Working range: -11.75 to 8.0 degrees
+    Step on knock: +0.35 (more retard)
+    Recovery: -0.35 per cycle (less retard, toward 0)
+    Note: 0xFFFF93E0 (FLKC displayed by RomRaider) may use different scaling/sign
+
+================================================================================
+3D TABLE DESCRIPTORS (Pull3DFloat calls)
+================================================================================
+
+  Descriptor    Used in           Purpose
+  -----------   ---------------   ------------------------------------------
+  0x000AE284    knock_detector    RPM/load-indexed knock threshold (main)
+  0x000AE290    knock_detector    Second knock signal table
+  0x000AE0F8    task12_knock_post Per-cycle retard amount lookup 1
+  0x000AE00C    task12_knock_post Per-cycle retard amount lookup 2
+  0x000AE020    task12_knock_post Per-cycle retard amount lookup 3
+  0x000AE10C    task12_knock_post Per-cycle retard amount lookup 4
+  0x000AE134    flkc_path_J       RPM-indexed FLKC threshold
+  0x000AE2CC    flkc_path_J       Per-cyl knock retard amount
+
+================================================================================
+CALL FLOW DIAGRAM
+================================================================================
+
+  Scheduler (0x4A94C)
+      |
+      v
+  knock_wrapper (0x43750)
+      |--- gate: cyl must be in {0,6,12,18}
+      |--- gate: knock_status < 4
+      v
+  knock_detector (0x43782)
+      |--- ADC snapshot analysis
+      |--- 3D table knock threshold
+      |--- Per-cyl IIR float accumulation (fmac)
+      |--- Outputs: knock_event_flag, knock_level_code
+      v
+  knock_wrapper_cont (0x43B7C)   [bra from wrapper after detector returns]
+      |--- RPM gate check (7200 RPM threshold)
+      |--- Intensity classification (0/2/4/5/6/7)
+      |--- Writes to knock_percyl_float array
+      |--- Writes FLKC code to 0xFFFF430D
+      v
+  task12_knock_post (0x43D68)    [separate periodic task]
+      |--- 4x Pull3DFloat for retard magnitude tables
+      |--- Threshold: 80.0 / 100.0 for high/low knock paths
+      v
+  flkc_path_J (0x45BFE)          [fast, per-event]
+      |--- Check knock_event_flag + suppress_flag
+      |--- Mode state machine (active / recovering)
+      |--- Recovery: counter >= RPM_threshold -> halving step (0.5x)
+      |--- Retard: add to FLKC_work_bank1/2
+      |--- Calls write_float_ptr for per-bank FLKC update
+      v
+  flkc_paths_FG (0x463BA)        [slower, sustained state]
+      |--- Exponential approach: fr12 = fr15*(1-FLKC), fr8 = -fr15*FLKC
+      |--- Retard step: +0.35 (if knock_metric <= 100 and conditions met)
+      |--- Clamp: [-11.75, 8.0] degrees
+      |--- Per-cyl array update: 0xFFFF3248[cyl_idx*8]
+      |--- Recovery: 0.35 deg/cycle via 0x000D2F54/58
+      |--- Counter gate: 125 cycles (0x000D29EE) before recovery begins
+      v
+  FLKC_commit_write (0x45EEA)    [at end of retard application]
+      |--- Updates FLKC_state_29D = 1 (knock active state)
+      |--- Resets FLKC_counter to 0
+      v
+  [Separate function ~0x73600]   [maps working FLKC to 0xFFFF93E0/93DC]
+      |--- 0xFFFF93E0 = FLKC  (viewable in RomRaider)
+      |--- 0xFFFF93DC = FBKC
+
+================================================================================
+OPEN QUESTIONS
+================================================================================
+
+  1. proc_6624 (0xFFFF6624): Confirmed as RPM-scaled variable (RPM * 16/9).
+     Source: unknown - likely computed from crank timer ISR.
+
+  2. proc_63F8 (0xFFFF63F8): Load-like variable used as Y-axis in 3D tables.
+     Likely MAP or normalized load. Needs further tracing.
+
+  3. 0xFFFF8258 (knock_metric): Cumulative knock signal used as fr15 in
+     flkc_paths_FG. Computed elsewhere; used as exponential weight.
+
+  4. FLKC sign convention for 0xFFFF93E0: The working values are positive=retard
+     in the [-11.75, 8.0] range. RomRaider displays as negative degrees.
+     Likely inverted/scaled in the commit function at ~0x73600.
+
+  5. Per-bank vs per-cylinder: 0xFFFF3234 and 0xFFFF323C appear to be two
+     separate bank values (EJ engines: bank1=cyl 1&3, bank2=cyl 2&4).
+     The per-cylinder array at 0xFFFF3248 provides finer granularity.
+
+  6. IAM interaction: IAM (0xFFFF9270) not directly referenced in these paths.
+     IAM is likely updated separately based on cumulative FLKC state.
+     FBKC (0xFFFF93DC) is referenced in the same commit function as FLKC.
+
+================================================================================
+END OF REPORT
+================================================================================
