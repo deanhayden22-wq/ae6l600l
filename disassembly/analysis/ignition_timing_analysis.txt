@@ -1,0 +1,674 @@
+================================================================================
+IGNITION TIMING PIPELINE -- COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2A)
+================================================================================
+
+
+OVERVIEW
+--------
+The ignition timing system is the largest single subsystem in the ECU,
+spanning scheduler tasks 0-50 (with gaps). It computes per-cylinder
+spark advance from base maps, corrections, and knock feedback, then
+outputs the final timing to the ignition coil drivers.
+
+The pipeline flows in three phases:
+
+  Phase 1: BASE TIMING         tasks 49, 50, 30, 31, 32
+  Phase 2: CORRECTIONS         tasks 33-37, 38-41, 42-45, 46-47
+  Phase 3: FINAL OUTPUT        tasks 48, 0, 29, 1, 27
+
+Knock detection and feedback runs as a parallel subsystem through
+tasks 2-28 (already analyzed in knock_flkc_analysis.txt).
+
+
+================================================================================
+SECTION 1: PIPELINE ARCHITECTURE
+================================================================================
+
+  The timing pipeline executes each scheduler cycle in this order:
+
+  PHASE 1 -- BASE TIMING COMPUTATION
+  -----------------------------------------------------------------------
+  [49] task49_base_advance    @ 0x3F00C   Base advance map selection
+  [50] task50_timing_blend_int @ 0x3F368  Timing blend interpolation
+  [30] task30_base_timing     @ 0x3FCA2   Primary base timing lookup
+  [31] task31_timing_blend_ratio @ 0x3FFD6 Blend ratio calculation
+  [32] task32_timing_blend_app @ 0x4004A  Apply timing blend
+
+  PHASE 2 -- CORRECTIONS & COMPENSATION
+  -----------------------------------------------------------------------
+  [33] task33_timing_ws_init  @ 0x40918   Workspace initialization
+  [34] task34_timing_throttle @ 0x40516   Throttle-based timing corr
+  [35] task35_timing_corr     @ 0x418AC   General timing correction
+  [36] task36_timing_percond  @ 0x415B8   Per-condition corrections
+  [37] task37_timing_multiaxis @ 0x419BA  Multi-axis correction
+  [38] task38_ign_output      @ 0x42A78   Ignition output calc (dwell)
+  [39] task39_ign_maf_corr    @ 0x42B90   MAF-based correction
+  [40] task40_ign_calc_a      @ 0x42D20   Ignition calc stage A
+  [41] task41_ign_calc_b      @ 0x42D54   Ignition calc stage B
+  [42] task42_timing_comp_b   @ 0x42F48   IAM/knock timing compensation
+  [43] task43_timing_out_load @ 0x4322A   Load-dependent timing output
+  [44] task44_timing_lu_a     @ 0x4317A   Timing lookup A
+  [45] task45_timing_lu_b     @ 0x431B0   Timing lookup B (ECT-indexed)
+  [46] task46_inj_mps_timing  @ 0x43368   MPS-based injection timing
+  [47] task47_mapswitch_lowpw @ 0x43464   Map switch / low PW handler
+
+  PHASE 3 -- FINAL TIMING & PER-CYLINDER APPLICATION
+  -----------------------------------------------------------------------
+  [48] task48_final_timing    @ 0x4359C   Final timing computation
+  [ 0] task00_timing_percyl   @ 0x44188   Per-cylinder timing (primary)
+  [29] task29_timing_percyl   @ 0x44296   Per-cylinder timing (secondary)
+  [ 1] task01_knock_timing_fb @ 0x45970   Knock timing feedback
+  [27] task27_knock_timing    @ 0x46296   Knock timing retard application
+
+
+================================================================================
+SECTION 2: PHASE 1 -- BASE TIMING
+================================================================================
+
+  task49_base_advance @ 0x3F00C
+  -----------------------------------------------------------------------
+  Selects and computes the base timing advance value. This is the
+  starting point for all timing calculations.
+
+  Inputs:
+    FFFF6624  engine_load (float)
+    FFFF65FC  manifold_pressure (float)
+    FFFF6350  rpm_current (float)
+    FFFF63F8  iat_current (float)
+    FFFF62F8  ect_derived (float)
+    FFFF62FC  secondary_load (float)
+    FFFF7354  throttle_filtered (float)
+    FFFF73E8  fuel_system_related (float)
+    FFFF805C  timing_workspace (float)
+    FFFF620C  speed_related (float)
+    FFFF64F5  engine_state_byte
+
+  Process:
+    1. Sets GBR = 0xFFFF7EC0 (timing base workspace)
+    2. Calls check_engine_status (0x3AB20)
+    3. Reads descriptors at 0xADAFC and 0xADB10 (base timing maps)
+       via table_desc_2d_typed (0xBE8E4/0xBE830)
+    4. Applies enable conditions:
+       - RPM > 120 threshold (cal 0xD2A50 = 120)
+       - RPM < 60 for alternate path (cal 0xD2A54 = 60)
+       - Load threshold (cal 0xD2A5C = 13)
+       - Blend factor = 0.7 (cal 0xD2A60, 0xD2A64)
+    5. Stores base advance to workspace at GBR-relative offsets
+
+  Key calibrations:
+    0xD2A50 = 120.0   RPM high threshold
+    0xD2A54 = 60.0    RPM low threshold
+    0xD2A58 = 0.0     minimum advance
+    0xD2A5C = 13.0    load threshold
+    0xD2A60 = 0.7     blend factor A
+    0xD2A64 = 0.7     blend factor B
+    0xD2A9C = 12000.0 RPM ceiling
+    0xD2AA0 = 5.0     advance step
+
+  Output:
+    FFFF7EC0+ workspace (GBR-relative, multiple floats)
+
+
+  task50_timing_blend_int @ 0x3F368
+  -----------------------------------------------------------------------
+  Computes the blend interpolation between two timing maps.
+  Used for smooth transitions between operating regions.
+
+  Inputs:
+    FFFF6624  engine_load
+    FFFF65FC  manifold_pressure
+    FFFF6350  rpm_current
+    FFFF62F8  ect_derived
+    FFFF5BE3  engine_state_byte_B
+    FFFF65BF  running_flag
+    FFFF7D18  fuel_system_state
+    FFFF7E90  GBR base (blend workspace)
+    FFFF7FBC  timing_correction
+    FFFF81DC  knock_related
+    FFFF8258  flkc_related
+    FFFF85D7  warmup_complete
+    FFFF8F16  blend_state_A
+    FFFF8F24  blend_state_B
+    FFFF7F04  blend_intermediate_A
+    FFFF7F0C  blend_intermediate_B
+    FFFF7F1C  blend_intermediate_C
+    FFFF7F68  blend_output
+
+  Key calibrations:
+    0xD2A08 = 2000.0   RPM blend threshold
+    0xD2A0C = 0.88     blend coefficient
+    0xD2A10 = 2.0      blend exponent/factor
+    0xD2A14 = 550.0    low RPM blend start
+    0xD2A18 = 1300.0   mid RPM blend point
+    0xD2A1C = 80.0     load blend threshold
+    0xD2A34 = 0.0      minimum blend
+    0xD2A38 = 4.0      maximum blend steps
+
+  This task is the core of the dual-map blending system used by Subaru
+  ECUs. It interpolates between the "primary" and "secondary" timing
+  maps based on operating conditions (RPM, load, warmup state).
+
+
+  task30_base_timing @ 0x3FCA2
+  -----------------------------------------------------------------------
+  Primary base timing table lookup. Uses the output from task49/50
+  along with current engine conditions to look up the base timing
+  advance from 2D maps.
+
+  Inputs (14 RAM addresses):
+    FFFF6624  engine_load
+    FFFF65FC  manifold_pressure
+    FFFF6350  rpm_current
+    FFFF6354  rpm_secondary
+    FFFF63F8  iat_current
+    FFFF67EC  engine_run_time (u16)
+    FFFF6898  secondary_input
+    FFFF5DB8  condition_flag_A
+    FFFF5BE2  engine_state_byte_A
+    FFFF8BA1  boost_flag
+    FFFF3158  diagnostic_flag
+    FFFF8910  system_state
+    FFFF7F10  GBR base (base timing workspace)
+    FFFF7F64  output_workspace
+
+  Process:
+    1. Sets GBR = 0xFFFF7F10
+    2. Loads all sensor inputs
+    3. Calls sub 0x40314 (pre-calculation)
+    4. Looks up descriptor 0xADB38 via table_desc_2d (primary map)
+    5. Looks up descriptor 0xADB9C via table_desc_2d (secondary map)
+    6. Applies deadband check (float_deadband_check)
+    7. Clamps result with float_min/float_max
+    8. Applies startup corrections using 1D table lookup
+
+  Key calibrations:
+    0xD2ADC = 4.0     minimum RPM multiplier
+    0xD2AE0 = 20.0    advance limit
+    0xD2AE4 = 0.07    deadband threshold
+    0xD2AE8 = 10.0    startup correction
+    0xD2AF0 = 600.0   warmup RPM threshold
+    0xD2AF4 = 69.65   temperature threshold (deg C?)
+
+  Key descriptors:
+    0xADB38  Primary base timing map (2D, RPM x Load -> advance)
+    0xADB9C  Secondary base timing map (2D, RPM x Load -> advance)
+
+
+  task31/32 -- Blend Ratio and Application
+  -----------------------------------------------------------------------
+  task31 computes the blend ratio between primary and secondary maps.
+  task32 applies the blend to produce the working base timing value.
+
+  task32 calls check_engine_running (0x582D2) and uses descriptors
+  for the blended timing output. Blend threshold = 6000 RPM (0xD2B14).
+
+
+================================================================================
+SECTION 3: PHASE 2 -- CORRECTIONS
+================================================================================
+
+  task33_timing_ws_init @ 0x40918
+  -----------------------------------------------------------------------
+  Initializes the timing correction workspace. Reads throttle_pos and
+  fuel_system_state. Prepares workspace at GBR=0xFFFF7FD4 for
+  subsequent correction tasks. References 30 descriptors -- the largest
+  descriptor count of any single task, indicating this initializes
+  lookup data for all correction stages.
+
+  task34_timing_throttle @ 0x40516
+  -----------------------------------------------------------------------
+  Throttle-based timing correction. Uses 8 descriptors including
+  2D maps of 9x3, 9x9, and 9x2 dimensions. Produces throttle-
+  dependent advance/retard stored at FFFF7F82.
+
+  task35_timing_corr @ 0x418AC
+  -----------------------------------------------------------------------
+  General timing correction. Reads:
+    FFFF7BE4  transient_fuel_comp
+    FFFF798C  fuel_trim_related
+    FFFF8010  correction_workspace
+  Uses descriptor 0xAE164 (1D table) for correction lookup.
+  Clamps result via float_max.
+
+  task36_timing_percond @ 0x415B8
+  -----------------------------------------------------------------------
+  Per-condition timing corrections. The most complex correction task.
+  Uses 11 descriptors with 2D maps indexed by:
+    - RPM x ECT (16x2, 8x2 maps)
+    - RPM x Load (16x6 map)
+  Reads engine_load, ect, iat, rpm, fuel_system_state.
+  GBR = 0xFFFF8000 (correction workspace).
+
+  Key calibrations:
+    0xD2BF0 = 4.0     correction scale
+    0xD2BF4 = 0.7     blend factor
+    0xD2BF8 = 0.02    step size
+    0xD2C04 = 0.003   minimum step
+    0xD2C08 = -20.0   maximum retard (degrees)
+
+  task37_timing_multiaxis @ 0x419BA
+  -----------------------------------------------------------------------
+  Multi-axis timing correction. Uses 19 descriptors (second largest
+  descriptor count). Applies corrections indexed across multiple
+  operating axes simultaneously. Output at FFFF802E.
+
+
+  task38_ign_output @ 0x42A78 (Dwell & Coil Control)
+  -----------------------------------------------------------------------
+  Computes ignition output parameters including coil dwell time.
+
+  Inputs:
+    FFFF6624  engine_load
+    FFFF6350  rpm_current
+    FFFF65C0  engine_state
+    FFFF5BE2  condition_flags
+    FFFF65BF  running_flag
+    FFFF8910  system_state
+    FFFF895C  AFL_value
+    FFFF8098  ign_output_workspace
+    FFFF80AE  dwell_output
+
+  Key calibrations:
+    0xD2CB0 = 850.0   idle RPM reference
+    0xD2CB4 = 300.0   minimum RPM for dwell calc
+    0xD2CB8 = 75.0    dwell time base (degrees or usec?)
+
+  Calls 0x278D2 (dwell calculator) and 0xBEAB0 (output driver).
+
+
+  task39_ign_maf_corr @ 0x42B90
+  -----------------------------------------------------------------------
+  MAF-based ignition correction. Reads maf_correction and applies
+  a 1D correction factor. Scale = 0.75 (0xD2CBC).
+
+  task40/41 -- Ignition Calculation Stages
+  -----------------------------------------------------------------------
+  task40: RPM/IAT-indexed calculation. Thresholds: 1000 RPM (0xD2CC0),
+          0.5 factor (0xD2CC4).
+  task41: Final calc with clamping. Range: -4.5 to +4.0 degrees
+          (0xD2CC8/-4.5, 0xD2CCC/4.0).
+
+
+  task42_timing_comp_b @ 0x42F48 (IAM/Knock Compensation)
+  -----------------------------------------------------------------------
+  The critical IAM-dependent timing compensation. This is where the
+  ECU applies learned knock compensation to the base timing.
+
+  Inputs:
+    FFFF6364  knock_signal
+    FFFF322C  fine_knock_learn (FLKC slow value)
+    FFFF3234  knock_learn_coarse
+    FFFF81BA  knock_state_flag
+    FFFF7BE2  fuel_system_state (CL/OL)
+    FFFF7BE1  fuel_state_B
+    FFFF7BE0  fuel_state_C
+    FFFF80C0  compensation_workspace
+    FFFF8258  flkc_retard
+    FFFF8260  flkc_retard_B
+
+  Process:
+    1. Reads FLKC slow learning value (FFFF322C) and coarse (FFFF3234)
+    2. Checks fuel system state (CL/OL)
+    3. If CL and FLKC > 0.6 threshold (0xD2CF4):
+       - Applies IAM-dependent compensation
+       - Reads compensation map via descriptor 0xADFAC
+       - Steps compensation by 0.1 deg (0xD2CE0, 0xD2CE4)
+       - Clamps between 0 and 3 degrees (0xD2CE8, 0xD2CD8)
+    4. If knock detected:
+       - Uses max retard of 3 degrees (0xD2CEC)
+       - Blend factor 0.5 (0xD2CF0)
+    5. Stores result to FFFF80C0+
+
+  Key calibrations:
+    0xD2CD4 = 0.01    minimum increment
+    0xD2CD8 = 3.0     maximum compensation (degrees)
+    0xD2CDC = 1.0     unity scaling
+    0xD2CE0 = 0.1     step size up
+    0xD2CE4 = 0.1     step size down
+    0xD2CE8 = 0.0     minimum compensation
+    0xD2CEC = 3.0     max retard
+    0xD2CF4 = 0.6     FLKC threshold to activate compensation
+
+  task43-45 -- Load/ECT-Dependent Timing
+  -----------------------------------------------------------------------
+  task43: Load-dependent output timing using descriptor 0xADFD4 (1D).
+          Reads RPM, IAT, MAF for indexing.
+  task44: Maturation/filtering stage (uint8_add_sat for counter).
+  task45: ECT-indexed timing lookup via descriptor 0xAE530 (2D, 16x7).
+          Also uses 0xADFC0. Clamp range applied.
+
+  task46/47 -- Injection/Map Switch Timing
+  -----------------------------------------------------------------------
+  task46: MPS-based injection timing. Uses 3 descriptors for MPS-
+          dependent timing offsets. Output at FFFF80E4.
+  task47: Map switch and low-PW handler. Checks engine_load, rpm,
+          ect. Multiple calibration thresholds for transitions between
+          timing maps. Significant: cal 0xD2D20=100, 0xD2D28=10000,
+          0xD2D38=11000 suggest RPM or load boundaries.
+
+
+================================================================================
+SECTION 4: PHASE 3 -- FINAL TIMING & PER-CYLINDER
+================================================================================
+
+  task48_final_timing @ 0x4359C
+  -----------------------------------------------------------------------
+  Computes the final combined timing advance by aggregating all
+  corrections onto the base timing value.
+
+  Inputs:
+    FFFF6624  engine_load
+    FFFF63F8  iat_current
+    FFFF65C0  engine_state
+    FFFF6812  cylinder_index
+    FFFF80F8  final_timing_output
+
+  Process:
+    1. Calls 0x299BC (transient_state_check)
+    2. Calls 0x297A0 (condition_evaluator)
+    3. Calls 0x22CF4 (engine_mode_check)
+    4. Calls 0x1CF16 (timing_mode_selector)
+    5. Reads cylinder index from FFFF6812
+    6. Looks up 5 descriptors (0xAE54C-0xAE5BC), all 2D 5x3 maps
+       These are per-condition final timing adjustments
+    7. Calls sub 0x436B6 (final combiner)
+    8. Branches based on engine state:
+       - State 1: cranking timing path (bt 0x4369E)
+       - State 2: warmup timing path (bt 0x43682)
+       - Normal: full timing computation
+    9. Stores final advance to FFFF80F8
+
+  Key calibrations:
+    0xD2D48 = 0.0     default correction offset
+
+  Descriptors (5x 2D maps, 5x3):
+    0xAE54C  Final timing map A
+    0xAE568  Final timing map B
+    0xAE584  Final timing map C
+    0xAE5A0  Final timing map D
+    0xAE5BC  Final timing map E
+
+
+  task00_timing_percyl @ 0x44188 (Primary Per-Cylinder)
+  -----------------------------------------------------------------------
+  Applies the final timing advance on a per-cylinder basis.
+  This is scheduler task 0 -- highest priority, runs first.
+
+  Inputs:
+    FFFF6624  engine_load
+    FFFF63F8  iat_current
+    FFFF6350  rpm_current
+    FFFF81E8  per_cylinder_timing_array
+
+  Process:
+    1. Calls 0x2F8EA (check_conditions)
+    2. Gate checks:
+       - RPM < 7000 (cal 0xD2D98 = 7000)
+       - IAT > 0 (cal 0xD2D9C = 0)
+       - RPM_secondary < 60 (cal 0xD2DA0 = 60)
+       - Condition flag must be 0
+    3. If all gates pass, looks up 4 descriptors:
+       Descriptor 0xAE5D8: per-cyl correction A (load x iat indexed)
+       Descriptor 0xAE5F4: per-cyl correction B
+       Descriptor 0xAE610: per-cyl correction C
+       Descriptor 0xAE62C: per-cyl correction D
+    4. Stores corrections to FFFF81E8+offset for each cylinder
+       Uses negative offsets: -12, -8, -4, +0 for 4 cylinders
+
+  Key calibrations:
+    0xD2D98 = 7000.0  RPM gate (per-cyl timing only above this RPM)
+    0xD2D9C = 0.0     IAT minimum
+    0xD2DA0 = 60.0    RPM secondary threshold
+
+  NOTE: The 7000 RPM gate means per-cylinder timing corrections are
+  only active at high RPM. Below 7000 RPM, all cylinders get the
+  same timing from task48.
+
+
+  task29_timing_percyl @ 0x44296 (Secondary Per-Cylinder)
+  -----------------------------------------------------------------------
+  Secondary per-cylinder timing computation. Reads maf_current and
+  accesses the FLKC/knock workspace at FFFF81F0, FFFF8260, FFFF828C.
+  Calls 0x29858 and 0x2997C (transient/condition helpers).
+  No calibration constants -- purely computed from workspace values.
+
+
+  task01_knock_timing_fb @ 0x45970
+  -----------------------------------------------------------------------
+  Knock timing feedback -- applies knock-learned retard to the
+  final timing advance.
+
+  Inputs:
+    FFFF63F8  iat_current
+    FFFF7F4C  timing_workspace
+    FFFF90A8  timing_state
+    FFFF826C  knock_retard_value
+    FFFF8214  knock_history
+    FFFF8204  knock_flag_computed
+    FFFF821C  knock_threshold
+    FFFF8218  knock_level
+
+  Uses 3 descriptors:
+    0xAE664  Knock retard map
+    0xAE680  Knock compensation map A
+    0xAE69C  Knock compensation map B
+
+  These are the "Knock Retard" and related tables from the
+  RomRaider/EcuFlash definitions -- 2D maps indexed by RPM x load.
+
+
+  task27_knock_timing @ 0x46296
+  -----------------------------------------------------------------------
+  Applies the knock-computed timing retard to the per-cylinder values.
+
+  Inputs:
+    FFFF822D  knock_event_type (byte)
+    FFFF3248  knock_retard_array (indexed by cylinder, float[4])
+    FFFF8298  current_cylinder_index
+    FFFF6790  knock_active_flag
+    FFFF81BA  knock_state
+    FFFF826C  knock_retard_accumulator
+    FFFF8268  knock_retard_secondary
+
+  Process:
+    1. Reads current cylinder index from FFFF8298
+    2. Indexes into knock retard array: FFFF3248[cyl * 8]
+    3. Checks knock event type:
+       - Type 10 (0x0A): active knock event
+       - Type 98 (0x62): secondary knock event
+    4. For active knock:
+       - If knock_active=1 and knock_state=0: apply retard
+       - Calls float_min(retard, 0) to ensure negative (retard only)
+       - Uses float_lerp with rate 0.02 (0xD2F3C) for smooth application
+    5. Stores per-cylinder retard at FFFF8298[-12] (float)
+
+  The 0.02 learning rate means knock retard is applied gradually --
+  approximately 2% per cycle toward the target retard value.
+
+
+================================================================================
+SECTION 5: IGNITION OUTPUT HARDWARE
+================================================================================
+
+  task38_ign_output @ 0x42A78 handles the interface to the ignition
+  coil drivers.
+
+  Dwell Calculation:
+    Base dwell referenced at idle (850 RPM, cal 0xD2CB0)
+    Minimum RPM for dwell = 300 (0xD2CB4)
+    Dwell angle = 75 degrees (0xD2CB8)
+
+  The coil dwell time is computed from RPM and battery voltage
+  (via the dwell calculator at 0x278D2), then the actual firing
+  angle is set by subtracting dwell from the commanded advance.
+
+  Final output is written via 0xBEAB0 (ignition output driver)
+  which programs the ATU (Auto-Timer Unit) hardware on the SH7058
+  for crank-angle-synchronized coil firing.
+
+
+================================================================================
+SECTION 6: KEY RAM ADDRESS MAP
+================================================================================
+
+  Address       Type    Description
+  -----------------------------------------------------------------------
+  FFFF6350      float   rpm_current (primary)
+  FFFF6354      float   rpm_secondary
+  FFFF63F8      float   iat_current
+  FFFF6624      float   engine_load (301 refs -- core variable)
+  FFFF65FC      float   manifold_pressure
+  FFFF65C0      u8      engine_state_byte
+  FFFF65BF      u8      running_flag
+  FFFF6812      u8      cylinder_index (0-3)
+  FFFF6898      float   secondary_input
+  FFFF67EC      u16     engine_run_time (seconds)
+  FFFF7EC0      --      GBR base: task49 workspace (base advance)
+  FFFF7E90      --      GBR base: task50 workspace (blend)
+  FFFF7F10      --      GBR base: task30 workspace (base timing)
+  FFFF7F0C      --      GBR base: task32 workspace (blend app)
+  FFFF7FD4      --      GBR base: task33 workspace (corrections init)
+  FFFF8000      --      GBR base: task36 workspace (per-condition)
+  FFFF7F64      float   base_timing_output
+  FFFF80F8      float   final_timing_advance
+  FFFF8098      float   ign_output_workspace
+  FFFF80AE      float   dwell_output
+  FFFF80C0      float   IAM_compensation_workspace
+  FFFF80C8      float   load_timing_output
+  FFFF80E4      float   mps_timing_output
+  FFFF81E8      float[4] per_cylinder_timing_corrections
+  FFFF322C      float   FLKC_slow_learning_value
+  FFFF3234      float   knock_learn_coarse
+  FFFF3248      float[4] per_cylinder_knock_retard
+  FFFF8258      float   flkc_retard
+  FFFF8260      float   flkc_retard_B
+  FFFF826C      float   knock_retard_accumulator
+  FFFF8268      float   knock_retard_secondary
+  FFFF8298      u8      current_cylinder_index
+  FFFF822D      u8      knock_event_type
+
+
+================================================================================
+SECTION 7: KEY CALIBRATION MAP
+================================================================================
+
+  Address   Value     Task    Description
+  -----------------------------------------------------------------------
+  0xD2A50   120.0     49      RPM high threshold for base advance
+  0xD2A54   60.0      49      RPM low threshold
+  0xD2A5C   13.0      49      Load threshold
+  0xD2A60   0.7       49      Blend factor A
+  0xD2A64   0.7       49      Blend factor B
+  0xD2A9C   12000.0   49      RPM ceiling
+  0xD2A08   2000.0    50      RPM blend threshold
+  0xD2A0C   0.88      50      Blend coefficient
+  0xD2A14   550.0     50      Low RPM blend start
+  0xD2A18   1300.0    50      Mid RPM blend point
+  0xD2A1C   80.0      50      Load blend threshold
+  0xD2ADC   4.0       30      Min RPM multiplier
+  0xD2AE0   20.0      30      Advance limit
+  0xD2AE4   0.07      30      Deadband threshold
+  0xD2AE8   10.0      30      Startup correction
+  0xD2AF0   600.0     30      Warmup RPM threshold
+  0xD2AF4   69.65     30      Temperature threshold (deg C)
+  0xD2B14   6000.0    32      Blend RPM threshold
+  0xD2BF0   4.0       36      Per-cond correction scale
+  0xD2BF4   0.7       36      Per-cond blend factor
+  0xD2BF8   0.02      36      Per-cond step size
+  0xD2C04   0.003     36      Per-cond minimum step
+  0xD2C08   -20.0     36      Maximum retard (degrees)
+  0xD2CB0   850.0     38      Idle RPM for dwell
+  0xD2CB4   300.0     38      Minimum RPM for dwell
+  0xD2CB8   75.0      38      Dwell angle (degrees)
+  0xD2CC0   1000.0    40      RPM threshold
+  0xD2CC4   0.5       40      Scale factor
+  0xD2CC8   -4.5      41      Minimum timing (retard limit)
+  0xD2CCC   4.0       41      Maximum timing (advance limit)
+  0xD2CD8   3.0       42      Max IAM compensation (degrees)
+  0xD2CE0   0.1       42      Compensation step up
+  0xD2CE4   0.1       42      Compensation step down
+  0xD2CF4   0.6       42      FLKC threshold for activation
+  0xD2D48   0.0       48      Default correction offset
+  0xD2D98   7000.0    00      Per-cyl RPM gate
+  0xD2DA0   60.0      00      Per-cyl RPM secondary threshold
+  0xD2F3C   0.02      27      Knock retard learning rate
+
+
+================================================================================
+SECTION 8: KEY DESCRIPTOR MAP (Timing Tables)
+================================================================================
+
+  Address     Task   Type       Description
+  -----------------------------------------------------------------------
+  0xADAFC     49     2D         Base advance map A (primary)
+  0xADB10     49     2D         Base advance map B (secondary)
+  0xADB38     30     2D         Primary base timing map (RPM x Load)
+  0xADB9C     30     2D         Secondary base timing map (RPM x Load)
+  0xADDE0     36     2D 16x2    Per-condition correction (RPM x ECT)
+  0xADFAC     42     2D         IAM/knock compensation map
+  0xADFC0     45     2D         Timing lookup (ECT-indexed)
+  0xADFD4     43     1D         Load-dependent timing
+  0xADFF4     46     1D         MPS timing descriptor
+  0xAE00C     12     1D         Knock post-processing A
+  0xAE020     12     1D         Knock post-processing B
+  0xAE0D8     36     2D 16x2    Per-condition A
+  0xAE0EC     36     2D 8x2     Per-condition B
+  0xAE0F8     12     1D         Knock post-processing C
+  0xAE10C     12     1D         Knock post-processing D
+  0xAE164     35     1D         General timing correction
+  0xAE26C     12     1D         Knock retard limit
+  0xAE278     12     1D         Knock retard scaling
+  0xAE450     36     2D         Per-condition (RPM x Load, 16x6)
+  0xAE46C     36     2D 16x2    Per-condition C
+  0xAE488     36     2D 16x2    Per-condition D
+  0xAE530     45     2D 16x7    Timing lookup B (RPM x ECT)
+  0xAE54C     48     2D 5x3     Final timing map A
+  0xAE568     48     2D 5x3     Final timing map B
+  0xAE584     48     2D 5x3     Final timing map C
+  0xAE5A0     48     2D 5x3     Final timing map D
+  0xAE5BC     48     2D 5x3     Final timing map E
+  0xAE5D8     00     2D         Per-cylinder correction A
+  0xAE5F4     00     2D         Per-cylinder correction B
+  0xAE610     00     2D         Per-cylinder correction C
+  0xAE62C     00     2D         Per-cylinder correction D
+  0xAE648     06     2D         Knock detection threshold
+  0xAE664     01     2D         Knock retard map
+  0xAE680     01     2D         Knock compensation A
+  0xAE69C     01     2D         Knock compensation B
+
+
+================================================================================
+SECTION 9: ROM FUNCTION MAP
+================================================================================
+
+  Address    Description
+  -----------------------------------------------------------------------
+  0x01CF16   timing_mode_selector
+  0x01CF22   timing_mode_alternate
+  0x022CF4   engine_mode_check
+  0x0278D2   dwell_calculator
+  0x0297A0   condition_evaluator
+  0x029858   transient_state_helper
+  0x0299BC   transient_state_check
+  0x02997C   condition_helper_B
+  0x02999C   condition_helper_C
+  0x0299F0   condition_helper_D
+  0x02F8EA   timing_precondition_check
+  0x03AB20   check_engine_status
+  0x040314   task30_pre_calc
+  0x040520   task34_sub (throttle calc)
+  0x0436B6   task48_final_combiner
+  0x045EEA   flkc_helper
+  0x0582D2   check_engine_running
+  0x05EB32   blend_helper
+  0x0BE53C   uint8_add_sat
+  0x0BE56C   uint8_sub_sat
+  0x0BE608   table_1d_float_interp
+  0x0BE830   table_desc_2d_lookup
+  0x0BE8E4   table_desc_2d_typed
+  0x0BE960   float_max
+  0x0BE970   float_min
+  0x0BEA40   float_lerp
+  0x0BEAB0   ignition_output_driver
+  0x0BDBCC   float_clamp_range
