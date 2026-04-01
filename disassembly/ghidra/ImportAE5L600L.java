@@ -308,6 +308,68 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0003697A, "clol_hysteresis_sub",
             "CL/OL hysteresis sub-function. Reads CL->OL throttle and BPW descriptors.");
 
+        // ── PATH B: FFFF7448 / FFFF7452 Writers ──────────────────────────────
+        // See: disassembly/analysis/cl_ol_master_analysis.txt (Sections 3-4)
+        //      disassembly/analysis/disasm_3162C_annotated.txt
+        count += labelComment(0x00031528, "clol_mode_flag_writer",
+            "Single writer of FFFF7448 (clol_mode_flag). PATH B main function. Called from task scheduler 0x49EA4. "
+            + "Collects FFFF744B (cl_inhibit←FFFF8E98), FFFF744C (readiness_A←FFFF8F08), "
+            + "FFFF744D/744E (readiness_B+mode state←func_021D9A(FFFF8F24)). "
+            + "Derives FFFF744A=(FFFF7452==1 AND 744E==1), FFFF7449=(FFFF7452==1 AND 744E==2). "
+            + "Decision: 744B!=0→OL; 744D==1 AND 744C!=0→OL; 7449|744A==1→CL; else→OL. "
+            + "See cl_ol_master_analysis.txt Section 3.");
+        count += labelComment(0x00031628, "cl_master_readiness_writer",
+            "Wrapper that calls cl_master_readiness_eval (0x3162C). Called with FFFF7452 context.");
+        count += labelComment(0x0003162C, "cl_master_readiness_eval",
+            "Computes FFFF7452 (cl_master_readiness) and 3 secondary flags. GBR=FFFF7450. "
+            + "Outputs: FFFF7450 (speed CL flag), FFFF7451 (speed+coolant CL flag), "
+            + "FFFF7452 (master CL enable), FFFF7453 (strictest: AFR stability required). "
+            + "7 conditions must ALL pass: (1) bit3(FFFF61F4)==0 early exit; "
+            + "(2) speed: FFFF67EC>=lookup AND FFFF798C near 0 (3.05e-5) AND FFFF7A20 near 0 "
+            + "AND FFFF7D18==0 AND FFFF77C8>-1.0; (3) throttle hyst flags (FFFF7458/745D/745E) "
+            + "AND FFFF65F6!=1 AND FFFF7464==0; (4) FFFF7BA8<0.11; (5) FFFF7BB0==0; "
+            + "(6) delay counters FFFF745B/745C both>=4; (7) coolant float@FFFF77C0 in [0.5,5.0]. "
+            + "FFFF798C is the BRIDGE: Path A OL enrichment must be zero for CL to be allowed. "
+            + "See cl_ol_master_analysis.txt Section 4, disasm_3162C_annotated.txt.");
+
+        // ── AFL Learning Functions ────────────────────────────────────────────
+        count += labelComment(0x00034884, "afl_learning_entry",
+            "AFL (A/F Learning) entry point. Dispatches to afl_learning_core (0x3452A). "
+            + "Gates: cl_active_check (0x345A4) requires CL mode (FFFF7448==1) — learning frozen in OL.");
+        count += labelComment(0x0003452A, "afl_learning_core",
+            "AFL learning core. Updates per-range stored values (FFFF316C/317C/317C/3184). "
+            + "4 airflow ranges (0-6, 6-23, 23-40, 40-80 g/s, breakpoints at CC074-CC07C). "
+            + "Learning gate: 0x34C54 reads FFFF7448; if OL, skips update. ");
+        count += labelComment(0x000345A4, "afl_cl_active_check",
+            "AFL CL-active gate (10-condition check). Called from afl_learning_core. "
+            + "Checks FFFF8F24, CC020 (MAF<=70g/s), FFFF73A4, FFFF7354, FFFF7374, "
+            + "FFFF7A14, FFFF7A20, FFFF7D18, FFFF7BE2 etc. All must pass to allow AFL update.");
+        count += labelComment(0x00034C54, "afl_clol_gate",
+            "AFL CL/OL gate inside learning pipeline. Reads FFFF7448 (clol_mode_flag). "
+            + "If FFFF7448==0 (OL mode): skip AFL learning update. Frozen in OL.");
+
+        // ── Path A Phase Functions (already partially labeled, update details) ─
+        count += labelComment(0x00036F76, "clol_post_transition_B",
+            "Secondary post-transition handler. Evaluates mode change consequences. "
+            + "Called from clol_main_transition. Phase 7 supplement.");
+        count += labelComment(0x0000700A, "clol_threshold_comparator",
+            "Threshold comparator subroutine for CL/OL state machine. "
+            + "Called from post-transition handler with threshold pair args.");
+
+        // ── FFFF7BA8 Writer / WOT Enrichment Context ──────────────────────────
+        count += labelComment(0x0003952C, "afr_deviation_calc",
+            "Computes FFFF7BA8 (AFR deviation metric). Inputs: FFFF77D8 + FFFF77DC, FFFF798C, "
+            + "FFFF7800, FFFF6354. Calls sub_3961C to clamp result to [0, 0.03] via CAL@CC3E8. "
+            + "Since max=0.03 < CBE78 threshold 0.11, FFFF7BA8 NEVER blocks cl_master_readiness_eval. "
+            + "See cl_ol_master_analysis.txt Section 5 (WOT delay root cause).");
+        count += labelComment(0x0003961C, "afr_deviation_clamp",
+            "Helper for afr_deviation_calc. Clamps FFFF7BA8 to max 0.03 (CAL@CC3E8). "
+            + "Calls 0xBE56C (float_clamp). Result written to FFFF7BAC area.");
+        count += labelComment(0x00039668, "afr_deviation_init",
+            "AFR deviation context initialization/setup. Runs on startup/reset. "
+            + "Sets up FFFF7BB8-BBC flags, FFFF7BB2 counter, FFFF7BB0 fault flag. "
+            + "References table-of-pointers at ROM 0x63B54, calls 0x21D9A, 0x1FD7C.");
+
         // Front O2 sensor scaling (ADC processing)
         count += labelComment(0x00058902, "frontO2_scaling_lookup",
             "Front O2 sensor scaling table lookup. Accesses descriptor near 0xAF468.");
@@ -935,6 +997,51 @@ public class ImportAE5L600L extends GhidraScript {
             "CL Delay Max Engine Load = 0.95-1.10 g/rev. 4 floats.");
         count += label(0x000CCD78, "CLOL_Delay_Throttle_Threshold");
         count += label(0x000CE5F8, "CLOL_Delay_BPW_Threshold");
+
+        // Path B (FFFF7452) readiness thresholds — all identical stock vs modified
+        count += labelComment(0x000CBBEF, "CL_Phase1_Counter_Threshold",
+            "Phase 1 master counter threshold (byte). FFFF7986 must reach this value "
+            + "before clol_transition_core takes a state snapshot. Controls snapshot rate.");
+        count += labelComment(0x000CBBD6, "CL_Readiness_Delay_Threshold",
+            "CL readiness delay counter threshold (byte) = 4. Both FFFF745B and FFFF745C "
+            + "must reach this value before cl_master_readiness_eval allows CL mode.");
+        count += labelComment(0x000CBE64, "CL_RPM_Sanity_Min",
+            "CL readiness RPM sanity minimum (float) = -15.0. FFFF6350 must be >= this "
+            + "(always true in practice). cl_master_readiness_eval speed check precondition.");
+        count += labelComment(0x000CBE68, "CL_RPMDelta_Hyst_ON",
+            "CL readiness RPM delta hysteresis ON threshold (float) = 570.0. "
+            + "FFFF7458 set=1 if (FFFF6898-FFFF620C) <= 570.");
+        count += labelComment(0x000CBE6C, "CL_RPMDelta_Hyst_OFF",
+            "CL readiness RPM delta hysteresis OFF threshold (float) = 580.0. "
+            + "FFFF7458 cleared=0 if delta > 580.");
+        count += labelComment(0x000CBE70, "CL_MAF_Hyst_ON",
+            "CL readiness MAF hysteresis ON threshold (float) = 1000.0 g/s. "
+            + "FFFF745D set=1 if FFFF6624 <= 1000.");
+        count += labelComment(0x000CBE74, "CL_MAF_Hyst_OFF",
+            "CL readiness MAF hysteresis OFF threshold (float) = 1100.0 g/s. "
+            + "FFFF745D cleared=0 if FFFF6624 > 1100.");
+        count += labelComment(0x000CBE78, "CL_AFRDeviation_Max",
+            "CL readiness AFR deviation upper bound (float) = 0.11. "
+            + "FFFF7BA8 must be < 0.11 for cl_master_readiness. "
+            + "NEVER blocking: afr_deviation_calc clamps FFFF7BA8 to max 0.03.");
+        count += labelComment(0x000CBEA0, "CL_SpeedTable_Hyst_Offset",
+            "CL readiness speed table hysteresis offset (float) = 20.0. "
+            + "Subtracted from speed table result to compute FFFF745E OFF threshold.");
+        count += labelComment(0x000CBEA4, "CL_AFC_Min",
+            "CL readiness AFC output minimum (float) = -1.0. "
+            + "FFFF77C8 must be > -1.0 for speed condition to pass.");
+        count += labelComment(0x000CBE8C, "CL_Coolant_Low_OFF",
+            "Coolant CL readiness low flag OFF threshold (float) = 0.5.");
+        count += labelComment(0x000CBE90, "CL_Coolant_Low_ON",
+            "Coolant CL readiness low flag ON threshold (float) = 0.5.");
+        count += labelComment(0x000CBE94, "CL_Coolant_High_ON",
+            "Coolant CL readiness high flag ON threshold (float) = 5.0.");
+        count += labelComment(0x000CBE98, "CL_Coolant_High_OFF",
+            "Coolant CL readiness high flag OFF threshold (float) = 5.0.");
+        count += labelComment(0x000CC3E8, "AFR_Deviation_Clamp_Max",
+            "AFR deviation clamp maximum (float) = 0.03. Used by afr_deviation_clamp (0x3961C) "
+            + "to limit FFFF7BA8. Since 0.03 < CL_AFRDeviation_Max (0.11), condition 4 in "
+            + "cl_master_readiness_eval is NEVER the blocking factor for CL→OL transitions.");
         count += label(0x000CE640, "CLOL_CounterStep_MAF");
         count += labelComment(0x000D14D0, "CL_FuelTarget_CompA_Load",
             "CL Fueling Target Comp A (Load). 3D table, AFR additive adj. Typical -0.01 to -0.61.");
@@ -1271,6 +1378,177 @@ public class ImportAE5L600L extends GhidraScript {
             "AFL multiplier output (float). Written by afl_application at 0x37B74. Consumed by fuel PW calc at 0x0301E4. Applied unconditionally in CL and OL.");
         count += labelComment(0xFFFF7C68, "engine_status_flag",
             "Engine status flag (byte). Gates AFL application — abnormal condition forces FFFF7AB4=1.0.");
+
+        // ── CL/OL Path B — FFFF7452 Readiness Inputs & Working Variables ─────
+        count += labelComment(0xFFFF7450, "cl_speed_readiness",
+            "Speed-based CL readiness flag (byte). GBR+0x00 in cl_master_readiness_eval. "
+            + "Set when RPM/speed conditions pass but coolant not checked.");
+        count += labelComment(0xFFFF7451, "cl_speed_coolant_readiness",
+            "Speed+coolant CL readiness flag (byte). GBR+0x01 in cl_master_readiness_eval.");
+        count += labelComment(0xFFFF7453, "cl_strict_readiness",
+            "Strictest CL readiness flag (byte). GBR+0x03. Requires FFFF77DC/7800 within "
+            + "tight AFR stability bounds (CBE7C-CBE88). Rarely 1 except at stable cruise.");
+        count += labelComment(0xFFFF7454, "cl_speed_threshold_1",
+            "Speed threshold 1 (word). Computed by cl_master_readiness_eval BSR to 0x3160E "
+            + "using table at 0xACDF4. Compared against FFFF67EC.");
+        count += labelComment(0xFFFF7456, "cl_speed_threshold_2",
+            "Speed threshold 2 (word). Alternate speed threshold from 0xBE8AC. Used when "
+            + "FFFF7829 speed selector == 1.");
+        count += labelComment(0xFFFF7458, "cl_rpm_delta_hyst",
+            "RPM delta hysteresis flag (byte). Set=1 if (FFFF6898-FFFF620C) <= 570 (CBE68). "
+            + "Cleared=0 if delta > 580 (CBE6C). One of 3 throttle-condition flags for CL readiness.");
+        count += labelComment(0xFFFF7459, "cl_engine_flag_prev",
+            "Previous value of FFFFA56B (engine running/cranking flag). Used for edge detection "
+            + "in cl_master_readiness_eval delay counter 1.");
+        count += labelComment(0xFFFF745A, "cl_cond_flag_prev",
+            "Previous value of FFFFACF0 (CL delay condition flag). Used for edge detection "
+            + "in cl_master_readiness_eval delay counter 2.");
+        count += labelComment(0xFFFF745B, "cl_delay_counter_1",
+            "CL readiness delay counter 1 (byte). Resets on FFFFA56B falling edge. "
+            + "Must reach threshold 4 (CBE6=CAL@CBBD6) before CL is allowed.");
+        count += labelComment(0xFFFF745C, "cl_delay_counter_2",
+            "CL readiness delay counter 2 (byte). Resets on FFFFACF0 rising edge. "
+            + "Must reach threshold 4 (CBE6=CAL@CBBD6) before CL is allowed.");
+        count += labelComment(0xFFFF745D, "cl_maf_hyst",
+            "MAF (FFFF6624) hysteresis flag (byte). Set=1 if MAF <= 1000 (CBE70). "
+            + "Cleared=0 if MAF > 1100 (CBE74). Second of 3 throttle-condition flags.");
+        count += labelComment(0xFFFF745E, "cl_speed_table_hyst",
+            "Speed table lookup hysteresis flag (byte). Set=1 if table_result > FFFF620C. "
+            + "Cleared=0 if (table_result - 20.0) > FFFF620C (CBE A0 offset). Third throttle flag.");
+        count += labelComment(0xFFFF745F, "cl_coolant_low_hyst",
+            "Coolant low hysteresis flag (byte). Set=0 if FFFF77C0 > 0.5 (CBE8C). "
+            + "Set=1 if FFFF77C0 <= 0.5 (CBE90). Used with cl_coolant_high_hyst for warmup gate.");
+        count += labelComment(0xFFFF7460, "cl_coolant_high_hyst",
+            "Coolant high hysteresis flag (byte). Set=1 if FFFF77C0 > 5.0 (CBE94). "
+            + "Set=0 if FFFF77C0 <= 5.0 (CBE98). CL requires 745F==1 AND 7460==1.");
+        count += labelComment(0xFFFF7464, "cl_throttle_gate",
+            "Throttle gate flag (byte). Must be 0 for CL readiness (throttle condition #3). "
+            + "Unclear writer — acts as an additional throttle-open inhibit.");
+        count += labelComment(0xFFFF7829, "cl_speed_table_sel",
+            "Speed table selector (byte). 0=use threshold 1 (FFFF7454), 1=use threshold 2 (FFFF7456). "
+            + "Selects which speed lookup table drives the CL speed condition.");
+        count += labelComment(0xFFFF67EC, "vehicle_speed_word",
+            "Vehicle speed derived value (unsigned word). Compared against cl_speed_threshold_1/2 "
+            + "in cl_master_readiness_eval speed condition check.");
+        count += labelComment(0xFFFF61F4, "engine_mode_bits",
+            "Engine mode flag byte. Bit 3: early exit for cl_master_readiness_eval — if set, "
+            + "forces FFFF7452/7450/7451 = 0 immediately. Also tested by sub_1CF46 (0x1CF46).");
+        count += labelComment(0xFFFF7A20, "o2_sensor2_output",
+            "Rear O2 / wideband sensor 2 output (float). Must be within 0.00390625 of 0.0 "
+            + "for CL readiness (speed condition check 6 in cl_master_readiness_eval).");
+        count += labelComment(0xFFFF8E98, "cl_inhibit_sensor_flag",
+            "Primary CL inhibit sensor flag (byte). Copied to cl_inhibit (FFFF744B). "
+            + "When non-zero: cl_mode_flag_writer forces FFFF7448=0 (OL) unconditionally.");
+        count += labelComment(0xFFFF8F08, "cl_readiness_A_input",
+            "CL readiness A input (byte). Copied to FFFF744C. When non-zero with cl_readiness_B==1: "
+            + "cl_mode_flag_writer forces OL.");
+        count += labelComment(0xFFFF8F24, "cl_readiness_B_input",
+            "CL readiness B input (byte). Processed by func_021D9A → FFFF744D/744E. "
+            + "Source of cl_mode_state (0/1/2) which determines CL entry path.");
+        count += labelComment(0xFFFF77C0, "coolant_temp_float",
+            "Coolant temperature as float (normalized/scaled). Used by cl_master_readiness_eval "
+            + "coolant condition: must be in [0.5, 5.0] (CBE8C/90/94/98 thresholds).");
+        count += labelComment(0xFFFF7800, "cl_afr_bound",
+            "AFR stability bound (float). Checked in cl_strict_readiness (FFFF7453) path. "
+            + "Must be within CBE84/CBE88 bounds [-5.0, 5.0].");
+
+        // ── CL/OL Path A — OL Enrichment Accumulator (the BRIDGE) ───────────
+        count += labelComment(0xFFFF7954, "clol_pathA_GBR_base",
+            "GBR base for Path A CL/OL state machine (0xFFFF7954). Set at entry of "
+            + "clol_transition_core (0x3580C). All Path A working vars are GBR-relative.");
+        count += labelComment(0xFFFF7986, "clol_phase1_counter",
+            "Path A Phase 1 master counter (byte). Written 0xFF by Phase 3 (clol_transition_sub_B) "
+            + "to re-arm Phase 1. Phase 1 fires when counter >= CAL@CBBEF threshold. "
+            + "Incremented by Phase 1, reset by Phase 3 each cycle.");
+        count += labelComment(0xFFFF794C, "clol_phase1_arm_word",
+            "Phase 1 arm word (word). Written 0x200 by Phase 3 to re-arm Phase 1 state snapshot.");
+        count += labelComment(0xFFFF7988, "clol_pathA_workspace",
+            "Path A OL workspace base (pointer). Phase 1 stores ECT, RPM, throttle, MAP, MAF, "
+            + "BPW, load, gear snapshots here. Base for GBR-relative OL enrichment vars.");
+        count += labelComment(0xFFFF798C, "ol_enrichment_accum",
+            "OL enrichment accumulator (float). THE BRIDGE between Path A and Path B. "
+            + "Path B (cl_master_readiness_eval) requires this to be within 3.05e-5 of 0.0 for CL. "
+            + "When Path A fires (OL condition met), this deviates from 0 → Path B drops FFFF7452 "
+            + "→ FFFF7448=0 → OL mode. Updated by WRITE 4 filter (0x36238-0x36306): "
+            + "filtered decay when transitioning, direct-assign when settled.");
+        count += labelComment(0xFFFF7990, "ol_enrichment_target",
+            "OL enrichment accumulator target (float). Computed as FR15 * ol_blend_coeff. "
+            + "WRITE 4 filter clamps ol_enrichment_accum to not drop below this target.");
+        count += labelComment(0xFFFF79A0, "ol_blend_coeff",
+            "OL enrichment blend coefficient (float). Multiplied with target enrichment value "
+            + "to compute ol_enrichment_target. Controls blend rate.");
+        count += labelComment(0xFFFF79C7, "clol_diagnostic_flag",
+            "CL/OL diagnostic flag (byte). Set by ol_condition_checker (0x3643A) to indicate "
+            + "which condition triggered the OL transition. Used for SSM/diagnostics.");
+        count += labelComment(0xFFFF79E0, "ol_decay_delta",
+            "OL enrichment decay delta (float, negative). Added to ol_enrichment_accum in "
+            + "WRITE 4 filtered path: accum = max(accum + decay_delta, target).");
+
+        // ── AFL Application Working Variables ─────────────────────────────────
+        count += labelComment(0xFFFF7AC0, "afl_ramp_multiplier",
+            "AFL ramp multiplier (float, 0.0-1.0). Written by sub_37E70. Controls ramp "
+            + "on/off of AFL application. In both stock and modified ROM: ramp step "
+            + "calibrations CC32C/CC330 = 0.0, making this a binary 0.0 or 1.0 switch.");
+        count += labelComment(0xFFFF7AD0, "afl_transient_copy",
+            "Copy of transient_state_flag (FFFF726C) for AFL workspace. GBR+0x1C in "
+            + "afl_application (0x37B74). When==1: AFL skipped, FFFF7AB4=1.0.");
+        count += labelComment(0xFFFF7AD1, "afl_ramp_flag_A",
+            "AFL ramp flag A. Controls immediate 1.0 path in sub_37E70 (afl_ramp stage). "
+            + "Writer not yet traced. When set with FFFF7AD0==0: afl_ramp_multiplier=1.0.");
+        count += labelComment(0xFFFF7AD2, "afl_engine_status_copy",
+            "Copy of engine_status_flag (FFFF7C68) for AFL workspace. GBR+0x1E. "
+            + "When==1: AFL skipped, FFFF7AB4=1.0.");
+        count += labelComment(0xFFFF7AD3, "afl_ramp_flag_B",
+            "AFL ramp flag B. Controls immediate paths in sub_37E70. "
+            + "Writer not yet traced. Interacts with afl_ramp_flag_A for ramp direction.");
+        count += labelComment(0xFFFF7AD8, "afl_hyst_input",
+            "AFL hysteresis input (float). Compared against CAL@CC31C/CC320 (118.0/119.0) "
+            + "in sub_37DD2 (AFL hysteresis handler). Controls FFFF7ADC master AFL enable.");
+        count += labelComment(0xFFFF7ADC, "afl_master_enable",
+            "AFL master enable flag (byte). Set=1 by sub_37DD2 when 3 hysteresis conditions pass "
+            + "AND FFFF7AD0==0 AND FFFF7AD2==0. Gates whether AFL correction is applied.");
+        count += labelComment(0xFFFF7ADD, "afl_counter_1",
+            "AFL counter 1 (byte). Checked >= 2 in sub_37D74 for 2D AFL table lookup. "
+            + "Must reach 2 before FFFF7ABC (2D correction) is computed.");
+        count += labelComment(0xFFFF7ADE, "afl_counter_2",
+            "AFL counter 2 (byte). Checked >= 2 in sub_37D74 alongside afl_counter_1. "
+            + "Both must be >= 2 for AFL 2D table correction to be active.");
+        count += labelComment(0xFFFF7ABC, "afl_2d_correction",
+            "AFL 2D correction value (float). Computed by sub_37D74 via 2D table lookup. "
+            + "Written only when FFFF7AD0==0 AND FFFF7AD2==0 AND both counters>=2. "
+            + "Otherwise set to 0.0.");
+        count += labelComment(0xFFFF7878, "afl_interp_display",
+            "AFL interpolated display value (float). Read by SSM PID 0x0A getter (0x5D2DA). "
+            + "display_pct = float * 100. Shows interpolated AFL at current airflow, NOT "
+            + "the applied multiplier at FFFF7AB4 or per-range stored value.");
+
+        // ── AFR Deviation (FFFF7BA8 context) ──────────────────────────────────
+        count += labelComment(0xFFFF7BA8, "afr_deviation_metric",
+            "AFR deviation metric (float). Written by afr_deviation_calc (0x3952C). "
+            + "Computed from FFFF77D8 + FFFF77DC, clamped to [0, 0.03] by sub_3961C (CC3E8=0.03). "
+            + "NEVER blocks cl_master_readiness_eval: threshold CBE78=0.11 > max clamp 0.03. "
+            + "The WOT CL delay was caused by dead Path A thresholds, not this value.");
+        count += labelComment(0xFFFF7BAC, "afr_deviation_input",
+            "Input value passed to afr_deviation_clamp (sub_3961C). Used in clamp computation.");
+        count += labelComment(0xFFFF7BB0, "afr_fault_flag",
+            "AFR/sensor fault flag (byte). Checked by cl_master_readiness_eval condition 5: "
+            + "must be 0 for CL. Also gated by func_39668 (afr_deviation_init).");
+        count += labelComment(0xFFFF7BB2, "afr_fault_counter",
+            "AFR fault counter (word). Incremented by func_39668. Checked against "
+            + "threshold CAL@CBC8C=0. Drives afr_fault_flag.");
+        count += labelComment(0xFFFF7BB8, "afr_init_flag_A",
+            "AFR deviation init flag A (byte). Set by afr_deviation_init (0x39668) via "
+            + "table-of-pointers at 0x63B54 +4.");
+        count += labelComment(0xFFFF7BB9, "afr_init_flag_B",
+            "AFR deviation init flag B (byte). Set by afr_deviation_init.");
+        count += labelComment(0xFFFF7BBA, "afr_init_flag_C",
+            "AFR deviation init flag C (byte). Set by afr_deviation_init.");
+        count += labelComment(0xFFFF7BBB, "afr_init_flag_D",
+            "AFR deviation init flag D (byte). Set by afr_deviation_init.");
+        count += labelComment(0xFFFF7BBC, "afr_init_flag_E",
+            "AFR deviation init flag E (byte). Set by afr_deviation_init.");
+        count += labelComment(0xFFFF7BC0, "afr_deviation_output_base",
+            "AFR deviation output struct base (RAM). Written by afr_deviation_calc (0x3952C).");
 
         // =====================================================================
         // HIGH-FREQUENCY SHARED SUBROUTINES (by cross-reference count)
