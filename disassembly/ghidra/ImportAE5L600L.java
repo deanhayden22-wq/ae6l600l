@@ -998,6 +998,181 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x000CCD78, "CLOL_Delay_Throttle_Threshold");
         count += label(0x000CE5F8, "CLOL_Delay_BPW_Threshold");
 
+        // ── Path A: OL enrichment condition checker (0x3643A) — per-gear / neutral RPM limits ──
+        // Note: existing CC180/CC1A8 labels cover start addresses; these add individual hi/lo pairs.
+        // CC1A8 = 6000.0 (single float, context TBD — between gear-5 and neutral table blocks).
+        // Neutral RPM limits indexed by neutral-state indicator (FFFF5E92 value 1-5):
+        count += labelComment(0x000CC1B0, "OL_NeutralState1_RPM_Lo",
+            "OL condition checker neutral-state-1 RPM lo threshold = 6000.0 RPM. "
+            + "Pair with CC1B4 (hi). Compared against FFFF6624 in ol_condition_checker (0x3643A).");
+        count += labelComment(0x000CC1B4, "OL_NeutralState1_RPM_Hi",
+            "OL condition checker neutral-state-1 RPM hi threshold = 6100.0 RPM. Hysteresis hi.");
+        count += labelComment(0x000CC1B8, "OL_NeutralState2_RPM_Lo",
+            "OL condition checker neutral-state-2 RPM lo threshold = 6000.0 RPM.");
+        count += labelComment(0x000CC1BC, "OL_NeutralState2_RPM_Hi",
+            "OL condition checker neutral-state-2 RPM hi threshold = 6100.0 RPM.");
+        count += labelComment(0x000CC1C0, "OL_NeutralState3_RPM_Lo",
+            "OL condition checker neutral-state-3 RPM lo threshold = 6000.0 RPM.");
+        count += labelComment(0x000CC1C4, "OL_NeutralState3_RPM_Hi",
+            "OL condition checker neutral-state-3 RPM hi threshold = 6100.0 RPM.");
+        count += labelComment(0x000CC1C8, "OL_NeutralState4_RPM_Lo",
+            "OL condition checker neutral-state-4 RPM lo threshold = 5700.0 RPM.");
+        count += labelComment(0x000CC1CC, "OL_NeutralState4_RPM_Hi",
+            "OL condition checker neutral-state-4 RPM hi threshold = 5800.0 RPM.");
+        count += labelComment(0x000CC1D0, "OL_NeutralState5_RPM_Lo",
+            "OL condition checker neutral-state-5 RPM lo threshold = 4200.0 RPM.");
+        count += labelComment(0x000CC1D4, "OL_NeutralState5_RPM_Hi",
+            "OL condition checker neutral-state-5 RPM hi threshold = 4300.0 RPM.");
+
+        // ── Path A: condition checker hysteresis flag thresholds (written to FFFF7A00–7A05) ──
+        // FR12=FFFF6898 (RPM delta) vs CC1DC/CC1E0 → writes FFFF7A05 (byte flag)
+        count += labelComment(0x000CC1DC, "OL_Condition_RPMDelta_Lo",
+            "OL condition flag RPM-delta hysteresis lo = 691.9. "
+            + "FFFF7A05 flag: set=1 when FFFF6898 < 691.9. Compared in ol_condition_checker (0x3643A).");
+        count += labelComment(0x000CC1E0, "OL_Condition_RPMDelta_Hi",
+            "OL condition flag RPM-delta hysteresis hi = 699.9. "
+            + "FFFF7A05 cleared=0 when FFFF6898 > 699.9. Hysteresis pair with CC1DC.");
+        // FR13=FFFF62DC (throttle/load) vs CC1E4/CC1E8 → writes FFFF7A00; CC1EC/CC1F0 → FFFF7A01
+        count += labelComment(0x000CC1E4, "OL_Condition_Load_A_Lo",
+            "OL condition flag A (FFFF7A00) lo threshold = 90.0. "
+            + "FFFF7A00 set=1 when FFFF62DC < 90.0. Hysteresis pair with CC1E8. ol_condition_checker.");
+        count += labelComment(0x000CC1E8, "OL_Condition_Load_A_Hi",
+            "OL condition flag A (FFFF7A00) hi threshold = 91.0. "
+            + "FFFF7A00 cleared=0 when FFFF62DC > 91.0.");
+        count += labelComment(0x000CC1EC, "OL_Condition_Load_B_Lo",
+            "OL condition flag B (FFFF7A01) lo threshold = 90.0. "
+            + "FFFF7A01 set=1 when FFFF62DC < 90.0. Hysteresis pair with CC1F0. ol_condition_checker.");
+        count += labelComment(0x000CC1F0, "OL_Condition_Load_B_Hi",
+            "OL condition flag B (FFFF7A01) hi threshold = 91.0. "
+            + "FFFF7A01 cleared=0 when FFFF62DC > 91.0.");
+        // FR15=FFFF65FC (vehicle speed) vs CC1F4 (labeled) / CC1F8:
+        count += labelComment(0x000CC1F8, "OL_Condition_Speed_Hi",
+            "OL condition flag speed hysteresis hi = 140.0. "
+            + "Speed flag cleared=0 when FFFF65FC > 140.0. Pair with CC1F4 (lo=130.0). ol_condition_checker.");
+        // FFFF63F8 (engine load g/rev) vs CC204 (labeled) / CC208:
+        count += labelComment(0x000CC208, "OL_Condition_EngLoad_Hi",
+            "OL condition engine load hysteresis hi = 4.9 g/rev. "
+            + "Pair with CC204 (lo=4.8 g/rev). ol_condition_checker. "
+            + "Stock: both thresholds never reached → this condition never triggers OL in stock.");
+
+        // ── Path A: clol_transition_core (0x3580C) enrichment gate calibrations ──
+        // These gate the OL enrichment computation itself (sub at 0x3585E6 within 3580C):
+        count += labelComment(0x000CC110, "OL_EnrichGate_Threshold_A",
+            "OL enrichment gate threshold A (float) = 25.0. "
+            + "clol_transition_core (0x3580C): first enrichment sub-entry condition. "
+            + "Compared against saved engine state snapshot. All 6 conditions must pass for enrichment.");
+        count += labelComment(0x000CC114, "OL_EnrichGate_Threshold_B",
+            "OL enrichment gate threshold B = 8.0. Second entry condition in 0x3580C sub.");
+        count += labelComment(0x000CC118, "OL_EnrichGate_Threshold_C",
+            "OL enrichment gate threshold C = 70.0. Third entry condition in 0x3580C sub.");
+        count += labelComment(0x000CC11C, "OL_EnrichGate_Threshold_D",
+            "OL enrichment gate threshold D = 0.06. Fourth entry condition in 0x3580C sub.");
+        count += labelComment(0x000CC120, "OL_EnrichGate_Threshold_E",
+            "OL enrichment gate threshold E = 0.02. Fifth entry condition in 0x3580C sub.");
+        count += labelComment(0x000CC124, "OL_EnrichGate_RPM_Lo",
+            "OL enrichment gate RPM lo threshold = 1000.0. "
+            + "clol_transition_core sub: RPM window check. Compared against FFFF7984 offset.");
+        count += labelComment(0x000CC128, "OL_EnrichGate_RPM_Hi",
+            "OL enrichment gate RPM hi threshold = 3000.0. "
+            + "Upper bound of RPM window for OL enrichment entry. Pair with CC124.");
+        count += labelComment(0x000CC12C, "OL_EnrichGate_RPM_Range",
+            "OL enrichment gate RPM range threshold = 300.0. "
+            + "clol_transition_core sub: additional RPM range check.");
+        count += labelComment(0x000CC170, "OL_Enrichment_MinThreshold",
+            "OL enrichment output minimum clamping threshold = 0.05. "
+            + "clol_transition_core / ol_enrichment_dispatch: if computed OL enrichment < 0.05, "
+            + "clamp to 0.0 (enrichment not applied). Effectively the OL enrichment activation floor.");
+
+        // ── Path A: WRITE4 / enrichment decay filter ──
+        // FUN_0003606C (ol_enrichment_dispatch) at 0x36204 calls 1D lookup using AD090 descriptor,
+        // result written to FFFF79E0 each cycle (the enrichment decay rate per task cycle).
+        count += labelComment(0x000AD090, "OL_Enrich_DecayRate_Desc",
+            "OL enrichment decay rate 1D descriptor (16 bytes). Axis: RPM 0-8000 (9 points). "
+            + "Values: step-floor u16 table at CE5A4, scale 1/32768. "
+            + "Output FFFF79E0 subtracted from FFFF798C each cycle to decay OL blend back to 0. "
+            + "At 0-4000 RPM: 100/32768 = 0.003052/cycle → ~1.68s to decay 0.512 at 100Hz.");
+        count += labelComment(0x000CE580, "OL_Enrich_DecayRate_Axis",
+            "OL enrichment decay rate RPM axis: 9 × f32: 0/1000/2000/3000/4000/5000/6000/7000/8000 RPM.");
+        count += labelComment(0x000CE5A4, "OL_Enrich_DecayRate_Table",
+            "OL enrichment decay rate step table: 9 × u16: [100,100,100,100,100,50,50,37,37]. "
+            + "Scale by 1/32768 for per-cycle decay rate. Higher = faster CL→OL transition. "
+            + "Stock at 0-4000 RPM: 100 = ~1.68s decay. At 7000+ RPM: 37 = ~4.53s (intentionally slower).");
+
+        // ── Path A: post-condition handler (0x36848) enrichment table descriptors ──
+        // At 0x368D2 / 0x368EC: CC224 is used as enrichment accumulation offset
+        count += labelComment(0x000CC224, "OL_Enrich_Accum_Offset",
+            "OL enrichment accumulator threshold offset = 20.0. "
+            + "post_condition_handler (0x36848): added to FFFF798C (enrichment blend) when computing "
+            + "whether to advance enrichment pipeline stage. Controls transition trigger point.");
+
+        // ── Path A: enrichment map descriptors (used in post-condition handler 0x36848) ──
+        count += labelComment(0x000AD960, "OL_Enrich_Map_Normal_Desc",
+            "OL enrichment 2D map descriptor — normal path (IAM >= CC16C=0.5). "
+            + "Used by post_condition_handler (0x368A4) when IAM high. RPM×load axes.");
+        count += labelComment(0x000AD97C, "OL_Enrich_Map_Reduced_Desc",
+            "OL enrichment 2D map descriptor — reduced path (IAM < CC16C=0.5). "
+            + "Used by post_condition_handler (0x368AA) when IAM low. RPM×load axes.");
+        count += labelComment(0x000AC5F8, "OL_Enrich_Scale_Normal_Desc",
+            "OL enrichment 1D scale descriptor — normal path (after map lookup). "
+            + "Applied to OL enrichment result after 2D map in post_condition_handler.");
+        count += labelComment(0x000AC60C, "OL_Enrich_Scale_Reduced_Desc",
+            "OL enrichment 1D scale descriptor — reduced path. "
+            + "Applied after 2D map when IAM < 0.5 in post_condition_handler.");
+
+        // ── Path A: hysteresis handler (0x36AB2) calibrations ──
+        count += labelComment(0x000CBC66, "OL_Hyst_SpeedCounter_Threshold",
+            "OL hysteresis handler speed counter threshold (word) = 0. "
+            + "clol_hysteresis_handler (0x36AB2): word@FFFF67EC vs this. Counter gate.");
+        count += labelComment(0x000CBC68, "OL_Hyst_Timer_Threshold",
+            "OL hysteresis handler timer threshold (word) = 56. "
+            + "clol_hysteresis_handler: enrichment state timer must reach 56 counts.");
+        count += labelComment(0x000CC228, "OL_Hyst_MAF_Threshold",
+            "OL hysteresis handler MAF gate threshold = 2000.0. "
+            + "clol_hysteresis_handler (0x36B0C): FFFF6624 must be < 2000 for hysteresis sub. "
+            + "In practice always passes (MAF << 2000 in any units).");
+        count += labelComment(0x000CC22C, "OL_Hyst_Speed_Threshold",
+            "OL hysteresis handler speed gate threshold = 0.0. "
+            + "clol_hysteresis_handler (0x36B2C): FFFF65FC must be <= 0.0. "
+            + "Stock=0.0 effectively disables this gate.");
+        count += labelComment(0x000CC230, "OL_Hyst_RateLimit",
+            "OL hysteresis sub rate limit = 0.004. "
+            + "clol_hysteresis_sub (0x36B8A): applied via float_max (0xBE960) "
+            + "to limit rate of change of enrichment working value at FFFF7A0C.");
+
+        // ── Path A: delay manager B (0x36BF4) calibrations ──
+        // FR8=FFFF6350, FR9=FFFF6364 compared against these thresholds:
+        count += labelComment(0x000CC234, "OL_DelayB_Thresh_A_Hi",
+            "OL delay manager B threshold A hi = 79.0. "
+            + "clol_delay_manager_B (0x36BF4): compared against FFFF6350. "
+            + "If FFFF6350 < 79.0 AND (CC238 or FFFF6364 conditions), take fast path.");
+        count += labelComment(0x000CC238, "OL_DelayB_Thresh_A_Lo",
+            "OL delay manager B threshold A lo = 0.0. "
+            + "clol_delay_manager_B: secondary condition check against FFFF6364.");
+        count += labelComment(0x000CC23C, "OL_DelayB_Thresh_B_Hi",
+            "OL delay manager B threshold B hi = 70.0. "
+            + "clol_delay_manager_B: alternate path threshold vs FFFF6350.");
+        count += labelComment(0x000CC240, "OL_DelayB_Thresh_B_Lo",
+            "OL delay manager B threshold B lo = 0.0. "
+            + "clol_delay_manager_B: alternate path secondary vs FFFF6364.");
+        count += labelComment(0x000CC244, "OL_DelayB_EnrichTarget_A",
+            "OL delay manager B enrichment target A = 0.3. "
+            + "clol_delay_manager_B: written to FFFF7A18 (enrichment delay step) on first condition path.");
+        count += labelComment(0x000CC248, "OL_DelayB_EnrichTarget_B",
+            "OL delay manager B enrichment target B = 0.0. "
+            + "clol_delay_manager_B: written to FFFF7A18 on second condition path.");
+        count += labelComment(0x000CBC6A, "OL_DelayB_Counter_Max",
+            "OL delay manager B integration counter maximum (word) = 188. "
+            + "clol_delay_manager_B (0x36CB2): word@FFFF7A1C clamped to this max value.");
+        count += labelComment(0x000CBC6E, "OL_DelayB_SpeedGate",
+            "OL delay manager B speed gate threshold (word) = 624. "
+            + "clol_delay_manager_B (0x36CD6): word@FFFF67EC vs 624 to gate enrichment ramp.");
+        count += labelComment(0x000CC254, "OL_DelayB_RateLimit_A",
+            "OL delay manager B rate limit A = 0.3. "
+            + "clol_delay_manager_B (0x36D5A): rate-limits FFFF7A1C-4 via float_max (0xBE960).");
+        count += labelComment(0x000CC258, "OL_DelayB_RateLimit_B",
+            "OL delay manager B rate limit B = 0.15. "
+            + "clol_delay_manager_B (0x36CE6): FFFF7A1C step-rate via rate_limit_interp (0xBE970).");
+
         // Path B (FFFF7452) readiness thresholds — all identical stock vs modified
         count += labelComment(0x000CBBEF, "CL_Phase1_Counter_Threshold",
             "Phase 1 master counter threshold (byte). FFFF7986 must reach this value "
@@ -1483,6 +1658,65 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF79E0, "ol_decay_delta",
             "OL enrichment decay delta (float, negative). Added to ol_enrichment_accum in "
             + "WRITE 4 filtered path: accum = max(accum + decay_delta, target).");
+        count += labelComment(0xFFFF79F8, "ol_enrich_func_ptr",
+            "OL enrichment pipeline function pointer (4 bytes). "
+            + "post_condition_handler (0x36848) writes AD998 or AD9B4 here (descriptor ptr). "
+            + "GBR+0x6C from base 0xFFFF798C. Selects enrichment computation path for next cycle.");
+        count += labelComment(0xFFFF7A00, "ol_cond_flag_A",
+            "OL condition flag A (byte). Written by ol_condition_checker (0x3643A). "
+            + "GBR+0x5C from 0xFFFF79A4. Set=1 if FFFF62DC < OL_Condition_Load_A_Lo (90.0).");
+        count += labelComment(0xFFFF7A01, "ol_cond_flag_B",
+            "OL condition flag B (byte). Written by ol_condition_checker. "
+            + "GBR+0x5D. Set=1 if FFFF62DC < OL_Condition_Load_B_Lo (90.0). Separate hysteresis track.");
+        count += labelComment(0xFFFF7A02, "ol_cond_flag_C",
+            "OL condition flag C (byte). Written by ol_condition_checker. GBR+0x5E. "
+            + "Comparison target and threshold not yet fully traced.");
+        count += labelComment(0xFFFF7A04, "ol_cond_flag_speed",
+            "OL condition speed flag (byte). Written by ol_condition_checker. GBR+0x60. "
+            + "Set=1 when FFFF65FC < OL_Condition_Speed_Lo (CC1F4=130.0). "
+            + "Speed within envelope for CL → set means speed OK for CL.");
+        count += labelComment(0xFFFF7A05, "ol_cond_flag_rpmDelta",
+            "OL condition RPM-delta flag (byte). Written by ol_condition_checker. GBR+0x61. "
+            + "Set=1 when FFFF6898 (RPM delta) < OL_Condition_RPMDelta_Lo (CC1DC=691.9).");
+        count += labelComment(0xFFFF7A0C, "ol_hyst_struct_base",
+            "OL hysteresis working struct base (float). Used by clol_hysteresis_handler (0x36AB2) "
+            + "and clol_delay_manager_B (0x36BF4) as base pointer. "
+            + "Offsets: +0=state_byte, +22=hyst_flag_A, +34=timer_word, +252=state_A, +228=state_B.");
+        count += labelComment(0xFFFF7A18, "ol_delay_step",
+            "OL enrichment delay step value (float). Written by clol_delay_manager_B (0x36C12). "
+            + "Set to OL_DelayB_EnrichTarget_A (0.3) or OL_DelayB_EnrichTarget_B (0.0) "
+            + "depending on RPM/ECT condition. Controls OL enrichment ramp rate.");
+        count += labelComment(0xFFFF7A1C, "ol_delay_counter",
+            "OL enrichment delay integration counter (word). "
+            + "clol_delay_manager_B: incremented each cycle by sub_BE554, clamped to "
+            + "OL_DelayB_Counter_Max (CBC6A=188). Gated by OL_DelayB_SpeedGate (CBC6E=624).");
+
+        // ── Path A sensor RAM variables (used in ol_condition_checker and clol_transition_core) ──
+        count += labelComment(0xFFFF6350, "engine_rpm",
+            "Engine speed (RPM, float). Read by ol_condition_checker (0x3643A), "
+            + "cl_master_readiness_eval (0x3162C), clol_delay_manager_B (0x36BF4). "
+            + "In cl_master_readiness: FFFF6350 >= -15.0 (sanity check, always true in operation).");
+        count += labelComment(0xFFFF62DC, "engine_load_metric",
+            "Engine load metric (float). Read by ol_condition_checker as FR13. "
+            + "Compared against OL_Condition_Load_A/B thresholds (90.0/91.0). "
+            + "Exact physical unit TBD — values of 90-91 suggest throttle degrees or normalized load.");
+        count += labelComment(0xFFFF6364, "engine_rpm_secondary",
+            "Secondary RPM or engine state float. Read by clol_delay_manager_B (0x36BF4) as FR9. "
+            + "Compared against OL_DelayB_Thresh_A_Lo / OL_DelayB_Thresh_B_Lo (0.0). "
+            + "Physical meaning TBD — consistently paired with FFFF6350 in delay manager B.");
+        count += labelComment(0xFFFF6624, "engine_rpm_or_maf",
+            "Engine state float (RPM or MAF, context-dependent). "
+            + "ol_condition_checker: compared against per-gear RPM limits (3700-5400 RPM). "
+            + "cl_master_readiness_eval: FFFF745D set=1 when this <= 1000 (hysteresis). "
+            + "LIKELY RPM given the per-gear thresholds; the 1000 hysteresis = idle RPM range.");
+        count += labelComment(0xFFFF65FC, "vehicle_speed",
+            "Vehicle speed (float). Read by ol_condition_checker (FR15). "
+            + "Compared against OL_Condition_Speed_Lo (CC1F4=130.0) and _Hi (CC1F8=140.0). "
+            + "Speed gate for ol_cond_flag_speed (FFFF7A04).");
+        count += labelComment(0xFFFF6898, "rpm_delta",
+            "RPM change rate / delta (float). Read by ol_condition_checker (FR12). "
+            + "Compared against OL_Condition_RPMDelta_Lo/Hi (CC1DC=691.9/CC1E0=699.9). "
+            + "cl_master_readiness: FFFF7458 set when (FFFF6898 - FFFF620C) <= 570 (RPM delta hyst).");
 
         // ── AFL Application Working Variables ─────────────────────────────────
         count += labelComment(0xFFFF7AC0, "afl_ramp_multiplier",
