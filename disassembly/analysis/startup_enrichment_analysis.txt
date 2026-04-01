@@ -1,0 +1,755 @@
+================================================================================
+STARTUP / CRANKING ENRICHMENT — COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+================================================================================
+
+
+OVERVIEW
+--------
+The startup enrichment system controls fueling from key-on cranking through
+post-start warmup to normal running.  It operates as 5 overlapping layers
+that activate in temporal sequence:
+
+  Layer 1 — Cranking Base Fuel      (IPW tables + compensation multipliers)
+  Layer 2 — Post-Start Enrichment   (LSD + HSD decay system, 26 descriptors)
+  Layer 3 — Warmup Enrichment       (ECT/IAT-indexed, Table B[7])
+  Layer 4 — ECT Warmup Timing Corr  (Table B[19] — timing, NOT fuel)
+  Layer 5 — Tau Cold Multiplier     (ECT-scaled transient enrichment)
+
+Hotstart enrichment is defined in the 32BITBASE template but has NO mapped
+addresses in this ROM revision.  It may be embedded within the warmup
+enrichment function (0x3CD34) but the exact branch has not been isolated.
+
+Temporal flow:
+  KEY ON → Layer 1 active (cranking IPW)
+         → Engine catches → Layer 2 activates (PSE decay begins)
+         → Layer 3 active throughout (warmup enrichment on enrichment_B)
+         → Layer 5 amplifies transients while cold (tau cold multiplier)
+         → Layer 4 adjusts ignition timing for warmup
+         → FFFF85D7 flag set → warmup complete → normal fueling
+
+
+================================================================================
+SECTION 1: CRANKING STATE DETECTION
+================================================================================
+
+Primary cranking gate:  FFFF65F1  (labeled transient_enable_gate)
+  - Value 0 = cranking ACTIVE
+  - Value != 0 = cranking INACTIVE (engine running)
+  - Set by upstream sensor processing (Task 10 at 0xDF14)
+  - No explicit RPM threshold comparison in the cranking fuel path itself;
+    the determination happens upstream based on crank sync + RPM
+
+Secondary engine state bytes:
+  FFFF65C0  engine_state_byte     (State 1 = cranking, State 2 = warmup)
+  FFFF6254  ecu_state_mode_flag   (mode flag for table selection)
+  FFFFA56B  engine_running_flag   (CL readiness edge detection)
+  FFFF65BF  running_flag          (ignition dwell control gate)
+
+The cranking fuel path executes from ISR dispatch entry 15 at 0x4A94C
+(isr_task_scheduler).  Three functions are called in sequence:
+
+  0x4A972 → 0x2FA84  RPM 3D compensation
+  0x4A978 → 0x2FC5C  Cranking IPW table selector
+  0x4A984 → 0x2F974  MAP/Accel/IAT compensation calc
+
+All three gate on FFFF65F1 == 0 before executing.
+
+
+================================================================================
+SECTION 2: CRANKING BASE IPW TABLE SELECTION (0x2FC5C)
+================================================================================
+
+Six ECT-indexed base IPW tables selected by a 2×3 matrix:
+
+  Mode byte A:  FFFF90C1  (possibly AT/MT or cruise/non-cruise)
+  Mode byte B:  FFFF72A1  (operating condition, passed to 0x22F92)
+
+  ┌──────────────┬──────────┬──────────┬──────────┐
+  │              │ B == 0   │ B == 1   │ B >= 2   │
+  ├──────────────┼──────────┼──────────┼──────────┤
+  │ A != 1       │ Table A  │ Table B  │ Table C  │
+  │              │ desc     │ desc     │ desc     │
+  │              │ 0xAC8D0  │ 0xAC8E4  │ 0xAC8F8  │
+  │              │ data     │ data     │ data     │
+  │              │ 0xCD2E6  │ 0xCD306  │ 0xCD326  │
+  ├──────────────┼──────────┼──────────┼──────────┤
+  │ A == 1       │ Table D  │ Table E  │ Table F  │
+  │              │ desc     │ desc     │ desc     │
+  │              │ 0xAC90C  │ 0xAC920  │ 0xAC934  │
+  │              │ data     │ data     │ data     │
+  │              │ 0xCD346  │ 0xCD366  │ 0xCD386  │
+  └──────────────┴──────────┴──────────┴──────────┘
+
+Table format:
+  - 16 entries, uint8 storage
+  - Scale factor: 8.0 (descriptor bytes 12-15 = 0x41000000)
+  - ECT axis: 0xCC624 (16 float32 breakpoints, -40 to 110 deg F)
+  - Output: FFFF72FC (cranking base IPW, float)
+
+Lookup mechanism:
+  Input:  FR4 = float@FFFF6350 (ECT / coolant temperature)
+  Call:   table_lookup_1D @ 0xBE830 with R4 = descriptor pointer
+  Store:  result → FFFF72FC
+
+
+================================================================================
+SECTION 3: CRANKING RPM 3D COMPENSATION (0x2FA84 / 0x2FAD4)
+================================================================================
+
+Entry:  0x2FA84
+Core:   0x2FAD4
+Gate:   FFFF65F1 == 0 AND FFFF726C == 1
+
+Inputs:
+  FR15 = float@FFFF6624  (engine_load)
+  FR14 = float@FFFF6350  (RPM)
+  Mode:  0x22CF4 (engine_mode_check) + FFFF90BE (ect_mode_flag)
+
+Descriptor selection (2D table, RPM × ECT):
+
+  ┌──────────────────────┬──────────────┬──────────────┐
+  │                      │ FFFF90BE = 0 │ FFFF90BE ≠ 0 │
+  ├──────────────────────┼──────────────┼──────────────┤
+  │ mode_check == 1      │ 0xAD55C      │ 0xAD578      │
+  │ (AT/mode1)           │ → 0xCF6B0    │ → 0xCF704    │
+  │                      │ (Non-Cruise) │ (Cruise)     │
+  ├──────────────────────┼──────────────┼──────────────┤
+  │ mode_check != 1      │ 0xAD524      │ 0xAD540      │
+  │                      │ (variant 3)  │ (variant 4)  │
+  └──────────────────────┴──────────────┴──────────────┘
+
+  Lookup:  table_lookup_2D @ 0xBE8E4 with FR4=load, FR5=RPM
+  Output:  FFFF72F0
+
+
+================================================================================
+SECTION 4: CRANKING MAP / ACCEL / IAT COMPENSATION (0x2F974 / 0x2F984)
+================================================================================
+
+Entry:  0x2F974
+Core:   0x2F984
+Gate:   FFFF65F1 == 0 AND FFFF726C == 1
+
+Performs 3 sequential 1D lookups:
+
+  ┌───────┬────────────┬────────────┬───────────────────┬─────────────────────┐
+  │ Step  │ Descriptor │ Data Addr  │ Axis              │ Input RAM           │
+  ├───────┼────────────┼────────────┼───────────────────┼─────────────────────┤
+  │ 1     │ 0xAC34C    │ 0xCC868    │ MAP (184-760 psi) │ FR4 = FFFF620C      │
+  │ 2     │ 0xAC360    │ 0xCC89C    │ Accel (0-90%)     │ FR4 = FFFF64D8      │
+  │ 3     │ 0xAC374    │ 0xCC8BC    │ IAT (-40-120°F)   │ FR4 = FFFF6364      │
+  └───────┴────────────┴────────────┴───────────────────┴─────────────────────┘
+
+Final assembly at 0x2F9E0:
+
+  cranking_ipw = base_ipw(ECT)             [FFFF72FC]
+               × comp_MAP(manifold_press)  [from step 1]
+               × comp_Accel(accel_angle)   [from step 2]
+               × comp_IAT(intake_air_temp) [from step 3]
+               × comp_RPM_3D(RPM, ECT)     [FFFF72F0]
+               × cached_factor             [FFFF72F4]
+
+Result clamped via 0xBE56C and stored as final cranking IPW.
+
+NOTE: The descriptors at 0xAC34C/0xAC360/0xAC374 and the ROM data at
+0xCC868/0xCC89C/0xCC8BC are labeled "Cranking Fuel IPW Compensation" in
+ROM definitions.  The existing analysis labeled the function at 0x2F984
+as "transient fuel correction calculator" — this may indicate dual-use
+depending on FFFF65F1 state (cranking vs running context).
+
+
+================================================================================
+SECTION 5: POST-START ENRICHMENT / PSE (0x30674)
+================================================================================
+
+Function:    0x30674 – 0x30A78  (1028 bytes)
+Descriptors: 0xAC948 – 0xACB3F  (26 entries)
+Tables:      0xCD3A6 – 0xCD666  (13 calibration tables)
+CT Axes:     0xCC624 (primary, 16 float32, -40 to 110°F)
+             0xCC664 (secondary, used by LSD Delay 2 only)
+
+The PSE system uses two independent decay mechanisms:
+
+  LSD (Low Speed Decay)  — coarse, counter-based decay with delay
+  HSD (High Speed Decay) — fine, step-based continuous decay
+
+Both are ECT-indexed: colder engine = more enrichment, longer decay.
+
+
+  ─── LSD Tables ──────────────────────────────────────────────────────────
+
+  Table                   Address   Scaling              Status
+  ──────────────────────  ────────  ───────────────────  ────────
+  LSD Initial 1A          0xCD3A6   ×0.00390625          active
+  LSD Initial 1B          0xCD3C6   ×0.00390625          active
+  LSD Initial 2A          0xCD3E6   ×0.00390625          active
+  LSD Initial 2B          0xCD406   ×0.00390625          active
+  LSD Delay 1             0xCD426   direct uint16        flat=38
+  LSD Delay 2             0xCD586   direct uint16        all zeros
+  LSD Delay Multiplier    0xCD666   ×0.0078125           active
+
+  LSD Logic:
+    1. On engine start, load LSD Initial values (1A/1B/2A/2B) from ECT
+    2. Wait for LSD Delay cycles (38 at all ECT in stock tune)
+    3. After delay expires, decrement enrichment by step each cycle
+    4. Delay Multiplier scales the delay count
+
+
+  ─── HSD Tables ──────────────────────────────────────────────────────────
+
+  Table                   Address   Scaling              Status
+  ──────────────────────  ────────  ───────────────────  ────────
+  HSD InitStart 1A        0xCD446   ×0.000244140625      active
+  HSD InitStart 1B        0xCD4A6   ×0.000244140625      active
+  HSD InitStart 2A        0xCD4E6   ×0.000244140625      active
+  HSD InitStart 2B        0xCD546   ×0.000244140625      active
+  HSD Step Value 1        0xCD5A6   ×9.5367e-7           active
+  HSD Step Value 2        0xCD5E6   ×9.5367e-7           active
+
+  HSD Logic:
+    1. On engine start, load HSD Initial Start values from ECT
+    2. Each cycle, subtract HSD Step Value from current enrichment
+    3. Extremely fine resolution (9.5e-7 per step) = very gradual decay
+    4. No delay — begins decaying immediately
+
+
+  ─── A/B Pairs ───────────────────────────────────────────────────────────
+
+  Both LSD and HSD have pairs: 1A/1B and 2A/2B.  The A/B selection is
+  controlled by mode flags (same FFFF90C1/FFFF72A1 matrix as cranking IPW).
+  The 1/2 pair may represent different engine operating conditions
+  (e.g., idle vs off-idle post-start).
+
+
+  ─── PSE Descriptor Map ──────────────────────────────────────────────────
+
+  Addr      Name                          Data Addr  Axis     Scale
+  ────────  ────────────────────────────  ─────────  ───────  ─────────────
+  0xAC948   PSE_Desc_LSD_Initial_1A       0xCD3A6    0xCC624  Decay1
+  0xAC95C   PSE_Desc_LSD_Initial_1B       0xCD3C6    0xCC624  Decay1
+  0xAC970   PSE_Desc_LSD_Initial_2A       0xCD3E6    0xCC624  Decay1
+  0xAC984   PSE_Desc_LSD_Initial_2B       0xCD406    0xCC624  Decay1
+  0xAC998   PSE_Desc_LSD_Delay_1          0xCD426    0xCC624  direct
+  0xAC9A4   PSE_Desc_HSD_InitStart_1A     0xCD446    0xCC624  Decay
+  0xAC9B8   PSE_Desc_HSD_InitStart_Zero1  0xCD466    —        zeros
+  0xAC9CC   PSE_Desc_HSD_InitStart_Zero2  0xCD486    —        zeros
+  0xAC9E0   PSE_Desc_HSD_InitStart_1B     0xCD4A6    0xCC624  Decay
+  0xAC9F4   PSE_Desc_HSD_InitStart_Zero3  0xCD4C6    —        zeros
+  0xACA08   PSE_Desc_HSD_InitStart_2A     0xCD4E6    0xCC624  Decay
+  0xACA1C   PSE_Desc_HSD_InitStart_Zero4  0xCD506    —        zeros
+  0xACA30   PSE_Desc_HSD_InitStart_Zero5  0xCD526    —        zeros
+  0xACA44   PSE_Desc_HSD_InitStart_2B     0xCD546    0xCC624  Decay
+  0xACA58   PSE_Desc_HSD_InitStart_Zero6  0xCD566    —        zeros
+  0xACA6C   PSE_Desc_LSD_Delay_2          0xCD586    0xCC664  direct
+  0xACA78   PSE_Desc_HSD_StepValue_1      0xCD5A6    0xCC624  Decay2
+  0xACA8C   PSE_Desc_HSD_StepValue_Zero1  0xCD5C6    —        zeros
+  0xACAA0   PSE_Desc_HSD_StepValue_2      0xCD5E6    0xCC624  Decay2
+  0xACAB4   PSE_Desc_HSD_StepValue_Zero2  0xCD606    —        zeros
+  0xACAC8   PSE_Desc_HSD_StepValue_Zero3  0xCD626    —        zeros
+  0xACADC   PSE_Desc_HSD_StepValue_Zero4  0xCD646    —        zeros
+  0xACAF0   PSE_Desc_LSD_DelayMult        0xCD666    0xCC624  Decay4
+  0xACB04   PSE_Desc_LSD_DelayMult_Zero   0xCD686    —        zeros
+  0xACB18   PSE_Desc_HSD_InitStart_Extra1 0xCD6A6    —        zeros
+  0xACB2C   PSE_Desc_HSD_InitStart_Extra2 0xCD6C6    —        zeros
+
+  Code literal pool pointers (function 0x30674):
+    0x30674 → 0xAC970 (LSD Init 2A)      0x309EC → HSD Init group start
+    0x30684 → 0xAC984 (LSD Init 2B)      0x30A04 → 0xAC9A4 (HSD Init 1A)
+    0x30688 → 0xAC948 (LSD Init 1A)      0x30A10 → 0xAC9E0 (HSD Init 1B)
+    0x3068C → 0xAC95C (LSD Init 1B)      0x30A0C → 0xACA08 (HSD Init 2A)
+    0x306CC → 0xAC998 (LSD Delay 1)      0x30A18 → 0xACA44 (HSD Init 2B)
+    0x30A3C → 0xACA6C (LSD Delay 2)      0x30A60 → 0xACA78 (HSD Step 1)
+    0x30A4C → LSD DelayMult + extra       0x30A6C → 0xACAA0 (HSD Step 2)
+
+
+================================================================================
+SECTION 6: WARMUP ENRICHMENT (0x3CD34 — Table B[7])
+================================================================================
+
+Function:  0x3CD34  (fuel_warmup_enrich / warmup_coldstart_enrichment)
+Pipeline:  fuel_dispatch_table_B[7]
+Output:    FFFF7878  (fuel_enrichment_B, float — additive term)
+
+Structure — wrapper calling 4 sub-functions:
+
+  0x3CD34: STS.L  PR,@-R15
+  0x3CD36: BSR    0x3D0B8         ; pre-computation
+  0x3CD3A: BSR    0x3CD4A         ; main warmup body (~260 bytes)
+  0x3CD3E: BSR    0x3CF96         ; post-processing
+  0x3CD42: BRA    0x3CFDA         ; finalizer (tail-jump)
+
+Separate thunk entry at 0x3CD46 → FUN_0003d21a.
+
+
+  ─── Inputs ──────────────────────────────────────────────────────────────
+
+  FFFF69FC  ECT (coolant temperature, float)
+  FFFF69F0  IAT (intake air temperature, float)
+  FFFF7448  fuel mode flag
+  FFFF7453  fuel status
+  FFFF6254  ECU state/mode flag
+  FFFF8F24  global CL enable flag
+  FFFF7885  fuel enrichment status byte
+  FFFF7C68  engine status flag (gates AFL)
+  FFFF94B1  status byte
+  FFFFA56A  status flag
+  FFFFAF3B  falling mode byte
+  FFFFACE6  status flag
+
+
+  ─── Subroutines Called ──────────────────────────────────────────────────
+
+  0x022F92  common condition/gate checker
+  0x0278D2  code helper
+  0x0278DE  code helper
+  0x01CF52  code helper
+  0x0298C8  code helper
+  0x029BA4  code helper
+  0x0BDBCC  1D interpolation (table lookup variant)
+  0x0BE980  interpolation function
+  0x0BDCB6  interpolation function
+  0x0BE608  float interpolation function
+
+
+  ─── Calibration References ──────────────────────────────────────────────
+
+  0xCC56C  workspace defaults (initialization values)
+  0xCC548  calibration constant
+  0xCBC0F  calibration constant
+
+  Scale constants in literal pool:
+    0x39800000 = 0.000244140625  (1/4096)
+    0x3A000000 = 0.00048828125   (1/2048)
+
+
+  ─── Time-Based Mode Switch (FUN_0003d21a) ───────────────────────────────
+
+  Called via thunk at 0x3CD46.  Implements a run-time-dependent mode switch:
+
+    FFFF6A22  engine run time counter (uint16)
+    0xCBC42   ROM threshold (uint16)
+    0xCC56C   cal value A (float, used when run_time < threshold)
+    0xCC568   cal value B (float, used when run_time >= threshold)
+    FFFF7D70  output (float)
+
+  Logic:
+    if (run_time < threshold)
+        FFFF7D70 = float@CC56C
+    else
+        FFFF7D70 = float@CC568
+
+  This likely discriminates between early-start and warmup-complete
+  enrichment base values.
+
+
+  ─── Output Path ─────────────────────────────────────────────────────────
+
+  Result written to FFFF7878 (fuel_enrichment_B).  This is an additive
+  term in the final IPW formula at fuel_pulse_width_calc @ 0x301E4:
+
+    FR8 = enrichment_A + enrichment_B + enrichment_C
+    FR8 *= base_factor
+    FR9 = AFL_multiplier × FR8
+    → per-cylinder IPW
+
+
+  ─── Warmup Complete Flag ────────────────────────────────────────────────
+
+  FFFF85D7  warmup_complete / afc_enable_flag_B / fuel_system_state
+    - 60 references across the ROM
+    - Read by: AFC PI controller (0x340A0), AFL learning, CL/OL transition,
+      diagnostic readiness (0x60392), ignition timing, idle control
+    - Writer: not definitively identified — likely set by ECT sensor
+      processing chain (e.g., 0x588F0) when ECT exceeds threshold
+    - Purpose: master gate for warmup→running transition across ALL
+      subsystems (fuel, timing, diagnostics, CL enable)
+
+
+================================================================================
+SECTION 7: ECT WARMUP TIMING CORRECTION (0x403C4 — Table B[19])
+================================================================================
+
+  *** NOTE: Despite executing in fueling pipeline B, this is an IGNITION ***
+  *** TIMING correction, not a fuel enrichment function.                 ***
+
+Function:  0x403C4  (ect_warmup_correction)
+Pipeline:  fuel_dispatch_table_B[19]
+Output:    FFFF7F68  (ect_warmup_correction, float)
+Consumer:  0x3F374  (ect_warmup_consumer, 2050 bytes — per-cylinder timing)
+
+Mode selection — 2 flags select among 4 ECT curves:
+
+  Flag A:  FFFF90BE  (ect_mode_flag)
+  Flag B:  FFFF6254  (ecu_state_mode_flag)
+
+  ┌──────────────┬────────────────────┬────────────────────┐
+  │              │ Flag B == 1        │ Flag B != 1        │
+  ├──────────────┼────────────────────┼────────────────────┤
+  │ Flag A == 0  │ desc 0xADBC4       │ desc 0xADBD8       │
+  │              │ data 0xD3206       │ data 0xD3216       │
+  ├──────────────┼────────────────────┼────────────────────┤
+  │ Flag A != 0  │ desc 0xADBEC       │ desc 0xADC00       │
+  │              │ data 0xD3226       │ data 0xD3236       │
+  └──────────────┴────────────────────┴────────────────────┘
+
+Descriptor format:
+  - 1D, 16 elements, int16 storage
+  - Scale: 0.351562, Bias: -45.0
+  - ECT axis: 0xD2F8C (16 float32, -40 to 110°C)
+
+Stock ROM values (all 4 curves identical):
+  ECT(°C):  -40   -30   -20   -10    0    10    20    30
+  Value:     8.1   8.1   8.1   8.1  7.0   5.6   3.9   3.2
+
+  ECT(°C):   40    50    60    70   80    90   100   110
+  Value:     2.1   1.1   0.0   0.0  0.0   0.0  -2.1  -3.9
+
+Interpretation:
+  - Positive values = timing ADVANCE when cold
+  - Zero at 60-70°C = no correction at operating temperature
+  - Negative values = timing RETARD when overheated (>90°C)
+
+Consumer function 0x3F374:
+  - Reads FFFF7F68
+  - Outputs per-cylinder timing corrections:
+    FFFF7E94  warmup_corr_cyl1 (float)
+    FFFF7E98  warmup_corr_cyl2 (float)
+    FFFF7E9C  warmup_corr_cyl3 (float)
+    (+ additional per-channel outputs)
+  - Embedded subs:
+    0x3FA8C  warmup_state_init
+    0x3FACE  warmup_mode_transition
+
+
+================================================================================
+SECTION 8: TAU COLD MULTIPLIER (Startup-Relevant Transient Enrichment)
+================================================================================
+
+The tau (load-rate transient) system provides ECT-dependent enrichment
+scaling.  While it operates at all temperatures, the cold-engine multipliers
+are extremely aggressive, making it a significant contributor to startup
+enrichment even though it is primarily a transient compensation system.
+
+See: tau_alpha_analysis.txt for full details.
+
+  Rising tau handler:  0x03735A
+  Falling tau handler: 0x03740C
+
+  ─── Rising Load Multipliers (3×16, Load × ECT) ──────────────────────
+
+  Table: 0xCD6E6  (Tau_RisingLoad_A)
+
+  At -40°F:  3.40×  (nearly 14× the warm value)
+  At  70°F:  0.75×
+  At 110°F:  0.25×
+
+  Cold engines get dramatically more transient fuel to compensate for
+  fuel film wetting on cold intake manifold walls.
+
+
+  ─── Falling Load Multipliers (1×16, ECT only) ───────────────────────
+
+  Table: 0xCD746  (Tau_FallingLoad primary)
+
+  At -40°F:  1.42×
+  At  70°F:  0.45×
+  At 110°F:  0.30×
+
+  Additional variants:
+    0xCD766  Tau_FallingLoad_A  — flat 0.50× (no ECT correction)
+    0xCD848  Tau_FallingLoad_B  — mild ECT sensitivity
+    0xCD868  Tau_FallingLoad_C  — aggressive warm cutoff (zeros at 90°F+)
+
+
+================================================================================
+SECTION 9: HOTSTART ENRICHMENT (UNMAPPED)
+================================================================================
+
+Hotstart enrichment is defined in the 32BITBASE.xml definition template
+under category "Alpha Hotstart" but has NO ROM addresses assigned in the
+AE5L600L-specific definition file.
+
+Defined tables (addresses unknown in this ROM):
+  hot_restart_enrich_initial_high           — Initial high enrichment value
+  hot_restart_enrich_initial_low            — Initial low enrichment value
+  hot_restart_enrich_initial_high_activat_min_coolant_temp
+  hot_restart_enrich_initial_high_activat_min_intake_temp
+  hot_restart_enrich_initial_low_activat_min_coolant_temp
+  hot_restart_enrich_initial_low_activat_min_intake_temp
+  hot_restart_enrich_decay_delay            — Delay before decay begins
+  hot_restart_enrich_decay_step_value       — Step value per cycle
+  hot_restart_enrich_max_non_idle           — Non-idle cap after delay
+  hot_restart_enrich_max_non_idle_activation_max_run_time
+  hot_restart_enrich_min_limit              — Minimum enrichment floor
+  hot_restart_enrich_min_lim_activat_max_run_time
+
+Expected logic (from 32BITBASE descriptions):
+  1. On hot restart: check ECT ≥ high_threshold AND IAT ≥ high_threshold
+     → if both met, use initial_high enrichment
+     → else check low thresholds → use initial_low
+  2. After decay_delay cycles, subtract decay_step_value each cycle
+  3. Minimum floor enforced during delay + configurable runtime
+  4. Non-idle enrichment capped at max_non_idle after separate delay
+
+Most likely location: embedded within warmup enrichment 0x3CD34 as a
+conditional branch on high ECT, or could be a separate function not yet
+identified.  The time-based mode switch at FUN_0003d21a (comparing engine
+run time against threshold) may be part of the hotstart/warmstart
+discrimination logic.
+
+
+================================================================================
+SECTION 10: INTEGRATION — COMPLETE STARTUP FUEL FLOW
+================================================================================
+
+Phase 1 — CRANKING (FFFF65F1 == 0)
+──────────────────────────────────────────────
+  Executed from ISR entry 15 @ 0x4A94C:
+    1. RPM 3D compensation lookup → FFFF72F0
+    2. Base IPW table selection (A-F by mode) → FFFF72FC
+    3. MAP × Accel × IAT compensation → multiply chain
+    4. Final: cranking_ipw = base × MAP × Accel × IAT × RPM3D × cache
+
+  Bypasses: entire fuel_dispatch_table_A/B pipeline
+  Duration: until FFFF65F1 transitions to non-zero
+
+
+Phase 2 — POST-START (engine catches, RPM rises)
+──────────────────────────────────────────────
+  FFFF65F1 → non-zero (cranking fuel path disabled)
+  Normal fuel pipeline activates (Table A + Table B dispatch)
+
+  PSE system (0x30674) initializes:
+    - LSD accumulators loaded from ECT-indexed Initial tables
+    - HSD accumulators loaded from ECT-indexed InitStart tables
+    - LSD delay counter set from ECT-indexed Delay table (stock: 38 cycles)
+    - HSD begins immediate step decay (no delay)
+
+  Warmup enrichment (0x3CD34) active:
+    - ECT/IAT indexed enrichment written to enrichment_B (FFFF7878)
+    - Time-based mode switch (0x3D21A) selects cal base value
+
+
+Phase 3 — WARMUP (engine running, ECT rising)
+──────────────────────────────────────────────
+  PSE decay progressing:
+    - LSD: after delay expires, decrements toward zero
+    - HSD: continuous fine-grained step decay toward zero
+    - Both rate-dependent on ECT (colder = more initial, slower decay)
+
+  Warmup enrichment (0x3CD34) continues:
+    - Enrichment value decreasing as ECT rises
+    - Multiple conditional paths based on mode flags
+
+  Tau cold multiplier active:
+    - Load transients get 3.4× enrichment at -40°F vs 0.25× at 110°F
+    - Progressively reduces as engine warms
+
+  ECT timing correction (0x403C4) active:
+    - Up to 8.1° advance when very cold
+    - Tapers to 0° at 60-70°C
+    - Helps maintain combustion quality on cold engine
+
+
+Phase 4 — WARMUP COMPLETE (FFFF85D7 set)
+──────────────────────────────────────────────
+  Flag FFFF85D7 transitions → warmup complete
+  Effects across all subsystems:
+    - AFC PI controller enabled (0x340A0)
+    - AFL learning unlocked
+    - CL/OL transition allowed (CL fueling can engage)
+    - Diagnostic readiness flags set (0x60392)
+    - Warmup enrichment and PSE fully decayed to zero
+    - Tau multipliers at warm values (0.25× rising, 0.30× falling)
+    - ECT timing correction at zero (60-70°C) or slightly negative
+
+
+================================================================================
+SECTION 11: COMPLETE CALIBRATION TABLE CATALOG
+================================================================================
+
+  ─── Cranking Base IPW (ECT-indexed, 2D) ─────────────────────────────
+
+  Address   Name                              Scale        Axis
+  ────────  ────────────────────────────────  ───────────  ──────
+  0xCD2E6   Cranking Fuel IPW A (ECT)         IPW(ms)      0xCC624
+  0xCD306   Cranking Fuel IPW B (ECT)         IPW(ms)      0xCC624
+  0xCD326   Cranking Fuel IPW C (ECT)         IPW(ms)      0xCC624
+  0xCD346   Cranking Fuel IPW D (ECT)         IPW(ms)      0xCC624
+  0xCD366   Cranking Fuel IPW E (ECT)         IPW(ms)      0xCC624
+  0xCD386   Cranking Fuel IPW F (ECT)         IPW(ms)      0xCC624
+
+  ─── Cranking Compensation (various axes) ────────────────────────────
+
+  0xCC868   Cranking Comp (MAP)               (x×.78125)-100%  MAP axis
+  0xCC89C   Cranking Comp (Accelerator)       (x×.78125)-100%  Accel axis
+  0xCC8BC   Cranking Comp (IAT)               (x×.78125)-100%  IAT axis
+  0xCF6B0   Cranking Comp 3D Non-Cruise (RPM) (x×.78125)-100%  RPM×ECT
+  0xCF704   Cranking Comp 3D Cruise (RPM)     (x×.78125)-100%  RPM×ECT
+
+  ─── Post-Start Enrichment LSD ───────────────────────────────────────
+
+  0xCD3A6   PSE LSD Initial 1A                ×0.00390625      0xCC624
+  0xCD3C6   PSE LSD Initial 1B                ×0.00390625      0xCC624
+  0xCD3E6   PSE LSD Initial 2A                ×0.00390625      0xCC624
+  0xCD406   PSE LSD Initial 2B                ×0.00390625      0xCC624
+  0xCD426   PSE LSD Delay 1                   direct uint16    0xCC624
+  0xCD586   PSE LSD Delay 2                   direct uint16    0xCC664
+  0xCD666   PSE LSD Delay Multiplier          ×0.0078125       0xCC624
+
+  ─── Post-Start Enrichment HSD ───────────────────────────────────────
+
+  0xCD446   PSE HSD InitStart 1A              ×0.000244140625  0xCC624
+  0xCD4A6   PSE HSD InitStart 1B              ×0.000244140625  0xCC624
+  0xCD4E6   PSE HSD InitStart 2A              ×0.000244140625  0xCC624
+  0xCD546   PSE HSD InitStart 2B              ×0.000244140625  0xCC624
+  0xCD5A6   PSE HSD Step Value 1              ×9.5367e-7       0xCC624
+  0xCD5E6   PSE HSD Step Value 2              ×9.5367e-7       0xCC624
+
+  ─── Warmup Enrichment Calibration ───────────────────────────────────
+
+  0xCC56C   Warmup workspace defaults (float)
+  0xCC568   Warmup alt cal value (float, post-threshold)
+  0xCC548   Warmup calibration constant
+  0xCBC0F   Warmup calibration constant
+  0xCBC42   Warmup run-time threshold (uint16)
+
+  ─── ECT Warmup Timing Correction ───────────────────────────────────
+
+  0xD3206   ECT Timing Curve 1 (A=0, B=1)    ×0.351562-45     0xD2F8C
+  0xD3216   ECT Timing Curve 2 (A=0, B≠1)    ×0.351562-45     0xD2F8C
+  0xD3226   ECT Timing Curve 3 (A≠0, B=1)    ×0.351562-45     0xD2F8C
+  0xD3236   ECT Timing Curve 4 (A≠0, B≠1)    ×0.351562-45     0xD2F8C
+
+  ─── Tau Cold Multipliers ────────────────────────────────────────────
+
+  0xCD6E6   Tau Rising Load A (3×16)          multiplier       Load×ECT
+  0xCD746   Tau Falling Load (1×16)           multiplier       ECT
+  0xCD766   Tau Falling Load A                multiplier       flat 0.50×
+  0xCD848   Tau Falling Load B                multiplier       ECT (mild)
+  0xCD868   Tau Falling Load C                multiplier       ECT (aggressive)
+
+
+================================================================================
+SECTION 12: COMPLETE RAM VARIABLE CATALOG
+================================================================================
+
+  ─── Cranking State & Control ────────────────────────────────────────
+
+  Address     Name                    Type     Purpose
+  ──────────  ──────────────────────  ───────  ─────────────────────────
+  FFFF65F1    cranking_gate           byte     0=cranking, ≠0=running
+  FFFF65C0    engine_state_byte       byte     1=crank, 2=warmup, etc.
+  FFFF6254    ecu_state_mode_flag     byte     table/curve selection
+  FFFF65BF    running_flag            byte     ignition dwell gate
+  FFFFA56B    engine_running_flag     byte     CL readiness edge detect
+
+  ─── Cranking Fuel Variables ─────────────────────────────────────────
+
+  FFFF90C1    mode_byte_A             byte     IPW table selection (row)
+  FFFF72A1    mode_byte_B             byte     IPW table selection (col)
+  FFFF72FC    cranking_base_ipw       float    base IPW from ECT lookup
+  FFFF72F0    rpm_3d_comp             float    RPM 3D compensation result
+  FFFF72E8    map_comp_result         float    MAP compensation result
+  FFFF72F4    comp_factor_accum       float    accumulated comp factor
+  FFFF7300    comp_factor_accum2      float    accumulated comp factor 2
+  FFFF726C    transient_state_flag    byte     must == 1 for comp calc
+
+  ─── Warmup Enrichment Variables ─────────────────────────────────────
+
+  FFFF7878    fuel_enrichment_B       float    warmup/transient enrichment
+  FFFF7D70    warmup_mode_output      float    time-based mode switch out
+  FFFF69FC    ECT_input               float    coolant temp for lookups
+  FFFF69F0    IAT_input               float    intake air temp for lookups
+  FFFF6A22    engine_run_time         uint16   run time counter
+  FFFF7448    fuel_mode_flag          —        fuel mode state
+  FFFF7453    fuel_status             —        fuel status byte
+  FFFF7885    fuel_enrich_status      byte     enrichment status
+  FFFF85D7    warmup_complete         byte     master warmup-done flag
+
+  ─── ECT Timing Correction Variables ─────────────────────────────────
+
+  FFFF90BE    ect_mode_flag           byte     timing curve selection
+  FFFF6350    ECT_float               float    coolant temp (timing input)
+  FFFF7F68    ect_warmup_correction   float    timing correction output
+  FFFF7E94    warmup_corr_cyl1        float    per-cylinder timing adj
+  FFFF7E98    warmup_corr_cyl2        float    per-cylinder timing adj
+  FFFF7E9C    warmup_corr_cyl3        float    per-cylinder timing adj
+
+  ─── Miscellaneous Status ────────────────────────────────────────────
+
+  FFFF8F24    global_CL_enable        byte     CL enable flag
+  FFFF7C68    engine_status_flag      —        gates AFL
+  FFFF94B1    status_byte             byte     referenced in AFL
+  FFFFA56A    status_flag             —        additional status
+  FFFFAF3B    falling_mode_byte       byte     falling load transient
+  FFFFACE6    status_flag             —        additional status
+
+
+================================================================================
+SECTION 13: CROSS-REFERENCES TO OTHER ANALYSES
+================================================================================
+
+  fueling_pipeline_analysis.txt
+    - Table B[7]  = warmup enrichment (Section 6 of this document)
+    - Table B[19] = ECT timing correction (Section 7 — NOT fuel enrichment)
+    - 0x30674     = PSE (additional function, not in dispatch table)
+    - 0x301E4     = fuel_pulse_width_calc (combines enrichment_B)
+    - 0x320AE     = final fuel correction accumulator
+
+  tau_alpha_analysis.txt
+    - Cold engine tau multipliers (Section 8 of this document)
+    - Rising/falling load handlers @ 0x03735A / 0x03740C
+
+  cl_ol_master_analysis.txt / cl_ol_state_machine.txt
+    - FFFF85D7 warmup_complete flag gates CL/OL transition
+    - No cranking fuel logic in CL/OL state machine
+
+  ignition_timing_analysis.txt
+    - FFFF65C0 State 1 = cranking timing path @ 0x4369E
+    - ECT timing correction feeds into per-cylinder timing
+
+  injector_deadtime_analysis.txt
+    - Dead time (0x303C0 → FFFF7350) added AFTER enrichment calculation
+    - Applied per-injection by ATU callback cluster
+
+
+================================================================================
+SECTION 14: TUNING NOTES
+================================================================================
+
+Cranking IPW:
+  - Adjust tables A-F at 0xCD2E6-0xCD386 for cold-start IPW
+  - Most tuners only need table A (FFFF90C1 ≠ 1, FFFF72A1 == 0)
+  - Compensation tables (MAP/Accel/IAT) are percentage offsets from
+    base IPW — adjust for altitude, turbo, or intake modifications
+
+Post-Start Enrichment:
+  - LSD controls the "big" post-start enrichment pulse — adjust Initial
+    tables (0xCD3A6-0xCD406) for cold-start richness
+  - LSD Delay (0xCD426, stock flat=38) controls how long before decay
+  - HSD controls the fine tail — adjust InitStart (0xCD446-0xCD546)
+    for the total post-start enrichment bump, Step Value (0xCD5A6/0xCD5E6)
+    for decay rate
+  - All tables are ECT-indexed: tune cold bins first, warm bins should
+    be near-zero in stock
+
+Warmup Enrichment:
+  - Controlled by 0x3CD34, writes to enrichment_B
+  - The run-time threshold at 0xCBC42 controls when the enrichment
+    base value switches from early-start to post-warmup mode
+  - Enrichment_B is ADDITIVE to enrichment_A and enrichment_C in the
+    final IPW formula — large values here directly add milliseconds
+
+Timing Correction:
+  - 0x403C4 adds timing advance when cold (up to 8.1° in stock)
+  - Retards timing when overheated (up to -3.9° at 110°C)
+  - All 4 curves are identical in stock — tune only if you need
+    mode-specific warmup timing behavior
+
+General:
+  - FFFF85D7 is the master warmup gate — until it sets, the engine
+    runs in OL with all enrichment layers active and CL disabled
+  - The exact conditions that set FFFF85D7 need further investigation
+    (likely ECT threshold + time, set by sensor processing chain)
