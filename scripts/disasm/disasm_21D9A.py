@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Disassemble sub_21D9A from Subaru ECU ROM (SH7058, SH-2A, Big-Endian)."""
+"""Disassemble sub_21D9A from Subaru ECU ROM (SH7058, SH-2, Big-Endian)."""
 
 import struct
 

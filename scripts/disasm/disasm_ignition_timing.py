@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Ignition Timing Subsystem Disassembly - AE5L600L ROM
-Disassembles all key ignition timing functions with SH-2A ISA decoder.
+Disassembles all key ignition timing functions with SH-2 ISA decoder.
 Output: ASCII only, no unicode characters.
 """
 import struct, sys, os
@@ -607,7 +607,7 @@ for name, start, end in cal_regions:
 # --- Part 2: Function Disassembly ---
 emit("")
 emit("=" * 78)
-emit("PART 2: FUNCTION DISASSEMBLY (SH-2A ISA)")
+emit("PART 2: FUNCTION DISASSEMBLY (SH-2 ISA)")
 emit("=" * 78)
 
 for func_name, func_addr, max_insns in functions:

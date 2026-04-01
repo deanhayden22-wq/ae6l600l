@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Knock detection and FLKC (Fine Learning Knock Correction) disassembly analysis.
-AE5L600L - 2013 Subaru WRX - SH7058 / SH-2A architecture
+AE5L600L - 2013 Subaru WRX - SH7058 / SH-2 architecture
 
 Functions covered:
   0x043750  knock_wrapper          - cylinder gate + status check
@@ -141,7 +141,7 @@ for i in range(8):
 ADC_CHAN_MAP[0x58] = "ADCSR2"; ADC_CHAN_MAP[0x59] = "ADCR2"
 
 # ---------------------------------------------------------------------------
-# Decoder (SH-2A)
+# Decoder (SH-2)
 # ---------------------------------------------------------------------------
 def sign_extend_8(val):
     return val - 0x100 if val & 0x80 else val

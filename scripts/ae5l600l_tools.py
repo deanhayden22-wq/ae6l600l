@@ -2,10 +2,10 @@
 """
 AE5L600L ECU ROM Analysis Toolkit
 ===================================
-Consolidated toolset for Subaru AE5L600L (SH7058 / SH-2A) ROM analysis.
+Consolidated toolset for Subaru AE5L600L (SH7058 / SH-2) ROM analysis.
 
 Modules:
-  disasm  — SH-2/SH-2A disassembler with knock/fuel analysis targets
+  disasm  — SH-2 disassembler with knock/fuel analysis targets
   clol    — CL/OL mode flag function trace (FFFF7448 writer at 0x034600)
   tasks   — 59-entry periodic task table dump with instruction peek
   tipin   — Tip-in enrichment vs Tau (alpha transient fueling) analysis
@@ -151,7 +151,7 @@ def read_uint8s(rom, addr, count):
 # ═════════════════════════════════════════════════════════════════════════════
 
 def decode_insn(code, pc, rom):
-    """Decode a single 16-bit SH-2/SH-2A instruction. Returns (mnemonic, length)."""
+    """Decode a single 16-bit SH-2 instruction. Returns (mnemonic, length)."""
     n = (code >> 8) & 0xF
     m = (code >> 4) & 0xF
     d = code & 0xF
@@ -614,7 +614,7 @@ def cmd_disasm(rom, rom_path, args):
     """Handle 'disasm' subcommand."""
     print(f"; ROM: {rom_path}")
     print(f"; Size: {len(rom)} bytes (0x{len(rom):X})")
-    print(f"; SH-2/SH-2A Big-Endian Disassembly")
+    print(f"; SH-2 Big-Endian Disassembly")
     print()
 
     if not args or args[0] == "all":

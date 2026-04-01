@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Disassemble the AFC PI Controller function at ROM address 0x342A8
-from the Subaru ECU ROM (SH7058, SH-2A, Big-Endian).
+from the Subaru ECU ROM (SH7058, SH-2, Big-Endian).
 """
 
 import struct

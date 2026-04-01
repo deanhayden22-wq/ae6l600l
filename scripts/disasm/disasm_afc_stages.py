@@ -3,7 +3,7 @@
 Disassemble the unanalyzed AFC pipeline stages from CL_fuel_dispatcher.
 Stages 3-5 (0x33658, 0x33FCE, 0x340A0) and stages 7-8 (0x3439E, 0x343CE).
 
-AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2A, Big-Endian)
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2, Big-Endian)
 """
 
 import struct
@@ -277,7 +277,7 @@ def classify_addr(addr):
 
 
 def disassemble_one(rom, pc):
-    """Disassemble a single SH-2A instruction at pc."""
+    """Disassemble a single SH-2 instruction at pc."""
     opcode = read_u16(rom, pc)
     nib0 = (opcode >> 12) & 0xF
     nib1 = (opcode >> 8) & 0xF
@@ -843,7 +843,7 @@ def main():
     print()
     print("=" * 110)
     print("  AFC PIPELINE -- UNANALYZED STAGES DISASSEMBLY")
-    print("  AE5L600L (2013 Subaru WRX MT) — SH7058 (SH-2A)")
+    print("  AE5L600L (2013 Subaru WRX MT) — SH7058 (SH-2)")
     print("=" * 110)
     print()
     print("  Pipeline order (from CL_fuel_dispatcher @ 0x33304):")

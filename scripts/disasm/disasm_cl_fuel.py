@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Disassemble CL fuel target functions from Subaru ECU ROM (SH7058, SH-2A, Big-Endian)."""
+"""Disassemble CL fuel target functions from Subaru ECU ROM (SH7058, SH-2, Big-Endian)."""
 
 import struct
 import sys
@@ -614,7 +614,7 @@ def disasm_function(start_addr, name, max_instr=500):
 # ============================================================
 
 print("=" * 80)
-print("  SH-2A ROM Disassembly: CL Fuel Target Functions")
+print("  SH-2 ROM Disassembly: CL Fuel Target Functions")
 print("  ROM:", ROM_PATH)
 print("  ROM size:", len(ROM), "bytes")
 print("=" * 80)

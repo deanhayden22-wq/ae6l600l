@@ -1,18 +1,17 @@
 ================================================================================
 SH7058 ECU ROM Disassembly
 ROM: 2013 USDM Subaru Impreza WRX MT  |  Part: AE5L600L
-MCU: Renesas SH7058  |  Arch: SH-2A Big-Endian  |  ROM Base: 0x00000000
+MCU: Renesas SH7058  |  Arch: SH-2 Big-Endian  |  ROM Base: 0x00000000
 RAM: 0xFFFF8000-0xFFFFFFFF (32KB)  |  ROM Size: 1MB (0x100000)
 ECU ID: 8A12587007  |  Flash Method: subarucan  |  Checksum: subarudbw
-ROM Variant: rev 20.2 "tiny wrex"  |  Ghidra: 12.0.2 SuperH:BE:32:SH-2A
+ROM Variant: rev 20.2 "tiny wrex"  |  Ghidra: 12.0.2 SuperH:BE:32:SH-2
 Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ================================================================================
 
 ; ═════════════════════════════════════════════════════════════════════════════
-; GHIDRA ANALYSIS SUMMARY (SuperH:BE:32:SH-2A)
+; GHIDRA ANALYSIS SUMMARY (SuperH:BE:32:SH-2)
 ; ═════════════════════════════════════════════════════════════════════════════
-; Processor: SuperH:BE:32:SH-2A:default (upgrade from SH-2 for 32-bit branch
-;            instructions, FPU ops, and wider opcode coverage)
+; Processor: SuperH:BE:32:SH-2:default
 ; Tool: Ghidra 12.0.2  |  Exported: 2026-03-08
 ;
 ; ─── Analysis Statistics ───────────────────────────────
@@ -44,7 +43,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   0x000BECA8  LowPW_AxisLookup
 ;
 ; ─── Bad Instruction Errors (13) ───────────────────────
-;   These are data-in-code conflicts, not SH-2A decoder failures.
+;   These are data-in-code conflicts, not SH-2 decoder failures.
 ;   0x001034  conflicting data (flow from 0x001032)
 ;   0x001050  conflicting data (flow from 0x00104E)
 ;   0x00760A  conflicting data (flow from self)
@@ -64,8 +63,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ;   0x584C8  0x9EE48  0xA95BA  0xBE81C  0xBE9A0  0xBEA6C
 ;
 ; ─── Thunk Functions (101) ─────────────────────────────
-;   SH-2A's wider instruction set enables Ghidra to identify indirect jump
-;   trampolines that SH-2 could not follow. Notable multi-target thunks:
+;   Notable multi-target thunks:
 ;     FUN_00022CB6 <- 4 thunks (0x2271C, 0x22720, 0x22724, 0x22728)
 ;     FUN_00006316 <- 2 thunks (0x0F694, 0x0F772)
 ;     FUN_00058964 <- 2 thunks (0x588FA, 0x588FE)
@@ -836,7 +834,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ; ═════════════════════════════════════════════════════════════════════════════
 ; KNOCK DETECTION & FLKC (Fine Learning Knock Correction) ANALYSIS
 ; ═════════════════════════════════════════════════════════════════════════════
-; Reverse-engineered from Ghidra SH-2A analysis of the knock correction system.
+; Reverse-engineered from Ghidra SH-2 analysis of the knock correction system.
 ; Two GBR contexts: knock_detector uses GBR=0xFFFF80FC,
 ;                   flkc_paths_FG uses GBR=0xFFFF8290.
 ;
@@ -2483,7 +2481,7 @@ Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
 ================================================================================
 AFC / CLOSED-LOOP FUEL FEEDBACK SYSTEM — COMPLETE TRACE
 ================================================================================
-ROM: AE5L600L (2013 USDM Impreza WRX MT)  |  MCU: SH7058 SH-2A BE
+ROM: AE5L600L (2013 USDM Impreza WRX MT)  |  MCU: SH7058 SH-2 BE
 Analysis: Ghidra 12.0.2 + binary cross-reference tracing
 ================================================================================
 
@@ -5330,7 +5328,7 @@ SECTION 12: GENERIC TABLE PROCESSORS (0xBE5A8-0xBEAB0)
 END OF ANALYSIS
 ================================================================================
 ;
-; ─── Ghidra SH-2A Coverage ─────────────────────────────
+; ─── Ghidra SH-2 Coverage ──────────────────────────────
 ;   3,642 functions identified across 3,776 code blocks
 ;   101 thunk functions (indirect call trampolines)
 ;   36,716 defined data items
@@ -5738,7 +5736,7 @@ END OF ANALYSIS
 
 ; ─────────────────────────────────────────────────────
 ; End of disassembly  |  ROM: AE5L600L rev 20.2  |  1,048,576 bytes
-; Arch: SH-2A BE  |  Ghidra 12.0.2  |  SuperH:BE:32:SH-2A:default
+; Arch: SH-2 BE  |  Ghidra 12.0.2  |  SuperH:BE:32:SH-2:default
 ; ─────────────────────────────────────────────────────
 ================================================================================
   AFL PERSISTENCE AND CL/OL TRANSITION DELAY ANALYSIS

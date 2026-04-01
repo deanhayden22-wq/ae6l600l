@@ -238,8 +238,8 @@ def disasm(start, end, title=''):
             if k == 0xD: mnem = f'fsts FPUL,FR{rn}'
             elif k == 0xC: mnem = f'flds FR{rn},FPUL'
             elif k == 0xA: mnem = f'fmul FR{rm},FR{rn}'
-            elif k == 0xB: mnem = f'fadd FR{rm},FR{rn}'  # actually fadd in SH-2A is lo=0
-            elif k == 0x8: mnem = f'fabs FR{rn}'         # fabs in SH-2A
+            elif k == 0xB: mnem = f'fadd FR{rm},FR{rn}'  # actually fadd in SH-2 is lo=0
+            elif k == 0x8: mnem = f'fabs FR{rn}'         # fabs in SH-2
             elif k == 0x7: mnem = f'fneg FR{rn}'
             elif k == 0x6: mnem = f'fmov @(R0,R{rm}),FR{rn}'
             elif k == 0x5: mnem = f'fmov @R{rm}+,FR{rn}'
@@ -248,7 +248,7 @@ def disasm(start, end, title=''):
             elif k == 0x2: mnem = f'fmov FR{rn},@-R{rm}'
             elif k == 0x1: mnem = f'fmov FR{rn},@R{rm}'
             elif k == 0x0: mnem = f'fmov FR{rm},FR{rn}'
-            elif k == 0x9: mnem = f'fmov @R{rm}+,FR{rn}'  # lo=9 in SH-2A/SH-4
+            elif k == 0x9: mnem = f'fmov @R{rm}+,FR{rn}'  # lo=9 in SH-2/SH-4
             elif k == 0xE: mnem = f'fmac FR0,FR{rm},FR{rn}'
             else: mnem = f'0x{op:04X}'
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Disassemble the top unlabeled call targets to classify them.
-Outputs SH-2A disassembly for each function's first N instructions.
+Outputs SH-2 disassembly for each function's first N instructions.
 """
 import os
 import struct

@@ -25,7 +25,7 @@ def flt(addr): return struct.unpack('>f', rom[addr:addr+4])[0]
 def rn(n): return f"R{n}"
 def frn(n): return f"FR{n}"
 
-# ── SH-2A disassembler (subset) ──────────────────────────────────────────
+# ── SH-2 disassembler (subset) ──────────────────────────────────────────
 def disasm_range(start, end, label=""):
     addr = start
     lines = []

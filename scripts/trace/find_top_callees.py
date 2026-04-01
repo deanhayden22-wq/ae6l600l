@@ -5,7 +5,7 @@ Find the most-called subroutines in the AE5L600L ROM.
 Scans for:
   1. BSR disp12  — 12-bit signed displacement calls (opcode 1011xxxx)
   2. JSR @Rn     — indirect calls preceded by mov.l @(disp,PC),Rn literal pool loads
-  3. JSR/N @Rn   — SH-2A no-delay-slot variant (4n4B)
+  3. JSR/N @Rn   — SH-2 no-delay-slot variant (4n4B)
 
 Outputs top N call targets ranked by cross-reference count, with caller addresses.
 """
@@ -193,7 +193,7 @@ def scan_rom(rom):
                 if (prev_word & 0xF00F) == 0x6003 and ((prev_word >> 8) & 0xF) == rn:
                     break
 
-        # JSR/N @Rn (SH-2A): 0100nnnn01001011
+        # JSR/N @Rn (SH-2): 0100nnnn01001011
         if (word & 0xF0FF) == 0x404B:
             rn = (word >> 8) & 0xF
             for back in range(1, 12):

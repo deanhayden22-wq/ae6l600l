@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Disassemble the AFC PI Controller function at ROM address 0x342A8
-from the Subaru ECU ROM (SH7058, SH-2A, Big-Endian).
+from the Subaru ECU ROM (SH7058, SH-2, Big-Endian).
 Version 2: Refined with detailed annotation and accurate pseudocode.
 """
 
@@ -394,7 +394,7 @@ def main():
     # So let me check if maybe R6 gets a DIFFERENT value than FFFF7864 somewhere,
     # or if the signed add wraps correctly on the SH7058.
     #
-    # For SH7058/SH-2A, address space is 32-bit and the on-chip RAM block at
+    # For SH7058/SH-2, address space is 32-bit and the on-chip RAM block at
     # 0xFFFF8000-0xFFFFBFFF (or similar). FFFF7864 is just below that.
     #
     # I think the answer is: FFFF7864 IS the struct/output address, accessed

@@ -213,7 +213,7 @@ def dis1(addr):
         return f'0x{op:04X}', ''
     if hi == 0xF:
         k = lo
-        # SH-2A FPU: lo=9 is fmov @Rm+,FRn; lo=8 is fmov @Rm,FRn; etc.
+        # SH-2 FPU: lo=9 is fmov @Rm+,FRn; lo=8 is fmov @Rm,FRn; etc.
         if k == 0x0: return f'fmov FR{rm},FR{rn}', ''
         if k == 0x1: return f'fmov FR{rn},@R{rm}', ''
         if k == 0x2: return f'fmov FR{rn},@-R{rm}', ''

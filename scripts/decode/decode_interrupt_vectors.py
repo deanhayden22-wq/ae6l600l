@@ -2,7 +2,7 @@
 """
 Decode the SH7058 interrupt/exception vector table.
 
-SH-2A ROM vector table at 0x000000 (when VBR=0 at reset):
+SH-2 ROM vector table at 0x000000 (when VBR=0 at reset):
   Offset 0x000: Power-on reset initial PC
   Offset 0x004: Power-on reset initial SP
   Offset 0x008: Manual reset initial PC

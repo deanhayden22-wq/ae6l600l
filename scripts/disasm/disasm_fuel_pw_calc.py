@@ -100,7 +100,7 @@ def label(addr):
     return None
 
 def disasm_range(start, end, gbr=0xFFFF7450):
-    """Disassemble a range of SH-2A code with full annotation."""
+    """Disassemble a range of SH-2 code with full annotation."""
     lines = []
     addr = start
     literal_refs = {}  # addr -> (pool_addr, value)
