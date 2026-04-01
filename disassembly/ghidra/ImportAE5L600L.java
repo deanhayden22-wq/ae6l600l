@@ -2528,14 +2528,75 @@ public class ImportAE5L600L extends GhidraScript {
             + "fuel_dispatch_table_B runner (0x049CF0) is called separately via "
             + "secondary dispatch: Task2/3 -> F97C -> E54E -> 5798 -> 049CF0.");
 
-        // Task 10 -- sensors / AVCS / boost / idle (20 ms)
+        // Task 10 -- ADC sensor processing pipeline (20 ms)
         count += labelComment(0x0000DF14L, "rtos_task10_sensors",
-            "RTOS Task 10: sensors/AVCS/boost/idle (20 ms, pri 4). TCB=FFFF1218. "
-            + "Highest-priority 20 ms task. ~39 JSR calls. "
-            + "First call 0xAE50 (tiny: loads mask 0xFF0F, bit-op, RTS). "
-            + "Covers: sensor ADC (100E4, 10C9C, FE58), control loops (6CD0, 40D4, CF58), "
-            + "actuator outputs (6624, 6704, CB08, C9CC), injection support. "
-            + "BSR to 0xE51C (sub-task wrapper). Likely owns AVCS, boost solenoid, IAC.");
+            "RTOS Task 10: ADC sensor processing pipeline (20 ms, pri 4). TCB=FFFF1218. "
+            + "Highest-priority 20 ms task. NO gate function -- runs unconditionally. "
+            + "63 JSR calls total: 43 in main block (DF14-E028) + 20 in continuation (E0D8-E15A). "
+            + "Raises SR interrupt level to 13 at entry (STC SR,R0 / OR #D0 / LDC R0,SR). "
+            + "Lowers level back to 0 at E14A before final call (call_63 @ FBBA). "
+            + "PRIMARY ROLE: ADC bulk read + all sensor conditioning. "
+            + "ADC workspace GBR base = FFFF4024 (32 channels raw, 0x40 bytes). "
+            + "Produces: MAF(FFFF40B4), TPS(FFFF4108), Baro(FFFF4130), ECT(FFFF4144), "
+            + "IAT(FFFF4128), Battery(FFFF41E0), MAP(FFFF43FC), cam_angle(FFFF40C8), "
+            + "inj_dead_time(FFFF4280), knock signals(FFFF4309). "
+            + "Also updates: AVCS/VVT solenoid output (0xF6EA I/O), ol_dispatch_gate (FFFF8EDC). "
+            + "See task10_analysis.txt for complete call table and RAM map.");
+
+        // Task 10 sub-function labels
+        count += labelComment(0x00040D4L, "adc_bulk_read_wrapper",
+            "ADC bulk read outer wrapper (Task 10 call_09). Saves R10-R14,PR then falls "
+            + "through to inner function at 0x040DE (GBR=FFFF4024, reads 32 A/D channels). "
+            + "Called by Task 10 at highest interrupt priority to capture ADC snapshot.");
+        count += labelComment(0x00040DEL, "adc_bulk_read",
+            "ADC bulk reader inner function. GBR base = FFFF4024. "
+            + "Polls ADCSR0/1/2 for conversion complete, reads all 32 channels to GBR+0..GBR+62. "
+            + "Channel map: ADDR4=Baro(402C), ADDR5=TPS(402E), ADDR7=VBatt(4032), "
+            + "ADDR14=MAP-baro(4040), ADDR15=MAF(4042), ADDR22=MAP-man(4050), "
+            + "ADDR26=FuelT(4058), ADDR28=O2(405C), ADDR29=ECT(405E), ADDR30=IAT(4060).");
+        count += labelComment(0x0000AE50L, "task10_init_irq_scratch",
+            "Task 10 call_01: tiny function. Manipulates interrupt-level mask bits (0xFF0F), "
+            + "bit operation on SR scratch value, immediate RTS. Init helper.");
+        count += labelComment(0x0000ACF4L, "task10_batv_calibrate",
+            "Task 10 call_29: Battery Voltage calibration. Reads FFFF4032 (Battery Voltage raw "
+            + "ADC ADDR7), scales via ROM table 0xC4A74, writes calibrated float to FFFF432C/432E.");
+        count += labelComment(0x00007034L, "task10_avcs_solenoid_output",
+            "Task 10 call_30: AVCS/VVT solenoid PWM output. Accesses I/O register 0xF6EA "
+            + "(solenoid duty control port), reads ROM calibration table 0xE6E4. "
+            + "Workspace: FFFF4166-4193 (solenoid state bytes and words).");
+        count += labelComment(0x00047C40L, "task10_clol_gate_update",
+            "Task 10 call_52: CL/OL gate update. Reads/writes FFFF8EDC (ol_dispatch_gate) "
+            + "and FFFF8323 (OL/CL state flag). Called from sensor task to update gate "
+            + "based on current sensor readings. Also accesses FFFF36BE.");
+        count += labelComment(0x0000A660L, "task10_knock_signal_read",
+            "Task 10 call_32: Knock signal per-cylinder read. Accesses FFFF4309 (knock byte), "
+            + "FFFF430D (knock byte 2), FFFF4311 (MAP/pressure threshold). "
+            + "Reads processed knock ADC values into per-cylinder knock state bytes.");
+        count += labelComment(0x0000BADCL, "task10_egr_state_update",
+            "Task 10 call_34: EGR state update. Accesses FFFF4330 (egr_state_a struct). "
+            + "Updates EGR state floats and status bytes from sensor data.");
+        count += labelComment(0x00009860L, "task10_injdt_workspace",
+            "Task 10 call_37: Injector dead time workspace. Accesses FFFF4284 "
+            + "and ROM tables 0x11A7C, 0x11848. Part of dead time calculation pipeline "
+            + "feeding FFFF4280 (injector_dead_time_applied).");
+        count += labelComment(0x00004B4D8L, "task10_dispatch_trampoline",
+            "Task 10 call_47: Jump table trampoline. 4 JMP entries (6 bytes each). "
+            + "Task 10 enters at offset 0 (entry 0) -> target [4B4F0] = 0x5A928. "
+            + "Other entries may be called from different task functions.");
+
+        // Task 10 RAM labels
+        count += labelComment(0xFFFF432CL, "batv_calibrated",
+            "Battery Voltage calibrated float (output of task10_batv_calibrate). "
+            + "Written by Task 10 call_29 from raw FFFF4032 via ROM table 0xC4A74.");
+        count += labelComment(0xFFFF4138L, "baro_correction_factor",
+            "Atmospheric / Baro correction factor (float). Written by Task 10 calls 44 and 58. "
+            + "Derived from Baro ADC output (FFFF4130).");
+        count += labelComment(0xFFFF41DCL, "maf_correction_factor",
+            "MAF correction factor (float). Written by Task 10 calls 45 and 56. "
+            + "Used to adjust MAF-based fuel calculation.");
+        count += labelComment(0xFFFF4284L, "injdt_workspace",
+            "Injector dead time calculation workspace (float). Written by Task 10 call_37. "
+            + "Feeds into injector_dead_time_applied (FFFF4280).");
 
         // Task 11 -- fast minimal (10 ms)
         count += labelComment(0x0000E3E4L, "rtos_task11_fast_minimal",
