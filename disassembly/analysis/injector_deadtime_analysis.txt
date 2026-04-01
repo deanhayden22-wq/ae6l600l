@@ -1,0 +1,330 @@
+AE5L600L Injector Dead Time Pipeline Analysis
+==============================================
+Traced: 2026-04-01
+Method: Static disassembly, pool resolution, cross-reference scan
+
+================================================================================
+OVERVIEW
+================================================================================
+
+The injector dead time pipeline converts raw battery voltage ADC data into a
+per-cylinder dead time correction that is added to injector pulse width before
+writing ATU output compare registers.
+
+Pipeline summary:
+  VBatt ADC (FFFF4032) → calibration → table lookup → FFFF4280 → ATU compare
+
+Key properties:
+  - Dead time is SHARED across all cylinders (single FFFF4280 value)
+  - Updated every 20ms by Task 10 via function at 0x0303C2
+  - Applied per-injection by ATU callback cluster (0x9E4A–0xA4DC)
+  - Table values are in 1/16 ATU timer tick units (right-shift 4 at apply time)
+
+================================================================================
+SECTION 1: STAGE-BY-STAGE PIPELINE
+================================================================================
+
+--- Stage 1: VBatt ADC Sampling (Task 10, call_09 @ 0x40D4) ---
+
+  Task 10 (every 20ms, priority 4) runs ADC bulk reader at 0x040DE.
+  GBR base = 0xFFFF4024. Channel ADDR7 stores raw uint16 to:
+
+    FFFF4032  =  raw_batv_adc       (VBatt raw, ADC ADDR7)
+
+--- Stage 2: VBatt Calibration (Task 10, call_29 @ 0xACF4) ---
+
+  Function: 0xACF4
+  Input:    FFFF4032 (raw VBatt ADC)
+  Output:   FFFF432C (batv_calibrated, float32)
+
+  Uses settling counter at FFFF432E. Threshold = 48 counts (0x30).
+  Applies ROM scale table at 0xC4A74 to convert ADC counts to volts.
+  Output is a float32 battery voltage in volts (approx 6–17V range).
+
+--- Stage 3: Dead Time Table Lookup (0x0303C2, called from Task 10 chain) ---
+
+  Function: 0x0303C2
+  Calls:    0xBE944 (2D interpolating table lookup engine)
+
+  Inputs to table lookup:
+    FR4 = [FFFF4130]   (first lookup axis input, identity TBD; likely batv or Baro)
+    FR5 = [FFFF6210]   (second lookup axis input, identity TBD)
+    R4  = 0x000AD7E0   (InjectorLatency descriptor pointer)
+
+  Table descriptor at 0xAD7E0 (16-byte format):
+    +00: 0x00050003    dims = {5, 3} — 5-entry and 3-entry axes
+    +04: 0x000D104C    axis1 ptr  → VBatt axis (5 float32)
+    +08: 0x000D1060    axis2 ptr  → secondary axis (3 float32)
+    +0C: 0x000D106C    data ptr   → dead time values (15 uint16)
+
+  InjectorLatency table data:
+
+    VBatt axis (0xD104C, 5 float32):
+      [6.5, 9.0, 11.5, 14.0, 16.5]  V
+
+    Secondary axis (0xD1060, 3 float32):
+      [-1000.0, 0.0, 1000.0]
+
+    Data (0xD106C, 15 uint16, 5 columns × 3 rows, all rows identical):
+      V=6.5:  12588 (0x312C)
+      V=9.0:   6857 (0x1AC9)
+      V=11.5:  4499 (0x1193)
+      V=14.0:  3225 (0x0C99)
+      V=16.5:  2693 (0x0A85)
+      (rows for axis2 = -1000, 0, +1000 are all identical — dead time is
+       independent of secondary axis; it varies only with VBatt)
+
+    Physical interpretation (÷16 → ATU ticks, assuming ~10 MHz ATU clock):
+      6.5V  →  787 ticks ≈ 78.7 μs
+      9.0V  →  428 ticks ≈ 42.8 μs
+      11.5V →  281 ticks ≈ 28.1 μs
+      14.0V →  201 ticks ≈ 20.1 μs
+      16.5V →  168 ticks ≈ 16.8 μs
+    (Monotonically decreasing: higher voltage → injector opens faster → less dead time)
+
+  Execution path in 0x0303C2:
+    0303C6: R2  = FFFF4130  → FR4 = [FFFF4130]   (axis input 1)
+    0303CA: R2  = FFFF6210  → FR5 = [FFFF6210]   (axis input 2)
+    0303CE: R4  = 0xAD7E0   (descriptor pointer)
+    0303D0: R2  = 0xBE944   (table lookup fn)
+    0303D2: JSR @R2  (call 0xBE944, NOP delay slot)
+            After return: R0 = uint16 dead time result
+    0303D6: R14 = FFFF7350  (intermediate output address)
+    0303D8: [FFFF7350] = R0  (MOV.W R0,@R14)
+    0303DA: R2  = 0x317C
+    0303DC: JSR @R2  (call 0x317C, delay slot: MOV #16,R4)
+            0x317C: interrupt level setter — if R4 > current IPM, sets SR=R4
+    0303E0: [R0] = R15       (store SP to SR-masked address, mechanism unclear)
+    0303E2: R2  = [FFFF7350] (reload dead time as uint16)
+    0303E4: R6  = 0x9E4A
+    0303E6: JSR @R6  (call 0x9E4A, delay slot: EXTU.W R2,R4 → R4=dead_time_u32)
+            → 0x9E4A: [FFFF4280] = R4  (store dead time to DT_APPLIED)
+            After return: FFFF4280 = zero-extended uint16 dead time
+    0303EA: R6  = 0xBE598    (float table lookup variant)
+    0303EC: R2  = [FFFF7350] → R4 = EXTU.W R2  (reload dead time again)
+    0303F0: FSTS FPUL,FR5    (convert FPUL to FR5)
+    0303F2: MOVA R0 = 0x030428 (float constant)
+    0303F4: JSR 0xBE598 (delay: FR4 = @0x030428, float constant)
+            Likely stores float dead time to nearby stack/output
+    0303F8: MOV #-4,R0
+    0303FA: FMOV FR14,@(R0,R0)  (store FR14 float result to stack)
+    0303FC: R6  = 0x3190
+    0303FE: R4  = @R15
+    030400: R15 += 4
+    030402: LDS.L @R15+,PR
+    030404: JMP @R6 (0x3190)   (tail-call, cleanup)
+
+--- Stage 4: FFFF4280 — injector_dead_time_applied ---
+
+  Written by:  stub 0x9E4A (called from 0x0303C2)
+  Format:      uint32 holding zero-extended uint16 value
+  Value range: 2693–12588 (at typical operating voltages: ~3225 @ 14V)
+
+  0x9E4A (stub, 3 instructions):
+    009E4A: R2 = FFFF4280   (from pool 0x9E9C)
+    009E4C: RTS
+    009E4E: [FFFF4280] = R4  (delay slot: MOV.L R4,@R2)
+
+  FFFF42F4 — companion dead time output, written by 0x9926 in context of
+  call_37 initialization path. Role: stores pointer/companion value for ATU
+  struct. Exact use TBD.
+
+  FFFF4284 — injdt_workspace (DT_WS), used as per-cylinder dead time struct
+  base (FFFF4284+23, FFFF4284+24 = cylinder index bytes written by call_37).
+
+--- Stage 5: ATU Struct Initialization (Task 10, call_37 @ 0x9860) ---
+
+  Function:  0x9860
+  Loops:     4 iterations (4 cylinders, R9=4 as limit)
+  Struct:    per-cylinder ATU config at 0x11A7C (R12 pointer) + FFFF4284 (R13)
+
+  For each cylinder i = 0..3:
+    - Writes cylinder index to FFFF4284+23 and FFFF4284+24
+    - Calls 0xE6E4 with ATU channel data from 0xF66C
+    - Calls 0x11848 with cylinder struct from 0x11A7C
+    - Advances R12 by 12, R13 by 28
+
+  Post-loop (0x9920–0x9926):
+    009920: R3 = FFFF4280   (DT_APPLIED address as VALUE)
+    009922: [R14] = R3      (store pointer 0xFFFF4280 into ATU struct @ R14)
+    009924: R2 = FFFF42F4   (companion address as VALUE)
+    009926: [R14] = R2      (store pointer 0xFFFF42F4 into ATU struct @ R14)
+
+  Purpose: initialization path that stores the DT_APPLIED pointer into the
+  per-cylinder ATU handler struct so ISR callbacks can find FFFF4280.
+
+--- Stage 6: ATU Callback / Per-Cylinder Application ---
+
+  When ATU fires an output-compare interrupt for an injector, it calls back
+  into one of these functions with a per-cylinder struct pointer.
+
+  func_A148 @ 0xA148 (primary apply path — most complete):
+    00A148: R0  = FFFF4280
+    00A14C: R1  = [FFFF4280]    (dead time uint32)
+    00A14E: R5  = @(12,cyl_struct) + R1  (base_pulse_width + dead_time)
+    00A152–A158: SHAR R5 × 4   → R5 >>= 4  (convert 1/16-tick units to ticks)
+    00A15A: R4  = [ATU_TCR]    (current ATU timer count, via R9)
+    00A15C: R4 += 3            (small offset, perhaps CMP/edge timing)
+    00A162: R0  = @(20,cyl_struct) - R4  (compare target - current count)
+    00A166: CMP/GE 0x8000      (sanity check: window not expired?)
+    00A168: BF/S → skip write if expired
+    00A170: [ATU_OCR+20] = R0  (MOV.W R0,@(20,R7)) → write ATU output compare
+    00A17C: [ATU_OCR] = R3     (MOV.W R3,@R0) → final pulse width write
+
+  func_A0C8 @ 0xA0C8 (earlier-stage apply, 4 SHAR):
+    00A0C8: R2  = FFFF4280
+    00A0CC: R3  = [FFFF4280]
+    00A0CE: R12 = @(12,cyl_struct) + R3
+    00A0D2–A0D8: SHAR R12 × 4  → R12 >>= 4
+    00A0DA: R3  = [ATU_TCR]    (current ATU timer count)
+    00A0DC: R0  = @(20,cyl_struct)  (ATU compare target)
+    00A0DE: R4  = @R0+
+    00A0E0: R4 -= R3           (target - current)
+    00A0E2: EXTU.W R4,R1
+    00A0E4: CMP/GE 0x8000      (check if positive half-cycle range)
+    00A0E8: BT/S → add path
+    00A0F0: R12 += R4          (add time-to-go to dead-time-adjusted count)
+    00A0F6: CMP/HS: clamp check
+    00A0FE: R12 -= R5          (clamp if over max)
+
+  func_9ED6 @ 0x9ED6 (float dead time path):
+    009ED6: R3  = FFFF4280
+    009ED8: R0  = [FFFF4280]
+    009EDA: R2 += R0           (accumulate dead time into R2)
+    009EDC: R0  = 0x9FCC       (float table pointer)
+    → FP mul/div, interpolated dead time path
+    009F0C: R3  = 0x3190       (cleanup fn)
+    009F0E: JMP @R3            (tail-call)
+
+  func_3D63A @ 0x3D63A (getter stub):
+    03D63A: R2  = FFFF4280
+    RTS, delay: R0 = [FFFF4280]  (returns dead time in R0)
+
+  func_9B2C @ 0x9B2C (float correction path):
+    009B4A: R4  = [FFFF4158]   (FFFF4158, identity TBD)
+    009B4C: R2  = [FFFF42F4]
+    009B4E: R0  = FFFF4280
+    009B50: R1  = [FFFF4280]
+    009B52: R1 += R2           (R1 = DT_APPLIED + FFFF42F4)
+    009B54: R0  = [stack+8]
+    009B56: R1 += R0           (add another offset)
+    → FTRC + FP interpolation using float tables at 0x9C14–0x9C28
+    → Used for runtime dead time trim/correction
+
+================================================================================
+SECTION 2: RAM ADDRESS MAP
+================================================================================
+
+Address    Size  Label                       Description
+--------------------------------------------------------------------------
+FFFF4032   u16   raw_batv_adc               VBatt raw ADC (ADDR7)
+FFFF4130   f32   dt_lookup_input1           First input to 0x0303C2 table lookup
+                                             (may be batv_calibrated or Baro)
+FFFF432C   f32   batv_calibrated            Calibrated battery voltage (volts)
+FFFF432E   u32   batv_settle_counter        VBatt settling counter (threshold=48)
+FFFF4158   f32   dt_fp_input                Input to float DT correction (9B2C)
+FFFF4168   f32   dt_fp_ref                  Reference float for DT correction
+FFFF4280   u32   injector_dead_time_applied Dead time (zero-ext uint16, 1/16-tick)
+FFFF4284   u32   injdt_workspace            DT workspace / per-cyl struct base
+FFFF42F4   u32   injdt_companion            Companion DT output (init by 0x9926)
+FFFF6210   f32   dt_lookup_input2           Second input to 0x0303C2 table lookup
+FFFF7350   u16   dt_intermediate            Intermediate DT from table (before FFFF4280)
+
+================================================================================
+SECTION 3: ROM TABLE MAP
+================================================================================
+
+Address    Size   Label                  Description
+--------------------------------------------------------------------------
+0xAD7E0    16B    InjLat_descriptor      2D descriptor: dims 5×3, VBatt indexed
+0xD104C    20B    InjLat_VBatt_axis      VBatt axis: [6.5,9.0,11.5,14.0,16.5] V
+0xD1060    12B    InjLat_secondary_axis  Secondary: [-1000.0,0.0,1000.0]
+0xD106C    30B    InjLat_data            Dead time values: 5 cols × 3 rows (all same)
+
+================================================================================
+SECTION 4: FUNCTION SUMMARY
+================================================================================
+
+Address    Label                       Role
+--------------------------------------------------------------------------
+0x0303C2   dt_table_lookup             2D dead time lookup; writes FFFF7350 → 9E4A
+0x9E4A     dt_apply_stub               Stub: [FFFF4280] = R4 (dead time value)
+0x3D63A    dt_read_stub                Stub: R0 = [FFFF4280] (dead time getter)
+0x9860     atu_cyl_struct_init         ATU 4-cyl init; stores DT ptrs into structs
+0x9B2C     dt_float_correction         Float DT correction using FFFF4280/42F4/4158
+0x9ED6     dt_accumulate_float         Adds DT to R2, float interpolation, → 0x3190
+0xA0C8     dt_apply_A0C8              Primary: DT+pulse >>4 → ATU window calc
+0xA148     dt_apply_A148              Primary: DT+pulse >>4 → ATU OCR write
+0xBE944    table_lookup_2d             Generic 2D bilinear interpolation engine
+0xBE598    table_lookup_float          Float variant of table lookup (used for FR path)
+0x317C     irq_level_set               Set SR interrupt mask level to R4 if R4 > current
+0x3190     irq_level_restore           Restore SR (if R4 != 0 → set SR=R4; else RTS)
+
+================================================================================
+SECTION 5: HARDWARE REGISTER ACCESSES
+================================================================================
+
+ATU registers accessed from dead time apply functions:
+  FFFF8F66C / 0xF66C  ATU channel config (read in call_37, setup)
+  FFFF84459 / 0xF459  Injector control register (bits set/cleared in call_37)
+
+  Per-cylinder ATU output compare registers are accessed as:
+    @(20, per_cyl_struct) → word = ATU OCRA/OCRB for that channel
+    Written by: A0C8, A148
+
+  ATU timer count read:
+    R9 = 0xF459 or similar; @R9 = ATU TCNT (16-bit free-running counter)
+
+================================================================================
+SECTION 6: OPEN QUESTIONS
+================================================================================
+
+1. FFFF4130 identity: Is this batv_calibrated (same as FFFF432C) or a
+   different value? The descriptor has a VBatt axis, so the primary lookup
+   input should be battery voltage. FFFF4130 is offset 0x10C from ADC base.
+
+2. FFFF6210 identity: Far from ADC workspace. May be a calibration constant
+   loaded from ROM, or a processed value from another task. Used as second
+   axis input to the dead time table but since all rows are identical, it
+   effectively has no effect on the dead time result.
+
+3. 0x0303E0 (MOV.L R15,@R0): Purpose unclear. R0 = SR & 0xF0 after 0x317C.
+   Storing SP to an address derived from the interrupt mask level; may be an
+   RTOS stack-pointer save mechanism.
+
+4. Float dead time path (0x9ED6, 0x9B2C): These appear to be a parallel
+   float-format dead time correction path, possibly for diagnostics or
+   an alternative compute path. Relationship to FFFF4280 (uint32) needs
+   further study.
+
+5. ISR context: The ISR at 0x48732 appears to be an RTOS context switch
+   handler (multi-stack save: 2FC6/2FD6/2FE6) that jumps to 0x0488CA. The
+   actual per-cylinder injection ISR that calls func_A148/A0C8 is invoked
+   via the ATU callback mechanism initialized by call_37 @ 0x9860. Exact
+   ISR vector addresses not yet traced.
+
+================================================================================
+SECTION 7: DESCRIPTOR REGION CONTEXT (0xAD7A0–0xAD860)
+================================================================================
+
+The InjectorLatency descriptor at 0xAD7E0 lives in a cluster of related 2D
+calibration descriptors:
+
+  0xAD7A0: descriptor, scale factor 1/128
+  0xAD7B8: descriptor
+  0xAD7D0: descriptor
+  0xAD7E0: InjectorLatency (dead time vs VBatt × secondary)  ← THIS ONE
+  0xAD800: descriptor
+  0xAD818: descriptor
+  0xAD830: descriptor
+  ...
+
+These descriptors share the same 16-byte format used by 0xBE944:
+  +00: dims (high halfword = dim1, low halfword = dim2)
+  +04: axis1 ptr (float32 array)
+  +08: axis2 ptr (float32 array)
+  +0C: data ptr  (uint16 or float32 array)
+
+================================================================================
+END OF ANALYSIS
+================================================================================

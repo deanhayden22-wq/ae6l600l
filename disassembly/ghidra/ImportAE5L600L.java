@@ -4303,8 +4303,13 @@ public class ImportAE5L600L extends GhidraScript {
             "AFC Stage 7: AFC enable/disable gate (50 bytes).");
 
         // ── Fuel Calculation & Output ──
-        count += labelComment(0x000303C0, "injector_dead_time_calc",
-            "Battery voltage dead time lookup. 2D map 0xAD7E0.");
+        count += labelComment(0x000303C2L, "injector_dead_time_calc",
+            "Dead time table lookup. Inputs: FR4=[FFFF4130], FR5=[FFFF6210], "
+            + "descriptor 0xAD7E0 (InjLat 5x3, VBatt axis 6.5-16.5V). "
+            + "Calls 0xBE944 (2D interp), stores uint16 result to FFFF7350, "
+            + "then calls 0x9E4A stub to write FFFF4280. Also calls 0xBE598 "
+            + "for float path. Tail-calls 0x3190 (irq level restore). "
+            + "Called from Task 10 dead time update chain.");
         count += labelComment(0x00030430, "status_byte_copy",
             "Copies FFFF726C to FFFF7370.");
         count += labelComment(0x00030744, "sensor_prep",
@@ -4367,8 +4372,40 @@ public class ImportAE5L600L extends GhidraScript {
             "Multi-cylinder full re-init.");
         count += labelComment(0x00008408, "hw_timer_init",
             "Hardware timer initialization.");
-        count += labelComment(0x00009E4A, "dead_time_store",
-            "Stores dead time to FFFF4280.");
+        count += labelComment(0x00009E4AL, "dead_time_apply_stub",
+            "Dead time apply stub (3 instr). R2=FFFF4280; RTS; delay: [FFFF4280]=R4. "
+            + "Called from 0x0303C2 (JSR) with R4=zero-extended uint16 dead time. "
+            + "Writes the current dead time to injector_dead_time_applied.");
+        count += labelComment(0x0003D63AL, "dead_time_read_stub",
+            "Dead time read stub (3 instr). R2=FFFF4280; RTS; delay: R0=[FFFF4280]. "
+            + "Returns applied dead time in R0. Used by ATU callback handlers.");
+        count += labelComment(0x0000A0C8L, "dt_atu_apply_A0C8",
+            "ATU dead time application #1. R3=[FFFF4280]; "
+            + "R12=@(12,cyl_struct)+R3 (base_pulse+dead_time); R12>>=4 (SHAR x4, 1/16-tick to ticks); "
+            + "reads ATU TCNT via R9; checks window; writes ATU compare value.");
+        count += labelComment(0x0000A148L, "dt_atu_apply_A148",
+            "ATU dead time application #2 (primary OCR write). R1=[FFFF4280]; "
+            + "R5=@(12,cyl_struct)+R1; R5>>=4 (SHAR x4); "
+            + "R4=ATU_TCNT+3; R0=@(20,cyl_struct)-R4; "
+            + "BF/S if window expired; MOV.W R0,@(20,R7) writes ATU OCR; "
+            + "BSR 0xA4E0; JSR 0xBE82C. Final per-cylinder pulse width write.");
+        count += labelComment(0x00009B2CL, "dt_float_correction",
+            "Dead time float correction. Reads FFFF4280, FFFF42F4, FFFF4158, FFFF4168. "
+            + "R1=[FFFF4280]+[FFFF42F4]+@(8,stack); converts to float index; "
+            + "3-branch interpolation from float tables at 0x9C14-0x9C28. "
+            + "Produces corrected dead time float for runtime compensation.");
+        count += labelComment(0x00009ED6L, "dt_accumulate_float",
+            "Dead time float accumulate. R0=[FFFF4280]; R2+=R0 (add DT to R2); "
+            + "FP multiply/divide chain; writes ATU float output; "
+            + "tail-calls 0x3190 (irq level restore).");
+        count += labelComment(0x0000317CL, "irq_level_set",
+            "Interrupt level setter helper. R5=0xF0; R0=SR&R5 (current IPM x0x10); "
+            + "CMP/HI R0,R4 (T if R4>current); BF 318C; RTS + delay: LDC R4,SR. "
+            + "Sets SR interrupt mask level to R4 if R4 is higher than current level.");
+        count += labelComment(0x00003190L, "irq_level_restore",
+            "Interrupt level restore / gate. TST R4,R4; BF 0x31A4; "
+            + "reads FFFF1288 ptr; checks status flag; if gate open: JMP 0x3664, LDC R4,SR. "
+            + "Tail-call target from dead time compute chain; restores interrupt mask.");
         count += labelComment(0x0000300E, "injector_ic_trigger",
             "Sets bit15 on external injector IC at 0xF00F00.");
         count += labelComment(0x000035FC, "inj_channel_timer_setup",
@@ -4411,8 +4448,10 @@ public class ImportAE5L600L extends GhidraScript {
             "AFC final correction output (float).");
         count += labelComment(0xFFFF7344, "fuel_per_cyl_struct",
             "Per-cylinder fuel struct (8 x float final IPW values).");
-        count += labelComment(0xFFFF7350, "injector_dead_time_ticks",
-            "Injector dead time in timer ticks (uint16).");
+        count += labelComment(0xFFFF7350L, "injector_dead_time_ticks",
+            "Injector dead time intermediate result (uint16, 1/16-tick units). "
+            + "Written by 0x0303C2 after InjLat 2D table lookup (R14=FFFF7350; MOV.W R0,@R14). "
+            + "Re-read as EXTU.W source before writing FFFF4280 via stub 0x9E4A.");
         count += labelComment(0xFFFF73AC, "base_fuel_map_output",
             "Base fuel map output (float).");
         count += labelComment(0xFFFF7400, "base_fuel_table_output",
@@ -4459,8 +4498,19 @@ public class ImportAE5L600L extends GhidraScript {
         // ── Injector Timing / Hardware RAM ──
         count += labelComment(0xFFFF41F0, "percyl_timing_array",
             "Per-cylinder timing array (8 bytes x 4 cylinders).");
-        count += labelComment(0xFFFF4280, "injector_dead_time_applied",
-            "Applied injector dead time (hardware timer).");
+        count += labelComment(0xFFFF4280L, "injector_dead_time_applied",
+            "Applied injector dead time (uint32, zero-extended uint16, 1/16 ATU tick units). "
+            + "Written by stub 0x9E4A from 0x0303C2 after InjLat 2D table lookup. "
+            + "Typical range 2693-12588 (168-787 ticks at 10MHz ATU). "
+            + "Read by ATU callbacks A0C8, A148 to compute OCR = (pulse+DT)>>4.");
+        count += labelComment(0xFFFF42F4L, "injdt_companion",
+            "Injector dead time companion output. Pointer stored into ATU cyl struct "
+            + "by call_37@0x9860 init path (0x9926: [R14]=FFFF42F4). "
+            + "Also added to FFFF4280 in float correction at 0x9B2C.");
+        count += labelComment(0xFFFF6210L, "dt_lookup_input2",
+            "Second input to dead time table lookup (func 0x0303C2, FR5). "
+            + "InjLat secondary axis is [-1000,0,1000]; all table rows identical "
+            + "so this input has no effect on dead time result. Identity TBD.");
         count += labelComment(0xFFFF3474, "inj_channel_enable",
             "Injection channel enable mask. 0xFF = all 8 channels.");
 
@@ -4501,8 +4551,11 @@ public class ImportAE5L600L extends GhidraScript {
             "AFC CL decision 1D descriptor.");
         count += labelComment(0x000AD928, "desc_afc_pi_blend_2D",
             "AFC PI blend 2D descriptor (11x10).");
-        count += labelComment(0x000AD7E0, "desc_injector_latency",
-            "Injector Latency descriptor (2D, 5x3, voltage x ECT).");
+        count += labelComment(0x000AD7E0L, "desc_injector_latency",
+            "InjectorLatency 2D descriptor (16-byte format). "
+            + "+00: 0x00050003 (dims 5x3), +04: 0x000D104C (VBatt axis ptr), "
+            + "+08: 0x000D1060 (secondary axis ptr), +0C: 0x000D106C (data ptr). "
+            + "Loaded by 0x0303C2 into R4 and passed to 0xBE944 (table_lookup_2D_int).");
         count += labelComment(0x000AD470, "desc_ipw_ect_threshold",
             "IPW ECT threshold 1D descriptor.");
         count += labelComment(0x000ADBC4, "desc_ect_warmup_1D_mode00",
@@ -4539,12 +4592,17 @@ public class ImportAE5L600L extends GhidraScript {
             "Default fuel multiplier calibration (float, 1.05).");
 
         // ── Injector Latency Table Data ──
-        count += labelComment(0x000D104C, "inj_latency_xaxis",
-            "Injector latency battery voltage axis (5 breakpoints).");
-        count += labelComment(0x000D1060, "inj_latency_yaxis",
-            "Injector latency ECT Y axis (3 breakpoints).");
-        count += labelComment(0x000D106C, "inj_latency_data",
-            "Injector latency dead time data (uint16, 5x3).");
+        count += labelComment(0x000D104CL, "inj_latency_vbatt_axis",
+            "InjLat VBatt axis (5 float32): [6.5, 9.0, 11.5, 14.0, 16.5] V. "
+            + "Primary lookup axis for dead time table (voltage → dead time).");
+        count += labelComment(0x000D1060L, "inj_latency_secondary_axis",
+            "InjLat secondary axis (3 float32): [-1000.0, 0.0, 1000.0]. "
+            + "All three data rows are identical so this axis has zero effect; "
+            + "dead time depends only on VBatt.");
+        count += labelComment(0x000D106CL, "inj_latency_data",
+            "InjLat dead time table (15 uint16, 5 cols x 3 rows, all rows same). "
+            + "Values [12588,6857,4499,3225,2693] map VBatt 6.5-16.5V. "
+            + "Divide by 16 for ATU ticks: 787/428/281/201/168 ticks (at 10MHz ≈ 79/43/28/20/17 μs).");
 
         // ── External Hardware ──
         count += labelComment(0x00F00F00L, "injector_hw_ctrl",
