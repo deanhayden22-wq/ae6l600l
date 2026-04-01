@@ -1,0 +1,1981 @@
+================================================================================
+FUELING PIPELINE — COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2A)
+================================================================================
+
+
+OVERVIEW
+--------
+The fueling system is organized as two dispatch tables that execute a
+sequence of functions each scheduler cycle:
+
+  fuel_dispatch_table_A @ 0x480B8 (19 entries)
+  fuel_dispatch_table_B @ 0x4A0B8 (20 entries)
+
+These are NOT independent — they run as two phases of a single fueling
+pipeline. Table A handles initialization, correction accumulation, and
+learning. Table B handles base fuel calculation, enrichment computation,
+and final output.
+
+The CL (Closed Loop) AFC pipeline at 0x33304 is a sub-pipeline called
+from within this framework, specifically from Table A[0] (0x33278).
+
+
+================================================================================
+SECTION 1: DISPATCH TABLE ENTRIES
+================================================================================
+
+  fuel_dispatch_table_A @ 0x480B8:
+  ─────────────────────────────────────────────────────────────────────────
+  [ 0] 0x33278  Fueling pre-calc → calls CL_fuel_dispatcher (0x33304)
+  [ 1] 0x31600  Init flag writer (writes -1 to FFFF745B)
+  [ 2] 0x32AA8  Fuel correction array (29-element, gear-dependent)
+  [ 3] 0x31C9C  Per-cylinder array init (zeros 3×42 floats)
+  [ 4] 0x32958  Correction filter init (zeros 3 floats at FFFF770C)
+  [ 5] 0x34488  AFL sub-dispatcher (orchestrates AFL learning cycle)
+  [ 6] 0x357D0  CL/OL transition sub B (counter management)
+  [ 7] 0x34EC8  AFL airflow processor
+  [ 8] 0x36008  CL/OL delay manager A
+  [ 9] 0x36A98  CL/OL hysteresis handler
+  [10] 0x36BF4  CL/OL delay manager B
+  [11] 0x36E60  Post-transition handler
+  [12] 0x37156  Fuel trim input (A/F ratio → FFFF7A74)
+  [13] 0x3756C  Injector trim init (reads FFFF895C, zeros FFFF7AB0)
+  [14] 0x37ABA  Injector trim application (AFL learning table update)
+  [15] 0x38158  Main IPW calculator (CL/OL state, WOT thresholds)
+  [16] 0x38D16  LTFT learning init (step 0.001, workspace FFFF7B60)
+  [17] 0x38E30  LTFT learning algorithm (RPM threshold 3600)
+  [18] 0x399EE  Default fuel output multiplier (1.05 → FFFF7BDC)
+
+  fuel_dispatch_table_B @ 0x4A0B8:
+  ─────────────────────────────────────────────────────────────────────────
+  [ 0] 0x332A2  Main fueling entry (non-returning)
+  [ 1] 0x32AA8  Fuel correction array (shared with Table A[2])
+  [ 2] 0x31C9C  Per-cylinder array init (shared with Table A[3])
+  [ 3] 0x32958  Correction filter init (shared with Table A[4])
+  [ 4] 0x31A4C  Fuel trim init (writes FFFF7464, checks cal IDs)
+  [ 5] 0x3160A  Major correction aggregator (RPM/MAF/lambda/enrichment)
+  [ 6] 0x31528  FFFF7448 CL/OL mode flag writer (1=CL, 0=OL)
+  [ 7] 0x3CD34  Warmup/cold-start enrichment (ECT/IAT indexed)
+  [ 8] 0x39528  WOT enrichment factor (2D map 0xAD258)
+  [ 9] 0x30ACC  Base fuel map combiner (2D map + descriptors → FFFF73AC)
+  [10] 0x36C3C  CL/OL state cleanup
+  [11] 0x37B68  Injector compensation (2D maps, RPM/load indexed)
+  [12] 0x3452A  AFL core entry (airflow→CL check→range→update→store)
+  [13] 0x34EF4  AFL validity check before learning
+  [14] 0x3580C  CL/OL transition core (OL enrichment computation)
+  [15] 0x3605E  OL fuel map selector (IAM vs 0.5 threshold)
+  [16] 0x37186  Transient fuel compensation (tip-in/out)
+  [17] 0x3A222  Per-cylinder fuel trim (4-iteration loop)
+  [18] 0x3EB8C  Overrun fuel cutoff (RPM/airflow thresholds)
+  [19] 0x403C4  (unknown — beyond analyzed range)
+
+  Additional functions called within pipeline (not in dispatch tables):
+  ─────────────────────────────────────────────────────────────────────────
+  0x301E4  fuel_pulse_width_calc (final per-cylinder IPW, 8 outputs)
+  0x303C0  Warmup enrichment (table lookup → FFFF7350)
+  0x30430  Status byte copy (FFFF726C → FFFF7370)
+  0x30674  Post-start enrichment (26 descriptors)
+  0x30744  Sensor prep (calls 0x23E48 → FFFF73A2)
+  0x30B68  Base fuel table calc (dual 1D lookups → FFFF7400)
+  0x320AE  Final fuel correction accumulator (AFC+LTFT+enrichments → IPW)
+  0x32892  Per-element correction calculator (42-element loop)
+  0x33304  CL_fuel_dispatcher (sequences 9-stage AFC pipeline)
+  0x33460  Fuel correction aggregator (clamps to [0.75, 1.25])
+  0x37B74  AFL application (writes FFFF7AB4 multiplier)
+  0x37F00  AFL multiplier computation subroutine
+  0x3AB20  Engine status gate (FFFF7C68 check, gates AFL)
+  0x3BB6C  Acceleration enrichment (tip-in/out gains)
+
+
+================================================================================
+SECTION 2: CL AFC PIPELINE (9 STAGES)
+================================================================================
+
+Called from Table A[0] via CL_fuel_dispatcher @ 0x33304.
+Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
+
+  Stage 1: cl_fuel_target_B @ 0x33D1C  [PREVIOUSLY ANALYZED]
+  ─────────────────────────────────────────────────────────────────────────
+  PID-like controller for CL fuel target.
+  Rates: P=0.05, D=0.025 (or table-lookup via 0xACE6C), I=0.015.
+  Reads CL integral term (FFFF7A44), applies rate limiting.
+  Output: FFFF77E0 (CL_target_comp_B_output)
+
+  Stage 2: cl_fuel_target_A @ 0x33CC0  [PREVIOUSLY ANALYZED]
+  ─────────────────────────────────────────────────────────────────────────
+  2D table lookup (RPM × Load) for CL target compensation.
+  Table selection based on AT/MT flag (FFFF984D) and sub_22CF4 result:
+    AT+flag1: desc 0xAD90C    AT+flag0: desc 0xAD8F0
+    MT+flag1: desc 0xAD8D4    MT+flag0: desc 0xAD8B8
+  Output: FFFF77DC (CL_target_comp_A_output)
+
+  Stage 3: func_33658 — AFC Sensor Conditioning  [NEW]
+  ─────────────────────────────────────────────────────────────────────────
+  Size: 566 bytes (0x33658-0x3388C)
+  GBR: 0xFFFF7828 (aggregator_struct)
+
+  FUNCTION: Conditions AFC sensor inputs with rate limiting and error
+  scaling. Serves as the sensor preparation stage for the AFC loop.
+
+  INPUTS:
+    FFFF6350  ECT (float)
+    FFFF6254  (unknown sensor byte)
+    FFFF65C0  (unknown sensor byte)
+    FFFF6540  sensor_state (float) — loaded when first_call=0
+    FFFF7448  CLOL_mode_flag (byte) — loaded when first_call=0
+
+  ALGORITHM:
+    1. Save/restore GBR=FFFF7828, save 5 GPRs + FR14/FR15
+    2. Load ECT into FR15, read two sensor bytes into R13/R12
+    3. Call sub_22CF4 (AT/MT detection)
+    4. If first_call_flag (R6) == 0:
+       - Load sensor_state (FFFF6540) into FR14
+       - Load CLOL_mode_flag (FFFF7448) into R14
+       - Jump to main processing
+    5. If first_call_flag != 0:
+       - Set FR14 = 0.0, R14 = 0
+       - Jump to main processing
+    6. Main processing:
+       - Read value from aggregator struct via @R11
+       - Call table_lookup_err_scale (0xBEAB0) with FR4=FR14, FR5=struct value
+       - Check result: if R14 == 1, proceed with rate-limited update
+       - Multiple paths with rate_limit_interp (0xBE970) and 0xBE960 calls
+       - Rate limiting uses calibration constants:
+         0xCBF74 = -0.02 (negative rate limit)
+         0xCBF78 = +0.02 (positive rate limit)
+         0xCBF7C-98 = 0.0005 (8 rate constants, likely per-condition)
+         0xCBF6C = 1.0 (unity reference)
+         0xCBF70 = 140.0 (ECT threshold)
+    7. Write conditioned result to struct via @(1*4,R11)
+    8. Write mode flag to struct via @(1*4,R10)
+
+  GBR-RELATIVE ACCESSES:
+    GBR+0   (FFFF7828): read byte — AFC struct status
+    GBR+65  (FFFF7869): read byte — AFC internal state A
+    GBR+66  (FFFF786A): read byte — AFC internal state B
+    GBR+24  (FFFF7840): read word — AFC working value
+    GBR+25  (FFFF7842): read word — AFC working value B
+
+  SUBROUTINES (12 internal helpers + 3 library calls):
+    0x32F5A, 0x32F66         (fuel correction helpers)
+    0x3355A-0x335D2          (10 inline subroutines — sensor conditioning)
+    0xBE960                  (float_max: returns max(FR4, FR5) in FR0)
+    0xBE970                  (rate_limit_interp)
+    0xBEAB0                  (table_lookup_err_scale)
+
+  OUTPUT: Conditioned sensor value written to aggregator_struct
+
+
+  Stage 4: func_33FCE — AFC Target Computation  [NEW]
+  ─────────────────────────────────────────────────────────────────────────
+  Size: 212 bytes (0x33FCE-0x340A0)
+
+  FUNCTION: Computes the AFC correction target by combining multiple
+  table lookups (sensor-based, RPM-based, load-based).
+
+  INPUTS:
+    FFFF6354  (unknown sensor float — secondary lambda?)
+    FFFF63F8  RPM (float)
+    FFFF6624  engine_load (float)
+    FFFF62F8  (unknown sensor float)
+    FFFF782C  (AFC working struct — struct offsets -88, -52, -48, -44)
+    FFFF67EC  (uint16 — operating state)
+
+  ALGORITHM:
+    1. Load four sensor floats into FR12-FR15
+    2. Read FFFF782C struct offsets -88 and -52 onto stack (previous values)
+    3. Call sub_23E48 with R6=FFFF67EC, read state word into R14
+    4. Decision: if sub returns 1 → proceed to table lookups
+                 if sub returns 0 → check CBBE3 flag:
+                   if flag == 0xFF → write 0.0 to struct[-48] and skip
+                   else → proceed to table lookups
+    5. Table lookups (when proceeding):
+       a) Call table_lookup_2D (0xBE8E4) with desc 0xAD63C, axes FR14×FR14
+          → FR14 = result (sensor-based correction target)
+       b) Call table_lookup_2D (0xBE8E4) with desc 0xAD658, axes RPM×load
+          → FR15 = result (RPM/load-based correction)
+       c) Call table_lookup_1D (0xBE830) with desc 0xAC4E8, axis FR13
+          → FR0 = result (1D sensor correction)
+       d) Final: FR14 = FR14 * FR15 * FR0
+       e) Store to FFFF782C struct offset -48
+    6. Post-processing:
+       - FR9 = struct[R13] (param block value = output address)
+       - Subtract stack[0] and stack[4] from FR9 (remove previous terms)
+       - Compare against negated struct[-48]: error magnitude check
+       - If within bounds AND CBBE3 flag == 0xFF:
+         Copy struct[-48] → struct[-44], set flag byte = 1
+       - Else: write 0.0 to struct[-44], set flag byte = 0
+    7. Write flag byte to @R5
+
+  DESCRIPTORS USED:
+    0xAD63C  afc_target_calc — 2D[16×10] (sensor × sensor)
+    0xAD658  afc_target_calc — 2D table (RPM × load)
+    0xAC4E8  afc_cl_decision — 1D table
+
+  OUTPUT: FFFF782C struct offsets -48 and -44, flag byte at @R5
+
+
+  Stage 5: func_340A0 — AFC PI Output  [NEW]
+  ─────────────────────────────────────────────────────────────────────────
+  Size: 522 bytes (0x340A0-0x342A8)
+
+  FUNCTION: Proportional-Integral output stage. Computes separate P and I
+  components from multiple descriptor lookups, then blends them with a
+  configurable alpha factor.
+
+  INPUTS:
+    FFFF63F8  RPM (float)
+    FFFF6624  engine_load (float)
+    FFFF6350  ECT (float)
+    FFFF65FC  (unknown byte)
+    FFFF68DC  (unknown float)
+    FFFF78B0  (AFC PI working struct)
+    FFFF8E7E  operating_mode_flag (byte)
+    FFFF85D7  status_byte (byte)
+    FFFF7870  (output address)
+
+  ALGORITHM:
+    1. Read sensor inputs (RPM, load, ECT)
+    2. Check operating_mode_flag and status_byte for gate conditions
+    3. P-component: Two descriptor lookups
+       - desc 0xACEA0 → P-gain load component
+       - desc 0xACEB4 → P-gain RPM component
+    4. I-component: Two descriptor lookups
+       - desc 0xACEC8 → I-gain load component
+       - desc 0xACEDC → I-gain RPM component
+    5. Additional lookups:
+       - desc 0xAC4FC → scaling factor
+       - desc 0xAC510 → additional factor
+       - desc 0xAD928 → 2D[11×10] blend table
+    6. Blend computation: out = P * alpha + I * (1 - alpha)
+       where alpha comes from desc 0xAD928
+    7. Rate limiting via 0xBE970 (rate_limit_interp)
+    8. Calibration constants:
+       0xCBFF4 = 4.0 (gain scaler)
+       0xCBFF8 = 10.0 (rate limit high)
+       0xCBFFC = 10.0 (rate limit low)
+
+  GBR-RELATIVE (GBR likely FFFF7828 or FFFF78B0):
+    GBR+232  read byte — mode gate
+    GBR+252  read byte — status gate
+    GBR+16   read word — working value
+
+  DESCRIPTORS USED:
+    0xACEA0  afc_pi_output — P-gain (load)
+    0xACEB4  afc_pi_output — P-gain (RPM)
+    0xACEC8  afc_pi_output — I-gain (load)
+    0xACEDC  afc_pi_output — I-gain (RPM)
+    0xAC4FC  afc_pi_output — scaling factor
+    0xAC510  afc_pi_output — additional factor
+    0xAD928  afc_pi_output — 2D[11×10] PI blend table
+
+  OUTPUT: FFFF7870 (AFC PI blended output)
+
+
+  Stage 6: AFC_PI_controller @ 0x342A8  [PREVIOUSLY ANALYZED]
+  ─────────────────────────────────────────────────────────────────────────
+  Reads FFFF7448 every cycle. When FFFF7448=0 (OL): output=0.
+  When CL: applies PI correction. Drops immediately on CL→OL transition.
+
+
+  Stage 7: func_3439E — AFC Enable/Disable Gate  [NEW]
+  ─────────────────────────────────────────────────────────────────────────
+  Size: 50 bytes (0x3439E-0x343CE)
+
+  FUNCTION: Simple enable/disable gate that determines whether AFC
+  correction should be applied.
+
+  ALGORITHM:
+    1. R14 = R4 (output pointer — FFFF781C from dispatcher)
+    2. Check R5 (first_call_flag):
+       - If R5 == 0: call sub_2BE2C (condition check A)
+       - If R5 != 0: call sub_2BE38 (condition check B)
+    3. Check return value:
+       - If R0 == 1: load FR8 from CAL[0xCC010] (= 0.0)
+       - If R0 != 1: FR8 remains 0.0 (fldi0)
+    4. Write FR8 to @R14 (FFFF781C = AFC_pipeline_result)
+
+  EFFECT: Either writes 0.0 (AFC disabled) or the calibration value at
+  0xCC010 (also 0.0 in stock — effectively always disabled in stock tune,
+  but the cal value can be changed to enable a correction offset).
+
+  OUTPUT: FFFF781C (AFC_pipeline_result)
+
+
+  Stage 8: func_343CE — AFC Output Clamp  [NEW]
+  ─────────────────────────────────────────────────────────────────────────
+  Size: 88 bytes (0x343CE-0x34424)
+
+  FUNCTION: Hysteresis-based output clamp with range validation.
+
+  GBR: 0xFFFF7820
+
+  INPUTS:
+    FFFF64D8  (float — likely engine load or airflow)
+    FFFF79C2  (uint16 — counter/state A)
+    FFFF79C4  (uint16 — counter/state B)
+    GBR+82    (FFFF7872) — AFC clamp status byte
+
+  ALGORITHM:
+    1. Read FFFF64D8 into FR8
+    2. Compare against upper threshold: CAL[0xCC014] = 200.0
+       - If FR8 >= 200.0: set clamp flag = 1, write to GBR+82
+    3. If not above 200.0, compare against lower threshold:
+       CAL[0xCC018] = 190.0
+       - If FR8 < 190.0: set clamp flag = 0, write to GBR+82
+       (Between 190-200: hysteresis — retain previous flag state)
+    4. Read counters FFFF79C2 and FFFF79C4:
+       - If counter A > 0 AND counter A < counter B AND clamp_flag == 1:
+         Load FR8 from CAL[0xCC01C] (= 0.0 in stock)
+       - Else: FR8 = 0.0 (fldi0)
+    5. Write FR8 to FFFF7820
+
+  CALIBRATION:
+    0xCC014 = 200.0 (upper clamp threshold)
+    0xCC018 = 190.0 (lower clamp threshold, 10-unit hysteresis band)
+    0xCC01C = 0.0   (clamp correction value — 0.0 in stock)
+
+  OUTPUT: FFFF7820 (AFC clamped output)
+
+  NOTE: In stock calibration, both the enable gate (stage 7) and the
+  clamp correction (stage 8) output 0.0. These are tuning hooks that
+  do nothing until the calibration values are modified.
+
+
+  Tail: fuel_aggregator_tail @ 0x33460  [PREVIOUSLY ANALYZED]
+  ─────────────────────────────────────────────────────────────────────────
+  Computes final fuel correction factor, clamped to [0.75, 1.25].
+  Writes FFFF74BC/BD mode flags.
+
+
+================================================================================
+SECTION 3: ENRICHMENT PATHS
+================================================================================
+
+The three enrichment inputs to fuel_pulse_width_calc (0x301E4) are:
+
+  fuel_enrichment_A @ FFFF76D4
+  fuel_enrichment_B @ FFFF7878
+  fuel_enrichment_C @ FFFF7AE4
+
+These are written through parameter block indirection — ROM tables at
+0x639xx contain RAM addresses, and the dispatch table functions write to
+them via loaded pointers. The write paths are:
+
+3.1  fuel_enrichment_A (FFFF76D4)
+     Parameter block base: 0x639DC (enrichment at offset +8)
+     ─────────────────────────────────────────────────────────────────
+     WRITER: Main IPW calculator @ 0x38158 (Table A[15])
+       - Integrates CL/OL state, load (FFFF6354), WOT thresholds
+       - Calibration: CC354-CC358 (WOT thresholds)
+       - Combines base fuel, corrections, and WOT enrichment factor
+
+     READ BY: fuel_pulse_width_calc (0x301E4) at 0x30210
+              Final correction accumulator (0x320AE) at 0x329C6
+              Various sensor prep functions
+
+3.2  fuel_enrichment_B (FFFF7878)
+     Parameter block base: 0x63A7C (enrichment at offset +8)
+     ─────────────────────────────────────────────────────────────────
+     WRITER: Transient fuel compensation @ 0x37186 (Table B[16])
+       - Tip-in/tip-out enrichment (acceleration/deceleration)
+       - Calibration: CC4200 region
+
+     ALSO WRITTEN BY: Warmup/cold-start enrichment @ 0x3CD34 (Table B[7])
+       - ECT-indexed (FFFF69FC) and IAT-indexed (FFFF69F0)
+
+     READ BY: fuel_pulse_width_calc (0x301E4) at 0x30214
+              Various correction stages
+
+3.3  fuel_enrichment_C (FFFF7AE4)
+     Parameter block base: 0x63B28 (enrichment at offset +8)
+     ─────────────────────────────────────────────────────────────────
+     WRITER: AFL application @ 0x37B74 (called from Table A pipeline)
+       - Writes AFL multiplier product
+       - Also written by warmup/cold-start path
+
+     READ BY: fuel_pulse_width_calc (0x301E4) at 0x3021A
+
+3.4  OL Enrichment (separate path)
+     ─────────────────────────────────────────────────────────────────
+     Computed by CL/OL transition core @ 0x3580C (Table B[14]):
+       - OL enrichment output @ FFFF795C (primary)
+       - OL enrichment factors @ FFFF7954, FFFF7958
+       - OL enrichment interpolation @ FFFF7960, FFFF7964
+       - OL enrichment blend @ FFFF7968
+       - Computed from tables at CC110 region
+       - Clamped: if < CAL[0xCC170] (0.05), set to 0.0
+
+     OL fuel map selector @ 0x3605E (Table B[15]):
+       - Reads IAM from FFFF3234
+       - Compares vs CC16C (0.5) to select enrichment map
+
+     OL enrichment condition checker @ 0x3643A:
+       - Throttle/RPM/load thresholds for enrichment activation
+
+3.5  Acceleration Enrichment
+     ─────────────────────────────────────────────────────────────────
+     Computed by @ 0x3BB6C (called within pipeline):
+       - Tip-in/out gains: CC51C-CC530
+       - Calibration flags: CBC0B, CBC0C
+
+3.6  WOT Enrichment Factor
+     ─────────────────────────────────────────────────────────────────
+     Computed by @ 0x39528 (Table B[8]):
+       - 2D map descriptor 0xAD258 (RPM × load)
+       - Output used by Main IPW calculator
+
+3.7  Post-Start Enrichment
+     ─────────────────────────────────────────────────────────────────
+     Computed by @ 0x30674:
+       - 26 descriptors at 0xAC948-0xACB3F
+       - ECT-indexed cranking/post-start enrichment decay
+
+3.8  Warmup Enrichment
+     ─────────────────────────────────────────────────────────────────
+     Computed by @ 0x303C0:
+       - Table lookup via descriptor 0xAD7E0
+       - Output stored to FFFF7350
+       - ECT-indexed correction factor
+
+3.9  Default Fuel Multiplier
+     ─────────────────────────────────────────────────────────────────
+     Set by @ 0x399EE (Table A[18]):
+       - Loads 1.05 from CBF40 → FFFF7BDC
+       - Provides baseline 5% enrichment
+
+
+================================================================================
+SECTION 4: COMPLETE DATA FLOW
+================================================================================
+
+                    DISPATCH TABLE A
+                    ────────────────
+  [0] Fueling pre-calc ─────────────────────────────────────────┐
+      │                                                         │
+      ├── CL_fuel_dispatcher (0x33304)                          │
+      │   ├── Stage 1: cl_fuel_target_B → FFFF77E0              │
+      │   ├── Stage 2: cl_fuel_target_A → FFFF77DC              │
+      │   ├── Stage 3: sensor conditioning → struct             │
+      │   ├── Stage 4: AFC target compute → FFFF782C[-48,-44]   │
+      │   ├── Stage 5: PI output blend → FFFF7870               │
+      │   ├── Stage 6: PI controller → AFC correction           │
+      │   ├── Stage 7: enable/disable gate → FFFF781C           │
+      │   ├── Stage 8: output clamp → FFFF7820                  │
+      │   └── Tail: aggregator → correction [0.75, 1.25]        │
+      │                                                         │
+  [1] Init flag → FFFF745B                                      │
+  [2] Correction array (29-element) → FFFF7730                  │
+  [3] Per-cyl array init (zeros)                                │
+  [4] Correction filter init (zeros)                            │
+  [5] AFL sub-dispatcher ──────────┐                            │
+  [6] CL/OL transition sub B      │                            │
+  [7] AFL airflow processor        │ AFL Learning               │
+  [8] CL/OL delay manager A       │ Loop                       │
+  [9] CL/OL hysteresis            │                            │
+  [10] CL/OL delay manager B       │                            │
+  [11] Post-transition handler      │                            │
+  [12] Fuel trim input → FFFF7A74  │                            │
+  [13] Injector trim init           │                            │
+  [14] Injector trim application ───┘ → AFL tables              │
+  [15] Main IPW calculator → fuel_enrichment_A (FFFF76D4)       │
+  [16] LTFT learning init                                       │
+  [17] LTFT learning algorithm                                  │
+  [18] Default multiplier → FFFF7BDC (1.05)                     │
+                                                                │
+                    DISPATCH TABLE B                             │
+                    ────────────────                             │
+  [0] Main fueling entry ──────────────────────────────────────┘
+  [4] Fuel trim init → FFFF7464
+  [5] Major correction aggregator (RPM/MAF/lambda)
+  [6] CL/OL mode flag → FFFF7448
+  [7] Warmup/cold-start enrichment → fuel_enrichment_B
+  [8] WOT enrichment factor (2D map)
+  [9] Base fuel map combiner → FFFF73AC
+  [10] CL/OL state cleanup
+  [11] Injector compensation (2D maps)
+  [12] AFL core (airflow→CL check→update→store)
+  [13] AFL validity check
+  [14] CL/OL transition core (OL enrichment → FFFF795C)
+  [15] OL fuel map selector (IAM check)
+  [16] Transient fuel comp → fuel_enrichment_B (FFFF7878)
+  [17] Per-cylinder fuel trim → FFFF7C10
+  [18] Overrun fuel cutoff
+  [19] (unknown)
+                    │
+                    ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ fuel_pulse_width_calc @ 0x301E4                              │
+  │                                                              │
+  │ INPUTS:                                                      │
+  │   fuel_enrichment_A (FFFF76D4) — IPW calc/WOT enrichment    │
+  │   fuel_enrichment_B (FFFF7878) — transient/warmup            │
+  │   fuel_enrichment_C (FFFF7AE4) — AFL correction              │
+  │   fuel_base_factor  (FFFF7348) — base fuel                   │
+  │   afl_multiplier    (FFFF7AB4) — AFL correction multiplier   │
+  │   fuel_correction_A (FFFF73A4) — correction term A           │
+  │   fuel_correction_B (FFFF7A08) — correction term B           │
+  │   fuel_correction_C (FFFF7BC4) — global scaler               │
+  │   fuel_blend_A-D    (FFFF7B6C-78) — per-cyl blend factors   │
+  │                                                              │
+  │ COMPUTATION:                                                 │
+  │   FR8 = enrichA + enrichB + enrichC                          │
+  │   FR8 *= base_factor                                         │
+  │   FR9 = AFL_multiplier * FR8                                 │
+  │   Per-cylinder corrections × 8 via float_clamp_apply         │
+  │                                                              │
+  │ OUTPUT: 8 per-cylinder IPW values at FFFF7344 struct         │
+  └──────────────────────┬──────────────────────────────────────┘
+                         │
+                         ▼
+               [Hardware ISR chain]
+               (see injection_timing_analysis.txt)
+
+
+================================================================================
+SECTION 5: CALIBRATION MAP
+================================================================================
+
+  AFC Pipeline Calibration (0xCBBxx-0xCC0xx):
+  ─────────────────────────────────────────────────────────────────────────
+  0xCBBD8-DB  CL mode valid values (4 bytes)
+  0xCBBE3     Mode flag (0xFF = enabled)
+  0xCBC36     Zero constant (0.0)
+  0xCBF3C     Fuel clamp low bound
+  0xCBF4C     Fuel correction offset (additive)
+  0xCBF50-68  Fuel mode thresholds (7 × float32)
+  0xCBF6C     Unity reference (1.0)
+  0xCBF70     ECT threshold (140.0)
+  0xCBF74     Negative rate limit (-0.02)
+  0xCBF78     Positive rate limit (+0.02)
+  0xCBF7C-98  Rate constants (8 × 0.0005)
+  0xCBFF4     PI gain scaler (4.0)
+  0xCBFF8     PI rate limit high (10.0)
+  0xCBFFC     PI rate limit low (10.0)
+  0xCC010     AFC enable correction (0.0 in stock — disabled)
+  0xCC014     AFC clamp upper (200.0)
+  0xCC018     AFC clamp lower (190.0)
+  0xCC01C     AFC clamp correction value (0.0 in stock)
+
+  Enrichment Calibration:
+  ─────────────────────────────────────────────────────────────────────────
+  0xCC110     OL enrichment tables region
+  0xCC16C     IAM threshold for OL map selection (0.5)
+  0xCC170     OL enrichment minimum threshold (0.05)
+  0xCC178     Throttle hysteresis (CL/OL)
+  0xCC174     BPW hysteresis (CL/OL)
+  0xCC278     RPM high threshold for enrichment gate (105.0)
+  0xCC27C     MAF high threshold for enrichment gate (12000.0)
+  0xCC354-58  WOT thresholds
+  0xCC4200    Transient fuel (tip-in/out) region
+  0xCC51C-30  Acceleration enrichment gains
+  0xCBF40     Default fuel multiplier (1.05)
+
+  AFL Calibration:
+  ─────────────────────────────────────────────────────────────────────────
+  0xCC05C     AFL step size (0.001)
+  0xCC064     AFL limit positive (+25%)
+  0xCC068     AFL limit negative (-25%)
+  0xCC2F0     AFL load threshold
+  0xCC2F4     AFL primary weight
+  0xCC2FC     AFL secondary weight
+  0xCC308     AFL RPM threshold
+  0xCC30C     AFL ECT threshold
+  0xCC33C-48  AFL additional thresholds
+
+  LTFT Calibration:
+  ─────────────────────────────────────────────────────────────────────────
+  0xCC3B0     LTFT step size (0.001)
+  0xCC3C4     LTFT RPM threshold (3600)
+
+
+================================================================================
+SECTION 6: KEY RAM VARIABLE MAP
+================================================================================
+
+  AFC Pipeline State:
+  ─────────────────────────────────────────────────────────────────────────
+  FFFF65F0   CL_OL_status_byte (byte) — gates AFC pipeline entry
+  FFFF7448   CLOL_mode_flag (byte) — 1=CL, 0=OL
+  FFFF7452   CL_readiness_flags
+  FFFF77C8   CL_base_params_struct
+  FFFF77DC   CL_target_comp_A_output (float)
+  FFFF77E0   CL_target_comp_B_output (float)
+  FFFF781C   AFC_pipeline_result (float) — stage 7 output
+  FFFF7820   AFC clamped output (float) — stage 8 output
+  FFFF7828   aggregator_struct (large struct, GBR base)
+  FFFF782C   AFC working struct (offsets -88 to 0)
+  FFFF7870   AFC PI blended output (float) — stage 5 output
+  FFFF7904   aggregator_output (float) — final correction
+  FFFF74BC   fuel_corr_mode (byte)
+  FFFF74BD   fuel_corr_status (byte)
+
+  Fuel Calculation:
+  ─────────────────────────────────────────────────────────────────────────
+  FFFF7344   fuel_per_cyl_struct (8 × float — final IPW values)
+  FFFF7348   fuel_base_factor (float)
+  FFFF73A4   fuel_correction_A (float)
+  FFFF73AC   base fuel map output (float)
+  FFFF7400   base fuel table output (float)
+  FFFF76D4   fuel_enrichment_A (float) — WOT/IPW enrichment
+  FFFF7878   fuel_enrichment_B (float) — transient/warmup enrichment
+  FFFF7AE4   fuel_enrichment_C (float) — AFL correction enrichment
+  FFFF7A08   fuel_correction_B (float)
+  FFFF7AB4   afl_multiplier_output (float)
+  FFFF7BC4   fuel_correction_C (float — global scaler)
+  FFFF7BDC   default_fuel_multiplier (float — 1.05)
+  FFFF7B6C-78 fuel_blend_A-D (4 × float — per-cyl blend)
+
+  OL Enrichment:
+  ─────────────────────────────────────────────────────────────────────────
+  FFFF7954   OL_enrichment_factor_A (float)
+  FFFF7958   OL_enrichment_factor_B (float)
+  FFFF795C   OL_enrichment_output (float — primary)
+  FFFF7960   OL_enrichment_interp_A (float)
+  FFFF7964   OL_enrichment_interp_B (float)
+  FFFF7968   OL_enrichment_blend (float)
+
+  AFL Learning:
+  ─────────────────────────────────────────────────────────────────────────
+  FFFF31A4   afl_learning_secondary
+  FFFF31AC   afl_learning_primary
+  FFFF7AB0   injector trim workspace (4 slots)
+  FFFF7AD8   afl_working_struct
+  FFFF726C   transient_flag (gates AFL application)
+  FFFF7C68   engine_status_flag (gates AFL)
+
+
+================================================================================
+SECTION 8: MAIN IPW CALCULATOR — func_38158
+================================================================================
+
+  Address:   0x38158 - 0x38860  (1802 bytes, 901 instructions)
+  Called by: fuel_dispatch_table_A entry [15] @ 0x480F8
+  GBR A:     0xFFFF7AF8 (fuel_ipw_state_C)
+  GBR B:     0xFFFF7AF4 (fuel_ipw_state_B)
+  Struct:    R10 = 0xFFFF7B40 (fuel_ipw_state_D), offsets -76 to -8
+
+  PURPOSE
+  -------
+  Computes per-cycle IPW correction factor from WOT enrichment, per-cylinder
+  balance, and transient state. Outputs rate-limited correction to
+  fuel_ipw_state_B (FFFF7AF4). Contains two sequenced sub-functions sharing
+  a common state block.
+
+
+  ENTRY PATHS
+  -----------
+  0x38158: Init path (short-circuit)
+    fuel_ipw_state_A[4] = 1
+    fuel_ipw_state_A[5] = 0
+    fuel_ipw_state_A[0] = -1 (word)
+    fuel_ipw_state_A[3] = byte from FFFF65C0
+    bra 0x38860 (epilogue, no main computation)
+
+  0x3816E: Trampoline
+    bsr 0x38860 (epilogue run first as init)
+    bra 0x3817C (enter sub-function A)
+
+  0x38178: bra 0x382C2 (enter sub-function B directly — second call)
+
+
+  SUB-FUNCTION A: WOT gate + state C update (0x3817C - 0x382C0)
+  --------------------------------------------------------------
+  GBR = FFFF7AF8 (fuel_ipw_state_C)
+  Inputs: FR12=load_sensor_B(FFFF6354), FR13=ipw_output_struct(FFFF7FBC),
+          FR15=injector_data(FFFF895C), FR14=engine_load(FFFF6624),
+          FR7=FFFF65FC, R13=FFFF67EC(word), R14=FFFF6254(byte),
+          R12=FFFF65C0(byte)
+
+  Gate chain (all must pass for WOT path):
+    1.  save transient_flag(FFFF726C) → GBR+73
+    2.  if R14(FFFF6254) == 1:
+          FR8 = FR15 + CC350(0.0)
+          GBR+70 = (FR14 > FR8 && FR14 < FR9) ? 1 : 0
+        else: GBR+70 = 0
+    3.  if transient(GBR+73) == 0:
+          GBR+71 = (FR14 > FR15) ? 1 : 0
+        else: GBR+71 = 0
+    4.  if transient(GBR+73) == 0:
+          check FFFF6254 word in range [CBC7A, CBC7C)
+          if out of range: → FAIL
+    5.  GBR+70 == 1 required
+    6.  CLOL_mode_flag(FFFF7448) == 0  (OL mode required)
+    7.  float_clamp_or_scale(fuel_load_state(FFFF798C)) must return 0
+    8.  engine_load(FR12) < CC354 (118.0)
+    9.  engine_load(FR12) < CC358 (119.0)  [hysteresis pair with 118]
+   10.  afl_state_3158(FFFF3158) == 0
+   11.  stack+4 (init flag from sub_22CF4) != 1
+   12.  ipw_output_struct(FR13) > CC35C (0.0)
+   13.  GBR+71 == 1
+   14.  FR7(FFFF65FC) > CC360 (0.0)
+
+  if ALL pass → GBR+64 = 1 (WOT active)
+  else        → GBR+64 = 0
+
+  if GBR+64 == 1:
+    FR15 -= CC364 (0.0)        ; subtract offset from injector_data
+    fuel_ipw_state_C = FR15    ; write to FFFF7AF8
+
+  Counter tracking:
+    if GBR+69 != R12(FFFF65C0 byte):
+      float_util_554(GBR+33*2, 1)    ; smooth counter step
+    GBR+33*2 = result
+    GBR+69 = R12                     ; update previous value
+
+
+  SUB-FUNCTION B: IPW blend + per-cyl + rate limit (0x382C2 - 0x3885E)
+  ---------------------------------------------------------------------
+  GBR = FFFF7AF4 (fuel_ipw_state_B)
+  R10 = FFFF7B40 (fuel_ipw_state_D struct base)
+  Inputs: FR14=engine_load(FFFF6624), FR13=ECT_float(FFFF6350),
+          FR15=sensor_8998, FR12=sensor_89C4, R13=FFFF67EC(word),
+          R12=FFFF6254(byte), R14=FFFF647D(byte), stack+8/12/16=per_cyl_A/B/C
+
+  Active flag (WOT_active): GBR+68 = FFFF7AF4+68 = FFFF7B38
+    (same physical address as sub-function A's GBR_A+64 = FFFF7AF8+64)
+
+  Load delta:
+    R10[-60] = engine_load(FR14) - fuel_ipw_state_C(R10[-72])
+
+  BLEND CHANNEL A (if WOT_active):
+    ECT table (desc 0xAD470): threshold = table_lookup_1D(ECT)
+    if sensor_8998 > ECT_threshold AND sensor_89C4 < CC368(0.0):
+      lookup_A = table_lookup_1D(desc 0xAD494, load_delta)
+      lookup_B = table_lookup_1D(desc 0xAC670, ECT)
+      R10[-56] = lookup_A * lookup_B
+      R10[-52] = 0.0
+    else:
+      if stack+4 == 1: desc = 0xAD47C else desc = 0xAD488
+      lookup_C = table_lookup_1D(desc, load_delta)
+      lookup_D = table_lookup_1D(desc 0xAC65C, ECT)
+      R10[-56] = 0.0
+      R10[-52] = lookup_C * lookup_D
+
+    Timer/count compare (GBR+35*2 vs CBC84):
+      if count >= CBC84:
+        blend_A = R10[-56] + R10[-52]           ; combined
+        clamp with CC36C (0.0)
+      else:
+        blend_A = FMAC(blend, FR8, FR4)         ; blend-weighted
+    float_clamp_apply(-1.0, 1.0) → R10[-48]
+
+    Rate gate (GBR+76):
+      if GBR+76 == 0: rate_limit_interp(0.0, prev, R10[-76]) → R10[-44]
+      else: hysteresis-tracked → R10[-44]
+
+  BLEND CHANNEL B (if WOT_active, 0x3850A):
+    Same structure as channel A using:
+      desc 0xAD4A0 (ECT threshold), 0xAD4B8/0xAD4C4 (active path),
+      0xAD4AC/0xAD4C4/0xAC684 (fallback path)
+    Outputs: R10[-40], R10[-36], R10[-32], R10[-28]
+
+  if WOT_active == 0: all channels → 0.0
+
+  TRANSIENT GATE (0x3861E):
+    if transient_flag(FFFF726C) == 0:
+      float_util_53C(GBR+72, 1) smooth counter
+      GBR+72 = result
+      if counter(GBR+72) >= CBBFE: FR14 = 1 else FR14 = 0
+    else:
+      GBR+72 = 0; FR14 = 0
+
+  PER-CYLINDER TRIM (if WOT_active && FR14 == 1, 0x386A8):
+    float_util_598(RPM, FR14=0.0) + table_lookup(ECT, load_delta)
+    delta_BA = per_cyl_B - per_cyl_A                ; stack+12 - stack+8
+    delta_CA = per_cyl_C - per_cyl_A                ; stack+16 - stack+8
+    R10[-24] = float_scale_B(delta_CA, CC364/CC360?) ; scaled cylinder A-C delta
+    R10[-20] = delta_BA
+    R10[-16] = R10[-24] - R10[-20]                  ; differential balance
+
+    4 table lookups (descs 0xAC6AC, 0xAC6D4, 0xAC6C0, 0xAC6E8):
+      output_B = lookup(0xAC6AC, load_delta) * lookup(0xAC6D4, load_delta)
+      output_C = lookup(0xAC6C0, load_delta) * lookup(0xAC6E8, ECT)
+      R10[-68] = output_B * output_C
+      R10[-64] = ... * FR0
+
+  1D TRIM LOOKUP (0x386DA):
+    desc 0xAC698: gain = table_lookup_1D(R10[-16])
+    GBR+35*2 vs GBR+12 compare
+    rate_limit_interp → R10[-12]
+
+  FINAL OUTPUT BLEND (0x38708 - 0x38844):
+    if stack+4 == 1 (init): jump to epilogue (write 0.0)
+    if WOT_active:
+      if FR14 (per-cyl active) == 1:
+        correction = (R10[-44] + R10[-28]) * R10[-12]
+        float_clamp_apply(min=FR5, max=FR6)
+      else:
+        correction = R10[-48] + R10[-28]
+    else: correction = 0.0
+
+  RATE-LIMITED OUTPUT (0x387CE):
+    dead_band = CC380 (0.0)
+    if |correction| > dead_band:
+      if CLOL_mode == 0 (CL) AND R12 == 0:
+        rate_up = CC384/CC388, rate_dn = CC394/CC398
+        if correction > CC380: rate_limit_with(CC394/CC398 step, CC384/CC388 step)
+        else: rate_limit_with(CC38C/CC390 step, CC39C/CC3A0 step)
+      elif CLOL_mode == 0 (CL) AND R12 != 0:
+        same with alternate rates
+      else (OL or init):
+        rate_limit with CC37C offset
+    else: fuel_ipw_state_B = 0.0
+
+    fuel_ipw_state_B (FFFF7AF4) = rate-limited correction  ← OUTPUT
+
+  EPILOGUE (0x38844):
+    GBR+76 = GBR+68   ; copy WOT_active → prev_active (for rate hysteresis)
+    restore registers
+
+
+  STATE BLOCK MAP (fuel_ipw_state_D @ FFFF7B40, R10 offsets)
+  -----------------------------------------------------------
+  R10[-76] = FFFF7AF4  fuel_ipw_state_B (final output)
+  R10[-72] = FFFF7AF8  fuel_ipw_state_C (sub-fn A output)
+  R10[-68] = FFFF7AFC  per_cyl_B-C blend product
+  R10[-64] = FFFF7B00  per_cyl_C blend factor
+  R10[-60] = FFFF7B04  load_delta (engine_load - state_C)
+  R10[-56] = FFFF7B08  blend_channel_A_path1
+  R10[-52] = FFFF7B0C  blend_channel_A_path2
+  R10[-48] = FFFF7B10  blend_channel_A_clamped
+  R10[-44] = FFFF7B14  blend_channel_A_rate_limited
+  R10[-40] = FFFF7B18  blend_channel_B_path1
+  R10[-36] = FFFF7B1C  blend_channel_B_path2
+  R10[-32] = FFFF7B20  blend_channel_B_clamped
+  R10[-28] = FFFF7B24  blend_channel_B_rate_limited
+  R10[-24] = FFFF7B28  per_cyl_delta_CA_scaled
+  R10[-20] = FFFF7B2C  per_cyl_delta_BA
+  R10[-16] = FFFF7B30  per_cyl_balance_differential
+  R10[-12] = FFFF7B34  trim_gain (1D lookup result)
+  R10[ -8] = FFFF7B38  GBR_B+68 = WOT_active flag
+
+
+  CALIBRATION MAP (0xCC350-0xCC3A0)
+  -----------------------------------
+  CC350: FR15-FR9 reference (0.0)
+  CC354: WOT load threshold (118.0 g/rev)
+  CC358: WOT load hysteresis (119.0 g/rev)
+  CC35C: ipw_output_struct minimum gate (0.0)
+  CC360: FFFF65FC minimum gate (0.0)
+  CC364: injector_data offset (0.0 — tunable deadband)
+  CC368: sensor_89C4 gate threshold (0.0)
+  CC36C: blend channel A clamp reference (0.0)
+  CC370: blend channel A rate gate (0.0)
+  CC374: blend channel B gate threshold (0.0)
+  CC378: blend channel B clamp reference (0.0)
+  CC37C: OL blend offset (0.0)
+  CC380: final correction deadband (0.0)
+  CC384/8/C/90/4/8/C/0: 8 rate-limit pairs for CL/OL up/down steps (all 0.0)
+  CBC84: blend channel A timer threshold (0.0)
+  CBC8A: blend channel B timer threshold (0.0)
+  CBBFE: transient counter saturation threshold (raw 0x00040008)
+  CBC7A/7C: FFFF6254 word range gate (0.0/0.0)
+
+
+================================================================================
+SECTION 9: FUEL OVERRUN CUTOFF — func_3EB8C  (Table B[18])
+================================================================================
+
+  Address:   0x3EB8C - 0x3EBD4  (74 bytes, 37 instructions)
+  Tail-call: fuel_cut_output_tail @ 0x46BCC
+  Purpose:   Deceleration fuel cut activation. Counts closed-throttle
+             scheduler ticks; activates fuel cut after threshold.
+
+  PSEUDOCODE
+  ----------
+  decel_flag = byte @ FFFF65BD        ; 0 = throttle closed / decel
+
+  if decel_flag == 0:
+    counter = word @ FFFF7E8E
+    threshold = word @ D29AA = 16     ; 16 scheduler ticks
+    if counter >= threshold:
+      overrun_state (FFFF7E8C) = 1    ; activate fuel cut
+    counter = float_util_554(counter, 1)   ; increment counter (smooth step)
+    FFFF7E8E = counter
+  else:
+    overrun_state (FFFF7E8C) = 0      ; deactivate fuel cut
+    FFFF7E8E = 0                      ; reset counter
+
+  tail-call fuel_cut_output_tail (0x46BCC)   ; handle injector gating
+
+  RAM
+  ---
+  FFFF65BD  decel_flag         (byte, 0=decel; 12+ refs across fuel code)
+  FFFF7E8C  overrun_state      (byte, 0=normal / 1=fuel cut active)
+  FFFF7E8E  overrun_counter    (word, scheduler tick counter)
+
+  CALIBRATION
+  -----------
+  D29AA:  FuelCut_DecelTickThreshold  (uint16 = 16 ticks; adjacent byte
+          at D29AB = 0x32 = 50, likely FuelCut_ResumeThreshold)
+
+
+================================================================================
+SECTION 10: ECT WARMUP CORRECTION — func_403C4  (Table B[19])
+================================================================================
+
+  Address:   0x403C4 - 0x403FA  (56 bytes, 28 instructions)
+  Purpose:   Mode-selected ECT-based correction factor. Chooses between
+             four 1D curves based on two operating-mode flags, then writes
+             result float to ect_warmup_correction.
+
+  PSEUDOCODE
+  ----------
+  FR4  = ECT_float (FFFF6350)
+  R6   = byte @ FFFF90BE     ; ect_mode_flag
+  R5   = byte @ FFFF6254     ; gear/operation mode byte
+
+  if R6 == 0:
+    if R5 == 1: desc = 0xADBC4   ; 1D_ECT_i16_16 → data @ D3206
+    else:       desc = 0xADBD8   ; 1D_ECT_i16_16 → data @ D3216
+  else:
+    if R5 == 1: desc = 0xADBEC   ; 1D_ECT_i16_16 → data @ D3226
+    else:       desc = 0xADC00   ; 1D_ECT_i16_16 → data @ D3236
+
+  ect_warmup_correction (FFFF7F68) = table_lookup_1D(FR4=ECT, desc)
+
+  NOTE: All 4 tables are 16-point, axis scale 0.351562°C/count, start -45°C
+  (spans approx. -45°C to +117°C at 0.35°C steps). In stock tune all four
+  tables appear to hold identical data — the mode selection is a tuning hook.
+
+  RAM
+  ---
+  FFFF6350  ECT_float             (engine coolant temp, float)
+  FFFF6254  gear/op mode byte     (1 = specific AT or mode condition)
+  FFFF90BE  ect_mode_flag         (byte, 0 or non-zero)
+  FFFF7F68  ect_warmup_correction (float output; consumed by func @ 0x3F500)
+
+  DESCRIPTORS
+  -----------
+  0xADBC4  1D_ECT_i16_16  data @ D3206  (R6=0, R5=1)
+  0xADBD8  1D_ECT_i16_16  data @ D3216  (R6=0, R5≠1)
+  0xADBEC  1D_ECT_i16_16  data @ D3226  (R6≠0, R5=1)
+  0xADC00  1D_ECT_i16_16  data @ D3236  (R6≠0, R5≠1)
+
+
+================================================================================
+SECTION 11: FUEL CUT OUTPUT TAIL — func_46BCC  (called from Section 9)
+================================================================================
+
+  Address  : 0x46BCC – 0x46FCC  (1026 bytes, 513 instructions + embedded subs)
+  Called by: fuel_overrun_cutoff (0x3EB8C) via tail-call
+  Calls    : 0x317C, 0x2B25C, 0x2B268, 0x2B274, 0x2B280 (condition checkers)
+             0x4760A (pulse-width lookup), 0x82B6 (mode-0 pulse emit)
+             0x82DE  (mode-1 pulse emit), 0xBE654 (float clamp/scale)
+             0x46DCA, 0x46DBE (per-cylinder timing helpers)
+             0x3190  (hardware injector output — tail-call)
+  Outputs  : FFFF82B8 (fuel_cut_bitmask, int16)
+             FFFF82C0 (per-cylinder struct[2], 44 bytes each)
+             FFFF41F0 (normalized timing float array, indexed by cylinder)
+
+
+  STRUCTURE OVERVIEW
+  ──────────────────
+  The function has three embedded sub-functions in addition to the main body:
+
+  0x46BCC  Main body     – condition gating, bitmask build, tail-call 0x3190
+  0x46E64  Sub-A         – FMAC cylinder timing dispatch (saves R11-R14+PR+FR14)
+  0x46EE4  Sub-B         – cylinder pulse timing emit (saves R11-R14+PR+FR14)
+  0x46F82  Sub-C         – per-cylinder condition/timing accumulate
+
+
+  MAIN BODY PSEUDOCODE (0x46BCC)
+  ───────────────────────────────
+
+    // 5 condition checks placed on stack
+    R0 = 0x42000000 (constant)
+    cond_A = func_317C(R4=16)       // rpm/load gate — result to no stack slot
+    cond_B = func_2B25C()           // → stack+0
+    cond_C = func_2B268()           // → stack+4
+    cond_D = func_2B274()           // → stack+8
+    cond_E = func_2B280()           // → stack+12
+
+    R14 = 0                         // bitmask accumulator
+
+    if overrun_state (FFFF7E8C) == 1 OR FFFF82B4 == 1:
+        R14 = -1                    // cut all cylinders
+    else:
+        // individual cylinder-condition bits
+        if cyl_0_cut:  R14 |= 0x0041
+        if cyl_1_cut:  R14 |= 0x0082
+        if cyl_2_cut:  R14 |= 0x0104
+        if cyl_3_cut:  R14 |= 0x0208
+
+    FFFF82B8 = word R14             // fuel_cut_bitmask: -1=all, bits=per-cyl
+
+    // Initialize per-cylinder struct FFFF82C0 (2 × 44-byte entries)
+    for each entry in FFFF82C0[0..1]:
+        byte @(2, entry) = 1        // mark active
+
+    tail-call 0x3190                // hardware injector write
+
+
+  PER-CYLINDER STRUCT  FFFF82C0  (44 bytes × 2 entries)
+  ───────────────────────────────────────────────────────
+  Offset  Size  Description
+  ──────  ────  ───────────────────────────────────────────
+    +0    byte  cylinder index / mode code (0–3 or 7,6,9,8)
+    +2    byte  active flag
+    +6    byte  timing mode (0 = RPM rising edge, 1 = other)
+    +7    byte  enabled flag
+    +8   float  timing offset A
+   +12   float  timing offset B  (@(3*4, entry))
+   +16   float  timing offset C  (result accumulator slot)
+   +40   int32  timing ticks A   (@(10*4, entry))
+   +44   int32  timing ticks B   (@(11*4, entry))
+
+
+  SUB-A: CYLINDER TIMING DISPATCH (0x46E64)
+  ──────────────────────────────────────────
+  R4 = pointer to per-cylinder struct entry
+  Cylinder mode pairs: (0↔7), (1↔6), (2↔9), (3↔8)
+  Loads FFFF7E90 floats as timing reference; applies FMAC per mode pair.
+  ftrc converts float result to int32 and stores at struct+40 or +44.
+  Calls: 0x4760A (pulse width lookup), 0x82B6 (mode dispatch sub)
+
+
+  SUB-B: CYLINDER PULSE EMIT (0x46EE4)
+  ──────────────────────────────────────
+  Iterates over per-cylinder struct entries (step=16 bytes).
+  Per entry:
+    if byte@(7,entry) == 0: skip
+    copy @(3*4,entry) → @(2*4,entry)           // latch timing B
+    mode = byte @(6,entry)
+    if mode == 1:
+        val = max(0, @(2*4,entry) + R11)        // R11 = crank ref
+        pulse = func_4760A(val)
+        FR8 = float(pulse) / FR14              // FR14 = normalization const
+        FFFF41F0[cylinder * 8] = FR8           // normalized timing
+    if mode == 0:
+        val = max(0, @(2*4,entry) + R11)
+        pulse = func_4760A(val)
+        FR4 = float(pulse) / FR14
+        func_82DE(cylinder, FR4)               // emit pulse
+        byte @(6,entry) = 1                    // mark emitted
+    entry += 16
+
+  After loop:
+    byte @(1, base) = 1
+    byte @(2, base) = 0
+
+
+  SUB-C: PER-CYLINDER CONDITION CHECK (0x46F82)
+  ───────────────────────────────────────────────
+  R12 = R5 (comparison base float)
+  Iterates struct entries (step=16):
+    if R12 > @(3*4, entry):
+        offset = func_46DCA(cylinder) + func_46DBE(cylinder)
+        func_BE654(R5=@FFFF4158, combined_offset)
+  R10 = 0xB4 = 180  (used as extu.b → some table index/limit)
+  R9  = 0xFFFF4158  (base for final per-cylinder output array)
+
+
+  KEY RAM ADDRESSES (fuel_cut_output_tail)
+  ─────────────────────────────────────────
+  FFFF4158  per-cylinder output base
+  FFFF41F0  normalized timing float array (cylinder × 8 byte stride)
+  FFFF4210  timing array B
+  FFFF4220  timing array C
+  FFFF65F8  source timing float
+  FFFF7E75  small timing byte
+  FFFF7E88  timing word
+  FFFF7E8C  overrun_state          (from Section 9)
+  FFFF7E90  cylinder timing offsets (mode pairs)
+  FFFF82B4  alternate cut gate (word)
+  FFFF82B8  fuel_cut_bitmask output (int16)
+  FFFF82BC  per-cylinder timing base float
+  FFFF82C0  per-cylinder struct[2] (44 bytes each)
+
+
+================================================================================
+SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
+================================================================================
+
+  Address  : 0x3F374 – 0x3FB74  (2050 bytes, 1025 instructions + embedded subs)
+  Called by: fuel_dispatch_table_B (exact slot TBD)
+  Reads    : ect_warmup_correction (FFFF7F68) — output of Section 10
+  Outputs  : 8 per-channel clamped warmup corrections
+             FFFF7E90[0..7] × 4 bytes = FFFF7E90–FFFF7EAC
+             (= GBR+0 through GBR+28 in the FFFF7E90 struct)
+  GBR base : 0xFFFF7E90  (main sub)
+             0xFFFF7EC0  (embedded sub-functions at 3FA8C, 3FACE)
+  Subs     : 0x5EB32  (unknown byte conditioner)
+             0x3AB20  (unknown boolean gate)
+             0x22F92  (unknown ECT sub — takes FR14=ECT_float)
+             0xBE56C  float_clamp_apply
+             0xBE830  table_lookup_1D
+             0xBE960  float_max
+             0xBE970  rate_limit_interp
+             0xAB69C  descriptor for table_lookup_1D (mode correction table)
+             0xADA98  descriptor for table_lookup_1D (GBR+40 init table)
+             0x4059E  unknown
+             0x46DCA  cylinder timing helper (also used by Section 11)
+
+
+  INPUT LOADING
+  ─────────────
+  FR12 = engine_load_float    (FFFF6624)
+  FR14 = FFFF62F8             (MAP/load derivative — possibly filtered RPM)
+  FR15 = FFFF65FC             (unknown float — possibly TPS derivative)
+  FR8  = ECT_float            (FFFF6350) → stack+0
+  FR8  = ect_warmup_correction(FFFF7F68) → stack+4   [reads Section 10 output]
+  FR8  = fuel_ipw_output_struct(FFFF7FBC) → stack+8
+  R12  = byte @ FFFF8F16      (mode A flag)
+  R11  = byte @ FFFF8F24      (mode B flag)
+  R10  = byte @ status_byte   (FFFF85D7)
+  R14  = byte @ FFFF5BE3      (warmup transition flag)
+  R13  = byte @ FFFF65BF      (warmup transition flag B)
+  R9   = byte @ FFFF7D18      (via func_5EB32)
+
+
+  EDGE-DETECT STATE COUNTERS  (GBR = FFFF7E90)
+  ──────────────────────────────────────────────
+  GBR+113 = FFFF7F01  counter_A: tracks R14 (FFFF5BE3) transitions
+  GBR+114 = FFFF7F02  counter_B: tracks R13 (FFFF65BF) transitions
+  GBR+115 = FFFF7F03  shadow of R14 (previous value)
+  GBR+116 = FFFF7F04  shadow of R13 (previous value)
+
+  Logic for counter_A:
+    if R14 == 1:  counter_A = 0           // transition detected — reset
+    elif GBR+115 == 1: counter_A = CAL[D2974]  // rising edge — load threshold
+    elif counter_A > 0: counter_A -= 1    // count down
+
+
+  MODE DISPATCH  (R14 = extu.b(R12) = FFFF8F16)
+  ───────────────────────────────────────────────
+  Mode 3:   FR13 = FMAC(FFFF7F0C, FFFF8258, const) - CAL[D2A34=0.0]
+            → sets FR12=FR13=FR15=FR13, store to stack+12, bra 3F88E
+
+  Mode 1:   FR15 = @(FFFF7F04 - 40) = FFFF6ECC  (direct lookup)
+            → bra L_3F5C4 (rate-limit setup)
+
+  R9==1 path: FR8 = FFFF7F0C + FFFF8260 + FFFF81F0 (3-source sum)
+            Add FR8 to each of FFFF81DC[0,+4,+8,+12]
+            → bra L_3F88E
+
+  Mode 90:  Full accumulation of 14 sources:
+            FR9 = FFFF7F0C + stack+4 + FFFF7F6C + FFFF7F74
+                - stack+8 - FFFF8000 + FFFF81EC + FFFF8028
+                - FFFF8038 + FFFF803C + FFFF805C - FFFF8084
+                + FFFF80B4 + FFFF80C4 - FFFF80E8 + FFFF80F0
+                + FFFF8088 + FFFF81DC[base]
+            FR13, FR12, FR15 = similar sums with per-cylinder offsets
+            → bra L_3F760
+
+  Mode != 90 (default): calls rate_limit_interp sequentially for each
+            FFFF803C/805C → FFFF8028 → FFFF80C4 → FFFF7F6C → FFFF80F0
+            then reconstructs 4 channel targets
+            → bra L_3F760
+
+  Mode -15: FR5 = 1.0  }
+  Mode -14: FR5 = 2.0  } multiplier applied via table_lookup_1D @0xAB69C
+  Mode -13: FR5 = 3.0  } then FR0 += FR5 → adds to all 4 channels
+  Mode -12: FR5 = 4.0  }
+  Mode -11: FR5 = 0.0 (or @3FB68)  }
+
+  R14 >= 0xF0 or == 2:
+            Adds FFFF80B8 + FFFF80DC to all 4 channels
+            → bra L_3F88E
+
+
+  COMMON OUTPUT PATH (L_3F88E)
+  ─────────────────────────────
+
+  // Mode 90: direct sum; else: rate_limit_interp for FFFF7F6C channel
+  FR0 += FFFF7F0C + stack+4 - stack+8  [+/- adjustment]
+
+  // Add to FFFF81DC base (per-cylinder correction base struct)
+  for i in [0, 4, 8, 12]:
+      stack+(32+i) = FFFF81DC[i] + FR0      // 4 per-channel adjusted targets
+
+  // Rate-limit each of 4 channels individually via rate_limit_interp (0xBE970)
+  // using FFFF7F04[-64] as upper limit and FFFF7F04[-68] as lower limit:
+  FFFF7EB0 = rate_limit(FR14, limits)    // channel 0 after rate limit
+  FFFF7EB4 = rate_limit(FR13, limits)    // channel 1
+  FFFF7EB8 = rate_limit(FR12, limits)    // channel 2
+  FFFF7EBC = rate_limit(FR15, limits)    // channel 3
+
+  // Clamp each channel + 4 stack-computed values via float_clamp_apply (0xBE56C)
+  // using FFFF7F04[-68] as clamp reference, 0x3FB80 float as bound:
+  FFFF7E90 = clamp(FFFF7EB0)    // GBR+0   final warmup correction cylinder 0
+  FFFF7E94 = clamp(FFFF7EB4)    // GBR+4   final warmup correction cylinder 1
+  FFFF7E98 = clamp(FFFF7EB8)    // GBR+8   final warmup correction cylinder 2
+  FFFF7E9C = clamp(FFFF7EBC)    // GBR+12  final warmup correction cylinder 3
+  FFFF7EA0 = clamp(stack+32)    // GBR+16  adjusted target cylinder 0
+  FFFF7EA4 = clamp(stack+36)    // GBR+20  adjusted target cylinder 1
+  FFFF7EA8 = clamp(stack+40)    // GBR+24  adjusted target cylinder 2
+  FFFF7EAC = clamp(stack+44)    // GBR+28  adjusted target cylinder 3
+
+
+  EMBEDDED SUB-FUNCTIONS
+  ───────────────────────
+  3FA8C:  GBR = FFFF7EC0.  R5 = FFFF7EFC.
+          Writes 4 floats (FR9 = constant from 3FB84, FR8 = constant from 3FB94)
+          to R5 offsets (-48,-60,-56,-32).
+          Sets GBR+30 = GBR+31 = -1 (word).
+          Calls table_lookup_1D(desc=0xADA98) → GBR+40 = result.
+          Stores FR0 to FFFF7EFC-24 = FFFF7ED8.
+          Purpose: initializes warmup state struct at FFFF7EC0 / FFFF7EFC.
+
+  3FACE:  GBR = FFFF7EC0.  Allocates 12 bytes on stack.
+          Reads ECT_float, calls 0x22F92.
+          Reads FFFF5BE3, FFFF65BF, FFFF85D7; calls 0x3AB20 (gate).
+          If gate==1: writes to GBR+67,65,68,66,72,75,73 (flag cluster).
+          Also processes FFFF805C float → conditional writes.
+          Purpose: warmup mode transition condition evaluator.
+
+
+  CALIBRATION REFERENCES
+  ───────────────────────
+  D2974   byte     counter_A threshold (= CAL[D2974])   stock: ~0
+  D2975   byte     counter_B threshold                   stock: ~0
+  D2A08   float    2000.0   RPM upper gate
+  D2A0C   float    0.8799   load lower gate
+  D2A10   float    2.0      FR15 lower gate
+  D2A14   float    550.0    RPM lower gate
+  D2A18   float    1300.0   RPM upper gate (inner)
+  D2A1C   float    80.0     FR7 upper gate (ECT or similar)
+  D2A20   float    0.0      fallback path gate FR14 lower
+  D2A24   float    0.0      fallback path gate FR15 lower
+  D2A28   float    0.0      fallback path gate FR12 upper
+  D2A2C   float    0.0      fallback path gate FR12 lower
+  D2A30   float    119.0    FR7 gate for fallback path
+  D2A34   float    0.0      FMAC bias subtracted in mode 3
+  D2A38   float    4.0      target FR15 when all gates pass
+  D2A3C   float    0.0      FR15 fallback target
+
+
+  DATA FLOW SUMMARY
+  ──────────────────
+  Section 10 (func_403C4):
+    ECT → table_lookup_1D → FFFF7F68 (ect_warmup_correction)
+
+  Section 12 (func_3F374):
+    FFFF7F68 → stack+4 (input)
+    Multi-mode computation with rate limiting and clamping
+    → FFFF7E90..FFFF7EAC (8 per-cylinder warmup correction floats)
+    → These are read by cylinder timing sub (func_46BCC Sub-A) via FFFF7E90
+
+
+================================================================================
+SECTION 13: INJECTOR OUTPUT CHAIN — func_3190 / func_82DE / func_4760A
+================================================================================
+
+  These functions form the lowest layer of the injection pipeline, between
+  the computed pulse widths and the hardware timer registers.
+
+
+  func_3190: INJECTOR GATE  (26 bytes)
+  ──────────────────────────────────────
+  Called by: fuel_cut_output_tail (tail-call), per_cyl_pulse_emit (jmp)
+
+    if R4 == 0: return           // zero pulse → skip
+    R5 = FFFF1288               // injection control struct
+    R6 = @(6*4, R5) = @FFFF12A0 // per-cylinder sub-struct
+    if byte @(1, R6) == 1: return  // injection in progress → skip (no-op)
+    jmp 0x3664                  // tail-call actual hardware write
+
+  0x3664 is the hardware injection trigger. Reads injector timer registers
+  and writes the pulse width to the SH7058 output compare unit.
+
+  FFFF1288  injection control struct base
+  FFFF12A0  per-cylinder active flag base (@+1 = busy flag)
+
+
+  func_82B6: CYLINDER TIMING NORMALIZER  (42 bytes)
+  ────────────────────────────────────────────────────
+  Input : FR4 = timing angle (float, crank degrees)
+          R4  = cylinder index (byte)
+  Output: FFFF41F0[cylinder*8] = normalized float
+          FFFF41F0[cylinder*8 + 4] = 1 (armed flag)
+          FFFF41F0[cylinder*8 + 5] = 0 (emitted flag)
+
+    FR3 = const @0x83A4       // reference angle offset
+    FR4 -= FR3                 // subtract reference
+    if FR4 <= 0:
+        FR1 = const @0x83A8   // full cycle wrap constant
+        FR4 += FR1             // wrap to positive range
+    R5 = cylinder * 8         // index into FFFF41F0 array
+    FFFF41F0[R5] = FR4        // store normalized timing
+    FFFF41F0[R5+4] = 1        // arm
+    FFFF41F0[R5+5] = 0        // clear emitted
+
+
+  func_82DE: PER-CYLINDER PULSE EMIT  (514 bytes, 3 entry points)
+  ─────────────────────────────────────────────────────────────────
+  Entry A (0x82DE): Float pulse mode — FR4=normalized float, R4=cylinder
+    1. Check: func_317C(R4=16)    // rpm/load gate
+    2. Store normalized float → FFFF41F0[cyl*8]
+    3. FFFF41F0[cyl*8+5]=0, FFFF41F0[cyl*8+4]=2  (state=pending-emit)
+    4. bsr 0x8696                 // timing sub
+    5. jmp 0x3190                 // gate then hardware write
+
+  Entry B (0x8318): State query — R4=cylinder
+    1. func_317C(R4=16)
+    2. If FFFF41F0[cyl*8+5] != 0: FFFF41F0[cyl*8+4] = 0
+    3. jmp 0x3190
+
+  Entry C (0x8344): State check — R4=cylinder
+    1. func_317C(R4=16)
+    2. R14 = f(FFFF41F0[cyl*8+4], FFFF41F0[cyl*8+5]) → 0, 1, or 2
+    3. jsr 0x3190 (with R14 = state)
+    4. return state in R0
+
+  FFFF41F0 array layout (8 bytes per cylinder, 4 cylinders = 32 bytes):
+    +0  float  normalized timing angle
+    +4  byte   state: 0=idle, 1=armed(82B6), 2=pending(82DE)
+    +5  byte   emitted flag
+
+
+  func_4760A: TIMING INT→TIMER COUNT  (52 bytes)
+  ─────────────────────────────────────────────────
+  Input : R4 = timing int32 (crank-based pulse offset)
+  Output: R0 = timer count for hardware output compare register
+
+  FFFF831C  byte: RPM-derived scale factor
+
+    R5 = byte @ FFFF831C               // scale byte
+    R2 = R5 * 15 * 131072 (= R5 * 0x1E0000)  // via shifts
+    R2 = R2 - R4 + 0xFFF60000         // subtract offset, add base
+    // clamp result to [0, 0x2D00000]
+    return R0 = clamped timer count
+
+  Purpose: converts a crank-position timing integer (from FMAC computation)
+  into an absolute timer count for the SH7058 output compare unit.
+  The scale factor in FFFF831C adjusts the conversion with engine speed.
+
+
+  MULTI-CYLINDER INIT (0x83B8) AND SETUP SUB (0x8408)
+  ──────────────────────────────────────────────────────
+  func_83B8: called when cylinder struct needs full re-init
+    - Calls 0x8408 (hardware timer init)
+    - Loops 4×: jsr @0x11848 (per-cylinder descriptor read),
+      stores result to FFFF41F0[cyl*8+4/5] and FFFF4210[cyl]
+    - Tail-calls 0x8948 (hardware timer arm)
+
+  func_8408: hardware timer initialization sub
+    - Calls 0xBE81C ×2 (struct init for 2 timing buffers)
+    - Clears hardware bits at 0xF627 (likely SH7058 MTU register)
+    - Calls 0xBE82C (another timer helper)
+    - Calls 0xE6E4 with hardware port addresses 0xF630, 0xF66C
+      (MTU output compare registers)
+
+
+  INJECTOR OUTPUT DATA FLOW
+  ──────────────────────────
+  IPW float
+    ↓ fuel_pulse_width_calc (0x35810)
+  float pulse width
+    ↓ Section 11 sub-A (0x46E64): FMAC → int32 timing
+    ↓ func_4760A (0x4760A): int32 → timer count
+    ↓ func_82B6 or func_82DE: store to FFFF41F0
+    ↓ func_3190 (0x3190): gate check (FFFF1288)
+    ↓ 0x3664: hardware output compare register write
+    → SH7058 MTU fires injector pulse
+
+  KEY RAM ADDRESSES (injection chain)
+  ─────────────────────────────────────
+  FFFF831C  RPM scale factor byte (input to pulse_lookup)
+  FFFF41F0  per-cylinder timing array (8 bytes × 4 cylinders)
+  FFFF4210  per-cylinder descriptor output array (4 × int32)
+  FFFF1288  injection control struct base
+  FFFF12A0  per-cylinder busy flag array
+
+
+================================================================================
+SECTION 14: INJECTOR DEAD TIME — func_303C0 / InjectorLatency @ 0xD106C
+================================================================================
+
+  Injector dead time compensates for the delay between the ECU commanding
+  the injector open and the nozzle actually flowing fuel. It is primarily
+  a function of battery voltage (lower voltage → longer solenoid delay).
+
+
+  func_303C0: DEAD TIME CALCULATOR  (50 bytes)
+  ──────────────────────────────────────────────
+  Address: 0x303C0 – 0x30406
+  Dispatcher: scheduler table @ 0x0E644 (entry adjacent to ISR22 at 0x48732)
+
+    FR4 = float @ FFFF4130 (battery_voltage_float)
+    FR5 = float @ FFFF6210 (ECT or secondary axis — unused in stock tune)
+    R4  = 0xAD7E0          (InjectorLatency descriptor)
+    R2  = 0xBE944          (table_lookup_2D_int)
+    call R2(R4, FR4, FR5)  → R0 = dead time in timer ticks (uint16)
+    FFFF7350 = word R0     (injector_dead_time_ticks)
+    call func_317C(R4=16)  // gate check
+    R2 = word @FFFF7350   // reload dead time
+    jmp 0x9E4A            // tail-call → @FFFF4280 = R4 (converted ticks)
+
+
+  func_9E4A: DEAD TIME STORE  (4 bytes)
+  ──────────────────────────────────────
+    R2 = FFFF4280 (injector_dead_time_applied struct base)
+    rts  [delay: store R4 → @FFFF4280]
+
+
+  INJECTORLATENCY CALIBRATION  (0xAD7E0 descriptor, 0xD106C data)
+  ─────────────────────────────────────────────────────────────────
+  Descriptor type: 2D bilinear interpolation (type=0x0003, 5×3 elements)
+  Called via: 0xBE944 (table_lookup_2D_int — returns integer result)
+
+  X-axis (battery voltage, 5 breakpoints) @ 0xD104C:
+      6.5V   9.0V   11.5V   14.0V   16.5V
+
+  Y-axis (ECT-like, 3 breakpoints) @ 0xD1060:
+      -1000.0   0.0   1000.0  (stock: all rows identical — ECT has no effect)
+
+  Dead time data (uint16 timer ticks) @ 0xD106C  [5 values per row]:
+      Row 0 (-1000):  12588   6857   4499   3225   2693
+      Row 1 (0):      12588   6857   4499   3225   2693
+      Row 2 (+1000):  12588   6857   4499   3225   2693
+
+  Converted to microseconds at ~12.5 MHz timer:
+      6.5V → 1007 μs    9.0V → 549 μs   11.5V → 360 μs
+     14.0V → 258 μs   16.5V → 215 μs
+
+  Note: the Y-axis data in all three rows is identical, so the effective
+  table is 1D (battery voltage only). The ECT axis is present in the
+  descriptor but has no calibration data differentiation — this is a
+  placeholder for future cold-start dead time extension.
+
+
+  OUTPUT RAM ADDRESSES
+  ──────────────────────
+  FFFF4130  battery_voltage_float     (input: read by this function)
+  FFFF7350  injector_dead_time_ticks  (output: uint16 timer count)
+  FFFF4280  injector_dead_time_applied (output: applied to hardware timer)
+
+  FFFF4280 is read by ISR22 (0x48732) to add dead time to the crank-position-
+  derived injection pulse trigger, giving the final commanded pulse duration:
+      final_pulse_start = crank_event - dead_time
+  The ISR processes FFFF3D08/3D10/3D18/3D1C struct arrays (per-cylinder
+  injection event data) and calls desc_read_float_safe (0xBDBCC) to apply
+  the calibrated dead time offsets.
+
+
+================================================================================
+SECTION 7: REMAINING WORK
+================================================================================
+
+1. DETAILED STAGE 3 SUBROUTINES: The 12 internal helpers at 0x32F5A-
+   0x335D2 are small conditioning functions. Full disassembly would
+   reveal exact sensor conditioning algorithms.
+
+2. DEAD TIME APPLICATION: RESOLVED — see Section 14. func_303C0 performs
+   the battery-voltage→dead-time lookup using InjectorLatency (0xD106C)
+   and stores the result to FFFF7350/FFFF4280. ISR22 (0x48732) applies
+   the dead time to the per-injection hardware trigger.
+
+3. PER-CYLINDER SEQUENCING: How the 8 IPW values from fuel_pulse_width_calc
+   map to 4-cylinder EJ255 firing order (1-3-2-4). PARTIALLY RESOLVED:
+   Section 13 shows the cylinder index byte in FFFF41F0 array uses values
+   0–3 directly. The firing order mapping is encoded in the FMAC mode pairs
+   (0↔7, 1↔6, 2↔9, 3↔8) dispatched by Section 11 Sub-A.
+
+4. INJECTOR_DATA (FFFF895C): RESOLVED — see Section 15. Write-site found:
+   func_517A0 @ 0x5189C via fmov.s FR0,@(R0=-8,R14=FFFF8964).
+   Relabeled "inj_struct_895C" — a rate-limited composite of sensor struct
+   fields.  Read by Main IPW calc, func_304BE (delta), func_3757E (copy to
+   FFFF7AB0), and Table_B_19 which shadows it to FFFF7F8C.
+   Dispatched by scheduler (not direct fuel pipeline call).
+
+5. OVERRUN FUEL CUTOFF: RESOLVED — see Section 9. Simple 16-tick
+   closed-throttle counter. Fuel cut output handled by func_46BCC
+   → see Section 11.
+
+6. TABLE B[19]: RESOLVED — see Section 10. ECT warmup correction factor
+   with 4-curve mode selection → FFFF7F68. Consumer func_3F374
+   → see Section 12.
+
+7. MAIN IPW CALC subroutines: 0x37C9E, 0x37CA6, 0x37E96, 0x37F62,
+   0x37F9A — RESOLVED as NOT called from Main IPW calc. Their apparent
+   BSR calls in the disassembly were literal pool false positives: the
+   CAL pointer values 0x000CBC7A/7C/8A and 0x000CBBFE decode as BSR
+   opcodes when the literal pool is scanned as code. These functions
+   manage separate AFL counters (FFFF7ADD via FFFF726C/7C68 gates) and
+   AFL rate limiter state (FFFF7AC0 via CC32C/CC330 steps). Not part
+   of the IPW pipeline.
+   0xBE960 = float_max(FR4, FR5) → FR0  [confirmed, 9 instructions]
+
+8. SENSOR_8998 / SENSOR_89C4 (FFFF8998, FFFF89C4): Resolved as follows:
+   - FFFF8998 is a STRUCT base address. All direct pointer dereferences
+     (fmov.s @R2,FRn) are reads of the first float field. At 0x52092 a
+     separate function sets GBR=FFFF8998 and manages the struct via
+     GBR-relative stores — this is the write site. FFFF8998 struct is
+     likely the fuel base calculation state (function at 0x52092 saves
+     R7-R14 + FR12-FR15, large prologue, ~10+ jsr @R14 calls with
+     GBR+75-82 byte results → threshold comparison pipeline).
+   - FFFF89C4 has only one ROM reference (Main IPW calc read at 0x383E4).
+     Write site is within the same struct or written by parameter block
+     indirection. Not a blocking gap for IPW calc understanding.
+
+
+================================================================================
+SECTION 15: FFFF895C STRUCT — WRITE SITE RESOLUTION
+================================================================================
+
+Investigation method: brute-force ROM scan for fmov.s FR,@(R0,Rn) indexed stores
+(opcode 0xFnm7), cross-referenced against nearby pool loads into the struct region
+FFFF8940-FFFF89D0.  Initial pass found 37 pool loads of 0xFFFF895C — all reads
+(fmov.s @R2,FRn).  Refined scan using base+offset matching (finding cases where
+a nearby struct-base address + R0 imm == 0xFFFF895C) found the single write site.
+
+CONFIRMED WRITE SITE: func_517A0 @ 0x5189C
+  Instruction:  fmov.s FR0,@(R0=-8, R14=0xFFFF8964) -> 0xFFFF895C
+  Function:     func_517A0 (0x517A0 - 0x518BC, ~284 bytes)
+  Prologue:     push R8-R14, sts.l PR, push FR12-FR15, add #-12,R15 (12 locals)
+
+  Computation sequence leading to the write (FFFF8964 = struct base in R14):
+    a) FR0 is produced by rate_limit_interp (0xBE970) called at 0x5188E
+       with FR5 = (rate_limit pass from 0x5186E call) and FR5 (1000.0 clamp)
+    b) FR14 = running composite (0x51884: fmov FR0,FR14 after the computation):
+         FR0  += @(FFFF8964-4)  = FFFF8960  [add recent computed field]
+         FR0  -= @(FFFF8964-48) = FFFF8934  [subtract reference term A]
+         FR0  -= @(FFFF8964-28) = FFFF8948  [subtract reference term B]
+    c) 0x51898: fmov FR14,FR4 (FR4 = composite FR14 for float_max)
+    d) 0x51896: jsr float_max (0xBE960), FR0 = float_max(FR4, FR5=prev_limit)
+    e) 0x5189A: R0 = -8
+    f) 0x5189C: fmov.s FR0,@(R0,R14)  ; WRITE to FFFF895C
+    g) 0x5189E: fmov.s @(R0,R14),FR8  ; READ BACK FFFF895C -> FR8
+    h) 0x518A0: fmov.s FR8,@R14       ; COPY FFFF895C -> FFFF8964
+
+  Summary: FFFF895C = float_max( rate_limit(composite), prev_rate_limit_out )
+           where composite = FFFF8960 - FFFF8934 - FFFF8948
+           After write, FFFF8964 is set to the same value as FFFF895C.
+
+  Inputs read on entry:
+    FR8  <- FFFF6350 (ECT_float), stored on stack
+    FR9  <- FFFF5E70 (unknown float), stored on stack+4
+    R14  <- byte @FFFF36BA (condition flag A)
+    R12  <- byte @FFFF36BC (condition flag B)
+    R9   <- byte @FFFF8F13 (status byte)
+    R13  <- byte @FFFF5BE3 (condition flag C)
+    R11  <- byte @FFFF8F24 (status byte B)
+    R10  <- byte @FFFF8C44 (sensor byte)
+
+  Callers: Not found via pool-load-jsr scan — func_517A0 is dispatched via
+           function pointer table (scheduler), NOT called directly from the
+           fuel pipeline BSR/JSR chain.  It runs as a separate periodic task.
+
+STRUCT LAYOUT (FFFF8920-FFFF89D0, base ref = FFFF8964):
+  Offset  Address    Notes (from func_517A0 and 0x51xxx init region)
+  -0x44   FFFF8920   read in 0x51866 (float_max FR4 input)
+  -0x30   FFFF8934   rate reference term A (subtracted from composite)
+  -0x28   FFFF893C   rate_limit input passed to float_max at 0x51860
+  -0x1C   FFFF8944   written by 0x51xxx init (pool 0x51724)
+  -0x1C   FFFF8948   reference term B (subtracted from composite)
+  -0x0C   FFFF8958   rate_limit FR5 argument at 0x51870
+  -0x08   FFFF8960   addend to composite (FFFF8964-4)
+  -0x08   FFFF895C   OUTPUT field: float_max result, read by IPW pipeline  [FFFF8964-8]
+  +0x00   FFFF8964   COPY of FFFF895C set by func_517A0 post-write
+  +0x04   FFFF8968   written by 0x51xxx init (pool 0x51514)
+  +0x0C   FFFF8970   multiple read sites in 0x40528, 0x55xxx regions
+  +0x2C   FFFF8990   written in dense 0x51xxx cluster (pool 0x51534)
+  +0x30   FFFF8994   written in dense 0x51xxx cluster (pool 0x514F8)
+  +0x38   FFFF8998   previously labeled sensor_struct_8998 (GBR base @0x52092)
+  +0x44   FFFF89A0   written 0x51xxx (pool 0x51CE8)
+  +0x68   FFFF89C4   previously labeled sensor_float_89C4 (Main IPW read)
+  +0x6C   FFFF89C8   written 0x51xxx (pool 0x51FFC)
+  Total struct span: at least FFFF8920-FFFF89CC = 0xAC bytes (172 bytes)
+
+READ SITES of FFFF895C in the fuel pipeline:
+  func_38158  @ 0x3819C  FR15 = FFFF895C  (Main IPW Calculator input)
+  func_3895C  @ 0x3895E  FR14 = FFFF895C  (IPW sub-calc, reads alongside ECT)
+  func_304BE  @ 0x304E4  FR15 = FFFF895C  (delta = engine_load - FFFF895C)
+  func_3757E  @ 0x3758E  FR8  = FFFF895C  (copies to FFFF7AB0+offset area)
+  func_37604  @ 0x37634  FR14 = FFFF895C  (correction reference computation)
+  func_403C4  @ 0x404A4  FR8  = FFFF895C  ; then 0x404A8: write FR8 to FFFF7F8C
+               @ 0x404F4  FR8  = FFFF895C  ; then 0x404F8: write FR8 to FFFF7F8C
+  (Table_B_19 reads FFFF895C and copies it to FFFF7F8C at both conditional paths)
+
+FFFF7F8C: shadow copy of FFFF895C written by Table_B_19 (func_403C4).
+  Pattern: R2=FFFF895C -> FR8=@R2; R2=FFFF7F8C -> @R2=FR8  (straight copy)
+  This occurs at two code paths in Table_B_19 (0x404A8 and 0x404F8).
+
+SEMANTIC: FFFF895C holds a RATE-LIMITED, CLAMPED float derived from a
+  composite of sensor struct fields.  It is produced by a scheduler-dispatched
+  function (func_517A0) that is independent of the direct fuel pipeline.
+  The fuel pipeline READS it as a reference/base quantity alongside
+  engine_load_float for delta and correction computations.  The label
+  "injector_data" from the initial survey is misleading — it is better
+  described as "sensor_composite_895C" or "inj_base_ref_float".
+
+CALIBRATIONS in func_517A0 at 0x5188C:
+  0x000D6280 -> 1000.0  (rate_limit clamp maximum)
+
+
+================================================================================
+SECTION 16: ISR22 (func_48732) — MAIN SYSTEM SCHEDULER ISR
+================================================================================
+
+SUMMARY
+  func_48732 is NOT a dead-time ISR as originally labeled.  It is the MAIN
+  PERIODIC EVENT-DRIVEN SCHEDULER fired by MTU on each crank-tooth event.
+  After per-cylinder injection setup, it sequentially dispatches ~100+
+  ECU subsystem functions covering fuel, ignition, sensors, diagnostics, and
+  output actuation.
+
+PROLOGUE @ 0x48732
+  mov.l R12,@-R15          ; push R12
+  mov.l R13,@-R15          ; push R13
+  mov.l R14,@-R15          ; push R14
+  sts.l PR,@-R15           ; push PR
+  fmov.s @R14,FR15         ; save float @(old_R14) — preserve interrupted
+                           ;   code's float context (no hardware FPU save)
+  add #-4,R15              ; allocate 4-byte scratch on stack
+  R2  = FFFF36BE           ; cylinder counter / sync word
+  R6  = @(FFFF36BE) word   ; current cylinder index word
+  R14 = FFFF3D08           ; cyl1 descriptor pointer
+  R13 = FFFF3D10           ; cyl2 descriptor end (exclusive upper bound)
+  bra 0x488CA              ; → loop condition
+  ftrc FR14,FPUL           ; [delay] convert old float context to int (FPUL)
+
+PER-CYLINDER CALLBACK LOOP (0x488C0 – 0x488CC)
+  Loop body @ 0x488C0:
+    R2 = 0x000BDBCC         ; per-cylinder injection callback
+    R4 = R14                ; cylinder descriptor address
+    jsr @R2                 ; call func_BDBCC(R4=cyl_desc_addr)
+    fmov.s @R14,FR4         ; [delay] FR4 = float @cyl_desc (first field)
+    add #8,R14              ; advance to next 8-byte descriptor
+  Loop test @ 0x488CA:
+    cmp/hs R13,R14          ; while R14 < R13
+    bf 0x488C0
+
+  First pass:  R14=FFFF3D08 → FFFF3D10 = R13  (1 iter, cyl1 descriptor)
+  Setup for second pass:
+    R14 = FFFF3D18 (cyl3 descriptor)
+    R13 = FFFF3D1C
+    bra 0x488EE              ; → same loop condition, R12=0 (delay)
+  Second pass: R14=FFFF3D18 → FFFF3D20 > FFFF3D1C  (1 iter, cyl3 descriptor)
+
+  The loop fires func_BDBCC for 2 cylinder descriptors per ISR invocation
+  (cyl1 and cyl3), corresponding to paired injection events.
+
+MAIN DISPATCH CHAIN (0x488EE – 0x48DA0)
+  After the cylinder loop, ISR22 executes a sequential call table of ~100
+  system functions, all called as `jsr @R2; nop` with no per-call arguments.
+  This is the firmware's SYNCHRONOUS ROUND-ROBIN TASK SCHEDULER — every
+  crank event triggers a complete pass through all ECU modules.
+
+  Selected functions from the dispatch list (addresses shown):
+    0x004BCA   — (timing/sync subsystem)
+    0x021150   — (sensor processing)
+    0x01D1FC   — (sensor processing)
+    0x01F896   — (sensor processing)
+    0x020F32   — (sensor processing)
+    0x021E22   — (calibration lookup)
+    0x03E654   — (fuel system pre-calc)
+    0x0230F4   — (enrichment calc)
+    0x0242DE   — (enrichment calc)
+    0x024CB0   — (enrichment calc)
+    0x02524E   — (enrichment calc)
+    0x025866   — (enrichment calc)
+    0x025C2C   — (enrichment calc)
+    0x024D7C   — (enrichment calc)
+    0x01FA78   — (control loop)
+    0x01FE10   — (control loop)
+    0x026754   — (control loop)
+    0x004BFBC  — (injector hardware)
+    0x004E8B8  — (injector hardware)
+    0x02EE78   — (IPW calc)
+    0x02FCF0   — (IPW calc)
+    0x0344BA   — (AFC stage, near 0x342A8 PI controller)
+    0x0357E8   — (AFC/OL enrichment)
+    0x037118   — (AFC stage 3 region)
+    0x037A74   — (AFC stage 4 region)
+    0x037F94   — (AFC stage 5 region, near 0x37F9A)
+    0x038CA6   — (near Main IPW calc 0x38158)
+    0x03CCA4   — (fuel table lookup)
+    0x03EAC4   — (fuel overrun/cutoff)
+    0x041D84   — (enrichment writer)
+    0x042DB8   — (enrichment writer)
+    0x04304A   — (injector output staging)
+    0x045874   — (injector output staging)
+    0x0460B4   — (injector scheduling)
+    0x052EC0   — (scheduler dispatch)
+    0x054194   — (scheduler dispatch)
+    0x054FD6   — (scheduler dispatch)
+    0x0000317C raise_ipl(R4=16)        ; lower IMASK → allow preemption
+    0x056022   — func_56022            ; set up injection parameters
+    0x003190   injector_output(R4=old_SR)  ← KEY: fires MTU injection gate
+    0x05AAB2   — (post-injection)
+    0x05CE40   — (sensor update)
+    0x013274   — (boost/throttle)
+    0x061B3C   — (EGR/aux actuation)
+    0x06085E   — (EGR/aux actuation)
+    0x05F87E   — (boost actuation)
+    0x011EEA   — (boost actuation)
+    0x0594A0   — (boost actuation)
+    0x05B21A   — (boost actuation)
+    ... [continuing through 0x7xxxx and 0x8xxxx subsystems — 100+ total]
+    0x004B288  — final pre-epilogue call
+
+  The dispatch table spans ROM addresses 0x4BCA through 0xA98A0, covering
+  virtually the entire active firmware code range.
+
+EPILOGUE @ 0x48DA8
+  add #4,R15              ; free scratch slot
+  fmov.s FR15,@-R14       ; restore interrupted code's float to @(--R14)
+  lds.l @R15+,PR          ; restore PR
+  mov.l @R15+,R14         ; restore R14
+  mov.l @R15+,R13         ; restore R13
+  jmp @R3                 ; tail-call to func_4B298 (ISR epilogue/rte handler)
+  mov.l @R15+,R12         ; [delay] restore R12
+
+FUNC_BDBCC (per-cylinder injection callback) @ 0xBDBCC
+  Callee-saved: R13, R14, PR.
+  Entry: R4 = cylinder descriptor address (8-byte struct)
+         FR4 = float @R4 (first field, pre-loaded by ISR22 delay slot)
+
+  Pseudocode:
+    FR14 = float @R4          ; save original float
+    R14  = R4                 ; R14 = descriptor address
+    if isNaN(FR4):            ; fcmp/eq FR4,FR4 → NaN guard
+        R0 = 1; return        ; skip injection (descriptor invalid)
+    fmov.s FR15,@R14          ; store context float to descriptor[0] (temp)
+    R2 = @(R15)               ; load stack word (cylinder channel word)
+    R0 = mov.b @(R14+1)       ; load descriptor byte[1] (raw)
+    R2 += R0                  ; combine
+    R13 = ~R2                 ; bitwise NOT into R13 (channel mask)
+    raise_ipl(R4=16)          ; lower IMASK to IPL=1 (allow preemption)
+    R4 = R0 (old_SR)          ; R4 = raise_ipl return (old masked SR)
+    @(R14+4) = R13 word       ; write channel mask to descriptor[4]
+    fmov.s FR14,@R14          ; restore original float to descriptor[0]
+    injector_output(R4=old_SR); → fire injection if gating allows
+    R0 = 0 (return 0)
+
+FUNC_317C (raise_ipl) @ 0x317C
+  Purpose: Raise SR IMASK to R4 if R4 > current IMASK.  Returns old IMASK.
+  Pseudocode:
+    mask = 0x00F0              ; SR bits [7:4] = IMASK field
+    old_ipl = SR & mask        ; current interrupt priority level field
+    if R4 > old_ipl:           ; raise priority (don't lower it)
+        SR = R4                ; set SR to R4 (raises IMASK)
+    return old_ipl             ; R0 = old SR & 0xF0
+
+  Called with R4=16=0x10 → sets SR=0x10 (IMASK=1, allows IPL>1 to preempt).
+  Return value 0 = "was already at IPL≤1" (injection may proceed).
+
+INJECTOR_OUTPUT (func_3190) @ 0x3190
+  Purpose: Gate injection pulse to MTU hardware.
+  Input: R4 = old_SR from raise_ipl (0 if IPL was already low, else non-zero).
+  Pseudocode:
+    if R4 != 0:                        ; ISR was at elevated priority
+        restore SR = R4; return        ; gated off — don't fire
+    struct_ptr = @(FFFF1288 + 0x18)    ; FFFF12A0: hardware gate struct
+    gate_byte  = @(struct_ptr + 1)     ; gate control byte
+    if gate_byte == 1:
+        restore SR = 0; return         ; gated off by hardware flag
+    jmp mtu_write_gate (func_3664)     ; tail-call: commit pulse to MTU
+    ldc R4,SR                          ; [delay] restore SR = 0
+
+  Gate address: FFFF1288 (struct base); +0x18 offset → FFFF12A0 (pointer).
+  Gate byte at @(FFFF12A0)+1 controls injection enable.
+
+MTU_WRITE_GATE (func_3664)
+  Commits the injection pulse width to the SH7058 Multi-Timer Unit (MTU).
+  This is the final hardware write step in the injection chain.
+  Not yet fully disassembled.
+
+INJECTION TRIGGER CHAIN SUMMARY
+  crank event → ISR22 fires
+    └→ func_BDBCC(cyl_desc) × 2 cylinders
+         ├→ raise_ipl(16)
+         └→ injector_output → mtu_write_gate (if not gated)
+    └→ [100+ system update functions]
+         ├→ [fuel calc, IPW, AFC stages, enrichments, sensors, actuators]
+         ├→ raise_ipl(16)
+         ├→ func_56022 (injection parameter staging)
+         └→ injector_output → mtu_write_gate (if not gated)
+
+  Two injection trigger paths exist per ISR22 invocation:
+  1. Per-cylinder (func_BDBCC loop): early, per-cyl descriptor path
+  2. Main dispatch (0x489DC): post-calculation path using func_56022 output
+
+FUNC_56022 (inj_param_stage) @ 0x56022
+  Pushes PR; calls func_BE9A0(R4=0) → R0=0xFF; writes R0 as word to FFFF3474;
+  restores PR; rts with delay mov.w R0,@R2.
+  Semantic: FFFF3474 = 0x00FF — writes the injection channel enable mask
+  (all 8 bits = 1 = all channels enabled) before injector_output fires.
+  func_BE9A0 computes: ((R4&0xFF)<<8) + (~R4&0xFF). With R4=0: 0+0xFF = 0xFF.
+
+CYLINDER DESCRIPTOR ARRAYS (FFFF316C and FFFF3D08 areas, 8 bytes per entry)
+  Three separate descriptor arrays feed func_BDBCC via different dispatch paths:
+
+  PATH 1 — ISR22 per-event loop (early, before main dispatch):
+    FFFF3D08 = cyl1 descriptor (per-crank event, step 8, limit FFFF3D10)
+    FFFF3D18 = cyl3 descriptor (per-crank event, step 8, limit FFFF3D1C)
+    → 1 cylinder per pass (cyl1 or cyl3 depending on which ISR22 event)
+
+  PATH 2 — func_344BA (dispatched by ISR22 main table @ 0x48970):
+    FFFF316C = all-cyl descriptor 0 (i=0)
+    FFFF3174 = all-cyl descriptor 1 (i=1)
+    FFFF317C = all-cyl descriptor 2 (i=2)
+    FFFF3184 = all-cyl descriptor 3 (i=3)
+    → 4 cylinders processed in sequence.
+    FR4 pre-loaded with ROM[R14] (tiny non-NaN sentinel = bypass NaN guard)
+    func_344BA pseudocode:
+      for i in 0..3:
+        R4 = 0xFFFF316C + i*8
+        FR4 = fmov.s @R14 (R14=i, ROM sentinel, not NaN → guard passes)
+        call cyl_injection_cb(R4, FR4)
+
+  PATH 3 — func_357E8 and func_37118 (dispatched by ISR22 @ 0x48976, 0x4897C):
+    func_357E8: FFFF318C = descriptor (single call, FR4=0.0)
+    func_37118: FFFF3194 = descriptor A (call, FR4=0.0)
+                FFFF319C = descriptor B (tail-call, FR4=0.0)
+
+  Descriptor layout (8 bytes @ FFFF316C+i*8 and FFFF3D08 area):
+    [+0]: float32  — timing/period float (subject to NaN guard)
+    [+4]: uint16   — channel mask (written by func_BDBCC from R13)
+    [+6]: uint16   — secondary state word
+
+================================================================================
+SECTION 17: INJECTION HARDWARE WRITE CHAIN -- COMPLETE TRACE
+================================================================================
+
+Complete call chain from ISR22 down to the external injector IC:
+
+  ISR22 (func_48732)
+    --> cyl_injection_cb (func_BDBCC)  [per-cylinder descriptor callback]
+    --> raise_ipl (func_317C)          [IPL raised to 16, critical section]
+    --> injector_output (func_3190)    [gate check]
+    --> mtu_write_gate (func_3664)     [external RAM gate state machine]
+    --> func_300E (0x300E)             [sets bit15 on external inj-IC register]
+    --> func_35FC (0x35FC)             [injection channel timer setup, RAM-resident]
+    --> func_2FEC (0x2FEC)             [final hardware write to inj-IC + XRAM]
+
+---
+
+EXTERNAL RAM STRUCT @ 0x10000100 (inj_gate_ctrl_ram):
+  Layout (external SRAM, word/longword accesses):
+    [+0x04]: uint16  current_slot     -- current channel/slot index
+    [+0x06]: uint16  target_slot      -- requested channel/slot index
+    [+0x08]: uint32  gate_flags       -- state flags (checked against 0x6EF6)
+    [+0x10]: uint32  gate_ipl_sr      -- SR value for IPL masking on entry
+    [+0x14]: uint32  channel_data_a   -- channel table field A
+    [+0x18]: uint32  channel_data_ptr -- pointer to channel config table entry
+  Note: The external RAM at 0x10000000 is the board-level SRAM chip.
+
+EXTERNAL PERIPHERAL @ 0x00F00F00 (injector_hw_ctrl):
+  Hardware I/O register on the external injection driver IC (ASIC/CPLD).
+  func_300E: @(0x00F00F00) |= 0x8000   --> sets bit15 (triggers injection pulse)
+  func_2FEC: @(0x00F00F00) &= 0x4000   --> reads/checks bit14 (injection status)
+
+INTERNAL XRAM @ 0xFFFF1290 (inj_state_flags):
+  func_2FEC: @(0xFFFF1290) |= 0xEE00   --> sets injection-in-progress flags
+  func_300E: @(0xFFFF1290) &= 0x3F2C   --> clears those flags on completion
+
+---
+
+MTU_WRITE_GATE (func_3664) -- COMPLETE:
+  Entry state: R4 = struct pointer, R5 = injection parameter
+  Saves: R14, R13, PR to stack; R13 = stc SR (saves interrupt state)
+
+  Load R14 = 0x10000100 (external RAM gate struct)
+  SR = @(R14+0x10)              ; raise interrupt mask level
+  word_A = @(R14+4)             ; read current_slot
+  word_B = @(R14+6)             ; read target_slot
+  if word_A == word_B: EXIT     ; already at target, skip write
+  flags = @(R14+8)              ; read gate_flags
+  if flags & 0x6EF6 != 0: EXIT  ; already in-progress, skip
+  @(R14+8) = 0x1000             ; set in-progress flag
+  if @(0xFFFF1288) != 0:
+      call @(0x3F2C)            ; injection pre-hook via ROM pointer
+  call func_300E(R4=0x10000100, R5=saved_SR, R6=@(R14+0x18))
+  EXIT:
+  SR = R13     ; restore interrupt state
+  R0 = 0       ; return 0
+  pop PR, R13; rts with delay-slot pop R14
+
+func_300E (0x300E) -- injector IC trigger:
+  Push PR
+  @(0x00F00F00) |= 0x8000     ; trigger injection pulse on external IC
+  call @(@(0x3F2C))            ; call ROM function-pointer at 0x3F2C
+  @(0xFFFF1290) &= 0x3F2C     ; clear injection state flags
+  Pop PR; rts
+
+func_35FC (0x35FC) -- injection channel timer setup (RAM-resident):
+  Entry: R4 = gate_struct (0x10000100), R5 = channel_index (0..3)
+  R12 = R4
+  R3 = channel_table_base   (PC-relative; resolves correctly from RAM only)
+  R13 = sign_extend(R5) * 16 ; offset into channel config table (16B/entry)
+  R13 += R3                  ; R13 = &channel_table[channel_index]
+  R14 = @(R13+4)             ; channel entry field[+4]
+  @(R12+4) = R5              ; write channel_index to gate struct
+  @(R12+0x18) = R13          ; write channel_table_entry ptr to struct
+  @(R12+0x14) = R14          ; write entry field[+4] to struct
+  if @(0x3F84) != 0:
+      call @(0x3F28)         ; channel-change notification hook
+  @(R12+8) = 0               ; clear pending flag
+  byte = @R14                ; check channel state byte
+  if byte == 0:              ; channel ready
+      @(R14+1) = @(R13+2)   ; write channel config byte
+      @(R14+4) = @(R12+0xC) ; write saved stack_ptr to channel struct
+      R4 = @(R13+8)          ; channel output parameter
+      R5 = @(R12+0xC)        ; stack_ptr
+      jmp func_2FEC          ; tail-call to hardware write
+  else:                      ; channel busy
+      R4 = @(R12+0xC)       ; stack_ptr
+      dispatch via @(0x4090 + @R14 - @R13[0])  ; jump table by channel state
+  NOTE: PC-relative literals resolve correctly only from RAM (code is copied
+        to RAM at boot). From ROM the literals read as garbage instruction bytes.
+
+func_2FEC (0x2FEC) -- final hardware write:
+  Push PR
+  @(0xFFFF1290) |= 0xEE00      ; set injection-active flags in XRAM
+  R1 = 0xFFFDFFFC               ; external SRAM address of runtime fn-ptr
+  R3 = @(R1)                    ; load runtime injection timing function ptr
+  call R3                        ; call it
+  R0 = @(0x00F00F00) & 0x4000  ; read injection IC status (bit14)
+  Pop PR; rts
+  NOTE: 0xFFFDFFFC is in external SRAM; the function pointer is set at boot.
+
+---
+
+EXTERNAL PERIPHERAL SUMMARY:
+  Address       Name               Description
+  0x00F00F00    injector_hw_ctrl   External injector ASIC/CPLD I/O register
+  0xFFFDFFFC    inj_timing_fn_ptr  Runtime injection timing fn (ext SRAM ptr)
+  0x10000100    inj_gate_ctrl_ram  Gate state machine struct (ext SRAM)
+
+INTERNAL XRAM INJECTION ADDRESSES (confirmed this section):
+  FFFF1288    inj_gate_hook_ptr    Non-zero = call injection pre-hook via 0x3F2C
+  FFFF1290    inj_state_flags      Set/cleared by func_2FEC / func_300E
+  FFFF3474    inj_channel_enable   0xFF = all 8 channels enabled (func_56022)
+
+ROM FUNCTION POINTER TABLE (indirect call sites in injection chain):
+  0x00003F2C  injection pre-hook target  (mtu_write_gate, func_300E)
+  0x00003F28  channel-change notification hook  (func_35FC)
+  0x00003F84  non-zero check triggers channel notification  (func_35FC)
+
+---
+
+EARLIER NOTE CORRECTION:
+  The "MTU_WRITE_GATE partial trace" note above incorrectly mapped the struct
+  to FFFF1288. Corrected: the main gate control struct is external RAM at
+  0x10000100. FFFF1288 is a separate hook pointer checked within the function.
+
+REMAINING UNKNOWNS
+  - func_4B298 @ 0x4B298: ISR epilogue/rte handler (not yet traced)
+  - func_3440 @ 0x3440: inj_timer_setup -- RAM-resident timer config; separate
+    path from mtu_write_gate; gate-state machine with reset fallback.
+  - What initialises the injection channel config table (used by func_35FC)?
+  - What initialises external RAM struct at 0x10000100?
+  - Gate struct at FFFF1288: what writes the hook pointer?
+  - Descriptor init: what writes float field and state words in FFFF316C?
+  - How descriptor float relates to injection pulse width (fuel_pw_final FFFF76C8)
+  - fuel_enrichment_A/B/C writers (FFFF76D4, FFFF7878, FFFF7AE4) -- plan step 3
+  - AFC stages 3-5 (0x33658, 0x33FCE, 0x340A0) -- plan step 1
+  - AFC stages 7-8 (0x3439E, 0x343CE) -- plan step 2
+
+
+================================================================================
+SCRIPTS PRODUCED
+================================================================================
+
+  disasm_afc_stages.py  - Disassembles stages 3-5, 7-8, and Main IPW
+                          calculator (--ipw flag) with full literal pool,
+                          RAM, calibration, and subroutine cross-reference
