@@ -8,7 +8,7 @@
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
-// Verified against Ghidra 12.0.2 SH-2 export (rev 20.2, 139 symbols + 41 comments).
+// Verified against Ghidra 12.0.2 SH-2 export. 884 labels + 1010 comments.
 //
 //@author  AE5L600L disassembly project
 //@category Data
@@ -184,9 +184,17 @@ public class ImportAE5L600L extends GhidraScript {
             "Task [50] Timing blend integration. RPM+MAF+cl_enable, blend output");
         // Boost / Wastegate
         count += labelComment(0x00054852, "task51_boost_wg_calc",
-            "Task [51] Boost/WG target calc. Throttle+MAF V+ECT cal, sets GBR");
+            "Task [51] Boost/WG target calc. GBR=0xFFFF8B50. Reads throttle, MAF L/R, RPM. "
+            + "Enable hysteresis (cal 4.0/5.0). 3 desc lookups (0xAEFE4/0xAEFF0/0xAEFFC). "
+            + "ECT correction via fmac. Ramp-down rates: 1.0 (bypass), 0.01 (disabled), 0.005 (counter).");
+        count += labelComment(0x000549D4, "boost_ign_switch_filter",
+            "Boost ignition switch EMA filter. Reads FFFF4130, writes FFFF8B9C workspace.");
         count += labelComment(0x000549FA, "task52_boost_feedback",
-            "Task [52] Boost feedback/trim. MAF, cal 0xD6748");
+            "Task [52] Boost feedback/trim. IIR filter on boost error + RPM error. "
+            + "Filter coeff cal[0xD6748]=0.5. Workspace base FFFF8BC4.");
+        count += labelComment(0x00054A5A, "boost_feedback_reset",
+            "Boost feedback workspace reset. Calls 0x22F92 (engine state check). "
+            + "Zeros 9 workspace fields on state change.");
         // Diagnostics
         count += labelComment(0x000602DC, "task53_diag_monitor",
             "Task [53] Diagnostic monitor. Diag state RAM, cal 0xD9A4C");
@@ -429,6 +437,51 @@ public class ImportAE5L600L extends GhidraScript {
             "FLKC output (word array indexed by cylinder)");
         count += labelComment(0xFFFF8EDC, "sched_disable_flag",
             "If != 0, entire scheduler dispatch is skipped");
+
+        // =====================================================================
+        // BOOST CONTROL WORKSPACE (GBR base 0xFFFF8B50)
+        // =====================================================================
+        count += labelComment(0xFFFF8B50, "boost_gbr_base",
+            "Boost control GBR base. Current target value (float). Set by task51.");
+        count += labelComment(0xFFFF8B54, "boost_error",
+            "Boost error: target - actual (float). Computed in task51 active path.");
+        count += labelComment(0xFFFF8B58, "boost_maf_error",
+            "MAF error: maf_left - target (float). Input to desc 0xAEFFC lookup.");
+        count += labelComment(0xFFFF8B5C, "boost_wg_duty_final",
+            "Final wastegate duty output (float). After desc lookup + ramp-down clamp.");
+        count += labelComment(0xFFFF8B7C, "boost_rpm_filtered_prev",
+            "Previous RPM filtered value (float). Used by task52 feedback IIR.");
+        count += labelComment(0xFFFF8B80, "boost_correction_output",
+            "Feedback correction value (float). Output of task52 lerp/filter.");
+        count += labelComment(0xFFFF8B84, "boost_rpm_error_filtered",
+            "Filtered RPM error (float). IIR-filtered in task52.");
+        count += labelComment(0xFFFF8B88, "boost_error_filtered",
+            "Filtered boost error (float). IIR-filtered in task52.");
+        count += labelComment(0xFFFF8B9C, "boost_ign_switch_filter_ws",
+            "Ignition switch EMA filter workspace (struct). Written by 0x549D4.");
+        count += labelComment(0xFFFF8BAC, "boost_desc_A_result",
+            "Desc 0xAEFE4 result: base WG duty from RPM lookup (float).");
+        count += labelComment(0xFFFF8BB0, "boost_desc_B_result",
+            "Desc 0xAEFF0 result: WG scale from RPM lookup (float).");
+        count += labelComment(0xFFFF8BB4, "boost_desc_C_result",
+            "Desc 0xAEFFC result: error correction from boost error lookup (float).");
+        count += labelComment(0xFFFF8BC0, "boost_error_prev",
+            "Previous boost error (float). History shift for task52 delta computation.");
+        count += labelComment(0xFFFF8BC4, "boost_feedback_trim",
+            "Boost feedback trim workspace base (float). Task52 GBR-relative base.");
+        count += labelComment(0xFFFF8BCC, "boost_counter",
+            "Boost enable counter (u8, saturating). Must reach cal[0xD6185]=8 before active path.");
+        count += labelComment(0xFFFF8BD0, "boost_enable_flag",
+            "Boost control enable byte (u8, 0/1). Set by hysteresis on sensor FFFF65FC.");
+
+        // Boost descriptors (task51)
+        count += labelComment(0x000AEFE4L, "desc_boost_base_wg_duty",
+            "1D float32x6, RPM 0-5000. Base WG duty: 10,10,10,100,100,100. Used by task51.");
+        count += labelComment(0x000AEFF0L, "desc_boost_rpm_scale",
+            "1D float32x6, RPM 0-5000. WG duty RPM scaling: 10,10,20,30,40,50. Used by task51.");
+        count += labelComment(0x000AEFFCL, "desc_boost_error_corr",
+            "1D float32x10, Error -800..0. Boost error correction ramp: 10..0. Used by task51.");
+
 
         // =====================================================================
         // FUELING - IAM SWITCH & FAILSAFE
@@ -2185,7 +2238,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AEC60L, "desc_1D_RPM_wide_u8_20");
         count += label(0x0AEF60L, "desc_1D_RPM_f32_8_AEF60");
         count += label(0x0AEF78L, "desc_1D_RPM_wide_f32_8");
-        count += label(0x0AEFF0L, "desc_1D_RPM_wide_f32_6_AEFF0");
+        // desc_1D_RPM_wide_f32_6_AEFF0 -- relabeled as desc_boost_rpm_scale (boost workspace section)
         count += label(0x0AF144L, "desc_1D_RPM_u8_16_AF144");
         count += label(0x0AF158L, "desc_1D_RPM_u8_16_AF158");
         count += label(0x0AF16CL, "desc_1D_RPM_u8_16_AF16C");

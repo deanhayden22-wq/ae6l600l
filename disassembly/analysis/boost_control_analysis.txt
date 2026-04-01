@@ -1,0 +1,418 @@
+================================================================================
+BOOST CONTROL SYSTEM -- COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2)
+================================================================================
+
+
+OVERVIEW
+--------
+The boost control system manages the turbocharger wastegate solenoid via
+two periodic scheduler tasks. Task 51 calculates target wastegate duty
+cycle based on throttle position, MAF voltage, RPM, and ECT compensation.
+Task 52 provides a feedback/trim loop using filtered boost pressure
+error and an IIR (exponential moving average) filter.
+
+The wastegate solenoid is driven via PWM at a frequency set by the
+WastegateDutyCycleFreq calibration (0xC009E, stock ~1.93 Hz).
+
+Architecture:
+  1. Engine running check (task 51 preamble)
+  2. Throttle/MAF sensor reads
+  3. Enable/disable hysteresis (cal 0xD6720/0xD6724, thresholds 4.0/5.0)
+  4. Descriptor-based WG duty lookup (3 RPM-indexed 1D tables)
+  5. Boost error computation (target - actual)
+  6. PID-style correction via float_max clamping
+  7. Feedback trim loop with IIR filter (task 52)
+  8. Safety: boost disable on knock (IAM/fine correction thresholds)
+
+GBR workspace base: 0xFFFF8B50
+
+
+================================================================================
+SECTION 1: TASK 51 -- BOOST/WASTEGATE TARGET CALCULATION
+================================================================================
+
+  task51_boost_wg_calc @ 0x054852
+  -----------------------------------------------------------------------
+  Entry point: 0x054852
+  Prologue saves: R12, R13, R14, PR, FR12-FR15, GBR
+  Sets GBR = 0xFFFF8B50 (boost workspace)
+
+  Inputs:
+    FFFF64F5  boost_related_flag (u8)  -- loaded into R14
+    FFFF65C0  throttle_position (u8)   -- loaded into R13
+    FFFF65FC  unknown sensor value     -- loaded into FR8
+    FFFF6624  rpm_current (float)      -- loaded into FR15
+    FFFF6640  maf_voltage_left (float) -- loaded into FR13
+    FFFF6644  maf_voltage_right (float)-- loaded into FR12
+
+  Process:
+
+  1. ENGINE RUNNING CHECK (0x05486A-0x05486E):
+     Calls 0x022CF4 (check_engine_running variant).
+     Return value R0 = 1 if engine running, 0 if not.
+     Result stored in R2 (extu.b R0,R2).
+
+  2. ENABLE HYSTERESIS (0x05488C-0x0548A6):
+     Reads calibration values:
+       cal[0xD6720] = 4.0 (enable threshold)
+       cal[0xD6724] = 5.0 (disable threshold)
+
+     Compares FR8 (sensor value from FFFF65FC) against thresholds:
+       If FR8 > 4.0:  set GBR+0x80 = 1 (enable boost control)
+       If FR8 <= 5.0:  set GBR+0x80 = 0 (disable boost control)
+       (Hysteresis: enable at 4.0, hold until > 5.0)
+
+     GBR+0x80 = FFFF8BD0 = boost_wg_duty_output enable flag
+
+  3. MAF VOLTAGE CHECK (0x0548A8-0x0548B8):
+     If maf_voltage_right (FR12) > 0.0:
+       Load ECT scale factor from cal[0xD6718] = 0.7  -> FR14
+     Else:
+       Load ECT scale factor from cal[0xD671C] = 2.0  -> FR14
+
+     FR14 is used later as a correction multiplier (fmac).
+
+  4. ENGINE NOT RUNNING PATH (0x0548B8-0x0548C6):
+     If R2 == 0 (engine not running):
+       Store 0.0 to GBR base (FFFF8B50)
+       Store 0.0 to FFFF8BD0-116 (wg duty = 0)
+       Branch to epilogue at 0x054990
+
+  5. BOOST DISABLED PATHS (0x0548C8-0x054976):
+     If throttle_position (R13) == 1 OR boost_related_flag (R14) == 1:
+       Skip descriptor lookups, go to 0x054978 (reduced duty path)
+
+  6. MAIN BOOST CONTROL PATH (0x0548D4-0x05495C):
+     Check GBR+0x80 (boost control enable byte):
+       If 0: branch to disabled path at 0x05495E
+
+     Read GBR+0x7C (FFFF8BCC) -- previous boost control counter.
+     Compare against cal[0xD6185] (u8 threshold, raw=0x08 = 8):
+       If counter < threshold: branch to disabled path
+
+     Active calculation:
+       a) table_desc_1d_float(desc_0xAEFE4, rpm_current)
+          -> result stored at R12-36 (FFFF8BD0-0x24 = FFFF8BAC)
+          Descriptor A: RPM-indexed base WG duty (6 points, 0-5000 RPM)
+          Values: 10, 10, 10, 100, 100, 100
+
+       b) table_desc_1d_float(desc_0xAEFF0, rpm_current)
+          -> result stored at R12-32 (FFFF8BD0-0x20 = FFFF8BB0)
+          Descriptor B: RPM-indexed WG scale (6 points, 0-5000 RPM)
+          Values: 10, 10, 20, 30, 40, 50
+
+       c) Boost error computation:
+          FR8 = [FFFF8B50] - desc_A_result   (target - base)
+          Store boost error to R12-124 (FFFF8BD0-0x7C = FFFF8B54)
+
+       d) Previous error difference:
+          FR4 = [R12-44] - desc_B_result     (prev MAF - current scale)
+
+       e) Apply ECT correction via FPU MAC:
+          FR4 = FR0 * FR14 + FR4   (fmac: multiply-accumulate)
+          where FR14 = ECT factor (0.7 or 2.0 from step 3)
+
+       f) Call 0xBE960 (float_max variant):
+          FR4 = correction, FR5 = boost error from R12-124
+          Result clamped and stored to [FFFF8B50]
+
+       g) MAF left bank error:
+          FR8 = maf_voltage_left - [FFFF8B50]
+          Store to R12-120 (FFFF8B58)
+
+       h) table_desc_1d_float(desc_0xAEFFC, maf_error)
+          -> result stored at R12-28 (FFFF8BD0-0x1C = FFFF8BB4)
+          Descriptor C: error-indexed correction (10 points, -800 to 0)
+          Values: 10,10,10,10,8,6,4,2,0.1,0
+
+       i) Final WG duty:
+          FR4 = [R12-116] - cal[0xD670C]   (subtract offset 0.005)
+          Call float_max with desc_C result
+          Store final duty to R12-116 (FFFF8BD0-0x74 = FFFF8B5C)
+
+  7. DISABLED DUTY PATH (0x05495E-0x054976):
+     Store 0.0 to [FFFF8B50]
+     Load previous duty from R12-116
+     FR4 = previous_duty - cal[0xD6710] (0.01, ramp-down rate)
+     Call float_max -> clamp to minimum
+     Store result to R12-116
+
+  8. BOOST DISABLE BYPASS PATH (0x054978-0x05498E):
+     Store 0.0 to [FFFF8B50]
+     Load previous duty from R12-116
+     FR4 = previous_duty - cal[0xD6714] (1.0, fast ramp-down)
+     Call float_max -> clamp to minimum
+     Store result to R12-116
+
+  9. COUNTER UPDATE (0x054990-0x0549B4):
+     If throttle_pos == 0 AND boost_flag == 0:
+       If GBR+0x80 == 1 (boost enabled):
+         Call 0xBE53C (uint8_add_sat variant)
+         with R4 = previous counter, R5 = 1
+         Increment counter with saturation
+     Else:
+       Set counter = 0
+
+     Store updated counter to GBR+0x7C (FFFF8BCC)
+
+  10. MAF HISTORY STORAGE (0x0549B6-0x0549BC):
+      Store maf_voltage_left to R12-44  (FFFF8B84)
+      Store maf_voltage_right to R12-40 (FFFF8B88)
+
+  11. EPILOGUE (0x0549BE-0x0549D2):
+      Restore GBR, FR12-FR15, PR, R12-R14
+      RTS
+
+
+================================================================================
+SECTION 2: INTERMEDIATE FUNCTION (0x0549D4-0x0549F8)
+================================================================================
+
+  boost_ign_switch_filter @ 0x0549D4
+  -----------------------------------------------------------------------
+  Located between task 51 epilogue and task 52 entry.
+  Reads ignition switch state and applies EMA filter.
+
+  Inputs:
+    FFFF4130  ignition_switch_state
+    FFFF8B9C  boost filter workspace (struct)
+
+  Process:
+  1. Read ignition_switch_state -> FR8
+  2. Shift previous filtered value: workspace[-4] -> workspace[-8]
+  3. Store new raw value: FR8 -> workspace[-4]
+  4. Call float_max (0xBE960) with current and previous
+  5. Store filtered result to [FFFF8B9C]
+
+
+================================================================================
+SECTION 3: TASK 52 -- BOOST FEEDBACK / TRIM
+================================================================================
+
+  task52_boost_feedback @ 0x0549FA
+  -----------------------------------------------------------------------
+  Entry point: 0x0549FA
+  Prologue saves: PR, FR14, FR15
+
+  Inputs:
+    FFFF6624  rpm_current (float) -> FR4
+    FFFF8BC4  boost_feedback_trim workspace base (R5)
+
+  Process:
+
+  1. LOAD PREVIOUS STATE (0x054A06-0x054A14):
+     FR15 = workspace[-72]  (FFFF8B7C, previous RPM filtered value)
+     FR8  = workspace[-60]  (FFFF8B88, previous boost error filtered)
+     Store FR8 -> workspace[-4] (FFFF8BC0, shift history)
+     FR14 = workspace[-68]  (FFFF8B80, previous correction output)
+
+  2. CORRECTION LOOKUP (0x054A16-0x054A22):
+     Call 0xBEA40 (desc_read_float_safe or float_lerp variant)
+     with:
+       FR4 = rpm_current
+       FR5 = workspace[-68] (previous correction)
+       FR6 = cal[0xD6748] = 0.5 (filter coefficient)
+       FR7 = literal from pool (likely a scaling constant)
+     Result -> FR0 (new correction value)
+
+  3. STORE AND COMPUTE BOOST ERROR DELTA (0x054A24-0x054A3C):
+     Store FR0 -> workspace[-68] (FFFF8B80, updated correction)
+     FR8 = workspace[-68] - FR14  (delta from previous correction)
+     FR9 = workspace[-60]         (previous integrated error)
+     FR8 = FR8 + FR9              (accumulate error delta)
+     FR9 = literal from pool      (IIR filter coefficient)
+     FR8 = FR8 * FR9              (apply filter)
+     Store FR8 -> workspace[-60]  (FFFF8B88, filtered error)
+
+  4. RPM FILTERED ERROR (0x054A3E-0x054A4E):
+     FR8 = FR15 (previous RPM filtered)
+     FR6 = [R5]  (current RPM at workspace base)
+     FR8 = FR8 - FR6  (RPM delta)
+     FR6 = workspace[-64] (previous RPM error filtered)
+     FR8 = FR8 + FR6      (accumulate)
+     FR8 = FR8 * FR9      (apply same IIR filter coefficient)
+     Store FR8 -> workspace[-64] (FFFF8B84)
+     Store FR15 -> [R5]          (update current RPM at workspace base)
+
+  5. EPILOGUE (0x054A50-0x054A58):
+     Restore FR15, FR14, PR. RTS.
+
+
+================================================================================
+SECTION 4: BOOST RESET FUNCTION (0x054A5A-0x054A94)
+================================================================================
+
+  boost_feedback_reset @ 0x054A5A
+  -----------------------------------------------------------------------
+  Called when engine state changes. Zeros all feedback workspace.
+
+  Process:
+  1. Call 0x022F92 (engine state check utility)
+  2. If result == 1:
+     Zero the following workspace offsets (all via fldi0 FR9):
+       workspace[-116]  (FFFF8B38)
+       workspace[-104]  (FFFF8B44)
+       workspace[-68]   (FFFF8B80)
+       workspace[-64]   (FFFF8B84)
+       workspace[-4]    (FFFF8BC0)
+       workspace[-60]   (FFFF8B88)
+       workspace[0]     (FFFF8BC4)
+       workspace[-32]   (FFFF8BA4)
+       workspace[-28]   (FFFF8BA8)
+  3. RTS
+
+
+================================================================================
+SECTION 5: DESCRIPTOR SUMMARY
+================================================================================
+
+  Addr       Type   Size    Axis Range           Data Values       Purpose
+  --------   ----   -----   ------------------   ---------------   -------------------------
+  0xAEFE4    1D     6       RPM 0-5000           10,10,10,100,100,100   Base WG duty (low/high RPM split)
+  0xAEFF0    1D     6       RPM 0-5000           10,10,20,30,40,50      WG duty RPM scaling factor
+  0xAEFFC    1D     10      Error -800 to 0      10..0 (ramp down)      Boost error correction
+  0xBE830    --     --      (function)           table_desc_1d_float    Descriptor lookup utility
+  0xBE960    --     --      (function)           float_max/clamp        Max/clamp utility
+  0xBE53C    --     --      (function)           uint8_add_sat          Counter increment utility
+  0xBEA40    --     --      (function)           boost_feedback_lerp    Feedback interpolation
+
+  Additional descriptors (boost-indexed, used by other subsystems):
+    26 x 1D_Boost descriptors (various compensation tables)
+    2 x 2D_Boostxrange (0xAF058, 0xAF074)
+    1 x 2D_RPMxBoost (0xAB058)
+
+
+================================================================================
+SECTION 6: KEY RAM ADDRESSES (BOOST WORKSPACE)
+================================================================================
+
+  Address       GBR+offset   Name                     Type     Notes
+  ----------    ----------   ----------------------   ------   -------------------------
+  FFFF8B50      GBR+0x00     boost_gbr_base           float    Workspace base / current target
+  FFFF8B54      --           boost_error              float    target - actual (computed)
+  FFFF8B58      --           maf_error                float    MAF left - target
+  FFFF8B5C      --           wg_duty_final            float    Final WG duty output
+  FFFF8B7C      --           rpm_filtered_prev        float    Previous RPM (feedback)
+  FFFF8B80      --           correction_output        float    Feedback correction value
+  FFFF8B84      --           rpm_error_filtered       float    Filtered RPM error (IIR)
+  FFFF8B88      --           boost_error_filtered     float    Filtered boost error (IIR)
+  FFFF8B9C      --           ign_switch_filter_ws     struct   Ignition switch filter workspace
+  FFFF8BAC      --           desc_A_result            float    Base WG duty from desc 0xAEFE4
+  FFFF8BB0      --           desc_B_result            float    WG scale from desc 0xAEFF0
+  FFFF8BB4      --           desc_C_result            float    Error correction from desc 0xAEFFC
+  FFFF8BC0      --           boost_error_prev         float    Previous boost error (history)
+  FFFF8BC4      GBR base     boost_feedback_trim      float    Feedback trim workspace base
+  FFFF8BCC      GBR+0x7C     boost_counter            u8       Enable counter (saturating)
+  FFFF8BD0      GBR+0x80     boost_enable_flag        u8       Boost control enable (0/1)
+
+  External RAM:
+  FFFF64F5      --           boost_related_flag       u8       External enable/disable flag
+  FFFF65C0      --           throttle_position        u8       Throttle position
+  FFFF65FC      --           sensor_value_unknown     float    Compared against enable thresholds
+  FFFF6624      --           rpm_current              float    Engine RPM
+  FFFF6640      --           maf_voltage_left         float    MAF sensor left bank
+  FFFF6644      --           maf_voltage_right        float    MAF sensor right bank
+  FFFF4130      --           ignition_switch_state    float    Ignition switch
+
+
+================================================================================
+SECTION 7: CALIBRATION ADDRESS MAP
+================================================================================
+
+  Address    Value       Definition Name                          Notes
+  -------    --------    ------------------------------------     ----------------
+  0xD6720    4.0         (boost enable threshold)                 Enable at > 4.0
+  0xD6724    5.0         (boost disable threshold)                Disable at <= 5.0
+  0xD6718    0.7         (ECT scale factor A)                     Used when MAF R > 0
+  0xD671C    2.0         (ECT scale factor B)                     Used when MAF R <= 0
+  0xD6185    8 (u8)      (counter threshold)                      Min counter before active
+  0xD670C    0.005       (WG ramp-down offset)                    Slow ramp-down rate
+  0xD6710    0.01        (WG ramp-down rate disabled)             Medium ramp-down rate
+  0xD6714    1.0         (WG ramp-down rate bypass)               Fast ramp-down rate
+  0xD6748    0.5         (feedback filter coefficient)            IIR alpha for task 52
+
+  Known definition tables (from XML):
+  0xC009E    1.93        WastegateDutyCycleFreq                   PWM frequency
+  0xC0F58    --          MaxWastegateDuty                         3D table (RPM x Load)
+  0xC1150    --          InitialWastegateDuty                     3D table (RPM x Load)
+  0xC1340    --          TargetBoost                              3D table (RPM x Load)
+  0xD2560    --          BoostLimit_FuelCut                       Boost pressure fuel cut
+  0xC0BFC    0.2         BoostControlDisable_IAM                  IAM threshold (disable if <)
+  0xC0BF8    -1.0        BoostControlDisable_FineCorrection       Fine knock corr threshold
+  0xC0BAD    2 (u8)      BoostControlDisableDelay_FineCorr        Delay counter
+  0xC0CF4    --          TargetBoostComp_ECT                      ECT compensation table
+  0xC0C0C    1.0         TargetBoostComp_1stGear                  1st gear multiplier
+  0xC0E3C    --          TargetBoostComp_IAT                      IAT compensation
+  0xC0EC4    --          TargetBoostComp_AtmPressure              Altitude compensation
+  0xC0C94    --          InitMaxWGDutyComp_IAT                    WG duty IAT compensation
+  0xC0CB4    --          InitMaxWGDutyComp_ECT                    WG duty ECT compensation
+  0xC0E7C    --          InitMaxWGDutyComp_AtmPressure            WG duty altitude comp
+  0xC0BD4    210.0       TD_ActivationThresholds_TargetBoost      TD enable threshold
+  0xC0BF0    -90.0       TD_IntegralCumulativeRange_WGDCCorr      TD integral clamp
+  0xC0BDC    0.0         TD_IntegralNegActivation_BoostError      TD negative activation
+  0xC0BE0    5.0         TD_IntegralPosActivation_BoostError      TD positive activation
+  0xC0BE4    5.0         TD_IntegralNegActivation_WGDuty          TD WG duty activation
+  0xC0D04    -160.0      Proportional_WGDCCorr_BoostError         PID P-term
+  0xC0D3C    -240.0      Integral_WGDCCorr_BoostError             PID I-term
+  0xC0D74    0.0         Derivative_WGDCCorr_BoostError           PID D-term (disabled)
+
+
+================================================================================
+SECTION 8: SYSTEM FLOW SUMMARY (PER SCHEDULER CYCLE)
+================================================================================
+
+  TASK 51 (boost/WG target calculation):
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  1. Set GBR = 0xFFFF8B50 (boost workspace)
+  2. Call check_engine_running
+  3. Read throttle_pos, sensor_FFFF65FC, RPM, MAF L/R
+  4. Apply enable hysteresis on sensor value (4.0/5.0 thresholds)
+  5. Select ECT correction factor (0.7 or 2.0 based on MAF R sign)
+  6. If engine not running: zero all outputs, exit
+  7. If throttle=1 or boost_flag=1: fast ramp-down (1.0/cycle), exit
+  8. If boost disabled (enable byte=0): medium ramp-down (0.01/cycle), exit
+  9. If counter < 8: medium ramp-down, exit
+  10. Active path:
+      a) Look up base WG duty from RPM (desc 0xAEFE4)
+      b) Look up WG scale from RPM (desc 0xAEFF0)
+      c) Compute boost error (target - base)
+      d) Apply ECT correction via MAC
+      e) Clamp result via float_max
+      f) Compute MAF error (left bank - target)
+      g) Look up error correction (desc 0xAEFFC)
+      h) Subtract offset (0.005), clamp, store final duty
+  11. Increment or reset enable counter
+  12. Store MAF L/R history
+
+  TASK 52 (boost feedback/trim):
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  1. Read rpm_current
+  2. Load previous filtered values from workspace
+  3. Call feedback interpolation with filter coeff 0.5
+  4. Compute boost error delta and accumulate
+  5. Apply IIR filter (exponential moving average)
+  6. Compute RPM error delta, accumulate, filter
+  7. Update workspace with new filtered values
+
+  RESET (on engine state change):
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  1. Check engine state via 0x022F92
+  2. If state changed: zero all 9 feedback workspace fields
+
+
+================================================================================
+SECTION 9: RAMP-DOWN BEHAVIOR
+================================================================================
+
+  The WG duty ramps down at different rates depending on disable reason:
+
+  Condition                           Rate/cycle    Effective speed
+  ----------------------------------  -----------   ---------------
+  Engine not running                  instant 0     Immediate off
+  Throttle=1 or boost_flag=1          -1.0          Fast (1% per cycle)
+  Boost disabled (enable byte=0)      -0.01         Slow (0.01% per cycle)
+  Counter < threshold (8 cycles)      -0.005        Very slow (0.5% per cycle)
+
+  All ramp-downs use float_max(duty - rate, 0.0) to clamp at zero.
+  This prevents negative duty and provides smooth wastegate transitions.
