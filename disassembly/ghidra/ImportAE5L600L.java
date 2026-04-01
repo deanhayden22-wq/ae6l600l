@@ -2777,6 +2777,667 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000C0094, "atu_capture_threshold_cal",
             "ATU capture threshold calibration (byte). Compared against counter in ISR[2].");
 
+        // =====================================================================
+        // AVCS (VARIABLE CAM TIMING) — CODE FUNCTIONS
+        // =====================================================================
+        // From avcs_analysis.txt — intake/exhaust cam advance control
+
+        count += labelComment(0x00031DB4, "avcs_control",
+            "Main AVCS control. RPM enable/disable hysteresis, intake+exhaust duty correction, cam advance output.");
+        count += labelComment(0x00031DEA, "avcs_control__enable_check",
+            "AVCS RPM enable/disable hysteresis check. Lower=500, upper=550 RPM.");
+        count += labelComment(0x00031E12, "avcs_control__intake_duty_corr",
+            "Intake duty correction lookup from desc_intake_duty_corr (10x9, Error x RPM).");
+        count += labelComment(0x00031E34, "avcs_control__exhaust_duty_corr",
+            "Exhaust duty correction lookup (vestigial on EJ255, zeroed table).");
+        count += labelComment(0x00031E58, "avcs_control__conditional_paths",
+            "Engine_state conditional branching for cam advance map selection.");
+        count += labelComment(0x00031E98, "avcs_control__standard_duty_output",
+            "Standard duty output path when engine_state == 1.");
+        count += labelComment(0x00031EAE, "avcs_control__final_output",
+            "Final AVCS duty computation and store to output RAM.");
+        count += labelComment(0x000627D8, "vvt_error_feedback",
+            "VVT error feedback PID function. Reads 4 descriptor tables (9x9, zeroed in stock). "
+            + "Writes FFFF920C-FFFF9228.");
+
+        // ── AVCS RAM ──
+        count += labelComment(0xFFFF40C8, "cam_angle_sensor",
+            "Actual cam position from CMP/CKP (float, degrees).");
+        count += labelComment(0xFFFF7480, "intake_avcs_workspace",
+            "Intake AVCS working data struct base.");
+        count += labelComment(0xFFFF7474, "intake_previous_output",
+            "Intake AVCS previous output (float). Workspace - 12.");
+        count += labelComment(0xFFFF7478, "intake_duty_correction",
+            "Intake AVCS duty correction (float). Workspace - 8.");
+        count += labelComment(0xFFFF747C, "intake_computed_duty",
+            "Intake AVCS computed duty (float). Workspace - 4.");
+        count += labelComment(0xFFFF76F4, "exhaust_avcs_workspace",
+            "Exhaust AVCS working data struct base (vestigial on EJ255).");
+        count += labelComment(0xFFFF76E8, "exhaust_correction_A",
+            "Exhaust AVCS correction A (float). Workspace - 12.");
+        count += labelComment(0xFFFF76EC, "exhaust_correction_B",
+            "Exhaust AVCS correction B (float). Workspace - 8.");
+        count += labelComment(0xFFFF76F0, "exhaust_computed",
+            "Exhaust AVCS computed value (float, near zero on EJ255). Workspace - 4.");
+        count += labelComment(0xFFFF920C, "vvt_error_feedback_A",
+            "Intake VVT error feedback result A (float).");
+        count += labelComment(0xFFFF9210, "vvt_error_feedback_B",
+            "Intake VVT error feedback result B (float).");
+        count += labelComment(0xFFFF9220, "vvt_error_feedback_C",
+            "Intake VVT error feedback result C (float).");
+        count += labelComment(0xFFFF9228, "vvt_error_feedback_D",
+            "Intake VVT error feedback result D (float).");
+
+        // ── AVCS Descriptors ──
+        count += labelComment(0x000AD674, "desc_intake_cam_advance_cruise",
+            "Intake Cam Advance Cruise descriptor (2D, 17x18, Load x RPM).");
+        count += labelComment(0x000AD690, "desc_intake_cam_advance_noncruise",
+            "Intake Cam Advance Non-Cruise descriptor (2D, 17x18, Load x RPM).");
+        count += labelComment(0x000AD6AC, "desc_intake_cam_advance_alt",
+            "Intake Cam Advance alternate descriptor (2D, 15x18).");
+        count += labelComment(0x000AD6C8, "desc_intake_cam_advance_D",
+            "Intake Cam Advance D descriptor (2D, 17x18).");
+        count += labelComment(0x000AD6E4, "desc_intake_cam_advance_E",
+            "Intake Cam Advance E descriptor (2D, 17x18).");
+        count += labelComment(0x000AD864, "desc_exhaust_duty_corr_ext",
+            "Extended exhaust duty correction descriptor (2D, 8x9).");
+        count += labelComment(0x000AC45C, "desc_avcs_rpm_base_lookup",
+            "AVCS RPM-indexed base lookup descriptor.");
+        count += labelComment(0x000AC484, "desc_avcs_run_time_corr",
+            "AVCS engine run time correction descriptor.");
+        count += labelComment(0x000AC498, "desc_avcs_rpm_time_corr",
+            "AVCS RPM x time correction descriptor.");
+        count += labelComment(0x000AC4AC, "desc_avcs_load_corr",
+            "AVCS load-dependent correction descriptor.");
+        count += labelComment(0x000ACE0C, "desc_avcs_standard_duty_output",
+            "AVCS standard duty output map descriptor.");
+        count += labelComment(0x000AF830, "desc_vvt_error_fb_1",
+            "VVT Error feedback table 1 descriptor (9x9, zeroed in stock).");
+        count += labelComment(0x000AF84C, "desc_vvt_error_fb_2",
+            "VVT Error feedback table 2 descriptor (9x9, zeroed in stock).");
+        count += labelComment(0x000AF868, "desc_vvt_error_fb_3",
+            "VVT Error feedback table 3 descriptor (9x9, zeroed in stock).");
+        count += labelComment(0x000AF884, "desc_vvt_error_fb_4",
+            "VVT Error feedback table 4 descriptor (9x9, zeroed in stock).");
+
+        // ── AVCS Calibration ──
+        count += labelComment(0x000CBEC0, "cal_avcs_enable_rpm_lower",
+            "AVCS RPM lower threshold to disable (float, 500.0 RPM).");
+        count += labelComment(0x000CBEC4, "cal_avcs_enable_rpm_upper",
+            "AVCS RPM upper threshold to enable (float, 550.0 RPM).");
+
+        // ── AVCS Table Data ──
+        count += labelComment(0x000DA96C, "data_intake_cam_cruise",
+            "Intake Cam Advance Cruise table data.");
+        count += labelComment(0x000DA8E4, "axis_cam_cruise_load",
+            "Load axis for cruise cam advance (18 floats).");
+        count += labelComment(0x000DA92C, "axis_cam_cruise_rpm",
+            "RPM axis for cruise cam advance (16 floats).");
+        count += labelComment(0x000DAC34, "data_intake_cam_noncruise",
+            "Intake Cam Advance Non-Cruise table data.");
+        count += labelComment(0x000DABAC, "axis_cam_noncruise_load",
+            "Load axis for non-cruise cam advance (18 floats).");
+        count += labelComment(0x000DABF4, "axis_cam_noncruise_rpm",
+            "RPM axis for non-cruise cam advance (16 floats).");
+
+        // =====================================================================
+        // DTC / DIAGNOSTICS — HANDLER FUNCTIONS
+        // =====================================================================
+        // From dtc_diagnostics_analysis.txt — state machine handlers & monitors
+
+        count += labelComment(0x000A1CC0, "dtc_pending_set_handler",
+            "DTC first-time set handler. State 0x00 -> pending.");
+        count += labelComment(0x000A240C, "dtc_confirm_set_handler",
+            "DTC confirm set handler. Pending -> confirmed (0xFF).");
+        count += labelComment(0x000A4FE4, "dtc_already_confirmed_handler",
+            "DTC handler when state already 0xFF.");
+        count += labelComment(0x000A58D6, "dtc_clear_pending_handler",
+            "DTC clear pending fault handler.");
+        count += labelComment(0x000A5ABC, "dtc_clear_confirmed_handler",
+            "DTC clear confirmed fault handler.");
+        count += labelComment(0x000A5AF0, "dtc_force_clear_handler",
+            "DTC force clear handler. State 0xFF -> 0x00.");
+        count += labelComment(0x000A6728, "engine_running_state_eval",
+            "Engine running state evaluator. Called by check_engine_running.");
+        count += labelComment(0x00015400, "dtc_readout_loop",
+            "DTC processing loop. Builds OBD-II mode $03 response.");
+
+        // ── DTC Monitor Tasks ──
+        count += labelComment(0x000602DC, "task53_diag_monitor",
+            "Task 53: diagnostic readiness computation.");
+        count += labelComment(0x0006035A, "task53_readiness_path_A",
+            "Task53 sub: initial readiness path.");
+        count += labelComment(0x00060392, "task53_readiness_path_B",
+            "Task53 sub: main readiness computation.");
+        count += labelComment(0x0006048E, "task53_readiness_compare",
+            "Task53 sub: final readiness comparison and clamp.");
+        count += labelComment(0x000900B4, "task55_mps_diag",
+            "Task 55: manifold pressure sensor diagnostic.");
+        count += labelComment(0x0006F0B8, "task58_maf_diag",
+            "Task 58: MAF sensor diagnostic monitor entry.");
+        count += labelComment(0x0006F0CE, "task58_maf_diag_part1",
+            "MAF diag part 1: precondition + IAT/load check.");
+        count += labelComment(0x0006F114, "task58_maf_diag_part2",
+            "MAF diag part 2: maturation and DTC set/clear.");
+        count += labelComment(0x0006F260, "task58_maf_diag_part3",
+            "MAF diag part 3: hardware fault line checks.");
+        count += labelComment(0x00066580, "task56_evap_purge",
+            "Task 56: EVAP purge system diagnostic.");
+        count += labelComment(0x00066D20, "task56_evap_sub_disabled_A",
+            "EVAP sub when diagnostics disabled (path A).");
+        count += labelComment(0x00066DEC, "task56_evap_sub_disabled_B",
+            "EVAP sub when diagnostics disabled (path B).");
+        count += labelComment(0x00066EBC, "task56_evap_sub_disabled_C",
+            "EVAP sub when diagnostics disabled (path C).");
+        count += labelComment(0x00066C40, "task56_evap_test_sequence",
+            "EVAP active test sequence (state 1 or 2).");
+        count += labelComment(0x0000D118, "clamp_filter",
+            "Clamp/filter function. Called by task53 readiness.");
+
+        // ── DTC Diagnostic RAM Regions ──
+        count += labelComment(0xFFFFAD14, "diag_state_E_start",
+            "Active fault status region start. 62 bytes, 268 refs.");
+        count += labelComment(0xFFFFAF70, "diag_state_A_start",
+            "Fault history region start. 59 bytes, 144 refs.");
+        count += labelComment(0xFFFFA156, "diag_state_B_start",
+            "Maturation counters region start. 55 bytes, 135 refs.");
+        count += labelComment(0xFFFFA32C, "diag_state_C_start",
+            "Monitor readiness region start. 115 bytes, 132 refs.");
+        count += labelComment(0xFFFFAB76, "diag_state_F_start",
+            "Healing counters region start. 79 bytes, 66 refs.");
+        count += labelComment(0xFFFFA2A0, "diag_state_D_start",
+            "Trip tracking region start. 104 bytes, 32 refs.");
+        count += labelComment(0xFFFF9080, "diag_readiness_workspace",
+            "Diagnostic readiness workspace (4 floats).");
+        count += labelComment(0xFFFF96A4, "maf_diag_state",
+            "MAF diag state: flag, enable, counter, init (4 bytes).");
+        count += labelComment(0xFFFF96A8, "maf_diag_extended",
+            "MAF diag extended state (2 bytes).");
+        count += labelComment(0xFFFF96AC, "maf_hw_fault_A",
+            "MAF hardware fault state A (2 bytes).");
+        count += labelComment(0xFFFF96AE, "maf_hw_fault_B",
+            "MAF hardware fault state B (2 bytes).");
+        count += labelComment(0xFFFFABF4, "mps_diag_state",
+            "MPS (manifold pressure sensor) diag state (byte).");
+
+        // ── DTC Calibration ──
+        count += labelComment(0x000D9A3C, "cal_readiness_rpm_thresh",
+            "Diagnostic readiness RPM threshold (float, 0).");
+        count += labelComment(0x000D9A40, "cal_readiness_load_thresh",
+            "Diagnostic readiness load threshold (float, 4.0).");
+        count += labelComment(0x000D9A44, "cal_readiness_load_upper",
+            "Diagnostic readiness load upper limit (float, 1000.0).");
+        count += labelComment(0x000D9A48, "cal_readiness_timing_thresh",
+            "Diagnostic readiness timing threshold (float, 65535.0 = disabled).");
+        count += labelComment(0x000D9A4C, "cal_readiness_default",
+            "Diagnostic readiness default value (float, 1.0).");
+        count += labelComment(0x000D9A58, "cal_readiness_minimum",
+            "Diagnostic readiness minimum (float, 0.05).");
+        count += labelComment(0x000D8B14, "cal_maf_diag_iat_thresh",
+            "MAF diagnostic IAT threshold.");
+        count += labelComment(0x000D8B18, "cal_maf_diag_load_thresh",
+            "MAF diagnostic load threshold.");
+        count += labelComment(0x000D8A40, "cal_maf_diag_maturation_thresh",
+            "MAF diagnostic maturation counter threshold.");
+        count += labelComment(0x0000F754, "hw_port_maf_status",
+            "Port status register. Bits 0x20/0x40 = MAF fault lines.");
+
+        // =====================================================================
+        // IGNITION TIMING — ADDITIONAL FUNCTIONS & CALIBRATION
+        // =====================================================================
+        // From ignition_timing_analysis.txt — subs, workspace, calibration
+
+        // ── Ignition Timing Sub-Functions ──
+        count += labelComment(0x00040314, "task30_pre_calc",
+            "Task30 base timing pre-calculation subroutine.");
+        count += labelComment(0x00040520, "task34_throttle_calc_sub",
+            "Task34 throttle timing calc subroutine.");
+        count += labelComment(0x00044296, "task29_timing_percyl",
+            "Task 29: secondary per-cylinder timing computation.");
+        count += labelComment(0x000278D2, "dwell_calculator",
+            "Computes coil dwell time from RPM and battery voltage.");
+        count += labelComment(0x00046296, "task27_knock_timing",
+            "Task 27: knock timing retard per-cylinder.");
+
+        // ── Ignition Timing Workspace RAM ──
+        count += labelComment(0xFFFF7F64, "base_timing_output",
+            "Base timing output (float). Written by task30.");
+        count += labelComment(0xFFFF7F10, "gbr_base_timing_ws",
+            "GBR base for task30 base timing workspace.");
+        count += labelComment(0xFFFF7FD4, "gbr_base_corr_init_ws",
+            "GBR base for timing corrections init workspace (task33).");
+        count += labelComment(0xFFFF8000, "gbr_base_percond_ws",
+            "GBR base for per-condition timing workspace (task36).");
+        count += labelComment(0xFFFF8098, "ign_output_workspace",
+            "Ignition output workspace (float). Task38.");
+        count += labelComment(0xFFFF80AE, "dwell_output",
+            "Dwell time output (float). Task38.");
+        count += labelComment(0xFFFF80C0, "IAM_compensation_ws",
+            "IAM compensation workspace (float). Task42.");
+        count += labelComment(0xFFFF80C8, "load_timing_output",
+            "Load-dependent timing output (float). Task43.");
+        count += labelComment(0xFFFF80E4, "mps_timing_output",
+            "MPS-based timing output (float). Task46.");
+        count += labelComment(0xFFFF80F8, "final_timing_advance",
+            "Final combined timing advance (float). Task48 output.");
+        count += labelComment(0xFFFF81E8, "per_cyl_timing_corr",
+            "Per-cylinder timing corrections (float[4]). Task0/29.");
+        count += labelComment(0xFFFF8258, "flkc_retard",
+            "FLKC retard value (float).");
+        count += labelComment(0xFFFF322C, "FLKC_slow_learning_value",
+            "Fine knock learn (FLKC slow) learning value (float).");
+        count += labelComment(0xFFFF3248, "per_cylinder_knock_retard",
+            "Knock retard array (float[4]), indexed by cylinder.");
+        count += labelComment(0xFFFF6812, "cylinder_index",
+            "Current cylinder index 0-3 (byte).");
+        count += labelComment(0xFFFF6790, "knock_active_flag",
+            "Knock event active flag.");
+
+        // ── Ignition Timing Calibration Scalars ──
+        count += labelComment(0x000D2ADC, "cal_t30_rpm_mult_min",
+            "Task30 minimum RPM multiplier (float, 4.0).");
+        count += labelComment(0x000D2AE0, "cal_t30_advance_limit",
+            "Task30 advance limit (float, 20.0 degrees).");
+        count += labelComment(0x000D2AE4, "cal_t30_deadband",
+            "Task30 deadband threshold (float, 0.07).");
+        count += labelComment(0x000D2AE8, "cal_t30_startup_corr",
+            "Task30 startup correction (float, 10.0 degrees).");
+        count += labelComment(0x000D2AF0, "cal_t30_warmup_rpm",
+            "Task30 warmup RPM threshold (float, 600.0).");
+        count += labelComment(0x000D2AF4, "cal_t30_temp_thresh",
+            "Task30 temperature threshold (float, 69.65 deg C).");
+        count += labelComment(0x000D2B14, "cal_t32_blend_rpm",
+            "Task32 blend RPM threshold (float, 6000.0).");
+        count += labelComment(0x000D2BF0, "cal_percond_scale",
+            "Per-condition timing correction scale (float, 4.0).");
+        count += labelComment(0x000D2BF4, "cal_percond_blend",
+            "Per-condition timing blend factor (float, 0.7).");
+        count += labelComment(0x000D2BF8, "cal_percond_step",
+            "Per-condition timing step size (float, 0.02).");
+        count += labelComment(0x000D2C08, "cal_percond_max_retard",
+            "Per-condition maximum retard (float, -20.0 degrees).");
+        count += labelComment(0x000D2CB0, "cal_dwell_idle_rpm",
+            "Dwell idle RPM reference (float, 850.0).");
+        count += labelComment(0x000D2CB4, "cal_dwell_min_rpm",
+            "Dwell minimum RPM (float, 300.0).");
+        count += labelComment(0x000D2CB8, "cal_dwell_angle",
+            "Dwell angle (float, 75.0 degrees).");
+        count += labelComment(0x000D2CBC, "cal_maf_corr_scale",
+            "MAF correction scale factor (float, 0.75).");
+        count += labelComment(0x000D2CC8, "cal_t41_min_timing",
+            "Task41 minimum timing / retard limit (float, -4.5 degrees).");
+        count += labelComment(0x000D2CCC, "cal_t41_max_timing",
+            "Task41 maximum timing / advance limit (float, 4.0 degrees).");
+        count += labelComment(0x000D2CD4, "cal_iam_min_inc",
+            "IAM minimum increment (float, 0.01).");
+        count += labelComment(0x000D2CD8, "cal_iam_max_comp",
+            "Maximum IAM compensation (float, 3.0 degrees).");
+        count += labelComment(0x000D2CE0, "cal_iam_step_up",
+            "IAM compensation step up (float, 0.1).");
+        count += labelComment(0x000D2CE4, "cal_iam_step_down",
+            "IAM compensation step down (float, 0.1).");
+        count += labelComment(0x000D2CF4, "cal_flkc_activation",
+            "FLKC threshold to activate compensation (float, 0.6).");
+        count += labelComment(0x000D2D98, "cal_percyl_rpm_gate",
+            "Per-cylinder corrections RPM gate (float, 7000.0).");
+        count += labelComment(0x000D2F3C, "cal_knock_learn_rate",
+            "Knock retard learning rate (float, 0.02, ~2%/cycle).");
+
+        // ── Ignition Timing Descriptors ──
+        count += labelComment(0x000ADAFC, "desc_base_advance_A",
+            "Base advance map A descriptor (1D scaled, 8 entries).");
+        count += labelComment(0x000ADB10, "desc_base_advance_B",
+            "Base advance map B descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADB38, "desc_base_timing_primary",
+            "Primary base timing descriptor (1D scaled, 9 entries).");
+        count += labelComment(0x000ADB4C, "desc_timing_blend_0",
+            "Timing blend curve 0 descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADB60, "desc_timing_blend_1",
+            "Timing blend curve 1 descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADB74, "desc_timing_blend_2",
+            "Timing blend curve 2 descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADB88, "desc_timing_blend_3",
+            "Timing blend curve 3 descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADB9C, "desc_base_timing_secondary",
+            "Secondary base timing descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADBB0, "desc_timing_blend_4",
+            "Timing blend curve 4 descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADDE0, "desc_percond_rpm_ect",
+            "Per-condition RPM x ECT descriptor (1D scaled, 7 entries).");
+        count += labelComment(0x000ADFAC, "desc_iam_knock_comp",
+            "IAM/knock compensation descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADFC0, "desc_timing_lu_ect_A",
+            "ECT-indexed timing lookup A descriptor (1D scaled, 16 entries).");
+        count += labelComment(0x000ADFD4, "desc_load_dep_timing",
+            "Load-dependent timing descriptor (1D).");
+        count += labelComment(0x000ADFF4, "desc_mps_timing",
+            "MPS timing descriptor (1D).");
+        count += labelComment(0x000AE00C, "desc_knock_post_A",
+            "Knock post-processing A descriptor (1D scaled, 6 entries).");
+        count += labelComment(0x000AE020, "desc_knock_post_B",
+            "Knock post-processing B descriptor (1D scaled, 5 entries).");
+        count += labelComment(0x000AE164, "desc_gen_timing_corr",
+            "General timing correction descriptor (1D).");
+        count += labelComment(0x000AE450, "desc_percond_rpmxect_2d",
+            "Per-condition RPM x ECT descriptor (2D, 16x2).");
+        count += labelComment(0x000AE46C, "desc_percond_rpmxload_2d",
+            "Per-condition RPM x load descriptor (2D, 16x6).");
+        count += labelComment(0x000AE530, "desc_timing_lu_ect_B",
+            "Timing lookup B descriptor (2D, 16x7, RPM x ECT).");
+        count += labelComment(0x000AE54C, "desc_final_timing_A",
+            "Final timing map A descriptor (2D, 5x3).");
+        count += labelComment(0x000AE568, "desc_final_timing_B",
+            "Final timing map B descriptor (2D, 5x3).");
+        count += labelComment(0x000AE584, "desc_final_timing_C",
+            "Final timing map C descriptor (2D, 5x3).");
+        count += labelComment(0x000AE5A0, "desc_final_timing_D",
+            "Final timing map D descriptor (2D, 5x3).");
+        count += labelComment(0x000AE5BC, "desc_final_timing_E",
+            "Final timing map E descriptor (2D, 5x3).");
+        count += labelComment(0x000AE5D8, "desc_percyl_corr_A",
+            "Per-cylinder timing correction A descriptor (2D, 14x5).");
+        count += labelComment(0x000AE5F4, "desc_percyl_corr_B",
+            "Per-cylinder timing correction B descriptor (2D, 14x5).");
+        count += labelComment(0x000AE610, "desc_percyl_corr_C",
+            "Per-cylinder timing correction C descriptor (2D, 14x5).");
+        count += labelComment(0x000AE62C, "desc_percyl_corr_D",
+            "Per-cylinder timing correction D descriptor (2D, 14x6).");
+        count += labelComment(0x000AE26C, "desc_knock_retard_limit",
+            "Knock retard limit descriptor (1D float, 18 entries).");
+        count += labelComment(0x000AE278, "desc_knock_retard_scale",
+            "Knock retard scaling descriptor (1D float, 18 entries).");
+        count += labelComment(0x000AE648, "desc_knock_det_thresh",
+            "Knock detection threshold descriptor (2D).");
+        count += labelComment(0x000AE664, "desc_knock_retard_map",
+            "Knock retard map descriptor (2D, 15x18).");
+        count += labelComment(0x000AE680, "desc_knock_comp_A",
+            "Knock compensation A descriptor (2D, 17x18).");
+        count += labelComment(0x000AE69C, "desc_knock_comp_B",
+            "Knock compensation B descriptor (2D, 17x18).");
+
+        // =====================================================================
+        // FUELING PIPELINE — ADDITIONAL FUNCTIONS
+        // =====================================================================
+        // From fueling_pipeline_analysis.txt — comprehensive pipeline trace
+
+        // ── Fueling Dispatch & Init ──
+        count += labelComment(0x00031600, "fuel_init_flag_writer",
+            "Writes -1 to FFFF745B init flag.");
+        count += labelComment(0x00032AA8, "fuel_correction_array",
+            "29-element gear-dependent correction array.");
+        count += labelComment(0x00031C9C, "fuel_percyl_array_init",
+            "Zeros 3x42 floats per-cylinder init.");
+        count += labelComment(0x00032958, "fuel_correction_filter_init",
+            "Zeros 3 floats at FFFF770C correction filter.");
+        count += labelComment(0x00031A4C, "fuel_trim_init_B",
+            "Writes FFFF7464, checks cal IDs.");
+        count += labelComment(0x0003160A, "major_correction_aggregator",
+            "RPM/MAF/lambda/enrichment aggregator.");
+
+        // ── CL AFC Pipeline Stages ──
+        count += labelComment(0x00033304, "cl_fuel_dispatcher",
+            "CL fuel dispatcher. Sequences 9-stage AFC pipeline.");
+        count += labelComment(0x00033460, "fuel_aggregator_tail",
+            "AFC final correction, clamp [0.75, 1.25].");
+        count += labelComment(0x00033CC0, "cl_fuel_target_A",
+            "AFC Stage 2: CL fuel target, 2D table lookup RPM x Load.");
+        count += labelComment(0x00033D1C, "cl_fuel_target_B",
+            "AFC Stage 1: PID-like CL fuel target controller.");
+        count += labelComment(0x00033658, "afc_sensor_conditioning",
+            "AFC Stage 3: rate-limited sensor conditioning (566 bytes).");
+        count += labelComment(0x00033FCE, "afc_target_computation",
+            "AFC Stage 4: multi-table AFC target (212 bytes).");
+        count += labelComment(0x0003439E, "afc_enable_disable_gate",
+            "AFC Stage 7: AFC enable/disable gate (50 bytes).");
+
+        // ── Fuel Calculation & Output ──
+        count += labelComment(0x000303C0, "injector_dead_time_calc",
+            "Battery voltage dead time lookup. 2D map 0xAD7E0.");
+        count += labelComment(0x00030430, "status_byte_copy",
+            "Copies FFFF726C to FFFF7370.");
+        count += labelComment(0x00030744, "sensor_prep",
+            "Calls 0x23E48, writes FFFF73A2.");
+        count += labelComment(0x00030ACC, "base_fuel_map_combiner",
+            "2D map + descriptors to FFFF73AC base fuel.");
+        count += labelComment(0x00030B68, "base_fuel_table_calc",
+            "Dual 1D lookups to FFFF7400 base fuel table.");
+        count += labelComment(0x000320AE, "final_fuel_correction_accum",
+            "AFC+LTFT+enrichments accumulated to final IPW.");
+        count += labelComment(0x00032892, "per_element_correction_calc",
+            "42-element correction loop for per-element fuel trim.");
+        count += labelComment(0x00037156, "fuel_trim_input",
+            "A/F ratio to FFFF7A74 fuel trim input.");
+        count += labelComment(0x0003756C, "injector_trim_init",
+            "Reads FFFF895C, zeros FFFF7AB0 injector trim workspace.");
+        count += labelComment(0x00038158, "main_ipw_calculator",
+            "Main IPW calc. CL/OL state, WOT thresholds, blend channels.");
+        count += labelComment(0x00038D16, "ltft_learning_init",
+            "LTFT learning init. Step 0.001.");
+        count += labelComment(0x00038E30, "ltft_learning_algorithm",
+            "LTFT learning algorithm. RPM threshold 3600.");
+        count += labelComment(0x000399EE, "default_fuel_multiplier_writer",
+            "Writes 1.05 to FFFF7BDC default fuel multiplier.");
+        count += labelComment(0x0003A222, "percyl_fuel_trim",
+            "Per-cylinder fuel trim. 4-iteration loop.");
+        count += labelComment(0x0003EB8C, "overrun_fuel_cutoff",
+            "Deceleration fuel cut. RPM/airflow thresholds.");
+        count += labelComment(0x000403C4, "ect_warmup_correction",
+            "Mode-selected ECT correction, 4 curves.");
+        count += labelComment(0x0003CD34, "warmup_coldstart_enrichment",
+            "ECT/IAT indexed warmup enrichment.");
+
+        // ── ECT Warmup Consumer ──
+        count += labelComment(0x0003F374, "ect_warmup_consumer",
+            "ECT warmup consumer (2050 bytes). Reads FFFF7F68, outputs 8 per-channel corrections.");
+        count += labelComment(0x0003FA8C, "warmup_state_init",
+            "Embedded sub: initializes warmup state struct.");
+        count += labelComment(0x0003FACE, "warmup_mode_transition",
+            "Embedded sub: warmup mode transition evaluator.");
+
+        // ── Fuel Cut / Injector Output Chain ──
+        count += labelComment(0x00046BCC, "fuel_cut_output_tail",
+            "Fuel cut condition gating, bitmask build (1026 bytes).");
+        count += labelComment(0x00046E64, "cyl_timing_dispatch",
+            "FMAC cylinder timing dispatch.");
+        count += labelComment(0x00046EE4, "cyl_pulse_emit",
+            "Cylinder pulse timing emit.");
+        count += labelComment(0x00046F82, "percyl_condition_check",
+            "Per-cylinder condition/timing accumulate.");
+        count += labelComment(0x0004760A, "timing_int_to_timer_count",
+            "Converts crank timing integer to timer count.");
+
+        // ── Injection Hardware Chain ──
+        count += labelComment(0x000082B6, "cyl_timing_normalizer",
+            "Normalizes timing angle. Writes FFFF41F0.");
+        count += labelComment(0x000082DE, "percyl_pulse_emit",
+            "Per-cylinder pulse emit (514 bytes, 3 entries).");
+        count += labelComment(0x000083B8, "multicyl_init",
+            "Multi-cylinder full re-init.");
+        count += labelComment(0x00008408, "hw_timer_init",
+            "Hardware timer initialization.");
+        count += labelComment(0x00009E4A, "dead_time_store",
+            "Stores dead time to FFFF4280.");
+        count += labelComment(0x0000300E, "injector_ic_trigger",
+            "Sets bit15 on external injector IC at 0xF00F00.");
+        count += labelComment(0x000035FC, "inj_channel_timer_setup",
+            "RAM-resident injection channel timer setup.");
+        count += labelComment(0x00002FEC, "inj_final_hw_write",
+            "Final hardware write to injector IC + XRAM.");
+
+        // ── Sensor Composite ──
+        count += labelComment(0x000517A0, "sensor_composite_calc",
+            "Computes rate-limited composite for FFFF895C. Scheduler-dispatched.");
+        count += labelComment(0x00052092, "sensor_struct_8998_manager",
+            "GBR=FFFF8998, manages sensor struct.");
+
+        // ── Library / Utility ──
+        count += labelComment(0x000BE830, "table_lookup_1D",
+            "1D table lookup utility.");
+        count += labelComment(0x000BE8E4, "table_lookup_2D",
+            "2D table lookup utility.");
+        count += labelComment(0x000BE944, "table_lookup_2D_int",
+            "2D table lookup returning integer.");
+        count += labelComment(0x000BE960, "float_max",
+            "Returns max(FR4, FR5) in FR0.");
+        count += labelComment(0x000BE970, "rate_limit_interp",
+            "Rate-limited interpolation utility.");
+        count += labelComment(0x000BEAB0, "table_lookup_err_scale",
+            "Table lookup with error scaling.");
+
+        // ── Fueling Pipeline RAM (Key Working Addresses) ──
+        count += labelComment(0xFFFF7448, "clol_mode_flag",
+            "CL/OL mode flag (byte). 1=CL, 0=OL. Gates AFC pipeline.");
+        count += labelComment(0xFFFF7452, "cl_readiness_flags",
+            "CL readiness flags.");
+        count += labelComment(0xFFFF781C, "afc_pipeline_result",
+            "AFC pipeline result (float). Stage 7 output.");
+        count += labelComment(0xFFFF7820, "afc_clamped_output",
+            "AFC clamped output (float). Stage 8 output.");
+        count += labelComment(0xFFFF7870, "afc_pi_blended_output",
+            "AFC PI blended output (float). Stage 5 output.");
+        count += labelComment(0xFFFF7904, "afc_aggregator_output",
+            "AFC final correction output (float).");
+        count += labelComment(0xFFFF7344, "fuel_per_cyl_struct",
+            "Per-cylinder fuel struct (8 x float final IPW values).");
+        count += labelComment(0xFFFF7350, "injector_dead_time_ticks",
+            "Injector dead time in timer ticks (uint16).");
+        count += labelComment(0xFFFF73AC, "base_fuel_map_output",
+            "Base fuel map output (float).");
+        count += labelComment(0xFFFF7400, "base_fuel_table_output",
+            "Base fuel table output (float).");
+        count += labelComment(0xFFFF7AB4, "afl_multiplier_output",
+            "AFL multiplier output (float). Written by afl_application.");
+        count += labelComment(0xFFFF7BDC, "default_fuel_multiplier",
+            "Default fuel multiplier (float, 1.05).");
+        count += labelComment(0xFFFF7A74, "fuel_trim_af_ratio",
+            "A/F ratio fuel trim input (float).");
+        count += labelComment(0xFFFF7AB0, "injector_trim_workspace",
+            "Injector trim workspace (4 slots).");
+        count += labelComment(0xFFFF7730, "fuel_correction_array_base",
+            "29-element correction array base.");
+        count += labelComment(0xFFFF770C, "correction_filter_base",
+            "Correction filter base (3 floats).");
+
+        // ── OL Enrichment State ──
+        count += labelComment(0xFFFF7954, "ol_enrichment_factor_A",
+            "OL enrichment factor A (float).");
+        count += labelComment(0xFFFF795C, "ol_enrichment_output",
+            "OL enrichment primary output (float).");
+        count += labelComment(0xFFFF7968, "ol_enrichment_blend",
+            "OL enrichment blend value (float).");
+
+        // ── Main IPW Calculator State ──
+        count += labelComment(0xFFFF7AF4, "fuel_ipw_state_B",
+            "Final IPW correction output (float).");
+        count += labelComment(0xFFFF7B38, "wot_active_flag",
+            "WOT active flag.");
+        count += labelComment(0xFFFF7B60, "ltft_workspace",
+            "LTFT learning workspace.");
+
+        // ── Fuel Cut / Overrun State ──
+        count += labelComment(0xFFFF7E8C, "overrun_state",
+            "Overrun state (byte). 0=normal, 1=fuel cut active.");
+        count += labelComment(0xFFFF7E8E, "overrun_counter",
+            "Overrun scheduler tick counter (word).");
+        count += labelComment(0xFFFF82B8, "fuel_cut_bitmask",
+            "Fuel cut bitmask. -1=all, bits=per-cylinder (int16).");
+        count += labelComment(0xFFFF7C10, "percyl_fuel_trim_output",
+            "Per-cylinder fuel trim output.");
+
+        // ── Injector Timing / Hardware RAM ──
+        count += labelComment(0xFFFF41F0, "percyl_timing_array",
+            "Per-cylinder timing array (8 bytes x 4 cylinders).");
+        count += labelComment(0xFFFF4280, "injector_dead_time_applied",
+            "Applied injector dead time (hardware timer).");
+        count += labelComment(0xFFFF3474, "inj_channel_enable",
+            "Injection channel enable mask. 0xFF = all 8 channels.");
+
+        // ── ECT Warmup Consumer State ──
+        count += labelComment(0xFFFF7E90, "warmup_corr_cyl0",
+            "Final warmup correction cylinder 0 (float).");
+        count += labelComment(0xFFFF7E94, "warmup_corr_cyl1",
+            "Final warmup correction cylinder 1 (float).");
+        count += labelComment(0xFFFF7E98, "warmup_corr_cyl2",
+            "Final warmup correction cylinder 2 (float).");
+        count += labelComment(0xFFFF7E9C, "warmup_corr_cyl3",
+            "Final warmup correction cylinder 3 (float).");
+        count += labelComment(0xFFFF7F68, "ect_warmup_correction",
+            "ECT warmup correction output (float).");
+
+        // ── Sensor Struct (FFFF89xx) ──
+        count += labelComment(0xFFFF8998, "sensor_struct_8998",
+            "Sensor struct base (GBR at 0x52092).");
+        count += labelComment(0xFFFF8920, "sensor_struct_start",
+            "First field in sensor struct.");
+
+        // ── Fueling Calibration Descriptors ──
+        count += labelComment(0x000ACE6C, "desc_cl_target_B_rate_table",
+            "CL target B rate table descriptor.");
+        count += labelComment(0x000AD90C, "desc_cl_target_A_AT_flag1",
+            "CL target A descriptor (AT + flag1).");
+        count += labelComment(0x000AD8F0, "desc_cl_target_A_AT_flag0",
+            "CL target A descriptor (AT + flag0).");
+        count += labelComment(0x000AD8D4, "desc_cl_target_A_MT_flag1",
+            "CL target A descriptor (MT + flag1).");
+        count += labelComment(0x000AD8B8, "desc_cl_target_A_MT_flag0",
+            "CL target A descriptor (MT + flag0).");
+        count += labelComment(0x000AD63C, "desc_afc_target_2D_sensor",
+            "AFC target 2D descriptor (16x10, sensor x sensor).");
+        count += labelComment(0x000AD658, "desc_afc_target_2D_rpm_load",
+            "AFC target 2D descriptor (RPM x load).");
+        count += labelComment(0x000AC4E8, "desc_afc_cl_decision_1D",
+            "AFC CL decision 1D descriptor.");
+        count += labelComment(0x000AD928, "desc_afc_pi_blend_2D",
+            "AFC PI blend 2D descriptor (11x10).");
+        count += labelComment(0x000AD7E0, "desc_injector_latency",
+            "Injector Latency descriptor (2D, 5x3, voltage x ECT).");
+        count += labelComment(0x000AD470, "desc_ipw_ect_threshold",
+            "IPW ECT threshold 1D descriptor.");
+        count += labelComment(0x000ADBC4, "desc_ect_warmup_1D_mode00",
+            "ECT warmup 1D descriptor (R6=0, R5=1). i16x16.");
+        count += labelComment(0x000ADBD8, "desc_ect_warmup_1D_mode01",
+            "ECT warmup 1D descriptor (R6=0, R5!=1). i16x16.");
+        count += labelComment(0x000ADBEC, "desc_ect_warmup_1D_mode10",
+            "ECT warmup 1D descriptor (R6!=0, R5=1). i16x16.");
+        count += labelComment(0x000ADC00, "desc_ect_warmup_1D_mode11",
+            "ECT warmup 1D descriptor (R6!=0, R5!=1). i16x16.");
+
+        // ── Fueling Calibration Constants ──
+        count += labelComment(0x000CC174, "cal_bpw_hysteresis_clol",
+            "BPW hysteresis for CL/OL transition.");
+        count += labelComment(0x000CC178, "cal_throttle_hysteresis_clol",
+            "Throttle hysteresis for CL/OL transition.");
+        count += labelComment(0x000CC16C, "cal_iam_threshold_ol_map",
+            "IAM threshold for OL map selection (float, 0.5).");
+        count += labelComment(0x000CC354, "cal_wot_load_threshold",
+            "WOT load threshold (float, 118.0 g/rev).");
+        count += labelComment(0x000CC358, "cal_wot_load_hysteresis",
+            "WOT load hysteresis (float, 119.0 g/rev).");
+        count += labelComment(0x000CC05C, "cal_afl_step_size",
+            "AFL step size (float, 0.001).");
+        count += labelComment(0x000CC064, "cal_afl_limit_positive",
+            "AFL limit positive (float, +25%).");
+        count += labelComment(0x000CC068, "cal_afl_limit_negative",
+            "AFL limit negative (float, -25%).");
+        count += labelComment(0x000CC3B0, "cal_ltft_step_size",
+            "LTFT step size (float, 0.001).");
+        count += labelComment(0x000CC3C4, "cal_ltft_rpm_threshold",
+            "LTFT RPM threshold (float, 3600).");
+        count += labelComment(0x000CBF40, "cal_default_fuel_mult",
+            "Default fuel multiplier calibration (float, 1.05).");
+
+        // ── Injector Latency Table Data ──
+        count += labelComment(0x000D104C, "inj_latency_xaxis",
+            "Injector latency battery voltage axis (5 breakpoints).");
+        count += labelComment(0x000D1060, "inj_latency_yaxis",
+            "Injector latency ECT Y axis (3 breakpoints).");
+        count += labelComment(0x000D106C, "inj_latency_data",
+            "Injector latency dead time data (uint16, 5x3).");
+
+        // ── External Hardware ──
+        count += labelComment(0x00F00F00L, "injector_hw_ctrl",
+            "External injector ASIC/CPLD I/O register.");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }
