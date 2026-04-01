@@ -2439,6 +2439,247 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x04AE82L, "isr_handler_53", "ISR dispatch table entry 53");
 
         // ============================================================
+        // RTOS TASK SCHEDULER (master task table @ 0x3F80)
+        // ============================================================
+        // 13-entry RTOS master task table. Each entry is 16 bytes:
+        //   +0x00  u32  period field (MSB = period in ticks; 1=10ms, 2=20ms, 13=130ms)
+        //   +0x04  u32  flags (hi16=0x0400; lo16=priority: 0x0100..0x0400)
+        //   +0x08  u32  TCB RAM pointer
+        //   +0x0C  u32  task function ROM pointer
+        // Task IDs correspond to gate(task_id) calls inside each task function.
+        // Gate function: 0x10A46 (= isr_handler_0). Epilogue: 0x35A4 (= isr_handler_9).
+        // ============================================================
+
+        // -- RTOS master task table (ROM 0x3F80, 13 entries × 16 bytes) --
+        count += labelComment(0x00003F80L, "rtos_task_table",
+            "RTOS master task table. 13 entries x 16 bytes. "
+            + "Format per entry: {period_u32, flags_u32, TCB_RAM_ptr, func_ROM_ptr}. "
+            + "Called by RTOS startup (0x65C). Reset PC = 0x0C0C; initial SP = 0xFFFFBFA0.");
+
+        // Task 0 -- slow background (~130 ms, priority 4)
+        count += labelComment(0x0000E1B0L, "rtos_task0_slow_bg",
+            "RTOS Task 0: slow background (~130 ms, pri 4). TCB=FFFF11C8. "
+            + "~26 JSR calls: diagnostics, calibration updates, ROM checks. "
+            + "Calls 0xBE81C x2 (dual struct init for timing buffers). "
+            + "Does NOT call gate function -- runs unconditionally.");
+
+        // Task 1 -- fast minimal (10 ms)
+        count += labelComment(0x0000DD52L, "rtos_task1_fast_minimal",
+            "RTOS Task 1: fast minimal (10 ms, pri 4). TCB=FFFF11D0. "
+            + "Body: JSR epilogue (0x35A4), RTS. Heartbeat / scheduler tick counter.");
+
+        // Task 2 -- secondary dispatch (20 ms)
+        count += labelComment(0x0000DDACL, "rtos_task2_secondary_dispatch",
+            "RTOS Task 2: secondary sub-task dispatch (20 ms, pri 3). TCB=FFFF11D8. "
+            + "gate(2) -> secondary_dispatcher(0xF97C) -> epilogue. "
+            + "0xF97C iterates sub-table @ 0x11BA4, including OL enrichment wrapper "
+            + "0xE54E -> 0x5798 -> 0x049CF0 (fuel_dispatch_table_B runner).");
+
+        // Task 3 -- secondary dispatch (20 ms)
+        count += labelComment(0x0000DE38L, "rtos_task3_secondary_dispatch",
+            "RTOS Task 3: secondary sub-task dispatch (20 ms, pri 2). TCB=FFFF11E0. "
+            + "gate(3) -> secondary_dispatcher(0xF97C) -> epilogue. "
+            + "Parallel to Task 2, allows independent phase offset for same sub-table.");
+
+        // Task 4 -- minimal (20 ms)
+        count += labelComment(0x0000DE92L, "rtos_task4_minimal",
+            "RTOS Task 4: minimal task (20 ms, pri 1). TCB=FFFF11E8. "
+            + "Body: epilogue (0x35A4), RTS. Lowest-priority placeholder.");
+
+        // Task 5 -- fuel sub-group A (20 ms)
+        count += labelComment(0x0000E486L, "rtos_task5_fuel_subA",
+            "RTOS Task 5: fuel sub-group A (20 ms, pri 4). TCB=FFFF11F0. "
+            + "gate(5) -> 0xFE22 (air charge/mass-flow setup) -> 0xA878 (charge accum) "
+            + "-> 0xD940 (fuel calc sub-step) -> 0x9A14 (AFL loop integration) "
+            + "-> 0x8528 (struct accumulation) -> 0x4A94C (OL-gated sub-dispatcher) "
+            + "-> epilogue. 0x4A94C checks FFFF8EDC (ol_dispatch_gate).");
+
+        // Task 6 -- fuel sub-group B (20 ms)
+        count += labelComment(0x0000E4BAL, "rtos_task6_fuel_subB",
+            "RTOS Task 6: fuel sub-group B (20 ms, pri 2). TCB=FFFF11F8. "
+            + "gate(6) -> 0xFE22 (air charge/mass-flow) -> 0x4AA58 (AFL trim-2) "
+            + "-> 0x9A34 (loop integration-2) -> 0x85AC -> 0xD3DC (ATU channel data FFFF44A4) "
+            + "-> epilogue.");
+
+        // Task 7 -- signal processing / injection timing (20 ms)
+        count += labelComment(0x0000E2FCL, "rtos_task7_signal_timing",
+            "RTOS Task 7: signal processing + injection timing (20 ms, pri 3). TCB=FFFF1200. "
+            + "gate(7) -> 0x109B8 (main timing calc, 8 regs saved) -> 0x42CA -> 0x4A2C "
+            + "-> 0xA59C (injection timing struct FFFF4040/4300) -> 0x4CCE (4 sub-BSR) "
+            + "-> 0x8E30 (injection output FFFF4248) -> 0x910A (injection flag FFFF4272) "
+            + "-> 0x48DB8 (OL-gated, checks FFFF8EDC, calls 0x58902) -> 0x7F44 "
+            + "-> 0xBE81C (struct init) -> BRA 0xE398.");
+
+        // Task 8 -- ATU hardware interface (20 ms)
+        count += labelComment(0x0000E3B2L, "rtos_task8_atu_hw",
+            "RTOS Task 8: ATU hardware interface (20 ms, pri 2). TCB=FFFF1208. "
+            + "gate(8) -> 0xCFB0 (ATU setup FFFF447C/FFFF4488) -> 0x5A20 -> 0xC5FC "
+            + "-> 0x56F4 -> 0x70BA -> 0x48E16 (OL-gated ATU channels, checks FFFF8EDC) "
+            + "-> epilogue, BRA 0xEF3E.");
+
+        // Task 9 -- MAIN FUEL / CLOL (20 ms)  ** KEY TASK **
+        count += labelComment(0x0000E448L, "rtos_task9_fuel_clol",
+            "RTOS Task 9: MAIN FUEL / CLOL calculation task (20 ms, pri 2). TCB=FFFF1210. "
+            + "gate(9) -> 0xFC04 (fuel pre-calc FFFF5B64) -> 0x5840 (crank-angle interp engine) "
+            + "-> 0xD658 (ATU channel set) -> 0xCBAC (MAF/intake FFFF447A) "
+            + "-> 0x4907C (fuel_dispatch_tableA runner, OL-gated FFFF8EDC) "
+            + "-> 0x9A58 (intake-B FFFF42F8) -> 0xD268 (ATU injection FFFF44A5) "
+            + "-> 0xCBEE (stub, immediate RTS) -> epilogue. "
+            + "fuel_dispatch_table_B runner (0x049CF0) is called separately via "
+            + "secondary dispatch: Task2/3 -> F97C -> E54E -> 5798 -> 049CF0.");
+
+        // Task 10 -- sensors / AVCS / boost / idle (20 ms)
+        count += labelComment(0x0000DF14L, "rtos_task10_sensors",
+            "RTOS Task 10: sensors/AVCS/boost/idle (20 ms, pri 4). TCB=FFFF1218. "
+            + "Highest-priority 20 ms task. ~39 JSR calls. "
+            + "First call 0xAE50 (tiny: loads mask 0xFF0F, bit-op, RTS). "
+            + "Covers: sensor ADC (100E4, 10C9C, FE58), control loops (6CD0, 40D4, CF58), "
+            + "actuator outputs (6624, 6704, CB08, C9CC), injection support. "
+            + "BSR to 0xE51C (sub-task wrapper). Likely owns AVCS, boost solenoid, IAC.");
+
+        // Task 11 -- fast minimal (10 ms)
+        count += labelComment(0x0000E3E4L, "rtos_task11_fast_minimal",
+            "RTOS Task 11: fast minimal (10 ms, pri 2). TCB=FFFF1220. "
+            + "Immediate JMP to epilogue (0x35A4). 10 ms heartbeat alongside Task 1.");
+
+        // Task 12 -- gate-only / sub-task entry (20 ms)
+        count += labelComment(0x0000E4E6L, "rtos_task12_subtask_entry",
+            "RTOS Task 12: gate-only sub-task entry (20 ms, pri 1). TCB=FFFF1228. "
+            + "gate(12) -> 0x10D58 (sub-task dispatcher: loads 0xFDB4, accesses FFFF5BBF, "
+            + "iterates sub-table @ ROM 0x11CA8) -> epilogue. "
+            + "Likely drives diagnostic / CAN / communication sub-functions.");
+
+        // -- RTOS kernel infrastructure --
+        count += labelComment(0x00010A46L, "rtos_task_gate",
+            "RTOS task gate function. Called at top of every gated task function. "
+            + "R4 = task_id (0-12). Returns non-zero if task is due to run, zero to skip. "
+            + "Accesses FFFF1288 (scheduler_state) and calls 0xBE81C (struct init). "
+            + "Previously labeled isr_handler_0 -- that label is also valid.");
+
+        count += labelComment(0x000035A4L, "rtos_task_epilogue",
+            "RTOS common task epilogue. Tail-called (JMP) at end of every task function. "
+            + "Updates TCB completion state. Reads task descriptor from ROM 0x3F2C. "
+            + "Accesses FFFF1288 (scheduler_state). "
+            + "Previously labeled isr_handler_9 -- that label is also valid.");
+
+        count += labelComment(0x0000F97CL, "rtos_secondary_dispatcher",
+            "RTOS secondary sub-task dispatcher. Called from Tasks 2 and 3. "
+            + "Iterates sub-table @ ROM 0x11BA4 dispatching sub-functions by their "
+            + "own period flags. Drives fuel_dispatch_table_B runner via: "
+            + "0xF97C -> 0xE54E (wrapper) -> 0x5798 (pre-calc) -> 0x049CF0 (runner). "
+            + "References 0xBE81C and sub-table base 0x11BA4.");
+
+        count += labelComment(0x00000C0CL, "rtos_reset_entry",
+            "Power-on reset entry point (= vec_PowerOnResetPC = 0x0C0C). "
+            + "Initial SP = 0xFFFFBFA0. Calls HW init (0xC20, 0xC54), "
+            + "then RTOS startup 0x65C with R4=R5=0. Main loop at 0x0C1C is infinite BRA.");
+
+        count += labelComment(0x0000065CL, "rtos_startup",
+            "RTOS startup / initialization. Called from reset entry (0x0C0C) with R4=R5=0. "
+            + "Registers task table @ 0x3F80, starts scheduler. "
+            + "Calls gate infra (0x004C), hardware setup (0x762, 0x78E), RTOS init (0x598). "
+            + "Checks magic at FFFF_BFFC, calls scheduler watchdog (0x0EE4).");
+
+        // -- Sub-task pool: OL-gated dispatchers (all check FFFF8EDC) --
+        count += labelComment(0x00049CF0L, "fuel_dispatch_tableB_runner",
+            "fuel_dispatch_table_B RUNNER. Checks ol_dispatch_gate (FFFF8EDC): "
+            + "if 0x00 = OL active: dispatches all 18 table-B functions (including 7-phase OL pipeline). "
+            + "if 0xFF = special mode: JMP to 0x5AB44 (mode-entry handler) with R4 from context. "
+            + "if other: JMP to 0x5AB44 with R4=1 (bypass). "
+            + "Called via secondary dispatch: Task2/3 -> F97C -> E54E -> 5798 -> 049CF0. "
+            + "Also labeled isr_handler_33 (that label is also valid).");
+
+        count += labelComment(0x00004907CL, "fuel_dispatch_tableA_runner",
+            "fuel_dispatch_table_A RUNNER. Called directly from Task 9 (rtos_task9_fuel_clol). "
+            + "Checks ol_dispatch_gate (FFFF8EDC): same gate logic as 0x049CF0. "
+            + "If OL active: calls 0x43750 and 0x22DB0 sub-dispatch chains. "
+            + "Also labeled isr_handler_5 (that label is also valid).");
+
+        count += labelComment(0x000048DB8L, "ol_gated_injection_dispatch",
+            "OL-gated injection timing dispatch. Called from Task 7 (rtos_task7_signal_timing). "
+            + "Checks ol_dispatch_gate (FFFF8EDC): same gate logic as 0x049CF0. "
+            + "If OL active: calls 0x58902 (injection timing sub-dispatch). "
+            + "Also labeled isr_handler (entry in sub-table 0x11C08 area).");
+
+        count += labelComment(0x000048E16L, "ol_gated_atu_dispatch",
+            "OL-gated ATU channel dispatch. Called from Task 8 (rtos_task8_atu_hw). "
+            + "Checks ol_dispatch_gate (FFFF8EDC): same gate logic as 0x049CF0. "
+            + "If OL active: dispatches ATU channels for OL injection mode. "
+            + "Also labeled isr_handler (entry in sub-table area).");
+
+        // -- Secondary sub-task wrappers (pool table 0xE5EC entries 32-33) --
+        count += labelComment(0x0000E54EL, "subtask_wrap_fuel_tableB",
+            "Secondary sub-task wrapper for fuel_dispatch_table_B path. "
+            + "Indexed at secondary sub-table [0x11BF0], flags=0 (always execute). "
+            + "JSR 0x5798 (fuel_tableB pre-calc/setup), then JMP 0x049CF0 (tableB runner). "
+            + "Called via: Task2/3 -> rtos_secondary_dispatcher -> this wrapper.");
+
+        count += labelComment(0x00005798L, "fuel_tableB_precalc",
+            "fuel_dispatch_table_B pre-calculation setup. Called before fuel_dispatch_tableB_runner. "
+            + "Accesses FFFF405C (struct base), FFFF4114, 0xBEA6C, 0xAF92C. "
+            + "Sets up working data for the 18-function table-B dispatch chain. "
+            + "Also labeled isr_handler_32 (that label is also valid).");
+
+        // -- Secondary sub-task tables --
+        count += labelComment(0x00011BA4L, "rtos_secondary_subtask_table",
+            "RTOS secondary sub-task table. Iterated by rtos_secondary_dispatcher (0xF97C). "
+            + "Each entry: {flags_u32, func_ptr_u32}. "
+            + "flags: 0x00000000=always, 0x00020000=every-2-cycles, 0x00030000=every-3-cycles. "
+            + "Entry [0x11BF0-0x11BF7]: flags=0, func=0xE54E (fuel_dispatch_tableB path). "
+            + "Drives: OL enrichment pipeline, injection timing sub-tasks, fuel calc sub-tasks.");
+
+        count += labelComment(0x00011CA8L, "rtos_task12_subtask_table",
+            "Sub-task table for Task 12. Iterated by 0x10D58. "
+            + "Contains communication / diagnostic sub-function pointers.");
+
+        // -- RTOS TCB RAM addresses --
+        count += labelComment(0xFFFF11C8L, "rtos_TCB_task0",
+            "Task Control Block for RTOS Task 0 (slow background ~130ms). 8 bytes.");
+        count += labelComment(0xFFFF11D0L, "rtos_TCB_task1",
+            "Task Control Block for RTOS Task 1 (fast minimal 10ms).");
+        count += labelComment(0xFFFF11D8L, "rtos_TCB_task2",
+            "Task Control Block for RTOS Task 2 (secondary dispatch 20ms).");
+        count += labelComment(0xFFFF11E0L, "rtos_TCB_task3",
+            "Task Control Block for RTOS Task 3 (secondary dispatch 20ms).");
+        count += labelComment(0xFFFF11E8L, "rtos_TCB_task4",
+            "Task Control Block for RTOS Task 4 (minimal 20ms).");
+        count += labelComment(0xFFFF11F0L, "rtos_TCB_task5",
+            "Task Control Block for RTOS Task 5 (fuel sub-group A 20ms).");
+        count += labelComment(0xFFFF11F8L, "rtos_TCB_task6",
+            "Task Control Block for RTOS Task 6 (fuel sub-group B 20ms).");
+        count += labelComment(0xFFFF1200L, "rtos_TCB_task7",
+            "Task Control Block for RTOS Task 7 (signal processing + injection timing).");
+        count += labelComment(0xFFFF1208L, "rtos_TCB_task8",
+            "Task Control Block for RTOS Task 8 (ATU hardware interface).");
+        count += labelComment(0xFFFF1210L, "rtos_TCB_task9",
+            "Task Control Block for RTOS Task 9 (MAIN FUEL / CLOL, 20ms).");
+        count += labelComment(0xFFFF1218L, "rtos_TCB_task10",
+            "Task Control Block for RTOS Task 10 (sensors/AVCS/boost/idle).");
+        count += labelComment(0xFFFF1220L, "rtos_TCB_task11",
+            "Task Control Block for RTOS Task 11 (fast minimal 10ms).");
+        count += labelComment(0xFFFF1228L, "rtos_TCB_task12",
+            "Task Control Block for RTOS Task 12 (gate-only sub-task entry).");
+
+        count += labelComment(0xFFFF1288L, "rtos_scheduler_state",
+            "RTOS scheduler state word. Read by task gate (0x10A46/rtos_task_gate) "
+            + "and task epilogue (0x35A4/rtos_task_epilogue) to determine task run eligibility.");
+
+        count += labelComment(0xFFFF8EDCL, "ol_dispatch_gate",
+            "OL enrichment dispatch gate (byte). Checked by all 4 OL-gated dispatchers: "
+            + "0x049CF0 (fuel_dispatch_tableB), 0x4907C (fuel_dispatch_tableA), "
+            + "0x48DB8 (injection timing), 0x48E16 (ATU channels). "
+            + "0x00 = OL enrichment active (all dispatchers run their sub-functions). "
+            + "0xFF = special mode (dispatchers JMP to 0x5AB44 mode-entry handler). "
+            + "other = bypass mode (dispatchers JMP to 0x5AB44 with R4=1). "
+            + "Written by: clol_mode_flag_writer (0x31528) each scheduler cycle.");
+
+        count += labelComment(0x0005AB44L, "ol_dispatch_bypass_handler",
+            "OL dispatch bypass handler. Called by all 4 OL-gated dispatchers when "
+            + "ol_dispatch_gate (FFFF8EDC) != 0. "
+            + "R4=0: normal CL/bypass entry. R4=1: special mode entry. "
+            + "Handles transition from OL-active back to CL-dominant operation.");
+
+        // ============================================================
         // CALIBRATION DESCRIPTOR LABELS (760 total, auto-generated)
         // Format: desc_<type>_<dtype>_<size>[_<addr>] -> descriptor struct
         // Each descriptor struct points to axis data + calibration table

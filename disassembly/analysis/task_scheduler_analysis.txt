@@ -1,0 +1,465 @@
+================================================================================
+TASK SCHEDULER ARCHITECTURE -- COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2)
+================================================================================
+
+
+OVERVIEW
+--------
+The ECU runs a cooperative RTOS with a 13-entry master task table.  Tasks
+execute at fixed periods (10 ms, 20 ms, or ~130 ms) controlled by a kernel
+dispatcher.  Each task is guarded by a central gate function and terminates
+through a common epilogue.  A secondary sub-task table handles finer-grained
+periodic sub-functions below the main task level.
+
+Three-level call hierarchy:
+
+  Level 1: RTOS kernel  -- iterates master task table @ ROM 0x3F80
+  Level 2: Task functions -- gated, call subsystem code, tail-call epilogue
+  Level 3: Sub-task table @ ROM 0x11B80 -- sub-periodic wrappers dispatched
+            by the secondary dispatcher (0xF97C) and the secondary table
+            wrappers at 0xE502-0xE5C0
+
+
+================================================================================
+SECTION 1: MASTER TASK TABLE (ROM 0x3F80)
+================================================================================
+
+  13 entries, each 16 bytes:
+    +0x00  u32  period_field    -- MSB = period in scheduler ticks
+    +0x04  u32  flags           -- hi16=0x0400 always; lo16=priority (0x0100..0x0400)
+    +0x08  u32  TCB_ptr         -- RAM address of task control block
+    +0x0C  u32  func_ptr        -- ROM address of task function
+
+  Tick period: assumed ~10 ms (standard ECU tick).
+    Period 1 = 10 ms (fast tasks)
+    Period 2 = 20 ms (main processing tasks)
+    Period 13 = ~130 ms (slow/background task)
+
+  Priority encoding (lo16 of flags field):
+    0x0100 = lowest priority
+    0x0200 = medium priority
+    0x0300 = medium-high priority
+    0x0400 = highest priority (among 20 ms tasks)
+
+  Complete task table:
+
+  Idx  Period  Pri   TCB         Func       Subsystem / Notes
+  ---  ------  ---   ----------  ---------  ----------------------------------
+   0     13    0400  FFFF11C8    0000E1B0   Slow background (diagnostics,
+                                            calibration updates, ~26 sub-calls)
+   1      1    0400  FFFF11D0    0000DD52   Fast minimal: calls epilogue only
+   2      2    0300  FFFF11D8    0000DDAC   Secondary dispatch via 0xF97C
+   3      2    0200  FFFF11E0    0000DE38   Secondary dispatch via 0xF97C (same)
+   4      2    0100  FFFF11E8    0000DE92   Minimal: calls epilogue only
+   5      2    0400  FFFF11F0    0000E486   Fuel sub-group A: charge calc / AFL
+   6      2    0200  FFFF11F8    0000E4BA   Fuel sub-group B: charge calc / AFL-2
+   7      2    0300  FFFF1200    0000E2FC   Signal processing + injection timing
+   8      2    0200  FFFF1208    0000E3B2   ATU hardware / injection channel setup
+   9      2    0200  FFFF1210    0000E448   MAIN FUEL / CLOL (fuel calc + OL dispatch)
+  10      2    0400  FFFF1218    0000DF14   Sensors / AVCS / boost / idle (~39 calls)
+  11      1    0200  FFFF1220    0000E3E4   Fast minimal: calls epilogue only
+  12      2    0100  FFFF1228    0000E4E6   Gate-only / sub-task entry (10D58)
+
+
+================================================================================
+SECTION 2: KERNEL INFRASTRUCTURE FUNCTIONS
+================================================================================
+
+2.1  Task Gate Function -- 0x00010A46
+     Called at the top of every task function (except tasks 1, 4, 11).
+     Receives task ID in R4.
+     Uses 0xBE81C (struct init call), accesses FFFF1288.
+     Returns: non-zero = task should execute; zero = skip (not yet due).
+     If the gate returns zero the task function jumps directly to the epilogue.
+
+2.2  Common Task Epilogue -- 0x000035A4
+     Called (tail-call via JMP) at the end of every task function.
+     Reads task state from FFFF1288 and ROM descriptor at 0x3F2C.
+     Updates task completion state in the TCB.
+     This is the last code executed inside any task function.
+
+2.3  Struct Init Helper -- 0x000BE81C
+     Called by the gate, epilogue, and various subsystem initializers.
+     Appears to zero-initialize or reset runtime structures.
+     Also called by many slow-background sub-functions (Task 0).
+
+2.4  Secondary Dispatcher -- 0x0000F97C
+     Called from Task 2 (0xDDAC) and Task 3 (0xDE38).
+     Loads from secondary table at ROM 0x11BA4; references 0xBE81C.
+     Iterates the secondary sub-task table, dispatching functions
+     based on their period flags.
+
+2.5  Reset entry point -- 0x00000C0C
+     Power-on reset PC (vector table [0]).  Initial SP = 0xFFFFBFA0.
+     Calls two hardware-init subroutines (0xC20, 0xC54), then calls
+     RTOS startup at 0x0000065C with R4=R5=0.
+     RTOS startup registers the task table and starts the scheduler.
+     Main loop at 0x0C1C is an infinite BRA (RTOS never returns).
+
+
+================================================================================
+SECTION 3: TASK FUNCTION DETAILS
+================================================================================
+
+3.0  Task 0 -- Slow Background (0x0000E1B0, ~130 ms, priority 4)
+     Does NOT use the gate function.
+     Calls ~26 functions including:
+       0x10CE2  struct init / TCB setup
+       0xBE81C  (x2 -- dual struct init, two timing buffer descriptors)
+       0x6738   unknown background A
+       0xCB88   unknown background B
+       0xC9D0   unknown background C
+       0x7086   unknown background D
+       0xBE62   unknown background E
+       0x993C   unknown background F
+       0x8408   unknown background G
+       0xD800   unknown background H
+       0x5650   unknown background I
+       0x64F8   unknown background J
+       0x80B6   unknown background K
+       0xC702   unknown background L
+       0xC33E   unknown background M
+       0x5BF8   unknown background N
+       0xD1AE   unknown background O
+       0x8C52   unknown background P
+       0x9106   unknown background Q
+       0x7F2C   unknown background R
+       0x4CCA   unknown background S
+       0xA690   unknown background T
+       0x486EE  unknown background U (high address)
+       0x101BA  unknown background V
+       0x10A78  unknown background W
+     Then BRA to code at 0xE1C0 (continuation).
+     Likely: diagnostics, ROM checksum, long-period calibration updates,
+     sensor plausibility checks, adaptive learn writes.
+
+3.1  Task 1 -- Fast Minimal (0x0000DD52, 10 ms, priority 4)
+     JSR to epilogue (0x35A4), then RTS.
+     Effectively a no-op task that triggers the epilogue mechanism
+     at 10 ms rate.  May serve as a heartbeat / scheduler tick counter.
+
+3.2  Task 2 -- Secondary Dispatch (0x0000DDAC, 20 ms, priority 3)
+     JSR gate(task_id=2), JSR 0xF97C, JSR 0x35A4, RTS.
+     Invokes the secondary sub-task dispatcher (0xF97C) which iterates
+     the secondary table at 0x11BA4+ calling sub-tasks by their own
+     period rules.  Drives a second tier of less-frequent sub-functions.
+
+3.3  Task 3 -- Secondary Dispatch (0x0000DE38, 20 ms, priority 2)
+     JSR gate(task_id=3), JSR 0xF97C, JSR 0x35A4, RTS.
+     Identical structure to Task 2.  Likely a second instance of the
+     same secondary dispatcher to allow independent phase control.
+
+3.4  Task 4 -- Minimal (0x0000DE92, 20 ms, priority 1)
+     JSR to epilogue (0x35A4), then RTS.  Lowest-priority placeholder.
+
+3.5  Task 5 -- Fuel Sub-Group A (0x0000E486, 20 ms, priority 4)
+     JSR gate(5)
+     JSR 0xFE22   -- air charge / mass-flow calculation setup
+     JSR 0xA878   -- charge result accumulator (uses R14 from FE22 output)
+     JSR 0xD940   -- fuel calculation sub-step (6 registers saved; mode flag 6)
+     JSR 0x9A14   -- loop/integration: iterates with DT, accesses 0x11ABE
+     JSR 0x8528   -- struct accumulation: BE81C + FFFF4168, FFFF4228
+     JSR 0x4A94C  -- OL-gated sub-dispatcher: checks FFFF8EDC, calls
+                     0x43750 and 0x22DB0
+     JMP 0x35A4   (epilogue)
+     Notes: 0xA878 references secondary table 0x11ABE and ROM 0xC00EB.
+            0xD940 saves R14-R8 (8 registers); takes mode arg in R4=6.
+            0x4A94C is gated by the OL flag at FFFF8EDC (same as 0x049CF0).
+
+3.6  Task 6 -- Fuel Sub-Group B (0x0000E4BA, 20 ms, priority 2)
+     JSR gate(6)
+     JSR 0xFE22   -- air charge / mass-flow calculation setup
+     JSR 0x4AA58  -- AFL/injection trim (different table from Task 5)
+     JSR 0x9A34   -- loop/integration (parallel to 9A14 in Task 5)
+     JSR 0x85AC   -- BRA to 0x8948 (stub or redirected calc)
+     JSR 0xD3DC   -- ATU/injection channel data: reads FFFF44A4
+     JMP 0x35A4   (epilogue)
+     Notes: FFFF44A4 is in the ATU/injection hardware register area.
+
+3.7  Task 7 -- Signal Processing / Injection Timing (0x0000E2FC, 20 ms, pri 3)
+     JSR gate(7)
+     JSR 0x109B8  -- large signal processor (saves R14-R8, 8 registers)
+     JSR 0x42CA   -- unknown sub-calc A
+     JSR 0x4A2C   -- floating-point calc: FFFF4042, 0xBE830, 0xAF45C
+     JSR 0xA59C   -- injection timing struct: FFFF4040, FFFF4300, 0xBEA6C
+     JSR 0x4CCE   -- multi-stage call: BSR x4 (4 sub-routines) then BRA 4EEE
+     JSR 0x8E30   -- injection output: FFFF4248, reads mode flag
+     JSR 0x910A   -- injection flag check: FFFF4272
+     JSR 0x48DB8  -- OL-gated: checks FFFF8EDC, calls 0x58902
+     JSR 0x7F44   -- status check: FFFF41D9, calls 0xFDB4 (diagnostics?)
+     JSR 0xBE81C  -- struct init
+     BRA 0xE398   (continuation block at 0xE398)
+     Notes: 0x48DB8 is in the same OL-gated family as 0x049CF0 and 0x4907C
+            (all check FFFF8EDC before dispatching their sub-table).
+            0x109B8 is likely the main injection timing calculation.
+
+3.8  Task 8 -- ATU Hardware Interface (0x0000E3B2, 20 ms, priority 2)
+     JSR gate(8)
+     JSR 0xCFB0   -- ATU setup: loads FFFF447C, FFFF4488 (ATU registers)
+     JSR 0x5A20   -- ATU/injection channel A
+     JSR 0xC5FC   -- ATU/injection channel B
+     JSR 0x56F4   -- ATU/injection channel C
+     JSR 0x70BA   -- ATU/injection channel D
+     JSR 0x48E16  -- OL-gated: checks FFFF8EDC (same gate as 0x049CF0)
+     JMP 0x35A4   (epilogue, first block)
+     BRA 0xEF3E   (continuation)
+     Notes: FFFF447C and FFFF4488 confirmed ATU-related from earlier analyses.
+            0x48E16 is the third OL-gated dispatcher (alongside 4907C, 48DB8).
+            The BRA to 0xEF3E suggests this task has a second code block.
+
+3.9  Task 9 -- MAIN FUEL / CLOL (0x0000E448, 20 ms, priority 2)  [KEY TASK]
+     JSR gate(9)
+     JSR 0xFC04   -- pre-calc / fuel setup: FFFF5B64 struct, calls sub at 0xB092
+     JSR 0x5840   -- CRANK-ANGLE INTERPOLATION ENGINE (ISR2, 268 bytes)
+                     [identified in injection_timing_analysis.txt]
+     JSR 0xD658   -- SECOND ATU CHANNEL SET (ISR3, 192 bytes)
+                     [identified in injection_timing_analysis.txt]
+     JSR 0xCBAC   -- intake/MAF processing: FFFF447A, increments counter
+     JSR 0x4907C  -- fuel_dispatch_table_A RUNNER (OL-gated, checks FFFF8EDC,
+                     then calls 0x43750 and 0x22DB0 dispatch sub-chains)
+     JSR 0x9A58   -- intake/MAF: FFFF42F8, reads byte, masks with 0x0F
+     JSR 0xD268   -- ATU injection: saves R14-R9 (6 registers), FFFF44A5
+     JSR 0xCBEE   -- STUB (immediate RTS, empty function)
+     JMP 0x35A4   (epilogue)
+
+     OL Enrichment path within Task 9:
+     The fuel_dispatch_table_B runner (0x049CF0) is NOT called directly
+     from the Task 9 function (0xE448).  Instead, it is dispatched from
+     the secondary sub-task table via:
+       Secondary wrapper 0xE54E:
+         JSR 0x5798  (fuel_dispatch_table_B setup / pre-calculation)
+         JMP 0x049CF0 (fuel_dispatch_table_B runner -- processes all 18+
+                       sub-functions including the 7-phase OL pipeline)
+
+     The secondary wrapper 0xE54E is indexed at secondary table [0x11BF0]
+     with flags 0x00000000 (always execute).  This secondary table is
+     iterated by secondary dispatcher 0xF97C (called from Tasks 2 and 3).
+
+     Therefore, the OL enrichment 7-phase pipeline runs:
+       Task 2/3 (20 ms) --> F97C --> E54E --> 5798 --> 049CF0 --> [18 funcs]
+                                           OL phases:  3605E, 3580C, etc.
+
+     FFFF8EDC (OL dispatch gate):
+       All three OL-gated dispatchers check this same byte:
+         0x4907C  -- fuel_dispatch_table_A runner (within Task 9 direct)
+         0x48DB8  -- Task 7's OL-gated injection-timing dispatch
+         0x48E16  -- Task 8's OL-gated ATU channel dispatch
+         0x049CF0 -- fuel_dispatch_table_B runner (via secondary table)
+       When FFFF8EDC == 0x00: OL enrichment dispatch is ACTIVE.
+       When FFFF8EDC != 0x00: dispatch jumps to a common handler that
+         sets R4=0 or R4=1 and jumps to 0x0005AB44 (mode-entry handler).
+
+3.10  Task 10 -- Sensors / AVCS / Boost / Idle (0x0000DF14, 20 ms, priority 4)
+      Highest-priority 20 ms task with ~39 JSR calls.  First call:
+      JSR 0xAE50  -- tiny function: load register/mask 0xFF0F, bit-op, RTS
+      Followed by ~38 more calls covering:
+        0x100E4, 0x10C9C  -- sensor / ADC processing
+        0xFE58, 0x10962, 0xF86C, 0xFC7E  -- unknown calculations
+        0x6CD0, 0x40D4, 0xCF58, 0xC76C  -- control loop calcs
+        0x6624, 0x6704, 0xCB08, 0xC9CC  -- actuator / output functions
+        0x5A18                           -- ATU-related
+        BSR 0xE51C (= Task 10 calling sub-task wrapper 0xE51C directly)
+        0x4A2C, 0x5978, 0x5790, 0x5834  -- injection / fuel support
+        0x6584, 0xA594, 0xC5FC, 0xD64C  -- unknown
+        0xD4EC, 0x81C0, 0x8124, 0x56EC  -- unknown
+        0xACF4, 0x7034, 0x7D02, 0xA660  -- unknown
+        0x4C68, 0xBADC, 0xBE58, 0xD7BC  -- unknown
+        0x9860, 0x83B8                  -- unknown
+      Best guesses: sensor digitization, AVCS cam angle control, boost
+      solenoid duty, idle-air valve, throttle position processing.
+      This task's priority-4 means it runs before fuel tasks 6,8,9.
+
+3.11  Task 11 -- Fast Minimal (0x0000E3E4, 10 ms, priority 2)
+      JMP 0x35A4 (immediate tail-call to epilogue).
+      BRA 0xEF3E (unreachable, continuation after epilogue returns).
+      Minimal fast task, likely provides the 10 ms tick to the epilogue
+      mechanism alongside Task 1.
+
+3.12  Task 12 -- Gate-Only Sub-Task Entry (0x0000E4E6, 20 ms, priority 1)
+      JSR gate(12)
+      JSR 0x10D58  -- sub-task dispatcher: loads 0xFDB4 (system call?),
+                     accesses FFFF5BBF, iterates sub-table at 0x11CA8
+      JMP 0x35A4   (epilogue)
+      Notes: 0x10D58 accesses a second sub-table at ROM 0x11CA8, which is
+             just above the primary secondary table at 0x11B80.  This task
+             may drive diagnostic or CAN/communication sub-functions.
+
+
+================================================================================
+SECTION 4: SECONDARY SUB-TASK TABLE (ROM 0x11B80)
+================================================================================
+
+  Two sub-tables live in this area:
+
+4.1  Sub-table A (0x11BE8 - 0x11C08) -- 8 entries, 8 bytes each:
+       +0: u32 flags  (0x00000000=always, 0x00020000=every-2, etc.)
+       +4: u32 func_ptr (address of secondary wrapper)
+
+     [0x11BE8] flags=?       func=0xE52E  JMP 0x49A7A
+     [0x11BEC] flags=?       func=0xE534  JSR C36C+A844+49BA4 -> JMP C370
+     [0x11BF0] flags=0       func=0xE54E  JSR 5798 -> JMP 049CF0  [OL PIPELINE]
+     [0x11BF4] flags=?       func=0xE55C  JSR D4FC+812C+ACFC -> JMP 4A03E
+     [0x11BF8] flags=?       func=0xE576  JSR 658C+5980+81C8 -> JMP 4A420
+     [0x11BFC] flags=?       func=0xE590  JMP 0x4A674
+     [0x11C00] flags=?       func=0xE596  JMP 0x4A6C6
+     [0x11C04] flags=?       func=0xE59C  JMP 0x4A6FA
+
+     The wrapper at [0x11BF0] = 0xE54E is the OL enrichment fuel dispatch
+     path.  It calls 0x5798 (pre-calculation) then 0x049CF0 (runner for
+     all 18 fuel_dispatch_table_B entries, including the 7-phase OL pipeline).
+
+4.2  Sub-table B (0x11C10 - 0x11C7C) -- longer table, 8 bytes per entry:
+     Interleaved flags and function pointers.  Entries include:
+       [0x11C14] func=0xE4FE  (RTS stub)
+       [0x11C1C] func=0xE502  JMP 0x4793C
+       [0x11C24] func=0xE508  JMP 0x48732
+       [0x11C2C] func=0xE50E  JSR 0x1076A -> JMP 0x4BCA
+       [0x11C34] func=0xE52A  (RTS stub)
+       [0x11C3C] func=0xE5E4  (RTS stub)
+       [0x11C44] func=0xE5E8  (RTS stub)
+       [0x11C4C] func=0xE5A2  JSR D8D0+4AE7C+... (longer wrapper)
+       [0x11C54] func=0xE5BC  unknown
+       [0x11C5C] func=0x4AF50 direct function (no wrapper)
+       [0x11C64] func=0x4AED4 direct function
+       [0x11C6C] func=0x4AF12 direct function
+       [0x11C74] func=0x4AFC4 direct function
+       [0x11C7C] func=0x4B0FC direct function
+
+     The functions 0x4AF50, 0x4AED4, 0x4AF12, 0x4AFC4, 0x4B0FC are in the
+     injection timing / FMAC dispatch area (0x4xxxx range).
+
+
+================================================================================
+SECTION 5: OL ENRICHMENT -- SCHEDULER PATH SUMMARY
+================================================================================
+
+  The 7-phase OL enrichment pipeline (traced in cl_ol_master_analysis.txt)
+  runs on every scheduler cycle via the secondary dispatcher.
+
+  Complete call chain:
+
+  RTOS kernel
+    --> Task 2 (or Task 3) @ 0xDDAC / 0xDE38   [20 ms, every cycle]
+        --> gate(2/3) @ 0x10A46
+        --> secondary dispatcher 0xF97C
+            --> sub-table A [0x11BF0] wrapper 0xE54E
+                --> 0x5798   (fuel_dispatch_table_B pre-calc setup)
+                --> 0x049CF0 (fuel_dispatch_table_B RUNNER)
+                    The runner checks FFFF8EDC:
+                      if == 0x00 (OL active): dispatches all 18 functions
+                        including the 7 OL phases:
+                          [6]  0x3580C  clol_transition_core      (Phase 1)
+                          [7]  0x3605E  ol_fuel_map_selector      (Phase 2)
+                          [8]  0x357D0  ol_init                   (Phase 3)
+                          [9]  0x36008  ol_delay_A                (Phase 4)
+                          [10] 0x36A98  ol_hysteresis             (Phase 5)
+                          [11] 0x36BF4  ol_delay_B                (Phase 6)
+                          [12] 0x36E60  ol_post_transition        (Phase 7)
+                      if != 0x00 (OL inactive / CL mode):
+                          jumps to 0x0005AB44 with R4=0/1 (mode handler)
+        --> epilogue @ 0x35A4
+
+  Separately, fuel_dispatch_table_A is run from Task 9 directly:
+  RTOS kernel
+    --> Task 9 @ 0xE448   [20 ms]
+        --> gate(9) @ 0x10A46
+        --> 0xFC04 ... 0xD658 (injection timing setup)
+        --> 0x4907C (fuel_dispatch_table_A runner, also OL-gated)
+        --> 0x9A58, 0xD268 ...
+        --> epilogue @ 0x35A4
+
+
+================================================================================
+SECTION 6: IDENTIFIED SUBSYSTEM OWNERSHIP
+================================================================================
+
+  Subsystem                 Primary Task(s)   Key Dispatcher / Functions
+  ------------------------  ----------------  --------------------------------
+  OL enrichment (7 phases)  Task 2/3 (F97C)   0x049CF0 (fuel_dispatch_table_B)
+  OL condition checker      Task 2/3 (F97C)   0x3643A (within 0x3580C)
+  Fuel dispatch table A     Task 9 direct     0x4907C
+  Air charge / mass-flow    Task 5, 6         0xFE22, 0xA878, 0x4AA58
+  AFL learning / trim       Task 5, 6         0x4A94C, 0x9A14, 0x9A34
+  Crank-angle interp        Task 9 direct     0x5840 (ISR2)
+  ATU channel config        Task 9 direct     0xD658 (ISR3)
+  ATU hardware setup        Task 8            0xCFB0, 0x5A20..0x70BA
+  Injection timing calc     Task 7            0x109B8, 0x4A2C, 0xA59C
+  OL-gated injection        Task 7            0x48DB8 (OL-gated)
+  OL-gated ATU channels     Task 8            0x48E16 (OL-gated)
+  Sensor / ADC processing   Task 10           0x100E4, 0x10C9C, 0xFE58
+  AVCS / boost / idle       Task 10 (likely)  (needs further investigation)
+  Diagnostics / DTC         Task 0 (~130 ms)  ~26 background functions
+  Sub-task dispatch B       Task 12           0x10D58 -> table @ 0x11CA8
+  Secondary sub-dispatch    Task 2, Task 3    0xF97C -> table @ 0x11BA4
+
+
+================================================================================
+SECTION 7: KEY RTOS RAM ADDRESSES
+================================================================================
+
+  FFFF8EDC   ol_dispatch_gate   -- byte, checked by all 4 OL-gated dispatchers
+                                    (0x049CF0, 0x4907C, 0x48DB8, 0x48E16)
+                                    0x00 = OL enrichment active
+                                    0xFF = special mode (calls 5AB44 mode entry)
+                                    other = skip dispatch (jump to 5AB44 R4=1)
+
+  FFFF1210   TCB_task9          -- task control block for Task 9 (FUEL/CLOL)
+  FFFF11F0   TCB_task5          -- task control block for Task 5 (fuel sub-A)
+  FFFF11F8   TCB_task6          -- task control block for Task 6 (fuel sub-B)
+  FFFF1288   scheduler_state    -- read by gate (10A46) and epilogue (35A4)
+                                   to determine task run eligibility
+
+  FFFF11C8 .. FFFF1228  -- TCBs for all 13 tasks (8 bytes each, 0xC8 base)
+
+
+================================================================================
+SECTION 8: ADDRESSES NEEDING FURTHER INVESTIGATION
+================================================================================
+
+  The following functions are called from periodic tasks but have not been
+  traced.  They are candidates for future analysis sessions:
+
+  From Task 9:
+    0x0000FC04  -- fuel setup/pre-calc (FFFF5B64 struct)
+    0x0000CBAC  -- MAF/intake processing (FFFF447A)
+    0x00009A58  -- intake processing B (FFFF42F8)
+    0x0000D268  -- ATU injection data writer (FFFF44A5)
+
+  From Task 5/6:
+    0x0000FE22  -- air charge / mass-flow (FFFF5B70)
+    0x0000A878  -- charge accumulator (secondary table 0x11ABE)
+    0x0000D940  -- fuel calc sub-step (FFFF registers, mode 6)
+    0x000085AC  -- BRA to 0x8948 (redirect target unknown)
+    0x0000D3DC  -- injection channel data (FFFF44A4)
+
+  From Task 10:
+    Almost all 39 sub-functions (AVCS / boost / idle / sensor candidates)
+
+  From Task 0:
+    All ~26 background functions (diagnostic / calibration candidates)
+
+  Unknown secondary table functions:
+    0x0004793C, 0x00048732, 0x0001076A, 0x00004BCA  (sub-table B entries)
+    0x0004AF50, 0x0004AED4, 0x0004AF12, 0x0004AFC4, 0x0004B0FC
+
+  Mode entry handler:
+    0x0005AB44  -- called when OL dispatch is bypassed (FFFF8EDC != 0)
+                   receives R4=0 (normal bypass) or R4=1 (special entry)
+
+
+================================================================================
+ANALYSIS METADATA
+================================================================================
+
+  Date:         2026-04-01
+  Analyst:      Claude (automated ROM analysis)
+  ROM file:     AE5L600L.bin
+  Confidence:   High -- master task table structure and task 9 FUEL path
+                       fully confirmed by disassembly
+                Medium -- task 5/6/10 subsystem IDs inferred from call
+                          signatures; task 0 details not yet traced
+  Cross-refs:   cl_ol_master_analysis.txt  -- OL pipeline details
+                fueling_pipeline_analysis.txt -- dispatch table structure
+                injection_timing_analysis.txt -- 0x5840, 0xD658 identification
+                ignition_timing_analysis.txt  -- task numbering context
