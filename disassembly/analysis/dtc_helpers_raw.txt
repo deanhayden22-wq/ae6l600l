@@ -1,0 +1,1010 @@
+======================================================================
+TASK53 CALIBRATION THRESHOLDS (0x0D9A3C - 0x0D9A64)
+======================================================================
+  0x0D9A3C:        0.000000  (raw: 0x00FA0271)
+  0x0D9A40:        4.000000  (raw: 0x40800000)
+  0x0D9A44:     1000.000000  (raw: 0x447A0000)
+  0x0D9A48:    65535.000000  (raw: 0x477FFF00)
+  0x0D9A4C:        1.000000  (raw: 0x3F800000)
+  0x0D9A50:        0.125000  (raw: 0x3E000000)
+  0x0D9A54:        1.000000  (raw: 0x3F800000)
+  0x0D9A58:        0.050000  (raw: 0x3D4CCCCC)
+  0x0D9A5C:        0.005000  (raw: 0x3BA3D70A)
+  0x0D9A60:        1.000000  (raw: 0x3F800000)
+  0x0D9A64:      -40.000000  (raw: 0xC2200000)
+
+======================================================================
+TASK58 MAF DIAG THRESHOLDS
+======================================================================
+  0x0D8B14:        8.000000  (raw: 0x41000000)
+  0x0D8B18:     3000.000000  (raw: 0x453B8000)
+
+======================================================================
+MAF DIAG MATURATION THRESHOLD (0x0D8A40)
+======================================================================
+  0x0D8A40:        0.000000  (raw: 0x0A081414)
+
+======================================================================
+FUNCTION @ 0x0582AC (check_engine_running?)
+======================================================================
+  0x000582AC:  D2A5  mov.l  @(0x00058544), R2  ; =0xFFFF36F0
+  0x000582AE:  8424  mov.b  @(4,R2), R0
+  0x000582B0:  620C  extu.b R0, R2
+  0x000582B2:  2228  tst    R2, R2
+  0x000582B4:  8909  bt     0x000582CA
+  0x000582B6:  E6FF  mov    #-1, R6
+  0x000582B8:  666C  extu.b R6, R6
+  0x000582BA:  3260  cmp/eq R6, R2
+  0x000582BC:  8907  bt     0x000582CE
+  0x000582BE:  E6A5  mov    #-91, R6
+  0x000582C0:  666C  extu.b R6, R6
+  0x000582C2:  3260  cmp/eq R6, R2
+  0x000582C4:  8B01  bf     0x000582CA
+  0x000582C6:  000B  rts
+  0x000582C8:  E002  mov    #2, R0
+  0x000582CA:  000B  rts
+  0x000582CC:  E000  mov    #0, R0
+  0x000582CE:  000B  rts
+  0x000582D0:  E001  mov    #1, R0
+  0x000582D2:  4F22  sts.l  PR, @-R15
+  0x000582D4:  D29C  mov.l  @(0x00058548), R2  ; =0x000A6728
+  0x000582D6:  420B  jsr    @R2
+  0x000582D8:  0009  nop
+  0x000582DA:  4F26  lds.l  @R15+, PR
+  0x000582DC:  000B  rts
+  0x000582DE:  600E  exts.b R0, R0
+  0x000582E0:  2FC6  mov.l  R12, @-R15
+  0x000582E2:  2FD6  mov.l  R13, @-R15
+  0x000582E4:  2FE6  mov.l  R14, @-R15
+  0x000582E6:  4F22  sts.l  PR, @-R15
+  0x000582E8:  7FFC  add    #-4, R15
+  0x000582EA:  6D53  mov    R5, R13
+  0x000582EC:  6C43  mov    R4, R12
+  0x000582EE:  6E63  mov    R6, R14
+  0x000582F0:  D296  mov.l  @(0x0005854C), R2  ; =0x0000317C
+  0x000582F2:  420B  jsr    @R2
+  0x000582F4:  E410  mov    #16, R4
+  0x000582F6:  2F02  mov.l  R0, @R15
+  0x000582F8:  D295  mov.l  @(0x00058550), R2  ; =0x000BE9B0
+  0x000582FA:  420B  jsr    @R2
+
+======================================================================
+FUNCTION @ 0x0582D2 (diag helper 2)
+======================================================================
+  0x000582D2:  4F22  sts.l  PR, @-R15
+  0x000582D4:  D29C  mov.l  @(0x00058548), R2  ; =0x000A6728
+  0x000582D6:  420B  jsr    @R2
+  0x000582D8:  0009  nop
+  0x000582DA:  4F26  lds.l  @R15+, PR
+  0x000582DC:  000B  rts
+  0x000582DE:  600E  exts.b R0, R0
+  0x000582E0:  2FC6  mov.l  R12, @-R15
+  0x000582E2:  2FD6  mov.l  R13, @-R15
+  0x000582E4:  2FE6  mov.l  R14, @-R15
+  0x000582E6:  4F22  sts.l  PR, @-R15
+  0x000582E8:  7FFC  add    #-4, R15
+  0x000582EA:  6D53  mov    R5, R13
+  0x000582EC:  6C43  mov    R4, R12
+  0x000582EE:  6E63  mov    R6, R14
+  0x000582F0:  D296  mov.l  @(0x0005854C), R2  ; =0x0000317C
+  0x000582F2:  420B  jsr    @R2
+  0x000582F4:  E410  mov    #16, R4
+  0x000582F6:  2F02  mov.l  R0, @R15
+  0x000582F8:  D295  mov.l  @(0x00058550), R2  ; =0x000BE9B0
+  0x000582FA:  420B  jsr    @R2
+  0x000582FC:  64ED  extu.w R14, R4
+  0x000582FE:  2D02  mov.l  R0, @R13
+  0x00058300:  D294  mov.l  @(0x00058554), R2  ; =0x000BE9A0
+  0x00058302:  420B  jsr    @R2
+  0x00058304:  E400  mov    #0, R4
+  0x00058306:  2C01  mov.w  R0, @R12
+  0x00058308:  D293  mov.l  @(0x00058558), R2  ; =0x00003190
+  0x0005830A:  64F2  mov.l  @R15, R4
+  0x0005830C:  7F04  add    #4, R15
+  0x0005830E:  4F26  lds.l  @R15+, PR
+  0x00058310:  6EF6  mov.l  @R15+, R14
+  0x00058312:  6DF6  mov.l  @R15+, R13
+  0x00058314:  422B  jmp    @R2
+  0x00058316:  6CF6  mov.l  @R15+, R12
+  0x00058318:  2FA6  mov.l  R10, @-R15
+  0x0005831A:  2FB6  mov.l  R11, @-R15
+  0x0005831C:  2FC6  mov.l  R12, @-R15
+  0x0005831E:  2FD6  mov.l  R13, @-R15
+  0x00058320:  2FE6  mov.l  R14, @-R15
+
+======================================================================
+FUNCTION @ 0x0584BE (diag helper 3)
+======================================================================
+  0x000584BE:  D627  mov.l  @(0x0005855E), R6  ; =0xAE08FFFF
+  0x000584C0:  6060  mov.b  @R6, R0
+  0x000584C2:  8801  cmp/eq #1, R0
+  0x000584C4:  000B  rts
+  0x000584C6:  0029  .word  0x0029
+  0x000584C8:  D625  mov.l  @(0x00058560), R6  ; =0xFFFFAE09
+  0x000584CA:  6060  mov.b  @R6, R0
+  0x000584CC:  8801  cmp/eq #1, R0
+  0x000584CE:  000B  rts
+  0x000584D0:  0029  .word  0x0029
+  0x000584D2:  D624  mov.l  @(0x00058566), R6  ; =0xAE0AFFFF
+  0x000584D4:  6060  mov.b  @R6, R0
+  0x000584D6:  8801  cmp/eq #1, R0
+  0x000584D8:  000B  rts
+  0x000584DA:  0029  .word  0x0029
+  0x000584DC:  D622  mov.l  @(0x00058568), R6  ; =0xFFFFAE0B
+  0x000584DE:  6060  mov.b  @R6, R0
+  0x000584E0:  8801  cmp/eq #1, R0
+  0x000584E2:  000B  rts
+  0x000584E4:  0029  .word  0x0029
+  0x000584E6:  D621  mov.l  @(0x0005856E), R6  ; =0xAE0CFFFF
+  0x000584E8:  6060  mov.b  @R6, R0
+  0x000584EA:  8801  cmp/eq #1, R0
+  0x000584EC:  000B  rts
+  0x000584EE:  0029  .word  0x0029
+  0x000584F0:  D61F  mov.l  @(0x00058570), R6  ; =0xFFFFAE0D
+  0x000584F2:  6060  mov.b  @R6, R0
+  0x000584F4:  8801  cmp/eq #1, R0
+  0x000584F6:  000B  rts
+  0x000584F8:  0029  .word  0x0029
+  0x000584FA:  D61E  mov.l  @(0x00058576), R6  ; =0xAE0EFFFF
+  0x000584FC:  6060  mov.b  @R6, R0
+  0x000584FE:  8801  cmp/eq #1, R0
+  0x00058500:  000B  rts
+  0x00058502:  0029  .word  0x0029
+  0x00058504:  D61C  mov.l  @(0x00058578), R6  ; =0xFFFFAE0F
+  0x00058506:  6060  mov.b  @R6, R0
+  0x00058508:  8801  cmp/eq #1, R0
+  0x0005850A:  000B  rts
+  0x0005850C:  0029  .word  0x0029
+
+======================================================================
+FUNCTION @ 0x0584C8 (diag helper 4)
+======================================================================
+  0x000584C8:  D625  mov.l  @(0x00058560), R6  ; =0xFFFFAE09
+  0x000584CA:  6060  mov.b  @R6, R0
+  0x000584CC:  8801  cmp/eq #1, R0
+  0x000584CE:  000B  rts
+  0x000584D0:  0029  .word  0x0029
+  0x000584D2:  D624  mov.l  @(0x00058566), R6  ; =0xAE0AFFFF
+  0x000584D4:  6060  mov.b  @R6, R0
+  0x000584D6:  8801  cmp/eq #1, R0
+  0x000584D8:  000B  rts
+  0x000584DA:  0029  .word  0x0029
+  0x000584DC:  D622  mov.l  @(0x00058568), R6  ; =0xFFFFAE0B
+  0x000584DE:  6060  mov.b  @R6, R0
+  0x000584E0:  8801  cmp/eq #1, R0
+  0x000584E2:  000B  rts
+  0x000584E4:  0029  .word  0x0029
+  0x000584E6:  D621  mov.l  @(0x0005856E), R6  ; =0xAE0CFFFF
+  0x000584E8:  6060  mov.b  @R6, R0
+  0x000584EA:  8801  cmp/eq #1, R0
+  0x000584EC:  000B  rts
+  0x000584EE:  0029  .word  0x0029
+  0x000584F0:  D61F  mov.l  @(0x00058570), R6  ; =0xFFFFAE0D
+  0x000584F2:  6060  mov.b  @R6, R0
+  0x000584F4:  8801  cmp/eq #1, R0
+  0x000584F6:  000B  rts
+  0x000584F8:  0029  .word  0x0029
+  0x000584FA:  D61E  mov.l  @(0x00058576), R6  ; =0xAE0EFFFF
+  0x000584FC:  6060  mov.b  @R6, R0
+  0x000584FE:  8801  cmp/eq #1, R0
+  0x00058500:  000B  rts
+  0x00058502:  0029  .word  0x0029
+  0x00058504:  D61C  mov.l  @(0x00058578), R6  ; =0xFFFFAE0F
+  0x00058506:  6060  mov.b  @R6, R0
+  0x00058508:  8801  cmp/eq #1, R0
+  0x0005850A:  000B  rts
+  0x0005850C:  0029  .word  0x0029
+  0x0005850E:  D61B  mov.l  @(0x0005857E), R6  ; =0xAD52FFFF
+  0x00058510:  604C  extu.b R4, R0
+  0x00058512:  026C  mov.b  @(R0,R6), R2
+  0x00058514:  000B  rts
+  0x00058516:  602C  extu.b R2, R0
+
+======================================================================
+REFERENCES TO 0x0009ED90 (dtc_set_pending?)
+======================================================================
+  Found at ROM offset 0x00066CA8
+  Found at ROM offset 0x0006A9D0
+  Found at ROM offset 0x0006ACC8
+  Found at ROM offset 0x0006B6E0
+  Found at ROM offset 0x0006BA10
+  Found at ROM offset 0x0006BAC8
+  Found at ROM offset 0x0006BBD8
+  Found at ROM offset 0x0006BFFC
+  Found at ROM offset 0x0006C288
+  Found at ROM offset 0x0006C3AC
+  Found at ROM offset 0x0006CC38
+  Found at ROM offset 0x0006CCF4
+  Found at ROM offset 0x0006CDA4
+  Found at ROM offset 0x0006D468
+  Found at ROM offset 0x0006D5AC
+  Found at ROM offset 0x0006DE18
+  Found at ROM offset 0x0006E0B0
+  Found at ROM offset 0x0006E1FC
+  Found at ROM offset 0x0006E5AC
+  Found at ROM offset 0x0006E74C
+  Found at ROM offset 0x0006EFA0
+  Found at ROM offset 0x0006F0AC
+  Found at ROM offset 0x0006F1A0
+  Found at ROM offset 0x0006F3F8
+  Found at ROM offset 0x0006F7E0
+  Found at ROM offset 0x0006FBFC
+  Found at ROM offset 0x00070B14
+  Found at ROM offset 0x00070D1C
+  Found at ROM offset 0x00070F64
+  Found at ROM offset 0x000710A0
+  Found at ROM offset 0x000711F4
+  Found at ROM offset 0x00071488
+  Found at ROM offset 0x000719D0
+  Found at ROM offset 0x000721F0
+  Found at ROM offset 0x00072478
+  Found at ROM offset 0x000728F4
+  Found at ROM offset 0x000729C8
+  Found at ROM offset 0x000746B8
+  Found at ROM offset 0x00079F60
+  Found at ROM offset 0x0007A1FC
+  Found at ROM offset 0x0007CABC
+  Found at ROM offset 0x0007CD64
+  Found at ROM offset 0x0007CE30
+  Found at ROM offset 0x0007D068
+  Found at ROM offset 0x0007D140
+  Found at ROM offset 0x0007DFF0
+  Found at ROM offset 0x0007F568
+  Found at ROM offset 0x0007F664
+  Found at ROM offset 0x000803C4
+  Found at ROM offset 0x000807D0
+  Found at ROM offset 0x00080A84
+  Found at ROM offset 0x000817E8
+  Found at ROM offset 0x00081C58
+  Found at ROM offset 0x000821B4
+  Found at ROM offset 0x00082564
+  Found at ROM offset 0x0008504C
+  Found at ROM offset 0x00085208
+  Found at ROM offset 0x00085D0C
+  Found at ROM offset 0x00085F88
+  Found at ROM offset 0x00086078
+  Found at ROM offset 0x00086308
+  Found at ROM offset 0x00088444
+  Found at ROM offset 0x00089654
+  Found at ROM offset 0x0008A6F4
+  Found at ROM offset 0x0008A960
+  Found at ROM offset 0x0008B1A0
+  Found at ROM offset 0x0008B47C
+  Found at ROM offset 0x0008BC2C
+  Found at ROM offset 0x0008C824
+  Found at ROM offset 0x0008CA9C
+  Found at ROM offset 0x0008D08C
+  Found at ROM offset 0x0008D318
+  Found at ROM offset 0x0008D870
+  Found at ROM offset 0x0008DA08
+  Found at ROM offset 0x0008DBAC
+  Found at ROM offset 0x0008DC24
+  Found at ROM offset 0x0008DD80
+  Found at ROM offset 0x0008E00C
+  Found at ROM offset 0x0008E3CC
+  Found at ROM offset 0x0008EEE4
+  Found at ROM offset 0x0008FC08
+  Found at ROM offset 0x0008FD10
+  Found at ROM offset 0x00090088
+  Found at ROM offset 0x000903D4
+  Found at ROM offset 0x0009056C
+  Found at ROM offset 0x00091050
+  Found at ROM offset 0x00091364
+  Found at ROM offset 0x000932AC
+  Found at ROM offset 0x00094D34
+  Found at ROM offset 0x00095CA8
+  Found at ROM offset 0x00095DBC
+  Found at ROM offset 0x0009606C
+  Found at ROM offset 0x00096178
+  Found at ROM offset 0x000963D4
+  Found at ROM offset 0x00096524
+  Found at ROM offset 0x00097108
+  Found at ROM offset 0x000A6160
+  Total: 97 references
+
+======================================================================
+REFERENCES TO 0x0009EDEC (dtc_clear?)
+======================================================================
+  Found at ROM offset 0x00066CB0
+  Found at ROM offset 0x0006A9D4
+  Found at ROM offset 0x0006B6E4
+  Found at ROM offset 0x0006BABC
+  Found at ROM offset 0x0006BBE0
+  Found at ROM offset 0x0006BFF8
+  Found at ROM offset 0x0006C284
+  Found at ROM offset 0x0006C3B0
+  Found at ROM offset 0x0006CC2C
+  Found at ROM offset 0x0006CCFC
+  Found at ROM offset 0x0006CDAC
+  Found at ROM offset 0x0006D470
+  Found at ROM offset 0x0006D590
+  Found at ROM offset 0x0006DE1C
+  Found at ROM offset 0x0006E0D0
+  Found at ROM offset 0x0006E220
+  Found at ROM offset 0x0006E5A0
+  Found at ROM offset 0x0006E750
+  Found at ROM offset 0x0006EFA4
+  Found at ROM offset 0x0006F0B4
+  Found at ROM offset 0x0006F1A8
+  Found at ROM offset 0x0006F3F0
+  Found at ROM offset 0x0006F7D8
+  Found at ROM offset 0x0006FC00
+  Found at ROM offset 0x00070B10
+  Found at ROM offset 0x00070D18
+  Found at ROM offset 0x00070F60
+  Found at ROM offset 0x000711FC
+  Found at ROM offset 0x0007148C
+  Found at ROM offset 0x000719D8
+  Found at ROM offset 0x000721FC
+  Found at ROM offset 0x00072488
+  Found at ROM offset 0x00072908
+  Found at ROM offset 0x000729D8
+  Found at ROM offset 0x000746BC
+  Found at ROM offset 0x00079C70
+  Found at ROM offset 0x0007A200
+  Found at ROM offset 0x0007CAB8
+  Found at ROM offset 0x0007CD68
+  Found at ROM offset 0x0007CE2C
+  Found at ROM offset 0x0007D06C
+  Found at ROM offset 0x0007D13C
+  Found at ROM offset 0x0007E008
+  Found at ROM offset 0x0007F560
+  Found at ROM offset 0x0007F66C
+  Found at ROM offset 0x000803BC
+  Found at ROM offset 0x00080528
+  Found at ROM offset 0x000807D4
+  Found at ROM offset 0x00080AC8
+  Found at ROM offset 0x000817E4
+  Found at ROM offset 0x00081C54
+  Found at ROM offset 0x000821B8
+  Found at ROM offset 0x00082568
+  Found at ROM offset 0x00085050
+  Found at ROM offset 0x0008520C
+  Found at ROM offset 0x00085788
+  Found at ROM offset 0x00085D00
+  Found at ROM offset 0x00085F84
+  Found at ROM offset 0x00086080
+  Found at ROM offset 0x0008630C
+  Found at ROM offset 0x00088454
+  Found at ROM offset 0x000884F0
+  Found at ROM offset 0x00089674
+  Found at ROM offset 0x0008A6F8
+  Found at ROM offset 0x0008A964
+  Found at ROM offset 0x0008B1A4
+  Found at ROM offset 0x0008B478
+  Found at ROM offset 0x0008BC28
+  Found at ROM offset 0x0008BD78
+  Found at ROM offset 0x0008C830
+  Found at ROM offset 0x0008CAA8
+  Found at ROM offset 0x0008D090
+  Found at ROM offset 0x0008D308
+  Found at ROM offset 0x0008D874
+  Found at ROM offset 0x0008DA10
+  Found at ROM offset 0x0008DBB0
+  Found at ROM offset 0x0008DC28
+  Found at ROM offset 0x0008DD74
+  Found at ROM offset 0x0008E014
+  Found at ROM offset 0x0008E3D4
+  Found at ROM offset 0x0008EEE0
+  Found at ROM offset 0x0008FC0C
+  Found at ROM offset 0x0008FD18
+  Found at ROM offset 0x0009008C
+  Found at ROM offset 0x000903D0
+  Found at ROM offset 0x00090570
+  Found at ROM offset 0x00091054
+  Found at ROM offset 0x0009135C
+  Found at ROM offset 0x000932B0
+  Found at ROM offset 0x00094D38
+  Found at ROM offset 0x00095CAC
+  Found at ROM offset 0x00095DC8
+  Found at ROM offset 0x00096070
+  Found at ROM offset 0x00096188
+  Found at ROM offset 0x000963D8
+  Found at ROM offset 0x00096510
+  Found at ROM offset 0x00097104
+  Total: 97 references
+
+======================================================================
+FUNCTION @ 0x09ED90 (dtc_set_pending?)
+======================================================================
+  0x0009ED90:  2FE6  mov.l  R14, @-R15
+  0x0009ED92:  4F22  sts.l  PR, @-R15
+  0x0009ED94:  D670  mov.l  @(0x0009EF58), R6  ; =0xFFFFB71C
+  0x0009ED96:  6260  mov.b  @R6, R2
+  0x0009ED98:  2228  tst    R2, R2
+  0x0009ED9A:  8F24  bf/s   0x0009EDE6
+  0x0009ED9C:  6E43  mov    R4, R14
+  0x0009ED9E:  D66F  mov.l  @(0x0009EF5E), R6  ; =0xA770000A
+  0x0009EDA0:  60E3  mov    R14, R0
+  0x0009EDA2:  006C  mov.b  @(R0,R6), R0
+  0x0009EDA4:  8801  cmp/eq #1, R0
+  0x0009EDA6:  8B1E  bf     0x0009EDE6
+  0x0009EDA8:  D267  mov.l  @(0x0009EF48), R2  ; =0xFFFF36F4
+  0x0009EDAA:  6620  mov.b  @R2, R6
+  0x0009EDAC:  626C  extu.b R6, R2
+  0x0009EDAE:  2228  tst    R2, R2
+  0x0009EDB0:  8B07  bf     0x0009EDC2
+  0x0009EDB2:  D36B  mov.l  @(0x0009EF62), R3  ; =0x1CC0000A
+  0x0009EDB4:  430B  jsr    @R3
+  0x0009EDB6:  64E3  mov    R14, R4
+  0x0009EDB8:  64E3  mov    R14, R4
+  0x0009EDBA:  4F26  lds.l  @R15+, PR
+  0x0009EDBC:  D369  mov.l  @(0x0009EF64), R3  ; =0x000A240C
+  0x0009EDBE:  432B  jmp    @R3
+  0x0009EDC0:  6EF6  mov.l  @R15+, R14
+  0x0009EDC2:  E6FF  mov    #-1, R6
+  0x0009EDC4:  666C  extu.b R6, R6
+  0x0009EDC6:  3260  cmp/eq R6, R2
+  0x0009EDC8:  8B04  bf     0x0009EDD4
+  0x0009EDCA:  64E3  mov    R14, R4
+  0x0009EDCC:  4F26  lds.l  @R15+, PR
+  0x0009EDCE:  D366  mov.l  @(0x0009EF6A), R3  ; =0x4FE4000A
+  0x0009EDD0:  432B  jmp    @R3
+  0x0009EDD2:  6EF6  mov.l  @R15+, R14
+  0x0009EDD4:  E6A5  mov    #-91, R6
+  0x0009EDD6:  666C  extu.b R6, R6
+  0x0009EDD8:  3260  cmp/eq R6, R2
+  0x0009EDDA:  8B04  bf     0x0009EDE6
+  0x0009EDDC:  64E3  mov    R14, R4
+  0x0009EDDE:  4F26  lds.l  @R15+, PR
+  0x0009EDE0:  D362  mov.l  @(0x0009EF6C), R3  ; =0x000A50A0
+  0x0009EDE2:  432B  jmp    @R3
+  0x0009EDE4:  6EF6  mov.l  @R15+, R14
+  0x0009EDE6:  4F26  lds.l  @R15+, PR
+  0x0009EDE8:  000B  rts
+  0x0009EDEA:  6EF6  mov.l  @R15+, R14
+  0x0009EDEC:  2FE6  mov.l  R14, @-R15
+  0x0009EDEE:  4F22  sts.l  PR, @-R15
+  0x0009EDF0:  D659  mov.l  @(0x0009EF58), R6  ; =0xFFFFB71C
+  0x0009EDF2:  6260  mov.b  @R6, R2
+  0x0009EDF4:  2228  tst    R2, R2
+  0x0009EDF6:  8F24  bf/s   0x0009EE42
+  0x0009EDF8:  6E43  mov    R4, R14
+  0x0009EDFA:  D658  mov.l  @(0x0009EF5E), R6  ; =0xA770000A
+  0x0009EDFC:  60E3  mov    R14, R0
+  0x0009EDFE:  006C  mov.b  @(R0,R6), R0
+  0x0009EE00:  8801  cmp/eq #1, R0
+  0x0009EE02:  8B1E  bf     0x0009EE42
+  0x0009EE04:  D250  mov.l  @(0x0009EF48), R2  ; =0xFFFF36F4
+  0x0009EE06:  6620  mov.b  @R2, R6
+  0x0009EE08:  626C  extu.b R6, R2
+  0x0009EE0A:  2228  tst    R2, R2
+  0x0009EE0C:  8B07  bf     0x0009EE1E
+  0x0009EE0E:  D358  mov.l  @(0x0009EF72), R3  ; =0x58D6000A
+  0x0009EE10:  430B  jsr    @R3
+  0x0009EE12:  64E3  mov    R14, R4
+  0x0009EE14:  64E3  mov    R14, R4
+  0x0009EE16:  4F26  lds.l  @R15+, PR
+  0x0009EE18:  D356  mov.l  @(0x0009EF74), R3  ; =0x000A5ABC
+  0x0009EE1A:  432B  jmp    @R3
+  0x0009EE1C:  6EF6  mov.l  @R15+, R14
+  0x0009EE1E:  E6FF  mov    #-1, R6
+  0x0009EE20:  666C  extu.b R6, R6
+  0x0009EE22:  3260  cmp/eq R6, R2
+  0x0009EE24:  8B04  bf     0x0009EE30
+  0x0009EE26:  64E3  mov    R14, R4
+  0x0009EE28:  4F26  lds.l  @R15+, PR
+  0x0009EE2A:  D353  mov.l  @(0x0009EF7A), R3  ; =0x5AF0000A
+  0x0009EE2C:  432B  jmp    @R3
+  0x0009EE2E:  6EF6  mov.l  @R15+, R14
+
+======================================================================
+FUNCTION @ 0x09EDEC (dtc_clear?)
+======================================================================
+  0x0009EDEC:  2FE6  mov.l  R14, @-R15
+  0x0009EDEE:  4F22  sts.l  PR, @-R15
+  0x0009EDF0:  D659  mov.l  @(0x0009EF58), R6  ; =0xFFFFB71C
+  0x0009EDF2:  6260  mov.b  @R6, R2
+  0x0009EDF4:  2228  tst    R2, R2
+  0x0009EDF6:  8F24  bf/s   0x0009EE42
+  0x0009EDF8:  6E43  mov    R4, R14
+  0x0009EDFA:  D658  mov.l  @(0x0009EF5E), R6  ; =0xA770000A
+  0x0009EDFC:  60E3  mov    R14, R0
+  0x0009EDFE:  006C  mov.b  @(R0,R6), R0
+  0x0009EE00:  8801  cmp/eq #1, R0
+  0x0009EE02:  8B1E  bf     0x0009EE42
+  0x0009EE04:  D250  mov.l  @(0x0009EF48), R2  ; =0xFFFF36F4
+  0x0009EE06:  6620  mov.b  @R2, R6
+  0x0009EE08:  626C  extu.b R6, R2
+  0x0009EE0A:  2228  tst    R2, R2
+  0x0009EE0C:  8B07  bf     0x0009EE1E
+  0x0009EE0E:  D358  mov.l  @(0x0009EF72), R3  ; =0x58D6000A
+  0x0009EE10:  430B  jsr    @R3
+  0x0009EE12:  64E3  mov    R14, R4
+  0x0009EE14:  64E3  mov    R14, R4
+  0x0009EE16:  4F26  lds.l  @R15+, PR
+  0x0009EE18:  D356  mov.l  @(0x0009EF74), R3  ; =0x000A5ABC
+  0x0009EE1A:  432B  jmp    @R3
+  0x0009EE1C:  6EF6  mov.l  @R15+, R14
+  0x0009EE1E:  E6FF  mov    #-1, R6
+  0x0009EE20:  666C  extu.b R6, R6
+  0x0009EE22:  3260  cmp/eq R6, R2
+  0x0009EE24:  8B04  bf     0x0009EE30
+  0x0009EE26:  64E3  mov    R14, R4
+  0x0009EE28:  4F26  lds.l  @R15+, PR
+  0x0009EE2A:  D353  mov.l  @(0x0009EF7A), R3  ; =0x5AF0000A
+  0x0009EE2C:  432B  jmp    @R3
+  0x0009EE2E:  6EF6  mov.l  @R15+, R14
+  0x0009EE30:  E6A5  mov    #-91, R6
+  0x0009EE32:  666C  extu.b R6, R6
+  0x0009EE34:  3260  cmp/eq R6, R2
+  0x0009EE36:  8B04  bf     0x0009EE42
+  0x0009EE38:  64E3  mov    R14, R4
+  0x0009EE3A:  4F26  lds.l  @R15+, PR
+  0x0009EE3C:  D34F  mov.l  @(0x0009EF7C), R3  ; =0x000A5D40
+  0x0009EE3E:  432B  jmp    @R3
+  0x0009EE40:  6EF6  mov.l  @R15+, R14
+  0x0009EE42:  4F26  lds.l  @R15+, PR
+  0x0009EE44:  000B  rts
+  0x0009EE46:  6EF6  mov.l  @R15+, R14
+  0x0009EE48:  2FD6  mov.l  R13, @-R15
+  0x0009EE4A:  2FE6  mov.l  R14, @-R15
+  0x0009EE4C:  4F22  sts.l  PR, @-R15
+  0x0009EE4E:  6E43  mov    R4, R14
+  0x0009EE50:  D23C  mov.l  @(0x0009EF44), R2  ; =0x0000317C
+  0x0009EE52:  420B  jsr    @R2
+  0x0009EE54:  E410  mov    #16, R4
+  0x0009EE56:  6403  mov    R0, R4
+  0x0009EE58:  60E3  mov    R14, R0
+  0x0009EE5A:  4008  shll2  R0
+  0x0009EE5C:  30EC  add    R14, R0
+  0x0009EE5E:  4008  shll2  R0
+  0x0009EE60:  6E03  mov    R0, R14
+  0x0009EE62:  DD47  mov.l  @(0x0009EF82), R13  ; =0xADAC0009
+  0x0009EE64:  D547  mov.l  @(0x0009EF84), R5  ; =0x0009A834
+  0x0009EE66:  6753  mov    R5, R7
+  0x0009EE68:  7702  add    #2, R7
+  0x0009EE6A:  067C  mov.b  @(R0,R7), R6
+  0x0009EE6C:  606C  extu.b R6, R0
+  0x0009EE6E:  02DC  mov.b  @(R0,R13), R2
+  0x0009EE70:  E1FF  mov    #-1, R1
+  0x0009EE72:  611C  extu.b R1, R1
+  0x0009EE74:  7503  add    #3, R5
+  0x0009EE76:  60E3  mov    R14, R0
+  0x0009EE78:  065C  mov.b  @(R0,R5), R6
+  0x0009EE7A:  666C  extu.b R6, R6
+  0x0009EE7C:  3168  sub    R6, R1
+  0x0009EE7E:  2219  and    R1, R2
+  0x0009EE80:  067C  mov.b  @(R0,R7), R6
+  0x0009EE82:  606C  extu.b R6, R0
+  0x0009EE84:  0D24  mov.b  R2, @(R0,R13)
+  0x0009EE86:  D233  mov.l  @(0x0009EF56), R2  ; =0x3190FFFF
+  0x0009EE88:  4F26  lds.l  @R15+, PR
+  0x0009EE8A:  6EF6  mov.l  @R15+, R14
+
+======================================================================
+REFERENCES TO 0xFFFF36F4 (dtc_enable_flag) IN 0x09E000-0x0A2000
+======================================================================
+  Found 12 references:
+    0x0009E500
+    0x0009EC80
+    0x0009EF48
+    0x0009F38C
+    0x0009FCB8
+    0x000A0674
+    0x000A096C
+    0x000A0C74
+    0x000A0F04
+    0x000A1174
+    0x000A1430
+    0x000A1ADC
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x0009E500
+(Disassembling from 0x0009E4D8)
+--------------------------------------------------
+  0x0009E4D8:  8901  bt     0x0009E4DE
+  0x0009E4DA:  A0C7  bra    0x0009E66C
+  0x0009E4DC:  0009  nop
+  0x0009E4DE:  D432  mov.l  @(0x0009E5AA), R4  ; =0x3740FFFF
+  0x0009E4E0:  4C0B  jsr    @R12
+  0x0009E4E2:  0009  nop
+  0x0009E4E4:  620C  extu.b R0, R2
+  0x0009E4E6:  2228  tst    R2, R2
+  0x0009E4E8:  8901  bt     0x0009E4EE
+  0x0009E4EA:  A0BF  bra    0x0009E66C
+  0x0009E4EC:  0009  nop
+  0x0009E4EE:  D42F  mov.l  @(0x0009E5AE), R4  ; =0x37424C0B
+  0x0009E4F0:  A05E  bra    0x0009E5B0
+  0x0009E4F2:  0009  nop
+  0x0009E4F4:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009E4F6:  36F0  cmp/eq R15, R6
+  0x0009E4F8:  000B  rts
+  0x0009E4FA:  E980  mov    #-128, R9
+  0x0009E4FC:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009E4FE:  36F2  cmp/hs R15, R6
+  0x0009E500:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009E502:  36F4  div1   R15, R6
+  0x0009E504:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009E506:  36F6  cmp/hi R15, R6
+  0x0009E508:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009E50A:  36F8  sub    R15, R6
+  0x0009E50C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009E50E:  36FA  subc   R15, R6
+  0x0009E510:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009E512:  36FC  add    R15, R6
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x0009EC80
+(Disassembling from 0x0009EC58)
+--------------------------------------------------
+  0x0009EC58:  0000  .word  0x0000
+  0x0009EC5A:  3B14  div1   R1, R11
+  0x0009EC5C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EC5E:  AF3E  bra    0x0009EADE
+  0x0009EC60:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EC62:  AF48  bra    0x0009EAF6
+  0x0009EC64:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EC66:  AE12  bra    0x0009E88E
+  0x0009EC68:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EC6A:  3C78  sub    R7, R12
+  0x0009EC6C:  000B  rts
+  0x0009EC6E:  DB92  mov.l  @(0x0009EEBA), R11  ; =0xD336430B
+  0x0009EC70:  A5A5  bra    0x0009F7BE
+  0x0009EC72:  A5A5  bra    0x0009F7C0
+  0x0009EC74:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EC76:  3C70  cmp/eq R7, R12
+  0x0009EC78:  000D  mov.w  @(R0,R0), R0
+  0x0009EC7A:  88A0  cmp/eq #-96, R0
+  0x0009EC7C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EC7E:  AE10  bra    0x0009E8A2
+  0x0009EC80:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EC82:  36F4  div1   R15, R6
+  0x0009EC84:  000A  .word  0x000A
+  0x0009EC86:  1B46  mov.l  R4, @(24,R11)
+  0x0009EC88:  000A  .word  0x000A
+  0x0009EC8A:  1BF8  mov.l  R15, @(32,R11)
+  0x0009EC8C:  000A  .word  0x000A
+  0x0009EC8E:  62E0  mov.b  @R14, R2
+  0x0009EC90:  0007  mul.l  R0, R0
+  0x0009EC92:  1A66  mov.l  R6, @(24,R10)
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x0009EF48
+(Disassembling from 0x0009EF20)
+--------------------------------------------------
+  0x0009EF20:  2FE6  mov.l  R14, @-R15
+  0x0009EF22:  4F22  sts.l  PR, @-R15
+  0x0009EF24:  E100  mov    #0, R1
+  0x0009EF26:  EDC3  mov    #-61, R13
+  0x0009EF28:  A05F  bra    0x0009EFEA
+  0x0009EF2A:  6DDC  extu.b R13, R13
+  0x0009EF2C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EF2E:  AF3D  bra    0x0009EDAC
+  0x0009EF30:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EF32:  8E98  .word  0x8E98
+  0x0009EF34:  0000  .word  0x0000
+  0x0009EF36:  DCE4  mov.l  @(0x0009F2CA), R12  ; =0x2120D22E
+  0x0009EF38:  0005  mov.w  R0, @(R0,R0)
+  0x0009EF3A:  AE18  bra    0x0009EB6E
+  0x0009EF3C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EF3E:  8E9B  .word  0x8E9B
+  0x0009EF40:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EF42:  8E9A  .word  0x8E9A
+  0x0009EF44:  0000  .word  0x0000
+  0x0009EF46:  317C  add    R7, R1
+  0x0009EF48:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EF4A:  36F4  div1   R15, R6
+  0x0009EF4C:  0007  mul.l  R0, R0
+  0x0009EF4E:  2DD4  mov.b  R13, @-R13
+  0x0009EF50:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EF52:  AF60  bra    0x0009EE16
+  0x0009EF54:  0000  .word  0x0000
+  0x0009EF56:  3190  cmp/eq R9, R1
+  0x0009EF58:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009EF5A:  B71C  bsr    0x0009FD96
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x0009F38C
+(Disassembling from 0x0009F364)
+--------------------------------------------------
+  0x0009F364:  64E3  mov    R14, R4
+  0x0009F366:  E500  mov    #0, R5
+  0x0009F368:  D212  mov.l  @(0x0009F3B4), R2  ; =0x000BDB92
+  0x0009F36A:  4F26  lds.l  @R15+, PR
+  0x0009F36C:  422B  jmp    @R2
+  0x0009F36E:  6EF6  mov.l  @R15+, R14
+  0x0009F370:  000B  rts
+  0x0009F372:  E9B0  mov    #-80, R9
+  0x0009F374:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009F376:  3800  cmp/eq R0, R8
+  0x0009F378:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009F37A:  36B8  sub    R11, R6
+  0x0009F37C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009F37E:  65AD  extu.w R10, R5
+  0x0009F380:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009F382:  AF54  bra    0x0009F22E
+  0x0009F384:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009F386:  AE11  bra    0x0009EFAC
+  0x0009F388:  000B  rts
+  0x0009F38A:  E9A0  mov    #-96, R9
+  0x0009F38C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009F38E:  36F4  div1   R15, R6
+  0x0009F390:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009F392:  3C70  cmp/eq R7, R12
+  0x0009F394:  000B  rts
+  0x0009F396:  DC6A  mov.l  @(0x0009F542), R12  ; =0x620C2228
+  0x0009F398:  A5A5  bra    0x0009FEE6
+  0x0009F39A:  A5A5  bra    0x0009FEE8
+  0x0009F39C:  000A  .word  0x000A
+  0x0009F39E:  6DE0  mov.b  @R14, R13
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x0009FCB8
+(Disassembling from 0x0009FC90)
+--------------------------------------------------
+  0x0009FC90:  000A  .word  0x000A
+  0x0009FC92:  0DF0  .word  0x0DF0
+  0x0009FC94:  000A  .word  0x000A
+  0x0009FC96:  0E6E  mov.l  @(R0,R6), R14
+  0x0009FC98:  000A  .word  0x000A
+  0x0009FC9A:  0F1C  mov.b  @(R0,R1), R15
+  0x0009FC9C:  000A  .word  0x000A
+  0x0009FC9E:  0FD0  .word  0x0FD0
+  0x0009FCA0:  000A  .word  0x000A
+  0x0009FCA2:  109E  mov.l  R9, @(56,R0)
+  0x0009FCA4:  000A  .word  0x000A
+  0x0009FCA6:  10DE  mov.l  R13, @(56,R0)
+  0x0009FCA8:  000A  .word  0x000A
+  0x0009FCAA:  1200  mov.l  R0, @(0,R2)
+  0x0009FCAC:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009FCAE:  AF3B  bra    0x0009FB28
+  0x0009FCB0:  0009  nop
+  0x0009FCB2:  A834  bra    0x0009ED1E
+  0x0009FCB4:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009FCB6:  AD52  bra    0x0009F75E
+  0x0009FCB8:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009FCBA:  36F4  div1   R15, R6
+  0x0009FCBC:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x0009FCBE:  ADAC  bra    0x0009F81A
+  0x0009FCC0:  6063  mov    R6, R0
+  0x0009FCC2:  8803  cmp/eq #3, R0
+  0x0009FCC4:  8901  bt     0x0009FCCA
+  0x0009FCC6:  A0E9  bra    0x0009FE9C
+  0x0009FCC8:  0009  nop
+  0x0009FCCA:  2888  tst    R8, R8
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x000A0674
+(Disassembling from 0x000A064C)
+--------------------------------------------------
+  0x000A064C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A064E:  AD50  bra    0x000A00F2
+  0x000A0650:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0652:  3702  cmp/hs R0, R7
+  0x000A0654:  000B  rts
+  0x000A0656:  E9A0  mov    #-96, R9
+  0x000A0658:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A065A:  36F0  cmp/eq R15, R6
+  0x000A065C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A065E:  AF3B  bra    0x000A04D8
+  0x000A0660:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0662:  AD52  bra    0x000A010A
+  0x000A0664:  0009  nop
+  0x000A0666:  A834  bra    0x0009F6D2
+  0x000A0668:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A066A:  2BEC  cmp/str R14, R11
+  0x000A066C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A066E:  2BEE  mulu.w R14, R11
+  0x000A0670:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0672:  399E  addc   R9, R9
+  0x000A0674:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0676:  36F4  div1   R15, R6
+  0x000A0678:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A067A:  255C  cmp/str R5, R5
+  0x000A067C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A067E:  255E  mulu.w R5, R5
+  0x000A0680:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0682:  3B06  cmp/hi R0, R11
+  0x000A0684:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0686:  AD52  bra    0x000A012E
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x000A096C
+(Disassembling from 0x000A0944)
+--------------------------------------------------
+  0x000A0944:  067C  mov.b  @(R0,R7), R6
+  0x000A0946:  666C  extu.b R6, R6
+  0x000A0948:  2569  and    R6, R5
+  0x000A094A:  4515  cmp/pl R5
+  0x000A094C:  8946  bt     0x000A09DC
+  0x000A094E:  D406  mov.l  @(0x000A096A), R4  ; =0xADACFFFF
+  0x000A0950:  A01A  bra    0x000A0988
+  0x000A0952:  0009  nop
+  0x000A0954:  057A  .word  0x057A
+  0x000A0956:  0606  mov.l  R0, @(R0,R6)
+  0x000A0958:  000B  rts
+  0x000A095A:  E9A0  mov    #-96, R9
+  0x000A095C:  0009  nop
+  0x000A095E:  A834  bra    0x0009F9CA
+  0x000A0960:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0962:  AF3B  bra    0x000A07DC
+  0x000A0964:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0966:  AD52  bra    0x000A040E
+  0x000A0968:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A096A:  ADAC  bra    0x000A04C6
+  0x000A096C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A096E:  36F4  div1   R15, R6
+  0x000A0970:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0972:  255C  cmp/str R5, R5
+  0x000A0974:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0976:  255E  mulu.w R5, R5
+  0x000A0978:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A097A:  3B06  cmp/hi R0, R11
+  0x000A097C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A097E:  3706  cmp/hi R0, R7
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x000A0C74
+(Disassembling from 0x000A0C4C)
+--------------------------------------------------
+  0x000A0C4C:  D408  mov.l  @(0x000A0C70), R4  ; =0xFFFFADAC
+  0x000A0C4E:  9206  mov.w  @(0x000A0C5E), R2  ; =0x0C6E (3182)
+  0x000A0C50:  6023  mov    R2, R0
+  0x000A0C52:  061C  mov.b  @(R0,R1), R6
+  0x000A0C54:  606C  extu.b R6, R0
+  0x000A0C56:  054C  mov.b  @(R0,R4), R5
+  0x000A0C58:  7201  add    #1, R2
+  0x000A0C5A:  A017  bra    0x000A0C8C
+  0x000A0C5C:  6023  mov    R2, R0
+  0x000A0C5E:  0C6E  mov.l  @(R0,R6), R12
+  0x000A0C60:  000B  rts
+  0x000A0C62:  E9A0  mov    #-96, R9
+  0x000A0C64:  0009  nop
+  0x000A0C66:  A834  bra    0x0009FCD2
+  0x000A0C68:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0C6A:  AF3B  bra    0x000A0AE4
+  0x000A0C6C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0C6E:  AD52  bra    0x000A0716
+  0x000A0C70:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0C72:  ADAC  bra    0x000A07CE
+  0x000A0C74:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0C76:  36F4  div1   R15, R6
+  0x000A0C78:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0C7A:  307A  subc   R7, R0
+  0x000A0C7C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0C7E:  3078  sub    R7, R0
+  0x000A0C80:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0C82:  3B06  cmp/hi R0, R11
+  0x000A0C84:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0C86:  370A  subc   R0, R7
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x000A0F04
+(Disassembling from 0x000A0EDC)
+--------------------------------------------------
+  0x000A0EDC:  420B  jsr    @R2
+  0x000A0EDE:  641C  extu.b R1, R4
+  0x000A0EE0:  81E8  mov.w  R0, @(16,R14)
+  0x000A0EE2:  4F26  lds.l  @R15+, PR
+  0x000A0EE4:  000B  rts
+  0x000A0EE6:  6EF6  mov.l  @R15+, R14
+  0x000A0EE8:  0322  stc    VBR, R3
+  0x000A0EEA:  030E  mov.l  @(R0,R0), R3
+  0x000A0EEC:  000B  rts
+  0x000A0EEE:  E9A0  mov    #-96, R9
+  0x000A0EF0:  0009  nop
+  0x000A0EF2:  A834  bra    0x0009FF5E
+  0x000A0EF4:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0EF6:  3B06  cmp/hi R0, R11
+  0x000A0EF8:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0EFA:  AF3B  bra    0x000A0D74
+  0x000A0EFC:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0EFE:  AD52  bra    0x000A09A6
+  0x000A0F00:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0F02:  ADAC  bra    0x000A0A5E
+  0x000A0F04:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0F06:  36F4  div1   R15, R6
+  0x000A0F08:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0F0A:  2E20  mov.b  R2, @R14
+  0x000A0F0C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0F0E:  370E  addc   R0, R7
+  0x000A0F10:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0F12:  2BF0  mov.b  R15, @R11
+  0x000A0F14:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A0F16:  2BF2  mov.l  R15, @R11
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x000A1174
+(Disassembling from 0x000A114C)
+--------------------------------------------------
+  0x000A114C:  0009  nop
+  0x000A114E:  4F26  lds.l  @R15+, PR
+  0x000A1150:  6EF6  mov.l  @R15+, R14
+  0x000A1152:  6DF6  mov.l  @R15+, R13
+  0x000A1154:  6CF6  mov.l  @R15+, R12
+  0x000A1156:  6BF6  mov.l  @R15+, R11
+  0x000A1158:  6AF6  mov.l  @R15+, R10
+  0x000A115A:  000B  rts
+  0x000A115C:  69F6  mov.l  @R15+, R9
+  0x000A115E:  D415  mov.l  @(0x000A11B6), R4  ; =0x3708E600
+  0x000A1160:  8446  mov.b  @(6,R4), R0
+  0x000A1162:  E603  mov    #3, R6
+  0x000A1164:  3062  cmp/hs R6, R0
+  0x000A1166:  8B27  bf     0x000A11B8
+  0x000A1168:  8448  mov.b  @(8,R4), R0
+  0x000A116A:  3062  cmp/hs R6, R0
+  0x000A116C:  8B24  bf     0x000A11B8
+  0x000A116E:  A024  bra    0x000A11BA
+  0x000A1170:  E601  mov    #1, R6
+  0x000A1172:  0000  .word  0x0000
+  0x000A1174:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1176:  36F4  div1   R15, R6
+  0x000A1178:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A117A:  3712  cmp/hs R1, R7
+  0x000A117C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A117E:  2BF4  mov.b  R15, @-R11
+  0x000A1180:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1182:  2BF6  mov.l  R15, @-R11
+  0x000A1184:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1186:  AD52  bra    0x000A0C2E
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x000A1430
+(Disassembling from 0x000A1408)
+--------------------------------------------------
+  0x000A1408:  626C  extu.b R6, R2
+  0x000A140A:  2429  and    R2, R4
+  0x000A140C:  4415  cmp/pl R4
+  0x000A140E:  8B00  bf     0x000A1412
+  0x000A1410:  E500  mov    #0, R5
+  0x000A1412:  7101  add    #1, R1
+  0x000A1414:  31C3  cmp/ge R12, R1
+  0x000A1416:  8901  bt     0x000A141C
+  0x000A1418:  AF75  bra    0x000A1306
+  0x000A141A:  0009  nop
+  0x000A141C:  6053  mov    R5, R0
+  0x000A141E:  7F04  add    #4, R15
+  0x000A1420:  6EF6  mov.l  @R15+, R14
+  0x000A1422:  6DF6  mov.l  @R15+, R13
+  0x000A1424:  A022  bra    0x000A146C
+  0x000A1426:  0009  nop
+  0x000A1428:  030E  mov.l  @(R0,R0), R3
+  0x000A142A:  0322  stc    VBR, R3
+  0x000A142C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A142E:  3706  cmp/hi R0, R7
+  0x000A1430:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1432:  36F4  div1   R15, R6
+  0x000A1434:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1436:  36BE  addc   R11, R6
+  0x000A1438:  0002  stc    SR, R0
+  0x000A143A:  D7E8  mov.l  @(0x000A17DE), R7  ; =0x6EF66DF6
+  0x000A143C:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A143E:  7204  add    #4, R2
+  0x000A1440:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1442:  AF40  bra    0x000A12C6
+
+--------------------------------------------------
+CONTEXT AROUND LITERAL 0xFFFF36F4 AT 0x000A1ADC
+(Disassembling from 0x000A1AB4)
+--------------------------------------------------
+  0x000A1AB4:  2FB6  mov.l  R11, @-R15
+  0x000A1AB6:  2FC6  mov.l  R12, @-R15
+  0x000A1AB8:  2FD6  mov.l  R13, @-R15
+  0x000A1ABA:  2FE6  mov.l  R14, @-R15
+  0x000A1ABC:  4F22  sts.l  PR, @-R15
+  0x000A1ABE:  D20C  mov.l  @(0x000A1AF2), R2  ; =0x317C6073
+  0x000A1AC0:  420B  jsr    @R2
+  0x000A1AC2:  E410  mov    #16, R4
+  0x000A1AC4:  6103  mov    R0, R1
+  0x000A1AC6:  E700  mov    #0, R7
+  0x000A1AC8:  6E73  mov    R7, R14
+  0x000A1ACA:  EAC3  mov    #-61, R10
+  0x000A1ACC:  6AAC  extu.b R10, R10
+  0x000A1ACE:  E9FF  mov    #-1, R9
+  0x000A1AD0:  A02D  bra    0x000A1B2E
+  0x000A1AD2:  699C  extu.b R9, R9
+  0x000A1AD4:  030E  mov.l  @(R0,R0), R3
+  0x000A1AD6:  0000  .word  0x0000
+  0x000A1AD8:  000B  rts
+  0x000A1ADA:  E9A0  mov    #-96, R9
+  0x000A1ADC:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1ADE:  36F4  div1   R15, R6
+  0x000A1AE0:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1AE2:  AD52  bra    0x000A158A
+  0x000A1AE4:  0009  nop
+  0x000A1AE6:  A834  bra    0x000A0B52
+  0x000A1AE8:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1AEA:  3B06  cmp/hi R0, R11
+  0x000A1AEC:  FFFF  .word  0xFFFF  ; FPU/unknown
+  0x000A1AEE:  AD51  bra    0x000A1594

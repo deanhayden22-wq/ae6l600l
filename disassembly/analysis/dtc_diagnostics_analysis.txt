@@ -1,0 +1,540 @@
+================================================================================
+DTC / DIAGNOSTIC SYSTEM -- COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2A)
+================================================================================
+
+
+OVERVIEW
+--------
+The diagnostic system implements OBD-II compliant fault detection, storage, and
+MIL (Check Engine Light) activation. It is organized as:
+
+  1. A ROM-resident DTC Definition Table (93 entries x 20 bytes) at 0x09A834
+  2. Per-DTC enable flags at 0x09A770
+  3. Distributed monitor tasks in the scheduler (task53, task55, task58, etc.)
+  4. A centralized DTC state machine with set/clear dispatchers at 0x9ED90/0x9EDEC
+  5. RAM state arrays across ~474 bytes in the diag_state region
+  6. A master diagnostic enable flag at 0xFFFFB71C
+  7. A per-DTC enable/status flag at 0xFFFF36F4
+
+
+================================================================================
+SECTION 1: DTC DEFINITION TABLE
+================================================================================
+
+  ROM Address:  0x09A834
+  Entry Count:  93
+  Entry Size:   20 bytes
+  Table End:    0x09AF78
+  Enable Flags: 0x09A770 (1 byte per entry: 0x01=enabled, 0x00=disabled)
+
+  Enabled:  81 / 93
+  Disabled: 12 (P0174, P0175, P0305, P0306, P0365, P0390,
+                P2088-P2091, P2094, P2095, P2098, P2099)
+
+  The disabled DTCs are: Bank 2 lean/rich (this is a single-turbo 4-cyl, no B2),
+  cylinders 5-6 misfire (4-cyl engine), CMP sensor B (single cam sensor per bank
+  on EJ255), TGV performance monitors, and post-cat B2 fuel trim.
+
+  DTC Entry Structure (20 bytes):
+  -----------------------------------------------------------------------
+  Offset  Size  Field   Description
+  -----------------------------------------------------------------------
+  +0x00   u16   W0      Monitor class / type code
+  +0x02   u16   W1      Monitor group:bitmask (group=high byte, mask=low byte)
+  +0x04   u16   W2      P-code (ISO 15031-6, BCD-encoded big-endian)
+  +0x06   u16   W3      Fault type / severity classification
+  +0x08   u16   W4      Extended parameter A (usually 0x0000)
+  +0x0A   u16   W5      Extended parameter B (usually 0x0000)
+  +0x0C   u16   W6      Trip maturation count (typically 9 = 2-trip logic)
+  +0x0E   u16   W7      Healing/clear parameters (packed)
+  +0x10   u16   W8      MIL illumination flag (0x0100 = MIL-on, 0x0000 = no MIL)
+  +0x12   u16   W9      Extended flags (all 0x0000 in this ROM)
+
+
+  W0 -- Monitor Class Codes:
+  -----------------------------------------------------------------------
+  0x0001  (4 DTCs)   System monitors: AVCS cam timing (P0011/P0021),
+                     catalyst efficiency (P0420), EVAP small leak (P0456)
+  0x0002  (73 DTCs)  Circuit/sensor monitors: all sensor range checks,
+                     heater circuits, throttle, idle, CKP, CMP, etc.
+  0x0003  (6 DTCs)   Misfire monitors: P0301-P0306
+  0x0100  (1 DTC)    Special monitor A: P0000 (internal, idx 40)
+  0x0200  (1 DTC)    Special monitor B: P0000 (internal, idx 39)
+  0x0302  (4 DTCs)   Fuel system monitors: lean/rich B1+B2 (P0171-P0175)
+  0x0402  (4 DTCs)   Post-cat fuel trim: P2096-P2099
+
+
+  W1 -- Monitor Group/Bitmask:
+  -----------------------------------------------------------------------
+  The W1 field encodes a group index (high byte) and a single-bit mask
+  (low byte). There are ~49 groups (0x00-0x30), each with up to 8 DTCs
+  addressed by bit position. This maps directly to the diag_state RAM
+  arrays where each group byte holds the status bitmask.
+
+  Group 0x00: CKP, RAM check         Group 0x13: Misfire cyl 1-6
+  Group 0x01: MAF, VSS               Group 0x15: O2 sensors
+  Group 0x02: Knock, TPS A           Group 0x16: IAT, O2 heaters
+  Group 0x03: ECT, fuel level        Group 0x17: MAP sensor
+  Group 0x06: Neutral switch         Group 0x1C: Wastegate solenoid
+  Group 0x0A: Idle RPM               Group 0x27: Fuel pump, MAP/MAF corr
+  Group 0x0C: AVCS, evap, fuel tank  Group 0x2C: ETS, throttle actuator
+  Group 0x12: Catalyst, EVAP, A/F    Group 0x2E: CMP sensors, ROM check
+
+
+  W3 -- Fault Type Classification:
+  -----------------------------------------------------------------------
+  0x0101  (46 DTCs)  Type 1, subtype 1: immediate circuit faults
+  0x0102  (25 DTCs)  Type 1, subtype 2: delayed/conditional faults
+  0x0002  (19 DTCs)  Type 0, subtype 2: system-level monitors
+  0x0201  (1 DTC)    P2109: TPS min stop performance
+  0x0301  (1 DTC)    P1160: Electronic throttle system
+  0x0401  (1 DTC)    P2103: Throttle actuator motor high
+
+
+  W6 -- Trip Maturation Count:
+  -----------------------------------------------------------------------
+  91 DTCs use W6=0x0009 (9): standard 2-trip maturation
+  2 DTCs use W6=0x0002 (2): P0851/P0852 (neutral switch) -- fast confirm
+
+
+  W8 -- MIL Illumination:
+  -----------------------------------------------------------------------
+  0x0100  (76 DTCs)  Illuminates MIL (Check Engine Light)
+  0x0000  (17 DTCs)  No MIL: P0604, P0122/P0123 (TPS A), P2109, P0222/P0223
+                     (TPS B), P1160, P2102/P2103, P2101 (throttle actuator),
+                     P2138 (TPS D/E corr), P2127/P2128/P2122/P2123 (TPS D/E),
+                     P2135 (TPS A/B corr), P0605 (ROM check)
+
+
+================================================================================
+SECTION 2: DTC SET/CLEAR DISPATCHER
+================================================================================
+
+  dtc_set_pending @ 0x09ED90
+  dtc_clear_fault @ 0x09EDEC
+
+  Both functions share the same architecture:
+
+  dtc_set_pending(R4 = dtc_index):
+  -----------------------------------------------------------------------
+  1. Check dtc_master_enable (0xFFFFB71C) -- if zero, early exit
+  2. Read enable flag: rom[0x09A770 + dtc_index] -- if not 1, exit
+  3. Read dtc_enable_flag (0xFFFF36F4):
+     - If 0x00:  call 0xA1CC0 (first-time set), then jmp 0xA240C (confirm set)
+     - If 0xFF:  jmp 0xA4FE4 (already confirmed / permanent)
+     - If 0xA5:  jmp to alternate handler (165 = scan tool cleared state)
+     - Otherwise: exit (already in transition)
+
+  dtc_clear_fault(R4 = dtc_index):
+  -----------------------------------------------------------------------
+  1. Same master_enable and per-DTC enable checks
+  2. Read dtc_enable_flag (0xFFFF36F4):
+     - If 0x00:  call 0xA58D6, then jmp 0xA5ABC (clear pending)
+     - If 0xFF:  jmp 0xA5AF0 (already clear / force clear)
+     - If 0xA5:  jmp to alternate handler
+     - Otherwise: exit
+
+  The dtc_enable_flag byte at 0xFFFF36F4 acts as the DTC state machine:
+    0x00 = no fault (initial / cleared state)
+    0xA5 = scan-tool-cleared but pending re-evaluation
+    0xFF = confirmed fault (matured, MIL commanded)
+
+  Key RAM:
+    0xFFFFB71C  dtc_master_enable  -- gates ALL diagnostic processing
+    0xFFFF36F4  dtc_enable_flag    -- per-DTC state machine byte
+    0xFFFF36F0  related diag status (read by 0x582AC helper)
+
+
+================================================================================
+SECTION 3: DIAGNOSTIC HELPER FUNCTIONS
+================================================================================
+
+  0x582AC  check_diag_state(void) -> R0
+  -----------------------------------------------------------------------
+  Reads status byte from 0xFFFF36F0+4. Returns:
+    0 = diagnostics disabled / not ready
+    1 = diagnostics active, DTC state = 0xFF (confirmed fault exists)
+    2 = diagnostics active, DTC state = 0xA5 (scan-tool cleared)
+  Used by all monitor tasks to gate their execution.
+
+  0x582D2  check_engine_running(void) -> R0
+  -----------------------------------------------------------------------
+  Calls 0xA6728. Returns engine running state:
+    0 = engine not running
+    1 = engine running, diagnostics can execute
+  Called by task53, task58 and many other diag monitors as a precondition.
+
+  0x584BE  check_diag_preconditions(R4) -> R0
+  -----------------------------------------------------------------------
+  Checks additional preconditions for a given diagnostic monitor index.
+
+  0x584C8  check_monitor_enable(R4, R5) -> R0
+  -----------------------------------------------------------------------
+  Verifies that a specific monitor's enable conditions are met.
+
+  0xBE53C  uint8_add_sat(R4=val, R5=add) -> R0
+  -----------------------------------------------------------------------
+  Saturating unsigned 8-bit add. Used for maturation counters.
+  Called when a fault condition is detected -- increments the trip
+  counter up to the W6 threshold before confirming the DTC.
+
+  0xBE598  table_1d_lookup(R4=input, FR4=scale) -> FR0
+  -----------------------------------------------------------------------
+  1D descriptor table lookup. Used by task53 for diagnostic threshold
+  interpolation.
+
+
+================================================================================
+SECTION 4: MONITOR TASKS
+================================================================================
+
+  The scheduler runs these diagnostic monitor tasks:
+
+  [53] task53_diag_monitor @ 0x602DC
+  -----------------------------------------------------------------------
+  Main diagnostic computation task. NOT a DTC-setting task directly.
+  Computes a diagnostic readiness metric stored at FFFF9080-FFFF9090.
+
+  Entry: reads FFFF4158 (scheduler tick), scales by 16000.0
+  Calls sub_6035A (readiness path A) and sub_60392 (readiness path B)
+  Then falls through to 0x6048E (final readiness comparison)
+
+  sub_6035A: Reads FFFF8E98 (engine state flag), looks up diagnostic
+  threshold via table at 0xBE598 using FFFF4494 input. If engine was
+  previously not running, stores initial readiness. Otherwise calls
+  0xBE628 for interpolated readiness.
+
+  sub_60392: The main readiness computation. Reads:
+    - FFFF67EC (engine run time, u16)
+    - FFFF85D7 (warmup complete flag)
+    - FFFF6624 (engine load -- 301 ROM references)
+    - FFFF65FC (manifold pressure)
+    - FFFF895C (AFL learning value)
+    - FFFF7FBC (timing correction)
+    - FFFF6354 (vehicle speed)
+
+  Then applies a cascade of threshold checks against calibration values:
+    0xD9A3C: RPM threshold for readiness (0 -- always pass)
+    0xD9A40: Load threshold = 4.0
+    0xD9A44: Load upper limit = 1000.0
+    0xD9A48: Timing threshold = 65535.0 (effectively disabled)
+    0xD9A4C: Default readiness = 1.0
+    0xD9A50: Low readiness value = 0.125
+    0xD9A54: Fallback readiness = 1.0
+    0xD9A58: Minimum readiness = 0.05
+    0xD9A5C: Warmup incomplete readiness = 0.005
+    0xD9A60: Override readiness = 1.0
+
+  Result stored to FFFF9080 workspace (16-byte struct accessed via
+  negative offsets from FFFF9090).
+
+  Readiness output at 0x6048E:
+    Copies previous readiness → current
+    Compares against min/max bounds
+    If out of bounds, calls 0xD118 (clamp/filter function)
+
+
+  [55] task55_mps_diag @ 0x900B4
+  -----------------------------------------------------------------------
+  Manifold Pressure Sensor diagnostic. Calls check_cl_active to verify
+  closed-loop operation. Writes results to FFFF_ABF4.
+
+
+  [58] task58_maf_diag @ 0x6F0B8
+  -----------------------------------------------------------------------
+  MAF sensor diagnostic monitor. Two-part structure:
+
+  Part 1 (sub at 0x6F0CE):
+    Calls 0x582D2 (check_engine_running, R4=39)
+    Calls 0x584BE (check_diag_preconditions)
+    Reads FFFF4130 (IAT value) and FFFF6624 (load)
+    Checks IAT against threshold at 0xD8B14
+    Checks load against threshold at 0xD8B18
+    Writes pass/fail to FFFF96A4
+
+  Part 2 (0x6F114):
+    If FFFF96A4 conditions met and FFFF96A5 flag set:
+      Reads maturation counter at FFFF96A4+2
+      Compares against threshold at 0xD8A40
+      If matured: jmp 0x9ED90 (dtc_set_pending) with R4=DTC index
+      If not: calls uint8_add_sat to increment counter
+    On condition cleared:
+      Resets counter, calls 0x9EDEC (dtc_clear_fault)
+
+  Part 3 (0x6F260, extended MAF diagnostics):
+    Checks hardware register 0xF754 (port status) bits 0x20 and 0x40
+    These correspond to MAF sensor hardware fault lines
+    Writes results to FFFF96AC and FFFF96AE
+    Uses separate maturation counters with thresholds from 0xD8A5D
+
+
+  [56] task56_evap_purge @ 0x66580
+  -----------------------------------------------------------------------
+  EVAP system diagnostic. Calls 0x582AC (check_diag_state).
+  Based on state:
+    0 = disabled: calls sub_66D20, sub_66DEC, then 0x66EBC
+    1 or 2 = active: branches to 0x66C40 (EVAP test sequence)
+  Initializes workspace at FFFF2368-FFFF2390 via descriptor reads
+  (0xBE9B0 for float descriptors, 0xBE9A0 for u16 descriptors).
+
+
+================================================================================
+SECTION 5: DTC STATE MACHINE (RAM)
+================================================================================
+
+  The DTC state is distributed across multiple RAM regions:
+
+  Region          Start        End          Size   Refs   Purpose
+  -----------------------------------------------------------------------
+  diag_state_E    0xFFFFAD14   0xFFFFAD52   62     268    Active fault status
+  diag_state_A    0xFFFFAF70   0xFFFFAFAB   59     144    Fault history
+  diag_state_B    0xFFFFA156   0xFFFFA18D   55     135    Maturation counters
+  diag_state_C    0xFFFFA32C   0xFFFFA39F   115    132    Monitor readiness
+  diag_state_F    0xFFFFAB76   0xFFFFABC5   79     66     Healing counters
+  diag_state_D    0xFFFFA2A0   0xFFFFA308   104    32     Trip tracking
+  -----------------------------------------------------------------------
+  TOTAL                                     474    777
+
+  diag_state_E (0xFFFFAD14-0xFFFFAD52) is the most heavily referenced region
+  (268 refs). This is the active fault status array, indexed by the W1 group
+  byte. Each byte holds the bitmask of currently faulted DTCs in that group.
+
+  The W1 group byte (high byte of W1) indexes into 0xFFFFAD52 (base address
+  seen in the code at 0x1548C: loads R5 = 0xFFFFAD52, then uses W1 group as
+  offset and W1 mask for bit testing). This means:
+    - Group 0x00 status at 0xFFFFAD52 + 0 = 0xFFFFAD52
+    - Group 0x01 status at 0xFFFFAD52 + 1 = 0xFFFFAD53
+    - etc.
+
+  The DTC processing loop at 0x15400-0x154F8:
+  -----------------------------------------------------------------------
+  Iterates R14 from 0 to 195 (0xC3), processing DTCs in pairs.
+  For each iteration:
+    1. Compute table offset: idx * 5 * 4 = idx * 20 (entry size)
+    2. Load DTC table base (R7 = 0x09A834)
+    3. Read W1+2 and W1+3 bytes (group byte and mask byte)
+    4. Load status byte from diag_state_E[group]
+    5. AND with mask -- if nonzero, DTC is currently faulted
+    6. If faulted and count < 4, read W4+4 word (P-code reference)
+       Mask with 0x3FFF, store to output, call uint8_add_sat
+    7. Increment R14, loop back
+
+  This loop builds the OBD-II mode $03 response (stored DTCs) by
+  scanning the active fault bitmask array and collecting confirmed
+  P-codes into an output buffer.
+
+  GBR-relative accesses at the loop exit (0x154CE-0x154EC):
+    @(213,GBR) = GBR+0xD5 = 0xFFFF7525  -- output slot index (0-3)
+    @(0,GBR)   = GBR+0x00 = 0xFFFF7450  -- output word accumulator
+
+
+================================================================================
+SECTION 6: DTC FLOW SUMMARY
+================================================================================
+
+  The complete diagnostic flow for a sensor fault (e.g., MAF):
+
+  1. PRECONDITION CHECK
+     task58_maf_diag calls check_engine_running (0x582D2)
+     Returns 1 if engine is running.
+
+  2. CONDITION EVALUATION
+     task58 reads sensor values (IAT at FFFF4130, load at FFFF6624)
+     Compares against calibration thresholds (0xD8B14, 0xD8B18)
+     Writes pass/fail flag to FFFF96A4
+
+  3. MATURATION
+     If fault detected and preconditions met:
+       Increments counter at FFFF96A4+2 via uint8_add_sat
+       When counter >= threshold (from 0xD8A40): fault is confirmed
+     If fault clears:
+       Counter resets, dtc_clear_fault called
+
+  4. DTC SET
+     dtc_set_pending(R4 = DTC_index) at 0x9ED90:
+       Checks dtc_master_enable (0xFFFFB71C)
+       Checks per-DTC enable (0x09A770 + index)
+       Reads current state from dtc_enable_flag (0xFFFF36F4):
+         0x00 → call 0xA1CC0 (pending set), then 0xA240C (confirm)
+         0xFF → 0xA4FE4 (already confirmed)
+         0xA5 → special handler (scan-tool clear recovery)
+       Sets bit in diag_state_E[group] using W1 mask
+
+  5. MIL ACTIVATION
+     If W8 field has 0x0100 set for this DTC:
+       The dtc_enable_flag transitions 0x00 → 0xFF
+       MIL output pin is driven (via output driver, not analyzed here)
+       SSM "CEL" parameter reflects the state
+
+  6. DTC CLEAR
+     dtc_clear_fault(R4 = DTC_index) at 0x9EDEC:
+       Same enable checks
+       State 0x00 → 0xA58D6 then 0xA5ABC (clear pending counter)
+       State 0xFF → 0xA5AF0 (clear confirmed)
+       State 0xA5 → alternate handler
+       Clears bit in diag_state_E[group]
+
+  7. OBD-II READOUT
+     The DTC processing loop at 0x15400 scans diag_state_E
+     Builds mode $03 response with up to 4 confirmed P-codes
+     Cycles through all 93 entries every scan cycle
+
+
+================================================================================
+SECTION 7: KEY RAM ADDRESSES
+================================================================================
+
+  Address       Type    Description
+  -----------------------------------------------------------------------
+  0xFFFFB71C    u8      dtc_master_enable (gates all diag processing)
+  0xFFFF36F4    u8      dtc_enable_flag (per-DTC state: 00/A5/FF)
+  0xFFFF36F0    u8      diag_status (read by 0x582AC helper)
+  0xFFFFAD52    u8[]    diag_state_E base (active fault bitmask array)
+  0xFFFF9080    float   diagnostic readiness workspace (4 floats)
+  0xFFFF9084    float   current readiness value
+  0xFFFF9088    float   scaled readiness input
+  0xFFFF908C    float   readiness output (after filtering)
+  0xFFFF9090    struct  readiness control struct (16 bytes, u16 counter + state)
+  0xFFFF96A4    u8[4]   MAF diag state (flag, enable, counter, init)
+  0xFFFF96A8    u8[2]   MAF diag extended state
+  0xFFFF96AC    u8[2]   MAF hardware fault state
+  0xFFFF96AE    u8[2]   MAF hardware fault state B
+  0xFFFFABF4    u8      MPS diag state
+  0xFFFF65C0    u8      engine state byte (used by task53)
+  0xFFFF85D7    u8      warmup complete flag
+  0xFFFF67EC    u16     engine run time (seconds)
+  0xFFFF4158    u32     scheduler tick count
+
+
+================================================================================
+SECTION 8: KEY ROM ADDRESSES
+================================================================================
+
+  Address       Type    Description
+  -----------------------------------------------------------------------
+  0x09A834      struct  DTC definition table (93 x 20 bytes)
+  0x09A770      u8[93]  DTC enable flags
+  0x09ED90      code    dtc_set_pending entry point
+  0x09EDEC      code    dtc_clear_fault entry point
+  0x0A1CC0      code    DTC pending-set handler (state 0x00 → pending)
+  0x0A240C      code    DTC confirm-set handler (pending → confirmed)
+  0x0A4FE4      code    DTC already-confirmed handler (state 0xFF)
+  0x0A58D6      code    DTC clear-pending handler
+  0x0A5ABC      code    DTC clear-confirmed handler
+  0x0A5AF0      code    DTC force-clear handler (state 0xFF → 0x00)
+  0x0582AC      code    check_diag_state helper
+  0x0582D2      code    check_engine_running helper
+  0x0584BE      code    check_diag_preconditions
+  0x0584C8      code    check_monitor_enable
+  0x0A6728      code    engine running state evaluator
+  0x015400      code    DTC readout loop (mode $03 builder)
+  0x0602DC      code    task53_diag_monitor
+  0x0900B4      code    task55_mps_diag
+  0x06F0B8      code    task58_maf_diag
+  0x066580      code    task56_evap_purge
+  0x0D9A3C      cal     task53 readiness thresholds (10 floats)
+  0x0D8B14      cal     MAF diag IAT threshold
+  0x0D8B18      cal     MAF diag load threshold
+  0x0D8A40      cal     MAF diag maturation threshold
+
+
+================================================================================
+SECTION 9: DTC TABLE REFERENCE (COMPLETE)
+================================================================================
+
+  Idx  P-Code  En  Class  Group  MIL  Description
+  -----------------------------------------------------------------------
+    0  P0335   Y   0x02   0x00   Y    Crankshaft Position Sensor A
+    1  P0336   Y   0x02   0x00   Y    CKP Sensor A Range/Perf
+    2  P0604   Y   0x02   0x00   N    Internal Control Module RAM
+    3  P0102   Y   0x02   0x01   Y    MAF Low
+    4  P0103   Y   0x02   0x01   Y    MAF High
+    5  P0500   Y   0x02   0x01   Y    Vehicle Speed Sensor
+    6  P0327   Y   0x02   0x02   Y    Knock Sensor 1 Low
+    7  P0328   Y   0x02   0x02   Y    Knock Sensor 1 High
+    8  P0122   Y   0x02   0x02   N    TPS A Low
+    9  P0123   Y   0x02   0x02   N    TPS A High
+   10  P0117   Y   0x02   0x03   Y    ECT Low
+   11  P0118   Y   0x02   0x03   Y    ECT High
+   12  P0125   Y   0x02   0x03   Y    ECT Insuff for CL
+   13  P0462   Y   0x02   0x03   Y    Fuel Level Sensor Low
+   14  P0463   Y   0x02   0x03   Y    Fuel Level Sensor High
+   15  P0461   Y   0x02   0x03   Y    Fuel Level Sensor Range
+   16  P0851   Y   0x02   0x06   Y    Neutral Switch Low
+   17  P0852   Y   0x02   0x06   Y    Neutral Switch High
+   18  P0506   Y   0x02   0x0A   Y    Idle RPM Low
+   19  P0507   Y   0x02   0x0A   Y    Idle RPM High
+   20  P0011   Y   0x01   0x0C   Y    Intake Cam Over-Adv B1
+   21  P0021   Y   0x01   0x0C   Y    Intake Cam Over-Adv B2
+   22  P1400   Y   0x02   0x0C   Y    Fuel Tank Pressure Sensor Low
+   23  P1420   Y   0x02   0x0C   Y    Fuel Tank Pressure Sensor High
+   24  P0458   Y   0x02   0x0C   Y    EVAP Purge Low
+   25  P0459   Y   0x02   0x0C   Y    EVAP Purge High
+   26  P0141   Y   0x02   0x10   Y    O2 Heater B1S2
+   27  P0174   N   0x302  0x11   Y    System Too Lean B2
+   28  P0175   N   0x302  0x11   Y    System Too Rich B2
+   29  P0420   Y   0x01   0x12   Y    Catalyst Efficiency B1
+   30  P0456   Y   0x01   0x12   Y    EVAP Very Small Leak
+   31  P0171   Y   0x302  0x12   Y    System Too Lean B1
+   32  P0172   Y   0x302  0x12   Y    System Too Rich B1
+   33  P0301   Y   0x03   0x13   Y    Cylinder 1 Misfire
+   34  P0302   Y   0x03   0x13   Y    Cylinder 2 Misfire
+   35  P0303   Y   0x03   0x13   Y    Cylinder 3 Misfire
+   36  P0304   Y   0x03   0x13   Y    Cylinder 4 Misfire
+   37  P0305   N   0x03   0x13   Y    Cylinder 5 Misfire (N/A)
+   38  P0306   N   0x03   0x13   Y    Cylinder 6 Misfire (N/A)
+   39  P0000   Y   0x200  0x14   Y    Internal Monitor A
+   40  P0000   Y   0x100  0x14   Y    Internal Monitor B
+   41  P0137   Y   0x02   0x15   Y    O2 Low B1S2
+   42  P0131   Y   0x02   0x15   Y    O2 Low B1S1
+   43  P0132   Y   0x02   0x15   Y    O2 High B1S1
+   44  P0138   Y   0x02   0x15   Y    O2 High B1S2
+   45  P0112   Y   0x02   0x16   Y    IAT Low
+   46  P0113   Y   0x02   0x16   Y    IAT High
+   47  P0111   Y   0x02   0x16   Y    IAT Range/Perf
+   48  P0038   Y   0x02   0x16   Y    HO2S Heater High B1S2
+   49  P0032   Y   0x02   0x16   Y    HO2S Heater High B1S1
+   50  P0037   Y   0x02   0x16   Y    HO2S Heater Low B1S2
+   51  P0031   Y   0x02   0x16   Y    HO2S Heater Low B1S1
+   52  P0107   Y   0x02   0x17   Y    MAP Low
+   53  P0108   Y   0x02   0x17   Y    MAP High
+   54  P0128   Y   0x02   0x1A   Y    ECT Below Thermostat Regulating
+   55  P0245   Y   0x02   0x1C   Y    Wastegate Solenoid A Low
+   56  P0246   Y   0x02   0x1C   Y    Wastegate Solenoid A High
+   57  P0244   Y   0x02   0x1C   Y    Wastegate Solenoid A
+   58  P0230   Y   0x02   0x27   Y    Fuel Pump Primary Circuit
+   59  P0068   Y   0x02   0x27   Y    MAP/MAF Correlation
+   60  P0101   Y   0x02   0x27   Y    MAF Range/Perf
+   61  P0134   Y   0x02   0x28   Y    O2 No Activity B1S1
+   62  P0030   Y   0x02   0x28   Y    HO2S Heater Control B1S1
+   63  P2109   Y   0x02   0x2B   N    TPS A Min Stop Performance
+   64  P0222   Y   0x02   0x2C   N    TPS B Low
+   65  P0223   Y   0x02   0x2C   N    TPS B High
+   66  P1160   Y   0x02   0x2C   N    Electronic Throttle System
+   67  P2102   Y   0x02   0x2C   N    Throttle Actuator Control Motor Low
+   68  P2103   Y   0x02   0x2C   N    Throttle Actuator Control Motor High
+   69  P2101   Y   0x02   0x2C   N    Throttle Actuator Control Motor Range
+   70  P2096   Y   0x402  0x2C   Y    Post Cat Fuel Trim Too Lean B1
+   71  P2138   Y   0x02   0x2D   N    TPS D/E Voltage Correlation
+   72  P2127   Y   0x02   0x2D   N    TPS E Low
+   73  P2128   Y   0x02   0x2D   N    TPS E High
+   74  P2122   Y   0x02   0x2D   N    TPS D Low
+   75  P2123   Y   0x02   0x2D   N    TPS D High
+   76  P2135   Y   0x02   0x2D   N    TPS A/B Voltage Correlation
+   77  P2097   Y   0x402  0x2D   Y    Post Cat Fuel Trim Too Rich B1
+   78  P0390   N   0x02   0x2E   Y    CMP Sensor B B2
+   79  P0365   N   0x02   0x2E   Y    CMP Sensor B B1
+   80  P0345   Y   0x02   0x2E   Y    CMP Sensor A B2
+   81  P0340   Y   0x02   0x2E   Y    Camshaft Position Sensor A B1
+   82  P0605   Y   0x02   0x2E   N    Internal Control Module ROM
+   83  P2095   N   0x02   0x2F   Y    TGV System B1 (Performance)
+   84  P2094   N   0x02   0x2F   Y    TGV System B2 (Performance)
+   85  P2091   N   0x02   0x2F   Y    TGV Actuator B2 (Closed Pos)
+   86  P2090   N   0x02   0x2F   Y    TGV Actuator B2 (Open Pos)
+   87  P2093   Y   0x02   0x2F   Y    TGV Actuator B2 Circuit
+   88  P2092   Y   0x02   0x2F   Y    TGV Actuator B1 Circuit
+   89  P2089   Y   0x02   0x2F   Y    TGV Actuator B1 (Closed Pos)
+   90  P2088   Y   0x02   0x2F   Y    TGV Actuator B1 (Open Pos)
+   91  P2099   N   0x402  0x30   Y    Post Cat Fuel Trim Too Rich B2
+   92  P2098   N   0x402  0x30   Y    Post Cat Fuel Trim Too Lean B2
