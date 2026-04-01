@@ -1,0 +1,290 @@
+================================================================================
+AVCS (ACTIVE VALVE CONTROL SYSTEM) -- COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2A)
+================================================================================
+
+
+OVERVIEW
+--------
+The AVCS system controls intake cam phasing via an Oil Control Valve
+(OCV) solenoid on each bank. This engine (EJ255) has intake AVCS only
+-- no exhaust AVCS. The exhaust duty correction table exists in ROM
+(shared base with EJ257) but is effectively zeroed.
+
+The system computes a target cam advance angle from 2D maps (Load x
+RPM), calculates the VVT error (target - actual), looks up a duty
+correction from the error, and outputs a PWM duty cycle to the OCV
+solenoid.
+
+Architecture:
+  1. Target angle lookup (cruise/non-cruise maps)
+  2. Actual cam angle measurement (CMP sensor vs CKP)
+  3. VVT error computation (target - actual)
+  4. Duty correction lookup (error x RPM -> duty %)
+  5. OCV PWM output (via GBR-relative hardware access)
+
+
+================================================================================
+SECTION 1: MAIN AVCS CONTROL FUNCTION
+================================================================================
+
+  avcs_control @ 0x031DB4
+  -----------------------------------------------------------------------
+  Single function handles both intake and exhaust AVCS paths.
+  Called as part of the fueling/sensor pipeline (not a scheduler task).
+
+  Function entry: 0x031DB4
+  Parameters:
+    R4 = control struct pointer (contains output RAM addr + enable flag)
+    R5 = enable flag (0 = use cam angle input, nonzero = use zero)
+
+  Inputs:
+    FFFF63C4  ect_current (float) -- loaded into FR14
+    FFFF6624  engine_load (float) -- loaded into FR15
+    FFFF6350  rpm_current (float) -- loaded into FR12
+    FFFF67EC  engine_run_time (u16) -- loaded into R11
+    FFFF6254  engine_state (u8) -- loaded into R14
+    FFFF40C8  cam_angle_sensor (float) -- actual cam position
+    FFFF7480  intake_avcs_workspace (struct, R8 base)
+    FFFF76F4  exhaust_avcs_workspace (struct, R9 base)
+
+  Process:
+
+  1. ENABLE CHECK (0x031DEA-0x031E10):
+     If R5 == 0 (enable flag not set):
+       Read cam angle from FFFF40C8
+     Else:
+       Use 0.0 (AVCS disabled / startup)
+
+     Check cam_angle > cal[0xCBEC0] (500.0 RPM):
+       If yes: set enable byte to 1, continue to duty calc
+     Check cam_angle > cal[0xCBEC4] (550.0 RPM):
+       If no: set enable byte to 0, continue to duty calc
+     (Hysteresis band: enable at 550 RPM, disable at 500 RPM)
+
+  2. INTAKE DUTY CORRECTION (0x031E12-0x031E32):
+     Load descriptor 0xAD620 (Intake Duty Correction, 10x9)
+     Call table_desc_2d_typed(R4=desc, FR4=ECT, FR5=load) -> FR0
+     Call float_min(FR0, literal) to clamp
+     Store result to workspace[R8-8]
+     Compute: previous_output * correction = new_intake_duty
+     Store to workspace[R8-4]
+
+  3. EXHAUST DUTY CORRECTION (0x031E34-0x031E58):
+     Load descriptor 0xAD848 (Exhaust Duty Correction, 10x9)
+     Same lookup: table_desc_2d_typed(desc, ECT, load) -> FR0
+     Store to exhaust workspace[R9-12]
+     Look up additional descriptor 0xAC45C via table_desc_2d(RPM)
+     Store to exhaust workspace[R9-8]
+     Compute: exhaust_correction * exhaust_lookup = product
+     NOTE: On EJ255 (intake AVCS only), these values are ~0
+           because the exhaust duty correction table is zeroed.
+
+  4. CONDITIONAL PATHS (0x031E58-0x031EBE):
+     If engine_state == 1 (running, warmed up):
+       Jump to 0x031E98 -- standard duty output path
+       Looks up descriptor 0xACE0C via table_desc_2d
+     Else if enable byte set:
+       Look up descriptors 0xAD864, 0xAC484, 0xAC498, 0xAC4AC
+       These provide additional cam angle targets and corrections
+       using RPM, engine_run_time, and load as inputs
+       Multiply results together for final duty factor
+
+  5. FINAL OUTPUT (0x031EAE-0x031EBE):
+     exhaust_corr[-4] * exhaust_corr[0] * blend_factor * duty = final
+     Store final duty to output RAM via control struct pointer [R13]
+
+
+================================================================================
+SECTION 2: TARGET ANGLE TABLES
+================================================================================
+
+  The AVCS target angle is looked up from 2D maps indexed by
+  engine load (g/rev) and RPM. There are cruise and non-cruise
+  variants, blended based on driving conditions.
+
+  Intake Cam Advance Angle Cruise (AVCS)
+  -----------------------------------------------------------------------
+  ROM address:  0xDA96C (data), 0xDA8E4 (load axis), 0xDA92C (RPM axis)
+  Dimensions:   18 x 16 (Load x RPM)
+  Descriptor:   0xAD674 (17x18, scale=0.007812)
+  Load axis:    0.3 - 2.7 g/rev
+  RPM axis:     800 - 7600 RPM
+
+  Typical values (degrees advance):
+    Idle (0.3 g/rev, 800 RPM):     0 degrees
+    Part throttle (1.0, 2000):    ~76-94 degrees
+    Mid load (1.5, 3200):        ~92-100 degrees
+    Full load (2.5, 5200):       ~56-82 degrees
+    High RPM (1.6, 7600):        ~112-134 degrees
+
+  Intake Cam Advance Angle Non-Cruise (AVCS)
+  -----------------------------------------------------------------------
+  ROM address:  0xDAC34 (data), 0xDABAC (load axis), 0xDABF4 (RPM axis)
+  Dimensions:   18 x 16 (Load x RPM)
+  Descriptor:   0xAD690 (17x18, scale=0.007812)
+
+  Similar structure, generally more aggressive advance at mid-load
+  for performance during non-cruise (acceleration) conditions.
+
+
+================================================================================
+SECTION 3: DUTY CORRECTION TABLE
+================================================================================
+
+  Intake Duty Correction A
+  -----------------------------------------------------------------------
+  Descriptor:   0xAD620
+  ROM address:  0xCFA38 (data), 0xCF9EC (VVT Error axis), 0xCFA14 (RPM axis)
+  Dimensions:   10 x 9 (VVT Error x RPM)
+  Data type:    uint8, scale = 0.2 (physical = raw * 0.2 %)
+  VVT Error:    4, 6, 10, 15, 20, 25, 30, 40, 60, 80 degrees
+  RPM:          650, 800, 1000, 1200, 1600, 2000, 2400, 3000, 3600
+
+  Table (physical duty %):
+
+               650    800   1000   1200   1600   2000   2400   3000   3600
+  --------------------------------------------------------------------------
+      4     11.6   10.0    6.6    6.0    5.6    5.0    5.0    5.0    5.0
+      6      5.0   12.4   10.8    7.0    6.2    5.8    5.6    5.4    5.4
+     10      5.4    5.4   13.6   11.2    8.2    6.8    6.0    5.6    5.4
+     15      5.4    5.4    5.4   14.6   12.2    8.8    7.2    6.4    5.8
+     20      5.4    5.4    5.4    5.4   16.0   15.4   11.2    9.2    7.8
+     25      6.8    6.6    6.2    6.0    5.8   18.0   16.0   12.6   10.4
+     30      9.0    8.0    7.2    6.6    6.4    6.2   19.0   17.0   14.0
+     40     11.2   10.2    9.2    8.0    7.2    6.8    6.4   20.0   18.0
+     60     15.6   13.4   12.4   11.0   10.0    8.8    8.0    7.6   22.0
+     80     21.0   19.8   15.2   14.2   13.0   12.6   11.6   10.0   10.0
+
+  The diagonal pattern shows that duty increases where the VVT error
+  is large relative to RPM -- the OCV needs more duty to move the cam
+  faster when the error is large. At low error / high RPM, oil pressure
+  is sufficient with minimal duty.
+
+  Exhaust Duty Correction A (VESTIGIAL -- EJ257 shared base)
+  -----------------------------------------------------------------------
+  Descriptor:   0xAD848
+  Data:         0xD121C (uint16, scale=0.000061, bias=-100)
+  All values cluster near -100 (effective zero correction).
+  NOT ACTIVE on EJ255 -- no exhaust AVCS hardware.
+
+
+================================================================================
+SECTION 4: VVT ERROR FEEDBACK TABLES
+================================================================================
+
+  Four 9x9 VVT Error tables at 0xAF830, 0xAF84C, 0xAF868, 0xAF884.
+
+  Axes:
+    Y-axis: Cam angle error -11.25 to +11.25 degrees (9 steps)
+    X-axis: RPM 800 to 4000 (9 steps)
+
+  All four tables are effectively zeroed (all values ~= -100.0,
+  which equals the bias offset). These are PID gain tables for the
+  AVCS feedback loop -- stock calibration uses default gains with
+  no RPM/error-dependent tuning.
+
+  Referenced by code at 0x0627D8-0x062890, which writes results to:
+    FFFF920C, FFFF9210 -- intake VVT error feedback A/B
+    FFFF9220, FFFF9228 -- intake VVT error feedback C/D
+
+
+================================================================================
+SECTION 5: ADDITIONAL AVCS DESCRIPTORS
+================================================================================
+
+  The AVCS control function references several additional descriptors
+  for cam angle target computation and output blending:
+
+  Descriptor   Dims     Data Addr   Description
+  -----------------------------------------------------------------------
+  0xAC45C      varies   varies      RPM-indexed base lookup
+  0xAC484      varies   varies      Engine run time correction
+  0xAC498      varies   varies      RPM x time correction
+  0xAC4AC      varies   varies      Load-dependent correction
+  0xACE0C      varies   varies      Standard duty output map
+  0xAD864      8x9      varies      Extended duty correction
+
+
+================================================================================
+SECTION 6: KEY RAM ADDRESSES
+================================================================================
+
+  Address       Type      Description
+  -----------------------------------------------------------------------
+  FFFF40C8      float     cam_angle_sensor (actual cam position, degrees)
+  FFFF6254      u8        engine_state (running/warmup/cranking)
+  FFFF6350      float     rpm_current
+  FFFF63C4      float     ect_current (coolant temp)
+  FFFF6624      float     engine_load
+  FFFF67EC      u16       engine_run_time (seconds)
+  FFFF7480      struct    intake_avcs_workspace (base pointer)
+  FFFF7480-12   float     intake_previous_output
+  FFFF7480-8    float     intake_duty_correction
+  FFFF7480-4    float     intake_computed_duty
+  FFFF76F4      struct    exhaust_avcs_workspace (base, vestigial)
+  FFFF76F4-12   float     exhaust_correction_A
+  FFFF76F4-8    float     exhaust_correction_B
+  FFFF76F4-4    float     exhaust_computed (near zero on EJ255)
+  FFFF920C      float     vvt_error_feedback_A
+  FFFF9210      float     vvt_error_feedback_B
+  FFFF9220      float     vvt_error_feedback_C
+  FFFF9228      float     vvt_error_feedback_D
+
+
+================================================================================
+SECTION 7: KEY ROM / CALIBRATION ADDRESSES
+================================================================================
+
+  Address     Value     Description
+  -----------------------------------------------------------------------
+  0x031DB4    code      avcs_control main function
+  0x0627D8    code      vvt_error_feedback function
+  0x0CBEC0    500.0     AVCS enable RPM threshold (lower, disable)
+  0x0CBEC4    550.0     AVCS enable RPM threshold (upper, enable)
+  0x0AD620    desc      Intake Duty Correction descriptor (10x9)
+  0x0AD848    desc      Exhaust Duty Correction descriptor (vestigial)
+  0x0AD674    desc      Intake Cam Advance Cruise (17x18)
+  0x0AD690    desc      Intake Cam Advance Non-Cruise (17x18)
+  0x0AD6AC    desc      Intake Cam Advance alternate (15x18)
+  0x0AD6C8    desc      Intake Cam Advance D (17x18)
+  0x0AD6E4    desc      Intake Cam Advance E (17x18)
+  0x0AF830    desc      VVT Error feedback table 1 (9x9, zeroed)
+  0x0AF84C    desc      VVT Error feedback table 2 (9x9, zeroed)
+  0x0AF868    desc      VVT Error feedback table 3 (9x9, zeroed)
+  0x0AF884    desc      VVT Error feedback table 4 (9x9, zeroed)
+  0x0CFA38    data      Intake Duty Correction data (90 u8)
+  0x0CF9EC    axis      VVT Error axis (10 floats: 4-80 deg)
+  0x0CFA14    axis      RPM axis (9 floats: 650-3600)
+  0x0DA96C    data      Intake Cam Advance Cruise data
+  0x0DA8E4    axis      Load axis (18 floats)
+  0x0DA92C    axis      RPM axis (16 floats)
+  0x0DAC34    data      Intake Cam Advance Non-Cruise data
+  0x0D121C    data      Exhaust Duty Correction (vestigial, zeroed)
+
+
+================================================================================
+SECTION 8: SYSTEM FLOW SUMMARY
+================================================================================
+
+  Per scheduler cycle:
+
+  1. Read cam_angle_sensor (FFFF40C8) from CMP/CKP processing
+  2. Check RPM > 550 (enable) or < 500 (disable) with hysteresis
+  3. Look up target cam advance from cruise or non-cruise map
+     (17x18, Load x RPM) -- selected by driving condition logic
+  4. Compute VVT error = target - actual
+  5. Look up duty correction from error table (10x9, Error x RPM)
+     Result is duty % correction (5-22% range)
+  6. Multiply by previous output and blend factors
+  7. Write final OCV duty to output RAM
+  8. OCV PWM is driven via ISR reading the duty RAM variables
+     (hardware access via GBR-relative addressing, not direct I/O loads)
+
+  The VVT error feedback tables (9x9, all zeroed in stock) provide
+  optional RPM/error-dependent PID gain tuning -- unused in stock cal.
+
+  NOTE: The exhaust AVCS path exists in code but is inactive on this
+  EJ255 engine. The exhaust duty correction table is zeroed and there
+  is no exhaust OCV hardware. This is shared ROM code from a platform
+  that includes EJ257 (STI) which has dual AVCS.
