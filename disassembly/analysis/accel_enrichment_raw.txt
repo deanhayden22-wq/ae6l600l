@@ -1,0 +1,404 @@
+================================================================================
+ACCELERATION ENRICHMENT / TIP-IN TRANSIENT FUELING - RAW DISASSEMBLY
+ROM: AE5L600L  |  ECU: Renesas SH7058 (SH-2)
+================================================================================
+
+NOTE ON 0x80Ex WORDS:
+  The disassembler decode() function is missing the SH-2 instruction:
+    MOV.B R0,@(disp4,Rn)  encoding: 1000 0000 nnnn dddd
+  These appear as ".word 0x80Ex" but are actually:
+    0x80E1 -> mov.b R0,@(0x1,R14)   ; write R0 to R14+1
+    0x80E2 -> mov.b R0,@(0x2,R14)   ; write R0 to R14+2
+    0x80E3 -> mov.b R0,@(0x3,R14)   ; write R0 to R14+3
+    0x80E4 -> mov.b R0,@(0x4,R14)   ; write R0 to R14+4
+    0x80E5 -> mov.b R0,@(0x5,R14)   ; write R0 to R14+5
+    0x80E6 -> mov.b R0,@(0x6,R14)   ; write R0 to R14+6
+    0x80E7 -> mov.b R0,@(0x7,R14)   ; write R0 to R14+7
+  Similarly, words like 0x80F4/F8/FC embedded after JSR are descriptor arg words
+  read by the callee via the saved PR register (Renesas calling convention).
+
+  Also: 0x422B in epilogue = JMP @R2 (SH-2: 0100mmmm00101011, m=2)
+        0x4F26 in epilogue = LDS.L @R15+,PR (restores PR from stack)
+        (NOT ldc.l @R15+,GBR as labeled by the decode() function)
+
+================================================================================
+fuel_transient_comp @ 0x037186
+================================================================================
+(function size: 0x60 bytes)
+Caller: periodic scheduler task via dispatch table
+Role:   Top-level transient fuel dispatcher. Reads throttle delta inputs,
+        calls throttle delta computer, then dispatches to 6 sub-handlers.
+
+  ; --- prologue ---
+  037186: 2FE6  mov.l   R14,@-R15
+  037188: 4F22  sts.l   PR,@-R15
+  03718A: FFEB  fmov.s  FR14,@-R15
+  03718C: FFFB  fmov.s  FR15,@-R15
+
+  ; --- load throttle delta inputs ---
+  03718E: D283  mov.l   @(0x20C,PC),R2       ; =0xFFFF7D68  throttle_delta_pos (float)
+  037190: FF28  fmov.s  @R2,FR15             ; FR15 = throttle_delta_pos
+  037192: D283  mov.l   @(0x20C,PC),R2       ; =0xFFFF7D6C  throttle_delta_neg (float)
+  037194: FE28  fmov.s  @R2,FR14             ; FR14 = throttle_delta_neg
+
+  ; --- call throttle delta / state calculator ---
+  037196: D283  mov.l   @(0x20C,PC),R2       ; =0x000278DE  FUN_000278DE
+  037198: 420B  jsr     @R2
+  03719A: 0009  nop
+  03719C: D282  mov.l   @(0x208,PC),R2       ; =0xFFFF7A5C  transient_mode_byte
+  03719E: 2200  mov.b   R0,@R2               ; store returned mode byte
+
+  ; --- set up workspace base ---
+  0371A0: D27B  mov.l   @(0x1EC,PC),R2       ; =0xFFFF69F4  current_throttle (float)
+  0371A2: F828  fmov.s  @R2,FR8              ; FR8 = current throttle position
+  0371A4: DE81  mov.l   @(0x204,PC),R14      ; =0xFFFF7A6C  workspace_base
+  0371A6: E0F4  mov     #-12,R0
+  0371A8: FE87  fmov.s  FR8,@(R0,R14)        ; workspace[-12] = current_throttle
+
+  ; --- load second float input, call limit/clamp function ---
+  0371AA: D281  mov.l   @(0x204,PC),R2       ; =0xFFFF6350  input_float_B (IPW or MAF)
+  0371AC: F828  fmov.s  @R2,FR8              ; FR8 = input_float_B
+  0371AE: E0FC  mov     #-4,R0
+  0371B0: D280  mov.l   @(0x200,PC),R2       ; =0x00029BA4  FUN_00029BA4 (clamp/limit)
+  0371B2: 420B  jsr     @R2
+  0371B4: FE87  fmov.s  FR8,@(R0,R14)        ; (delay slot) workspace[-4] = FR8
+
+  ; --- dispatch to 6 sub-handlers ---
+  ; sub1: tip-in rate / ramp state machine
+  0371B6: B16C  bsr     037492               ; -> FUN_037492
+  0371B8: 2E00  mov.b   R0,@R14              ; (delay slot) store result to workspace[0]
+
+  ; sub2: tau/alpha rising time constant
+  0371BA: B0CE  bsr     03735A               ; -> FUN_03735A
+  0371BC: 0009  nop
+
+  ; sub3: tau/alpha falling time constant
+  0371BE: B125  bsr     03740C               ; -> FUN_03740C
+  0371C0: 0009  nop
+
+  ; sub4: overrun fuel cut handler
+  0371C2: B145  bsr     037450               ; -> FUN_037450
+  0371C4: 0009  nop
+
+  ; sub5: additional transient condition check
+  0371C6: B050  bsr     03726A               ; -> FUN_03726A
+  0371C8: 0009  nop
+
+  ; sub6: final enrichment computation (tip-in amount calc)
+  0371CA: 64E3  mov     R14,R4               ; R4 = workspace_base
+  0371CC: 74D8  add     #-40,R4              ; R4 = workspace_base - 40 (history buffer)
+  0371CE: F4FC  fmov    FR15,FR4             ; FR4 = throttle_delta_pos
+  0371D0: B009  bsr     0371E6               ; -> FUN_0371E6 (final enrichment calc)
+  0371D2: F5EC  fmov    FR14,FR5             ; (delay slot) FR5 = throttle_delta_neg
+
+  ; --- store final result back to workspace ---
+  0371D4: E0F4  mov     #-12,R0
+  0371D6: F8E6  fmov.s  @(R0,R14),FR8        ; FR8 = workspace[-12] (updated throttle)
+  0371D8: E0F8  mov     #-8,R0
+  0371DA: FE87  fmov.s  FR8,@(R0,R14)        ; workspace[-8] = FR8 (previous throttle)
+
+  ; --- epilogue ---
+  0371DC: FFF9  fmov.s  @R15+,FR15
+  0371DE: FEF9  fmov.s  @R15+,FR14
+  0371E0: 4F26  lds.l   @R15+,PR             ; (NOTE: labeled ldc.l GBR by disasm bug)
+  0371E2: 000B  rts
+  0371E4: 6EF6  mov.l   @R15+,R14            ; (delay slot)
+
+
+================================================================================
+fuel_accel_enrich @ 0x03BB6C
+================================================================================
+(function size: 0x168 bytes)
+Caller: unknown (separate call chain from fuel_transient_comp)
+Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
+        manages active/inactive state machine with counter thresholds, tail-calls
+        to enrichment output function.
+
+  ; --- prologue (saves R14, PR, FR12-FR15, allocates 20-byte stack frame) ---
+  03BB6C: 2FE6  mov.l   R14,@-R15
+  03BB6E: 4F22  sts.l   PR,@-R15
+  03BB70: FFCB  fmov.s  FR12,@-R15
+  03BB72: FFDB  fmov.s  FR13,@-R15
+  03BB74: FFEB  fmov.s  FR14,@-R15
+  03BB76: FFFB  fmov.s  FR15,@-R15
+  03BB78: 7FEC  add     #-20,R15             ; allocate 20-byte local frame
+
+  ; --- load inputs ---
+  03BB7A: D25B  mov.l   @(0x16C,PC),R2       ; =0xFFFF65FC  prev_throttle_pos (float)
+  03BB7C: FC28  fmov.s  @R2,FR12             ; FR12 = previous throttle position
+  03BB7E: D25B  mov.l   @(0x16C,PC),R2       ; =0xFFFF6624  curr_throttle_pos (float)
+  03BB80: F928  fmov.s  @R2,FR9              ; FR9 = current throttle position
+  03BB82: FF9A  fmov.s  FR9,@R15             ; stack[0] = curr_throttle (saved)
+  03BB84: D25A  mov.l   @(0x168,PC),R2       ; =0xFFFF620C  current_rpm (float)
+  03BB86: FD28  fmov.s  @R2,FR13             ; FR13 = current RPM
+
+  ; --- state/condition queries (Renesas descriptor calling convention) ---
+  ; Each JSR reads args from words embedded after the call (via saved PR)
+  03BB88: D25A  mov.l   @(0x168,PC),R2       ; =0x0001CF16  FUN_0001CF16 (mode query)
+  03BB8A: 420B  jsr     @R2
+  03BB8C: 0009  nop
+  03BB8E: D25A  mov.l   @(0x168,PC),R2       ; =0x00022CF4  FUN_00022CF4 (cond query)
+  03BB90: 420B  jsr     @R2
+  03BB92: 80F4  ; arg: workspace field +0x14 (mov.b R0,@(0x14,R0) descriptor)
+  03BB94: D259  mov.l   @(0x164,PC),R2       ; =0x000297A0  FUN_000297A0 (cond query B)
+  03BB96: 420B  jsr     @R2
+  03BB98: 80F8  ; arg: workspace field +0x18
+  03BB9A: D559  mov.l   @(0x164,PC),R5       ; =0x000299BC  FUN_000299BC (cond query C)
+  03BB9C: 450B  jsr     @R5
+  03BB9E: 80FC  ; arg: workspace field +0x1C
+
+  ; --- save last query result to local frame, read gain-set selector ---
+  03BBA0: 6703  mov     R0,R7
+  03BBA2: E010  mov     #16,R0
+  03BBA4: 0F74  mov.b   R7,@(R0,R15)         ; frame[16] = last condition result
+  03BBA6: 84F8  mov.b   @(0x08,R15),R0       ; R0 = frame[8] (gain set selector)
+  03BBA8: 8801  cmp/eq  #1,R0               ; selector == 1?
+  03BBAA: 8B04  bf       03BBB6              ; no -> use A-set gains
+
+  ; --- gain set B (alternate cal set) ---
+  03BBAC: D255  mov.l   @(0x154,PC),R2       ; =0x000CC520  tip_in_gain_B  = 510.0
+  03BBAE: FF28  fmov.s  @R2,FR15             ; FR15 = 510.0 (tip-in multiplier)
+  03BBB0: D255  mov.l   @(0x154,PC),R2       ; =0x000CC528  tip_out_gain_B = 505.0
+  03BBB2: A004  bra     03BBBE
+  03BBB4: FE28  fmov.s  @R2,FR14             ; (delay) FR14 = 505.0 (tip-out multiplier)
+
+  ; --- gain set A (primary cal set) ---
+  03BBB6: D255  mov.l   @(0x154,PC),R2       ; =0x000CC51C  tip_in_gain_A  = 510.0
+  03BBB8: FF28  fmov.s  @R2,FR15             ; FR15 = 510.0 (tip-in multiplier)
+  03BBBA: D255  mov.l   @(0x154,PC),R2       ; =0x000CC524  tip_out_gain_A = 505.0
+  03BBBC: FE28  fmov.s  @R2,FR14             ; FR14 = 505.0 (tip-out multiplier)
+
+  ; --- load workspace base, check active flag ---
+  03BBBE: DE55  mov.l   @(0x154,PC),R14      ; =0xFFFF7CE0  workspace_base
+  03BBC0: 60E0  mov.b   @R14,R0              ; R0 = workspace[0] = active_flag
+  03BBC2: 8801  cmp/eq  #1,R0              ; active?
+  03BBC4: D654  mov.l   @(0x150,PC),R6       ; =0x000BE53C  DESC_ramp_counter
+  03BBC6: 8B3D  bf       03BC44             ; not active -> tip-in trigger check
+
+  ; ============================================================
+  ; ACTIVE PATH (enrichment currently running)
+  ; ============================================================
+
+  ; --- call ramp counter descriptor to advance/expire counter ---
+  03BBC8: 84E7  mov.b   @(0x07,R14),R0      ; R0 = workspace[7] = inactive_counter
+  03BBCA: 640C  extu.b  R0,R4               ; R4 = counter (unsigned)
+  03BBCC: 460B  jsr     @R6                 ; call DESC_ramp_counter (0xBE53C)
+  03BBCE: E501  mov     #1,R5               ; (delay) R5 = step = 1
+  03BBD0:       ; mov.b R0,@(0x7,R14)       ; [0x80E7] store updated counter to workspace[7]
+
+  ; --- check tip-out condition: FR14 (tip-out gain) > FR12 (prev throttle) ---
+  03BBD2: E000  mov     #0,R0
+  03BBD4: FEC5  fcmp/gt FR12,FR14           ; tip-out gain > prev_throttle?
+  03BBD6: 8F0B  bf/s     03BBF0             ; no -> check decay condition
+  03BBD8:       ; mov.b R0,@(0x6,R14)       ; [0x80E6] (delay slot) clear workspace[6]
+
+  ; --- check additional deactivation conditions ---
+  03BBDA: 84FC  mov.b   @(0x0C,R15),R0     ; R0 = frame[12] (condition flag)
+  03BBDC: 2008  tst     R0,R0
+  03BBDE: 8B07  bf       03BBF0             ; flag set -> check decay
+  03BBE0: D24E  mov.l   @(0x138,PC),R2      ; =0x000CC52C  rpm_threshold = 1260.0
+  03BBE2: F828  fmov.s  @R2,FR8
+  03BBE4: F8D5  fcmp/gt FR13,FR8            ; RPM > 1260?
+  03BBE6: 8B03  bf       03BBF0             ; RPM <= 1260 -> check decay
+  03BBE8: E010  mov     #16,R0
+  03BBEA: 07FC  mov.b   @(R0,R15),R7        ; R7 = frame[16] (last condition)
+  03BBEC: 2778  tst     R7,R7
+  03BBEE: 890B  bt       03BC08             ; all conditions met -> DEACTIVATE
+
+  ; --- DECAY path: enrichment decaying (FR8=curr_throttle > decay_gain=10000?) ---
+  03BBF0: F8F8  fmov.s  @R15,FR8            ; FR8 = curr_throttle (saved at frame[0])
+  03BBF2: D24B  mov.l   @(0x12C,PC),R2      ; =0x000CC530  decay_gain = 10000.0
+  03BBF4: F928  fmov.s  @R2,FR9             ; FR9 = 10000.0
+  03BBF6: F985  fcmp/gt FR8,FR9             ; 10000 > curr_throttle? (i.e. not maxed)
+  03BBF8: 8B03  bf       03BC02             ; no -> check RPM threshold
+  03BBFA: D248  mov.l   @(0x120,PC),R2      ; =0x000CC52C  rpm_threshold = 1260.0
+  03BBFC: F828  fmov.s  @R2,FR8
+  03BBFE: F8D5  fcmp/gt FR13,FR8            ; RPM > 1260?
+  03BC00: 8902  bt       03BC08             ; yes -> DEACTIVATE (skip decay, deactivate)
+  03BC02: 84F4  mov.b   @(0x04,R15),R0      ; R0 = frame[4] (sub-condition flag)
+  03BC04: 8801  cmp/eq  #1,R0             ; sub-condition == 1?
+  03BC06: 8B12  bf       03BC2E            ; no -> remain active (counter branch)
+
+  ; --- DEACTIVATE: clear active flag, reset workspace fields ---
+  03BC08: E200  mov     #0,R2
+  03BC0A: 2E20  mov.b   R2,@R14            ; workspace[0] = 0 (clear active flag)
+  03BC0C: 84E7  mov.b   @(0x07,R14),R0    ; R0 = workspace[7] (counter value)
+  03BC0E: D545  mov.l   @(0x114,PC),R5     ; =0x000CBC0B  applied_ctr_max = 3
+  03BC10: 6250  mov.b   @R5,R2             ; R2 = 3
+  03BC12: 3026  cmp/hi  R2,R0             ; counter > 3?
+  03BC14: 8908  bt       03BC28            ; yes -> skip clear (counter still valid)
+  ; clear workspace fields 1-5, set counter 6 = inactive_ctr_max
+  03BC16: E000  mov     #0,R0
+  03BC18:       ; mov.b R0,@(0x1,R14)  [0x80E1]  workspace[1] = 0
+  03BC1A:       ; mov.b R0,@(0x2,R14)  [0x80E2]  workspace[2] = 0
+  03BC1C:       ; mov.b R0,@(0x3,R14)  [0x80E3]  workspace[3] = 0
+  03BC1E:       ; mov.b R0,@(0x4,R14)  [0x80E4]  workspace[4] = 0
+  03BC20:       ; mov.b R0,@(0x5,R14)  [0x80E5]  workspace[5] = 0
+  03BC22: D541  mov.l   @(0x104,PC),R5     ; =0x000CBC0C  inactive_ctr_max = 3
+  03BC24: 6050  mov.b   @R5,R0             ; R0 = 3
+  03BC26:       ; mov.b R0,@(0x6,R14)  [0x80E6]  workspace[6] = inactive_ctr_max
+
+  03BC28: E000  mov     #0,R0
+  03BC2A: A046  bra     03BCBA             ; -> EPILOGUE (enrichment = 0)
+  03BC2C:       ; mov.b R0,@(0x7,R14)  [0x80E7]  (delay) workspace[7] = 0
+
+  ; --- counter still running path (active but conditions not met for deactivate) ---
+  03BC2E: 84E7  mov.b   @(0x07,R14),R0    ; R0 = workspace[7] (counter)
+  03BC30: D53C  mov.l   @(0xF0,PC),R5      ; =0x000CBC0B  applied_ctr_max = 3
+  03BC32: 6250  mov.b   @R5,R2
+  03BC34: 3026  cmp/hi  R2,R0             ; counter > 3?
+  03BC36: E001  mov     #1,R0
+  03BC38:       ; mov.b R0,@(0x1,R14)  [0x80E1]  workspace[1] = 1
+  03BC3A: 8F36  bf/s     03BCAA           ; counter <= 3 -> branch
+  03BC3C:       ; mov.b R0,@(0x2,R14)  [0x80E2]  (delay) workspace[2] = 1
+  03BC3E:       ; mov.b R0,@(0x3,R14)  [0x80E3]  workspace[3] = 1
+  03BC40: A033  bra     03BCAA
+  03BC42:       ; mov.b R0,@(0x4,R14)  [0x80E4]  (delay) workspace[4] = 1
+
+  ; ============================================================
+  ; NOT-ACTIVE PATH (monitoring for tip-in trigger)
+  ; ============================================================
+
+  03BC44: E501  mov     #1,R5              ; step = 1 (for ramp counter)
+  03BC46: 84E6  mov.b   @(0x06,R14),R0    ; R0 = workspace[6] = applied_counter
+  03BC48: 460B  jsr     @R6               ; call DESC_ramp_counter (0xBE53C)
+  03BC4A: 640C  extu.b  R0,R4             ; (delay) R4 = counter (unsigned)
+  03BC4C:       ; mov.b R0,@(0x6,R14)  [0x80E6]  store updated counter to workspace[6]
+
+  ; --- check tip-in trigger: FR15 (tip-in gain) > FR12 (prev throttle)? ---
+  03BC4E: E000  mov     #0,R0
+  03BC50: FFC5  fcmp/gt FR12,FR15         ; tip-in gain > prev_throttle?
+  03BC52: 8F07  bf/s     03BC64           ; no -> check throttle/condition
+  03BC54:       ; mov.b R0,@(0x7,R14)  [0x80E7]  (delay) workspace[7] = 0
+  03BC56: 84FC  mov.b   @(0x0C,R15),R0   ; R0 = frame[12] (condition flag)
+  03BC58: 8802  cmp/eq  #2,R0           ; condition == 2?
+  03BC5A: 8903  bt       03BC64          ; yes -> skip to throttle check
+  03BC5C: E010  mov     #16,R0
+  03BC5E: 00FC  mov.b   @(R0,R15),R0    ; R0 = frame[16] (last condition result)
+  03BC60: 8802  cmp/eq  #2,R0           ; result == 2?
+  03BC62: 8B1A  bf       03BC9A          ; no -> counter check (no trigger)
+
+  ; --- throttle check before activation ---
+  03BC64: F8F8  fmov.s  @R15,FR8         ; FR8 = curr_throttle (frame[0])
+  03BC66: D22E  mov.l   @(0xB8,PC),R2    ; =0x000CC530  decay_gain = 10000.0
+  03BC68: F928  fmov.s  @R2,FR9          ; FR9 = 10000.0
+  03BC6A: F985  fcmp/gt FR8,FR9          ; 10000 > curr_throttle?
+  03BC6C: 8915  bt       03BC9A          ; throttle > 10000 -> no activation
+  03BC6E: 84F4  mov.b   @(0x04,R15),R0  ; R0 = frame[4]
+  03BC70: 2008  tst     R0,R0
+  03BC72: 8B12  bf       03BC9A          ; frame[4] != 0 -> no activation
+
+  ; --- ACTIVATE enrichment ---
+  03BC74: E201  mov     #1,R2
+  03BC76: 2E20  mov.b   R2,@R14          ; workspace[0] = 1 (set active flag)
+  03BC78: 84E6  mov.b   @(0x06,R14),R0  ; R0 = workspace[6] (applied counter)
+  03BC7A: D52B  mov.l   @(0xAC,PC),R5   ; =0x000CBC0C  inactive_ctr_max = 3
+  03BC7C: 6250  mov.b   @R5,R2           ; R2 = 3
+  03BC7E: 3026  cmp/hi  R2,R0           ; counter > 3?
+  03BC80: 8908  bt       03BC94          ; yes -> skip counter load
+  ; set workspace fields 1-5 = 1, set counter 7 = applied_ctr_max
+  03BC82: E001  mov     #1,R0
+  03BC84:       ; mov.b R0,@(0x1,R14)  [0x80E1]  workspace[1] = 1
+  03BC86:       ; mov.b R0,@(0x2,R14)  [0x80E2]  workspace[2] = 1
+  03BC88:       ; mov.b R0,@(0x3,R14)  [0x80E3]  workspace[3] = 1
+  03BC8A:       ; mov.b R0,@(0x4,R14)  [0x80E4]  workspace[4] = 1
+  03BC8C:       ; mov.b R0,@(0x5,R14)  [0x80E5]  workspace[5] = 1
+  03BC8E: D525  mov.l   @(0x94,PC),R5   ; =0x000CBC0B  applied_ctr_max = 3
+  03BC90: 6050  mov.b   @R5,R0           ; R0 = 3
+  03BC92:       ; mov.b R0,@(0x7,R14)  [0x80E7]  workspace[7] = applied_ctr_max
+
+  03BC94: E000  mov     #0,R0
+  03BC96: A010  bra     03BCBA           ; -> EPILOGUE
+  03BC98:       ; mov.b R0,@(0x6,R14)  [0x80E6]  (delay) workspace[6] = 0
+
+  ; --- counter decrement path (not active, no trigger, decrement applied counter) ---
+  03BC9A: 84E6  mov.b   @(0x06,R14),R0  ; R0 = workspace[6]
+  03BC9C: D522  mov.l   @(0x88,PC),R5   ; =0x000CBC0C  inactive_ctr_max = 3
+  03BC9E: 6250  mov.b   @R5,R2
+  03BCA0: 3026  cmp/hi  R2,R0           ; counter > 3?
+  03BCA2: 8D05  bt/s     03BCB0          ; yes -> set fields to 1
+  03BCA4: E000  mov     #0,R0            ; (delay) R0 = 0
+  03BCA6:       ; mov.b R0,@(0x3,R14)  [0x80E3]  workspace[3] = 0
+  03BCA8:       ; mov.b R0,@(0x4,R14)  [0x80E4]  workspace[4] = 0
+  03BCAA: E001  mov     #1,R0
+  03BCAC: A005  bra     03BCBA
+  03BCAE:       ; mov.b R0,@(0x5,R14)  [0x80E5]  (delay) workspace[5] = 1
+
+  03BCB0:       ; mov.b R0,@(0x1,R14)  [0x80E1]  workspace[1] = 1
+  03BCB2:       ; mov.b R0,@(0x2,R14)  [0x80E2]  workspace[2] = 1
+  03BCB4:       ; mov.b R0,@(0x3,R14)  [0x80E3]  workspace[3] = 1
+  03BCB6:       ; mov.b R0,@(0x4,R14)  [0x80E4]  workspace[4] = 1
+  03BCB8:       ; mov.b R0,@(0x5,R14)  [0x80E5]  workspace[5] = 1
+
+  ; ============================================================
+  ; EPILOGUE: tail-call to enrichment output function
+  ; ============================================================
+
+  03BCBA: D21C  mov.l   @(0x70,PC),R2    ; =0x0003D2FC  FUN_enrich_apply (output fn)
+  03BCBC: 7F14  add     #20,R15          ; deallocate local frame
+  03BCBE: FFF9  fmov.s  @R15+,FR15       ; restore FR15
+  03BCC0: FEF9  fmov.s  @R15+,FR14       ; restore FR14
+  03BCC2: FDF9  fmov.s  @R15+,FR13       ; restore FR13
+  03BCC4: FCF9  fmov.s  @R15+,FR12       ; restore FR12
+  03BCC6: 4F26  lds.l   @R15+,PR         ; restore PR (NOTE: decode() shows ldc GBR)
+  03BCC8:       ; jmp @R2   [0x422B]      ; TAIL CALL to 0x3D2FC
+  03BCCA: 6EF6  mov.l   @R15+,R14        ; (delay slot) restore R14
+
+  ; --- alternate exit path (reached if no enrichment applied) ---
+  03BCCC: E6FF  mov     #-1,R6
+  03BCCE: D218  mov.l   @(0x60,PC),R2    ; =0xFFFF7CE6  enrich_signal
+  03BCD0: 000B  rts
+  03BCD2: 2260  mov.b   R6,@R2           ; (delay) write -1 to enrich_signal
+
+
+================================================================================
+REFERENCED CALIBRATION ADDRESSES (confirmed float32 big-endian unless noted)
+================================================================================
+  0x000CBC0B  applied_ctr_max   uint8 = 3   (max cycles enrichment stays applied)
+  0x000CBC0C  inactive_ctr_max  uint8 = 3   (max cycles of inactive counting)
+  0x000CC51C  tip_in_gain_A     f32 = 510.0
+  0x000CC520  tip_in_gain_B     f32 = 510.0
+  0x000CC524  tip_out_gain_A    f32 = 505.0
+  0x000CC528  tip_out_gain_B    f32 = 505.0
+  0x000CC52C  rpm_threshold     f32 = 1260.0 RPM
+  0x000CC530  decay_gain        f32 = 10000.0
+
+================================================================================
+REFERENCED RAM ADDRESSES
+================================================================================
+  0xFFFF65FC  prev_throttle_pos    float (FR12 source)
+  0xFFFF6350  input_float_B        float (IPW or MAF signal)
+  0xFFFF620C  current_rpm          float (FR13 source)
+  0xFFFF6624  curr_throttle_pos    float (FR9 source)
+  0xFFFF69F4  current_throttle     float (fuel_transient_comp FR8 source)
+  0xFFFF7A5C  transient_mode_byte  byte
+  0xFFFF7A6C  transient_workspace  base (fuel_transient_comp R14)
+  0xFFFF7CE0  enrich_workspace     base (fuel_accel_enrich R14)
+    +0x00 (0xFFFF7CE0) active_flag        byte R/W
+    +0x01 (0xFFFF7CE1) field_1            byte R/W
+    +0x02 (0xFFFF7CE2) field_2            byte R/W
+    +0x03 (0xFFFF7CE3) field_3            byte R/W
+    +0x04 (0xFFFF7CE4) field_4            byte R/W
+    +0x05 (0xFFFF7CE5) field_5            byte R/W
+    +0x06 (0xFFFF7CE6) applied_counter    byte R/W / enrich_signal output
+    +0x07 (0xFFFF7CE7) inactive_counter   byte R/W
+  0xFFFF7D68  throttle_delta_pos   float
+  0xFFFF7D6C  throttle_delta_neg   float
+
+================================================================================
+REFERENCED CODE / DESCRIPTOR ADDRESSES
+================================================================================
+  0x0001CF16  FUN_0001CF16  mode state query
+  0x00022CF4  FUN_00022CF4  condition query (descriptor calling convention)
+  0x000278DE  FUN_000278DE  throttle delta / state calculator
+  0x000297A0  FUN_000297A0  condition query B
+  0x000299BC  FUN_000299BC  condition query C
+  0x00029BA4  FUN_00029BA4  clamp/limit function
+  0x0003D2FC  FUN_enrich_apply  enrichment output application (tail-call target)
+  0x000BE53C  DESC_ramp_counter  ramp/counter descriptor table entry
+  0x03735A    FUN_03735A    tau/alpha rising time constant handler
+  0x03740C    FUN_03740C    tau/alpha falling time constant handler
+  0x037450    FUN_037450    overrun fuel cut handler
+  0x037492    FUN_037492    tip-in rate / ramp state machine
+  0x03726A    FUN_03726A    additional transient condition check
+  0x0371E6    FUN_0371E6    final enrichment computation

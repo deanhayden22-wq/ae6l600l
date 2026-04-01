@@ -1,0 +1,401 @@
+================================================================================
+IDLE CONTROL RAW DISASSEMBLY
+AE5L600L (2013 Subaru WRX MT) -- SH-2
+================================================================================
+
+
+================================================================================
+task54_idle_control @ 0x04BC20  (wrapper -- clears latch)
+================================================================================
+  04BC20: E200  mov     #0,R2
+  04BC22: D674  mov.l   @(0x1D0,PC),R6          ; = 0xFFFF8373
+  04BC24: 000B  rts
+  04BC26: 2620  mov.b   R2,@R6                  ; RAM[FFFF8373] = 0
+
+
+================================================================================
+FUN_0004bc28 @ 0x04BC28  (enable/disable state machine)
+GBR = 0xFFFF8364
+================================================================================
+  ; --- Prologue ---
+  04BC28: 2FC6  mov.l   R12,@-R15
+  04BC2A: 2FD6  mov.l   R13,@-R15
+  04BC2C: 2FE6  mov.l   R14,@-R15
+  04BC2E: 4F22  sts.l   PR,@-R15
+  04BC30: 4F13  stc.l   GBR,@-R15
+  04BC32: D071  mov.l   @(0x1C4,PC),R0          ; = 0xFFFF8364
+  04BC34: 401E  ldc     R0,GBR                  ; GBR = 0xFFFF8364
+  04BC36: 7FFC  add     #-4,R15                 ; alloc 4 bytes
+
+  ; --- Load inputs ---
+  04BC38: D670  mov.l   @(0x1C0,PC),R6          ; = 0xFFFF65D2
+  04BC3A: 6E60  mov.b   @R6,R14                 ; R14 = idle_request_flag
+  04BC3C: D670  mov.l   @(0x1C0,PC),R6          ; = 0xFFFF65A9
+  04BC3E: D271  mov.l   @(0x1C4,PC),R2          ; = 0x0002F8EA
+  04BC40: 420B  jsr     @R2                     ; call check_status()
+  04BC42: 6D60  mov.b   @R6,R13                 ; R13 = RAM[FFFF65A9] (delay slot)
+
+  ; --- Process status return ---
+  04BC44: 620C  extu.b  R0,R2                   ; R2 = status result
+  04BC46: C407  mov.b   @(0x07,GBR),R0          ; R0 = GBR[7] = enable_flag
+  04BC48: C012  mov.b   R0,@(0x12,GBR)          ; GBR[0x12] = old enable (save)
+  04BC4A: 6CEC  extu.b  R14,R12                 ; R12 = idle_request & 0xFF
+
+  ; --- Enable condition check ---
+  04BC4C: 60C3  mov     R12,R0                  ; R0 = idle_request
+  04BC4E: 8801  cmp/eq  #1,R0                   ; idle_request == 1?
+  04BC50: 8B12  bf      0x04BC78                ; NO -> disabled path
+
+  04BC52: C500  mov.w   @(0x00,GBR),R0          ; R0 = enable_ramp_counter
+  04BC54: D46C  mov.l   @(0x1B0,PC),R4          ; R4 = 0xD6012
+  04BC56: 6641  mov.w   @R4,R6                  ; R6 = CAL[D6012] = 10
+  04BC58: 3062  cmp/hs  R6,R0                   ; counter >= 10?
+  04BC5A: 8B0D  bf      0x04BC78                ; NO -> disabled
+
+  04BC5C: C403  mov.b   @(0x03,GBR),R0          ; R0 = decay_counter
+  04BC5E: D46B  mov.l   @(0x1AC,PC),R4          ; R4 = 0xD6011
+  04BC60: 6640  mov.b   @R4,R6                  ; R6 = CAL[D6011] = 5
+  04BC62: 3062  cmp/hs  R6,R0                   ; decay >= 5?
+  04BC64: 8908  bt      0x04BC78                ; YES -> disabled (too much decay)
+
+  04BC66: 60DC  extu.b  R13,R0                  ; R0 = secondary_condition
+  04BC68: 8801  cmp/eq  #1,R0                   ; == 1?
+  04BC6A: 8B05  bf      0x04BC78                ; NO -> disabled
+
+  04BC6C: 2228  tst     R2,R2                   ; engine_status == 0?
+  04BC6E: 8B03  bf      0x04BC78                ; NO -> disabled
+
+  ; --- All conditions met: ENABLE ---
+  04BC70: E001  mov     #1,R0
+  04BC72: C007  mov.b   R0,@(0x07,GBR)          ; enable_flag = 1
+  04BC74: A007  bra     0x04BC86                ; skip ramp, R0=0 (delay)
+  04BC76: E000  mov     #0,R0
+
+  ; --- DISABLED PATH ---
+  04BC78: E000  mov     #0,R0
+  04BC7A: C007  mov.b   R0,@(0x07,GBR)          ; enable_flag = 0
+  04BC7C: D264  mov.l   @(0x190,PC),R2          ; R2 = 0xBE554 (ramp counter)
+  04BC7E: C500  mov.w   @(0x00,GBR),R0          ; R0 = enable_ramp_counter
+  04BC80: 640D  extu.w  R0,R4                   ; R4 = current value
+  04BC82: 420B  jsr     @R2                     ; ramp_counter(current, 1)
+  04BC84: E501  mov     #1,R5                   ; R5 = step = 1
+
+  ; --- Store ramp result ---
+  04BC86: C100  mov.w   R0,@(0x00,GBR)          ; enable_ramp_counter = result
+
+  ; --- Secondary ramp logic ---
+  04BC88: C407  mov.b   @(0x07,GBR),R0          ; enable_flag
+  04BC8A: 8801  cmp/eq  #1,R0
+  04BC8C: 8B03  bf      0x04BC96                ; not enabled -> update ramp
+  04BC8E: C412  mov.b   @(0x12,GBR),R0          ; old_enable
+  04BC90: 2008  tst     R0,R0
+  04BC92: 8D05  bt/s    0x04BCA0                ; was 0 (fresh enable) -> skip
+  04BC94: E000  mov     #0,R0                   ; R0 = 0 (delay slot)
+
+  04BC96: D25E  mov.l   @(0x178,PC),R2          ; = 0xBE554
+  04BC98: E501  mov     #1,R5
+  04BC9A: C505  mov.w   @(0x0A,GBR),R0          ; secondary_counter
+  04BC9C: 420B  jsr     @R2                     ; ramp(current, 1)
+  04BC9E: 640D  extu.w  R0,R4
+
+  04BCA0: C105  mov.w   R0,@(0x0A,GBR)          ; store secondary counter
+
+  ; --- Compute "not ready" flag ---
+  04BCA2: C505  mov.w   @(0x0A,GBR),R0          ; reload
+  04BCA4: D55B  mov.l   @(0x16C,PC),R5          ; = 0xD6014
+  04BCA6: 6251  mov.w   @R5,R2                  ; CAL[D6014] = 3
+  04BCA8: 3022  cmp/hs  R2,R0                   ; counter >= 3?
+  04BCAA: 0029  movt    R0                       ; R0 = T (1 if >= 3)
+  04BCAC: CA01  xor     #0x01,R0                ; invert: 1 if < 3
+  04BCAE: C006  mov.b   R0,@(0x06,GBR)          ; not_ready = (counter < 3)
+
+  ; --- Fresh enable: update decay counter ---
+  04BCB0: C407  mov.b   @(0x07,GBR),R0
+  04BCB2: 8801  cmp/eq  #1,R0
+  04BCB4: 8B0A  bf      0x04BCCC                ; not enabled
+  04BCB6: C412  mov.b   @(0x12,GBR),R0
+  04BCB8: 2008  tst     R0,R0
+  04BCBA: 8B07  bf      0x04BCCC                ; old state != 0 (not fresh)
+
+  04BCBC: D256  mov.l   @(0x158,PC),R2          ; = 0xBE53C (ramp variant)
+  04BCBE: C403  mov.b   @(0x03,GBR),R0          ; decay_counter
+  04BCC0: 2F02  mov.l   R0,@R15                 ; push to stack
+  04BCC2: 640C  extu.b  R0,R4
+  04BCC4: 420B  jsr     @R2                     ; ramp(decay, 1)
+  04BCC6: E501  mov     #1,R5
+  04BCC8: A009  bra     0x04BCDE                ; -> epilogue
+  04BCCA: C003  mov.b   R0,@(0x03,GBR)          ; decay_counter = result
+
+  ; --- Not enabled: check if should reset decay ---
+  04BCCC: 2CC8  tst     R12,R12                 ; idle_request == 0?
+  04BCCE: 8B06  bf      0x04BCDE                ; request != 0, skip
+  04BCD0: C500  mov.w   @(0x00,GBR),R0          ; enable_ramp_counter
+  04BCD2: D552  mov.l   @(0x148,PC),R5          ; = 0xD6016
+  04BCD4: 6251  mov.w   @R5,R2                  ; CAL[D6016] = 31
+  04BCD6: 3022  cmp/hs  R2,R0                   ; counter >= 31?
+  04BCD8: 8B01  bf      0x04BCDE                ; not yet
+  04BCDA: E000  mov     #0,R0
+  04BCDC: C003  mov.b   R0,@(0x03,GBR)          ; decay_counter = 0 (reset)
+
+  ; --- Epilogue ---
+  04BCDE: 7F04  add     #4,R15
+  04BCE0: 4F17  lds.l   @R15+,PR
+  04BCE2: 4F26  ldc.l   @R15+,GBR
+  04BCE4: 6EF6  mov.l   @R15+,R14
+  04BCE6: 6DF6  mov.l   @R15+,R13
+  04BCE8: 000B  rts
+  04BCEA: 6CF6  mov.l   @R15+,R12
+
+  ; --- Literal Pool ---
+  ; 04BDF4: FFFF8373  (RAM -- task latch)
+  ; 04BDF8: FFFF8364  (RAM -- GBR base)
+  ; 04BDFC: FFFF65D2  (RAM -- idle_request_flag)
+  ; 04BE00: FFFF65A9  (RAM -- secondary_condition)
+  ; 04BE04: 0002F8EA  (CODE -- check_status)
+  ; 04BE08: 000D6012  (CAL -- enable threshold = 10)
+  ; 04BE0C: 000D6011  (CAL -- decay threshold = 5)
+  ; 04BE10: 000BE554  (DESC -- ramp counter)
+  ; 04BE14: 000D6014  (CAL -- secondary threshold = 3)
+  ; 04BE18: 000BE53C  (DESC -- ramp counter variant)
+  ; 04BE1C: 000D6016  (CAL -- reset threshold = 31)
+
+
+================================================================================
+FUN_0004c01a @ 0x04C01A  (DTC enable condition checker)
+================================================================================
+  04C01A: 2FB6  mov.l   R11,@-R15
+  04C01C: 2FC6  mov.l   R12,@-R15
+  04C01E: 2FD6  mov.l   R13,@-R15
+  04C020: 2FE6  mov.l   R14,@-R15
+  04C022: 4F22  sts.l   PR,@-R15
+  04C024: 7FFC  add     #-4,R15
+  04C026: E600  mov     #0,R6                   ; default result = 0
+  04C028: D482  mov.l   @(0x208,PC),R4          ; = 0xFFFF340E
+  04C02A: DC83  mov.l   @(0x20C,PC),R12         ; = 0xBE980 (cond checker)
+  04C02C: 4C0B  jsr     @R12                    ; check(0xFFFF340E)
+  04C02E: 2F60  mov.b   R6,@R15                 ; save result on stack
+  04C030: 620C  extu.b  R0,R2
+  04C032: 2228  tst     R2,R2
+  04C034: 8B0B  bf      0x04C04E                ; condition set -> return 1
+
+  04C036: D47C  mov.l   @(0x1F0,PC),R4          ; = 0xFFFF340C
+  04C038: 4C0B  jsr     @R12                    ; check(0xFFFF340C)
+  04C03A: 0009  nop
+  04C03C: 620C  extu.b  R0,R2
+  04C03E: 2228  tst     R2,R2
+  04C040: 8B05  bf      0x04C04E                ; condition set
+
+  04C042: D47E  mov.l   @(0x1F8,PC),R4          ; = 0xFFFF341A
+  04C044: 4C0B  jsr     @R12                    ; check(0xFFFF341A)
+  04C046: 0009  nop
+  04C048: 620C  extu.b  R0,R2
+  04C04A: 2228  tst     R2,R2
+  04C04C: 8901  bt      0x04C052                ; clear -> continue loop
+
+  04C04E: E601  mov     #1,R6                   ; result = 1 (DTC active)
+  04C050: 2F60  mov.b   R6,@R15
+
+  ; --- Loop: check 5 additional conditions ---
+  04C052: EE00  mov     #0,R14                  ; loop counter = 0
+  04C054: 6DE3  mov     R14,R13                 ; offset = 0
+  04C056: A00B  bra     0x04C070
+  04C058: EB05  mov     #5,R11                  ; limit = 5
+
+  04C05A: D479  mov.l   @(0x1E4,PC),R4          ; = 0xFFFF3410
+  04C05C: 4C0B  jsr     @R12                    ; check(0xFFFF3410 + offset)
+  04C05E: 34DC  add     R13,R4                  ; R4 += offset (delay slot)
+  04C060: 620C  extu.b  R0,R2
+  04C062: 2228  tst     R2,R2
+  04C064: 8902  bt      0x04C06C                ; clear -> next
+  04C066: E601  mov     #1,R6
+  04C068: A005  bra     0x04C076                ; result = 1, exit loop
+  04C06A: 2F60  mov.b   R6,@R15
+
+  04C06C: 7E01  add     #1,R14                  ; counter++
+  04C06E: 7D02  add     #2,R13                  ; offset += 2
+
+  04C070: 62EC  extu.b  R14,R2
+  04C072: 32B3  cmp/ge  R11,R2                  ; counter >= 5?
+  04C074: 8BF1  bf      0x04C05A                ; loop back
+
+  ; --- Epilogue ---
+  04C076: 60F0  mov.b   @R15,R0                 ; R0 = result
+  04C078: 7F04  add     #4,R15
+  04C07A: 4F26  ldc.l   @R15+,GBR
+  04C07C: 6EF6  mov.l   @R15+,R14
+  04C07E: 6DF6  mov.l   @R15+,R13
+  04C080: 6CF6  mov.l   @R15+,R12
+  04C082: 000B  rts
+  04C084: 6BF6  mov.l   @R15+,R11
+
+
+================================================================================
+FUN_0004c828 -- MAIN IDLE DISPATCHER (partial, key sections)
+GBR = 0xFFFF837B
+================================================================================
+
+  ; --- Prologue ---
+  04C828: 2FA6  mov.l   R10,@-R15
+  04C82A: 2FB6  mov.l   R11,@-R15
+  04C82C: 2FC6  mov.l   R12,@-R15
+  04C82E: 2FD6  mov.l   R13,@-R15
+  04C830: 2FE6  mov.l   R14,@-R15
+  04C832: 4F22  sts.l   PR,@-R15
+  04C834: 4F13  stc.l   GBR,@-R15
+  04C836: D00F  mov.l   @(0x3C,PC),R0           ; = 0xFFFF837B
+  04C838: 401E  ldc     R0,GBR
+  04C83A: 7FE4  add     #-28,R15                ; 28 bytes local stack
+
+  ; --- Initialize output buffers ---
+  04C83C: EB00  mov     #0,R11
+  04C83E: 60B3  mov     R11,R0
+  04C840: C080  mov.b   R0,@(0x80,GBR)          ; output_idx_A = 0
+  04C842: C081  mov.b   R0,@(0x81,GBR)          ; output_idx_B = 0
+  04C844: C082  mov.b   R0,@(0x82,GBR)          ; output_idx_C = 0
+
+  ; --- Sensor processing loop setup ---
+  04C846: 6DB3  mov     R11,R13                 ; loop counter = 0
+  04C848: EC0C  mov     #12,R12                 ; iterations = 12
+  04C84A: A042  bra     0x04C8D2                ; -> loop check
+  04C84C: EA08  mov     #8,R10                  ; threshold = 8 (delay slot)
+
+  ; --- Loop body: sensor read + output ---
+  04C878: 62E3  mov     R14,R2
+  04C87A: 4200  shll    R2                      ; channel * 2
+  04C87C: 652C  extu.b  R2,R5                   ; R5 = channel index
+  04C87E: D291  mov.l   @(0x244,PC),R2          ; = 0x6B5A (sensor_read)
+  04C880: 66B3  mov     R11,R6
+  04C882: 420B  jsr     @R2                     ; sensor_read(0, index)
+  04C884: E400  mov     #0,R4
+  04C886: D290  mov.l   @(0x240,PC),R2          ; = 0x67A6 (convert)
+  04C888: 420B  jsr     @R2                     ; convert(result)
+  04C88A: 6403  mov     R0,R4
+  04C88C: 660D  extu.w  R0,R6                   ; R6 = converted value
+  04C88E: 6263  mov     R6,R2
+  04C890: 4219  shlr8   R2                      ; R2 = MSB (high byte)
+  04C892: 6129  swap.w  R2,R1
+  04C894: 621E  exts.b  R1,R2                   ; sign-extend for comparison
+
+  ; --- Store to appropriate buffer ---
+  04C896: 3EA7  cmp/gt  R10,R14                 ; iteration > 8?
+  04C898: D58C  mov.l   @(0x230,PC),R5          ; = 0xFFFF837B (GBR base)
+  04C89A: D78D  mov.l   @(0x234,PC),R7          ; = 0xBE53C (ramp counter)
+  04C89C: 8D0F  bt/s    0x04C8BE                ; if > 8, secondary path
+  ...
+  ; (continues with buffer write and ramp counter calls)
+
+  ; --- Change detection loop (5 iterations) ---
+  04C8DE: EE00  mov     #0,R14                  ; counter = 0
+  04C8E0: ED05  mov     #5,R13                  ; limit = 5
+  04C8E2: A045  bra     0x04C970
+  04C8E4: EC02  mov     #2,R12                  ; compare mode (delay slot)
+  ; (compares sensor buffers at GBR+0x68 vs GBR+0x6E vs GBR+0x74)
+  ; (sets transition flags and GBR+0x8A status bits)
+
+  ; --- Target speed selection ---
+  04C976: C465  mov.b   @(0x65,GBR),R0          ; selector_A
+  04C978: 6D03  mov     R0,R13
+  04C97A: C466  mov.b   @(0x66,GBR),R0          ; selector_B
+  04C97C: 3D00  cmp/eq  R0,R13                  ; A == B?
+  04C97E: C465  mov.b   @(0x65,GBR),R0
+  04C980: 6D0C  extu.b  R0,R13
+  04C982: C467  mov.b   @(0x67,GBR),R0          ; selector_C
+  04C984: 8F0C  bf/s    0x04C9A0                ; A != B, branch
+  04C986: 620C  extu.b  R0,R2
+
+  ; (target speed selection logic continues with 4 cases)
+  ; Case 1 (A==B, A==C): GBR[0]=A, mode=-1 (no ramp)
+  ; Case 2 (A==B, A!=C): GBR[0]=A, mode=2 (slow)
+  ; Case 3 (A!=B, A==C): GBR[0]=A, mode=1 (medium)
+  ; Case 4 (all differ): GBR[0]=B, mode=0 (instant), error
+
+  ; --- Load ISC calibration params ---
+  04CA10: D631  mov.l   @(0xC4,PC),R6           ; = 0xD608A
+  04CA12: 6060  mov.b   @R6,R0
+  04CA14: C02A  mov.b   R0,@(0x2A,GBR)          ; ISC_param[0] = 102
+  04CA16: D631  mov.l   @(0xC4,PC),R6           ; = 0xD608B
+  04CA18: 6060  mov.b   @R6,R0
+  04CA1A: C02B  mov.b   R0,@(0x2B,GBR)          ; ISC_param[1] = 16
+  04CA1C: D630  mov.l   @(0xC0,PC),R6           ; = 0xD608C
+  04CA1E: 6060  mov.b   @R6,R0
+  04CA20: C02C  mov.b   R0,@(0x2C,GBR)          ; ISC_param[2] = 8
+  04CA22: D630  mov.l   @(0xC0,PC),R6           ; = 0xD608D
+  04CA24: 6060  mov.b   @R6,R0
+  04CA26: C02D  mov.b   R0,@(0x2D,GBR)          ; ISC_param[3] = 25
+  04CA28: D62F  mov.l   @(0xBC,PC),R6           ; = 0xD608E
+  04CA2A: 6060  mov.b   @R6,R0
+  04CA2C: C02E  mov.b   R0,@(0x2E,GBR)          ; ISC_param[4] = 151
+
+  ; --- Epilogue ---
+  04CA3C: 7F1C  add     #28,R15
+  04CA3E: 4F17  lds.l   @R15+,PR
+  04CA40: 4F26  ldc.l   @R15+,GBR
+  04CA42: 6EF6  mov.l   @R15+,R14
+  04CA44: 6DF6  mov.l   @R15+,R13
+  04CA46: 6CF6  mov.l   @R15+,R12
+  04CA48: 6BF6  mov.l   @R15+,R11
+  04CA4A: 000B  rts
+  04CA4C: 6AF6  mov.l   @R15+,R10
+
+  ; --- Literal Pool ---
+  ; 04CAC4: 00006B5A  (CODE -- sensor_read)
+  ; 04CAC8: 000067A6  (CODE -- convert)
+  ; 04CACC: FFFF837B  (RAM -- GBR base)
+  ; 04CAD0: 000BE53C  (DESC -- ramp counter)
+  ; 04CAD4: 0004E802  (CODE -- error handler)
+  ; 04CAD8: 000D608A  (CAL -- ISC param 0)
+  ; 04CADC: 000D608B  (CAL -- ISC param 1)
+  ; 04CAE0: 000D608C  (CAL -- ISC param 2)
+  ; 04CAE4: 000D608D  (CAL -- ISC param 3)
+  ; 04CAE8: 000D608E  (CAL -- ISC param 4)
+  ; 04CAEC: FFFF83A5  (RAM -- sensor reference)
+  ; 04CAF0: 0004E7A0  (CODE -- sensor comparison)
+
+
+================================================================================
+ISC OUTPUT HANDLER BLOCK (example at 0x4CDD8)
+GBR = 0xFFFF837E
+================================================================================
+  ; (Context: one of 19 handler blocks dispatched from control loop)
+  ; Sets GBR to ISC output workspace and writes state + outputs
+
+  04CDD8: D0xx  mov.l   @(disp,PC),R0           ; = 0xFFFF837E
+  04CDDA: 401E  ldc     R0,GBR
+
+  ; ... (computation of ISC values from inputs) ...
+
+  04CDF0: C05E  mov.b   R0,@(0x5E,GBR)          ; output_modifier = val
+  04CDF2: E002  mov     #2,R0
+  04CDF4: C000  mov.b   R0,@(0x00,GBR)          ; state = 2
+  04CDF6: E005  mov     #5,R0
+  04CDF8: C001  mov.b   R0,@(0x01,GBR)          ; mode = 5
+  04CDFA: E002  mov     #2,R0
+  04CDFC: C05C  mov.b   R0,@(0x5C,GBR)          ; *** ISC OUTPUT = 2 ***
+  04CDFE: E000  mov     #0,R0
+  04CE00: C05D  mov.b   R0,@(0x5D,GBR)          ; secondary = 0
+
+  ; Set status flags via or.b
+  04CE02: E084  mov     #-124,R0                ; 0x84
+  04CE04: 600C  extu.b  R0,R0                   ; R0 = 0x84
+  04CE06: CF80  or.b    #0x80,@(R0,GBR)         ; set bit 7 @ GBR+0x84
+  04CE08: 7002  add     #2,R0                   ; R0 = 0x86
+  04CE0A: CF10  or.b    #0x10,@(R0,GBR)         ; set bit 4 @ GBR+0x86
+  04CE0C: 4F17  lds.l   @R15+,PR
+  04CE0E: 4F26  ldc.l   @R15+,GBR
+
+  ; (Note: there are 18 more similar handler blocks)
+  ; Each sets different state/mode/output combinations depending on
+  ; the current operating condition.
+
+
+================================================================================
+GBR SET POINTS FOR ISC OUTPUT HANDLERS (all 19 locations)
+================================================================================
+  0x04CBE2    0x04CC2E    0x04CC76    0x04CCFA    0x04CDD8
+  0x04CF6C    0x04D55C    0x04D604    0x04D798    0x04D892
+  0x04D8DC    0x04DA06    0x04DAB4    0x04DB24    0x04DC28
+  0x04DC4E    0x04DD38    0x04DE4C    0x04DF34
+
+  These span approximately 0x4CBE2 to 0x4DF34 (~5 KB of code),
+  forming the complete ISC output state machine with 19 distinct
+  operating cases.

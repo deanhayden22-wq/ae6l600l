@@ -1,0 +1,175 @@
+================================================================================
+TAU-ALPHA TRANSIENT FUELING — RAW DISASSEMBLY
+ROM: AE5L600L  |  ECU: Renesas SH7058 (SH-2)  |  2013 Subaru WRX MT
+================================================================================
+
+NOTE ON DECODE ISSUES:
+  0xC722 at 03735E = MOVA @(disp,PC),R0    (MOVA not handled by decode())
+    Format: 1100 0111 dddd dddd  (C7xx)
+    disp = 0x22, target = ((03735E+4)&~3) + 0x22*4 = 037360 + 0x88 = 0x0373E8
+    So R0 = ROM address 0x0373E8 (literal pool data pointer)
+
+  0xF48D at 037434 = fsts FPUL,FR4          (delay slot of BRA)
+    Format: 1111nnnn00001101  n=4 → 0xF40D... actually n=4, m=8, sub=D:
+    0xF48D & 0xF0FF = 0xF00D → fsts FPUL,FRn with n=4 ✓
+
+  0x4F26 in epilogues = LDS.L @R15+,PR      (not LDC.L GBR)
+    See accel_enrichment_analysis.txt for full encoding note.
+
+
+================================================================================
+FUN_03735A — tau_rising_handler @ 0x037186 (called from fuel_transient_comp)
+================================================================================
+Address:  0x03735A
+Size:     0x20 bytes code + literal pool
+BSR from: fuel_transient_comp @ 0x3717A (second BSR, bsr 03735A)
+Role:     Apply rising-load tau time constant via descriptor table lookup.
+          Computes enrichment contribution for load INCREASE transients.
+
+  ; --- prologue ---
+  03735A: 4F22  sts.l   PR,@-R15
+
+  ; --- set up tau table pointer (MOVA reads ROM literal pool) ---
+  03735C: D228  mov.l   @(0xA0,PC),R2       ; R2 = 0x000BEA40  DESC_tau_rising
+  03735E: C722  mova    @(0x88,PC),R0       ; R0 = 0x0373E8 (ptr into literal pool)
+  037360: F708  fmov.s  @R0,FR7             ; FR7 = [0x0373E8] = 0.004578 (raw tau weight?)
+
+  ; --- load workspace floats (R6 = 0xFFFF7A60, transient workspace) ---
+  037362: D629  mov.l   @(0xA4,PC),R6       ; R6 = 0xFFFF7A60  tau_workspace
+  037364: E0F8  mov     #-8,R0
+  037366: F666  fmov.s  @(R0,R6),FR6        ; FR6 = [R6-8]  = [0xFFFF7A58] = prev_load_signal
+  037368: E0F4  mov     #-12,R0
+  03736A: F566  fmov.s  @(R0,R6),FR5        ; FR5 = [R6-12] = [0xFFFF7A54] = tau_accum_rising
+
+  ; --- call tau rising descriptor ---
+  03736C: 420B  jsr     @R2                 ; call DESC_0BEA40 (tau rising table apply)
+  03736E: F468  fmov.s  @R6,FR4             ; (delay) FR4 = [R6+0] = [0xFFFF7A60] = current_load
+
+  ; --- store result back ---
+  037370: D625  mov.l   @(0x94,PC),R6       ; R6 = 0xFFFF7A60  (reload workspace ptr)
+  037372: E0F4  mov     #-12,R0
+  037374: 4F26  lds.l   @R15+,PR            ; restore PR
+  037376: 000B  rts
+  037378: F607  fmov.s  FR0,@(R0,R6)        ; (delay) [R6-12] = [0xFFFF7A54] = FR0 (result)
+
+  ; --- literal pool follows (not instructions) ---
+  ;   037400: 0x000BEA40   DESC_tau_rising
+  ;   037408: 0xFFFF7A60   tau_workspace
+
+
+================================================================================
+FUN_03740C — tau_falling_handler @ 0x03740C (called from fuel_transient_comp)
+================================================================================
+Address:  0x03740C
+Size:     0x50 bytes
+BSR from: fuel_transient_comp @ 0x3717E (third BSR, bsr 03740C)
+Role:     Apply falling-load tau time constant. Handles fuel film EVAPORATION
+          during decreasing load. Gated by load threshold (720.0) and state flag.
+
+  ; --- prologue ---
+  03740C: 2FE6  mov.l   R14,@-R15
+  03740E: 4F22  sts.l   PR,@-R15
+
+  ; --- load state and current tau accumulator ---
+  037410: D640  mov.l   @(0x100,PC),R6      ; R6 = 0xFFFFAF3B  falling_mode_byte (addr)
+  037412: 6E60  mov.b   @R6,R14             ; R14 = falling_mode_byte value
+  037414: D240  mov.l   @(0x100,PC),R2      ; R2 = 0xFFFF3194  tau_accum_falling (float)
+  037416: F428  fmov.s  @R2,FR4             ; FR4 = current tau accumulator value
+  037418: D240  mov.l   @(0x100,PC),R2      ; R2 = 0xFFFF8EAC  current_load_signal (float)
+
+  ; --- check mode: if mode==1, proceed with falling tau logic ---
+  03741A: 60EC  extu.b  R14,R0             ; R0 = mode byte (zero-extended)
+  03741C: 8801  cmp/eq  #1,R0
+  03741E: 8F0A  bf/s     037436            ; mode != 1 → alt path (load-based fallback)
+  037420: F828  fmov.s  @R2,FR8            ; (delay) FR8 = current_load_signal
+
+  ; --- mode == 1: check flag and load threshold ---
+  037422: D53F  mov.l   @(0xFC,PC),R5      ; R5 = 0xFFFF7A74  tau_state_flag (addr)
+  037424: 6250  mov.b   @R5,R2             ; R2 = tau_state_flag value
+  037426: 2228  tst     R2,R2
+  037428: 8B05  bf       037436            ; flag != 0 → alt path
+  03742A: D23E  mov.l   @(0xF8,PC),R2      ; R2 = 0x000CC2B0  CAL: load_threshold = 720.0
+  03742C: F928  fmov.s  @R2,FR9            ; FR9 = 720.0
+  03742E: F985  fcmp/gt FR8,FR9            ; FR9 > FR8 (720 > load_signal)?
+  037430: 8901  bt       037436            ; load < 720 → alt path
+  037432: A004  bra     03743E             ; load >= 720 → apply falling tau directly
+  037434: F48D  fsts    FPUL,FR4           ; (delay) FR4 = FPUL (tau from prior FTRC)
+
+  ; --- alt path: load from workspace history buffer and accumulate ---
+  037436: D53A  mov.l   @(0xE8,PC),R5      ; R5 = 0xFFFF7A74  workspace reference
+  037438: E0E0  mov     #-32,R0
+  03743A: F856  fmov.s  @(R0,R5),FR8       ; FR8 = [R5-32] = [0xFFFF7A54] = history_val
+  03743C: F480  fadd    FR8,FR4             ; FR4 = tau_accum + history_val
+
+  ; --- apply falling tau via descriptor ---
+  03743E: D436  mov.l   @(0xD8,PC),R4      ; R4 = 0xFFFF3194  &tau_accum_falling
+  037440: D239  mov.l   @(0xE4,PC),R2      ; R2 = 0x000BDBCC  DESC_tau_falling
+  037442: 420B  jsr     @R2                ; call DESC_0BDBCC
+  037444: 0009  nop
+
+  ; --- store state byte and return ---
+  037446: D536  mov.l   @(0xD8,PC),R5      ; R5 = 0xFFFF7A74
+  037448: 25E0  mov.b   R14,@R5            ; [0xFFFF7A74] = falling_mode_byte (state persist)
+  03744A: 4F26  lds.l   @R15+,PR           ; restore PR
+  03744C: 000B  rts
+  03744E: 6EF6  mov.l   @R15+,R14          ; (delay) restore R14
+
+  ; --- literal pool ---
+  ;   037514: 0xFFFFAF3B   falling_mode_byte
+  ;   037518: 0xFFFF3194   tau_accum_falling
+  ;   03751C: 0xFFFF8EAC   current_load_signal
+  ;   037520: 0xFFFF7A74   tau_state_flag
+  ;   037524: 0x000CC2B0   load_threshold (720.0)
+  ;   037528: 0x000BDBCC   DESC_tau_falling
+
+
+================================================================================
+CALIBRATION TABLE DUMPS
+================================================================================
+
+ECT axis @ 0xCC624 (float32, 16 bins, 10°F steps):
+  -40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110  (°F)
+
+Load axis @ 0xCCDCC (float32, 3 bins, g/rev):
+  1.4, 3.0, 8.0  g/rev
+
+Tau_RisingLoad_A @ 0xCD6E6  (3 load bins × 16 ECT bins, uint16, scale=1/2048)
+  ECT:      -40   -30   -20   -10     0    10    20    30    40    50    60    70    80    90   100   110
+  1.4g/rev: 3.40  3.40  3.40  2.70  2.20  2.00  1.90  1.75  1.50  1.30  1.05  0.80  0.40  0.40  0.40  0.40
+  3.0g/rev: 3.40  3.40  3.40  2.70  2.20  2.00  1.90  1.75  1.50  1.30  1.05  0.80  0.35  0.30  0.30  0.30
+  8.0g/rev: 3.40  3.40  3.40  2.70  2.20  2.00  1.90  1.80  1.70  1.60  1.50  1.40  0.30  0.25  0.25  0.25
+
+Tau_FallingLoad @ 0xCD746  (16 ECT bins, primary, uint16, scale=1/2048)
+  ECT:      -40   -30   -20   -10     0    10    20    30    40    50    60    70    80    90   100   110
+  Falling:  1.42  1.42  1.42  1.35  1.24  1.09  0.98  0.90  0.86  0.83  0.78  0.70  0.40  0.30  0.30  0.30
+
+Tau_FallingLoad_A @ 0xCD766  (16 ECT bins, variant A, uint16, scale=1/2048)
+  Flat 0.50 across all ECT bins
+
+Tau_FallingLoad_B @ 0xCD848  (16 ECT bins, variant B, uint16, scale=1/2048)
+  ECT:      -40   -30   -20   -10     0    10    20    30    40    50    60    70    80    90   100   110
+  Falling:  0.90  0.90  0.90  0.90  0.90  0.90  0.90  0.90  0.90  0.80  0.70  0.60  0.40  0.30  0.30  0.30
+
+Tau_FallingLoad_C @ 0xCD868  (16 ECT bins, variant C, uint16, scale=1/2048)
+  ECT:      -40   -30   -20   -10     0    10    20    30    40    50    60    70    80    90   100   110
+  Falling:  0.70  0.70  0.70  0.70  0.50  0.50  0.50  0.50  0.50  0.50  0.50  0.40  0.25  0.00  0.00  0.00
+
+Load threshold CAL @ 0xCC2B0: 720.0  (RPM? g/rev × 1000? context: 720 RPM ≈ idle)
+  Adjacent cals: CC2AC=0.25, CC2B4=6.3, CC2B8=300.0, CC2BC=500.0, CC2C0=100.0
+
+================================================================================
+REFERENCED RAM ADDRESSES
+================================================================================
+  0xFFFF3194   tau_accum_falling    float  current falling tau accumulator
+  0xFFFF7A54   tau_accum_rising     float  [= tau_workspace - 12]
+  0xFFFF7A58   prev_load_signal     float  [= tau_workspace - 8]
+  0xFFFF7A60   tau_workspace        float  current load (tau_rising R6 base)
+  0xFFFF7A74   tau_state_flag       byte   mode/state flag for falling tau
+  0xFFFF8EAC   current_load_signal  float  (FR8 source in FUN_03740C)
+  0xFFFFAF3B   falling_mode_byte    byte   (R14 source in FUN_03740C)
+
+================================================================================
+REFERENCED CODE / DESCRIPTOR ADDRESSES
+================================================================================
+  0x000BEA40   DESC_tau_rising   tau rising load table lookup
+  0x000BDBCC   DESC_tau_falling  tau falling load table apply

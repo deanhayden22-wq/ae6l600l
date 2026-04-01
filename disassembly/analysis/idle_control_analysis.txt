@@ -1,0 +1,583 @@
+================================================================================
+IDLE SPEED CONTROL (ISC) SYSTEM -- COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2)
+================================================================================
+
+
+OVERVIEW
+--------
+The idle speed control system is a multi-layered, state-machine-driven
+architecture that manages engine idle speed through:
+  1. Drive-by-wire (DBW) throttle plate position
+  2. Ignition timing compensation
+  3. Airflow targeting with decel/ramp logic
+
+This is NOT a traditional ISCV (idle air control valve) system -- the 2013
+WRX uses electronic throttle body (DBW). Idle speed is controlled by
+adjusting the target throttle plate opening angle based on desired idle
+airflow, with ignition timing used as a fast-acting correction path.
+
+Architecture:
+  Task 54 (scheduler task) -> Enable/disable state machine (FUN_0004bc28)
+  FUN_0004c828             -> Main idle dispatcher (19 handler blocks)
+  FUN_0004c01a             -> DTC enable condition checker
+  Handler blocks 0x4CB-0x4DF -> Individual ISC control cases
+
+GBR Workspaces:
+  0xFFFF8364  -- Enable/disable state machine (task 54 direct)
+  0xFFFF837B  -- Main dispatcher workspace
+  0xFFFF837E  -- ISC output/state machine (19 fields, 62 accesses)
+
+
+================================================================================
+SECTION 1: TASK 54 WRAPPER AND ENABLE/DISABLE STATE MACHINE
+================================================================================
+
+  task54_idle_control @ 0x04BC20  (scheduler entry)
+  ---------------------------------------------------------------
+  This is a tiny wrapper that clears a single flag byte:
+
+    04BC20: mov     #0,R2
+    04BC22: mov.l   @(PC),R6        ; R6 = 0xFFFF8373
+    04BC24: rts
+    04BC26: mov.b   R2,@R6          ; RAM[0xFFFF8373] = 0 (delay slot)
+
+  Effect: Clears RAM 0xFFFF8373 on every scheduler tick.
+  This byte is likely a "task executed" flag or watchdog latch.
+
+
+  FUN_0004bc28 @ 0x04BC28  (enable/disable logic)
+  ---------------------------------------------------------------
+  Entry: Called separately (not from wrapper -- separate dispatch)
+  Prologue: Saves R12-R14, PR, GBR; sets GBR = 0xFFFF8364
+  Stack: 4 bytes local
+
+  GBR field map (base 0xFFFF8364):
+    +0x00 (0xFFFF8364): word  -- counter/timer 1 (enable ramp)
+    +0x03 (0xFFFF8367): byte  -- counter/timer 2 (decay ramp)
+    +0x06 (0xFFFF836A): byte  -- "not ready" flag
+    +0x07 (0xFFFF836B): byte  -- master enable flag (1=idle active)
+    +0x0A (0xFFFF836E): word  -- counter/timer 3 (secondary ramp)
+    +0x12 (0xFFFF8376): byte  -- previous enable state (edge detect)
+
+  Input RAM:
+    0xFFFF65D2  -- idle request flag (byte, R14/R12)
+    0xFFFF65A9  -- secondary idle condition (byte, R13)
+
+  Calibrations:
+    0xD6011 (byte) = 0x05  -- decay counter threshold
+    0xD6012 (word) = 0x000A (10) -- enable ramp threshold
+    0xD6014 (word) = 0x0003 (3)  -- secondary counter threshold
+    0xD6016 (word) = 0x001F (31) -- reset counter threshold
+
+  Called subroutines:
+    0x02F8EA  -- Status/condition check (returns status in R0)
+    0xBE554   -- Ramp counter (descriptor-based, R4=current, R5=step)
+    0xBE53C   -- Ramp counter variant (same interface)
+
+  Logic Flow:
+
+  1. COPY PREVIOUS STATE (0x04BC46-0x04BC48):
+     GBR[0x12] = GBR[0x07]  (save old enable flag for edge detection)
+
+  2. ENABLE CONDITION CHECK (0x04BC4C-0x04BC70):
+     ALL of these must be true to set enable=1:
+       a) RAM[0xFFFF65D2] == 1     (idle request active)
+       b) GBR[0x00] >= CAL[0xD6012] (enable ramp counter >= 10)
+       c) GBR[0x03] < CAL[0xD6011]  (decay counter < 5)
+       d) RAM[0xFFFF65A9] == 1      (secondary condition met)
+       e) R2 == 0                   (engine status from 0x2F8EA == 0)
+     If ALL true: GBR[0x07] = 1 (enable idle control), skip ramp
+
+  3. DISABLE PATH (0x04BC78-0x04BC84):
+     GBR[0x07] = 0
+     Call ramp counter 0xBE554(GBR[0x00], step=1)
+     Store result back to GBR[0x00] -- increments enable ramp counter
+
+  4. SECONDARY RAMP (0x04BC86-0x04BCAE):
+     Always: Store ramp result to GBR[0x00]
+     If enabled AND old state was 0 (transition to idle):
+       Skip secondary ramp update (R0 = 0)
+     Else:
+       Call ramp counter 0xBE554(GBR[0x0A], step=1)
+     Store to GBR[0x0A]
+     Compute: GBR[0x06] = (GBR[0x0A] < CAL[0xD6014])
+       => "not ready" flag: 1 while counter < 3, then 0
+
+  5. FRESH ENABLE / DECAY RESET (0x04BCB0-0x04BCDC):
+     If enabled AND old state was 0 (fresh transition):
+       Call 0xBE53C(GBR[0x03], step=1) -- increment decay counter
+       Store result to GBR[0x03]
+     Else if idle_request == 0 AND counter >= 31:
+       GBR[0x03] = 0  (reset decay counter when not idling)
+
+  Summary: This function manages the enable/disable state with hysteresis
+  ramps. Idle control enables only after the enable ramp counter reaches 10
+  ticks, and the decay counter provides a delay before re-enabling after
+  the idle condition temporarily drops out.
+
+
+================================================================================
+SECTION 2: MAIN IDLE DISPATCHER (FUN_0004c828)
+================================================================================
+
+  FUN_0004c828 @ 0x04C828
+  ---------------------------------------------------------------
+  Entry: Called from main control loop (not directly from task 54)
+  Prologue: Saves R10-R14, PR, GBR; sets GBR = 0xFFFF837B
+  Stack: 28 bytes local
+  Size: ~0x4C828-0x4CA4D (large, ~550 bytes)
+
+  GBR field map (base 0xFFFF837B):
+    +0x00 (0xFFFF837B): byte  -- dispatch state variable
+    +0x65 (0xFFFF83E0): byte  -- target speed selector A
+    +0x66 (0xFFFF83E1): byte  -- target speed selector B
+    +0x67 (0xFFFF83E2): byte  -- target speed selector C
+    +0x7F (0xFFFF83FA): byte  -- transition mode flag (-1/0/1/2)
+    +0x80 (0xFFFF83FB): byte  -- output buffer index A
+    +0x81 (0xFFFF83FC): byte  -- output buffer index B
+    +0x82 (0xFFFF83FD): byte  -- output buffer index C
+    +0x8A (0xFFFF8405): byte  -- status flags (bit 7: active)
+
+  Structure:
+
+  Phase 1 - SENSOR PROCESSING LOOP (0x4C836-0x4C8D6):
+    Iterates 12 times (R12=12, counter R13):
+      For each iteration:
+        - Calls 0x6B5A (sensor read/scale, R5=channel index)
+        - Calls 0x67A6 (conversion/format)
+        - Splits result into MSB/LSB components
+        - If iteration <= 8: writes to output buffer at GBR+0x68
+        - If iteration > 8: writes to secondary buffer at GBR+0x65
+      This populates sensor channels (RPM, ECT, TPS, etc.)
+
+  Phase 2 - CHANGE DETECTION LOOP (0x4C8DE-0x4C974):
+    Iterates 5 times:
+      For each of 5 sensor channels:
+        - Compares current value (GBR+0x68+offset) with previous (GBR+0x6E)
+        - Compares current with a third buffer (GBR+0x74)
+        - Sets transition state:
+          - 0xFF (-1): value unchanged from both references
+          - 0x00: value changed but matches alternate
+          - 0x01: value increased
+          - 0x02: value decreased
+        - Sets GBR+0x8A flags: bit 6 if any change, bit 7 if specific change
+
+  Phase 3 - TARGET SPEED SELECTION (0x4C976-0x4C9EA):
+    Reads three target speed selector bytes (GBR+0x65, +0x66, +0x67)
+    Compares them in priority order:
+      If selector_A != selector_B AND selector_A == selector_C:
+        GBR[0x00] = selector_A, GBR[0x7F] = -1 (no ramp)
+      If selector_A == selector_B AND selector_A != selector_C:
+        GBR[0x00] = selector_A, GBR[0x7F] = 2 (slow ramp)
+      If selector_A != selector_B != selector_C:
+        GBR[0x00] = selector_B, GBR[0x7F] = 1 (medium ramp)
+      Default: GBR[0x00] = selector_B, GBR[0x7F] = 0 (instant)
+
+  Phase 4 - DISPATCH AND CALIBRATION LOAD (0x4C9EA-0x4CA4C):
+    If GBR[0x00] is 0 or 1: error state, reset and call 0x4E802
+    If GBR[0x00] is valid AND GBR+0x8A bit 7 set:
+      - Load 5 calibration bytes from CAL[0xD608A-0xD608E]:
+          0xD608A = 0x66 (102) -> GBR+0x2A
+          0xD608B = 0x10 (16)  -> GBR+0x2B
+          0xD608C = 0x08 (8)   -> GBR+0x2C
+          0xD608D = 0x19 (25)  -> GBR+0x2D
+          0xD608E = 0x97 (151) -> GBR+0x2E
+      - These are ISC output parameters (duty cycle or timing params)
+      - If GBR+0x8A bit 7: Call 0x4E7A0 with R4=0xFFFF83A5
+
+  Epilogue: Restore registers and return.
+
+
+================================================================================
+SECTION 3: ISC OUTPUT HANDLER BLOCKS (GBR=0xFFFF837E)
+================================================================================
+
+  19 handler blocks set GBR = 0xFFFF837E at addresses:
+    0x4CBE2  0x4CC2E  0x4CC76  0x4CCFA  0x4CDD8
+    0x4CF6C  0x4D55C  0x4D604  0x4D798  0x4D892
+    0x4D8DC  0x4DA06  0x4DAB4  0x4DB24  0x4DC28
+    0x4DC4E  0x4DD38  0x4DE4C  0x4DF34
+
+  GBR field map (base 0xFFFF837E):
+    +0x00 (0xFFFF837E): byte R/W -- ISC state machine state
+    +0x01 (0xFFFF837F): byte W   -- ISC mode byte
+    +0x02 (0xFFFF8380): byte W   -- output channel A
+    +0x03 (0xFFFF8381): byte W   -- output channel B
+    +0x04 (0xFFFF8382): byte W   -- output channel C
+    +0x05 (0xFFFF8383): byte W   -- output channel D
+    +0x06 (0xFFFF8384): byte W   -- output channel E
+    +0x07 (0xFFFF8385): byte W   -- output misc
+    +0x22 (0xFFFF83A0): byte R   -- input status A
+    +0x23 (0xFFFF83A1): byte R   -- input status B
+    +0x24 (0xFFFF83A2): byte R   -- input status C
+    +0x25 (0xFFFF83A3): byte R   -- input status D
+    +0x26 (0xFFFF83A4): byte R   -- input status E
+    +0x5C (0xFFFF83DA): byte W   -- PRIMARY ISC OUTPUT (11 writes!)
+    +0x5D (0xFFFF83DB): byte W   -- secondary output
+    +0x5E (0xFFFF83DC): byte W   -- output modifier
+    +0x5F (0xFFFF83DD): byte W   -- output clamp A
+    +0x60 (0xFFFF83DE): byte W   -- output clamp B
+    +0x81 (0xFFFF83FF): byte R   -- feedback status
+
+  Each handler block follows the pattern:
+    1. Set GBR = 0xFFFF837E
+    2. Read input conditions from +0x22 to +0x26
+    3. Compute new outputs for the specific control case
+    4. Write state to +0x00 (state machine state)
+    5. Write mode to +0x01 (ISC operating mode)
+    6. Write computed values to +0x02 through +0x06
+    7. Write final ISC output to +0x5C (the primary output)
+    8. Write secondary/clamp values to +0x5D through +0x60
+
+  The PRIMARY ISC OUTPUT at 0xFFFF83DA (+0x5C) receives 11 writes from
+  3 different handler groups:
+    - Handlers at 0x4CDFC, 0x4D598, 0x4D638
+  This value ultimately drives the DBW throttle plate position command
+  for idle speed control.
+
+  Example handler (at 0x4CDD8):
+    04CDD8: mov.l  @(PC),R0   ; R0 = 0xFFFF837E
+    04CDDA: ldc    R0,GBR     ; GBR = 0xFFFF837E
+    [compute ISC outputs from sensor inputs and calibrations]
+    04CDF0: mov.b  R0,@(0x5E,GBR)  ; output modifier
+    04CDF2: mov    #2,R0
+    04CDF4: mov.b  R0,@(0x00,GBR)  ; state = 2
+    04CDF6: mov    #5,R0
+    04CDF8: mov.b  R0,@(0x01,GBR)  ; mode = 5
+    04CDFA: mov    #2,R0
+    04CDFC: mov.b  R0,@(0x5C,GBR)  ; PRIMARY ISC OUTPUT = 2
+
+
+================================================================================
+SECTION 4: IDLE SPEED TARGET TABLES
+================================================================================
+
+  Four primary idle speed target tables, all 2D (ECT-indexed, 16 elements):
+  Axis: Coolant Temperature (16 breakpoints, cold to hot)
+
+  Idle Speed Target A @ 0xD6F34:
+    Row 1: 0x2200 0x2200 0x2200 0x2100 0x2000 0x1F00 0x1E00 0x1E00
+           0x1E00 0x1A00 0x1800 0x1000 0x1000 0x1000 0x1000 0x1000
+    Row 2: 0x2200 0x2200 0x2200 0x2100 0x2000 0x1F00 0x1E00 0x1E00
+           0x1E00 0x1A00 0x1600 0x1200 0x0E00 0x0E00 0x0E00 0x0E00
+    (Two variants -- likely neutral vs in-gear, or A/C on vs off)
+
+  Idle Speed Target B @ 0xD6F74:
+    Same as Target A (identical bytes -- stock ROM has same values)
+
+  Idle Speed Target C @ 0xD6FB4:
+    Row 1: Same as A/B Row 1
+    Row 2: 0x1B00 0x1B00 0x1B00 0x1A00 0x1900 0x1800 0x1700 0x1700
+           0x1700 0x1300 0x1100 0x0E00 0x0E00 0x0E00 0x0E00 0x0E00
+    (Lower warm idle targets in row 2)
+
+  Idle Speed Target D @ 0xD7054:
+    Row 1: Same as A/B Row 1
+    Row 2: 0x1E00 0x1E00 0x1E00 0x1D00 0x1C00 0x1B00 0x1700 0x1400
+           0x1400 0x1000 0x0E80 0x0E00 0x0E00 0x0E00 0x0E00 0x0E00
+    (Slightly different ramp-down profile)
+
+  Decoded RPM values (MSB * scaling factor):
+    Cold idle target (all tables): ~850 RPM (0x22)
+    Warm idle target (Table A/B):  ~400-700 RPM range
+    The target speed selector in the dispatcher selects which table
+    is active based on operating conditions (neutral/in-gear, A/C, etc.)
+
+  Additional Idle Speed Targets (from definitions, E/F/G plus MT/AT variants):
+    Targets E and F exist in the base definition but addresses are not
+    mapped in this ROM variant's specific definition file -- they may
+    use the same addresses as A-D with different axis mappings, or may
+    be unused in this calibration.
+
+
+================================================================================
+SECTION 5: IDLE STABILITY / FEEDBACK CONTROL
+================================================================================
+
+  Two 3D stability correction tables provide feedback-based ISC trim:
+
+  Idle Speed Stability A @ 0xD7EE8:
+    Axes: Idle Speed Error (24 elements) x Engine Speed Delta (11 elements)
+    Scaling: uint16, formula (x*0.0078125)-256 => MAP/duty related units
+    Purpose: Corrects ISC output when actual RPM differs from target
+
+  Idle Speed Stability B @ 0xD8084:
+    Same structure as A, second map for alternate conditions
+
+  Error axis breakpoints @ 0xD7E80 (float values, RPM):
+    -150.0, -125.0, -100.0, -75.0, -50.0, -25.0, -12.5, 0.0,
+    12.5, 25.0, 50.0, 100.0, ...
+    (Symmetric error range from underspeed to overspeed)
+
+  Speed Delta axis breakpoints @ 0xD7EC4 (float values, RPM):
+    -50.0, -40.0, -30.0, -20.0, -10.0, 0.0, 10.0, 20.0, 50.0
+    (Rate of change of engine speed)
+
+  The feedback loop reads:
+    1. Actual engine RPM (from FFFF6624 or equivalent)
+    2. Target idle RPM (from selected idle speed target table)
+    3. Computes error = target - actual
+    4. Computes delta = current_RPM - previous_RPM
+    5. Looks up correction from Stability A or B table
+    6. Applies correction to ISC output (+0x5C)
+
+  This provides proportional-derivative (PD) style feedback:
+    - Error axis = proportional term
+    - Speed delta axis = derivative term
+
+
+================================================================================
+SECTION 6: IGNITION TIMING IDLE COMPENSATION
+================================================================================
+
+  The ignition timing system has extensive idle-specific tables that work
+  in concert with the ISC system. These are computed in the ignition timing
+  pipeline (covered in ignition_timing_analysis.txt) but listed here for
+  completeness:
+
+  Base Timing Idle Tables:
+    0xD319D: Base Timing Idle Minimum (vs RPM)
+    0xD31A6: Base Timing Idle A (In-Gear) (vs ECT)
+    0xD31B6: Base Timing Idle B (In-Gear) (vs ECT)
+    0xD31C6: Base Timing Idle A (Neutral) (vs ECT)
+    0xD31D6: Base Timing Idle B (Neutral) (vs ECT)
+
+  Ignition Timing Compensation Tables (PD feedback on timing):
+    - Idle Target In Error Range A/B (3D: error x speed_delta)
+    - Idle Target Out of Error Range A/B (3D: error x target_RPM)
+    - Idle Target Load Change A/B (3D: speed_delta x target_RPM)
+
+  Dwell Reference:
+    0xD2CB0: cal_dwell_idle_rpm = 850.0 (float)
+    Used to switch dwell calculation to idle mode when RPM <= 850
+
+  Vehicle Speed Threshold:
+    0xD2ADC: Base Timing Idle Minimum Vehicle Speed Enable
+    Enables different idle timing behavior above/below speed threshold
+
+
+================================================================================
+SECTION 7: IDLE AIRFLOW TARGETING (DBW INTERFACE)
+================================================================================
+
+  Since this is a drive-by-wire (DBW) system, idle speed is ultimately
+  controlled by the throttle plate. The ISC system computes a target
+  airflow which is converted to a throttle plate angle:
+
+  Target Throttle Plate Position (Idle):
+    Input axis: Idle Airflow Target (17 breakpoints, g/s units)
+    Output: Throttle plate opening angle (%)
+    This is the final conversion from ISC airflow demand to physical
+    throttle position.
+
+  Idle Airflow Min Target Decel Tables:
+    0xD7E40: Adder (RPM x ECT) -- 3D, 16x14 elements
+    0xD6480: Active Vehicle Speed threshold
+    0xD6484: Initial Idle Min Airflow
+    0xD64A4: Ramping Adder Decreasing (decel approach ramp)
+    0xD64A8: Ramping Adder Increasing (accel approach ramp)
+
+  These control the deceleration-to-idle transition:
+    When the driver lifts off the throttle at speed, the system
+    ramps down airflow from the driving level to the idle target.
+    The ramp rate depends on RPM, ECT, and vehicle speed.
+
+
+================================================================================
+SECTION 8: DTC ENABLE/CONDITION CHECKER (FUN_0004c01a)
+================================================================================
+
+  FUN_0004c01a @ 0x04C01A
+  ---------------------------------------------------------------
+  Purpose: Checks multiple diagnostic enable conditions for idle DTCs
+  Returns: R0 = 1 if any DTC enable condition is set, 0 if all clear
+
+  Process:
+    1. Load 0xBE980 -> R12 (condition checker function pointer)
+    2. Check RAM[0xFFFF340E]: if set, return 1
+    3. Check RAM[0xFFFF340C]: if set, return 1
+    4. Check RAM[0xFFFF341A]: if set, return 1
+    5. Loop 5 times checking RAM[0xFFFF3410 + offset]:
+       if any set, return 1
+    6. Return 0 (all clear)
+
+  Related DTCs:
+    P0506: Idle Control RPM Lower Than Expected
+    P0507: Idle Control RPM Higher Than Expected
+    P0508: Idle Control Circuit Low
+    P0509: Idle Control Circuit High
+    P0519: Idle Control Malfunction (Fail-Safe)
+    P050A: Cold Start Idle Air Control System Performance
+
+
+================================================================================
+SECTION 9: ISC OUTPUT CALIBRATION PARAMETERS
+================================================================================
+
+  Five calibration bytes loaded into the ISC workspace during dispatch:
+
+  0xD608A = 0x66 (102) -> GBR+0x2A
+    Purpose: Primary ISC output range/scaling parameter
+    Likely represents a base duty cycle or throttle opening percentage
+
+  0xD608B = 0x10 (16)  -> GBR+0x2B
+    Purpose: Output step size or increment value
+    Controls the granularity of ISC adjustments
+
+  0xD608C = 0x08 (8)   -> GBR+0x2C
+    Purpose: Minimum output clamp or dead zone
+    Prevents ISC output from going below this threshold
+
+  0xD608D = 0x19 (25)  -> GBR+0x2D
+    Purpose: Rate limit or ramp speed parameter
+    Controls how quickly ISC output can change per cycle
+
+  0xD608E = 0x97 (151) -> GBR+0x2E
+    Purpose: Maximum output clamp
+    Upper bound on ISC output to prevent throttle over-opening
+
+
+================================================================================
+SECTION 10: COMPLETE RAM MAP (IDLE CONTROL)
+================================================================================
+
+  Enable/Disable Workspace (GBR=0xFFFF8364):
+    0xFFFF8364: [word]  enable ramp counter
+    0xFFFF8367: [byte]  decay ramp counter
+    0xFFFF836A: [byte]  "not ready" flag (counter < threshold)
+    0xFFFF836B: [byte]  master enable flag (1=idle active)
+    0xFFFF836E: [word]  secondary ramp counter
+    0xFFFF8373: [byte]  task-executed latch (cleared by task 54 wrapper)
+    0xFFFF8376: [byte]  previous enable state (edge detect)
+
+  Main Dispatcher Workspace (GBR=0xFFFF837B):
+    0xFFFF837B: [byte]  dispatch state / target speed index
+    0xFFFF83E0: [byte]  target speed selector A
+    0xFFFF83E1: [byte]  target speed selector B
+    0xFFFF83E2: [byte]  target speed selector C
+    0xFFFF83FA: [byte]  transition mode flag
+    0xFFFF83FB: [byte]  output buffer index A
+    0xFFFF83FC: [byte]  output buffer index B
+    0xFFFF83FD: [byte]  output buffer index C
+    0xFFFF83A5: [byte]  sensor comparison reference (passed to 0x4E7A0)
+    0xFFFF8405: [byte]  status flags (bit 7: active, bit 6: change)
+
+  ISC Output Workspace (GBR=0xFFFF837E):
+    0xFFFF837E: [byte]  ISC state machine state
+    0xFFFF837F: [byte]  ISC operating mode
+    0xFFFF8380-84: [5 bytes]  output channels A-E
+    0xFFFF8385: [byte]  output misc
+    0xFFFF83A0-A4: [5 bytes]  input status channels (read-only)
+    0xFFFF83DA: [byte]  *** PRIMARY ISC OUTPUT ***
+    0xFFFF83DB: [byte]  secondary output
+    0xFFFF83DC: [byte]  output modifier
+    0xFFFF83DD: [byte]  output clamp A
+    0xFFFF83DE: [byte]  output clamp B
+    0xFFFF83FF: [byte]  feedback status (read-only)
+
+  External Inputs:
+    0xFFFF65A9: [byte]  secondary idle enable condition
+    0xFFFF65D2: [byte]  idle request flag (from throttle logic)
+    0xFFFF6624: [float] current RPM (from engine speed calc)
+
+
+================================================================================
+SECTION 11: CALIBRATION ADDRESS MAP
+================================================================================
+
+  Enable/Disable Thresholds:
+    0xD6011: [byte]  = 0x05 (5)    decay counter threshold
+    0xD6012: [word]  = 0x000A (10) enable ramp threshold
+    0xD6014: [word]  = 0x0003 (3)  secondary counter threshold
+    0xD6016: [word]  = 0x001F (31) reset counter threshold
+
+  ISC Output Parameters:
+    0xD608A: [byte]  = 0x66 (102)  base output range
+    0xD608B: [byte]  = 0x10 (16)   output step size
+    0xD608C: [byte]  = 0x08 (8)    minimum output clamp
+    0xD608D: [byte]  = 0x19 (25)   rate limit
+    0xD608E: [byte]  = 0x97 (151)  maximum output clamp
+
+  Idle Speed Targets (ECT-indexed, 16-point 2D):
+    0xD6F34: Idle Speed Target A
+    0xD6F74: Idle Speed Target B
+    0xD6FB4: Idle Speed Target C
+    0xD7054: Idle Speed Target D
+
+  Idle Stability Feedback (3D tables):
+    0xD7E80: Idle Speed Error axis (float breakpoints)
+    0xD7EC4: Engine Speed Delta axis (float breakpoints)
+    0xD7EE8: Idle Speed Stability A (error x delta correction)
+    0xD8084: Idle Speed Stability B (error x delta correction)
+
+  Idle Airflow Decel Targets:
+    0xD6214: Decel Initial Idle Activation Max Mode Counter
+    0xD6480: Decel Adder Active Vehicle Speed threshold
+    0xD6484: Decel Initial Idle Min Airflow
+    0xD64A4: Decel Ramping Adder Decreasing
+    0xD64A8: Decel Ramping Adder Increasing
+    0xD7E40: Decel Adder (RPM x ECT) 3D table
+
+  Idle Ignition Timing:
+    0xD2CB0: Dwell idle RPM reference = 850.0 (float)
+    0xD319D: Base Timing Idle Minimum
+    0xD31A6: Base Timing Idle A (In-Gear)
+    0xD31B6: Base Timing Idle B (In-Gear)
+    0xD31C6: Base Timing Idle A (Neutral)
+    0xD31D6: Base Timing Idle B (Neutral)
+    0xD2ADC: Base Timing Idle Minimum Vehicle Speed Enable
+
+
+================================================================================
+SECTION 12: SYSTEM ARCHITECTURE SUMMARY
+================================================================================
+
+                    ┌─────────────────────────┐
+                    │   Scheduler (Task 54)   │
+                    │   Clears latch @ 8373   │
+                    └────────────┬────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │  Enable/Disable Logic   │
+                    │  FUN_0004bc28           │
+                    │  GBR = 0xFFFF8364       │
+                    │                         │
+                    │  Checks: idle_request,  │
+                    │  ramp counters, decay   │
+                    │  Output: enable flag    │
+                    └────────────┬────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │   Main Dispatcher       │
+                    │   FUN_0004c828          │
+                    │   GBR = 0xFFFF837B      │
+                    │                         │
+                    │   12-channel sensor     │
+                    │   read + change detect  │
+                    │   Target speed select   │
+                    │   (Tables A/B/C/D)      │
+                    │   Cal params load       │
+                    └────────────┬────────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                   │
+   ┌──────────▼────────┐ ┌──────▼───────┐  ┌───────▼──────────┐
+   │ 19 ISC Handler    │ │ Ignition     │  │ Airflow Target   │
+   │ Blocks            │ │ Timing Comp  │  │ (DBW interface)  │
+   │ GBR=0xFFFF837E    │ │ Tables at    │  │                  │
+   │                   │ │ 0xD31xx      │  │ Idle Airflow ->  │
+   │ State machine     │ │              │  │ Throttle Plate   │
+   │ -> ISC output     │ │ PD feedback  │  │ Position (%)     │
+   │ @ 0xFFFF83DA      │ │ via error +  │  │                  │
+   └───────────────────┘ │ speed delta  │  │ Decel ramp       │
+                         └──────────────┘  │ control           │
+                                           └──────────────────┘
+
+  The ISC system operates in parallel across three output paths:
+  1. Direct ISC state machine output (19 handler blocks)
+  2. Ignition timing compensation (fast-acting feedback)
+  3. Airflow/throttle position targeting (main control path)
+
+  All three paths use the same error/delta feedback from the
+  Idle Speed Stability tables, providing coordinated control.

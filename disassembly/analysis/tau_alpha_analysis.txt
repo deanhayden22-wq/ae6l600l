@@ -1,0 +1,436 @@
+================================================================================
+TAU-ALPHA TRANSIENT FUELING — ANALYSIS
+ROM: AE5L600L  |  ECU: Renesas SH7058 (SH-2)  |  2013 Subaru WRX MT
+================================================================================
+
+TABLE OF CONTENTS
+  1. System Overview
+  2. Physical Basis (Fuel Film Dynamics)
+  3. Call Chain and Function Inventory
+  4. tau_rising_handler @ 0x3735A — Rising Load Path
+  5. tau_falling_handler @ 0x3740C — Falling Load Path
+  6. Calibration Tables — Rising Load
+  7. Calibration Tables — Falling Load
+  8. Tau Variants: A, B, C Explained
+  9. Load Threshold Gate (720.0)
+ 10. Interaction with Tip-In Enrichment
+ 11. Complete RAM Map
+ 12. Complete Calibration Address Map
+ 13. System Architecture Diagram
+
+
+================================================================================
+SECTION 1: SYSTEM OVERVIEW
+================================================================================
+
+The Tau-Alpha system compensates for fuel film dynamics during load-rate
+transients — specifically situations where engine load (g/rev) changes rapidly
+but the throttle plate position may or may not change simultaneously.
+
+Unlike the Tip-In enrichment (Subsystem 1) which is throttle-position-rate
+triggered, the Tau-Alpha system is load-rate triggered. This matters for:
+  - Turbo spool: boost arrives WITHOUT throttle movement → tip-in sees nothing
+  - Gear changes: RPM drops, load rises without throttle input
+  - Altitude changes: air density shifts affecting g/rev at same TPS
+
+The system uses separate time constants (tau multipliers) for:
+  - Rising load:  more enrichment required (fuel sticking to cold walls)
+  - Falling load: fuel evaporating from walls → excess fuel must be subtracted
+
+Both paths are ECT (Engine Coolant Temperature) indexed. Cold engines require
+significantly higher tau values because:
+  - Cold cylinder walls cause more fuel to condense into a wall film
+  - Less fuel actually reaches the combustion chamber per injection
+  - The film takes longer to evaporate due to low wall temperatures
+
+
+================================================================================
+SECTION 2: PHYSICAL BASIS (FUEL FILM DYNAMICS)
+================================================================================
+
+The "tau-alpha" model describes injector fuel transport:
+
+  fuel_delivered(t) = alpha × fuel_injected(t) + (1 - alpha) × film(t-1)
+  film(t)          = (1 - tau) × film(t-1) + (1 - alpha) × fuel_injected(t)
+
+Where:
+  alpha = fraction of injected fuel that directly enters combustion (vaporized)
+  tau   = film evaporation rate constant per cycle
+  film  = fuel stuck to port/manifold walls
+
+The ECU ROM implements this as multiplier tables rather than the classical
+differential equation form. The tau calibration values are dimensionless
+multipliers that scale the base enrichment adder.
+
+At cold temperatures (-40°F):
+  Rising tau = 3.40× → large enrichment needed for load increase
+  Falling tau = 1.42× → significant fuel is still evaporating from walls
+
+At fully warm temperature (≥80°F):
+  Rising tau = 0.25–0.40× → most fuel vaporizes directly
+  Falling tau = 0.30× → little residual film effect
+
+
+================================================================================
+SECTION 3: CALL CHAIN AND FUNCTION INVENTORY
+================================================================================
+
+fuel_transient_comp @ 0x37186
+  │
+  ├─ BSR FUN_037492 (1st)    tip-in ramp state machine
+  ├─ BSR FUN_03735A (2nd)    TAU RISING  ← this subsystem
+  ├─ BSR FUN_03740C (3rd)    TAU FALLING ← this subsystem
+  ├─ BSR FUN_037450 (4th)    overrun fuel cut
+  ├─ BSR FUN_03726A (5th)    transient condition check
+  └─ BSR FUN_0371E6 (6th)    final enrichment computation
+
+FUN_03735A (tau rising):
+  └─ JSR DESC_0BEA40         tau rising table lookup
+
+FUN_03740C (tau falling):
+  └─ JSR DESC_0BDBCC         tau falling table apply
+
+Both functions reference shared tau workspace at 0xFFFF7A60 and accumulator
+at 0xFFFF3194.
+
+
+================================================================================
+SECTION 4: tau_rising_handler @ 0x3735A
+================================================================================
+
+Address:  0x03735A
+Size:     0x20 bytes (32 bytes)
+Inputs:
+  FR4 = [0xFFFF7A60]  current_load          (from fuel_transient_comp R14[0])
+  FR5 = [0xFFFF7A54]  tau_accum_rising      (accumulated rising tau value)
+  FR6 = [0xFFFF7A58]  prev_load_signal      (previous cycle load)
+  FR7 = ROM literal   tau weight constant   (0.004578, from 0x0373E8)
+  R2  = 0x0BEA40      DESC_tau_rising
+
+Descriptor call (DESC_0BEA40):
+  The descriptor encapsulates the table lookup using FR4-FR7 as inputs.
+  It interpolates Tau_RisingLoad_A based on current_load vs the 3-bin
+  load axis (1.4, 3.0, 8.0 g/rev) and ECT.
+
+Output:
+  FR0 = new tau_accum_rising value
+  Written to [0xFFFF7A54]
+
+PSEUDOCODE:
+  void tau_rising_handler() {
+      float load_now  = RAM[0xFFFF7A60];   // current load g/rev
+      float load_prev = RAM[0xFFFF7A58];   // previous load
+      float tau_accum = RAM[0xFFFF7A54];   // accumulated tau correction
+      float tau_wt    = 0.004578;          // tau weight (ROM constant)
+
+      // Descriptor interpolates tau table at load_now/ECT,
+      // applies tau_wt to blend with tau_accum
+      float result = DESC_tau_rising(load_now, load_prev, tau_accum, tau_wt);
+
+      RAM[0xFFFF7A54] = result;
+  }
+
+
+================================================================================
+SECTION 5: tau_falling_handler @ 0x3740C
+================================================================================
+
+Address:  0x03740C
+Size:     0x50 bytes (80 bytes)
+Inputs:
+  R14  ← [0xFFFFAF3B]  falling_mode_byte   (byte, mode/state selector)
+  FR4  ← [0xFFFF3194]  tau_accum_falling   (current falling tau accumulator)
+  FR8  ← [0xFFFF8EAC]  current_load_signal (used for 720.0 gate comparison)
+  [0xFFFF7A74]          tau_state_flag      (byte, gating condition)
+  CAL 0xCC2B0 = 720.0   load_threshold
+
+Output:
+  Calls DESC_0BDBCC with R4 = &tau_accum_falling
+  [0xFFFF7A74] = falling_mode_byte (mode persisted across cycles)
+
+LOGIC:
+  if (falling_mode_byte == 1) AND (tau_state_flag == 0) AND (load >= 720.0):
+      → PRIMARY PATH: apply falling tau directly
+        DESC_0BDBCC(tau_accum_falling) → updates 0xFFFF3194
+  else:
+      → ACCUMULATION PATH: load from history buffer and add
+        FR4 = tau_accum + workspace_history[-32]
+        DESC_0BDBCC(FR4) → updates 0xFFFF3194
+
+  [0xFFFF7A74] = falling_mode_byte  (persist for next cycle)
+
+The PRIMARY PATH fires when:
+  1. Mode is 1 (falling load phase active)
+  2. State flag is clear (not inhibited)
+  3. Load signal >= 720.0 (above idle threshold)
+
+Below 720.0 (idle/near-idle), the accumulation path is used instead,
+preventing aggressive fuel subtraction when the engine is at idle where
+small load variations should not trigger wall film compensation.
+
+
+================================================================================
+SECTION 6: CALIBRATION TABLES — RISING LOAD
+================================================================================
+
+Load Axis (float32) @ 0xCCDCC:
+  3 breakpoints: 1.4 g/rev,  3.0 g/rev,  8.0 g/rev
+  (Represents low, medium, high engine load)
+
+ECT Axis (float32) @ 0xCC624:
+  16 bins: -40°F to 110°F in 10°F steps
+
+Tau_RisingLoad_A @ 0xCD6E6  (3 × 16, uint16, multiply by 1/2048 for value):
+
+         ECT→   -40°F  -30°F  -20°F  -10°F   0°F   10°F  20°F  30°F  40°F  50°F  60°F  70°F  80°F  90°F 100°F 110°F
+  Load 1.4 g/r:  3.40   3.40   3.40   2.70   2.20   2.00  1.90  1.75  1.50  1.30  1.05  0.80  0.40  0.40  0.40  0.40
+  Load 3.0 g/r:  3.40   3.40   3.40   2.70   2.20   2.00  1.90  1.75  1.50  1.30  1.05  0.80  0.35  0.30  0.30  0.30
+  Load 8.0 g/r:  3.40   3.40   3.40   2.70   2.20   2.00  1.90  1.80  1.70  1.60  1.50  1.40  0.30  0.25  0.25  0.25
+
+Key observations:
+  - Cold plateau (≤-20°F): uniformly 3.40× across all loads
+  - Warm temperature (≥80°F): drops sharply to 0.25–0.40×
+  - High load at warm temps (8.0 g/rev, 80°F+): only 0.25–0.30×
+    (high load at warm = efficient direct vaporization, minimal wall film)
+  - The load effect only becomes significant at warmed temps:
+    below 70°F, all three load bins are nearly identical
+    above 70°F, higher load gives LOWER tau (better vaporization at high load)
+  - Transition region: 0°F to 70°F shows smooth 2.20× → 0.80× drop
+  - This reflects the wall wetting physics: cold walls trap fuel in
+    a liquid film; warm walls allow direct vaporization.
+
+
+================================================================================
+SECTION 7: CALIBRATION TABLES — FALLING LOAD
+================================================================================
+
+Tau_FallingLoad @ 0xCD746  (PRIMARY — 16 ECT bins, uint16, scale 1/2048):
+
+  ECT→  -40°F  -30°F  -20°F  -10°F   0°F  10°F  20°F  30°F  40°F  50°F  60°F  70°F  80°F  90°F 100°F 110°F
+  Tau:   1.42   1.42   1.42   1.35   1.24  1.09  0.98  0.90  0.86  0.83  0.78  0.70  0.40  0.30  0.30  0.30
+
+Tau_FallingLoad_A @ 0xCD766  (VARIANT A — uniform):
+  Flat 0.50× across ALL ECT bins (temperature-independent)
+
+Tau_FallingLoad_B @ 0xCD848  (VARIANT B — mild ECT sensitivity):
+
+  ECT→  -40°F  -30°F  -20°F  -10°F   0°F  10°F  20°F  30°F  40°F  50°F  60°F  70°F  80°F  90°F 100°F 110°F
+  Tau:   0.90   0.90   0.90   0.90   0.90  0.90  0.90  0.90  0.90  0.80  0.70  0.60  0.40  0.30  0.30  0.30
+
+Tau_FallingLoad_C @ 0xCD868  (VARIANT C — aggressive warm cutoff):
+
+  ECT→  -40°F  -30°F  -20°F  -10°F   0°F  10°F  20°F  30°F  40°F  50°F  60°F  70°F  80°F  90°F 100°F 110°F
+  Tau:   0.70   0.70   0.70   0.70   0.50  0.50  0.50  0.50  0.50  0.50  0.50  0.40  0.25  0.00  0.00  0.00
+
+Key observations:
+  PRIMARY:   Cold=1.42, warm=0.30 — smoothest curve, moderate cold correction
+  VARIANT A: Flat 0.50 — no ECT correction; likely used for mild/steady state
+  VARIANT B: Cold=0.90, warm=0.30 — weaker cold correction than PRIMARY
+  VARIANT C: Cold=0.70, drops to 0.00 at ≥90°F — ZERO correction when hot
+             (at fully warm engine, falling load needs no tau compensation)
+
+The zero values in Variant C at 90°F+ mean: when the engine is fully warm,
+the wall film effect on falling load is negligible — the ECU simply stops
+applying falling tau compensation when the engine has been running long enough
+to fully heat the port walls.
+
+Falling tau values are LOWER than rising tau at equivalent temperatures:
+  Primary rising (1.4g/rev, -40°F) = 3.40×  vs  Primary falling (-40°F) = 1.42×
+  Ratio ≈ 2.4:1 — enrichment needed on tip-in is much larger than tip-out
+  subtraction, reflecting asymmetry of wall film dynamics.
+
+
+================================================================================
+SECTION 8: TAU VARIANTS A, B, C EXPLAINED
+================================================================================
+
+Four falling tau tables exist: PRIMARY + A + B + C. These correspond to
+different operating conditions selected by the falling_mode_byte (0xFFFFAF3B):
+
+  falling_mode_byte == 1  → PRIMARY PATH via FUN_03740C main branch
+                             Uses PRIMARY table (0xCD746) in DESC_0BDBCC
+
+The other variants (A, B, C) are selected by the descriptor based on:
+  - Overrun state (is deceleration fuel cut active?)
+  - Load transient direction (how fast is load falling?)
+  - Possibly closed-loop correction state
+
+In tuner terms:
+  PRIMARY (0xCD746): Normal closed-throttle deceleration, mild enrichment hold
+  Variant A (0xCD766): Steady-state / cruise, flat 0.50× regardless of ECT
+  Variant B (0xCD848): Partial throttle tip-out, moderate correction
+  Variant C (0xCD868): Aggressive tip-out or overrun, removes correction at hot
+
+The use of four variants allows different calibration for different types of
+"load decrease" events, which have very different fuel film behaviors.
+
+
+================================================================================
+SECTION 9: LOAD THRESHOLD GATE (720.0)
+================================================================================
+
+CAL @ 0xCC2B0 = 720.0
+
+This value is compared against current_load_signal (0xFFFF8EAC) in FUN_03740C:
+  if (load_signal >= 720.0) → PRIMARY PATH (active falling tau correction)
+  if (load_signal < 720.0)  → ACCUMULATION PATH (history-based fallback)
+
+The units of 720.0 depend on what 0xFFFF8EAC contains. Given context:
+  - Adjacent cals: 720.0, 6.3, 300.0, 500.0, 100.0
+  - 720.0 could be RPM (720 RPM ≈ target idle speed), OR
+  - 720.0 could be in internal load units
+
+If RPM: the gate says "only apply falling tau correction above idle RPM"
+  → This makes physical sense: at idle, falling tau would fight idle stability
+
+If load units: represents a minimum load level for falling tau application.
+
+The 6.3 and 300.0/500.0 values adjacent to 720.0 at 0xCC2B4-0xCC2BC may be:
+  - 6.3:   small float, possibly a rate threshold
+  - 300.0: moderate value, possibly RPM delta or time constant
+  - 500.0: possibly RPM-based hysteresis for the 720.0 gate
+
+
+================================================================================
+SECTION 10: INTERACTION WITH TIP-IN ENRICHMENT
+================================================================================
+
+The Tau-Alpha system (this subsystem) and Tip-In Enrichment (Subsystem 1) are
+both called from fuel_transient_comp in sequence:
+
+  1. BSR FUN_037492  → tip-in ramp (throttle-position-rate based)
+  2. BSR FUN_03735A  → TAU RISING  (load-rate based, this subsystem)
+  3. BSR FUN_03740C  → TAU FALLING (load-rate based, this subsystem)
+  4. BSR FUN_037450  → overrun cut
+  5. BSR FUN_03726A  → condition check
+  6. BSR FUN_0371E6  → FINAL computation (combines all corrections)
+
+Both tip-in and tau write to the same workspace region:
+  Tip-in writes to:  workspace[0] (mode byte via FUN_037492)
+  Tau rising reads:  workspace[-12] (tau_accum_rising) and workspace[-8] (prev load)
+  Tau rising writes: workspace[-12] (updated accumulator)
+
+The final computation sub (FUN_0371E6) receives:
+  R4  = workspace_base - 40   (history buffer start)
+  FR4 = throttle_delta_pos    (from fuel_transient_comp inputs)
+  FR5 = throttle_delta_neg    (from fuel_transient_comp inputs)
+
+This final function blends all transient corrections into the output enrichment
+value that is eventually added to the base IPW.
+
+Design implication: a sudden tip-in during boost spool triggers BOTH corrections:
+  - Tip-In fires on throttle delta → immediate pulse
+  - Tau rising fires on load delta  → sustained enrichment as boost arrives
+
+
+================================================================================
+SECTION 11: COMPLETE RAM MAP
+================================================================================
+
+ADDRESS       NAME                   TYPE    SOURCE/NOTES
+-----------   --------------------   ------  --------------------------------
+0xFFFF3194    tau_accum_falling      float   Falling tau accumulator; R4 source in
+                                             FUN_03740C; updated by DESC_0BDBCC
+0xFFFF7A54    tau_accum_rising       float   [tau_workspace - 12]; FR5 source in
+                                             FUN_03735A; result written back here
+0xFFFF7A58    prev_load_signal       float   [tau_workspace - 8]; FR6 source in
+                                             FUN_03735A (previous cycle value)
+0xFFFF7A60    tau_workspace          float   R6 base in FUN_03735A; current_load
+                                             value (= fuel_transient_comp R14[-12])
+0xFFFF7A74    tau_state_flag         byte    Read + written in FUN_03740C;
+                                             gates PRIMARY vs ACCUMULATION path
+0xFFFF8EAC    current_load_signal    float   FR8 source in FUN_03740C;
+                                             compared against 720.0 threshold
+0xFFFFAF3B    falling_mode_byte      byte    R14 source in FUN_03740C;
+                                             == 1 enables tau falling PRIMARY path
+
+
+================================================================================
+SECTION 12: COMPLETE CALIBRATION ADDRESS MAP
+================================================================================
+
+ADDRESS       TYPE       VALUE/RANGE    NAME / DESCRIPTION
+-----------   ---------  -------------  ------------------------------------------
+0x000CC2B0    float32    720.0          load_threshold (tau falling gate)
+0x000CC624    float32[16] -40 to 110°F ECT_axis (shared across transient system)
+0x000CCDCC    float32[3]  1.4,3.0,8.0  Tau_RisingLoad_Axis (g/rev breakpoints)
+0x000CD6E6    uint16[48] 0.25–3.40     Tau_RisingLoad_A (3×16, load×ECT)
+                                        Scale: 1/2048 (0.00048828125)
+0x000CD746    uint16[16] 0.30–1.42     Tau_FallingLoad primary (16×ECT)
+                                        Scale: 1/2048
+0x000CD766    uint16[16] 0.50 flat     Tau_FallingLoad_A (flat, no ECT correction)
+                                        Scale: 1/2048
+0x000CD848    uint16[16] 0.30–0.90     Tau_FallingLoad_B (mild ECT sensitivity)
+                                        Scale: 1/2048
+0x000CD868    uint16[16] 0.00–0.70     Tau_FallingLoad_C (zeros out at warm)
+                                        Scale: 1/2048
+
+Adjacent calibration context at 0xCC2AC-0xCC2C4:
+  0xCC2AC = 0.25   (minimum clamp or rate scale)
+  0xCC2B0 = 720.0  (load threshold, see Section 9)
+  0xCC2B4 = 6.3    (possibly rate-of-change threshold)
+  0xCC2B8 = 300.0  (possibly RPM hysteresis or time constant)
+  0xCC2BC = 500.0
+  0xCC2C0 = 100.0
+
+
+================================================================================
+SECTION 13: SYSTEM ARCHITECTURE DIAGRAM
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  INPUTS                                                                 │
+  │  [0xFFFF7A60]  current_load (g/rev)         ──→  TAU RISING            │
+  │  [0xFFFF7A58]  prev_load                    ──→  TAU RISING            │
+  │  [0xFFFF7A54]  tau_accum_rising              ──→  TAU RISING (in/out)  │
+  │  [0xFFFF8EAC]  current_load_signal           ──→  TAU FALLING          │
+  │  [0xFFFF3194]  tau_accum_falling             ──→  TAU FALLING (in/out) │
+  │  [0xFFFFAF3B]  falling_mode_byte             ──→  TAU FALLING          │
+  │  [0xFFFF7A74]  tau_state_flag                ──→  TAU FALLING gate     │
+  └───────────────┬─────────────────────────────────────────────────────────┘
+                  │
+  ┌───────────────▼──────────────────┐    ┌────────────────────────────────┐
+  │  FUN_03735A — TAU RISING         │    │  FUN_03740C — TAU FALLING      │
+  │  DESC_0BEA40 table lookup        │    │  mode check:                   │
+  │                                  │    │   mode==1 AND flag==0          │
+  │  Tau_RisingLoad_A @ 0xCD6E6      │    │   AND load >= 720.0            │
+  │  ┌──────────────────────────┐    │    │  ├─ YES → DESC_0BDBCC direct   │
+  │  │ Load×ECT interpolation   │    │    │  └─ NO  → add history, then    │
+  │  │ Cold: 3.40×              │    │    │          DESC_0BDBCC           │
+  │  │ Warm: 0.25×              │    │    │                                │
+  │  └──────────────────────────┘    │    │  Tables (selected by mode):    │
+  │  Result → 0xFFFF7A54             │    │  PRIMARY @ 0xCD746 (1.42→0.30) │
+  └──────────────────────────────────┘    │  Variant A @ 0xCD766 (0.50)    │
+                                          │  Variant B @ 0xCD848 (0.90→.30)│
+                                          │  Variant C @ 0xCD868 (0.70→0.0)│
+                                          │  Result → 0xFFFF3194           │
+                                          └────────────────────────────────┘
+                  │                                         │
+                  └────────────────┬────────────────────────┘
+                                   │
+                    ┌──────────────▼──────────────────────┐
+                    │  FUN_0371E6 — FINAL COMPUTATION      │
+                    │  (called last from fuel_transient_comp) │
+                    │  Blends tau rising + tau falling +    │
+                    │  tip-in + all transient corrections   │
+                    │  into final enrichment multiplier     │
+                    └─────────────────────────────────────┘
+
+  CALIBRATION DEPENDENCY:
+
+  Tau_RisingLoad_A (0xCD6E6):         Tau_FallingLoad (0xCD746):
+  ┌──────────────────────┐            ┌──────────────────────┐
+  │ ECT   Load  Tau      │            │ ECT   Tau            │
+  │ -40°F any   3.40×    │            │ -40°F 1.42×          │
+  │  0°F  any   2.20×    │            │  0°F  1.24×          │
+  │ 30°F  low   1.75×    │            │ 30°F  0.90×          │
+  │ 30°F  high  1.80×    │            │ 70°F  0.70×          │
+  │ 70°F  low   0.80×    │            │ 80°F  0.40×          │
+  │ 70°F  high  1.40×    │            │ 90°F+ 0.30×          │
+  │ 80°F+ low   0.40×    │            └──────────────────────┘
+  │ 80°F+ high  0.25×    │
+  └──────────────────────┘
+
+  Rising tau > Falling tau at all temperatures:
+    Asymmetry reflects physics: wetting a cold wall needs more fuel
+    than evaporating the same film on a warming wall.

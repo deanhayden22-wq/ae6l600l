@@ -1,0 +1,507 @@
+================================================================================
+ACCELERATION ENRICHMENT / TIP-IN TRANSIENT FUELING - ANALYSIS
+ROM: AE5L600L  |  ECU: Renesas SH7058 (SH-2)  |  2013 Subaru WRX MT
+================================================================================
+
+TABLE OF CONTENTS
+  1. System Overview
+  2. Call Chain and Function Inventory
+  3. fuel_transient_comp @ 0x37186 — Dispatcher
+  4. fuel_accel_enrich @ 0x3BB6C  — Core State Machine
+  5. State Machine Logic (Pseudocode)
+  6. Gain Calibration
+  7. Counter Thresholds
+  8. Complete RAM Map
+  9. Complete Calibration Address Map
+ 10. Disassembler Note: Missing SH-2 Instruction Encoding
+ 11. System Architecture Diagram
+
+
+================================================================================
+SECTION 1: SYSTEM OVERVIEW
+================================================================================
+
+The acceleration enrichment system provides additional fueling during rapid
+throttle opening (tip-in). On the AE5L600L this is implemented as a software
+state machine — no dedicated injector pulse extension hardware is used.
+
+Three enrichment pathways operate in this ROM:
+  A. Tip-In / Throttle Delta   — primary subject of this document
+  B. Tau/Alpha Load Rate       — mass flow rate transient enrichment
+  C. Overrun Fuel Cut          — removes enrichment during deceleration
+
+All three are dispatched from fuel_transient_comp @ 0x37186. The core state
+machine for pathway A is in fuel_accel_enrich @ 0x3BB6C.
+
+Key behavioral characteristics:
+  - Enrichment is gated by a two-state flag (active / not-active)
+  - Two independent counter tracks: applied_counter and inactive_counter
+  - Both counters have the same threshold: 3 cycles (CBC0B = CBC0C = 3)
+  - Dual gain sets (A and B), both currently calibrated identically:
+      tip-in: 510.0 × throttle delta
+      tip-out decay: 505.0 × throttle delta
+  - RPM inhibit threshold: 1260 RPM (enrichment blocked above this)
+  - Decay gain threshold: 10000.0 (internal float used for saturating logic)
+  - Final output routed via tail-call to FUN_enrich_apply @ 0x3D2FC
+
+
+================================================================================
+SECTION 2: CALL CHAIN AND FUNCTION INVENTORY
+================================================================================
+
+Scheduler → fuel_transient_comp @ 0x37186
+              │
+              ├─ FUN_000278DE         throttle delta state calculator
+              ├─ FUN_00029BA4         clamp/limit helper
+              │
+              ├─ BSR FUN_037492       tip-in ramp state machine
+              ├─ BSR FUN_03735A       tau/alpha rising time constant
+              ├─ BSR FUN_03740C       tau/alpha falling time constant
+              ├─ BSR FUN_037450       overrun fuel cut handler
+              ├─ BSR FUN_03726A       additional transient condition check
+              └─ BSR FUN_0371E6       final enrichment computation
+
+Separate caller → fuel_accel_enrich @ 0x3BB6C
+                    │
+                    ├─ JSR FUN_0001CF16    mode state query
+                    ├─ JSR FUN_00022CF4    condition query (descriptor args)
+                    ├─ JSR FUN_000297A0    condition query B (descriptor args)
+                    ├─ JSR FUN_000299BC    condition query C (descriptor args)
+                    ├─ JSR DESC_0xBE53C    ramp/counter descriptor (x2)
+                    └─ JMP FUN_0003D2FC    enrichment output application (tail-call)
+
+Note: fuel_accel_enrich has a separate call path from fuel_transient_comp.
+It is not called from within fuel_transient_comp. Both are periodic tasks
+dispatched by the ECU scheduler.
+
+
+================================================================================
+SECTION 3: fuel_transient_comp @ 0x37186
+================================================================================
+
+Address:  0x037186
+Size:     0x60 bytes (96 bytes)
+Role:     Top-level transient fuel dispatcher
+
+PROLOGUE
+  Saves R14, PR, FR14, FR15 to stack.
+
+INPUT LOADING
+  FR15 ← [0xFFFF7D68]  throttle_delta_pos (positive throttle rate of change)
+  FR14 ← [0xFFFF7D6C]  throttle_delta_neg (negative throttle rate of change)
+  Calls FUN_000278DE to update throttle delta state. Return value (mode byte)
+  stored to [0xFFFF7A5C].
+
+  R14 ← 0xFFFF7A6C     (transient workspace base)
+  [R14-12] ← [0xFFFF69F4]  current_throttle (float)
+  [R14-4]  ← [0xFFFF6350]  input_float_B (likely normalized IPW or MAF)
+  (limit/clamp via FUN_00029BA4 applied in delay slot)
+
+SUB-FUNCTION DISPATCH
+  The function sequentially calls 6 sub-handlers via BSR:
+    0x37492  tip-in rate / ramp — manages ramp-up profile
+    0x3735A  tau alpha rising   — cold-to-hot time constant for enrichment rise
+    0x3740C  tau alpha falling  — cold-to-hot time constant for enrichment decay
+    0x37450  overrun cut        — overrun fuel cut logic
+    0x3726A  transient cond     — additional condition gating
+    0x371E6  final computation  — computes final enrichment amount
+
+  Final enrichment sub-function receives:
+    R4  = R14-40  (history/integration buffer pointer)
+    FR4 = throttle_delta_pos
+    FR5 = throttle_delta_neg
+
+EPILOGUE
+  [R14-8] ← [R14-12]   (shift current throttle to previous for next cycle)
+  Restores FR15, FR14, PR, R14.  Returns.
+
+
+================================================================================
+SECTION 4: fuel_accel_enrich @ 0x3BB6C
+================================================================================
+
+Address:  0x03BB6C
+Size:     0x168 bytes (360 bytes)
+Role:     Core tip-in enrichment gate and counter state machine
+
+PROLOGUE AND STACK FRAME
+  Stack layout (grows down from caller's R15):
+    [R15+0]   curr_throttle_pos (FR9 saved)    float
+    [R15+4]   (padding)
+    [R15+8]   gain_set_selector                byte (from condition query)
+    [R15+12]  condition_flag                   byte
+    [R15+16]  last_condition_result            byte
+    [R15+20+] FR12, FR13, FR14, FR15, PR, R14  saved registers
+
+INPUTS LOADED
+  FR12 ← [0xFFFF65FC]  prev_throttle_pos
+  FR9  ← [0xFFFF6624]  curr_throttle_pos
+  FR13 ← [0xFFFF620C]  current_rpm
+
+CONDITION QUERIES
+  Four sequential JSR calls (0x1CF16, 0x22CF4, 0x297A0, 0x299BC) populate
+  the local frame with mode/condition flags. These use the Renesas descriptor
+  calling convention: argument words embedded after the JSR in the code stream
+  (0x80F4, 0x80F8, 0x80FC) are read by the callee via the saved PR value.
+
+GAIN SELECTION
+  If frame[8] == 1: load gain set B (0xCC520 / 0xCC528)
+  Otherwise:        load gain set A (0xCC51C / 0xCC524)
+  Both calibration sets are currently identical:
+    FR15 = 510.0  (tip-in multiplier)
+    FR14 = 505.0  (tip-out / decay multiplier)
+
+WORKSPACE
+  R14 ← 0xFFFF7CE0  (enrich_workspace base)
+  active_flag = workspace[0]
+
+STATE MACHINE DISPATCH
+  if active_flag == 1 → ACTIVE PATH
+  else                → NOT-ACTIVE PATH
+
+
+================================================================================
+SECTION 5: STATE MACHINE LOGIC (PSEUDOCODE)
+================================================================================
+
+struct Workspace {  // base: 0xFFFF7CE0
+    u8 active_flag;          // +0  1=enrichment running, 0=idle
+    u8 field_1;              // +1  sub-state flag
+    u8 field_2;              // +2  sub-state flag
+    u8 field_3;              // +3  sub-state flag
+    u8 field_4;              // +4  sub-state flag
+    u8 field_5;              // +5  sub-state flag
+    u8 applied_counter;      // +6  counts cycles enrichment was applied
+    u8 inactive_counter;     // +7  counts cycles since deactivation
+};
+
+void fuel_accel_enrich() {
+    float prev_tps  = RAM[0xFFFF65FC];   // FR12
+    float curr_tps  = RAM[0xFFFF6624];   // FR9
+    float curr_rpm  = RAM[0xFFFF620C];   // FR13
+
+    // query conditions (fill frame flags)
+    query_conditions();
+
+    // gain selection
+    float tip_in_gain  = (frame[8]==1) ? CAL[0xCC520] : CAL[0xCC51C];  // 510.0
+    float tip_out_gain = (frame[8]==1) ? CAL[0xCC528] : CAL[0xCC524];  // 505.0
+
+    Workspace* ws = 0xFFFF7CE0;
+
+    if (ws->active_flag == 1) {
+        // ── ACTIVE PATH ──────────────────────────────────────────────────────
+        ws->inactive_counter = ramp_counter(ws->inactive_counter, step=1);
+
+        bool tip_out = (tip_out_gain > prev_tps);   // FR14 > FR12
+        bool cond_ok = (frame[12] == 0);
+        bool rpm_ok  = (curr_rpm > CAL[0xCC52C]);   // RPM > 1260.0
+        bool last_ok = (frame[16] == 0);
+
+        if (tip_out && cond_ok && rpm_ok && last_ok) {
+            // all deactivation conditions met → DEACTIVATE
+            goto deactivate;
+        }
+
+        // check decay saturation
+        if (curr_tps > CAL[0xCC530]) {              // tps > 10000.0 (saturated)
+            if (curr_rpm > CAL[0xCC52C])             // RPM > 1260.0
+                goto deactivate;
+            if (frame[4] == 1)
+                goto deactivate;
+        }
+
+        // counter still running
+        if (ws->inactive_counter > CAL[0xCBC0B]) {  // > 3
+            ws->field_1 = ws->field_2 = 1;
+        } else {
+            ws->field_1 = ws->field_2 = ws->field_3 = ws->field_4 = 1;
+        }
+        goto epilogue;
+
+    deactivate:
+        ws->active_flag = 0;
+        if (ws->inactive_counter <= CAL[0xCBC0B]) {  // <= 3
+            ws->field_1 = ws->field_2 = ws->field_3 = 0;
+            ws->field_4 = ws->field_5 = 0;
+            ws->applied_counter = CAL[0xCBC0C];       // = 3
+        }
+        ws->inactive_counter = 0;
+        goto epilogue;
+
+    } else {
+        // ── NOT-ACTIVE PATH ──────────────────────────────────────────────────
+        ws->applied_counter = ramp_counter(ws->applied_counter, step=1);
+
+        bool tip_in_trig = (tip_in_gain > prev_tps);   // FR15 > FR12: throttle opening
+
+        if (!tip_in_trig) {
+            // no tip-in: check mode conditions
+            if (frame[12] == 2) goto throttle_check;
+            if (frame[16] == 2) goto throttle_check;
+            goto counter_decrement;
+        }
+
+    throttle_check:
+        if (curr_tps > CAL[0xCC530]) goto counter_decrement;  // tps > 10000
+        if (frame[4] != 0) goto counter_decrement;
+
+        // ACTIVATE
+        ws->active_flag = 1;
+        if (ws->applied_counter <= CAL[0xCBC0C]) {    // <= 3
+            ws->field_1 = ws->field_2 = ws->field_3 = 1;
+            ws->field_4 = ws->field_5 = 1;
+            ws->inactive_counter = CAL[0xCBC0B];       // = 3
+        }
+        ws->applied_counter = 0;
+        goto epilogue;
+
+    counter_decrement:
+        if (ws->applied_counter > CAL[0xCBC0C]) {     // > 3
+            ws->field_1 = ws->field_2 = ws->field_3 = 1;
+            ws->field_4 = ws->field_5 = 1;
+        } else {
+            ws->field_3 = ws->field_4 = 0;
+            ws->field_5 = 1;
+        }
+        goto epilogue;
+    }
+
+epilogue:
+    // tail-call to enrichment output application
+    JMP FUN_0003D2FC;   // applies workspace state to fuel output
+}
+
+
+================================================================================
+SECTION 6: GAIN CALIBRATION
+================================================================================
+
+Two calibration sets are present (A and B). The gain set selector (a condition
+flag returned by the 4th query function) chooses between them. Both sets are
+currently calibrated identically — the B-set appears to be an OEM provision for
+alternate operating conditions (possibly closed-loop vs open-loop mode).
+
+  CAL ADDRESS  NAME              VALUE   SET
+  -----------  ----------------  ------  ---
+  0x000CC51C   tip_in_gain_A     510.0   A
+  0x000CC520   tip_in_gain_B     510.0   B
+  0x000CC524   tip_out_gain_A    505.0   A
+  0x000CC528   tip_out_gain_B    505.0   B
+  0x000CC52C   rpm_threshold     1260.0  (shared)
+  0x000CC530   decay_gain       10000.0  (shared, saturation sentinel)
+
+The gain values (510.0, 505.0) are multiplicative factors applied to the
+throttle delta float. The exact throttle delta units determine actual enrichment
+magnitude — the delta is computed by FUN_000278DE and passed as a float in the
+range observed from ROM context (~0.0 to ~1.0 normalized TPS).
+
+Example at 10% TPS opening:
+  Tip-in enrichment factor ≈ 510.0 × 0.10 = 51.0  (units: IPW ms × gain)
+
+The rpm_threshold (1260.0 RPM) gates deactivation: enrichment cannot deactivate
+if RPM is below 1260 RPM, ensuring tip-in enrichment is sustained at low RPM
+where the engine is most susceptible to lean stumble.
+
+The decay_gain (10000.0) acts as a saturation check on the current throttle
+float — when the throttle signal exceeds this value, the enrichment is treated
+as fully saturated and deactivation logic is applied regardless of other
+conditions. This is a guard against runaway in pathological cases.
+
+
+================================================================================
+SECTION 7: COUNTER THRESHOLDS
+================================================================================
+
+  CAL ADDRESS  NAME              VALUE   DESCRIPTION
+  -----------  ----------------  ------  ---------------------------------
+  0x000CBC0B   applied_ctr_max   3       Max cycles of applied enrichment
+  0x000CBC0C   inactive_ctr_max  3       Max cycles of inactive counting
+
+Both counters are uint8 values and both have the same threshold of 3 cycles.
+The applied_counter (workspace[6]) tracks how many scheduler cycles the
+enrichment has been applied since activation. The inactive_counter (workspace[7])
+tracks how many cycles have elapsed since deactivation.
+
+These counters gate the sub-state fields (workspace[1]-[5]) which downstream
+consumers use to determine enrichment ramp profile and tau time constants.
+
+At the default scheduler rate, 3 cycles corresponds to roughly 30–90 ms
+depending on the task period, giving a brief tip-in enrichment window.
+
+Note: CAL[0xCBC0B] and CAL[0xCBC0C] show as 0.0000 in float32 interpretation
+because these are uint8 byte values stored at byte addresses within the
+calibration region. Reading them as float32 is incorrect. Correct read:
+  rom[0xCBC0B] = 0x03 = 3   (applied_ctr_max)
+  rom[0xCBC0C] = 0x03 = 3   (inactive_ctr_max)
+
+
+================================================================================
+SECTION 8: COMPLETE RAM MAP
+================================================================================
+
+ADDRESS       NAME                     TYPE    NOTES
+-----------   ----------------------   ------  -----------------------------------
+0xFFFF6350    input_float_B            float   Likely normalized IPW or MAF signal
+0xFFFF65FC    prev_throttle_pos        float   Previous throttle position (fuel_accel_enrich FR12)
+0xFFFF6624    curr_throttle_pos        float   Current throttle position (fuel_accel_enrich FR9)
+0xFFFF620C    current_rpm              float   Current RPM (fuel_accel_enrich FR13)
+0xFFFF69F4    current_throttle         float   fuel_transient_comp FR8 source
+0xFFFF7A5C    transient_mode_byte      byte    Output of FUN_000278DE (mode/state)
+0xFFFF7A6C    transient_workspace      base    fuel_transient_comp R14 workspace
+  [R14-12]                             float   current_throttle copy
+  [R14-8]                              float   previous_throttle (shifted each cycle)
+  [R14-4]                              float   input_float_B copy (clamped)
+  [R14+0]                              byte    returned from FUN_037492
+0xFFFF7CE0    enrich_workspace         base    fuel_accel_enrich R14 workspace
+  +0 (0xFFFF7CE0)  active_flag         byte    1=enrichment active, 0=idle
+  +1 (0xFFFF7CE1)  field_1             byte    sub-state (set 0 or 1 by state machine)
+  +2 (0xFFFF7CE2)  field_2             byte    sub-state
+  +3 (0xFFFF7CE3)  field_3             byte    sub-state
+  +4 (0xFFFF7CE4)  field_4             byte    sub-state
+  +5 (0xFFFF7CE5)  field_5             byte    sub-state
+  +6 (0xFFFF7CE6)  applied_counter     byte    cycles enrichment has been applied
+  +7 (0xFFFF7CE7)  inactive_counter    byte    cycles since deactivation
+0xFFFF7D68    throttle_delta_pos       float   Positive throttle rate of change
+0xFFFF7D6C    throttle_delta_neg       float   Negative throttle rate of change
+
+
+================================================================================
+SECTION 9: COMPLETE CALIBRATION ADDRESS MAP
+================================================================================
+
+ADDRESS       TYPE    VALUE        NAME / DESCRIPTION
+-----------   ------  -----------  -------------------------------------------
+0x000CBC0B    uint8   3            applied_ctr_max  (enrichment sustain cycles)
+0x000CBC0C    uint8   3            inactive_ctr_max (inactive counting cycles)
+0x000CC51C    float   510.0        tip_in_gain_A    (primary tip-in multiplier)
+0x000CC520    float   510.0        tip_in_gain_B    (alternate tip-in multiplier)
+0x000CC524    float   505.0        tip_out_gain_A   (primary tip-out multiplier)
+0x000CC528    float   505.0        tip_out_gain_B   (alternate tip-out multiplier)
+0x000CC52C    float   1260.0       rpm_threshold    (RPM gate for deactivation)
+0x000CC530    float   10000.0      decay_gain       (saturation sentinel value)
+
+Calibration region context (0xCC500-0xCC538 float dump):
+  0xCC500: 6700.0   0xCC504: 6680.0   0xCC508: 6700.0   0xCC50C: 6680.0
+  0xCC510: 6700.0   0xCC514: 6680.0   0xCC518: 1260.0   [rpm_threshold start]
+  0xCC51C: 510.0    0xCC520: 510.0    0xCC524: 505.0    0xCC528: 505.0
+  0xCC52C: 1260.0   0xCC530: 10000.0  0xCC534: 168.0    0xCC538: 20.0
+
+The values at 0xCC500-0xCC518 (6700.0, 6680.0 alternating, then 1260.0) appear
+to be neighboring calibration for a different subsystem (possibly rev limiters or
+RPM-based fuel cut thresholds adjacent to the accel enrichment block).
+
+Sub-function calibration (tau/alpha, overrun) is located in the sub-function
+bodies (FUN_03735A, FUN_03740C, FUN_037450) — not yet disassembled in detail.
+From prior context (summary), the tau calibration region includes:
+  Tau rising:  3.4× cold → 0.4× hot  (ECT-indexed multiplier table)
+  Tau falling: 1.4× cold → 0.3× hot  (ECT-indexed multiplier table)
+  Overrun cut: -17.0 RPM/cycle activation threshold, 2250 RPM cut threshold
+  ECT comp B:  uint16 curve 0x7000→lower (big-endian, scale ÷32768)
+
+
+================================================================================
+SECTION 10: DISASSEMBLER NOTE — MISSING SH-2 INSTRUCTION ENCODING
+================================================================================
+
+The decode() function in scripts/disasm_accel.py (and disasm_idle.py) does not
+implement the following SH-2 instruction:
+
+  MOV.B R0,@(disp4,Rn)    encoding: 1000 0000 nnnn dddd
+
+This causes words like 0x80E1, 0x80E2, ... 0x80E7 to be emitted as ".word"
+rather than decoded instructions. These ARE valid SH-2 instructions:
+
+  0x80E1 → mov.b R0,@(0x1,R14)   (Rn=14=R14, disp=1)
+  0x80E2 → mov.b R0,@(0x2,R14)
+  0x80E3 → mov.b R0,@(0x3,R14)
+  0x80E4 → mov.b R0,@(0x4,R14)
+  0x80E5 → mov.b R0,@(0x5,R14)
+  0x80E6 → mov.b R0,@(0x6,R14)
+  0x80E7 → mov.b R0,@(0x7,R14)
+
+Similarly, 0x80F0/F4/F8/FC embedded after JSR calls are not instructions but
+descriptor argument words (Renesas calling convention). These must be
+distinguished by call context, not by opcode analysis.
+
+Additionally, 0x422B in the epilogue at 0x3BCC8 is JMP @R2 (not data):
+  JMP @Rm:  0100 mmmm 0010 1011 → m=2 → 0100 0010 0010 1011 = 0x422B
+
+And 0x4F26 is LDS.L @R15+,PR (not LDC.L @R15+,GBR as the decode table shows):
+  LDS.L @Rm+,PR: 0100 mmmm 0010 0110 → m=15 → 0x4F26
+
+To fix: add 0x80xx decoding in decode() for the MOV.B R0,@(disp4,Rn) case:
+  if (op >> 8) == 0x80:
+      n = (op >> 4) & 0xF
+      d = op & 0xF
+      return f"mov.b R0,@(0x{d:X},R{n})"
+
+
+================================================================================
+SECTION 11: SYSTEM ARCHITECTURE DIAGRAM
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │                   ECU TASK SCHEDULER                        │
+  └──────────────────────┬──────────────────────────────────────┘
+                         │ periodic dispatch
+                         ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │  fuel_transient_comp @ 0x037186                              │
+  │  ┌──────────────────────────────────────────────────────┐   │
+  │  │ Throttle Delta Inputs                                │   │
+  │  │  [0xFFFF7D68] throttle_delta_pos → FR15              │   │
+  │  │  [0xFFFF7D6C] throttle_delta_neg → FR14              │   │
+  │  │  FUN_000278DE → mode_byte [0xFFFF7A5C]               │   │
+  │  └──────────────────────────────────────────────────────┘   │
+  │                                                              │
+  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
+  │  │ FUN_037492  │ │ FUN_03735A  │ │ FUN_03740C  │           │
+  │  │ Tip-in ramp │ │ Tau rising  │ │ Tau falling │           │
+  │  └─────────────┘ └─────────────┘ └─────────────┘           │
+  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
+  │  │ FUN_037450  │ │ FUN_03726A  │ │ FUN_0371E6  │           │
+  │  │ Overrun cut │ │ Trans.cond  │ │ Final enrich│           │
+  │  └─────────────┘ └─────────────┘ └─────────────┘           │
+  └──────────────────────────────────────────────────────────────┘
+
+  Separate scheduler path:
+  ┌──────────────────────────────────────────────────────────────┐
+  │  fuel_accel_enrich @ 0x03BB6C                                │
+  │                                                              │
+  │  Inputs:  FR12=prev_tps  FR9=curr_tps  FR13=RPM             │
+  │  Gains:   FR15=510.0 (tip-in)  FR14=505.0 (tip-out)        │
+  │                                                              │
+  │  Workspace: 0xFFFF7CE0                                       │
+  │  ┌─────────────────────────────────────────────────────┐    │
+  │  │ [active_flag=0] NOT-ACTIVE STATE                    │    │
+  │  │   monitor for: tip_in_gain > prev_tps               │    │
+  │  │   manage: applied_counter via DESC_ramp_counter     │    │
+  │  │   on trigger: set active=1, load inactive_ctr_max   │    │
+  │  └────────────────┬────────────────────────────────────┘    │
+  │                   │ tip-in detected                          │
+  │                   ▼                                          │
+  │  ┌─────────────────────────────────────────────────────┐    │
+  │  │ [active_flag=1] ACTIVE STATE                        │    │
+  │  │   advance: inactive_counter via DESC_ramp_counter   │    │
+  │  │   deactivate when:                                  │    │
+  │  │     tip_out_gain > prev_tps  (throttle reversed)    │    │
+  │  │     AND frame conditions met                        │    │
+  │  │     AND RPM > 1260.0                                │    │
+  │  │   on deactivate: clear fields, set applied_ctr_max  │    │
+  │  └────────────────┬────────────────────────────────────┘    │
+  │                   │                                          │
+  │                   ▼                                          │
+  │       tail-call: JMP FUN_0003D2FC                           │
+  │       (enrichment output application)                        │
+  └──────────────────────────────────────────────────────────────┘
+
+  Calibration:                          RAM:
+  ┌─────────────────────────────┐       ┌──────────────────────────────┐
+  │ 0xCC51C  tip_in_gain_A=510  │  ←→  │ 0xFFFF7CE0 active_flag       │
+  │ 0xCC524  tip_out_gain_A=505 │       │ 0xFFFF7CE1-E5 sub-state[1-5] │
+  │ 0xCC52C  rpm_threshold=1260 │       │ 0xFFFF7CE6 applied_counter   │
+  │ 0xCC530  decay_gain=10000   │       │ 0xFFFF7CE7 inactive_counter  │
+  │ 0xCBC0B  applied_ctr_max=3  │       │ 0xFFFF7D68 throttle_delta+   │
+  │ 0xCBC0C  inactive_ctr_max=3 │       │ 0xFFFF7D6C throttle_delta-   │
+  └─────────────────────────────┘       └──────────────────────────────┘
