@@ -1,0 +1,324 @@
+AE5L600L — Mystery Subroutine Analysis
+========================================
+Addresses: 0x29858 / 0x2999C / 0x2F8FE
+Generated from: disassembly/analysis/mystery_subs_raw.txt
+
+These three addresses were identified as "mystery subroutines" because they are
+called repeatedly across multiple scheduler tasks (11, 18, 19, 23, 25, 29, 8, 10, 56)
+but had no prior analysis or labels.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FINDING 1: 0x29858 is not a single function — it is a DISPATCH TABLE
+══════════════════════════════════════════════════════════════════════════════
+
+0x29858 is the base of a large array of identical 8-instruction (16-byte)
+"read-flag-and-return" stubs.  Each stub:
+
+  1. Loads a target RAM address from its own inline literal pool entry
+  2. Reads a single byte from that address
+  3. Tests the byte: tst R2,R2
+  4. bf/s +4  (branch-if-false/skip = branch if non-zero)
+     delay slot: mov #2,R0
+  5. mov #0,R0            ; executed if byte == 0
+  6. rts / nop
+
+  Return value: R0 = 2 if flag byte != 0, R0 = 0 if flag byte == 0
+
+Callers use JSR/BSR to a specific offset within the table to read a specific
+flag slot.  The offset encodes which byte in the learning state array to check.
+
+
+  Table layout (stub entries with live flag reads):
+  ─────────────────────────────────────────────────
+  Offset  Address    RAM flag       Notes
+  +0x000  0x29858    FFFF970E       slot  0 — called by task11, task29
+  +0x010  0x29868    FFFF970F       slot  1
+  +0x020  0x29878    FFFF9710       slot  2
+  +0x030  0x29888    FFFF9711       slot  3
+  [dead]  0x29898    (no read)      slot  4 — stub returns R0=0 unconditionally
+  +0x044  0x2989C    FFFF9712       slot  5
+  [dead]  0x298AC    (no read)      slot  6
+  [dead]  0x298B0    (no read)      slot  7
+  +0x05C  0x298B4    FFFF9713       slot  8
+  [dead]  0x298C4    (no read)      slot  9
+  +0x070  0x298C8    FFFF9714       slot 10
+  +0x080  0x298D8    FFFF9715       slot 11
+  +0x090  0x298E8    FFFF9716       slot 12
+  [literal pool @ 0x298F8 – 0x2990F]
+  +0x114  0x2996C    FFFF9719       slot 13 (approx)
+  +0x124  0x2997C    FFFF971A       slot 14 (approx)
+  +0x144  0x2999C    FFFF971B       slot 15 — called by task19, task23, task56
+  +0x154  0x299AC    FFFF971D       (skip — 971C follows)
+  +0x164  0x299BC    FFFF971C
+  +0x174  0x299CC    FFFF971E
+  +0x184  0x299DC    FFFF971F
+  [dead]  0x299EC    (no read)
+  +0x198  0x299F0    FFFF9720
+  +0x1A8  0x29A00    FFFF9721
+  [dead × 2]
+  +0x1C0  0x29A18    FFFF9722
+  [dead × 3]
+  +0x1E8  0x29A30    FFFF9723
+  +0x1F8  0x29A40    FFFF9724
+  [dead × 6]
+  +0x248  0x29AA0    FFFF972E
+  +0x258  0x29AB0    FFFF972C
+  +0x268  0x29AC0    FFFF972D
+  +0x278  0x29AD0    FFFF9737
+  +0x288  0x29AE0    FFFF9735
+  +0x298  0x29AF0    FFFF9736
+
+  Total covered: FFFF970E – FFFF9737 (41 bytes of flag array),
+  with many dead/unused slots returning R0=0 unconditionally.
+
+
+  What is the FFFF970E – FFFF9737 array?
+
+  Given the calling tasks:
+  - task11 (knock_flag), task29 (timing_percyl): read slot 0 / FFFF970E
+  - task19 (flkc_post), task23 (knock_cyl_track): read slot 15 / FFFF971B
+  - task56 (EVAP): reads slot 15 / FFFF971B
+
+  And task23 iterates over flkc_fg_var (FFFF3248) with 35 entries × 8 bytes each,
+  while task08 (knock_window) iterates flkc_fg_var with 35 entries and also reads
+  from a separate 6-entry table at ROM 0x63E88/0x63E98 —
+
+  This array is the FLKC (Fine Learning Knock Correction) convergence state flag
+  array.  Each byte at FFFF970E+N represents whether learning cell N has been
+  populated/converged:
+    0x00 = not yet learned / cell empty
+    Non-zero = cell has converged learning data
+
+  The "dead" entries (unconditional R0=0 stubs) correspond to cells that are
+  permanently disabled or outside the supported operating range for this ECU
+  calibration.
+
+  Label: learning_flag_table_base @ FFFF970E
+  Table name: flkc_state_flag_reader_table @ 0x29858
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FINDING 2: 0x2999C is NOT a separate function
+══════════════════════════════════════════════════════════════════════════════
+
+0x2999C is simply offset +0x144 into the 0x29858 dispatch table.
+It is the stub that reads FFFF971B (learning state slot 15).
+
+The existing label "float_compare_and_flag" is INCORRECT and should be
+replaced with "flkc_state_flag_reader_table+0x144" or a descriptive stub label.
+
+Tasks 19, 23, and 56 all call directly to 0x2999C rather than 0x29858 because
+they specifically need slot 15 (FFFF971B).
+
+  ─── task19 (flkc_post) @ 0x45E96 ───────────────────────────────────────────
+  Uses result of 0x2999C (R0=0 or 2) as:
+  - If R0=2 AND FFFF8286==2: triggers IAM/FLKC_BASE_STEP update via 0xBDBCC
+  - If R0!=2: checks R0==2 again with cl_ol_transition_flag (FFFF65BD) for
+    alternate path
+  - Writes result back to FFFF8286
+  Purpose: post-run FLKC consolidation — only update fine learning if cell
+           has converged data (0x2999C == 2) AND CL/OL transition conditions met.
+
+  ─── task23 (knock_cyl_track) @ 0x467F4 ──────────────────────────────────────
+  Uses result of 0x2999C (R0=0 or 2) identically to task19:
+  - If R0=2 AND FFFF82AB==2: iterates 35 FLKC table entries (FFFF3248+R13*8),
+    calls 0xBDBCC (clamp/store) for each entry
+  - Writes result to FFFF82AB
+  Purpose: per-cylinder FLKC tracking — propagate learned corrections to all
+           table cells when convergence flag is set.
+
+  ─── task56 (EVAP) @ already analyzed ───────────────────────────────────────
+  task56 calls 0x2999C as part of EVAP precondition check: requires FLKC cell
+  convergence (FFFF971B != 0) before starting EVAP pressure decay test.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FINDING 3: 0x2F8FE — Check tip-in/transient sub-flag (FFFF726E)
+══════════════════════════════════════════════════════════════════════════════
+
+0x2F8FE is a 6-instruction leaf stub:
+
+  0x2F8FE:  D61C  mov.l  @(0x2F970),R6    ; =0xFFFF726E (RAM)
+  0x2F900:  6060  mov.b  @R6,R0
+  0x2F902:  8801  cmp/eq #1,R0
+  0x2F904:  000B  rts
+  0x2F906:  0029  movt   R0               ; delay slot: R0 = T-bit
+
+  Returns: R0 = 1 if FFFF726E == 1, R0 = 0 otherwise.
+
+This is a flag-equality test, not a transient correction calculator.
+The full transient correction function begins at 0x2F984 (separate entry point).
+
+
+  FFFF726E vs FFFF726C:
+  ────────────────────
+  FFFF726C = transient_state_flag (existing label) — the master transient gate
+  FFFF726E = 2 bytes after, a different byte — the transient knock-inhibit flag
+
+  The existing "check_transient_flag" @ 0x2F8EA reads FFFF726C.
+  This new stub at 0x2F8FE reads FFFF726E — a sibling flag used specifically
+  to inhibit knock processing during tip-in/tip-out events.
+
+  FFFF726E is set to 1 when a transient event (throttle tip-in, rapid load
+  change) is in progress AND knock detection should be suppressed.  This is
+  distinct from the master transient_state_flag which gates fuel/AFL corrections.
+
+
+  ─── task11 (knock_flag) @ 0x4438C ──────────────────────────────────────────
+  Call sequence:
+    1. Call 0xCF22 (unrelated — sets up knock window table / interpolation)
+    2. Call 0x2F8FE → store result at @R15 (local var 0)
+       "is transient knock inhibit active?"
+    3. Call 0x29858 → store result at @R15+4 and @R15+8
+       "is global FLKC learning state flag set? (FFFF970E)"
+    4. Read FFFF81BA (KNOCK_FLAG), FFFF81BB (KNOCK_BANK_FLAG)
+    5. Call 0x2997C (another small helper)
+
+  Later in the function:
+    - If @R15 == 1 (transient inhibit active): jump to "abort knock flag update"
+    - Check FFFF7E76 (another gate)
+    - Check extu.b result of step 3 == 1 → also abort
+    - Check GBR[90] == 1 → abort
+    - Check @R15+8 == 2 → set GBR[67]=1, jump to "apply DAM knock table"
+    - Check @R15+12 == 2 → set GBR[67]=1, jump to alternate DAM table
+
+  So task11 uses 0x2F8FE to suppress knock flag updates during tip-in, and
+  uses 0x29858 to check whether the global FLKC learning baseline is valid
+  before choosing which knock correction table to use.
+
+  ─── task08 (knock_window) @ 0x44E04 ─────────────────────────────────────────
+  Call sequence:
+    1. Load RPM (FFFF6350), FFFF6898, IAM (FFFF3234) into FR14/FR15/FR12
+    2. Call 0x2F8FE → store at @R15 (local var 0) and @R15+4
+       "is transient knock inhibit active?"
+    3. Call 0x58524 (diag_read_state_E) → store at @R15+4
+    4. Read flkc_fg_R0_init (FFFF3244), mask &0x01 → store at @R15+8
+    5. Compare RPM against two calibration thresholds (ROM 0xD2E1C, 0xD2E20)
+       → set/clear GBR[62] (RPM gate flag)
+    6. Compare FFFF6898 against threshold (0xD2E2C ± hysteresis)
+       → set/clear GBR[65] (load gate flag)
+    7. Iterate 35 FLKC entries: compare each flkc_fg_var[i] against cal 0xD2E34/0xD2E40
+       using uint8_add_sat; compare accumulated count vs threshold at ROM 0xD299C
+    8. Iterate 6 knock history slots: compare against thresholds at ROM 0xD2E3C/0xD2E40
+       and ROM 0xD2E44/0xD2E48
+
+  task08 uses 0x2F8FE as a quick check: if transient inhibit is set, skip the
+  knock window update logic.  The result at @R15 and @R15+4 is checked later
+  against ==1 to gate each processing stage.
+
+  ─── task10 (not in call site output, referenced in summary) ─────────────────
+  Also calls 0x2F8FE for the same transient inhibit check in knock processing.
+
+
+  ─── Related function at 0x2F984 ────────────────────────────────────────────
+  This is the TRANSIENT CORRECTION CALCULATOR co-located with the stub.
+  It is NOT called by tasks 8/10/11 — they only use the 0x2F8FE entry point.
+  0x2F984:
+    - Guards on transient_state_flag (FFFF726C) == 1 and FFFF65F1 != 0
+    - Reads FFFF620C (airflow/MAF), FFFF64D8 (engine load), FFFF6364 (RPM float)
+    - Calls table_1d_desc with descriptors 0xAC34C, 0xAC360, 0xAC374
+      (tip-in enrichment vs RPM/load lookups)
+    - Float multiply chain with stored results at FFFF72E8, FFFF72F4, FFFF7300
+    - Calls helpers at 0x2FCBA (float clamp?), 0x2FB1C (float store?)
+    - Does fmac (fused multiply-accumulate): FR4 += FR0 * FR8
+    - Calls float_clamp or similar at 0xBE56C
+    - Final path checks check_cl_active (0x22F92) — skips update if not in CL mode
+  Purpose: compute and store transient tip-in fuel correction multipliers
+
+
+══════════════════════════════════════════════════════════════════════════════
+  RAM SUMMARY
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Size  Label                      Source
+  ──────────  ────  ─────────────────────────  ──────────────────────────────
+  FFFF970E    41B   learning_flag_table_base   Dispatch table at 0x29858
+  FFFF971B    1B    flkc_state_flag_slot15     Called directly by task19/23/56
+  FFFF726E    1B    transient_knock_inhibit    Read by 0x2F8FE (tasks 8/10/11)
+  FFFF72E8    12B   transient_correction_out   Written by 0x2F984 calculator
+  FFFF72F4    4B    transient_correction_fr9   Used in fmul chain at 0x2F9F8
+  FFFF7300    4B    transient_correction_fr4   Used in fmul chain at 0x2F9FA
+  FFFF7E4C    4B    transient_accum_ptr        Pointer used by 0x2F984
+  FFFF65F1    1B    transient_enable_gate      Gate flag checked in 0x2F984
+  FFFF82AB    1B    knock_cyl_track_state      task23: FLKC propagation state
+  FFFF8286    2B    flkc_post_state            task19: FLKC post-run state
+  FFFF8294    2W    knock_window_ctr           task23: knock window counter
+  FFFF3248    280B  flkc_fg_var                FLKC per-cell float array [35 × 8B]
+  FFFF3244    1B    flkc_fg_R0_init            FLKC R0 initialization flags
+
+
+══════════════════════════════════════════════════════════════════════════════
+  ROM CALIBRATION SUMMARY
+══════════════════════════════════════════════════════════════════════════════
+
+  Address    Label                         Used by
+  ─────────  ────────────────────────────  ────────────────────────────────
+  0xAC34C    transient_tipIn_rpm_cal       0x2F984 table_1d_desc arg 1
+  0xAC360    transient_tipIn_load_cal      0x2F984 table_1d_desc arg 2
+  0xAC374    transient_tipIn_factor_cal    0x2F984 table_1d_desc arg 3
+  0xD2E1C    knock_rpm_gate_low            task08: RPM threshold
+  0xD2E20    knock_rpm_gate_high           task08: RPM threshold
+  0xD2E2C    knock_load_gate               task08: load threshold
+  0xD2E34    knock_flkc_cell_hi_cal        task08: FLKC cell threshold high
+  0xD2E3C    knock_hist_gate_lo            task08: knock history low gate
+  0xD2E40    knock_hist_gate_hi            task08: knock history high gate
+  0xD2E44    knock_hist2_gate_lo           task08: second knock history gate
+  0xD2E48    knock_hist2_gate_hi           task08
+  0xD299C    knock_flkc_count_thresh       task08: FLKC cell count threshold
+  0xD2995    knock_count_thresh_val        task11: knock flag threshold byte
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FUNCTION LABELS
+══════════════════════════════════════════════════════════════════════════════
+
+  Address    Label
+  ─────────  ───────────────────────────────────────────────────────────────
+  0x29858    flkc_state_flag_reader_table
+             Dispatch table of 16-byte stubs. Each stub reads one byte from
+             the FFFF970E learning state flag array and returns R0=2 (set) or
+             R0=0 (clear). Callers JSR to a specific offset to read a specific
+             flag slot. Covers FFFF970E–FFFF9737.
+
+  0x2999C    flkc_state_flag_reader_table+0x144  (stub for FFFF971B)
+             [CORRECTS existing wrong label "float_compare_and_flag"]
+             Same table as 0x29858. Reads FFFF971B (learning convergence state
+             for FLKC slot 15). Returns R0=2 if converged, R0=0 if not.
+             Called by tasks 19 (flkc_post), 23 (knock_cyl_track), 56 (EVAP).
+
+  0x2F8FE    check_transient_knock_inhibit
+             6-instruction leaf. Reads FFFF726E; returns R0=1 if ==1, R0=0
+             otherwise. Checks tip-in knock suppression sub-flag (NOT the
+             master transient_state_flag at FFFF726C). Called by tasks 8, 10,
+             11 to skip knock window / knock flag updates during tip-in.
+
+  0x2F984    transient_correction_calc
+             Full transient fuel correction calculator. Guards on FFFF726C==1
+             and FFFF65F1!=0. Performs 3× table_1d_desc lookups (RPM/load
+             tip-in tables), float multiply chain, writes results to
+             FFFF72E8/72F4/7300. Only updates in CL mode.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  CONCLUSIONS
+══════════════════════════════════════════════════════════════════════════════
+
+1. The "mystery" at 0x29858 was a dispatch table masquerading as a function.
+   The disassembler treated the first stub as the function entry, but the
+   entire 0x29858–0x29B00 region is a table of micro-stubs with no shared
+   prologue/epilogue.  Each caller jumps to a different offset.
+
+2. 0x2999C is not a separate function. It is the table entry for FFFF971B.
+   The existing "float_compare_and_flag" label is wrong and misleads Ghidra.
+
+3. 0x2F8FE is a sibling of check_transient_flag (0x2F8EA) reading a different
+   byte (FFFF726E vs FFFF726C). This second byte is the knock-specific
+   transient inhibit rather than the global transient state flag. Knock tasks
+   use 0x2F8FE while fuel/AFL tasks use 0x2F8EA.
+
+4. The FFFF970E array and the FLKC float table (FFFF3248, 35 entries × 8 bytes)
+   are the core data structures for fine learning knock correction. The state
+   flag at FFFF971B gates FLKC consolidation (task19) and EVAP test enablement
+   (task56), linking the knock learning system to both fuel corrections and
+   OBD-II readiness.

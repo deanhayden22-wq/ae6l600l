@@ -67,7 +67,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00043470, "LowPW_GateFunction",
             "Low PW Injector Comp gate: checks RPM < max and IPW < max");
         count += labelComment(0x0004438C, "task11_knock_flag_read",
-            "Task [11] Knock flag consumer - reads KNOCK_FLAG+BANK_FLAG, dispatches knock response");
+            "Task [11] Knock flag consumer. Gates on check_transient_knock_inhibit (0x2F8FE, FFFF726E) "
+            + "and flkc_state_flag_reader_table slot 0 (0x29858, FFFF970E). If transient inhibit active "
+            + "or FLKC slot not converged: skips knock response. Otherwise: reads KNOCK_FLAG/BANK_FLAG "
+            + "and dispatches to DAM knock table (cal 0xD2DC4/D2DD4). GBR=FFFF81F0.");
         count += labelComment(0x00043D68, "task12_knock_post",
             "Task [12] Knock post-process - writes 0xFFFF81D9, refs knock GBR base, cal 0xD2D60-74");
         count += labelComment(0x00045BFE, "flkc_path_J",
@@ -97,7 +100,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000450AE, "task07_knock_det",
             "Task [7] Knock detection. KNOCK_FLAG+MAF, sets GBR");
         count += labelComment(0x00044E04, "task08_knock_window",
-            "Task [8] Knock window setup. IAM+RPM, cal 0xD2E1C-2C");
+            "Task [8] Knock window setup. Gates on check_transient_knock_inhibit (0x2F8FE). "
+            + "Loads RPM/IAM/FFFF6898. Iterates 35 flkc_fg_var entries vs KnockWindow_FLKC_Cell_Threshold "
+            + "(0xD2E34) with uint8_add_sat. Iterates 6 knock history slots vs 0xD2E3C/40/44/48. "
+            + "GBR=FFFF8210. Cal 0xD2E1C/20/2C/34/3C/40/44/48, threshold 0xD299C.");
         count += labelComment(0x00044DB0, "task09_knock_det",
             "Task [9] Knock detection. KNOCK_FLAG+IAM+RPM, sets GBR");
         count += labelComment(0x000448F4, "task10_knock_config",
@@ -117,7 +123,10 @@ public class ImportAE5L600L extends GhidraScript {
             "Task [17] FLKC pre-process. FLKC_BASE_STEP+IAM, Advance Multiplier");
         // Tasks 18/25 already labeled above (flkc_path_J, flkc_paths_FG)
         count += labelComment(0x00045E96, "task19_flkc_post",
-            "Task [19] FLKC post-process. Advance Multiplier application");
+            "Task [19] FLKC post-process. Calls flkc_state_flag_slot15 (0x2999C, FFFF971B) to check "
+            + "convergence. If converged AND CL/OL transition (FFFF65BD) met: triggers IAM (FFFF3234) "
+            + "and FLKC_BASE_STEP (FFFF323C) update via 0xBDBCC. Sets flkc_fg_R0_init (FFFF3244) "
+            + "bits [1:0]=0b10 on successful update. Writes result to flkc_post_state (FFFF8286).");
         count += labelComment(0x000459F6, "task20_knock_win_upd",
             "Task [20] Knock window per-cyl update. IAM+MAF, sets GBR");
         count += labelComment(0x000467AE, "task21_knock_win_upd",
@@ -125,7 +134,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000461D2, "task22_knock_percyl",
             "Task [22] Knock per-cyl config. Cyl index (0xFFFF8298), sets GBR");
         count += labelComment(0x000467F4, "task23_knock_cyl_track",
-            "Task [23] Knock cyl tracking. KNOCK_FLAG+cyl index tracking");
+            "Task [23] Knock cyl tracking. Calls flkc_state_flag_slot15 (0x2999C, FFFF971B). "
+            + "If converged AND FFFF82AB==2: iterates 35 flkc_fg_var entries (FFFF3248+i*8), "
+            + "calls 0xBDBCC per cell. Writes result to FFFF82AB. Also manages KNOCK_FLAG "
+            + "counter at FFFF8294 and cl_ol_transition_flag (FFFF65BD) check.");
         count += labelComment(0x000469A4, "task24_flkc_output",
             "Task [24] FLKC output stage. flkc_output_table+cal 0xD29F0");
         // Task 25 already labeled above
@@ -137,7 +149,10 @@ public class ImportAE5L600L extends GhidraScript {
             "Task [28] FLKC recovery. Advance recovery steps 0xD2EEC-0xD2F08");
         // Timing Pipeline
         count += labelComment(0x00044296, "task29_timing_percyl",
-            "Task [29] Per-cyl timing comp. Load+knock state, sets GBR");
+            "Task [29] Per-cyl timing comp. Calls flkc_state_flag_reader_table slot 0 (0x29858, "
+            + "FFFF970E) — skip timing correction if FLKC learning slot 0 not converged. "
+            + "Also calls 0x2997C. Uses knock_GBR_base (FFFF81F0) + FFFF8260/828C float offsets. "
+            + "Writes per-cylinder timing comp to FFFF81EC.");
         count += labelComment(0x0003FCA2, "task30_base_timing",
             "Task [30] Base timing lookup. RPM+MAF+ECT+ATM, 14+ RAM refs");
         count += labelComment(0x0003FFD6, "task31_timing_blend_ratio",
@@ -195,24 +210,87 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00054A5A, "boost_feedback_reset",
             "Boost feedback workspace reset. Calls 0x22F92 (engine state check). "
             + "Zeros 9 workspace fields on state change.");
-        // Diagnostics
+        // Diagnostics -- Task 53: Readiness Monitor
         count += labelComment(0x000602DC, "task53_diag_monitor",
-            "Task [53] Diagnostic monitor. Diag state RAM, cal 0xD9A4C");
+            "Task [53] OBD-II readiness monitor. Computes drive-cycle readiness (0.0-1.0) "
+            + "from engine_run_time, warmup, load, manifold_pressure, AFL learning, timing_corr, "
+            + "vehicle_speed. Priority cascade writes FFFF9080-9090. Cal at 0xD9A3C (10 floats).");
+        count += labelComment(0x0006035A, "diag_readiness_path_a",
+            "Readiness path A. Reads engine_state_flag (FFFF8E98), table_1d_lookup via FFFF4494. "
+            + "If engine was not running: interp_readiness(0xBE628). Else: store 1.0 default.");
+        count += labelComment(0x00060392, "diag_readiness_path_b",
+            "Readiness path B (main cascade). Checks engine_run_time, warmup, manifold_pressure, "
+            + "load, AFL learning against cal thresholds. First failing condition sets readiness level.");
+        count += labelComment(0x0006048E, "diag_readiness_output_filter",
+            "Readiness output filter. Copies prev to current, clamps against bounds, "
+            + "calls clamp_filter(0xD118). Final output at FFFF908C.");
+
         // Idle
         count += labelComment(0x0004BC20, "task54_idle_control",
             "Task [54] Idle speed control. Throttle RAM, no FPU, GBR state machine");
-        // MPS Diag
+
+        // Diagnostics -- Task 55: MPS Diagnostic
         count += labelComment(0x000900B4, "task55_mps_diag",
-            "Task [55] MPS diagnostics. MPS scaling/CEL, ATM cross-check");
-        // EVAP
+            "Task [55] MPS sensor diagnostic. Gates: diag_preconditions, engine_running, "
+            + "IAT >= 0xD8B14, run_time >= 0xD8AB8. Maturation counter at FFFFABF4. "
+            + "Shift-register stuck detection via structs at 0x982A4/0x982CC.");
+        count += labelComment(0x00090156, "mps_shift_register_update",
+            "MPS shift register update. Operates on 40-byte param block (R14). "
+            + "Shifts 3-deep history, detects stuck readings, manages maturation counter. "
+            + "Thresholds at 0xD8A52 (confirm) and 0xD8A54 (decay).");
+
+        // Diagnostics -- Task 56: EVAP Purge
         count += labelComment(0x00066580, "task56_evap_purge",
-            "Task [56] EVAP/purge control. No FPU, 2 BSR calls");
-        // EGR
+            "Task [56] EVAP purge diagnostic. check_diag_state dispatch: "
+            + "active(1/2)->evap_test_sequence(0x66C40), disabled(0)->sub_66D20/66DEC/66EBC. "
+            + "Workspace at FFFF236C (5 floats + 6 u16s). GBR=FFFF933C.");
+        count += labelComment(0x00066C40, "evap_test_sequence",
+            "EVAP leak test sequence. Multi-stage: seal system, apply vacuum, "
+            + "monitor pressure decay. DTCs: P0456 (very small leak), P0458/P0459 (purge circuit).");
+        count += labelComment(0x000665C0, "evap_workspace_init",
+            "EVAP workspace initialization. 5x desc_read_float + 6x desc_read_u16 "
+            + "into FFFF236C-FFFF238A calibration cache.");
+        count += labelComment(0x00066626, "evap_ect_threshold_lookup",
+            "EVAP ECT-based threshold lookup. Two 1D tables (desc 0xACF64, 0xACF78) "
+            + "compute lower/upper EVAP pressure bounds. Delta/sum stored to FFFF9314/9318.");
+        count += labelComment(0x0006665E, "evap_condition_eval",
+            "EVAP precondition evaluation. GBR=FFFF933C. Checks RPM, manifold_pressure, "
+            + "IAT, engine_run_time, purge flow. Cal: 0xC48DC-0xC50E8.");
+
+        // Diagnostics -- Task 57: EGR/Emissions
         count += labelComment(0x000758CA, "task57_egr_emissions",
-            "Task [57] EGR/emissions control. MAF, high-addr RAM, sets GBR");
-        // MAF Diag
+            "Task [57] EGR/emissions monitor. Calls egr_sub_a(0x7BF3C) for maturation "
+            + "counters, egr_sub_b(0x7C242) for completion check, tail-calls 0x7C280 output handler. "
+            + "GBR bases: FFFFA198/A156/A158. Critical section at 0xBA84.");
+        count += labelComment(0x000758DE, "egr_main_setup",
+            "EGR main setup. GBR=FFFFA198. Copies 6 floats from FFFF4330 to FFFFA1C0-A1D4. "
+            + "Reads cal 0xC4755=27, 0xC4753=2. Critical section for egr_flag_byte (FFFF43B1).");
+        count += labelComment(0x0007BF3C, "egr_sub_a_maturation",
+            "EGR maturation counters. GBR=FFFFA156. Increments 4 counters at GBR+164-167 "
+            + "(FFFFA1FA-A1FD) via uint8_add_sat when armed (>0). State machine checks "
+            + "GBR+1 nibble and GBR+38 bit 0. Reads FFFF2BFA channel selector.");
+        count += labelComment(0x0007C242, "egr_sub_b_completion",
+            "EGR completion check. Reads FFFF9FA4 timer, compares against 400. "
+            + "Checks FFFFA157 bytes 0-3 low nibbles. Sets/clears FFFFA17D bit 0 (completion flag).");
+        count += labelComment(0x0007C280, "egr_output_handler",
+            "EGR output handler. GBR=FFFFA158. Reads FFFF2BFC period. "
+            + "Iterates 10 monitor bits across GBR+0/1/2, clearing each processed bit.");
+
+        // Diagnostics -- Task 58: MAF Diagnostic
         count += labelComment(0x0006F0B8, "task58_maf_diag",
-            "Task [58] MAF sensor diagnostics. MAF+MPS cross-check");
+            "Task [58] MAF sensor diagnostic. Two stages: precondition check (0x6F0CE) "
+            + "then maturation (0x6F114). DTC index 1 -> P0102/P0103. "
+            + "Extended check at 0x6F1AC with 125s engine_run_time gate.");
+        count += labelComment(0x0006F0CE, "maf_diag_precondition",
+            "MAF precondition check. check_engine_running(R4=39), check_diag_preconditions, "
+            + "IAT >= 0xD8B14, load >= 0xD8B18. Result to FFFF96A4.");
+        count += labelComment(0x0006F114, "maf_diag_maturation",
+            "MAF maturation. If state==2: increment counter, compare 0xD8A40, "
+            + "call dtc_set_pending(R4=1). If state==1: clear counter, dtc_clear_fault(R4=1). "
+            + "Counter at FFFF96A6, init flag at FFFF96A7.");
+        count += labelComment(0x0006F1AC, "maf_diag_extended",
+            "MAF extended diagnostics. Checks engine_state, diag_state, load range, "
+            + "IAT, engine_run_time >= 125s. Results to FFFF96A8/96A9.");
 
         // Front O2 sensor processing
         count += labelComment(0x00021A40, "frontO2_process",
@@ -421,6 +499,23 @@ public class ImportAE5L600L extends GhidraScript {
             "Routes post-retard clamp fn call");
         count += labelComment(0xFFFF82AA, "flkc_fg_prev_cyl",
             "Previous cylinder; must match for retard");
+        count += labelComment(0xFFFF82AB, "knock_cyl_track_state",
+            "FLKC propagation state for task23 (knock_cyl_track). Set to result of "
+            + "flkc_state_flag_slot15 (0x2999C) after per-cell FLKC table update. "
+            + "Used to gate 35-entry FLKC correction loop.");
+        count += labelComment(0xFFFF8286, "flkc_post_state",
+            "FLKC post-run consolidation state for task19 (flkc_post). "
+            + "Set to result of flkc_state_flag_slot15 (0x2999C). "
+            + "Checked vs 2 to gate IAM/FLKC_BASE_STEP update via 0xBDBCC.");
+        count += labelComment(0xFFFF970E, "learning_flag_table_base",
+            "FLKC learning convergence state flag array (41 bytes, FFFF970E–FFFF9737). "
+            + "Each byte: 0=cell empty/not converged, non-zero=cell has converged learning data. "
+            + "Read by flkc_state_flag_reader_table dispatch stubs (0x29858). Dead slots "
+            + "in the table return R0=0 for indices with no active learning cell.");
+        count += labelComment(0xFFFF971B, "learning_flag_slot15",
+            "FLKC learning convergence flag for slot 15. Read by flkc_state_flag_slot15 (0x2999C). "
+            + "When non-zero: task19 consolidates FLKC corrections, task23 propagates per-cell "
+            + "corrections, task56 EVAP precondition passes.");
         count += labelComment(0xFFFF8258, "flkc_fg_limit_FR15",
             "Loaded into FR15, compared vs 100.0");
         count += labelComment(0xFFFF3234, "flkc_fg_ref_FR14",
@@ -428,7 +523,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF3244, "flkc_fg_R0_init",
             "Early R0 setup");
         count += labelComment(0xFFFF3248, "flkc_fg_var_3248",
-            "Read in setup");
+            "Read in setup. Also: per-cell FLKC correction float array [35 entries × 8 bytes]. "
+            + "Iterated by task23 (knock_cyl_track) and task08 (knock_window) with 35-entry loops.");
         count += labelComment(0xFFFF8233, "flkc_fg_flag_8233",
             "Byte flag checked during FP setup");
         count += labelComment(0xFFFF7D18, "sched_status_R1",
@@ -608,6 +704,23 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x000D2F48, "FineCorr_AdvanceValue");
         count += label(0x000D2F4C, "FineCorr_RetardLimit");
         count += label(0x000D2F50, "FineCorr_RetardValue");
+
+        // Knock window / FLKC gating (task08, task11 — see mystery_subs_analysis.txt)
+        count += label(0x000D2E1C, "KnockWindow_RPM_Gate_Low");
+        count += label(0x000D2E20, "KnockWindow_RPM_Gate_High");
+        count += label(0x000D2E2C, "KnockWindow_Load_Gate");
+        count += label(0x000D2E34, "KnockWindow_FLKC_Cell_Threshold");
+        count += label(0x000D2E3C, "KnockWindow_Hist_Gate_Lo");
+        count += label(0x000D2E40, "KnockWindow_Hist_Gate_Hi");
+        count += label(0x000D2E44, "KnockWindow_Hist2_Gate_Lo");
+        count += label(0x000D2E48, "KnockWindow_Hist2_Gate_Hi");
+        count += label(0x000D299C, "KnockWindow_FLKC_Count_Threshold");
+        count += label(0x000D2995, "KnockFlag_Count_Threshold");
+
+        // Transient tip-in enrichment tables (0x2F984 transient_correction_calc)
+        count += label(0x000AC34C, "TipIn_Enrichment_RPM_Factor");
+        count += label(0x000AC360, "TipIn_Enrichment_Load_Factor");
+        count += label(0x000AC374, "TipIn_Enrichment_Combined_Factor");
 
         // Map switching
         count += label(0x000D29AC, "MapSwitch_CruiseSwitchCounterA");
@@ -1115,6 +1228,23 @@ public class ImportAE5L600L extends GhidraScript {
             "AFL primary interpolated output (float).");
         count += labelComment(0xFFFF726C, "transient_state_flag",
             "Transient state flag (byte). Gates AFL application — when set, forces FFFF7AB4=1.0.");
+        count += labelComment(0xFFFF726E, "transient_knock_inhibit",
+            "Transient knock inhibit flag (byte). Read by check_transient_knock_inhibit (0x2F8FE). "
+            + "When ==1: tasks 8/10/11 suppress knock window/flag updates (tip-in protection). "
+            + "Distinct from transient_state_flag (FFFF726C) which gates AFL/fuel corrections.");
+        count += labelComment(0xFFFF7E4C, "transient_accum_ptr",
+            "Pointer/accumulator used by transient_correction_calc (0x2F984). "
+            + "Loaded as 32-bit value, used in float multiply chain for tip-in enrichment.");
+        count += labelComment(0xFFFF65F1, "transient_enable_gate",
+            "Gate flag checked by transient_correction_calc (0x2F984). When zero, skips tip-in "
+            + "calculation entirely. Related to 0x2F974 entry guard.");
+        count += labelComment(0xFFFF72E8, "transient_correction_out",
+            "Transient correction output block (float, 12 bytes). Written by transient_correction_calc "
+            + "(0x2F984) via fmov.s into @(R0,R13) at offsets -8, -4, 0. Indexed by R13.");
+        count += labelComment(0xFFFF72F4, "transient_correction_fr9",
+            "Transient correction intermediate float (FR9). Used in fmul chain at 0x2F9F8.");
+        count += labelComment(0xFFFF7300, "transient_correction_fr4",
+            "Transient correction intermediate float (FR4). Used in fmul chain at 0x2F9FA.");
         count += labelComment(0xFFFF7448, "clol_mode_flag",
             "CL/OL mode flag (byte). 1=CL, 0=OL. Gates AFC + AFL learning. Written by 0x031528. Does NOT gate AFL application.");
         count += labelComment(0xFFFF7449, "clol_cond_A",
@@ -1227,28 +1357,43 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0002F8EA, "check_transient_flag",
             "65 calls. Reads FFFF726C byte (transient flag), returns T-bit = (value==1). "
             + "Transient condition gate for AFL/fuel corrections.");
+        count += labelComment(0x0002F8FE, "check_transient_knock_inhibit",
+            "6-instruction leaf stub. Reads FFFF726E (transient knock-inhibit sub-flag, 2 bytes "
+            + "after FFFF726C). Returns R0=1 if ==1, R0=0 otherwise. Distinct from "
+            + "check_transient_flag (0x2F8EA): this flag suppresses knock window/flag updates "
+            + "during tip-in. Called by task08 (knock_window), task10, task11 (knock_flag).");
+        count += labelComment(0x0002F984, "transient_correction_calc",
+            "Full transient fuel correction calculator. Entry 0x2F974 first gates on FFFF65F1 != 0 "
+            + "and FFFF726C == 1, then calls 3x table_1d_desc (0xAC34C, 0xAC360, 0xAC374) for "
+            + "tip-in RPM/load factors. Float multiply chain writes results to FFFF72E8/72F4/7300. "
+            + "Final stage calls check_cl_active — skips update if not in closed-loop mode.");
         count += labelComment(0x0003AB20, "check_engine_status",
             "35 calls. Reads FFFF7C68 byte (engine status), returns T-bit = (value==1). "
             + "Gates AFL application — forces multiplier=1.0 on abnormal.");
 
         // ── Diagnostic / Sensor Validation Framework ───────────────────────
-        count += labelComment(0x000582D2, "diag_wrapper_set",
-            "108 calls. Wrapper: saves PR, calls 0xA6728, restores PR. "
-            + "Diagnostic flag set used by sensor monitor tasks.");
-        count += labelComment(0x000582AC, "diag_check_status",
-            "100 calls. Reads FFFF36F0, checks diagnostic mode byte. "
-            + "Returns r0=2 if mode active. Multi-condition diagnostic gate.");
+        count += labelComment(0x000582D2, "check_engine_running_diag",
+            "108 calls. Calls engine_running_eval(0xA6728) with R4=DTC_index. "
+            + "Returns R0=1 if engine running. Used by task55 (R4=72), task58 (R4=39).");
+        count += labelComment(0x000582AC, "check_diag_state",
+            "100 calls. Reads FFFF36F4 (dtc_enable_flag). Returns: "
+            + "0=no fault(0x00), 1=confirmed(0xFF), 2=scan-cleared(0xA5). "
+            + "Used by task56 (EVAP), task58 extended.");
         count += labelComment(0x000582E0, "diag_read_pack_2val",
             "43 calls. Reads descriptor, packs 2 values via uint16_pack/uint8_pack, "
             + "calls interrupt_restore. Diagnostic data read with atomicity.");
-        count += labelComment(0x000584C8, "diag_check_enable_B",
-            "59 calls. Reads FFFFAE09 byte, returns T-bit = (value==1). "
-            + "Diagnostic enable gate B.");
-        count += labelComment(0x000584BE, "diag_check_enable_A",
-            "43 calls. Reads FFFFAE08 byte, returns T-bit = (value==1). "
-            + "Diagnostic enable gate A.");
-        count += labelComment(0x00058524, "diag_helper_C",
-            "11 calls. Diagnostic utility C. Short helper in diag framework.");
+        count += labelComment(0x000584C8, "check_monitor_enable",
+            "59 calls. Reads FFFFAE09 byte, returns 1 if == 1. "
+            + "First of 8 consecutive enable gates at +0x0A intervals (FFFFAE09-AE0F).");
+        count += labelComment(0x000584BE, "check_diag_preconditions",
+            "43 calls. Reads FFFFAE08 byte, returns 1 if == 1. "
+            + "Master diagnostic precondition gate. Used by task55, task58.");
+        count += labelComment(0x00058524, "diag_read_state_E",
+            "11 calls. Reads diag_state_E[R4] at FFFFAD52+R4. Returns active fault bitmask.");
+        count += labelComment(0x0005850E, "diag_read_state_E_indexed",
+            "Reads diag_state_E array at FFFFAD52 indexed by R4. Returns fault bitmask byte.");
+        count += labelComment(0x00058518, "diag_read_indexed_table",
+            "Reads FFFF3B06 + R4*2. Indexed diagnostic lookup table.");
 
         // ── Scheduler / Timer Utilities ────────────────────────────────────
         count += labelComment(0x0000E6E4, "sched_event_post",
@@ -1317,8 +1462,18 @@ public class ImportAE5L600L extends GhidraScript {
             "16 calls. Variant of float_load_from_desc.");
         count += labelComment(0x000299BC, "float_store_to_ram",
             "14 calls. Stores float to RAM address from descriptor result.");
-        count += labelComment(0x0002999C, "float_compare_and_flag",
-            "10 calls. Compares float values and sets a RAM flag based on result.");
+
+        // ── FLKC Learning State Flag Dispatch Table ────────────────────────
+        count += labelComment(0x00029858, "flkc_state_flag_reader_table",
+            "Dispatch table of 16-byte stubs (NOT a single function). Each stub reads one byte "
+            + "from the FFFF970E learning state flag array and returns R0=2 (non-zero/converged) "
+            + "or R0=0 (zero/empty). Callers JSR to a specific offset to check a specific flag slot. "
+            + "Covers FFFF970E-FFFF9737 (41 bytes). Dead slots return R0=0 unconditionally. "
+            + "Called by task11 (knock_flag), task18, task25, task29 (timing_percyl) at offset +0.");
+        count += labelComment(0x0002999C, "flkc_state_flag_slot15",
+            "Offset +0x144 in flkc_state_flag_reader_table (0x29858). Reads FFFF971B "
+            + "(FLKC learning convergence flag, slot 15). Returns R0=2 if converged, R0=0 if not. "
+            + "Called by task19 (flkc_post), task23 (knock_cyl_track), task56 (EVAP precondition).");
 
         // ── Sensor Reading Helpers ─────────────────────────────────────────
         count += labelComment(0x00045EEA, "knock_helper_leaf",
@@ -3011,7 +3166,53 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF96AE, "maf_hw_fault_B",
             "MAF hardware fault state B (2 bytes).");
         count += labelComment(0xFFFFABF4, "mps_diag_state",
-            "MPS (manifold pressure sensor) diag state (byte).");
+            "MPS (manifold pressure sensor) maturation counter (byte).");
+        count += labelComment(0xFFFF44E8, "mps_current_readings",
+            "MPS current readings (2 bytes, channel A and B).");
+        count += labelComment(0xFFFFAE08, "diag_precondition_flag",
+            "Master diagnostic precondition flag. Read by check_diag_preconditions (0x584BE).");
+        count += labelComment(0xFFFFAE09, "diag_monitor_enable_flags",
+            "Diagnostic monitor enable flags array (7 bytes, FFFFAE09-AE0F). "
+            + "Each byte gates a different monitor group. Read by 0x584C8 dispatch table.");
+        count += labelComment(0xFFFF933C, "evap_diag_state_GBR",
+            "EVAP diagnostic state base (GBR). Used by task56 condition evaluation.");
+        count += labelComment(0xFFFF9314, "evap_pressure_delta",
+            "EVAP pressure delta (baseline - lower threshold). Written by task56.");
+        count += labelComment(0xFFFF9318, "evap_pressure_sum",
+            "EVAP pressure sum (baseline + upper threshold). Written by task56.");
+        count += labelComment(0xFFFF318C, "evap_pressure_baseline",
+            "EVAP pressure baseline value (float).");
+        count += labelComment(0xFFFF236C, "evap_cal_cache",
+            "EVAP calibration cache (5 floats + 6 u16s = 32 bytes). "
+            + "Loaded from descriptors by task56 workspace init.");
+        count += labelComment(0xFFFFA1FA, "egr_maturation_counters",
+            "EGR maturation counters A-D (4 bytes). Incremented by egr_sub_a "
+            + "when armed (>0). GBR=FFFFA156 offset 164.");
+        count += labelComment(0xFFFFA17D, "egr_completion_flag",
+            "EGR completion flag (bit 0). Set by egr_sub_b when timer==400 "
+            + "and all 4 nibble checks pass.");
+        count += labelComment(0xFFFFA224, "egr_state_b",
+            "EGR state_b (6 consecutive floats). Copied from FFFF4330 by task57 setup.");
+        count += labelComment(0xFFFF2BFA, "egr_channel_selector",
+            "EGR channel selector (u8) + timer (u16 at +4). Read by egr_sub_a.");
+        count += labelComment(0xFFFF2BFC, "egr_timeout_counter",
+            "EGR timeout/period counter (u16). Read by egr_output_handler.");
+        count += labelComment(0xFFFF9FA4, "egr_timer",
+            "EGR timer (u16). Compared against 400 by egr_sub_b.");
+        count += labelComment(0xFFFF9FAE, "egr_init_flag",
+            "EGR initialization flag (u16). Set to 1 by egr_sub_a on first run.");
+        count += labelComment(0xFFFF9FB2, "egr_timeout_threshold",
+            "EGR timeout threshold (u16). Read by egr_output_handler.");
+        count += labelComment(0xFFFF41D0, "monitoring_state",
+            "Monitoring state byte: 1=transitioning, 2=active. Read by task58 maturation.");
+        count += labelComment(0xFFFF65A9, "engine_state_extended",
+            "Engine state extended byte. Read by task58 extended MAF diagnostics.");
+        count += labelComment(0xFFFF63C4, "iat_related_sensor",
+            "IAT-related sensor value (float). Read by task56 EVAP condition eval.");
+        count += labelComment(0xFFFF63FC, "barometric_pressure",
+            "Barometric/atmospheric pressure (float). Read by task56 EVAP.");
+        count += labelComment(0xFFFF3B06, "diag_indexed_lookup_table",
+            "Diagnostic indexed lookup table. Accessed at FFFF3B06 + R4*2 by 0x58518.");
 
         // ── DTC Calibration ──
         count += labelComment(0x000D9A3C, "cal_readiness_rpm_thresh",
@@ -3034,6 +3235,50 @@ public class ImportAE5L600L extends GhidraScript {
             "MAF diagnostic maturation counter threshold.");
         count += labelComment(0x0000F754, "hw_port_maf_status",
             "Port status register. Bits 0x20/0x40 = MAF fault lines.");
+
+        // ── MPS Diagnostic Calibration ──
+        count += labelComment(0x000D8AB8, "cal_mps_min_run_time",
+            "MPS diagnostic minimum engine run time (u16).");
+        count += labelComment(0x000D8A51, "cal_mps_counter_gate",
+            "MPS maturation counter initial gate threshold (u8).");
+        count += labelComment(0x000D8A52, "cal_mps_confirm_thresh",
+            "MPS maturation confirm threshold (u8).");
+        count += labelComment(0x000D8A53, "cal_mps_increment_step",
+            "MPS maturation increment step size (u8).");
+        count += labelComment(0x000D8A54, "cal_mps_decay_thresh",
+            "MPS maturation decay/subtraction threshold (u8).");
+        count += labelComment(0x000982A4, "mps_param_block_A",
+            "MPS channel A parameter block (40 bytes, 10 pointers).");
+        count += labelComment(0x000982CC, "mps_param_block_B",
+            "MPS channel B parameter block (40 bytes, 10 pointers).");
+
+        // ── EVAP Diagnostic Calibration ──
+        count += labelComment(0x000ACF64, "desc_evap_ect_lower",
+            "EVAP ECT-based lower pressure threshold table descriptor.");
+        count += labelComment(0x000ACF78, "desc_evap_ect_upper",
+            "EVAP ECT-based upper pressure threshold table descriptor.");
+        count += labelComment(0x000C48DC, "cal_evap_min_run_time",
+            "EVAP diagnostic min engine run time (u16).");
+        count += labelComment(0x000C50DC, "cal_evap_min_rpm",
+            "EVAP diagnostic min RPM (float).");
+        count += labelComment(0x000C50E0, "cal_evap_min_manifold_press",
+            "EVAP diagnostic min manifold pressure (float).");
+        count += labelComment(0x000C50E4, "cal_evap_min_iat",
+            "EVAP diagnostic min IAT-related threshold (float).");
+        count += labelComment(0x000C50E8, "cal_evap_min_purge_flow",
+            "EVAP diagnostic min purge flow rate (float).");
+
+        // ── Readiness Additional Calibration ──
+        count += labelComment(0x000D9A50, "cal_readiness_low",
+            "Diagnostic readiness low value (float, 0.125). Set when manifold_pressure high.");
+        count += labelComment(0x000D9A54, "cal_readiness_fallback",
+            "Diagnostic readiness fallback (float, 1.0). All conditions passed.");
+        count += labelComment(0x000D9A5C, "cal_readiness_warmup_incomplete",
+            "Diagnostic readiness warmup incomplete (float, 0.005).");
+        count += labelComment(0x000D9A60, "cal_readiness_override",
+            "Diagnostic readiness override (float, 1.0). Timing correction exceeded.");
+        count += labelComment(0x000AF5CC, "desc_readiness_vss_table",
+            "Vehicle speed readiness 1D table descriptor. Used when engine_run_time < threshold.");
 
         // =====================================================================
         // IGNITION TIMING — ADDITIONAL FUNCTIONS & CALIBRATION

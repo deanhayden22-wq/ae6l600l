@@ -1,0 +1,654 @@
+================================================================================
+DIAGNOSTIC TASKS -- DEEP ANALYSIS
+AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2)
+================================================================================
+
+Five scheduler tasks handle on-board diagnostics: readiness evaluation,
+sensor plausibility checks, EVAP leak detection, EGR monitoring, and MAF
+validation. This document traces each task at instruction level.
+
+
+================================================================================
+TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
+================================================================================
+
+  Purpose: Computes OBD-II "readiness" -- a metric that tells the scan tool
+  how far through its diagnostic drive cycle the ECU has progressed. This is
+  NOT a fault-setting task. It writes a readiness value (0.0-1.0) that other
+  monitors consult before running their tests.
+
+  Entry:
+    1. Read scheduler tick (FFFF4158), convert to float
+    2. Multiply by scale factor (loaded from 0x604B8 literal pool)
+    3. Store scaled value to FFFF9088 (diag_readiness_in)
+    4. Call readiness_path_a (0x6035A)
+    5. Call readiness_path_b (0x60392)
+    6. Branch to readiness_output_filter (0x6048E)
+
+  sub_6035A -- readiness_path_a:
+  -----------------------------------------------------------------------
+    Reads engine_state_flag (FFFF8E98). Looks up diagnostic threshold via
+    table_1d_lookup (0xBE598) using diag_threshold_input (FFFF4494).
+
+    If engine was NOT previously running (R14 == 0):
+      Calls interp_readiness (0xBE628) for interpolated value
+      Stores result to FFFF9084 (diag_readiness_val)
+    If engine WAS running:
+      Loads fallback from 0xD9A4C (cal = 1.0)
+      Stores to both FFFF9080 and FFFF9084
+
+  sub_60392 -- readiness_path_b (main cascade):
+  -----------------------------------------------------------------------
+    This is a priority-ordered cascade of condition checks. The first
+    condition that fails determines the readiness value.
+
+    Inputs read:
+      FFFF67EC  engine_run_time (u16, seconds)
+      FFFF85D7  warmup_complete (u8, 0/1)
+      FFFF6624  engine_load (float)
+      FFFF65FC  manifold_pressure (float)
+      FFFF895C  afl_learning_val (float)
+      FFFF7FBC  timing_correction (float)
+      FFFF6354  vehicle_speed (float)
+
+    Call: 0x2F8EA -- unknown helper, result stored to stack
+    Call: table_1d_lookup with FFFF4494 input
+
+    Decision cascade (checked in order):
+    -----------------------------------------------------------------------
+    1. If helper returned 1:
+       readiness = cal[0xD9A4C] = 1.0  (full readiness immediately)
+
+    2. If engine_run_time < cal[0xD9A3C] (u16, = 0 -- always passes):
+       readiness = 1D table lookup on vehicle_speed via desc 0xAF5CC
+
+    3. If warmup NOT complete:
+       Branch to step 8 (fallback)
+
+    4. If manifold_pressure > cal[0xD9A40] (= 4.0 g/rev):
+       Sub-check: if timing_correction > cal[0xD9A48] (= 65535.0, disabled):
+         readiness = cal[0xD9A60] = 1.0  (override)
+       Sub-check: if engine_load > cal[0xD9A44] (= 1000.0, disabled):
+         Branch to step 8
+       Otherwise:
+         readiness = cal[0xD9A50] = 0.125  (low readiness)
+
+    5. If afl_learning_val > engine_load:
+       readiness = cal[0xD9A5C] = 0.005  (warmup incomplete)
+
+    6. If table_lookup_result > previous_readiness (FFFF9090-8):
+       AND readiness_counter >= cal[0xD9A3E] (u16):
+         readiness = cal[0xD9A58] = 0.05  (minimum threshold)
+
+    7. All conditions passed:
+       readiness = cal[0xD9A54] = 1.0  (fallback = full readiness)
+
+    Result stored to FFFF9090-16 (readiness workspace)
+
+  sub_6048E -- readiness_output_filter:
+  -----------------------------------------------------------------------
+    Copies previous readiness to current slot (FFFF908C)
+    Compares scaled input against bounds
+    If out of range, calls clamp_filter (0xD118)
+    Final filtered readiness output at FFFF908C
+
+  Calibration Summary:
+  -----------------------------------------------------------------------
+    0xD9A3C:  0 (u16)    RPM threshold -- always pass
+    0xD9A3E:  ?          Readiness counter threshold
+    0xD9A40:  4.0        Manifold pressure threshold (g/rev)
+    0xD9A44:  1000.0     Load upper limit (effectively disabled)
+    0xD9A48:  65535.0    Timing threshold (effectively disabled)
+    0xD9A4C:  1.0        Default/immediate readiness
+    0xD9A50:  0.125      Low readiness (manifold pressure high)
+    0xD9A54:  1.0        Fallback readiness
+    0xD9A58:  0.05       Minimum readiness
+    0xD9A5C:  0.005      Warmup incomplete readiness
+    0xD9A60:  1.0        Override readiness
+
+  RAM Summary:
+  -----------------------------------------------------------------------
+    FFFF4158   u32    Scheduler tick count (input)
+    FFFF4494   u16    Diagnostic threshold input
+    FFFF8E98   u8     Engine state flag
+    FFFF65C0   u8     Engine state byte (stored to ctrl struct)
+    FFFF67EC   u16    Engine run time (seconds)
+    FFFF85D7   u8     Warmup complete flag
+    FFFF6624   float  Engine load (g/rev)
+    FFFF65FC   float  Manifold pressure
+    FFFF895C   float  A/F learning value
+    FFFF7FBC   float  Timing correction
+    FFFF6354   float  Vehicle speed
+    FFFF9080   float  Readiness workspace [0]
+    FFFF9084   float  Readiness value (current)
+    FFFF9088   float  Readiness input (scaled tick)
+    FFFF908C   float  Readiness output (filtered)
+    FFFF9090   struct Readiness control (16 bytes: u16 counter + state + workspace)
+
+
+================================================================================
+TASK 55: MPS DIAGNOSTIC (MAP SWITCH) @ 0x900B4
+================================================================================
+
+  Purpose: Monitors the manifold pressure sensor for stuck/implausible
+  readings. Uses a maturation counter to confirm faults before setting DTCs.
+  Also maintains a shift register for recent readings to detect stuck values.
+
+  Entry (0x900D2):
+    1. Read IAT value (FFFF4130) into FR14
+    2. Call check_diag_preconditions (0x584BE) -- reads FFFFAE08
+    3. Call check_engine_running (0x582D2) with R4=72 (DTC index 72)
+    4. Read engine_run_time (FFFF67EC)
+
+  Gate Conditions (all must pass):
+    - check_diag_preconditions returned 1
+    - check_engine_running returned 1
+    - IAT >= threshold at 0xD8B14 (float)
+    - engine_run_time >= threshold at 0xD8AB8 (u16)
+
+  If ALL gates pass:
+    Read mps_diag_state (FFFFABF4)
+    Compare against threshold at 0xD8A51 (u8)
+    If state >= threshold: set R14 = 1 (matured)
+    Else: R14 = 0 (not yet matured)
+    Call uint8_add_sat to increment counter
+    Store incremented value back to FFFFABF4
+
+  If ANY gate fails:
+    R14 = 0
+    Reset FFFFABF4 to 0
+
+  Sub-function at 0x90156 -- shift_register_update:
+  -----------------------------------------------------------------------
+    Operates on a parameter block passed in R14 (pointer to 40-byte struct
+    at ROM 0x982A4 and 0x982CC). The struct contains pointers to:
+      +0x00: current reading ptr
+      +0x08: history[0] ptr
+      +0x0C: history[1] ptr
+      +0x10: history[2] ptr
+      +0x14: output flag ptr
+      +0x18: clear flag ptr
+      +0x24: maturation counter ptr
+
+    Logic:
+    1. Shift history: history[2] = history[1], history[1] = history[0]
+    2. Compare current reading against history[0]
+       If match: history[0] flag = 0 (stuck)
+       If different: history[0] flag = 1 (changing)
+    3. Store current to history[0]
+    4. If R14 == 1 (matured) AND all 3 history flags are 0 (all stuck):
+       Increment maturation counter via uint8_add_sat
+       Compare against threshold at 0xD8A52
+       If matured: set output flag = 1, clear flag = 0
+    5. If history shows stuck AND counter >= decay threshold (0xD8A54):
+       Subtract decay value from counter (counter -= threshold)
+    6. Final check: if counter >= confirm threshold (0xD8A52):
+       Set output = 1, clear = 0
+
+  This runs twice per task invocation:
+    - First call with struct at 0x982A4, reading from FFFF44E8+0
+    - Second call with struct at 0x982CC, reading from FFFF44E8+1
+
+  Reset path (0x900B8):
+    Called when R4 != 0 (from scheduler dispatch)
+    Calls 0x22F92 (check startup state)
+    If returns 1: clear FFFFABF4 to 0
+
+  RAM Summary:
+  -----------------------------------------------------------------------
+    FFFFABF4   u8     MPS maturation counter
+    FFFF4130   float  IAT ADC value
+    FFFF67EC   u16    Engine run time
+    FFFF44E8   u8[2]  MPS current readings (2 channels)
+    FFFFAE08   u8     Diagnostic precondition flag
+
+  Calibration:
+  -----------------------------------------------------------------------
+    0xD8B14    float  IAT minimum threshold
+    0xD8AB8    u16    Engine run time minimum
+    0xD8A51    u8     MPS counter threshold (initial gate)
+    0xD8A52    u8     MPS confirm threshold
+    0xD8A53    u8     uint8_add_sat increment step
+    0xD8A54    u8     Decay threshold / subtraction value
+
+  Parameter Blocks:
+    0x982A4    struct MPS channel A parameter block (40 bytes, 10 pointers)
+    0x982CC    struct MPS channel B parameter block (40 bytes, 10 pointers)
+
+
+================================================================================
+TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
+================================================================================
+
+  Purpose: Monitors the EVAP (evaporative emissions) system. Tests purge
+  valve operation and detects fuel vapor leaks. The most complex diagnostic
+  task with multiple operating modes depending on engine state.
+
+  Entry Dispatch (0x66580):
+    Call check_diag_state (0x582AC)
+    Result determines path:
+      1 or 2 (diagnostics active): jump to evap_test_sequence (0x66C40)
+      0 (disabled): fall through to RTS
+
+  Secondary Entry (0x6659C):
+    Call check_diag_state again
+    If 0 (disabled):
+      Call evap_sub_disabled_a (0x66D20)
+      Call evap_sub_disabled_b (0x66DEC)
+      Jump to evap_sub_disabled_c (0x66EBC)
+    If active: RTS (already handled by primary entry)
+
+  Workspace Initialization (0x665C0):
+  -----------------------------------------------------------------------
+    Reads calibration descriptors into EVAP workspace at FFFF236C:
+    - 5 float reads via desc_read_float (0xBE9B0) -> FFFF236C to FFFF237C
+    - 6 u16 reads via desc_read_u16 (0xBE9A0) -> FFFF2380 to FFFF238A
+    These are EVAP test thresholds loaded from calibration descriptors.
+
+  ECT-Based Threshold Lookup (0x66626):
+  -----------------------------------------------------------------------
+    Reads ECT (FFFF63CC)
+    Two 1D table lookups via 0xBE830:
+      - desc 0xACF64: ECT-based EVAP lower threshold -> FR15
+      - desc 0xACF78: ECT-based EVAP upper threshold -> FR0
+    Reads FFFF318C (pressure baseline?)
+    Computes delta: FR8 = baseline - lower_threshold
+    Stores delta to FFFF9314 (FFFF9318-4)
+    Computes sum: FR9 = baseline + upper_threshold
+    Stores sum to FFFF9318
+
+  Condition Evaluation (0x6665E):
+  -----------------------------------------------------------------------
+    Sets GBR = FFFF933C (EVAP diagnostic state base)
+    Calls 0x584D2 (check_monitor_enable variant)
+    Reads:
+      - RPM (FFFF6350) -> FR8
+      - Manifold pressure (FFFF65FC) -> FR9
+      - FFFF63C4 (IAT-related?) -> FR6
+      - FFFF63FC (barometric?) -> FR4
+      - Engine run time (FFFF67EC)
+
+    Gate conditions (all must pass for EVAP test):
+      - Monitor enable returned 1
+      - Engine run time >= threshold at 0xC48DC (u16)
+      - RPM >= threshold at 0xC50DC (float)
+      - Manifold pressure >= threshold at 0xC50E0 (float)
+      - IAT-related value >= threshold at 0xC50E4 (float)
+      - Purge valve flow (from 0xBEAB0 lookup) >= threshold at 0xC50E8
+
+    Result: R0 = 1 if all pass, 0 if any fail
+
+  The actual EVAP leak test sequence at 0x66C40 and the disabled-mode
+  sub-functions implement the multi-stage EVAP test protocol:
+    - Seal the system (close purge and vent valves)
+    - Apply vacuum via engine intake
+    - Monitor pressure decay rate
+    - Compare against thresholds for small/very small leaks
+    - DTCs: P0456 (very small leak), P0458/P0459 (purge valve circuit)
+
+  RAM Summary:
+  -----------------------------------------------------------------------
+    FFFF2368   struct EVAP workspace base (float at +0)
+    FFFF236C   struct EVAP calibration cache (5 floats + 6 u16s)
+    FFFF318C   float  Pressure baseline value
+    FFFF9314   float  EVAP delta (baseline - lower)
+    FFFF9318   float  EVAP sum (baseline + upper)
+    FFFF933C   struct EVAP diagnostic state (GBR base)
+    FFFF63C4   float  IAT-related sensor value
+    FFFF63CC   float  ECT
+    FFFF63FC   float  Barometric / atmospheric pressure
+    FFFF6350   float  RPM
+    FFFF65FC   float  Manifold pressure
+    FFFF67EC   u16    Engine run time
+
+  Calibration:
+  -----------------------------------------------------------------------
+    0xACF64    desc   ECT-based EVAP lower threshold table
+    0xACF78    desc   ECT-based EVAP upper threshold table
+    0xC48DC    u16    Min engine run time for EVAP test
+    0xC50DC    float  Min RPM for EVAP test
+    0xC50E0    float  Min manifold pressure
+    0xC50E4    float  Min IAT-related threshold
+    0xC50E8    float  Min purge flow rate
+
+
+================================================================================
+TASK 57: EGR / EMISSIONS CONTROL @ 0x758CA
+================================================================================
+
+  Purpose: Monitors the EGR (Exhaust Gas Recirculation) system. On a turbo
+  Subaru, the "EGR" system in the ROM is actually the secondary air system
+  and emissions monitoring, not a traditional EGR valve. This task manages
+  the emissions monitor state machine with maturation counters.
+
+  Entry (0x758CA):
+    1. Call egr_sub_a (0x7BF3C) with R4 = engine state byte
+    2. Call egr_sub_b (0x7C242)
+    3. Tail-call to 0x7C280 (egr_output_handler)
+
+  Setup (0x758DE -- called before main entry):
+  -----------------------------------------------------------------------
+    Sets GBR = FFFFA198 (egr_gbr_base)
+    Allocates 28 bytes of stack space
+    Calls 0xBE81C with R5=0xE0 (224) for initialization
+
+    Reads FFFF4330 (egr_state_a) block:
+      - Byte at offset +60 -> GBR+108
+      - 6 consecutive floats at +0 to +20 -> egr_state_b region:
+        FFFFA224-0x64 through FFFFA224-0x50 (FFFFA1C0-FFFFA1D4)
+      - Byte at offset +61 -> stack[4]
+
+    Reads engine_load (FFFF6624) -> stores to GBR base (FFFFA198)
+    Calls 0xBE82C with stack[0] parameter
+
+    Enters critical section (0xBA84):
+      R5 = cal[0xC4755] = 0x1B (27)
+      R4 = cal[0xC4753] = 0x02 (2)
+
+    Reads egr_flag_byte (FFFF43B1):
+      If == 1: clear GBR+110 to 0, exit critical section
+      If != 1: copy stack[4] to GBR+110
+
+  State Machine (0x7596A onward):
+  -----------------------------------------------------------------------
+    GBR+142 (0xFFFFA226): monitor status bits
+
+    Check GBR+142 bit 0:
+      If set: Set GBR+0x85 bit 0 (mark active)
+              Copy GBR+108 to GBR+109 (prev = current)
+              Clear GBR+0x8E bit 0
+
+    Check GBR+110:
+      If == 1 AND GBR+111 == 0:
+        Set GBR+0x85 bit 0 (mark active)
+        Copy GBR+108 to GBR+109
+        Set GBR+0x8E bit 0
+
+    Check GBR+110:
+      If == 1 AND GBR+133 bit 0 clear:
+        Set GBR+0x85 bit 0
+        Branch to extended handler at 0x75C36
+
+  sub_7BF3C -- egr_sub_a (maturation counters):
+  -----------------------------------------------------------------------
+    GBR = FFFFA156 (maturation counter base)
+    Allocates 72 bytes of stack
+
+    Increments 4 independent maturation counters:
+      GBR+164 (FFFFA1FA): counter A -- if > 0, uint8_add_sat(+1)
+      GBR+165 (FFFFA1FB): counter B -- if > 0, uint8_add_sat(+1)
+      GBR+166 (FFFFA1FC): counter C -- if > 0, uint8_add_sat(+1)
+      GBR+167 (FFFFA1FD): counter D -- if > 0, uint8_add_sat(+1)
+
+    These are monitoring maturation counters. They only increment when
+    their current value is > 0 (i.e., they must be "armed" first by
+    setting them to a non-zero value from elsewhere).
+
+    After counter updates:
+      Read FFFF2BFA: u8 at +0 -> R12 (channel selector)
+                     u16 at +4 -> R13 (timer/counter)
+
+    Check GBR+1 low nibble:
+      If all 4 bits clear (0x0F mask):
+        Set GBR+0 = 1, FFFF9FAE = 1
+        Set GBR+38 bit 0, branch to 0x7C12A
+
+    Check GBR+38 bit 0:
+      If set: Complex state machine with R11 (engine state):
+        R11 == 0: Check GBR+1 bit 0, set counter A
+        R11 == 2: Check GBR+1 bits 0-1, if bits[1:0]==2, set counter B
+        R11 == 1: Check GBR+1 bits 0-2, if bits[2:0]==4, set counter C
+
+  sub_7C242 -- egr_sub_b (completion check):
+  -----------------------------------------------------------------------
+    Reads FFFF9FA4 (u16 timer)
+    Compares against 400 (100 * 4): if timer == 400 -> check completion
+
+    Checks FFFFA157 (GBR base at FFFFA156+1) bytes 0-3 low nibbles:
+      If bytes 1,2,3 all have low nibble == 0:
+        Check byte 0 low nibble
+        If also 0: Set FFFFA17D bit 0 (completion flag)
+      Else: Clear FFFFA17D bit 0
+
+  sub_7C280 -- egr_output_handler:
+  -----------------------------------------------------------------------
+    GBR = FFFFA158
+    Reads FFFF2BFC (u16)
+    Checks GBR+0,1,2 low nibbles for pending operations
+
+    If all clear: branch to 0x7C488 (idle/exit)
+
+    Otherwise: reads FFFF9FB2 (u16 timeout)
+    If timeout > FFFF2BFC: reset and begin clearing bits
+
+    Iterates through 3 bytes (GBR+0, GBR+1, GBR+2), checking each bit:
+      For each set bit: clear it and branch to 0x7C384 (output handler)
+    Processes bits 0-3 of GBR+0, bits 0-3 of GBR+1, bits 0-1 of GBR+2
+    Total: up to 10 independent monitor outputs
+
+  RAM Summary:
+  -----------------------------------------------------------------------
+    FFFFA198   float  Engine load (copied from FFFF6624)
+    FFFFA198   GBR    EGR state base (main task)
+    FFFFA156   GBR    EGR maturation counter base (sub_a)
+    FFFFA158   GBR    EGR output handler base (sub_c)
+    FFFFA1FA   u8[4]  Maturation counters A-D
+    FFFFA17D   u8     Completion flag (bit 0)
+    FFFFA224   struct EGR state_b (float array, 6 entries)
+    FFFF4330   struct EGR state_a (floats + bytes at +60,+61)
+    FFFF43B1   u8     EGR flag byte (1 = override active)
+    FFFF2BFA   struct Channel selector (u8) + timer (u16 at +4)
+    FFFF2BFC   u16    Timeout/period counter
+    FFFF9FA4   u16    Timer (compared against 400)
+    FFFF9FAE   u16    Initialization flag
+    FFFF9FB2   u16    Timeout threshold
+
+  Calibration:
+  -----------------------------------------------------------------------
+    0xC4755    u8     = 27 (0x1B) -- critical section priority
+    0xC4753    u8     = 2 -- critical section parameter
+
+
+================================================================================
+TASK 58: MAF SENSOR DIAGNOSTIC @ 0x6F0B8
+================================================================================
+
+  Purpose: Two-stage MAF sensor diagnostic. Stage 1 checks basic
+  plausibility (preconditions + IAT/load gates). Stage 2 checks for
+  hardware faults via port status registers.
+
+  Entry:
+    1. Call maf_diag_sub_a (0x6F0CE) -- precondition check
+    2. Branch to maf_diag_maturation (0x6F114)
+
+  Alternate entry at 0x6F0C2:
+    Sets maf_diag_flag (FFFF96A5) = (R4 == 1) ? 1 : 0
+
+  sub_6F0CE -- precondition check:
+  -----------------------------------------------------------------------
+    Call check_engine_running(R4=39) -> DTC index 39 = P0000 (internal)
+    Call check_diag_preconditions -> reads FFFFAE08
+    Read IAT (FFFF4130) -> FR8
+    Read engine_load (FFFF6624) -> FR9
+
+    Gates (all must pass):
+      - check_engine_running returned 1
+      - check_diag_preconditions returned 1
+      - IAT >= threshold at 0xD8B14
+      - engine_load >= threshold at 0xD8B18
+
+    Result: FFFF96A4 = 1 if all pass, 0 if any fail
+
+  sub_6F114 -- maturation:
+  -----------------------------------------------------------------------
+    Read FFFF96A4 (precondition result)
+    If != 1: reset counter (FFFF96A4+2 = 0) and init flag (+3 = 0)
+
+    If == 1:
+      Check FFFF96A5 (maf_diag_flag):
+        If != 1: same reset path
+
+      Check init flag (FFFF96A4+3):
+        If == 0: set to 1, exit (first-time initialization)
+
+      Read FFFF41D0 (monitoring state):
+        If == 2 (active monitoring):
+          Read counter (FFFF96A4+2)
+          Compare against threshold at 0xD8A40
+          If counter >= threshold:
+            TAIL-CALL dtc_set_pending(R4=1) -> P0102/P0103 (MAF low/high)
+          Else:
+            uint8_add_sat(counter, 1), store back
+
+        If == 1 (transitioning):
+          Clear counter to 0
+          TAIL-CALL dtc_clear_fault(R4=1) -> clear MAF DTC
+
+  Extended MAF Diagnostics (0x6F1AC area):
+  -----------------------------------------------------------------------
+    Reads FFFF65A9 (engine state extended)
+    Calls check_diag_state (0x582AC)
+    Reads engine_load (FFFF6624), IAT (FFFF4130), engine_run_time (FFFF67EC)
+
+    If engine state == 1:
+      Call 0xBE608 (range check) with engine_load, scale factor
+      If range check passes AND diag_state active:
+        Check IAT against threshold (from literal pool)
+        Check engine_load against threshold
+        Check engine_run_time >= 125 seconds
+        Check diag_state == 1 or 2
+        If all pass: R11 = 1 (extended check passed)
+
+    Store results to FFFF96A8 (extended state byte 0 = R12)
+    Store to FFFF96A9 (extended state byte 1 = R11)
+
+  RAM Summary:
+  -----------------------------------------------------------------------
+    FFFF96A4   u8     MAF precondition result (0/1)
+    FFFF96A5   u8     MAF diagnostic flag (armed)
+    FFFF96A6   u8     MAF maturation counter
+    FFFF96A7   u8     MAF init flag (first-time)
+    FFFF96A8   u8     MAF extended check result A
+    FFFF96A9   u8     MAF extended check result B
+    FFFF41D0   u8     Monitoring state (1=transitioning, 2=active)
+    FFFF65A9   u8     Engine state extended byte
+    FFFFAE08   u8     Diagnostic precondition flag
+
+  Calibration:
+  -----------------------------------------------------------------------
+    0xD8B14    float  IAT minimum threshold for MAF diag
+    0xD8B18    float  Engine load minimum threshold for MAF diag
+    0xD8A40    u8     MAF maturation threshold (counter must reach this)
+
+
+================================================================================
+SHARED DIAGNOSTIC HELPERS
+================================================================================
+
+  check_diag_state @ 0x582AC:
+  -----------------------------------------------------------------------
+    Reads byte at FFFF36F0+4 = FFFF36F4 (dtc_enable_flag)
+    Returns:
+      0 = byte is 0x00 (no fault / disabled)
+      1 = byte is 0xFF (confirmed fault)
+      2 = byte is 0xA5 (scan-tool cleared, pending re-eval)
+    Used by: task56 (EVAP), task58 extended
+
+  check_engine_running @ 0x582D2:
+  -----------------------------------------------------------------------
+    Calls engine_running_eval (0xA6728) with R4=DTC index
+    Returns R0 sign-extended (0 or 1)
+    Used by: task55 (MPS), task58 (MAF)
+
+  check_diag_preconditions @ 0x584BE:
+  -----------------------------------------------------------------------
+    Reads FFFFAE08. Returns 1 if byte == 1, else 0.
+    Simple single-flag gate.
+    Used by: task55, task58
+
+  check_monitor_enable array @ 0x584C8-0x58530:
+  -----------------------------------------------------------------------
+    A dispatch table of 8 independent enable checks at consecutive
+    addresses, each reading a different RAM flag:
+      0x584C8: FFFFAE09
+      0x584D2: FFFFAE0A
+      0x584DC: FFFFAE0B
+      0x584E6: FFFFAE0C
+      0x584F0: FFFFAE0D
+      0x584FA: FFFFAE0E
+      0x58504: FFFFAE0F
+    Each returns 1 if its flag == 1, else 0.
+
+    Additional entries:
+      0x5850E: Read diag_state_E[R4] at FFFFAD52+R4 -> bitmask lookup
+      0x58518: Read FFFF3B06 + R4*2 -> u8 (indexed lookup table)
+      0x58524: Read FFFFAD44 -> raw byte
+      0x5852A: Read FFFFAD45 -> raw byte
+
+
+================================================================================
+KEY NEW RAM ADDRESSES DISCOVERED
+================================================================================
+
+  Address       Type    Description                       Refs
+  -----------------------------------------------------------------------
+  FFFFA156      GBR     EGR maturation counter base       task57
+  FFFFA158      GBR     EGR output handler base           task57
+  FFFFA198      GBR     EGR state base (main)             task57
+  FFFFA1FA      u8[4]   EGR maturation counters A-D       task57
+  FFFFA17D      u8      EGR completion flag               task57
+  FFFFA224      struct  EGR state_b (6 floats)            task57
+  FFFF2BFA      struct  EGR channel selector + timer      task57
+  FFFF2BFC      u16     EGR timeout counter               task57
+  FFFF9FA4      u16     EGR timer (vs 400)                task57
+  FFFF9FAE      u16     EGR init flag                     task57
+  FFFF9FB2      u16     EGR timeout threshold             task57
+  FFFF933C      GBR     EVAP diagnostic state base        task56
+  FFFF9314      float   EVAP delta                        task56
+  FFFF9318      float   EVAP sum                          task56
+  FFFF318C      float   Pressure baseline                 task56
+  FFFF63C4      float   IAT-related sensor                task56
+  FFFF63FC      float   Barometric pressure               task56
+  FFFF44E8      u8[2]   MPS current readings              task55
+  FFFFAE08      u8      Diag precondition flag            shared
+  FFFFAE09-0F   u8[7]   Monitor enable flags              shared
+  FFFFAD44      u8      Diag state raw byte A             shared
+  FFFFAD45      u8      Diag state raw byte B             shared
+  FFFF3B06      u8[]    Indexed diag lookup table         shared
+  FFFF41D0      u8      Monitoring state (1/2)            task58
+  FFFF65A9      u8      Engine state extended              task58
+  FFFF96A6      u8      MAF maturation counter            task58
+  FFFF96A7      u8      MAF init flag                     task58
+  FFFF96A8      u8      MAF extended result A             task58
+  FFFF96A9      u8      MAF extended result B             task58
+
+
+================================================================================
+KEY NEW ROM ADDRESSES DISCOVERED
+================================================================================
+
+  Address       Type    Description
+  -----------------------------------------------------------------------
+  0x022F92      code    Startup/initialization state check
+  0x02F8EA      code    Unknown helper (used by task53 readiness)
+  0x07C280      code    EGR output handler
+  0x0982A4      struct  MPS channel A parameter block (40 bytes)
+  0x0982CC      struct  MPS channel B parameter block (40 bytes)
+  0x0BE608      code    Range check function
+  0x0BE81C      code    Block initialization function
+  0x0BE82C      code    Parameter block processor
+  0x0BE830      code    1D table lookup (descriptor-based)
+  0x0BEAB0      code    Purge flow lookup function
+  0x0ACF64      desc    ECT-based EVAP lower threshold
+  0x0ACF78      desc    ECT-based EVAP upper threshold
+  0x0AF5CC      desc    Vehicle speed readiness table
+  0x0C48DC      cal     EVAP min engine run time (u16)
+  0x0C50DC      cal     EVAP min RPM (float)
+  0x0C50E0      cal     EVAP min manifold pressure (float)
+  0x0C50E4      cal     EVAP min IAT threshold (float)
+  0x0C50E8      cal     EVAP min purge flow (float)
+  0x0D8AB8      cal     MPS min engine run time (u16)
+  0x0D8A51      cal     MPS counter initial gate (u8)
+  0x0D8A52      cal     MPS confirm threshold (u8)
+  0x0D8A53      cal     MPS increment step (u8)
+  0x0D8A54      cal     MPS decay threshold (u8)
