@@ -1,0 +1,719 @@
+AE5L600L — 0x5AB44 Analysis: OL Bypass / CL Transition State Machine
+=====================================================================
+ROM: AE5L600L (2013 USDM WRX MT, Renesas SH7058)
+Entry point: 0x0005AB44
+Size: ~672 bytes code + 2 literal pools (to 0x5AE5C)
+
+
+══════════════════════════════════════════════════════════════════════════════
+  SUMMARY
+══════════════════════════════════════════════════════════════════════════════
+
+0x5AB44 is the handler invoked by ALL FOUR OL-gated dispatch runners
+(0x049CF0, 0x4907C, 0x48DB8, 0x48E16) when FFFF8EDC != 0x00 — i.e. when
+OL enrichment is NOT active.  This function manages the CL-side state while
+the engine is operating in closed-loop fuel control.
+
+It monitors sensor health, counts time-in-CL, manages phase tracking for
+CL↔OL transition readiness, and conditionally triggers diagnostic and
+calibration update routines.
+
+Input parameter:
+  R4 = 0: normal CL-mode tick (FFFF8EDC == some non-zero, non-0xFF value)
+  R4 = 1: special entry (FFFF8EDC == 0xFF — mode re-entry / forced CL)
+
+
+══════════════════════════════════════════════════════════════════════════════
+  CALLING CONTEXT
+══════════════════════════════════════════════════════════════════════════════
+
+Literal pool references found at:
+  0x49DFC — within fuel_dispatch_table_A runner (0x4907C, Task 9)
+  0x4A128 — within fuel_dispatch_table_B runner (0x049CF0, Task 2/3)
+
+All four OL-gated dispatchers check FFFF8EDC:
+  if FFFF8EDC == 0x00: dispatch OL enrichment sub-functions
+  if FFFF8EDC != 0x00: set R4=0 or R4=1, JMP 0x5AB44
+
+Therefore this function runs on every 20ms scheduler tick when the engine
+is in closed-loop mode.  It is the CL-side counterpart to the 7-phase OL
+enrichment pipeline.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  ANNOTATED DISASSEMBLY
+══════════════════════════════════════════════════════════════════════════════
+
+─── PROLOGUE ──────────────────────────────────────────────────────────────
+
+  0x5AB44:  mov.l  R8,@-R15           ; save R8-R14, PR
+  0x5AB46:  mov.l  R9,@-R15
+  0x5AB48:  mov.l  R10,@-R15
+  0x5AB4A:  mov.l  R11,@-R15
+  0x5AB4C:  mov.l  R12,@-R15
+  0x5AB4E:  mov.l  R13,@-R15
+  0x5AB50:  mov.l  R14,@-R15
+  0x5AB52:  sts.l  PR,@-R15
+  0x5AB54:  add    #-24,R15           ; allocate 24 bytes on stack
+                                       ; locals: @SP+0..+3   = scratch
+                                       ;         @SP+4..+7   = irq_save_token
+                                       ;         @SP+8       = prev_cl_active (from check_cl_active)
+                                       ;         @SP+12      = check_cl_active result (copy)
+                                       ;         @SP+16..+19 = sensor_diag result
+                                       ;         @SP+20..+23 = uint16_add_sat func ptr
+
+
+─── READ INPUT PARAMETER ──────────────────────────────────────────────────
+
+  0x5AB56:  mov    R4,R9              ; R9 = mode_param (0=normal CL, 1=forced re-entry)
+
+
+─── INTERRUPT SAVE ────────────────────────────────────────────────────────
+
+  0x5AB58:  mov.l  @(0x5ACB4),R2     ; =0x0000317C  interrupt_save
+  0x5AB5A:  jsr    @R2
+  0x5AB5C:  mov    #16,R4             ; delay slot: R4=16 (IRQ priority level)
+  0x5AB5E:  mov.l  R0,@(4,R15)       ; save IRQ token to local[1]
+
+
+─── LOAD ENGINE STATE FLAGS ───────────────────────────────────────────────
+
+  0x5AB60:  mov.l  @(0x5ACC4),R6     ; =0xFFFF65A9  engine_state_extended
+  0x5AB62:  mov.b  @R6,R12           ; R12 = engine_state_extended
+
+  0x5AB64:  mov.l  @(0x5AC90),R6     ; =0xFFFF8CA0
+  0x5AB66:  mov.b  @R6,R0            ; R0 = FFFF8CA0 (sensor status byte)
+
+  0x5AB68:  mov.l  @(0x5ACC8),R6     ; =0x00022F92  check_cl_active
+  0x5AB6A:  jsr    @R6
+  0x5AB6C:  mov.b  R0,@(8,R15)       ; delay slot: save FFFF8CA0 to local[2]
+  0x5AB6E:  mov.b  R0,@(12,R15)      ; save check_cl_active result to local[3]
+                                       ; R0=1 if closed-loop active, 0 otherwise
+
+  0x5AB70:  mov.l  @(0x5ACCC),R6     ; =0xFFFFB000
+  0x5AB72:  mov.b  @R6,R13           ; R13 = FFFFB000 (engine_running_flag?)
+
+  0x5AB74:  mov.l  @(0x5AC9C),R6     ; =0xFFFF8CAD
+  0x5AB76:  mov.b  @R6,R8            ; R8 = FFFF8CAD (sensor_ready_flag?)
+
+  0x5AB78:  mov.l  @(0x5AC94),R6     ; =0xFFFF65BC
+  0x5AB7A:  mov.b  @R6,R10           ; R10 = FFFF65BC (cl_transition_ready?)
+
+  0x5AB7C:  mov.l  @(0x5ACD0),R6     ; =0xFFFF6C4E
+  0x5AB7E:  mov.b  @R6,R11           ; R11 = FFFF6C4E (warmup_complete_flag?)
+
+
+─── SENSOR DIAGNOSTIC CHECK ───────────────────────────────────────────────
+
+  0x5AB80:  mov.l  @(0x5AC88),R6     ; =0x0005CC9A  sensor_diag_helper
+  0x5AB82:  jsr    @R6
+  0x5AB84:  nop
+  0x5AB86:  extu.b R0,R6             ; R6 = sensor_diag result (0 or 1)
+
+  0x5AB88:  mov.l  @(0x5AC8C),R14    ; =0xFFFF8E98  (struct base: cl_state_struct)
+  0x5AB8A:  mov.l  @(8,R14),R14      ; R14 = cl_state_struct[+8] (dword: cycle_counter)
+
+
+─── BRANCH A: CL TRANSITION READY (FFFF65BC == 1) ────────────────────────
+                                       ; R10 = FFFF65BC
+  0x5AB8C:  extu.b R10,R0
+  0x5AB8E:  cmp/eq #1,R0
+  0x5AB90:  bf/s   0x5ABBE            ; if FFFF65BC != 1 → skip to Branch B
+  0x5AB92:  mov.l  R6,@(16,R15)      ; delay slot: save sensor_diag result
+
+  ; FFFF65BC == 1: CL transition is ready
+  0x5AB94:  mov.l  @(0x5AC8C),R5     ; R5 = 0xFFFF8E98 (cl_state_struct)
+  0x5AB96:  mov.b  @(14,R5),R0       ; R0 = struct[+14] (prev_cl_transition_ready)
+  0x5AB98:  tst    R0,R0
+  0x5AB9A:  bf     0x5ABBE            ; if prev value != 0 → already handled, skip
+
+  0x5AB9C:  mov.b  @R5,R6            ; R6 = struct[+0] (state_phase byte)
+  0x5AB9E:  tst    R6,R6
+  0x5ABA0:  bt     0x5ABBE            ; if state == 0 → not initialized, skip
+
+  ; state != 0 AND first time FFFF65BC went high → TRIGGER CL ENTRY SEQUENCE
+  0x5ABA2:  mov.l  @(0x5ACD4),R6     ; =0x0009ED44  (ROM routine — CL entry init A)
+  0x5ABA4:  jsr    @R6
+  0x5ABA6:  nop
+
+  0x5ABA8:  mov.l  @(0x5ACD8),R6     ; =0x0005CA42  (ROM routine — CL entry init B)
+  0x5ABAA:  jsr    @R6
+  0x5ABAC:  nop
+
+  0x5ABAE:  mov    #0,R4              ; R4 = 0 (table walk mode)
+  0x5ABB0:  [2F42]                    ; mov.l R4,@-R15 (push R4)
+  0x5ABB2:  mov    R15,R6             ; R6 = stack pointer (output buffer)
+  0x5ABB4:  mov.l  @(0x5ACDC),R1     ; =0x0000DCE4  desc_table_walk
+  0x5ABB6:  jsr    @R1
+  0x5ABB8:  mov    #3,R5              ; delay slot: R5 = 3 (table count)
+  0x5ABBA:  bra    0x5ADAA            ; → EPILOGUE PATH
+
+
+─── BRANCH B: SENSOR DIAG OK (result == 1) ───────────────────────────────
+
+  0x5ABBE:  mov.l  @(16,R15),R0      ; reload sensor_diag result
+  0x5ABC0:  cmp/eq #1,R0
+  0x5ABC2:  bf     0x5AC0E            ; if sensor_diag != 1 → Branch C
+
+  ; Sensor diagnostics passed — increment CL timer, check thresholds
+
+  0x5ABC4:  mov.l  @(0x5ACE0),R6     ; =0x000BE554  uint16_add_sat
+  0x5ABC6:  mov.l  @(0x5AC8C),R13    ; =0xFFFF8E98  (cl_state_struct)
+  0x5ABC8:  mov.w  @(6,R13),R0       ; R0 = struct[+6] (cl_dwell_counter, u16)
+  0x5ABCA:  extu.w R0,R4
+  0x5ABCC:  jsr    @R6               ; uint16_add_sat(cl_dwell_counter, 1)
+  0x5ABCE:  mov    #1,R5             ; delay slot: R5 = 1 (increment)
+  0x5ABD0:  mov.w  R0,@(6,R13)       ; struct[+6] = saturated result
+
+  0x5ABD2:  mov.l  @(0x5ACE4),R6     ; =0x000C4B04  (ROM address)
+  0x5ABD4:  mov.l  @R6,R2            ; R2 = 32-bit threshold from ROM 0xC4B04
+  0x5ABD6:  cmp/hs R2,R14            ; if cycle_counter >= threshold
+  0x5ABD8:  bt     0x5ABF8            ;   → skip to "apply transition"
+
+  ; cycle_counter < threshold — check secondary condition
+  0x5ABDA:  bsr    0x5AE18           ; sub: check FFFF8E9E >= 6
+  0x5ABDC:  nop
+  0x5ABDE:  extu.b R0,R0
+  0x5ABE0:  cmp/eq #1,R0
+  0x5ABE2:  bt     0x5ABE8            ; if FFFF8E9E >= 6 → check phase match
+  0x5ABE4:  bra    0x5ADAA            ; else → epilogue (not ready yet)
+  0x5ABE6:  nop
+
+  ; Check phase match: struct[+2] must equal struct[+3]
+  0x5ABE8:  mov.l  @(0x5AC8C),R14    ; =0xFFFF8E98
+  0x5ABEA:  mov.b  @(2,R14),R0       ; R0 = struct[+2] (phase_A)
+  0x5ABEC:  mov    R0,R5
+  0x5ABEE:  mov.b  @(3,R14),R0       ; R0 = struct[+3] (phase_B)
+  0x5ABF0:  cmp/eq R0,R5
+  0x5ABF2:  bt     0x5ABF8            ; if phase_A == phase_B → ready to apply
+  0x5ABF4:  bra    0x5ADAA            ; else → epilogue
+  0x5ABF6:  nop
+
+  ─── APPLY CL TRANSITION ────────────────────────────────────────────────
+
+  0x5ABF8:  extu.b R9,R0             ; R0 = mode_param
+  0x5ABFA:  cmp/eq #1,R0
+  0x5ABFC:  bf     0x5AC04            ; if mode != 1 (forced re-entry) → skip
+  0x5ABFE:  mov.l  @(0x5ACE8),R6     ; =0x0005CA32  (CL re-entry handler)
+  0x5AC00:  jsr    @R6
+  0x5AC02:  nop
+
+  0x5AC04:  mov.l  @(0x5ACEC),R6     ; =0x0000FACA  (CL finalize — applies correction)
+  0x5AC06:  jsr    @R6
+  0x5AC08:  nop
+  0x5AC0A:  bra    0x5ADAA            ; → epilogue
+  0x5AC0C:  nop
+
+
+─── BRANCH C: ENGINE RUNNING + CL CHECK (FFFFB000/FFFF8CA0) ──────────────
+
+  0x5AC0E:  extu.b R13,R0            ; R0 = FFFFB000 (engine_running)
+  0x5AC10:  cmp/eq #1,R0
+  0x5AC12:  bf     0x5AC24            ; if engine not running → Branch D
+
+  0x5AC14:  mov.b  @(12,R15),R0      ; R0 = check_cl_active result
+  0x5AC16:  cmp/eq #1,R0
+  0x5AC18:  bf     0x5AC24            ; if CL not active → Branch D
+
+  ; Engine running AND CL active BUT sensors failed → WATCHDOG RESET
+  ; This is a SAFETY FAULT HANDLER: sensors have failed during CL with
+  ; engine running and no pending transition.  Forces ECU restart.
+  0x5AC1A:  mov.l  @(0x5ACF0),R6     ; =0x0000FBA4  watchdog_fault_reset
+  0x5AC1C:  jsr    @R6               ; DOES NOT RETURN — enters infinite loop
+  0x5AC1E:  nop                       ; triggers watchdog timeout → ECU reset
+  0x5AC20:  bra    0x5ADAA            ; (unreachable — dead code after reset)
+  0x5AC22:  nop
+
+
+─── BRANCH D: ENGINE STATE EXTENDED == 1 (RESET PATH) ────────────────────
+
+  0x5AC24:  extu.b R12,R0            ; R0 = FFFF65A9 (engine_state_extended)
+  0x5AC26:  cmp/eq #1,R0
+  0x5AC28:  bf     0x5AC4E            ; if != 1 → Branch E
+
+  ; engine_state_extended == 1 → RESET CL STATE
+  0x5AC2A:  mov    #0,R4
+  0x5AC2C:  mov.l  @(0x5AC8C),R14    ; =0xFFFF8E98
+  0x5AC2E:  mov    R4,R0              ; R0 = 0
+  0x5AC30:  mov.w  R0,@(4,R14)       ; struct[+4] = 0  (reset timer word)
+  0x5AC32:  mov.b  R0,@(2,R14)       ; struct[+2] = 0  (reset phase_A)
+
+  0x5AC34:  mov.l  @(0x5ACA0),R5     ; =0x000BE9A0  uint8_pack
+  0x5AC36:  jsr    @R5
+  0x5AC38:  mov.b  R0,@(3,R14)       ; delay slot: struct[+3] = 0 (reset phase_B)
+                                       ; uint8_pack(R4=0) → R0
+
+  0x5AC3A:  mov.l  @(0x5ACA4),R1     ; =0xFFFF366C  (output register)
+  0x5AC3C:  mov.w  R0,@R1            ; FFFF366C = packed result [+0]
+
+  0x5AC3E:  mov.l  @(0x5ACA0),R5     ; =0x000BE9A0  uint8_pack
+  0x5AC40:  jsr    @R5
+  0x5AC42:  mov    #0,R4              ; R4=0 again
+  0x5AC44:  mov.l  @(0x5ACA4),R1     ; =0xFFFF366C
+  0x5AC46:  mov.w  R0,@(4,R1)        ; FFFF3670 = packed result [+2]
+
+  0x5AC48:  mov    #1,R0
+  0x5AC4A:  bra    0x5ADAA            ; → epilogue
+  0x5AC4C:  mov.b  R0,@(1,R14)       ; delay slot: struct[+1] = 1 (mark reset done)
+
+
+─── BRANCH E: DEFAULT — MONITOR / COUNT UP ────────────────────────────────
+
+  0x5AC4E:  mov.l  @(0x5AC8C),R5     ; =0xFFFF8E98
+  0x5AC50:  mov.b  @R5,R2            ; R2 = struct[+0] (state_phase)
+  0x5AC52:  tst    R2,R2
+  0x5AC54:  bf     0x5ACFC            ; if state != 0 → Branch F (already running)
+
+  ; state == 0: NOT YET STARTED — check if conditions met to begin CL monitoring
+
+  0x5AC56:  mov.l  @(0x5AC8C),R5     ; =0xFFFF8E98
+  0x5AC58:  mov.w  @(4,R5),R0        ; R0 = struct[+4] (timer_word, u16)
+  0x5AC5A:  mov.l  @(0x5ACF4),R6     ; =0x000D97E4  (ROM calibration: cl_start_threshold)
+  0x5AC5C:  mov.w  @R6,R2            ; R2 = threshold value (6 from ROM)
+  0x5AC5E:  cmp/hs R2,R0             ; if timer >= threshold
+  0x5AC60:  mov.l  @(0x5ACE0),R7     ; =0x000BE554  uint16_add_sat
+  0x5AC62:  bt/s   0x5AC6A           ;   → start monitoring
+  0x5AC64:  mov.l  R7,@(20,R15)      ; delay slot: save func ptr to local[5]
+  0x5AC66:  bra    0x5AD84            ; else → INCREMENT TIMER (skip start)
+  0x5AC68:  nop
+
+  ; Timer reached threshold → ACTIVATE CL monitoring state
+
+  0x5AC6A:  mov    #1,R4             ; R4 = 1 (new state: active)
+  0x5AC6C:  mov.l  @(0x5AC8C),R14    ; =0xFFFF8E98
+  0x5AC6E:  mov.l  @(0x5ACA0),R6     ; =0x000BE9A0  uint8_pack
+  0x5AC70:  jsr    @R6
+  0x5AC72:  mov.b  R4,@R14           ; delay slot: struct[+0] = 1 (state = ACTIVE)
+  0x5AC74:  mov.l  @(0x5ACA4),R1     ; =0xFFFF366C
+  0x5AC76:  mov.w  R0,@(4,R1)        ; FFFF3670 = packed result
+
+  0x5AC78:  mov    #0,R0
+  0x5AC7A:  mov.w  R0,@(6,R14)       ; struct[+6] = 0 (reset cl_dwell_counter)
+
+  0x5AC7C:  mov.l  @(0x5ACF8),R6     ; =0x0004AE6A  (CL activation callback)
+  0x5AC7E:  jsr    @R6
+  0x5AC80:  mov.b  R0,@(1,R14)       ; delay slot: struct[+1] = 0
+
+  0x5AC82:  bra    0x5AD84            ; → COMMON COUNTER INCREMENT
+  0x5AC84:  nop
+
+
+─── LITERAL POOL A (0x5AC86 – 0x5ACFA) ───────────────────────────────────
+
+  0x5AC88: 0x0005CC9A  sensor_diag_helper
+  0x5AC8C: 0xFFFF8E98  cl_state_struct (base)
+  0x5AC90: 0xFFFF8CA0  sensor_status_byte
+  0x5AC94: 0xFFFF65BC  cl_transition_ready_flag
+  0x5AC98: 0xFFFF8EA4  (unused in visible code?)
+  0x5AC9C: 0xFFFF8CAD  sensor_ready_flag
+  0x5ACA0: 0x000BE9A0  uint8_pack
+  0x5ACA4: 0xFFFF366C  io_output_register
+  0x5ACA8: 0x000BE980  (uint8_pack variant?)
+  0x5ACAC: 0xFFFF366E  io_output_register+2
+  0x5ACB0: 0xFFFF3670  io_output_register+4
+  0x5ACB4: 0x0000317C  interrupt_save
+  0x5ACB8: 0xFFFF8E9A  cl_state_struct+2 (aliased?)
+  0x5ACBC: 0x00003190  interrupt_restore
+  0x5ACC0: 0xFFFF8E9B  cl_state_struct+3 (aliased?)
+  0x5ACC4: 0xFFFF65A9  engine_state_extended
+  0x5ACC8: 0x00022F92  check_cl_active
+  0x5ACCC: 0xFFFFB000  engine_running_flag
+  0x5ACD0: 0xFFFF6C4E  warmup_complete_flag
+  0x5ACD4: 0x0009ED44  cl_entry_init_A (ROM high area)
+  0x5ACD8: 0x0005CA42  cl_entry_init_B
+  0x5ACDC: 0x0000DCE4  desc_table_walk
+  0x5ACE0: 0x000BE554  uint16_add_sat
+  0x5ACE4: 0x000C4B04  ROM threshold (32-bit cycle count?)
+  0x5ACE8: 0x0005CA32  cl_reentry_handler
+  0x5ACEC: 0x0000FACA  cl_finalize_correction
+  0x5ACF0: 0x0000FBA4  watchdog_fault_reset (SAFETY — ECU reset on sensor failure)
+  0x5ACF4: 0x000D97E4  ROM calibration: cl_start_threshold (=6)
+  0x5ACF8: 0x0004AE6A  cl_activation_callback
+
+
+─── BRANCH F: STATE ALREADY ACTIVE (struct[+0] != 0) ─────────────────────
+
+  ; Jumped from 0x5AC54 when struct[+0] is non-zero
+
+  0x5ACFC:  tst    R8,R8             ; R8 = FFFF8CAD (sensor_ready)
+  0x5ACFE:  bf     0x5AD12            ; if sensor_ready != 0 → skip conditional
+
+  ; sensor_ready == 0 — check if struct[+13] was previously set
+  0x5AD00:  mov.l  @(0x5AE24),R5     ; =0xFFFF8E98
+  0x5AD02:  mov.b  @(13,R5),R0       ; R0 = struct[+13] (prev_sensor_ready)
+  0x5AD04:  cmp/eq #1,R0
+  0x5AD06:  bf     0x5AD12            ; if prev wasn't 1 → skip
+
+  ; Sensor went from ready→not-ready: write fallback value
+  0x5AD08:  mov.l  @(0x5AE28),R6     ; =0x000BE9A0  uint8_pack
+  0x5AD0A:  jsr    @R6
+  0x5AD0C:  mov    #1,R4             ; R4=1
+  0x5AD0E:  mov.l  @(0x5AE2C),R1     ; =0xFFFF366C
+  0x5AD10:  mov.w  R0,@R1            ; FFFF366C = packed(1)
+
+  ; Continue: increment cl_dwell_counter
+  0x5AD12:  mov.l  @(0x5AE30),R6     ; =0x000BE554  uint16_add_sat
+  0x5AD14:  mov.l  R6,@(20,R15)      ; save func ptr to local[5]
+  0x5AD16:  mov.l  @(0x5AE24),R14    ; =0xFFFF8E98
+  0x5AD18:  mov.w  @(6,R14),R0       ; R0 = struct[+6] (cl_dwell_counter)
+  0x5AD1A:  extu.w R0,R4
+  0x5AD1C:  jsr    @R6               ; uint16_add_sat(counter, 1)
+  0x5AD1E:  mov    #1,R5
+  0x5AD20:  mov.w  R0,@(6,R14)       ; struct[+6] = incremented counter
+
+  ; Check if counter reached second threshold
+  0x5AD22:  mov.w  @(6,R14),R0
+  0x5AD24:  extu.w R0,R2
+  0x5AD26:  mov.w  @(0x5ADF2),R5     ; =0x493E (18750 decimal = 375 seconds @ 20ms)
+  0x5AD28:  cmp/ge R5,R2
+  0x5AD2A:  bt     0x5AD58            ; if counter >= 18750 → FULLY CONVERGED
+
+  ; Not yet converged — check secondary condition
+  0x5AD2C:  bsr    0x5AE18           ; sub: check FFFF8E9E >= 6
+  0x5AD2E:  nop
+  0x5AD30:  extu.b R0,R0
+  0x5AD32:  cmp/eq #1,R0
+  0x5AD34:  bf     0x5AD84            ; if not → COMMON COUNTER INCREMENT
+
+  ; FFFF8E9E >= 6 — check phase match
+  0x5AD36:  mov.b  @(2,R14),R0       ; phase_A
+  0x5AD38:  mov    R0,R5
+  0x5AD3A:  mov.b  @(3,R14),R0       ; phase_B
+  0x5AD3C:  cmp/eq R0,R5
+  0x5AD3E:  bf     0x5AD84            ; if phases don't match → not ready
+
+  ; Phases match — check timer word against second ROM threshold
+  0x5AD40:  mov.l  @(0x5AE24),R5     ; =0xFFFF8E98
+  0x5AD42:  mov.w  @(4,R5),R0        ; struct[+4] timer_word
+  0x5AD44:  mov.l  @(0x5AE34),R6     ; =0x000D97E8  (ROM cal: cl_converge_threshold)
+  0x5AD46:  mov.w  @R6,R2            ; threshold = 0 (from ROM)
+  0x5AD48:  cmp/hs R2,R0             ; timer >= threshold (always true since thresh=0)
+  0x5AD4A:  bf     0x5AD84            ; (dead branch with threshold=0)
+
+  ; Additional gates: check_cl_active + warmup
+  0x5AD4C:  mov.b  @(12,R15),R0      ; check_cl_active result
+  0x5AD4E:  cmp/eq #1,R0
+  0x5AD50:  bf     0x5AD84            ; if CL not active → skip
+
+  0x5AD52:  extu.b R11,R0            ; R11 = FFFF6C4E (warmup_complete)
+  0x5AD54:  cmp/eq #1,R0
+  0x5AD56:  bf     0x5AD84            ; if not warmed up → skip
+
+  ─── FULLY CONVERGED: COMMIT CL STATE ───────────────────────────────────
+
+  0x5AD58:  mov    #2,R2             ; state = 2 (CONVERGED)
+  0x5AD5A:  mov.l  @(0x5AE24),R5     ; =0xFFFF8E98
+  0x5AD5C:  mov.b  R2,@R5            ; struct[+0] = 2
+
+  0x5AD5E:  mov.l  @(0x5AE28),R6     ; =0x000BE9A0  uint8_pack
+  0x5AD60:  jsr    @R6
+  0x5AD62:  mov    #1,R4             ; R4=1
+  0x5AD64:  mov.l  @(0x5AE2C),R1     ; =0xFFFF366C
+
+  0x5AD66:  mov.l  @(0x5AE38),R6     ; =0x0005AE60  (post-convergence handler)
+  0x5AD68:  jsr    @R6
+  0x5AD6A:  mov.w  R0,@(2,R1)        ; delay slot: FFFF366E = packed result
+
+  0x5AD6C:  mov.l  @(0x5AE3C),R6     ; =0x0005CA42  cl_entry_init_B
+  0x5AD6E:  jsr    @R6
+  0x5AD70:  nop
+
+  0x5AD72:  extu.b R9,R0             ; mode_param
+  0x5AD74:  cmp/eq #1,R0
+  0x5AD76:  bf     0x5AD7E
+  0x5AD78:  mov.l  @(0x5AE40),R6     ; =0x0005CA32  cl_reentry_handler
+  0x5AD7A:  jsr    @R6
+  0x5AD7C:  nop
+
+  0x5AD7E:  mov.l  @(0x5AE44),R6     ; =0x0000FACA  cl_finalize_correction
+  0x5AD80:  jsr    @R6
+  0x5AD82:  nop
+
+
+─── COMMON COUNTER INCREMENT (0x5AD84) ───────────────────────────────────
+
+  0x5AD84:  mov    #1,R5             ; R5 = 1 (increment)
+  0x5AD86:  mov.l  @(0x5AE24),R14    ; =0xFFFF8E98
+  0x5AD88:  mov.w  @(4,R14),R0       ; R0 = struct[+4] (timer_word)
+  0x5AD8A:  mov.l  @(20,R15),R7      ; R7 = uint16_add_sat (saved earlier)
+  0x5AD8C:  jsr    @R7               ; uint16_add_sat(timer_word, 1)
+  0x5AD8E:  extu.w R0,R4
+  0x5AD90:  mov.w  R0,@(4,R14)       ; struct[+4] = incremented timer
+
+  ; Conditional: if prev CL state (FFFF8CA0) was active AND struct[+12] clear
+  0x5AD92:  mov.b  @(8,R15),R0       ; FFFF8CA0 (sensor_status)
+  0x5AD94:  cmp/eq #1,R0
+  0x5AD96:  bf     0x5ADAA            ; if not → epilogue
+
+  0x5AD98:  mov.l  @(0x5AE24),R5     ; =0xFFFF8E98
+  0x5AD9A:  mov.b  @(12,R5),R0       ; struct[+12]
+  0x5AD9C:  tst    R0,R0
+  0x5AD9E:  bf     0x5ADAA            ; if already set → epilogue
+
+  ; First tick with sensor_status==1 AND struct[+12]==0 → write fallback
+  0x5ADA0:  mov.l  @(0x5AE28),R6     ; =0x000BE9A0  uint8_pack
+  0x5ADA2:  jsr    @R6
+  0x5ADA4:  mov    #0,R4
+  0x5ADA6:  mov.l  @(0x5AE2C),R1     ; =0xFFFF366C
+  0x5ADA8:  mov.w  R0,@(2,R1)        ; FFFF366E = packed(0)
+
+
+─── EPILOGUE (0x5ADAA) ───────────────────────────────────────────────────
+
+  ; Manage the cycle counter at struct[+8]
+  0x5ADAA:  mov.l  @(16,R15),R0      ; sensor_diag result
+  0x5ADAC:  cmp/eq #1,R0
+  0x5ADAE:  bf     0x5ADC4            ; if sensor_diag != 1 → RESET counter
+
+  ; Sensor OK: increment cycle counter (if not at max 0xFFFFFFFF)
+  0x5ADB0:  mov.l  @(0x5AE24),R5     ; =0xFFFF8E98
+  0x5ADB2:  mov.l  @(8,R5),R2        ; R2 = struct[+8] (cycle_counter)
+  0x5ADB4:  mov    #-1,R6            ; R6 = 0xFFFFFFFF
+  0x5ADB6:  cmp/hs R6,R2
+  0x5ADB8:  bt     0x5ADCA            ; if already at max → skip increment
+
+  0x5ADBA:  mov.l  @(0x5AE24),R14    ; =0xFFFF8E98
+  0x5ADBC:  mov.l  @(8,R14),R2
+  0x5ADBE:  add    #1,R2
+  0x5ADC0:  bra    0x5ADCA
+  0x5ADC2:  mov.l  R2,@(8,R14)       ; delay slot: struct[+8] = counter + 1
+                                       ; (branch target 0x5ADCA is below)
+
+  ; Sensor NOT OK: reset cycle counter to 0
+  0x5ADC4:  mov    #0,R2
+  0x5ADC6:  mov.l  @(0x5AE24),R5     ; =0xFFFF8E98
+  0x5ADC8:  mov.l  R2,@(8,R5)        ; struct[+8] = 0
+
+  ; Save previous-state snapshots
+  0x5ADCA:  mov.b  @(8,R15),R0       ; FFFF8CA0 value (sensor_status)
+  0x5ADCC:  mov.l  @(0x5AE24),R5     ; =0xFFFF8E98
+  0x5ADCE:  mov.b  R0,@(12,R5)       ; struct[+12] = prev_sensor_status
+  0x5ADD0:  mov    R8,R0              ; R8 = FFFF8CAD
+  0x5ADD2:  mov.b  R0,@(13,R5)       ; struct[+13] = prev_sensor_ready
+  0x5ADD4:  mov    R10,R0             ; R10 = FFFF65BC
+  0x5ADD6:  mov.b  R0,@(14,R5)       ; struct[+14] = prev_cl_transition_ready
+
+  ; Restore interrupts
+  0x5ADD8:  mov.l  @(0x5AE48),R6     ; =0x00003190  interrupt_restore
+  0x5ADDA:  jsr    @R6
+  0x5ADDC:  mov.l  @(4,R15),R4       ; delay slot: R4 = saved IRQ token
+
+  ; Restore stack and return
+  0x5ADDE:  add    #24,R15
+  0x5ADE0:  lds.l  @R15+,PR
+  0x5ADE2:  mov.l  @R15+,R14
+  0x5ADE4:  mov.l  @R15+,R13
+  0x5ADE6:  mov.l  @R15+,R12
+  0x5ADE8:  mov.l  @R15+,R11
+  0x5ADEA:  mov.l  @R15+,R10
+  0x5ADEC:  mov.l  @R15+,R9
+  0x5ADEE:  rts
+  0x5ADF0:  mov.l  @R15+,R8          ; delay slot
+
+
+─── HELPER: check_convergence_count (0x5AE18) ────────────────────────────
+
+  0x5AE18:  mov.l  @(0x5AE5C),R6     ; =0xFFFF8E9E
+  0x5AE1A:  mov.w  @R6,R2            ; R2 = FFFF8E9E (convergence_tick_count, u16)
+  0x5AE1C:  mov    #6,R6
+  0x5AE1E:  cmp/hs R6,R2             ; if count >= 6
+  0x5AE20:  rts
+  0x5AE22:  movt   R0                ; delay slot: R0 = T-bit (1 if true)
+
+  ; Returns R0=1 if FFFF8E9E >= 6, R0=0 otherwise
+
+
+─── RELATED: post_convergence_handler (0x5AE60) ──────────────────────────
+
+  Small wrapper called when state transitions to CONVERGED:
+  0x5AE60:  sts.l  PR,@-R15
+  0x5AE62:  mov.l  @(0x5AE70),R2     ; =0x00024DE4
+  0x5AE64:  jsr    @R2               ; call 0x24DE4 (timer/scheduler utility)
+  0x5AE66:  nop
+  0x5AE68:  mov.l  @(0x5AE74),R2     ; =0x0002259C
+  0x5AE6A:  jmp    @R2               ; tail-call 0x2259C (convergence commit)
+  0x5AE6C:  lds.l  @R15+,PR          ; delay slot
+
+
+══════════════════════════════════════════════════════════════════════════════
+  cl_state_struct LAYOUT (base: 0xFFFF8E98)
+══════════════════════════════════════════════════════════════════════════════
+
+  Offset  Size  Label                     Description
+  ──────  ────  ────────────────────────  ────────────────────────────────────
+  +0      u8    state_phase               0=IDLE, 1=ACTIVE (monitoring),
+                                          2=CONVERGED (CL established)
+  +1      u8    reset_flag                Set to 1 on engine_state reset,
+                                          0 on activation
+  +2      u8    phase_A                   CL phase tracking byte A
+  +3      u8    phase_B                   CL phase tracking byte B
+                                          (transition requires A == B)
+  +4      u16   timer_word                General-purpose timer, incremented
+                                          each 20ms tick in common path.
+                                          Must reach cl_start_threshold (6)
+                                          to leave IDLE state.
+  +6      u16   cl_dwell_counter          Saturating counter tracking time
+                                          in sensor-OK CL mode. Threshold:
+                                          18750 ticks = 375 seconds.
+  +8      u32   cycle_counter             Lifetime CL cycle count. Incremented
+                                          each tick when sensor_diag OK.
+                                          Reset to 0 when sensor_diag fails.
+                                          Saturates at 0xFFFFFFFF.
+  +12     u8    prev_sensor_status        Previous value of FFFF8CA0
+  +13     u8    prev_sensor_ready         Previous value of FFFF8CAD
+  +14     u8    prev_cl_transition_ready  Previous value of FFFF65BC
+
+  Total struct size: >= 15 bytes (probably 16-byte aligned)
+
+
+══════════════════════════════════════════════════════════════════════════════
+  STATE MACHINE SUMMARY
+══════════════════════════════════════════════════════════════════════════════
+
+  This function implements a 3-state CL monitoring state machine:
+
+  STATE 0 — IDLE
+    Entry: engine_state_extended reset, or initial power-on.
+    Behavior: Increment timer_word each 20ms tick.
+    Transition: timer_word >= cl_start_threshold (6 ticks = 120ms)
+                → set state=1, reset cl_dwell_counter, call cl_activation_callback
+
+  STATE 1 — ACTIVE (CL monitoring in progress)
+    Entry: Timer threshold met while sensor_diag passes.
+    Behavior: Increment cl_dwell_counter each tick when sensor_diag OK.
+              Check convergence conditions each tick.
+    Transition to CONVERGED requires ALL of:
+      a) cl_dwell_counter >= 18750 (375 sec) OR cycle_counter >= ROM threshold
+      b) convergence_tick_count (FFFF8E9E) >= 6
+      c) phase_A == phase_B
+      d) check_cl_active == 1 (CL fuel control active)
+      e) warmup_complete (FFFF6C4E) == 1
+      On convergence → set state=2, call post_convergence_handler,
+                        cl_entry_init_B, cl_finalize_correction.
+
+  STATE 2 — CONVERGED (CL fully established)
+    Entry: All convergence criteria met.
+    Behavior: Still runs each tick, continues counting.
+              If FFFF65BC goes from 0→1 (CL transition ready event),
+              triggers CL entry init sequence (0x9ED44, 0x5CA42, desc_table_walk).
+
+  RESET: If engine_state_extended (FFFF65A9) == 1 at any point,
+         the struct is zeroed (phases, timers) and state returns to IDLE.
+
+  SENSOR FAILURE: If sensor_diag_helper returns 0, the cycle_counter
+                  is reset to 0 (preventing false convergence).
+                  The cl_dwell_counter is NOT reset — it only counts
+                  sensor-OK ticks but doesn't lose progress on transient
+                  sensor failures.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  INPUTS AND THEIR KNOWN IDENTITIES
+══════════════════════════════════════════════════════════════════════════════
+
+  RAM Address    Name (from prior analysis)           Role in this function
+  ───────────    ──────────────────────────────────   ─────────────────────────
+  FFFF8E98       cl_state_struct base                  Primary working struct
+  FFFF65A9       engine_state_extended                 Reset trigger (==1)
+  FFFF65BC       cl_transition_ready_flag              Gates CL entry sequence
+  FFFF8CA0       sensor_status_byte                    Saved to struct[+12]
+  FFFF8CAD       sensor_ready_flag                     Saved to struct[+13]
+  FFFFB000       engine_running_flag                   Gates CL maintenance
+  FFFF6C4E       warmup_complete_flag                  Convergence gate
+  FFFF8E9E       convergence_tick_count (u16)          Must reach >= 6
+  FFFF366C       io_output_register                    Written with packed vals
+  FFFF366E       io_output_register+2                  Written with packed vals
+  FFFF3670       io_output_register+4                  Written with packed vals
+
+
+══════════════════════════════════════════════════════════════════════════════
+  ROM CALIBRATION
+══════════════════════════════════════════════════════════════════════════════
+
+  Address    Value    Label                      Usage
+  ─────────  ───────  ─────────────────────────  ─────────────────────────────
+  0x0D97E4   6 (u16)  cl_start_threshold         Ticks in IDLE before ACTIVE
+  0x0D97E8   0 (u16)  cl_converge_threshold      Timer threshold in Branch F
+                                                  (=0, so effectively disabled)
+  0x0C4B04   (u32)    cl_cycle_count_threshold   cycle_counter gate in Branch B
+  0x5ADF2    0x493E   cl_dwell_threshold         =18750 decimal (375 sec @20ms)
+
+
+══════════════════════════════════════════════════════════════════════════════
+  CALLED SUBROUTINES
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Label (existing)           Role in this function
+  ──────────  ─────────────────────────  ──────────────────────────────────
+  0x0000317C  interrupt_save             Save IRQ state, priority level 16
+  0x00003190  interrupt_restore          Restore IRQ state from saved token
+  0x00022F92  check_cl_active            Returns 1 if CL fuel active
+  0x0005CC9A  sensor_diag_helper         Returns 1 if sensors healthy
+  0x000BE554  uint16_add_sat             Saturating u16 add (counter++)
+  0x000BE9A0  uint8_pack                 Pack byte value for I/O register
+  0x0000DCE4  desc_table_walk            Walk descriptor table (3 entries)
+  0x0009ED44  cl_entry_init_A            CL entry initialization step A
+  0x0005CA42  cl_entry_init_B            CL entry initialization step B
+  0x0005CA32  cl_reentry_handler         Called on forced CL re-entry (R4=1)
+  0x0000FACA  cl_finalize_correction     Apply final CL correction values
+  0x0000FBA4  watchdog_fault_reset       SAFETY: forces ECU reset via WDT on
+                                          sensor failure during CL+engine running
+  0x0004AE6A  cl_activation_callback     Called when state transitions 0→1
+  0x0005AE60  post_convergence_handler   Calls 0x24DE4 then 0x2259C
+  0x00024DE4  (called by 0x5AE60)        Timer/scheduler utility
+  0x0002259C  (called by 0x5AE60)        Convergence commit
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FUNCTION LABELS — NEW
+══════════════════════════════════════════════════════════════════════════════
+
+  0x0005AB44  cl_monitor_state_machine
+              CL-side state machine for the OL bypass path. Runs every 20ms
+              when FFFF8EDC != 0 (CL mode active). Manages IDLE→ACTIVE→
+              CONVERGED state transitions in cl_state_struct (FFFF8E98).
+              Monitors sensor health, counts CL dwell time, triggers CL
+              entry/convergence callbacks. Input R4: 0=normal, 1=forced.
+
+  0x0005AE18  check_convergence_count
+              Leaf: returns R0=1 if FFFF8E9E >= 6, else R0=0.
+
+  0x0005AE60  post_convergence_handler
+              Wrapper: calls 0x24DE4 (timer utility) then tail-calls
+              0x2259C (convergence commit). Invoked on state 1→2 transition.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  CONCLUSIONS
+══════════════════════════════════════════════════════════════════════════════
+
+1. 0x5AB44 is NOT simply a "mode entry handler" — it is the complete CL
+   monitoring state machine.  Every 20ms tick in CL mode, this function
+   runs in place of the OL enrichment pipeline, tracking how long the
+   engine has been in stable closed-loop operation.
+
+2. The 375-second (6.25 minute) dwell threshold at cl_dwell_counter is
+   consistent with OBD-II readiness monitor requirements.  Many OBD-II
+   monitors require the engine to operate in stable CL for a minimum
+   duration before the monitor is considered "ready."  This function
+   likely gates OBD-II readiness flags.
+
+3. The cl_state_struct at FFFF8E98 is a 15+ byte state block that persists
+   across scheduler ticks.  It tracks not just current state but previous
+   values of three sensor/status flags, enabling edge detection (e.g.,
+   FFFF65BC going 0→1 triggers the CL entry sequence).
+
+4. The convergence check at FFFF8E9E >= 6 is a secondary gate beyond the
+   dwell counter.  FFFF8E9E is written elsewhere (likely by the fuel
+   correction system) and represents how many correction cycles have
+   converged.  This prevents declaring CL "converged" purely on time.
+
+5. The cl_converge_threshold at ROM 0xD97E8 is 0 in this calibration,
+   effectively disabling that particular gate.  This may be intentional
+   (the dwell counter is sufficient) or may be a calibration that differs
+   between ECU variants.
+
+6. The interrupt save/restore pair (0x317C/0x3190) with priority 16
+   indicates this function modifies shared state that ISRs also access.
+   The I/O register writes to FFFF366C-3670 are protected by this
+   critical section.

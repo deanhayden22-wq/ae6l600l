@@ -443,9 +443,13 @@ SECTION 8: ADDRESSES NEEDING FURTHER INVESTIGATION
     0x0004793C, 0x00048732, 0x0001076A, 0x00004BCA  (sub-table B entries)
     0x0004AF50, 0x0004AED4, 0x0004AF12, 0x0004AFC4, 0x0004B0FC
 
-  Mode entry handler:
-    0x0005AB44  -- called when OL dispatch is bypassed (FFFF8EDC != 0)
-                   receives R4=0 (normal bypass) or R4=1 (special entry)
+  Mode entry handler:  ** RESOLVED — see ol_bypass_state_machine.txt **
+    0x0005AB44  cl_monitor_state_machine
+                3-state CL monitoring state machine (IDLE→ACTIVE→CONVERGED).
+                Runs every 20ms when FFFF8EDC != 0 (CL mode, OL bypassed).
+                Tracks sensor health, CL dwell time (375sec threshold),
+                phase convergence, and triggers CL entry callbacks.
+                R4=0: normal CL tick. R4=1: forced re-entry.
 
 
 ================================================================================

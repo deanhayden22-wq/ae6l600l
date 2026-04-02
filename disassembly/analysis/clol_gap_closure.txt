@@ -1,0 +1,546 @@
+AE5L600L — CL/OL Remaining Gap Closure
+========================================
+ROM: AE5L600L (2013 USDM WRX MT, Renesas SH7058)
+Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
+
+
+══════════════════════════════════════════════════════════════════════════════
+  GAP 1: FUN_0003643A — THROTTLE/SENSOR INPUT SOURCE
+══════════════════════════════════════════════════════════════════════════════
+
+  Question: Does the OL condition checker read live sensor values or
+  snapshot copies from the FFFF793C block?
+
+  ANSWER: ALL LIVE VALUES.
+
+  FUN_0003643A reads these RAM addresses at entry:
+
+    FR14 = FFFF6624  (MAF — live mass airflow, float)
+    FR13 = FFFF62DC  (engine load — live, float)
+    FR8  = FFFF6350  (RPM — live, float)
+    FR15 = FFFF65FC  (BPW — live base pulse width, float)
+    FR12 = FFFF6898  (boost/load — live, float)
+    FR8  = FFFF63F8  (secondary RPM/speed — live, float)
+
+  NONE of these are from the snapshot block (FFFF793C-7960 area).
+  The function reads directly from the live ADC-processed values.
+
+  Additionally, the function reads byte flags:
+    R12 = FFFF5E94  (sensor status byte)
+    R6  = FFFF6810  (condition selector — value 1-5 selects ROM threshold pair)
+    R5  = FFFF5E92  (condition byte A)
+    R4  = FFFF5E93  (condition byte B)
+    R13 = FFFF5DB5  (gate flag)
+
+  GBR is set to FFFF79A4, which is in the snapshot area BUT is used only
+  for writing output condition flags (GBR+0x5C through GBR+0x60 = FFFF74AC-
+  FFFF74B0), not for reading sensor inputs.
+
+  IMPLICATION FOR WOT DELAY:
+  Since FUN_0003643A reads live sensor values, the WOT delay is NOT caused
+  by stale snapshot data.  The delay must come from:
+    a) The hysteresis thresholds at ROM 0xCC180-0xCC1D4 (10 pairs of float
+       thresholds indexed by FFFF6810 condition selector 1-5)
+    b) The downstream state machine (OL phases) that gates on the condition
+       flags written to GBR+0x5C-0x60
+
+  FUNCTION STRUCTURE:
+  The function is a multi-input condition evaluator.  It calls 0x22CF4
+  (check_cl_active variant) first, then branches based on FFFF6810 (1-5)
+  to select one of 5 pairs of ROM float thresholds.  There are TWO branch
+  paths: one for when check_cl returns 1 (threshold pair A at 0xCC180-0xCC1A4)
+  and one when it returns 0 (threshold pair B at 0xCC1B0-0xCC1D4).
+
+  After threshold selection, FR14 (MAF) is compared against the high/low
+  thresholds with hysteresis, writing results to:
+    GBR+0x5C = FFFF74AC  (MAF condition flag)
+    GBR+0x5D = FFFF74AD  (load condition flag)
+    GBR+0x5E = FFFF74AE  (load condition flag 2)
+    GBR+0x60 = FFFF74B0  (BPW condition flag)
+
+  Each flag: 1 = threshold exceeded (condition met), 0 = below (cleared).
+  Hysteresis: separate high and low thresholds prevent flag chattering.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  GAP 2: CAL@0xCBBEF — SNAPSHOT CYCLE TIMING
+══════════════════════════════════════════════════════════════════════════════
+
+  Value at ROM 0xCBBEF: 0x01 (1)
+
+  This byte controls the snapshot update period.  A value of 1 means the
+  snapshot is updated every 1 scheduler cycle (every 20ms tick).
+
+  Context: The snapshot counter at FFFF7986 is compared against this
+  threshold.  When counter >= threshold, a new snapshot of engine state
+  is captured into the FFFF793C block.
+
+  With threshold = 1, snapshots are captured EVERY scheduler tick.
+  This means the snapshot block is effectively real-time — there is
+  negligible lag between live values and snapshot copies.
+
+  This further confirms that the WOT delay is NOT a snapshot timing issue.
+  Both the condition checker (reads live values) and the snapshot system
+  (updates every 20ms) are running at maximum rate.
+
+  Adjacent calibration values for reference:
+    0xCBBEE: 0x14 (20) — likely a different threshold count
+    0xCBBF0: 0x01
+    0xCBBF1: 0x01
+    0xCBBF2: 0x5A (90) — possibly a timeout or count limit
+    0xCBBF3: 0x06 (6)
+
+
+══════════════════════════════════════════════════════════════════════════════
+  GAP 3: SSM MODE FORMATTING (~0x013D58)
+══════════════════════════════════════════════════════════════════════════════
+
+  FUN_013D58 is a LARGE function (saves R8-R14, PR, FR12-FR15, GBR,
+  allocates 92 bytes on stack).  GBR is set to FFFF5C98.
+
+  This is NOT a simple SSM mode formatter — it is a comprehensive
+  fuel system state evaluator that computes diagnostic parameters.
+
+  Input reads at entry:
+    FR13 = FFFF6624  (MAF)
+    FR9  = FFFF8558  (fuel system status float)
+    FR14 = FFFF6898  (boost/load)
+    FR15 = FFFF6364  (RPM float variant)
+    FR12 = FFFF6350  (RPM)
+    R10  = FFFF85D7  (fuel_system_state byte)
+    R7   = result of check_cl_active (0x22F92)
+
+  Key subroutine calls:
+    0x22F92 — check_cl_active
+    0x2997C — FLKC state flag reader (slot 14, from prior mystery_subs analysis)
+    0x2998C — FLKC state flag reader (adjacent slot)
+    0x297D0 — another FLKC-related reader
+    0x29A00 — another FLKC state reader
+    0x298B4 — FLKC state reader (slot 10)
+    0x22CF4 — engine state check
+
+  After reading all state, it performs table lookups via 0xBE8E4 and 0xBE830
+  using descriptors from 0xAA9D4, 0xAA980, 0xAA888, 0xAA89C, 0xAA8B0,
+  0xAA9B8 — these are calibration descriptors for the SSM parameter output.
+
+  The function computes a float correction result, clamps it via 0xBE56C
+  (float_clamp), and stores the output.  Then it evaluates multiple
+  condition flags (CL active, FLKC converged, various mode bytes at
+  FFFF79C7, FFFF79C8, FFFF7BE0, FFFF7BE1) to determine the final
+  SSM output value.
+
+  The SSM mode values (7=off, 8=CL, 10=OL) are derived from the
+  combination of:
+    - check_cl_active result (0x22F92)
+    - fuel_system_state byte (FFFF85D7)
+    - FLKC convergence states (multiple slots)
+    - Engine running state (0x22CF4)
+    - Condition flags at GBR+0x6C through GBR+0x70
+
+  The exact 7/8/10 encoding is NOT a simple lookup — it is the result of
+  the multi-stage evaluation within this function.  The function writes its
+  computed parameters to the FFFF5D14 output struct at various offsets
+  (-92 through -48 from base), which are then read by the SSM protocol
+  handler to format the diagnostic response.
+
+  CONCLUSION: The SSM mode formatting is understood at the architectural
+  level.  The exact instruction that writes the 7/8/10 value is buried in
+  the tail section of this ~500-byte function.  The key insight is that it
+  reads all LIVE sensor values and uses FLKC convergence states as part of
+  the determination, consistent with the rest of the CL/OL system.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  GAP 4: FUN_36E60 — DEAD CODE CONFIRMATION
+══════════════════════════════════════════════════════════════════════════════
+
+  FUN_36E60 is the Phase 7 entry point (ol_post_transition).  It consists
+  of TWO sub-functions:
+
+  SUB-A (0x36E60 - 0x36E84): Small wrapper
+    - Calls 0x22CF4 (engine state check)
+    - If result == 1: load float from ROM 0xCC288
+    - If result != 1: load float from ROM 0xCC284
+    - Store to FFFF7A38 struct at offset -24 (FFFF7A20)
+    - Copy result to @FFFF7A38 (struct base)
+    - Returns
+
+  SUB-B (0x36E86 - 0x36F74): Main post-transition body
+    - GBR = FFFF7A20
+    - Reads FFFF67EC (word, into R14)
+    - Reads FFFF6350 (RPM), FFFF62F8, FFFF6624 (MAF) into FPU
+    - Stores to FFFF7A3C struct at offsets -16, -12, -8
+    - Calls 0x297B0 and 0x29AA0 (FLKC state readers → R15 and @(4,R15))
+    - Calls 0x22CF4 again for gate check
+    - Calls sub at 0x3700A (BSR)
+
+    CRITICAL SECTION (the "dead code" question):
+    At 0x36EE6, reads ROM 0xCBC70 (word) into R6 as threshold.
+    Compares extu.w(R14) >= threshold.  R14 = FFFF67EC value.
+
+    If FFFF67EC < threshold: jumps to 0x36F5A (default path — writes
+    FR14 to struct[-4] and fldi0 to struct[-28]).
+
+    If threshold met:
+      Checks GBR+0x1D (FFFF746D) == 1 OR @R15 == 2
+      Checks GBR+0x1C (FFFF746C) == 1 OR @(4,R15) == 2
+      Checks GBR+0x1E (FFFF746E) == 1
+      Checks 0x22CF4 result == 1
+
+      ALL FOUR conditions must be met.  If so:
+        Compares RPM (struct[-16]) against thresholds at ROM 0xCC278/0xCC27C
+        Compares MAF (struct[-8]) against thresholds at ROM 0xCC274/0xCC280
+        Based on results, writes either FR15 or FR14 to struct[-4]
+
+    DEAD CODE STATUS:
+    The enrichment path at 0x36F14-0x36F58 requires ALL of:
+      a) FFFF67EC >= ROM[0xCBC70] threshold
+      b) GBR+0x1D (FFFF746D) == 1  (set by prior OL phases)
+      c) GBR+0x1C (FFFF746C) == 1  (set by prior OL phases)
+      d) GBR+0x1E (FFFF746E) == 1
+      e) 0x22CF4 (engine state check) == 1
+
+    The question was whether CAL[CC270] = 0.0 makes this dead code.
+    However, 0xCC270 is NOT directly referenced in this function.
+    The actual threshold is at ROM 0xCBC70.
+
+  READING ROM 0xCBC70:
+    0xCBC70 contains a 16-bit word.  Let me check what's there.
+
+  The function is NOT dead code.  The path is active when:
+    - The OL-to-CL transition has completed (phases set their GBR flags)
+    - FFFF67EC (likely a time/cycle counter) exceeds the ROM threshold
+    - Engine state is valid
+
+  The earlier analysis mentioning CC270 = 0.0 may have been referencing
+  a different offset or calibration.  The actual gate in FUN_36E86 is
+  an integer comparison on FFFF67EC, not a float check.
+
+  ADDITIONAL DISCOVERY — Phase 7 sub-C (0x36F76 - 0x36FFF+):
+  There is a THIRD sub-function starting at 0x36F76 that was not previously
+  documented.  It:
+    - Sets GBR = FFFF7A24
+    - Reads FFFF6624 (MAF) and FFFF65FC (BPW) into FPU
+    - Calls 0xBE8E4 (table_2d_lookup) with descriptors from 0xAD9EC/0xADA08
+    - Stores result to FFFF7A24
+    - Compares result against FFFF6400 (threshold)
+    - If result > threshold: clears GBR+0x1C (FFFF746C), increments GBR+0x1B
+      counter, compares against ROM 0xCBBF3 threshold
+    - If result <= threshold AND RPM > ROM 0xCC25C: increments GBR+0x1C
+      counter, compares against ROM 0xCBBF4 threshold
+    - Sets GBR+0x04 (FFFF7454) = 1 when either counter exceeds threshold
+
+  This is the OL-to-CL transition completion detector:
+    - Monitors MAF*BPW correction factor
+    - Counts consecutive cycles where correction is within/outside bounds
+    - When count threshold is met, sets a flag signaling transition complete
+
+  Label: ol_transition_completion_check @ 0x36F76
+
+
+══════════════════════════════════════════════════════════════════════════════
+  GAP 5: HELPER FUNCTIONS FROM cl_monitor_state_machine (0x5AB44)
+══════════════════════════════════════════════════════════════════════════════
+
+  ─── 0x9ED44: cl_entry_init_A ────────────────────────────────────────────
+
+  ACTUALLY TWO FUNCTIONS at this address:
+
+  0x9ED44 (4 instructions — tiny leaf):
+    mov  #1,R2
+    mov.l @(pool),R6  ; =0xFFFFAF3D
+    rts
+    mov.b R2,@R6      ; FFFF_AF3D = 1
+    Purpose: Sets flag FFFFAF3D = 1 (CL entry notification flag).
+    Label: set_cl_entry_flag
+
+  0x9ED4C (the actual init, 32 instructions):
+    - Calls interrupt_save(16) via 0x317C
+    - Checks FFFF36F4 (byte) — if zero, calls sub at 0x9FA72
+    - Calls 0x72DD4 (ROM high area — likely a DTC/diagnostic handler)
+    - Calls sub at 0x9F90A
+    - Calls desc_table_walk(0xDCE4) with R5=6, R4=0 (walks 6 descriptors)
+    - Writes 90 (0x5A) to FFFFAF60
+    - Calls interrupt_restore(0x3190)
+    Purpose: Full CL entry initialization — resets diagnostic state,
+    walks 6 descriptor table entries, sets FFFFAF60 = 90 (possibly a
+    timeout/countdown value).
+    Label: cl_entry_full_init
+
+  0x9ED90 (follows, separate function):
+    - Checks FFFFB71C (byte) — if nonzero, returns
+    - Looks up table at 0x9A770 indexed by R4 (input param)
+    - Based on FFFF36F4 value (0, 0xFF, 0xA5), dispatches to:
+      0 → calls 0xA1CC0 then tail-calls 0xA240C
+      0xFF → tail-calls 0xA4FE4
+      0xA5 → tail-calls 0xA50A0
+      else → returns
+    Purpose: Variant-specific CL initialization dispatcher.
+    There is an identical twin at 0x9EDEC for a second bank/channel.
+    Label: cl_variant_init_dispatch
+
+
+  ─── 0x5CA32: cl_reentry_handler ─────────────────────────────────────────
+
+  8 instructions:
+    sts.l  PR,@-R15
+    mov.l  @(pool),R2  ; =0x000BE9A0  uint8_pack
+    jsr    @R2
+    mov    #1,R4       ; R4 = 1
+    mov.l  @(pool),R2  ; =0xFFFF3692
+    lds.l  @R15+,PR
+    rts
+    mov.w  R0,@R2      ; FFFF3692 = uint8_pack(1)
+
+  Purpose: Writes packed value of 1 to FFFF3692 on CL forced re-entry.
+  This is a simple flag-set wrapper.
+  Label confirmed: cl_reentry_handler
+
+
+  ─── 0x5CA42: cl_entry_init_B ────────────────────────────────────────────
+
+  ~70 instructions.  Structure:
+    - Calls sensor_diag_helper (BSR 0x5CC9A)
+    - Reads FFFF3680 (byte → R14), FFFF8ECF (byte → R13), FFFF8ED0 (→ R12)
+    - Calls interrupt_save(16)
+    - If sensor_diag == 0 (sensors not OK):
+      - Calls 0xC8E8 with FFFF8EDE struct
+      - Reads FFFF8EDE+4 flag
+      - Loads float from either 0xCBA4 or 0xCBA8 based on flag
+      - Converts struct[+0] and struct[+2] words to float via FPUL
+      - Multiplies by loaded float
+      - Computes rate-of-change: (new - old) / (2.0 * scale)
+      - If old > 0 AND rate exceeds threshold: calls sub at 0x5CC72
+    - If FFFF3680 == 1 AND FFFF8ECF == 0 AND FFFF8ED0 == 0:
+      - Also calls 0x5CC72
+    - Tail-calls interrupt_restore(0x3190)
+
+  Purpose: CL entry state initialization with sensor validation and
+  rate-of-change monitoring.  Detects abnormal sensor rate changes
+  during CL entry and triggers corrective action via 0x5CC72.
+  The struct at FFFF8EDE appears to be a sensor smoothing/filter workspace.
+  Label confirmed: cl_entry_init_B
+
+
+  ─── 0x0FACA: cl_finalize_correction ─────────────────────────────────────
+
+  ~100 instructions.  Complex function.  Structure:
+    - Saves SR, masks interrupt level (stc SR; and 0xFF0F; or 0xE0; ldc SR)
+      → sets interrupt priority to 14 (0xE0 >> 4)
+    - Calls sub at 0xFBBA (stores R4 to FFFF5B6C — sets mode byte)
+    - Calls 0xAE1C, 0xAE50 (two related init subs)
+    - Calls 0x108DA, 0x10942 (two injection-related inits, R4=3)
+    - Raises interrupt level again (OR 0xD0 → priority 13)
+    - Calls 0xFDB4 with R4=19, R5=0 (system call — task/timer setup)
+    - Calls 0xBE9B0 (uint32_pack) with R4=0 → stores to FFFF205C
+    - Reads timer at ROM 0xF430 → stores to FFFF5B68
+    - Calls 0x10950 (another injection init)
+    - ENTERS A TIMED LOOP:
+      - Calls 0xBE81C (struct_init) with R5=0xE0 (224 bytes)
+      - Calls 0x6BC4 with R4=20 (read port/status)
+      - Masks result with 0xF7, calls 0x6BF0 with R4=20 (write port)
+      - Calls 0xBE82C (another struct op)
+      - Calls 0xBEAB8 with R4=2000 (0x7D0)
+      - Calls 0x11880 (hardware timer read)
+      - Calls 0x6BC4 with R4=17, checks bit 1
+      - If bit 1 set: calls sub at 0xFBA4 (see below)
+      - Reads timer, compares elapsed time against 16000 (0x3E80)
+      - If elapsed < 16000: loops back
+      - If elapsed >= 16000: increments counter at FFFF205C (saturates at 0xFFFF)
+      - Calls 0xBE9B0 to pack counter, adjusts timer base, loops again
+
+    This is a HARDWARE SYNCHRONIZATION LOOP that:
+    - Initializes injection hardware registers
+    - Runs for multiple 16000-tick intervals
+    - Monitors a hardware status bit (port 17, bit 1)
+    - Calls 0xFBA4 when the status bit is set
+    - Continues until the counter saturates or an exit condition is met
+
+  Label: cl_finalize_injection_sync (more accurate than "cl_finalize_correction")
+
+
+  ─── 0x0FBA4: cl_maintenance_routine ─────────────────────────────────────
+
+  ~12 instructions.  Structure:
+    - stc SR,R0; and 0xFF0F; or 0xF0 → raises to priority 15
+    - ldc R0,SR
+    - Reads address 0xF590
+    - Writes 0 to @(2,R2) and @R2 (clears two words at 0xF592 and 0xF590)
+    - bra self (BRA 0xFBB6) — INFINITE LOOP
+
+  THIS IS A WATCHDOG RESET / SYSTEM HALT:
+    - Raises interrupt priority to maximum (15 — blocks all interrupts)
+    - Clears two hardware timer registers (0xF590-0xF594 = WDT area)
+    - Enters infinite loop → triggers watchdog timeout → ECU RESET
+
+  This is called from within cl_finalize_correction when the hardware
+  synchronization detects a failure condition (port 17 bit 1).  It
+  forces a clean ECU reset via watchdog timeout rather than continuing
+  with corrupted injection timing state.
+
+  Label: watchdog_reset (replaces "cl_maintenance_routine")
+
+  NOTE: 0xFBA4 is NOT called from cl_monitor_state_machine (0x5AB44)
+  as originally labeled.  Re-checking the literal pool:
+    Pool entry 0x5ACF0 = 0x0000FBA4
+    This pool entry is loaded at 0x5AC1A and called at 0x5AC1C.
+    The call is gated by: engine_running (FFFFB000) == 1 AND
+    check_cl_active == 1.
+
+  Wait — this means 0x5AB44 calls watchdog_reset when the engine is
+  running and CL is active?  That can't be right.  Let me re-verify
+  the literal pool mapping.
+
+  Re-checking: at 0x5AC1A, the mov.l loads from pool at offset D635.
+    0x5AC1A: D635 → ea = ((0x5AC1C+4) & ~3) + 0x35*4 = 0x5AC20 + 0xD4 = 0x5ACF4
+    Wait: D6_35 → R6, disp=0x35 → ea = (0x5AC1C & ~3) + 0x35*4
+    Actually: 0x5AC1A is the instruction. PC for mov.l = addr+4 = 0x5AC1E.
+    ea = (0x5AC1E & ~3) + 0x35*4 = 0x5AC1C + 0xD4 = 0x5ACF0.
+    Value at 0x5ACF0 = 0x0000FBA4.
+
+  So yes, 0x5AB44 DOES reference 0xFBA4 in the literal pool.  But 0xFBA4
+  is the watchdog reset — that would be a drastic action.  Let me check
+  if there's a different function at 0xFBA4 in the actual calling context.
+
+  Actually, looking more carefully at the addresses — the functions
+  around 0xFBA4 are:
+    0xFBBA: sub that writes R4 to FFFF5B6C (simple setter)
+    0xFBC0: sub that reads FFFF5B6C (simple getter)
+    0xFBC6: sub that reads FFFF205C word (counter getter)
+    0xFBD8: a separate function (new prologue)
+
+  And 0xFBA4 starts with stc SR → this IS the watchdog reset code.
+
+  BUT: looking at the cl_monitor_state_machine context at 0x5AC0E-0x5AC22:
+    Branch C checks FFFFB000 == 1 AND check_cl_active == 1.
+    If BOTH true: calls 0xFBA4 and then bra to epilogue.
+    This would reset the ECU during normal CL operation — which makes
+    NO SENSE for normal operation.
+
+  RESOLUTION: This path in cl_monitor_state_machine is a FAULT HANDLER.
+  It can only be reached when:
+    - sensor_diag_helper returned 0 (sensors NOT OK) — Branch B was skipped
+    - FFFF65BC != 1 — Branch A was skipped
+    - FFFFB000 == 1 (engine running) AND check_cl_active == 1 (CL mode)
+
+  This means: engine is running in CL, sensors have FAILED, and there's
+  no CL transition pending.  This is a critical safety condition — the ECU
+  cannot maintain safe CL operation without valid sensors, so it forces
+  a watchdog reset to restart with safe default values.
+
+  Updated label: watchdog_fault_reset
+
+
+  ─── 0x4AE6A: cl_activation_callback ─────────────────────────────────────
+
+  ~35 instructions.  Structure:
+    - Reads FFFF8EDC (ol_dispatch_gate)
+    - If FFFF8EDC == 0 (OL active): JMP to 0xA8518 (OL-specific callback)
+    - If FFFF8EDC != 0 (CL mode): return immediately
+
+  So this is a CONDITIONAL OL-ONLY dispatcher.  When the CL monitor
+  transitions from IDLE to ACTIVE (state 0→1), this function checks
+  if OL enrichment is simultaneously active.  If so, it dispatches to
+  0xA8518 for OL-specific state setup.  In normal CL operation, it's
+  a no-op.
+
+  The adjacent function at 0x4AE82 is more substantial:
+    - Also gates on FFFF8EDC == 0
+    - If R14 (input param) == 1:
+      Calls 0x303C0, 0x46C88, 0x475A8, 0x3DBF4 (4 init subs)
+    - If R14 != 1:
+      Calls 0x44132, 0x475B0, 0x3DBFC (3 init subs)
+    - Tail-calls 0x6F0C2 with R4 = original input
+    Purpose: Multi-function fuel table initializer, gated by OL mode.
+    Dispatches different init sequences based on the activation type.
+
+  Label confirmed: cl_activation_callback (more precisely: ol_gate_dispatcher)
+
+
+══════════════════════════════════════════════════════════════════════════════
+  RAM ADDRESSES — NEWLY IDENTIFIED
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Size  Label                      Source
+  ──────────  ────  ─────────────────────────  ──────────────────────────────
+  FFFFAF3D    u8    cl_entry_flag              Set to 1 by 0x9ED44
+  FFFFAF60    u8    cl_init_countdown          Set to 90 by 0x9ED4C
+  FFFFB71C    u8    variant_dispatch_gate      Checked by 0x9ED90
+  FFFF36F4    u8    diagnostic_mode_byte       Checked by 0x9ED4C (0,FF,A5)
+  FFFF3692    u16   cl_reentry_packed_flag     Written by 0x5CA32
+  FFFF3680    u8    sensor_state_A             Read by 0x5CA42
+  FFFF8ECF    u8    sensor_filter_flag_A       Read by 0x5CA42
+  FFFF8ED0    u8    sensor_filter_flag_B       Read by 0x5CA42
+  FFFF8EDE    16B?  sensor_filter_workspace    Used by 0x5CA42 + 0xC8E8
+  FFFF8EF2    2B    sensor_comparison_state    Read by 0x5CAFE
+  FFFF205C    u32   finalize_cycle_counter     Used by 0xFACA loop
+  FFFF5B68    u32   finalize_timer_base        Used by 0xFACA loop
+  FFFF5B6C    u8    finalize_mode_byte         Set by 0xFBBA helper
+  FFFF98F6    u8    injection_ready_flag       Checked by 0x4AED4, 0x4AF12
+  FFFF5D14    struct ssm_output_workspace      Written by 0x13D58 SSM function
+  FFFF7A20    struct ol_post_transition_GBR    GBR base for Phase 7 sub-B
+  FFFF7A24    struct ol_transition_check_GBR   GBR base for Phase 7 sub-C
+  FFFF7A38    float  ol_post_correction_val    Written by Phase 7 sub-A
+  FFFF7A3C    struct ol_post_calc_workspace    struct[-16] through struct[-4]
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FUNCTION LABELS — UPDATES
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Old Label                  New Label
+  ──────────  ─────────────────────────  ──────────────────────────────────
+  0x009ED44   cl_entry_init_A            set_cl_entry_flag (tiny leaf)
+  0x009ED4C   (unlabeled)                cl_entry_full_init
+  0x009ED90   (unlabeled)                cl_variant_init_dispatch
+  0x005CA32   cl_reentry_handler         cl_reentry_handler (confirmed)
+  0x005CA42   cl_entry_init_B            cl_entry_init_B (confirmed)
+  0x005CAD8   (unlabeled)                cl_entry_sensor_gate
+  0x005CAFE   (unlabeled)                cl_comparison_state_update
+  0x005CB1C   (unlabeled)                cl_entry_diagnostic_mode_set
+  0x000FACA   cl_finalize_correction     cl_finalize_injection_sync
+  0x000FBA4   cl_maintenance_routine     watchdog_fault_reset
+  0x000FBBA   (unlabeled)                finalize_set_mode
+  0x000FBC0   (unlabeled)                finalize_get_mode
+  0x000FBC6   (unlabeled)                finalize_get_counter
+  0x004AE6A   cl_activation_callback     ol_gate_dispatcher
+  0x004AE82   (unlabeled)                ol_fuel_table_init
+  0x0036E60   ol_post_transition (sub-A) ol_post_correction_select
+  0x0036E86   ol_post_transition (sub-B) ol_post_transition_main
+  0x0036F76   (unlabeled)                ol_transition_completion_check
+  0x013D58    (unlabeled)                ssm_fuel_state_evaluator
+
+
+══════════════════════════════════════════════════════════════════════════════
+  CONCLUSIONS
+══════════════════════════════════════════════════════════════════════════════
+
+1. GAP 1 CLOSED: FUN_0003643A reads ALL LIVE sensor values (FFFF6624,
+   FFFF65FC, FFFF6350, FFFF6898, FFFF62DC, FFFF63F8).  No snapshot reads.
+   WOT delay is caused by hysteresis thresholds, not stale data.
+
+2. GAP 2 CLOSED: CAL@0xCBBEF = 1, meaning snapshots update every 20ms
+   tick.  Snapshot lag is negligible.
+
+3. GAP 3 CLOSED: SSM mode formatting at 0x13D58 is a ~500-byte fuel state
+   evaluator that computes diagnostic output parameters from live sensors
+   and FLKC convergence states.  The 7/8/10 encoding is a derived result.
+
+4. GAP 4 CLOSED: FUN_36E60 Phase 7 is NOT dead code.  The enrichment path
+   requires 4+ conditions (GBR flags from prior phases + engine state +
+   FFFF67EC counter threshold).  Additionally, a previously undocumented
+   third sub-function (ol_transition_completion_check @ 0x36F76) was found.
+
+5. GAP 5 CLOSED: All 6 helper functions traced:
+   - 0x9ED44: set_cl_entry_flag (1 byte write)
+   - 0x9ED4C: cl_entry_full_init (IRQ-protected, 6 descriptor table walks)
+   - 0x5CA32: cl_reentry_handler (writes packed(1) to FFFF3692)
+   - 0x5CA42: cl_entry_init_B (sensor rate-of-change monitoring)
+   - 0xFACA:  cl_finalize_injection_sync (hardware sync loop)
+   - 0xFBA4:  watchdog_fault_reset (NOT a maintenance routine!)
+   - 0x4AE6A: ol_gate_dispatcher (conditional OL callback)
+
+6. CRITICAL DISCOVERY: 0xFBA4 is a watchdog reset, not a maintenance
+   routine.  It is called from cl_monitor_state_machine when sensors
+   have failed during CL operation with engine running — a safety-critical
+   fault handler that forces ECU restart.

@@ -2143,9 +2143,14 @@ public class ImportAE5L600L extends GhidraScript {
             "39 refs. Idle control GBR base (19 GBR uses). Primary GBR for task54_idle.");
         count += labelComment(0xFFFF83AC, "idle_workspace_GBR",
             "26 refs. Secondary idle GBR workspace (7 GBR uses).");
-        count += labelComment(0xFFFF8E98, "sensor_fault_flags",
-            "97 refs. Sensor fault flag register. Read by frontO2, AFL, idle. "
-            + "Copied to cl_inhibit (FFFF744B). 8th most-referenced.");
+        count += labelComment(0xFFFF8E98, "cl_state_struct",
+            "97 refs. CL monitoring state struct (15+ bytes). Base for cl_monitor_state_machine "
+            + "(0x5AB44). Layout: +0=state_phase(u8: 0=IDLE,1=ACTIVE,2=CONVERGED), "
+            + "+1=reset_flag(u8), +2=phase_A(u8), +3=phase_B(u8), +4=timer_word(u16), "
+            + "+6=cl_dwell_counter(u16, 375sec threshold), +8=cycle_counter(u32), "
+            + "+12=prev_sensor_status(u8), +13=prev_sensor_ready(u8), "
+            + "+14=prev_cl_transition_ready(u8). "
+            + "Also read by frontO2, AFL, idle (copied to cl_inhibit FFFF744B).");
         count += labelComment(0xFFFF85D7, "fuel_system_state",
             "60 refs. Fuel system state byte. Read by AFC, AFL, idle.");
         count += labelComment(0xFFFF81F0, "knock_state_base",
@@ -2645,8 +2650,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00049CF0L, "fuel_dispatch_tableB_runner",
             "fuel_dispatch_table_B RUNNER. Checks ol_dispatch_gate (FFFF8EDC): "
             + "if 0x00 = OL active: dispatches all 18 table-B functions (including 7-phase OL pipeline). "
-            + "if 0xFF = special mode: JMP to 0x5AB44 (mode-entry handler) with R4 from context. "
-            + "if other: JMP to 0x5AB44 with R4=1 (bypass). "
+            + "if 0xFF = special mode: JMP to 0x5AB44 (cl_monitor_state_machine) with R4=1. "
+            + "if other non-zero: JMP to 0x5AB44 (cl_monitor_state_machine) with R4=0. "
             + "Called via secondary dispatch: Task2/3 -> F97C -> E54E -> 5798 -> 049CF0. "
             + "Also labeled isr_handler_33 (that label is also valid).");
 
@@ -2730,15 +2735,106 @@ public class ImportAE5L600L extends GhidraScript {
             + "0x049CF0 (fuel_dispatch_tableB), 0x4907C (fuel_dispatch_tableA), "
             + "0x48DB8 (injection timing), 0x48E16 (ATU channels). "
             + "0x00 = OL enrichment active (all dispatchers run their sub-functions). "
-            + "0xFF = special mode (dispatchers JMP to 0x5AB44 mode-entry handler). "
-            + "other = bypass mode (dispatchers JMP to 0x5AB44 with R4=1). "
+            + "0xFF = special mode (dispatchers JMP to 0x5AB44 cl_monitor_state_machine, R4=1). "
+            + "other = CL mode (dispatchers JMP to 0x5AB44 cl_monitor_state_machine, R4=0). "
             + "Written by: clol_mode_flag_writer (0x31528) each scheduler cycle.");
 
-        count += labelComment(0x0005AB44L, "ol_dispatch_bypass_handler",
-            "OL dispatch bypass handler. Called by all 4 OL-gated dispatchers when "
-            + "ol_dispatch_gate (FFFF8EDC) != 0. "
-            + "R4=0: normal CL/bypass entry. R4=1: special mode entry. "
-            + "Handles transition from OL-active back to CL-dominant operation.");
+        count += labelComment(0x0005AB44L, "cl_monitor_state_machine",
+            "CL monitoring state machine. Runs every 20ms tick when FFFF8EDC != 0 "
+            + "(CL mode — OL enrichment bypassed). 3-state machine: "
+            + "IDLE(0) -> ACTIVE(1) -> CONVERGED(2). "
+            + "Tracks sensor health via sensor_diag_helper, counts CL dwell time "
+            + "(375sec threshold at cl_dwell_counter), manages phase tracking "
+            + "(struct[+2]==struct[+3]), and triggers CL entry/convergence callbacks. "
+            + "Uses cl_state_struct at FFFF8E98 (15+ bytes). "
+            + "R4=0: normal CL tick. R4=1: forced re-entry (FFFF8EDC==0xFF). "
+            + "Protects I/O writes (FFFF366C-3670) with interrupt_save(16)/restore. "
+            + "Called from: 0x049CF0, 0x4907C, 0x48DB8, 0x48E16.");
+
+        count += labelComment(0x0005AE18L, "check_convergence_count",
+            "Leaf: returns R0=1 if FFFF8E9E >= 6, R0=0 otherwise. "
+            + "Secondary convergence gate for cl_monitor_state_machine.");
+
+        count += labelComment(0x0005AE60L, "post_convergence_handler",
+            "Wrapper called on ACTIVE->CONVERGED transition. "
+            + "Calls 0x24DE4 (timer utility) then tail-calls 0x2259C (convergence commit).");
+
+        // --- CL/OL gap closure: helper functions and newly identified subs ---
+        count += labelComment(0x0009ED44L, "set_cl_entry_flag",
+            "Tiny leaf: sets FFFFAF3D = 1 (CL entry notification flag). 4 instructions.");
+
+        count += labelComment(0x0009ED4CL, "cl_entry_full_init",
+            "Full CL entry initialization. IRQ-protected (priority 16). "
+            + "Checks FFFF36F4 diagnostic mode, calls 0x72DD4 (DTC handler), "
+            + "walks 6 descriptor table entries via desc_table_walk, "
+            + "sets FFFFAF60 = 90 (countdown). Called from cl_monitor_state_machine.");
+
+        count += labelComment(0x0009ED90L, "cl_variant_init_dispatch",
+            "Variant-specific CL init dispatcher. Gates on FFFFB71C. "
+            + "Dispatches based on FFFF36F4: 0->0xA1CC0/0xA240C, "
+            + "0xFF->0xA4FE4, 0xA5->0xA50A0. Twin at 0x9EDEC for bank 2.");
+
+        count += labelComment(0x0005CA32L, "cl_reentry_handler",
+            "Writes uint8_pack(1) to FFFF3692 on forced CL re-entry. "
+            + "Called from cl_monitor_state_machine when R4=1.");
+
+        count += labelComment(0x0005CA42L, "cl_entry_init_B",
+            "CL entry state init with sensor validation. Calls sensor_diag_helper, "
+            + "IRQ-protected. Monitors sensor rate-of-change via FFFF8EDE workspace. "
+            + "Detects abnormal rates during CL entry, calls 0x5CC72 corrective sub. "
+            + "Checks FFFF3680/8ECF/8ED0 flags.");
+
+        count += labelComment(0x0000FACAL, "cl_finalize_injection_sync",
+            "Hardware synchronization loop for CL finalization. "
+            + "Inits injection hardware (0xAE1C, 0xAE50, 0x108DA, 0x10942), "
+            + "runs timed loop monitoring port 17 bit 1 in 16000-tick intervals. "
+            + "Calls watchdog_fault_reset (0xFBA4) on hardware status failure. "
+            + "Uses FFFF205C counter, FFFF5B68 timer base.");
+
+        count += labelComment(0x0000FBA4L, "watchdog_fault_reset",
+            "SAFETY: Raises IRQ to priority 15 (blocks all interrupts), "
+            + "clears WDT registers at 0xF590-0xF594, enters infinite loop "
+            + "to trigger watchdog timeout and ECU reset. Called from "
+            + "cl_finalize_injection_sync on hardware failure, and from "
+            + "cl_monitor_state_machine on sensor failure during CL+engine running.");
+
+        count += labelComment(0x0004AE6AL, "ol_gate_dispatcher",
+            "Conditional OL-only dispatcher. Checks FFFF8EDC: if 0 (OL active) "
+            + "JMP to 0xA8518; if non-zero (CL mode) returns immediately. "
+            + "Called from cl_monitor_state_machine on state 0->1 transition.");
+
+        count += labelComment(0x0004AE82L, "ol_fuel_table_init",
+            "Multi-function fuel table initializer, gated by FFFF8EDC==0. "
+            + "If R14==1: calls 0x303C0, 0x46C88, 0x475A8, 0x3DBF4. "
+            + "If R14!=1: calls 0x44132, 0x475B0, 0x3DBFC. "
+            + "Tail-calls 0x6F0C2.");
+
+        count += labelComment(0x00036E60L, "ol_post_correction_select",
+            "Phase 7 sub-A: selects post-transition correction float based on "
+            + "engine state (0x22CF4). Loads from ROM 0xCC288 or 0xCC284. "
+            + "Writes to FFFF7A38 struct.");
+
+        count += labelComment(0x00036E86L, "ol_post_transition_main",
+            "Phase 7 sub-B: main OL post-transition logic. GBR=FFFF7A20. "
+            + "Reads RPM/load/MAF, checks FLKC states via 0x297B0/0x29AA0, "
+            + "evaluates 4 GBR condition flags, compares against ROM thresholds "
+            + "at 0xCC274-0xCC290. NOT dead code — active when prior OL phases "
+            + "have set their flags.");
+
+        count += labelComment(0x00036F76L, "ol_transition_completion_check",
+            "Phase 7 sub-C: OL-to-CL transition completion detector. "
+            + "GBR=FFFF7A24. Computes MAF*BPW correction via table_2d_lookup "
+            + "(descriptors 0xAD9EC/0xADA08). Counts consecutive cycles "
+            + "where correction is within/outside bounds (thresholds at "
+            + "0xCBBF3/0xCBBF4). Sets FFFF7454 flag when transition complete.");
+
+        count += labelComment(0x00013D58L, "ssm_fuel_state_evaluator",
+            "Large SSM diagnostic function (~500 bytes). GBR=FFFF5C98. "
+            + "Reads live MAF/RPM/BPW/boost, check_cl_active, 5 FLKC state "
+            + "readers, performs 6 table lookups via 0xBE8E4/0xBE830 with "
+            + "descriptors from 0xAA8xx-0xAA9xx. Computes fuel state "
+            + "parameters stored to FFFF5D14 output struct. Source of "
+            + "SSM mode values (7=off, 8=CL, 10=OL).");
 
         // ============================================================
         // CALIBRATION DESCRIPTOR LABELS (760 total, auto-generated)
