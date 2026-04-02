@@ -35,17 +35,76 @@ def r_u16(rom, a): return struct.unpack_from(">H", rom, a)[0]
 def r_u32(rom, a): return struct.unpack_from(">I", rom, a)[0]
 
 KNOWN_RAM = {
-    0xFFFF80FC: "knock_det_GBR_base", 0xFFFF81BA: "KNOCK_FLAG",
-    0xFFFF81BB: "KNOCK_BANK_FLAG", 0xFFFF8290: "flkc_fg_GBR_base",
-    0xFFFF837E: "idle_control_GBR", 0xFFFF83AC: "idle_workspace_GBR",
-    0xFFFF9094: "sched_task_GBR", 0xFFFFA160: "diag_monitor_GBR",
-    0xFFFF69F0: "boost_pressure", 0xFFFF81F0: "knock_state_base",
-    0xFFFF837B: "gbr_837B", 0xFFFF8387: "gbr_8387",
-    0xFFFF8EA8: "sched_control_GBR", 0xFFFF35E4: "gbr_35E4",
-    0xFFFF3718: "gbr_3718", 0xFFFF6155: "adc_channel_status",
-    0xFFFF3682: "gbr_3682", 0xFFFF8EC7: "gbr_8EC7",
-    0xFFFF980C: "sched_periodic_GBR", 0xFFFFAC6C: "diag_protocol_GBR",
-    0xFFFF726C: "transient_flag", 0xFFFF7448: "clol_mode_flag",
+    # Hardware / peripheral
+    0xFFFF4024: "adc_raw_workspace",
+    0xFFFF6155: "adc_channel_status",
+    # Calibration mirror / descriptor
+    0xFFFF2398: "desc_table_copy_2398",
+    0xFFFF24A8: "desc_partial_copy_24A8",
+    0xFFFF2D88: "desc_partial_copy_2D88",
+    0xFFFF2F84: "desc_table_copy_2F84",
+    0xFFFF30E4: "desc_partial_copy_30E4",
+    0xFFFF3480: "cal_mirror_base",
+    0xFFFF34EC: "desc_table_copy_34EC",
+    0xFFFF35E4: "cal_mirror_lookup",
+    0xFFFF3682: "cal_output_buffer",
+    0xFFFF3718: "cal_descriptor_queue",
+    # Sensor / boost
+    0xFFFF5C98: "ssm_diagnostic_GBR",
+    0xFFFF69F0: "boost_pressure",
+    # Fuel / CL-OL
+    0xFFFF726C: "transient_flag",
+    0xFFFF7448: "clol_mode_flag",
+    0xFFFF77BC: "fuel_pipeline_base",
+    0xFFFF798C: "timing_state_var",
+    0xFFFF7AB4: "afl_multiplier_output",
+    0xFFFF7AF4: "fuel_ipw_state_B",
+    # Timing
+    0xFFFF7E90: "warmup_blend_state",
+    0xFFFF7EC0: "base_advance_state",
+    0xFFFF7F0C: "timing_blend_app",
+    0xFFFF7F10: "base_timing_state",
+    0xFFFF7FBC: "timing_final_advance",
+    0xFFFF7FD4: "timing_ws_init",
+    0xFFFF8000: "timing_percond_state",
+    0xFFFF8C9C: "timing_workspace_A",
+    # Knock / FLKC
+    0xFFFF80FC: "knock_det_GBR_base",
+    0xFFFF81BA: "KNOCK_FLAG",
+    0xFFFF81BB: "KNOCK_BANK_FLAG",
+    0xFFFF81F0: "knock_state_base",
+    0xFFFF81F8: "knock_thresh_config",
+    0xFFFF8210: "knock_window_state",
+    0xFFFF821C: "knock_thresh_calc",
+    0xFFFF8258: "roughness_correction",
+    0xFFFF8277: "roughness_detection",
+    0xFFFF8290: "flkc_fg_GBR_base",
+    0xFFFF8298: "knock_percyl_state",
+    0xFFFF829E: "knock_window_update",
+    # Idle control
+    0xFFFF837B: "idle_dispatch_workspace",
+    0xFFFF837E: "idle_control_GBR",
+    0xFFFF8387: "knock_flkc_workspace",
+    0xFFFF83AC: "idle_workspace_GBR",
+    # Ignition / boost ext
+    0xFFFF8B50: "boost_wastegate_calc",
+    # Scheduler
+    0xFFFF8EA8: "sched_control_GBR",
+    0xFFFF8EC7: "sched_control_secondary",
+    0xFFFF8F08: "cl_readiness_A_input",
+    0xFFFF9094: "sched_task_GBR",
+    0xFFFF91C4: "sched_queue_base",
+    0xFFFF980C: "sched_periodic_GBR",
+    0xFFFF9FA8: "sched_timer_B",
+    0xFFFF9FC6: "sched_timer_base",
+    # Diagnostics
+    0xFFFFA156: "diag_state_B_start",
+    0xFFFFA160: "diag_monitor_GBR",
+    0xFFFFA198: "egr_diag_state",
+    0xFFFFAC6C: "diag_protocol_GBR",
+    0xFFFFAF70: "diag_state_A_start",
+    # Sensor structs
+    0xFFFF8998: "sensor_struct_8998",
 }
 
 

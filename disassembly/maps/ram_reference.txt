@@ -1,6 +1,6 @@
 AE5L600L Consolidated RAM Reference Map
 ==============================================================================================================
-Total addresses: 838 | Named: 402 | Unnamed: 436
+Total addresses: 838 | Named: 428 | Unnamed: 410
 Sources: Ghidra import (373), Task10 analysis (61), manual (29), ram_map_raw (501)
 ==============================================================================================================
 
@@ -67,7 +67,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      21  0xFFFF83A5  idle_sensor_ref                      Idle control sensor comparison reference (passed to 0x4
      21  0xFFFFAD50  diag_session_state_B                 Diagnostic session state variable B
      20  0xFFFF233C  timer_config_block                   Timer configuration block (16 bytes). Injection timing 
-     20  0xFFFF4144  ???                                  ECT output (degrees C)           FMAC / call_08
+     20  0xFFFF4144  ect_output_fmac                      ECT output (degrees C, float). ADC pipeline ADDR29 -> FMAC call_08.
      20  0xFFFF62DC  fuel_rate                            20 refs. Fuel injection rate (float). Read by timing, b
      20  0xFFFF65BF  warmup_transition_flag_B             Warmup transition flag B (byte). Read by fueling pipeli
      20  0xFFFF7F08  ignition_timing_workspace            Ignition timing workspace variable (float). Multiple re
@@ -87,8 +87,8 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      18  0xFFFF8366  knock_workspace_B                    Knock/FLKC workspace variable B
      18  0xFFFF8391  knock_workspace_C                    Knock/FLKC workspace variable C
      18  0xFFFFB6E1  stack_guard_byte                     Stack area guard byte / canary
-     17  0xFFFF20F4  ???                                  
-     17  0xFFFF2AB4  ???                                  
+     17  0xFFFF20F4  system_config_timer_A                System config/timer variable A. System state cluster.
+     17  0xFFFF2AB4  system_state_descriptor              System state descriptor variable. Descriptor region.                                  
      17  0xFFFF36C0  cal_mirror_state                     Calibration mirror state variable
      17  0xFFFF61AC  adc_processed_alt                    ADC processed alternate channel
      17  0xFFFF798C  timing_state_var                     17 refs. Timing state variable. Referenced by task35_ti
@@ -97,49 +97,49 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      17  0xFFFF8C9C  timing_workspace_A                   17 refs. Timing workspace variable.
      17  0xFFFF8E7E  afc_enable_flag_A                    PI output enable flag A (byte). Must == 1 for afc_pi_ou
      17  0xFFFF9FA8  sched_timer_B                        17 refs. Scheduler timer variable B.
-     16  0xFFFF20D4  ???                                  
-     16  0xFFFF5FC0  ???                                  
-     16  0xFFFF63B0  ???                                  
+     16  0xFFFF20D4  system_init_flags_B                  System initialization flags B. System state cluster.
+     16  0xFFFF5FC0  sensor_io_state_secondary            Sensor I/O state secondary. Near io_state_register (0xFFFF5FFC).
+     16  0xFFFF63B0  adc_processed_temperature_B          ADC processed temperature B (float). ECT/IAT sensor region.                                  
      16  0xFFFF63CC  ram_ECT                              Coolant temperature / ECT (float)
      16  0xFFFF8910  ignition_system_state                Ignition system state. Referenced in ignition timing an
      16  0xFFFF922C  scheduler_counter                    Scheduler counter variable
      16  0xFFFFA290  diag_monitor_state                   Diagnostic monitor state area
-     15  0xFFFF20CC  ???                                  
-     15  0xFFFF3420  ???                                  
+     15  0xFFFF20CC  system_state_flags_A                 System state flags A. System state cluster 0xFFFF20A0-0xFFFF227C.
+     15  0xFFFF3420  cal_mirror_descriptor_ptr            Cal mirror descriptor pointer. Cal mirror region 0xFFFF341A-0xFFFF3612.
      15  0xFFFF5C98  peripheral_control_GBR               15 refs. Peripheral control GBR base (3 uses).
      15  0xFFFFA160  diag_monitor_GBR                     21 refs. Diagnostic monitor GBR base (6 GBR uses).
-     15  0xFFFFA59D  ???                                  
-     14  0xFFFF5BE2  ???                                  
+     15  0xFFFFA59D  diag_fault_enable_flags               Diagnostic fault enable/masking flags. Referenced by diag tasks.                                  
+     14  0xFFFF5BE2  engine_condition_flags                Engine condition flags byte. Read by task10, task30, task38. Called "condition_flags" in ignition analysis.                                  
      14  0xFFFF7FBC  timing_final_advance                 14 refs. Final timing advance value.
-     14  0xFFFF89E8  ???                                  
+     14  0xFFFF89E8  knock_sensor_state_B                 Knock sensor state variable B. Knock/FLKC cluster.                                  
      14  0xFFFFAD14  diag_state_E_start                   Active fault status region start. 62 bytes, 268 refs.
-     14  0xFFFFAD1C  ???                                  
-     13  0xFFFF837B  ???                                  
-     13  0xFFFF8387  ???                                  
-     13  0xFFFF903C  ???                                  
+     14  0xFFFFAD1C  diag_active_fault_B                  Active fault status byte B. Part of diag_state_E (0xFFFFAD14-0xFFFFAD52, 268 refs).                                  
+     13  0xFFFF837B  idle_dispatch_workspace              Main idle dispatcher state (GBR base). 39 fields, 129 accesses.                                  
+     13  0xFFFF8387  knock_flkc_workspace                 Knock/FLKC post-retard state (GBR base). Adjacent to knock_workspace_B/C.                                  
+     13  0xFFFF903C  sched_task_dispatch_state             Scheduler task dispatch state. Scheduler region.                                  
      13  0xFFFFA198  egr_diag_state                       13 refs. EGR/emissions diagnostic state. GBR base (3 us
      13  0xFFFFAC6C  diag_protocol_GBR                    13 refs. Diagnostic protocol GBR base (4 GBR uses).
-     13  0xFFFFAF73  ???                                  
-     12  0xFFFF3C80  ???                                  
-     12  0xFFFF6540  ???                                  
-     12  0xFFFF90A8  ???                                  
-     12  0xFFFF9FE4  ???                                  
-     12  0xFFFFAD18  ???                                  
-     12  0xFFFFAD20  ???                                  
-     12  0xFFFFAD24  ???                                  
-     12  0xFFFFAD28  ???                                  
-     11  0xFFFF5DB5  ???                                  
-     11  0xFFFF61FC  ???                                  
-     11  0xFFFF7BE4  ???                                  
-     11  0xFFFF85E4  ???                                  
+     13  0xFFFFAF73  diag_fault_history_byte               Diagnostic fault history byte. Part of diag_state_A (0xFFFFAF70-0xFFFFAFAB).                                  
+     12  0xFFFF3C80  cal_mirror_timer_workspace            Cal mirror timer workspace. Cal mirror timer region.
+     12  0xFFFF6540  o2_sensor_conditioned                Conditioned O2 sensor value (float). Rate-limited ±0.02/cycle. AFC PI error input.
+     12  0xFFFF90A8  timing_dispatch_state                Timing dispatch state. Read by task01, task10, task32. Called "timing_state" in ign analysis.
+     12  0xFFFF9FE4  sched_timer_extended_B               Scheduler extended timer B. Scheduler timer cluster.
+     12  0xFFFFAD18  diag_active_fault_C                  Active fault status byte C. diag_state_E array offset +0x04.
+     12  0xFFFFAD20  diag_active_fault_D                  Active fault status byte D. diag_state_E array offset +0x0C.
+     12  0xFFFFAD24  diag_active_fault_E                  Active fault status byte E. diag_state_E array offset +0x10.
+     12  0xFFFFAD28  diag_active_fault_F                  Active fault status byte F. diag_state_E array offset +0x14.                                  
+     11  0xFFFF5DB5  cl_ol_gate_flag                      CL/OL gate flag byte. Referenced in cl_ol_state_machine and clol_gap_closure.
+     11  0xFFFF61FC  adc_processed_extra                  ADC processed extra channel (float). Near airflow_maf_current.
+     11  0xFFFF7BE4  transient_fuel_comp                  Transient fuel compensation value (float). AFC working value. Read by task35.
+     11  0xFFFF85E4  fuel_knock_state_var                 Fuel/knock state variable. Near fuel_system_state (0xFFFF85D7).                                  
      11  0xFFFF8998  sensor_struct_8998                   Sensor struct base (GBR at 0x52092).
-     11  0xFFFF9FE0  ???                                  
-     11  0xFFFFA163  ???                                  
-     11  0xFFFFA26C  ???                                  
-     10  0xFFFF20C0  ???                                  
-     10  0xFFFF65A2  ???                                  
-     10  0xFFFF7864  ???                                  
-     10  0xFFFF7D04  ???                                  
+     11  0xFFFF9FE0  sched_timer_extended_A               Scheduler extended timer A. Scheduler timer cluster.
+     11  0xFFFFA163  diag_monitor_state_byte              Diagnostic monitor state byte. Adjacent to diag_monitor_GBR (+3).
+     11  0xFFFFA26C  diag_trip_tracking_flags             Diagnostic trip tracking flags. Trip tracking region.                                  
+     10  0xFFFF20C0  system_state_var_C                   System state variable C. System state cluster.
+     10  0xFFFF65A2  engine_state_var_A                   Engine state variable A. Near engine_state_extended (0xFFFF65A9).
+     10  0xFFFF7864  fuel_enrichment_state                Fuel enrichment state (float). Near fuel_enrichment_B (0xFFFF7878).
+     10  0xFFFF7D04  fuel_timing_state_B                  Fuel/timing state variable B. Fuel/timing region.                                  
       9  0xFFFF3444  ???                                  
       9  0xFFFF4254  ???                                  
       9  0xFFFF85DC  ???                                  
@@ -158,13 +158,13 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
       7  0xFFFF2EF4  ???                                  
       7  0xFFFF341C  ???                                  
       7  0xFFFF3438  ???                                  
-      7  0xFFFF35E4  ???                                  
-      7  0xFFFF3682  ???                                  
+      7  0xFFFF35E4  cal_mirror_lookup                    Cal mirror lookup workspace (GBR base). 26 fields, 40 accesses.                                  
+      7  0xFFFF3682  cal_output_buffer                    Cal output buffer (GBR base). 22 fields, single caller 0x5B16C.                                  
       7  0xFFFF5FC2  ???                                  
       7  0xFFFF65AB  ???                                  
       7  0xFFFF69FC  ???                                  
       7  0xFFFF7878  fuel_enrichment_B                    Fuel enrichment term B (float). Summed with A+C.
-      7  0xFFFF81F8  ???                                  
+      7  0xFFFF81F8  knock_thresh_config                  Knock threshold config workspace (GBR base). Task04/10.                                  
       7  0xFFFF8CFC  ???                                  
       7  0xFFFF8F08  cl_readiness_A_input                 CL readiness A input (byte). Copied to FFFF744C. When n
       7  0xFFFF980C  sched_periodic_GBR                   7 refs. Scheduler periodic timer GBR base (4 GBR uses).
@@ -175,18 +175,18 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
       6  0xFFFF20BC  ???                                  
       6  0xFFFF20C4  ???                                  
       6  0xFFFF2F84  ???                                  
-      6  0xFFFF3718  ???                                  
+      6  0xFFFF3718  cal_descriptor_queue                 Cal descriptor queue workspace (GBR base). 39 fields, 129 accesses.                                  
       6  0xFFFF3C70  ???                                  
       6  0xFFFF40AB  knock_cylinder_count                 Cylinder count dispatch byte for knock ADC Group 1 read
       6  0xFFFF5C75  ???                                  
       6  0xFFFF6134  ???                                  
       6  0xFFFF613C  ???                                  
-      6  0xFFFF8210  ???                                  
+      6  0xFFFF8210  knock_window_state                   Knock window state workspace (GBR base). Task08.                                  
       6  0xFFFF8570  ???                                  
       6  0xFFFF8D04  ???                                  
       6  0xFFFF8D2C  ???                                  
       6  0xFFFF8E38  ???                                  
-      6  0xFFFF8EC7  ???                                  
+      6  0xFFFF8EC7  sched_control_secondary              Secondary scheduler control (GBR base). Adjacent to sched_control_GBR.                                  
       6  0xFFFF8EF8  ???                                  
       6  0xFFFF9358  ???                                  
       6  0xFFFF9FE2  ???                                  

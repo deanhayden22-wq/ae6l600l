@@ -2,7 +2,7 @@ AE5L600L GBR Workspace Registry
 ====================================================================================================
 Total ldc GBR instructions: 651
 Unique GBR bases: 459
-Named: 65 | Unnamed: 394
+Named: 91 | Unnamed: 368
 ====================================================================================================
 
    Uses  GBR Base     Name                                 Description
@@ -13,39 +13,39 @@ Named: 65 | Unnamed: 394
       6  0xFFFFA160  diag_monitor_GBR                     21 refs. Diagnostic monitor GBR base (6 GBR u
       5  0xFFFF69F0  boost_pressure                       32 refs. Boost pressure (float). Read by AFL.
       5  0xFFFF81F0  knock_state_base                     30 refs. Knock state workspace base. GBR base
-      5  0xFFFF837B  ???                                  
-      5  0xFFFF8387  ???                                  
+      5  0xFFFF837B  idle_dispatch_workspace               Main idle dispatcher state. 39 fields, 129 accesses. Documented in idle_control_analysis.txt.
+      5  0xFFFF8387  knock_flkc_workspace                 Knock/FLKC post-retard state. 13 refs. Adjacent to knock_workspace_B/C.                                  
       5  0xFFFF8EA8  sched_control_GBR                    14 refs. Scheduler control GBR base (5 GBR us
-      5  0xFFFF35E4  ???                                  
-      5  0xFFFF3718  ???                                  
+      5  0xFFFF35E4  cal_mirror_lookup                    Cal mirror lookup workspace. 26 fields, 40 accesses. Callers 0x9672C, 0x96BC0.
+      5  0xFFFF3718  cal_descriptor_queue                 Cal descriptor queue workspace. 39 fields, 129 accesses. Descriptor write pattern.                                  
       4  0xFFFF6155  adc_channel_status                   36 refs. ADC channel status/index (byte). GBR
-      4  0xFFFF3682  ???                                  
-      4  0xFFFF8EC7  ???                                  
+      4  0xFFFF3682  cal_output_buffer                    Cal output buffer. 22 fields, single caller 0x5B16C.
+      4  0xFFFF8EC7  sched_control_secondary              Secondary scheduler control. Adjacent to sched_control_GBR (0xFFFF8EA8).                                  
       4  0xFFFF980C  sched_periodic_GBR                   7 refs. Scheduler periodic timer GBR base (4 
       4  0xFFFFAC6C  diag_protocol_GBR                    13 refs. Diagnostic protocol GBR base (4 GBR 
       3  0xFFFF5C98  ssm_diagnostic_GBR                   SSM fuel state evaluator (0x13D58)
-      3  0xFFFF5FC2  ???                                  
-      3  0xFFFF6134  ???                                  
-      3  0xFFFF613C  ???                                  
-      3  0xFFFF6490  ???                                  
+      3  0xFFFF5FC2  io_peripheral_workspace              I/O peripheral workspace. 56B, 18 fields. Near io_state_register.
+      3  0xFFFF6134  adc_conditioning_workspace_A         ADC conditioning workspace A. Near adc_channel_status (+33).
+      3  0xFFFF613C  adc_conditioning_workspace_B         ADC conditioning workspace B. Near adc_channel_status (+25).
+      3  0xFFFF6490  sensor_dispatch_workspace            Sensor dispatch workspace. 3 GBR uses. Sensor data region.                                  
       3  0xFFFF726C  transient_state_flag                 Transient state flag (byte). Gates AFL applic
-      3  0xFFFF7EC0  ???                                  
+      3  0xFFFF7EC0  base_advance_state                   Task49 base advance workspace. GBR base for base_advance calculations.                                  
       3  0xFFFF80FC  knock_det_GBR_base                   GBR base for knock_detector
-      3  0xFFFF8D14  ???                                  
-      3  0xFFFF8D2C  ???                                  
-      3  0xFFFF8F28  ???                                  
+      3  0xFFFF8D14  ignition_ext_workspace_A             Ignition/knock extended workspace A. 3 GBR uses.
+      3  0xFFFF8D2C  ignition_ext_workspace_B             Ignition/knock extended workspace B. 3 GBR uses.
+      3  0xFFFF8F28  cl_ol_scheduler_workspace            CL/OL scheduler workspace. 3 GBR uses. CL/OL region.                                  
       3  0xFFFF91C4  sched_queue_base                     8 refs. Scheduler queue base. GBR base (3 use
-      3  0xFFFF2398  ???                                  
-      3  0xFFFF24A8  ???                                  
+      3  0xFFFF2398  desc_table_copy_2398                 Descriptor table clone. 222 bytes, 66 fields. Alternating long-write/word-read pattern.                                  
+      3  0xFFFF24A8  desc_partial_copy_24A8               Descriptor partial copy. 62 bytes, 18 fields.                                  
       3  0xFFFFA198  egr_diag_state                       13 refs. EGR/emissions diagnostic state. GBR 
       3  0xFFFF9FC6  sched_timer_base                     22 refs. Scheduler timer base. GBR base (3 us
-      3  0xFFFF9F80  ???                                  
-      3  0xFFFF2E48  ???                                  
-      3  0xFFFF2EF4  ???                                  
-      3  0xFFFF2F84  ???                                  
-      3  0xFFFF30E4  ???                                  
-      3  0xFFFFAC68  ???                                  
-      3  0xFFFF34EC  ???                                  
+      3  0xFFFF9F80  sched_ext_workspace                  Scheduler extended workspace. Near sched_timer_B (+40).                                  
+      3  0xFFFF2E48  desc_region_workspace                Descriptor region workspace. 3 GBR uses.
+      3  0xFFFF2EF4  desc_region_workspace_B              Descriptor region workspace B. 3 GBR uses.
+      3  0xFFFF2F84  desc_table_copy_2F84                 Descriptor table clone. 222 bytes, 66 fields. Alternating long-write/word-read pattern.
+      3  0xFFFF30E4  desc_partial_copy_30E4               Descriptor partial copy. 90 bytes, 24 fields.
+      3  0xFFFFAC68  diag_protocol_workspace              Adjacent to diag_protocol_GBR (+4). 3 GBR uses.
+      3  0xFFFF34EC  desc_table_copy_34EC                 Descriptor table clone. 218 bytes, 64 fields. Near-full descriptor copy.                                  
       2  0xFFFF5BD8  ???                                  
       2  0xFFFF5BE5  ???                                  
       2  0xFFFF5BDF  ???                                  
@@ -81,8 +81,8 @@ Named: 65 | Unnamed: 394
       2  0xFFFF7F74  ???                                  
       2  0xFFFF7FBC  timing_final_advance                 14 refs. Final timing advance value.
       2  0xFFFF8020  ???                                  
-      2  0xFFFF8210  ???                                  
-      2  0xFFFF81F8  ???                                  
+      2  0xFFFF8210  knock_window_state                   Task08 knock window state. 2 GBR uses.
+      2  0xFFFF81F8  knock_thresh_config                  Task04/10 knock threshold config. Near knock_state_base (-8).                                  
       2  0xFFFF8330  ???                                  
       2  0xFFFF8378  ???                                  
       2  0xFFFF837C  ???                                  
@@ -254,7 +254,7 @@ Named: 65 | Unnamed: 394
       1  0xFFFF7EEC  ???                                  
       1  0xFFFF7E90  warmup_corr_cyl0                     Final warmup correction cylinder 0 (float).
       1  0xFFFF7F10  gbr_base_timing_ws                   GBR base for task30 base timing workspace.
-      1  0xFFFF7F0C  ???                                  
+      1  0xFFFF7F0C  timing_blend_app                     Task32 timing blend application workspace.                                  
       1  0xFFFF7F8C  ???                                  
       1  0xFFFF7FD4  gbr_base_corr_init_ws                GBR base for timing corrections init workspac
       1  0xFFFF7FB0  ???                                  
@@ -264,9 +264,9 @@ Named: 65 | Unnamed: 394
       1  0xFFFF8068  ???                                  
       1  0xFFFF805C  ???                                  
       1  0xFFFF81AC  ???                                  
-      1  0xFFFF8218  ???                                  
-      1  0xFFFF821C  ???                                  
-      1  0xFFFF8277  ???                                  
+      1  0xFFFF8218  knock_det_workspace_ext              Knock detection workspace extension.
+      1  0xFFFF821C  knock_thresh_calc                    Task03 knock threshold calculation workspace.
+      1  0xFFFF8277  roughness_detection                  Task13 roughness detection workspace.                                  
       1  0xFFFF8258  flkc_retard                          FLKC retard value (float).
       1  0xFFFF8298  flkc_fg_cyl_index                    Current cylinder/bank index
       1  0xFFFF8290  flkc_fg_GBR_base                     GBR base for flkc_paths_FG
@@ -370,7 +370,7 @@ Named: 65 | Unnamed: 394
       1  0xFFFF984C  ???                                  
       1  0xFFFF9854  ???                                  
       1  0xFFFF2AAC  ???                                  
-      1  0xFFFF2D88  ???                                  
+      1  0xFFFF2D88  desc_partial_copy_2D88               Descriptor partial copy. 122 bytes, 40 fields.                                  
       1  0xFFFF2D40  ???                                  
       1  0xFFFF2D38  ???                                  
       1  0xFFFFA161  ???                                  
