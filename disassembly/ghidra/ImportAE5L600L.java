@@ -8,7 +8,8 @@
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
-// Verified against Ghidra 12.0.2 SH-2 export. 884 labels + 1010 comments.
+// Verified against Ghidra 12.0.2 SH-2 export. 2827 label operations total.
+// Includes: original 884+1010, 463 RomRaider cal table labels, 125 RAM labels.
 //
 //@author  AE5L600L disassembly project
 //@category Data
@@ -132,7 +133,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000467AE, "task21_knock_win_upd",
             "Task [21] Knock window per-cyl update. MAF+cyl index, sets GBR");
         count += labelComment(0x000461D2, "task22_knock_percyl",
-            "Task [22] Knock per-cyl config. Cyl index (0xFFFF8298), sets GBR");
+            "Task [22] Knock per-cyl config. Cyl index (0xFFFF8298L), sets GBR");
         count += labelComment(0x000467F4, "task23_knock_cyl_track",
             "Task [23] Knock cyl tracking. Calls flkc_state_flag_slot15 (0x2999C, FFFF971B). "
             + "If converged AND FFFF82AB==2: iterates 35 flkc_fg_var entries (FFFF3248+i*8), "
@@ -398,7 +399,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000343CE, "afc_output_clamp",
             "AFC output clamp. Upper=200% (0xCC014), Lower=190% (0xCC018). Reads/writes 0xFFFF7820.");
         count += labelComment(0x000320AE, "fuel_correction_final",
-            "Final fuel correction accumulator. Combines AFC (0xFFFF77C8) + LTFT + enrichments into IPW multiplier.");
+            "Final fuel correction accumulator. Combines AFC (0xFFFF77C8L) + LTFT + enrichments into IPW multiplier.");
 
         // Undocumented pointer table
         count += labelComment(0x0008D838, "ptr_table_8D838",
@@ -533,103 +534,103 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
         // RAM VARIABLES
         // =====================================================================
-        count += labelComment(0xFFFF80FC, "knock_det_GBR_base",
+        count += labelComment(0xFFFF80FCL, "knock_det_GBR_base",
             "GBR base for knock_detector");
-        count += labelComment(0xFFFF81BA, "KNOCK_FLAG",
+        count += labelComment(0xFFFF81BAL, "KNOCK_FLAG",
             "1=knock detected, 0=no knock (per cycle)");
-        count += labelComment(0xFFFF81BB, "KNOCK_BANK_FLAG",
+        count += labelComment(0xFFFF81BBL, "KNOCK_BANK_FLAG",
             "Bank selector: 1=bank1, 0=bank0");
-        count += labelComment(0xFFFF81D9, "fn_043d68_output",
+        count += labelComment(0xFFFF81D9L, "fn_043d68_output",
             "Written by task [12], NOT the knock flag");
-        count += labelComment(0xFFFF323C, "FLKC_BASE_STEP",
+        count += labelComment(0xFFFF323CL, "FLKC_BASE_STEP",
             "Base correction step (float), = 0.5 stock");
-        count += labelComment(0xFFFF8290, "flkc_fg_GBR_base",
+        count += labelComment(0xFFFF8290L, "flkc_fg_GBR_base",
             "GBR base for flkc_paths_FG");
-        count += labelComment(0xFFFF8294, "flkc_fg_counter",
+        count += labelComment(0xFFFF8294L, "flkc_fg_counter",
             "Cycle counter, must be >= 90 for F/G paths");
-        count += labelComment(0xFFFF8298, "flkc_fg_cyl_index",
+        count += labelComment(0xFFFF8298L, "flkc_fg_cyl_index",
             "Current cylinder/bank index");
-        count += labelComment(0xFFFF829C, "flkc_fg_active",
+        count += labelComment(0xFFFF829CL, "flkc_fg_active",
             "Active flag; cleared on knock entry");
-        count += labelComment(0xFFFF829D, "flkc_fg_retard_done",
+        count += labelComment(0xFFFF829DL, "flkc_fg_retard_done",
             "Set to 1 after retard applied");
-        count += labelComment(0xFFFF829E, "flkc_fg_enable",
+        count += labelComment(0xFFFF829EL, "flkc_fg_enable",
             "Must == 1 to enter main logic");
-        count += labelComment(0xFFFF82A0, "flkc_fg_exit_flag",
+        count += labelComment(0xFFFF82A0L, "flkc_fg_exit_flag",
             "Set to 1 at normal exit");
-        count += labelComment(0xFFFF82A1, "flkc_fg_bank_route",
+        count += labelComment(0xFFFF82A1L, "flkc_fg_bank_route",
             "Routes post-retard clamp fn call");
-        count += labelComment(0xFFFF82AA, "flkc_fg_prev_cyl",
+        count += labelComment(0xFFFF82AAL, "flkc_fg_prev_cyl",
             "Previous cylinder; must match for retard");
-        count += labelComment(0xFFFF82AB, "knock_cyl_track_state",
+        count += labelComment(0xFFFF82ABL, "knock_cyl_track_state",
             "FLKC propagation state for task23 (knock_cyl_track). Set to result of "
             + "flkc_state_flag_slot15 (0x2999C) after per-cell FLKC table update. "
             + "Used to gate 35-entry FLKC correction loop.");
-        count += labelComment(0xFFFF8286, "flkc_post_state",
+        count += labelComment(0xFFFF8286L, "flkc_post_state",
             "FLKC post-run consolidation state for task19 (flkc_post). "
             + "Set to result of flkc_state_flag_slot15 (0x2999C). "
             + "Checked vs 2 to gate IAM/FLKC_BASE_STEP update via 0xBDBCC.");
-        count += labelComment(0xFFFF970E, "learning_flag_table_base",
+        count += labelComment(0xFFFF970EL, "learning_flag_table_base",
             "FLKC learning convergence state flag array (41 bytes, FFFF970E–FFFF9737). "
             + "Each byte: 0=cell empty/not converged, non-zero=cell has converged learning data. "
             + "Read by flkc_state_flag_reader_table dispatch stubs (0x29858). Dead slots "
             + "in the table return R0=0 for indices with no active learning cell.");
-        count += labelComment(0xFFFF971B, "learning_flag_slot15",
+        count += labelComment(0xFFFF971BL, "learning_flag_slot15",
             "FLKC learning convergence flag for slot 15. Read by flkc_state_flag_slot15 (0x2999C). "
             + "When non-zero: task19 consolidates FLKC corrections, task23 propagates per-cell "
             + "corrections, task56 EVAP precondition passes.");
-        count += labelComment(0xFFFF8258, "flkc_fg_limit_FR15",
+        count += labelComment(0xFFFF8258L, "flkc_fg_limit_FR15",
             "Loaded into FR15, compared vs 100.0");
-        count += labelComment(0xFFFF3234, "flkc_fg_ref_FR14",
+        count += labelComment(0xFFFF3234L, "flkc_fg_ref_FR14",
             "Loaded into FR14 at entry");
-        count += labelComment(0xFFFF3244, "flkc_fg_R0_init",
+        count += labelComment(0xFFFF3244L, "flkc_fg_R0_init",
             "Early R0 setup");
-        count += labelComment(0xFFFF3248, "flkc_fg_var_3248",
+        count += labelComment(0xFFFF3248L, "flkc_fg_var_3248",
             "Read in setup. Also: per-cell FLKC correction float array [35 entries × 8 bytes]. "
             + "Iterated by task23 (knock_cyl_track) and task08 (knock_window) with 35-entry loops.");
-        count += labelComment(0xFFFF8233, "flkc_fg_flag_8233",
+        count += labelComment(0xFFFF8233L, "flkc_fg_flag_8233",
             "Byte flag checked during FP setup");
-        count += labelComment(0xFFFF7D18, "sched_status_R1",
+        count += labelComment(0xFFFF7D18L, "sched_status_R1",
             "Read at fn_0463ba (flkc_paths_FG) entry");
-        count += labelComment(0xFFFF3360, "flkc_output_table",
+        count += labelComment(0xFFFF3360L, "flkc_output_table",
             "FLKC output (word array indexed by cylinder)");
-        count += labelComment(0xFFFF8EDC, "sched_disable_flag",
+        count += labelComment(0xFFFF8EDCL, "sched_disable_flag",
             "If != 0, entire scheduler dispatch is skipped");
 
         // =====================================================================
         // BOOST CONTROL WORKSPACE (GBR base 0xFFFF8B50)
         // =====================================================================
-        count += labelComment(0xFFFF8B50, "boost_gbr_base",
+        count += labelComment(0xFFFF8B50L, "boost_gbr_base",
             "Boost control GBR base. Current target value (float). Set by task51.");
-        count += labelComment(0xFFFF8B54, "boost_error",
+        count += labelComment(0xFFFF8B54L, "boost_error",
             "Boost error: target - actual (float). Computed in task51 active path.");
-        count += labelComment(0xFFFF8B58, "boost_maf_error",
+        count += labelComment(0xFFFF8B58L, "boost_maf_error",
             "MAF error: maf_left - target (float). Input to desc 0xAEFFC lookup.");
-        count += labelComment(0xFFFF8B5C, "boost_wg_duty_final",
+        count += labelComment(0xFFFF8B5CL, "boost_wg_duty_final",
             "Final wastegate duty output (float). After desc lookup + ramp-down clamp.");
-        count += labelComment(0xFFFF8B7C, "boost_rpm_filtered_prev",
+        count += labelComment(0xFFFF8B7CL, "boost_rpm_filtered_prev",
             "Previous RPM filtered value (float). Used by task52 feedback IIR.");
-        count += labelComment(0xFFFF8B80, "boost_correction_output",
+        count += labelComment(0xFFFF8B80L, "boost_correction_output",
             "Feedback correction value (float). Output of task52 lerp/filter.");
-        count += labelComment(0xFFFF8B84, "boost_rpm_error_filtered",
+        count += labelComment(0xFFFF8B84L, "boost_rpm_error_filtered",
             "Filtered RPM error (float). IIR-filtered in task52.");
-        count += labelComment(0xFFFF8B88, "boost_error_filtered",
+        count += labelComment(0xFFFF8B88L, "boost_error_filtered",
             "Filtered boost error (float). IIR-filtered in task52.");
-        count += labelComment(0xFFFF8B9C, "boost_ign_switch_filter_ws",
+        count += labelComment(0xFFFF8B9CL, "boost_ign_switch_filter_ws",
             "Ignition switch EMA filter workspace (struct). Written by 0x549D4.");
-        count += labelComment(0xFFFF8BAC, "boost_desc_A_result",
+        count += labelComment(0xFFFF8BACL, "boost_desc_A_result",
             "Desc 0xAEFE4 result: base WG duty from RPM lookup (float).");
-        count += labelComment(0xFFFF8BB0, "boost_desc_B_result",
+        count += labelComment(0xFFFF8BB0L, "boost_desc_B_result",
             "Desc 0xAEFF0 result: WG scale from RPM lookup (float).");
-        count += labelComment(0xFFFF8BB4, "boost_desc_C_result",
+        count += labelComment(0xFFFF8BB4L, "boost_desc_C_result",
             "Desc 0xAEFFC result: error correction from boost error lookup (float).");
-        count += labelComment(0xFFFF8BC0, "boost_error_prev",
+        count += labelComment(0xFFFF8BC0L, "boost_error_prev",
             "Previous boost error (float). History shift for task52 delta computation.");
-        count += labelComment(0xFFFF8BC4, "boost_feedback_trim",
+        count += labelComment(0xFFFF8BC4L, "boost_feedback_trim",
             "Boost feedback trim workspace base (float). Task52 GBR-relative base.");
-        count += labelComment(0xFFFF8BCC, "boost_counter",
+        count += labelComment(0xFFFF8BCCL, "boost_counter",
             "Boost enable counter (u8, saturating). Must reach cal[0xD6185]=8 before active path.");
-        count += labelComment(0xFFFF8BD0, "boost_enable_flag",
+        count += labelComment(0xFFFF8BD0L, "boost_enable_flag",
             "Boost control enable byte (u8, 0/1). Set by hysteresis on sensor FFFF65FC.");
 
         // Boost descriptors (task51)
@@ -1266,84 +1267,84 @@ public class ImportAE5L600L extends GhidraScript {
         // AFC / CLOSED-LOOP FUELING — RAM VARIABLES
         // =====================================================================
         // PI controller internal state (relative to GBR=0xFFFF77C8)
-        count += labelComment(0xFFFF7814, "afc_p_term",
+        count += labelComment(0xFFFF7814L, "afc_p_term",
             "AFC P-term output. Error value when |error| >= deadzone (2.0), else 0.0. Written by afc_pi_controller.");
-        count += labelComment(0xFFFF7818, "afc_i_accum",
+        count += labelComment(0xFFFF7818L, "afc_i_accum",
             "AFC I-term accumulator. Winds up/down by +/-1.0/cycle, bounded [0, 20%]. Written by afc_pi_controller.");
-        count += labelComment(0xFFFF7828, "afc_active_flag",
+        count += labelComment(0xFFFF7828L, "afc_active_flag",
             "AFC active flag (GBR+0x60). 1=PI controller was active last cycle.");
-        count += labelComment(0xFFFF7865, "afc_prev_state",
+        count += labelComment(0xFFFF7865L, "afc_prev_state",
             "AFC previous-cycle state (GBR+0x9D). Tracks CL/OL mode for transition detection.");
-        count += labelComment(0xFFFF782A, "afc_state1_flag",
+        count += labelComment(0xFFFF782AL, "afc_state1_flag",
             "AFC state-1 flag (GBR+0x62). Set to 1 on fresh CL entry.");
 
         // PI output stage state
-        count += labelComment(0xFFFF7838, "afc_p_load_out",
+        count += labelComment(0xFFFF7838L, "afc_p_load_out",
             "AFC P-gain by load output (float). Written by afc_pi_output.");
-        count += labelComment(0xFFFF783C, "afc_p_rpm_out",
+        count += labelComment(0xFFFF783CL, "afc_p_rpm_out",
             "AFC P-gain by RPM output (float). Written by afc_pi_output.");
-        count += labelComment(0xFFFF7840, "afc_p_norm_out",
+        count += labelComment(0xFFFF7840L, "afc_p_norm_out",
             "AFC P normalizer output (float). Written by afc_pi_output.");
-        count += labelComment(0xFFFF7844, "afc_i_2d_out",
+        count += labelComment(0xFFFF7844L, "afc_i_2d_out",
             "AFC I-component 2D output (float). Written by afc_pi_output.");
-        count += labelComment(0xFFFF7848, "afc_i_load_out",
+        count += labelComment(0xFFFF7848L, "afc_i_load_out",
             "AFC I-gain by load output (float). Written by afc_pi_output.");
-        count += labelComment(0xFFFF784C, "afc_i_rpm_out",
+        count += labelComment(0xFFFF784CL, "afc_i_rpm_out",
             "AFC I-gain by RPM output (float). Written by afc_pi_output.");
-        count += labelComment(0xFFFF7850, "afc_i_norm_out",
+        count += labelComment(0xFFFF7850L, "afc_i_norm_out",
             "AFC I normalizer output (float). Written by afc_pi_output.");
-        count += labelComment(0xFFFF7804, "afc_p_total",
+        count += labelComment(0xFFFF7804L, "afc_p_total",
             "AFC P_total = (P_load + P_rpm) * P_norm. Written by afc_pi_output.");
-        count += labelComment(0xFFFF7808, "afc_i_total",
+        count += labelComment(0xFFFF7808L, "afc_i_total",
             "AFC I_total = (I_2d + I_load + I_rpm) * I_norm. Written by afc_pi_output.");
-        count += labelComment(0xFFFF7810, "afc_pi_blend_out",
+        count += labelComment(0xFFFF7810L, "afc_pi_blend_out",
             "AFC final blend = P_total*alpha + I_total*(1-alpha). Written by afc_pi_output.");
-        count += labelComment(0xFFFF8E7E, "afc_enable_flag_A",
+        count += labelComment(0xFFFF8E7EL, "afc_enable_flag_A",
             "PI output enable flag A (byte). Must == 1 for afc_pi_output to compute.");
-        count += labelComment(0xFFFF85D7, "afc_enable_flag_B",
+        count += labelComment(0xFFFF85D7L, "afc_enable_flag_B",
             "PI output enable flag B (byte). Controls alpha blend activation.");
 
         // Additional RAM used by fuel_correction_final
-        count += labelComment(0xFFFF78B0, "afc_axis_val_A",
+        count += labelComment(0xFFFF78B0L, "afc_axis_val_A",
             "AFC additional axis value A (float). Input to P/I normalizer lookups.");
-        count += labelComment(0xFFFF65FC, "afc_axis_val_B",
+        count += labelComment(0xFFFF65FCL, "afc_axis_val_B",
             "AFC additional axis value B (float). Alpha activation check input.");
-        count += labelComment(0xFFFF68DC, "ram_coolant_alt",
+        count += labelComment(0xFFFF68DCL, "ram_coolant_alt",
             "Coolant temperature alternate/computed (float). Input to P/I gain lookups.");
-        count += labelComment(0xFFFF653C, "ram_sensor_val",
+        count += labelComment(0xFFFF653CL, "ram_sensor_val",
             "Sensor value (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF7904, "fuel_corr_param_A",
+        count += labelComment(0xFFFF7904L, "fuel_corr_param_A",
             "Fuel correction parameter A (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF77D8, "fuel_corr_param_B",
+        count += labelComment(0xFFFF77D8L, "fuel_corr_param_B",
             "Fuel correction parameter B (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF781C, "fuel_corr_param_C",
+        count += labelComment(0xFFFF781CL, "fuel_corr_param_C",
             "Fuel correction parameter C (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF77E4, "fuel_corr_param_D",
+        count += labelComment(0xFFFF77E4L, "fuel_corr_param_D",
             "Fuel correction parameter D (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF77DC, "fuel_corr_cl_target_A",
+        count += labelComment(0xFFFF77DCL, "fuel_corr_cl_target_A",
             "CL target comp A output (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF63C4, "ram_engine_param",
+        count += labelComment(0xFFFF63C4L, "ram_engine_param",
             "Engine parameter (float). Read by fuel_correction_final secondary computation.");
 
-        count += labelComment(0xFFFF316C, "afl_table_base",
+        count += labelComment(0xFFFF316CL, "afl_table_base",
             "A/F Learning table base in RAM (4 ranges x 8 bytes = 32 bytes)");
-        count += labelComment(0xFFFF78A0, "afl_output_struct",
+        count += labelComment(0xFFFF78A0L, "afl_output_struct",
             "A/F Learning output data structure base (~100 bytes). +3=CL active flag.");
-        count += labelComment(0xFFFF787F, "afl_airflow_range_idx",
+        count += labelComment(0xFFFF787FL, "afl_airflow_range_idx",
             "Current A/F Learning airflow range index (byte, 0-3: A/B/C/D)");
-        count += labelComment(0xFFFF8F24, "cl_global_enable",
+        count += labelComment(0xFFFF8F24L, "cl_global_enable",
             "Global CL enable flag (byte). Must be non-zero for CL fueling.");
-        count += labelComment(0xFFFF7BE2, "cl_enable_final",
+        count += labelComment(0xFFFF7BE2L, "cl_enable_final",
             "CL enable final check flag (byte). Last gate in cl_active_check.");
-        count += labelComment(0xFFFF6350, "ram_RPM",
+        count += labelComment(0xFFFF6350L, "ram_RPM",
             "Current engine RPM (float)");
-        count += labelComment(0xFFFF63F8, "ram_MAF",
+        count += labelComment(0xFFFF63F8L, "ram_MAF",
             "Mass air flow (float, g/s)");
-        count += labelComment(0xFFFF63CC, "ram_ECT",
+        count += labelComment(0xFFFF63CCL, "ram_ECT",
             "Coolant temperature / ECT (float)");
-        count += labelComment(0xFFFF6624, "ram_MAF_alt",
+        count += labelComment(0xFFFF6624L, "ram_MAF_alt",
             "MAF alternate/computed value (float, g/s)");
-        count += labelComment(0xFFFF3234, "ram_IAM",
+        count += labelComment(0xFFFF3234L, "ram_IAM",
             "Ignition Advance Multiplier current value (float). Also used by FLKC.");
 
         // =====================================================================
@@ -1385,7 +1386,7 @@ public class ImportAE5L600L extends GhidraScript {
             "ISR epilogue: restores all saved context, decrements nesting counter.");
 
         // ISR nesting context
-        count += labelComment(0xFFFF1288, "ISR_NestingContext",
+        count += labelComment(0xFFFF1288L, "ISR_NestingContext",
             "ISR nesting context struct. +8=nesting counter, +16=saved SR.");
 
         // =====================================================================
@@ -1415,13 +1416,13 @@ public class ImportAE5L600L extends GhidraScript {
             "Reads Group 1 ADC channels for knock detection. Stores to 0xFFFF407C. Dispatch by cylinder count.");
 
         // Knock ADC RAM structures
-        count += labelComment(0xFFFF4064, "knock_adc_group0",
+        count += labelComment(0xFFFF4064L, "knock_adc_group0",
             "Knock ADC Group 0 snapshot: ADDR0-ADDR11 raw 16-bit values (24 bytes).");
-        count += labelComment(0xFFFF407C, "knock_adc_group1",
+        count += labelComment(0xFFFF407CL, "knock_adc_group1",
             "Knock ADC Group 1 snapshot: ADDR12-ADDR23 raw 16-bit values (24 bytes).");
-        count += labelComment(0xFFFF40AB, "knock_cylinder_count",
+        count += labelComment(0xFFFF40ABL, "knock_cylinder_count",
             "Cylinder count dispatch byte for knock ADC Group 1 read (1/4/8/12).");
-        count += labelComment(0xFFFF4024, "knock_adc_working",
+        count += labelComment(0xFFFF4024L, "knock_adc_working",
             "Knock ADC working copy (channels copied from snapshot during processing).");
 
         // VBR setup location
@@ -1496,292 +1497,292 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
         // AFL / CL/OL PERSISTENCE ANALYSIS — RAM Addresses
         // =====================================================================
-        count += labelComment(0xFFFF316C, "afl_range0_value",
+        count += labelComment(0xFFFF316CL, "afl_range0_value",
             "AFL Range 0 learning value (float). Idle zone: 0-6.0 g/s.");
-        count += labelComment(0xFFFF3174, "afl_range1_value",
+        count += labelComment(0xFFFF3174L, "afl_range1_value",
             "AFL Range 1 learning value (float). Light cruise: 6.0-23.0 g/s.");
-        count += labelComment(0xFFFF317C, "afl_range2_value",
+        count += labelComment(0xFFFF317CL, "afl_range2_value",
             "AFL Range 2 learning value (float). Normal driving: 23.0-40.0 g/s.");
-        count += labelComment(0xFFFF3184, "afl_range3_value",
+        count += labelComment(0xFFFF3184L, "afl_range3_value",
             "AFL Range 3 learning value (float). Heavy load: 40.0-80.0 g/s (partially OL).");
-        count += labelComment(0xFFFF31A4, "afl_interp_secondary",
+        count += labelComment(0xFFFF31A4L, "afl_interp_secondary",
             "AFL secondary interpolated output (float).");
-        count += labelComment(0xFFFF31AC, "afl_interp_primary",
+        count += labelComment(0xFFFF31ACL, "afl_interp_primary",
             "AFL primary interpolated output (float).");
-        count += labelComment(0xFFFF726C, "transient_state_flag",
+        count += labelComment(0xFFFF726CL, "transient_state_flag",
             "Transient state flag (byte). Gates AFL application — when set, forces FFFF7AB4=1.0.");
-        count += labelComment(0xFFFF726E, "transient_knock_inhibit",
+        count += labelComment(0xFFFF726EL, "transient_knock_inhibit",
             "Transient knock inhibit flag (byte). Read by check_transient_knock_inhibit (0x2F8FE). "
             + "When ==1: tasks 8/10/11 suppress knock window/flag updates (tip-in protection). "
             + "Distinct from transient_state_flag (FFFF726C) which gates AFL/fuel corrections.");
-        count += labelComment(0xFFFF7E4C, "transient_accum_ptr",
+        count += labelComment(0xFFFF7E4CL, "transient_accum_ptr",
             "Pointer/accumulator used by transient_correction_calc (0x2F984). "
             + "Loaded as 32-bit value, used in float multiply chain for tip-in enrichment.");
-        count += labelComment(0xFFFF65F1, "transient_enable_gate",
+        count += labelComment(0xFFFF65F1L, "transient_enable_gate",
             "Gate flag checked by transient_correction_calc (0x2F984). When zero, skips tip-in "
             + "calculation entirely. Related to 0x2F974 entry guard.");
-        count += labelComment(0xFFFF72E8, "transient_correction_out",
+        count += labelComment(0xFFFF72E8L, "transient_correction_out",
             "Transient correction output block (float, 12 bytes). Written by transient_correction_calc "
             + "(0x2F984) via fmov.s into @(R0,R13) at offsets -8, -4, 0. Indexed by R13.");
-        count += labelComment(0xFFFF72F4, "transient_correction_fr9",
+        count += labelComment(0xFFFF72F4L, "transient_correction_fr9",
             "Transient correction intermediate float (FR9). Used in fmul chain at 0x2F9F8.");
-        count += labelComment(0xFFFF7300, "transient_correction_fr4",
+        count += labelComment(0xFFFF7300L, "transient_correction_fr4",
             "Transient correction intermediate float (FR4). Used in fmul chain at 0x2F9FA.");
-        count += labelComment(0xFFFF7448, "clol_mode_flag",
+        count += labelComment(0xFFFF7448L, "clol_mode_flag",
             "CL/OL mode flag (byte). 1=CL, 0=OL. Gates AFC + AFL learning. Written by 0x031528. Does NOT gate AFL application.");
-        count += labelComment(0xFFFF7449, "clol_cond_A",
+        count += labelComment(0xFFFF7449L, "clol_cond_A",
             "CL mode condition A (byte). (FFFF7452==1 AND FFFF744E==2) ? 1 : 0");
-        count += labelComment(0xFFFF744A, "clol_cond_B",
+        count += labelComment(0xFFFF744AL, "clol_cond_B",
             "CL mode condition B (byte). (FFFF7452==1 AND FFFF744E==1) ? 1 : 0");
-        count += labelComment(0xFFFF744B, "cl_inhibit",
+        count += labelComment(0xFFFF744BL, "cl_inhibit",
             "CL inhibit flag (byte). Copy of FFFF8E98 sensor flag. When !=0: FFFF7448=0.");
-        count += labelComment(0xFFFF744C, "cl_readiness_A",
+        count += labelComment(0xFFFF744CL, "cl_readiness_A",
             "CL readiness A (byte). Copy of FFFF8F08.");
-        count += labelComment(0xFFFF744D, "cl_readiness_B",
+        count += labelComment(0xFFFF744DL, "cl_readiness_B",
             "CL readiness B (byte). From func_021D9A.");
-        count += labelComment(0xFFFF744E, "cl_mode_state",
+        count += labelComment(0xFFFF744EL, "cl_mode_state",
             "CL mode state (byte). 0/1/2 from func_021D9A of FFFF8F24.");
-        count += labelComment(0xFFFF7452, "cl_master_readiness",
+        count += labelComment(0xFFFF7452L, "cl_master_readiness",
             "Master CL readiness flag (byte). Written at 0x031966. Multiple conditions + hysteresis.");
-        count += labelComment(0xFFFF79C4, "ol_delay_counter_B",
+        count += labelComment(0xFFFF79C4L, "ol_delay_counter_B",
             "OL enrichment delay counter_B. Set by CBC62 (modified=0 for immediate OL enrichment).");
-        count += labelComment(0xFFFF79C6, "ol_mode_state",
+        count += labelComment(0xFFFF79C6L, "ol_mode_state",
             "OL mode state flag (byte). NEVER WRITTEN — always 0. Values 1/2 are dead code hooks in FUN_0003606C.");
-        count += labelComment(0xFFFF79F2, "ol_active_flag",
+        count += labelComment(0xFFFF79F2L, "ol_active_flag",
             "OL active flag (byte). Written by Path A state machine.");
-        count += labelComment(0xFFFF7AB4, "afl_multiplier_output",
+        count += labelComment(0xFFFF7AB4L, "afl_multiplier_output",
             "AFL multiplier output (float). Written by afl_application at 0x37B74. Consumed by fuel PW calc at 0x0301E4. Applied unconditionally in CL and OL.");
-        count += labelComment(0xFFFF7C68, "engine_status_flag",
+        count += labelComment(0xFFFF7C68L, "engine_status_flag",
             "Engine status flag (byte). Gates AFL application — abnormal condition forces FFFF7AB4=1.0.");
 
         // ── CL/OL Path B — FFFF7452 Readiness Inputs & Working Variables ─────
-        count += labelComment(0xFFFF7450, "cl_speed_readiness",
+        count += labelComment(0xFFFF7450L, "cl_speed_readiness",
             "Speed-based CL readiness flag (byte). GBR+0x00 in cl_master_readiness_eval. "
             + "Set when RPM/speed conditions pass but coolant not checked.");
-        count += labelComment(0xFFFF7451, "cl_speed_coolant_readiness",
+        count += labelComment(0xFFFF7451L, "cl_speed_coolant_readiness",
             "Speed+coolant CL readiness flag (byte). GBR+0x01 in cl_master_readiness_eval.");
-        count += labelComment(0xFFFF7453, "cl_strict_readiness",
+        count += labelComment(0xFFFF7453L, "cl_strict_readiness",
             "Strictest CL readiness flag (byte). GBR+0x03. Requires FFFF77DC/7800 within "
             + "tight AFR stability bounds (CBE7C-CBE88). Rarely 1 except at stable cruise.");
-        count += labelComment(0xFFFF7454, "cl_speed_threshold_1",
+        count += labelComment(0xFFFF7454L, "cl_speed_threshold_1",
             "Speed threshold 1 (word). Computed by cl_master_readiness_eval BSR to 0x3160E "
             + "using table at 0xACDF4. Compared against FFFF67EC.");
-        count += labelComment(0xFFFF7456, "cl_speed_threshold_2",
+        count += labelComment(0xFFFF7456L, "cl_speed_threshold_2",
             "Speed threshold 2 (word). Alternate speed threshold from 0xBE8AC. Used when "
             + "FFFF7829 speed selector == 1.");
-        count += labelComment(0xFFFF7458, "cl_rpm_delta_hyst",
+        count += labelComment(0xFFFF7458L, "cl_rpm_delta_hyst",
             "RPM delta hysteresis flag (byte). Set=1 if (FFFF6898-FFFF620C) <= 570 (CBE68). "
             + "Cleared=0 if delta > 580 (CBE6C). One of 3 throttle-condition flags for CL readiness.");
-        count += labelComment(0xFFFF7459, "cl_engine_flag_prev",
+        count += labelComment(0xFFFF7459L, "cl_engine_flag_prev",
             "Previous value of FFFFA56B (engine running/cranking flag). Used for edge detection "
             + "in cl_master_readiness_eval delay counter 1.");
-        count += labelComment(0xFFFF745A, "cl_cond_flag_prev",
+        count += labelComment(0xFFFF745AL, "cl_cond_flag_prev",
             "Previous value of FFFFACF0 (CL delay condition flag). Used for edge detection "
             + "in cl_master_readiness_eval delay counter 2.");
-        count += labelComment(0xFFFF745B, "cl_delay_counter_1",
+        count += labelComment(0xFFFF745BL, "cl_delay_counter_1",
             "CL readiness delay counter 1 (byte). Resets on FFFFA56B falling edge. "
             + "Must reach threshold 4 (CBE6=CAL@CBBD6) before CL is allowed.");
-        count += labelComment(0xFFFF745C, "cl_delay_counter_2",
+        count += labelComment(0xFFFF745CL, "cl_delay_counter_2",
             "CL readiness delay counter 2 (byte). Resets on FFFFACF0 rising edge. "
             + "Must reach threshold 4 (CBE6=CAL@CBBD6) before CL is allowed.");
-        count += labelComment(0xFFFF745D, "cl_maf_hyst",
+        count += labelComment(0xFFFF745DL, "cl_maf_hyst",
             "MAF (FFFF6624) hysteresis flag (byte). Set=1 if MAF <= 1000 (CBE70). "
             + "Cleared=0 if MAF > 1100 (CBE74). Second of 3 throttle-condition flags.");
-        count += labelComment(0xFFFF745E, "cl_speed_table_hyst",
+        count += labelComment(0xFFFF745EL, "cl_speed_table_hyst",
             "Speed table lookup hysteresis flag (byte). Set=1 if table_result > FFFF620C. "
             + "Cleared=0 if (table_result - 20.0) > FFFF620C (CBE A0 offset). Third throttle flag.");
-        count += labelComment(0xFFFF745F, "cl_coolant_low_hyst",
+        count += labelComment(0xFFFF745FL, "cl_coolant_low_hyst",
             "Coolant low hysteresis flag (byte). Set=0 if FFFF77C0 > 0.5 (CBE8C). "
             + "Set=1 if FFFF77C0 <= 0.5 (CBE90). Used with cl_coolant_high_hyst for warmup gate.");
-        count += labelComment(0xFFFF7460, "cl_coolant_high_hyst",
+        count += labelComment(0xFFFF7460L, "cl_coolant_high_hyst",
             "Coolant high hysteresis flag (byte). Set=1 if FFFF77C0 > 5.0 (CBE94). "
             + "Set=0 if FFFF77C0 <= 5.0 (CBE98). CL requires 745F==1 AND 7460==1.");
-        count += labelComment(0xFFFF7464, "cl_throttle_gate",
+        count += labelComment(0xFFFF7464L, "cl_throttle_gate",
             "Throttle gate flag (byte). Must be 0 for CL readiness (throttle condition #3). "
             + "Unclear writer — acts as an additional throttle-open inhibit.");
-        count += labelComment(0xFFFF7829, "cl_speed_table_sel",
+        count += labelComment(0xFFFF7829L, "cl_speed_table_sel",
             "Speed table selector (byte). 0=use threshold 1 (FFFF7454), 1=use threshold 2 (FFFF7456). "
             + "Selects which speed lookup table drives the CL speed condition.");
-        count += labelComment(0xFFFF67EC, "vehicle_speed_word",
+        count += labelComment(0xFFFF67ECL, "vehicle_speed_word",
             "Vehicle speed derived value (unsigned word). Compared against cl_speed_threshold_1/2 "
             + "in cl_master_readiness_eval speed condition check.");
-        count += labelComment(0xFFFF61F4, "engine_mode_bits",
+        count += labelComment(0xFFFF61F4L, "engine_mode_bits",
             "Engine mode flag byte. Bit 3: early exit for cl_master_readiness_eval — if set, "
             + "forces FFFF7452/7450/7451 = 0 immediately. Also tested by sub_1CF46 (0x1CF46).");
-        count += labelComment(0xFFFF7A20, "o2_sensor2_output",
+        count += labelComment(0xFFFF7A20L, "o2_sensor2_output",
             "Rear O2 / wideband sensor 2 output (float). Must be within 0.00390625 of 0.0 "
             + "for CL readiness (speed condition check 6 in cl_master_readiness_eval).");
-        count += labelComment(0xFFFF8E98, "cl_inhibit_sensor_flag",
+        count += labelComment(0xFFFF8E98L, "cl_inhibit_sensor_flag",
             "Primary CL inhibit sensor flag (byte). Copied to cl_inhibit (FFFF744B). "
             + "When non-zero: cl_mode_flag_writer forces FFFF7448=0 (OL) unconditionally.");
-        count += labelComment(0xFFFF8F08, "cl_readiness_A_input",
+        count += labelComment(0xFFFF8F08L, "cl_readiness_A_input",
             "CL readiness A input (byte). Copied to FFFF744C. When non-zero with cl_readiness_B==1: "
             + "cl_mode_flag_writer forces OL.");
-        count += labelComment(0xFFFF8F24, "cl_readiness_B_input",
+        count += labelComment(0xFFFF8F24L, "cl_readiness_B_input",
             "CL readiness B input (byte). Processed by func_021D9A → FFFF744D/744E. "
             + "Source of cl_mode_state (0/1/2) which determines CL entry path.");
-        count += labelComment(0xFFFF77C0, "coolant_temp_float",
+        count += labelComment(0xFFFF77C0L, "coolant_temp_float",
             "Coolant temperature as float (normalized/scaled). Used by cl_master_readiness_eval "
             + "coolant condition: must be in [0.5, 5.0] (CBE8C/90/94/98 thresholds).");
-        count += labelComment(0xFFFF7800, "cl_afr_bound",
+        count += labelComment(0xFFFF7800L, "cl_afr_bound",
             "AFR stability bound (float). Checked in cl_strict_readiness (FFFF7453) path. "
             + "Must be within CBE84/CBE88 bounds [-5.0, 5.0].");
 
         // ── CL/OL Path A — OL Enrichment Accumulator (the BRIDGE) ───────────
-        count += labelComment(0xFFFF7954, "clol_pathA_GBR_base",
-            "GBR base for Path A CL/OL state machine (0xFFFF7954). Set at entry of "
+        count += labelComment(0xFFFF7954L, "clol_pathA_GBR_base",
+            "GBR base for Path A CL/OL state machine (0xFFFF7954L). Set at entry of "
             + "clol_transition_core (0x3580C). All Path A working vars are GBR-relative.");
-        count += labelComment(0xFFFF7986, "clol_phase1_counter",
+        count += labelComment(0xFFFF7986L, "clol_phase1_counter",
             "Path A Phase 1 master counter (byte). Written 0xFF by Phase 3 (clol_transition_sub_B) "
             + "to re-arm Phase 1. Phase 1 fires when counter >= CAL@CBBEF threshold. "
             + "Incremented by Phase 1, reset by Phase 3 each cycle.");
-        count += labelComment(0xFFFF794C, "clol_phase1_arm_word",
+        count += labelComment(0xFFFF794CL, "clol_phase1_arm_word",
             "Phase 1 arm word (word). Written 0x200 by Phase 3 to re-arm Phase 1 state snapshot.");
-        count += labelComment(0xFFFF7988, "clol_pathA_workspace",
+        count += labelComment(0xFFFF7988L, "clol_pathA_workspace",
             "Path A OL workspace base (pointer). Phase 1 stores ECT, RPM, throttle, MAP, MAF, "
             + "BPW, load, gear snapshots here. Base for GBR-relative OL enrichment vars.");
-        count += labelComment(0xFFFF798C, "ol_enrichment_accum",
+        count += labelComment(0xFFFF798CL, "ol_enrichment_accum",
             "OL enrichment accumulator (float). THE BRIDGE between Path A and Path B. "
             + "Path B (cl_master_readiness_eval) requires this to be within 3.05e-5 of 0.0 for CL. "
             + "When Path A fires (OL condition met), this deviates from 0 → Path B drops FFFF7452 "
             + "→ FFFF7448=0 → OL mode. Updated by WRITE 4 filter (0x36238-0x36306): "
             + "filtered decay when transitioning, direct-assign when settled.");
-        count += labelComment(0xFFFF7990, "ol_enrichment_target",
+        count += labelComment(0xFFFF7990L, "ol_enrichment_target",
             "OL enrichment accumulator target (float). Computed as FR15 * ol_blend_coeff. "
             + "WRITE 4 filter clamps ol_enrichment_accum to not drop below this target.");
-        count += labelComment(0xFFFF79A0, "ol_blend_coeff",
+        count += labelComment(0xFFFF79A0L, "ol_blend_coeff",
             "OL enrichment blend coefficient (float). Multiplied with target enrichment value "
             + "to compute ol_enrichment_target. Controls blend rate.");
-        count += labelComment(0xFFFF79C7, "clol_diagnostic_flag",
+        count += labelComment(0xFFFF79C7L, "clol_diagnostic_flag",
             "CL/OL diagnostic flag (byte). Set by ol_condition_checker (0x3643A) to indicate "
             + "which condition triggered the OL transition. Used for SSM/diagnostics.");
-        count += labelComment(0xFFFF79E0, "ol_decay_delta",
+        count += labelComment(0xFFFF79E0L, "ol_decay_delta",
             "OL enrichment decay delta (float, negative). Added to ol_enrichment_accum in "
             + "WRITE 4 filtered path: accum = max(accum + decay_delta, target).");
-        count += labelComment(0xFFFF79F8, "ol_enrich_func_ptr",
+        count += labelComment(0xFFFF79F8L, "ol_enrich_func_ptr",
             "OL enrichment pipeline function pointer (4 bytes). "
             + "post_condition_handler (0x36848) writes AD998 or AD9B4 here (descriptor ptr). "
             + "GBR+0x6C from base 0xFFFF798C. Selects enrichment computation path for next cycle.");
-        count += labelComment(0xFFFF7A00, "ol_cond_flag_A",
+        count += labelComment(0xFFFF7A00L, "ol_cond_flag_A",
             "OL condition flag A (byte). Written by ol_condition_checker (0x3643A). "
             + "GBR+0x5C from 0xFFFF79A4. Set=1 if FFFF62DC < OL_Condition_Load_A_Lo (90.0).");
-        count += labelComment(0xFFFF7A01, "ol_cond_flag_B",
+        count += labelComment(0xFFFF7A01L, "ol_cond_flag_B",
             "OL condition flag B (byte). Written by ol_condition_checker. "
             + "GBR+0x5D. Set=1 if FFFF62DC < OL_Condition_Load_B_Lo (90.0). Separate hysteresis track.");
-        count += labelComment(0xFFFF7A02, "ol_cond_flag_C",
+        count += labelComment(0xFFFF7A02L, "ol_cond_flag_C",
             "OL condition flag C (byte). Written by ol_condition_checker. GBR+0x5E. "
             + "Comparison target and threshold not yet fully traced.");
-        count += labelComment(0xFFFF7A04, "ol_cond_flag_speed",
+        count += labelComment(0xFFFF7A04L, "ol_cond_flag_speed",
             "OL condition speed flag (byte). Written by ol_condition_checker. GBR+0x60. "
             + "Set=1 when FFFF65FC < OL_Condition_Speed_Lo (CC1F4=130.0). "
             + "Speed within envelope for CL → set means speed OK for CL.");
-        count += labelComment(0xFFFF7A05, "ol_cond_flag_rpmDelta",
+        count += labelComment(0xFFFF7A05L, "ol_cond_flag_rpmDelta",
             "OL condition RPM-delta flag (byte). Written by ol_condition_checker. GBR+0x61. "
             + "Set=1 when FFFF6898 (RPM delta) < OL_Condition_RPMDelta_Lo (CC1DC=691.9).");
-        count += labelComment(0xFFFF7A0C, "ol_hyst_struct_base",
+        count += labelComment(0xFFFF7A0CL, "ol_hyst_struct_base",
             "OL hysteresis working struct base (float). Used by clol_hysteresis_handler (0x36AB2) "
             + "and clol_delay_manager_B (0x36BF4) as base pointer. "
             + "Offsets: +0=state_byte, +22=hyst_flag_A, +34=timer_word, +252=state_A, +228=state_B.");
-        count += labelComment(0xFFFF7A18, "ol_delay_step",
+        count += labelComment(0xFFFF7A18L, "ol_delay_step",
             "OL enrichment delay step value (float). Written by clol_delay_manager_B (0x36C12). "
             + "Set to OL_DelayB_EnrichTarget_A (0.3) or OL_DelayB_EnrichTarget_B (0.0) "
             + "depending on RPM/ECT condition. Controls OL enrichment ramp rate.");
-        count += labelComment(0xFFFF7A1C, "ol_delay_counter",
+        count += labelComment(0xFFFF7A1CL, "ol_delay_counter",
             "OL enrichment delay integration counter (word). "
             + "clol_delay_manager_B: incremented each cycle by sub_BE554, clamped to "
             + "OL_DelayB_Counter_Max (CBC6A=188). Gated by OL_DelayB_SpeedGate (CBC6E=624).");
 
         // ── Path A sensor RAM variables (used in ol_condition_checker and clol_transition_core) ──
-        count += labelComment(0xFFFF6350, "engine_rpm",
+        count += labelComment(0xFFFF6350L, "engine_rpm",
             "Engine speed (RPM, float). Read by ol_condition_checker (0x3643A), "
             + "cl_master_readiness_eval (0x3162C), clol_delay_manager_B (0x36BF4). "
             + "In cl_master_readiness: FFFF6350 >= -15.0 (sanity check, always true in operation).");
-        count += labelComment(0xFFFF62DC, "engine_load_metric",
+        count += labelComment(0xFFFF62DCL, "engine_load_metric",
             "Engine load metric (float). Read by ol_condition_checker as FR13. "
             + "Compared against OL_Condition_Load_A/B thresholds (90.0/91.0). "
             + "Exact physical unit TBD — values of 90-91 suggest throttle degrees or normalized load.");
-        count += labelComment(0xFFFF6364, "engine_rpm_secondary",
+        count += labelComment(0xFFFF6364L, "engine_rpm_secondary",
             "Secondary RPM or engine state float. Read by clol_delay_manager_B (0x36BF4) as FR9. "
             + "Compared against OL_DelayB_Thresh_A_Lo / OL_DelayB_Thresh_B_Lo (0.0). "
             + "Physical meaning TBD — consistently paired with FFFF6350 in delay manager B.");
-        count += labelComment(0xFFFF6624, "engine_rpm_or_maf",
+        count += labelComment(0xFFFF6624L, "engine_rpm_or_maf",
             "Engine state float (RPM or MAF, context-dependent). "
             + "ol_condition_checker: compared against per-gear RPM limits (3700-5400 RPM). "
             + "cl_master_readiness_eval: FFFF745D set=1 when this <= 1000 (hysteresis). "
             + "LIKELY RPM given the per-gear thresholds; the 1000 hysteresis = idle RPM range.");
-        count += labelComment(0xFFFF65FC, "vehicle_speed",
+        count += labelComment(0xFFFF65FCL, "vehicle_speed",
             "Vehicle speed (float). Read by ol_condition_checker (FR15). "
             + "Compared against OL_Condition_Speed_Lo (CC1F4=130.0) and _Hi (CC1F8=140.0). "
             + "Speed gate for ol_cond_flag_speed (FFFF7A04).");
-        count += labelComment(0xFFFF6898, "rpm_delta",
+        count += labelComment(0xFFFF6898L, "rpm_delta",
             "RPM change rate / delta (float). Read by ol_condition_checker (FR12). "
             + "Compared against OL_Condition_RPMDelta_Lo/Hi (CC1DC=691.9/CC1E0=699.9). "
             + "cl_master_readiness: FFFF7458 set when (FFFF6898 - FFFF620C) <= 570 (RPM delta hyst).");
 
         // ── AFL Application Working Variables ─────────────────────────────────
-        count += labelComment(0xFFFF7AC0, "afl_ramp_multiplier",
+        count += labelComment(0xFFFF7AC0L, "afl_ramp_multiplier",
             "AFL ramp multiplier (float, 0.0-1.0). Written by sub_37E70. Controls ramp "
             + "on/off of AFL application. In both stock and modified ROM: ramp step "
             + "calibrations CC32C/CC330 = 0.0, making this a binary 0.0 or 1.0 switch.");
-        count += labelComment(0xFFFF7AD0, "afl_transient_copy",
+        count += labelComment(0xFFFF7AD0L, "afl_transient_copy",
             "Copy of transient_state_flag (FFFF726C) for AFL workspace. GBR+0x1C in "
             + "afl_application (0x37B74). When==1: AFL skipped, FFFF7AB4=1.0.");
-        count += labelComment(0xFFFF7AD1, "afl_ramp_flag_A",
+        count += labelComment(0xFFFF7AD1L, "afl_ramp_flag_A",
             "AFL ramp flag A. Controls immediate 1.0 path in sub_37E70 (afl_ramp stage). "
             + "Writer not yet traced. When set with FFFF7AD0==0: afl_ramp_multiplier=1.0.");
-        count += labelComment(0xFFFF7AD2, "afl_engine_status_copy",
+        count += labelComment(0xFFFF7AD2L, "afl_engine_status_copy",
             "Copy of engine_status_flag (FFFF7C68) for AFL workspace. GBR+0x1E. "
             + "When==1: AFL skipped, FFFF7AB4=1.0.");
-        count += labelComment(0xFFFF7AD3, "afl_ramp_flag_B",
+        count += labelComment(0xFFFF7AD3L, "afl_ramp_flag_B",
             "AFL ramp flag B. Controls immediate paths in sub_37E70. "
             + "Writer not yet traced. Interacts with afl_ramp_flag_A for ramp direction.");
-        count += labelComment(0xFFFF7AD8, "afl_hyst_input",
+        count += labelComment(0xFFFF7AD8L, "afl_hyst_input",
             "AFL hysteresis input (float). Compared against CAL@CC31C/CC320 (118.0/119.0) "
             + "in sub_37DD2 (AFL hysteresis handler). Controls FFFF7ADC master AFL enable.");
-        count += labelComment(0xFFFF7ADC, "afl_master_enable",
+        count += labelComment(0xFFFF7ADCL, "afl_master_enable",
             "AFL master enable flag (byte). Set=1 by sub_37DD2 when 3 hysteresis conditions pass "
             + "AND FFFF7AD0==0 AND FFFF7AD2==0. Gates whether AFL correction is applied.");
-        count += labelComment(0xFFFF7ADD, "afl_counter_1",
+        count += labelComment(0xFFFF7ADDL, "afl_counter_1",
             "AFL counter 1 (byte). Checked >= 2 in sub_37D74 for 2D AFL table lookup. "
             + "Must reach 2 before FFFF7ABC (2D correction) is computed.");
-        count += labelComment(0xFFFF7ADE, "afl_counter_2",
+        count += labelComment(0xFFFF7ADEL, "afl_counter_2",
             "AFL counter 2 (byte). Checked >= 2 in sub_37D74 alongside afl_counter_1. "
             + "Both must be >= 2 for AFL 2D table correction to be active.");
-        count += labelComment(0xFFFF7ABC, "afl_2d_correction",
+        count += labelComment(0xFFFF7ABCL, "afl_2d_correction",
             "AFL 2D correction value (float). Computed by sub_37D74 via 2D table lookup. "
             + "Written only when FFFF7AD0==0 AND FFFF7AD2==0 AND both counters>=2. "
             + "Otherwise set to 0.0.");
-        count += labelComment(0xFFFF7878, "afl_interp_display",
+        count += labelComment(0xFFFF7878L, "afl_interp_display",
             "AFL interpolated display value (float). Read by SSM PID 0x0A getter (0x5D2DA). "
             + "display_pct = float * 100. Shows interpolated AFL at current airflow, NOT "
             + "the applied multiplier at FFFF7AB4 or per-range stored value.");
 
         // ── AFR Deviation (FFFF7BA8 context) ──────────────────────────────────
-        count += labelComment(0xFFFF7BA8, "afr_deviation_metric",
+        count += labelComment(0xFFFF7BA8L, "afr_deviation_metric",
             "AFR deviation metric (float). Written by afr_deviation_calc (0x3952C). "
             + "Computed from FFFF77D8 + FFFF77DC, clamped to [0, 0.03] by sub_3961C (CC3E8=0.03). "
             + "NEVER blocks cl_master_readiness_eval: threshold CBE78=0.11 > max clamp 0.03. "
             + "The WOT CL delay was caused by dead Path A thresholds, not this value.");
-        count += labelComment(0xFFFF7BAC, "afr_deviation_input",
+        count += labelComment(0xFFFF7BACL, "afr_deviation_input",
             "Input value passed to afr_deviation_clamp (sub_3961C). Used in clamp computation.");
-        count += labelComment(0xFFFF7BB0, "afr_fault_flag",
+        count += labelComment(0xFFFF7BB0L, "afr_fault_flag",
             "AFR/sensor fault flag (byte). Checked by cl_master_readiness_eval condition 5: "
             + "must be 0 for CL. Also gated by func_39668 (afr_deviation_init).");
-        count += labelComment(0xFFFF7BB2, "afr_fault_counter",
+        count += labelComment(0xFFFF7BB2L, "afr_fault_counter",
             "AFR fault counter (word). Incremented by func_39668. Checked against "
             + "threshold CAL@CBC8C=0. Drives afr_fault_flag.");
-        count += labelComment(0xFFFF7BB8, "afr_init_flag_A",
+        count += labelComment(0xFFFF7BB8L, "afr_init_flag_A",
             "AFR deviation init flag A (byte). Set by afr_deviation_init (0x39668) via "
             + "table-of-pointers at 0x63B54 +4.");
-        count += labelComment(0xFFFF7BB9, "afr_init_flag_B",
+        count += labelComment(0xFFFF7BB9L, "afr_init_flag_B",
             "AFR deviation init flag B (byte). Set by afr_deviation_init.");
-        count += labelComment(0xFFFF7BBA, "afr_init_flag_C",
+        count += labelComment(0xFFFF7BBAL, "afr_init_flag_C",
             "AFR deviation init flag C (byte). Set by afr_deviation_init.");
-        count += labelComment(0xFFFF7BBB, "afr_init_flag_D",
+        count += labelComment(0xFFFF7BBBL, "afr_init_flag_D",
             "AFR deviation init flag D (byte). Set by afr_deviation_init.");
-        count += labelComment(0xFFFF7BBC, "afr_init_flag_E",
+        count += labelComment(0xFFFF7BBCL, "afr_init_flag_E",
             "AFR deviation init flag E (byte). Set by afr_deviation_init.");
-        count += labelComment(0xFFFF7BC0, "afr_deviation_output_base",
+        count += labelComment(0xFFFF7BC0L, "afr_deviation_output_base",
             "AFR deviation output struct base (RAM). Written by afr_deviation_calc (0x3952C).");
 
         // =====================================================================
@@ -2045,19 +2046,19 @@ public class ImportAE5L600L extends GhidraScript {
             "10 calls. DTC history memory update. Writes fault history for readout.");
 
         // ── Known RAM: Status Check Addresses ──────────────────────────────
-        count += labelComment(0xFFFF65F6, "cl_active_flag",
+        count += labelComment(0xFFFF65F6L, "cl_active_flag",
             "Byte: 1=closed loop active. Read by check_cl_active (0x22F92), 111 calls.");
-        count += labelComment(0xFFFF65C5, "engine_running_flag",
+        count += labelComment(0xFFFF65C5L, "engine_running_flag",
             "Byte: 1=engine running. Read by check_engine_running (0x22CF4), 100 calls.");
-        count += labelComment(0xFFFFB71C, "dtc_master_enable",
+        count += labelComment(0xFFFFB71CL, "dtc_master_enable",
             "Byte: DTC system master enable. Read by dtc_set_code/dtc_clear_code.");
-        count += labelComment(0xFFFF36F0, "diag_mode_status",
+        count += labelComment(0xFFFF36F0L, "diag_mode_status",
             "DWord: Diagnostic mode status. Read by diag_check_status (0x582AC).");
-        count += labelComment(0xFFFF36F4, "dtc_enable_flag",
+        count += labelComment(0xFFFF36F4L, "dtc_enable_flag",
             "Byte: DTC processing enable. Read by dtc_set_code/dtc_clear_code.");
-        count += labelComment(0xFFFFAE08, "diag_enable_A",
+        count += labelComment(0xFFFFAE08L, "diag_enable_A",
             "Byte: Diagnostic enable A. Read by diag_check_enable_A (0x584BE).");
-        count += labelComment(0xFFFFAE09, "diag_enable_B",
+        count += labelComment(0xFFFFAE09L, "diag_enable_B",
             "Byte: Diagnostic enable B. Read by diag_check_enable_B (0x584C8).");
 
         // =====================================================================
@@ -2067,83 +2068,83 @@ public class ImportAE5L600L extends GhidraScript {
         // These appear in virtually every disassembly trace.
 
         // ── ADC / Sensor Processed Values (0xFFFF6xxx) ─────────────────────
-        count += labelComment(0xFFFF6624, "rpm_current",
+        count += labelComment(0xFFFF6624L, "rpm_current",
             "301 refs. Current RPM (float). Read by frontO2, AFL, CL/OL, timing, knock, boost, idle, diag. "
             + "THE most-referenced RAM address in the ROM.");
-        count += labelComment(0xFFFF6350, "ect_current",
+        count += labelComment(0xFFFF6350L, "ect_current",
             "205 refs. Coolant temperature (float). Read by PSE, AFC, AFL, timing, idle, diag. "
             + "Second most-referenced address.");
-        count += labelComment(0xFFFF65FC, "engine_load_current",
+        count += labelComment(0xFFFF65FCL, "engine_load_current",
             "135 refs. Engine load (float, g/rev). Read by AFL, CL/OL transition, timing, fuel.");
-        count += labelComment(0xFFFF67EC, "atm_pressure_current",
+        count += labelComment(0xFFFF67ECL, "atm_pressure_current",
             "99 refs. Atmospheric/barometric pressure (float). Read by frontO2, PSE, AFL, timing.");
-        count += labelComment(0xFFFF65C0, "throttle_position",
+        count += labelComment(0xFFFF65C0L, "throttle_position",
             "89 refs. Throttle position (float). Read by AFL, timing tasks 34/38, boost, idle.");
-        count += labelComment(0xFFFF63F8, "iat_current",
+        count += labelComment(0xFFFF63F8L, "iat_current",
             "86 refs. Intake air temperature (float). Read by AFL, CL/OL, timing.");
-        count += labelComment(0xFFFF6354, "ect_raw_adc",
+        count += labelComment(0xFFFF6354L, "ect_raw_adc",
             "69 refs. ECT raw ADC value or secondary ECT (float). Read by PSE, AFL.");
-        count += labelComment(0xFFFF6364, "ect_startup",
+        count += labelComment(0xFFFF6364L, "ect_startup",
             "48 refs. ECT at engine start (float). Read by AFL, knock window setup.");
-        count += labelComment(0xFFFF63C4, "ect_compensation",
+        count += labelComment(0xFFFF63C4L, "ect_compensation",
             "43 refs. ECT compensation factor (float). Read by AFC, AFL, CL/OL.");
-        count += labelComment(0xFFFF6254, "maf_current",
+        count += labelComment(0xFFFF6254L, "maf_current",
             "51 refs. MAF sensor value (float, g/s). Read by AFL pipeline.");
-        count += labelComment(0xFFFF6228, "maf_voltage",
+        count += labelComment(0xFFFF6228L, "maf_voltage",
             "22 refs. MAF sensor voltage (float). Read by timing, fuel.");
-        count += labelComment(0xFFFF61CC, "vehicle_speed",
+        count += labelComment(0xFFFF61CCL, "vehicle_speed",
             "56 refs. Vehicle speed (float). Read by timing, CL/OL, boost.");
-        count += labelComment(0xFFFF62DC, "fuel_rate",
+        count += labelComment(0xFFFF62DCL, "fuel_rate",
             "20 refs. Fuel injection rate (float). Read by timing, boost.");
-        count += labelComment(0xFFFF6898, "manifold_pressure",
+        count += labelComment(0xFFFF6898L, "manifold_pressure",
             "48 refs. Manifold pressure (float). Read by frontO2, PSE, CL/OL, base timing.");
-        count += labelComment(0xFFFF69F0, "boost_pressure",
+        count += labelComment(0xFFFF69F0L, "boost_pressure",
             "32 refs. Boost pressure (float). Read by AFL. GBR base (5 uses).");
-        count += labelComment(0xFFFF6C48, "battery_voltage",
+        count += labelComment(0xFFFF6C48L, "battery_voltage",
             "34 refs. Battery voltage (float). Read by injector latency, diag.");
 
         // ── ADC / Sensor Raw + Status (0xFFFF61xx-0xFFFF65xx) ──────────────
-        count += labelComment(0xFFFF6155, "adc_channel_status",
+        count += labelComment(0xFFFF6155L, "adc_channel_status",
             "36 refs. ADC channel status/index (byte). GBR base (4 uses).");
-        count += labelComment(0xFFFF64D8, "throttle_raw",
+        count += labelComment(0xFFFF64D8L, "throttle_raw",
             "29 refs. Throttle raw ADC or secondary throttle.");
-        count += labelComment(0xFFFF65BD, "engine_state_byte",
+        count += labelComment(0xFFFF65BDL, "engine_state_byte",
             "34 refs. Engine state byte (cranking/running/etc).");
-        count += labelComment(0xFFFF653C, "o2_sensor_voltage",
+        count += labelComment(0xFFFF653CL, "o2_sensor_voltage",
             "19 refs. O2 sensor voltage or lambda value.");
 
         // ── Sensor / Input Block (0xFFFF4xxx) ──────────────────────────────
-        count += labelComment(0xFFFF4130, "ignition_switch_state",
+        count += labelComment(0xFFFF4130L, "ignition_switch_state",
             "77 refs. Ignition/key switch state. Read by frontO2, idle, boost. 4th most-referenced.");
-        count += labelComment(0xFFFF4024, "sensor_group_base",
+        count += labelComment(0xFFFF4024L, "sensor_group_base",
             "56 refs. Sensor processing group base. GBR base (1 use). Read by frontO2.");
-        count += labelComment(0xFFFF43FC, "sensor_misc_state",
+        count += labelComment(0xFFFF43FCL, "sensor_misc_state",
             "25 refs. Misc sensor state.");
 
         // ── Calibration Mirror Area (0xFFFF3xxx) ───────────────────────────
-        count += labelComment(0xFFFF399E, "dtc_maturation_timer",
+        count += labelComment(0xFFFF399EL, "dtc_maturation_timer",
             "118 refs. DTC maturation timer/counter. Read primarily by DTC framework. 4th most-referenced.");
-        count += labelComment(0xFFFF3B06, "dtc_debounce_state",
+        count += labelComment(0xFFFF3B06L, "dtc_debounce_state",
             "92 refs. DTC debounce state. Read by diag/DTC framework.");
-        count += labelComment(0xFFFF3836, "dtc_monitor_state",
+        count += labelComment(0xFFFF3836L, "dtc_monitor_state",
             "76 refs. DTC monitor state/counter. Read by DTC framework.");
-        count += labelComment(0xFFFF3480, "cal_mirror_base",
+        count += labelComment(0xFFFF3480L, "cal_mirror_base",
             "45 refs. Calibration mirror base. Referenced by various subsystems.");
-        count += labelComment(0xFFFF366C, "timer_counter_A",
+        count += labelComment(0xFFFF366CL, "timer_counter_A",
             "41 refs. Timer/counter A.");
-        count += labelComment(0xFFFF367C, "timer_counter_B",
+        count += labelComment(0xFFFF367CL, "timer_counter_B",
             "25 refs. Timer/counter B.");
-        count += labelComment(0xFFFF3674, "timer_counter_C",
+        count += labelComment(0xFFFF3674L, "timer_counter_C",
             "25 refs. Timer/counter C.");
-        count += labelComment(0xFFFF25CC, "system_tick_counter",
+        count += labelComment(0xFFFF25CCL, "system_tick_counter",
             "48 refs. System tick/event counter.");
 
         // ── Knock / FLKC Workspace (0xFFFF8xxx) ────────────────────────────
-        count += labelComment(0xFFFF837E, "idle_control_GBR",
+        count += labelComment(0xFFFF837EL, "idle_control_GBR",
             "39 refs. Idle control GBR base (19 GBR uses). Primary GBR for task54_idle.");
-        count += labelComment(0xFFFF83AC, "idle_workspace_GBR",
+        count += labelComment(0xFFFF83ACL, "idle_workspace_GBR",
             "26 refs. Secondary idle GBR workspace (7 GBR uses).");
-        count += labelComment(0xFFFF8E98, "cl_state_struct",
+        count += labelComment(0xFFFF8E98L, "cl_state_struct",
             "97 refs. CL monitoring state struct (15+ bytes). Base for cl_monitor_state_machine "
             + "(0x5AB44). Layout: +0=state_phase(u8: 0=IDLE,1=ACTIVE,2=CONVERGED), "
             + "+1=reset_flag(u8), +2=phase_A(u8), +3=phase_B(u8), +4=timer_word(u16), "
@@ -2151,77 +2152,77 @@ public class ImportAE5L600L extends GhidraScript {
             + "+12=prev_sensor_status(u8), +13=prev_sensor_ready(u8), "
             + "+14=prev_cl_transition_ready(u8). "
             + "Also read by frontO2, AFL, idle (copied to cl_inhibit FFFF744B).");
-        count += labelComment(0xFFFF85D7, "fuel_system_state",
+        count += labelComment(0xFFFF85D7L, "fuel_system_state",
             "60 refs. Fuel system state byte. Read by AFC, AFL, idle.");
-        count += labelComment(0xFFFF81F0, "knock_state_base",
+        count += labelComment(0xFFFF81F0L, "knock_state_base",
             "30 refs. Knock state workspace base. GBR base (5 uses). Read by task11 knock.");
-        count += labelComment(0xFFFF895C, "injector_data",
+        count += labelComment(0xFFFF895CL, "injector_data",
             "37 refs. Injector data (pulse width or duty). Read by timing tasks.");
-        count += labelComment(0xFFFF87E4, "timing_correction_A",
+        count += labelComment(0xFFFF87E4L, "timing_correction_A",
             "26 refs. Timing correction value A.");
-        count += labelComment(0xFFFF8C9C, "timing_workspace_A",
+        count += labelComment(0xFFFF8C9CL, "timing_workspace_A",
             "17 refs. Timing workspace variable.");
-        count += labelComment(0xFFFF8EA8, "sched_control_GBR",
+        count += labelComment(0xFFFF8EA8L, "sched_control_GBR",
             "14 refs. Scheduler control GBR base (5 GBR uses).");
-        count += labelComment(0xFFFF8E46, "fuel_mode_flags",
+        count += labelComment(0xFFFF8E46L, "fuel_mode_flags",
             "39 refs. Fuel mode flags register.");
 
         // ── Diagnostic State (0xFFFFAxxx) ──────────────────────────────────
-        count += labelComment(0xFFFFAD52, "diag_session_state",
+        count += labelComment(0xFFFFAD52L, "diag_session_state",
             "107 refs. Diagnostic session state. Read by diag/DTC framework. 6th most-referenced.");
-        count += labelComment(0xFFFFADAC, "diag_request_state",
+        count += labelComment(0xFFFFADACL, "diag_request_state",
             "69 refs. Diagnostic request/response state. Read by DTC framework.");
-        count += labelComment(0xFFFFACE0, "diag_output_buffer",
+        count += labelComment(0xFFFFACE0L, "diag_output_buffer",
             "32 refs. Diagnostic output buffer pointer.");
-        count += labelComment(0xFFFFAC6C, "diag_protocol_GBR",
+        count += labelComment(0xFFFFAC6CL, "diag_protocol_GBR",
             "13 refs. Diagnostic protocol GBR base (4 GBR uses).");
-        count += labelComment(0xFFFFA160, "diag_monitor_GBR",
+        count += labelComment(0xFFFFA160L, "diag_monitor_GBR",
             "21 refs. Diagnostic monitor GBR base (6 GBR uses).");
-        count += labelComment(0xFFFFA198, "egr_diag_state",
+        count += labelComment(0xFFFFA198L, "egr_diag_state",
             "13 refs. EGR/emissions diagnostic state. GBR base (3 uses).");
-        count += labelComment(0xFFFFAF3B, "comms_state_byte",
+        count += labelComment(0xFFFFAF3BL, "comms_state_byte",
             "36 refs. Communications protocol state byte.");
-        count += labelComment(0xFFFFAF60, "comms_buffer_ptr",
+        count += labelComment(0xFFFFAF60L, "comms_buffer_ptr",
             "Referenced in dtc_set_code literal pool. Comms buffer pointer.");
 
         // ── Scheduler / System (0xFFFF9xxx) ────────────────────────────────
-        count += labelComment(0xFFFF9094, "sched_task_GBR",
+        count += labelComment(0xFFFF9094L, "sched_task_GBR",
             "36 refs. Scheduler task GBR base (6 GBR uses).");
-        count += labelComment(0xFFFF9058, "sched_state_A",
+        count += labelComment(0xFFFF9058L, "sched_state_A",
             "32 refs. Scheduler state variable A.");
-        count += labelComment(0xFFFF9FC6, "sched_timer_base",
+        count += labelComment(0xFFFF9FC6L, "sched_timer_base",
             "22 refs. Scheduler timer base. GBR base (3 uses).");
-        count += labelComment(0xFFFF9FA8, "sched_timer_B",
+        count += labelComment(0xFFFF9FA8L, "sched_timer_B",
             "17 refs. Scheduler timer variable B.");
-        count += labelComment(0xFFFF91C4, "sched_queue_base",
+        count += labelComment(0xFFFF91C4L, "sched_queue_base",
             "8 refs. Scheduler queue base. GBR base (3 uses).");
-        count += labelComment(0xFFFF980C, "sched_periodic_GBR",
+        count += labelComment(0xFFFF980CL, "sched_periodic_GBR",
             "7 refs. Scheduler periodic timer GBR base (4 GBR uses).");
 
         // ── Fuel / Timing Working (0xFFFF7xxx) ─────────────────────────────
-        count += labelComment(0xFFFF77C8, "afc_output",
+        count += labelComment(0xFFFF77C8L, "afc_output",
             "19 refs. AFC output value. Referenced in fuel_correction_final.");
-        count += labelComment(0xFFFF798C, "timing_state_var",
+        count += labelComment(0xFFFF798CL, "timing_state_var",
             "17 refs. Timing state variable. Referenced by task35_timing_corr.");
-        count += labelComment(0xFFFF7E90, "timing_output_A",
+        count += labelComment(0xFFFF7E90L, "timing_output_A",
             "25 refs. Timing output value A.");
-        count += labelComment(0xFFFF7D68, "timing_blend_state",
+        count += labelComment(0xFFFF7D68L, "timing_blend_state",
             "19 refs. Timing blend state variable.");
-        count += labelComment(0xFFFF7FBC, "timing_final_advance",
+        count += labelComment(0xFFFF7FBCL, "timing_final_advance",
             "14 refs. Final timing advance value.");
-        count += labelComment(0xFFFF7C9D, "fuel_state_byte",
+        count += labelComment(0xFFFF7C9DL, "fuel_state_byte",
             "32 refs. Fuel state byte/flag.");
 
         // ── Peripheral I/O Region (0xFFFF5xxx) ─────────────────────────────
-        count += labelComment(0xFFFF5BE3, "peripheral_status",
+        count += labelComment(0xFFFF5BE3L, "peripheral_status",
             "33 refs. Peripheral status register.");
-        count += labelComment(0xFFFF5C98, "peripheral_control_GBR",
+        count += labelComment(0xFFFF5C98L, "peripheral_control_GBR",
             "15 refs. Peripheral control GBR base (3 uses).");
-        count += labelComment(0xFFFF5FFC, "io_state_register",
+        count += labelComment(0xFFFF5FFCL, "io_state_register",
             "23 refs. I/O state register.");
 
         // ── System State (0xFFFF2xxx) ──────────────────────────────────────
-        count += labelComment(0xFFFF2004, "system_init_flags",
+        count += labelComment(0xFFFF2004L, "system_init_flags",
             "23 refs. System initialization flags.");
 
         // =====================================================================
@@ -2230,25 +2231,25 @@ public class ImportAE5L600L extends GhidraScript {
         // From SH7058 hardware manual + cross-reference with code context.
         // Only addresses actually referenced in the ROM are labeled.
 
-        count += labelComment(0xFFFF0000, "SH7058_STBCR",
+        count += labelComment(0xFFFF0000L, "SH7058_STBCR",
             "9 refs. Standby Control Register (power management). Module stop control bits.");
-        count += labelComment(0xFFFF0004, "SH7058_STBCR2",
+        count += labelComment(0xFFFF0004L, "SH7058_STBCR2",
             "2 refs. Standby Control Register 2. Additional module stop bits.");
-        count += labelComment(0xFFFF0008, "SH7058_STBCR3",
+        count += labelComment(0xFFFF0008L, "SH7058_STBCR3",
             "2 refs. Standby Control Register 3. Peripheral clock gating.");
-        count += labelComment(0xFFFF0020, "SH7058_SYSCR",
+        count += labelComment(0xFFFF0020L, "SH7058_SYSCR",
             "2 refs. System Control Register. Bus width, endianness, clock divider.");
-        count += labelComment(0xFFFF1230, "SH7058_TIER_MTU0",
+        count += labelComment(0xFFFF1230L, "SH7058_TIER_MTU0",
             "3 refs. Timer Interrupt Enable Register (MTU channel 0). Used for periodic interrupts.");
-        count += labelComment(0xFFFF12B0, "SH7058_SCI_SMR",
+        count += labelComment(0xFFFF12B0L, "SH7058_SCI_SMR",
             "2 refs. Serial Mode Register (SCI). Baud rate, parity, data length config.");
-        count += labelComment(0xFFFF12B4, "SH7058_SCI_BRR",
+        count += labelComment(0xFFFF12B4L, "SH7058_SCI_BRR",
             "1 ref. Bit Rate Register (SCI). Baud rate divisor.");
-        count += labelComment(0xFFFF12B5, "SH7058_SCI_SCR",
+        count += labelComment(0xFFFF12B5L, "SH7058_SCI_SCR",
             "1 ref. Serial Control Register (SCI). TX/RX enable, interrupt enable.");
-        count += labelComment(0xFFFF12B8, "SH7058_SCI_TDR",
+        count += labelComment(0xFFFF12B8L, "SH7058_SCI_TDR",
             "5 refs. Transmit Data Register (SCI). Write byte to send.");
-        count += labelComment(0xFFFF12C8, "SH7058_SCI_SSR",
+        count += labelComment(0xFFFF12C8L, "SH7058_SCI_SSR",
             "2 refs. Serial Status Register (SCI). TX empty, RX full, error flags.");
 
         // =====================================================================
@@ -4011,51 +4012,51 @@ public class ImportAE5L600L extends GhidraScript {
             + "Computes final fuel correction factor, clamps [0.75, 1.25]. Writes to FFFF74BC/BD mode flags.");
 
         // -- Fuel Pipeline RAM --
-        count += labelComment(0xFFFF77BC, "fuel_pipeline_base",
+        count += labelComment(0xFFFF77BCL, "fuel_pipeline_base",
             "GBR base for fuel aggregator pipeline. Struct contains fuel correction state.");
-        count += labelComment(0xFFFF7828, "aggregator_struct_base",
+        count += labelComment(0xFFFF7828L, "aggregator_struct_base",
             "Major struct base for fuel aggregation (R9 in aggregator). Offsets -108 to -12 hold working values.");
-        count += labelComment(0xFFFF7904, "aggregator_fuel_output",
+        count += labelComment(0xFFFF7904L, "aggregator_fuel_output",
             "Fuel correction output (float). Written by aggregator_tail. Prior cycle value read as input.");
-        count += labelComment(0xFFFF7344, "fuel_per_cyl_struct",
+        count += labelComment(0xFFFF7344L, "fuel_per_cyl_struct",
             "Per-cylinder pulse width struct. 8 float outputs written by fuel_pulse_width_calc at offsets -36,0,-32,-12,-28,-24,-20,-16.");
-        count += labelComment(0xFFFF7348, "fuel_base_factor",
+        count += labelComment(0xFFFF7348L, "fuel_base_factor",
             "Base fuel factor (float). Input to fuel_pulse_width_calc — multiplied by enrichment sum.");
-        count += labelComment(0xFFFF73A4, "fuel_correction_A",
+        count += labelComment(0xFFFF73A4L, "fuel_correction_A",
             "Fuel correction term A (float). Input to fuel_pulse_width_calc.");
-        count += labelComment(0xFFFF7A08, "fuel_correction_B",
+        count += labelComment(0xFFFF7A08L, "fuel_correction_B",
             "Fuel correction term B (float). Input to fuel_pulse_width_calc.");
-        count += labelComment(0xFFFF7BC4, "fuel_correction_C",
+        count += labelComment(0xFFFF7BC4L, "fuel_correction_C",
             "Fuel correction C / global scaler (float). Used as FR12 in fuel_pulse_width_calc — multiplied into every term.");
-        count += labelComment(0xFFFF76D4, "fuel_enrichment_A",
+        count += labelComment(0xFFFF76D4L, "fuel_enrichment_A",
             "Fuel enrichment term A (float). Summed with B+C then multiplied by base factor.");
-        count += labelComment(0xFFFF7878, "fuel_enrichment_B",
+        count += labelComment(0xFFFF7878L, "fuel_enrichment_B",
             "Fuel enrichment term B (float). Summed with A+C.");
-        count += labelComment(0xFFFF7AE4, "fuel_enrichment_C",
+        count += labelComment(0xFFFF7AE4L, "fuel_enrichment_C",
             "Fuel enrichment term C (float). Summed with A+B.");
-        count += labelComment(0xFFFF7B6C, "fuel_blend_A",
+        count += labelComment(0xFFFF7B6CL, "fuel_blend_A",
             "Per-cylinder fuel blend factor A (float). Used by float_clamp_apply in PW calc.");
-        count += labelComment(0xFFFF7B70, "fuel_blend_B",
+        count += labelComment(0xFFFF7B70L, "fuel_blend_B",
             "Per-cylinder fuel blend factor B (float).");
-        count += labelComment(0xFFFF7B74, "fuel_blend_C",
+        count += labelComment(0xFFFF7B74L, "fuel_blend_C",
             "Per-cylinder fuel blend factor C (float).");
-        count += labelComment(0xFFFF7B78, "fuel_blend_D",
+        count += labelComment(0xFFFF7B78L, "fuel_blend_D",
             "Per-cylinder fuel blend factor D (float).");
-        count += labelComment(0xFFFF74BC, "fuel_corr_mode_flag",
+        count += labelComment(0xFFFF74BCL, "fuel_corr_mode_flag",
             "Fuel correction mode flag (byte). Written by aggregator at GBR+0x6C.");
-        count += labelComment(0xFFFF74BD, "fuel_corr_status_flag",
+        count += labelComment(0xFFFF74BDL, "fuel_corr_status_flag",
             "Fuel correction status flag (byte). Written by aggregator at GBR+0x6D.");
 
         // -- AFL Working RAM --
-        count += labelComment(0xFFFF7AD8, "afl_working_struct",
+        count += labelComment(0xFFFF7AD8L, "afl_working_struct",
             "AFL computation workspace struct. R13 base in afl_application. Engine load stored at -4, ECT at +0.");
 
         // -- Ignition Timing Corrections (RENAMED from inj_*) --
-        count += labelComment(0xFFFF80E4, "timing_comp_mps",
+        count += labelComment(0xFFFF80E4L, "timing_comp_mps",
             "MPS-based ignition timing compensation (struct). Written by task46. NOT injection PW.");
-        count += labelComment(0xFFFF80EC, "timing_comp_lowpw_state",
+        count += labelComment(0xFFFF80ECL, "timing_comp_lowpw_state",
             "Low-PW ignition timing deactivation state (struct). Written by task47. Counter + flags.");
-        count += labelComment(0xFFFF80F8, "final_ign_timing_output",
+        count += labelComment(0xFFFF80F8L, "final_ign_timing_output",
             "Final ignition timing output (struct). Written by task48. [0]=load flag, [1]=RPM flag, [-4]=timing value, [-8]=scaled output.");
 
         // -- Task Corrections --
@@ -4069,19 +4070,19 @@ public class ImportAE5L600L extends GhidraScript {
             "Task48 subroutine: engine_load/RPM hysteresis check. Sets flags at final_ign_timing_output[0,1].");
 
         // -- ATU Hardware --
-        count += labelComment(0xFFFF4024, "ATU_primary_ctrl",
+        count += labelComment(0xFFFF4024L, "ATU_primary_ctrl",
             "ATU primary control register. 36 code refs — master injection/ignition angle timing.");
-        count += labelComment(0xFFFF40C8, "ATU_compare_reg",
+        count += labelComment(0xFFFF40C8L, "ATU_compare_reg",
             "ATU compare register. 17 code refs — injection/ignition window timing.");
-        count += labelComment(0xFFFF40E0, "ATU_output_ctrl",
+        count += labelComment(0xFFFF40E0L, "ATU_output_ctrl",
             "ATU output control register. 5 refs — injection/ignition driver output control.");
 
         // -- InternalIO Ports (injection/ignition driver) --
-        count += labelComment(0xFFFF3B06, "io_inj_ign_port_ctrl",
+        count += labelComment(0xFFFF3B06L, "io_inj_ign_port_ctrl",
             "InternalIO port control (44 refs). Likely injection/ignition output port enable.");
-        count += labelComment(0xFFFF366C, "io_inj_driver_ctrl",
+        count += labelComment(0xFFFF366CL, "io_inj_driver_ctrl",
             "InternalIO injection driver control register (31 refs).");
-        count += labelComment(0xFFFF3836, "io_ign_driver_ctrl",
+        count += labelComment(0xFFFF3836L, "io_ign_driver_ctrl",
             "InternalIO ignition driver control register (31 refs).");
 
         // -- Calibration --
@@ -4117,7 +4118,7 @@ public class ImportAE5L600L extends GhidraScript {
             "ISR dispatch table (54 entries x 4 bytes). Maps ISR index to handler address.");
 
         // -- Shared Fuel/Ignition State --
-        count += labelComment(0xFFFF895C, "fuel_ign_shared_state",
+        count += labelComment(0xFFFF895CL, "fuel_ign_shared_state",
             "Shared fuel/ignition state (float). 28 pool refs. Read by task38_ign_output. "
             + "Previously labeled injector_data — used by BOTH fuel injection and ignition timing systems.");
 
@@ -4156,33 +4157,33 @@ public class ImportAE5L600L extends GhidraScript {
             "Vec 206: ATU busy-wait polling. Same 290-iter pattern as Vec 202. Synchronization between ATU channels.");
 
         // -- ATU Working RAM --
-        count += labelComment(0xFFFF4118, "atu_output_timing_chA",
+        count += labelComment(0xFFFF4118L, "atu_output_timing_chA",
             "ATU output timing channel A (float). Written by ISR[2] crank-angle interpolation.");
-        count += labelComment(0xFFFF4120, "atu_output_timing_chB",
+        count += labelComment(0xFFFF4120L, "atu_output_timing_chB",
             "ATU output timing channel B. Written by ISR[2].");
-        count += labelComment(0xFFFF4124, "atu_counter_threshold",
+        count += labelComment(0xFFFF4124L, "atu_counter_threshold",
             "ATU counter/threshold channel. Used by ISR[2] for timing validation.");
-        count += labelComment(0xFFFF44BC, "atu_output_timing_chC",
+        count += labelComment(0xFFFF44BCL, "atu_output_timing_chC",
             "ATU output timing channel C. Written by ISR[3].");
-        count += labelComment(0xFFFF44C0, "atu_output_timing_chD",
+        count += labelComment(0xFFFF44C0L, "atu_output_timing_chD",
             "ATU output timing channel D. Written by ISR[3].");
-        count += labelComment(0xFFFF8DA0, "atu_interp_float_state",
+        count += labelComment(0xFFFF8DA0L, "atu_interp_float_state",
             "Per-channel float state for crank-angle interpolation (array). Read by ISR[2].");
-        count += labelComment(0xFFFF8DA8, "atu_upper_threshold",
+        count += labelComment(0xFFFF8DA8L, "atu_upper_threshold",
             "ATU upper threshold array (2×uint16). Compared against timer captures in ISR[2].");
-        count += labelComment(0xFFFF8DAC, "atu_lower_threshold",
+        count += labelComment(0xFFFF8DACL, "atu_lower_threshold",
             "ATU lower threshold array (2×uint16). Compared against timer captures in ISR[2].");
 
         // -- Injection State RAM --
-        count += labelComment(0xFFFF3D08, "inj_descriptor_struct",
+        count += labelComment(0xFFFF3D08L, "inj_descriptor_struct",
             "Injection descriptor struct (8-byte entries). Read by ISR[21] gate logic.");
-        count += labelComment(0xFFFF3D10, "inj_descriptor_end",
+        count += labelComment(0xFFFF3D10L, "inj_descriptor_end",
             "End pointer for injection descriptor struct.");
-        count += labelComment(0xFFFF3D18, "inj_status_array",
+        count += labelComment(0xFFFF3D18L, "inj_status_array",
             "Injection status array (2-byte entries). Read by ISR[21] gate logic.");
-        count += labelComment(0xFFFF3D1C, "inj_status_end",
+        count += labelComment(0xFFFF3D1CL, "inj_status_end",
             "End pointer for injection status array.");
-        count += labelComment(0xFFFF36BE, "inj_ign_port_status",
+        count += labelComment(0xFFFF36BEL, "inj_ign_port_status",
             "Injection/ignition port status word. Read by ISR[21] and ISR[22].");
 
         // -- Calibration for ATU --
@@ -4215,31 +4216,31 @@ public class ImportAE5L600L extends GhidraScript {
             + "Writes FFFF920C-FFFF9228.");
 
         // ── AVCS RAM ──
-        count += labelComment(0xFFFF40C8, "cam_angle_sensor",
+        count += labelComment(0xFFFF40C8L, "cam_angle_sensor",
             "Actual cam position from CMP/CKP (float, degrees).");
-        count += labelComment(0xFFFF7480, "intake_avcs_workspace",
+        count += labelComment(0xFFFF7480L, "intake_avcs_workspace",
             "Intake AVCS working data struct base.");
-        count += labelComment(0xFFFF7474, "intake_previous_output",
+        count += labelComment(0xFFFF7474L, "intake_previous_output",
             "Intake AVCS previous output (float). Workspace - 12.");
-        count += labelComment(0xFFFF7478, "intake_duty_correction",
+        count += labelComment(0xFFFF7478L, "intake_duty_correction",
             "Intake AVCS duty correction (float). Workspace - 8.");
-        count += labelComment(0xFFFF747C, "intake_computed_duty",
+        count += labelComment(0xFFFF747CL, "intake_computed_duty",
             "Intake AVCS computed duty (float). Workspace - 4.");
-        count += labelComment(0xFFFF76F4, "exhaust_avcs_workspace",
+        count += labelComment(0xFFFF76F4L, "exhaust_avcs_workspace",
             "Exhaust AVCS working data struct base (vestigial on EJ255).");
-        count += labelComment(0xFFFF76E8, "exhaust_correction_A",
+        count += labelComment(0xFFFF76E8L, "exhaust_correction_A",
             "Exhaust AVCS correction A (float). Workspace - 12.");
-        count += labelComment(0xFFFF76EC, "exhaust_correction_B",
+        count += labelComment(0xFFFF76ECL, "exhaust_correction_B",
             "Exhaust AVCS correction B (float). Workspace - 8.");
-        count += labelComment(0xFFFF76F0, "exhaust_computed",
+        count += labelComment(0xFFFF76F0L, "exhaust_computed",
             "Exhaust AVCS computed value (float, near zero on EJ255). Workspace - 4.");
-        count += labelComment(0xFFFF920C, "vvt_error_feedback_A",
+        count += labelComment(0xFFFF920CL, "vvt_error_feedback_A",
             "Intake VVT error feedback result A (float).");
-        count += labelComment(0xFFFF9210, "vvt_error_feedback_B",
+        count += labelComment(0xFFFF9210L, "vvt_error_feedback_B",
             "Intake VVT error feedback result B (float).");
-        count += labelComment(0xFFFF9220, "vvt_error_feedback_C",
+        count += labelComment(0xFFFF9220L, "vvt_error_feedback_C",
             "Intake VVT error feedback result C (float).");
-        count += labelComment(0xFFFF9228, "vvt_error_feedback_D",
+        count += labelComment(0xFFFF9228L, "vvt_error_feedback_D",
             "Intake VVT error feedback result D (float).");
 
         // ── AVCS Descriptors ──
@@ -4349,75 +4350,75 @@ public class ImportAE5L600L extends GhidraScript {
             "Clamp/filter function. Called by task53 readiness.");
 
         // ── DTC Diagnostic RAM Regions ──
-        count += labelComment(0xFFFFAD14, "diag_state_E_start",
+        count += labelComment(0xFFFFAD14L, "diag_state_E_start",
             "Active fault status region start. 62 bytes, 268 refs.");
-        count += labelComment(0xFFFFAF70, "diag_state_A_start",
+        count += labelComment(0xFFFFAF70L, "diag_state_A_start",
             "Fault history region start. 59 bytes, 144 refs.");
-        count += labelComment(0xFFFFA156, "diag_state_B_start",
+        count += labelComment(0xFFFFA156L, "diag_state_B_start",
             "Maturation counters region start. 55 bytes, 135 refs.");
-        count += labelComment(0xFFFFA32C, "diag_state_C_start",
+        count += labelComment(0xFFFFA32CL, "diag_state_C_start",
             "Monitor readiness region start. 115 bytes, 132 refs.");
-        count += labelComment(0xFFFFAB76, "diag_state_F_start",
+        count += labelComment(0xFFFFAB76L, "diag_state_F_start",
             "Healing counters region start. 79 bytes, 66 refs.");
-        count += labelComment(0xFFFFA2A0, "diag_state_D_start",
+        count += labelComment(0xFFFFA2A0L, "diag_state_D_start",
             "Trip tracking region start. 104 bytes, 32 refs.");
-        count += labelComment(0xFFFF9080, "diag_readiness_workspace",
+        count += labelComment(0xFFFF9080L, "diag_readiness_workspace",
             "Diagnostic readiness workspace (4 floats).");
-        count += labelComment(0xFFFF96A4, "maf_diag_state",
+        count += labelComment(0xFFFF96A4L, "maf_diag_state",
             "MAF diag state: flag, enable, counter, init (4 bytes).");
-        count += labelComment(0xFFFF96A8, "maf_diag_extended",
+        count += labelComment(0xFFFF96A8L, "maf_diag_extended",
             "MAF diag extended state (2 bytes).");
-        count += labelComment(0xFFFF96AC, "maf_hw_fault_A",
+        count += labelComment(0xFFFF96ACL, "maf_hw_fault_A",
             "MAF hardware fault state A (2 bytes).");
-        count += labelComment(0xFFFF96AE, "maf_hw_fault_B",
+        count += labelComment(0xFFFF96AEL, "maf_hw_fault_B",
             "MAF hardware fault state B (2 bytes).");
-        count += labelComment(0xFFFFABF4, "mps_diag_state",
+        count += labelComment(0xFFFFABF4L, "mps_diag_state",
             "MPS (manifold pressure sensor) maturation counter (byte).");
-        count += labelComment(0xFFFF44E8, "mps_current_readings",
+        count += labelComment(0xFFFF44E8L, "mps_current_readings",
             "MPS current readings (2 bytes, channel A and B).");
-        count += labelComment(0xFFFFAE08, "diag_precondition_flag",
+        count += labelComment(0xFFFFAE08L, "diag_precondition_flag",
             "Master diagnostic precondition flag. Read by check_diag_preconditions (0x584BE).");
-        count += labelComment(0xFFFFAE09, "diag_monitor_enable_flags",
+        count += labelComment(0xFFFFAE09L, "diag_monitor_enable_flags",
             "Diagnostic monitor enable flags array (7 bytes, FFFFAE09-AE0F). "
             + "Each byte gates a different monitor group. Read by 0x584C8 dispatch table.");
-        count += labelComment(0xFFFF933C, "evap_diag_state_GBR",
+        count += labelComment(0xFFFF933CL, "evap_diag_state_GBR",
             "EVAP diagnostic state base (GBR). Used by task56 condition evaluation.");
-        count += labelComment(0xFFFF9314, "evap_pressure_delta",
+        count += labelComment(0xFFFF9314L, "evap_pressure_delta",
             "EVAP pressure delta (baseline - lower threshold). Written by task56.");
-        count += labelComment(0xFFFF9318, "evap_pressure_sum",
+        count += labelComment(0xFFFF9318L, "evap_pressure_sum",
             "EVAP pressure sum (baseline + upper threshold). Written by task56.");
-        count += labelComment(0xFFFF318C, "evap_pressure_baseline",
+        count += labelComment(0xFFFF318CL, "evap_pressure_baseline",
             "EVAP pressure baseline value (float).");
-        count += labelComment(0xFFFF236C, "evap_cal_cache",
+        count += labelComment(0xFFFF236CL, "evap_cal_cache",
             "EVAP calibration cache (5 floats + 6 u16s = 32 bytes). "
             + "Loaded from descriptors by task56 workspace init.");
-        count += labelComment(0xFFFFA1FA, "egr_maturation_counters",
+        count += labelComment(0xFFFFA1FAL, "egr_maturation_counters",
             "EGR maturation counters A-D (4 bytes). Incremented by egr_sub_a "
             + "when armed (>0). GBR=FFFFA156 offset 164.");
-        count += labelComment(0xFFFFA17D, "egr_completion_flag",
+        count += labelComment(0xFFFFA17DL, "egr_completion_flag",
             "EGR completion flag (bit 0). Set by egr_sub_b when timer==400 "
             + "and all 4 nibble checks pass.");
-        count += labelComment(0xFFFFA224, "egr_state_b",
+        count += labelComment(0xFFFFA224L, "egr_state_b",
             "EGR state_b (6 consecutive floats). Copied from FFFF4330 by task57 setup.");
-        count += labelComment(0xFFFF2BFA, "egr_channel_selector",
+        count += labelComment(0xFFFF2BFAL, "egr_channel_selector",
             "EGR channel selector (u8) + timer (u16 at +4). Read by egr_sub_a.");
-        count += labelComment(0xFFFF2BFC, "egr_timeout_counter",
+        count += labelComment(0xFFFF2BFCL, "egr_timeout_counter",
             "EGR timeout/period counter (u16). Read by egr_output_handler.");
-        count += labelComment(0xFFFF9FA4, "egr_timer",
+        count += labelComment(0xFFFF9FA4L, "egr_timer",
             "EGR timer (u16). Compared against 400 by egr_sub_b.");
-        count += labelComment(0xFFFF9FAE, "egr_init_flag",
+        count += labelComment(0xFFFF9FAEL, "egr_init_flag",
             "EGR initialization flag (u16). Set to 1 by egr_sub_a on first run.");
-        count += labelComment(0xFFFF9FB2, "egr_timeout_threshold",
+        count += labelComment(0xFFFF9FB2L, "egr_timeout_threshold",
             "EGR timeout threshold (u16). Read by egr_output_handler.");
-        count += labelComment(0xFFFF41D0, "monitoring_state",
+        count += labelComment(0xFFFF41D0L, "monitoring_state",
             "Monitoring state byte: 1=transitioning, 2=active. Read by task58 maturation.");
-        count += labelComment(0xFFFF65A9, "engine_state_extended",
+        count += labelComment(0xFFFF65A9L, "engine_state_extended",
             "Engine state extended byte. Read by task58 extended MAF diagnostics.");
-        count += labelComment(0xFFFF63C4, "iat_related_sensor",
+        count += labelComment(0xFFFF63C4L, "iat_related_sensor",
             "IAT-related sensor value (float). Read by task56 EVAP condition eval.");
-        count += labelComment(0xFFFF63FC, "barometric_pressure",
+        count += labelComment(0xFFFF63FCL, "barometric_pressure",
             "Barometric/atmospheric pressure (float). Read by task56 EVAP.");
-        count += labelComment(0xFFFF3B06, "diag_indexed_lookup_table",
+        count += labelComment(0xFFFF3B06L, "diag_indexed_lookup_table",
             "Diagnostic indexed lookup table. Accessed at FFFF3B06 + R4*2 by 0x58518.");
 
         // ── DTC Calibration ──
@@ -4504,37 +4505,37 @@ public class ImportAE5L600L extends GhidraScript {
             "Task 27: knock timing retard per-cylinder.");
 
         // ── Ignition Timing Workspace RAM ──
-        count += labelComment(0xFFFF7F64, "base_timing_output",
+        count += labelComment(0xFFFF7F64L, "base_timing_output",
             "Base timing output (float). Written by task30.");
-        count += labelComment(0xFFFF7F10, "gbr_base_timing_ws",
+        count += labelComment(0xFFFF7F10L, "gbr_base_timing_ws",
             "GBR base for task30 base timing workspace.");
-        count += labelComment(0xFFFF7FD4, "gbr_base_corr_init_ws",
+        count += labelComment(0xFFFF7FD4L, "gbr_base_corr_init_ws",
             "GBR base for timing corrections init workspace (task33).");
-        count += labelComment(0xFFFF8000, "gbr_base_percond_ws",
+        count += labelComment(0xFFFF8000L, "gbr_base_percond_ws",
             "GBR base for per-condition timing workspace (task36).");
-        count += labelComment(0xFFFF8098, "ign_output_workspace",
+        count += labelComment(0xFFFF8098L, "ign_output_workspace",
             "Ignition output workspace (float). Task38.");
-        count += labelComment(0xFFFF80AE, "dwell_output",
+        count += labelComment(0xFFFF80AEL, "dwell_output",
             "Dwell time output (float). Task38.");
-        count += labelComment(0xFFFF80C0, "IAM_compensation_ws",
+        count += labelComment(0xFFFF80C0L, "IAM_compensation_ws",
             "IAM compensation workspace (float). Task42.");
-        count += labelComment(0xFFFF80C8, "load_timing_output",
+        count += labelComment(0xFFFF80C8L, "load_timing_output",
             "Load-dependent timing output (float). Task43.");
-        count += labelComment(0xFFFF80E4, "mps_timing_output",
+        count += labelComment(0xFFFF80E4L, "mps_timing_output",
             "MPS-based timing output (float). Task46.");
-        count += labelComment(0xFFFF80F8, "final_timing_advance",
+        count += labelComment(0xFFFF80F8L, "final_timing_advance",
             "Final combined timing advance (float). Task48 output.");
-        count += labelComment(0xFFFF81E8, "per_cyl_timing_corr",
+        count += labelComment(0xFFFF81E8L, "per_cyl_timing_corr",
             "Per-cylinder timing corrections (float[4]). Task0/29.");
-        count += labelComment(0xFFFF8258, "flkc_retard",
+        count += labelComment(0xFFFF8258L, "flkc_retard",
             "FLKC retard value (float).");
-        count += labelComment(0xFFFF322C, "FLKC_slow_learning_value",
+        count += labelComment(0xFFFF322CL, "FLKC_slow_learning_value",
             "Fine knock learn (FLKC slow) learning value (float).");
-        count += labelComment(0xFFFF3248, "per_cylinder_knock_retard",
+        count += labelComment(0xFFFF3248L, "per_cylinder_knock_retard",
             "Knock retard array (float[4]), indexed by cylinder.");
-        count += labelComment(0xFFFF6812, "cylinder_index",
+        count += labelComment(0xFFFF6812L, "cylinder_index",
             "Current cylinder index 0-3 (byte).");
-        count += labelComment(0xFFFF6790, "knock_active_flag",
+        count += labelComment(0xFFFF6790L, "knock_active_flag",
             "Knock event active flag.");
 
         // ── Ignition Timing Calibration Scalars ──
@@ -4826,69 +4827,69 @@ public class ImportAE5L600L extends GhidraScript {
             "Table lookup with error scaling.");
 
         // ── Fueling Pipeline RAM (Key Working Addresses) ──
-        count += labelComment(0xFFFF7448, "clol_mode_flag",
+        count += labelComment(0xFFFF7448L, "clol_mode_flag",
             "CL/OL mode flag (byte). 1=CL, 0=OL. Gates AFC pipeline.");
-        count += labelComment(0xFFFF7452, "cl_readiness_flags",
+        count += labelComment(0xFFFF7452L, "cl_readiness_flags",
             "CL readiness flags.");
-        count += labelComment(0xFFFF781C, "afc_pipeline_result",
+        count += labelComment(0xFFFF781CL, "afc_pipeline_result",
             "AFC pipeline result (float). Stage 7 output.");
-        count += labelComment(0xFFFF7820, "afc_clamped_output",
+        count += labelComment(0xFFFF7820L, "afc_clamped_output",
             "AFC clamped output (float). Stage 8 output.");
-        count += labelComment(0xFFFF7870, "afc_pi_blended_output",
+        count += labelComment(0xFFFF7870L, "afc_pi_blended_output",
             "AFC PI blended output (float). Stage 5 output.");
-        count += labelComment(0xFFFF7904, "afc_aggregator_output",
+        count += labelComment(0xFFFF7904L, "afc_aggregator_output",
             "AFC final correction output (float).");
-        count += labelComment(0xFFFF7344, "fuel_per_cyl_struct",
+        count += labelComment(0xFFFF7344L, "fuel_per_cyl_struct",
             "Per-cylinder fuel struct (8 x float final IPW values).");
         count += labelComment(0xFFFF7350L, "injector_dead_time_ticks",
             "Injector dead time intermediate result (uint16, 1/16-tick units). "
             + "Written by 0x0303C2 after InjLat 2D table lookup (R14=FFFF7350; MOV.W R0,@R14). "
             + "Re-read as EXTU.W source before writing FFFF4280 via stub 0x9E4A.");
-        count += labelComment(0xFFFF73AC, "base_fuel_map_output",
+        count += labelComment(0xFFFF73ACL, "base_fuel_map_output",
             "Base fuel map output (float).");
-        count += labelComment(0xFFFF7400, "base_fuel_table_output",
+        count += labelComment(0xFFFF7400L, "base_fuel_table_output",
             "Base fuel table output (float).");
-        count += labelComment(0xFFFF7AB4, "afl_multiplier_output",
+        count += labelComment(0xFFFF7AB4L, "afl_multiplier_output",
             "AFL multiplier output (float). Written by afl_application.");
-        count += labelComment(0xFFFF7BDC, "default_fuel_multiplier",
+        count += labelComment(0xFFFF7BDCL, "default_fuel_multiplier",
             "Default fuel multiplier (float, 1.05).");
-        count += labelComment(0xFFFF7A74, "fuel_trim_af_ratio",
+        count += labelComment(0xFFFF7A74L, "fuel_trim_af_ratio",
             "A/F ratio fuel trim input (float).");
-        count += labelComment(0xFFFF7AB0, "injector_trim_workspace",
+        count += labelComment(0xFFFF7AB0L, "injector_trim_workspace",
             "Injector trim workspace (4 slots).");
-        count += labelComment(0xFFFF7730, "fuel_correction_array_base",
+        count += labelComment(0xFFFF7730L, "fuel_correction_array_base",
             "29-element correction array base.");
-        count += labelComment(0xFFFF770C, "correction_filter_base",
+        count += labelComment(0xFFFF770CL, "correction_filter_base",
             "Correction filter base (3 floats).");
 
         // ── OL Enrichment State ──
-        count += labelComment(0xFFFF7954, "ol_enrichment_factor_A",
+        count += labelComment(0xFFFF7954L, "ol_enrichment_factor_A",
             "OL enrichment factor A (float).");
-        count += labelComment(0xFFFF795C, "ol_enrichment_output",
+        count += labelComment(0xFFFF795CL, "ol_enrichment_output",
             "OL enrichment primary output (float).");
-        count += labelComment(0xFFFF7968, "ol_enrichment_blend",
+        count += labelComment(0xFFFF7968L, "ol_enrichment_blend",
             "OL enrichment blend value (float).");
 
         // ── Main IPW Calculator State ──
-        count += labelComment(0xFFFF7AF4, "fuel_ipw_state_B",
+        count += labelComment(0xFFFF7AF4L, "fuel_ipw_state_B",
             "Final IPW correction output (float).");
-        count += labelComment(0xFFFF7B38, "wot_active_flag",
+        count += labelComment(0xFFFF7B38L, "wot_active_flag",
             "WOT active flag.");
-        count += labelComment(0xFFFF7B60, "ltft_workspace",
+        count += labelComment(0xFFFF7B60L, "ltft_workspace",
             "LTFT learning workspace.");
 
         // ── Fuel Cut / Overrun State ──
-        count += labelComment(0xFFFF7E8C, "overrun_state",
+        count += labelComment(0xFFFF7E8CL, "overrun_state",
             "Overrun state (byte). 0=normal, 1=fuel cut active.");
-        count += labelComment(0xFFFF7E8E, "overrun_counter",
+        count += labelComment(0xFFFF7E8EL, "overrun_counter",
             "Overrun scheduler tick counter (word).");
-        count += labelComment(0xFFFF82B8, "fuel_cut_bitmask",
+        count += labelComment(0xFFFF82B8L, "fuel_cut_bitmask",
             "Fuel cut bitmask. -1=all, bits=per-cylinder (int16).");
-        count += labelComment(0xFFFF7C10, "percyl_fuel_trim_output",
+        count += labelComment(0xFFFF7C10L, "percyl_fuel_trim_output",
             "Per-cylinder fuel trim output.");
 
         // ── Injector Timing / Hardware RAM ──
-        count += labelComment(0xFFFF41F0, "percyl_timing_array",
+        count += labelComment(0xFFFF41F0L, "percyl_timing_array",
             "Per-cylinder timing array (8 bytes x 4 cylinders).");
         count += labelComment(0xFFFF4280L, "injector_dead_time_applied",
             "Applied injector dead time (uint32, zero-extended uint16, 1/16 ATU tick units). "
@@ -4903,25 +4904,25 @@ public class ImportAE5L600L extends GhidraScript {
             "Second input to dead time table lookup (func 0x0303C2, FR5). "
             + "InjLat secondary axis is [-1000,0,1000]; all table rows identical "
             + "so this input has no effect on dead time result. Identity TBD.");
-        count += labelComment(0xFFFF3474, "inj_channel_enable",
+        count += labelComment(0xFFFF3474L, "inj_channel_enable",
             "Injection channel enable mask. 0xFF = all 8 channels.");
 
         // ── ECT Warmup Consumer State ──
-        count += labelComment(0xFFFF7E90, "warmup_corr_cyl0",
+        count += labelComment(0xFFFF7E90L, "warmup_corr_cyl0",
             "Final warmup correction cylinder 0 (float).");
-        count += labelComment(0xFFFF7E94, "warmup_corr_cyl1",
+        count += labelComment(0xFFFF7E94L, "warmup_corr_cyl1",
             "Final warmup correction cylinder 1 (float).");
-        count += labelComment(0xFFFF7E98, "warmup_corr_cyl2",
+        count += labelComment(0xFFFF7E98L, "warmup_corr_cyl2",
             "Final warmup correction cylinder 2 (float).");
-        count += labelComment(0xFFFF7E9C, "warmup_corr_cyl3",
+        count += labelComment(0xFFFF7E9CL, "warmup_corr_cyl3",
             "Final warmup correction cylinder 3 (float).");
-        count += labelComment(0xFFFF7F68, "ect_warmup_correction",
+        count += labelComment(0xFFFF7F68L, "ect_warmup_correction",
             "ECT warmup correction output (float).");
 
         // ── Sensor Struct (FFFF89xx) ──
-        count += labelComment(0xFFFF8998, "sensor_struct_8998",
+        count += labelComment(0xFFFF8998L, "sensor_struct_8998",
             "Sensor struct base (GBR at 0x52092).");
-        count += labelComment(0xFFFF8920, "sensor_struct_start",
+        count += labelComment(0xFFFF8920L, "sensor_struct_start",
             "First field in sensor struct.");
 
         // ── Fueling Calibration Descriptors ──
@@ -4999,6 +5000,1223 @@ public class ImportAE5L600L extends GhidraScript {
         // ── External Hardware ──
         count += labelComment(0x00F00F00L, "injector_hw_ctrl",
             "External injector ASIC/CPLD I/O register.");
+
+
+        // =====================================================================
+        // ROMRAIDER CALIBRATION TABLE LABELS
+        // 463 labels from RomRaider definitions
+        // =====================================================================
+
+        // --- (uncategorized) ---
+        count += labelComment(0x00014004, "cal_Max_Wastegate_Duty_Limit_Post_Compensation",
+            "RomRaider: Max Wastegate Duty Limit Post-Compensation");
+        count += labelComment(0x00020384, "cal_Engine_Load_Limit_A_Maximum",
+            "RomRaider: Engine Load Limit A (Maximum)");
+        count += labelComment(0x0004BBAC, "cal_Fuel_Pump_Duty",
+            "RomRaider: Fuel Pump Duty");
+        count += labelComment(0x0009A771, "cal_P0336_CRANKSHAFT_POS_SENSOR_A_RANGE_PERF",
+            "RomRaider: (P0336) CRANKSHAFT POS. SENSOR A RANGE/PERF");
+        count += labelComment(0x0009A772, "cal_P0604_CONTROL_MODULE_RAM_ERROR",
+            "RomRaider: (P0604) CONTROL MODULE RAM ERROR");
+        count += labelComment(0x0009A773, "cal_P0102_MAF_SENSOR_LOW_INPUT",
+            "RomRaider: (P0102) MAF SENSOR LOW INPUT");
+        count += labelComment(0x0009A774, "cal_P0103_MAF_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0103) MAF SENSOR HIGH INPUT");
+        count += labelComment(0x0009A775, "cal_P0500_VEHICLE_SPEED_SENSOR_A",
+            "RomRaider: (P0500) VEHICLE SPEED SENSOR A");
+        count += labelComment(0x0009A776, "cal_P0327_KNOCK_SENSOR_1_LOW_INPUT",
+            "RomRaider: (P0327) KNOCK SENSOR 1 LOW INPUT");
+        count += labelComment(0x0009A777, "cal_P0328_KNOCK_SENSOR_1_HIGH_INPUT",
+            "RomRaider: (P0328) KNOCK SENSOR 1 HIGH INPUT");
+        count += labelComment(0x0009A778, "cal_P0122_TPS_A_LOW_INPUT",
+            "RomRaider: (P0122) TPS A LOW INPUT");
+        count += labelComment(0x0009A779, "cal_P0123_TPS_A_HIGH_INPUT",
+            "RomRaider: (P0123) TPS A HIGH INPUT");
+        count += labelComment(0x0009A77A, "cal_P0117_COOLANT_TEMP_SENSOR_LOW_INPUT",
+            "RomRaider: (P0117) COOLANT TEMP SENSOR LOW INPUT");
+        count += labelComment(0x0009A77B, "cal_P0118_COOLANT_TEMP_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0118) COOLANT TEMP SENSOR HIGH INPUT");
+        count += labelComment(0x0009A77C, "cal_P0125_INSUFFICIENT_COOLANT_TEMP_FUELING",
+            "RomRaider: (P0125) INSUFFICIENT COOLANT TEMP (FUELING)");
+        count += labelComment(0x0009A77D, "cal_P0462_FUEL_LEVEL_SENSOR_LOW_INPUT",
+            "RomRaider: (P0462) FUEL LEVEL SENSOR LOW INPUT");
+        count += labelComment(0x0009A77E, "cal_P0463_FUEL_LEVEL_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0463) FUEL LEVEL SENSOR HIGH INPUT");
+        count += labelComment(0x0009A77F, "cal_P0461_FUEL_LEVEL_SENSOR_RANGE_PERF",
+            "RomRaider: (P0461) FUEL LEVEL SENSOR RANGE/PERF");
+        count += labelComment(0x0009A780, "cal_P0851_NEUTRAL_SWITCH_INPUT_LOW",
+            "RomRaider: (P0851) NEUTRAL SWITCH INPUT LOW");
+        count += labelComment(0x0009A781, "cal_P0852_NEUTRAL_SWITCH_INPUT_HIGH",
+            "RomRaider: (P0852) NEUTRAL SWITCH INPUT HIGH");
+        count += labelComment(0x0009A782, "cal_P0506_IDLE_CONTROL_RPM_LOWER_THAN_EXPECTED",
+            "RomRaider: (P0506) IDLE CONTROL RPM LOWER THAN EXPECTED");
+        count += labelComment(0x0009A783, "cal_P0507_IDLE_CONTROL_RPM_HIGH_THAN_EXPECTED",
+            "RomRaider: (P0507) IDLE CONTROL RPM HIGH THAN EXPECTED");
+        count += labelComment(0x0009A784, "cal_P0011_CAMSHAFT_POS_TIMING_OVER_ADVANCED_1",
+            "RomRaider: (P0011) CAMSHAFT POS. - TIMING OVER-ADVANCED 1");
+        count += labelComment(0x0009A785, "cal_P0021_CAMSHAFT_POS_TIMING_OVER_ADVANCED_2",
+            "RomRaider: (P0021) CAMSHAFT POS. - TIMING OVER-ADVANCED 2");
+        count += labelComment(0x0009A786, "cal_P1400_FUEL_TANK_PRESSURE_SOL_LOW",
+            "RomRaider: (P1400) FUEL TANK PRESSURE SOL. LOW");
+        count += labelComment(0x0009A787, "cal_P1420_FUEL_TANK_PRESSURE_SOL_HIGH_INPUT",
+            "RomRaider: (P1420) FUEL TANK PRESSURE SOL. HIGH INPUT");
+        count += labelComment(0x0009A788, "cal_P0458_EVAP_PURGE_VALVE_CIRCUIT_LOW",
+            "RomRaider: (P0458) EVAP PURGE VALVE CIRCUIT LOW");
+        count += labelComment(0x0009A789, "cal_P0459_EVAP_PURGE_VALVE_CIRCUIT_HIGH",
+            "RomRaider: (P0459) EVAP PURGE VALVE CIRCUIT HIGH");
+        count += labelComment(0x0009A78A, "cal_P0141_REAR_O2_SENSOR_MALFUNCTION",
+            "RomRaider: (P0141) REAR O2 SENSOR MALFUNCTION");
+        count += labelComment(0x0009A78D, "cal_P0420_CAT_EFFICIENCY_BELOW_THRESHOLD",
+            "RomRaider: (P0420) CAT EFFICIENCY BELOW THRESHOLD");
+        count += labelComment(0x0009A78E, "cal_P0456_EVAP_LEAK_DETECTED_VERY_SMALL",
+            "RomRaider: (P0456) EVAP LEAK DETECTED (VERY SMALL)");
+        count += labelComment(0x0009A78F, "cal_P0171_SYSTEM_TOO_LEAN",
+            "RomRaider: (P0171) SYSTEM TOO LEAN");
+        count += labelComment(0x0009A790, "cal_P0172_SYSTEM_TOO_RICH",
+            "RomRaider: (P0172) SYSTEM TOO RICH");
+        count += labelComment(0x0009A791, "cal_P0301_MISFIRE_CYLINDER_1",
+            "RomRaider: (P0301) MISFIRE CYLINDER 1");
+        count += labelComment(0x0009A792, "cal_P0302_MISFIRE_CYLINDER_2",
+            "RomRaider: (P0302) MISFIRE CYLINDER 2");
+        count += labelComment(0x0009A793, "cal_P0303_MISFIRE_CYLINDER_3",
+            "RomRaider: (P0303) MISFIRE CYLINDER 3");
+        count += labelComment(0x0009A794, "cal_P0304_MISFIRE_CYLINDER_4",
+            "RomRaider: (P0304) MISFIRE CYLINDER 4");
+        count += labelComment(0x0009A797, "cal_P0000_PASS_CODE_NO_DTC_DETECTED",
+            "RomRaider: (P0000) PASS CODE (NO DTC DETECTED)");
+        count += labelComment(0x0009A798, "cal_P0000_PASS_CODE_NO_DTC_DETECTED",
+            "RomRaider: (P0000) PASS CODE (NO DTC DETECTED)_");
+        count += labelComment(0x0009A799, "cal_P0137_REAR_O2_SENSOR_LOW_VOLTAGE",
+            "RomRaider: (P0137) REAR O2 SENSOR LOW VOLTAGE");
+        count += labelComment(0x0009A79A, "cal_P0131_FRONT_O2_SENSOR_LOW_INPUT",
+            "RomRaider: (P0131) FRONT O2 SENSOR LOW INPUT");
+        count += labelComment(0x0009A79B, "cal_P0132_FRONT_O2_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0132) FRONT O2 SENSOR HIGH INPUT");
+        count += labelComment(0x0009A79C, "cal_P0138_REAR_O2_SENSOR_HIGH_VOLTAGE",
+            "RomRaider: (P0138) REAR O2 SENSOR HIGH VOLTAGE");
+        count += labelComment(0x0009A79D, "cal_P0112_IAT_SENSOR_LOW_INPUT",
+            "RomRaider: (P0112) IAT SENSOR LOW INPUT");
+        count += labelComment(0x0009A79E, "cal_P0113_IAT_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0113) IAT SENSOR HIGH INPUT");
+        count += labelComment(0x0009A79F, "cal_P0111_IAT_SENSOR_RANGE_PERF",
+            "RomRaider: (P0111) IAT SENSOR RANGE/PERF");
+        count += labelComment(0x0009A7A0, "cal_P0038_REAR_O2_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0038) REAR O2 SENSOR HIGH INPUT");
+        count += labelComment(0x0009A7A1, "cal_P0032_FRONT_O2_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0032) FRONT O2 SENSOR HIGH INPUT");
+        count += labelComment(0x0009A7A2, "cal_P0037_REAR_O2_SENSOR_LOW_INPUT",
+            "RomRaider: (P0037) REAR O2 SENSOR LOW INPUT");
+        count += labelComment(0x0009A7A3, "cal_P0031_FRONT_O2_SENSOR_LOW_INPUT",
+            "RomRaider: (P0031) FRONT O2 SENSOR LOW INPUT");
+        count += labelComment(0x0009A7A4, "cal_P0107_MAP_SENSOR_LOW_INPUT",
+            "RomRaider: (P0107) MAP SENSOR LOW INPUT");
+        count += labelComment(0x0009A7A5, "cal_P0108_MAP_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0108) MAP SENSOR HIGH INPUT");
+        count += labelComment(0x0009A7A6, "cal_P0128_THERMOSTAT_MALFUNCTION",
+            "RomRaider: (P0128) THERMOSTAT MALFUNCTION");
+        count += labelComment(0x0009A7A7, "cal_P0245_WASTEGATE_SOLENOID_A_LOW",
+            "RomRaider: (P0245) WASTEGATE SOLENOID A LOW");
+        count += labelComment(0x0009A7A8, "cal_P0246_WASTEGATE_SOLENOID_A_HIGH",
+            "RomRaider: (P0246) WASTEGATE SOLENOID A HIGH");
+        count += labelComment(0x0009A7A9, "cal_P0244_WASTEGATE_SOLENOID_A_RANGE_PERF",
+            "RomRaider: (P0244) WASTEGATE SOLENOID A RANGE/PERF");
+        count += labelComment(0x0009A7AA, "cal_P0230_FUEL_PUMP_PRIMARY_CIRCUIT",
+            "RomRaider: (P0230) FUEL PUMP PRIMARY CIRCUIT");
+        count += labelComment(0x0009A7AB, "cal_P0068_MAP_SENSOR_RANGE_PERF",
+            "RomRaider: (P0068) MAP SENSOR RANGE/PERF");
+        count += labelComment(0x0009A7AC, "cal_P0101_MAF_SENSOR_RANGE_PERF",
+            "RomRaider: (P0101) MAF SENSOR RANGE/PERF");
+        count += labelComment(0x0009A7AD, "cal_P0134_FRONT_O2_SENSOR_NO_ACTIVITY",
+            "RomRaider: (P0134) FRONT O2 SENSOR NO ACTIVITY");
+        count += labelComment(0x0009A7AE, "cal_P0030_FRONT_O2_SENSOR_RANGE_PERF",
+            "RomRaider: (P0030) FRONT O2 SENSOR RANGE/PERF");
+        count += labelComment(0x0009A7AF, "cal_P2109_TPS_A_MINIMUM_STOP_PERF",
+            "RomRaider: (P2109) TPS A MINIMUM STOP PERF");
+        count += labelComment(0x0009A7B0, "cal_P0222_TPS_B_LOW_INPUT",
+            "RomRaider: (P0222) TPS B LOW INPUT");
+        count += labelComment(0x0009A7B1, "cal_P0223_TPS_B_HIGH_INPUT",
+            "RomRaider: (P0223) TPS B HIGH INPUT");
+        count += labelComment(0x0009A7B2, "cal_P1160_ABNORMAL_RETURN_SPRING",
+            "RomRaider: (P1160) ABNORMAL RETURN SPRING");
+        count += labelComment(0x0009A7B3, "cal_P2102_THROTTLE_ACTUATOR_CIRCUIT_LOW",
+            "RomRaider: (P2102) THROTTLE ACTUATOR CIRCUIT LOW");
+        count += labelComment(0x0009A7B4, "cal_P2103_THROTTLE_ACTUATOR_CIRCUIT_HIGH",
+            "RomRaider: (P2103) THROTTLE ACTUATOR CIRCUIT HIGH");
+        count += labelComment(0x0009A7B5, "cal_P2101_THROTTLE_ACTUATOR_CIRCUIT_RANGE_PERF",
+            "RomRaider: (P2101) THROTTLE ACTUATOR CIRCUIT RANGE/PERF");
+        count += labelComment(0x0009A7B6, "cal_P2096_POST_CATALYST_TOO_LEAN_B1",
+            "RomRaider: (P2096) POST CATALYST TOO LEAN B1");
+        count += labelComment(0x0009A7B7, "cal_P2138_TPS_D_E_VOLTAGE",
+            "RomRaider: (P2138) TPS D/E VOLTAGE");
+        count += labelComment(0x0009A7B8, "cal_P2127_TPS_E_CIRCUIT_LOW_INPUT",
+            "RomRaider: (P2127) TPS E CIRCUIT LOW INPUT");
+        count += labelComment(0x0009A7B9, "cal_P2128_TPS_E_CIRCUIT_HIGH_INPUT",
+            "RomRaider: (P2128) TPS E CIRCUIT HIGH INPUT");
+        count += labelComment(0x0009A7BA, "cal_P2122_TPS_D_CIRCUIT_LOW_INPUT",
+            "RomRaider: (P2122) TPS D CIRCUIT LOW INPUT");
+        count += labelComment(0x0009A7BB, "cal_P2123_TPS_D_CIRCUIT_HIGH_INPUT",
+            "RomRaider: (P2123) TPS D CIRCUIT HIGH INPUT");
+        count += labelComment(0x0009A7BC, "cal_P2135_TPS_A_B_VOLTAGE",
+            "RomRaider: (P2135) TPS A/B VOLTAGE");
+        count += labelComment(0x0009A7BD, "cal_P2097_POST_CATALYST_TOO_RICH_B1",
+            "RomRaider: (P2097) POST CATALYST TOO RICH B1");
+        count += labelComment(0x0009A7C0, "cal_P0345_CAMSHAFT_POS_SENSOR_A_BANK_2",
+            "RomRaider: (P0345) CAMSHAFT POS. SENSOR A BANK 2");
+        count += labelComment(0x0009A7C1, "cal_P0340_CAMSHAFT_POS_SENSOR_A_MALFUNCTION",
+            "RomRaider: (P0340) CAMSHAFT POS. SENSOR A MALFUNCTION");
+        count += labelComment(0x0009A7C2, "cal_P0605_CONTROL_MODULE_ROM_ERROR",
+            "RomRaider: (P0605) CONTROL MODULE ROM ERROR");
+        count += labelComment(0x0009A7C7, "cal_P2093_OCV_SOLENOID_A2_CIRCUIT_SHORT",
+            "RomRaider: (P2093) OCV SOLENOID A2 CIRCUIT SHORT");
+        count += labelComment(0x0009A7C8, "cal_P2092_OCV_SOLENOID_A2_CIRCUIT_OPEN",
+            "RomRaider: (P2092) OCV SOLENOID A2 CIRCUIT OPEN");
+        count += labelComment(0x0009A7C9, "cal_P2089_OCV_SOLENOID_A1_CIRCUIT_SHORT",
+            "RomRaider: (P2089) OCV SOLENOID A1 CIRCUIT SHORT");
+        count += labelComment(0x0009A7CA, "cal_P2088_OCV_SOLENOID_A1_CIRCUIT_OPEN",
+            "RomRaider: (P2088) OCV SOLENOID A1 CIRCUIT OPEN");
+        count += labelComment(0x0009A7CE, "cal_P2004_TGV_INTAKE_MANIFOLD_RUNNER_1_STUCK_OPEN",
+            "RomRaider: (P2004) TGV - INTAKE MANIFOLD RUNNER 1 STUCK OPEN");
+        count += labelComment(0x0009A7CF, "cal_P2006_TGV_INTAKE_MANIFOLD_RUNNER_1_STUCK_CLOSED",
+            "RomRaider: (P2006) TGV - INTAKE MANIFOLD RUNNER 1 STUCK CLOSED");
+        count += labelComment(0x0009A7D0, "cal_P2005_TGV_INTAKE_MANIFOLD_RUNNER_2_STUCK_OPEN",
+            "RomRaider: (P2005) TGV - INTAKE MANIFOLD RUNNER 2 STUCK OPEN");
+        count += labelComment(0x0009A7D1, "cal_P2007_TGV_INTAKE_MANIFOLD_RUNNER_2_STUCK_CLOSED",
+            "RomRaider: (P2007) TGV - INTAKE MANIFOLD RUNNER 2 STUCK CLOSED");
+        count += labelComment(0x0009A7D3, "cal_P2016_TGV_INTAKE_MANIFOLD_RUNNER_1_POS_SENSOR_LOW",
+            "RomRaider: (P2016) TGV - INTAKE MANIFOLD RUNNER 1 POS. SENSOR LOW");
+        count += labelComment(0x0009A7D4, "cal_P2017_TGV_INTAKE_MANIFOLD_RUNNER_1_POS_SENSOR_HIGH",
+            "RomRaider: (P2017) TGV - INTAKE MANIFOLD RUNNER 1 POS. SENSOR HIGH");
+        count += labelComment(0x0009A7D5, "cal_P2021_TGV_INTAKE_MANIFOLD_RUNNER_2_POS_SENSOR_LOW",
+            "RomRaider: (P2021) TGV - INTAKE MANIFOLD RUNNER 2 POS. SENSOR LOW");
+        count += labelComment(0x0009A7D6, "cal_P2022_TGV_INTAKE_MANIFOLD_RUNNER_2_POS_SENSOR_HIGH",
+            "RomRaider: (P2022) TGV - INTAKE MANIFOLD RUNNER 2 POS. SENSOR HIGH");
+        count += labelComment(0x0009A7D7, "cal_P2009_TGV_INTAKE_MANIFOLD_RUNNER_1_CIRCUIT_LOW",
+            "RomRaider: (P2009) TGV - INTAKE MANIFOLD RUNNER 1 CIRCUIT LOW");
+        count += labelComment(0x0009A7D8, "cal_P2012_TGV_INTAKE_MANIFOLD_RUNNER_2_CIRCUIT_LOW",
+            "RomRaider: (P2012) TGV - INTAKE MANIFOLD RUNNER 2 CIRCUIT LOW");
+        count += labelComment(0x0009A7D9, "cal_P2008_TGV_INTAKE_MANIFOLD_RUNNER_1_CIRCUIT_OPEN",
+            "RomRaider: (P2008) TGV - INTAKE MANIFOLD RUNNER 1 CIRCUIT OPEN");
+        count += labelComment(0x0009A7DA, "cal_P2011_TGV_INTAKE_MANIFOLD_RUNNER_2_CIRCUIT_OPEN",
+            "RomRaider: (P2011) TGV - INTAKE MANIFOLD RUNNER 2 CIRCUIT OPEN");
+        count += labelComment(0x0009A7DB, "cal_P2444_SECONDARY_AIR_PUMP_1_STUCK_ON_B1",
+            "RomRaider: (P2444) SECONDARY AIR PUMP 1 STUCK ON B1");
+        count += labelComment(0x0009A7DC, "cal_P0411_SECONDARY_AIR_PUMP_INCORRECT_FLOW",
+            "RomRaider: (P0411) SECONDARY AIR PUMP INCORRECT FLOW");
+        count += labelComment(0x0009A7DD, "cal_P0410_SECONDARY_AIR_PUMP_SYSTEM",
+            "RomRaider: (P0410) SECONDARY AIR PUMP SYSTEM");
+        count += labelComment(0x0009A7DE, "cal_P2431_SECONDARY_AIR_PUMP_CIRCUIT_RANGE_PERF",
+            "RomRaider: (P2431) SECONDARY AIR PUMP CIRCUIT RANGE/PERF");
+        count += labelComment(0x0009A7DF, "cal_P2433_SECONDARY_AIR_PUMP_CIRCUIT_HIGH",
+            "RomRaider: (P2433) SECONDARY AIR PUMP CIRCUIT HIGH");
+        count += labelComment(0x0009A7E0, "cal_P2432_SECONDARY_AIR_PUMP_CIRCUIT_LOW",
+            "RomRaider: (P2432) SECONDARY AIR PUMP CIRCUIT LOW");
+        count += labelComment(0x0009A7E1, "cal_P0413_SECONDARY_AIR_PUMP_A_OPEN",
+            "RomRaider: (P0413) SECONDARY AIR PUMP A OPEN");
+        count += labelComment(0x0009A7E2, "cal_P0140_REAR_O2_SENSOR_NO_ACTIVITY",
+            "RomRaider: (P0140) REAR O2 SENSOR NO ACTIVITY");
+        count += labelComment(0x0009A7E3, "cal_P0414_SECONDARY_AIR_PUMP_A_SHORTED",
+            "RomRaider: (P0414) SECONDARY AIR PUMP A SHORTED");
+        count += labelComment(0x0009A7E4, "cal_P0018_CRANKSHAFT_CAMSHAFT_CORRELATION_2A",
+            "RomRaider: (P0018) CRANKSHAFT/CAMSHAFT CORRELATION 2A");
+        count += labelComment(0x0009A7E5, "cal_P0016_CRANKSHAFT_CAMSHAFT_CORRELATION_1A",
+            "RomRaider: (P0016) CRANKSHAFT/CAMSHAFT CORRELATION 1A");
+        count += labelComment(0x0009A7E6, "cal_P1410_SECONDARY_AIR_PUMP_VALVE_STUCK_OPEN",
+            "RomRaider: (P1410) SECONDARY AIR PUMP VALVE STUCK OPEN");
+        count += labelComment(0x0009A7E7, "cal_P2443_SECONDARY_AIR_PUMP_2_STUCK_CLOSED",
+            "RomRaider: (P2443) SECONDARY AIR PUMP 2 STUCK CLOSED");
+        count += labelComment(0x0009A7E8, "cal_P2442_SECONDARY_AIR_PUMP_VALVE_2_STUCK_OPEN",
+            "RomRaider: (P2442) SECONDARY AIR PUMP VALVE 2 STUCK OPEN");
+        count += labelComment(0x0009A7E9, "cal_P2441_SECONDARY_AIR_PUMP_VALVE_1_STUCK_CLOSED",
+            "RomRaider: (P2441) SECONDARY AIR PUMP VALVE 1 STUCK CLOSED");
+        count += labelComment(0x0009A7EA, "cal_P2440_SECONDARY_AIR_PUMP_VALVE_1_STUCK_OPEN",
+            "RomRaider: (P2440) SECONDARY AIR PUMP VALVE 1 STUCK OPEN");
+        count += labelComment(0x0009A7EB, "cal_P0417_SECONDARY_AIR_PUMP_B_SHORTED",
+            "RomRaider: (P0417) SECONDARY AIR PUMP B SHORTED");
+        count += labelComment(0x0009A7EC, "cal_P0416_SECONDARY_AIR_PUMP_B_OPEN",
+            "RomRaider: (P0416) SECONDARY AIR PUMP B OPEN");
+        count += labelComment(0x0009A7F2, "cal_P0201_INJECTOR_CIRCUIT_MALFUNCTION_CYLINDER_1",
+            "RomRaider: (P0201) INJECTOR CIRCUIT MALFUNCTION CYLINDER 1");
+        count += labelComment(0x0009A7F3, "cal_P0204_INJECTOR_CIRCUIT_MALFUNCTION_CYLINDER_4",
+            "RomRaider: (P0204) INJECTOR CIRCUIT MALFUNCTION CYLINDER 4");
+        count += labelComment(0x0009A7F4, "cal_P0203_INJECTOR_CIRCUIT_MALFUNCTION_CYLINDER_3",
+            "RomRaider: (P0203) INJECTOR CIRCUIT MALFUNCTION CYLINDER 3");
+        count += labelComment(0x0009A7F5, "cal_P0202_INJECTOR_CIRCUIT_MALFUNCTION_CYLINDER_2",
+            "RomRaider: (P0202) INJECTOR CIRCUIT MALFUNCTION CYLINDER 2");
+        count += labelComment(0x0009A7F6, "cal_U0422_CAN_INVALID_DATA_RECEIVED_FROM_BIU",
+            "RomRaider: (U0422) CAN INVALID DATA RECEIVED FROM BIU");
+        count += labelComment(0x0009A7F7, "cal_U0140_CAN_LOST_COMMUNICATION_WITH_BIU",
+            "RomRaider: (U0140) CAN LOST COMMUNICATION WITH BIU");
+        count += labelComment(0x0009A7F8, "cal_U0402_CAN_INVALID_DATA_RECEIVED_FROM_TCM",
+            "RomRaider: (U0402) CAN INVALID DATA RECEIVED FROM TCM");
+        count += labelComment(0x0009A7F9, "cal_U0101_CAN_LOST_COMMUNICATION_WITH_TCM",
+            "RomRaider: (U0101) CAN LOST COMMUNICATION WITH TCM");
+        count += labelComment(0x0009A7FA, "cal_U0416_CAN_INVALID_DATA_RECEIVED_FROM_VDC",
+            "RomRaider: (U0416) CAN INVALID DATA RECEIVED FROM VDC");
+        count += labelComment(0x0009A7FB, "cal_U0122_CAN_LOST_COMMUNICATION_WITH_VDC",
+            "RomRaider: (U0122) CAN LOST COMMUNICATION WITH VDC");
+        count += labelComment(0x0009A7FC, "cal_U0073_CAN_COMMUNICATION_BUS_A_OFF",
+            "RomRaider: (U0073) CAN COMMUNICATION BUS A OFF");
+        count += labelComment(0x0009A7FD, "cal_P050B_COLD_START_IGNITION_TIMING_PERFORMANCE",
+            "RomRaider: (P050B) COLD START IGNITION TIMING PERFORMANCE");
+        count += labelComment(0x0009A7FE, "cal_P050A_COLD_START_IDLE_AIR_CONTROL_SYSTEM_PERFORMANCE",
+            "RomRaider: (P050A) COLD START IDLE AIR CONTROL SYSTEM PERFORMANCE");
+        count += labelComment(0x0009A7FF, "cal_P2610_ECM_PCM_INTERNAL_ENGINE_OFF_TIMER_PERFORMANCE",
+            "RomRaider: (P2610) ECM/PCM INTERNAL ENGINE OFF TIMER PERFORMANCE");
+        count += labelComment(0x0009A800, "cal_P2420_EVAP_SWITCHING_VALVE_HIGH",
+            "RomRaider: (P2420) EVAP SWITCHING VALVE HIGH");
+        count += labelComment(0x0009A801, "cal_P2419_EVAP_SWITCHING_VALVE_LOW",
+            "RomRaider: (P2419) EVAP SWITCHING VALVE LOW");
+        count += labelComment(0x0009A802, "cal_P2401_EVAP_LEAK_DETECTION_PUMP_CONTROL_CIRCUIT_LOW",
+            "RomRaider: (P2401) EVAP LEAK DETECTION PUMP CONTROL CIRCUIT LOW");
+        count += labelComment(0x0009A803, "cal_P0453_EVAP_PRESSURE_SENSOR_HIGH_INPUT",
+            "RomRaider: (P0453) EVAP PRESSURE SENSOR HIGH INPUT");
+        count += labelComment(0x0009A804, "cal_P0452_EVAP_PRESSURE_SENSOR_LOW_INPUT",
+            "RomRaider: (P0452) EVAP PRESSURE SENSOR LOW INPUT");
+        count += labelComment(0x0009A805, "cal_P015B_O2_SENSOR_DELAYED_RESPONSE_LEAN_TO_RICH_B1_S1",
+            "RomRaider: (P015B) O2 SENSOR DELAYED RESPONSE LEAN TO RICH B1 S1");
+        count += labelComment(0x0009A806, "cal_P015A_O2_SENSOR_DELAYED_RESPONSE_RICH_TO_LEAN_B1_S1",
+            "RomRaider: (P015A) O2 SENSOR DELAYED RESPONSE RICH TO LEAN B1 S1");
+        count += labelComment(0x0009A807, "cal_P014D_O2_SENSOR_SLOW_RESPONSE_LEAN_TO_RICH_B1_S1",
+            "RomRaider: (P014D) O2 SENSOR SLOW RESPONSE LEAN TO RICH B1 S1");
+        count += labelComment(0x0009A808, "cal_P014C_O2_SENSOR_SLOW_RESPONSE_RICH_TO_LEAN_B1_S1",
+            "RomRaider: (P014C) O2 SENSOR SLOW RESPONSE RICH TO LEAN B1 S1");
+        count += labelComment(0x0009A809, "cal_P1451_EVAPORATIVE_EMISSION_CONT_SYS",
+            "RomRaider: (P1451) EVAPORATIVE EMISSION CONT. SYS.");
+        count += labelComment(0x0009A80A, "cal_P1449_EVAPORATIVE_EMISSION_CONT_SYS_AIR_FILTER_CLOG",
+            "RomRaider: (P1449) EVAPORATIVE EMISSION CONT. SYS. AIR FILTER CLOG");
+        count += labelComment(0x0009A80B, "cal_P0455_EVAP_EMISSION_CONTROL_SYSTEM_LEAK_DETECTED_GROSS_L",
+            "RomRaider: (P0455) EVAP EMISSION CONTROL SYSTEM LEAK DETECTED (GROSS LEAK)");
+        count += labelComment(0x0009A80C, "cal_P0451_EVAP_PRESSURE_SENSOR_RANGE_PERF",
+            "RomRaider: (P0451) EVAP PRESSURE SENSOR RANGE/PERF");
+        count += labelComment(0x0009A80D, "cal_P0441_EVAP_INCORRECT_PURGE_FLOW",
+            "RomRaider: (P0441) EVAP INCORRECT PURGE FLOW");
+        count += labelComment(0x0009A80F, "cal_P219A_BANK_1_AFR_IMBALANCE",
+            "RomRaider: (P219A) BANK 1 AFR IMBALANCE");
+        count += labelComment(0x0009A810, "cal_P2404_EVAP_LEAK_DETECTION_PUMP_SENSE_CIRCUIT_RANGE_PERF",
+            "RomRaider: (P2404) EVAP LEAK DETECTION PUMP SENSE CIRCUIT RANGE/PERF");
+        count += labelComment(0x0009A811, "cal_P2402_EVAP_LEAK_DETECTION_PUMP_CONTROL_CIRCUIT_HIGH",
+            "RomRaider: (P2402) EVAP LEAK DETECTION PUMP CONTROL CIRCUIT HIGH");
+        count += labelComment(0x0009A812, "cal_P013F_O2_SENSOR_DELAYED_RESPONSE_LEAN_TO_RICH_B1_S2",
+            "RomRaider: (P013F) O2 SENSOR DELAYED RESPONSE LEAN TO RICH B1 S2");
+        count += labelComment(0x0009A813, "cal_P013E_O2_SENSOR_DELAYED_RESPONSE_RICH_TO_LEAN_B1_S2",
+            "RomRaider: (P013E) O2 SENSOR DELAYED RESPONSE RICH TO LEAN B1 S2");
+        count += labelComment(0x0009A814, "cal_P013B_O2_SENSOR_SLOW_RESPONSE_LEAN_TO_RICH_B1_S2",
+            "RomRaider: (P013B) O2 SENSOR SLOW RESPONSE LEAN TO RICH B1 S2");
+        count += labelComment(0x0009A815, "cal_P013A_O2_SENSOR_SLOW_RESPONSE_RICH_TO_LEAN_B1_S2",
+            "RomRaider: (P013A) O2 SENSOR SLOW RESPONSE RICH TO LEAN B1 S2");
+        count += labelComment(0x0009A816, "cal_P0354_IGNITION_COIL_D_PRIMARY_SECONDARY_CIRCUIT_MALFUNCT",
+            "RomRaider: (P0354) IGNITION COIL D PRIMARY/SECONDARY CIRCUIT MALFUNCTION");
+        count += labelComment(0x0009A817, "cal_P0353_IGNITION_COIL_C_PRIMARY_SECONDARY_CIRCUIT_MALFUNCT",
+            "RomRaider: (P0353) IGNITION COIL C PRIMARY/SECONDARY CIRCUIT MALFUNCTION");
+        count += labelComment(0x0009A818, "cal_P0352_IGNITION_COIL_B_PRIMARY_SECONDARY_CIRCUIT_MALFUNCT",
+            "RomRaider: (P0352) IGNITION COIL B PRIMARY/SECONDARY CIRCUIT MALFUNCTION");
+        count += labelComment(0x0009A819, "cal_P0351_IGNITION_COIL_A_PRIMARY_SECONDARY_CIRCUIT_MALFUNCT",
+            "RomRaider: (P0351) IGNITION COIL A PRIMARY/SECONDARY CIRCUIT MALFUNCTION");
+        count += labelComment(0x0009A81A, "cal_P0512_STARTER_REQUEST_CIRCUIT",
+            "RomRaider: (P0512) STARTER REQUEST CIRCUIT");
+        count += labelComment(0x0009A82B, "cal_P0341_CAMSHAFT_POS_SENSOR_A_RANGE_PERF",
+            "RomRaider: (P0341) CAMSHAFT POS. SENSOR A RANGE/PERF");
+        count += labelComment(0x000C0BAD, "cal_Boost_Control_Disable_Delay_Fine_Correction",
+            "RomRaider: Boost Control Disable Delay (Fine Correction)");
+        count += labelComment(0x000C0BD4, "cal_TD_Activation_Thresholds_Target_Boost",
+            "RomRaider: TD Activation Thresholds (Target Boost)_");
+        count += labelComment(0x000C0BDC, "cal_TD_Integral_Negative_Activation_Boost_Error",
+            "RomRaider: TD Integral Negative Activation (Boost Error)");
+        count += labelComment(0x000C0BE0, "cal_TD_Integral_Positive_Activation_Boost_Error",
+            "RomRaider: TD Integral Positive Activation (Boost Error)");
+        count += labelComment(0x000C0BE4, "cal_TD_Integral_Negative_Activation_Wastegate_Duty",
+            "RomRaider: TD Integral Negative Activation (Wastegate Duty)");
+        count += labelComment(0x000C0BE8, "cal_TD_Activation_Thresholds_RPM",
+            "RomRaider: TD Activation Thresholds (RPM)");
+        count += labelComment(0x000C0BF0, "cal_TD_Integral_Cumulative_Range_WGDC_Correction",
+            "RomRaider: TD Integral Cumulative Range (WGDC Correction)");
+        count += labelComment(0x000C0BF8, "cal_Boost_Control_Disable_Fine_Correction",
+            "RomRaider: Boost Control Disable (Fine Correction)");
+        count += labelComment(0x000C0BFC, "cal_Boost_Control_Disable_IAM",
+            "RomRaider: Boost Control Disable (IAM)");
+        count += labelComment(0x000C0C08, "cal_Target_Boost_Compensation_1st_Gear_Speed_Disable",
+            "RomRaider: Target Boost Compensation (1st Gear) Speed Disable");
+        count += labelComment(0x000C0C0C, "cal_Target_Boost_Compensation_1st_Gear",
+            "RomRaider: Target Boost Compensation (1st Gear)");
+        count += labelComment(0x000C0C14, "cal_Coolant_Temperature",
+            "RomRaider: Coolant Temperature");
+        count += labelComment(0x000C0C54, "cal_Intake_Temperature",
+            "RomRaider: Intake Temperature");
+        count += labelComment(0x000C0C94, "cal_Initial_Max_Wastegate_Duty_Compensation_IAT",
+            "RomRaider: Initial/Max Wastegate Duty Compensation (IAT)");
+        count += labelComment(0x000C0CB4, "cal_Initial_Max_Wastegate_Duty_Compensation_ECT",
+            "RomRaider: Initial/Max Wastegate Duty Compensation (ECT)");
+        count += labelComment(0x000C0CC4, "cal_TD_Proportional_Compensation_IAT",
+            "RomRaider: TD Proportional Compensation (IAT)");
+        count += labelComment(0x000C0CD4, "cal_TD_Integral_Negative_Compensation_IAT",
+            "RomRaider: TD Integral Negative Compensation (IAT)");
+        count += labelComment(0x000C0CE4, "cal_TD_Integral_Positive_Compensation_IAT",
+            "RomRaider: TD Integral Positive Compensation (IAT)");
+        count += labelComment(0x000C0CF4, "cal_Target_Boost_Compensation_ECT",
+            "RomRaider: Target Boost Compensation (ECT)");
+        count += labelComment(0x000C0D04, "cal_Boost_Error",
+            "RomRaider: Boost Error");
+        count += labelComment(0x000C0D28, "cal_Turbo_Dynamics_Proportional",
+            "RomRaider: Turbo Dynamics Proportional");
+        count += labelComment(0x000C0D3C, "cal_Boost_Error",
+            "RomRaider: Boost Error");
+        count += labelComment(0x000C0D60, "cal_Turbo_Dynamics_Integral_Negative",
+            "RomRaider: Turbo Dynamics Integral Negative");
+        count += labelComment(0x000C0D74, "cal_Boost_Error",
+            "RomRaider: Boost Error");
+        count += labelComment(0x000C0D98, "cal_Turbo_Dynamics_Integral_Positive",
+            "RomRaider: Turbo Dynamics Integral Positive");
+        count += labelComment(0x000C0E24, "cal_Intake_Temperature",
+            "RomRaider: Intake Temperature");
+        count += labelComment(0x000C0E3C, "cal_Target_Boost_Compensation_IAT",
+            "RomRaider: Target Boost Compensation (IAT)_");
+        count += labelComment(0x000C0E54, "cal_Atmospheric_Pressure",
+            "RomRaider: Atmospheric Pressure");
+        count += labelComment(0x000C0E6C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C0E7C, "cal_Initial_Max_Wastegate_Duty_Compensation_Atm_Pressure",
+            "RomRaider: Initial/Max Wastegate Duty Compensation (Atm. Pressure)");
+        count += labelComment(0x000C0E94, "cal_Atmospheric_Pressure",
+            "RomRaider: Atmospheric Pressure");
+        count += labelComment(0x000C0EAC, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C0EC4, "cal_Target_Boost_Compensation_Atm_Pressure",
+            "RomRaider: Target Boost Compensation (Atm. Pressure)_");
+        count += labelComment(0x000C0EE8, "cal_Requested_Torque",
+            "RomRaider: Requested Torque");
+        count += labelComment(0x000C0F24, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C10E0, "cal_Requested_Torque",
+            "RomRaider: Requested Torque");
+        count += labelComment(0x000C111C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C12D8, "cal_Requested_Torque",
+            "RomRaider: Requested Torque");
+        count += labelComment(0x000C1304, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C1598, "cal_Cluster_Display_Fuel_Consumption_Correction",
+            "RomRaider: Cluster Display Fuel Consumption Correction");
+        count += labelComment(0x000C1780, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000C17C0, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C1A00, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000C1A40, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C1C80, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000C1CC0, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C1F00, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000C1F40, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C3474, "cal_Gear_Determination_Thresholds_A",
+            "RomRaider: Gear Determination Thresholds A");
+        count += labelComment(0x000C3488, "cal_Gear_Determination_Thresholds_B",
+            "RomRaider: Gear Determination Thresholds B");
+        count += labelComment(0x000C349C, "cal_Gear_Determination_Thresholds_C",
+            "RomRaider: Gear Determination Thresholds C");
+        count += labelComment(0x000C3600, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C36F8, "cal_Atmospheric_Pressure",
+            "RomRaider: Atmospheric Pressure");
+        count += labelComment(0x000C3B7C, "cal_Intake_Temperature",
+            "RomRaider: Intake Temperature");
+        count += labelComment(0x000C3B90, "cal_Mass_Airflow",
+            "RomRaider: Mass Airflow");
+        count += labelComment(0x000C3BB0, "cal_MAF_Compensation_IAT",
+            "RomRaider: MAF Compensation (IAT)");
+        count += labelComment(0x000C3BD8, "cal_Manifold_Pressure",
+            "RomRaider: Manifold Pressure");
+        count += labelComment(0x000C3C04, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C3C3C, "cal_Engine_Load_Compensation_Cruise_MP",
+            "RomRaider: Engine Load Compensation Cruise (MP)");
+        count += labelComment(0x000C3CD8, "cal_Manifold_Pressure",
+            "RomRaider: Manifold Pressure");
+        count += labelComment(0x000C3D04, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000C3D3C, "cal_Engine_Load_Compensation_Non_Cruise_MP",
+            "RomRaider: Engine Load Compensation Non-Cruise (MP)");
+        count += labelComment(0x000CBC09, "cal_Tip_in_Throttle_Cumulative_Reset",
+            "RomRaider: Tip-in Throttle Cumulative Reset");
+        count += labelComment(0x000CC4A8, "cal_Tip_in_Enrichment_Compensation_D_ECT_Activation",
+            "RomRaider: Tip-in Enrichment Compensation D (ECT) Activation");
+        count += labelComment(0x000CC518, "cal_Rev_Limit_Fuel_Resume_Boost",
+            "RomRaider: Rev Limit Fuel Resume (Boost)");
+        count += labelComment(0x000CC528, "cal_Speed_Limiting_Disable_Fuel_Cut",
+            "RomRaider: Speed Limiting Disable (Fuel Cut)");
+        count += labelComment(0x000CC830, "cal_Min_Primary_Base_Enrichment_1_Non_Primary_OL",
+            "RomRaider: Min Primary Base Enrichment 1 (Non-Primary OL)_");
+        count += labelComment(0x000CC840, "cal_Manifold_Pressure",
+            "RomRaider: Manifold Pressure");
+        count += labelComment(0x000CC868, "cal_Cranking_Fuel_IPW_Compensation_MAP",
+            "RomRaider: Cranking Fuel IPW Compensation (MAP)");
+        count += labelComment(0x000CC874, "cal_Accelerator_Pedal_Angle",
+            "RomRaider: Accelerator Pedal Angle");
+        count += labelComment(0x000CC89C, "cal_Cranking_Fuel_IPW_Compensation_Accelerator",
+            "RomRaider: Cranking Fuel IPW Compensation (Accelerator)");
+        count += labelComment(0x000CC8A8, "cal_Intake_Temperature",
+            "RomRaider: Intake Temperature");
+        count += labelComment(0x000CC8BC, "cal_Cranking_Fuel_IPW_Compensation_IAT",
+            "RomRaider: Cranking Fuel IPW Compensation (IAT)");
+        count += labelComment(0x000CCD18, "cal_Timing_Compensation_MRP_Timing_Compensation_IAT",
+            "RomRaider: 'Timing Compensation (MRP)' + 'Timing Compensation (IAT)'");
+        count += labelComment(0x000CCD30, "cal_Primary_Open_Loop_Fueling_Compensation_Timing_Compensati",
+            "RomRaider: Primary Open Loop Fueling Compensation (Timing Compensation)_");
+        count += labelComment(0x000CCD38, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000CCD88, "cal_Throttle_Plate_Opening_Angle",
+            "RomRaider: Throttle Plate Opening Angle");
+        count += labelComment(0x000CCDA0, "cal_Minimum_Primary_Open_Loop_Enrichment_Throttle",
+            "RomRaider: Minimum Primary Open Loop Enrichment (Throttle)");
+        count += labelComment(0x000CCDA8, "cal_Accelerator_Pedal_Angle",
+            "RomRaider: Accelerator Pedal Angle");
+        count += labelComment(0x000CCDC0, "cal_Minimum_Primary_Open_Loop_Enrichment_Accelerator",
+            "RomRaider: Minimum Primary Open Loop Enrichment (Accelerator)");
+        count += labelComment(0x000CD128, "cal_Boost_Error",
+            "RomRaider: Boost Error");
+        count += labelComment(0x000CE5B8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000CE618, "cal_Mass_Airflow",
+            "RomRaider: Mass Airflow");
+        count += labelComment(0x000CE6CC, "cal_Primary_Open_Loop_Fueling_Compensation_ECT",
+            "RomRaider: Primary Open Loop Fueling Compensation (ECT)");
+        count += labelComment(0x000CED74, "cal_Throttle_Angle_Change",
+            "RomRaider: Throttle Angle Change");
+        count += labelComment(0x000CF680, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000CF694, "cal_Coolant_Temperature",
+            "RomRaider: Coolant Temperature");
+        count += labelComment(0x000CF6B0, "cal_Cranking_Fuel_IPW_Compensation_Imm_Non_Cruise_RPM",
+            "RomRaider: Cranking Fuel IPW Compensation Imm. Non-Cruise (RPM)");
+        count += labelComment(0x000CF6D4, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000CF6E8, "cal_Coolant_Temperature",
+            "RomRaider: Coolant Temperature");
+        count += labelComment(0x000CF704, "cal_Cranking_Fuel_IPW_Compensation_Imm_Cruise_RPM",
+            "RomRaider: Cranking Fuel IPW Compensation Imm. Cruise (RPM)");
+        count += labelComment(0x000CF898, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000CF8B8, "cal_Min_Primary_Base_Enrichment_1_Non_Cruise",
+            "RomRaider: Min Primary Base Enrichment 1 Non-Cruise");
+        count += labelComment(0x000CF938, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000CF95C, "cal_Min_Primary_Base_Enrichment_1_Cruise",
+            "RomRaider: Min Primary Base Enrichment 1 Cruise");
+        count += labelComment(0x000CFCA4, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000CFCE8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000CFE64, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000CFEA8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000CFEF0, "cal_Primary_Open_Loop_Fueling_Failsafe_KCA_Alternate_Mode",
+            "RomRaider: Primary Open Loop Fueling (Failsafe)(KCA Alternate Mode)");
+        count += labelComment(0x000D01B8, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D01FC, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D0378, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D03BC, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D0538, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D057C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D0760, "cal_Last_Calculated_Base_Pulse_Width",
+            "RomRaider: Last Calculated Base Pulse Width");
+        count += labelComment(0x000D07A4, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D07E8, "cal_Per_Injector_Pulse_Width_Compensation_A",
+            "RomRaider: Per Injector Pulse Width Compensation A");
+        count += labelComment(0x000D090C, "cal_Last_Calculated_Base_Pulse_Width",
+            "RomRaider: Last Calculated Base Pulse Width");
+        count += labelComment(0x000D0950, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D0994, "cal_Per_Injector_Pulse_Width_Compensation_B",
+            "RomRaider: Per Injector Pulse Width Compensation B");
+        count += labelComment(0x000D0AB8, "cal_Last_Calculated_Base_Pulse_Width",
+            "RomRaider: Last Calculated Base Pulse Width");
+        count += labelComment(0x000D0AFC, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D0B40, "cal_Per_Injector_Pulse_Width_Compensation_C",
+            "RomRaider: Per Injector Pulse Width Compensation C");
+        count += labelComment(0x000D0C64, "cal_Last_Calculated_Base_Pulse_Width",
+            "RomRaider: Last Calculated Base Pulse Width");
+        count += labelComment(0x000D0CA8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D0CEC, "cal_Per_Injector_Pulse_Width_Compensation_D",
+            "RomRaider: Per Injector Pulse Width Compensation D");
+        count += labelComment(0x000D13A4, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D1410, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D147C, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D14A8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D16DC, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D1710, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D2530, "cal_Atmospheric_Pressure",
+            "RomRaider: Atmospheric Pressure");
+        count += labelComment(0x000D2548, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D29DE, "cal_Feedback_Correction_Negative_Advance_Delay",
+            "RomRaider: Feedback Correction Negative Advance Delay");
+        count += labelComment(0x000D29EE, "cal_Fine_Correction_Advance_Delay",
+            "RomRaider: Fine Correction Advance Delay");
+        count += labelComment(0x000D2D9C, "cal_Timing_Comp_Minimum_Load_Per_Cylinder",
+            "RomRaider: Timing Comp Minimum Load (Per Cylinder)");
+        count += labelComment(0x000D2DA0, "cal_Timing_Comp_Minimum_Coolant_Temp_Per_Cylinder",
+            "RomRaider: Timing Comp Minimum Coolant Temp (Per Cylinder)");
+        count += labelComment(0x000D2DAC, "cal_Feedback_Correction_Range_RPM",
+            "RomRaider: Feedback Correction Range (RPM)");
+        count += labelComment(0x000D2DD8, "cal_Extended_Feedback_Correction_High_RPM_Compensation",
+            "RomRaider: Extended Feedback Correction High RPM Compensation");
+        count += labelComment(0x000D2EBC, "cal_Rough_Correction_Range_RPM",
+            "RomRaider: Rough Correction Range (RPM)");
+        count += labelComment(0x000D2ECC, "cal_Rough_Correction_Range_Load",
+            "RomRaider: Rough Correction Range (Load)");
+        count += labelComment(0x000D2F6C, "cal_Fine_Correction_Range_RPM",
+            "RomRaider: Fine Correction Range (RPM)");
+        count += labelComment(0x000D2F7C, "cal_Fine_Correction_Range_Load",
+            "RomRaider: Fine Correction Range (Load)");
+        count += labelComment(0x000D2F8C, "cal_Coolant_Temperature",
+            "RomRaider: Coolant Temperature");
+        count += labelComment(0x000D300C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D31B6, "cal_Base_Timing_Idle_B_In_Gear",
+            "RomRaider: Base Timing Idle B (In-Gear)");
+        count += labelComment(0x000D31D6, "cal_Base_Timing_Idle_B_Neutral",
+            "RomRaider: Base Timing Idle B (Neutral)");
+        count += labelComment(0x000D3206, "cal_Timing_Compensation_Imm_Non_Cruise_A_ECT",
+            "RomRaider: Timing Compensation Imm. Non-Cruise A (ECT)");
+        count += labelComment(0x000D3216, "cal_Timing_Compensation_Imm_Non_Cruise_B_ECT",
+            "RomRaider: Timing Compensation Imm. Non-Cruise B (ECT)");
+        count += labelComment(0x000D3226, "cal_Timing_Compensation_Imm_Cruise_A_ECT",
+            "RomRaider: Timing Compensation Imm. Cruise A (ECT)");
+        count += labelComment(0x000D3236, "cal_Timing_Compensation_Imm_Cruise_B_ECT",
+            "RomRaider: Timing Compensation Imm. Cruise B (ECT)");
+        count += labelComment(0x000D3248, "cal_Intake_Temperature",
+            "RomRaider: Intake Temperature");
+        count += labelComment(0x000D3288, "cal_Timing_Compensation_A_IAT",
+            "RomRaider: Timing Compensation A (IAT)");
+        count += labelComment(0x000D3860, "cal_Intake_Temperature",
+            "RomRaider: Intake Temperature");
+        count += labelComment(0x000D38A0, "cal_Timing_Compensation_B_IAT",
+            "RomRaider: Timing Compensation B (IAT)");
+        count += labelComment(0x000D3C04, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D3C2C, "cal_Rough_Correction_Learning_Delay_Increasing",
+            "RomRaider: Rough Correction Learning Delay (Increasing)_");
+        count += labelComment(0x000D4688, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D46CC, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D4848, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D488C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D4A08, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D4A4C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D4A94, "cal_Base_Timing_Reference_Cruise_AVCS_related",
+            "RomRaider: Base Timing Reference Cruise (AVCS related)");
+        count += labelComment(0x000D4BC8, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D4C0C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D4C54, "cal_Base_Timing_Reference_Non_Cruise_AVCS_related",
+            "RomRaider: Base Timing Reference Non-Cruise (AVCS related)");
+        count += labelComment(0x000D4D88, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D4DA8, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D4DC8, "cal_Timing_Compensation_A_IAT_Activation",
+            "RomRaider: Timing Compensation A (IAT) Activation");
+        count += labelComment(0x000D5374, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D5388, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D53A4, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D53B8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D53D4, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D53E8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D5404, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D5418, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D5434, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D5448, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D5464, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D549C, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D54F8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D5530, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D558C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D55C4, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D5620, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D5658, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D5878, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D58BC, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D5904, "cal_Knock_Correction_Advance_Max_Cruise",
+            "RomRaider: Knock Correction Advance Max Cruise");
+        count += labelComment(0x000D5A38, "cal_Engine_Load",
+            "RomRaider: Engine Load");
+        count += labelComment(0x000D5A7C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D5AC4, "cal_Knock_Correction_Advance_Max_Non_Cruise",
+            "RomRaider: Knock Correction Advance Max Non-Cruise");
+        count += labelComment(0x000D6214, "cal_Idle_Airflow_Min_Target_Decel_Initial_Idle_Activation_Ma",
+            "RomRaider: Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter");
+        count += labelComment(0x000D6480, "cal_Idle_Airflow_Min_Target_Decel_Adder_Active_Veh_Speed_A",
+            "RomRaider: Idle Airflow Min Target Decel Adder Active Veh Speed A");
+        count += labelComment(0x000D6484, "cal_Idle_Airflow_Min_Target_Decel_Initial_Idle_Min_Airflow_A",
+            "RomRaider: Idle Airflow Min Target Decel Initial Idle Min Airflow A");
+        count += labelComment(0x000D64A4, "cal_Idle_Airflow_Min_Target_Decel_Ramping_Adder_Decreasing",
+            "RomRaider: Idle Airflow Min Target Decel Ramping Adder Decreasing");
+        count += labelComment(0x000D64A8, "cal_Idle_Airflow_Min_Target_Decel_Ramping_Adder_Increasing",
+            "RomRaider: Idle Airflow Min Target Decel Ramping Adder Increasing");
+        count += labelComment(0x000D67C8, "cal_Coolant_Temperature",
+            "RomRaider: Coolant Temperature");
+        count += labelComment(0x000D6F34, "cal_Idle_Speed_Target_A",
+            "RomRaider: Idle Speed Target A");
+        count += labelComment(0x000D6F74, "cal_Idle_Speed_Target_B",
+            "RomRaider: Idle Speed Target B");
+        count += labelComment(0x000D6FB4, "cal_Idle_Speed_Target_C",
+            "RomRaider: Idle Speed Target C");
+        count += labelComment(0x000D7054, "cal_Idle_Speed_Target_D",
+            "RomRaider: Idle Speed Target D");
+        count += labelComment(0x000D7DF8, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D7E38, "cal_Coolant_Temp",
+            "RomRaider: Coolant Temp");
+        count += labelComment(0x000D7E40, "cal_Idle_Airflow_Min_Target_Decel_Adder_RPM_x_ECT",
+            "RomRaider: Idle Airflow Min Target Decel Adder (RPM x ECT)");
+        count += labelComment(0x000D7E80, "cal_Idle_Speed_Error",
+            "RomRaider: Idle Speed Error");
+        count += labelComment(0x000D7EC4, "cal_Engine_Speed_Delta",
+            "RomRaider: Engine Speed Delta");
+        count += labelComment(0x000D7EE8, "cal_Idle_Speed_Stability_A",
+            "RomRaider: Idle Speed Stability A");
+        count += labelComment(0x000D801C, "cal_Idle_Speed_Error",
+            "RomRaider: Idle Speed Error");
+        count += labelComment(0x000D8060, "cal_Engine_Speed_Delta",
+            "RomRaider: Engine Speed Delta");
+        count += labelComment(0x000D8084, "cal_Idle_Speed_Stability_B",
+            "RomRaider: Idle Speed Stability B");
+        count += labelComment(0x000D8A39, "cal_Manifold_Pressure_Sensor_CEL_Delays",
+            "RomRaider: Manifold Pressure Sensor CEL Delays");
+        count += labelComment(0x000D8A88, "cal_Manifold_Pressure_Sensor_Limits_CEL",
+            "RomRaider: Manifold Pressure Sensor Limits (CEL)");
+        count += labelComment(0x000D8AD8, "cal_Manifold_Pressure_Sensor_Scaling",
+            "RomRaider: Manifold Pressure Sensor Scaling_");
+        count += labelComment(0x000D8BC4, "cal_MAF_sensor",
+            "RomRaider: MAF sensor");
+        count += labelComment(0x000D8C9C, "cal_MAF_Sensor_Scaling",
+            "RomRaider: MAF Sensor Scaling");
+        count += labelComment(0x000D8DDC, "cal_Coolant_Temp_Sensor",
+            "RomRaider: Coolant Temp Sensor");
+        count += labelComment(0x000D8E4C, "cal_Coolant_Temp_Sensor_Scaling",
+            "RomRaider: Coolant Temp Sensor Scaling");
+        count += labelComment(0x000D8EBC, "cal_Intake_Temp_Sensor",
+            "RomRaider: Intake Temp Sensor");
+        count += labelComment(0x000D8F34, "cal_Intake_Temp_Sensor_Scaling",
+            "RomRaider: Intake Temp Sensor Scaling");
+        count += labelComment(0x000D8FAC, "cal_Fuel_Temp_Sensor",
+            "RomRaider: Fuel Temp Sensor");
+        count += labelComment(0x000D9024, "cal_Fuel_Temp_Sensor_Scaling",
+            "RomRaider: Fuel Temp Sensor Scaling");
+        count += labelComment(0x000D918C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000D91CC, "cal_Battery_Volts",
+            "RomRaider: Battery Volts");
+        count += labelComment(0x000D91E0, "cal_Ignition_Dwell",
+            "RomRaider: Ignition Dwell");
+        count += labelComment(0x000D932C, "cal_Radiator_Fan_Modes_A_ECT",
+            "RomRaider: Radiator Fan Modes A (ECT)");
+        count += labelComment(0x000D933C, "cal_Radiator_Fan_Modes_B_ECT",
+            "RomRaider: Radiator Fan Modes B (ECT)");
+        count += labelComment(0x000D934C, "cal_Radiator_Fan_Modes_Veh_Speed",
+            "RomRaider: Radiator Fan Modes (Veh. Speed)");
+        count += labelComment(0x000F8948, "cal_Speed_Limiting_A_Throttle_SI_DRIVE_Sport_Sport_Sharp",
+            "RomRaider: Speed Limiting A (Throttle) SI-DRIVE Sport/Sport Sharp");
+        count += labelComment(0x000F8954, "cal_Speed_Limiting_Throttle_SI_DRIVE_Intelligent",
+            "RomRaider: Speed Limiting (Throttle) SI-DRIVE Intelligent");
+        count += labelComment(0x000F8960, "cal_Speed_Limiting_B_Throttle_SI_DRIVE_Sport_Sport_Sharp",
+            "RomRaider: Speed Limiting B (Throttle) SI-DRIVE Sport/Sport Sharp");
+        count += labelComment(0x000F8B14, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F8B54, "cal_Requested_Torque_Base_RPM",
+            "RomRaider: Requested Torque Base (RPM)");
+        count += labelComment(0x000F8F84, "cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B",
+            "RomRaider: 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'");
+        count += labelComment(0x000F8FC4, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F9004, "cal_Target_Throttle_Plate_Position_Cruise_Requested_Torque_R",
+            "RomRaider: Target Throttle Plate Position Cruise (Requested Torque Ratio)");
+        count += labelComment(0x000F9204, "cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B",
+            "RomRaider: 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'");
+        count += labelComment(0x000F9244, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F9284, "cal_Target_Throttle_Plate_Position_Non_Cruise_Requested_Torq",
+            "RomRaider: Target Throttle Plate Position Non-Cruise (Requested Torque Ratio)");
+        count += labelComment(0x000F9484, "cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B",
+            "RomRaider: 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'");
+        count += labelComment(0x000F94C4, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F9504, "cal_Target_Throttle_Plate_Position_Maximum_Requested_Torque",
+            "RomRaider: Target Throttle Plate Position Maximum (Requested Torque Ratio)");
+        count += labelComment(0x000F9730, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F9770, "cal_Gear",
+            "RomRaider: Gear");
+        count += labelComment(0x000F9788, "cal_Requested_Torque_Limit_A_Per_Gear_Engine_Speed",
+            "RomRaider: Requested Torque Limit A (Per Gear/Engine Speed)");
+        count += labelComment(0x000F9848, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F9888, "cal_Gear",
+            "RomRaider: Gear");
+        count += labelComment(0x000F98A0, "cal_Requested_Torque_Limit_B_Per_Gear_Engine_Speed",
+            "RomRaider: Requested Torque Limit B (Per Gear/Engine Speed)");
+        count += labelComment(0x000F9960, "cal_Accelerator_Pedal_Angle",
+            "RomRaider: Accelerator Pedal Angle");
+        count += labelComment(0x000F999C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F99E0, "cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Sport",
+            "RomRaider: Requested Torque (Accelerator Pedal) SI-DRIVE Sport");
+        count += labelComment(0x000F9BE0, "cal_Accelerator_Pedal_Angle",
+            "RomRaider: Accelerator Pedal Angle");
+        count += labelComment(0x000F9C1C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F9C60, "cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Sport_Sharp",
+            "RomRaider: Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp");
+        count += labelComment(0x000F9E60, "cal_Accelerator_Pedal_Angle",
+            "RomRaider: Accelerator Pedal Angle");
+        count += labelComment(0x000F9E9C, "cal_Engine_Speed",
+            "RomRaider: Engine Speed");
+        count += labelComment(0x000F9EE0, "cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Intelligent",
+            "RomRaider: Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent");
+
+        // --- Alpha Engine Load Limit B Multiplier ---
+        count += labelComment(0x000AAE20, "cal_Engine_Load_Limit_B_Maximum_RPM_Multiplier",
+            "RomRaider: Engine Load Limit B Maximum (RPM) - Multiplier");
+
+        // --- Map Switching - Cruise/Non-Cruise ---
+        count += labelComment(0x000D29AE, "cal_Map_Switching_Cruise_Switch_Min_Delay_A",
+            "RomRaider: Map Switching Cruise Switch Min Delay A");
+        count += labelComment(0x000D29B0, "cal_Map_Switching_Cruise_Switch_Counter_B",
+            "RomRaider: Map Switching Cruise Switch Counter B");
+        count += labelComment(0x000D29B2, "cal_Map_Switching_Cruise_Switch_Min_Delay_B",
+            "RomRaider: Map Switching Cruise Switch Min Delay B");
+        count += labelComment(0x000D2A0C, "cal_Map_Switching_Requested_Torque_Ratio_Threshold",
+            "RomRaider: Map Switching Requested Torque Ratio Threshold");
+        count += labelComment(0x000D2A10, "cal_Map_Switching_MAF_Load_Threshold",
+            "RomRaider: Map Switching MAF/Load Threshold");
+        count += labelComment(0x000D2A14, "cal_Map_Switching_Vehicle_Speed_Low_Threshold",
+            "RomRaider: Map Switching Vehicle Speed Low Threshold");
+        count += labelComment(0x000D2A18, "cal_Map_Switching_Vehicle_Speed_High_Threshold",
+            "RomRaider: Map Switching Vehicle Speed High Threshold");
+        count += labelComment(0x000D2A1C, "cal_Map_Switching_IAT_Threshold",
+            "RomRaider: Map Switching IAT Threshold");
+        count += labelComment(0x000D2A34, "cal_Map_Switching_Idle_Mode_Threshold",
+            "RomRaider: Map Switching Idle Mode Threshold");
+        count += labelComment(0x000D2A38, "cal_Map_Switching_SI_Drive_Mode_Threshold",
+            "RomRaider: Map Switching SI-Drive Mode Threshold");
+        count += labelComment(0x000D2A40, "cal_Map_Switching_ECT_Cold_Threshold_Low",
+            "RomRaider: Map Switching ECT Cold Threshold Low");
+        count += labelComment(0x000D2A44, "cal_Map_Switching_ECT_Cold_Threshold_High",
+            "RomRaider: Map Switching ECT Cold Threshold High");
+        count += labelComment(0x000D2A50, "cal_Map_Switching_ECT_IAT_Hot_Threshold_A",
+            "RomRaider: Map Switching ECT/IAT Hot Threshold A");
+        count += labelComment(0x000D2A54, "cal_Map_Switching_ECT_IAT_Hot_Threshold_B",
+            "RomRaider: Map Switching ECT/IAT Hot Threshold B");
+        count += labelComment(0x000D2A58, "cal_Map_Switching_Ratio_Modifier_Min",
+            "RomRaider: Map Switching Ratio Modifier Min");
+        count += labelComment(0x000D2A5C, "cal_Map_Switching_Ratio_Modifier_Scale",
+            "RomRaider: Map Switching Ratio Modifier Scale");
+        count += labelComment(0x000D2A60, "cal_Map_Switch_Ramping_Adder_A",
+            "RomRaider: Map Switch Ramping Adder A");
+        count += labelComment(0x000D2A64, "cal_Map_Switch_Ramping_Adder_B",
+            "RomRaider: Map Switch Ramping Adder B");
+        count += labelComment(0x000D2A68, "cal_Map_Switching_MAF_Sensor_Threshold_A",
+            "RomRaider: Map Switching MAF Sensor Threshold A");
+        count += labelComment(0x000D2A6C, "cal_Map_Switching_MAF_Sensor_Threshold_B",
+            "RomRaider: Map Switching MAF Sensor Threshold B");
+        count += labelComment(0x000D2A70, "cal_Map_Switching_Requested_Torque_Min",
+            "RomRaider: Map Switching Requested Torque Min");
+        count += labelComment(0x000D2A78, "cal_Map_Switching_Per_Gear_RPM_Threshold_2",
+            "RomRaider: Map Switching Per-Gear RPM Threshold 2");
+        count += labelComment(0x000D2A7C, "cal_Map_Switching_Per_Gear_RPM_Threshold_3",
+            "RomRaider: Map Switching Per-Gear RPM Threshold 3");
+        count += labelComment(0x000D2A80, "cal_Map_Switching_Per_Gear_RPM_Threshold_4",
+            "RomRaider: Map Switching Per-Gear RPM Threshold 4");
+        count += labelComment(0x000D2A84, "cal_Map_Switching_Per_Gear_RPM_Threshold_5",
+            "RomRaider: Map Switching Per-Gear RPM Threshold 5");
+        count += labelComment(0x000D2A88, "cal_Map_Switching_Per_Gear_RPM_Threshold_6",
+            "RomRaider: Map Switching Per-Gear RPM Threshold 6");
+        count += labelComment(0x000D2A8C, "cal_Map_Switching_Base_RPM_Threshold",
+            "RomRaider: Map Switching Base RPM Threshold");
+        count += labelComment(0x000D2A90, "cal_Map_Switching_ECT_Compensation_A",
+            "RomRaider: Map Switching ECT Compensation A");
+        count += labelComment(0x000D2A94, "cal_Map_Switching_ECT_Compensation_B",
+            "RomRaider: Map Switching ECT Compensation B");
+        count += labelComment(0x000D2A98, "cal_Map_Switching_ECT_Threshold",
+            "RomRaider: Map Switching ECT Threshold");
+        count += labelComment(0x000D2A9C, "cal_Map_Switching_RPM_Override_Threshold",
+            "RomRaider: Map Switching RPM Override Threshold");
+        count += labelComment(0x000D2AA0, "cal_Map_Switching_Load_Override_Threshold",
+            "RomRaider: Map Switching Load Override Threshold");
+        count += labelComment(0x000D2AA4, "cal_Map_Switching_Speed_Load_Check_Value",
+            "RomRaider: Map Switching Speed/Load Check Value");
+        count += labelComment(0x000D2AA8, "cal_Map_Switching_Engine_Speed_Hysteresis_Low",
+            "RomRaider: Map Switching Engine Speed Hysteresis Low");
+        count += labelComment(0x000D2AAC, "cal_Map_Switching_Engine_Speed_Hysteresis_High",
+            "RomRaider: Map Switching Engine Speed Hysteresis High");
+        count += labelComment(0x000D2AB0, "cal_Map_Switching_Ratio_Minimum_Bound",
+            "RomRaider: Map Switching Ratio Minimum Bound");
+        count += labelComment(0x000D2AB4, "cal_Map_Switching_Ratio_Maximum_Bound",
+            "RomRaider: Map Switching Ratio Maximum Bound");
+        count += labelComment(0x000D2ABC, "cal_Map_Switching_Percentage_Ceiling",
+            "RomRaider: Map Switching Percentage Ceiling");
+
+        // --- Map Switching - Timing Blend ---
+        count += labelComment(0x000D2AEC, "cal_Timing_Blend_RPM_Activation_Threshold",
+            "RomRaider: Timing Blend RPM Activation Threshold");
+        count += labelComment(0x000D2AF8, "cal_Timing_Blend_IAT_Threshold_B",
+            "RomRaider: Timing Blend IAT Threshold B");
+        count += labelComment(0x000D2B00, "cal_Timing_Blend_RPM_Max_for_Blending",
+            "RomRaider: Timing Blend RPM Max for Blending");
+        count += labelComment(0x000D2B04, "cal_Timing_Blend_Ramping_Rate",
+            "RomRaider: Timing Blend Ramping Rate");
+        count += labelComment(0x000D2B08, "cal_Timing_Blend_Correction_Threshold",
+            "RomRaider: Timing Blend Correction Threshold");
+        count += labelComment(0x000D2B0C, "cal_Timing_Blend_Half_Ratio_Map_Ratio_E42",
+            "RomRaider: Timing Blend Half Ratio (Map Ratio E42)");
+        count += labelComment(0x000D2B10, "cal_Timing_Blend_Minimum_Ratio",
+            "RomRaider: Timing Blend Minimum Ratio");
+        count += labelComment(0x000D2B1C, "cal_Timing_Blend_Ratio_Ceiling",
+            "RomRaider: Timing Blend Ratio Ceiling");
+
+        // --- tinywrex patches ---
+        count += labelComment(0x000C0BC8, "cal_Boost_disable_during_fuel_cut_Boost_bar_threshold",
+            "RomRaider: Boost disable during fuel cut-Boost(bar) threshold");
+        count += labelComment(0x000C0BCC, "cal_Boost_disable_during_fuel_cut_Load_threshold",
+            "RomRaider: Boost disable during fuel cut-Load threshold");
+        count += labelComment(0x000C0BD0, "cal_Boost_disable_during_fuel_cut_RPM_threshold",
+            "RomRaider: Boost disable during fuel cut-RPM threshold");
+        count += labelComment(0x000CC508, "cal_Rev_Limit_On_2",
+            "RomRaider: Rev Limit On (2)");
+        count += labelComment(0x000CC50C, "cal_Rev_Limit_Off_2",
+            "RomRaider: Rev Limit Off (2)");
+        count += labelComment(0x000CC510, "cal_Rev_Limit_On_3",
+            "RomRaider: Rev Limit On (3)");
+        count += labelComment(0x000CC514, "cal_Rev_Limit_Off_3",
+            "RomRaider: Rev Limit Off (3)");
+        count += labelComment(0x000F104C, "cal_LC_disable_speed_KMH_threshold",
+            "RomRaider: LC disable speed(KMH)threshold");
+        count += labelComment(0x000F1050, "cal_LC_RPM_delta",
+            "RomRaider: LC RPM delta");
+        count += labelComment(0x000F1054, "cal_FFS_RPM_delta",
+            "RomRaider: FFS RPM delta");
+
+
+        // =====================================================================
+        // RAM VARIABLES — BATCH UPDATE
+        // 125 labels from ram_reference.txt cross-reference
+        // =====================================================================
+
+        // --- system_state (16 labels) ---
+        count += labelComment(0xFFFF20A0L, "system_state_cluster_base",
+            "System state cluster base (0xFFFF20A0-0xFFFF227C, 88 addresses).");
+        count += labelComment(0xFFFF20ACL, "system_init_counter_A",
+            "System initialization counter/timer A. OL charge workspace cluster.");
+        count += labelComment(0xFFFF20BCL, "system_init_counter_B",
+            "System initialization counter/timer B. Before system_state_var_C.");
+        count += labelComment(0xFFFF20C0L, "system_state_var_C",
+            "System state variable C. System state cluster.");
+        count += labelComment(0xFFFF20C4L, "system_state_var_D",
+            "System state variable D. Paired with system_state_var_C (+4).");
+        count += labelComment(0xFFFF20CCL, "system_state_flags_A",
+            "System state flags A. System state cluster 0xFFFF20A0-0xFFFF227C.");
+        count += labelComment(0xFFFF20D4L, "system_init_flags_B",
+            "System initialization flags B. System state cluster.");
+        count += labelComment(0xFFFF20F4L, "system_config_timer_A",
+            "System config/timer variable A. System state cluster.");
+        count += labelComment(0xFFFF233CL, "timer_config_block",
+            "Timer configuration block (16 bytes). Injection timing");
+        count += labelComment(0xFFFF2368L, "evap_workspace_base",
+            "EVAP diagnostic workspace base (floats + counters).");
+        count += labelComment(0xFFFF24A8L, "desc_partial_copy",
+            "Descriptor partial copy workspace (62 bytes, GBR base). Temp buffer for cal descriptor processing.");
+        count += labelComment(0xFFFF2AB4L, "system_state_descriptor",
+            "System state descriptor variable. Descriptor region.");
+        count += labelComment(0xFFFF2D38L, "system_state_timer_A",
+            "System state timer counter A. Extended system_state region.");
+        count += labelComment(0xFFFF2D40L, "system_state_timer_B",
+            "System state timer counter B. Adjacent to timer_A (+8).");
+        count += labelComment(0xFFFF2EF4L, "desc_region_workspace_B",
+            "Descriptor region workspace B (GBR base). Descriptor queue/mirror operations.");
+        count += labelComment(0xFFFF2F84L, "desc_table_mirror",
+            "Descriptor table clone workspace (222 bytes, GBR base). ROM 0x88Exx processing.");
+
+        // --- cal_mirrors (20 labels) ---
+        count += labelComment(0xFFFF3158L, "afl_diagnostic_flag",
+            "AFL state / diagnostic flag. Checked by fueling pipelin");
+        count += labelComment(0xFFFF341AL, "cal_mirrors_cluster_base",
+            "Cal mirrors region start (0xFFFF341A-0xFFFF3612, 152 addresses).");
+        count += labelComment(0xFFFF341CL, "cal_mirror_state_flags",
+            "Cal mirror state/control flags. Adjacent to cal_mirror_descriptor_ptr.");
+        count += labelComment(0xFFFF3420L, "cal_mirror_descriptor_ptr",
+            "Cal mirror descriptor pointer. Cal mirror region 0xFFFF341A-0xFFFF3612.");
+        count += labelComment(0xFFFF3438L, "cal_mirror_queue_index",
+            "Cal mirror descriptor queue index. Cal mirror pipeline management.");
+        count += labelComment(0xFFFF3444L, "dtc_idle_enable_cond",
+            "DTC idle control enable condition flag (byte). Cal mirror for P0506-P050A diagnostic preconditions.");
+        count += labelComment(0xFFFF34D8L, "cal_mirror_data",
+            "Calibration mirror data area");
+        count += labelComment(0xFFFF35E4L, "cal_mirror_lookup",
+            "Cal mirror lookup workspace (GBR base). 26 fields, 40 accesses.");
+        count += labelComment(0xFFFF3654L, "cal_mirror_cache_A",
+            "Calibration mirror workspace/cache A. Cal mirrors region.");
+        count += labelComment(0xFFFF365CL, "cal_mirror_timer",
+            "Calibration mirror timer/counter");
+        count += labelComment(0xFFFF3668L, "cal_mirror_cache_B",
+            "Calibration mirror workspace/cache B. Cal mirrors region.");
+        count += labelComment(0xFFFF366EL, "io_output_packed",
+            "I/O output register packed status (word). Timing/output values.");
+        count += labelComment(0xFFFF3682L, "cal_output_buffer",
+            "Cal output buffer (GBR base). 22 fields, single caller 0x5B16C.");
+        count += labelComment(0xFFFF36C0L, "cal_mirror_state",
+            "Calibration mirror state variable");
+        count += labelComment(0xFFFF3718L, "cal_descriptor_queue",
+            "Cal descriptor queue workspace (GBR base). 39 fields, 129 accesses.");
+        count += labelComment(0xFFFF3C70L, "cal_mirror_state_base",
+            "Cal mirror state/control base. Precedes cal_mirror_timer_workspace.");
+        count += labelComment(0xFFFF3C80L, "cal_mirror_timer_workspace",
+            "Cal mirror timer workspace. Cal mirror timer region.");
+        count += labelComment(0xFFFF3C88L, "cal_mirror_sync_timer_A",
+            "Cal mirror sync timer A. Near cal_mirror_timer_workspace (+8).");
+        count += labelComment(0xFFFF3C90L, "knock_status_shadow",
+            "Knock status shadow/mirror (copy from 0xFFFF81AC). Knock detector.");
+        count += labelComment(0xFFFF3C98L, "cal_descriptor_ptr_ws",
+            "Calibration descriptor pointer workspace. Links to ROM tables.");
+
+        // --- sensor_data (17 labels) ---
+        count += labelComment(0xFFFF4144L, "ect_output_fmac",
+            "ECT output (degrees C, float). ADC pipeline ADDR29 -> FMAC call_08.");
+        count += labelComment(0xFFFF4254L, "afr_lambda_workspace",
+            "O2/AFR lambda workspace (float). Task10 call_48 output for lambda ratio calculation.");
+        count += labelComment(0xFFFF425FL, "injection_state_flag",
+            "Injection channel enable/disable state flag (byte). Checked by injection_state_machine at 0x9106.");
+        count += labelComment(0xFFFF447BL, "maf_timer_counter",
+            "MAF/intake sensor timer counter (byte). Task9 80ms prescaler reload via 0xCBAC.");
+        count += labelComment(0xFFFF447CL, "atu_timer_period",
+            "ATU timer period/register (word). ATU hardware setup.");
+        count += labelComment(0xFFFF5BE2L, "engine_condition_flags",
+            "Engine condition flags byte. Read by task10, task30, task38. Called 'condition_flags' in ignition...");
+        count += labelComment(0xFFFF5C75L, "sensor_peripheral_status",
+            "Sensor peripheral status byte. Near peripheral_control_GBR.");
+        count += labelComment(0xFFFF5D14L, "ssm_output_workspace",
+            "SSM diagnostic output workspace struct. Written by ssm_");
+        count += labelComment(0xFFFF5DB5L, "cl_ol_gate_flag",
+            "CL/OL gate flag byte. Referenced in cl_ol_state_machine and clol_gap_closure.");
+        count += labelComment(0xFFFF5E40L, "sensor_data_misc",
+            "Sensor data miscellaneous");
+        count += labelComment(0xFFFF5F94L, "sensor_burst_buf_0",
+            "Sensor data burst buffer byte 0. Consecutive 6-byte buffer.");
+        count += labelComment(0xFFFF5F95L, "sensor_burst_buf_1",
+            "Sensor data burst buffer byte 1.");
+        count += labelComment(0xFFFF5F97L, "sensor_burst_buf_3",
+            "Sensor data burst buffer byte 3.");
+        count += labelComment(0xFFFF5F98L, "sensor_burst_buf_4",
+            "Sensor data burst buffer byte 4.");
+        count += labelComment(0xFFFF5F99L, "sensor_burst_buf_5",
+            "Sensor data burst buffer byte 5.");
+        count += labelComment(0xFFFF5FC0L, "sensor_io_state_secondary",
+            "Sensor I/O state secondary. Near io_state_register (0xFFFF5FFCL).");
+        count += labelComment(0xFFFF5FC2L, "io_peripheral_workspace",
+            "I/O peripheral workspace (56 bytes, GBR base, 18 fields). Sensor I/O operations.");
+
+        // --- adc_processed (15 labels) ---
+        count += labelComment(0xFFFF6134L, "adc_conditioning_ws_A",
+            "ADC conditioning workspace A (GBR base). Near adc_channel_status.");
+        count += labelComment(0xFFFF613CL, "adc_conditioning_ws_B",
+            "ADC conditioning workspace B (GBR base). Near adc_channel_status.");
+        count += labelComment(0xFFFF61ACL, "adc_processed_alt",
+            "ADC processed alternate channel");
+        count += labelComment(0xFFFF61FCL, "adc_processed_extra",
+            "ADC processed extra channel (float). Near airflow_maf_current.");
+        count += labelComment(0xFFFF620CL, "airflow_maf_current",
+            "Current MAF/airflow (float). Used by accel enrichment a");
+        count += labelComment(0xFFFF63B0L, "adc_processed_temperature_B",
+            "ADC processed temperature B (float). ECT/IAT sensor region.");
+        count += labelComment(0xFFFF6430L, "adc_processed_secondary",
+            "ADC processed secondary sensor value");
+        count += labelComment(0xFFFF6540L, "o2_sensor_conditioned",
+            "Conditioned O2 sensor value (float). Rate-limited ±0.02/cycle. AFC PI error input.");
+        count += labelComment(0xFFFF6598L, "adc_processed_temp",
+            "ADC processed intermediate sensor value (float). Pipeline temp between raw ADC and engine state.");
+        count += labelComment(0xFFFF65A2L, "engine_state_var_A",
+            "Engine state variable A. Near engine_state_extended (0xFFFF65A9L).");
+        count += labelComment(0xFFFF65ABL, "engine_state_ext_byte_B",
+            "Engine state extended byte B. Adjacent to engine_state_extended (+2).");
+        count += labelComment(0xFFFF65BFL, "warmup_transition_flag_B",
+            "Warmup transition flag B (byte). Read by fueling pipeli");
+        count += labelComment(0xFFFF6810L, "ol_condition_selector",
+            "OL condition selector byte (1-5). Selects ROM threshold");
+        count += labelComment(0xFFFF682CL, "adc_processed_misc",
+            "ADC processed miscellaneous sensor value");
+        count += labelComment(0xFFFF69FCL, "ect_input_float",
+            "ECT input value for fuel/ignition lookups (float). Startup enrichment / fueling pipeline.");
+
+        // --- fuel_timing (5 labels) ---
+        count += labelComment(0xFFFF71EAL, "fuel_timing_state",
+            "Fuel timing state variable");
+        count += labelComment(0xFFFF7BE4L, "transient_fuel_comp",
+            "Transient fuel compensation value (float). AFC working value. Read by task35.");
+        count += labelComment(0xFFFF7D04L, "fuel_timing_state_B",
+            "Fuel/timing state variable B. Fuel/timing region.");
+        count += labelComment(0xFFFF7E68L, "fuel_timing_corr",
+            "Fuel timing correction variable");
+        count += labelComment(0xFFFF7F08L, "ignition_timing_workspace",
+            "Ignition timing workspace variable (float). Multiple re");
+
+        // --- knock_flkc (25 labels) ---
+        count += labelComment(0xFFFF8080L, "knock_flkc_workspace",
+            "Knock/FLKC workspace area");
+        count += labelComment(0xFFFF81F8L, "knock_thresh_config",
+            "Knock threshold config workspace (GBR base). Task04/10.");
+        count += labelComment(0xFFFF8210L, "knock_window_state",
+            "Knock window state workspace (GBR base). Task08.");
+        count += labelComment(0xFFFF8318L, "knock_state_var",
+            "Knock state variable");
+        count += labelComment(0xFFFF8366L, "knock_workspace_B",
+            "Knock/FLKC workspace variable B");
+        count += labelComment(0xFFFF837BL, "idle_dispatch_workspace",
+            "Main idle dispatcher state (GBR base). 39 fields, 129 accesses.");
+        count += labelComment(0xFFFF8387L, "knock_flkc_workspace",
+            "Knock/FLKC post-retard state (GBR base). Adjacent to knock_workspace_B/C.");
+        count += labelComment(0xFFFF8391L, "knock_workspace_C",
+            "Knock/FLKC workspace variable C");
+        count += labelComment(0xFFFF83A5L, "idle_sensor_ref",
+            "Idle control sensor comparison reference (passed to 0x4");
+        count += labelComment(0xFFFF83AAL, "idle_workspace_var",
+            "Idle workspace variable (near idle GBR base)");
+        count += labelComment(0xFFFF8570L, "knock_flkc_event_flag",
+            "Knock/FLKC interrupt or event flag. Knock processing region.");
+        count += labelComment(0xFFFF85DCL, "knock_fuel_interlock",
+            "Knock/fuel interlock control byte. Between fuel_system_state and fuel_knock_state_var; gates knoc...");
+        count += labelComment(0xFFFF85E4L, "fuel_knock_state_var",
+            "Fuel/knock state variable. Near fuel_system_state (0xFFFF85D7L).");
+        count += labelComment(0xFFFF8910L, "ignition_system_state",
+            "Ignition system state. Referenced in ignition timing an");
+        count += labelComment(0xFFFF89E8L, "knock_sensor_state_B",
+            "Knock sensor state variable B. Knock/FLKC cluster.");
+        count += labelComment(0xFFFF8A74L, "knock_flkc_state",
+            "Knock/FLKC state variable");
+        count += labelComment(0xFFFF8C98L, "timing_workspace_B",
+            "Timing calculation workspace B (float). Adjacent to timing_workspace_A.");
+        count += labelComment(0xFFFF8CE0L, "knock_timing_retard_base",
+            "Knock timing retard workspace base (struct, 116 bytes). Per-cylinder knock state machine.");
+        count += labelComment(0xFFFF8CFCL, "timing_workspace_extended",
+            "Extended timing calculation workspace (float). Knock/timing intermediate result.");
+        count += labelComment(0xFFFF8D04L, "ign_ext_counter_A",
+            "Ignition extended workspace counter. Near timing_workspace_A.");
+        count += labelComment(0xFFFF8D2CL, "ign_ext_workspace_B",
+            "Ignition/knock extended workspace B (GBR base). Timing calculation chain.");
+        count += labelComment(0xFFFF8E38L, "knock_level_accum",
+            "Knock intensity/level accumulator. Near fuel_mode_flags.");
+        count += labelComment(0xFFFF8EC7L, "sched_control_secondary",
+            "Secondary scheduler control (GBR base). Adjacent to sched_control_GBR.");
+        count += labelComment(0xFFFF8EDEL, "sensor_filter_workspace",
+            "O2 sensor rate-of-change filter workspace. CL entry validation via sub 0xC8E8.");
+        count += labelComment(0xFFFF8EF8L, "cl_readiness_state",
+            "Closed-loop readiness state variable. Near cl_readiness_A_input.");
+
+        // --- scheduler (10 labels) ---
+        count += labelComment(0xFFFF903CL, "sched_task_dispatch_state",
+            "Scheduler task dispatch state. Scheduler region.");
+        count += labelComment(0xFFFF9070L, "scheduler_state_B",
+            "Scheduler state variable B");
+        count += labelComment(0xFFFF90A8L, "timing_dispatch_state",
+            "Timing dispatch state. Read by task01, task10, task32. Called 'timing_state' in ign analysis.");
+        count += labelComment(0xFFFF922CL, "scheduler_counter",
+            "Scheduler counter variable");
+        count += labelComment(0xFFFF9358L, "sched_event_counter",
+            "Scheduler event/task counter (GBR base). Scheduler region.");
+        count += labelComment(0xFFFF9FBCL, "sched_timer_extended_C",
+            "Scheduler timer extension C (GBR base). Adjacent to sched_timer_base cluster.");
+        count += labelComment(0xFFFF9FDFL, "sched_timer_state",
+            "Scheduler timer state field (byte). RTOS task dispatch eligibility tracking.");
+        count += labelComment(0xFFFF9FE0L, "sched_timer_extended_A",
+            "Scheduler extended timer A. Scheduler timer cluster.");
+        count += labelComment(0xFFFF9FE2L, "sched_timer_fractional",
+            "Scheduler timer fractional field. Adjacent to sched_timer_extended_A (+2).");
+        count += labelComment(0xFFFF9FE4L, "sched_timer_extended_B",
+            "Scheduler extended timer B. Scheduler timer cluster.");
+
+        // --- diag_state (14 labels) ---
+        count += labelComment(0xFFFFA163L, "diag_monitor_state_byte",
+            "Diagnostic monitor state byte. Adjacent to diag_monitor_GBR (+3).");
+        count += labelComment(0xFFFFA176L, "diag_maturation_counter",
+            "Diagnostic maturation counter byte (GBR base). DTC trip tracking / qualification.");
+        count += labelComment(0xFFFFA26CL, "diag_trip_tracking_flags",
+            "Diagnostic trip tracking flags. Trip tracking region.");
+        count += labelComment(0xFFFFA290L, "diag_monitor_state",
+            "Diagnostic monitor state area");
+        count += labelComment(0xFFFFA59DL, "diag_fault_enable_flags",
+            "Diagnostic fault enable/masking flags. Referenced by diag tasks.");
+        count += labelComment(0xFFFFA6E8L, "diag_maturation_threshold",
+            "Diagnostic maturation threshold (word, GBR base). DTC qualification gate between state_D and AB76...");
+        count += labelComment(0xFFFFAB96L, "diag_counter_mps",
+            "Diagnostic counter/threshold byte (MPS-related). DTC maturation cluster.");
+        count += labelComment(0xFFFFAD18L, "diag_active_fault_C",
+            "Active fault status byte C. diag_state_E array offset +0x04.");
+        count += labelComment(0xFFFFAD1CL, "diag_active_fault_B",
+            "Active fault status byte B. Part of diag_state_E (0xFFFFAD14-0xFFFFAD52, 268 refs).");
+        count += labelComment(0xFFFFAD20L, "diag_active_fault_D",
+            "Active fault status byte D. diag_state_E array offset +0x0C.");
+        count += labelComment(0xFFFFAD24L, "diag_active_fault_E",
+            "Active fault status byte E. diag_state_E array offset +0x10.");
+        count += labelComment(0xFFFFAD28L, "diag_active_fault_F",
+            "Active fault status byte F. diag_state_E array offset +0x14.");
+        count += labelComment(0xFFFFAD50L, "diag_session_state_B",
+            "Diagnostic session state variable B");
+        count += labelComment(0xFFFFAF73L, "diag_fault_history_byte",
+            "Diagnostic fault history byte. Part of diag_state_A (0xFFFFAF70-0xFFFFAFAB).");
+
+        // --- stack_area (3 labels) ---
+        count += labelComment(0xFFFFB6C8L, "stack_workspace_var",
+            "Stack area workspace variable (long). Part of 28-byte stack canary cluster.");
+        count += labelComment(0xFFFFB6CCL, "stack_scratch_var",
+            "Stack area scratch variable. Part of stack canary cluster.");
+        count += labelComment(0xFFFFB6E1L, "stack_guard_byte",
+            "Stack area guard byte / canary");
+
 
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
