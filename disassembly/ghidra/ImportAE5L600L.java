@@ -2836,6 +2836,70 @@ public class ImportAE5L600L extends GhidraScript {
             + "parameters stored to FFFF5D14 output struct. Source of "
             + "SSM mode values (7=off, 8=CL, 10=OL).");
 
+        // --- Fuel path helper functions (Task 5/6/9) ---
+        count += labelComment(0x0000FE22L, "charge_table_advance",
+            "Double-buffered function pointer selector. Struct at FFFF5B70 "
+            + "(12 bytes/entry: 2 func ptrs + slot index). Ping-pongs slot "
+            + "0/1 each call, returns selected function pointer. Called by Task 5/6.");
+
+        count += labelComment(0x0000FDECL, "charge_table_store",
+            "Stores a new function pointer into the next slot of the "
+            + "double-buffered charge table at FFFF5B70.");
+
+        count += labelComment(0x0000FE5CL, "charge_channel_dispatch_7",
+            "IRQ-protected charge calc dispatcher for channel 7. "
+            + "interrupt_save(0xE0), stack_frame_setup(7), "
+            + "calls charge_calc_active(0x107B6) or charge_calc_idle(0x107F4), "
+            + "interrupt_restore.");
+
+        count += labelComment(0x0000A878L, "charge_accumulator",
+            "4-channel charge accumulation loop. Input R4=channel selector. "
+            + "Iterates ROM tables 0xC00EB and 0x11ABE to find matching channel. "
+            + "Calls charge_accumulate_step(0xAC8C), charge_result_store(0xAA4C), "
+            + "charge_integration_step(0xA914). Writes to FFFF4326.");
+
+        count += labelComment(0x0000D940L, "injection_channel_calc",
+            "Per-channel injection pulse width calculator (~420 bytes). "
+            + "Mode R4=6 (normalized to 0-5). Processes up to 6 channels: "
+            + "pulse = (charge_delta / timing_delta) * correction. "
+            + "Reads FFFF4158 (charge), FFFF416C (timing). "
+            + "Outputs to FFFF44D4 float array. Clamps to ROM[0xC00F0] max. "
+            + "ROM tables: 0x11B74, 0x11B84, 0x11B94.");
+
+        count += labelComment(0x00009A14L, "integration_loop_A",
+            "Task 5: 4-iteration loop calling charge integration sub 0x9F1C.");
+
+        count += labelComment(0x00009A34L, "integration_loop_B",
+            "Task 6: 4-iteration loop calling charge integration sub 0x9EA0.");
+
+        count += labelComment(0x00009A58L, "intake_tick_counter",
+            "Task 9 prescaler. Increments FFFF42F8, every 16th tick (320ms) "
+            + "calls 0xA470 for full intake/MAF recalculation.");
+
+        count += labelComment(0x0000CBACL, "maf_timer_prescaler",
+            "Task 9: reloads 9 timer channels (IDs 0,1,2,4,8,9,10,12) via "
+            + "timer_reload(0xCA72) every 4th tick (80ms). Counter at FFFF447A.");
+
+        count += labelComment(0x0000FC04L, "fuel_system_init",
+            "Task 9 fuel vtable initialization. Writes 0xFB0 to FFFF5B64, "
+            + "validates via 0xFD34/0xFD6A. If FFFF415C==1: one-shot hw sync "
+            + "(raises IRQ to 15, programs ATU, enters sync loop). Normally "
+            + "early-exits when fuel system not being initialized.");
+
+        count += labelComment(0x0000D268L, "injection_atu_commit_A",
+            "Task 9: commits injection timing data to ATU hardware. "
+            + "Reads FFFF44A5 control flag.");
+
+        count += labelComment(0x0000D3DCL, "injection_atu_write_B",
+            "Task 6: writes injection timing data to ATU hardware. "
+            + "Reads FFFF44A4 control flag.");
+
+        count += labelComment(0x0000CBEEL, "fuel_stub_nop",
+            "Empty stub (RTS/NOP). Placeholder in Task 9 call chain.");
+
+        count += labelComment(0x000085ACL, "struct_accumulator_B_thunk",
+            "Redirect stub: BRA 0x8948. Task 6 charge workspace processing.");
+
         // ============================================================
         // CALIBRATION DESCRIPTOR LABELS (760 total, auto-generated)
         // Format: desc_<type>_<dtype>_<size>[_<addr>] -> descriptor struct

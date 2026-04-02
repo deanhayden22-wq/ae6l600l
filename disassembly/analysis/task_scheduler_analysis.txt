@@ -420,18 +420,18 @@ SECTION 8: ADDRESSES NEEDING FURTHER INVESTIGATION
   The following functions are called from periodic tasks but have not been
   traced.  They are candidates for future analysis sessions:
 
-  From Task 9:
-    0x0000FC04  -- fuel setup/pre-calc (FFFF5B64 struct)
-    0x0000CBAC  -- MAF/intake processing (FFFF447A)
-    0x00009A58  -- intake processing B (FFFF42F8)
-    0x0000D268  -- ATU injection data writer (FFFF44A5)
+  From Task 9:  ** ALL RESOLVED — see fuel_path_helpers.txt **
+    0x0000FC04  fuel_system_init — vtable init + one-shot hw sync
+    0x0000CBAC  maf_timer_prescaler — reloads 9 timers every 80ms
+    0x00009A58  intake_tick_counter — 16-tick prescaler for MAF recalc
+    0x0000D268  injection_atu_commit_A — programs ATU hardware (FFFF44A5)
 
-  From Task 5/6:
-    0x0000FE22  -- air charge / mass-flow (FFFF5B70)
-    0x0000A878  -- charge accumulator (secondary table 0x11ABE)
-    0x0000D940  -- fuel calc sub-step (FFFF registers, mode 6)
-    0x000085AC  -- BRA to 0x8948 (redirect target unknown)
-    0x0000D3DC  -- injection channel data (FFFF44A4)
+  From Task 5/6:  ** ALL RESOLVED — see fuel_path_helpers.txt **
+    0x0000FE22  charge_table_advance — double-buffered func ptr selector
+    0x0000A878  charge_accumulator — 4-channel accumulation loop
+    0x0000D940  injection_channel_calc — per-channel pulse width (420 bytes)
+    0x000085AC  struct_accumulator_B_thunk — redirect to 0x8948
+    0x0000D3DC  injection_atu_write_B — ATU hardware write (FFFF44A4)
 
   From Task 10:
     Almost all 39 sub-functions (AVCS / boost / idle / sensor candidates)

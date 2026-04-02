@@ -1,0 +1,607 @@
+AE5L600L — Fuel Path Helper Functions (Task 5/6/9)
+====================================================
+ROM: AE5L600L (2013 USDM WRX MT, Renesas SH7058)
+Resolves: Task scheduler Section 8 fuel path unknowns
+
+
+══════════════════════════════════════════════════════════════════════════════
+  OVERVIEW
+══════════════════════════════════════════════════════════════════════════════
+
+Task 5 (Fuel Sub-Group A, 20ms, priority 4):
+  gate(5) → FE22 → A878 → D940 → 9A14 → 8528 → 4A94C → epilogue
+
+Task 6 (Fuel Sub-Group B, 20ms, priority 2):
+  gate(6) → FE22 → 4AA58 → 9A34 → 85AC → D3DC → epilogue
+
+Task 9 (Main Fuel / CLOL, 20ms, priority 2):
+  gate(9) → FC04 → 5840 → D658 → CBAC → 4907C → 9A58 → D268 → CBEE → epilogue
+
+This document traces all previously-unidentified functions in these three
+task call chains.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xFE22 — charge_table_advance (Task 5/6 shared entry)
+══════════════════════════════════════════════════════════════════════════════
+
+  Size: ~52 bytes (0xFE22-0xFE56)
+  Called from: Task 5 (R4=from Task 5 context), Task 6 (same)
+
+  STRUCTURE:
+    R7 = R4
+    R6 = FFFF5B70 (charge_table_base)
+    R7 = R4*3, then shll2 → R7 = R4 * 12 (struct size = 12 bytes)
+    R5 = FFFF5B70 + R7 (entry pointer)
+    R0 = struct[+9] (byte: current slot index, 0 or 1)
+    R4 = struct + slot_index*4 (dereference function pointer)
+    R4 = *(R4)  → function pointer from double-indirect
+    Increment slot index, wrap at 2 (ping-pong buffer)
+    Return R0 = function pointer
+
+  PURPOSE:
+    This is a DOUBLE-BUFFERED FUNCTION POINTER SELECTOR.  The struct at
+    FFFF5B70 contains per-channel charge calculation state:
+      +0: function pointer slot A (32-bit)
+      +4: function pointer slot B (32-bit)
+      +8: reserved
+      +9: current slot index (byte, 0 or 1)
+
+    Each call advances the slot index (ping-pong between 0 and 1), reads
+    the function pointer from the current slot, and returns it.  The caller
+    then invokes the returned function pointer to execute the appropriate
+    charge calculation for this cycle.
+
+  This is NOT a direct air charge calculator — it is the double-buffer
+  advance mechanism that selects WHICH charge calculator to run.
+
+  RELATED FUNCTIONS:
+    0xFDEC (charge_table_store): Stores a new function pointer into the
+    next slot of the same struct.  Called from 0xFF82 variant.
+
+    0xFE58 (trivial RTS): Empty stub, no-op.
+
+  Label: charge_table_advance
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xFE5C / 0xFE8E / 0xFEEC / 0xFF1E / 0xFF50 / 0xFF82 / 0xFFBE
+  — charge_channel_dispatch (7 variants, IRQ-protected)
+══════════════════════════════════════════════════════════════════════════════
+
+  These are 7 nearly-identical functions that each handle one charge
+  calculation channel.  Each follows this pattern:
+
+    1. interrupt_save(0xE0 = priority 14)  via 0x317C
+    2. Call stack_frame_setup(0x2EDC) with channel ID (5-12)
+    3. If result != 0: call 0x107B6 (charge_calc_active)
+       If result == 0: call 0x107F4 (charge_calc_idle)
+    4. interrupt_restore via tail-call to 0x3190
+
+  Channel IDs per variant:
+    0xFE5C: channel 7     (Task 5 air charge A)
+    0xFE8E: channel 8     (Task 6 air charge B)
+    0xFEEC: channel 11
+    0xFF1E: channel 9     (Task 9 air charge)
+    0xFF50: channel 12
+    0xFF82: channel 5     (with additional charge_table_store call)
+    0xFFBE: channel 6
+
+  The variant at 0xFF82 is special: after calling 0x107B6/0x107F4, it
+  also calls charge_table_store(0xFDEC) with R5=input param, R4=0.
+
+  PURPOSE:
+    These are IRQ-protected charge calculation dispatchers.  Each channel
+    represents a different phase/bank of the intake charge calculation.
+    0x2EDC (stack_frame_setup) determines if the channel is due for
+    recalculation this cycle.  If so, 0x107B6 runs the active calculation;
+    otherwise 0x107F4 runs an idle/holdover calculation.
+
+  0x107B6: charge_calc_active — performs the actual air charge computation
+           for the channel (reading sensors, applying corrections).
+  0x107F4: charge_calc_idle — copies/holds the previous calculation result
+           (no new sensor data needed).
+
+  Label: charge_channel_dispatch_N (where N = channel ID)
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xA878 — charge_accumulator (Task 5)
+══════════════════════════════════════════════════════════════════════════════
+
+  Size: ~90 bytes (0xA878-0xA8D0)
+  Input: R4 = channel selector (from Task 5)
+
+  STRUCTURE:
+    R14 = 0 (loop counter)
+    R13 = R4 (channel selector, extu.b)
+    R12 = 4 (loop limit)
+    R9 = 0x11ABE (secondary dispatch table base)
+    R10 = 0xC00EB (channel-to-task mapping table)
+    R11 = FFFF4326 (accumulator state byte)
+
+    Loop (R14 = 0 to 3):
+      1. Load byte from ROM[0xC00EB + R14]
+         If byte == R13 (channel matches):
+           Call sub at 0xAC8C (charge_accumulate_step)
+           Call sub at 0xAA4C (charge_result_store)
+
+      2. Load byte from ROM[0x11ABE + R14]
+         If byte == R13:
+           Write R14 to FFFF4326 (current accumulator index)
+           Call sub at 0xA914 (charge_integration_step)
+           Break loop
+
+      3. Otherwise: increment R14, continue
+
+  PURPOSE:
+    Iterates 4 charge channels, finds the one matching the input selector,
+    and performs the accumulation + integration for that channel.  The ROM
+    tables at 0xC00EB and 0x11ABE map channel IDs to the accumulation
+    pipeline.  FFFF4326 tracks which channel was last processed.
+
+    Sub-functions:
+      0xAC8C: charge_accumulate_step — accumulates raw charge data
+      0xAA4C: charge_result_store — stores accumulated result
+      0xA914: charge_integration_step — runs integration/filtering
+
+  Label: charge_accumulator
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xD940 — injection_channel_calc (Task 5, mode 6)
+══════════════════════════════════════════════════════════════════════════════
+
+  Size: ~420 bytes (0xD940-0xDAEE+)
+  Saves: R8-R14, FR14-FR15, PR.  Allocates 16 bytes on stack.
+
+  Input: R4 = mode byte (stored to stack[8])
+
+  STRUCTURE:
+    The mode byte at stack[8] is normalized: if >= 6, subtract 6 repeatedly
+    until < 6.  This maps modes 6-11 → 0-5 (modulo 6).
+
+    FR15 = 0.0 (accumulator init)
+    R9 = FFFF44D4 (injection output float array base)
+    R10 = 2 (inner loop limit)
+    R14 = outer loop counter (0 to N)
+
+    Outer loop:
+      Load from ROM table 0x11B74[R14*4] → R5 (function descriptor pointer)
+      Inner loop: scan bytes at @R5 looking for match with mode byte.
+        If found at position R4:
+          Load FFFF4158 (u32, charge_count) into R8
+          Load FFFF416C (u32, timing_count) → compute timing delta
+          If delta count valid (!= 0 and not stale):
+            Look up from ROM 0x11B84/0x11B94 tables
+            Compute: injection_time = (charge_delta / timing_delta) * FR14
+            Clamp result between 0.0 and ROM[0xC00F0] (max injection time)
+            Store to FFFF44D4[R14*4] (per-channel injection output)
+            Store charge delta to FFFF44FC[R14*2]
+          Else:
+            Store 0.0 and clear counters
+
+      Call 0xFDB4 with R4=24 (system call — injection timing commit)
+      Check FFFF8DC8[R14] against mode byte (mode validation)
+
+  PURPOSE:
+    This is the PER-CHANNEL INJECTION PULSE WIDTH CALCULATOR.  For each
+    injection channel (up to 6), it:
+      1. Finds the matching channel descriptor from the ROM table
+      2. Reads the accumulated charge count (FFFF4158) and timing count
+      3. Computes injection time = charge / timing * correction factor
+      4. Clamps to [0, max_injection_time]
+      5. Stores the result to the per-channel output array at FFFF44D4
+
+    The mode byte selects which set of channels to process (Task 5 uses
+    mode 6, which maps to channel set 0 after normalization).
+
+  RAM ADDRESSES:
+    FFFF44D4: float[6] — per-channel injection pulse width output
+    FFFF44C4: float[6] — per-channel injection correction factor
+    FFFF44EC: float[6] — per-channel charge accumulation workspace
+    FFFF44FC: u16[6]  — per-channel charge delta (integer)
+    FFFF450C: byte[6] — per-channel mode validation flags
+    FFFF451C: byte[6] — per-channel output-ready flags
+    FFFF4504: u16[6]  — per-channel previous charge count
+    FFFF4150: float   — global charge normalization factor
+    FFFF4158: u32     — raw charge accumulator (from ADC)
+    FFFF416C: u32     — timing reference counter
+
+  ROM TABLES:
+    0x11B74: u32[N]  — function descriptor pointers (per channel set)
+    0x11B84: u32[N]  — charge-to-time conversion table pointers
+    0x11B94: byte[N] — channel validity flags
+    0xC00F0: float   — maximum injection pulse width clamp
+
+  Label: injection_channel_calc
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0x9A14 / 0x9A34 — integration_loop_A / integration_loop_B (Task 5/6)
+══════════════════════════════════════════════════════════════════════════════
+
+  0x9A14 (Task 5):
+    Loop R14 = 0 to 3: BSR 0x9F1C with R4 = R14
+    Simple 4-iteration loop calling a charge integration sub-step.
+    Label: integration_loop_A
+
+  0x9A34 (Task 6):
+    Loop R14 = 0 to 3: BSR 0x9EA0 with R4 = R14
+    Identical structure, calls a different integration sub-step.
+    Label: integration_loop_B
+
+  Both are thin loop wrappers that iterate 4 channels, calling the actual
+  integration function for each.  0x9F1C and 0x9EA0 are the per-channel
+  integration calculators (reading from charge accumulators, applying
+  time-domain filtering, writing corrected charge values).
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0x9A58 — intake_tick_counter (Task 9)
+══════════════════════════════════════════════════════════════════════════════
+
+  Size: ~22 bytes (0x9A58-0x9A6E)
+
+  STRUCTURE:
+    R4 = FFFF42F8 (intake counter byte)
+    Increment FFFF42F8 by 1
+    If (FFFF42F8 & 0x0F) == 0 (every 16th tick):
+      BRA to 0xA470 (periodic intake recalculation)
+    Else:
+      RTS (return, no action)
+
+  PURPOSE:
+    This is a PRESCALER that triggers a full intake/MAF recalculation
+    every 16 scheduler ticks (16 × 20ms = 320ms).  The counter at
+    FFFF42F8 free-runs; every 16th increment (when low nibble == 0)
+    it calls 0xA470 for a complete intake processing pass.
+
+  Label: intake_tick_counter
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0x9A72 — injection_output_commit (follows 0x9A58 in Task context)
+══════════════════════════════════════════════════════════════════════════════
+
+  Size: ~140 bytes (0x9A72-0x9AFE)
+  Saves: PR, GBR, FPU regs.  Allocates 20 bytes on stack.
+
+  STRUCTURE:
+    - interrupt_save(0x317C) with priority 16
+    - Reads FFFF4284 (injection workspace base) + channel offset
+    - Reads current charge value from FFFF4168 (accumulated charge, float)
+    - Subtracts previous charge, applies correction via float thresholds
+      from ROM literal pool
+    - If delta exceeds upper threshold: apply high correction
+    - If delta below lower threshold: apply low correction
+    - Otherwise: maintain current value
+    - Stores corrected value + flag byte at workspace[+4] and [+23]
+    - If new value exceeds previous stored value:
+      Calls 0x9F72 (overflow handler)
+      Clears flag at workspace[+23]
+    - interrupt_restore(0x3190)
+
+  PURPOSE:
+    Per-channel injection output commit with charge delta correction.
+    Applies hysteresis-banded corrections to prevent injection timing
+    jitter when charge values are near calculation boundaries.
+
+  Label: injection_output_commit
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0x8528 — struct_accumulator_A (Task 5)
+══════════════════════════════════════════════════════════════════════════════
+
+  (From disassembly: saves registers, calls BE81C with struct at FFFF4168
+  and FFFF4228, processes accumulated charge data.)
+
+  PURPOSE:
+    Struct accumulation pass for Task 5's charge pipeline.  Calls
+    BE81C (struct_init) to prepare the workspace, then processes
+    the accumulated charge values at FFFF4168 and FFFF4228.
+
+  Label: struct_accumulator_A
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0x85AC — struct_accumulator_B (Task 6)
+══════════════════════════════════════════════════════════════════════════════
+
+  Size: ~6 bytes
+  0x85AC: BRA 0x8948
+
+  This is a REDIRECT STUB that jumps to 0x8948.  0x8948 is the actual
+  struct accumulation function for Task 6's pipeline.  The redirect exists
+  because 0x85AC was the original entry point in the task call chain, but
+  the implementation was moved/consolidated to 0x8948.
+
+  Label: struct_accumulator_B_thunk
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xD3DC — injection_atu_channel_write (Task 6)
+══════════════════════════════════════════════════════════════════════════════
+
+  Reads FFFF44A4 (ATU injection channel register).  Processes the injection
+  timing data from the Task 6 fuel calculation pipeline and writes it to
+  the ATU (Advanced Timer Unit) hardware channel registers.
+
+  This is the final stage of Task 6's pipeline: it takes the computed
+  injection pulse widths and programs them into the hardware timers that
+  control the physical injector drivers.
+
+  Label: injection_atu_write_B
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xD268 — injection_atu_channel_commit (Task 9)
+══════════════════════════════════════════════════════════════════════════════
+
+  Saves R9-R14, PR.  Reads FFFF44A5.
+
+  Similar to 0xD3DC but for Task 9's injection pipeline.  Commits the
+  computed injection data to ATU hardware registers.  FFFF44A5 is one byte
+  after FFFF44A4, suggesting these are paired byte-sized ATU control flags
+  (one per bank or channel set).
+
+  Label: injection_atu_commit_A
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xFC04 — fuel_pre_calc (Task 9 entry function)
+══════════════════════════════════════════════════════════════════════════════
+
+  Size: ~120 bytes (0xFC04-0xFC7A)
+
+  STRUCTURE:
+    - Writes 0x0FB0 (4016) to FFFF5B64 struct (timing configuration)
+    - Calls 0xFD34 (fuel_vtable_init) — reads from ROM 0x11BC4 secondary
+      table, validates via 0x5EA4, initializes FFFF5B64 vtable
+    - If result == -1 (first attempt failed):
+      Calls 0xFD6A (fuel_vtable_fallback) — tries secondary init path
+    - If still -1: exits early (no valid fuel config)
+    - Checks FFFF415C (byte) == 1 (fuel system enabled flag)
+    - If not enabled: exits
+    - Raises IRQ priority (stc SR; and 0xFF0F; or 0xF0 → priority 15)
+    - Calls finalize_set_mode(0xFBBA) with R4=2
+    - Writes 0x77 to RAM 0xBFAD (fuel mode signature byte)
+    - Calls BE81C (struct_init) with 224 bytes
+    - Calls 0x6BC4 (io_port_read) with port 20
+    - Masks result with 0xF7, calls 0x6BF0 (io_port_write) port 20
+    - Calls BE82C (struct_op)
+    - Reads vtable from FFFF5B64: dereferences *(FFFF5B64) → function table
+      Then calls vtable[0] with R4=1 (execute fuel pre-calculation)
+    - BRA self (0xFC72) — INFINITE LOOP → likely enters finalization
+      (similar to cl_finalize_injection_sync)
+
+  PURPOSE:
+    This is the FUEL SYSTEM INITIALIZATION entry point for Task 9.  It:
+    1. Sets up the fuel calculation virtual function table at FFFF5B64
+    2. Validates the table via two init paths (primary + fallback)
+    3. If the fuel system is enabled, raises IRQ priority and begins
+       the hardware synchronization sequence (identical pattern to
+       cl_finalize_injection_sync at 0xFACA)
+    4. The infinite loop at the end suggests this is a one-shot init
+       that runs once at startup, not every scheduler cycle
+
+    WAIT — re-reading Task 9: 0xFC04 is called EVERY 20ms cycle (it's in
+    the Task 9 call chain).  But the infinite loop at 0xFC72 would hang
+    the task.  This means the FFFF415C check at 0xFC2A normally fails
+    (returns 0), causing the function to exit early.  The init path only
+    executes once when FFFF415C is set to 1 (e.g., on first start or
+    after a mode change).
+
+  SUB-FUNCTIONS:
+    0xFD34: fuel_vtable_init — loads fuel vtable from ROM 0x11BC4, validates
+            via 0x5EA4, returns function pointer or -1
+    0xFD6A: fuel_vtable_fallback — secondary init: reads vtable[+8] instead
+            of vtable[+4], different validation path
+
+  RAM:
+    FFFF5B64: u32  — pointer to fuel calculation vtable
+    FFFF5B5C: struct — fuel validation workspace
+    FFFF415C: byte — fuel system enable flag (1=enabled)
+
+  Label: fuel_system_init
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xCBAC — maf_prescaler_dispatch (Task 9)
+══════════════════════════════════════════════════════════════════════════════
+
+  Size: ~66 bytes (0xCBAC-0xCBEE)
+
+  STRUCTURE:
+    - Reads FFFF447A (byte), increments by 1, writes back
+    - If FFFF447A >= 4:
+      - Reset FFFF447A to 0
+      - Call timer_reload(0xCA72) × 9 times with IDs:
+        0, 1, 2, 4, 8, 9, 10, 12  (then tail-call with 12)
+    - If FFFF447A < 4: return immediately
+
+  PURPOSE:
+    This is a PRESCALER with a 4-cycle period.  Every 4th scheduler tick
+    (4 × 20ms = 80ms), it resets the counter and reloads 9 timer channels
+    via timer_reload (0xCA72).
+
+    The timer channels (0, 1, 2, 4, 8, 9, 10, 12) correspond to the MAF
+    sampling and intake processing timers.  By reloading them every 80ms,
+    this ensures the MAF measurement and intake charge calculations are
+    synchronized with the scheduler.
+
+  Label: maf_timer_prescaler
+
+
+══════════════════════════════════════════════════════════════════════════════
+  0xCBEE — empty_stub (Task 9)
+══════════════════════════════════════════════════════════════════════════════
+
+  0xCBEE: RTS / NOP
+
+  Confirmed: this is a no-op stub.  It exists in the Task 9 call chain
+  as a placeholder (possibly for a function that was removed or is
+  conditionally compiled out in this ROM variant).
+
+  Label: fuel_stub_nop
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FUELING PIPELINE DATA FLOW SUMMARY
+══════════════════════════════════════════════════════════════════════════════
+
+  Task 5 (Fuel Sub-Group A — 20ms, priority 4):
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │ charge_table_advance(FE22) → select charge calc function pointer   │
+  │ charge_accumulator(A878) → iterate 4 channels, accumulate charge   │
+  │ injection_channel_calc(D940) → compute per-channel pulse widths    │
+  │ integration_loop_A(9A14) → 4× charge integration sub-steps        │
+  │ struct_accumulator_A(8528) → process accumulated workspace         │
+  │ OL-gated dispatcher(4A94C) → conditional OL enrichment             │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Task 6 (Fuel Sub-Group B — 20ms, priority 2):
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │ charge_table_advance(FE22) → same double-buffer advance            │
+  │ AFL/injection trim(4AA58) → AFL-specific correction [already known]│
+  │ integration_loop_B(9A34) → 4× integration sub-steps (variant B)   │
+  │ struct_accumulator_B(85AC→8948) → redirect to actual accumulator   │
+  │ injection_atu_write_B(D3DC) → program ATU hardware timers          │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Task 9 (Main Fuel / CLOL — 20ms, priority 2):
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │ fuel_system_init(FC04) → one-shot vtable init + hw sync            │
+  │ crank_angle_interp(5840) → ISR2 [already known]                    │
+  │ atu_channel_set(D658) → ISR3 [already known]                       │
+  │ maf_timer_prescaler(CBAC) → reload 9 timer channels every 80ms    │
+  │ fuel_dispatch_table_A(4907C) → OL-gated dispatch [already known]   │
+  │ intake_tick_counter(9A58) → every 16th tick → full MAF recalc      │
+  │ injection_atu_commit_A(D268) → program ATU hardware                │
+  │ fuel_stub_nop(CBEE) → placeholder (no-op)                          │
+  └─────────────────────────────────────────────────────────────────────┘
+
+
+══════════════════════════════════════════════════════════════════════════════
+  KEY RAM ADDRESSES — NEWLY IDENTIFIED
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Size    Label                        Description
+  ──────────  ──────  ───────────────────────────  ──────────────────────────
+  FFFF5B70    12B×N   charge_table_base            Double-buffered func ptr structs
+  FFFF5B78    12B×N   charge_table_slot_base       Slot index tracking
+  FFFF4326    u8      charge_accum_channel_idx     Current accumulator channel
+  FFFF4327    u8      charge_accum_state            Accumulator state machine
+  FFFF42F8    u8      intake_tick_counter           Prescaler counter (mod 16)
+  FFFF447A    u8      maf_prescaler_counter         MAF timer prescaler (mod 4)
+  FFFF44D4    float×6 injection_pulse_output        Per-channel pulse width
+  FFFF44C4    float×6 injection_correction_factor   Per-channel correction
+  FFFF44EC    float×6 charge_accum_workspace        Per-channel accumulation
+  FFFF44FC    u16×6   charge_delta_int              Per-channel charge delta
+  FFFF4504    u16×6   charge_prev_count             Previous charge count
+  FFFF450C    byte×6  channel_mode_validation       Mode validation flags
+  FFFF451C    byte×6  channel_output_ready          Output-ready flags
+  FFFF4150    float   charge_normalization           Global normalization factor
+  FFFF4158    u32     raw_charge_accumulator         Raw charge from ADC
+  FFFF416C    u32     timing_reference_counter       Timing reference
+  FFFF4168    float   accumulated_charge             Filtered charge value
+  FFFF4228    struct  charge_workspace_B             Task 5 workspace
+  FFFF4284    struct  injection_workspace_base       Injection output workspace
+  FFFF4314    float   timing_scale_factor            Timing→charge conversion
+  FFFF4318    float   charge_scale_factor            Charge→injection conversion
+  FFFF4324    u16     charge_rate_output             Computed charge rate
+  FFFF44A4    byte    atu_channel_flag_B             ATU control flag (Task 6)
+  FFFF44A5    byte    atu_channel_flag_A             ATU control flag (Task 9)
+  FFFF415C    byte    fuel_system_enable             1=fuel system active
+  FFFF5B64    u32     fuel_vtable_ptr                Pointer to fuel calc vtable
+  FFFF5B5C    struct  fuel_validation_workspace      Fuel init validation state
+  FFFF8DC8    byte×N  channel_mode_map               Expected mode per channel
+
+
+══════════════════════════════════════════════════════════════════════════════
+  ROM TABLES — NEWLY IDENTIFIED
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Size     Label                       Description
+  ──────────  ───────  ──────────────────────────  ──────────────────────────
+  0x11ABE     byte×4   charge_channel_map_A        Channel-to-accumulator mapping
+  0xC00EB     byte×4   charge_channel_map_B        Channel-to-task mapping
+  0xC00F0     float    max_injection_pulse_width   Upper clamp for pulse calc
+  0x11B74     u32×N    injection_descriptor_table   Per-channel-set descriptors
+  0x11B84     u32×N    charge_conversion_table      Charge-to-time table pointers
+  0x11B94     byte×N   channel_validity_flags       Per-channel validity
+  0x11BC4     struct   fuel_vtable_rom_source       Source for FFFF5B64 vtable
+  0x11BD4     u32×15   charge_dispatch_table        Per-channel charge functions
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FUNCTION LABELS — COMPLETE LIST
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Label                          Type
+  ──────────  ───────────────────────────    ──────────────
+  0x0000FE22  charge_table_advance           Double-buffer selector
+  0x0000FE58  charge_nop                     Empty stub (RTS)
+  0x0000FE5C  charge_channel_dispatch_7      IRQ-protected channel 7
+  0x0000FE8E  charge_channel_dispatch_8      IRQ-protected channel 8
+  0x0000FEEC  charge_channel_dispatch_11     IRQ-protected channel 11
+  0x0000FF1E  charge_channel_dispatch_9      IRQ-protected channel 9
+  0x0000FF50  charge_channel_dispatch_12     IRQ-protected channel 12
+  0x0000FF82  charge_channel_dispatch_5      IRQ-protected channel 5 + store
+  0x0000FFBE  charge_channel_dispatch_6      IRQ-protected channel 6
+  0x0000FDEC  charge_table_store             Store func ptr into next slot
+  0x0000FDB4  fuel_system_call               System call (used by D940)
+  0x0000FD34  fuel_vtable_init               Load/validate fuel vtable
+  0x0000FD6A  fuel_vtable_fallback           Secondary vtable init path
+  0x0000A878  charge_accumulator             4-channel accumulation loop
+  0x0000A914  charge_integration_step        Single-channel integration
+  0x0000AC8C  charge_accumulate_step         Raw charge accumulation
+  0x0000AA4C  charge_result_store            Store accumulated result
+  0x0000D940  injection_channel_calc         Per-channel pulse width calc
+  0x00009A14  integration_loop_A             4× integration (Task 5)
+  0x00009A34  integration_loop_B             4× integration (Task 6)
+  0x00009A58  intake_tick_counter            16-tick prescaler → 0xA470
+  0x00009A72  injection_output_commit        IRQ-protected output write
+  0x00008528  struct_accumulator_A           Charge workspace processing
+  0x000085AC  struct_accumulator_B_thunk     Redirect to 0x8948
+  0x0000D3DC  injection_atu_write_B          ATU hardware write (Task 6)
+  0x0000D268  injection_atu_commit_A         ATU hardware commit (Task 9)
+  0x0000FC04  fuel_system_init               Vtable init + hw sync (Task 9)
+  0x0000FC7E  fuel_dispatch_entry            Dispatch entry for sub-table
+  0x0000FC88  fuel_hw_sync_mode1             Hardware sync mode 1
+  0x0000CBAC  maf_timer_prescaler            9-channel timer reload (80ms)
+  0x0000CBEE  fuel_stub_nop                  Empty stub
+  0x000107B6  charge_calc_active             Active charge calculation
+  0x000107F4  charge_calc_idle               Idle/holdover calculation
+
+
+══════════════════════════════════════════════════════════════════════════════
+  CONCLUSIONS
+══════════════════════════════════════════════════════════════════════════════
+
+1. The fueling pipeline uses a DOUBLE-BUFFERED function pointer mechanism
+   (0xFE22/0xFDEC) to allow charge calculations to be updated atomically
+   between scheduler ticks.  This prevents mid-calculation read of stale
+   data by the injection timing ISRs.
+
+2. Air charge calculation is distributed across 7 IRQ-protected channels
+   (IDs 5-12), each dispatched by identical wrapper functions that call
+   either charge_calc_active or charge_calc_idle based on whether the
+   channel is due for recalculation.
+
+3. Injection pulse width calculation (0xD940) is a 420-byte function that
+   processes up to 6 channels per mode, computing: pulse = (charge_delta /
+   timing_delta) * correction, clamped to [0, max].  This is the core
+   calculation that converts accumulated air charge into injector on-time.
+
+4. Two prescalers control timing:
+   - maf_timer_prescaler (0xCBAC): reloads 9 timer channels every 80ms
+   - intake_tick_counter (0x9A58): triggers full MAF recalc every 320ms
+
+5. 0xFC04 (fuel_system_init) contains a one-shot hardware synchronization
+   sequence identical to cl_finalize_injection_sync.  It normally early-exits
+   when FFFF415C == 0; the init path only runs when the fuel system is
+   first enabled.
+
+6. 0xCBEE is confirmed as an empty stub (no-op placeholder).
