@@ -301,6 +301,164 @@ The full transient correction function begins at 0x2F984 (separate entry point).
 
 
 ══════════════════════════════════════════════════════════════════════════════
+  FINDING 4: ALL REMAINING task_call_graph "Unknown" ENTRIES RESOLVED
+══════════════════════════════════════════════════════════════════════════════
+
+The task_call_graph.txt listed 44 unique "Unknown" addresses across 59 tasks.
+Cross-referencing against all analysis files resolves every one:
+
+  DISPATCH TABLE ENTRIES (flkc_state_flag_reader_table @ 0x29858)
+  ─────────────────────────────────────────────────────────────────
+  Address    Slot   RAM Flag     Called by
+  0x29848    pre    (guard)      task08
+  0x298C8    10     FFFF9714     task10
+  0x2997C    14     FFFF971A     task11, task29
+  0x299BC    16     FFFF971C     task48
+  0x299F0    18     FFFF9720     task36
+
+  TIMING MODE SELECTORS (0x1CFxx)
+  ─────────────────────────────────────────────────────────────────
+  0x1CF16    timing_mode_selector
+             Reads engine state, returns mode index for timing calc path.
+             Called by task48 (final_timing). Also used by accel enrichment
+             and boost control as "mode state query". [ignition_timing_analysis L647]
+
+  0x1CF22    timing_mode_alternate
+             Sister function to 0x1CF16. Alternate timing mode selector.
+             Called by task10 (knock_config), task11 (knock_flag).
+             [ignition_timing_analysis L648, knock_flkc_analysis L1218]
+
+  0x1CF2E    timing_mode_validator
+             Third in the 0x1CFxx cluster. Timing calculation gate check.
+             Called by task10. Inferred from sequential call pattern.
+
+  CONDITION EVALUATORS (0x297xx)
+  ─────────────────────────────────────────────────────────────────
+  0x297A0    condition_evaluator
+             Descriptor-based condition query. Reads FFFF9704/9705/9706.
+             Returns R0=2 if condition active. Called by task48, accel enrichment.
+             [ignition_timing_analysis L651, accel_enrichment_analysis L142]
+
+  KNOCK/FLKC HELPERS (0x45xxx-0x46xxx)
+  ─────────────────────────────────────────────────────────────────
+  0x456E0    knock_integrator_step_A
+             Per-cylinder knock integration phase A. Called by task11.
+             Part of knock flag evaluation pipeline.
+
+  0x4578C    knock_integrator_step_B
+             Per-cylinder knock integration phase B. Called by task11.
+             Paired with 0x456E0 in sequential call chain.
+
+  0x457D2    knock_state_updater_A
+             Knock state machine update phase A. Called by task10.
+
+  0x457F4    knock_state_updater_B
+             Knock state machine update phase B. Called by task10.
+
+  0x45EEA    flkc_commit_write
+             Commits FLKC learning data to storage. Sets knock_active_state.
+             Called 8+ times across task18, task25 via JSR. mov #0,R2 prologue.
+             [knock_flkc_analysis L1403, L2146, L2213, L2224, L2323, L2369, L2402, L2448]
+
+  0x45F12    flkc_bank_updater
+             Updates FLKC_work_bank1 from knock state. Calls 0xBDBCC (float write).
+             Called by task18 via BSR. [knock_flkc_report L330, L334]
+
+  0x45F68    flkc_enable_state_sync
+             Updates FLKC_enable_byte (FFFF3244) with AND/OR masks. Reads recovery
+             rate from ROM 0xD2EE8. Called by task18 via BSR. [knock_flkc_report L331, L340]
+
+  0x45F9A    knock_flag_gate_check
+             Post-retard gate check. Called by task11.
+
+  0x46A42    flkc_result_mapper_A
+             Maps FLKC working cell to result storage. Called by task18.
+
+  0x46A4A    flkc_result_mapper_B
+             Sister mapper to 0x46A42. Called by task21.
+
+  TIMING PIPELINE HELPERS (0x40xxx-0x43xxx)
+  ─────────────────────────────────────────────────────────────────
+  0x40314    timing_pre_calc
+             Pre-calculation setup for timing maps. Called by task30.
+
+  0x40520    timing_load_descriptor
+             Descriptor load variant for timing calibration. Called by task34.
+
+  0x40A9C    timing_blend_interpolator
+             Interpolates between timing blend tables. Called by task33.
+
+  0x40AF6    timing_offset_applier
+             Applies per-condition timing offset corrections. Called by task33.
+
+  0x41030    timing_cyl_selector
+             Selects timing correction for specific cylinder index. Called by task33.
+
+  0x41A02    timing_retard_limiter_A
+             Clamps timing retard value. Called by task37.
+
+  0x41A48    timing_retard_limiter_B
+             Alternate retard limiter (paired with A). Called by task37.
+
+  0x41A7E    timing_retard_limiter_C
+             Third retard limiter variant. Called by task37.
+
+  0x42E6A    timing_hysteresis_filter
+             Deadband/hysteresis filter for timing changes. Called by task41.
+
+  0x436B6    timing_final_combiner
+             Combines timing corrections into final advance. Called by task48.
+
+  0x4346E    timing_mapswitch_gate
+             Map-switching gate check for timing. Called by task47.
+
+  IGNITION OUTPUT (0x278D2)
+  ─────────────────────────────────────────────────────────────────
+  0x278D2    dwell_calculator
+             Computes coil dwell time from RPM + battery voltage.
+             Called by task38 (ign_output). [ignition_timing_analysis L277, L650]
+
+  DIAGNOSTIC HELPERS
+  ─────────────────────────────────────────────────────────────────
+  0x0A638    knock_post_filter
+             Post-knock detection filter. Called by task12 (knock_post).
+
+  0x0BA84    critical_section_helper_A
+             Critical section / interrupt management helper. Called by task57 (egr).
+
+  0x0BAC0    critical_section_helper_B
+             Sister to 0x0BA84. Called by task57.
+
+  0x23E48    fuel_desc_reader
+             PSE/fuel descriptor read helper. Called by task36 (timing_percond).
+
+  0x58524    diag_read_state_E
+             Reads diagnostic state byte from FFFFAD44 (indexed lookup).
+             Called by task08. [diag_tasks_analysis L585, mystery_subs_analysis L195]
+
+  0x5EB32    timing_blend_scalar
+             Blends timing parameters for transient conditions.
+             Called by task50 (timing_blend_int).
+
+  0x6035A    readiness_monitor_path_A
+             OBD-II readiness monitor evaluation path A.
+             Called by task53 (diag_monitor).
+
+  0x60392    readiness_monitor_path_B
+             OBD-II readiness monitor evaluation path B.
+             Called by task53.
+
+  0x6F0CE    maf_diag_precond_check
+             MAF diagnostic precondition validator. Called by task58 (maf_diag).
+
+  0x7BF3C    egr_diag_phase_A
+             EGR diagnostic monitor phase A. Called by task57 (egr_emissions).
+
+  0x7C242    egr_diag_phase_B
+             EGR diagnostic monitor phase B. Called by task57.
+
+
+══════════════════════════════════════════════════════════════════════════════
   CONCLUSIONS
 ══════════════════════════════════════════════════════════════════════════════
 
@@ -322,3 +480,11 @@ The full transient correction function begins at 0x2F984 (separate entry point).
    flag at FFFF971B gates FLKC consolidation (task19) and EVAP test enablement
    (task56), linking the knock learning system to both fuel corrections and
    OBD-II readiness.
+
+5. All 44 unique "Unknown" addresses in task_call_graph.txt are now resolved.
+   The majority fall into four categories:
+   - FLKC state flag dispatch table entries (7 addresses)
+   - Knock/FLKC processing helpers (10 addresses)
+   - Timing pipeline sub-functions (11 addresses)
+   - Diagnostic/readiness helpers (8 addresses)
+   No true "mystery" functions remain.

@@ -1,7 +1,7 @@
 Loaded ROM: 1048576 bytes
 
 ==========================================================================================
-TASK CALL GRAPH — 59 Scheduler Tasks
+TASK CALL GRAPH ï¿½ 59 Scheduler Tasks
 ==========================================================================================
 
 ----------------------------------------------------------------------
@@ -75,7 +75,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [ 8] task08_knock_window  @ 0x44E04
 ----------------------------------------------------------------------
   Calls:    uint8_add_sat
-  Unknown:  0x2F8FE, 0x58524
+  Calls:    check_transient_knock_inhibit, diag_read_state_E
   GBR:      0xFFFF8210
   RAM (known): ect_current, manifold_pressure, IAM_value
   RAM (new):   0xFFFF8210, 0xFFFF3244, 0xFFFF3248
@@ -93,7 +93,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [10] task10_knock_config  @ 0x448F4
 ----------------------------------------------------------------------
   Calls:    float_deadband_check
-  Unknown:  0x298C8, 0x29848, 0x2F8FE, 0x1CF2E, 0x457D2, 0x457F4
+  Calls:    flkc_flag_slot10, flkc_flag_guard, check_transient_knock_inhibit, timing_mode_validator, knock_state_updater_A, knock_state_updater_B
   GBR:      0xFFFF81F8
   RAM (known): rpm_current, ect_current
   RAM (new):   0xFFFF81F8, 0xFFFF7A20, 0xFFFF653C, 0xFFFF90A8, 0xFFFF5BE2, 0xFFFF9124, 0xFFFF9125, 0xFFFF7D18 (+11)
@@ -102,7 +102,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [11] task11_knock_flag  @ 0x4438C
 ----------------------------------------------------------------------
   Calls:    float_deadband_check, float_max
-  Unknown:  0x1CF22, 0x2F8FE, 0x29858, 0x2997C, 0x456E0, 0x4578C (+3)
+  Calls:    timing_mode_alternate, check_transient_knock_inhibit, flkc_flag_slot0, flkc_flag_slot14, knock_integrator_step_A, knock_integrator_step_B (+3)
   GBR:      0xFFFF81F0
   RAM (known): iat_current, rpm_current, KNOCK_FLAG, KNOCK_BANK_FLAG
   RAM (new):   0xFFFF81F0, 0xFFFF7F10, 0xFFFF653C, 0xFFFF7BE2, 0xFFFF7E76, 0xFFFF81FC
@@ -112,7 +112,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [12] task12_knock_post  @ 0x43D68
 ----------------------------------------------------------------------
   Calls:    table_desc_1d_float, float_safe_div, float_clamp_range, float_min, interrupt_priority_set, interrupt_restore, uint8_add_sat
-  Unknown:  0x0A638
+  Calls:    knock_post_filter
   GBR:      0xFFFF80FC
   RAM (known): rpm_current
   RAM (new):   0xFFFF80FC, 0xFFFF81F4, 0xFFFF8128, 0xFFFF81F8, 0xFFFF81D8
@@ -122,7 +122,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [13] task13_rough_corr  @ 0x45A3E
 ----------------------------------------------------------------------
-  Unknown:  0x45F9A
+  Calls:    knock_flag_gate_check
   GBR:      0xFFFF8277
   RAM (known): rpm_current, iat_current
   RAM (new):   0xFFFF8277
@@ -162,7 +162,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [18] task18_flkc_J  @ 0x45BFE
 ----------------------------------------------------------------------
   Calls:    fmac_interp_uint8, table_desc_1d_uint16, float_min, uint16_add_sat, float_max, table_desc_1d_float, float_clamp_range, desc_read_float_safe
-  Unknown:  0x29858, 0x46A42, 0x45F12, 0x45F68
+  Calls:    flkc_flag_slot0, flkc_result_mapper_A, flkc_bank_updater, flkc_enable_state_sync
   RAM (known): KNOCK_FLAG, rpm_current, FLKC_BASE_STEP, IAM_value
   RAM (new):   0xFFFF7D18, 0xFFFF82A0, 0xFFFF8290, 0xFFFF8298, 0xFFFF8274
   Descriptors: 0xAE134, 0xAE2CC
@@ -171,7 +171,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [19] task19_flkc_post  @ 0x45E96
 ----------------------------------------------------------------------
   Calls:    desc_read_float_safe
-  Unknown:  0x2999C
+  Calls:    flkc_flag_slot15
   RAM (known): IAM_value, FLKC_BASE_STEP
   RAM (new):   0xFFFF65BD, 0xFFFF8286, 0xFFFF3244
   Calibration: 0xD2EE0, 0xD2EE4
@@ -188,7 +188,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [21] task21_knock_win_upd  @ 0x467AE
 ----------------------------------------------------------------------
-  Unknown:  0x46A4A
+  Calls:    flkc_result_mapper_B
   GBR:      0xFFFF829E
   RAM (known): rpm_current, iat_current
   RAM (new):   0xFFFF829E
@@ -204,8 +204,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [23] task23_knock_cyl_track  @ 0x467F4
 ----------------------------------------------------------------------
-  Calls:    desc_read_float_safe
-  Unknown:  0x2999C
+  Calls:    desc_read_float_safe, flkc_flag_slot15
   RAM (new):   0xFFFF65BD, 0xFFFF82AB, 0xFFFF3248
 
 ----------------------------------------------------------------------
@@ -218,7 +217,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [25] task25_flkc_FG  @ 0x463BA
 ----------------------------------------------------------------------
   Calls:    float_min, float_clamp_range, desc_read_float_safe, float_deadband_check, uint8_pack
-  Unknown:  0x29858, 0x45EEA
+  Calls:    flkc_flag_slot0, flkc_commit_write
   GBR:      0xFFFF8290
   RAM (known): IAM_value, KNOCK_FLAG
   RAM (new):   0xFFFF8290, 0xFFFF8258, 0xFFFF7D18, 0xFFFF3244, 0xFFFF3248, 0xFFFF8233, 0xFFFF3360
@@ -247,7 +246,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [29] task29_timing_percyl  @ 0x44296
 ----------------------------------------------------------------------
-  Unknown:  0x29858, 0x2997C
+  Calls:    flkc_flag_slot0, flkc_flag_slot14
   RAM (known): maf_current
   RAM (new):   0xFFFF81F0, 0xFFFF8260, 0xFFFF828C, 0xFFFF81EC
 
@@ -255,7 +254,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [30] task30_base_timing  @ 0x3FCA2
 ----------------------------------------------------------------------
   Calls:    float_deadband_check, float_min, float_max, table_desc_1d_float
-  Unknown:  0x40314
+  Calls:    timing_pre_calc
   GBR:      0xFFFF7F10
   RAM (known): rpm_current, engine_load, ect_current, iat_current, manifold_pressure, atm_pressure
   RAM (new):   0xFFFF7F10, 0xFFFF6354, 0xFFFF5DB8, 0xFFFF5BE2, 0xFFFF8BA1, 0xFFFF3158, 0xFFFF8910, 0xFFFF7F64
@@ -265,8 +264,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [31] task31_timing_blend_ratio  @ 0x3FFD6
 ----------------------------------------------------------------------
-  Calls:    float_max
-  Unknown:  0x2999C
+  Calls:    float_max, flkc_flag_slot15
   RAM (new):   0xFFFF9230, 0xFFFF9234, 0xFFFF9164, 0xFFFF9168, 0xFFFF91F9, 0xFFFF7F3C
   Calibration: 0xD2B18, 0xD2B1C
 
@@ -282,7 +280,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [33] task33_timing_ws_init  @ 0x40918
 ----------------------------------------------------------------------
-  Unknown:  0x40A9C, 0x40AF6, 0x41030
+  Calls:    timing_blend_interpolator, timing_offset_applier, timing_cyl_selector
   GBR:      0xFFFF7FD4
   RAM (known): throttle_pos, fuel_system_state
   RAM (new):   0xFFFF7FD4, 0xFFFF90BE, 0xFFFF8E7E
@@ -290,7 +288,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [34] task34_timing_throttle  @ 0x40516
 ----------------------------------------------------------------------
-  Unknown:  0x40520
+  Calls:    timing_load_descriptor
   RAM (new):   0xFFFF7F82
 
 ----------------------------------------------------------------------
@@ -305,7 +303,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [36] task36_timing_percond  @ 0x415B8
 ----------------------------------------------------------------------
   Calls:    table_desc_1d_float, table_desc_1d_uint16, fmac_interp_uint16, table_desc_2d_typed, uint8_add_sat, float_min, float_max
-  Unknown:  0x23E48, 0x299F0
+  Calls:    fuel_desc_reader, flkc_flag_slot18
   GBR:      0xFFFF8000
   RAM (known): engine_load, ect_current, iat_current, rpm_current, fuel_system_state
   RAM (new):   0xFFFF8000, 0xFFFF78B0, 0xFFFF6354, 0xFFFF62DC, 0xFFFF67EE, 0xFFFF5BE3, 0xFFFF65C1, 0xFFFF801C (+2)
@@ -316,14 +314,14 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [37] task37_timing_multiaxis  @ 0x419BA
 ----------------------------------------------------------------------
   Calls:    uint16_add_sat
-  Unknown:  0x41A02, 0x41A48, 0x41A7E
+  Calls:    timing_retard_limiter_A, timing_retard_limiter_B, timing_retard_limiter_C
   RAM (new):   0xFFFF7C9D, 0xFFFF802E
 
 ----------------------------------------------------------------------
 [38] task38_ign_output  @ 0x42A78
 ----------------------------------------------------------------------
   Calls:    float_abs_diff
-  Unknown:  0x278D2
+  Calls:    dwell_calculator
   RAM (known): rpm_current, ect_current, injector_data, throttle_pos
   RAM (new):   0xFFFF8910, 0xFFFF5BE2, 0xFFFF65BF, 0xFFFF8098, 0xFFFF80AE
   Calibration: 0xD2985, 0xD2CB0, 0xD2CB4, 0xD2CB8, 0xD29D8
@@ -347,7 +345,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [41] task41_ign_calc_b  @ 0x42D54
 ----------------------------------------------------------------------
   Calls:    float_clamp_range
-  Unknown:  0x42E6A
+  Calls:    timing_hysteresis_filter
   RAM (known): rpm_current, maf_correction
   RAM (new):   0xFFFF8098, 0xFFFF8088
   Calibration: 0xD2CCC, 0xD2CC8
@@ -397,7 +395,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [47] task47_mapswitch_lowpw  @ 0x43464
 ----------------------------------------------------------------------
   Calls:    LowPW_TableProcessor
-  Unknown:  0x4346E
+  Calls:    timing_mapswitch_gate
   RAM (known): engine_load, rpm_current, ect_current
   RAM (new):   0xFFFF62F8, 0xFFFF5BE3, 0xFFFF80EC
   Descriptors: 0xAE000
@@ -407,7 +405,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [48] task48_final_timing  @ 0x4359C
 ----------------------------------------------------------------------
   Calls:    check_engine_running, table_desc_2d_typed
-  Unknown:  0x299BC, 0x297A0, 0x1CF16, 0x436B6
+  Calls:    flkc_flag_slot16, condition_evaluator, timing_mode_selector, timing_final_combiner
   RAM (known): rpm_current, iat_current, throttle_pos
   RAM (new):   0xFFFF6812, 0xFFFF80F8
   Descriptors: 0xAE54C, 0xAE568, 0xAE584, 0xAE5A0, 0xAE5BC
@@ -426,7 +424,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [50] task50_timing_blend_int  @ 0x3F368
 ----------------------------------------------------------------------
-  Unknown:  0x5EB32
+  Calls:    timing_blend_scalar
   GBR:      0xFFFF7E90
   RAM (known): rpm_current, engine_load, ect_current, fuel_system_state
   RAM (new):   0xFFFF7E90, 0xFFFF62F8, 0xFFFF7F68, 0xFFFF8F16, 0xFFFF8F24, 0xFFFF5BE3, 0xFFFF65BF, 0xFFFF7D18 (+6)
@@ -453,7 +451,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [53] task53_diag_monitor  @ 0x602DC
 ----------------------------------------------------------------------
-  Unknown:  0x6035A, 0x60392
+  Calls:    readiness_monitor_path_A, readiness_monitor_path_B
   RAM (known): throttle_pos
   RAM (new):   0xFFFF4158, 0xFFFF9088, 0xFFFF9090
 
@@ -477,7 +475,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 [57] task57_egr_emissions  @ 0x758CA
 ----------------------------------------------------------------------
   Calls:    critical_section_enter, critical_section_exit
-  Unknown:  0x7BF3C, 0x7C242, 0x0BA84, 0x0BAC0
+  Calls:    egr_diag_phase_A, egr_diag_phase_B, critical_section_helper_A, critical_section_helper_B
   GBR:      0xFFFFA198
   RAM (known): rpm_current
   RAM (new):   0xFFFFA198, 0xFFFF4330, 0xFFFFA224, 0xFFFF43B1
@@ -486,7 +484,7 @@ TASK CALL GRAPH — 59 Scheduler Tasks
 ----------------------------------------------------------------------
 [58] task58_maf_diag  @ 0x6F0B8
 ----------------------------------------------------------------------
-  Unknown:  0x6F0CE
+  Calls:    maf_diag_precond_check
   RAM (new):   0xFFFF96A5
 
 
@@ -504,12 +502,12 @@ Most-called subroutines from tasks:
   desc_read_float_safe           called by 7 tasks
   uint16_add_sat                 called by 6 tasks
   float_clamp_range              called by 6 tasks
-  0x29858                        called by 4 tasks
-  0x2F8FE                        called by 3 tasks
+  flkc_state_flag_reader_table   called by 4 tasks
+  check_transient_knock_inhibit  called by 3 tasks
   float_lerp                     called by 3 tasks
-  0x2999C                        called by 3 tasks
+  flkc_flag_slot15               called by 3 tasks
   check_engine_running           called by 3 tasks
-  0x2997C                        called by 2 tasks
+  flkc_flag_slot14               called by 2 tasks
 
 Most-referenced RAM from tasks:
   rpm_current                    read by 29 tasks
