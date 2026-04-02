@@ -3041,7 +3041,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0ACCF8L, "desc_1D_Boost_u8_11_ACCF8");
         count += label(0x0ACD0CL, "desc_1D_Boost_u8_11_ACD0C");
         count += label(0x0ACD20L, "desc_1D_Boost_u8_11_ACD20");
-        count += label(0x0AD37CL, "desc_1D_Boost_u8_18");
+        count += labelComment(0x0AD37CL, "desc_1D_Boost_u8_18",
+            "RR: Throttle Tip-in Enrichment B");
         count += label(0x0AD47CL, "desc_1D_Boost_f32_16_AD47C");
         count += label(0x0AD494L, "desc_1D_Boost_f32_16_AD494");
         count += label(0x0AD4ACL, "desc_1D_Boost_f32_16_AD4AC");
@@ -3055,13 +3056,19 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AEE94L, "desc_1D_Degrees_u8_12_AEE94");
 
         // --- 1D_ECT (258 descriptors) ---
-        count += label(0x0AA888L, "desc_1D_ECT_i16_16_AA888");
+        count += labelComment(0x0AA888L, "desc_1D_ECT_i16_16_AA888",
+            "RR: Initial/Max Wastegate Duty Compensation (IAT)");
         count += label(0x0AA89CL, "desc_1D_ECT_i16_16_AA89C");
-        count += label(0x0AA8B0L, "desc_1D_ECT_i16_16_AA8B0");
-        count += label(0x0AA8C4L, "desc_1D_ECT_i16_16_AA8C4");
-        count += label(0x0AA8D8L, "desc_1D_ECT_i16_16_AA8D8");
-        count += label(0x0AA8ECL, "desc_1D_ECT_i16_16_AA8EC");
-        count += label(0x0AA900L, "desc_1D_ECT_i16_16_AA900");
+        count += labelComment(0x0AA8B0L, "desc_1D_ECT_i16_16_AA8B0",
+            "RR: Initial/Max Wastegate Duty Compensation (ECT)");
+        count += labelComment(0x0AA8C4L, "desc_1D_ECT_i16_16_AA8C4",
+            "RR: TD Proportional Compensation (IAT)");
+        count += labelComment(0x0AA8D8L, "desc_1D_ECT_i16_16_AA8D8",
+            "RR: TD Integral Negative Compensation (IAT)");
+        count += labelComment(0x0AA8ECL, "desc_1D_ECT_i16_16_AA8EC",
+            "RR: TD Integral Positive Compensation (IAT)");
+        count += labelComment(0x0AA900L, "desc_1D_ECT_i16_16_AA900",
+            "RR: Target Boost Compensation (ECT)");
         count += label(0x0AADECL, "desc_1D_ECT_u8_16_AADEC");
         count += label(0x0AAE00L, "desc_1D_ECT_u8_16_AAE00");
         count += label(0x0AAE28L, "desc_1D_ECT_u8_16_AAE28");
@@ -3080,8 +3087,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AB9ACL, "desc_1D_ECT_f32_16_AB9AC");
         count += label(0x0AB9C4L, "desc_1D_ECT_f32_16_AB9C4");
         count += label(0x0AC2B0L, "desc_1D_ECT_f32_16_AC2B0");
-        count += label(0x0AC338L, "desc_1D_ECT_i16_16_AC338");
-        count += label(0x0AC374L, "desc_1D_ECT_i16_5");
+        count += labelComment(0x0AC338L, "desc_1D_ECT_i16_16_AC338",
+            "RR: Min Primary Base Enrichment 1 (Non-Primary OL)_");
+        count += labelComment(0x0AC374L, "desc_1D_ECT_i16_5",
+            "RR: Cranking Fuel IPW Compensation (IAT)");
         count += label(0x0AC388L, "desc_1D_ECT_i16_16_AC388");
         count += label(0x0AC3A0L, "desc_1D_ECT_i16_16_AC3A0");
         count += label(0x0AC3B8L, "desc_1D_ECT_i16_16_AC3B8");
@@ -3099,8 +3108,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AC6C0L, "desc_1D_ECT_i16_16_AC6C0");
         count += label(0x0AC6E8L, "desc_1D_ECT_i16_16_AC6E8");
         count += label(0x0AC774L, "desc_1D_ECT_i16_16_AC774");
-        count += label(0x0AC7D8L, "desc_1D_ECT_i16_16_AC7D8");
-        count += label(0x0AC7ECL, "desc_1D_ECT_i16_16_AC7EC");
+        count += labelComment(0x0AC7D8L, "desc_1D_ECT_i16_16_AC7D8",
+            "RR: Tip-in Enrichment Compensation A (ECT)");
+        count += labelComment(0x0AC7ECL, "desc_1D_ECT_i16_16_AC7EC",
+            "RR: Tip-in Enrichment Disable Applied Counter Threshold A (ECT)");
         count += label(0x0AC804L, "desc_1D_ECT_u8_16_AC804");
         count += label(0x0AC818L, "desc_1D_ECT_u8_16_AC818");
         count += label(0x0AC82CL, "desc_1D_ECT_u8_16_AC82C");
@@ -3111,43 +3122,65 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AC890L, "desc_1D_ECT_u8_16_AC890");
         count += label(0x0AC8A4L, "desc_1D_ECT_u8_16_AC8A4");
         count += label(0x0AC8B8L, "desc_1D_ECT_u8_16_AC8B8");
-        count += label(0x0AC8D0L, "desc_1D_ECT_u8_16_AC8D0");
-        count += label(0x0AC8E4L, "desc_1D_ECT_u8_16_AC8E4");
-        count += label(0x0AC8F8L, "desc_1D_ECT_u8_16_AC8F8");
-        count += label(0x0AC90CL, "desc_1D_ECT_u8_16_AC90C");
-        count += label(0x0AC920L, "desc_1D_ECT_u8_16_AC920");
-        count += label(0x0AC934L, "desc_1D_ECT_u8_16_AC934");
-        count += label(0x0AC948L, "desc_1D_ECT_u8_16_AC948");
-        count += label(0x0AC95CL, "desc_1D_ECT_u8_16_AC95C");
-        count += label(0x0AC970L, "desc_1D_ECT_u8_16_AC970");
-        count += label(0x0AC984L, "desc_1D_ECT_u8_16_AC984");
-        count += label(0x0AC998L, "desc_1D_ECT_u8_16_AC998");
+        count += labelComment(0x0AC8D0L, "desc_1D_ECT_u8_16_AC8D0",
+            "RR: Cranking Fuel Injector Pulse Width A (ECT)");
+        count += labelComment(0x0AC8E4L, "desc_1D_ECT_u8_16_AC8E4",
+            "RR: Cranking Fuel Injector Pulse Width B (ECT)");
+        count += labelComment(0x0AC8F8L, "desc_1D_ECT_u8_16_AC8F8",
+            "RR: Cranking Fuel Injector Pulse Width C (ECT)");
+        count += labelComment(0x0AC90CL, "desc_1D_ECT_u8_16_AC90C",
+            "RR: Cranking Fuel Injector Pulse Width D (ECT)");
+        count += labelComment(0x0AC920L, "desc_1D_ECT_u8_16_AC920",
+            "RR: Cranking Fuel Injector Pulse Width E (ECT)");
+        count += labelComment(0x0AC934L, "desc_1D_ECT_u8_16_AC934",
+            "RR: Cranking Fuel Injector Pulse Width F (ECT)");
+        count += labelComment(0x0AC948L, "desc_1D_ECT_u8_16_AC948",
+            "RR: Table_Post_Start_Enrich_Low_Speed_Decay_Initial_1A");
+        count += labelComment(0x0AC95CL, "desc_1D_ECT_u8_16_AC95C",
+            "RR: Table_Post_Start_Enrich_Low_Speed_Decay_Initial_1B");
+        count += labelComment(0x0AC970L, "desc_1D_ECT_u8_16_AC970",
+            "RR: Table_Post_Start_Enrich_Low_Speed_Decay_Initial_2A");
+        count += labelComment(0x0AC984L, "desc_1D_ECT_u8_16_AC984",
+            "RR: Table_Post_Start_Enrich_Low_Speed_Decay_Initial_2B");
+        count += labelComment(0x0AC998L, "desc_1D_ECT_u8_16_AC998",
+            "RR: Table_Post_Start_Enrich_Low_Speed_Decay_Delay_1");
         count += label(0x0AC9B8L, "desc_1D_ECT_u8_16_AC9B8");
         count += label(0x0AC9CCL, "desc_1D_ECT_u8_16_AC9CC");
-        count += label(0x0AC9E0L, "desc_1D_ECT_u8_16_AC9E0");
+        count += labelComment(0x0AC9E0L, "desc_1D_ECT_u8_16_AC9E0",
+            "RR: Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_1B");
         count += label(0x0AC9F4L, "desc_1D_ECT_u8_16_AC9F4");
-        count += label(0x0ACA08L, "desc_1D_ECT_u8_16_ACA08");
+        count += labelComment(0x0ACA08L, "desc_1D_ECT_u8_16_ACA08",
+            "RR: Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_2A");
         count += label(0x0ACA1CL, "desc_1D_ECT_u8_16_ACA1C");
         count += label(0x0ACA30L, "desc_1D_ECT_u8_16_ACA30");
-        count += label(0x0ACA44L, "desc_1D_ECT_u8_16_ACA44");
+        count += labelComment(0x0ACA44L, "desc_1D_ECT_u8_16_ACA44",
+            "RR: Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_2B");
         count += label(0x0ACA58L, "desc_1D_ECT_u8_16_ACA58");
-        count += label(0x0ACA6CL, "desc_1D_ECT_u8_16_ACA6C");
+        count += labelComment(0x0ACA6CL, "desc_1D_ECT_u8_16_ACA6C",
+            "RR: Table_Post_Start_Enrich_Low_Speed_Decay_Delay_2");
         count += label(0x0ACA8CL, "desc_1D_ECT_u8_16_ACA8C");
-        count += label(0x0ACAA0L, "desc_1D_ECT_u8_16_ACAA0");
+        count += labelComment(0x0ACAA0L, "desc_1D_ECT_u8_16_ACAA0",
+            "RR: Table_Post_Start_Enrich_High_Speed_Decay_Step_Value_2");
         count += label(0x0ACAB4L, "desc_1D_ECT_u8_16_ACAB4");
         count += label(0x0ACAC8L, "desc_1D_ECT_u8_16_ACAC8");
         count += label(0x0ACADCL, "desc_1D_ECT_u8_16_ACADC");
-        count += label(0x0ACAF0L, "desc_1D_ECT_u8_16_ACAF0");
+        count += labelComment(0x0ACAF0L, "desc_1D_ECT_u8_16_ACAF0",
+            "RR: Table_Post_Start_Enrich_Low_Speed_Decay_Delay_Multiplier");
         count += label(0x0ACB04L, "desc_1D_ECT_u8_16_ACB04");
         count += label(0x0ACB18L, "desc_1D_ECT_u8_16_ACB18");
         count += label(0x0ACB2CL, "desc_1D_ECT_u8_16_ACB2C");
-        count += label(0x0ACB40L, "desc_1D_ECT_u8_16_ACB40");
+        count += labelComment(0x0ACB40L, "desc_1D_ECT_u8_16_ACB40",
+            "RR: Tau Input A Rising Load Activation");
         count += label(0x0ACB54L, "desc_1D_ECT_u8_16_ACB54");
         count += label(0x0ACB68L, "desc_1D_ECT_u8_16_ACB68");
-        count += label(0x0ACB7CL, "desc_1D_ECT_u8_16_ACB7C");
-        count += label(0x0ACB90L, "desc_1D_ECT_u8_16_ACB90");
-        count += label(0x0ACBCCL, "desc_1D_ECT_u8_16_ACBCC");
-        count += label(0x0ACBE0L, "desc_1D_ECT_u8_16_ACBE0");
+        count += labelComment(0x0ACB7CL, "desc_1D_ECT_u8_16_ACB7C",
+            "RR: Tau Input A Falling Load Activation");
+        count += labelComment(0x0ACB90L, "desc_1D_ECT_u8_16_ACB90",
+            "RR: Tau Input A Falling Load Activation A");
+        count += labelComment(0x0ACBCCL, "desc_1D_ECT_u8_16_ACBCC",
+            "RR: Tau Input A Falling Load Activation B");
+        count += labelComment(0x0ACBE0L, "desc_1D_ECT_u8_16_ACBE0",
+            "RR: Tau Input A Falling Load Activation C");
         count += label(0x0ACC1CL, "desc_1D_ECT_u8_16_ACC1C");
         count += label(0x0ACC30L, "desc_1D_ECT_u8_16_ACC30");
         count += label(0x0ACC44L, "desc_1D_ECT_u8_16_ACC44");
@@ -3188,32 +3221,46 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AD334L, "desc_1D_ECT_u8_16_AD334");
         count += label(0x0AD348L, "desc_1D_ECT_u8_16_AD348");
         count += label(0x0AD35CL, "desc_1D_ECT_u8_16_AD35C");
-        count += label(0x0AD390L, "desc_1D_ECT_u8_16_AD390");
-        count += label(0x0AD3A4L, "desc_1D_ECT_u8_16_AD3A4");
+        count += labelComment(0x0AD390L, "desc_1D_ECT_u8_16_AD390",
+            "RR: Tip-in Enrichment Compensation B (ECT)");
+        count += labelComment(0x0AD3A4L, "desc_1D_ECT_u8_16_AD3A4",
+            "RR: Tip-in Enrichment Compensation C (ECT)");
         count += label(0x0AD3B8L, "desc_1D_ECT_u8_16_AD3B8");
-        count += label(0x0AD3D8L, "desc_1D_ECT_u8_16_AD3D8");
-        count += label(0x0AD3ECL, "desc_1D_ECT_u8_16_AD3EC");
+        count += labelComment(0x0AD3D8L, "desc_1D_ECT_u8_16_AD3D8",
+            "RR: Tip-in Enrichment Disable Throttle Cumulative Threshold A (ECT)");
+        count += labelComment(0x0AD3ECL, "desc_1D_ECT_u8_16_AD3EC",
+            "RR: Tip-in Enrichment Disable Throttle Cumulative Threshold B (ECT)");
         count += label(0x0AD420L, "desc_1D_ECT_u8_16_AD420");
         count += label(0x0AD4C4L, "desc_1D_ECT_f32_16_AD4C4");
         count += label(0x0ADA98L, "desc_1D_ECT_i16_16_ADA98");
         count += label(0x0ADAACL, "desc_1D_ECT_i16_16_ADAAC");
-        count += label(0x0ADB4CL, "desc_1D_ECT_i16_16_ADB4C");
-        count += label(0x0ADB60L, "desc_1D_ECT_i16_16_ADB60");
-        count += label(0x0ADB74L, "desc_1D_ECT_i16_16_ADB74");
-        count += label(0x0ADB88L, "desc_1D_ECT_i16_16_ADB88");
+        count += labelComment(0x0ADB4CL, "desc_1D_ECT_i16_16_ADB4C",
+            "RR: Base Timing Idle A (In-Gear)");
+        count += labelComment(0x0ADB60L, "desc_1D_ECT_i16_16_ADB60",
+            "RR: Base Timing Idle B (In-Gear)");
+        count += labelComment(0x0ADB74L, "desc_1D_ECT_i16_16_ADB74",
+            "RR: Base Timing Idle A (Neutral)");
+        count += labelComment(0x0ADB88L, "desc_1D_ECT_i16_16_ADB88",
+            "RR: Base Timing Idle B (Neutral)");
         count += label(0x0ADB9CL, "desc_1D_ECT_i16_16_ADB9C");
         count += label(0x0ADBB0L, "desc_1D_ECT_i16_16_ADBB0");
-        count += label(0x0ADBC4L, "desc_1D_ECT_i16_16_ADBC4");
-        count += label(0x0ADBD8L, "desc_1D_ECT_i16_16_ADBD8");
-        count += label(0x0ADBECL, "desc_1D_ECT_i16_16_ADBEC");
-        count += label(0x0ADC00L, "desc_1D_ECT_i16_16_ADC00");
-        count += label(0x0ADC14L, "desc_1D_ECT_i16_16_ADC14");
+        count += labelComment(0x0ADBC4L, "desc_1D_ECT_i16_16_ADBC4",
+            "RR: Timing Compensation Imm. Non-Cruise A (ECT)");
+        count += labelComment(0x0ADBD8L, "desc_1D_ECT_i16_16_ADBD8",
+            "RR: Timing Compensation Imm. Non-Cruise B (ECT)");
+        count += labelComment(0x0ADBECL, "desc_1D_ECT_i16_16_ADBEC",
+            "RR: Timing Compensation Imm. Cruise A (ECT)");
+        count += labelComment(0x0ADC00L, "desc_1D_ECT_i16_16_ADC00",
+            "RR: Timing Compensation Imm. Cruise B (ECT)");
+        count += labelComment(0x0ADC14L, "desc_1D_ECT_i16_16_ADC14",
+            "RR: Timing Compensation A (IAT)");
         count += label(0x0ADD90L, "desc_1D_ECT_i16_16_ADD90");
         count += label(0x0ADDA4L, "desc_1D_ECT_i16_16_ADDA4");
         count += label(0x0ADE08L, "desc_1D_ECT_i16_16_ADE08");
         count += label(0x0ADF34L, "desc_1D_ECT_i16_16_ADF34");
         count += label(0x0ADF48L, "desc_1D_ECT_i16_16_ADF48");
-        count += label(0x0ADFACL, "desc_1D_ECT_i16_16_ADFAC");
+        count += labelComment(0x0ADFACL, "desc_1D_ECT_i16_16_ADFAC",
+            "RR: Timing Compensation B (IAT)");
         count += label(0x0AE034L, "desc_1D_ECT_u8_16_AE034");
         count += label(0x0AE054L, "desc_1D_ECT_u8_16_AE054");
         count += label(0x0AE068L, "desc_1D_ECT_u8_16_AE068");
@@ -3254,16 +3301,20 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AEAE4L, "desc_1D_ECT_u8_16_AEAE4");
         count += label(0x0AEAF8L, "desc_1D_ECT_u8_16_AEAF8");
         count += label(0x0AEB0CL, "desc_1D_ECT_u8_16_AEB0C");
-        count += label(0x0AEB20L, "desc_1D_ECT_u8_16_AEB20");
+        count += labelComment(0x0AEB20L, "desc_1D_ECT_u8_16_AEB20",
+            "RR: Idle Speed Target A");
         count += label(0x0AEB34L, "desc_1D_ECT_u8_16_AEB34");
-        count += label(0x0AEB48L, "desc_1D_ECT_u8_16_AEB48");
+        count += labelComment(0x0AEB48L, "desc_1D_ECT_u8_16_AEB48",
+            "RR: Idle Speed Target B");
         count += label(0x0AEB5CL, "desc_1D_ECT_u8_16_AEB5C");
-        count += label(0x0AEB70L, "desc_1D_ECT_u8_16_AEB70");
+        count += labelComment(0x0AEB70L, "desc_1D_ECT_u8_16_AEB70",
+            "RR: Idle Speed Target C");
         count += label(0x0AEB84L, "desc_1D_ECT_u8_16_AEB84");
         count += label(0x0AEB98L, "desc_1D_ECT_u8_16_AEB98");
         count += label(0x0AEBACL, "desc_1D_ECT_u8_16_AEBAC");
         count += label(0x0AEBC0L, "desc_1D_ECT_u8_16_AEBC0");
-        count += label(0x0AEBD4L, "desc_1D_ECT_u8_16_AEBD4");
+        count += labelComment(0x0AEBD4L, "desc_1D_ECT_u8_16_AEBD4",
+            "RR: Idle Speed Target D");
         count += label(0x0AEBE8L, "desc_1D_ECT_u8_16_AEBE8");
         count += label(0x0AEC10L, "desc_1D_ECT_u8_16_AEC10");
         count += label(0x0AEC24L, "desc_1D_ECT_u8_16_AEC24");
@@ -3328,12 +3379,14 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AC5F8L, "desc_1D_IPW_i16_6_AC5F8");
         count += label(0x0AC60CL, "desc_1D_IPW_i16_6_AC60C");
         count += label(0x0ACE20L, "desc_1D_IPW_u8_13");
-        count += label(0x0AD0B8L, "desc_1D_IPW_f32_10_AD0B8");
+        count += labelComment(0x0AD0B8L, "desc_1D_IPW_f32_10_AD0B8",
+            "RR: CL to OL Transition Counter Step Value (MAF)");
         count += label(0x0AD0D0L, "desc_1D_IPW_f32_10_AD0D0");
         count += label(0x0AD434L, "desc_1D_IPW_f32_9");
         count += label(0x0ADFE8L, "desc_1D_IPW_f32_5");
         count += label(0x0AF450L, "desc_1D_IPW_f32_16");
-        count += label(0x0AF480L, "desc_1D_IPW_f32_30");
+        count += labelComment(0x0AF480L, "desc_1D_IPW_f32_30",
+            "RR: Intake Temp Sensor Scaling");
 
         // --- 1D_KnockIdx (4 descriptors) ---
         count += label(0x0AB56CL, "desc_1D_KnockIdx_u8_7_AB56C");
@@ -3369,7 +3422,8 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- 1D_MAF (2 descriptors) ---
         count += label(0x0AB21CL, "desc_1D_MAF_u8_14");
-        count += label(0x0AC7C4L, "desc_1D_MAF_i16_9");
+        count += labelComment(0x0AC7C4L, "desc_1D_MAF_i16_9",
+            "RR: Tip-in Enrichment Compensation (Boost Error)");
 
         // --- 1D_Pressure (11 descriptors) ---
         count += label(0x0AAAF0L, "desc_1D_Pressure_u8_6_AAAF0");
@@ -3431,13 +3485,15 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AC4ACL, "desc_1D_RPM_wide_i16_16_AC4AC");
         count += label(0x0AC4FCL, "desc_1D_RPM_wide_i16_11_AC4FC");
         count += label(0x0AC510L, "desc_1D_RPM_wide_i16_11_AC510");
-        count += label(0x0AC5BCL, "desc_1D_RPM_wide_i16_16_AC5BC");
+        count += labelComment(0x0AC5BCL, "desc_1D_RPM_wide_i16_16_AC5BC",
+            "RR: CL to OL Transition with Delay (Throttle)");
         count += label(0x0AC634L, "desc_1D_RPM_wide_i16_16_AC634");
         count += label(0x0AC710L, "desc_1D_RPM_i16_7_AC710");
         count += label(0x0AC724L, "desc_1D_RPM_i16_7_AC724");
         count += label(0x0AC738L, "desc_1D_RPM_i16_7_AC738");
         count += label(0x0AC74CL, "desc_1D_RPM_i16_7_AC74C");
-        count += label(0x0AC7B0L, "desc_1D_RPM_wide_i16_16_AC7B0");
+        count += labelComment(0x0AC7B0L, "desc_1D_RPM_wide_i16_16_AC7B0",
+            "RR: Tip-in Enrichment Compensation (RPM)");
         count += label(0x0ACBA4L, "desc_1D_RPM_wide_u8_16_ACBA4");
         count += label(0x0ACBB8L, "desc_1D_RPM_wide_u8_16_ACBB8");
         count += label(0x0ACBF4L, "desc_1D_RPM_wide_u8_16_ACBF4");
@@ -3446,8 +3502,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0ACC80L, "desc_1D_RPM_wide_u8_16_ACC80");
         count += label(0x0ACD34L, "desc_1D_RPM_u8_8");
         count += label(0x0ACE54L, "desc_1D_RPM_wide_f32_6_ACE54");
-        count += label(0x0AD090L, "desc_1D_RPM_wide_u8_9");
-        count += label(0x0AD0A4L, "desc_1D_RPM_wide_u8_16_AD0A4");
+        count += labelComment(0x0AD090L, "desc_1D_RPM_wide_u8_9",
+            "RR: AFL Decay Rate (CL to OL Transition Speed)");
+        count += labelComment(0x0AD0A4L, "desc_1D_RPM_wide_u8_16_AD0A4",
+            "RR: CL to OL Transition with Delay (Base Pulse Width)");
         count += label(0x0AD0F0L, "desc_1D_RPM_wide_u8_16_AD0F0");
         count += label(0x0AD208L, "desc_1D_RPM_u8_7_AD208");
         count += label(0x0AD21CL, "desc_1D_RPM_u8_7_AD21C");
@@ -3460,10 +3518,12 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0ADE30L, "desc_1D_RPM_i16_13_ADE30");
         count += label(0x0ADFC0L, "desc_1D_RPM_wide_i16_16_ADFC0");
         count += label(0x0ADFD4L, "desc_1D_RPM_wide_i16_16_ADFD4");
-        count += label(0x0AE000L, "desc_1D_RPM_f32_8_AE000");
+        count += labelComment(0x0AE000L, "desc_1D_RPM_f32_8_AE000",
+            "RR: Low Pulse Width Fuel Injector Compensation");
         count += label(0x0AE10CL, "desc_1D_RPM_u8_7_AE10C");
         count += label(0x0AE120L, "desc_1D_RPM_wide_u8_16_AE120");
-        count += label(0x0AE134L, "desc_1D_RPM_f32_10_AE134");
+        count += labelComment(0x0AE134L, "desc_1D_RPM_f32_10_AE134",
+            "RR: Rough Correction Learning Delay (Increasing)_");
         count += label(0x0AE17CL, "desc_1D_RPM_f32_6");
         count += label(0x0AE26CL, "desc_1D_RPM_f32_18");
         count += label(0x0AE290L, "desc_1D_RPM_f32_10_AE290");
@@ -3475,7 +3535,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AEF60L, "desc_1D_RPM_f32_8_AEF60");
         count += label(0x0AEF78L, "desc_1D_RPM_wide_f32_8");
         // desc_1D_RPM_wide_f32_6_AEFF0 -- relabeled as desc_boost_rpm_scale (boost workspace section)
-        count += label(0x0AF144L, "desc_1D_RPM_u8_16_AF144");
+        count += labelComment(0x0AF144L, "desc_1D_RPM_u8_16_AF144",
+            "RR: Requested Torque Base (RPM)");
         count += label(0x0AF158L, "desc_1D_RPM_u8_16_AF158");
         count += label(0x0AF16CL, "desc_1D_RPM_u8_16_AF16C");
         count += label(0x0AF180L, "desc_1D_RPM_u8_16_AF180");
@@ -3498,7 +3559,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0ACC94L, "desc_1D_SmallRatio_u8_13_ACC94");
         count += label(0x0ACCA8L, "desc_1D_SmallRatio_u8_13_ACCA8");
         count += label(0x0AE020L, "desc_1D_SmallRatio_i16_5");
-        count += label(0x0AF468L, "desc_1D_SmallRatio_f32_13");
+        count += labelComment(0x0AF468L, "desc_1D_SmallRatio_f32_13",
+            "RR: Front Oxygen Sensor Scaling");
 
         // --- 1D_Throttle (41 descriptors) ---
         count += label(0x0AA760L, "desc_1D_Throttle_u8_16_AA760");
@@ -3515,9 +3577,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AB638L, "desc_1D_Throttle_u8_9_AB638");
         count += label(0x0AB64CL, "desc_1D_Throttle_u8_9_AB64C");
         count += label(0x0ABA54L, "desc_1D_Throttle_f32_13");
-        count += label(0x0AC360L, "desc_1D_Throttle_i16_10_AC360");
+        count += labelComment(0x0AC360L, "desc_1D_Throttle_i16_10_AC360",
+            "RR: Cranking Fuel IPW Compensation (Accelerator)");
         count += label(0x0AC544L, "desc_1D_Throttle_i16_8_AC544");
-        count += label(0x0AC5E4L, "desc_1D_Throttle_i16_6_AC5E4");
+        count += labelComment(0x0AC5E4L, "desc_1D_Throttle_i16_6_AC5E4",
+            "RR: Minimum Primary Open Loop Enrichment (Accelerator)");
         count += label(0x0ADE1CL, "desc_1D_Throttle_i16_7");
         count += label(0x0ADE44L, "desc_1D_Throttle_i16_8_ADE44");
         count += label(0x0ADE58L, "desc_1D_Throttle_i16_8_ADE58");
@@ -3559,7 +3623,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AEBFCL, "desc_1D_TimingAdv_u8_7");
 
         // --- 1D_VehSpd (11 descriptors) ---
-        count += label(0x0AA93CL, "desc_1D_VehSpd_u8_9_AA93C");
+        count += labelComment(0x0AA93CL, "desc_1D_VehSpd_u8_9_AA93C",
+            "RR: Turbo Dynamics Integral Positive");
         count += label(0x0AB9F4L, "desc_1D_VehSpd_f32_8_AB9F4");
         count += label(0x0ABBBCL, "desc_1D_VehSpd_f32_8_ABBBC");
         count += label(0x0AC4C0L, "desc_1D_VehSpd_i16_9_AC4C0");
@@ -3580,13 +3645,16 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AA7B0L, "desc_1D_range_0_3500_u8_8");
         count += label(0x0AA7D8L, "desc_1D_range_40_20_f32_12");
         count += label(0x0AA80CL, "desc_1D_range_40_20_u8_12");
-        count += label(0x0AA914L, "desc_1D_range_160_160_u8_9");
-        count += label(0x0AA928L, "desc_1D_range_240_0_u8_9");
+        count += labelComment(0x0AA914L, "desc_1D_range_160_160_u8_9",
+            "RR: Turbo Dynamics Proportional");
+        count += labelComment(0x0AA928L, "desc_1D_range_240_0_u8_9",
+            "RR: Turbo Dynamics Integral Negative");
         count += label(0x0AABA4L, "desc_1D_range_100_760_u8_5");
         count += label(0x0AAC94L, "desc_1D_range_20_0_f32_6");
         count += label(0x0AAE64L, "desc_1D_range_4000_7500_u8_8");
         count += label(0x0AAE78L, "desc_1D_range_3200_6000_u8_8");
-        count += label(0x0AAE8CL, "desc_1D_range_524_758_u8_4");
+        count += labelComment(0x0AAE8CL, "desc_1D_range_524_758_u8_4",
+            "RR: Front Oxygen Sensor Compensation (Atm. Pressure)");
         count += label(0x0AAFDCL, "desc_1D_range_15_60_f32_4");
         count += label(0x0AB154L, "desc_1D_range_20_80_i16_7");
         count += label(0x0AB190L, "desc_1D_range_0_0_u8_7_AB190");
@@ -3621,14 +3689,17 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AC26CL, "desc_1D_range_8_24_f32_4");
         count += label(0x0AC284L, "desc_1D_range_7_30_u8_5");
         count += label(0x0AC298L, "desc_1D_range_0_0_f32_24");
-        count += label(0x0AC34CL, "desc_1D_range_184_760_i16_10");
+        count += labelComment(0x0AC34CL, "desc_1D_range_184_760_i16_10",
+            "RR: Cranking Fuel IPW Compensation (MAP)");
         count += label(0x0AC3F4L, "desc_1D_range_3600_7200_i16_10_AC3F4");
         count += label(0x0AC408L, "desc_1D_range_3600_7200_i16_10_AC408");
         count += label(0x0AC524L, "desc_1D_range_0_0_f32_6_AC524");
         count += label(0x0AC558L, "desc_1D_range_0_110000_i16_12_AC558");
         count += label(0x0AC580L, "desc_1D_range_0_110000_i16_12_AC580");
-        count += label(0x0AC5A8L, "desc_1D_range_10_0_i16_6");
-        count += label(0x0AC5D0L, "desc_1D_range_11_89_i16_6");
+        count += labelComment(0x0AC5A8L, "desc_1D_range_10_0_i16_6",
+            "RR: Primary Open Loop Fueling Compensation (Timing Compensation)_");
+        count += labelComment(0x0AC5D0L, "desc_1D_range_11_89_i16_6",
+            "RR: CL to OL Enrichment Threshold (MAF)");
         count += label(0x0AC760L, "desc_1D_range_300_650_i16_8");
         count += label(0x0ACE6CL, "desc_1D_range_0_0_u8_9");
         count += label(0x0ACEF0L, "desc_1D_range_0_0_f32_6_ACEF0");
@@ -3647,7 +3718,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0ADAE8L, "desc_1D_range_1600_3200_i16_5_ADAE8");
         count += label(0x0ADB10L, "desc_1D_range_0_1500_i16_16");
         count += label(0x0ADB24L, "desc_1D_range_515_795_i16_5");
-        count += label(0x0ADB38L, "desc_1D_range_400_2000_i16_9");
+        count += labelComment(0x0ADB38L, "desc_1D_range_400_2000_i16_9",
+            "RR: Base Timing Idle Minimum");
         count += label(0x0ADF5CL, "desc_1D_range_20_20_i16_21_ADF5C");
         count += label(0x0ADF70L, "desc_1D_range_20_20_i16_21_ADF70");
         count += label(0x0ADF84L, "desc_1D_range_20_20_i16_21_ADF84");
@@ -3669,13 +3741,16 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AF808L, "desc_1D_range_0_0_u8_13_AF808");
 
         // --- 2D_AtmPressurexRPM (4 descriptors) ---
-        count += label(0x0AA99CL, "desc_2D_AtmPressurexRPM_i16_6x6");
+        count += labelComment(0x0AA99CL, "desc_2D_AtmPressurexRPM_i16_6x6",
+            "RR: Target Boost Compensation (Atm. Pressure)_");
         count += label(0x0ABE7CL, "desc_2D_AtmPressurexRPM_u8_7x14_ABE7C");
         count += label(0x0ABE98L, "desc_2D_AtmPressurexRPM_u8_7x14_ABE98");
-        count += label(0x0ADA24L, "desc_2D_AtmPressurexRPM_u8_6x6");
+        count += labelComment(0x0ADA24L, "desc_2D_AtmPressurexRPM_u8_6x6",
+            "RR: Boost Limit (Fuel Cut)_");
 
         // --- 2D_AtmPressurexrange (1 descriptors) ---
-        count += label(0x0AA980L, "desc_2D_AtmPressurexrange_4000_7000_i16_6x4");
+        count += labelComment(0x0AA980L, "desc_2D_AtmPressurexrange_4000_7000_i16_6x4",
+            "RR: Initial/Max Wastegate Duty Compensation (Atm. Pressure)");
 
         // --- 2D_Boostxrange (2 descriptors) ---
         count += label(0x0AF058L, "desc_2D_Boostxrange_0_2000_i16_8x6_AF058");
@@ -3688,8 +3763,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AF0E4L, "desc_2D_ECTxIAT_u8_16x6");
 
         // --- 2D_ECTxLoad (3 descriptors) ---
-        count += label(0x0AD5E8L, "desc_2D_ECTxLoad_i16_16x8");
-        count += label(0x0AD604L, "desc_2D_ECTxLoad_i16_16x9");
+        count += labelComment(0x0AD5E8L, "desc_2D_ECTxLoad_i16_16x8",
+            "RR: Min Primary Base Enrichment 1 Non-Cruise");
+        count += labelComment(0x0AD604L, "desc_2D_ECTxLoad_i16_16x9",
+            "RR: Min Primary Base Enrichment 1 Cruise");
         count += label(0x0AE46CL, "desc_2D_ECTxLoad_i16_16x6");
 
         // --- 2D_IATxIAT (1 descriptors) ---
@@ -3705,10 +3782,14 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AF03CL, "desc_2D_KnockIdxxrange_0_2000_i16_8x6_AF03C");
 
         // --- 2D_LoadxRPM (49 descriptors) ---
-        count += label(0x0AAA64L, "desc_2D_LoadxRPM_u8_16x16_AAA64");
-        count += label(0x0AAA80L, "desc_2D_LoadxRPM_u8_16x16_AAA80");
-        count += label(0x0AAA9CL, "desc_2D_LoadxRPM_u8_16x16_AAA9C");
-        count += label(0x0AAAB8L, "desc_2D_LoadxRPM_u8_16x16_AAAB8");
+        count += labelComment(0x0AAA64L, "desc_2D_LoadxRPM_u8_16x16_AAA64",
+            "RR: Calculated Engine Torque A");
+        count += labelComment(0x0AAA80L, "desc_2D_LoadxRPM_u8_16x16_AAA80",
+            "RR: Calculated Engine Torque B");
+        count += labelComment(0x0AAA9CL, "desc_2D_LoadxRPM_u8_16x16_AAA9C",
+            "RR: Calculated Engine Torque C");
+        count += labelComment(0x0AAAB8L, "desc_2D_LoadxRPM_u8_16x16_AAAB8",
+            "RR: Calculated Engine Torque D");
         count += label(0x0ABC1CL, "desc_2D_LoadxRPM_f32_10x14");
         count += label(0x0ABDD4L, "desc_2D_LoadxRPM_u8_7x14_ABDD4");
         count += label(0x0ABDF0L, "desc_2D_LoadxRPM_u8_7x14_ABDF0");
@@ -3726,15 +3807,22 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AD4ECL, "desc_2D_LoadxRPM_i16_16x9_AD4EC");
         count += label(0x0AD508L, "desc_2D_LoadxRPM_i16_16x9_AD508");
         count += label(0x0AD658L, "desc_2D_LoadxRPM_wide_i16_16x10");
-        count += label(0x0AD674L, "desc_2D_LoadxRPM_i16_17x18_AD674");
-        count += label(0x0AD690L, "desc_2D_LoadxRPM_i16_17x18_AD690");
+        count += labelComment(0x0AD674L, "desc_2D_LoadxRPM_i16_17x18_AD674",
+            "RR: Primary Open Loop Fueling (KCA Alternate Mode)");
+        count += labelComment(0x0AD690L, "desc_2D_LoadxRPM_i16_17x18_AD690",
+            "RR: Primary Open Loop Fueling (Failsafe)(KCA Alternate Mode)");
         count += label(0x0AD6ACL, "desc_2D_LoadxRPM_i16_15x18_AD6AC");
-        count += label(0x0AD6C8L, "desc_2D_LoadxRPM_i16_17x18_AD6C8");
-        count += label(0x0AD6E4L, "desc_2D_LoadxRPM_i16_17x18_AD6E4");
-        count += label(0x0AD700L, "desc_2D_LoadxRPM_i16_17x18_AD700");
-        count += label(0x0AD8B8L, "desc_2D_LoadxRPM_u8_11x10_AD8B8");
+        count += labelComment(0x0AD6C8L, "desc_2D_LoadxRPM_i16_17x18_AD6C8",
+            "RR: Primary Open Loop Fueling (KCA Additive B Low)");
+        count += labelComment(0x0AD6E4L, "desc_2D_LoadxRPM_i16_17x18_AD6E4",
+            "RR: Primary Open Loop Fueling (KCA Additive B High)");
+        count += labelComment(0x0AD700L, "desc_2D_LoadxRPM_i16_17x18_AD700",
+            "RR: Primary Open Loop Fueling (Failsafe)");
+        count += labelComment(0x0AD8B8L, "desc_2D_LoadxRPM_u8_11x10_AD8B8",
+            "RR: CL Fueling Target Compensation A (Load)");
         count += label(0x0AD8D4L, "desc_2D_LoadxRPM_u8_11x10_AD8D4");
-        count += label(0x0AD8F0L, "desc_2D_LoadxRPM_u8_13x12_AD8F0");
+        count += labelComment(0x0AD8F0L, "desc_2D_LoadxRPM_u8_13x12_AD8F0",
+            "RR: CL Fueling Target Compensation B (Load)");
         count += label(0x0AD90CL, "desc_2D_LoadxRPM_u8_13x12_AD90C");
         count += label(0x0AD928L, "desc_2D_LoadxRPM_u8_11x10_AD928");
         count += label(0x0AD960L, "desc_2D_LoadxRPM_u8_12x15_AD960");
@@ -3742,18 +3830,29 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AD998L, "desc_2D_LoadxRPM_u8_12x13_AD998");
         count += label(0x0AD9B4L, "desc_2D_LoadxRPM_u8_12x13_AD9B4");
         count += label(0x0AD9D0L, "desc_2D_LoadxRPM_u8_12x13_AD9D0");
-        count += label(0x0AE31CL, "desc_2D_LoadxRPM_i16_17x18_AE31C");
-        count += label(0x0AE338L, "desc_2D_LoadxRPM_i16_17x18_AE338");
-        count += label(0x0AE354L, "desc_2D_LoadxRPM_i16_17x18_AE354");
-        count += label(0x0AE370L, "desc_2D_LoadxRPM_i16_17x18_AE370");
+        count += labelComment(0x0AE31CL, "desc_2D_LoadxRPM_i16_17x18_AE31C",
+            "RR: Base Timing Primary Cruise");
+        count += labelComment(0x0AE338L, "desc_2D_LoadxRPM_i16_17x18_AE338",
+            "RR: Base Timing Primary Non-Cruise");
+        count += labelComment(0x0AE354L, "desc_2D_LoadxRPM_i16_17x18_AE354",
+            "RR: Base Timing Reference Cruise (AVCS related)");
+        count += labelComment(0x0AE370L, "desc_2D_LoadxRPM_i16_17x18_AE370",
+            "RR: Base Timing Reference Non-Cruise (AVCS related)");
         count += label(0x0AE664L, "desc_2D_LoadxRPM_i16_15x18_AE664");
-        count += label(0x0AE680L, "desc_2D_LoadxRPM_i16_17x18_AE680");
-        count += label(0x0AE69CL, "desc_2D_LoadxRPM_i16_17x18_AE69C");
-        count += label(0x0AF22CL, "desc_2D_LoadxRPM_u8_16x16_AF22C");
-        count += label(0x0AF248L, "desc_2D_LoadxRPM_u8_16x16_AF248");
-        count += label(0x0AF264L, "desc_2D_LoadxRPM_u8_16x16_AF264");
-        count += label(0x0AF8D8L, "desc_2D_LoadxRPM_u8_18x16_AF8D8");
-        count += label(0x0AF8F4L, "desc_2D_LoadxRPM_u8_18x16_AF8F4");
+        count += labelComment(0x0AE680L, "desc_2D_LoadxRPM_i16_17x18_AE680",
+            "RR: Knock Correction Advance Max Cruise");
+        count += labelComment(0x0AE69CL, "desc_2D_LoadxRPM_i16_17x18_AE69C",
+            "RR: Knock Correction Advance Max Non-Cruise");
+        count += labelComment(0x0AF22CL, "desc_2D_LoadxRPM_u8_16x16_AF22C",
+            "RR: Target Throttle Plate Position Cruise (Requested Torque Ratio)");
+        count += labelComment(0x0AF248L, "desc_2D_LoadxRPM_u8_16x16_AF248",
+            "RR: Target Throttle Plate Position Non-Cruise (Requested Torque Ratio)");
+        count += labelComment(0x0AF264L, "desc_2D_LoadxRPM_u8_16x16_AF264",
+            "RR: Target Throttle Plate Position Maximum (Requested Torque Ratio)");
+        count += labelComment(0x0AF8D8L, "desc_2D_LoadxRPM_u8_18x16_AF8D8",
+            "RR: Intake Cam Advance Angle Cruise (AVCS)");
+        count += labelComment(0x0AF8F4L, "desc_2D_LoadxRPM_u8_18x16_AF8F4",
+            "RR: Intake Cam Advance Angle Non-Cruise (AVCS)");
 
         // --- 2D_Loadxrange (3 descriptors) ---
         count += label(0x0AC1A4L, "desc_2D_Loadxrange_0_4500_f32_9x9");
@@ -3768,7 +3867,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AB26CL, "desc_2D_PressurexLoad_u8_7x5");
 
         // --- 2D_PressurexRPM (2 descriptors) ---
-        count += label(0x0AA9F0L, "desc_2D_PressurexRPM_u8_11x15");
+        count += labelComment(0x0AA9F0L, "desc_2D_PressurexRPM_u8_11x15",
+            "RR: Target Boost_");
         count += label(0x0AD9ECL, "desc_2D_PressurexRPM_u8_10x7");
 
         // --- 2D_PressurexSmallRatio (2 descriptors) ---
@@ -3782,20 +3882,27 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AF37CL, "desc_2D_Pressurexrange_800_2000_u8_8x4");
 
         // --- 2D_RPM (7 descriptors) ---
-        count += label(0x0AE38CL, "desc_2D_RPM_widexLoad_i16_8x8");
+        count += labelComment(0x0AE38CL, "desc_2D_RPM_widexLoad_i16_8x8",
+            "RR: Timing Compensation A (IAT) Activation");
         count += label(0x0AE514L, "desc_2D_RPM_midxLoad_i16_7x4");
-        count += label(0x0AE5D8L, "desc_2D_RPM_midxLoad_i16_14x5_AE5D8");
-        count += label(0x0AE5F4L, "desc_2D_RPM_midxLoad_i16_14x5_AE5F4");
-        count += label(0x0AE610L, "desc_2D_RPM_midxLoad_i16_14x5_AE610");
-        count += label(0x0AE62CL, "desc_2D_RPM_midxLoad_i16_14x6");
+        count += labelComment(0x0AE5D8L, "desc_2D_RPM_midxLoad_i16_14x5_AE5D8",
+            "RR: Timing Compensation Per Cylinder A");
+        count += labelComment(0x0AE5F4L, "desc_2D_RPM_midxLoad_i16_14x5_AE5F4",
+            "RR: Timing Compensation Per Cylinder B");
+        count += labelComment(0x0AE610L, "desc_2D_RPM_midxLoad_i16_14x5_AE610",
+            "RR: Timing Compensation Per Cylinder C");
+        count += labelComment(0x0AE62CL, "desc_2D_RPM_midxLoad_i16_14x6",
+            "RR: Timing Compensation Per Cylinder D");
         count += label(0x0AF41CL, "desc_2D_RPM_widexLoad_u8_6x6");
 
         // --- 2D_RPMxBoost (1 descriptors) ---
         count += label(0x0AB058L, "desc_2D_RPMxBoost_u8_9x7");
 
         // --- 2D_RPMxIPW (2 descriptors) ---
-        count += label(0x0AF29CL, "desc_2D_RPMxIPW_u8_16x6_AF29C");
-        count += label(0x0AF2B8L, "desc_2D_RPMxIPW_u8_16x6_AF2B8");
+        count += labelComment(0x0AF29CL, "desc_2D_RPMxIPW_u8_16x6_AF29C",
+            "RR: Requested Torque Limit A (Per Gear/Engine Speed)");
+        count += labelComment(0x0AF2B8L, "desc_2D_RPMxIPW_u8_16x6_AF2B8",
+            "RR: Requested Torque Limit B (Per Gear/Engine Speed)");
 
         // --- 2D_RPMxLoad (1 descriptors) ---
         count += label(0x0AA86CL, "desc_2D_RPMxLoad_u8_6x6");
@@ -3807,7 +3914,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AAD94L, "desc_2D_RPMxThrottle_u8_7x11");
 
         // --- 2D_RPMxVoltage (1 descriptors) ---
-        count += label(0x0AF4B0L, "desc_2D_RPMxVoltage_f32_16x5");
+        count += labelComment(0x0AF4B0L, "desc_2D_RPMxVoltage_f32_16x5",
+            "RR: Ignition Dwell");
 
         // --- 2D_RPMxrange (1 descriptors) ---
         count += label(0x0AB03CL, "desc_2D_RPMxrange_11_84_i16_15x31");
@@ -3819,11 +3927,16 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AC154L, "desc_2D_ThrottlexMAF_f32_5x5");
 
         // --- 2D_ThrottlexRPM (5 descriptors) ---
-        count += label(0x0AD620L, "desc_2D_ThrottlexRPM_i16_10x9");
-        count += label(0x0AD848L, "desc_2D_ThrottlexRPM_u8_10x9");
-        count += label(0x0AF2D4L, "desc_2D_ThrottlexRPM_u8_15x17_AF2D4");
-        count += label(0x0AF2F0L, "desc_2D_ThrottlexRPM_u8_15x17_AF2F0");
-        count += label(0x0AF30CL, "desc_2D_ThrottlexRPM_u8_15x17_AF30C");
+        count += labelComment(0x0AD620L, "desc_2D_ThrottlexRPM_i16_10x9",
+            "RR: Intake Duty Correction A");
+        count += labelComment(0x0AD848L, "desc_2D_ThrottlexRPM_u8_10x9",
+            "RR: Exhaust Duty Correction A");
+        count += labelComment(0x0AF2D4L, "desc_2D_ThrottlexRPM_u8_15x17_AF2D4",
+            "RR: Requested Torque (Accelerator Pedal) SI-DRIVE Sport");
+        count += labelComment(0x0AF2F0L, "desc_2D_ThrottlexRPM_u8_15x17_AF2F0",
+            "RR: Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp");
+        count += labelComment(0x0AF30CL, "desc_2D_ThrottlexRPM_u8_15x17_AF30C",
+            "RR: Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent");
 
         // --- 2D_ThrottlexThrottle (2 descriptors) ---
         count += label(0x0AF1F4L, "desc_2D_ThrottlexThrottle_i16_8x8_AF1F4");
@@ -3846,11 +3959,15 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- 2D_range (29 descriptors) ---
         count += label(0x0AA850L, "desc_2D_range_30_20_xrange_0_1400_u8_11x29");
-        count += label(0x0AA9B8L, "desc_2D_range_120_350_xRPM_mid_u8_15x13_AA9B8");
-        count += label(0x0AA9D4L, "desc_2D_range_120_350_xRPM_mid_u8_15x13_AA9D4");
+        count += labelComment(0x0AA9B8L, "desc_2D_range_120_350_xRPM_mid_u8_15x13_AA9B8",
+            "RR: Max Wastegate Duty_");
+        count += labelComment(0x0AA9D4L, "desc_2D_range_120_350_xRPM_mid_u8_15x13_AA9D4",
+            "RR: Initial Wastegate Duty_");
         count += label(0x0AACECL, "desc_2D_range_200_800_xRPM_mid_u8_5x5");
-        count += label(0x0AB004L, "desc_2D_range_210_960_xRPM_i16_11x14_AB004");
-        count += label(0x0AB020L, "desc_2D_range_210_960_xRPM_i16_11x14_AB020");
+        count += labelComment(0x0AB004L, "desc_2D_range_210_960_xRPM_i16_11x14_AB004",
+            "RR: Engine Load Compensation Cruise (MP)");
+        count += labelComment(0x0AB020L, "desc_2D_range_210_960_xRPM_i16_11x14_AB020",
+            "RR: Engine Load Compensation Non-Cruise (MP)");
         count += label(0x0AB088L, "desc_2D_range_520_760_xIAT_u8_4x5");
         count += label(0x0AB288L, "desc_2D_range_39_508_xLoad_u8_13x13");
         count += label(0x0ABED0L, "desc_2D_range_10_40_xrange_0_3001_f32_4x5");
@@ -3859,21 +3976,29 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AC244L, "desc_2D_range_10_26_xrange_11_14_f32_5x4");
         count += label(0x0AD524L, "desc_2D_range_115_515_xrange_30_0_i16_5x7_AD524");
         count += label(0x0AD540L, "desc_2D_range_115_515_xrange_30_0_i16_5x7_AD540");
-        count += label(0x0AD55CL, "desc_2D_range_115_515_xrange_30_0_i16_5x7_AD55C");
-        count += label(0x0AD578L, "desc_2D_range_115_515_xTimingAdv_i16_5x7");
+        count += labelComment(0x0AD55CL, "desc_2D_range_115_515_xrange_30_0_i16_5x7_AD55C",
+            "RR: Cranking Fuel IPW Compensation Imm. Non-Cruise (RPM)");
+        count += labelComment(0x0AD578L, "desc_2D_range_115_515_xTimingAdv_i16_5x7",
+            "RR: Cranking Fuel IPW Compensation Imm. Cruise (RPM)");
         count += label(0x0AD594L, "desc_2D_range_504_760_xrange_30_0_i16_5x4_AD594");
         count += label(0x0AD5B0L, "desc_2D_range_600_600_xIAT_i16_13x12");
         count += label(0x0AD5CCL, "desc_2D_range_504_760_xrange_30_0_i16_5x4_AD5CC");
         count += label(0x0AD63CL, "desc_2D_range_0_500000_xECT_i16_16x10");
-        count += label(0x0AD738L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD738");
-        count += label(0x0AD754L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD754");
-        count += label(0x0AD770L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD770");
-        count += label(0x0AD78CL, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD78C");
+        count += labelComment(0x0AD738L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD738",
+            "RR: Per Injector Pulse Width Compensation A");
+        count += labelComment(0x0AD754L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD754",
+            "RR: Per Injector Pulse Width Compensation B");
+        count += labelComment(0x0AD770L, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD770",
+            "RR: Per Injector Pulse Width Compensation C");
+        count += labelComment(0x0AD78CL, "desc_2D_range_1000_16000_xRPM_i16_17x17_AD78C",
+            "RR: Per Injector Pulse Width Compensation D");
         count += label(0x0AD864L, "desc_2D_range_4_60_xRPM_u8_8x9");
         count += label(0x0AE3E0L, "desc_2D_range_200_200_xrange_20_20_i16_9x9_AE3E0");
         count += label(0x0AE3FCL, "desc_2D_range_200_200_xrange_20_20_i16_9x9_AE3FC");
-        count += label(0x0AF0ACL, "desc_2D_range_150_600_xIAT_u8_17x9_AF0AC");
-        count += label(0x0AF0C8L, "desc_2D_range_150_600_xIAT_u8_17x9_AF0C8");
+        count += labelComment(0x0AF0ACL, "desc_2D_range_150_600_xIAT_u8_17x9_AF0AC",
+            "RR: Idle Speed Stability A");
+        count += labelComment(0x0AF0C8L, "desc_2D_range_150_600_xIAT_u8_17x9_AF0C8",
+            "RR: Idle Speed Stability B");
 
 
         // =====================================================================
