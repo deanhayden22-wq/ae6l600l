@@ -1,0 +1,266 @@
+AE5L600L — Secondary Sub-Task Table B Complete Analysis
+========================================================
+ROM: AE5L600L (2013 USDM WRX MT, Renesas SH7058)
+Table location: ROM 0x11C10 - 0x11C7C
+Dispatched by: Task 12 via 0x10D58 → sub-table at 0x11CA8
+
+
+══════════════════════════════════════════════════════════════════════════════
+  OVERVIEW
+══════════════════════════════════════════════════════════════════════════════
+
+Sub-table B is the SECOND secondary dispatch table, iterated by Task 12's
+dispatcher (0x10D58).  It contains 14 entries — some are wrappers that
+call multiple sub-functions, some are direct function pointers, and 4 are
+RTS stubs (disabled/placeholder).
+
+ALL functions in this table gate on FFFF8EDC (ol_dispatch_gate):
+  if FFFF8EDC == 0 (OL active): execute the function
+  if FFFF8EDC != 0 (CL mode): return immediately (skip)
+
+This means Sub-table B is EXCLUSIVELY OL-mode processing — it only
+executes when OL enrichment is active.  This is the same gate used by
+fuel_dispatch_table_A/B runners.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  COMPLETE ENTRY TABLE
+══════════════════════════════════════════════════════════════════════════════
+
+  Entry  Wrapper  Target(s)                      Label
+  ─────  ───────  ─────────────────────────────  ─────────────────────────────
+  [00]   0xE4FE   (RTS stub)                     disabled_slot_0
+  [01]   0xE502   JMP 0x4793C                    ol_fuel_learning_update
+  [02]   0xE508   JMP 0x48732                    ol_fuel_correction_calc
+  [03]   0xE50E   JSR 0x1076A → JMP 0x4BCA      ol_charge_init_and_validate
+  [04]   0xE52A   (RTS stub)                     disabled_slot_4
+  [05]   0xE5E4   (RTS stub)                     disabled_slot_5
+  [06]   0xE5E8   (RTS stub)                     disabled_slot_6
+  [07]   0xE5A2   JSR D8D0+4AE7C+...            ol_conditioning_multi
+  [08]   0xE5BC   unknown wrapper                ol_conditioning_ext
+  [09]   0x4AF50  direct                         ol_state_dispatcher
+  [10]   0x4AED4  direct                         ol_ignition_timing_A
+  [11]   0x4AF12  direct                         ol_ignition_timing_B
+  [12]   0x4AFC4  direct                         ol_sensor_processing
+  [13]   0x4B0FC  direct                         ol_can_comm_dispatch
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FUNCTION DETAILS
+══════════════════════════════════════════════════════════════════════════════
+
+
+─── [01] 0x4793C — ol_fuel_learning_update ────────────────────────────────
+
+  Size: ~530 bytes.  Saves R9-R14.
+
+  STRUCTURE:
+    Phase 1 — Call 5 pre-processing subs:
+      0x5B5D8, 0x5B690, 0x951F8, 0x5B73C, 0x5CB1C
+      (Fuel learning state preparation, FLKC workspace setup)
+
+    Phase 2 — Iterate FFFF3D08-3D10 (float array, 8 bytes × N entries):
+      For each entry: call BDCB6 (float_compare_clamp), check result.
+      If any entry triggers: set R11 = 1 (learning update needed).
+
+    Phase 3 — Iterate FFFF3D18-3D1C (packed array, 2 bytes × N):
+      For each entry: call BE980 (uint8_unpack), check result.
+      If any entry triggers: set R12 = 1.
+
+    Phase 4 — Gate checks:
+      If R11 OR R12 set: jump to 0x47B50 (learning commit path)
+      Else: call 0x4BEC (charge_validation_check) and
+            0x983B4 + 0x9845C (diagnostic pre-checks)
+      Call 0x11E4C (additional validation)
+
+    Phase 5 — Learning update:
+      Reads FFFF36BE (u16, learning counter), uses BDBCC (float_store_clamp)
+      to write to FFFF3D08 array.  Calls BDCB6 and BE9A0/BE980 for pack/
+      unpack of learning values.
+
+  PURPOSE:
+    OL fuel learning table update.  When OL enrichment is active, this
+    function iterates the FLKC/AFL learning arrays, validates current
+    learned values against thresholds, and commits updated corrections.
+    This is the write-side counterpart to the CL monitor's read-side
+    convergence tracking.
+
+  RAM: FFFF3D08 (float array), FFFF3D18 (packed array), FFFF36BE (counter)
+
+
+─── [02] 0x48732 — ol_fuel_correction_calc ────────────────────────────────
+
+  Size: ~410 bytes.  Saves R12-R14, FR14.
+
+  STRUCTURE:
+    - Reads FFFF36BE (u16, learning counter)
+    - Loads FFFF3D08-3D10 float array base (same as 0x4793C)
+    - Iterates with FPU operations through extensive literal pool
+      (0x48750-0x487A0 area contains 30+ ROM table pointers in 0x6xxxx-
+      0x8xxxx range — calibration descriptors for OL fuel correction)
+    - Float multiply chains, comparisons, clamping
+    - Calls BDBCC (float_store_clamp), BE830 (table_1d_lookup)
+
+  PURPOSE:
+    OL fuel correction calculator.  Computes the actual OL enrichment
+    correction factors by looking up calibration tables and applying
+    them to the current engine state.  The large literal pool (30+ entries)
+    indicates this accesses many calibration maps — RPM vs load, temperature
+    corrections, altitude compensation, etc.
+
+
+─── [03] 0x1076A + 0x4BCA — ol_charge_init_and_validate ──────────────────
+
+  0x1076A: charge_workspace_init
+    - Calls BDB6E (float_init) with FFFF2060, R5=0
+    - Calls BDB80 (float_init_pair) with FFFF20A0, R5=0
+    - Loop R13=0 to 4: calls BDB80 for FFFF2064+R13*12 entries
+      (5 iterations, 12-byte stride → initializes 60 bytes)
+    - Writes 0 to FFFF20A8
+
+  0x4BCA: charge_validation_check
+    - Reads FFFF2058, loads float from ROM 0xC0064 (calibration)
+    - Calls BDBCC (float_store_clamp) with FFFF2050
+    - Calls BDB6E with FFFF2058
+    - Returns after BDB6E
+
+  0x4BEC (following function): charge_convergence_check
+    - Iterates FFFF2050 struct, calls BDCB6 + BDC0E
+    - Returns R14=1 if convergence detected, 0 otherwise
+
+  PURPOSE:
+    Two-part function: first initializes the OL charge calculation
+    workspace (FFFF2060-20A8), then validates the current charge state
+    against calibration.  The workspace tracks accumulated charge data
+    for the OL enrichment period.
+
+
+─── [09] 0x4AF50 — ol_state_dispatcher ────────────────────────────────────
+
+  Already partially traced in CL/OL gap closure.
+
+  Gates on FFFF8EDC == 0 (OL active).
+  Reads @R4 (input pointer) as state value:
+    state 0: JMP 0x61850 with R4=0
+    state 1: JMP 0x61850 with R4=1
+    state 2: returns (no action)
+    other: returns
+
+  0x61850 is a large state handler (engine mode entry/exit processing).
+
+  Also includes thunks:
+    0x4AF7C: JMP 0x5AB14 (pre-CL-monitor setup)
+    0x4AF82: JMP 0x5AB2C (CL monitor state variant)
+    0x4AF88: OL gate → JMP 0x3DC46 (fuel correction apply)
+    0x4AF9A: OL gate → reads @R4, @R4+4 → JMP 0x3DCB6
+
+  Label confirmed: ol_state_dispatcher
+
+
+─── [10] 0x4AED4 — ol_ignition_timing_A ───────────────────────────────────
+
+  Gates on FFFF8EDC == 0.
+  Calls: 0x758DE, then checks FFFF98F6 (injection ready flag):
+    if == 1: calls 0x7D526 (knock retard calculation)
+  Checks FFFF98F6 again:
+    if == 1: calls 0x232A2, 0x3757A, tail-calls 0x3A226
+
+  PURPOSE:
+    OL-mode ignition timing path A.  0x758DE is the ignition base timing
+    lookup.  0x7D526 applies knock retard.  0x232A2/0x3757A/0x3A226 are
+    the ignition timing output chain (compute → correct → commit).
+    Only runs when FFFF98F6 (injection ready) is set AND OL is active.
+
+
+─── [11] 0x4AF12 — ol_ignition_timing_B ───────────────────────────────────
+
+  Identical structure to 0x4AED4 but calls 0x75C4A instead of 0x758DE
+  for the base timing lookup.  Same knock retard and output chain.
+
+  PURPOSE:
+    OL-mode ignition timing path B — likely for a different cylinder bank
+    or timing map (primary vs secondary timing table selection).
+
+
+─── [12] 0x4AFC4 — ol_sensor_processing ───────────────────────────────────
+
+  Gates on FFFF8EDC == 0.
+  Calls: 0x2262C, 0x1D2FC, 0x57018, then tail-calls 0x4B1C4.
+
+  Sub-functions in the 0x4AFxx-0x4B0xx area (same gate pattern):
+    0x4AFEA: JMP 0x1BFEC (single call, likely sensor plausibility)
+    0x4AFFC: Large — calls 0x16776, 0x1832E, 0x16C04, 0x1777E, 0x17DA4,
+             0x1BFEC, 0x5B158, 0x61B60, 0x2D77A, 0x2E808, tail-call 0x2C210
+             (11 sub-calls — comprehensive OL-mode sensor processing chain)
+
+  PURPOSE:
+    OL-mode sensor processing and conditioning.  The 11-sub-call chain
+    covers: sensor plausibility, signal conditioning, transient detection,
+    load calculation, and related OL-specific sensor paths.  The addresses
+    in the 0x16xxx-0x1Dxxx range are typically CKP/CMP (crank/cam position)
+    signal processing and engine speed calculation.
+
+
+─── [13] 0x4B0FC — ol_can_comm_dispatch ───────────────────────────────────
+
+  Gates on FFFF8EDC == 0.
+  Calls 0x6334 with R4=0 (system port read/check).
+  If result != 0: checks bit 15 (AND 0x8000).
+    If bit 15 set: JMP 0x9CFA8 (CAN communication handler)
+  Else: returns.
+
+  Following function at 0x4B124:
+    Same gate.  Calls 0x631E with R4=0, checks bit 13 (AND 0x2000).
+    If set: complex processing — calls 0x5EA4 (validation), 0x62EA,
+    checks for value == 8 at specific offset.
+    Purpose: CAN bus message validation and dispatch for OL-mode
+    specific diagnostic/communication frames.
+
+  PURPOSE:
+    OL-mode CAN communication dispatcher.  Checks port status bits and
+    dispatches to CAN protocol handlers when specific conditions are met
+    during OL enrichment.  0x9CFA8 is likely the OBD-II/CAN frame handler
+    for enrichment-related diagnostic PIDs.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  SUMMARY
+══════════════════════════════════════════════════════════════════════════════
+
+Sub-table B is the OL-MODE SECONDARY PROCESSING TABLE.  Every active
+entry gates on FFFF8EDC == 0 (OL enrichment active).  The table covers:
+
+  1. OL fuel learning updates (0x4793C) — write learned corrections
+  2. OL fuel correction calculation (0x48732) — compute correction factors
+  3. OL charge workspace init + validation (0x1076A + 0x4BCA)
+  4. OL state dispatching (0x4AF50) — engine mode entry/exit
+  5. OL ignition timing A/B (0x4AED4, 0x4AF12) — dual-path timing calc
+  6. OL sensor processing (0x4AFC4) — 11-sub-call sensor chain
+  7. OL CAN communication (0x4B0FC) — diagnostic frame dispatch
+
+4 slots are disabled (RTS stubs) — likely reserved for variant-specific
+features not enabled in this USDM WRX calibration.
+
+Combined with Sub-table A (which handles the 7-phase OL enrichment pipeline
+via 0x49CF0), these two secondary tables form the COMPLETE OL-mode
+processing system, dispatched every 20ms by Tasks 2 and 3.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FUNCTION LABELS
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Label                         Notes
+  ──────────  ────────────────────────────  ────────────────────────
+  0x0004793C  ol_fuel_learning_update       530 bytes, FLKC/AFL write
+  0x00048732  ol_fuel_correction_calc       410 bytes, 30+ cal tables
+  0x0001076A  charge_workspace_init         Init FFFF2060-20A8
+  0x00004BCA  charge_validation_check       Float clamp + BDB6E
+  0x00004BEC  charge_convergence_check      Iterate + BDCB6/BDC0E
+  0x0004AF50  ol_state_dispatcher           State 0/1 → 0x61850
+  0x0004AED4  ol_ignition_timing_A          Base timing via 0x758DE
+  0x0004AF12  ol_ignition_timing_B          Base timing via 0x75C4A
+  0x0004AFC4  ol_sensor_processing          3 calls + tail-call
+  0x0004AFFC  ol_sensor_chain_full          11 sub-calls (CKP/CMP/etc)
+  0x0004B0FC  ol_can_comm_dispatch          Port check → CAN handler
+  0x0004B124  ol_can_message_validate       CAN frame validation

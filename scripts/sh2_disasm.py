@@ -1,10 +1,16 @@
 import struct, sys
 
-with open('C:/Users/Dean/Documents/GitHub/ae6l600l/rom/ae5l600l.bin', 'rb') as f:
+import os
+_base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+with open(os.path.join(_base, 'rom', 'ae5l600l.bin'), 'rb') as f:
     rom = f.read()
 
-with open('C:/Users/Dean/Documents/GitHub/ae6l600l/rom/AE5L600L 20g rev 20.5 tiny wrex.bin', 'rb') as f:
-    mod_rom = f.read()
+_mod_path = os.path.join(_base, 'rom', 'AE5L600L 20g rev 20.6 tiny wrex.bin')
+if os.path.exists(_mod_path):
+    with open(_mod_path, 'rb') as f:
+        mod_rom = f.read()
+else:
+    mod_rom = rom  # fallback
 
 GBR = 0xFFFF7450
 
@@ -24,8 +30,12 @@ def read_s8(val):
 def rn(n): return f"R{n}"
 def frn(n): return f"FR{n}"
 
-start = 0x03162C
-end_addr = 0x031A00
+if len(sys.argv) >= 3:
+    start = int(sys.argv[1], 16)
+    end_addr = int(sys.argv[2], 16)
+else:
+    start = 0x03162C
+    end_addr = 0x031A00
 
 addr = start
 lines = []

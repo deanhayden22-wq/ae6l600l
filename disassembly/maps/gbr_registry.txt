@@ -1,0 +1,468 @@
+AE5L600L GBR Workspace Registry
+====================================================================================================
+Total ldc GBR instructions: 651
+Unique GBR bases: 459
+Named: 65 | Unnamed: 394
+====================================================================================================
+
+   Uses  GBR Base     Name                                 Description
+  -----  -----------  -----------------------------------  ---------------------------------------------
+     19  0xFFFF837E  idle_control_GBR                     39 refs. Idle control GBR base (19 GBR uses).
+      7  0xFFFF83AC  idle_workspace_GBR                   26 refs. Secondary idle GBR workspace (7 GBR 
+      6  0xFFFF9094  sched_task_GBR                       36 refs. Scheduler task GBR base (6 GBR uses)
+      6  0xFFFFA160  diag_monitor_GBR                     21 refs. Diagnostic monitor GBR base (6 GBR u
+      5  0xFFFF69F0  boost_pressure                       32 refs. Boost pressure (float). Read by AFL.
+      5  0xFFFF81F0  knock_state_base                     30 refs. Knock state workspace base. GBR base
+      5  0xFFFF837B  ???                                  
+      5  0xFFFF8387  ???                                  
+      5  0xFFFF8EA8  sched_control_GBR                    14 refs. Scheduler control GBR base (5 GBR us
+      5  0xFFFF35E4  ???                                  
+      5  0xFFFF3718  ???                                  
+      4  0xFFFF6155  adc_channel_status                   36 refs. ADC channel status/index (byte). GBR
+      4  0xFFFF3682  ???                                  
+      4  0xFFFF8EC7  ???                                  
+      4  0xFFFF980C  sched_periodic_GBR                   7 refs. Scheduler periodic timer GBR base (4 
+      4  0xFFFFAC6C  diag_protocol_GBR                    13 refs. Diagnostic protocol GBR base (4 GBR 
+      3  0xFFFF5C98  ssm_diagnostic_GBR                   SSM fuel state evaluator (0x13D58)
+      3  0xFFFF5FC2  ???                                  
+      3  0xFFFF6134  ???                                  
+      3  0xFFFF613C  ???                                  
+      3  0xFFFF6490  ???                                  
+      3  0xFFFF726C  transient_state_flag                 Transient state flag (byte). Gates AFL applic
+      3  0xFFFF7EC0  ???                                  
+      3  0xFFFF80FC  knock_det_GBR_base                   GBR base for knock_detector
+      3  0xFFFF8D14  ???                                  
+      3  0xFFFF8D2C  ???                                  
+      3  0xFFFF8F28  ???                                  
+      3  0xFFFF91C4  sched_queue_base                     8 refs. Scheduler queue base. GBR base (3 use
+      3  0xFFFF2398  ???                                  
+      3  0xFFFF24A8  ???                                  
+      3  0xFFFFA198  egr_diag_state                       13 refs. EGR/emissions diagnostic state. GBR 
+      3  0xFFFF9FC6  sched_timer_base                     22 refs. Scheduler timer base. GBR base (3 us
+      3  0xFFFF9F80  ???                                  
+      3  0xFFFF2E48  ???                                  
+      3  0xFFFF2EF4  ???                                  
+      3  0xFFFF2F84  ???                                  
+      3  0xFFFF30E4  ???                                  
+      3  0xFFFFAC68  ???                                  
+      3  0xFFFF34EC  ???                                  
+      2  0xFFFF5BD8  ???                                  
+      2  0xFFFF5BE5  ???                                  
+      2  0xFFFF5BDF  ???                                  
+      2  0xFFFF5C75  ???                                  
+      2  0xFFFF5D86  ???                                  
+      2  0xFFFF5D20  ???                                  
+      2  0xFFFF5DC0  ???                                  
+      2  0xFFFF5E58  ???                                  
+      2  0xFFFF616C  ???                                  
+      2  0xFFFF6298  ???                                  
+      2  0xFFFF6374  ???                                  
+      2  0xFFFF63B4  ???                                  
+      2  0xFFFF6578  ???                                  
+      2  0xFFFF68A4  ???                                  
+      2  0xFFFF6A29  ???                                  
+      2  0xFFFF69FC  ???                                  
+      2  0xFFFF6A64  ???                                  
+      2  0xFFFF6AC0  ???                                  
+      2  0xFFFF71E2  ???                                  
+      2  0xFFFF721C  ???                                  
+      2  0xFFFF7244  ???                                  
+      2  0xFFFF7278  ???                                  
+      2  0xFFFF77BC  fuel_pipeline_base                   GBR base for fuel aggregator pipeline. Struct
+      2  0xFFFF7830  ???                                  
+      2  0xFFFF7874  ???                                  
+      2  0xFFFF798C  timing_state_var                     17 refs. Timing state variable. Referenced by
+      2  0xFFFF7AB4  afl_multiplier_output                AFL multiplier output (float). Written by afl
+      2  0xFFFF7AF4  fuel_ipw_state_B                     Final IPW correction output (float).
+      2  0xFFFF7BE4  ???                                  
+      2  0xFFFF7C34  ???                                  
+      2  0xFFFF7C6C  ???                                  
+      2  0xFFFF7D04  ???                                  
+      2  0xFFFF7F74  ???                                  
+      2  0xFFFF7FBC  timing_final_advance                 14 refs. Final timing advance value.
+      2  0xFFFF8020  ???                                  
+      2  0xFFFF8210  ???                                  
+      2  0xFFFF81F8  ???                                  
+      2  0xFFFF8330  ???                                  
+      2  0xFFFF8378  ???                                  
+      2  0xFFFF837C  ???                                  
+      2  0xFFFF8389  ???                                  
+      2  0xFFFF8570  ???                                  
+      2  0xFFFF8A84  ???                                  
+      2  0xFFFF8B1C  ???                                  
+      2  0xFFFF8C98  ???                                  
+      2  0xFFFF8C9C  timing_workspace_A                   17 refs. Timing workspace variable.
+      2  0xFFFF8E38  ???                                  
+      2  0xFFFF8E44  ???                                  
+      2  0xFFFF8E64  ???                                  
+      2  0xFFFF8E65  ???                                  
+      2  0xFFFF90B2  ???                                  
+      2  0xFFFF2368  ???                                  
+      2  0xFFFF9358  ???                                  
+      2  0xFFFF95FC  ???                                  
+      2  0xFFFF972B  ???                                  
+      2  0xFFFFA156  diag_state_B_start                   Maturation counters region start. 55 bytes, 1
+      2  0xFFFF9FBC  ???                                  
+      2  0xFFFFA176  ???                                  
+      2  0xFFFF9FA8  sched_timer_B                        17 refs. Scheduler timer variable B.
+      2  0xFFFFA450  ???                                  
+      2  0xFFFFA714  ???                                  
+      2  0xFFFFA736  ???                                  
+      2  0xFFFFA72A  ???                                  
+      2  0xFFFFA716  ???                                  
+      2  0xFFFFA670  ???                                  
+      2  0xFFFFA6E8  ???                                  
+      2  0xFFFF3480  cal_mirror_base                      45 refs. Calibration mirror base. Referenced 
+      2  0xFFFF36F0  diag_mode_status                     DWord: Diagnostic mode status. Read by diag_c
+      2  0xFFFFAF70  diag_state_A_start                   Fault history region start. 59 bytes, 144 ref
+      1  0xFFFF4024  adc_raw_workspace                    Task 10 ADC raw data (32 channels, GBR base)
+      1  0xFFFF5BE2  ???                                  
+      1  0xFFFF5BE4  ???                                  
+      1  0xFFFF5BE1  ???                                  
+      1  0xFFFF5C3C  ???                                  
+      1  0xFFFF5C24  ???                                  
+      1  0xFFFF5C10  ???                                  
+      1  0xFFFF5D27  ???                                  
+      1  0xFFFF5D1C  ???                                  
+      1  0xFFFF5D47  ???                                  
+      1  0xFFFF5D7A  ???                                  
+      1  0xFFFF5D9C  ???                                  
+      1  0xFFFF5D9F  ???                                  
+      1  0xFFFF5D24  ???                                  
+      1  0xFFFF5D7D  ???                                  
+      1  0xFFFF5D7E  ???                                  
+      1  0xFFFF5D80  ???                                  
+      1  0xFFFF5DEC  ???                                  
+      1  0xFFFF5DB5  ???                                  
+      1  0xFFFF5D9E  ???                                  
+      1  0xFFFF5DBA  ???                                  
+      1  0xFFFF5E76  ???                                  
+      1  0xFFFF5EBC  ???                                  
+      1  0xFFFF5EC0  ???                                  
+      1  0xFFFF5EDB  ???                                  
+      1  0xFFFF5F1C  ???                                  
+      1  0xFFFF5F30  ???                                  
+      1  0xFFFF5F58  ???                                  
+      1  0xFFFF5F91  ???                                  
+      1  0xFFFF5F5C  ???                                  
+      1  0xFFFF5F9D  ???                                  
+      1  0xFFFF5FC9  ???                                  
+      1  0xFFFF5FDC  ???                                  
+      1  0xFFFF5FC7  ???                                  
+      1  0xFFFF5FFC  io_state_register                    23 refs. I/O state register.
+      1  0xFFFF60C0  ???                                  
+      1  0xFFFF6080  ???                                  
+      1  0xFFFF6118  ???                                  
+      1  0xFFFF6078  ???                                  
+      1  0xFFFF6150  ???                                  
+      1  0xFFFF612C  ???                                  
+      1  0xFFFF6138  ???                                  
+      1  0xFFFF6130  ???                                  
+      1  0xFFFF6158  ???                                  
+      1  0xFFFF61FC  ???                                  
+      1  0xFFFF6228  maf_voltage                          22 refs. MAF sensor voltage (float). Read by 
+      1  0xFFFF6270  ???                                  
+      1  0xFFFF62AA  ???                                  
+      1  0xFFFF62A0  ???                                  
+      1  0xFFFF62DC  fuel_rate                            20 refs. Fuel injection rate (float). Read by
+      1  0xFFFF6350  ect_current                          205 refs. Coolant temperature (float). Read b
+      1  0xFFFF63C4  iat_related_sensor                   IAT-related sensor value (float). Read by tas
+      1  0xFFFF63B8  ???                                  
+      1  0xFFFF643C  ???                                  
+      1  0xFFFF6458  ???                                  
+      1  0xFFFF21AC  ???                                  
+      1  0xFFFF64D8  throttle_raw                         29 refs. Throttle raw ADC or secondary thrott
+      1  0xFFFF653C  o2_sensor_voltage                    19 refs. O2 sensor voltage or lambda value.
+      1  0xFFFF6540  ???                                  
+      1  0xFFFF655C  ???                                  
+      1  0xFFFF65AA  ???                                  
+      1  0xFFFF65A8  ???                                  
+      1  0xFFFF678C  ???                                  
+      1  0xFFFF6624  rpm_current                          301 refs. Current RPM (float). Read by frontO
+      1  0xFFFF67F0  ???                                  
+      1  0xFFFF6811  ???                                  
+      1  0xFFFF683C  ???                                  
+      1  0xFFFF68EF  ???                                  
+      1  0xFFFF68C8  ???                                  
+      1  0xFFFF6948  ???                                  
+      1  0xFFFF69AC  ???                                  
+      1  0xFFFF6A18  ???                                  
+      1  0xFFFF69F8  ???                                  
+      1  0xFFFF6A84  ???                                  
+      1  0xFFFF6A74  ???                                  
+      1  0xFFFF9704  ???                                  
+      1  0xFFFF6AD8  ???                                  
+      1  0xFFFF6AC4  ???                                  
+      1  0xFFFF6AC8  ???                                  
+      1  0xFFFF6AD1  ???                                  
+      1  0xFFFF6ACD  ???                                  
+      1  0xFFFF6B20  ???                                  
+      1  0xFFFF6B30  ???                                  
+      1  0xFFFF6BB8  ???                                  
+      1  0xFFFF6BBC  ???                                  
+      1  0xFFFF6BD0  ???                                  
+      1  0xFFFF6BDC  ???                                  
+      1  0xFFFF71E6  ???                                  
+      1  0xFFFF71E0  ???                                  
+      1  0xFFFF72A0  ???                                  
+      1  0xFFFF726D  ???                                  
+      1  0xFFFF72B4  ???                                  
+      1  0xFFFF7354  ???                                  
+      1  0xFFFF7374  ???                                  
+      1  0xFFFF73B0  ???                                  
+      1  0xFFFF73E0  ???                                  
+      1  0xFFFF7450  fuel_state_GBR                       Primary fuel state workspace (used by CL/OL p
+      1  0xFFFF7710  ???                                  
+      1  0xFFFF7828  aggregator_struct_base               Major struct base for fuel aggregation (R9 in
+      1  0xFFFF7858  ???                                  
+      1  0xFFFF77F4  ???                                  
+      1  0xFFFF77C8  afc_output                           19 refs. AFC output value. Referenced in fuel
+      1  0xFFFF7820  afc_clamped_output                   AFC clamped output (float). Stage 8 output.
+      1  0xFFFF7888  ???                                  
+      1  0xFFFF787F  afl_airflow_range_idx                Current A/F Learning airflow range index (byt
+      1  0xFFFF787E  ???                                  
+      1  0xFFFF78AC  ???                                  
+      1  0xFFFF7954  ol_enrichment_factor_A               OL enrichment factor A (float).
+      1  0xFFFF7950  ???                                  
+      1  0xFFFF79C0  ???                                  
+      1  0xFFFF79A4  ol_condition_checker_GBR             FUN_0003643A OL condition checker
+      1  0xFFFF79CC  ???                                  
+      1  0xFFFF7A20  ol_post_transition_GBR               Phase 7 sub-B ol_post_transition_main
+      1  0xFFFF7A24  ol_transition_check_GBR              Phase 7 sub-C ol_transition_completion_check
+      1  0xFFFF7A2C  ???                                  
+      1  0xFFFF7AA0  ???                                  
+      1  0xFFFF7A78  ???                                  
+      1  0xFFFF7AB8  ???                                  
+      1  0xFFFF7AD0  afl_transient_copy                   Copy of transient_state_flag (FFFF726C) for A
+      1  0xFFFF7AC0  afl_ramp_multiplier                  AFL ramp multiplier (float, 0.0-1.0). Written
+      1  0xFFFF7AF8  ???                                  
+      1  0xFFFF7B7C  ???                                  
+      1  0xFFFF7B8C  ???                                  
+      1  0xFFFF7C30  ???                                  
+      1  0xFFFF7C82  ???                                  
+      1  0xFFFF7C92  ???                                  
+      1  0xFFFF7C80  ???                                  
+      1  0xFFFF7CCA  ???                                  
+      1  0xFFFF7D08  ???                                  
+      1  0xFFFF7D11  ???                                  
+      1  0xFFFF7D28  ???                                  
+      1  0xFFFF7D2A  ???                                  
+      1  0xFFFF7D5C  ???                                  
+      1  0xFFFF7D68  timing_blend_state                   19 refs. Timing blend state variable.
+      1  0xFFFF7E74  ???                                  
+      1  0xFFFF7ED4  ???                                  
+      1  0xFFFF7EEC  ???                                  
+      1  0xFFFF7E90  warmup_corr_cyl0                     Final warmup correction cylinder 0 (float).
+      1  0xFFFF7F10  gbr_base_timing_ws                   GBR base for task30 base timing workspace.
+      1  0xFFFF7F0C  ???                                  
+      1  0xFFFF7F8C  ???                                  
+      1  0xFFFF7FD4  gbr_base_corr_init_ws                GBR base for timing corrections init workspac
+      1  0xFFFF7FB0  ???                                  
+      1  0xFFFF8000  gbr_base_percond_ws                  GBR base for per-condition timing workspace (
+      1  0xFFFF8024  ???                                  
+      1  0xFFFF804C  ???                                  
+      1  0xFFFF8068  ???                                  
+      1  0xFFFF805C  ???                                  
+      1  0xFFFF81AC  ???                                  
+      1  0xFFFF8218  ???                                  
+      1  0xFFFF821C  ???                                  
+      1  0xFFFF8277  ???                                  
+      1  0xFFFF8258  flkc_retard                          FLKC retard value (float).
+      1  0xFFFF8298  flkc_fg_cyl_index                    Current cylinder/bank index
+      1  0xFFFF8290  flkc_fg_GBR_base                     GBR base for flkc_paths_FG
+      1  0xFFFF829E  flkc_fg_enable                       Must == 1 to enter main logic
+      1  0xFFFF8336  ???                                  
+      1  0xFFFF8333  ???                                  
+      1  0xFFFF8354  ???                                  
+      1  0xFFFF8364  ???                                  
+      1  0xFFFF8358  ???                                  
+      1  0xFFFF83CC  ???                                  
+      1  0xFFFF83AB  ???                                  
+      1  0xFFFF33F4  ???                                  
+      1  0xFFFF83E3  ???                                  
+      1  0xFFFF8408  ???                                  
+      1  0xFFFF840C  ???                                  
+      1  0xFFFF85D4  ???                                  
+      1  0xFFFF8584  ???                                  
+      1  0xFFFF87A8  ???                                  
+      1  0xFFFF87EC  ???                                  
+      1  0xFFFF88EC  ???                                  
+      1  0xFFFF890C  ???                                  
+      1  0xFFFF8920  sensor_struct_start                  First field in sensor struct.
+      1  0xFFFF8968  ???                                  
+      1  0xFFFF8944  ???                                  
+      1  0xFFFF8948  ???                                  
+      1  0xFFFF897E  ???                                  
+      1  0xFFFF89A0  ???                                  
+      1  0xFFFF89E8  ???                                  
+      1  0xFFFF8998  sensor_struct_8998                   Sensor struct base (GBR at 0x52092).
+      1  0xFFFF8A1C  ???                                  
+      1  0xFFFF8A24  ???                                  
+      1  0xFFFF8A6C  ???                                  
+      1  0xFFFF8AC0  ???                                  
+      1  0xFFFF8B90  ???                                  
+      1  0xFFFF8B50  boost_gbr_base                       Boost control GBR base. Current target value 
+      1  0xFFFF8BA1  ???                                  
+      1  0xFFFF8B8C  ???                                  
+      1  0xFFFF8B60  ???                                  
+      1  0xFFFF8C38  ???                                  
+      1  0xFFFF8C20  ???                                  
+      1  0xFFFF8C60  ???                                  
+      1  0xFFFF8C9A  ???                                  
+      1  0xFFFF8D22  ???                                  
+      1  0xFFFF8D3C  ???                                  
+      1  0xFFFF8D2A  ???                                  
+      1  0xFFFF8D3A  ???                                  
+      1  0xFFFF8D7C  ???                                  
+      1  0xFFFF8DA0  atu_interp_float_state               Per-channel float state for crank-angle inter
+      1  0xFFFF8E06  ???                                  
+      1  0xFFFF8E02  ???                                  
+      1  0xFFFF8DF0  ???                                  
+      1  0xFFFF8E0E  ???                                  
+      1  0xFFFF8E48  ???                                  
+      1  0xFFFF8E3C  ???                                  
+      1  0xFFFF8E34  ???                                  
+      1  0xFFFF367C  timer_counter_B                      25 refs. Timer/counter B.
+      1  0xFFFF8ECC  ???                                  
+      1  0xFFFF8EB0  ???                                  
+      1  0xFFFF8EB4  ???                                  
+      1  0xFFFF8EC4  ???                                  
+      1  0xFFFF8F2A  ???                                  
+      1  0xFFFF8F2C  ???                                  
+      1  0xFFFF8F34  ???                                  
+      1  0xFFFF903C  ???                                  
+      1  0xFFFF90E0  ???                                  
+      1  0xFFFF90C5  ???                                  
+      1  0xFFFF90C7  ???                                  
+      1  0xFFFF90B0  ???                                  
+      1  0xFFFF90B4  ???                                  
+      1  0xFFFF90A8  ???                                  
+      1  0xFFFF90A0  ???                                  
+      1  0xFFFF9124  ???                                  
+      1  0xFFFF91E0  ???                                  
+      1  0xFFFF9218  ???                                  
+      1  0xFFFF9258  ???                                  
+      1  0xFFFF9240  ???                                  
+      1  0xFFFF9280  ???                                  
+      1  0xFFFF933C  evap_diag_state_GBR                  EVAP diagnostic state base (GBR). Used by tas
+      1  0xFFFF93E8  ???                                  
+      1  0xFFFF93BC  ???                                  
+      1  0xFFFF94B3  ???                                  
+      1  0xFFFF94BC  ???                                  
+      1  0xFFFF94C4  ???                                  
+      1  0xFFFF95B4  ???                                  
+      1  0xFFFF9618  ???                                  
+      1  0xFFFF95F0  ???                                  
+      1  0xFFFF967A  ???                                  
+      1  0xFFFF96BC  ???                                  
+      1  0xFFFF96F0  ???                                  
+      1  0xFFFF972C  ???                                  
+      1  0xFFFF9735  ???                                  
+      1  0xFFFF972A  ???                                  
+      1  0xFFFF9740  ???                                  
+      1  0xFFFF97B8  ???                                  
+      1  0xFFFF97A4  ???                                  
+      1  0xFFFF97F0  ???                                  
+      1  0xFFFF984A  ???                                  
+      1  0xFFFF98A0  ???                                  
+      1  0xFFFF984D  ???                                  
+      1  0xFFFF9888  ???                                  
+      1  0xFFFF984C  ???                                  
+      1  0xFFFF9854  ???                                  
+      1  0xFFFF2AAC  ???                                  
+      1  0xFFFF2D88  ???                                  
+      1  0xFFFF2D40  ???                                  
+      1  0xFFFF2D38  ???                                  
+      1  0xFFFFA161  ???                                  
+      1  0xFFFFA19C  ???                                  
+      1  0xFFFF9FA2  ???                                  
+      1  0xFFFFA163  ???                                  
+      1  0xFFFF2BF8  ???                                  
+      1  0xFFFF9FB0  ???                                  
+      1  0xFFFF9FA4  egr_timer                            EGR timer (u16). Compared against 400 by egr_
+      1  0xFFFF9F90  ???                                  
+      1  0xFFFFA166  ???                                  
+      1  0xFFFFA16B  ???                                  
+      1  0xFFFFA168  ???                                  
+      1  0xFFFFA1B8  ???                                  
+      1  0xFFFF9FAC  ???                                  
+      1  0xFFFFA15B  ???                                  
+      1  0xFFFFA158  ???                                  
+      1  0xFFFFA26C  ???                                  
+      1  0xFFFFA248  ???                                  
+      1  0xFFFFA2A0  diag_state_D_start                   Trip tracking region start. 104 bytes, 32 ref
+      1  0xFFFFA2F0  ???                                  
+      1  0xFFFFA350  ???                                  
+      1  0xFFFFA3B8  ???                                  
+      1  0xFFFFA3D8  ???                                  
+      1  0xFFFFA494  ???                                  
+      1  0xFFFFA4D4  ???                                  
+      1  0xFFFFA508  ???                                  
+      1  0xFFFFA550  ???                                  
+      1  0xFFFFA562  ???                                  
+      1  0xFFFFA53C  ???                                  
+      1  0xFFFFA59D  ???                                  
+      1  0xFFFFA5B6  ???                                  
+      1  0xFFFFA72B  ???                                  
+      1  0xFFFFA735  ???                                  
+      1  0xFFFFA734  ???                                  
+      1  0xFFFFA604  ???                                  
+      1  0xFFFFA71A  ???                                  
+      1  0xFFFFA630  ???                                  
+      1  0xFFFFA650  ???                                  
+      1  0xFFFFA64C  ???                                  
+      1  0xFFFFA654  ???                                  
+      1  0xFFFFA664  ???                                  
+      1  0xFFFFA660  ???                                  
+      1  0xFFFFA738  ???                                  
+      1  0xFFFFA67C  ???                                  
+      1  0xFFFFA684  ???                                  
+      1  0xFFFFA69C  ???                                  
+      1  0xFFFFA6AC  ???                                  
+      1  0xFFFFA690  ???                                  
+      1  0xFFFFA698  ???                                  
+      1  0xFFFFA739  ???                                  
+      1  0xFFFFA6E4  ???                                  
+      1  0xFFFFA726  ???                                  
+      1  0xFFFFA6F8  ???                                  
+      1  0xFFFFA820  ???                                  
+      1  0xFFFFA862  ???                                  
+      1  0xFFFFA863  ???                                  
+      1  0xFFFFA89C  ???                                  
+      1  0xFFFFA8AC  ???                                  
+      1  0xFFFFAB64  ???                                  
+      1  0xFFFFAB7C  ???                                  
+      1  0xFFFFAB90  ???                                  
+      1  0xFFFFAC1E  ???                                  
+      1  0xFFFFAC06  ???                                  
+      1  0xFFFFACBC  ???                                  
+      1  0xFFFFACC0  ???                                  
+      1  0xFFFFACCE  ???                                  
+      1  0xFFFFAC7C  ???                                  
+      1  0xFFFFACA8  ???                                  
+      1  0xFFFFACAC  ???                                  
+      1  0xFFFF35F4  ???                                  
+      1  0xFFFF35FC  ???                                  
+      1  0xFFFF3604  ???                                  
+      1  0xFFFFB024  ???                                  
+      1  0xFFFFB210  ???                                  
+      1  0xFFFFAF3D  ???                                  
+      1  0xFFFFAF3E  ???                                  
+      1  0xFFFFAF3B  comms_state_byte                     36 refs. Communications protocol state byte.
+      1  0xFFFFAE06  ???                                  
+      1  0xFFFF3C90  ???                                  
+      1  0xFFFF3C88  ???                                  
+      1  0xFFFF3C80  ???                                  
+      1  0xFFFFAF80  ???                                  
+      1  0xFFFF64A0  ???                                  
+      1  0xFFFF9758  ???                                  
+      1  0xFFFF8434  ???                                  
+      1  0xFFFF8550  ???                                  
+      1  0xFFFF8558  ???                                  
+      1  0xFFFF8634  ???                                  
+      1  0xFFFF8564  ???                                  
+      1  0xFFFF8560  ???                                  
+      1  0xFFFF8694  ???                                  
+      1  0xFFFF8680  ???                                  
+      1  0xFFFF85C4  ???                                  
+      1  0xFFFF8574  ???                                  
