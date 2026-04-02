@@ -1,0 +1,188 @@
+AE5L600L Interrupt and ISR Architecture Map
+=============================================
+ROM: AE5L600L (2013 USDM WRX MT, Renesas SH7058)
+
+
+ARCHITECTURE
+============
+
+The SH7058 uses a SOFTWARE DISPATCH model for peripheral interrupts:
+
+  Hardware IRQ
+    -> Vector table entry (0x00-0x3FF)
+    -> Generic ISR @ 0x0BAC (saves R0-R7, PR, MACH, MACL)
+    -> isr_dispatch_manager @ 0x0F4C
+    -> IRQ source identifier @ 0x0EE4 (reads HW reg F70B)
+    -> Maps source to handler index (0, 1, 2, or 0xFF)
+    -> Dispatches to appropriate handler via function table
+    -> ISR epilogue @ 0x2BD4 (restores context)
+    -> RTE (return from exception)
+
+  The ISR prologue at 0x2B8C (118 callers) does full FPU context save
+  (R2-R7, FR0-FR10, FPUL, PR) and increments the nesting counter at
+  FFFF1288+8.
+
+
+HARDWARE VECTOR TABLE (ROM 0x000-0x03FF)
+=========================================
+
+  Vec#   Address    Handler       Description
+  ----   --------   ----------    ---------------------------------
+  0      0x000000   0x000C0C      Power-on reset PC
+  1      0x000004   0xFFFFBFA0    Power-on reset SP (top of RAM)
+  2      0x000008   0x000C0C      Manual reset PC (same as power-on)
+  3      0x00000C   0xFFFFBFA0    Manual reset SP
+  4-10   0x000010   0x000BFA      Default handler (infinite loop) — unused
+  11     0x00002C   0x000BAC      NMI -> generic peripheral ISR
+
+  Vectors 64+ (peripheral IRQs): Most point to code/data following
+  the vector table, NOT to ISR handlers.  The SH7058 in this ECU does
+  NOT use per-vector hardware dispatch for peripherals.  All peripheral
+  interrupts route through the NMI/generic ISR path or through the
+  RTOS tick mechanism.
+
+
+RESET HANDLER (0x0C0C)
+=======================
+
+  0x0C0C: BSR 0x0C20  (hardware init A — WDT setup, writes EC20-EC26)
+  0x0C10: BSR 0x0C54  (hardware init B — ATU timer F720-F726 setup)
+  0x0C14: JSR 0x065C  (RTOS startup — registers task table, starts scheduler)
+  0x0C1C: BRA 0x0C1C  (infinite loop — RTOS never returns)
+
+  Hardware init A (0x0C20):
+    - Writes 0x0F to EC20 (WDT prescaler)
+    - Writes 0 to EC22 (WDT counter clear)
+    - Writes 0x7777 to EC24 (WDT unlock key)
+    - Writes 0 to EC26
+    - Writes 0x77 to BFAD (mode signature)
+    - Writes 0x3C04 to F70A (interrupt controller config)
+    - Waits for bit 15 of ED18 (hardware ready flag)
+
+  Hardware init B (0x0C54):
+    - Writes 0 to F720 (ATU timer control)
+    - Writes 0xFFFF to F726 (ATU counter max)
+    - Additional ATU configuration
+
+
+NMI HANDLER (0x0BAC)
+====================
+
+  Full context save ISR.  Structure:
+    - Save R0-R7, PR, MACH, MACL to stack
+    - Call 0x0F4C (ISR dispatch with R4=20)
+    - Check ED18 bit 15 (watchdog status)
+    - If not set: clear F708 bit 0, call 0x0BFA (hang — watchdog fault)
+    - Restore all registers
+    - RTE
+
+  The 0x0BFA handler is an infinite loop — if the NMI was triggered by
+  a watchdog fault, the ECU hangs (allowing the WDT to eventually reset).
+
+
+ISR SOURCE IDENTIFIER (0x0EE4)
+===============================
+
+  Reads HW register F70B (interrupt source identification register).
+  Masks with 0xFB, writes to F70A (clears/acknowledges IRQ).
+  Reads F7C2 (secondary source register), shifts right 8 bits.
+
+  Maps source to handler class:
+    Source 11 (0x0B) or 13 (0x0D) -> class 0 (ATU interval timer)
+    Source 80 (0x50)               -> class 1 (A/D conversion complete)
+    Source 14 (0x0E) or 15 (0x0F) -> class 2 (CMT compare match)
+    Other                          -> class 0xFF (unknown/unhandled)
+
+
+KNOWN ISR HANDLER STUBS
+========================
+
+  Address   Handler Target   Source                    Description
+  --------  ---------------  ------------------------  ---------------------------------
+  0x219C    -> 0xE970        ATU interval timer        RTOS SCHEDULER TICK — the heartbeat
+                                                       that drives the entire task scheduler.
+                                                       Every 10ms tick triggers task evaluation.
+
+  0x27E4    -> 0xF2F6        CMT compare match 0       Timer-based periodic callback.
+                                                       Used for injection timing base.
+
+  0x2814    -> 0xF312        ADI0 A/D conv complete    ADC conversion complete — triggers
+                                                       sensor data processing pipeline.
+
+  0x2904    (internal)       Watchdog timer interval   WDT interrupt handler — resets WDT
+                                                       counter to prevent timeout.
+
+  0x2B8C    (prologue)       ISR register save         118-caller ISR prologue: saves R2-R7,
+                                                       FR0-FR10, FPUL, PR. Increments nesting
+                                                       counter at FFFF1288+8.
+
+  0x2BD4    (epilogue)       ISR register restore      Restores all saved context, decrements
+                                                       nesting counter.
+
+
+ISR-TO-RTOS CONNECTION
+=======================
+
+  The scheduler tick ISR (0x219C -> 0xE970) is the bridge between hardware
+  interrupts and the RTOS:
+
+  ATU interval timer fires every 10ms
+    -> ISR stub 0x219C
+    -> 0xE970 (scheduler tick handler)
+    -> Increments FFFF1288 tick counter
+    -> Evaluates master task table (ROM 0x3F80)
+    -> Sets task-due flags in TCBs (FFFF11C8-1228)
+    -> Returns from interrupt
+    -> RTOS main loop picks up pending tasks
+
+  The ADC conversion ISR (0x2814 -> 0xF312) is the second critical path:
+    -> Triggers after A/D group 0 completes all channel conversions
+    -> Copies raw ADC values to FFFF4024 workspace
+    -> Sets flag for Task 10 to begin sensor conditioning
+
+  The CMT compare match ISR (0x27E4 -> 0xF2F6) provides injection timing:
+    -> Fires at programmed intervals for injection pulse control
+    -> Works with ATU hardware to time injector open/close events
+
+
+ISR PRIORITY LEVELS
+====================
+
+  Task 10 runs at SR interrupt level 13 (0xD0) — blocks all peripheral
+  IRQs with priority <= 13 during sensor workspace writes.
+
+  The cl_monitor_state_machine (0x5AB44) uses interrupt_save at level 16
+  (0x10 via 0x317C) — blocks lower-priority interrupts during state updates.
+
+  The fuel_system_init (0xFC04) and cl_finalize_injection_sync (0xFACA)
+  raise to level 15 (0xF0) — near-maximum, only NMI can preempt.
+
+  Standard RTOS task execution runs at level 0 (all interrupts enabled).
+
+  Hierarchy:
+    Level 15: Hardware sync / fuel finalization (blocks everything but NMI)
+    Level 14: Charge channel dispatch (protects charge calculations)
+    Level 13: Task 10 sensor conditioning (protects ADC workspace)
+    Level 16: CL monitor state updates (protects I/O register writes)
+    Level 0:  Normal task execution (all IRQs enabled)
+
+
+RELATIONSHIP TO TASK SCHEDULER
+===============================
+
+  The function pointer pool at 0xE5EC-0xE6C0 is shared between:
+    - RTOS task call targets (Task 5/6/9 function lists)
+    - Secondary sub-task dispatch table entries
+    - ISR handler stubs
+
+  This means the same ROM area serves as both the task scheduler's
+  function registry AND the ISR dispatch lookup.  Functions labeled
+  as "isr_handler_N" in Ghidra are actually dual-purpose: they are
+  called both from ISR context AND from the RTOS task scheduler.
+
+  Key dual-role functions:
+    0x35A4: rtos_task_epilogue / isr_handler_9
+    0x5798: fuel_dispatch_table_B_precalc / isr_handler_32
+    0x5840: crank_angle_interpolation / isr_handler_2
+    0x4BCA: charge_validation_check / isr_handler_24
+    0x10A46: task_gate_function / isr_handler_0
