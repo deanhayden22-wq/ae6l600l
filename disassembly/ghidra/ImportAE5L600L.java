@@ -2836,6 +2836,113 @@ public class ImportAE5L600L extends GhidraScript {
             + "parameters stored to FFFF5D14 output struct. Source of "
             + "SSM mode values (7=off, 8=CL, 10=OL).");
 
+        // --- Secondary sub-table B (OL-mode processing) ---
+        count += labelComment(0x0004793CL, "ol_fuel_learning_update",
+            "Sub-table B [01]. OL fuel learning table update (~530 bytes). "
+            + "Iterates FFFF3D08 float array and FFFF3D18 packed array. "
+            + "Calls BDCB6/BE980 for validation, commits via BDBCC. "
+            + "5 pre-processing subs: 0x5B5D8, 0x5B690, 0x951F8, 0x5B73C, 0x5CB1C.");
+
+        count += labelComment(0x00048732L, "ol_fuel_correction_calc",
+            "Sub-table B [02]. OL fuel correction calculator (~410 bytes). "
+            + "30+ calibration table lookups via extensive literal pool. "
+            + "Reads FFFF36BE counter, iterates FFFF3D08 array. "
+            + "Float multiply chains with BE830 table lookups.");
+
+        count += labelComment(0x0001076AL, "charge_workspace_init",
+            "Sub-table B [03a]. Initializes OL charge workspace FFFF2060-20A8. "
+            + "Calls BDB6E/BDB80 (float_init) for 5 entries × 12 bytes. "
+            + "Clears FFFF20A8.");
+
+        count += labelComment(0x00004BCAL, "charge_validation_check",
+            "Sub-table B [03b]. OL charge validation. Reads FFFF2058, "
+            + "loads ROM 0xC0064 cal, calls BDBCC + BDB6E.");
+
+        count += labelComment(0x0004AED4L, "ol_ignition_timing_A",
+            "Sub-table B [10]. OL ignition timing path A. Gates FFFF8EDC. "
+            + "Calls 0x758DE (base timing), 0x7D526 (knock retard) "
+            + "if FFFF98F6==1. Output chain: 0x232A2→0x3757A→0x3A226.");
+
+        count += labelComment(0x0004AF12L, "ol_ignition_timing_B",
+            "Sub-table B [11]. OL ignition timing path B. Same structure "
+            + "as path A but calls 0x75C4A for base timing lookup. "
+            + "Likely second cylinder bank or alternate timing map.");
+
+        count += labelComment(0x0004AFC4L, "ol_sensor_processing",
+            "Sub-table B [12]. OL sensor processing. Gates FFFF8EDC. "
+            + "Calls 0x2262C, 0x1D2FC, 0x57018, tail-calls 0x4B1C4.");
+
+        count += labelComment(0x0004B0FCL, "ol_can_comm_dispatch",
+            "Sub-table B [13]. OL CAN communication dispatch. "
+            + "Checks port status via 0x6334, if bit 15 set: "
+            + "JMP 0x9CFA8 (CAN/OBD-II handler).");
+
+        // --- Task 0 background functions (30 calls) ---
+        count += labelComment(0x0000FC88L, "hw_port_init_background",
+            "Task 0 call_01. HW port refresh: finalize_set_mode(R4=1), "
+            + "struct_init(224), io_port_read/write port 20.");
+
+        count += labelComment(0x00010CE2L, "scheduler_state_update",
+            "Task 0 call_02. ATU HW reg config (F710 OR bit1, F718=C0, F71C=9C3). "
+            + "Sub at 0x10D10: prescaler at FFFF5BBE drives FDB4 calls "
+            + "with R4=0/1/3/4 at different rates (mod 3, mod 5).");
+
+        count += labelComment(0x0000ADD6L, "diagnostic_monitor_dispatch",
+            "Task 0 call_04. PRIMARY DIAGNOSTIC MONITOR — calls 17 sub-routines "
+            + "(0xAFB0 through 0xB8A8) covering OBD-II readiness checks, "
+            + "sensor plausibility, DTC evaluation. Sub 0xAE1C clears "
+            + "diagnostic timer registers at 0xED00-0xED0A.");
+
+        count += labelComment(0x00004218L, "adc_prescaler_counters",
+            "Task 0 call_06. ADC sample timing for slow sensors. "
+            + "Calls 0x432A/0x43EE/0x447A, manages multi-phase counter "
+            + "at FFFF40A4 (mod 4 and mod 16 phases).");
+
+        count += labelComment(0x00006738L, "hw_register_conditioning_B",
+            "Task 0 call_08. Double BE81C, accesses HW ports F018-F026. "
+            + "Peripheral port conditioning — ensures correct HW reg state.");
+
+        count += labelComment(0x0000CB88L, "timer_channel_bg_reload",
+            "Task 0 call_09. Calls sub 0xCC80 4x with (R4,R5) pairs "
+            + "(0,0xA4)/(0,0xA8)/(1,0xA4)/(1,0xA8). Timer reload.");
+
+        count += labelComment(0x00007086L, "avcs_solenoid_background",
+            "Task 0 call_11. AVCS/VVT solenoid duty at slow rate. "
+            + "Checks FFFF4191==1, writes via sched_timer_dispatch "
+            + "to I/O port 0xF6EA.");
+
+        count += labelComment(0x0000C33EL, "map_sensor_calibration",
+            "Task 0 call_20. MAP sensor cal: ROM 0xC00D2 → F508-F50E "
+            + "(6 HW regs) + FFFF4434 (7 words). Processes FFFF4024 "
+            + "with FFFF43B4 workspace. Tables 0xC00C8/0xC00CC.");
+
+        count += labelComment(0x000486EEL, "clol_background_dispatch",
+            "Task 0 call_28. CL/OL BACKGROUND MAINTENANCE hub. "
+            + "Clears FFFF8323, calls 10 subs: 0x588FE, 0x1CB68, "
+            + "0x1CF0C, 0x261A8, 0x5CBC8, 0x98482, 0xA9914, 0x3D7F0, "
+            + "0x47138, tail-call 0x587FC. AFL consolidation, FLKC "
+            + "updates, adaptive fuel trim persistence.");
+
+        count += labelComment(0x000101BAL, "rom_integrity_check",
+            "Task 0 call_29. ROM checksum validator. Checks FFFF5B8C==2, "
+            + "reads ROM region descriptors from 0xFFB80, iterates regions "
+            + "accumulating checksums. Incremental verification.");
+
+        count += labelComment(0x00010A78L, "rom_size_validator",
+            "Task 0 call_30. Scans ROM descriptor table 0x11CD4 for "
+            + "sentinel 0xC33C3CC3 to determine ROM used size. "
+            + "Writes to FFFF5BAC. If >= 64: calls 0x9000 error handler.");
+
+        count += labelComment(0x00009106L, "injection_state_machine_bg",
+            "Task 0 call_24. Injection channel enable/disable state machine. "
+            + "Reads FFFF4272 state byte, dispatches to 0x9154 or 0x9594. "
+            + "Checks FFFF425F for continuation at 0x938E.");
+
+        count += labelComment(0x00004CCAL, "tps_multi_stage_calc",
+            "Task 0 call_26. Multi-stage TPS pipeline: calls 5 subs "
+            + "(0x4DAC, 0x4F5E, 0x5004, 0x5376, tail-call 0x4EEE) "
+            + "all with R4=0. Background throttle position processing.");
+
         // --- Fuel path helper functions (Task 5/6/9) ---
         count += labelComment(0x0000FE22L, "charge_table_advance",
             "Double-buffered function pointer selector. Struct at FFFF5B70 "

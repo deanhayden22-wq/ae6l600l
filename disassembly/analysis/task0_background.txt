@@ -1,0 +1,370 @@
+AE5L600L — Task 0 (Background) Complete Call Analysis
+======================================================
+ROM: AE5L600L (2013 USDM WRX MT, Renesas SH7058)
+Entry: 0x0000E1B0, Period: ~130ms (tick 13), Priority: 4
+No gate check — runs unconditionally.  INFINITE LOOP (BRA back to start).
+
+
+══════════════════════════════════════════════════════════════════════════════
+  OVERVIEW
+══════════════════════════════════════════════════════════════════════════════
+
+Task 0 is the slow background task.  It runs in an infinite loop with 30
+sub-function calls per iteration plus a struct_init/struct_op pair.
+
+The function pre-loads 6 frequently-called addresses into R8-R13 for
+efficiency (avoiding repeated literal pool loads):
+  R8  = 0x6628   (hw_register_conditioning_A)
+  R9  = 0x4210   (adc_prescaler_counters)
+  R10 = 0x6CE2   (stub — RTS)
+  R11 = 0xADD6   (diagnostic_monitor_dispatch)
+  R12 = 0x1096C  (sensor_dispatch_thunk → 0x10950)
+  R13 = 0xFC88   (hw_port_init_background)
+
+The loop body calls R13→R12→R11→R10→R9→R8 first (calls 1-7), then
+BE81C/BE82C (struct_init pair), then 22 more individual calls (8-30).
+
+
+══════════════════════════════════════════════════════════════════════════════
+  COMPLETE CALL TABLE
+══════════════════════════════════════════════════════════════════════════════
+
+  call  address   tag         description
+  ────  ────────  ──────────  ─────────────────────────────────────────────
+
+  01    0x0FC88   [HW-INIT]   hw_port_init_background
+                              Calls finalize_set_mode(0xFBBA) with R4=1,
+                              BE81C (struct_init, 224 bytes), 0x6BC4
+                              (io_port_read port 20), mask & write via
+                              0x6BF0, BE82C.  Same pattern as fuel_system_init
+                              but lightweight — refreshes HW port state each
+                              background pass.
+
+  02    0x10CE2   [SCHED]     scheduler_state_update
+                              BE81C (struct_init), writes ATU HW regs
+                              (F710: OR bit 1, F718=0xC0, F71C=0x9C3),
+                              BE82C.  Configures ATU timer channel for
+                              background timing base.
+                              PLUS: sub at 0x10D10 — prescaler that calls
+                              FDB4 (system call) with different R4 values
+                              (0, 1, 3, 4) based on FFFF5BBE counter
+                              modulo 3 and modulo 5.  Drives sub-periodic
+                              background task scheduling.
+
+  03    0x1096C   [DISPATCH]  sensor_dispatch_thunk
+                              BRA to 0x10950 — a sensor state dispatch
+                              function.  Same function as Task 10 call_61.
+
+  04    0xADD6    [DIAG]      diagnostic_monitor_dispatch
+                              LARGE function — calls 17 sub-routines via BSR:
+                                0xAFB0, 0xB050, 0xB072, 0xB080, 0xB1DA,
+                                0xB2A6, 0xB2C6, 0xB2EA, 0xB364, 0xB3E4,
+                                0xB474, 0xB4DE, 0xB650, 0xB736, 0xB7D2,
+                                0xB85A, then tail-call 0xB8A8.
+                              The sub at 0xAE1C (immediately after) clears
+                              3 pairs of HW timer registers at 0xED00-0xED0A
+                              (watchdog/diagnostic timer area).
+                              This is the PRIMARY DIAGNOSTIC MONITOR — runs
+                              all OBD-II readiness checks, sensor plausibility
+                              tests, and DTC evaluation sub-routines.
+
+  05    0x6CE2    [STUB]      nop_stub — immediate RTS
+
+  06    0x4210    [ADC]       adc_prescaler_counters
+                              RTS at entry (0x4210 is a stub entry).
+                              Real function at 0x4218: calls 0x432A, 0x43EE,
+                              0x447A (3 ADC processing subs), then manages
+                              a multi-phase counter at FFFF40A4:
+                              - Copies state bytes between offsets +7→+8,
+                                +9→+10, +11→+12
+                              - Increments master counter and phase byte
+                              - Phase byte cycles through 0/1/2 based on
+                                counter bits (mod 4 and mod 16)
+                              Controls ADC sample timing for slow-updating
+                              sensors (ECT, IAT, fuel temp).
+
+  07    0x6628    [HW-REG]    hw_register_conditioning_A
+                              BE81C + BE82C wrapper.  Simple struct refresh.
+
+  --    BE81C     [STRUCT]    struct_init (224 bytes on stack)
+  --    BE82C     [STRUCT]    struct_op (processes struct_init result)
+
+  08    0x6738    [HW-REG]    hw_register_conditioning_B
+                              Double BE81C call (two workspaces), then
+                              accesses HW registers F018-F026 (port area):
+                              - F018: check bit pattern, mask with 0x80
+                              - F01A: mask bits 0-1 (clear with 0xFC)
+                              - F01E: check bit 3, write 0xFA if not set
+                              - F019: check == 6, write 6 if not
+                              Peripheral port conditioning — ensures HW
+                              registers maintain correct state.
+
+  09    0xCB88    [TIMER]     timer_channel_background_reload
+                              Calls sub 0xCC80 4 times with different
+                              (R4, R5) pairs: (0,0xA4), (0,0xA8), (1,0xA4),
+                              (1,0xA8).  Reloads timer channels for the
+                              background task's timing needs.  0xA4/0xA8 are
+                              offsets into the timer config area (FFFF447A
+                              related).
+
+  10    0xC9D0    [STUB]      nop_stub — immediate RTS
+
+  11    0x7086    [AVCS]      avcs_solenoid_background
+                              BE81C, calls sub 0x71CC (AVCS calculation),
+                              checks FFFF4191 == 1 (AVCS active flag).
+                              If active: calls sched_timer_dispatch(0xE6E4)
+                              with port=0xF6EA, R5=4, R6=1.
+                              Writes AVCS/VVT solenoid duty at slow rate.
+
+  12    0xBE62    [OUTPUT]    output_port_write_background
+                              Loads byte from ROM 0xC00E6, JMP to 0x6BF0
+                              (io_port_write) with R4=15.
+                              Simple I/O port refresh from calibration.
+
+  13    0x993C    [HW-REG]    hw_register_conditioning_C
+                              Double BE81C + BE82C, accesses HW register
+                              F459: mask with 0xF8, OR with 0x01.
+                              Then second workspace: F459 mask 0x8F, OR 0x10.
+                              Configures multi-function pin register (MFP)
+                              for peripheral I/O.
+
+  14    0x8408    [HW-TIMER]  hw_timer_init (already labeled)
+                              BE81C + BE82C + sched_timer_dispatch(0xE6E4).
+                              Hardware timer initialization for background
+                              periodic subsystem.
+
+  15    0xD800    [HW-REG]    hw_register_conditioning_D
+                              Saves R8-R10.  Double BE81C + BE82C, accesses
+                              HW register F42A: mask 0xF3, OR 0x08.
+                              Calls sched_timer_dispatch(0xE6E4) with
+                              port=0xF42E, R5=2, R6=1.
+                              Then second workspace: F42A mask 0xCF, OR 0x10,
+                              sched_timer_dispatch with R5=4.
+                              Third workspace follows.  ATU timer group
+                              conditioning for injection timing base.
+
+  16    0x5650    [TPS-OUT]   tps_output_background
+                              BE81C, loads FFFF4410, reads ROM 0xC0082
+                              (calibration), writes to workspace.
+                              Checks workspace[+11] == 90 (0x5A): if so,
+                              calls sched_timer_dispatch(0xE6E4) with
+                              R5=0x800, port=0xF482, R6=1.
+                              TPS output conditioning at slow rate.
+
+  17    0x64F8    [BARO-OUT]  baro_output_background
+                              Identical pattern to 0x5650 but with
+                              FFFF441C workspace, ROM 0xC00A0 calibration.
+                              Checks [+11] == 90: calls sched_timer_dispatch
+                              with R5=64, port=0xF482, R6=1.
+                              Barometric pressure output conditioning.
+
+  18    0x80B6    [MAF-CAL]   maf_calibration_write
+                              Reads ROM 0xC00AC (MAF calibration word),
+                              writes to F58C (HW register) and FFFF443C.
+                              Tiny leaf — no prologue.  Refreshes MAF
+                              calibration constant to hardware.
+
+  19    0xC702    [OUT-CAL]   output_calibration_write
+                              Reads ROM 0xC00C4 (output cal word), writes
+                              to FFFF443E[+4].  Refreshes output stage
+                              calibration.  Tiny leaf.
+
+  20    0xC33E    [MAP-CAL]   map_sensor_calibration
+                              Reads ROM 0xC00D2, writes to F508-F50E (6 HW
+                              registers) and FFFF4434 workspace (7 words).
+                              Then processes FFFF4024 (ADC base) with
+                              FFFF43B4 (MAP workspace).  ROM tables at
+                              0xC00C8 and 0xC00CC used for conversion.
+                              MAP sensor calibration and conditioning pass.
+
+  21    0x5BF8    [BARO-CAL]  baro_calibration_write
+                              BE81C + FFFF4404, ROM 0xC009E.  Same pattern
+                              as 0x5650/0x64F8.  Checks [+11] == 90: calls
+                              sched_timer_dispatch with R5=0x400, port=0xF482.
+                              Barometric sensor calibration refresh.
+
+  22    0xD1AE    [INJ-HW]    injection_hardware_conditioning
+                              Double BE81C (two workspaces).  Reads
+                              FFFF4428 + FFFF4494 (injection timing data).
+                              Checks [+11] == 90: calls sched_timer_dispatch
+                              with R5=4, R6=1.  Then second BE82C pass.
+                              Also: sub at 0xD1F4 writes 0 to FFFF44A4
+                              (ATU flag), 0xFFFF to FFFF4494, loads float
+                              from pool.  Injection hardware register refresh.
+
+  23    0x8C52    [HW-REG]    hw_register_conditioning_E
+                              Double BE81C, accesses HW registers F020-F026
+                              (port area).  Same pattern as 0x6738 but
+                              different register offsets.  Checks F022 bits,
+                              masks with 0xFC.  Checks F026 bit 3.
+                              Peripheral port conditioning pass E.
+
+  24    0x9106    [INJ-STATE] injection_state_machine
+                              RTS at 0x9106 (conditional stub entry).
+                              Real entry at 0x910A: reads FFFF4272 (injection
+                              state byte).  If 0 or 4: check FFFF426A, call
+                              0x9594 (injection state handler).  Else call
+                              0x9154 (injection calc sub).
+                              Checks FFFF425F: if set, BRA to 0x938E (large
+                              injection state machine continuation).
+                              Manages injection channel enable/disable state.
+
+  25    0x7F2C    [DIAG-TMR]  diagnostic_timer_reload
+                              Checks FFFF41D8 (diagnostic monitoring state):
+                              if set, writes 4000 (0xFA0) to F58A and F588
+                              (HW timer registers).  Reloads diagnostic
+                              watchdog timers.
+
+  26    0x4CCA    [TPS-CALC]  tps_multi_stage_calc
+                              RTS at entry (conditional stub).
+                              Real function at 0x4CCE: calls 5 sub-routines:
+                                0x4DAC(R4=0), 0x4F5E(R4=0), 0x5004(R4=0),
+                                0x5376(R4=0), then tail-call 0x4EEE(R4=0).
+                              Multi-stage TPS processing pipeline — runs
+                              throttle position calculation/filtering at
+                              background rate.
+
+  27    0xA690    [ATU-COND]  atu_timer_conditioning
+                              RTS at entry (conditional stub).
+                              Real function at 0xA694: BE81C, calls
+                              sched_timer_dispatch(0xE6E4) with port=0xF482,
+                              R5=32, R6=0.  BE82C, accesses F4CB (HW reg),
+                              masks 0xF8, OR 0x02.  Reads F4C0/F4C2 (timer
+                              counters).  ATU timer conditioning at background
+                              rate — maintains injection timer base.
+
+  28    0x486EE   [CLOL-BG]   clol_background_dispatch
+                              Clears FFFF8323 = 0, then calls 9 sub-routines:
+                                0x588FE, 0x1CB68, 0x1CF0C, 0x261A8,
+                                0x5CBC8, 0x98482, 0xA9914, 0x3D7F0,
+                                0x47138, then tail-call 0x587FC.
+                              This is the CL/OL BACKGROUND MAINTENANCE
+                              dispatcher.  FFFF8323 is the OL/CL background
+                              state flag.  The 10 sub-routines handle:
+                              - Fuel learning table maintenance
+                              - AFL (Air-Fuel Learning) consolidation
+                              - FLKC (Fine Learning Knock Correction) updates
+                              - Adaptive fuel trim persistence
+                              - OBD-II readiness flag management
+
+  29    0x101BA   [ROM-CHK]   rom_integrity_check
+                              Checks FFFF5B8C == 2 (ROM check state byte).
+                              If active: reads FFFF5B8A (ROM bank selector),
+                              loads from ROM table 0xFFB80 (ROM region
+                              descriptors), iterates through ROM region
+                              pointers (R14/R12), accumulates checksum (R13),
+                              compares against expected value.
+                              This is the ROM CHECKSUM VALIDATOR — verifies
+                              ROM integrity at background rate by checksumming
+                              ROM regions defined in the descriptor table at
+                              0xFFB80.
+
+  30    0x10A78   [ROM-SIZE]  rom_size_validator
+                              Loads ROM table 0x11CD4 (ROM descriptor), scans
+                              for sentinel value 0xC33C3CC3 to determine ROM
+                              used size.  Writes count to FFFF5BAC (u16).
+                              If count >= 64: calls 0x9000 (ROM error handler).
+                              Validates ROM descriptor table integrity.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  SUBSYSTEM OWNERSHIP
+══════════════════════════════════════════════════════════════════════════════
+
+  Subsystem                    Calls           Primary function
+  ───────────────────────────  ──────────────  ─────────────────────────────
+  Hardware port conditioning   01,07,08,13,23  Refresh peripheral HW regs
+  ATU timer conditioning       02,09,15,27     Background timer maintenance
+  ADC prescaler                06              Slow sensor sample timing
+  Sensor dispatch              03              Thunk to sensor state machine
+  AVCS solenoid                11              VVT duty at slow rate
+  TPS output                   16,26           Throttle position pipeline
+  BARO output                  17,21           Barometric pressure pipeline
+  MAF calibration              18              MAF cal constant refresh
+  MAP sensor calibration       20              MAP cal + HW register write
+  Output calibration           19              Output stage cal refresh
+  Injection hardware           22,24           Injection timing HW refresh
+  Injection state machine      24              Channel enable/disable mgmt
+  Diagnostic monitoring        04,25           OBD-II readiness + DTC eval
+  CL/OL background             28              AFL/FLKC learn maintenance
+  ROM integrity                29,30           Checksum + descriptor validate
+  I/O port refresh             12              Simple port write from cal
+  Stubs (no-op)                05,10           Placeholder/disabled paths
+
+
+══════════════════════════════════════════════════════════════════════════════
+  KEY FINDINGS
+══════════════════════════════════════════════════════════════════════════════
+
+1. The diagnostic_monitor_dispatch (0xADD6) at call_04 is by far the
+   largest sub-function — it calls 17 diagnostic sub-routines covering
+   all OBD-II readiness monitors and sensor plausibility checks.  The
+   sub at 0xAE1C clears diagnostic timer registers (watchdog heartbeat).
+
+2. The clol_background_dispatch (0x486EE) at call_28 is the CL/OL
+   BACKGROUND MAINTENANCE hub — 10 sub-calls handling AFL consolidation,
+   FLKC updates, and adaptive fuel trim persistence.  This is where
+   learned fuel corrections are committed to long-term storage.
+
+3. ROM integrity checking (calls 29-30) validates both ROM checksums and
+   descriptor table integrity every background cycle.  The ROM is divided
+   into regions described by a table at 0xFFB80; each region is checksummed
+   incrementally.  The sentinel 0xC33C3CC3 marks the end of valid ROM data.
+
+4. ~10 of the 30 calls are hardware register conditioning — refreshing
+   peripheral port states, timer channels, and MFP (multi-function pin)
+   registers to ensure they maintain correct configuration.  This guards
+   against single-bit errors in HW registers caused by EMI or power
+   transients — a common automotive ECU safety pattern.
+
+5. The background loop has NO gate and NO epilogue call — it runs
+   continuously as an infinite loop.  Unlike other tasks which JMP to
+   0x35A4 (epilogue), Task 0 BRAs back to its start after call_30.
+   This means it is never re-scheduled by the RTOS — it runs whenever
+   no higher-priority task needs the CPU.
+
+6. The scheduler_state_update (0x10CE2, call_02) includes a prescaler
+   at FFFF5BBE that drives sub-periodic scheduling: FDB4 is called with
+   R4=0 every cycle, R4=1 every 3rd cycle, and R4=3,4 every 5th cycle.
+   This provides 3-level timing within the ~130ms background rate.
+
+
+══════════════════════════════════════════════════════════════════════════════
+  FUNCTION LABELS
+══════════════════════════════════════════════════════════════════════════════
+
+  Address     Label                         Tag
+  ──────────  ────────────────────────────  ─────────
+  0x0000FC88  hw_port_init_background       [HW-INIT]
+  0x00010CE2  scheduler_state_update        [SCHED]
+  0x00010D10  background_prescaler          [SCHED]
+  0x0001096C  sensor_dispatch_thunk         [DISPATCH]
+  0x0000ADD6  diagnostic_monitor_dispatch   [DIAG]
+  0x0000AE1C  diagnostic_timer_clear        [DIAG]
+  0x00006CE2  nop_stub_6CE2                 [STUB]
+  0x00004210  adc_prescaler_stub            [ADC]
+  0x00004218  adc_prescaler_counters        [ADC]
+  0x00006628  hw_register_conditioning_A    [HW-REG]
+  0x00006738  hw_register_conditioning_B    [HW-REG]
+  0x0000CB88  timer_channel_bg_reload       [TIMER]
+  0x0000C9D0  nop_stub_C9D0                 [STUB]
+  0x00007086  avcs_solenoid_background      [AVCS]
+  0x0000BE62  output_port_write_background  [OUTPUT]
+  0x0000993C  hw_register_conditioning_C    [HW-REG]
+  0x00008408  hw_timer_init                 [HW-TIMER]
+  0x0000D800  hw_register_conditioning_D    [HW-REG]
+  0x00005650  tps_output_background         [TPS-OUT]
+  0x000064F8  baro_output_background        [BARO-OUT]
+  0x000080B6  maf_calibration_write         [MAF-CAL]
+  0x0000C702  output_calibration_write      [OUT-CAL]
+  0x0000C33E  map_sensor_calibration        [MAP-CAL]
+  0x00005BF8  baro_calibration_write        [BARO-CAL]
+  0x0000D1AE  injection_hw_conditioning     [INJ-HW]
+  0x00008C52  hw_register_conditioning_E    [HW-REG]
+  0x00009106  injection_state_machine       [INJ-STATE]
+  0x00007F2C  diagnostic_timer_reload       [DIAG-TMR]
+  0x00004CCA  tps_multi_stage_calc          [TPS-CALC]
+  0x0000A690  atu_timer_conditioning        [ATU-COND]
+  0x000486EE  clol_background_dispatch      [CLOL-BG]
+  0x000101BA  rom_integrity_check           [ROM-CHK]
+  0x00010A78  rom_size_validator            [ROM-SIZE]

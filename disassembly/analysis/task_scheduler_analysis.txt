@@ -433,15 +433,33 @@ SECTION 8: ADDRESSES NEEDING FURTHER INVESTIGATION
     0x000085AC  struct_accumulator_B_thunk — redirect to 0x8948
     0x0000D3DC  injection_atu_write_B — ATU hardware write (FFFF44A4)
 
-  From Task 10:
-    Almost all 39 sub-functions (AVCS / boost / idle / sensor candidates)
+  From Task 10:  ** ALL RESOLVED — see task10_analysis.txt **
+    All 63 calls fully cataloged (not 39 — original count was low).
+    ADC bulk read, FMAC sensor conditioning, TPS/BARO/ECT/MAF/MAP/O2,
+    injector deadtime, AVCS solenoid, knock, EGR, CL/OL gate update,
+    diagnostic monitoring. IRQ level 13 protects sensor workspace.
 
-  From Task 0:
-    All ~26 background functions (diagnostic / calibration candidates)
+  From Task 0:  ** ALL RESOLVED — see task0_background.txt **
+    All 30 calls fully cataloged.  Key subsystems:
+    - diagnostic_monitor_dispatch (0xADD6): 17 OBD-II/DTC sub-routines
+    - clol_background_dispatch (0x486EE): 10 AFL/FLKC/learn maintenance subs
+    - rom_integrity_check (0x101BA): ROM checksum validator
+    - rom_size_validator (0x10A78): ROM descriptor table integrity
+    - 10× hardware register conditioning (port/timer/MFP refresh)
+    - Injection state machine, TPS pipeline, AVCS solenoid, MAP/BARO cal
 
-  Unknown secondary table functions:
-    0x0004793C, 0x00048732, 0x0001076A, 0x00004BCA  (sub-table B entries)
-    0x0004AF50, 0x0004AED4, 0x0004AF12, 0x0004AFC4, 0x0004B0FC
+  Secondary table B functions:  ** ALL RESOLVED — see secondary_table_b.txt **
+    All 14 entries cataloged (4 RTS stubs, 10 active functions).
+    ALL gate on FFFF8EDC==0 (OL-mode only processing):
+    0x0004793C  ol_fuel_learning_update — FLKC/AFL write (530 bytes)
+    0x00048732  ol_fuel_correction_calc — 30+ cal table lookups (410 bytes)
+    0x0001076A  charge_workspace_init — init FFFF2060-20A8
+    0x00004BCA  charge_validation_check — float clamp + validation
+    0x0004AF50  ol_state_dispatcher — engine mode entry/exit
+    0x0004AED4  ol_ignition_timing_A — base timing + knock retard
+    0x0004AF12  ol_ignition_timing_B — alternate timing path
+    0x0004AFC4  ol_sensor_processing — 11-sub-call sensor chain
+    0x0004B0FC  ol_can_comm_dispatch — CAN/OBD-II frame handler
 
   Mode entry handler:  ** RESOLVED — see ol_bypass_state_machine.txt **
     0x0005AB44  cl_monitor_state_machine
