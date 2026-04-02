@@ -8,9 +8,9 @@
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
-// Verified against Ghidra 12.0.2 SH-2 export. 2846 label operations total.
+// Verified against Ghidra 12.0.2 SH-2 export. 2872 label operations total.
 // Includes: original 884+1010, 463 RomRaider cal table labels, 125 RAM labels,
-// 19 MAF scaling path labels (functions, descriptors, RAM, calibration).
+// 19 MAF scaling path labels, 26 torque management labels.
 //
 //@author  AE5L600L disassembly project
 //@category Data
@@ -3063,6 +3063,77 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7A60L, "current_load_grev",
             "Current engine load (float, g/rev). Derived from MAF g/s "
             + "via per-revolution charge integration. Single literal ref at 0x37408.");
+
+        // Torque management — functions traced in torque_management_analysis.txt
+        count += labelComment(0x0003B810L, "torque_request_main",
+            "Torque request enable logic. Reads APP (FFFF65FC), MAF (FFFF6624), "
+            + "RPM (FFFF63F8), throttle (FFFF65C0). Manages workspace at FFFF7CC8. "
+            + "Multi-condition gate: APP>1.0, RPM>0.46, MAF<1000, 125-tick counters.");
+        count += labelComment(0x0003B8E6L, "torque_request_hyst_gates",
+            "CL/OL RPM/MAF hysteresis gate setter. GBR=FFFF7CCA. "
+            + "Sets flags FFFF7458 (torque enable), FFFF745E-7461 (MAF hysteresis). "
+            + "Thresholds at CC588-CC5A0 (airflow g/s, not RPM).");
+        count += labelComment(0x0003B7C4L, "torque_request_decel_gate",
+            "Torque request decel counter. Checks FFFF65BD (decel flag), "
+            + "manages counter at FFFF7CBC. Tail-calls 0x3D2FC.");
+        count += labelComment(0x0003EBD8L, "overrun_resume_pergear",
+            "Overrun resume enrichment with per-gear RPM dispatch. "
+            + "Switch on gear (FFFF5E74): D2A74-D2A84 per-gear thresholds. "
+            + "Resume PW: CC49C=1400us, decay: CC4A0=0.85.");
+        count += labelComment(0x00046BCCL, "fuel_cut_gating",
+            "Central fuel cut bitmask generator. Checks overrun_state (FFFF7E8C) "
+            + "and alt_gate (FFFF82B4). Per-cyl: 0x2B25C-2B280. "
+            + "Bitmask: 0x0041/0082/0104/0208 per-cyl, 0xFFFF=all. Output: FFFF82B8.");
+
+        // Torque management — per-cylinder cut checkers
+        count += label(0x0002B25CL, "cyl_0_cut_check");
+        count += label(0x0002B268L, "cyl_1_cut_check");
+        count += label(0x0002B274L, "cyl_2_cut_check");
+        count += label(0x0002B280L, "cyl_3_cut_check");
+
+        // Torque management — RAM
+        count += labelComment(0xFFFF7CC8L, "torque_request_workspace",
+            "Torque request workspace. +0x00: counter (word), +0x0B: active flag, "
+            + "+0x0E: secondary counter, -0x08/-0x04: previous MAF/APP.");
+        count += labelComment(0xFFFF7CBCL, "torque_decel_workspace",
+            "Torque request decel workspace. +0x00: state byte, +0x02: counter word.");
+        count += labelComment(0xFFFF82B4L, "alt_fuel_cut_gate",
+            "Alternate fuel cut gate (word). When ==1, fuel_cut_gating cuts all cylinders.");
+        count += labelComment(0xFFFF82B8L, "fuel_cut_bitmask",
+            "Fuel cut per-cylinder bitmask (word). 0x0041=cyl0, 0x0082=cyl1, "
+            + "0x0104=cyl2, 0x0208=cyl3, 0xFFFF=all. Written by 0x46BCC.");
+        count += labelComment(0xFFFF7F60L, "cruise_noncruise_ratio",
+            "Cruise/non-cruise map blend ratio (float). 0.0=cruise, 1.0=non-cruise. "
+            + "Modulates timing, fueling, knock, AVCS calibrations.");
+        count += labelComment(0xFFFF5DB5L, "si_drive_mode",
+            "SI-DRIVE mode selector (byte). 0=Sport, 1=Sport Sharp, 2=Intelligent. "
+            + "Selects between 3 requested torque maps.");
+
+        // Torque management — calibration
+        count += labelComment(0x000CC570L, "cal_torque_min_app",
+            "Min APP for torque request enable (float, 0.46).");
+        count += labelComment(0x000CC574L, "cal_torque_maf_upper",
+            "MAF upper gate for torque request (float, 1000.0 g/s).");
+        count += labelComment(0x000CC578L, "cal_torque_maf_max",
+            "MAF absolute maximum for torque request (float, 2000.0 g/s).");
+
+        // Torque management — descriptor pointers
+        count += labelComment(0x000AF2E0L, "desc_ReqTorque_Sport",
+            "Descriptor for Requested Torque SI-DRIVE Sport. Data: 0xF99E0.");
+        count += labelComment(0x000AF2FCL, "desc_ReqTorque_SportSharp",
+            "Descriptor for Requested Torque SI-DRIVE Sport Sharp. Data: 0xF9C60.");
+        count += labelComment(0x000AF318L, "desc_ReqTorque_Intelligent",
+            "Descriptor for Requested Torque SI-DRIVE Intelligent. Data: 0xF9EE0.");
+        count += labelComment(0x000AF238L, "desc_TargetThrottle_Cruise",
+            "Descriptor for Target Throttle Plate Position Cruise. Data: 0xF9004.");
+        count += labelComment(0x000AF254L, "desc_TargetThrottle_NonCruise",
+            "Descriptor for Target Throttle Plate Position Non-Cruise. Data: 0xF9284.");
+        count += labelComment(0x000AF270L, "desc_TargetThrottle_Max",
+            "Descriptor for Target Throttle Plate Position Maximum. Data: 0xF9504.");
+        count += labelComment(0x000AF2A8L, "desc_TorqueLimit_A",
+            "Descriptor for Torque Limit A (Per Gear/RPM). Data: 0xF9788.");
+        count += labelComment(0x000AF2C4L, "desc_TorqueLimit_B",
+            "Descriptor for Torque Limit B (Per Gear/RPM). Data: 0xF98A0.");
 
         count += labelComment(0x0000FC04L, "fuel_system_init",
             "Task 9 fuel vtable initialization. Writes 0xFB0 to FFFF5B64, "

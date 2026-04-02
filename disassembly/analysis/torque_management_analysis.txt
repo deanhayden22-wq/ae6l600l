@@ -1,0 +1,562 @@
+================================================================================
+TORQUE MANAGEMENT / TORQUE REQUEST MODEL — COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+================================================================================
+
+
+OVERVIEW
+--------
+The AE5L600L uses a drive-by-wire (DBW) torque-request architecture. The
+driver's accelerator pedal position (APP) maps through SI-DRIVE mode-specific
+requested torque tables, which determine target throttle plate position.
+Torque is limited or reduced through 5 independent mechanisms:
+
+  1. Throttle plate limiting (DBW target clamping)
+  2. Fuel cut (rev limit, speed limit, overrun/decel)
+  3. Timing retard (knock feedback, per-condition corrections)
+  4. Boost control (wastegate duty limiting)
+  5. Cruise/non-cruise map switching (blended calibrations)
+
+These mechanisms are distributed across multiple scheduler tasks — there is
+no single "torque limit" register. Instead, torque reduction emerges from
+the interaction of fueling, ignition, boost, and throttle subsystems.
+
+
+================================================================================
+SECTION 1: TORQUE REQUEST PATH (APP -> THROTTLE)
+================================================================================
+
+Signal flow:
+  APP sensor (ADDR12/16) -> SI-DRIVE mode select -> Requested Torque table
+  -> Torque Ratio (req/base) -> Target Throttle Plate Position table
+  -> DBW motor driver -> actual throttle angle (TPS, ADDR5)
+
+  ┌─────────────────┐     ┌──────────────────────────┐
+  │ Accelerator      │     │ SI-DRIVE Mode Select     │
+  │ Pedal Position   │ --> │ FFFF5DB5 (byte)          │
+  │ ADDR12: FFFF40D0│     │ 0=Sport, 1=SportSharp,   │
+  │ ADDR16: FFFF40B8│     │ 2=Intelligent            │
+  └─────────────────┘     └────────────┬─────────────┘
+                                       │
+                    ┌──────────────────▼────────────────────┐
+                    │  Requested Torque (3 maps)             │
+                    │  Sport:       0xF99E0 (3D: APP×RPM)   │
+                    │  Sport Sharp: 0xF9C60 (3D: APP×RPM)   │
+                    │  Intelligent: 0xF9EE0 (3D: APP×RPM)   │
+                    │  Descriptors: 0xAF2E0/AF2FC/AF318      │
+                    └──────────────────┬────────────────────┘
+                                       │
+                    ┌──────────────────▼────────────────────┐
+                    │  Requested Torque Base (RPM)           │
+                    │  0xF8B54 (2D: RPM-indexed)             │
+                    │  Descriptor: 0xAF14C                    │
+                    └──────────────────┬────────────────────┘
+                                       │
+                    ┌──────────────────▼────────────────────┐
+                    │  Torque Ratio = Req_Torque / Base      │
+                    │  Threshold: 0.8798 (0xD2A0C)           │
+                    │  Min: 5.0 (0xD2A70)                    │
+                    └──────────────────┬────────────────────┘
+                                       │
+              ┌────────────────────────┼────────────────────────┐
+              │                        │                        │
+    ┌─────────▼─────────┐   ┌─────────▼─────────┐   ┌─────────▼─────────┐
+    │ Target Throttle    │   │ Target Throttle    │   │ Target Throttle    │
+    │ Cruise             │   │ Non-Cruise         │   │ Maximum            │
+    │ 0xF9004 (3D)       │   │ 0xF9284 (3D)       │   │ 0xF9504 (3D)       │
+    │ desc 0xAF238       │   │ desc 0xAF254       │   │ desc 0xAF270       │
+    └─────────┬─────────┘   └─────────┬─────────┘   └─────────┬─────────┘
+              │                        │                        │
+              └────────────────────────┼────────────────────────┘
+                                       │
+                    ┌──────────────────▼────────────────────┐
+                    │  Torque Limiting                        │
+                    │  Limit A: 0xF9788 (3D: Gear×RPM)       │
+                    │  Limit B: 0xF98A0 (3D: Gear×RPM)       │
+                    │  Descriptors: 0xAF2A8/AF2C4              │
+                    └──────────────────┬────────────────────┘
+                                       │
+                    ┌──────────────────▼────────────────────┐
+                    │  DBW Throttle Motor Output             │
+                    │  Actual: TPS ADDR5 -> FFFF4108 (float) │
+                    │  Primary: FFFF65C0 (89 refs)            │
+                    └───────────────────────────────────────┘
+
+  Calculated Engine Torque (feedback/monitoring, 4 maps):
+    A: 0xC1800  (3D: load × RPM)
+    B: 0xC1A80  (3D: load × RPM)
+    C: 0xC1D00  (3D: load × RPM)
+    D: 0xC1F80  (3D: load × RPM)
+    Descriptors: 0xAAA64, 0xAAA80, 0xAAA9C, 0xAAAB8
+
+
+================================================================================
+SECTION 2: TORQUE REQUEST ENABLE LOGIC (0x03B810)
+================================================================================
+
+The torque request main function at 0x3B810 manages whether torque request
+processing is active. It reads live sensor data and applies multiple gates.
+
+  Inputs:
+    FR14 = APP position (0xFFFF65FC, float)
+    FR15 = MAF alt (0xFFFF6624, float)
+    FR8  = RPM alt (0xFFFF63F8, float)
+    R2   = throttle position (0xFFFF65C0, byte)
+
+  Workspace: 0xFFFF7CC8
+    +0x00: counter (word)
+    +0x0B: torque_request_active flag (byte, 0 or 1)
+    +0x0E: secondary counter (word)
+    -0x08: previous MAF (float, for rate-of-change)
+    -0x04: previous APP (float, for rate-of-change)
+
+  Enable conditions (ALL must pass):
+    1. APP > 1.0 (minimum pedal input)
+    2. RPM_alt > 0.46 (engine running gate)
+    3. MAF < 1000.0 (not already at high load)
+    4. MAF > 2000.0 condition NOT met (absolute ceiling)
+    5. Counter >= 125 ticks AND secondary counter >= 125 ticks
+    6. Rate-of-change check: |MAF_delta| / |MAF_error| < 2000.0
+    7. APP delta < 50.0 (no sudden pedal transient)
+
+  Thresholds (ROM @ 0xCC570-CC584):
+    0xCC570: 0.46    — minimum APP for torque request enable
+    0xCC574: 1000.0  — MAF upper gate
+    0xCC578: 2000.0  — MAF absolute maximum
+    0xCC57C: 1500.0  — MAF secondary threshold
+    0xCC580: 2000.0  — rate-of-change threshold
+    0xCC584: 50.0    — APP delta threshold
+
+  Output: workspace[+0x0B] = 0 (inactive) or 1 (active)
+
+
+================================================================================
+SECTION 3: CL/OL RPM HYSTERESIS GATES (0x03B8E6)
+================================================================================
+
+The second part of the torque request block sets RPM-based hysteresis
+flags used by the CL/OL fueling system and timing system.
+
+  Inputs:
+    FR14 = RPM (0xFFFF6350)
+    FR12 = APP (0xFFFF65FC)
+    FR15 = MAF (0xFFFF6624)
+    GBR  = 0xFFFF7CCA (hysteresis workspace)
+
+  Called subroutines:
+    0x29AA0: check_engine_running
+    0x297A0: engine_state_check
+    0x582AC: state_checker_A (SI-DRIVE related)
+    0x1CF16: state_checker_B (cruise/idle state)
+
+  Hysteresis flags written:
+  ┌───────────┬──────────────────────────────────────────────────┐
+  │ Address   │ Description                                      │
+  ├───────────┼──────────────────────────────────────────────────┤
+  │ FFFF7458  │ Torque request enable — multi-condition gate     │
+  │           │ Requires: engine running, no decel, no idle,     │
+  │           │ APP > threshold, MAF within range, no transient  │
+  ├───────────┼──────────────────────────────────────────────────┤
+  │ FFFF745E  │ RPM hysteresis A — ON: MAF>5600, OFF: MAF<5100  │
+  │ FFFF745F  │ RPM hysteresis B — ON: MAF>4000, OFF: MAF<3500  │
+  │ FFFF7460  │ RPM hysteresis C — ON: MAF>2600, OFF: MAF<1900  │
+  │ FFFF7461  │ RPM hysteresis D — ON: MAF>2600                 │
+  └───────────┴──────────────────────────────────────────────────┘
+
+  Note: These flags use MAF (not RPM) for hysteresis — the thresholds
+  at 0xCC588-CC5A0 are airflow values in g/s, not RPM. This creates
+  load-dependent CL/OL transition behavior, matching the MAF-centric
+  architecture of this ECU.
+
+
+================================================================================
+SECTION 4: REV LIMITER (FUEL CUT)
+================================================================================
+
+Three rev limit pairs with on/off hysteresis at 0xCC500:
+
+  ┌──────────────┬────────────┬────────────┐
+  │ Pair         │ ON (RPM)   │ OFF (RPM)  │
+  ├──────────────┼────────────┼────────────┤
+  │ Primary      │ 6700       │ 6650       │
+  │ Secondary    │ 6700       │ 6650       │
+  │ Tertiary     │ 6700       │ 6650       │
+  └──────────────┴────────────┴────────────┘
+
+  All three pairs are identical on the stock calibration (6700/6650).
+  Having three pairs allows different limits for different conditions
+  (e.g., cold engine, limp mode), though stock values are equal.
+
+  Additional rev limit parameters:
+    0xCC518: 1260.0  — Rev Limit Fuel Resume (Boost) — RPM below which
+                       boost-related fuel cut resumes normal fueling
+    0xCC51C: 510.0   — Related to speed limiting (see Section 5)
+
+  The rev limit is implemented via the overrun fuel cut path:
+    1. RPM exceeds ON threshold -> overrun_state = 1 (0xFFFF7E8C)
+    2. Fuel cut gating at 0x46BCC sets bitmask = 0xFFFF (all cylinders)
+    3. When RPM drops below OFF threshold -> overrun_state = 0
+    4. Normal fueling resumes
+
+
+================================================================================
+SECTION 5: SPEED LIMITING
+================================================================================
+
+Speed limiting operates through two mechanisms:
+
+  A. FUEL CUT (0xCC520/CC528)
+  ─────────────────────────────
+    Enable:  510.0 km/h (0xCC520)
+    Disable: 505.0 km/h (0xCC528)
+    Logic at 0x3BD04: reads GBR+0x40 (FFFF7490) and GBR+0x50 (FFFF74A0)
+
+    On the stock calibration, 510 km/h is effectively disabled — the 2013
+    WRX is physically incapable of reaching this speed. This is a
+    placeholder for the speed limiter that can be lowered for specific
+    market requirements.
+
+  B. THROTTLE LIMITING (SI-DRIVE dependent)
+  ─────────────────────────────
+    Sport/Sport Sharp:
+      Limit A: 0xF8948  (descriptor @ 0xAB0D0)
+      Limit B: 0xF8960  (descriptor @ 0xAB0F8)
+    Intelligent:
+      Limit:   0xF8954  (descriptor @ 0xAB0E4)
+
+    These tables clamp the target throttle plate position when vehicle
+    speed exceeds certain thresholds. In Intelligent mode, the throttle
+    limiting is more aggressive (earlier onset).
+
+
+================================================================================
+SECTION 6: DECELERATION FUEL CUT (OVERRUN)
+================================================================================
+
+The primary torque reduction tool during deceleration.
+
+  Entry: 0x03EB8C (fuel_dispatch_table_B[18])
+
+  Logic:
+    if decel_flag (FFFF65BD) == 0:          // throttle closed
+      overrun_counter++ (FFFF7E8E)
+      if overrun_counter >= 16:             // 16 × 20ms = 320ms
+        overrun_state = 1 (FFFF7E8C)       // activate fuel cut
+    else:                                   // throttle open
+      overrun_state = 0                     // deactivate
+      overrun_counter = 0                   // reset
+
+  After state determination, tail-calls fuel_cut_gating @ 0x46BCC.
+
+  Resume enrichment (0x03EBD8):
+    When fuel cut deactivates, a resume enrichment pulse prevents lean
+    stumble during tip-in from decel:
+    - Initial pulse width: 1400 us (0xCC49C)
+    - RPM delta threshold: -17 RPM (0xCC498) — RPM must be dropping
+    - Counter threshold: 1800 RPM (0xCC4EC)
+    - Decay factor: 0.85 (0xCC4A0)
+
+
+================================================================================
+SECTION 7: FUEL CUT GATING (0x046BCC)
+================================================================================
+
+Central fuel cut output function. Called from overrun, rev limit, and
+speed limit paths. Generates per-cylinder fuel cut bitmask.
+
+  Logic:
+    R14 = 0 (bitmask accumulator)
+
+    // Global cut conditions (override per-cylinder)
+    if overrun_state (FFFF7E8C) == 1:  R14 = 0xFFFF (ALL)
+    if alt_fuel_cut_gate (FFFF82B4) == 1:  R14 = 0xFFFF (ALL)
+
+    // Per-cylinder cut conditions (4 independent checkers)
+    cyl_0: 0x2B25C -> if active: R14 |= 0x0041
+    cyl_1: 0x2B268 -> if active: R14 |= 0x0082
+    cyl_2: 0x2B274 -> if active: R14 |= 0x0104
+    cyl_3: 0x2B280 -> if active: R14 |= 0x0208
+
+    Store bitmask -> FFFF82B8 (word)
+
+  Bitmask encoding:
+    0x0041 = cylinder 0 cut
+    0x0082 = cylinder 1 cut
+    0x0104 = cylinder 2 cut
+    0x0208 = cylinder 3 cut
+    0xFFFF = ALL cylinders cut (overrun or global gate)
+
+  The bitmask at 0xFFFF82B8 is read by the injector driver to gate
+  individual cylinder fuel pulse outputs.
+
+
+================================================================================
+SECTION 8: PER-GEAR RPM THRESHOLDS (MAP SWITCHING)
+================================================================================
+
+The overrun resume function at 0x3EBD8 dispatches per-gear RPM thresholds
+for the cruise/non-cruise map switching system.
+
+  Switch statement on gear position (0xFFFF5E74):
+    Gear 1: 0xD2A74 (Map Switching Per-Gear RPM Threshold 1)
+    Gear 2: 0xD2A78 (Map Switching Per-Gear RPM Threshold 2)
+    Gear 3: 0xD2A7C (Map Switching Per-Gear RPM Threshold 3)
+    Gear 4: 0xD2A80 (Map Switching Per-Gear RPM Threshold 4)
+    Gear 5: 0xD2A84 (Map Switching Per-Gear RPM Threshold 5)
+    Default: 0xD2A88 (Base RPM Threshold)
+
+  High-gear override: if gear >= threshold (0xD29AE) AND no decel,
+  uses base RPM threshold (0xD2A8C) regardless of gear.
+
+  Additional checks:
+    MAF > 60.0 g/s (0xD2A68): high-load path
+    MAF > 0.0 g/s (0xD2A6C):  any-load path
+    Min torque: 5.0 (0xD2A70)
+
+
+================================================================================
+SECTION 9: CRUISE/NON-CRUISE MAP SWITCHING
+================================================================================
+
+The ECU blends between cruise and non-cruise calibrations using a ratio
+stored at 0xFFFF7F60 (0.0 = full cruise, 1.0 = full non-cruise).
+
+  Blending formula:
+    result = cruise_value + (noncruise_value - cruise_value) × ratio
+
+  Affected calibrations:
+    - Base Timing: Cruise (0xD4714) vs Non-Cruise (0xD48D4)
+    - Base Timing Reference: Cruise (0xD4A94) vs Non-Cruise (0xD4C54)
+    - Knock Correction Max: Cruise (0xD5904) vs Non-Cruise (0xD5AC4)
+    - CL Fueling Target: Cruise (0xD13B0) vs Non-Cruise (0xD141C)
+    - Cranking IPW Comp: Cruise (0xCF704) vs Non-Cruise (0xCF6B0)
+    - Engine Load Comp: Cruise (0xC3C3C) vs Non-Cruise (0xC3D3C)
+    - AVCS Cam Advance: Cruise (0xDA96C) vs Non-Cruise (0xDAC34)
+    - Timing ECT Comp: Cruise A/B (0xD3226/36) vs Non-Cruise A/B (0xD3206/16)
+
+  Switching criteria (~40 parameters at 0xD29AC-D2ABC):
+    - RPM > 2000 (0xD2A08)
+    - Torque ratio > 0.8798 (0xD2A0C)
+    - MAF/load > 2.0 g/rev (0xD2A10)
+    - Vehicle speed windows (0xD2A14/18)
+    - IAT > 80°F (0xD2A1C)
+    - SI-DRIVE mode > 4.0 (0xD2A38)
+    - Per-gear RPM thresholds (0xD2A74-88)
+    - Delay counters: 50/38 ticks (0xD29AC-AE), 100/38 ticks (0xD29B0-B2)
+    - Ramp rate: 0.7 per cycle (0xD2A60/64)
+
+  The ramp adder of 0.7 means the ratio transitions from 0→1 or 1→0
+  in approximately 1.4 cycles (very fast switching with slight smoothing).
+
+
+================================================================================
+SECTION 10: TIMING-BASED TORQUE REDUCTION
+================================================================================
+
+Timing retard reduces torque by pulling ignition advance. This operates
+through the 50-task ignition timing pipeline (already analyzed in
+ignition_timing_analysis.txt). Key torque-relevant tasks:
+
+  Task 27 @ 0x46296: Knock timing retard application (Phase 3)
+  ─────────────────────────────────────────────────────────────
+  - Reads knock event type from FFFF822D
+  - Indexes per-cylinder retard array at FFFF3248
+  - Learning rate: 2% per cycle (~40 cycles for full convergence)
+  - Accumulates retard to FFFF826C
+
+  Task 34 @ 0x40516: Throttle-based timing correction
+  ─────────────────────────────────────────────────────
+  - 8 descriptors (2D: 9×3, 9×9, 9×2)
+  - Output: FFFF7F82 (throttle-dependent advance/retard)
+
+  Tasks 36-37: Per-condition and multi-axis corrections
+  ─────────────────────────────────────────────────────
+  - Task 36 (0x415B8): 11 descriptors, RPM × ECT, RPM × Load maps
+  - Task 37 (0x419BA): 19 descriptors, multi-axis output to FFFF802E
+
+  Task 48 @ 0x4359C: Final timing aggregation
+  ─────────────────────────────────────────────
+  - Sums all corrections: base + throttle + general + percondition
+    + multiaxis + knock retard → final timing output
+
+
+================================================================================
+SECTION 11: BOOST-BASED TORQUE LIMITING
+================================================================================
+
+The boost control system (analyzed in boost_control_analysis.txt) limits
+torque by controlling manifold pressure via wastegate duty cycle.
+
+  Task 51 @ 0x54852: Boost/WG target calculation
+  Task 52 @ 0x549FA: Boost feedback trim
+
+  Enable hysteresis:
+    ON:  sensor > 4.0 (0xD6720)
+    OFF: sensor <= 5.0 (0xD6724)
+
+  WG duty lookup (3 RPM-indexed 1D tables):
+    Base duty: [10, 10, 10, 100, 100, 100] %
+    Scale factor: [10, 10, 20, 30, 40, 50]
+    Error correction: [10..0] (ramp down on error)
+
+  Boost Limit (Fuel Cut): 0xD2560 = 0.0 (disabled on stock)
+  When enabled, this cuts fuel if manifold pressure exceeds the limit,
+  providing a hard ceiling on boost-derived torque.
+
+  Ramp-down rates when boost control disables:
+    Fast (bypass): -1.0/cycle
+    Medium: -0.01/cycle
+    Slow (counter < 8): -0.005/cycle
+
+
+================================================================================
+SECTION 12: KEY RAM ADDRESSES
+================================================================================
+
+  ┌──────────────┬───────────┬──────┬──────────────────────────────────────┐
+  │ Address      │ Type      │ Refs │ Description                          │
+  ├──────────────┼───────────┼──────┼──────────────────────────────────────┤
+  │ 0xFFFF5DB5   │ byte      │    - │ SI-DRIVE mode (0=S, 1=SS, 2=I)      │
+  │ 0xFFFF5E74   │ word      │    - │ Gear position                        │
+  │ 0xFFFF65BD   │ byte      │    - │ Decel flag (0=decel, 1=normal)       │
+  │ 0xFFFF65C0   │ byte      │   89 │ Throttle position (DBW actual)       │
+  │ 0xFFFF65FC   │ float     │    - │ APP (accelerator pedal position)     │
+  │ 0xFFFF6350   │ float     │  90+ │ Engine RPM                           │
+  │ 0xFFFF6624   │ float     │    - │ MAF alternate value                  │
+  │ 0xFFFF7CBC   │ struct    │    - │ Torque request workspace              │
+  │ 0xFFFF7CC8   │ struct    │    - │ Torque request workspace (alt)        │
+  │ 0xFFFF7E8C   │ byte      │    - │ Overrun state (0=normal, 1=fuel cut) │
+  │ 0xFFFF7E8E   │ word      │    - │ Overrun tick counter                 │
+  │ 0xFFFF7F08   │ struct    │    - │ Map switching workspace               │
+  │ 0xFFFF7F60   │ float     │    - │ Cruise/non-cruise blend ratio        │
+  │ 0xFFFF82B4   │ word      │    - │ Alternate fuel cut gate              │
+  │ 0xFFFF82B8   │ word      │    - │ Fuel cut bitmask (injector gating)   │
+  │ 0xFFFF85D7   │ byte      │    - │ Engine status byte                   │
+  └──────────────┴───────────┴──────┴──────────────────────────────────────┘
+
+
+================================================================================
+SECTION 13: CALIBRATION TABLE SUMMARY
+================================================================================
+
+  Torque Request:
+  ┌──────────┬──────────────────────────────────────┬───────────────────┐
+  │ Address  │ Name                                 │ Type              │
+  ├──────────┼──────────────────────────────────────┼───────────────────┤
+  │ 0xF99E0  │ Req Torque (APP) SI-DRIVE Sport      │ 3D: APP × RPM     │
+  │ 0xF9C60  │ Req Torque (APP) SI-DRIVE Sport Sharp│ 3D: APP × RPM     │
+  │ 0xF9EE0  │ Req Torque (APP) SI-DRIVE Intelligent│ 3D: APP × RPM     │
+  │ 0xF8B54  │ Req Torque Base (RPM)                │ 2D: RPM-indexed   │
+  │ 0xF9004  │ Target Throttle Cruise (Torque Ratio) │ 3D: ratio × gear │
+  │ 0xF9284  │ Target Throttle Non-Cruise            │ 3D: ratio × gear │
+  │ 0xF9504  │ Target Throttle Maximum                │ 3D: ratio × gear │
+  │ 0xF9788  │ Torque Limit A (Per Gear/RPM)         │ 3D: gear × RPM   │
+  │ 0xF98A0  │ Torque Limit B (Per Gear/RPM)         │ 3D: gear × RPM   │
+  └──────────┴──────────────────────────────────────┴───────────────────┘
+
+  Rev/Speed Limiting:
+  ┌──────────┬──────────────────────────────────────┬──────────────────┐
+  │ Address  │ Name                                 │ Stock Value      │
+  ├──────────┼──────────────────────────────────────┼──────────────────┤
+  │ 0xCC500  │ Rev Limit ON                          │ 6700 RPM         │
+  │ 0xCC504  │ Rev Limit OFF                         │ 6650 RPM         │
+  │ 0xCC508  │ Rev Limit ON (2)                      │ 6700 RPM         │
+  │ 0xCC50C  │ Rev Limit OFF (2)                     │ 6650 RPM         │
+  │ 0xCC510  │ Rev Limit ON (3)                      │ 6700 RPM         │
+  │ 0xCC514  │ Rev Limit OFF (3)                     │ 6650 RPM         │
+  │ 0xCC518  │ Rev Limit Fuel Resume (Boost)          │ 1260 RPM         │
+  │ 0xCC520  │ Speed Limit Enable (Fuel Cut)          │ 510 km/h         │
+  │ 0xCC528  │ Speed Limit Disable (Fuel Cut)         │ 505 km/h         │
+  │ 0xF8948  │ Speed Limit A (Throttle) Sport/SS      │ (table)          │
+  │ 0xF8960  │ Speed Limit B (Throttle) Sport/SS      │ (table)          │
+  │ 0xF8954  │ Speed Limit (Throttle) Intelligent     │ (table)          │
+  └──────────┴──────────────────────────────────────┴──────────────────┘
+
+  Overrun / Deceleration:
+  ┌──────────┬──────────────────────────────────────┬──────────────────┐
+  │ Address  │ Name                                 │ Stock Value      │
+  ├──────────┼──────────────────────────────────────┼──────────────────┤
+  │ 0xD29AA  │ Overrun Tick Threshold                │ 16 (320ms)       │
+  │ 0xCC498  │ Overrun Enrich RPM Delta Activation    │ -17.0 RPM        │
+  │ 0xCC49C  │ Overrun Initial Enrichment PW          │ 1400.0 us        │
+  │ 0xCC4A0  │ Overrun Enrichment Decay Factor        │ 0.85             │
+  │ 0xCC4EC  │ Overrun Cut Counter RPM Threshold      │ 1800.0 RPM       │
+  │ 0xCEED0  │ Overrun Resume RPM Threshold           │ 0.0 (disabled?)  │
+  └──────────┴──────────────────────────────────────┴──────────────────┘
+
+  Torque Request Enable:
+  ┌──────────┬──────────────────────────────────────┬──────────────────┐
+  │ Address  │ Name                                 │ Stock Value      │
+  ├──────────┼──────────────────────────────────────┼──────────────────┤
+  │ 0xCC570  │ Min APP for torque request            │ 0.46             │
+  │ 0xCC574  │ MAF upper gate                        │ 1000.0 g/s       │
+  │ 0xCC578  │ MAF absolute maximum                  │ 2000.0 g/s       │
+  │ 0xCC57C  │ MAF secondary threshold               │ 1500.0 g/s       │
+  │ 0xCC580  │ Rate-of-change threshold              │ 2000.0           │
+  │ 0xCC584  │ APP delta threshold                   │ 50.0             │
+  │ 0xCC588  │ RPM hyst A ON                         │ 5600.0 g/s       │
+  │ 0xCC58C  │ RPM hyst A OFF                        │ 5100.0 g/s       │
+  │ 0xCC590  │ RPM hyst B ON                         │ 4000.0 g/s       │
+  │ 0xCC594  │ RPM hyst B OFF                        │ 3500.0 g/s       │
+  │ 0xCC598  │ RPM hyst C ON                         │ 2600.0 g/s       │
+  │ 0xCC59C  │ RPM hyst C OFF                        │ 1900.0 g/s       │
+  │ 0xCC5A0  │ RPM hyst D ON                         │ 2600.0 g/s       │
+  └──────────┴──────────────────────────────────────┴──────────────────┘
+
+
+================================================================================
+SECTION 14: COMPLETE TORQUE MANAGEMENT ARCHITECTURE DIAGRAM
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  DRIVER INPUT                                                      │
+  │  Accelerator Pedal (APP) -> ADDR12/16 -> FFFF65FC (float)          │
+  │  SI-DRIVE Mode Switch -> FFFF5DB5 (byte: 0/1/2)                   │
+  └───────────────────────────────┬─────────────────────────────────────┘
+                                  │
+                    ┌─────────────▼──────────────────┐
+                    │  REQUESTED TORQUE LOOKUP         │
+                    │  3 SI-DRIVE maps (F99E0/F9C60/  │
+                    │  F9EE0) -> torque ratio          │
+                    │  Limits: F9788/F98A0 (gear×RPM) │
+                    └─────────────┬──────────────────┘
+                                  │
+                    ┌─────────────▼──────────────────┐
+                    │  TARGET THROTTLE POSITION        │
+                    │  Cruise: F9004 | Non-Cruise: F9284│
+                    │  Speed limits: F8948/F8960       │
+                    └─────────────┬──────────────────┘
+                                  │
+                    ┌─────────────▼──────────────────┐
+                    │  DBW THROTTLE MOTOR              │
+                    │  Target -> Actual (TPS feedback) │
+                    │  FFFF65C0 (89 consumers)         │
+                    └─────────────┬──────────────────┘
+                                  │
+         ┌────────────────────────┼─────────────────────────┐
+         │                        │                         │
+  ┌──────▼──────┐    ┌───────────▼───────────┐   ┌─────────▼─────────┐
+  │ FUELING      │    │ IGNITION TIMING       │   │ BOOST CONTROL     │
+  │              │    │                       │   │                   │
+  │ Rev Limit    │    │ Base timing (T49)     │   │ WG target (T51)  │
+  │ 6700/6650 RPM│    │ Throttle corr (T34)  │   │ Feedback (T52)   │
+  │              │    │ Per-cond corr (T36)   │   │ Limit: D2560     │
+  │ Speed Limit  │    │ Multi-axis (T37)      │   │ Enable: 4.0/5.0  │
+  │ 510/505 km/h │    │ Knock retard (T27)    │   │                   │
+  │              │    │ Aggregation (T48)      │   │ Ramp rates:      │
+  │ Overrun Cut  │    │                       │   │ Fast: -1.0/cyc   │
+  │ 320ms delay  │    │ Output: final timing  │   │ Med:  -0.01/cyc  │
+  │              │    │ degrees BTDC          │   │ Slow: -0.005/cyc │
+  │ Fuel Cut     │    └───────────────────────┘   └───────────────────┘
+  │ Bitmask:     │
+  │ FFFF82B8     │
+  │ Per-cyl gate │
+  └──────────────┘
+         │
+  ┌──────▼──────────────────────────────────────────────────────────┐
+  │  CRUISE/NON-CRUISE MAP SWITCHING                                │
+  │  Blend ratio: FFFF7F60 (0.0=cruise, 1.0=non-cruise)           │
+  │  Affects: timing, fueling, knock advance, AVCS, load comp     │
+  │  ~40 switching parameters at D29AC-D2ABC                        │
+  │  Per-gear RPM thresholds: D2A74-D2A88                          │
+  └─────────────────────────────────────────────────────────────────┘

@@ -1,0 +1,321 @@
+================================================================================
+TORQUE MANAGEMENT — RAW DISASSEMBLY DUMPS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+================================================================================
+
+
+================================================================================
+SECTION 1: OVERRUN FUEL CUTOFF @ 0x03EB8C
+================================================================================
+
+Checks decel_flag; if decelerating, increments overrun counter toward
+a calibratable tick threshold. Once threshold reached, sets overrun_state=1
+(fuel cut active). Tail-calls fuel_cut_gating to apply per-cylinder masks.
+
+03EB8C: 4F22  sts.l  PR,@-R15
+03EB8E: D20D  mov.l  @(0x03EBC4),R2       ; R2 = 0xFFFF65BD (decel_flag)
+03EB90: 6620  mov.b  @R2,R6               ; R6 = decel_flag
+03EB92: 2668  tst    R6,R6                ; decel active? (flag == 0)
+03EB94: 8B0F  bf     0x03EBB6            ; not decel -> clear state
+03EB96: D10C  mov.l  @(0x03EBC8),R1       ; R1 = 0xFFFF7E8C (overrun_state)
+03EB98: 8511  mov.w  @(2,R1),R0           ; R0 = overrun_counter (word at +2)
+03EB9A: D50C  mov.l  @(0x03EBCC),R5       ; R5 = 0x000D29AA (cal threshold addr)
+03EB9C: 6251  mov.w  @R5,R2               ; R2 = threshold (16 ticks)
+03EB9E: 3022  cmp/hs R2,R0               ; counter >= threshold?
+03EBA0: 8B01  bf     0x03EBA6            ; no -> increment
+03EBA2: E201  mov    #1,R2
+03EBA4: 2120  mov.b  R2,@R1               ; overrun_state = 1 (fuel cut active)
+03EBA6: D20A  mov.l  @(0x03EBD0),R2       ; R2 = 0x000BE554 (ramp_counter)
+03EBA8: 8511  mov.w  @(2,R1),R0           ; R0 = counter
+03EBAA: 640D  extu.w R0,R4
+03EBAC: 420B  jsr    @R2                   ; counter = ramp_counter(counter, 1)
+03EBAE: E501  mov    #1,R5                ;   increment by 1
+03EBB0: D105  mov.l  @(0x03EBC8),R1       ; R1 = overrun_state base
+03EBB2: A003  bra    0x03EBBC            ; -> store counter
+03EBB4: 0009  nop
+03EBB6: E000  mov    #0,R0                ; --- NOT DECEL ---
+03EBB8: D103  mov.l  @(0x03EBC8),R1       ; R1 = overrun_state base
+03EBBA: 2100  mov.b  R0,@R1               ; overrun_state = 0 (normal)
+03EBBC: 8111  mov.w  R0,@(2,R1)           ; overrun_counter = R0 (0 or incremented)
+03EBBE: D205  mov.l  @(0x03EBD4),R2       ; R2 = 0x00046BCC (fuel_cut_gating)
+03EBC0: 422B  jmp    @R2                   ; tail call fuel_cut_gating
+03EBC2: 4F26  lds.l  @R15+,PR
+
+Literal pool:
+  0x03EBC4: 0xFFFF65BD  (decel_flag — 0=decel, 1=normal)
+  0x03EBC8: 0xFFFF7E8C  (overrun_state byte + overrun_counter word at +2)
+  0x03EBCC: 0x000D29AA  (cal: overrun tick threshold = 16)
+  0x03EBD0: 0x000BE554  (ramp_counter routine)
+  0x03EBD4: 0x00046BCC  (fuel_cut_gating)
+
+
+================================================================================
+SECTION 2: FUEL CUT GATING @ 0x046BCC
+================================================================================
+
+Per-cylinder fuel cut gating. Checks overrun_state and alt_fuel_cut_gate;
+if either is active, cuts ALL cylinders (bitmask = 0xFFFF). Otherwise,
+queries each cylinder's individual cut check and builds a selective bitmask.
+Stores result to fuel_cut_bitmask at FFFF82B8.
+
+046BCC: 2FE6  mov.l  R14,@-R15
+046BCE: 4F22  sts.l  PR,@-R15
+046BD0: 7FF0  add    #-16,R15             ; alloc 16 bytes
+046BD2: D21C  mov.l  @(0x046C44),R2       ; R2 = 0x0000317C (descriptor_dispatch)
+046BD4: 420B  jsr    @R2                   ; descriptor_dispatch(16)
+046BD6: E410  mov    #16,R4
+046BD8: D21B  mov.l  @(0x046C48),R2       ; R2 = 0x0002B25C (cyl_0_cut_check)
+046BDA: 420B  jsr    @R2
+046BDC: 2F02  mov.l  R0,@R15              ; stack[0] = descriptor result
+046BDE: D21B  mov.l  @(0x046C4C),R2       ; R2 = 0x0002B268 (cyl_1_cut_check)
+046BE0: 420B  jsr    @R2
+046BE2: 80F4  mov.b  R0,@(4,R15)          ; stack[4] = cyl_1 result
+046BE4: D51A  mov.l  @(0x046C50),R5       ; R5 = 0x0002B274 (cyl_2_cut_check)
+046BE6: 450B  jsr    @R5
+046BE8: 80F8  mov.b  R0,@(8,R15)          ; stack[8] = cyl_2 result
+046BEA: D51A  mov.l  @(0x046C54),R5       ; R5 = 0x0002B280 (cyl_3_cut_check)
+046BEC: 450B  jsr    @R5
+046BEE: 80FC  mov.b  R0,@(12,R15)         ; stack[12] = cyl_3 result
+046BF0: 640C  extu.b R0,R4                ; R4 = cyl_3 result
+046BF2: D619  mov.l  @(0x046C58),R6       ; R6 = 0xFFFF7E8C (overrun_state)
+046BF4: 6060  mov.b  @R6,R0
+046BF6: 8801  cmp/eq #1,R0               ; overrun_state == 1?
+046BF8: 8D1A  bt/s   0x046C30            ; yes -> cut ALL cylinders
+046BFA: EE00  mov    #0,R14               ; R14 = bitmask = 0
+046BFC: D617  mov.l  @(0x046C5C),R6       ; R6 = 0xFFFF82B4 (alt_fuel_cut_gate)
+046BFE: 6060  mov.b  @R6,R0
+046C00: 8801  cmp/eq #1,R0               ; alt gate active?
+046C02: 8915  bt     0x046C30            ; yes -> cut ALL
+046C04: 84F4  mov.b  @(4,R15),R0          ; cyl_1 cut?
+046C06: 8801  cmp/eq #1,R0
+046C08: 8B00  bf     0x046C0C
+046C0A: EE41  mov    #65,R14              ; R14 |= 0x0041 (cyl 0)
+046C0C: 84F8  mov.b  @(8,R15),R0          ; cyl_2 cut?
+046C0E: 8801  cmp/eq #1,R0
+046C10: 8B02  bf     0x046C18
+046C12: 60E3  mov    R14,R0
+046C14: CB82  or.b   #0x82,@(R0,GBR)      ; R14 |= 0x0082 (cyl 1)
+046C16: 6E03  mov    R0,R14
+046C18: 84FC  mov.b  @(12,R15),R0         ; cyl_2 cut (from stack)?
+046C1A: 8801  cmp/eq #1,R0
+046C1C: 8B02  bf     0x046C24
+046C1E: E241  mov    #65,R2
+046C20: 4208  shll2  R2                    ; R2 = 0x0104
+046C22: 2E2B  or     R2,R14               ; R14 |= 0x0104 (cyl 2)
+046C24: 6043  mov    R4,R0                ; cyl_3 cut?
+046C26: 8801  cmp/eq #1,R0
+046C28: 8B03  bf     0x046C32
+046C2A: 920A  mov.w  @(0x046C42),R2       ; R2 = 0x0208
+046C2C: A001  bra    0x046C32
+046C2E: 2E2B  or     R2,R14               ; R14 |= 0x0208 (cyl 3)
+046C30: EEFF  mov    #-1,R14              ; R14 = 0xFFFF (CUT ALL)
+046C32: D60B  mov.l  @(0x046C60),R6       ; R6 = 0xFFFF82B8 (fuel_cut_bitmask)
+046C34: 26E1  mov.w  R14,@R6              ; store bitmask
+046C36: D20B  mov.l  @(0x046C64),R2       ; R2 = 0x00003190 (result_store)
+046C38: 64F2  mov.l  @R15,R4
+046C3A: 7F10  add    #16,R15
+046C3C: 4F26  lds.l  @R15+,PR
+046C3E: 422B  jmp    @R2                   ; tail call result_store
+046C40: 6EF6  mov.l  @R15+,R14
+
+Literal pool:
+  0x046C44: 0x0000317C  (descriptor_dispatch)
+  0x046C48: 0x0002B25C  (cyl_0_cut_check)
+  0x046C4C: 0x0002B268  (cyl_1_cut_check)
+  0x046C50: 0x0002B274  (cyl_2_cut_check)
+  0x046C54: 0x0002B280  (cyl_3_cut_check)
+  0x046C58: 0xFFFF7E8C  (overrun_state)
+  0x046C5C: 0xFFFF82B4  (alt_fuel_cut_gate)
+  0x046C60: 0xFFFF82B8  (fuel_cut_bitmask)
+  0x046C64: 0x00003190  (result_store)
+
+Bitmask encoding:
+  0x0041 = cylinder 0
+  0x0082 = cylinder 1
+  0x0104 = cylinder 2
+  0x0208 = cylinder 3
+  0xFFFF = ALL cylinders (overrun or alt gate)
+
+
+================================================================================
+SECTION 3: TORQUE REQUEST / CL-OL GATE @ 0x03B7C4
+================================================================================
+
+Entry point for torque request state machine. Checks decel_flag and
+manages a counter in torque_req_workspace (FFFF7CBC). When counter >= 2,
+sets state = 1 (torque request mode active). Tail-calls 0x3D2FC.
+
+; Entry: checks decel_flag and manages overrun counter
+03B7C6: D20E  mov.l  @(0x03B800),R2       ; R2 = 0xFFFF65BD (decel_flag)
+03B7C8: 6620  mov.b  @R2,R6
+03B7CA: 2668  tst    R6,R6                ; decel active?
+03B7CC: 8B11  bf     0x03B7F2            ; no -> clear
+03B7CE: D20D  mov.l  @(0x03B804),R2       ; R2 = 0x000BE554 (ramp_counter)
+03B7D0: E501  mov    #1,R5
+03B7D2: D10D  mov.l  @(0x03B808),R1       ; R1 = 0xFFFF7CBC (torque_req_workspace)
+03B7D4: 8511  mov.w  @(2,R1),R0           ; read counter
+03B7D6: 420B  jsr    @R2                   ; increment
+03B7D8: 640D  extu.w R0,R4
+03B7DA: D10B  mov.l  @(0x03B808),R1
+03B7DC: 8111  mov.w  R0,@(2,R1)           ; store counter
+03B7DE: 8511  mov.w  @(2,R1),R0
+03B7E0: E602  mov    #2,R6
+03B7E2: 3062  cmp/hs R6,R0               ; counter >= 2?
+03B7E4: 8B02  bf     0x03B7EC
+03B7E6: E201  mov    #1,R2
+03B7E8: A007  bra    0x03B7FA
+03B7EA: 2120  mov.b  R2,@R1               ; state = 1
+; ... tail calls 0x3D2FC
+
+
+================================================================================
+SECTION 4: TORQUE REQUEST MAIN FUNCTION @ 0x03B810
+================================================================================
+
+Main torque request logic. Reads APP (accelerator pedal position), MAF,
+RPM, and throttle position. Gates on APP > 1.0 to enter torque request
+processing. Applies RPM and MAF threshold checks from calibration data
+(CC570/CC574/CC578). Uses 125-tick counter thresholds (CBD96/CBD98) and
+rate-of-change error scaling (BEAB0). Output: torque_request_active flag
+stored to workspace[+11].
+
+; Reads: APP (FFFF65FC), MAF (FFFF6624), RPM (FFFF63F8), throttle (FFFF65C0)
+; Manages torque request state at FFFF7CC8
+
+03B810: 2FD6  mov.l  R13,@-R15
+03B812: 2FE6  mov.l  R14,@-R15
+03B814: 4F22  sts.l  PR,@-R15
+03B816: FFEB  fmov.s FR14,@-R15
+03B818: FFFB  fmov.s FR15,@-R15
+03B81A: D26C  mov.l  @(0x03B9CC),R2       ; FR14 = APP (FFFF65FC)
+03B81C: FE28  fmov.s @R2,FR14
+03B81E: D26C  mov.l  @(0x03B9D0),R2       ; FR15 = MAF alt (FFFF6624)
+03B820: FF28  fmov.s @R2,FR15
+03B822: D26C  mov.l  @(0x03B9D4),R2       ; FR8 = RPM_alt (FFFF63F8)
+03B824: F828  fmov.s @R2,FR8
+03B826: D26C  mov.l  @(0x03B9D8),R2       ; R2 = throttle_pos (FFFF65C0)
+03B828: F99D  fldi1  FR9                   ; FR9 = 1.0
+03B82A: F9E5  fcmp/gt FR14,FR9            ; APP > 1.0?
+03B82C: 8D04  bt/s   0x03B838            ; yes -> process torque request
+03B82E: 6220  mov.b  @R2,R2               ; R2 = throttle byte
+; ... APP <= 1.0 path: clear workspace, early exit
+03B830: E200  mov    #0,R2
+03B832: DD6A  mov.l  @(0x03B9DC),R13      ; R13 = FFFF7CC8 (workspace)
+03B834: A015  bra    0x03B862
+03B836: 2D21  mov.w  R2,@R13              ; workspace.counter = 0
+
+; APP > 1.0 path: check thresholds
+03B838: D669  mov.l  @(0x03B9E0),R6       ; cal @ CC570 = 0.46
+03B83A: F968  fmov.s @R6,FR9
+03B83C: F985  fcmp/gt FR8,FR9             ; RPM_alt > 0.46?
+03B83E: 8910  bt     0x03B862            ; no -> skip
+03B840: D668  mov.l  @(0x03B9E4),R6       ; cal @ CC574 = 1000.0
+03B842: F868  fmov.s @R6,FR8
+03B844: F8F5  fcmp/gt FR15,FR8            ; MAF > 1000.0?
+03B846: 890C  bt     0x03B862            ; yes -> skip (already beyond range)
+03B848: D667  mov.l  @(0x03B9E8),R6       ; cal @ CC578 = 2000.0
+03B84A: F868  fmov.s @R6,FR8
+03B84C: F8F5  fcmp/gt FR15,FR8            ; MAF > 2000.0?
+03B84E: 8B08  bf     0x03B862            ; no -> continue normally
+; ... counter management with 125-tick thresholds (CBD96/CBD98)
+; ... rate-of-change checks with BEAB0 (error scaling)
+; Output: R14 = torque_request_active flag (0 or 1)
+; Stored to workspace[+11]
+
+Literal pool:
+  0x03B9CC: 0xFFFF65FC  (APP position, float)
+  0x03B9D0: 0xFFFF6624  (MAF alt value, float)
+  0x03B9D4: 0xFFFF63F8  (RPM alt, float)
+  0x03B9D8: 0xFFFF65C0  (throttle_position, byte)
+  0x03B9DC: 0xFFFF7CC8  (torque_request_workspace)
+  0x03B9E0: 0x000CC570  (threshold: 0.46 — minimum APP for torque request)
+  0x03B9E4: 0x000CC574  (threshold: 1000.0 — MAF upper gate)
+  0x03B9E8: 0x000CC578  (threshold: 2000.0 — MAF absolute max)
+  0x03B9EC: 0x000BE554  (ramp_counter)
+  0x03B9F0: 0x000CBD96  (counter threshold = 125)
+  0x03B9F4: 0x000CBD98  (counter threshold = 125)
+
+
+================================================================================
+SECTION 5: CL/OL RPM HYSTERESIS GATE @ 0x03B8E6
+================================================================================
+
+Second half of the torque request block. Reads RPM, APP, MAF, and throttle
+to set multiple hysteresis flags at GBR-relative offsets (GBR base = FFFF7CCA).
+Calls check_engine_running (0x29AA0), engine_state_check (0x297A0), and
+two additional state checkers (0x582AC, 0x1CF16). Writes RPM threshold
+flags that control CL/OL switching and torque request enable.
+
+; This is the second half of the torque request block.
+; Reads RPM (FFFF6350), APP (FFFF65FC), MAF (FFFF6624), throttle (FFFF65C0)
+; Sets multiple hysteresis flags at GBR+offset (GBR=FFFF7CCA base)
+; Calls check_engine_running (0x29AA0), engine_state_check (0x297A0),
+; and two additional state checkers (0x582AC, 0x1CF16)
+;
+; RPM threshold flags written:
+;   FFFF7458 (GBR+8):  torque request enable flag — complex multi-condition gate
+;   FFFF745E (GBR+14): MAF hysteresis flag A — thresholds 5600/5100 RPM (CC588/CC58C)
+;   FFFF745F (GBR+15): MAF hysteresis flag B — thresholds 4000/3500 RPM (CC590/CC594)
+;   FFFF7460 (GBR+16): MAF hysteresis flag C — thresholds 2600/1900 RPM (CC598/CC59C)
+;   FFFF7461 (GBR+17): MAF hysteresis flag D — threshold 2600 RPM (CC5A0)
+
+Literal pool:
+  0x03BA08: 0xFFFF7CCA  (GBR base for hysteresis workspace)
+  0x03BA0C: 0xFFFF6350  (RPM)
+  0x03BA14: 0x000297A0  (engine_state_check)
+  0x03BA18: 0x000582AC  (state_checker_A)
+  0x03BA1C: 0x0001CF16  (state_checker_B)
+  0x03BA20: 0xFFFF85D7  (engine_status_byte)
+  0x03BA24: RPM threshold float
+  0x03BA28: APP threshold float
+
+
+================================================================================
+SECTION 6: OVERRUN RESUME ENRICHMENT / PER-GEAR RPM DISPATCH @ 0x03EBD8
+================================================================================
+
+Large function (>500 bytes). Manages overrun resume enrichment and per-gear
+RPM threshold dispatch for map switching. Reads vehicle speed, RPM, APP,
+MAF, gear position, engine status, throttle, and run state. Switches on
+gear (1-5) to select per-gear RPM thresholds from calibration (D2A74-D2A84).
+When overrun is active and RPM drops below the per-gear threshold, applies
+resume enrichment pulse (CC49C = 1400 us initial PW) with RPM delta
+activation (CC498 = -17 RPM) and counter threshold (CC4EC = 1800 RPM).
+
+; Large function (>500 bytes). Reads:
+;   FR14 = vehicle_speed (FFFF6364)
+;   FR12 = RPM (FFFF6350)
+;   FR13 = APP (FFFF65FC)
+;   FR15 = MAF alt (FFFF6624)
+;   FR9  = MAF (saved to stack)
+;   R13  = gear (FFFF5E74)
+;   R12  = engine_status (FFFF85D7)
+;   R11  = throttle_position (FFFF65C0)
+;   R14  = run_state (FFFF6810)
+;
+; Calls check_engine_running (0x22CF4), engine_status_gate (0x3AB20)
+;
+; Per-gear RPM threshold dispatch (switch on R14 = gear 1-5):
+;   Gear 1: D2A74  Gear 2: D2A78  Gear 3: D2A7C
+;   Gear 4: D2A80  Gear 5: D2A84  Default: D2A88
+;   These are the Map Switching Per-Gear RPM Thresholds
+;
+; Stores per-gear threshold to FFFF7F08[-48] (workspace)
+; Also reads MAF thresholds D2A68/D2A6C (60.0/0.0) and D2A70 (5.0 min torque)
+;
+; Resume enrichment logic:
+;   If overrun active AND RPM below threshold:
+;     Apply resume enrichment pulse (CC49C = 1400 us initial PW)
+;     RPM delta activation: CC498 = -17 RPM
+;     Counter threshold: CC4EC = 1800 RPM
+
+Literal pool (selected):
+  0x03EDEC: 0xFFFF6350  (RPM)
+  0x03EDF0: 0xFFFF65FC  (APP)
+  0x03EDF4: 0xFFFF6624  (MAF alt)
+  0x03EE00: 0xFFFF5E74  (gear position)
+  0x03EE04: 0xFFFF85D7  (engine_status_byte)
+  0x03EE08: 0xFFFF65C0  (throttle_position)
+  0x03EE14: 0x000D29AE  (overrun resume vehicle speed threshold)
+  0x03EE1C-EE2C: 0x000D2A74-D2A84  (per-gear RPM thresholds, 5 gears)
+  0x03EE30: 0x000D2A88  (base RPM threshold / default gear)
