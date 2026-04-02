@@ -1,0 +1,312 @@
+================================================================================
+AFC PI CONTROLLER — INSTRUCTION-LEVEL TRACE
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+================================================================================
+
+  Source: ROM binary, instruction-by-instruction decode of 0x342A8-0x3439C
+  and 0x33460-0x33654 (tail aggregator).
+
+
+SECTION 1: PI CONTROLLER (0x342A8) — REGISTER-LEVEL TRACE
+================================================================================
+
+  Function size: 244 bytes (0x342A8-0x3439C)
+  Called as: Stage 6 of the 9-stage CL AFC pipeline (BSR from 0x33304)
+
+  ENTRY STATE:
+    GBR = FFFF7828 (AFC aggregator struct, set by CL dispatcher)
+    FR4 = float@FFFF6540 (conditioned O2 sensor, loaded by caller)
+
+  PROLOGUE (0x342A8-0x342BE):
+    0x342AE:  R0  = &FFFF77C8               ; pool ref, address literal
+    0x342B0:  LDC R0,GBR                     ; *** GBR NOW = FFFF77C8 ***
+    0x342B4:  R2  = &FFFF6540                ; pool ref
+    0x342B6:  FR4 = float@FFFF6540           ; O2 sensor state (the "actual")
+    0x342B8:  R6  = &FFFF7448                ; pool ref
+    0x342BA:  R14 = byte@FFFF7448            ; CL/OL mode flag
+    0x342BC:  R6  = 0xFF (-1)
+    0x342BE:  R0  = extu.b(R14)              ; zero-extend mode flag
+
+  NOTE: GBR changes from FFFF7828 to FFFF77C8 at entry. All subsequent
+  GBR-relative accesses use FFFF77C8 as base:
+    GBR+0x9D = FFFF7865 (previous CL/OL state, for transition detection)
+    GBR+0x60 = FFFF7828 (AFC enable state — same as old GBR base)
+    GBR+0x62 = FFFF782A (AFC active flag)
+
+
+  CL MODE CHECK (0x342C0-0x342C4):
+    cmp/eq #1,R0                             ; is mode == 1 (CL)?
+    bf/s 0x34322                             ; if NOT CL → OL path
+    (delay slot: R6 = extu.b(R6) = 0xFF)
+
+
+  CL ACTIVE PATH (0x342C6-0x342DA):
+    0x342C6:  write R0 to GBR+0x9D           ; save current mode to FFFF7865
+    0x342C8:  tst R0,R0                      ; was previous state == 0?
+    0x342CA:  bf 0x34302                      ; if nonzero → I-term limit check
+    0x342CC:  R0 = byte@GBR+0x60             ; read FFFF7828 (AFC enable)
+    0x342CE:  store R0 to stack[4]
+    0x342D0:  R0 = extu.b(R0)
+    0x342D2:  cmp/eq #1,R0                   ; AFC sub-state enabled?
+    0x342D4:  bf 0x34332                      ; if not → dispatch on path code
+
+  ERROR COMPUTATION (0x342D6-0x342DA):
+    0x342D6:  R2  = &FFFF77C8
+    0x342D8:  FR8 = float@FFFF77C8           ; THE REFERENCE VALUE
+    0x342DA:  FR4 = FR4 - FR8               ; *** ERROR = FFFF6540 - FFFF77C8 ***
+
+  CRITICAL FINDING:
+    The PI error is NOT (measured_AFR - target_AFR).
+    It is (conditioned_O2_sensor - aggregator_correction_state).
+    FFFF6540 = conditioned O2 value (from Stage 3, rate-limited ±0.02/cycle)
+    FFFF77C8 = aggregator output (from Stage 9, rate-limited via sub_BE970)
+
+
+  P-TERM EVALUATION (0x342DC-0x342FE):
+    0x342DC:  store FR4 (error) to stack[0]
+    0x342DE:  R2 = &sub_BEAB0                ; table lookup function
+    0x342E0:  jsr sub_BEAB0                  ; FR0 = table_lookup(error, 0.0)
+    0x342E2:  FR5 = 0.0 (delay slot)
+    0x342E4:  R2 = &CC000
+    0x342E6:  FR8 = float@CC000 = 2.0        ; P-gain dead-zone threshold
+    0x342E8:  fcmp/gt FR0,FR8                ; is 2.0 > lookup_result?
+    0x342EA:  bt 0x342F6                     ; if yes → error in dead zone
+
+    ERROR OUTSIDE DEAD ZONE → Path B:
+      0x342EC:  FR4 = reload error from stack
+      0x342EE:  R6 = &FFFF7864
+      0x342F0:  R0 = -80                      ; R0+R6 = FFFF7814
+      0x342F4:  write FR4 to FFFF7814         ; P-term = raw error
+      0x342F2:  bra 0x342FE → set path=1
+
+    ERROR INSIDE DEAD ZONE → Path A:
+      0x342F6:  FR5 = 0.0
+      0x342F8:  R6 = &FFFF7864
+      0x342FA:  R0 = -80                      ; R0+R6 = FFFF7814
+      0x342FC:  write 0.0 to FFFF7814         ; zero P-term
+      0x342FE:  bra 0x34332 → dispatch
+      0x34300:  R6 = 1 (path code = 1)
+
+
+  I-TERM LIMIT CHECK (0x34302-0x34330):
+    Reached when prev_state != 0 (not first CL entry)
+
+    0x34302:  R2 = &CC004
+    0x34304:  FR9 = float@CC004 = 20.0        ; I-term upper clamp
+    0x34306:  R6 = &FFFF7864
+    0x34308:  R0 = -76                         ; R0+R6 = FFFF7818
+    0x3430A:  FR8 = float@FFFF7818             ; current I-term
+    0x3430C:  fcmp/gt FR8,FR9                  ; is I-term > 20.0?
+    0x3430E:  bt 0x34314                       ; yes → check low bound
+    0x34310:  bra 0x34332, R6=2                ; path=2 (I-term ≥ 20, step down)
+
+    0x34314:  FR9 = float@FFFF7818             ; reload I-term
+    0x34316:  R2 = &CC008
+    0x34318:  FR8 = float@CC008 = 0.0          ; I-term lower clamp
+    0x3431A:  fcmp/gt FR9,FR8                  ; is 0.0 > I-term? (I-term < 0?)
+    0x3431C:  bf 0x34330                       ; no → within bounds
+    0x3431E:  bra 0x34332, R6=3                ; path=3 (I-term < 0, step up)
+
+    0x34330:  R6 = 4                           ; path=4 (within limits, no action)
+
+
+  OL / TRANSITION PATH (0x34322-0x34330):
+    Reached when mode != 1 (CL/OL flag = 0)
+
+    0x34322:  R0 = byte@GBR+0x60              ; read FFFF7828
+    0x34324:  cmp/eq #1,R0                    ; was AFC previously enabled?
+    0x34326:  bf 0x34330                       ; no → path=4
+    ; Yes: AFC was active, now entering OL
+    0x34328:  FR5 = 0.0
+    0x3432A:  R6 = &FFFF7864
+    0x3432C:  R0 = -80                         ; FFFF7814
+    0x3432E:  write 0.0 to FFFF7814            ; zero P-term on CL→OL
+    0x34330:  R6 = 4                           ; path=4
+
+
+  STATE MACHINE DISPATCH (0x34332-0x3438E):
+
+    Path 1 — Normal PI update (first CL cycle):
+      0x34338:  FR8 = float@FFFF7814           ; P-term output
+      0x34340:  write FR8 to FFFF7818           ; copy P-term → I-term accumulator
+      0x34342:  R0 = 1
+      0x34344:  bra epilog
+      0x34346:  write 1 to GBR+0x62            ; FFFF782A = active flag
+
+    Path 2 — Rich correction (I-term ≥ 20.0):
+      0x3434C:  R6 = &FFFF7864
+      0x34350:  FR4 = float@FFFF7818           ; current I-term
+      0x34352:  FR8 = float@CC00C = 1.0        ; step size
+      0x34356:  FR4 = FR4 - 1.0                ; step down
+      0x34358:  jsr sub_BE960                   ; rich-direction clamp
+      0x3435E:  write FR0 to FFFF7818           ; store clamped result
+
+    Path 3 — Lean correction (I-term < 0.0):
+      0x3436A:  R6 = &FFFF7864
+      0x3436E:  FR4 = float@FFFF7818           ; current I-term
+      0x34370:  FR8 = float@CC00C = 1.0        ; step size
+      0x34374:  FR4 = FR4 + 1.0                ; step up
+      0x34376:  jsr sub_BE970                   ; lean-direction clamp
+      0x3437C:  write FR0 to FFFF7818           ; store clamped result
+
+    Path 4 — Disabled / within limits:
+      0x34388:  FR5 = 0.0
+      0x3438A:  R6 = &FFFF7864
+      0x3438E:  write 0.0 to FFFF7818           ; zero I-term
+
+
+  EPILOGUE (0x34390-0x3439C):
+    0x34390:  R0 = R14 (saved mode flag)
+    0x34392:  write R0 to GBR+0x9D             ; save mode to FFFF7865
+    0x34394:  restore stack frame
+    0x3439A:  rts
+
+
+  RAM VARIABLES — PI CONTROLLER INTERNAL:
+    FFFF7814   float   P-term output (error or 0.0 depending on dead zone)
+    FFFF7818   float   I-term accumulator (stepped ±1.0, clamped 0.0-20.0)
+    FFFF7828   byte    AFC enable sub-state (read as GBR+0x60)
+    FFFF782A   byte    AFC active flag (written as GBR+0x62)
+    FFFF7865   byte    Previous CL/OL mode (transition detector, GBR+0x9D)
+
+
+================================================================================
+SECTION 2: TAIL AGGREGATOR — FFFF77C8 WRITER (0x33460)
+================================================================================
+
+  Function size: ~500 bytes (0x33460-0x33654)
+  Called as: Stage 9 of the CL AFC pipeline (BRA tail-call from dispatcher)
+
+  ENTRY STATE:
+    GBR set to FFFF77BC (via pool ref at 0x33698 → ldc R0,GBR)
+    R9 = FFFF7828 (aggregator struct base, from pool at 0x336A4)
+
+  STRUCT OFFSETS (relative to R9 = FFFF7828):
+    R9+(-108) = R9+0x94 = FFFF77BC   (base value, also the GBR)
+    R9+(-100) = R9+0x9C = FFFF77C4   (intermediate accumulator)
+    R9+(-96)  = R9+0xA0 = FFFF77C8   (final output — the PI reference)
+    R9+(-92)  = R9+0xA4 = FFFF77CC   (additional correction term)
+    R9+(-80)  = R9+0xB0 = FFFF77D8   (additional correction factor)
+    R9+(-68)  = R9+0xBC = FFFF77E4   (additional correction factor)
+    R9+(-52)  = R9+0xCC = FFFF77F4   (CL fuel target)
+
+  THREE WRITE PATHS TO FFFF77C8:
+
+  Write Path 1 (0x33588-0x33596) — DIRECT COPY:
+    Condition: calibration flag check passes (cmp/eq #2)
+    Operation:
+      FR8 = float@FFFF77BC           ; load base
+      write FR8 to FFFF77C4          ; copy to intermediate
+      FR8 = float@FFFF77BC           ; reload base
+      write FR8 to FFFF77C8          ; copy to output
+    Result: FFFF77C8 = FFFF77BC (immediate)
+
+  Write Path 2 (0x335E4-0x33610) — BOUNDED COPY:
+    Condition: table_lookup(FFFF77C4, stack_val) < 5.0 (CBF44)
+              AND secondary value < 100.0 (CBF48)
+    Operation: same as Path 1 — direct copy FFFF77BC → FFFF77C8
+    Result: FFFF77C8 = FFFF77BC (immediate, when bounds pass)
+
+  Write Path 3 (0x33618-0x33634) — RATE-LIMITED (normal path):
+    Condition: bounds check from Path 2 failed (fallthrough)
+    Operation:
+      FR4 = float@FFFF77C4           ; current intermediate
+      FR8 = float@CBF5C = 1.0        ; offset
+      FR4 = FR4 + 1.0                ; add offset to intermediate
+      FR6 = float@FFFF77BC           ; target (base value)
+      FR5 = float@CBF58 = 0.9        ; clamp factor
+      FR0 = sub_BE970(FR4, FR5, FR6) ; rate_limit_interp
+      write FR0 to FFFF77C4          ; update intermediate
+      FR8 = float@FFFF77C4           ; reload
+      write FR8 to FFFF77C8          ; propagate to output
+    Result: FFFF77C8 = rate_limit_interp(FFFF77C4 + 1.0, 0.9, FFFF77BC)
+
+  CALIBRATION CONSTANTS:
+    CBF44 = 5.0     Path 2 upper bound for table lookup result
+    CBF48 = 100.0   Path 2 secondary bound
+    CBF58 = 0.9     Path 3 rate limiter clamp factor
+    CBF5C = 1.0     Path 3 offset before rate limiting
+
+
+================================================================================
+SECTION 3: AFC SIGNAL FLOW — CORRECTED ARCHITECTURE
+================================================================================
+
+  Previous understanding (WRONG):
+    error = measured_AFR - target_AFR
+    AFC adjusts fuel to drive measured AFR toward target
+
+  Actual architecture (CONFIRMED BY TRACE):
+    error = FFFF6540 - FFFF77C8
+    where:
+      FFFF6540 = O2 sensor after Stage 3 conditioning (rate-limited ±0.02/cycle)
+      FFFF77C8 = tail aggregator output (rate-limited via sub_BE970, clamp=0.9)
+
+  The PI controller drives the conditioned sensor toward the aggregator
+  state, NOT toward a target AFR. Both signals are independently
+  rate-limited, so neither directly corresponds to the SSM-reported
+  AFR or FFB values.
+
+  SSM "AFC" = I-term at FFFF7818, scaled to percentage
+  SSM "AFR" = separate computation, not FFFF6540
+  SSM "FFB" = separate computation, not FFFF77C8
+
+  This explains why AFC can appear to add fuel while the car is running
+  rich of the displayed target — the PI loop is comparing two internal
+  rate-limited signals, not the values shown in the SSM log.
+
+
+================================================================================
+SECTION 4: LOG VALIDATION — SAMPLES 7321 vs 7473
+================================================================================
+
+  Both from logs/4-1.csv, CL/OL=8 (closed loop), similar airflow.
+
+  Sample 7321:
+    AFC=-3.91%  AFR=12.98  FFB=13.80  wbo2=12.99
+    RPM=3219  load=0.506  MAF=27.16  throttle=17.25%
+
+  Sample 7473:
+    AFC=+13.28%  AFR=13.90  FFB=14.27  wbo2=13.79
+    RPM=3807  load=0.427  MAF=27.07  throttle=16.86%
+
+  Both are rich of their respective SSM targets.
+  The 17-point AFC swing is consistent with the PI controller tracking
+  FFFF6540 vs FFFF77C8 (internal rate-limited signals) rather than
+  tracking AFR vs FFB (SSM display values).
+
+  The RPM/load change between the two samples means different cells in:
+    - cl_fuel_target_A (0xAD8D4, RPM × load → FFFF77DC)
+    - I_comp 2D table (0xAD928, lambda × RPM)
+    - P_gain_A/B tables (0xACEA0/0xACEB4)
+  All of which feed into FFFF77BC → FFFF77C8 through the aggregator,
+  while FFFF6540 rate-limits independently. The AFC integrator is
+  simply tracking the gap between these two rate-limited signals.
+
+
+================================================================================
+SECTION 5: OPEN QUESTIONS
+================================================================================
+
+  1. FFFF6540 WRITER — NOT YET TRACED
+     ram_map_raw.txt labels this "adc_processed" with 12 xrefs.
+     Stage 3 (afc_sensor_prep at 0x33658) reads it as input but the
+     actual ADC pipeline writer has not been traced.
+
+  2. sub_BE970 INTERNALS — NOT YET TRACED
+     The rate_limit_interp function is called in both the tail
+     aggregator (FFFF77C8 path) and the PI output stage. Understanding
+     its exact clamping behavior would clarify the rate at which
+     FFFF77C8 tracks changes.
+
+  3. FFFF77BC COMPUTATION — PARTIALLY TRACED
+     The base value at FFFF77BC is itself computed from multiple
+     correction terms in the aggregator. The full computation involves
+     FR14 accumulation from multiple struct offsets and the value at
+     FFFF7904. Not fully annotated yet.
+
+  4. SSM AFR/FFB DERIVATION — NOT TRACED
+     The SSM display values for AFR and FFB are computed by separate
+     getter functions (likely in the diagnostic task space around
+     0x5Dxxx). Tracing these would confirm the disconnect between
+     display values and PI controller inputs.
