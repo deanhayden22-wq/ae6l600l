@@ -1,0 +1,452 @@
+================================================================================
+MAF SCALING — RAW DISASSEMBLY DUMPS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+================================================================================
+
+
+================================================================================
+SECTION 1: MAF TIMER PRESCALER @ 0x0CBAC
+================================================================================
+
+Called from Task 9 (fuel system), every 20ms scheduler tick.
+Increments counter at FFFF447A. When counter >= 4 (every 80ms),
+resets to 0 and reloads 9 intake/MAF timer channels via 0xCA72.
+
+00CBAC: 4F22  sts.l  PR,@-R15
+00CBAE: D414  mov.l  @(0x00CC00),R4       ; R4 = 0xFFFF447A (maf_prescale_counter)
+00CBB0: 6340  mov.b  @R4,R3               ; R3 = *counter
+00CBB2: 7301  add    #1,R3                ; counter++
+00CBB4: 2430  mov.b  R3,@R4               ; store
+00CBB6: E304  mov    #4,R3                ; threshold = 4
+00CBB8: 6240  mov.b  @R4,R2               ; re-read counter
+00CBBA: 622C  extu.b R2,R2
+00CBBC: 3233  cmp/ge R3,R2               ; counter >= 4?
+00CBBE: 8F13  bf/s   0x00CBE8            ; no -> return
+00CBC0: 0009  nop
+00CBC2: E100  mov    #0,R1
+00CBC4: 2410  mov.b  R1,@R4               ; reset counter = 0
+00CBC6: BF54  bsr    0x00CA72             ; timer_reload(ch=0)
+00CBC8: 6413  mov    R1,R4
+00CBCA: BF52  bsr    0x00CA72             ; timer_reload(ch=1)
+00CBCC: E401  mov    #1,R4
+00CBCE: BF50  bsr    0x00CA72             ; timer_reload(ch=2)
+00CBD0: E402  mov    #2,R4
+00CBD2: BF4E  bsr    0x00CA72             ; timer_reload(ch=4)
+00CBD4: E404  mov    #4,R4
+00CBD6: BF4C  bsr    0x00CA72             ; timer_reload(ch=8)
+00CBD8: E408  mov    #8,R4
+00CBDA: BF4A  bsr    0x00CA72             ; timer_reload(ch=9)
+00CBDC: E409  mov    #9,R4
+00CBDE: BF48  bsr    0x00CA72             ; timer_reload(ch=10)
+00CBE0: E40A  mov    #10,R4
+00CBE2: E40C  mov    #12,R4               ; (delay slot setup for tail call)
+00CBE4: AF45  bra    0x00CA72             ; timer_reload(ch=12) [tail call]
+00CBE6: 4F26  lds.l  @R15+,PR
+00CBE8: 4F26  lds.l  @R15+,PR             ; early return path
+00CBEA: 000B  rts
+00CBEC: 0009  nop
+
+Literal pool:
+  0x00CC00: 0xFFFF447A  (maf_prescale_counter)
+
+
+================================================================================
+SECTION 2: INTAKE TICK COUNTER @ 0x09A58
+================================================================================
+
+Increments counter at FFFF42F8 every 20ms. Every 16th tick (320ms),
+branches to 0xA470 for full MAF/intake recalculation.
+
+009A58: D42C  mov.l  @(0x009B0C),R4       ; R4 = 0xFFFF42F8 (intake_tick_counter)
+009A5A: 6340  mov.b  @R4,R3               ; R3 = *counter
+009A5C: 7301  add    #1,R3                ; counter++
+009A5E: 2430  mov.b  R3,@R4               ; store
+009A60: 6040  mov.b  @R4,R0               ; re-read
+009A62: 600C  extu.b R0,R0
+009A64: C80F  tst    #0x0F,R0             ; (counter & 0x0F) == 0?
+009A66: 8F02  bf/s   0x009A6E            ; no -> return
+009A68: 0009  nop
+009A6A: A501  bra    0x00A470             ; yes -> full MAF recalc [tail call]
+009A6C: 0009  nop
+009A6E: 000B  rts
+009A70: 0009  nop
+
+
+================================================================================
+SECTION 3: INTAKE CHANNEL PROCESSOR @ 0x09A72
+================================================================================
+
+Called per-channel from the 0xA470 loop. Processes one intake/MAF
+channel: computes delta from filtered charge, applies rate limiting,
+stores result to workspace.
+
+Inputs:  R4 = channel index, R5 = new value (float), FR4 = new float value
+Workspace: FFFF4284 (base), stride 28 bytes per channel
+
+009A72: E008  mov    #8,R0
+009A74: D323  mov.l  @(0x009B04),R3       ; R3 = 0x0000317C (descriptor_dispatch)
+009A76: 4F22  sts.l  PR,@-R15
+009A78: 4F12  sts.l  FPSCR,@-R15
+009A7A: 7FEC  add    #-20,R15             ; alloc 20 bytes on stack
+009A7C: 2F40  mov.b  R4,@R15              ; stack[0] = channel_index
+009A7E: FF47  fmov.s FR4,@(R0,R15)        ; stack[8] = new_value (float)
+009A80: 1F51  mov.l  R5,@(4,R15)          ; stack[4] = new_value (int)
+009A82: 430B  jsr    @R3                   ; call descriptor_dispatch(16)
+009A84: E410  mov    #16,R4               ;   descriptor group 16
+009A86: E31C  mov    #28,R3               ; stride = 28 bytes
+009A88: D221  mov.l  @(0x009B10),R2       ; R2 = 0xFFFF4284 (workspace_base)
+009A8A: 1F04  mov.l  R0,@(16,R15)         ; stack[16] = descriptor result
+009A8C: 64F0  mov.b  @R15,R4              ; R4 = channel_index
+009A8E: E008  mov    #8,R0
+009A90: 644C  extu.b R4,R4
+009A92: 243E  mulu.w R3,R4               ; R4 * 28
+009A94: 041A  sts    MACL,R4              ; R4 = workspace_offset
+009A96: 1F43  mov.l  R4,@(12,R15)         ; stack[12] = offset
+009A98: 51F1  mov.l  @(4,R15),R1          ; R1 = new_value (int)
+009A9A: 342C  add    R2,R4                ; R4 = workspace_base + offset
+009A9C: 2412  mov.l  R1,@R4               ; workspace[ch].raw = new_value
+009A9E: D11D  mov.l  @(0x009B14),R1       ; R1 = 0xFFFF4168 (filtered_charge)
+009AA0: F4F6  fmov.s @(R0,R15),FR4        ; FR4 = new_value (float)
+009AA2: F318  fmov.s @R1,FR3              ; FR3 = filtered_charge
+009AA4: C71C  mova   @(0x009B18),R0       ; -60.0
+009AA6: F431  fsub   FR3,FR4              ; FR4 = new - filtered (delta)
+009AA8: F208  fmov.s @R0,FR2              ; FR2 = -60.0
+009AAA: F245  fcmp/gt FR4,FR2             ; delta > -60.0?
+009AAC: 8F03  bf/s   0x009AB6            ; no -> check positive limit
+009AAE: 0009  nop
+009AB0: C71A  mova   @(0x009B1C),R0       ; 720.0 (max positive rate)
+009AB2: A007  bra    0x009AC4
+009AB4: F108  fmov.s @R0,FR1              ; FR1 = 720.0
+009AB6: C71A  mova   @(0x009B20),R0       ; 660.0
+009AB8: F308  fmov.s @R0,FR3              ; FR3 = 660.0
+009ABA: F345  fcmp/gt FR4,FR3             ; delta > 660.0?
+009ABC: 8D05  bt/s   0x009ACA            ; yes -> use unclamped
+009ABE: 0009  nop
+009AC0: C718  mova   @(0x009B24),R0       ; -720.0 (max negative rate)
+009AC2: F108  fmov.s @R0,FR1              ; FR1 = -720.0
+009AC4: F34C  fmov   FR4,FR3              ; FR3 = delta
+009AC6: A001  bra    0x009ACC
+009AC8: F310  fadd   FR1,FR3              ; FR3 = delta + rate_limit
+009ACA: F34C  fmov   FR4,FR3              ; FR3 = delta (unclamped)
+009ACC: E004  mov    #4,R0
+009ACE: E301  mov    #1,R3
+009AD0: F437  fmov.s FR3,@(R0,R4)         ; workspace[ch].delta = result
+009AD2: E017  mov    #23,R0
+009AD4: 0434  mov.b  R3,@(R0,R4)          ; workspace[ch].valid = 1
+009AD6: C714  mova   @(0x009B28),R0       ; 35.0
+009AD8: F308  fmov.s @R0,FR3              ; FR3 = 35.0 (threshold)
+009ADA: E004  mov    #4,R0
+009ADC: F246  fmov.s @(R0,R4),FR2         ; FR2 = workspace[ch].delta
+009ADE: F325  fcmp/gt FR2,FR3             ; 35.0 > delta?
+009AE0: 8F08  bf/s   0x009AF4            ; no (delta >= 35) -> skip recalc
+009AE2: 0009  nop
+009AE4: B245  bsr    0x009F72             ; call recalc_intake(channel_index)
+009AE6: 64F0  mov.b  @R15,R4
+009AE8: D309  mov.l  @(0x009B10),R3       ; workspace_base
+009AEA: E100  mov    #0,R1
+009AEC: 52F3  mov.l  @(12,R15),R2         ; offset
+009AEE: E017  mov    #23,R0
+009AF0: 323C  add    R3,R2                ; workspace_base + offset
+009AF2: 0214  mov.b  R1,@(R0,R2)          ; workspace[ch].valid = 0
+009AF4: 54F4  mov.l  @(16,R15),R4         ; descriptor result
+009AF6: 7F14  add    #20,R15              ; dealloc stack
+009AF8: D303  mov.l  @(0x009B08),R3       ; 0x00003190
+009AFA: 4F16  lds.l  @R15+,FPSCR
+009AFC: 432B  jmp    @R3                   ; tail call to 0x3190 (store result)
+009AFE: 4F26  lds.l  @R15+,PR
+
+Literal pool:
+  0x009B04: 0x0000317C  (descriptor_dispatch)
+  0x009B08: 0x00003190  (result_store)
+  0x009B0C: 0xFFFF42F8  (intake_tick_counter)
+  0x009B10: 0xFFFF4284  (intake_workspace_base)
+  0x009B14: 0xFFFF4168  (filtered_charge)
+  0x009B18: 0xC2700000  (-60.0)    rate limit min
+  0x009B1C: 0x44340000  (720.0)    rate limit max positive
+  0x009B20: 0x44250000  (660.0)    rate limit threshold
+  0x009B24: 0xC4340000  (-720.0)   rate limit max negative
+  0x009B28: 0x420C0000  (35.0)     recalc threshold
+
+
+================================================================================
+SECTION 4: FULL MAF/INTAKE RECALCULATION LOOP @ 0x0A470
+================================================================================
+
+Called every 320ms from 0x9A58. Iterates over 4 intake channels,
+processing each via the intake channel table at 0x11A7C.
+Uses workspace at FFFF4284 and library routines for allocation.
+
+00A470: 2FE6  mov.l  R14,@-R15
+00A472: EE00  mov    #0,R14               ; R14 = channel_index = 0
+00A474: 2FD6  mov.l  R13,@-R15
+00A476: 2FC6  mov.l  R12,@-R15
+00A478: 2FB6  mov.l  R11,@-R15
+00A47A: EC04  mov    #4,R12               ; R12 = 4 (num_channels)
+00A47C: DD28  mov.l  @(0x00A520),R13      ; R13 = 0x0007A120 (upper_clamp)
+00A47E: 2FA6  mov.l  R10,@-R15
+00A480: 2F96  mov.l  R9,@-R15
+00A482: 2F86  mov.l  R8,@-R15
+00A484: 4F22  sts.l  PR,@-R15
+00A486: 4F12  sts.l  FPSCR,@-R15
+00A488: D823  mov.l  @(0x00A518),R8       ; R8 = 0xFFFF4284 (workspace_base)
+00A48A: 7FFC  add    #-4,R15
+00A48C: D921  mov.l  @(0x00A514),R9       ; R9 = 0x000BE82C (workspace_free)
+00A48E: DA23  mov.l  @(0x00A51C),R10      ; R10 = 0x000BE81C (workspace_alloc)
+00A490: 9B38  mov.w  @(0x00A504),R11      ; R11 = 224 (workspace_size)
+
+; --- LOOP START (4 channels) ---
+00A492: 65B3  mov    R11,R5               ; R5 = 224
+00A494: 4A0B  jsr    @R10                 ; workspace_alloc(SP, 224)
+00A496: 64F3  mov    R15,R4
+00A498: 63EC  extu.b R14,R3               ; R3 = channel_index
+00A49A: E21C  mov    #28,R2               ; stride = 28
+00A49C: 232E  mulu.w R2,R3               ; offset = index * 28
+00A49E: 031A  sts    MACL,R3
+00A4A0: 338C  add    R8,R3                ; R3 = workspace_base + offset
+00A4A2: 5134  mov.l  @(16,R3),R1          ; R1 = workspace[ch].descriptor_ptr
+00A4A4: 2118  tst    R1,R1                ; null check
+00A4A6: 8D09  bt/s   0x00A4BC            ; skip if null
+00A4A8: 0009  nop
+00A4AA: B058  bsr    0x00A55E             ; call get_channel_count(ch_index)
+00A4AC: 64E3  mov    R14,R4               ;   R4 = channel_index
+00A4AE: 6503  mov    R0,R5                ; R5 = result (new count)
+00A4B0: 35D2  cmp/hs R13,R5              ; R5 >= upper_clamp?
+00A4B2: 8F01  bf/s   0x00A4B8
+00A4B4: 64E3  mov    R14,R4
+00A4B6: 65D3  mov    R13,R5               ; clamp to upper_clamp
+00A4B8: B012  bsr    0x00A4E0             ; call process_channel(ch_index, count)
+00A4BA: 0009  nop
+00A4BC: 490B  jsr    @R9                  ; workspace_free(SP_saved)
+00A4BE: 64F2  mov.l  @R15,R4
+00A4C0: 7E01  add    #1,R14               ; channel_index++
+00A4C2: 63EC  extu.b R14,R3
+00A4C4: 33C3  cmp/ge R12,R3              ; index >= 4?
+00A4C6: 8FE4  bf/s   0x00A492            ; no -> loop
+00A4C8: 0009  nop
+; --- LOOP END ---
+
+00A4CA: 7F04  add    #4,R15
+00A4CC: 4F16  lds.l  @R15+,FPSCR
+00A4CE: 4F26  lds.l  @R15+,PR
+00A4D0: 68F6  mov.l  @R15+,R8
+00A4D2: 69F6  mov.l  @R15+,R9
+00A4D4: 6AF6  mov.l  @R15+,R10
+00A4D6: 6BF6  mov.l  @R15+,R11
+00A4D8: 6CF6  mov.l  @R15+,R12
+00A4DA: 6DF6  mov.l  @R15+,R13
+00A4DC: 000B  rts
+00A4DE: 6EF6  mov.l  @R15+,R14
+
+Literal pool:
+  0x00A504: 0x00E0     (224 = workspace_size)
+  0x00A514: 0x000BE82C (workspace_free)
+  0x00A518: 0xFFFF4284 (intake_workspace_base)
+  0x00A51C: 0x000BE81C (workspace_alloc)
+  0x00A520: 0x0007A120 (upper_clamp value)
+
+Intake channel table @ 0x011A7C (12-byte stride, 4 entries):
+  [0] RAW=0xFFFFF640  OUT=0xFFFFF444  MASK=0x00010000
+  [1] RAW=0xFFFFF642  OUT=0xFFFFF446  MASK=0x00020000
+  [2] RAW=0xFFFFF644  OUT=0xFFFFF448  MASK=0x00040000
+  [3] RAW=0xFFFFF646  OUT=0xFFFFF44A  MASK=0x00080000
+
+
+================================================================================
+SECTION 5: get_channel_count @ 0x0A55E
+================================================================================
+
+Computes the new intake count for a channel from the channel table
+and current accumulator.
+
+00A55E: 634C  extu.b R4,R3               ; R3 = channel_index
+00A560: 4F12  sts.l  FPSCR,@-R15
+00A562: E21C  mov    #28,R2               ; stride = 28
+00A564: 232E  mulu.w R2,R3               ; offset = index * 28
+00A566: 614C  extu.b R4,R1               ; R1 = index
+00A568: 031A  sts    MACL,R3              ; R3 = offset
+00A56A: 6013  mov    R1,R0
+00A56C: 4100  shll   R1                   ; R1 = index * 2
+00A56E: 310C  add    R0,R1                ; R1 = index * 3
+00A570: D005  mov.l  @(0x00A588),R0       ; R0 = 0x00011A7C (channel_table)
+00A572: 4108  shll2  R1                   ; R1 = index * 12
+00A574: 011E  mov.l  @(R0,R1),R1          ; R1 = channel_table[ch].raw_ptr
+00A576: 6111  mov.w  @R1,R1               ; R1 = *raw_ptr (uint16 raw count)
+00A578: 611D  extu.w R1,R1
+00A57A: D005  mov.l  @(0x00A590),R0       ; R0 = 0xFFFF4294 (accumulator_base)
+00A57C: 043E  mov.l  @(R0,R3),R4          ; R4 = accumulator[ch]
+00A57E: 341C  add    R1,R4                ; R4 = accumulator + raw_count
+00A580: 6043  mov    R4,R0                ; return value
+00A582: 000B  rts
+00A584: 4F16  lds.l  @R15+,FPSCR
+
+Literal pool:
+  0x00A588: 0x00011A7C (intake_channel_table)
+  0x00A590: 0xFFFF4294 (intake_accumulator_base)
+
+
+================================================================================
+SECTION 6: MAP/BARO PROCESSING @ 0x0A594
+================================================================================
+
+Processes MAP sensor (ADDR14) with IIR filtering and barometric
+pressure calculation. Runs inline after the A470 loop.
+
+; --- Direct MAP copy ---
+00A594: D31D  mov.l  @(0x00A60C),R3       ; R3 = 0xFFFF4040 (ADDR14 raw MAP)
+00A596: 6231  mov.w  @R3,R2               ; R2 = raw MAP value
+00A598: D11D  mov.l  @(0x00A610),R1       ; R1 = 0xFFFF4300 (MAP filtered input)
+00A59A: 2121  mov.w  R2,@R1               ; copy raw -> filtered input
+
+; --- MAP IIR filter ---
+00A59C: 2FE6  mov.l  R14,@-R15
+00A59E: 4F22  sts.l  PR,@-R15
+00A5A0: D31A  mov.l  @(0x00A60C),R3       ; R3 = 0xFFFF4040 (ADDR14 raw)
+00A5A2: 7FFC  add    #-4,R15
+00A5A4: DE1A  mov.l  @(0x00A610),R14      ; R14 = 0xFFFF4300 (filtered)
+00A5A6: 6231  mov.w  @R3,R2               ; new = raw MAP
+00A5A8: D11B  mov.l  @(0x00A618),R1       ; R1 = 0x000BEA6C (iir_filter)
+00A5AA: 2F21  mov.w  R2,@R15              ; stack = new
+00A5AC: D219  mov.l  @(0x00A614),R2       ; R2 = 0x000C00B8 (IIR coeff addr)
+00A5AE: 6621  mov.w  @R2,R6               ; R6 = coeff (0x0100 = 256)
+00A5B0: 65E1  mov.w  @R14,R5              ; R5 = old filtered
+00A5B2: 655D  extu.w R5,R5
+00A5B4: 64F1  mov.w  @R15,R4              ; R4 = new raw
+00A5B6: 410B  jsr    @R1                   ; result = iir_filter(new, old, coeff)
+00A5B8: 644D  extu.w R4,R4
+
+; --- Barometric pressure calculation ---
+00A5BA: F58D  fldi0  FR5                   ; FR5 = 0.0 (min clamp)
+00A5BC: D318  mov.l  @(0x00A620),R3       ; R3 = 0x000BE598 (uint16_to_float)
+00A5BE: 2E01  mov.w  R0,@R14              ; store filtered MAP
+00A5C0: C716  mova   @(0x00A61C),R0       ; load 0x38A00000 (0.000076...)
+00A5C2: F408  fmov.s @R0,FR4              ; FR4 = 1/32768 scale factor
+00A5C4: 430B  jsr    @R3                   ; FR0 = float(filtered_MAP) * scale
+00A5C6: 64E1  mov.w  @R14,R4              ;   R4 = filtered MAP
+00A5C8: D316  mov.l  @(0x00A624),R3       ; R3 = 0x000D8ADC
+00A5CA: F338  fmov.s @R3,FR3              ; FR3 = -414.0 (baro offset)
+00A5CC: D216  mov.l  @(0x00A628),R2       ; R2 = 0x000D8AD8
+00A5CE: F228  fmov.s @R2,FR2              ; FR2 = 514.2 (baro scale)
+00A5D0: D116  mov.l  @(0x00A62C),R1       ; R1 = 0xFFFF42FC (baro_pressure_out)
+00A5D2: F32E  fmac   FR0,FR2,FR3          ; FR3 = FR3 + FR0 * FR2
+                                           ;      = -414 + normalized_MAP * 514.2
+00A5D4: F13A  fmov.s FR3,@R1              ; store baro pressure (mmHg)
+00A5D6: 7F04  add    #4,R15
+00A5D8: 4F26  lds.l  @R15+,PR
+00A5DA: 000B  rts
+00A5DC: 6EF6  mov.l  @R15+,R14
+
+Literal pool:
+  0x00A60C: 0xFFFF4040  (ADDR14 raw MAP sensor)
+  0x00A610: 0xFFFF4300  (MAP filtered accumulator)
+  0x00A614: 0x000C00B8  (IIR filter coefficient = 0x0100 = 256)
+  0x00A618: 0x000BEA6C  (iir_filter routine)
+  0x00A61C: 0x38A00000  (1/32768 ≈ 0.0000305 — ADC scale)
+  0x00A620: 0x000BE598  (uint16_to_float_scale)
+  0x00A624: 0x000D8ADC  (-414.0 baro offset)
+  0x00A628: 0x000D8AD8  (514.2 baro scale)
+  0x00A62C: 0xFFFF42FC  (baro_pressure_out, float)
+
+
+================================================================================
+SECTION 7: MAP RANGE CHECK @ 0x0A5DE
+================================================================================
+
+Classifies filtered MAP into 3 ranges (0, 1, 2) based on thresholds
+from ROM. Used for mode selection downstream.
+
+00A5DE: D30C  mov.l  @(0x00A610),R3       ; R3 = 0xFFFF4300 (MAP filtered)
+00A5E0: D113  mov.l  @(0x00A630),R1       ; R1 = 0x000D8A88 (threshold table)
+00A5E2: 6531  mov.w  @R3,R5               ; R5 = filtered MAP
+00A5E4: 6211  mov.w  @R1,R2               ; R2 = threshold_high
+00A5E6: 645D  extu.w R5,R4
+00A5E8: 622D  extu.w R2,R2
+00A5EA: 3423  cmp/ge R2,R4               ; filtered >= high?
+00A5EC: 8F02  bf/s   0x00A5F4
+00A5EE: 0009  nop
+00A5F0: A009  bra    0x00A606
+00A5F2: E401  mov    #1,R4                ; range = 1
+00A5F4: D00F  mov.l  @(0x00A634),R0       ; 0x000D8A8A (threshold_low)
+00A5F6: 6201  mov.w  @R0,R2
+00A5F8: 622D  extu.w R2,R2
+00A5FA: 3423  cmp/ge R2,R4               ; filtered >= low?
+00A5FC: 8D02  bt/s   0x00A604
+00A5FE: 0009  nop
+00A600: A001  bra    0x00A606
+00A602: E402  mov    #2,R4                ; range = 2
+00A604: E400  mov    #0,R4                ; range = 0
+00A606: 000B  rts
+00A608: 6043  mov    R4,R0                ; return range
+
+Literal pool:
+  0x00A630: 0x000D8A88  (MAP range threshold high)
+  0x00A634: 0x000D8A8A  (MAP range threshold low)
+
+
+================================================================================
+SECTION 8: IIR FILTER @ 0x0BEA6C
+================================================================================
+
+filtered = old + (new - old) * coeff/65536
+Inputs: R4 = new (uint16), R5 = old (uint16), R6 = coeff (uint16)
+Output: R0 = filtered (uint16)
+
+0BEA6C: C709  mova   @(0x0BEA94),R0       ; 0x3B800000 (1/65536)
+0BEA6E: F19D  fldi1  FR1                   ; FR1 = 1.0
+0BEA70: F208  fmov.s @R0,FR2              ; FR2 = 1/65536
+0BEA72: 666D  extu.w R6,R6
+0BEA74: 465A  lds    R6,FPUL              ; FPUL = coeff
+0BEA76: F32D  float  FPUL,FR3             ; FR3 = (float)coeff
+0BEA78: F322  fmul   FR2,FR3              ; FR3 = coeff/65536 (alpha)
+0BEA7A: F131  fsub   FR3,FR1              ; FR1 = 1 - alpha
+0BEA7C: 455A  lds    R5,FPUL              ; FPUL = old
+0BEA7E: F32D  float  FPUL,FR3             ; FR3 = (float)old
+0BEA80: 445A  lds    R4,FPUL              ; FPUL = new
+0BEA82: F02D  float  FPUL,FR0             ; FR0 = (float)new
+0BEA84: F301  fsub   FR0,FR3              ; FR3 = old - new
+0BEA86: F132  fmul   FR3,FR1              ; FR1 = (old - new) * (1 - alpha)
+0BEA88: F13D  ftrc   FR1,FPUL             ; truncate to int
+0BEA8A: 035A  sts    FPUL,R3
+0BEA8C: 343C  add    R3,R4                ; R4 = new + (old-new)*(1-alpha)
+0BEA8E: 000B  rts                          ;    = old + (new-old)*alpha
+0BEA90: 6043  mov    R4,R0
+
+Literal pool:
+  0x0BEA94: 0x3B800000  (1/65536 ≈ 0.0000153)
+
+
+================================================================================
+SECTION 9: uint16_to_float_scale @ 0x0BE598
+================================================================================
+
+Converts uint16 ADC value to float, with scaling.
+FR4 = scale factor, FR5 = min clamp
+Input: R4 = uint16 raw value
+Output: FR0 = scaled float
+
+0BE598: 644D  extu.w R4,R4
+0BE59A: 445A  lds    R4,FPUL              ; FPUL = raw
+0BE59C: F32D  float  FPUL,FR3             ; FR3 = (float)raw
+0BE59E: F04C  fmov   FR4,FR0              ; FR0 = scale (passed in FR4)
+0BE5A0: F53E  fmac   FR0,FR3,FR5          ; FR5 = FR5 + raw * scale
+                                           ;      = min + raw * scale
+0BE5A2: 000B  rts
+0BE5A4: F05C  fmov   FR5,FR0              ; return FR0 = result
+
+
+================================================================================
+SECTION 10: MAF SENSOR DESCRIPTOR @ 0x0AF45C
+================================================================================
+
+Raw descriptor words:
+  word[0]: 0x00360000  (count=54, type=0 [float axis, float data])
+  word[1]: 0x000D8BC4  (MAF_Sensor axis pointer)
+  word[2]: 0x000D8C9C  (MAF_Sensor_Scaling data pointer)
+  word[3]: 0x000D0000  (next descriptor chain link control)
+  word[4]: 0x000D8D74  (Front O2 sensor table — next in chain)
+
+Structure:
+  Type: Pull3DFloat (1D interpolation, float axis, float output)
+  Input: ADDR15 raw ADC (0xFFFF4042, uint16)
+  Axis: 54 voltage breakpoints (0.898V .. 5.000V) @ 0x0D8BC4
+  Data: 54 airflow values (1.098 .. 375.347 g/s) @ 0x0D8C9C
+  Output: 0xFFFF40B4 (float, g/s)

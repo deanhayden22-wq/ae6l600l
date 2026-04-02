@@ -1,0 +1,512 @@
+================================================================================
+MAF SCALING — COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+================================================================================
+
+
+OVERVIEW
+--------
+The MAF (Mass Airflow) sensor is the primary airflow measurement for this
+ECU. There is no speed-density fallback — the MAF sensor drives all fueling,
+ignition, boost, and knock calculations. This document traces the complete
+signal path from hardware ADC through scaling, correction, and integration
+into the fueling pipeline.
+
+Signal flow summary:
+  ADC ADDR15 (raw uint16) -> Pull3DFloat descriptor -> g/s (float)
+  -> corrections (IAT, limit) -> per-channel integration -> load (g/rev)
+  -> fueling pipeline, ignition, knock, boost
+
+
+================================================================================
+SECTION 1: HARDWARE ADC ACQUISITION
+================================================================================
+
+The MAF sensor voltage is sampled on ADC channel ADDR15 (Group 1).
+
+  Hardware register:  0xFFFFF826 (SH7058 ADC ADDR15)
+  Bulk reader:        0x040DE (reads all 32 channels)
+  Raw storage:        0xFFFF4042 (uint16, GBR+0x1E)
+  Filter:             NONE (MAF has no IIR filter — direct pass-through)
+  Conversion:         Via descriptor 0x0AF45C (Pull3DFloat)
+  Output:             0xFFFF40B4 (float, g/s)
+
+Unlike most other sensor channels (ECT, IAT, MAP, O2, battery), the MAF
+channel has no IIR filter applied to the raw ADC value. The raw uint16
+is passed directly to the descriptor interpolation. This is intentional —
+the MAF signal needs fast transient response for accurate load tracking.
+
+  +------------------+     +------------------+     +------------------+
+  | SH7058 ADC       |     | Bulk Reader      |     | Descriptor       |
+  | ADDR15 register  | --> | 0x040DE          | --> | 0x0AF45C         |
+  | 0xFFFFF826       |     | -> 0xFFFF4042    |     | Pull3DFloat      |
+  | (analog voltage) |     | (uint16 raw)     |     | -> 0xFFFF40B4    |
+  +------------------+     +------------------+     | (float, g/s)     |
+                                                    +------------------+
+
+
+================================================================================
+SECTION 2: MAF SENSOR TRANSFER FUNCTION
+================================================================================
+
+The voltage-to-airflow conversion uses a 54-point 1D interpolation table.
+
+Descriptor @ 0x0AF45C:
+  word[0]: 0x00360000  (54 entries, type 0 = float/float)
+  word[1]: 0x000D8BC4  (axis pointer — voltage breakpoints)
+  word[2]: 0x000D8C9C  (data pointer — airflow values)
+
+The descriptor engine (Pull3DFloat) performs linear interpolation between
+adjacent breakpoints. Input is the raw uint16 ADC value, which represents
+sensor voltage after the ADC's internal conversion.
+
+MAF_Sensor Axis (voltage, V) @ 0x0D8BC4:
+  54 float breakpoints spanning 0.898V to 5.000V
+
+MAF_Sensor_Scaling (airflow, g/s) @ 0x0D8C9C:
+  54 float values spanning 1.098 to 375.347 g/s
+
+Transfer function (selected points):
+  ┌──────────┬──────────────┐
+  │ Voltage  │ Airflow g/s  │
+  ├──────────┼──────────────┤
+  │  0.898   │    1.098     │  (idle/decel)
+  │  1.015   │    1.657     │
+  │  1.250   │    3.694     │
+  │  1.563   │    7.809     │
+  │  1.875   │   14.396     │
+  │  2.188   │   24.145     │
+  │  2.539   │   39.807     │
+  │  2.891   │   59.712     │
+  │  3.125   │   77.562     │
+  │  3.477   │  110.912     │
+  │  3.828   │  153.225     │
+  │  4.063   │  187.029     │
+  │  4.297   │  225.751     │
+  │  4.492   │  262.056     │
+  │  4.688   │  302.275     │
+  │  4.883   │  346.640     │
+  │  5.000   │  375.347     │  (WOT/max flow)
+  └──────────┴──────────────┘
+
+The curve is nonlinear — airflow increases exponentially with voltage.
+This matches the characteristics of a hot-wire MAF sensor where the
+relationship between voltage and mass flow is approximately exponential.
+
+Output is stored to 0xFFFF40B4 as a 32-bit IEEE float in g/s.
+This address has only 2 consumers — it feeds into the intake processing
+pipeline (Sections 3-4) where it propagates to the widely-used
+0xFFFF6254 (51 refs) and 0xFFFF620C (43 refs).
+
+
+================================================================================
+SECTION 3: TIMING AND PERIODIC RECALCULATION
+================================================================================
+
+MAF processing runs on two nested prescalers within Task 9 (20ms base):
+
+  PRESCALER 1: maf_timer_prescaler @ 0x0CBAC
+  ─────────────────────────────────────────────
+  Counter: 0xFFFF447A (byte)
+  Period:  4 ticks × 20ms = 80ms
+  Action:  Reloads 9 intake/MAF timer channels via timer_reload(0xCA72)
+  Channels reloaded: 0, 1, 2, 4, 8, 9, 10, 12
+
+  PRESCALER 2: intake_tick_counter @ 0x09A58
+  ─────────────────────────────────────────────
+  Counter: 0xFFFF42F8 (byte)
+  Period:  16 ticks × 20ms = 320ms
+  Action:  Calls full_maf_recalc @ 0x0A470
+
+  Timing chain:
+    Task 9 scheduler tick (20ms)
+     ├── 0x0CBAC: timer reload every 80ms (syncs ADC sampling)
+     └── 0x09A58: full recalc every 320ms
+          └── 0x0A470: 4-channel intake processing loop
+
+
+================================================================================
+SECTION 4: FULL MAF/INTAKE RECALCULATION (0x0A470)
+================================================================================
+
+The main recalculation loop processes 4 intake channels every 320ms.
+
+  Loop structure:
+    for channel_index = 0..3:
+      workspace_alloc(224 bytes)
+      if workspace[ch].descriptor_ptr != NULL:
+        new_count = get_channel_count(ch_index)    ; 0xA55E
+        clamp(new_count, upper_limit)
+        process_channel(ch_index, new_count)       ; 0xA4E0
+      workspace_free()
+
+  Intake channel table @ 0x011A7C (12-byte stride):
+    ┌─────┬──────────────┬──────────────┬────────────┐
+    │ Ch  │ Raw Input    │ Output       │ Mask       │
+    ├─────┼──────────────┼──────────────┼────────────┤
+    │  0  │ 0xFFFFF640   │ 0xFFFFF444   │ 0x00010000 │
+    │  1  │ 0xFFFFF642   │ 0xFFFFF446   │ 0x00020000 │
+    │  2  │ 0xFFFFF644   │ 0xFFFFF448   │ 0x00040000 │
+    │  3  │ 0xFFFFF646   │ 0xFFFFF44A   │ 0x00080000 │
+    └─────┴──────────────┴──────────────┴────────────┘
+
+  Workspace: 0xFFFF4284 (base), 28 bytes per channel
+    +0x00: raw value (int)
+    +0x04: delta from filtered_charge (float)
+    +0x10: descriptor pointer
+    +0x17: valid flag (byte)
+
+  Per-channel processing (0x09A72):
+    1. Call descriptor_dispatch(group=16) to process sensor reading
+    2. Compute delta = new_value - filtered_charge (0xFFFF4168)
+    3. Apply rate limiting:
+       - Negative rate limit: -60.0 g/s per cycle (decel protection)
+       - Positive rate limit: +720.0 g/s per cycle (accel response)
+       - If delta exceeds 660.0, allow unclamped (WOT snap)
+    4. If delta < 35.0, trigger full recalculation (0x9F72)
+    5. Store processed result via descriptor store (0x3190)
+
+
+================================================================================
+SECTION 5: MAP/BAROMETRIC PRESSURE (inline @ 0x0A594)
+================================================================================
+
+Immediately following the MAF channel loop, MAP sensor processing runs:
+
+  1. Copy raw MAP (ADDR14, 0xFFFF4040) -> 0xFFFF4300
+  2. Apply IIR filter (coeff=256, ~256 samples to settle)
+     filtered = old + (new - old) * 256/65536
+     Filter routine: 0xBEA6C
+  3. Convert to float: normalized = filtered * (1/32768)
+  4. Compute barometric pressure:
+     baro = -414.0 + normalized * 514.2
+     Output: 0xFFFF42FC (baro_pressure, float, mmHg)
+
+  The barometric pressure feeds into altitude compensation for MAF
+  correction and is also used by the boost control system.
+
+  MAP Range Classification (0x0A5DE):
+    Thresholds at 0x0D8A88/0x0D8A8A classify MAP into ranges 0, 1, 2
+    for downstream mode selection.
+
+
+================================================================================
+SECTION 6: MAF CORRECTIONS AND COMPENSATION
+================================================================================
+
+After the raw MAF signal is converted to g/s, several corrections
+are applied before the value reaches the fueling pipeline:
+
+  A. IAT COMPENSATION (0x0C3BB0)
+  ─────────────────────────────────
+  Category: Mass Airflow
+  Type: 2D table, indexed by MAF (g/s)
+  Y-axis (airflow breakpoints, g/s):
+    1.6, 2.5, 5.0, 10.0, 20.0, 90.0, 170.0, 290.0
+  Data: Compensation offset (g/s)
+    Stock: All -0.0 for low airflow (< 20 g/s)
+           Ramps to 210..460 at high airflow (170-290 g/s)
+
+  Purpose: Corrects for air density changes with intake temperature.
+  The stock calibration applies zero correction at low loads and
+  progressively larger corrections at high loads where IAT has
+  more impact on mass flow accuracy.
+
+  B. MAF LIMIT (MAXIMUM) (0x0C3100)
+  ─────────────────────────────────
+  Clamp value: 300.0 g/s (at 0x0C3100)
+  Additional parameters at this address:
+    Scale factors: 1.0, 0.5, 1.0
+    Rate params: 0.0017, 0.1013, 2.3, 0.1
+    CL threshold: 70.0 g/s (at +0x38)
+    RPM limit: 4400.0 (at +0x3C)
+
+  The 300 g/s clamp prevents erroneous high readings from causing
+  dangerously rich fueling. On a stock 2013 WRX (TD04 turbo),
+  peak airflow is approximately 200-250 g/s at redline.
+
+  C. MAF CORRECTION FACTOR (0xFFFF41DC)
+  ─────────────────────────────────
+  RAM float applied as a multiplier to the MAF reading.
+  Scale factor from ROM @ 0x0D2CBC: 0.75
+  Used in ignition timing correction (Task 39, 0x42B90).
+
+  D. BAROMETRIC CORRECTION
+  ─────────────────────────────────
+  Baro pressure (0xFFFF42FC) from Section 5 provides altitude
+  compensation. The ECU uses atmospheric pressure to adjust
+  expected MAF readings at altitude, preventing lean conditions.
+
+
+================================================================================
+SECTION 7: KEY RAM VARIABLES
+================================================================================
+
+  ┌──────────────┬───────────┬──────┬──────────────────────────────────────┐
+  │ Address      │ Type      │ Refs │ Description                          │
+  ├──────────────┼───────────┼──────┼──────────────────────────────────────┤
+  │ 0xFFFF4042   │ uint16    │    - │ Raw ADC ADDR15 (MAF voltage)         │
+  │ 0xFFFF40B4   │ float     │    2 │ MAF descriptor output (g/s)          │
+  │ 0xFFFF4168   │ float     │    - │ Filtered charge accumulator          │
+  │ 0xFFFF41DC   │ float     │    - │ MAF correction factor                │
+  │ 0xFFFF4284   │ struct    │    - │ Intake workspace base (4 × 28 bytes) │
+  │ 0xFFFF4294   │ uint32[4] │    - │ Intake channel accumulators          │
+  │ 0xFFFF42F8   │ byte      │    - │ Intake tick counter (320ms prescaler)│
+  │ 0xFFFF42FC   │ float     │    - │ Barometric pressure (mmHg)           │
+  │ 0xFFFF4300   │ uint16    │    - │ MAP filtered accumulator             │
+  │ 0xFFFF447A   │ byte      │    - │ MAF prescaler counter (80ms)         │
+  │ 0xFFFF447B   │ byte      │    8 │ MAF timer channel counter            │
+  │ 0xFFFF6228   │ float     │   22 │ MAF sensor voltage (float, V)        │
+  │ 0xFFFF620C   │ float     │   43 │ Current airflow (g/s) — accel enrich │
+  │ 0xFFFF6254   │ float     │   51 │ MAF current (g/s) — primary variable │
+  │ 0xFFFF6350   │ float     │  90+ │ Engine RPM                           │
+  │ 0xFFFF7A60   │ float     │    1 │ Current engine load (g/rev)          │
+  └──────────────┴───────────┴──────┴──────────────────────────────────────┘
+
+  Variable propagation:
+    0xFFFF40B4 (descriptor output, 2 consumers)
+     ├── 0xFFFF6254 (maf_current, 51 consumers)
+     │    ├── Base fuel map selection (0x30ACC)
+     │    ├── Major correction aggregator (0x3160A)
+     │    ├── AFL airflow processor (0x34EC8)
+     │    ├── CL/OL transition logic
+     │    ├── Ignition timing tasks (30-50)
+     │    ├── Knock detection tasks (2-7, 10, 16, 20-21)
+     │    └── Boost/WG control (tasks 51-52)
+     │
+     └── 0xFFFF620C (airflow_maf_current, 43 consumers)
+          ├── Acceleration enrichment (0x37B74)
+          ├── Transient fuel compensation (0x37186)
+          ├── Overrun fuel cutoff (0x3EB8C)
+          ├── Idle control
+          └── EGR control (task 57)
+
+
+================================================================================
+SECTION 8: AIRFLOW-TO-LOAD CONVERSION
+================================================================================
+
+Engine load (g/rev) is derived from MAF (g/s) using RPM:
+
+  load (g/rev) = MAF (g/s) × K / RPM
+
+The load value at 0xFFFF7A60 has only 1 literal pool reference
+(at 0x037408), placing it within the tau-alpha / transient fuel
+compensation subsystem (0x3740C). This function reads:
+
+  0xFFFF3194: accumulated charge (float)
+  0xFFFF8EAC: engine state variable
+  0xFFFF7A74: A/F ratio target
+
+  At 0x3740C:
+    if engine_state == 1 AND af_target flag clear:
+      if accumulated_charge > threshold (0xCC2B0):
+        load = 0.0 (fuel cut condition)
+      else:
+        load = accumulated_charge + delta(0xFFFF7A54)
+    store result -> 0xFFFF3194
+    write state -> 0xFFFF7A74
+
+The per-revolution charge integration happens upstream in the intake
+channel processing (Section 4), where raw MAF counts are accumulated
+per engine revolution using the crank timing signals. The channel
+table at 0x011A7C reads from crank-synchronized counters
+(0xFFFFF640-F646) that capture MAF ADC samples per revolution.
+
+The 4 intake channels correspond to the 4 cylinders, with the
+accumulation mask bits (0x0001, 0x0002, 0x0004, 0x0008) in the
+channel table selecting which crank window each channel measures.
+
+
+================================================================================
+SECTION 9: INTEGRATION WITH FUELING PIPELINE
+================================================================================
+
+MAF feeds into the fueling pipeline at multiple dispatch table entries:
+
+  fuel_dispatch_table_A @ 0x480B8:
+  ─────────────────────────────────
+  [5]  0x34488  AFL sub-dispatcher — uses MAF for learning range
+  [7]  0x34EC8  AFL airflow processor — reads 0xFFFF6254
+  [9]  0x36A98  CL/OL hysteresis — MAF thresholds gate transitions
+  [15] 0x38158  Main IPW calc — WOT thresholds from MAF limit
+
+  fuel_dispatch_table_B @ 0x4A0B8:
+  ─────────────────────────────────
+  [5]  0x3160A  Major correction aggregator — RPM/MAF/lambda/enrichment
+  [9]  0x30ACC  Base fuel map combiner — load from MAF -> base PW
+  [12] 0x3452A  AFL core entry — airflow range selection
+  [16] 0x37186  Transient fuel comp — load rate from MAF delta
+  [18] 0x3EB8C  Overrun fuel cutoff — MAF threshold check
+
+  AFL airflow range breakpoints @ 0x0CC074:
+    Range 0:  < 5.6 g/s   (idle)
+    Range 1:  5.6 - 10.0 g/s  (light cruise)
+    Range 2:  10.0 - 50.0 g/s (part throttle)
+    Range 3:  > 50.0 g/s  (heavy load / boost)
+
+  Learning rate (from 0x34CC8):
+    < 35 g/s:  88 scheduler ticks between updates (slow learn)
+    >= 35 g/s: 244 scheduler ticks (very slow learn at high flow)
+
+  CL/OL MAF thresholds:
+    CL learning enable: 70.0 g/s (0x0CC020)
+    CL hysteresis ON:   1000.0 g/s (0x0CBE70) [effectively disabled]
+    CL hysteresis OFF:  1100.0 g/s (0x0CBE74) [effectively disabled]
+
+  Map switching MAF thresholds:
+    Load threshold:     2.0 g/rev (0x0D2A10)
+    MAF threshold A:    60.0 g/s (0x0D2A68)
+    MAF threshold B:    0.0 g/s (0x0D2A6C)
+
+
+================================================================================
+SECTION 10: IGNITION AND KNOCK INTEGRATION
+================================================================================
+
+MAF drives the load axis for ignition timing and knock control:
+
+  Ignition tasks using MAF:
+    Task 30 (0x3FCA2):  Base timing lookup — RPM × MAF × ECT
+    Task 34 (0x40516):  Throttle compensation — MAF voltage
+    Task 36 (0x0415B8): Per-condition timing — RPM × MAF
+    Task 37 (0x0419BA): Multi-axis timing — RPM × MAF
+    Task 38 (0x042A78): Ignition output — RPM × MAF
+    Task 39 (0x042B90): MAF correction — uses 0xFFFF41DC × 0.75 scale
+    Task 44 (0x04317A): Timing lookup A — RPM × MAF
+    Task 45 (0x0431B0): Timing lookup B — RPM × MAF
+    Task 49 (0x03F00C): Base timing advance — RPM × MAF × load
+    Task 50 (0x03F368): Timing blend — RPM × MAF
+
+  Knock tasks using MAF:
+    Task 2  (0x045098): Knock window setup — MAF threshold
+    Task 4  (0x0455E6): Knock threshold config — MAF sensitivity
+    Task 5  (0x04530A): Knock detection — MAF + IAM
+    Task 10 (0x0448F4): Knock config dispatcher — RPM × MAF
+    Task 16 (0x045BBC): FLKC pre-process — MAF
+    Task 20 (0x0459F6): Knock window update — MAF
+    Task 21 (0x0467AE): Per-cylinder knock window — MAF
+
+
+================================================================================
+SECTION 11: MAF DIAGNOSTICS (Task 58)
+================================================================================
+
+  Entry: 0x06F0B8
+  DTC codes:
+    P0101 @ 0x9A7AC: MAF Sensor Range/Performance
+    P0102 @ 0x9A773: MAF Sensor Low Input
+    P0103 @ 0x9A774: MAF Sensor High Input
+    P0068 @ 0x9ACD0: MAP/MAF Correlation
+
+  Diagnostic RAM:
+    0xFFFF96A4: maf_diag_state (flag, enable, counter, index)
+    0xFFFF96A8: maf_diag_extended
+    0xFFFF96AC: maf_hw_fault_A
+    0xFFFF96AE: maf_hw_fault_B
+
+  Hardware fault detection:
+    Port status register 0xF754, bits 0x20/0x40 = MAF fault lines
+
+  Preconditions:
+    - Engine run time >= 125 seconds
+    - IAT within threshold (0x0D8B14)
+    - Load within threshold (0x0D8B18)
+    - Maturation counter exceeds threshold (0x0D8A40)
+
+
+================================================================================
+SECTION 12: CALIBRATION TABLE SUMMARY
+================================================================================
+
+  ┌──────────┬──────────────────────────────────────┬──────────────┐
+  │ Address  │ Name                                 │ Stock Value  │
+  ├──────────┼──────────────────────────────────────┼──────────────┤
+  │ 0x0D8BC4 │ MAF Sensor (voltage axis, 54 pts)    │ 0.898-5.000V │
+  │ 0x0D8C9C │ MAF Sensor Scaling (54 pts)           │ 1.1-375.3g/s │
+  │ 0x0C3100 │ MAF Limit (Maximum)                  │ 300.0 g/s    │
+  │ 0x0C3BB0 │ MAF Compensation (IAT)               │ see Sec 6    │
+  │ 0x0CC074 │ AFL Airflow Range Breakpoints         │ 5.6/10/50/80 │
+  │ 0x0CC020 │ CL MAF Threshold                     │ 70.0 g/s     │
+  │ 0x0D2CBC │ MAF Correction Scale                  │ 0.75         │
+  │ 0x0D2A10 │ Map Switch MAF/Load Threshold         │ 2.0 g/rev    │
+  │ 0x0D2A68 │ Map Switch MAF Threshold A            │ 60.0 g/s     │
+  │ 0x0D2A6C │ Map Switch MAF Threshold B            │ 0.0 g/s      │
+  │ 0x0D8AD8 │ Baro Scale Factor                    │ 514.2        │
+  │ 0x0D8ADC │ Baro Offset                          │ -414.0       │
+  │ 0x0C00B8 │ MAP IIR Filter Coefficient            │ 0x0100 (256) │
+  └──────────┴──────────────────────────────────────┴──────────────┘
+
+
+================================================================================
+SECTION 13: COMPLETE SIGNAL PATH DIAGRAM
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  HARDWARE                                                          │
+  │  MAF Sensor (hot-wire) -> analog voltage -> ADC ADDR15             │
+  │  0xFFFFF826 hardware register                                      │
+  └───────────────────────────────┬─────────────────────────────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │  Bulk ADC Reader (0x040DE) │
+                    │  0xFFFF4042 (uint16 raw)   │
+                    │  NO IIR filter applied     │
+                    └─────────────┬─────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │  Descriptor 0x0AF45C       │
+                    │  Pull3DFloat interpolation │
+                    │  54-point V -> g/s table   │
+                    │  Axis: 0x0D8BC4            │
+                    │  Data: 0x0D8C9C            │
+                    │  0xFFFF40B4 (float, g/s)   │
+                    └─────────────┬─────────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              │                   │                   │
+    ┌─────────▼─────────┐  ┌─────▼──────────┐  ┌─────▼──────────┐
+    │  MAF Limit         │  │ IAT Comp       │  │ Baro Comp      │
+    │  Clamp: 300 g/s   │  │ Table 0xC3BB0  │  │ via 0xFFFF42FC │
+    │  @ 0x0C3100       │  │ f(MAF, IAT)    │  │ altitude adj   │
+    └─────────┬─────────┘  └─────┬──────────┘  └─────┬──────────┘
+              │                   │                   │
+              └───────────────────┼───────────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │  Intake Channel Loop       │
+                    │  0xA470 (every 320ms)      │
+                    │  4 channels × 28-byte WS   │
+                    │  Rate-limited integration  │
+                    │  ±720 g/s per cycle        │
+                    └─────────────┬─────────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              │                   │                   │
+    ┌─────────▼─────────┐  ┌─────▼──────────┐  ┌─────▼──────────┐
+    │ 0xFFFF6254         │  │ 0xFFFF620C     │  │ 0xFFFF6228     │
+    │ maf_current (g/s) │  │ airflow_maf    │  │ maf_voltage    │
+    │ 51 consumers      │  │ 43 consumers   │  │ 22 consumers   │
+    └─────────┬─────────┘  └─────┬──────────┘  └────────────────┘
+              │                   │
+    ┌─────────▼─────────┐  ┌─────▼──────────┐
+    │ FUELING PIPELINE   │  │ TRANSIENT      │
+    │ Base fuel (0x30ACC)│  │ Accel enrich   │
+    │ AFL (0x34EC8)     │  │ (0x37B74)      │
+    │ CL/OL (0x36A98)  │  │ Tip-in (37186) │
+    │ IPW calc (38158)  │  │ Fuel cut(3EB8C)│
+    ├───────────────────┤  └────────────────┘
+    │ IGNITION          │
+    │ Base timing       │
+    │ Per-condition     │
+    │ MAF correction    │
+    ├───────────────────┤
+    │ KNOCK CONTROL     │
+    │ Window setup      │
+    │ Threshold config  │
+    │ FLKC feedback     │
+    ├───────────────────┤
+    │ BOOST CONTROL     │
+    │ WG target (54852) │
+    │ Feedback (549FA)  │
+    └───────────────────┘

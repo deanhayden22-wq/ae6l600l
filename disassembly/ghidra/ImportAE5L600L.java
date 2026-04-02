@@ -8,8 +8,9 @@
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
-// Verified against Ghidra 12.0.2 SH-2 export. 2827 label operations total.
-// Includes: original 884+1010, 463 RomRaider cal table labels, 125 RAM labels.
+// Verified against Ghidra 12.0.2 SH-2 export. 2846 label operations total.
+// Includes: original 884+1010, 463 RomRaider cal table labels, 125 RAM labels,
+// 19 MAF scaling path labels (functions, descriptors, RAM, calibration).
 //
 //@author  AE5L600L disassembly project
 //@category Data
@@ -2987,6 +2988,81 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0000CBACL, "maf_timer_prescaler",
             "Task 9: reloads 9 timer channels (IDs 0,1,2,4,8,9,10,12) via "
             + "timer_reload(0xCA72) every 4th tick (80ms). Counter at FFFF447A.");
+
+        // MAF scaling path — functions traced in maf_scaling_analysis.txt
+        count += labelComment(0x0000A470L, "full_maf_recalc",
+            "Full MAF/intake recalculation loop (every 320ms from 0x9A58). "
+            + "Iterates 4 intake channels (table @ 0x11A7C, 12-byte stride). "
+            + "Workspace: FFFF4284, 28 bytes/channel. Calls 0xA55E (get_channel_count) "
+            + "and 0xA4E0 (process_channel). Allocs 224-byte workspace per iteration.");
+        count += labelComment(0x0000A4E0L, "maf_process_channel",
+            "Per-channel intake processing. Clamps count to 0xFFFF, computes "
+            + "remainder, calls descriptor interpolation (0x11848) and stores "
+            + "accumulator result to FFFF4294[ch].");
+        count += labelComment(0x0000A55EL, "maf_get_channel_count",
+            "Reads raw crank-synced MAF count from intake channel table (0x11A7C) "
+            + "and adds to accumulator at FFFF4294[ch]. Returns new total count.");
+        count += labelComment(0x00009A72L, "intake_channel_processor",
+            "Per-channel intake processor. Descriptor dispatch(group=16), computes "
+            + "delta from filtered_charge (FFFF4168), applies rate limiting "
+            + "(±720 g/s, decel limit -60 g/s). Recalc threshold: 35.0. "
+            + "Workspace stride 28 bytes at FFFF4284.");
+        count += labelComment(0x0000A594L, "map_baro_processing",
+            "MAP sensor processing (ADDR14). Copies raw MAP (FFFF4040->FFFF4300), "
+            + "applies IIR filter (coeff=256 @ C00B8), then computes barometric "
+            + "pressure: baro = -414.0 + normalized * 514.2. Output: FFFF42FC (float, mmHg).");
+        count += labelComment(0x0000A5DEL, "map_range_classify",
+            "MAP range classifier. Thresholds at D8A88/D8A8A, returns range 0/1/2.");
+
+        // MAF scaling — intake channel table
+        count += labelComment(0x00011A7CL, "intake_channel_table",
+            "Intake channel table (4 entries, 12-byte stride). Per-channel: "
+            + "raw_ptr (crank-synced counter), out_ptr, mask. "
+            + "Ch0: F640/F444/0x10000, Ch1: F642/F446/0x20000, "
+            + "Ch2: F644/F448/0x40000, Ch3: F646/F44A/0x80000.");
+        count += labelComment(0x00011848L, "descriptor_interpolation",
+            "Descriptor-based 1D interpolation. Allocs 224-byte workspace, "
+            + "calls 0xBE81C/0xBE82C. Used by MAF and other sensor channels.");
+
+        // MAF scaling — descriptor
+        count += labelComment(0x000AF45CL, "desc_MAF_Sensor",
+            "MAF sensor descriptor (Pull3DFloat). 54-point voltage->g/s table. "
+            + "Axis: 0x0D8BC4 (0.898-5.000V), Data: 0x0D8C9C (1.1-375.3 g/s). "
+            + "Input: ADDR15 raw (FFFF4042). Output: FFFF40B4 (float, g/s).");
+
+        // MAF scaling — baro constants
+        count += labelComment(0x000D8AD8L, "cal_baro_scale",
+            "Barometric pressure scale factor (float, 514.2). "
+            + "Used in baro calc: baro = -414.0 + normalized_MAP * 514.2.");
+        count += labelComment(0x000D8ADCL, "cal_baro_offset",
+            "Barometric pressure offset (float, -414.0). "
+            + "Used in baro calc at 0xA5C8.");
+
+        // MAF scaling — RAM variables
+        count += labelComment(0xFFFF4042L, "pMafSensorVoltage",
+            "Raw MAF sensor ADC value (uint16). ADDR15 channel. "
+            + "No IIR filter — direct pass-through to descriptor 0xAF45C.");
+        count += labelComment(0xFFFF40B4L, "maf_raw_gs",
+            "MAF descriptor output (float, g/s). From Pull3DFloat interp of "
+            + "54-point table. Only 2 direct consumers — feeds FFFF6254 and FFFF620C.");
+        count += labelComment(0xFFFF4168L, "filtered_charge",
+            "Filtered charge accumulator (float). Reference for intake channel "
+            + "delta computation in rate-limited MAF processing (0x9A72).");
+        count += labelComment(0xFFFF42FCL, "baro_pressure",
+            "Barometric pressure (float, mmHg). Computed from filtered MAP: "
+            + "baro = -414.0 + normalized * 514.2. Used for altitude compensation.");
+        count += labelComment(0xFFFF447AL, "maf_prescale_counter",
+            "MAF prescaler counter (byte). Increments each 20ms tick. "
+            + "Resets at 4 (80ms period) to reload timer channels via 0xCA72.");
+        count += labelComment(0xFFFF4294L, "intake_accumulator_base",
+            "Intake channel accumulator array (4 × uint32). Per-channel running "
+            + "total of crank-synced MAF ADC counts. Base for A470 loop.");
+        count += labelComment(0xFFFF4300L, "map_filtered_accum",
+            "MAP sensor filtered accumulator (uint16). IIR filtered from "
+            + "ADDR14 raw (FFFF4040). Coeff 256/65536. Input to baro calc.");
+        count += labelComment(0xFFFF7A60L, "current_load_grev",
+            "Current engine load (float, g/rev). Derived from MAF g/s "
+            + "via per-revolution charge integration. Single literal ref at 0x37408.");
 
         count += labelComment(0x0000FC04L, "fuel_system_init",
             "Task 9 fuel vtable initialization. Writes 0xFB0 to FFFF5B64, "
