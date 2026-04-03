@@ -1,0 +1,1027 @@
+================================================================================
+SENSOR DIAGNOSTIC SUBSYSTEMS -- COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2)
+================================================================================
+
+
+OVERVIEW
+--------
+Three interconnected subsystems handle sensor-level diagnostics: two dispatcher
+frameworks that coordinate sensor monitoring and DTC evaluation, and a
+rationality checker that cross-validates sensor readings against physical
+expectations. These feed into a shared EEPROM adaptation persistence layer
+that stores learned correction values with hysteresis-protected writes.
+
+Architecture:
+  1. Sensor Diagnostic Dispatcher 1 (0x071A76) -- DISABLED stub
+     Real body at 0x071ABA: 13 sub-function dispatch chain with FPU-heavy
+     sensor computation, float clamping, and DTC monitor pairs
+  2. Sensor Diagnostic Dispatcher 2 (0x07D526) -- ACTIVE
+     Catalyst/O2 sensor monitor with 20+ qualification conditions,
+     fuel trim cross-checks, and multi-channel maturation counters
+  3. Sensor Rationality Check (0x07CB30)
+     4-channel sensor baseline validation against MAP-derived bounds,
+     with debounced fault detection and DTC dispatch
+  4. EEPROM Adaptation Persistence (0x071224, 0x0717EC, 0x07B7A8)
+     Hysteresis-protected write controller for sensor correction values
+
+
+================================================================================
+SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- FUN_071A76
+================================================================================
+
+  Entry Point and Stub
+  -----------------------------------------------------------------------
+  The nominal entry at 0x071A76 is a DISABLED stub:
+
+    0x071A76:  rts          ; return immediately
+    0x071A78:  nop          ; delay slot
+
+  This means the dispatcher is currently inactive. It was likely disabled
+  during development or is conditionally patched elsewhere. The real
+  dispatcher body follows at FUN_071ABA.
+
+
+  FUN_071ABA -- Main Dispatcher Body
+  -----------------------------------------------------------------------
+  Entry point: 0x071ABA
+  Size: ~62 bytes (dispatcher shell)
+  Prologue: sts.l PR,@-R15
+
+  Disassembly excerpt (dispatch chain):
+
+    0x071ABA:  sts.l   PR, @-R15        ; save return address
+    0x071ABC:  mov.b   @(R0,GBR), R0    ; read FFFF7C9F
+    0x071ABE:  mov.b   R0, @(disp,GBR)  ; store to FFFF97CC
+    0x071AC0:  bsr     0x072584         ; sensor data acquisition A
+    0x071AC2:  nop
+    0x071AC4:  bsr     0x0724C8         ; sensor data acquisition B
+    0x071AC6:  nop
+    0x071AC8:  bsr     0x071B58         ; sensor computation (FPU-heavy)
+    ...
+    0x071AD0:  bsr     0x071D08         ; float clamp A
+    0x071AD4:  bsr     0x071D14         ; float clamp B
+    0x071AD8:  bsr     0x071D92         ; interpolation
+    0x071ADC:  bsr     0x071F48         ; DTC monitor set/clear pair 1
+    0x071AE0:  bsr     0x07200C         ; DTC monitor set/clear pair 2
+    0x071AE4:  bsr     0x072066         ; DTC monitor set/clear pair 3
+    0x071AE8:  bsr     0x072108         ; DTC monitor 4
+    0x071AEC:  bsr     0x072218         ; DTC monitor 5
+    0x071AF0:  bsr     0x072272         ; DTC monitor 6
+    0x071AF4:  bsr     0x072314         ; EEPROM storage
+    0x071AF8:  bra     0x0723AC         ; tail-call: final handler
+
+  Call Graph:
+
+    FUN_071A76 (DISABLED entry -- rts/nop)
+     |
+     +-- FUN_071ABA (real dispatcher)
+     |    |
+     |    +-- 0x072584  sensor_data_acq_a
+     |    +-- 0x0724C8  sensor_data_acq_b
+     |    +-- 0x071B58  sensor_computation (FPU-heavy)
+     |    +-- 0x071D08  float_clamp_a
+     |    +-- 0x071D14  float_clamp_b
+     |    +-- 0x071D92  float_interpolation
+     |    +-- 0x071F48  dtc_monitor_pair_1
+     |    +-- 0x07200C  dtc_monitor_pair_2
+     |    +-- 0x072066  dtc_monitor_pair_3
+     |    +-- 0x072108  dtc_monitor_4
+     |    +-- 0x072218  dtc_monitor_5
+     |    +-- 0x072272  dtc_monitor_6
+     |    +-- 0x072314  eeprom_storage
+     |    +-- 0x0723AC  final_handler (tail-call)
+     |
+     +-- FUN_071AFA (conditional sensor calc)
+     |    +-- 0x022F92  timer/task state read
+     |    +-- 0xBE960  float_abs
+     |    +-- 0xBEA40  float_clamp_range
+     |
+     +-- FUN_071A8E (EEPROM initialization)
+     |    +-- 0xBDBCC  eeprom_op (x3)
+     |
+     +-- FUN_071A7A (helper)
+          +-- uint8_pack(0) -> FFFF255E
+
+
+  FUN_071AFA -- Conditional Sensor Computation
+  -----------------------------------------------------------------------
+  Called via bra from 0x071AB2.
+
+  Pseudocode:
+
+    void sensor_conditional_calc() {
+        timer_state = check_timer_state();       // JSR 0x022F92
+        sensor_val  = *(float*)FFFF653C;
+        offset      = *(float*)FFFF77C8;
+        correction1 = *(float*)FFFF76D4;
+        correction2 = *(float*)FFFF7878;
+        diag_flag   = *(uint8*)FFFF7449;
+
+        if (timer_state == 1 || diag_flag != 0) {
+            // Active computation path
+            result = sensor_val - offset + correction1 + correction2;
+            result = float_abs(result);          // call 0xBE960
+            result = float_clamp_range(result,   // call 0xBEA40
+                         cal_lower, cal_upper);  // bounds from 0x0C50B4
+            *(float*)FFFF97B4 = result;          // workspace
+            *(float*)FFFF97B0 = result;          // output
+        } else {
+            // Inactive: store neutral 1.0
+            *(float*)FFFF97B4 = 1.0f;
+            *(float*)FFFF97B0 = 1.0f;
+        }
+    }
+
+
+  FUN_071A8E -- EEPROM Diagnostic Initialization
+  -----------------------------------------------------------------------
+  Initializes three EEPROM adaptation slots to known values:
+
+    eeprom_op(FFFF2544, 0.0);     // zero init
+    eeprom_op(FFFF254C, 0.0);     // zero init
+    eeprom_op(FFFF2554, cal_val); // calibration default from literal pool
+
+  These are diagnostic adaptation values -- correction factors that the
+  sensor computation path (FUN_071AFA) uses during active monitoring.
+
+
+  FUN_071A7A -- Simple State Helper
+  -----------------------------------------------------------------------
+  Packs uint8 zero and stores to FFFF255E (diagnostic state byte).
+
+    *(uint8*)FFFF255E = uint8_pack(0);
+
+
+  Tuning Relevance:
+  -----------------------------------------------------------------------
+  This entire dispatcher is DISABLED (entry returns immediately). If it were
+  active, the sensor computation at FUN_071AFA would use calibration bounds
+  at 0x0C50B4 for clamping, and the DTC monitors would set/clear fault codes
+  based on the computed results. Since it is stubbed out, no DTCs from this
+  dispatcher can fire in the stock ROM.
+
+  If re-enabling this dispatcher (e.g., by patching the rts/nop at 0x071A76
+  to a branch into 0x071ABA), ensure the EEPROM init path (FUN_071A8E) runs
+  first to set valid adaptation defaults, or stale EEPROM data at
+  FFFF2544-2554 could cause immediate false faults.
+
+
+================================================================================
+SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- FUN_07D526
+================================================================================
+
+  Purpose: Catalyst/O2 sensor diagnostic monitor. Implements OBD-II catalyst
+  efficiency and O2 sensor response time monitoring with a 20+ condition
+  qualification cascade, fuel trim cross-validation, and multi-stage
+  maturation counters.
+
+
+  FUN_07D526 -- Outer Dispatch Shell
+  -----------------------------------------------------------------------
+  Entry point: 0x07D526
+  Size: 46 bytes (shell only)
+  Prologue saves PR, then dispatches 10 BSR calls + 1 tail-call:
+
+    0x07D526:  sts.l   PR, @-R15
+    0x07D528:  bsr     0x07D9F8
+    0x07D52A:  nop
+    0x07D52C:  bsr     0x07DA1C
+    ...
+    0x07D546:  bsr     0x07DF6C
+    0x07D548:  nop
+    0x07D54A:  lds.l   @R15+, PR
+    0x07D54C:  bra     0x07E014         ; tail-call: EEPROM adaptation store
+
+  Call Graph:
+
+    FUN_07D526 (outer dispatch)
+     +-- 0x07D9F8   sub_monitor_1
+     +-- 0x07DA1C   sub_monitor_2
+     +-- 0x07DAB4   sub_monitor_3
+     +-- 0x07DAE8   sub_monitor_4
+     +-- 0x07DB0E   sub_monitor_5
+     +-- 0x07DB80   sub_monitor_6
+     +-- 0x07DC04   sub_monitor_7
+     +-- 0x07E13C   sub_monitor_8
+     +-- 0x07DC88   sub_monitor_9
+     +-- 0x07DF6C   sub_monitor_10
+     +-- 0x07E014   eeprom_adapt_store (tail-call)
+
+
+  FUN_07D554 -- Real Dispatcher Body (Initialization)
+  -----------------------------------------------------------------------
+  Falls through from 0x07D554. Sets up the diagnostic workspace.
+
+  Pseudocode:
+
+    void o2_diag_init() {
+        GBR = 0xFFFFA248;                   // diagnostic workspace base
+
+        engine_state = check_engine_state(); // call 0x022F92
+        if (engine_state != 1) return;
+
+        // First-enable initialization
+        if (first_run) {
+            *(uint8*)(GBR+0x49) = 1;        // FFFFA291: enable flag
+
+            // Zero counters
+            *(uint16*)(GBR+0x24) = 0;       // FFFFA26C
+            *(uint16*)(GBR+0x26) = 0;       // FFFFA26E
+
+            // Zero float workspace
+            *(float*)(R2-0x44) = 0.0f;
+            *(float*)(R2-0x48) = 0.0f;
+            *(float*)(R2-0x4C) = 0.0f;
+
+            // Set 9 float slots to 8000.0 (0x45FA0000)
+            for (i = 0; i < 9; i++)
+                float_slot[i] = 8000.0f;    // large sentinel value
+
+            // Zero 4x4 uint16 arrays
+            memset(GBR+0x28, 0, 8);         // FFFFA270
+            memset(GBR+0x30, 0, 8);         // FFFFA278
+            memset(GBR+0x38, 0, 8);         // FFFFA280
+            memset(GBR+0x40, 0, 8);         // FFFFA288
+
+            *(uint8*)(GBR+0x4D) = 0;        // FFFFA295: clear state
+        }
+    }
+
+  The sentinel value 8000.0 is used to indicate "no valid measurement yet" --
+  any real sensor reading will be smaller, so the first comparison will
+  always trigger an update.
+
+
+  FUN_07D620 -- Catalyst/O2 Diagnostic Coordinator
+  -----------------------------------------------------------------------
+  Entry point: 0x07D620
+  Size: ~470 bytes (0x07D620-0x07D9F6)
+  Stack: 92 bytes allocated. Saves R8-R14, FR12-FR15.
+
+  This is the core diagnostic logic. It loads 16+ sensor floats, evaluates
+  ~20 qualification conditions, and updates maturation counters.
+
+  Sensor Inputs:
+
+    Address      Register   Likely Identity
+    -----------------------------------------------------------------------
+    FFFF73A4     FR         MAF sensor (airflow)
+    FFFF7354     FR         Sensor A (temperature or pressure)
+    FFFF7374     FR         Sensor B (temperature or pressure)
+    FFFF7A14     FR         O2 sensor voltage/ratio A
+    FFFF7A20     FR         O2 sensor voltage/ratio B
+    FFFF7328     FR         Engine parameter 1
+    FFFF732C     FR         Engine parameter 2
+    FFFF7330     FR         Engine parameter 3
+    FFFF7334     FR         Engine parameter 4
+    FFFF733C     FR         Engine parameter 5
+    FFFF77D8     FR         Filtered sensor value
+    FFFF6624     FR         RPM / engine load
+    FFFF6350     FR         Vehicle speed
+    FFFF6364     FR         Throttle position
+    FFFF63F8     FR         Boost/manifold pressure A
+    FFFF63FC     FR         Boost/manifold pressure B
+    FFFF69F0     FR         Exhaust temperature
+    FFFF7D68     FR         Diagnostic intermediate
+
+  State/Flag Inputs:
+
+    Address      Type       Identity
+    -----------------------------------------------------------------------
+    FFFF67EC     u16        Diagnostic enable flags (engine run time)
+    FFFF6A22     u8         Diagnostic sub-state
+    FFFF79C2     float      Fuel trim state A (cross-ref: CL/OL analysis)
+    FFFF79C4     float      Fuel trim state B (cross-ref: CL/OL analysis)
+    FFFF7448     u8         Engine running flag
+    FFFF7453     u8         CL (closed-loop) state flag
+    FFFF8E09     u8         Engine condition byte
+    FFFF7BE2     u8         Learning flag (0 = not learning)
+    FFFF7D18     u8         Timing state byte
+    FFFF5BE3     u8         System state A
+    FFFF65AB     u8         System state B
+
+  Library Calls:
+
+    0x584D2   check_diag_state        -- diagnostic state validator
+    0x3AB20   timer/engine_state      -- timing gate check
+    0xBE830   table_lookup_1D         -- cal table 0xAB558 + FFFF6624
+    0xBEAB0   fmac_interp_2d          -- 2D interpolation on FFFF63FC
+    0xBE608   float_in_range          -- range check (multiple calls)
+
+  Qualification Cascade Pseudocode:
+
+    bool qualify_o2_catalyst_diag() {
+        // Gate 1: Diagnostic enable time
+        if (*(uint16*)FFFF67EC < threshold) return false;
+
+        // Gate 2: Engine must be running
+        if (*(uint8*)FFFF7448 != 1) return false;
+
+        // Gate 3: Must be in closed-loop fuel control
+        if (*(uint8*)FFFF7453 != 1) return false;
+
+        // Gate 4: Check diagnostic system state
+        if (check_diag_state(0x584D2) != 1) return false;
+
+        // Gate 5-9: Five sensor floats must be in valid ranges
+        if (!float_in_range(*(float*)FFFF73A4, lo1, hi1)) return false;
+        if (!float_in_range(*(float*)FFFF7354, lo2, hi2)) return false;
+        if (!float_in_range(*(float*)FFFF7374, lo3, hi3)) return false;
+        if (!float_in_range(*(float*)FFFF7A14, lo4, hi4)) return false;
+        if (!float_in_range(*(float*)FFFF7A20, lo5, hi5)) return false;
+
+        // Gate 10: Not currently learning
+        if (*(uint8*)FFFF7BE2 != 0) return false;
+
+        // Gate 11-12: Timing conditions
+        if (!timer_check(0x3AB20)) return false;
+
+        // Gate 13-14: Fuel trim cross-validation
+        float trim_a = *(float*)FFFF79C2;
+        float trim_b = *(float*)FFFF79C4;
+        if (trim_a <= 0.0) return false;   // must be positive
+        if (trim_a < trim_b) return false; // A must be >= B
+
+        // Gate 15-16: Internal state bits
+        if (*(uint8*)FFFFA161 & 0x01) return false;
+        if (*(uint8*)FFFFA162 & 0x01) return false;
+
+        // Gate 17: Timer/state byte
+        if (timer_state_byte != 0) return false;
+
+        // Gate 18: MAP-based lookup qualification
+        float map_factor = table_lookup_1D(0xAB558, *(float*)FFFF6624);
+        // ... additional MAP/boost checks via fmac_interp_2d ...
+
+        // All ~20 conditions passed
+        return true;
+    }
+
+    void run_o2_catalyst_monitor() {
+        if (qualify_o2_catalyst_diag()) {
+            *(uint8*)FFFFA290 = 1;           // qualified flag
+            maturation_counter++;            // FFFFA290+6 (word)
+            // Update debounce at FFFFA290+8
+            // Update comparison state at FFFFA290+10-12
+        } else {
+            *(uint8*)FFFFA290 = 0;           // not qualified
+        }
+    }
+
+
+  DTC Mapping (from FUN_07CCD0)
+  -----------------------------------------------------------------------
+  The maturation counters feed into DTC dispatch at FUN_07CCD0. When a
+  counter reaches its calibration threshold (from 0xC47CB), the
+  corresponding DTC is set pending:
+
+    Counter    DTC Code   P-Code   Description
+    -----------------------------------------------------------------------
+    [1]        0x82       P0130    O2 Sensor Circuit Bank 1 Sensor 1
+    [2]        0x85       P0133    O2 Sensor Slow Response B1S1
+    [3]        0x84       P0132    O2 Sensor Low Voltage B1S1
+    [4]        0x83       P0131    O2 Sensor High Voltage B1S1
+
+  When a counter is zero, the corresponding DTC is cleared. The DTC codes
+  are passed as negative int8 values and converted via extu.b.
+
+
+  Workspace Layout (FFFFA248 -- GBR base)
+  -----------------------------------------------------------------------
+    Offset  Size    Field
+    -----------------------------------------------------------------------
+    +0x00   float   measurement_slot_0
+    +0x04   float   measurement_slot_1
+    +0x08   float   measurement_slot_2
+    +0x0C   float   sentinel_slot_0 (init: 8000.0)
+    ...     ...     (9 sentinel float slots total)
+    +0x24   u16     counter_A
+    +0x26   u16     counter_B
+    +0x28   u16[4]  history_array_0
+    +0x30   u16[4]  history_array_1
+    +0x38   u16[4]  history_array_2
+    +0x40   u16[4]  history_array_3
+    +0x49   u8      enable_flag (FFFFA291)
+    +0x4D   u8      clear_state (FFFFA295)
+
+  Qualification Workspace (FFFFA290):
+    +0x00   u8      qualified (0/1)
+    +0x06   u16     maturation_counter
+    +0x08   u16     debounce_counter
+    +0x0A   u8      comparison_state_0
+    +0x0B   u8      comparison_state_1
+    +0x0C   u8      comparison_state_2
+
+
+  Tuning Relevance:
+  -----------------------------------------------------------------------
+  This is the primary O2 sensor and catalyst efficiency monitor. Key
+  implications for tuning:
+
+  - The closed-loop requirement (gate 3, FFFF7453 == 1) means this monitor
+    ONLY runs in CL mode. Open-loop tunes will never trigger these DTCs,
+    but the OBD-II readiness flags will also never set (potential inspection
+    failure). Cross-reference: cl_ol_analysis.txt.
+
+  - Fuel trim gates (FFFF79C2/79C4) require positive trims with A >= B.
+    Aggressive negative fuel trims from AFC tuning can prevent the monitor
+    from qualifying, masking real catalyst degradation.
+
+  - The 8000.0 sentinel initialization means the monitor needs a full
+    drive cycle to collect valid data. Quick key-on/key-off cycles will
+    never mature the counters.
+
+  - The learning flag gate (FFFF7BE2 == 0) prevents monitoring during
+    active fuel trim learning. This is standard OBD-II behavior to avoid
+    false faults during adaptation.
+
+
+================================================================================
+SECTION 3: SENSOR RATIONALITY CHECK -- FUN_07CB30
+================================================================================
+
+  Purpose: Cross-validates 4 sensor baseline readings against MAP-derived
+  physical bounds. If any sensor falls outside the expected range, a
+  debounced fault is set and routed to DTC dispatch.
+
+
+  FUN_07CB30 -- Main Rationality Check
+  -----------------------------------------------------------------------
+  Entry point: 0x07CB30
+  Size: 254 bytes (0x07CB30-0x07CC2E)
+  Saves: R12-R14, PR, FR12-FR15. Stack: 16 bytes.
+
+  Sensor Inputs:
+
+    Address      Register   Identity
+    -----------------------------------------------------------------------
+    FFFF6624     FR8        MAP/boost pressure (primary reference)
+    FFFF7D94     FR14       Sensor A baseline
+    FFFF7D98     FR15       Sensor B baseline
+    FFFF7DA0     FR13       Sensor C baseline
+    FFFF7DA4     FR1        Sensor D baseline
+    FFFF734C     FR12       Correction offset (applied to all baselines)
+    FFFF67EC     R12        Diagnostic enable flags (word)
+
+  Library Calls:
+
+    0x3AB20   timer/engine_state       -> stack[8]
+    0x584C8   check_diag_state_2       -> stack[12]
+    0xBE628   float_safe_div           -- MAP / calibration divisor
+    0xBE608   float_in_range           -- (not directly, but equivalent logic)
+
+  Pseudocode:
+
+    void sensor_rationality_check() {
+        float map_raw    = *(float*)FFFF6624;
+        float baseline_a = *(float*)FFFF7D94;
+        float baseline_b = *(float*)FFFF7D98;
+        float baseline_c = *(float*)FFFF7DA0;
+        float baseline_d = *(float*)FFFF7DA4;
+        float correction = *(float*)FFFF734C;
+        uint16 diag_time = *(uint16*)FFFF67EC;
+
+        // Derive MAP-adjusted reference
+        // Calibration divisor: 0x4CE4E1C0 (float literal ~1900.5...)
+        float map_adjusted = float_safe_div(map_raw, cal_divisor);
+
+        // Apply correction offset to all baselines
+        float a = baseline_a + correction;
+        float b = baseline_b + correction;
+        float c = baseline_c + correction;
+        float d = baseline_d + correction;
+
+        // Rationality bounds:
+        //   Lower: 1000.0 (0x447A0000)
+        //   Upper: map_adjusted + 1000.0 (0xC47A0000 tolerance)
+        float lower = 1000.0f;
+        float upper = map_adjusted + 1000.0f;
+
+        bool rational = true;
+        if (a <= lower || a >= upper) rational = false;
+        if (b <= lower || b >= upper) rational = false;
+        if (c <= lower || c >= upper) rational = false;
+        if (d <= lower || d >= upper) rational = false;
+
+        // A/D channel read for additional sensor data
+        uint16 ad_val = get_ad_channel(16);
+
+        // Read and reset previous state
+        uint8 prev_state = *(uint8*)(FFFFA228 + 10);
+        *(uint8*)(FFFFA228 + 10) = 0;
+        get_ad_raw(0x3190);
+
+        // Diagnostic precondition gates
+        uint8 diag_state   = check_diag_state_2();  // must == 1
+        uint8 timer_state  = check_timer_state();    // must == 0
+        bool  time_ok      = (diag_time > 125);      // > 0x7D
+        bool  map_ok       = (map_raw > 500.0f);     // > 0x43FA0000
+        bool  prev_ok      = (prev_state == 0);
+
+        if (diag_state == 1 && time_ok && map_ok &&
+            rational && timer_state == 0 && prev_ok) {
+            // All preconditions met: increment qualification counter
+            uint8 count = uint8_add_sat(*(uint8*)(FFFFA228+9), 1);
+            *(uint8*)(FFFFA228+9) = count;
+
+            if (count >= 2) {
+                // Debounced fault: confirmed irrational
+                *(uint8*)FFFFA228 = 1;  // fault_detected
+            }
+        } else {
+            // Reset: conditions not met
+            *(uint8*)(FFFFA228+9) = 0;  // clear counter
+            *(uint8*)FFFFA228    = 0;   // clear fault
+        }
+    }
+
+  The qualification counter requires TWO consecutive passing cycles before
+  declaring a fault. This is a simple 2-count debounce to filter transient
+  sensor glitches during rapid operating point changes.
+
+
+  FUN_07CC30 -- Multi-Channel Maturation Counter
+  -----------------------------------------------------------------------
+  Entry point: 0x07CC30
+  Size: ~158 bytes (0x07CC30-0x07CCCE)
+
+  Reads the fault_detected byte (FFFFA228[0]). If set to 1, processes
+  four channel states (FFFFA228 bytes [5-8]):
+
+  Pseudocode:
+
+    void maturation_update() {
+        if (*(uint8*)FFFFA228 != 1) return;
+
+        for (ch = 0; ch < 4; ch++) {
+            uint8 state = *(uint8*)(FFFFA228 + 5 + ch);
+
+            if (state == 1 || state == 2 || state == 3) {
+                // Active channel: increment maturation counter
+                *(uint8*)(FFFFA228 + 1 + ch) += 1;
+                // Reset channel state to idle
+                *(uint8*)(FFFFA228 + 5 + ch) = 0xFF;
+            }
+        }
+    }
+
+  Channel states 1, 2, and 3 represent different fault classifications
+  (circuit, response, voltage). The 0xFF idle value prevents
+  double-counting on the next iteration.
+
+
+  FUN_07CCD0 -- DTC Dispatch
+  -----------------------------------------------------------------------
+  Entry point: 0x07CCD0
+  Size: ~252 bytes (0x07CCD0-0x07CDCC)
+
+  Reads the four maturation counters (FFFFA228 bytes [1-4]) and dispatches
+  DTCs based on calibration threshold at 0xC47CB:
+
+    Counter   Threshold    Action if >= threshold    Action if == 0
+    -----------------------------------------------------------------------
+    byte[1]   cal[C47CB]   dtc_set_pending(0x82)     dtc_clear(0x82)
+    byte[2]   cal[C47CB]   dtc_set_pending(0x85)     dtc_clear(0x85)
+    byte[3]   cal[C47CB]   dtc_set_pending(0x84)     dtc_clear(0x84)
+    byte[4]   cal[C47CB]   dtc_set_pending(0x83)     dtc_clear(0x83)
+
+  DTC Code Mapping:
+
+    Internal   P-Code   Description
+    -----------------------------------------------------------------------
+    0x82       P0130    O2 Sensor Circuit Malfunction B1S1
+    0x85       P0133    O2 Sensor Circuit Slow Response B1S1
+    0x84       P0132    O2 Sensor Circuit Low Voltage B1S1
+    0x83       P0131    O2 Sensor Circuit High Voltage B1S1
+
+  Cross-reference: dtc_diagnostics_analysis.txt, DTC Definition Table
+  entries at group 0x15 (O2 sensors).
+
+
+  Workspace Layout (FFFFA228)
+  -----------------------------------------------------------------------
+    Offset  Size   Field                 Description
+    -----------------------------------------------------------------------
+    +0      u8     fault_detected        0 = OK, 1 = fault confirmed
+    +1      u8     maturation_ctr_1      Counter for P0130 (circuit)
+    +2      u8     maturation_ctr_2      Counter for P0133 (slow response)
+    +3      u8     maturation_ctr_3      Counter for P0132 (low voltage)
+    +4      u8     maturation_ctr_4      Counter for P0131 (high voltage)
+    +5      u8     channel_state_1       0xFF=idle, 1/2/3=active fault type
+    +6      u8     channel_state_2       0xFF=idle, 1/2/3=active fault type
+    +7      u8     channel_state_3       0xFF=idle, 1/2/3=active fault type
+    +8      u8     channel_state_4       0xFF=idle, 1/2/3=active fault type
+    +9      u8     qualification_ctr     Debounce counter (must reach 2)
+    +10     u8     previous_state        Previous cycle result
+
+
+  Call Graph:
+
+    FUN_07CB30 (rationality check)
+     +-- 0x3AB20   timer/engine_state
+     +-- 0x584C8   check_diag_state_2
+     +-- 0xBE628   float_safe_div
+     +-- get_ad_channel(16)
+     +-- get_ad_raw(0x3190)
+     +-- uint8_add_sat
+     |
+     v
+    FUN_07CC30 (maturation update)
+     |
+     v
+    FUN_07CCD0 (DTC dispatch)
+     +-- dtc_set_pending (0x09ED90)
+     +-- dtc_clear_fault (0x09EDEC)
+
+
+  Tuning Relevance:
+  -----------------------------------------------------------------------
+  - The MAP > 500.0 gate means the rationality check only runs under
+    significant manifold pressure. Low-load idle and cruise conditions
+    will not trigger sensor rationality faults.
+
+  - The 2-count debounce (qualification_ctr >= 2) is relatively aggressive.
+    If sensor wiring is marginal, two consecutive bad reads under boost
+    will set the fault flag.
+
+  - The four DTCs (P0130-P0133) are all O2 sensor circuit codes.
+    Cross-reference with DTC table: all four have MIL illumination
+    enabled (W8=0x0100), so these faults WILL light the check engine lamp.
+
+  - For wideband O2 conversions: aftermarket widebands that output
+    different voltage ranges than the stock narrowband can trigger these
+    rationality faults if the baseline values (FFFF7D94-7DA4) are not
+    within 1000.0 of the MAP-adjusted reference.
+
+
+================================================================================
+SECTION 4: EEPROM ADAPTATION PERSISTENCE
+================================================================================
+
+  Purpose: Manages persistent storage of sensor adaptation/correction values
+  to EEPROM. Uses maturation counters and hysteresis to prevent premature
+  writes from transient conditions.
+
+
+  FUN_071224 -- EEPROM Initialization
+  -----------------------------------------------------------------------
+  Entry point: 0x071224
+
+  Pseudocode:
+
+    void eeprom_init() {
+        // Unconditional: zero the primary slot
+        eeprom_op(FFFF2530, 0.0);
+
+        // Conditional: check init flag
+        if (*(uint8*)FFFFA59C == 0) {
+            // First-time init: zero two uint16 slots
+            uint16_pack(0) -> FFFF2538;
+            uint16_pack(0) -> FFFF253C;
+        }
+
+        // Initialize adaptation slots with defaults
+        eeprom_op(FFFF2520, cal_float);  // calibration default
+        eeprom_op(FFFF2528, 0.0);        // zero
+        eeprom_op(FFFF2530, 0.0);        // zero
+    }
+
+
+  FUN_071268 -- EEPROM Validation
+  -----------------------------------------------------------------------
+  Entry point: 0x071268
+
+  Reads 5 EEPROM slots and validates their integrity:
+
+    Slot         Read Method           Purpose
+    -----------------------------------------------------------------------
+    FFFF2520     desc_read_int_safe    Adaptation float A
+    FFFF2528     desc_read_int_safe    Adaptation float B
+    FFFF2530     desc_read_int_safe    Adaptation float C
+    FFFF2538     uint16_unpack         Counter/state A
+    FFFF253C     uint16_unpack         Counter/state B
+
+  Returns: 0 = all valid, 1 = corruption detected.
+
+  desc_read_int_safe (0xBDCB6) includes checksum or range validation --
+  if any read returns a nonzero error code, the entire set is flagged
+  as corrupt and the init function (FUN_071224) must re-run.
+
+
+  eeprom_read_helper (0x0717B2) -- Maturation Counter
+  -----------------------------------------------------------------------
+  Entry point: 0x0717B2
+
+  Pseudocode:
+
+    void eeprom_maturation_check(uint8 expected_state) {
+        uint8 current = *(uint8*)FFFF979D;
+
+        if (current == expected_state) {
+            // State matches: increment maturation counter
+            current = uint8_add_sat(current, 1);
+            *(uint8*)FFFF979D = current;
+        } else {
+            // State mismatch: reset counter
+            *(uint8*)FFFF979D = 0xFF;
+        }
+    }
+
+  This ensures the ECU has been in a consistent state for multiple
+  consecutive cycles before allowing an EEPROM write. The 0xFF reset
+  value requires a full re-maturation sequence.
+
+
+  FUN_0717EC -- EEPROM Write State Machine (Hysteresis Controller)
+  -----------------------------------------------------------------------
+  Entry point: 0x0717EC
+  Size: ~154 bytes (0x0717EC-0x071886)
+
+  This is the core write protection mechanism. It implements a UP/DOWN
+  hysteresis counter that prevents EEPROM writes until conditions have
+  been stable for a calibrated duration.
+
+  Workspace (FFFF9794):
+
+    Offset  Size   Field            Description
+    -----------------------------------------------------------------------
+    +0      u8     max_count        From calibration 0xC473C
+    +1      u8     state            1 = counting-up, other = counting-down
+    +2      u8     write_trigger    Set when write is authorized
+    +4      u16    counter_down     Down-counter for write qualification
+    +6      u16    counter_up       Up-counter for write qualification
+    +8      u8     stored_value     Cached EEPROM value
+    +10     u8     dirty_flag       Pending write indicator
+
+  Pseudocode:
+
+    void eeprom_write_state_machine() {
+        uint8 write_enable = *(uint8*)FFFFAF3D;
+
+        if (state == 1) {
+            // COUNTING UP: conditions are favorable
+            if (write_enable) {
+                counter_up = uint16_add_sat(counter_up, 1);
+            }
+            if (counter_up >= cal[0xC4838]) {
+                // Matured: commit value to EEPROM
+                uint8_pack(1) -> FFFF2540;
+            }
+        } else {
+            // COUNTING DOWN: conditions unfavorable or transitioning
+            counter_up = 0;
+            if (write_enable) {
+                counter_down++;
+            }
+            if (counter_down >= cal[0xC483A]) {
+                write_trigger = 1;
+            }
+        }
+
+        // Always: check for pending EEPROM value
+        uint16 pending = uint16_unpack(FFFF2540);
+        if (pending != 0) {
+            // Write cached value back to EEPROM
+            uint8_pack(stored_value) -> FFFF2540;
+        }
+    }
+
+  The hysteresis thresholds at cal[0xC4838] (up) and cal[0xC483A] (down)
+  control how long conditions must be sustained. This prevents EEPROM
+  wear from rapid on/off cycling and ensures adaptation values are only
+  stored when the engine has been running in a stable diagnostic-ready
+  state for a sufficient period.
+
+
+  FUN_07B7A8 -- Conditional Adaptation Writer
+  -----------------------------------------------------------------------
+  Entry point: 0x07B7A8
+  Size: ~278 bytes (0x07B7A8-0x07B8BE)
+
+  Stores sensor correction values to EEPROM only when no faults are
+  present. Resets adaptation to defaults when faults are detected.
+
+  Pseudocode:
+
+    void conditional_adaptation_write() {
+        // Read DTC status from struct table
+        uint8 dtc_a = dtc_struct[0x9A834 + 0x322];
+        uint8 dtc_b = dtc_struct[0x9A834 + 0x323];
+
+        // Check fault flags
+        bool fault_a = *(uint8*)FFFF399E & flag_bit;
+        bool fault_b = *(uint8*)FFFF3B06 & flag_bit;
+
+        // Load current adaptation values
+        float adapt_0 = *(float*)FFFF259C;
+        float adapt_1 = *(float*)FFFF25A4;
+        float adapt_2 = *(float*)FFFF25AC;
+
+        // Range-check each adaptation value
+        bool range_ok = true;
+        range_ok &= float_in_range(adapt_0, lo_0, hi_0);
+        range_ok &= float_in_range(adapt_1, lo_1, hi_1);
+        range_ok &= float_in_range(adapt_2, lo_2, hi_2);
+
+        if (!fault_a && !fault_b && range_ok) {
+            // NO FAULTS: store learned adaptation
+            get_ad_channel(16);  // read current sensor
+            float val_0 = *(float*)FFFF9F7C;  // learned correction
+            eeprom_op(FFFF259C, val_0);
+            eeprom_op(FFFF25A4, val_1);
+            eeprom_op(FFFF25AC, val_2);
+        }
+
+        if ((fault_a || fault_b) && other_conditions) {
+            // FAULTS PRESENT: reset adaptation to defaults
+            eeprom_op(FFFF259C, 0.0);
+            eeprom_op(FFFF25A4, 0.0);
+            eeprom_op(FFFF25AC, cal_default);
+        }
+
+        get_ad_raw(0x3190);  // finalize A/D conversion
+    }
+
+  This creates a feedback loop: when the O2/catalyst diagnostics detect
+  a fault, the adaptation writer resets learned corrections to zero. When
+  the fault clears and conditions are stable, new corrections are learned
+  and stored.
+
+
+  Call Graph:
+
+    FUN_071224 (EEPROM init)
+     +-- 0xBDBCC  eeprom_op (x3)
+     +-- uint16_pack
+
+    FUN_071268 (EEPROM validation)
+     +-- 0xBDCB6  desc_read_int_safe (x3)
+     +-- 0xBE990  uint16_unpack (x2)
+
+    FUN_0712CC (EEPROM cycle trigger)
+     +-- FUN_0714A4  eeprom_read_check
+     +-- FUN_07132C  eeprom_state_machine
+
+    0x0717B2 (maturation counter)
+     +-- uint8_add_sat
+
+    FUN_0717EC (write state machine)
+     +-- uint16_add_sat
+     +-- uint8_pack
+     +-- uint16_unpack
+
+    FUN_07B7A8 (conditional adaptation writer)
+     +-- 0xBE608   float_in_range (x3)
+     +-- 0xBDBCC   eeprom_op (x3 write, x3 reset)
+     +-- get_ad_channel(16)
+     +-- get_ad_raw(0x3190)
+
+
+  Tuning Relevance:
+  -----------------------------------------------------------------------
+  - EEPROM adaptation slots (FFFF2520-253C, FFFF259C-25AC) persist across
+    key cycles. After reflashing, these values retain their previous state
+    unless explicitly cleared. A battery disconnect or EEPROM reset via
+    scan tool will force re-initialization via FUN_071224.
+
+  - The hysteresis write controller (FUN_0717EC) uses calibration
+    thresholds at 0xC4838 and 0xC483A. Reducing these thresholds would
+    cause more frequent EEPROM writes (faster adaptation convergence but
+    increased EEPROM wear). Stock values provide conservative protection.
+
+  - The conditional adaptation writer (FUN_07B7A8) resets learned values
+    when DTCs are present. This means clearing a DTC code will trigger a
+    re-learning period where fuel trim may be temporarily off until new
+    adaptation values mature and are written.
+
+  - After installing an aftermarket O2 sensor or wideband, the adaptation
+    at FFFF259C-25AC should be reset (battery pull or scan tool clear) to
+    prevent stale narrowband correction values from corrupting wideband
+    readings during the re-learning window.
+
+
+================================================================================
+KEY RAM ADDRESS SUMMARY
+================================================================================
+
+  Sensor Workspace:
+  -----------------------------------------------------------------------
+    FFFF2520     float   EEPROM adaptation slot A (float, persistent)
+    FFFF2528     float   EEPROM adaptation slot B (float, persistent)
+    FFFF2530     float   EEPROM adaptation slot C (float, persistent)
+    FFFF2538     u16     EEPROM counter/state A (persistent)
+    FFFF253C     u16     EEPROM counter/state B (persistent)
+    FFFF2540     u8      EEPROM commit value (write trigger)
+    FFFF2544     float   EEPROM diagnostic init A (persistent)
+    FFFF254C     float   EEPROM diagnostic init B (persistent)
+    FFFF2554     float   EEPROM diagnostic init C (persistent)
+    FFFF255E     u8      Diagnostic state byte
+    FFFF259C     float   Sensor adaptation workspace A (persistent)
+    FFFF25A4     float   Sensor adaptation workspace B (persistent)
+    FFFF25AC     float   Sensor adaptation workspace C (persistent)
+
+  Diagnostic State:
+  -----------------------------------------------------------------------
+    FFFF67EC     u16     Diagnostic enable flags / engine run time
+    FFFF79C2     float   Fuel trim state A (cross-ref: cl_ol_analysis.txt)
+    FFFF79C4     float   Fuel trim state B (cross-ref: cl_ol_analysis.txt)
+    FFFF7448     u8      Engine running flag
+    FFFF7453     u8      Closed-loop state flag
+    FFFF7BE2     u8      Learning active flag (0 = not learning)
+    FFFF97B0     float   Sensor diagnostic result (output)
+    FFFF97B4     float   Sensor diagnostic result (workspace)
+    FFFF97CC     u8      Diagnostic state transfer byte
+    FFFF979D     u8      EEPROM maturation counter state
+    FFFF9794     struct  EEPROM write state machine workspace (12 bytes)
+    FFFF9F7C     float   Learned correction value (source for EEPROM write)
+    FFFFAF3D     u8      EEPROM write enable flag (system-level)
+    FFFFA59C     u8      EEPROM first-init flag
+
+  Monitor Workspaces:
+  -----------------------------------------------------------------------
+    FFFFA228     struct  Sensor rationality workspace (11 bytes)
+    FFFFA248     struct  O2/catalyst diagnostic workspace (GBR base, ~80 bytes)
+    FFFFA290     struct  O2 sensor qualification workspace (13+ bytes)
+
+  Sensor Inputs (read by dispatcher 2 / rationality check):
+  -----------------------------------------------------------------------
+    FFFF6350     float   Vehicle speed
+    FFFF6364     float   Throttle position
+    FFFF6624     float   RPM / engine load / MAP
+    FFFF653C     float   Sensor value (dispatcher 1 input)
+    FFFF69F0     float   Exhaust temperature
+    FFFF7328     float   Engine parameter 1
+    FFFF732C     float   Engine parameter 2
+    FFFF7330     float   Engine parameter 3
+    FFFF7334     float   Engine parameter 4
+    FFFF733C     float   Engine parameter 5
+    FFFF734C     float   Correction offset (rationality check)
+    FFFF7354     float   Sensor A (range-checked)
+    FFFF7374     float   Sensor B (range-checked)
+    FFFF73A4     float   MAF sensor (airflow)
+    FFFF76D4     float   Correction 1 (dispatcher 1)
+    FFFF77C8     float   Offset (dispatcher 1)
+    FFFF77D8     float   Filtered sensor value
+    FFFF7878     float   Correction 2 (dispatcher 1)
+    FFFF7A14     float   O2 sensor voltage/ratio A
+    FFFF7A20     float   O2 sensor voltage/ratio B
+    FFFF7D68     float   Diagnostic intermediate
+    FFFF7D94     float   Sensor A baseline (rationality)
+    FFFF7D98     float   Sensor B baseline (rationality)
+    FFFF7DA0     float   Sensor C baseline (rationality)
+    FFFF7DA4     float   Sensor D baseline (rationality)
+
+  DTC State (cross-ref: dtc_diagnostics_analysis.txt):
+  -----------------------------------------------------------------------
+    FFFF399E     u8      DTC flag word A (fault_a indicator)
+    FFFF3B06     u8      DTC flag word B (fault_b indicator)
+
+
+================================================================================
+CALIBRATION ADDRESS SUMMARY
+================================================================================
+
+    Address      Type     Description
+    -----------------------------------------------------------------------
+    0x09A834     table    DTC struct table base (20 bytes/entry x 93)
+    0x0AB558     table    1D lookup table (MAP-based qualification)
+    0x0C473C     u8       EEPROM max count (maturation limit)
+    0x0C47CB     u8       DTC maturation threshold
+    0x0C4838     u16      EEPROM write threshold (up-counter)
+    0x0C483A     u16      EEPROM write threshold (down-counter)
+    0x0C48BC     u16      Diagnostic enable word threshold A
+    0x0C48C2     u16      Diagnostic enable word threshold B
+    0x0C506C     float    Sensor range threshold (lower bound set)
+    0x0C507C     float    Sensor range threshold (upper bound set)
+    0x0C50B4     float    Float clamp bounds (dispatcher 1)
+
+
+================================================================================
+CROSS-REFERENCES
+================================================================================
+
+  cl_ol_analysis.txt:
+    - FFFF79C2/79C4 fuel trim state used as qualification gates
+    - FFFF7453 CL state flag gates catalyst monitoring
+    - CL/OL state directly controls whether O2 diagnostics can run
+
+  dtc_diagnostics_analysis.txt:
+    - DTC codes 0x82-0x85 map to P0130-P0133 in the definition table
+    - dtc_set_pending (0x09ED90) and dtc_clear_fault (0x09EDEC) shared
+    - DTC struct table at 0x09A834, group 0x15 = O2 sensors
+    - All four O2 DTCs have MIL enabled (W8=0x0100)
+
+  diag_tasks_analysis.txt:
+    - Task 53 readiness monitor must complete before these monitors qualify
+    - FFFF67EC (engine run time) shared between readiness and sensor diag
+    - check_diag_state functions (0x584C8/0x584D2) shared infrastructure
+
+  fueling_pipeline_analysis.txt:
+    - Adaptation values at FFFF259C-25AC feed back into fuel corrections
+    - EEPROM persistence means reflash does not clear learned adaptations
+
+
+================================================================================
+END OF ANALYSIS
+================================================================================
