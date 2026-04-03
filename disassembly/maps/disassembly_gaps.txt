@@ -1,0 +1,172 @@
+AE5L600L Disassembly Gap Analysis
+==================================
+Last updated: 2026-04-03
+Source: Ghidra export cross-referenced against all analysis files (address-based matching)
+
+================================================================================
+OVERALL COVERAGE
+================================================================================
+
+ROM Size:         1,048,576 bytes (1024 KB)
+ROM Holes:          195,476 bytes (190.9 KB) — free/unused 0xFF space
+Active ROM:         853,100 bytes (833.1 KB) — code + data
+
+Functions (Ghidra):
+  Total:              2,700
+  Named (user-assigned):  329  (12.2%)
+  Unnamed (FUN_):       2,283  (84.6%)
+  Thunks:                  88  (3.3%)
+
+Named Function Coverage (address-based matching against analysis files):
+  Covered:              322 / 329  (97.9%)
+  True gaps:              7         (see below)
+
+================================================================================
+NAMED FUNCTION GAPS (7 remaining)
+================================================================================
+
+These 7 named Ghidra functions have zero address hits in any analysis file:
+
+EVAP/Emissions (intentionally skipped — no EGR valve on turbo EJ255):
+  0x0662D0  evap_workspace_init    Duplicate; the other at 0x665C0 IS covered
+
+Peripheral I/O Library:
+  0x0BDC6A  peripheral_io_config   Neighbor peripheral_io_init (0xBDB92) is covered
+  0x0BDD5A  peripheral_io_read     Same subsystem
+
+Math/Utility Library (ROM library routines at 0xBE000+):
+  0x0BE88C  table_desc_2d_uint8    2D table descriptor lookup, uint8 variant
+  0x0BE8C4  table_desc_2d_uint16   2D table descriptor lookup, uint16 variant
+  0x0BEA98  int_sat_sub            Saturating integer subtraction
+  0x0BEB90  interp_1d_uint16_int   1D interpolation, uint16 variant
+
+These are all low-level infrastructure. Higher-level code calling them IS analyzed.
+
+================================================================================
+COMPLETED SUBSYSTEMS (do not re-flag)
+================================================================================
+
+The following subsystems are FULLY ANALYZED — all named functions covered:
+
+  CL/OL Fuel Control        16/16 functions  (6 analysis files)
+  Boost Control               2/2  functions
+  Ignition Timing             3/3  functions  (+ descriptors)
+  Injection Timing            3/3  functions
+  Idle Control                covered
+  AVCS                        covered
+  Torque Management           2/2  functions
+  Knock/FLKC                  5/5  functions
+  MAF Scaling                 3/3  functions
+  Fuel Pump                   covered
+  ETB/DBW                    15/15 functions
+  Task Scheduler              6/6  functions
+  AFC/AFL Fuel                7/7  functions
+  LTFT Learning               2/2  functions
+  Startup Enrichment          covered
+  Accel Enrichment            covered
+  Tau Alpha                   covered
+  Map Switching               covered
+  Fueling Pipeline            covered
+  DTC Diagnostics             covered (framework)
+  Mystery Subs                covered
+
+NOTE: Analysis files use FUN_XXXXXXXX notation; Ghidra uses user-assigned labels.
+Always match by hex address, not by label name, when checking coverage.
+
+================================================================================
+UNNAMED FUNCTION REGIONS (2,283 FUN_ functions)
+================================================================================
+
+Region-by-region breakdown of unnamed functions:
+
+  Region            Unnamed  Total  % Named  Status
+  ─────────────────────────────────────────────────────────────
+  0x000000-0x00FFFF    307    383    19%     Partially explored (RTOS, ISR, ADC)
+  0x010000-0x01FFFF    257    264     2%     DARK — needs scouting
+  0x020000-0x02FFFF    334    364     8%     Partially explored (fueling, diag)
+  0x030000-0x03FFFF    203    257    21%     Partially explored (CL/OL, AFC, timing)
+  0x040000-0x04FFFF    138    209    33%     Best coverage (knock, ignition, injection)
+  0x050000-0x05FFFF    207    242    14%     Partially explored (ETB, boost, diag)
+  0x060000-0x06FFFF    166    173     4%     DARK — only EVAP/MAF diag identified
+  0x070000-0x07FFFF    211    217     2%     DARK — only EGR labels (skip per policy)
+  0x080000-0x08FFFF    227    227     0%     SCOUTED — see below
+  0x090000-0x09FFFF    164    176     6%     Partially explored (DTC framework)
+  0x0A0000-0x0AFFFF    126    133     5%     Partially explored (DTC handlers)
+  0x0B0000-0x0BFFFF     31     55    43%     Best % named (library/utility)
+
+================================================================================
+REGION 0x080000-0x08FFFF — SCOUTED 2026-04-03
+================================================================================
+
+227 functions, 0% named, zero in task_call_graph or cal_crossref.
+87% of functions are <=64 bytes (descriptor-handler stubs).
+
+Identified contents:
+  - Diagnostic monitors: 72 DTC helper calls (34 set_pending + 38 clear)
+  - Per-cylinder injection output: 7 functions identified in injection_timing_analysis
+    0x081A64, 0x082A9C, 0x0839F8, 0x0843AC, 0x084A28, 0x08C31E, 0x08E3E4
+  - 50 task-dispatched handlers called from main dispatch tables at 0x048xxx
+  - 2 unmapped descriptor tables:
+    - 28+ entries at 0x0865xx-0x0868xx (bbf'p pattern)
+    - 36 entries at 0x0870xx-0x0875xx (Lb, prefix — 3 type variants)
+  - CL/OL state machine ties at 0x082Dxx and 0x0844xx
+
+Sub-region breakdown:
+  0x0800xx-0x080Exx  Init, pointer tables, dispatch stubs
+  0x0810xx-0x0860xx  Per-cylinder injection output + calibration
+  0x0860xx-0x086Bxx  Descriptor-linked lookup handlers
+  0x086Cxx-0x0875xx  Float calibration + descriptor tables
+  0x0876xx-0x088Bxx  Output/control routines + float calibration
+  0x088Dxx-0x08C0xx  Diagnostic monitor handlers (heavy DTC usage)
+  0x08C0xx-0x08FFxx  More diagnostic monitors + ptr_table_8D838
+
+Status: ANALYSIS IN PROGRESS (per-cyl injection, descriptors, diag monitors)
+
+================================================================================
+PRIORITY REGIONS FOR FUTURE SCOUTING
+================================================================================
+
+1. 0x010000-0x01FFFF (257 functions, 2% named)
+   Likely contains: descriptor processing, state machines, initialization
+   No scouting done yet.
+
+2. 0x060000-0x06FFFF (166 functions, 4% named)
+   Known: EVAP purge (0x662D0, 0x665C0), MAF diagnostics
+   Likely contains: additional diagnostic monitors, sensor processing
+   No scouting done yet.
+
+3. 0x070000-0x07FFFF (211 functions, 2% named)
+   Known: EGR/emissions labels (diagnostic monitors only — skip per policy)
+   May contain: other non-emissions subsystems mixed in
+   Needs scouting to separate EGR from non-EGR code.
+
+4. 0x020000-0x02FFFF (334 functions, 8% named)
+   Largest region by unnamed count. Partially explored via fueling/diag analysis.
+   Needs systematic scouting to identify remaining subsystems.
+
+================================================================================
+CALIBRATION MAPPING GAPS
+================================================================================
+
+From cal_crossref.txt:
+  Total RomRaider definitions: 622
+  Labeled in Ghidra:           159
+  Unmapped:                    463
+
+The two descriptor tables at 0x0865xx and 0x0870xx contain calibration pointers
+not yet mapped to any RomRaider definition.
+
+================================================================================
+METHODOLOGY NOTES
+================================================================================
+
+Gap detection uses ADDRESS-BASED matching (not label name matching).
+For each function, four hex formats are searched:
+  - Raw stripped hex (e.g., "36A98")
+  - 0x-prefixed (e.g., "0x36A98")
+  - Full 8-digit (e.g., "00036A98")
+  - 0x + 8-digit (e.g., "0x00036A98")
+
+This avoids false positives caused by Ghidra labels not matching FUN_ references
+in analysis files (e.g., CL/OL was 100% complete but appeared as 16 gaps under
+name-based matching).
