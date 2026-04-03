@@ -1,0 +1,238 @@
+AE5L600L Startup / Hardware Initialization Analysis
+================================================================================
+Code range: 0x000000 - 0x01FFFF (128 KB)
+Total functions with prologues: 213 (in 0x012600-0x01E3FF alone)
+Total call targets: 802 (313 in main code gap + 489 in lower region)
+Total calls: 2,434 into this range from entire ROM
+
+Based on: Automated classification + ROM region map + task_scheduler_analysis
+
+
+================================================================================
+SECTION 1: OVERVIEW
+================================================================================
+
+The 0x000000-0x01FFFF range contains the SH7058 microcontroller's
+startup infrastructure, RTOS kernel, ISR dispatch system, and hardware
+peripheral initialization code.
+
+The range breaks into these architectural layers:
+
+  Address Range        Size    Content
+  ─────────────────    ─────   ────────────────────────────────────
+  0x000000-0x000033    52B     Exception vector table (13 entries)
+  0x000034-0x000BAC    2.9KB   System data tables / vectors
+  0x000BAC-0x000C0C    96B     ISR generic handler + fault traps
+  0x000C0C-0x001000    1KB     Reset entry + HW init + ISR dispatch
+  0x001000-0x003700    10KB    Calibration data tables (float_data)
+  0x003700-0x003F80    2KB     RTOS kernel code + task epilogue
+  0x003F80-0x004A00    2.7KB   Master task table + calibration data
+  0x004A00-0x00D940    36KB    Low-level I/O, injection HW, ISR code
+  0x00D940-0x00E6C0    3.5KB   Task entry functions + dispatch tables
+  0x00E6C0-0x00FC04    5.5KB   Scheduler tick + secondary dispatchers
+  0x00FC04-0x011B80    8KB     Fuel system init + charge calc + ROM check
+  0x011B80-0x012600    2.7KB   Sub-task tables (data)
+  0x012600-0x01E400    48KB    HW peripheral config + sensor I/O init
+  0x01E400-0x020000    7KB     Extended init / sensor processing
+
+
+================================================================================
+SECTION 2: FUNCTION CLASSIFICATION (0x012600-0x01E3FF)
+================================================================================
+
+213 functions with standard prologues. Classified by RAM workspace:
+
+  Category                              Count    %
+  ────────────────────────────────────  ─────    ──
+  HW peripheral / port configuration    177     83%
+  Sensor / ADC processing                17      8%
+  No RAM refs (pure computation)         19      9%
+
+The overwhelming majority (83%) are hardware peripheral configuration
+functions — they read/write the SH7058's on-chip register space
+(FFFF20xx-5Fxx) to configure GPIO ports, timer units (ATU/MTU),
+ADC channels, serial interfaces, and DMA controllers.
+
+2.1  Hardware Register Ranges Accessed
+──────────────────────────────────────
+
+  RAM Range          Count   SH7058 Peripheral
+  ─────────────────  ─────   ─────────────────────────
+  FFFF20xx-21xx       20     System control (BSC, WDT, power)
+  FFFF36xx-37xx        5     DMA controller (DMAC)
+  FFFF40xx-41xx       25     General I/O ports (PORTA-PORTK)
+  FFFF44xx-45xx       15     ATU timer channels (injection timing)
+  FFFF4Axx-4Bxx        5     MTU2 timer channels
+  FFFF5Bxx-5Cxx       40     ADC configuration + sensor workspace
+  FFFF5Dxx-5Exx       30     Extended I/O + GPIO config
+  FFFF5Fxx             37     GPIO port data registers
+
+2.2  Address Block Distribution
+───────────────────────────────
+
+  Block        Functions  Primary Content
+  ──────────   ─────────  ────────────────────────
+  0x012000       10       System controller init, BSC setup
+  0x013000       17       ADC/sensor conditioning config
+  0x014000       21       Timer unit configuration (ATU)
+  0x015000       25       Injection channel HW setup
+  0x016000       29       GPIO port configuration (densest block)
+  0x017000       14       Extended I/O port setup (FFFF5Exx)
+  0x018000       17       Serial comms (SCI) + CAN controller init
+  0x019000       14       Sensor calibration + ADC pipeline setup
+  0x01A000       16       Actuator output configuration
+  0x01B000       10       Timer prescaler + interrupt priority setup
+  0x01C000        8       Watchdog timer + clock config
+  0x01D000       24       System startup sequence
+  0x01E000        8       Sensor processing / validation init
+
+
+================================================================================
+SECTION 3: KNOWN INFRASTRUCTURE (ALREADY LABELED)
+================================================================================
+
+The following elements in 0x000000-0x01FFFF are already well documented:
+
+  3.1  Vector Table (0x000000-0x000033) — COMPLETE
+  3.2  ISR Infrastructure (0x000BAC-0x000FFF) — COMPLETE
+  3.3  Reset Entry (0x000C0C) — COMPLETE
+  3.4  RTOS Kernel (0x0035A4, 0x003F80) — COMPLETE
+  3.5  All 13 Task Entry Functions (0xDD52-0xE4E6) — COMPLETE
+  3.6  ISR Dispatch Table (0xE5EC-0xE6C0, 54 entries) — COMPLETE
+  3.7  Sub-task Tables (0x11B80-0x11CFF) — COMPLETE
+  3.8  53 ISR Handler Addresses — LABELED (some not deeply traced)
+
+Total already-labeled addresses: ~120
+
+
+================================================================================
+SECTION 4: ISR HANDLERS — UNLABELED SEMANTICS
+================================================================================
+
+20 ISR handlers in this range are labeled only as "isr_handler_N"
+without semantic identification. Based on their RAM accesses:
+
+  Handler          Address    RAM Accessed       Likely Function
+  ───────────────  ─────────  ─────────────────  ──────────────────────
+  isr_handler_3    0x00D658   ATU F4xx regs      ATU channel set (injection)
+  isr_handler_14   0x008528   FFFF42xx           Charge accumulator A
+  isr_handler_28   0x00C36C   FFFF44xx           Timer channel management
+  isr_handler_29   0x00A844   FFFF42xx           Injection pre-calc
+  isr_handler_31   0x00C370   FFFF44xx           Timer channel mgmt (pair w/28)
+  isr_handler_34   0x00D4FC   FFFF44xx           Injection HW sync
+  isr_handler_35   0x00812C   FFFF41xx           Port output control
+  isr_handler_36   0x00ACFC   FFFF42xx           Charge/integration helper
+  isr_handler_38   0x00658C   FFFF41xx           Sensor input conditioning
+  isr_handler_39   0x005980   FFFF5Bxx           ADC prescaler
+  isr_handler_40   0x0081C8   FFFF41xx           Port output control
+  isr_handler_45   0x00D8D0   FFFF44xx           Injection output timing
+  isr_handler_47   0x0099E4   FFFF42xx           Integration result store
+  isr_handler_48   0x00D1F4   FFFF44A4           Injection HW write clear
+  isr_handler_49   0x0084D8   FFFF41xx           Port/sensor handler
+  isr_handler_50   0x00A694   ATU F4Cx regs      ATU timer conditioning
+  isr_handler_51   0x00BB32   FFFF44xx           Timer overflow handler
+  isr_handler_52   0x007D12   FFFF41xx           Diagnostic timer
+
+  These are all interrupt-driven hardware handlers for the injection
+  timing system, ATU timer management, and sensor acquisition. They
+  don't need deep analysis for ROM tuning — they're fixed hardware
+  drivers that rarely change between ROM revisions.
+
+
+================================================================================
+SECTION 5: CALIBRATION DATA REGIONS
+================================================================================
+
+Large float_data regions in 0x000000-0x01FFFF contain calibration
+tables that are NOT yet mapped to descriptors:
+
+  0x001000-0x002C00 (7.2KB) — Sensor calibration coefficients
+  0x002D00-0x003700 (2.5KB) — Additional calibration data
+  0x003900-0x003F7F (1.7KB) — RTOS timing parameters
+  0x010E00-0x011700 (2.3KB) — System config data
+  0x011800-0x011B7F (1KB)   — Timer/prescaler config tables
+
+  Total: ~14.7KB of calibration/config data tables.
+  These are mostly hardware-level calibration (ADC scaling factors,
+  timer prescaler values, sensor voltage-to-physical conversion
+  tables) rather than tuneable ECU parameters.
+
+
+================================================================================
+SECTION 6: ARCHITECTURAL NOTES
+================================================================================
+
+6.1  Boot Sequence
+──────────────────
+  1. Power-on reset → vec[0] → 0x000C0C (reset_entry_point)
+  2. hw_init_A: WDT setup (F70A), bus state controller
+  3. hw_init_B: ATU timer base setup (F720-F726)
+  4. RAM clear (FFFF0000-FFFFBFFF zeroed)
+  5. BSS init + static data copy
+  6. Peripheral init chain: 0x012600-0x01E3FF functions
+  7. RTOS scheduler start → task10 → all other tasks
+
+6.2  ISR Dispatch Architecture
+──────────────────────────────
+  1. Any peripheral interrupt → NMI vector → 0x000BAC
+  2. Context save (all regs including FPU)
+  3. 0x000EE4 (intevt_resolver): reads INTEVT register (FFFF70B)
+     Maps source to class 0/1/2/FF
+  4. 0x000F4C (dispatch_manager): indexed jump via table at 0xE5EC
+     54 handler slots, each a function pointer
+  5. Handler executes → RTE → context restore
+
+6.3  RTOS Task Architecture
+───────────────────────────
+  - 13 task slots in master_task_table at 0x003F80
+  - Each entry: 16 bytes (priority, period, state, entry address)
+  - Scheduler tick from ATU interval ISR (0xE970)
+  - Task epilogue at 0x0035A4: common exit path
+  - Sub-task dispatchers at 0xF97C and 0x10D58: secondary tables
+    for tasks 2/3/12 that iterate additional function arrays
+
+6.4  The 0x012600-0x01E3FF Block in Context
+───────────────────────────────────────────
+  This ~48KB block is the SH7058 BSP (Board Support Package) —
+  hardware peripheral initialization code that:
+  - Configures all GPIO pins (input/output/alternate function)
+  - Sets up ATU timer channels for injection timing
+  - Initializes ADC converter channels and scaling
+  - Configures serial interfaces (SCI, CAN)
+  - Sets interrupt priorities and enables
+  - Calibrates sensor input chains (voltage → physical units)
+
+  This code runs once at startup and is largely static across ROM
+  revisions. It is NOT tuneable and does not contain calibration
+  parameters relevant to engine tuning. The 213 functions here are
+  the standard Denso initialization library for the SH7058 platform.
+
+
+================================================================================
+SECTION 7: SUMMARY
+================================================================================
+
+The 0x000000-0x01FFFF range is now fully classified:
+
+  Component                    Labeled   Unlabeled   Notes
+  ─────────────────────────    ───────   ─────────   ────────────
+  Vector table                 13/13     0           Complete
+  ISR infrastructure           8/8       0           Complete
+  RTOS kernel                  5/5       0           Complete
+  Task entries                 13/13     0           Complete
+  ISR dispatch table           54/54     0           Complete
+  ISR handler functions        53/53     20 unnamed  Semantics identified above
+  Low-level I/O drivers        ~40       ~30         Partially labeled
+  HW peripheral init (BSP)     0         213         83% are GPIO/timer config
+  Sensor ADC processing        0         17          Startup sensor init
+  Sub-task tables              All       0           Structure known
+  Calibration data (float)     0         ~14.7KB     Hardware-level cal tables
+
+  The 213 BSP functions in 0x012600-0x01E3FF are Denso platform
+  initialization code. They configure hardware peripherals and run
+  once at boot. They don't contain tuneable parameters and are the
+  lowest priority for detailed reverse engineering.
+
+  The 20 semantically-unnamed ISR handlers are all injection timing
+  and sensor hardware drivers — important for understanding the
+  hardware layer but not for ROM tuning.
