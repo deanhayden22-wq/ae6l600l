@@ -22,7 +22,7 @@
 | Descriptors catalogued | 760 (1D: 621, 2D: 139) |
 | RAM addresses catalogued | 4,456 |
 | GBR bases identified | 459 (445 labeled, 14 already covered) |
-| Ghidra label operations | 3,358 |
+| Ghidra label operations | 3,398 |
 | Scheduler tasks documented | 59 |
 | Analysis files produced | 79 |
 
@@ -93,9 +93,7 @@ Region             Functions  Named   %     Status
    - Misclassified code block at 0x028100-0x029700
    - See `analysis/region_020000_scout.txt`
 
-3. **Batch-label 200 flag/DTC reader stubs in 0x020000**
-   - Mechanical labeling of template functions (check_xx, diag_check_Pxxxx)
-   - Would propagate names to 500+ call sites across the ROM
+3. ~~**Batch-label flag/DTC reader stubs in 0x020000**~~ -- Done. 40 new labels via byte pattern scanner (scripts/flag_reader_scan.py). Templates: T1 (flag readers), T2 (DTC flag readers), T5 (tiny return stubs).
 
 ### MEDIUM (diagnostic/sensor, useful for understanding DTCs)
 
@@ -148,6 +146,7 @@ Region             Functions  Named   %     Status
 | `scripts/ae5l600l_tools.py` | General analysis toolkit |
 | `scripts/consolidate_defs.py` | RomRaider definition consolidation |
 | `scripts/gbr_label_gen.py` | GBR bulk-labeling generator script |
+| `scripts/flag_reader_scan.py` | Flag/DTC reader byte pattern scanner |
 
 ---
 
