@@ -1,0 +1,595 @@
+Final Seven Named Function Analysis — 329/329 (100%)
+=====================================================
+Date: 2026-04-03
+Purpose: Close out the last 7 unnamed gaps to reach 100% named function coverage.
+
+These are all low-level infrastructure functions. Higher-level callers are already
+fully analyzed in the main subsystem files.
+
+================================================================================
+1. evap_workspace_init (DUPLICATE) — 0x0662D0
+================================================================================
+
+Range: 0x0662D0 - 0x0662D3 (4 bytes)
+Type:  Trampoline / redirect
+
+Disassembly:
+  0662D0: A176  bra     0x0665C0       ; unconditional branch to primary copy
+  0662D2: 0009  nop                    ; delay slot
+
+Analysis:
+  Pure trampoline. Redirects to the primary evap_workspace_init at 0x0665C0.
+  Both share the same Ghidra label. This duplicate exists because the EVAP
+  subsystem has two call sites — one reaches through this trampoline, the
+  other calls 0x665C0 directly.
+
+  No unique logic. Covered by reference to the primary copy below.
+
+
+================================================================================
+2. evap_workspace_init (PRIMARY) — 0x0665C0
+================================================================================
+
+Range: 0x0665C0 - 0x066624 (100 bytes)
+Type:  Workspace initializer (EVAP/emissions subsystem)
+Note:  Ghidra boundary was 0x665C0-0x665FB (truncated). Actual function extends
+       to 0x066624 via fall-through past the Ghidra-detected range.
+
+Disassembly:
+  ; === Prologue ===
+  0665C0: 2FC6  mov.l   R12,@-R15      ; save R12
+  0665C2: 2FD6  mov.l   R13,@-R15      ; save R13
+  0665C4: 2FE6  mov.l   R14,@-R15      ; save R14
+  0665C6: 4F22  sts.l   PR,@-R15       ; save PR
+
+  ; === Phase 1: Zero-initialize 6 dword slots via uint16_pack(0) ===
+  0665C8: DE3E  mov.l   @(0xF8,PC),R14 ; R14 = 0x000BE9B0 = uint16_pack
+  0665CA: ED00  mov     #0,R13         ; R13 = 0 (value to pack)
+
+  0665CC: 4E0B  jsr     @R14           ; R0 = uint16_pack(0)
+  0665CE: 64D3  mov     R13,R4         ;   delay: R4 = 0
+  0665D0: D23D  mov.l   @(0xF4,PC),R2  ; R2 = 0xFFFF2368
+  0665D2: 2202  mov.l   R0,@R2         ; [FFFF2368] = packed(0)
+
+  0665D4: 4E0B  jsr     @R14           ; R0 = uint16_pack(0)
+  0665D6: 64D3  mov     R13,R4
+  0665D8: DC3C  mov.l   @(0xF0,PC),R12 ; R12 = 0xFFFF236C (base for array)
+  0665DA: 2C02  mov.l   R0,@R12        ; [FFFF236C+0x00] = packed(0)
+
+  0665DC: 4E0B  jsr     @R14           ; R0 = uint16_pack(0)
+  0665DE: 64D3  mov     R13,R4
+  0665E0: 1C01  mov.l   R0,@(0x4,R12)  ; [FFFF236C+0x04] = packed(0)
+
+  0665E2: 4E0B  jsr     @R14           ; R0 = uint16_pack(0)
+  0665E4: 64D3  mov     R13,R4
+  0665E6: 1C02  mov.l   R0,@(0x8,R12)  ; [FFFF236C+0x08] = packed(0)
+
+  0665E8: 4E0B  jsr     @R14           ; R0 = uint16_pack(0)
+  0665EA: 64D3  mov     R13,R4
+  0665EC: 1C03  mov.l   R0,@(0xC,R12)  ; [FFFF236C+0x0C] = packed(0)
+
+  0665EE: 4E0B  jsr     @R14           ; R0 = uint16_pack(0)
+  0665F0: 64D3  mov     R13,R4
+  0665F2: 1C04  mov.l   R0,@(0x10,R12) ; [FFFF236C+0x10] = packed(0)
+
+  ; === Phase 2: Set 6 byte flags to 1 via uint8_pack(1) ===
+  0665F4: DE36  mov.l   @(0xD8,PC),R14 ; R14 = 0x000BE9A0 = uint8_pack
+  0665F6: ED01  mov     #1,R13         ; R13 = 1 (value to pack)
+
+  0665F8: 4E0B  jsr     @R14           ; R0 = uint8_pack(1)
+  0665FA: 64D3  mov     R13,R4
+  0665FC: 81CA  mov.w   R0,@(0x14,R12) ; [FFFF236C+0x14] = packed(1)
+
+  0665FE: 4E0B  jsr     @R14           ; R0 = uint8_pack(1)
+  066600: 64D3  mov     R13,R4
+  066602: 81CB  mov.w   R0,@(0x16,R12) ; [FFFF236C+0x16] = packed(1)
+
+  066604: 4E0B  jsr     @R14           ; R0 = uint8_pack(1)
+  066606: 64D3  mov     R13,R4
+  066608: 81CC  mov.w   R0,@(0x18,R12) ; [FFFF236C+0x18] = packed(1)
+
+  06660A: 4E0B  jsr     @R14           ; R0 = uint8_pack(1)
+  06660C: 64D3  mov     R13,R4
+  06660E: 81CD  mov.w   R0,@(0x1A,R12) ; [FFFF236C+0x1A] = packed(1)
+
+  066610: 4E0B  jsr     @R14           ; R0 = uint8_pack(1)
+  066612: 64D3  mov     R13,R4
+  066614: 81CE  mov.w   R0,@(0x1C,R12) ; [FFFF236C+0x1C] = packed(1)
+
+  066616: 4E0B  jsr     @R14           ; R0 = uint8_pack(1)
+  066618: 64D3  mov     R13,R4
+  06661A: 81CF  mov.w   R0,@(0x1E,R12) ; [FFFF236C+0x1E] = packed(1)
+
+  ; === Epilogue ===
+  06661C: 4F26  lds.l   @R15+,PR       ; restore PR
+  06661E: 6EF6  mov.l   @R15+,R14      ; restore R14
+  066620: 6DF6  mov.l   @R15+,R13      ; restore R13
+  066622: 000B  rts
+  066624: 6CF6  mov.l   @R15+,R12      ; delay: restore R12
+
+Literal pool:
+  [0x0666C4] = 0x000BE9B0  → uint16_pack
+  [0x0666C8] = 0xFFFF2368  → evap_workspace_slot0 (standalone dword)
+  [0x0666CC] = 0xFFFF236C  → evap_workspace_base (array base for slots 1-11)
+  [0x0666D0] = 0x000BE9A0  → uint8_pack
+
+Pseudocode:
+  void evap_workspace_init(void) {
+      // Zero 6 uint16 workspace slots (stored as packed dwords)
+      *(uint32_t*)0xFFFF2368 = uint16_pack(0);      // slot 0
+      *(uint32_t*)0xFFFF236C = uint16_pack(0);      // slot 1
+      *(uint32_t*)0xFFFF2370 = uint16_pack(0);      // slot 2
+      *(uint32_t*)0xFFFF2374 = uint16_pack(0);      // slot 3
+      *(uint32_t*)0xFFFF2378 = uint16_pack(0);      // slot 4
+      *(uint32_t*)0xFFFF237C = uint16_pack(0);      // slot 5
+
+      // Set 6 byte flags to 1 (stored as packed words)
+      *(uint16_t*)0xFFFF2380 = uint8_pack(1);       // flag 0
+      *(uint16_t*)0xFFFF2382 = uint8_pack(1);       // flag 1
+      *(uint16_t*)0xFFFF2384 = uint8_pack(1);       // flag 2
+      *(uint16_t*)0xFFFF2386 = uint8_pack(1);       // flag 3
+      *(uint16_t*)0xFFFF2388 = uint8_pack(1);       // flag 4
+      *(uint16_t*)0xFFFF238A = uint8_pack(1);       // flag 5
+  }
+
+RAM:
+  0xFFFF2368        evap_workspace_slot0 (uint32, packed uint16 = 0)
+  0xFFFF236C-237C   evap_workspace_slots[1..5] (uint32 each, packed uint16 = 0)
+  0xFFFF2380-238A   evap_workspace_flags[0..5] (uint16 each, packed uint8 = 1)
+
+Calls:
+  uint16_pack (0x0BE9B0) — 6 times, param=0
+  uint8_pack  (0x0BE9A0) — 6 times, param=1
+
+Tuning relevance: NONE. EVAP/emissions init only. No EGR on turbo EJ255.
+
+
+================================================================================
+3. peripheral_io_config — 0x0BDC6A
+================================================================================
+
+Range: 0x0BDC6A - 0x0BDCB4 (74 bytes)
+Type:  Peripheral I/O configuration with checksum validation
+Note:  Ghidra boundary was 0x0BDC6A-0x0BDC79 (16 bytes). Actual function
+       extends to 0x0BDCB4 via fall-through. Ghidra likely split at the JSR.
+
+Disassembly:
+  ; === Prologue ===
+  0BDC6A: 2FD6  mov.l   R13,@-R15      ; save R13
+  0BDC6C: 2FE6  mov.l   R14,@-R15      ; save R14
+  0BDC6E: 4F22  sts.l   PR,@-R15       ; save PR
+  0BDC70: 7FFC  add     #-4,R15        ; allocate 4 bytes stack
+
+  ; === Read peripheral register ===
+  0BDC72: 6D43  mov     R4,R13         ; R13 = config_struct pointer
+  0BDC74: D223  mov.l   @(0x8C,PC),R2  ; R2 = 0x0000317C (peripheral_reg_read)
+  0BDC76: 420B  jsr     @R2            ; R0 = peripheral_reg_read(16)
+  0BDC78: E410  mov     #16,R4         ;   delay: R4 = 16 (port/channel)
+
+  ; === Checksum validation ===
+  0BDC7A: 6403  mov     R0,R4          ; R4 = raw register value
+  0BDC7C: 62D2  mov.l   @R13,R2        ; R2 = config_struct[0] (32-bit config word)
+  0BDC7E: 2F22  mov.l   R2,@R15        ; store on stack
+  0BDC80: 62F1  mov.w   @R15,R2        ; R2 = upper 16 bits of config word
+  0BDC82: 85F1  mov.w   @(0x2,R15),R0  ; R0 = lower 16 bits of config word
+  0BDC84: 320C  add     R0,R2          ; R2 = upper + lower
+  0BDC86: 6527  not     R2,R5          ; R5 = ~(upper + lower) = expected checksum
+
+  0BDC88: 85D2  mov.w   @(0x4,R13),R0  ; R0 = config_struct.checksum_a
+  0BDC8A: 620D  extu.w  R0,R2          ; R2 = zero-extended checksum_a
+  0BDC8C: 665D  extu.w  R5,R6          ; R6 = zero-extended computed checksum
+  0BDC8E: 3620  cmp/eq  R2,R6          ; computed == checksum_a?
+  0BDC90: 8904  bt      0x0BDC9C       ; if match: skip to "valid" path
+
+  0BDC92: 85D3  mov.w   @(0x6,R13),R0  ; R0 = config_struct.checksum_b (backup)
+  0BDC94: 620D  extu.w  R0,R2          ; R2 = zero-extended checksum_b
+  0BDC96: 3620  cmp/eq  R2,R6          ; computed == checksum_b?
+  0BDC98: 8F04  bf/s    0x0BDCA4       ; if no match: skip update, R14=1
+  0BDC9A: EE01  mov     #1,R14         ;   delay: R14 = 1 (invalid/changed)
+
+  ; === Valid path: update stored checksums ===
+  0BDC9C: EE00  mov     #0,R14         ; R14 = 0 (valid)
+  0BDC9E: 6053  mov     R5,R0          ; R0 = computed checksum
+  0BDCA0: 81D2  mov.w   R0,@(0x4,R13)  ; config_struct.checksum_a = computed
+  0BDCA2: 81D3  mov.w   R0,@(0x6,R13)  ; config_struct.checksum_b = computed
+
+  ; === Finalize ===
+  0BDCA4: D218  mov.l   @(0x60,PC),R2  ; R2 = 0x00003190 (peripheral_reg_write)
+  0BDCA6: 420B  jsr     @R2            ; peripheral_reg_write()
+  0BDCA8: 0009  nop
+
+  ; === Epilogue ===
+  0BDCAA: 60E3  mov     R14,R0         ; R0 = return value (0=valid, 1=changed)
+  0BDCAC: 7F04  add     #4,R15         ; deallocate stack
+  0BDCAE: 4F26  lds.l   @R15+,PR       ; restore PR
+  0BDCB0: 6EF6  mov.l   @R15+,R14      ; restore R14
+  0BDCB2: 000B  rts
+  0BDCB4: 6DF6  mov.l   @R15+,R13      ; delay: restore R13
+
+Literal pool:
+  [0x0BDD04] = 0x0000317C  → peripheral_reg_read (low ROM, RTOS/BSP)
+  [0x0BDD08] = 0x00003190  → peripheral_reg_write (low ROM, RTOS/BSP)
+
+Pseudocode:
+  int peripheral_io_config(io_config_t *cfg) {
+      uint16_t raw = peripheral_reg_read(16);   // read port 16
+
+      uint32_t word = cfg->config_word;
+      uint16_t upper = (uint16_t)(word >> 16);
+      uint16_t lower = (uint16_t)(word);
+      uint16_t checksum = ~(upper + lower);
+
+      if (checksum == cfg->checksum_a || checksum == cfg->checksum_b) {
+          // Config valid — update both checksum copies
+          cfg->checksum_a = checksum;
+          cfg->checksum_b = checksum;
+          peripheral_reg_write();
+          return 0;  // valid
+      }
+
+      peripheral_reg_write();
+      return 1;  // invalid / changed
+  }
+
+Config struct layout (io_config_t):
+  +0x00  uint32  config_word      (split into two 16-bit halves for checksum)
+  +0x04  uint16  checksum_a       (primary checksum)
+  +0x06  uint16  checksum_b       (backup checksum)
+
+Calls:
+  0x0000317C  peripheral_reg_read(channel) — BSP, reads SH7058 I/O register
+  0x00003190  peripheral_reg_write()       — BSP, writes SH7058 I/O register
+
+Tuning relevance: NONE. Low-level I/O infrastructure.
+
+
+================================================================================
+4. peripheral_io_read — 0x0BDD5A
+================================================================================
+
+Range: 0x0BDD5A - 0x0BDD6D (20 bytes)
+Type:  Integer clamp (min/max bounding)
+
+Disassembly:
+  0BDD5A: 3453  cmp/ge  R5,R4          ; R4 >= R5? (value >= min?)
+  0BDD5C: 8B01  bf      0x0BDD62       ; if value < min: go to max check path
+  0BDD5E: A004  bra     0x0BDD6A       ; value >= min: check if > max
+  0BDD60: 6253  mov     R5,R2          ;   delay: R2 = min (tentative result)
+
+  0BDD62: 3467  cmp/gt  R6,R4          ; R4 > R6? (value > max?)
+  0BDD64: 8D01  bt/s    0x0BDD6A       ; if value > max: return max
+  0BDD66: 6243  mov     R4,R2          ;   delay: R2 = value
+  0BDD68: 6263  mov     R6,R2          ; R2 = max (value was < min AND <= max? No...)
+
+  0BDD6A: 000B  rts
+  0BDD6C: 6023  mov     R2,R0          ; delay: R0 = result
+
+Analysis:
+  Wait — re-reading the control flow more carefully:
+
+  Path A (value >= min):
+    0BDD5A: cmp/ge R5,R4  → T=1 if R4>=R5
+    0BDD5C: bf 0BDD62     → not taken (T=1)
+    0BDD5E: bra 0BDD6A    → jump to return
+    0BDD60: mov R5,R2     → delay slot: R2 = min... but this is wrong for "in range"
+
+  Actually this is tricky. Let me re-trace:
+    R4 = value, R5 = param2, R6 = param3
+
+  If cmp/ge R5,R4 (signed: R4 >= R5):
+    True path:  bra 0BDD6A with R2=R5 → returns R5
+    False path: falls to 0BDD62
+
+  At 0BDD62: cmp/gt R6,R4 (signed: R4 > R6):
+    True path:  bt/s 0BDD6A with R2=R4 → returns R4
+    False path: R2=R6, then mov R6,R2 → returns R6... wait R2 was already R4
+
+  Let me re-read:
+    0BDD62: cmp/gt R6,R4   ; T=1 if R4 > R6
+    0BDD64: bt/s   0BDD6A  ; if R4 > R6: branch, delay slot sets R2=R4
+    0BDD66: mov    R4,R2   ; delay: R2 = R4
+    0BDD68: mov    R6,R2   ; (reached only if R4 <= R6): R2 = R6
+
+  So the full logic:
+    if (value >= param2) return param2;      // R4 >= R5 → return R5
+    if (value > param3)  return value;       // R4 > R6  → return R4
+    else                 return param3;      // R4 <= R6 → return R6
+
+  This is: clamp-to-bounds with inverted sense. Given the function name
+  "peripheral_io_read", this appears to be a bounded read where:
+    R4 = raw reading, R5 = high bound, R6 = low bound
+    if reading >= high_bound: return high_bound
+    if reading > low_bound:   return reading (in range)
+    else:                     return low_bound
+
+Pseudocode:
+  int peripheral_io_read(int value, int high, int low) {
+      if (value >= high) return high;   // clamp to upper bound
+      if (value > low)   return value;  // in range, pass through
+      return low;                       // clamp to lower bound
+  }
+
+  Equivalent to: return clamp(value, low, high)
+  where param order is (value, high_bound, low_bound).
+
+Tuning relevance: NONE. Generic I/O utility.
+
+
+================================================================================
+5. table_desc_2d_uint8 — 0x0BE88C
+================================================================================
+
+Range: 0x0BE88C - 0x0BE8A9 (30 bytes)
+Type:  2D table descriptor lookup returning uint8
+
+Disassembly:
+  ; === Save MACL, MACH, PR ===
+  0BE88C: 4F12  sts.l   MACL,@-R15     ; save MACL (used by multiply in interp)
+  0BE88E: 4F02  sts.l   MACH,@-R15     ; save MACH
+  0BE890: 4F22  sts.l   PR,@-R15       ; save PR
+
+  ; === Axis lookup ===
+  0BE892: 8540  mov.w   @(0x0,R4),R0   ; R0 = desc->axis_count (word at desc+0)
+  0BE894: 5141  mov.l   @(0x4,R4),R1   ; R1 = desc->axis_ptr (long at desc+4)
+  0BE896: B221  bsr     0x0BECDC       ; call axis_lookup_2d(axis_ptr, lookup_val)
+  0BE898: 6253  mov     R5,R2          ;   delay: R2 = lookup_value (R5)
+                                        ; Returns: R0 = index, R2 = fraction
+
+  ; === Data interpolation ===
+  0BE89A: 6213  mov     R1,R2          ; R2 = fraction (from axis_lookup_2d in R1)
+  0BE89C: B150  bsr     0x0BEB40       ; call interp_1d_uint8_int()
+  0BE89E: 5142  mov.l   @(0x8,R4),R1   ;   delay: R1 = desc->data_ptr (long at desc+8)
+                                        ; Returns: R0 = interpolated value
+
+  ; === Restore and return ===
+  0BE8A0: 4F26  lds.l   @R15+,PR       ; restore PR
+  0BE8A2: 4F06  lds.l   @R15+,MACH     ; restore MACH
+  0BE8A4: 4F16  lds.l   @R15+,MACL     ; restore MACL
+  0BE8A6: 000B  rts
+  0BE8A8: 600C  extu.b  R0,R0          ; delay: zero-extend to uint8
+
+Pseudocode:
+  uint8_t table_desc_2d_uint8(desc_2d_t *desc, uint32_t lookup_value) {
+      // Find position in axis
+      axis_result_t pos = axis_lookup_2d(desc->axis_ptr, desc->axis_count, lookup_value);
+      // Interpolate in data table
+      uint32_t raw = interp_1d_uint8_int(pos.index, desc->data_ptr, pos.fraction);
+      return (uint8_t)raw;
+  }
+
+Descriptor struct (desc_2d_t):
+  +0x00  uint16  axis_count    (number of axis breakpoints)
+  +0x04  uint32  axis_ptr      (pointer to axis breakpoint array)
+  +0x08  uint32  data_ptr      (pointer to data value array)
+
+Calls:
+  axis_lookup_2d     (0x0BECDC) — binary search + fractional position in axis
+  interp_1d_uint8_int (0x0BEB40) — 1D linear interpolation, uint8 data
+
+Callers: Widely used across engine control for 1D calibration table lookups
+         with uint8 output resolution (e.g., correction factors, flags).
+
+Tuning relevance: LOW directly, but this is the lookup engine behind many
+calibration tables. Callers are already analyzed.
+
+
+================================================================================
+6. table_desc_2d_uint16 — 0x0BE8C4
+================================================================================
+
+Range: 0x0BE8C4 - 0x0BE8E1 (30 bytes)
+Type:  2D table descriptor lookup returning uint16
+
+Disassembly:
+  ; === Save MACL, MACH, PR ===
+  0BE8C4: 4F12  sts.l   MACL,@-R15     ; save MACL
+  0BE8C6: 4F02  sts.l   MACH,@-R15     ; save MACH
+  0BE8C8: 4F22  sts.l   PR,@-R15       ; save PR
+
+  ; === Axis lookup ===
+  0BE8CA: 8540  mov.w   @(0x0,R4),R0   ; R0 = desc->axis_count
+  0BE8CC: 5141  mov.l   @(0x4,R4),R1   ; R1 = desc->axis_ptr
+  0BE8CE: B205  bsr     0x0BECDC       ; call axis_lookup_2d()
+  0BE8D0: 6253  mov     R5,R2          ;   delay: R2 = lookup_value
+
+  ; === Data interpolation ===
+  0BE8D2: 6213  mov     R1,R2          ; R2 = fraction
+  0BE8D4: B15C  bsr     0x0BEB90       ; call interp_1d_uint16_int()
+  0BE8D6: 5142  mov.l   @(0x8,R4),R1   ;   delay: R1 = desc->data_ptr
+
+  ; === Restore and return ===
+  0BE8D8: 4F26  lds.l   @R15+,PR       ; restore PR
+  0BE8DA: 4F06  lds.l   @R15+,MACH     ; restore MACH
+  0BE8DC: 4F16  lds.l   @R15+,MACL     ; restore MACL
+  0BE8DE: 000B  rts
+  0BE8E0: 600D  extu.w  R0,R0          ; delay: zero-extend to uint16
+
+Analysis:
+  Identical structure to table_desc_2d_uint8, except:
+  - Calls interp_1d_uint16_int (0x0BEB90) instead of interp_1d_uint8_int
+  - Final zero-extension is extu.w (16-bit) instead of extu.b (8-bit)
+
+Pseudocode:
+  uint16_t table_desc_2d_uint16(desc_2d_t *desc, uint32_t lookup_value) {
+      axis_result_t pos = axis_lookup_2d(desc->axis_ptr, desc->axis_count, lookup_value);
+      uint32_t raw = interp_1d_uint16_int(pos.index, desc->data_ptr, pos.fraction);
+      return (uint16_t)raw;
+  }
+
+Calls:
+  axis_lookup_2d       (0x0BECDC) — same axis search
+  interp_1d_uint16_int (0x0BEB90) — 1D linear interpolation, uint16 data
+
+Tuning relevance: LOW directly. This is the lookup engine behind most
+calibration tables with uint16 output (RPM targets, timing values, etc.).
+
+
+================================================================================
+7. int_sat_sub — 0x0BEA98
+================================================================================
+
+Range: 0x0BEA98 - 0x0BEAA9 (18 bytes)
+Type:  Saturating signed 32-bit integer subtraction
+
+Disassembly:
+  0BEA98: 345B  subv    R5,R4          ; R4 = R4 - R5; T = overflow flag
+  0BEA9A: 8F04  bf/s    0x0BEAA6       ; if no overflow: branch to return
+  0BEA9C: 6043  mov     R4,R0          ;   delay: R0 = result
+
+  ; === Overflow path: saturate ===
+  0BEA9E: D003  mov.l   @(0x0C,PC),R0  ; R0 = 0x7FFFFFFF (INT32_MAX)
+  0BEAA0: 4411  cmp/pz  R4             ; T = (R4 >= 0)?
+  0BEAA2: E400  mov     #0,R4          ; R4 = 0 (T unchanged)
+  0BEAA4: 304E  addc    R4,R0          ; R0 = R0 + R4 + T = 0x7FFFFFFF + 0 + T
+                                        ;   If original R4 >= 0: T=1 → R0 = 0x80000000
+                                        ;   If original R4 < 0:  T=0 → R0 = 0x7FFFFFFF
+
+  ; === Return ===
+  0BEAA6: 000B  rts
+  0BEAA8: 0009  nop
+
+Literal pool:
+  [0x0BEAAC] = 0x7FFFFFFF  → INT32_MAX
+
+Pseudocode:
+  int32_t int_sat_sub(int32_t a, int32_t b) {
+      int32_t result = a - b;
+      if (no overflow)
+          return result;
+      // Overflow occurred
+      if (a >= 0)
+          return INT32_MIN;  // 0x80000000 (positive - negative overflowed)
+      else
+          return INT32_MAX;  // 0x7FFFFFFF (negative - positive overflowed)
+  }
+
+Analysis:
+  Classic saturating subtraction. Uses the SH-2 SUBV instruction which sets
+  the T flag on signed overflow. The saturation logic uses a clever trick:
+  loads INT32_MAX, then adds T via ADDC. If the original minuend was positive
+  (meaning the subtraction overflowed to negative), T=1 and adding 1 to
+  0x7FFFFFFF gives 0x80000000 = INT32_MIN. If the minuend was negative
+  (overflow to positive), T=0 and the result stays 0x7FFFFFFF = INT32_MAX.
+
+Tuning relevance: NONE directly. Used internally by enrichment calculations
+and other math paths. Callers are already analyzed.
+
+
+================================================================================
+8. interp_1d_uint16_int — 0x0BEB90
+================================================================================
+
+Range: 0x0BEB90 - 0x0BEBBD (46 bytes)
+Type:  1D linear interpolation for uint16 table data
+
+Input registers (set by caller):
+  R0 = integer index into table
+  R1 = pointer to uint16 data array
+  R2 = fractional part (0 = exact, nonzero = interpolate)
+
+Disassembly:
+  ; === Compute byte offset and read entry[index] ===
+  0BEB90: 4000  shll    R0             ; R0 = index * 2 (uint16 stride)
+  0BEB92: 310C  add     R0,R1         ; R1 = &data[index]
+  0BEB94: 6015  mov.w   @R1+,R0       ; R0 = data[index]; R1 advances to &data[index+1]
+  0BEB96: 2228  tst     R2,R2         ; fraction == 0?
+  0BEB98: 8D0F  bt/s    0x0BEBBA      ; if exact index: skip interpolation
+  0BEB9A: 600D  extu.w  R0,R0         ;   delay: R0 = (uint16_t)data[index]
+
+  ; === Read next entry ===
+  0BEB9C: 6111  mov.w   @R1,R1        ; R1 = data[index+1]
+  0BEB9E: 611D  extu.w  R1,R1         ; R1 = (uint16_t)data[index+1]
+
+  ; === Determine interpolation direction ===
+  0BEBA0: 3107  cmp/gt  R0,R1         ; data[index+1] > data[index]?
+  0BEBA2: 8F05  bf/s    0x0BEBB0      ; if data[i+1] <= data[i]: go to downward path
+  0BEBA4: 6303  mov     R0,R3         ;   delay: R3 = data[index] (saved)
+
+  ; === Upward interpolation: data[i+1] > data[i] ===
+  0BEBA6: 3108  sub     R0,R1         ; R1 = data[i+1] - data[i] (positive delta)
+  0BEBA8: 3215  dmulu.l R1,R2         ; MACH:MACL = delta * fraction
+  0BEBAA: 010A  sts     MACH,R1       ; R1 = high 32 bits = interpolated offset
+  0BEBAC: 000B  rts
+  0BEBAE: 301C  add     R1,R0         ; delay: R0 = data[i] + offset → result
+
+  ; === Downward interpolation: data[i+1] <= data[i] ===
+  0BEBB0: 3318  sub     R1,R3         ; R3 = data[i] - data[i+1] (positive delta)
+  0BEBB2: 3235  dmulu.l R3,R2         ; MACH:MACL = delta * fraction
+  0BEBB4: 010A  sts     MACH,R1       ; R1 = interpolated offset
+  0BEBB6: 000B  rts
+  0BEBB8: 3018  sub     R1,R0         ; delay: R0 = data[i] - offset → result
+
+  ; === Exact index (no interpolation) ===
+  0BEBBA: 000B  rts
+  0BEBBC: 0009  nop
+
+Pseudocode:
+  uint16_t interp_1d_uint16_int(uint index, uint16_t *data, uint32_t fraction) {
+      uint16_t val = data[index];
+      if (fraction == 0)
+          return val;
+
+      uint16_t next = data[index + 1];
+      if (next > val) {
+          // Ascending: interpolate upward
+          uint32_t delta = next - val;
+          uint32_t offset = (uint32_t)((uint64_t)(delta * fraction) >> 32);
+          return val + offset;
+      } else {
+          // Descending: interpolate downward
+          uint32_t delta = val - next;
+          uint32_t offset = (uint32_t)((uint64_t)(delta * fraction) >> 32);
+          return val - offset;
+      }
+  }
+
+Analysis:
+  Standard fixed-point linear interpolation between two adjacent uint16 table
+  entries. The fraction is a 32-bit fixed-point value (0x00000000 = 0.0,
+  0xFFFFFFFF = ~1.0). The DMULU.L instruction performs 32x32→64 unsigned
+  multiply; taking MACH (high 32 bits) effectively divides by 2^32, giving
+  the fractional interpolation result.
+
+  The split into ascending/descending paths avoids signed arithmetic — both
+  paths compute a positive delta and add/subtract it, keeping everything
+  unsigned.
+
+  This is the uint16 sibling of interp_1d_uint8_int (0x0BEB40), which uses
+  the same algorithm but with byte-sized table entries.
+
+Callers:
+  table_desc_2d_uint16 (0x0BE8C4) — the primary caller
+  Also called directly by various subsystem functions via the descriptor
+  lookup framework.
+
+Tuning relevance: LOW directly. This is the interpolation engine behind
+all uint16 calibration table lookups. Callers are already analyzed.
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+All 7 named function gaps are now analyzed:
+
+  # | Address   | Name                   | Size | Type
+  --|-----------|------------------------|------|---------------------------
+  1 | 0x0662D0  | evap_workspace_init    |   4B | Trampoline → 0x665C0
+  2 | 0x0665C0  | evap_workspace_init    | 100B | EVAP workspace zeroing
+  3 | 0x0BDC6A  | peripheral_io_config   |  74B | I/O config checksum check
+  4 | 0x0BDD5A  | peripheral_io_read     |  20B | Integer clamp(val,hi,lo)
+  5 | 0x0BE88C  | table_desc_2d_uint8    |  30B | 2D table lookup → uint8
+  6 | 0x0BE8C4  | table_desc_2d_uint16   |  30B | 2D table lookup → uint16
+  7 | 0x0BEA98  | int_sat_sub            |  18B | Saturating int32 subtract
+  8 | 0x0BEB90  | interp_1d_uint16_int   |  46B | 1D uint16 interpolation
+
+Named function coverage: 329/329 = 100.0%
+
+Notes:
+  - evap_workspace_init at 0x665C0 was already covered in prior analysis
+    (the copy at 0x662D0 is the actual gap — just a trampoline)
+  - Ghidra boundary issues: peripheral_io_config and evap_workspace_init both
+    have truncated ADDRESS_RANGE entries in the Ghidra export. The actual
+    functions extend past the declared boundaries via fall-through.
+  - All 7 functions are low-level infrastructure with no direct tuning
+    relevance. Higher-level callers are fully analyzed in subsystem files.

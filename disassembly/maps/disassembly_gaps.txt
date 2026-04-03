@@ -18,29 +18,25 @@ Functions (Ghidra):
   Thunks:                  88  (3.3%)
 
 Named Function Coverage (address-based matching against analysis files):
-  Covered:              322 / 329  (97.9%)
-  True gaps:              7         (see below)
+  Covered:              329 / 329  (100.0%)
+  True gaps:              0         (all closed — see final_seven_analysis.txt)
 
 ================================================================================
-NAMED FUNCTION GAPS (7 remaining)
+NAMED FUNCTION GAPS — ALL CLOSED (2026-04-03)
 ================================================================================
 
-These 7 named Ghidra functions have zero address hits in any analysis file:
+All 7 gaps closed in analysis/final_seven_analysis.txt:
 
-EVAP/Emissions (intentionally skipped — no EGR valve on turbo EJ255):
-  0x0662D0  evap_workspace_init    Duplicate; the other at 0x665C0 IS covered
+  0x0662D0  evap_workspace_init    Trampoline → 0x665C0 (4 bytes)
+  0x0665C0  evap_workspace_init    EVAP workspace zeroing (100 bytes, Ghidra boundary was truncated)
+  0x0BDC6A  peripheral_io_config   I/O config checksum validation (74 bytes, Ghidra boundary was truncated)
+  0x0BDD5A  peripheral_io_read     Integer clamp(value, high, low) (20 bytes)
+  0x0BE88C  table_desc_2d_uint8    2D descriptor lookup → uint8 (30 bytes)
+  0x0BE8C4  table_desc_2d_uint16   2D descriptor lookup → uint16 (30 bytes)
+  0x0BEA98  int_sat_sub            Saturating int32 subtraction (18 bytes)
+  0x0BEB90  interp_1d_uint16_int   1D uint16 linear interpolation (46 bytes)
 
-Peripheral I/O Library:
-  0x0BDC6A  peripheral_io_config   Neighbor peripheral_io_init (0xBDB92) is covered
-  0x0BDD5A  peripheral_io_read     Same subsystem
-
-Math/Utility Library (ROM library routines at 0xBE000+):
-  0x0BE88C  table_desc_2d_uint8    2D table descriptor lookup, uint8 variant
-  0x0BE8C4  table_desc_2d_uint16   2D table descriptor lookup, uint16 variant
-  0x0BEA98  int_sat_sub            Saturating integer subtraction
-  0x0BEB90  interp_1d_uint16_int   1D interpolation, uint16 variant
-
-These are all low-level infrastructure. Higher-level code calling them IS analyzed.
+All low-level infrastructure. No direct tuning relevance.
 
 ================================================================================
 COMPLETED SUBSYSTEMS (do not re-flag)

@@ -251,9 +251,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00066C40, "evap_test_sequence",
             "EVAP leak test sequence. Multi-stage: seal system, apply vacuum, "
             + "monitor pressure decay. DTCs: P0456 (very small leak), P0458/P0459 (purge circuit).");
+        count += labelComment(0x000662D0, "evap_workspace_init_trampoline",
+            "Trampoline: bra 0x665C0. Redirect to primary evap_workspace_init.");
         count += labelComment(0x000665C0, "evap_workspace_init",
-            "EVAP workspace initialization. 5x desc_read_float + 6x desc_read_u16 "
-            + "into FFFF236C-FFFF238A calibration cache.");
+            "EVAP workspace initialization. Zeros 6 uint16 slots (FFFF2368-FFFF237C) "
+            + "via uint16_pack(0), sets 6 byte flags (FFFF2380-FFFF238A) to 1 via uint8_pack(1).");
         count += labelComment(0x00066626, "evap_ect_threshold_lookup",
             "EVAP ECT-based threshold lookup. Two 1D tables (desc 0xACF64, 0xACF78) "
             + "compute lower/upper EVAP pressure bounds. Delta/sum stored to FFFF9314/9318.");

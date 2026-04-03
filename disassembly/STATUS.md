@@ -1,7 +1,7 @@
 # AE5L600L Disassembly Status
 
 **ROM:** 2013 USDM Impreza WRX MT (Denso SH7058, SH-2 CPU)
-**Last updated:** 2026-04-03
+**Last updated:** 2026-04-03 (100% named function coverage achieved)
 
 ---
 
@@ -16,7 +16,7 @@
 | Named functions | 329 (12.2%) |
 | Unnamed (FUN_) | 2,283 (84.6%) |
 | Thunks resolved | 88 (3.3%) |
-| Named function coverage | 322/329 (97.9%) |
+| Named function coverage | 329/329 (100%) |
 | Calibration defs (RomRaider) | 622 |
 | Calibration defs mapped to Ghidra | 622 (100%) |
 | Descriptors catalogued | 760 (1D: 621, 2D: 139) |
@@ -24,7 +24,7 @@
 | GBR bases identified | 459 (445 labeled, 14 already covered) |
 | Ghidra label operations | 3,398 |
 | Scheduler tasks documented | 59 |
-| Analysis files produced | 79 |
+| Analysis files produced | 80 |
 
 ---
 
@@ -55,6 +55,9 @@ Every named function in these subsystems is fully analyzed with disassembly, pse
 | Task Scheduler | 6 | task_scheduler_analysis.txt, task_call_graph.txt |
 | DTC Framework | covered | dtc_diagnostics_analysis.txt |
 | Per-Cyl Injection Output | 7 stages | percyl_injection_output_analysis.txt |
+| EVAP Workspace Init | 1 (+trampoline) | final_seven_analysis.txt |
+| Peripheral I/O Library | 2 | final_seven_analysis.txt |
+| Math/Utility Library | 4 | final_seven_analysis.txt |
 
 ---
 
@@ -115,9 +118,9 @@ Region             Functions  Named   %     Status
    - Naming top 5 functions (0x016708, 0x016558, 0x011880, 0x014278, 0x01D742) would propagate labels to 200+ call sites
    - RTOS/hardware-level code, minimal tuning value
 
-8. **Math/utility library gaps (0x0BE000+)**
-   - 4 named but uncovered functions: 2D table lookups, saturating subtract, 1D interpolation
-   - Called by higher-level code that IS analyzed
+8. ~~**Math/utility library gaps (0x0BE000+)**~~ -- DONE
+   - 4 functions analyzed: table_desc_2d_uint8, table_desc_2d_uint16, int_sat_sub, interp_1d_uint16_int
+   - See `analysis/final_seven_analysis.txt`
 
 9. **0x078000-0x078FFF sub-region**
    - Code blocks present but zero Ghidra-detected functions
@@ -168,7 +171,7 @@ Region             Functions  Named   %     Status
 ### Phase 4: Polish
 - **Propagate BSP labels** — Name 5 high-call-count BSP functions to label 200+ call sites.
 - **Correct rom_region_map errors** — Several "float_data" blocks are actually code (0x010800, 0x01A300, 0x064100).
-- **Document utility library** — The 4 remaining math functions (2D lookups, saturating math, interpolation).
+- ~~**Document utility library**~~ -- DONE. All 7 remaining named functions analyzed in `analysis/final_seven_analysis.txt`. Named function coverage: **329/329 (100%)**.
 
 ---
 
