@@ -786,14 +786,35 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x000AC360, "TipIn_Enrichment_Load_Factor");
         count += label(0x000AC374, "TipIn_Enrichment_Combined_Factor");
 
-        // Map switching
+        // Map switching - primary thresholds
         count += label(0x000D29AC, "MapSwitch_CruiseSwitchCounterA");
+        count += label(0x000D29D4, "MapSwitch_BlendAppCounterThreshold");
         count += label(0x000D2A08, "MapSwitch_EngineSpeedThreshold");
+        count += label(0x000D2A0C, "MapSwitch_TorqueRatioThreshold");
+        count += label(0x000D2A10, "MapSwitch_MAFLoadThreshold");
+        count += label(0x000D2A14, "MapSwitch_VehicleSpeedLow");
+        count += label(0x000D2A18, "MapSwitch_VehicleSpeedHigh");
+        count += label(0x000D2A1C, "MapSwitch_IATThreshold");
+        count += label(0x000D2A38, "MapSwitch_SIDriveThreshold");
+        count += label(0x000D2A60, "MapSwitch_RampAdderA");
+        count += label(0x000D2A64, "MapSwitch_RampAdderB");
         count += label(0x000D2A74, "MapSwitch_PerGearRPM_1");
+        // Map switching - secondary thresholds (mostly stock-disabled)
+        count += label(0x000D2A20, "MapSwitch_Secondary_TorqueThreshold");
+        count += label(0x000D2A24, "MapSwitch_Secondary_LoadThreshold");
+        count += label(0x000D2A28, "MapSwitch_Secondary_SpeedLow");
+        count += label(0x000D2A2C, "MapSwitch_Secondary_SpeedHigh");
+        count += label(0x000D2A30, "MapSwitch_Secondary_IATThreshold");
+        count += label(0x000D2A3C, "MapSwitch_Secondary_SIDriveValue");
 
         // Timing blend
         count += label(0x000D2AE8, "TimingBlend_LookupThreshold");
         count += label(0x000D2AFC, "TimingBlend_CorrectionOffset");
+        count += label(0x000D2B08, "TimingBlend_CorrThreshold_44deg");
+        count += label(0x000D2B0C, "TimingBlend_HalfRatio");
+        count += label(0x000D2B14, "TimingBlend_RPMLimit");
+        count += label(0x000D2B18, "TimingBlend_RatioFloor");
+        count += label(0x000D2B1C, "TimingBlend_RatioCeiling");
 
         // Engine torque (DBW)
         count += label(0x000C1800, "CalcEngineTorqueA");
@@ -2005,6 +2026,60 @@ public class ImportAE5L600L extends GhidraScript {
             "25 calls. EEPROM/NV-memory read utility. Called from DTC and adaptation contexts.");
         count += labelComment(0x0005CC9A, "sensor_diag_helper",
             "20 calls. Sensor diagnostic utility. Called from O2 sensor, boost, and idle contexts.");
+
+        // ── Fueling Sub-Function Labels (0x020000-0x02FFFF) ──
+        // Flag readers and utility functions called by the fueling pipeline
+        count += label(0x00020FF6, "read_flag_sensor_config_B");
+        count += label(0x00021006, "read_flag_sensor_config_C");
+        count += label(0x00021016, "check_sensor_config_valid");
+        count += label(0x00021D9A, "check_sensor_valid");
+        count += label(0x00022CEA, "check_accel_pedal_idle");
+        count += label(0x0002F8EA, "check_fuel_system_ready");
+        count += label(0x0002F8F4, "check_fuel_mode_byte_1");
+        count += label(0x0002F8FE, "check_fuel_mode_byte_2");
+        // Diagnostic monitor flag readers (each reads a DTC status byte)
+        count += label(0x000297A0, "diag_check_P0031");
+        count += label(0x000297B0, "diag_check_P0032");
+        count += label(0x000297C0, "diag_check_P0037");
+        count += label(0x000297D0, "diag_check_P0038");
+        count += label(0x000297E0, "diag_check_P0068");
+        count += label(0x000297F4, "diag_check_P0101");
+        count += label(0x00029808, "diag_check_P0102");
+        count += label(0x00029828, "diag_check_P0103");
+        count += label(0x00029848, "diag_check_P0107");
+        count += label(0x00029858, "diag_check_P0108");
+        count += label(0x00029868, "diag_check_P0111");
+        count += label(0x00029888, "diag_check_P0116");
+        count += label(0x000298B4, "diag_check_P0122");
+        count += label(0x000298C8, "diag_check_P0123");
+        count += label(0x000298D8, "diag_check_P0125");
+        count += label(0x000298E8, "diag_check_P0126");
+        count += label(0x0002995C, "diag_check_P0128");
+        count += label(0x0002997C, "diag_check_P0131");
+        count += label(0x0002996C, "diag_check_P0132");
+        count += label(0x0002998C, "diag_check_P0133");
+        count += label(0x000299AC, "diag_check_P0138");
+        count += label(0x000299DC, "diag_check_P0141");
+        count += label(0x000299F0, "diag_check_P0171");
+        count += label(0x00029A00, "diag_check_P0172");
+        count += label(0x00029A18, "diag_check_P0222");
+        count += label(0x00029A30, "diag_check_P0223");
+        count += label(0x00029A40, "diag_check_P0230");
+        count += label(0x00029AB0, "diag_check_P0461");
+        count += label(0x00029AC0, "diag_check_P0462");
+        count += label(0x00029AA0, "diag_check_P0463");
+        count += label(0x00029B50, "diag_check_P0464");
+        count += label(0x00029AE0, "diag_check_P0500");
+        count += label(0x00029AF0, "diag_check_P0502");
+        count += label(0x00029B00, "diag_check_P0604");
+        count += label(0x00029B10, "diag_check_P0605");
+        count += label(0x00029B20, "diag_check_P0606");
+        count += label(0x00029B30, "diag_check_P0638");
+        count += label(0x00029B40, "diag_check_P0850");
+        count += label(0x00029B60, "diag_check_P1443");
+        count += label(0x0002B220, "diag_ws_check_A179");
+        count += label(0x0002D7E8, "fuel_correction_helper_A");
+        count += label(0x0002D92C, "fuel_correction_helper_B");
 
         // ── BDD88 family (appears in multiple peripheral I/O contexts) ─────
         count += labelComment(0x000BDD5A, "peripheral_io_read",
@@ -4754,6 +4829,17 @@ public class ImportAE5L600L extends GhidraScript {
             "Secondary base timing descriptor (1D scaled, 16 entries).");
         count += labelComment(0x000ADBB0, "desc_timing_blend_4",
             "Timing blend curve 4 descriptor (1D scaled, 16 entries).");
+        // ECT correction descriptors for timing blend (selected by throttle×engine state)
+        count += labelComment(0x000ADBC4, "desc_timing_ect_corr_0",
+            "ECT timing correction: throttle=0, engine running (1D, 16 entries).");
+        count += labelComment(0x000ADBD8, "desc_timing_ect_corr_1",
+            "ECT timing correction: throttle=0, cranking (1D, 16 entries).");
+        count += labelComment(0x000ADBEC, "desc_timing_ect_corr_2",
+            "ECT timing correction: throttle=1, engine running (1D, 16 entries).");
+        count += labelComment(0x000ADC00, "desc_timing_ect_corr_3",
+            "ECT timing correction: throttle=1, cranking (1D, 16 entries).");
+        count += labelComment(0x000ADC14, "desc_timing_atm_comp",
+            "Atmospheric pressure compensation for timing blend (1D, 16 entries).");
         count += labelComment(0x000ADDE0, "desc_percond_rpm_ect",
             "Per-condition RPM x ECT descriptor (1D scaled, 7 entries).");
         count += labelComment(0x000ADFAC, "desc_iam_knock_comp",
@@ -4959,6 +5045,35 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00052092, "sensor_struct_8998_manager",
             "GBR=FFFF8998, manages sensor struct.");
 
+        // ── ETB/DBW (Electronic Throttle Body) Control ──
+        // 0x050000-0x054851: 41 functions in two dispatch tables
+        // Dispatch Table A (13 entries at 0x483D4): fast sensor path
+        // Dispatch Table B (28 entries at 0x49760): full PID/target path
+        count += label(0x000483D4, "etb_dispatch_table_A");
+        count += label(0x00049082, "etb_dispatch_table_B_caller");
+        count += label(0x00049760, "etb_dispatch_table_B");
+        count += labelComment(0x000500E8, "etb_sensor_init",
+            "ETB sensor conditioning init. 314B, 8 descriptors. Reads ECT + throttle.");
+        count += labelComment(0x00050720, "etb_cold_start_throttle",
+            "ETB cold-start throttle compensation. 394B, 14 calibrations.");
+        count += labelComment(0x00050A5A, "etb_safety_interlock",
+            "ETB safety interlock. 566B, 8 cals. Checks engine state + DTC flags.");
+        count += labelComment(0x00050DE2, "etb_target_compute_main",
+            "ETB main throttle target computation. 626B (largest). ECT + atm + throttle.");
+        count += label(0x00051B06, "etb_rpm_correction");
+        count += label(0x00052644, "etb_pedal_interpret");
+        count += labelComment(0x00052BCE, "etb_torque_map",
+            "ETB throttle-to-torque mapping. 20 calibrations (most cal-heavy).");
+        count += label(0x00052E62, "etb_pedal_process");
+        count += label(0x00052F80, "etb_ect_throttle_trim");
+        count += labelComment(0x00053ED8, "etb_thermal_protection",
+            "ETB thermal protection. 5 descriptors, 8 cals. Reads ECT + atm + timing state.");
+        count += label(0x00054228, "etb_clutch_process");
+        count += label(0x00054260, "etb_altitude_temp_comp");
+        count += label(0x0005456E, "etb_clutch_intervention");
+        count += label(0x00054640, "etb_env_compensation");
+        count += label(0x00054822, "etb_boost_limit");
+
         // ── Library / Utility ──
         count += labelComment(0x000BE830, "table_lookup_1D",
             "1D table lookup utility.");
@@ -5159,8 +5274,21 @@ public class ImportAE5L600L extends GhidraScript {
             "RomRaider: Max Wastegate Duty Limit Post-Compensation");
         count += labelComment(0x00020384, "cal_Engine_Load_Limit_A_Maximum",
             "RomRaider: Engine Load Limit A (Maximum)");
-        count += labelComment(0x0004BBAC, "cal_Fuel_Pump_Duty",
-            "RomRaider: Fuel Pump Duty");
+        // Fuel pump control
+        count += labelComment(0x0004B970, "fuel_pump_duty_ctrl",
+            "Fuel pump duty controller - initial prime + descriptor lookup. Called from task10 call_52.");
+        count += labelComment(0x0004BA30, "fuel_pump_mode_select",
+            "Fuel pump mode selection state machine - selects 100/66.7/33.3/0% duty.");
+        count += labelComment(0x0004BBA0, "cal_FuelPump_DutyMax_100pct",
+            "Fuel pump max duty: 100% (prime/cranking). Float constant in code space.");
+        count += labelComment(0x0004BBAC, "cal_FuelPump_DutyHigh_66pct",
+            "Fuel pump high duty: 66.7% (normal running/warmup).");
+        count += labelComment(0x0004BBB0, "cal_FuelPump_DutyLow_33pct",
+            "Fuel pump low duty: 33.3% (idle/steady state).");
+        count += labelComment(0x0004BBF0, "cal_FuelPump_MinVoltage",
+            "Min battery voltage (8.0V) before pump duty reduction is allowed.");
+        count += label(0x000D6018, "cal_FuelPump_RunTimeGateA");
+        count += label(0x000D601A, "cal_FuelPump_RunTimeGateB");
         count += labelComment(0x0009A771, "cal_P0336_CRANKSHAFT_POS_SENSOR_A_RANGE_PERF",
             "RomRaider: (P0336) CRANKSHAFT POS. SENSOR A RANGE/PERF");
         count += labelComment(0x0009A772, "cal_P0604_CONTROL_MODULE_RAM_ERROR",

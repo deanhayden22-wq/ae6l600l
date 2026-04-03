@@ -1,0 +1,246 @@
+AE5L600L Electronic Throttle Body (ETB/DBW) Control Analysis
+================================================================================
+Code range: 0x050000 - 0x054851 (~18.4 KB)
+Called from: task10_call52 (0x47C40) Dispatch Table A — 13 entries
+            task10_sub_0x049082 Dispatch Table B — 28 entries
+            Additional callers: 0x04A752, 0x04F19C, 0x0489C0
+Functions: 64 prologues, 71 unique call targets
+Descriptors: 26 referenced
+Calibrations: 117 referenced
+RAM workspace: FFFF88E8 - FFFF8BFF (~792 bytes)
+
+
+================================================================================
+SECTION 1: OVERVIEW
+================================================================================
+
+The 0x050000-0x054851 range contains the Electronic Throttle Body (ETB)
+drive-by-wire control system. This is the code that translates driver
+pedal input into throttle plate position via the electronic throttle
+actuator.
+
+The code is organized as two dispatch tables called from within
+task10 (20ms sensor task):
+
+  Dispatch Table A @ 0x0483D4 (13 entries)
+    Called from task10_call52 (0x47C40) — the same mega-function
+    that also contains fuel pump control and CL/OL management.
+    These appear to be the FAST path (sensor conditioning, position
+    tracking, safety checks).
+
+  Dispatch Table B @ 0x049760 (28 entries)
+    Called from an internal sub-function at 0x049082 within the
+    task10 call chain. These appear to be the FULL path (target
+    computation, PID control, actuator output, limit enforcement).
+
+Both tables dispatch sequentially — each entry is a sub-function
+that processes one stage of the throttle control pipeline.
+
+
+================================================================================
+SECTION 2: DISPATCH TABLE A — SENSOR CONDITIONING (13 entries)
+================================================================================
+
+These functions run on every 20ms cycle for fast sensor tracking.
+
+  Slot  Address    Size  Sensors Read              Workspace       Proposed Label
+  ────  ─────────  ────  ────────────────────────  ──────────────  ──────────────────
+  [0]   0x0500E8   314B  ECT, throttle_pos         FFFF88E8        etb_sensor_init
+  [1]   0x050A24    18B  throttle_pos              FFFF8906        etb_throttle_read
+  [2]   0x050A48    18B  —                         FFFF8912        etb_cal_read
+  [3]   0x050DCC    22B  —                         FFFF8970        etb_state_A_read
+  [4]   0x051AF4    18B  —                         FFFF8A02        etb_state_B_read
+  [5]   0x052E62    94B  accel_state, throttle     FFFF8A24        etb_pedal_process
+  [6]   0x05305E    10B  accel_state               FFFF8A48        etb_accel_flag_A
+  [7]   0x05323E    10B  accel_state               FFFF8A80        etb_accel_flag_B
+  [8]   0x0535B6    20B  throttle_pos              FFFF8A9C        etb_throttle_state
+  [9]   0x0539BE    10B  —                         FFFF8AE1,8E46   etb_mode_flag_read
+  [10]  0x053BFC    26B  —                         FFFF8AF4        etb_limit_read
+  [11]  0x054228    56B  clutch, throttle×2        FFFF8B44        etb_clutch_process
+  [12]  0x054822    48B  —                         FFFF8B90,8BD0   etb_boost_state_read
+
+Slot [0] is the largest (314B) — reads ECT and throttle, evaluates
+8 descriptors. This is the initial sensor conditioning that sets up
+the DBW workspace for the rest of the pipeline.
+
+Slot [5] (94B) processes accelerator pedal position — reads accel_state,
+throttle, and throttle sub-bytes (FFFF65C6). This converts raw pedal
+input into the requested throttle target.
+
+Slot [11] (56B) processes clutch state (FFFF5BE3) alongside throttle —
+likely the clutch-cancel/rev-match logic for manual transmission.
+
+Slot [12] reads boost workspace (FFFF8B90, 8BD0) — boost-based
+throttle limiting to protect the turbo/engine.
+
+
+================================================================================
+SECTION 3: DISPATCH TABLE B — TARGET & PID CONTROL (28 entries)
+================================================================================
+
+These functions compute the throttle target and drive the actuator.
+
+  Slot  Address    Size  Key Sensors    Workspace                 Desc  Cals
+  ────  ─────────  ────  ────────────   ────────────────────────  ────  ────
+  [0]   0x0535A0    42B  throttle       FFFF8A9C                  0     0
+  [1]   0x055568    —    throttle       FFFF8970,8C42             0     0
+  [2]   0x050DE2   626B  ECT,atm,throt  FFFF8920,8A74,8A9D,8C44  0     4
+  [3]   0x0500E4   318B  ECT,throttle   FFFF88E8,8A9D             8     0
+  [4]   0x050A5A   566B  engine,throt   FFFF890C,895C,8B60,8E98   0     8
+  [5]   0x051B06   200B  RPM            FFFF8910,8914,89A0,8A0C   0     6
+  [6]   0x051BCE   156B  —              FFFF8910,8912,895C,89F0   1     6
+  [7]   0x051C6A   122B  RPM            FFFF8910,8912,895C,89E8   1     1
+  [8]   0x051D70   196B  RPM,MAF_volt   FFFF8910,8912,895C,89C8   3     6
+  [9]   0x051E34   192B  —              FFFF8910,8912,89E8         1     5
+  [10]  0x054804    78B  —              FFFF8B90,8BD0              0     0
+  [11]  0x052644   444B  ECT,accel,thr  FFFF8924,8964,8A1C,8A24   0     0
+  [12]  0x051EF4   250B  speed,RPM      FFFF8910,8912,89E8         1     5
+  [13]  0x050720   394B  engine,ECT,thr FFFF8904,8912,8A14,8A50   1    14
+  [14]  0x0508AA   206B  ECT,throt,load FFFF88EC,8908              1     3
+  [15]  0x052BCE   —     atm,FFFF65C3   FFFF8912,8998,8A20        0    20
+  [16]  0x052F80   —     engine,ECT,acc FFFF895C,8A44              0     9
+  [17]  0x053124   —     engine,load    FFFF8924,8964,8A58         1     2
+  [18]  0x0531C4   —     ECT,FFFF65C3   FFFF8A5C                  2     0
+  [19]  0x053228   —     accel_state    FFFF8A80                   0     0
+  [20]  0x0539B0   —     —              FFFF8AE1,8E46              0     0
+  [21]  0x0530B8   —     —              FFFF8A4C-8A68              0     0
+  [22]  0x053C16   —     —              FFFF8AEC                   0     0
+  [23]  0x053ED8   —     ECT,atm,throt  FFFF895C,8970,8B10,8E7E   5     8
+  [24]  0x05408C   —     ECT,FFFF64D8   FFFF8910,895C,8B18        1     7
+  [25]  0x054640   —     engine,ECT,atm FFFF8A1C,8B1C,8B4C        0    11
+  [26]  0x05456E   —     clutch         FFFF8998,8A20,8B1C        0     1
+  [27]  0x054260   —     accel×3        FFFF8B1C,8B48              0    12
+
+Key observations:
+
+  - Slot [2] (626B) is the LARGEST function — reads ECT, atmospheric
+    pressure, and throttle with 4 calibrations. This is likely the
+    main throttle target computation.
+
+  - Slot [4] (566B) reads engine state, throttle, and checks the
+    fuel pump DTC flag (FFFF8E98). This is the safety interlock
+    that limits throttle when engine faults are detected.
+
+  - Slot [13] (394B, 14 calibrations) is the most calibration-heavy
+    function. Reads engine state, ECT, throttle — likely the cold-start
+    throttle opening compensation (idle air control via ETB).
+
+  - Slot [15] has 20 calibrations — the throttle-to-torque mapping
+    function that converts pedal input into a torque request.
+
+  - Slot [25] (11 cals) and [27] (12 cals) access engine state +
+    ECT + atmospheric pressure — altitude and temperature compensation
+    for the throttle target.
+
+  - Slot [26] reads clutch state — the manual transmission clutch
+    intervention (throttle blip for downshifts or rev-hang reduction).
+
+  - Slot [11] (444B, no cals/descs) is the pedal interpretation
+    function — converts raw pedal into requested opening using the
+    existing workspace values.
+
+
+================================================================================
+SECTION 4: WORKSPACE RAM MAP (FFFF88E8 - FFFF8BFF)
+================================================================================
+
+The ETB/DBW workspace spans ~790 bytes. Key regions based on access
+patterns:
+
+  Range              Used by      Likely purpose
+  ─────────────────  ──────────   ─────────────────────────────
+  FFFF88E8-88FF      Slot A[0]    Sensor conditioning outputs
+  FFFF8904-8914      Multi-slot   Throttle config/scaling params
+  FFFF8920-895C      Multi-slot   Intermediate throttle targets
+  FFFF8964-8998      Slots 11,15  Pedal → torque workspace
+  FFFF89A0-89F0      Slots 5-9    RPM-based throttle corrections
+  FFFF89E8-8A02      Slots 7-12   Throttle position tracking
+  FFFF8A0C-8A24      Multi-slot   Accelerator pedal processing
+  FFFF8A44-8A80      Slots 6-7    Accel/decel state flags
+  FFFF8A9C-8AF4      Slots 8-10   Throttle state + limits
+  FFFF8AE1-8AEC      Slots 9,20   Mode flags
+  FFFF8B10-8B60      Slots 4,23   Safety interlocks
+  FFFF8B90-8BD0      Slots 10,12  Boost-linked workspace
+
+The overlap with the boost control workspace (FFFF8B50-8BD0,
+previously identified in boost_control_analysis.txt) confirms
+that throttle limiting is tightly integrated with boost control.
+
+
+================================================================================
+SECTION 5: DESCRIPTOR REFERENCE
+================================================================================
+
+26 descriptors referenced from this code block. Key descriptors:
+
+  0xAE7D8  — 1D RPM-indexed (used by slot 3/0)
+  0xAE7EC  — 1D RPM-indexed (used by slot 3/0)
+  0xAE9CC  — used by Table B slots
+  0xAE9E0  — used by Table B slots
+  0xAEA08-AEA6C  — cluster of 6 descriptors (used by slots 6-9)
+  0xAEAD0  — used by Table B
+  0xAEC4C-AEC88  — cluster of 4 descriptors (slots 23-24)
+
+These are NOT yet named in the descriptor labels. They should be
+labeled as ETB/DBW descriptors.
+
+
+================================================================================
+SECTION 6: CALIBRATION CONCENTRATION
+================================================================================
+
+117 unique calibration addresses are referenced. The heaviest users:
+
+  Slot B[15] 0x052BCE — 20 calibrations (throttle→torque mapping)
+  Slot B[13] 0x050720 — 14 calibrations (cold-start throttle comp)
+  Slot B[27] 0x054260 — 12 calibrations (altitude/temp throttle comp)
+  Slot B[25] 0x054640 — 11 calibrations (environmental throttle comp)
+  Slot B[16] 0x052F80 —  9 calibrations (ECT-based throttle trim)
+  Slot B[4]  0x050A5A —  8 calibrations (safety interlock thresholds)
+  Slot B[23] 0x053ED8 —  8 calibrations (thermal protection)
+  Slot B[24] 0x05408C —  7 calibrations (RPM-dependent limiting)
+
+The calibrations are concentrated in the 0xD5xxx-0xD6xxx range.
+These should be cross-referenced against the ECUFlash "Torque
+Management / DBW" definitions to identify which are already defined.
+
+
+================================================================================
+SECTION 7: INTEGRATION WITH OTHER SUBSYSTEMS
+================================================================================
+
+The ETB/DBW system interfaces with:
+
+  1. Boost control (FFFF8B50-8BD0) — throttle limiting under boost
+  2. Fuel pump (FFFF8E98) — safety throttle reduction on pump DTC
+  3. CL/OL fueling (via task10_call52 shared parent)
+  4. Ignition timing (FFFF8E7E timing state, read by slot B[23])
+  5. Cruise control (likely via FFFF8A9C-8A9D workspace)
+  6. Clutch/transmission (FFFF5BE3 clutch state, slots A[11], B[26])
+
+The fact that this code runs WITHIN task10_call52 (the same function
+as fuel pump and CL/OL management) explains why it was never identified
+as a separate subsystem — it's deeply embedded in the sensor task's
+sequential dispatch chain.
+
+
+================================================================================
+SECTION 8: SUMMARY
+================================================================================
+
+The 0x050000-0x054851 range is the Electronic Throttle Body (ETB)
+drive-by-wire (DBW) control system comprising:
+
+  - 13 fast-path functions (sensor conditioning, position tracking)
+  - 28 full-path functions (target computation, PID, safety limits)
+  - 26 descriptor tables for throttle mapping
+  - 117 calibration parameters
+  - ~790 bytes of RAM workspace (FFFF88E8-8BFF)
+
+This fills the last major code gap between the fueling pipeline
+(0x030000-0x03FFFF) and the boost control system (0x054852+).
+
+The existing "Torque Management / DBW" analysis in
+torque_management_analysis.txt covers the high-level torque request
+path but not this low-level ETB actuator control code. This analysis
+documents the actual throttle plate positioning implementation.

@@ -866,3 +866,20 @@
         count += label(0x0AF0ACL, "desc_2D_range_150_600_xIAT_u8_17x9_AF0AC");
         count += label(0x0AF0C8L, "desc_2D_range_150_600_xIAT_u8_17x9_AF0C8");
 
+        // --- Timing blend / map switching (15 descriptors) ---
+        count += label(0x0ADB4CL, "desc_timing_blend_0");       // 1D ECT-based timing blend (throttle=0, running)
+        count += label(0x0ADB60L, "desc_timing_blend_1");       // 1D ECT-based timing blend (throttle=0, cranking)
+        count += label(0x0ADB74L, "desc_timing_blend_2");       // 1D ECT-based timing blend (throttle=1, running)
+        count += label(0x0ADB88L, "desc_timing_blend_3");       // 1D ECT-based timing blend (throttle=1, cranking)
+        count += label(0x0ADBB0L, "desc_timing_blend_4");       // 1D ECT-based timing blend secondary
+        count += label(0x0ADBC4L, "desc_timing_ect_corr_0");    // 1D ECT correction (throttle=0, running)
+        count += label(0x0ADBD8L, "desc_timing_ect_corr_1");    // 1D ECT correction (throttle=0, cranking)
+        count += label(0x0ADBECL, "desc_timing_ect_corr_2");    // 1D ECT correction (throttle=1, running)
+        count += label(0x0ADC00L, "desc_timing_ect_corr_3");    // 1D ECT correction (throttle=1, cranking)
+        count += label(0x0ADC14L, "desc_timing_atm_comp");      // 1D atmospheric compensation for timing blend
+        count += label(0x0AE31CL, "desc_blend_app_0");          // 2D IAT×ratio timing blend output A
+        count += label(0x0AE338L, "desc_blend_app_1");          // 2D IAT×ratio timing blend output B
+        count += label(0x0AE354L, "desc_blend_app_2");          // 2D IAT×ratio timing blend output C
+        count += label(0x0AE370L, "desc_blend_app_3");          // 2D IAT×ratio timing blend output D
+        count += label(0x0AE38CL, "desc_blend_app_4");          // 2D RPM×? blend application lookup
+

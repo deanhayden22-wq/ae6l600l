@@ -1333,7 +1333,28 @@
 	<table name="Engine Load Limit B Maximum (RPM) - Multiplier" category="Alpha Engine Load Limit B Multiplier" address="aae20" type="2D" scaling="rawecuvalueverbose">
 	</table>
 
-	<table name="Fuel Pump Duty" category="Fuel System" address="4bbac">
+	<table name="Fuel Pump Duty Max (Prime/Cranking)" category="Fuel System" address="4bba0" type="1D" scaling="rawecuvalueverbose">
+		<description>Maximum fuel pump duty cycle used during key-on priming and cranking. Stock value: 100.0%. This is a float constant embedded in code space.</description>
+	</table>
+
+	<table name="Fuel Pump Duty High (Running)" category="Fuel System" address="4bbac" type="1D" scaling="rawecuvalueverbose">
+		<description>High fuel pump duty cycle for normal engine running during warmup. Used when engine is running but run-time has not yet exceeded the ~75 second threshold. Stock value: 66.7%.</description>
+	</table>
+
+	<table name="Fuel Pump Duty Low (Idle/Steady)" category="Fuel System" address="4bbb0" type="1D" scaling="rawecuvalueverbose">
+		<description>Low fuel pump duty cycle for idle and steady-state operation. Active after engine has been running for ~75 seconds. Stock value: 33.3%.</description>
+	</table>
+
+	<table name="Fuel Pump Min Voltage Threshold" category="Fuel System" address="4bbf0" type="1D" scaling="rawecuvalueverbose">
+		<description>Minimum battery voltage before fuel pump duty reduction is allowed. Below this voltage, the pump stays at higher duty. Stock value: 8.0V.</description>
+	</table>
+
+	<table name="Fuel Pump Run Time Gate A" category="Fuel System" address="d6018" type="1D" scaling="MapSwitchCounter">
+		<description>Engine run time threshold (in 20ms ticks) before fuel pump can reduce from high to low duty. 3750 ticks = ~75 seconds. Stock value: 3750.</description>
+	</table>
+
+	<table name="Fuel Pump Run Time Gate B" category="Fuel System" address="d601a" type="1D" scaling="MapSwitchCounter">
+		<description>Secondary engine run time threshold for fuel pump duty reduction. Same as Gate A for non-throttle state. Stock value: 3750.</description>
 	</table>
 
 	<table name="Tau Input A Falling Load Activation" category="Fueling - Base / Enrichment" address="cd746">
@@ -1778,6 +1799,38 @@
 
 	<table name="Map Switching Percentage Ceiling" category="Map Switching - Cruise/Non-Cruise" address="d2abc" type="1D" scaling="MapSwitchFloat">
 		<description>Percentage ceiling for map switching calculation. Stock value: 100.0.</description>
+	</table>
+
+	<!-- Secondary Switching Thresholds (0x0D2A20-0x0D2A3C) -->
+	<!-- These are alternative thresholds for a secondary switching path in task50. -->
+	<!-- Stock values are mostly 0.0 (disabled), meaning the secondary path rarely activates. -->
+
+	<table name="Map Switching Secondary Torque Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a20" type="1D" scaling="MapSwitchFloat">
+		<description>Secondary torque ratio threshold for cruise/non-cruise switching. Used when the primary path (D2A0C) fails. Stock value: 0.0 (effectively disabled).</description>
+	</table>
+
+	<table name="Map Switching Secondary Load Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a24" type="1D" scaling="MapSwitchFloat">
+		<description>Secondary engine load threshold for cruise/non-cruise switching. Stock value: 0.0 (effectively disabled).</description>
+	</table>
+
+	<table name="Map Switching Secondary Vehicle Speed Low" category="Map Switching - Cruise/Non-Cruise" address="d2a28" type="1D" scaling="MapSwitchFloat">
+		<description>Secondary vehicle speed lower bound for cruise/non-cruise switching. Stock value: 0.0 (effectively disabled).</description>
+	</table>
+
+	<table name="Map Switching Secondary Vehicle Speed High" category="Map Switching - Cruise/Non-Cruise" address="d2a2c" type="1D" scaling="MapSwitchFloat">
+		<description>Secondary vehicle speed upper bound for cruise/non-cruise switching. Stock value: 0.0 (effectively disabled).</description>
+	</table>
+
+	<table name="Map Switching Secondary IAT Threshold" category="Map Switching - Cruise/Non-Cruise" address="d2a30" type="1D" scaling="MapSwitchTemp">
+		<description>Secondary IAT threshold for cruise/non-cruise switching. Stock value: 119.0 deg F.</description>
+	</table>
+
+	<table name="Map Switching Secondary SI-Drive Value" category="Map Switching - Cruise/Non-Cruise" address="d2a3c" type="1D" scaling="MapSwitchFloat">
+		<description>Secondary SI-DRIVE mode value for cruise/non-cruise switching. Stock value: 0.0 (effectively disabled).</description>
+	</table>
+
+	<table name="Map Switching Blend App Counter Threshold" category="Map Switching - Cruise/Non-Cruise" address="d29d4" type="1D" scaling="MapSwitchCounter">
+		<description>Counter threshold for blend application in task32. Cruise switch counter must exceed this value before switching proceeds. Stock value: 88.</description>
 	</table>
 
 	<!-- Delay Counter Parameters (uint16, 0x0D29AC-0x0D29B2) -->

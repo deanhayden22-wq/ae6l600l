@@ -1,0 +1,604 @@
+AE5L600L Map Switching & Timing Blend Analysis
+================================================================================
+Subsystem: Cruise/Non-Cruise Map Switching + Timing Blend Interpolation
+Tasks: 31, 32, 33, 50
+Code range: 0x3F368 - 0x410D4
+Calibration range: 0xD29AC - 0xD2B1C
+Primary RAM: 0xFFFF7F60 (map_ratio), 0xFFFF7F0C (timing_blend_gbr)
+
+Based on: map_switching_raw.txt disassembly trace
+
+
+================================================================================
+SECTION 1: OVERVIEW
+================================================================================
+
+The cruise/non-cruise map switching system determines how the ECU blends
+between two parallel sets of calibration tables. A floating-point ratio
+stored at FFFF7F60 (0.0 = full cruise, 1.0 = full non-cruise) controls
+the blend. This ratio affects timing, fueling, knock limits, AVCS, and
+throttle response.
+
+Four scheduler tasks implement the system:
+
+  Task 50 @ 0x3F368: Main evaluator - reads sensors, evaluates switching
+                     criteria, computes timing corrections per-cylinder
+  Task 32 @ 0x4004A: Blend ratio application - applies the ratio to
+                     descriptor table lookups
+  Task 31 @ 0x3FFD6: Blend ratio bounds checker - enforces floor/ceiling
+  Task 33 @ 0x40918: Timing workspace initializer - dispatches sub-functions
+                     for ECT-based descriptor selection
+
+Execution order: 50 → 32 → 31 → 33 (within the ignition timing pipeline)
+
+
+================================================================================
+SECTION 2: MAP RATIO (FFFF7F60) STRUCTURE
+================================================================================
+
+The map ratio is not just a single float. FFFF7F60 is the base of a small
+workspace structure accessed via byte/word offsets from R1 or R12:
+
+  Offset  Type    Address      Purpose
+  ──────  ──────  ───────────  ──────────────────────────────────
+  +0x00   uint16  FFFF7F60     Cruise switch counter (current)
+  +0x02   byte    FFFF7F62     Cruise mode active flag
+  +0x03   byte    FFFF7F63     SI-Drive mode latch
+  -0x14   float   FFFF7F4C     Blend ratio output (actual 0.0-1.0)
+  -0x24   float   FFFF7F3C     Blend output scratch (task31 output)
+  -0x08   float   FFFF7F58     Current blended timing
+  -0x04   float   FFFF7F5C     Previous blended timing
+  -0x40   float   FFFF7F20     Timing blend lookup input
+  -0x38   float   FFFF7F28     Timing blend rate accumulator
+  -0x34   float   FFFF7F2C     ECT-based descriptor result
+  -0x50   float   FFFF7F10     Timing blend workspace A
+  -0x4C   float   FFFF7F14     Timing blend workspace B
+
+Task 32 sets GBR = FFFF7F0C and accesses the ratio workspace via
+computed offsets from GBR (e.g., GBR+0x54 = FFFF7F60).
+
+
+================================================================================
+SECTION 3: TASK 50 - MAIN MAP SWITCH EVALUATOR (0x3F368)
+================================================================================
+
+Task 50 is the largest function (~1300 instructions). It operates
+with GBR = 0xFFFF7E90 and implements the full cruise/non-cruise
+decision engine.
+
+Inputs loaded at entry:
+  fr12 = rpm_current       (FFFF6624)
+  fr14 = torque_ratio      (FFFF62F8)
+  fr15 = load_current      (FFFF65FC)
+  fr8  = ect_current       (FFFF6350) → saved to stack
+  r12  = flkc_mode_byte    (FFFF8F16)
+  r11  = timing_state_A    (FFFF8F24)
+  r10  = timing_state_B    (FFFF85D7)
+  r14  = clutch_state      (FFFF5BE3)
+  r13  = accel_state       (FFFF65BF)
+  r9   = sched_status      (FFFF7D18)
+
+The function also reads:
+  FFFF7F68 = ECT-based blend correction (from task33)
+  FFFF7FBC = previous timing output
+
+3.1  Delay Counter Logic (GBR+0x71, GBR+0x72)
+──────────────────────────────────────────────
+
+Two independent countdown timers gate the switching:
+
+  Counter A (GBR+0x71): Loaded from D2974 (ROM byte) on state change.
+    Decrements each cycle while > 0. Only when counter A expires AND
+    the clutch/accel conditions are met does the switching proceed.
+
+  Counter B (GBR+0x72): Same mechanism, loaded from D2975.
+    Gates the second switching path (secondary threshold check).
+
+  The uint16 counters at D29AC-D29B2 (50/38/100/38) are the counter
+  initialization values used elsewhere in the map switch framework
+  (cross-referenced by the timer reload paths in FUN_0x022CF4).
+
+3.2  Primary Switching Path (0x3F462 → 0x3F49A)
+────────────────────────────────────────────────
+
+Triggered when flkc_mode_byte (r12) == 1 (non-idle, non-FLKC):
+
+  The ratio source is read from FFFF7F04 (pre-computed ratio):
+    GBR = FFFF7E90 → offset -0x40+GBR = FFFF7F04 (approximation unclear)
+    → loads fr15 = pre-existing blend ratio
+
+3.3  High-Load Switching Path (0x3F476 → 0x3F49A)
+──────────────────────────────────────────────────
+
+Conditions (ALL must be true):
+  1. timing_state_A (r11) == 1
+  2. FUN_0x5EB32 returned 1 (check_engine_running equivalent)
+  3. timing_state_B (r10) == 1
+  4. ECT-based blend correction (FFFF7F68) > 0.0
+  5. RPM > MapSwitch_EngineSpeedThreshold (D2A08 = 2000 RPM)
+
+If all conditions met → loads fr15 from FFFF7F1C (pre-blended ratio)
+
+3.4  Standard Non-Cruise Evaluation (0x3F49A → 0x3F584)
+────────────────────────────────────────────────────────
+
+This is the main switching decision. ALL of the following must be true
+for the ECU to select non-cruise mode:
+
+  1. Torque ratio > 0.8798         (D2A0C: MapSwitch_TorqueRatioThreshold)
+  2. Load > 2.0 g/rev              (D2A10: MapSwitch_MAFLoadThreshold)
+  3. Vehicle speed < 550            (D2A14: MapSwitch_VehicleSpeedLow)
+     Note: this is a "less than" check — LOW speed = non-cruise
+  4. Vehicle speed < 1300           (D2A18: MapSwitch_VehicleSpeedHigh)
+  5. Counter A (GBR+0x71) > 0      (delay timer hasn't expired)
+  6. Counter B tst == 0             (no other inhibit)
+  7. IAT < 80°F                    (D2A1C: MapSwitch_IATThreshold)
+     Wait — the check is fcmp/gt fr7,fr8 where fr8=threshold, fr7=IAT
+     So: threshold > IAT → bt (skip) means: if IAT >= 80°F → skip to cruise
+     Correct interpretation: IAT must be BELOW threshold for non-cruise
+
+If all pass → loads fr15 from D2A38 (MapSwitch_SIDriveThreshold = 4.0)
+as the blend target, and falls through to the timing computation.
+
+3.5  Secondary Switching Path (0x3F584 → 0x3F5D6)
+──────────────────────────────────────────────────
+
+If the standard path fails, a secondary set of thresholds is checked:
+
+  Calibration addresses for secondary path:
+    D2A20, D2A24, D2A28, D2A2C, D2A30, D2A3C
+
+  These are NOT in the ECUFlash definitions yet. They appear to be
+  alternative thresholds for a less aggressive switching condition
+  (possibly used during warmup or transient conditions).
+
+  The same gate structure applies: counter B (GBR+0x72) must be > 0
+  and the inhibit must be clear.
+
+  If secondary passes → loads fr15 from D2A3C and proceeds.
+
+3.6  Timing Summation (0x3F618 → 0x3F6A8)
+──────────────────────────────────────────
+
+When the byte at D2976 == 90 (0x5A), the function enters a full
+timing summation path that adds/subtracts multiple correction terms:
+
+  final_timing = timing_blend_base (FFFF7F0C)
+               + blend_correction_A (FFFF7F68 from stack @4)
+               + blend_correction_B (FFFF7F6C)
+               + blend_correction_C (FFFF7F74)
+               - stack_correction   (stack @8)
+               - base_timing_offset (FFFF8000)
+               + ECT_timing_comp    (FFFF81EC)
+               + correction_28      (FFFF8028)
+               - correction_38      (FFFF8038)
+               + correction_3C      (FFFF803C)
+               + correction_5C      (FFFF805C)
+               - correction_84      (FFFF8084)
+               + correction_B4      (FFFF80B4)
+               + correction_C4      (FFFF80C4)
+               - correction_E8      (FFFF80E8)
+               + correction_F0      (FFFF80F0)
+               + accumulator_88     (FFFF8088)
+               + workspace_81DC     (FFFF81DC)
+
+This mirrors the final timing aggregation logic from ignition_timing_analysis.txt
+(task 48), meaning task 50 is computing what the BLENDED timing would be
+by summing all the same correction terms used in the non-blended path.
+
+The result is stored into 4 per-cylinder timing values:
+  fr9/fr13/fr12/fr15 → cylinder 1/2/3/4 blended timing
+
+Each per-cylinder value adds the corresponding offset from the
+FFFF8088 workspace (per-cylinder knock retard accumulator) and
+FFFF81DC workspace (per-cylinder base timing correction).
+
+
+================================================================================
+SECTION 4: TASK 32 - BLEND RATIO APPLICATION (0x4004A)
+================================================================================
+
+Task 32 applies the map ratio to descriptor lookups. It uses
+GBR = FFFF7F0C.
+
+4.1  Inputs
+───────────
+  fr12 = rpm_current (FFFF6624)
+  fr14 = iat_current (FFFF63F8)
+  fr15 = gear_current (FFFF679C) — as float
+  fr9  = initial value from check_engine_running → either
+         TimBlend_RPMLimit (D2B14 = 6000) or TimBlend_MinRatio (D2B10 = 0.0)
+  r13  = idle_mode_flag (FFFF7BE2)
+
+4.2  SI-Drive Gate
+──────────────────
+  Reads FFFF8075 (si_drive_mode), checks bit 1 (SI-DRIVE S# mode).
+  If SI-DRIVE S# is not active → skips to ratio store at 0x40160.
+  Also checks bit 0 (SI-DRIVE I mode).
+
+  SI-DRIVE determines whether the ECU uses the non-cruise tables at all.
+  In S# mode (bit 1 set), non-cruise is always active (ratio → 1.0).
+  In I mode (bit 0 set), the switching logic is enabled.
+  In S mode (neither), it falls through to the cruise-only path.
+
+4.3  Counter Gate (GBR+0x54)
+────────────────────────────
+  Reads the cruise switch counter (uint16 at GBR+0x54 = FFFF7F60).
+  Compares against MapSwitch_BlendAppCal (D29D4).
+  If counter > threshold → skips to ratio = 0.0 (cruise mode).
+
+4.4  Descriptor Lookups
+───────────────────────
+  Four 2D descriptors are evaluated via table_desc_2d_typed (0xBE8E4):
+
+    Descriptor @ 0xAE31C (Base Timing Primary Cruise)       — fr4=fr14(IAT), fr5=ratio
+    Descriptor @ 0xAE354 (Base Timing Reference Cruise)     — fr4=fr14(IAT), fr5=ratio
+    Descriptor @ 0xAE338 (Base Timing Primary Non-Cruise)   — fr4=fr14(IAT), fr5=ratio
+    Descriptor @ 0xAE370 (Base Timing Reference Non-Cruise) — fr4=fr14(IAT), fr5=ratio
+
+  These are the same base timing Load×RPM descriptors used in the
+  ignition timing pipeline. Task 32 accesses them with IAT and the
+  map ratio as lookup inputs — the descriptor processor evaluates
+  the underlying 2D tables and applies the ratio as a blend weight.
+
+  Results stored as:
+    fr15 = cruise primary timing
+    fr13 = cruise reference timing
+    fr12 = non-cruise primary timing
+    fr8  = non-cruise reference timing (saved to stack @8)
+
+4.5  Blending Formula
+─────────────────────
+  The blend uses the standard linear interpolation:
+
+    fr14 = desc0_result  (cruise value)
+    fr15 = desc0_result - desc1_result  (delta)
+    → float_max(fr15, 0.0) → clamp negative
+    → fr14 = fr14 - fr0 * blend_correction  (fmac)
+
+  This is stored to GBR-0x20 (FFFF7F0C - 0x20 = FFFF7EEC).
+
+  Same process for desc2/desc3:
+    fr14 = desc2_result
+    → fmac blend → store to GBR-0x1C (FFFF7EF0)
+
+4.6  Smoothing & Ramping
+─────────────────────────
+  The timing blend uses a "previous vs current" smoothing step:
+
+    blended = blend_correction_A * map_ratio + (1.0 - map_ratio) * blend_correction_B
+
+  This is the classic formula:
+    result = cruise + (noncruise - cruise) × ratio
+
+  First-cycle initialization check:
+    if GBR+0x56 (byte) == 0 → copy current to previous, set flag to 1
+
+  Deviation check against TimBlend_CorrThreshold (D2B08 = 44.0°):
+    If |current - previous| > 44° → average and scale by 0.5
+    This prevents sudden large timing jumps during transitions.
+
+  Idle mode special path (r13 == 1):
+    Calls FUN_0xBEA40 with:
+      fr4 = current timing
+      fr7 = ramp rate constant (from literal pool = 0x3EB40000 ≈ 0.35)
+      fr6 = TimBlend_HalfRatio (D2B0C = 0.5)
+      fr5 = previous timing (from GBR-0x18)
+    This implements a gentle ramp during idle transitions.
+
+
+================================================================================
+SECTION 5: TASK 31 - BLEND RATIO BOUNDS (0x3FFD6)
+================================================================================
+
+Task 31 is a simple bounds checker / state machine gate.
+
+Inputs:
+  fr14 = blend_ratio_workspace_A (FFFF9230)
+  fr15 = blend_ratio_workspace_B (FFFF9234)
+  fr12 = blend_timing_ws_A       (FFFF9164)
+  fr13 = blend_timing_ws_B       (FFFF9168)
+  r14  = blend_state_flag         (FFFF91F9, byte)
+
+Calls FUN_0x2999C (check_engine_running variant) → r0 = engine state
+
+5.1  Engine State = 2 (cranking/starting)
+─────────────────────────────────────────
+  → Sets fr8 = 1.0 (fldi1), stores to FFFF7F3C (blend_output_scratch)
+  → Jumps to epilogue. During cranking, ratio is forced to 1.0 (non-cruise).
+
+5.2  Floor Check
+────────────────
+  Loads fr8 from TimBlend_RatioFloor (D2B18 = 0.0).
+  Checks if fr14, fr15, fr12, fr13 are ALL > floor.
+  If any is at or below floor → skip to epilogue (preserve current ratio).
+
+5.3  Blend State = 1 (active blending)
+──────────────────────────────────────
+  Reads FFFF7F3C, subtracts TimBlend_RatioCeiling (D2B1C = 1.0).
+  Calls float_max(result, 0.0) at 0xBE960.
+  Stores clamped result back to FFFF7F3C.
+
+  This ensures the blend ratio never exceeds 1.0 (full non-cruise).
+
+
+================================================================================
+SECTION 6: TASK 33 - TIMING WORKSPACE INIT (0x40918)
+================================================================================
+
+Task 33 is a dispatcher that calls three sub-functions:
+
+  BSR 0x40A9C: Sub-function A — ECT-based descriptor selection
+  BSR 0x40AF6: Sub-function B — Additional workspace setup
+  BSR 0x41030: Sub-function C — Cylinder-specific timing init
+  BRA 0x410D4: Sub-function D — Final dispatch (tail call)
+
+6.1  Sub-function A (0x40A9C → appears at 0x4092A)
+───────────────────────────────────────────────────
+  GBR = FFFF7FD4 (timing_ws_gbr)
+
+  Reads:
+    throttle_position (FFFF65C0)
+    FFFF85D7 (timing state byte)
+    timing_ws_scratch (FFFF90BE)
+    timing_ws_state   (FFFF8E7E)
+
+  Selects between descriptor pairs based on throttle state and engine state:
+
+    State matrix:
+      throttle=0, engine_running=0 → desc @ 0xADB60 (desc_timing_blend_1)
+      throttle=0, engine_running=1 → desc @ 0xADB4C (desc_timing_blend_0)
+      throttle=1, engine_running=0 → desc @ 0xADB88 (desc_timing_blend_3)
+      throttle=1, engine_running=1 → desc @ 0xADB74 (desc_timing_blend_2)
+
+  The descriptor is evaluated via table_desc_1d_float (0xBE830) with
+  fr4 = ect_current. Result stored to FFFF7F2C.
+
+6.2  Sub-function at 0x403C4 (ECT correction)
+──────────────────────────────────────────────
+  Reads ect_current (FFFF6350) and timing_ws_scratch (FFFF90BE).
+  Similar descriptor selection logic with descriptors:
+    0xADBD8, 0xADBC4, 0xADC00, 0xADBEC
+
+  Result stored to FFFF7F68 (ECT blend correction, used by task 50).
+
+6.3  Sub-function at 0x40420 (timing blend table lookup)
+────────────────────────────────────────────────────────
+  Reads:
+    iat_current (FFFF63F8)
+    FFFF6364 (unknown sensor, possibly atmospheric pressure)
+    rpm_current (FFFF6624)
+
+  Evaluates descriptor @ 0xAE38C via table_desc_2d_typed.
+  Result stored to FFFF7F70.
+
+  Then evaluates descriptor @ 0xADC14 via table_desc_1d_float
+  with fr4 = FFFF6364 (atmospheric pressure?).
+  Multiplies result by FFFF7F70, stores to FFFF7F6C.
+
+  This appears to be an atmospheric/altitude compensation for the
+  timing blend.
+
+
+================================================================================
+SECTION 7: CALIBRATION PARAMETER REFERENCE
+================================================================================
+
+7.1  Map Switching Thresholds (float, 0xD2A08-D2ABC)
+─────────────────────────────────────────────────────
+
+  Address    Value        Name                          Purpose
+  ─────────  ───────────  ────────────────────────────  ────────────────────────
+  D2A08      2000.0 RPM   EngineSpeedThreshold          RPM above which non-cruise criteria are checked
+  D2A0C      0.8798       TorqueRatioThreshold          Requested torque ratio threshold
+  D2A10      2.0 g/rev    MAFLoadThreshold              Engine load threshold
+  D2A14      550.0        VehicleSpeedLow               Vehicle speed lower bound
+  D2A18      1300.0       VehicleSpeedHigh              Vehicle speed upper bound
+  D2A1C      80.0 °F      IATThreshold                  Max IAT for non-cruise
+  D2A34      0.0          IdleModeThreshold             Idle detection threshold
+  D2A38      4.0          SIDriveThreshold              SI-DRIVE mode level
+  D2A40      -39.0 °F     ECTColdLow                    ECT cold soak lower bound
+  D2A44      -20.0 °F     ECTColdHigh                   ECT cold soak upper bound
+  D2A50      120.0 °F     ECTHotA                       ECT hot threshold A
+  D2A54      60.0 °F      ECTHotB                       ECT hot threshold B
+  D2A58      0.0          RatioModMin                   Minimum ratio modifier
+  D2A5C      13.0         RatioModScale                 Ratio modifier scale factor
+  D2A60      0.7          RampAdderA                    Transition ramp rate A
+  D2A64      0.7          RampAdderB                    Transition ramp rate B
+  D2A68      60.0 g/s     MAFSensorA                    High-load MAF threshold
+  D2A6C      0.0 g/s      MAFSensorB                    Any-load MAF threshold
+  D2A70      5.0          ReqTorqueMin                  Minimum requested torque
+  D2A74-88   4000.0 RPM   GearRPM_1 through _6          Per-gear RPM thresholds
+  D2A8C      2800.0 RPM   BaseRPMThreshold              Base RPM threshold
+  D2A90      10.0         ECTCompA                      ECT compensation A
+  D2A94      10.0         ECTCompB                      ECT compensation B
+  D2A98      69.7 °F      ECTThreshold                  ECT switching threshold
+  D2A9C      12000.0 RPM  RPMOverride                   RPM override (unreachable)
+  D2AA0      5.0          LoadOverride                  Load override threshold
+  D2AA4      10.0         SpeedLoadCheck                Speed/load check value
+  D2AA8      7900.0 RPM   RPMHystLow                    Hysteresis lower bound
+  D2AAC      8000.0 RPM   RPMHystHigh                   Hysteresis upper bound
+  D2AB0      0.0          RatioMinBound                 Ratio minimum bound
+  D2AB4      20.0         RatioMaxBound                 Ratio maximum bound
+  D2ABC      100.0        PctCeiling                    Percentage ceiling
+
+7.2  Timing Blend Parameters (float, 0xD2AE8-D2B1C)
+────────────────────────────────────────────────────
+
+  D2AE8      10.0         LookupInputThreshold          Initial blend lookup input
+  D2AEC      700.0 RPM    RPMActivation                 RPM activation threshold
+  D2AF0      600.0 RPM    RPMSecondary                  Secondary RPM threshold
+  D2AF4      69.65 °F     IAT_A                         IAT threshold A
+  D2AF8      69.65 °F     IAT_B                         IAT threshold B
+  D2AFC      -3.0 deg     CorrOffset                    Correction offset
+  D2B00      10000.0 RPM  RPMMax                        Maximum RPM for blending
+  D2B04      0.35         RampRate                      Blend ramp rate per cycle
+  D2B08      44.0 deg     CorrThreshold                 Max correction deviation
+  D2B0C      0.5          HalfRatio                     Half-ratio (blend midpoint)
+  D2B10      0.0          MinRatio                      Minimum blend ratio
+  D2B14      6000.0 RPM   RPMLimit                      RPM limit for blend
+  D2B18      0.0          RatioFloor                    Ratio floor (hard min)
+  D2B1C      1.0          RatioCeiling                  Ratio ceiling (hard max)
+
+7.3  Delay Counters (uint16, 0xD29AC-D29B2)
+───────────────────────────────────────────
+
+  D29AC      50           CruiseSwitchCounterA          Ticks before switch A
+  D29AE      38           CruiseSwitchMinDelayA         Minimum delay A
+  D29B0      100          CruiseSwitchCounterB          Ticks before switch B
+  D29B2      38           CruiseSwitchMinDelayB         Minimum delay B
+
+7.4  Undocumented Calibrations (found in task 50)
+─────────────────────────────────────────────────
+
+  D2974      byte         Counter reload value A        Loaded on state change
+  D2975      byte         Counter reload value B        Loaded on state change
+  D2976      byte         Timing mode selector          == 90 enables full summation
+  D2A20      float        Secondary torque threshold    Alternative to D2A0C
+  D2A24      float        Secondary load threshold      Alternative to D2A10
+  D2A28      float        Secondary speed low           Alternative to D2A14
+  D2A2C      float        Secondary speed high          Alternative to D2A18
+  D2A30      float        Secondary IAT threshold       Alternative to D2A1C
+  D2A3C      float        Secondary SI-Drive value      Alternative to D2A38
+
+  These secondary thresholds at D2A20-D2A3C need ECUFlash definitions added.
+
+
+================================================================================
+SECTION 8: RAM ADDRESS REFERENCE
+================================================================================
+
+  Address      Type    Name                       Task   Purpose
+  ───────────  ──────  ─────────────────────────  ─────  ──────────────────────
+  FFFF5BE3     byte    clutch_state               50     Clutch engagement state
+  FFFF62F8     float   torque_ratio               50     Requested torque ratio
+  FFFF6364     float   atm_pressure               33     Atmospheric pressure (?)
+  FFFF65BF     byte    accel_state                50     Acceleration state flag
+  FFFF65FC     float   load_current               50     Engine load (g/rev)
+  FFFF7E90     -       task50_gbr_base            50     GBR base for task 50
+  FFFF7F04     float   pre_ratio                  50     Pre-computed blend ratio
+  FFFF7F0C     float   timing_blend_gbr           32     GBR base for task 32
+  FFFF7F1C     float   alt_blend_ratio            50     Alternative blend ratio
+  FFFF7F2C     float   ect_desc_result            33     ECT descriptor output
+  FFFF7F3C     float   blend_output_scratch       31     Task 31 output
+  FFFF7F60     struct  map_ratio_workspace        32,50  Map ratio workspace base
+  FFFF7F68     float   ect_blend_correction       33,50  ECT blend correction
+  FFFF7F6C     float   atm_blend_correction       33     Atmospheric correction
+  FFFF7F70     float   rpm_iat_blend_result       33     RPM×IAT table result
+  FFFF7F74     float   blend_correction_C         50     Third blend correction
+  FFFF7FBC     float   previous_timing_output     50     Previous cycle timing
+  FFFF7FD4     -       timing_ws_gbr              33     GBR base for task 33
+  FFFF8000     float   base_timing_offset         50     Base timing reference
+  FFFF8028     float   timing_corr_28             50     Timing correction +
+  FFFF8038     float   timing_corr_38             50     Timing correction -
+  FFFF803C     float   timing_corr_3C             50     Timing correction +
+  FFFF805C     float   timing_corr_5C             50     Timing correction +
+  FFFF8075     byte    si_drive_mode              32     SI-DRIVE setting
+  FFFF8084     float   timing_corr_84             50     Timing correction -
+  FFFF8088     float   knock_retard_accum         50     Per-cyl knock retard
+  FFFF80B4     float   timing_corr_B4             50     Timing correction +
+  FFFF80C4     float   timing_corr_C4             50     Timing correction +
+  FFFF80E8     float   timing_corr_E8             50     Timing correction -
+  FFFF80F0     float   timing_corr_F0             50     Timing correction +
+  FFFF81DC     float   per_cyl_base_corr          50     Per-cyl base correction
+  FFFF81EC     float   ect_timing_comp            50     ECT timing compensation
+  FFFF8258     float   flkc_retard_total          50     FLKC retard sum
+  FFFF8260     float   knock_corr_advance         50     Knock correction advance
+  FFFF81F0     float   knock_learning_value       50     Knock learning value
+  FFFF8F16     byte    flkc_mode_byte             50     FLKC operating mode
+  FFFF8F24     byte    timing_state_A             50     Timing state flag A
+  FFFF85D7     byte    timing_state_B             50,33  Timing state flag B
+  FFFF9164     float   blend_timing_ws_A          31     Blend timing workspace
+  FFFF9168     float   blend_timing_ws_B          31     Blend timing workspace
+  FFFF91F9     byte    blend_state_flag           31     Blend state machine flag
+  FFFF9230     float   blend_ratio_ws_A           31     Blend ratio workspace
+  FFFF9234     float   blend_ratio_ws_B           31     Blend ratio workspace
+  FFFF90A8     float   blend_app_scratch          32     Blend app scratch
+  FFFF90BE     byte    timing_ws_scratch          33     Timing workspace flag
+
+
+================================================================================
+SECTION 9: DESCRIPTOR REFERENCE
+================================================================================
+
+9.1  Timing Blend Descriptors (task 33)
+───────────────────────────────────────
+
+  Address    Label                 Axes              Used when
+  ─────────  ────────────────────  ────────────────  ────────────────────
+  0xADB4C    desc_timing_blend_0   1D, ECT input     throttle=0, running
+  0xADB60    desc_timing_blend_1   1D, ECT input     throttle=0, cranking
+  0xADB74    desc_timing_blend_2   1D, ECT input     throttle=1, running
+  0xADB88    desc_timing_blend_3   1D, ECT input     throttle=1, cranking
+  0xADBB0    desc_timing_blend_4   1D, ECT input     (secondary ECT path)
+  0xADBC4    desc_timing_blend_5   1D, ECT input     ECT corr, throttle=0, running
+  0xADBD8    desc_timing_blend_6   1D, ECT input     ECT corr, throttle=0, cranking
+  0xADBEC    desc_timing_blend_7   1D, ECT input     ECT corr, throttle=1, running
+  0xADC00    desc_timing_blend_8   1D, ECT input     ECT corr, throttle=1, cranking
+  0xADC14    desc_timing_blend_9   1D, atm input     Atmospheric compensation
+
+9.2  Timing Table Descriptors used by Blend (task 32)
+─────────────────────────────────────────────────────
+
+  These are the standard base timing descriptors, accessed by task 32
+  with IAT and blend ratio as lookup inputs:
+
+  0xAE31C    desc Base Timing Primary Cruise         2D Load×RPM
+  0xAE338    desc Base Timing Primary Non-Cruise     2D Load×RPM
+  0xAE354    desc Base Timing Reference Cruise       2D Load×RPM
+  0xAE370    desc Base Timing Reference Non-Cruise   2D Load×RPM
+  0xAE38C    desc RPM×Load blend application lookup  2D RPM×Load (task 33)
+
+
+================================================================================
+SECTION 10: AFFECTED CALIBRATION PAIRS
+================================================================================
+
+The map ratio blends between these cruise/non-cruise table pairs:
+
+  Subsystem                Cruise          Non-Cruise
+  ───────────────────────  ──────────────  ──────────────
+  Base Timing Primary      D4714           D48D4
+  Base Timing Reference    D4A94           D4C54
+  Knock Correction Max     D5904           D5AC4
+  CL Fueling Target        D13B0           D141C
+  Cranking IPW Comp        CF704           CF6B0
+  Engine Load Comp         C3C3C           C3D3C
+  AVCS Cam Advance         DA96C           DAC34
+  Timing ECT Comp A        D3226           D3206
+  Timing ECT Comp B        D3236           D3216
+  Target Throttle Plate    F9004           F9284
+  Min Base Enrichment 1    CF95C           CF8B8
+
+
+================================================================================
+SECTION 11: SUMMARY OF FINDINGS
+================================================================================
+
+1. The map switching system is more complex than initially documented in
+   torque_management_analysis.txt. Task 50 alone is ~1300 instructions with
+   multiple switching paths.
+
+2. SI-DRIVE mode directly controls the switching behavior:
+   - S# mode (bit 1): Forces non-cruise (ratio = 1.0)
+   - I mode (bit 0): Enables switching logic
+   - S mode (default): Cruise-only
+
+3. There is a secondary set of thresholds at D2A20-D2A3C that are NOT yet
+   in the ECUFlash definitions. These provide alternative switching criteria.
+
+4. The byte at D2976 == 90 (0x5A) selects between a simple timing blend
+   and a full per-cylinder timing summation that mirrors the ignition
+   timing pipeline.
+
+5. The 44° deviation threshold (D2B08) prevents sudden timing jumps
+   during cruise/non-cruise transitions — a safety feature.
+
+6. 10 new descriptors identified (ADB4C-ADC14) for ECT-based blend
+   corrections, plus 5 new descriptors (AE31C-AE38C) for the
+   IAT×ratio blend application tables.
+
+7. ~15 previously unnamed RAM addresses now identified (Section 8).
+
+8. New calibration addresses D2A20-D2A3C and D2974-D2976 need
+   ECUFlash definitions added.

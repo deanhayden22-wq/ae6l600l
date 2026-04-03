@@ -1,0 +1,320 @@
+AE5L600L Fuel Pump Control Analysis
+================================================================================
+Subsystem: Fuel Pump Duty Cycle Control
+Code range: 0x4B970 - 0x4BC10 (main), 0x4BCEC, 0x4BDAA (sub-functions)
+Called from: rtos_task10_sensors (0xDF14), call_52 @ 0x47C40
+Calibration: 0x4BBA0, 0x4BBAC, 0x4BBB0 (embedded constants)
+                0xD6018, 0xD601A (run-time thresholds)
+Primary RAM: 0xFFFF8354 (fuel_pump_state), 0xFFFF8366 (fuel_pump_workspace)
+
+Based on: fuel_pump_raw.txt disassembly trace
+
+
+================================================================================
+SECTION 1: OVERVIEW
+================================================================================
+
+The fuel pump is controlled via a duty cycle output driven by the
+hw_port_write function at 0x80C6. The duty cycle is expressed as a
+percentage (0-100%) stored in FFFF8354 and divided by 100.0 before
+being written to the hardware port.
+
+The system runs within rtos_task10_sensors (20ms period), as call_52
+in the task10 dispatch chain. It has two distinct phases:
+
+  Phase 1 (0x4B970): Initial fuel pump priming / descriptor-based lookup
+  Phase 2 (0x4BA30): Steady-state fuel pump mode selection
+
+Three fixed duty levels exist:
+  100.0%  (0x4BBA0) — Full duty (prime / cranking)
+   66.7%  (0x4BBAC) — High duty (normal running)
+   33.3%  (0x4BBB0) — Low duty (idle / low demand)
+
+The ECUFlash "Fuel Pump Duty" definition at 0x4BBAC (66.7%) is the
+HIGH-duty running constant.
+
+
+================================================================================
+SECTION 2: PHASE 1 — PUMP PRIME / DESCRIPTOR LOOKUP (0x4B970)
+================================================================================
+
+This is a short entry function that performs a descriptor lookup and
+sets the initial pump duty.
+
+  2.1  Descriptor Lookup
+  ──────────────────────
+  Inputs:
+    fr4 = ignition_switch_state (FFFF4130) — as float
+    fr5 = FFFF6210 (likely battery/key-on voltage)
+
+  Descriptor: 0xAE774 — 1D int8, 2 entries
+    Data at 0xD6048, X-axis at 0xD6050
+    Evaluated via table_desc_2d_typed (0xBE8E4)
+
+  The result (fr0) is stored to FFFF8360 (fuel_pump_workspace - 4).
+
+  2.2  Initial Duty Set
+  ─────────────────────
+  Loads 100.0% from 0x4BBA0, stores to FFFF8354 - 0x10 = FFFF8344.
+  Sets FFFF8354 (uint16) = 0xFFFF (-1 = "priming active" flag).
+  Sets FFFF835E (uint16 @ offset +10) = 0xFFFF.
+
+  Computes: duty_ratio = 100.0 / 100.0 = 1.0 (full duty)
+  Tail-calls hw_port_write (0x80C6) with fr4 = 1.0.
+
+  This means the pump runs at 100% duty on initial key-on (priming).
+
+
+================================================================================
+SECTION 3: PHASE 2 — STEADY STATE MODE SELECTION (0x4B9A2 → 0x4BC0A)
+================================================================================
+
+GBR is set to FFFF8354 (fuel_pump_state base). The function uses
+GBR-relative byte accesses extensively.
+
+  3.1  GBR Workspace Layout
+  ─────────────────────────
+  GBR = FFFF8354
+
+  Offset  Address      Type    Name
+  ──────  ───────────  ──────  ──────────────────────
+  +0x00   FFFF8354     float   fuel_pump_duty (output)
+  +0x14   FFFF8368     byte    pump_mode_A
+  +0x15   FFFF8369     byte    pump_mode_B
+  +0x16   FFFF836A     byte    pump_override_flag
+
+  3.2  Override Check
+  ──────────────────
+  If pump_override_flag (GBR+0x16) == 1 → jump to low-duty output
+  at 0x4BA04 (sets duty = 0.0, i.e., pump OFF).
+
+  3.3  Mode Selection State Machine
+  ─────────────────────────────────
+  The mode selection cascades through three conditions:
+
+  Case 1: pump_mode_A == 1 AND pump_mode_B == 1
+    → Duty = 100.0% (full pump, mova 0x4BBA0)
+
+  Case 2: pump_mode_A == 0 AND pump_mode_B == 1
+    → Duty = 66.7% (high duty, mova 0x4BBAC)
+
+  Case 3: pump_mode_A == 1 AND pump_mode_B == 0
+    → Duty = 33.3% (low duty, mova 0x4BBB0)
+
+  Default: Duty = 0.0 (fldi0 fr8, pump OFF)
+
+  3.4  Output
+  ──────────
+  The selected duty percentage is stored to FFFF8354 (float).
+  Then: duty_ratio = duty / 100.0
+  Tail-calls hw_port_write (0x80C6) with fr4 = ratio (0.0-1.0).
+
+
+================================================================================
+SECTION 4: PHASE 2 SUB — MODE DETERMINATION (0x4BA30)
+================================================================================
+
+This is the main decision logic that determines pump_mode_A and
+pump_mode_B. Called via BSR from the task10_call52 parent function.
+
+  4.1  Inputs
+  ───────────
+  r13 = fuel_pump_flag      (FFFF8E98, byte)
+  r11 = fuel_pump_helper_B result (engine_running check)
+  r10 = FFFF65AE            (unknown sensor flag)
+  r8  = engine_run_time     (FFFF67EC, uint16, in 20ms ticks)
+  r9  = FFFF65C1            (throttle-related state byte)
+  r14 → fr14 = ignition_switch_state (FFFF4130, float)
+  r12 = FFFF85D7            (timing state)
+  r14_byte = FFFF8F24       (timing mode)
+  stack[12] = check_cl_active result (0x22F92)
+
+  4.2  Early Exit Conditions
+  ──────────────────────────
+  If fuel_pump_flag (r13) != 0 → skip to duty output (0x4BBFC)
+    This appears to be a diagnostic/DTC inhibit — if P0230 is set,
+    the pump control is bypassed.
+
+  If FFFF8F24 == 1 AND FFFF85D7 == 1 AND stack[4] == 1
+    → skip to duty output (all three timing/CL conditions met
+       suggests the engine is in a specific protected state)
+
+  4.3  Mode Activation Logic
+  ──────────────────────────
+  The function uses the FFFF8366 workspace (14+ bytes) as a state
+  machine with counters and mode flags:
+
+    FFFF8366+0x00  byte  state_counter_main
+    FFFF8366+0x02  byte  mode_flag_A
+    FFFF8366+0x03  byte  mode_flag_B
+    FFFF8366+0x06  byte  activation_flag
+    FFFF8366+0x0C  byte  transition_counter
+    FFFF8366+0x0D  byte  saturation_counter
+
+  Transition counter thresholds:
+    >= 47 (0x2F):  Check second threshold
+    >= 94 (0x5E):  Check third threshold
+    >= 141 (0x8D): Full activation — set mode_flag_A=1, mode_flag_B=1
+    == 255 (0xFF): Saturated — reset transition_counter to 0
+
+  The saturation_counter at +0x0D increments each cycle (up to 0xFF).
+
+  4.4  Run Time Gate
+  ──────────────────
+  At 0x4BB46: Checks if state_counter >= 63 (0x3F) AND
+  saturation_counter >= 31 (0x1F) AND FFFF65AE == 0.
+  If all true → skip to output (pump is in steady state).
+
+  4.5  Voltage Check
+  ──────────────────
+  At 0x4BB46: mova loads float at 0x4BBF0 = 8.0.
+  Compares: if ignition_voltage (fr14) > 8.0V → proceed with
+  run-time check. Otherwise → skip (low battery = keep pump running).
+
+  4.6  Engine Run Time Thresholds
+  ───────────────────────────────
+  Two calibrations gate the pump mode transitions:
+
+    D6018 = 3750 (uint16) — ~75 seconds at 20ms/tick
+    D601A = 3750 (uint16) — same value, for different state
+
+  If engine_run_time >= threshold → transition allowed.
+  These control how long after engine start before the pump can
+  reduce duty from 100% to 66.7%.
+
+  4.7  Final Mode Set
+  ──────────────────
+  BSR to 0x4BDAA performs the final pump hardware control when the
+  activation_flag at +0x06 is not set and all conditions pass.
+
+
+================================================================================
+SECTION 5: HELPER FUNCTIONS
+================================================================================
+
+  0x0281DC (fuel_pump_helper_A)
+    Reads a global state flag and returns a boolean.
+    Likely checks if the ECU is in a diagnostic test mode.
+
+  0x05EA4E (fuel_pump_helper_B)
+    Engine running check — returns 1 if engine is running.
+
+  0x05EB1A (fuel_pump_helper_C)
+    Returns another state flag — possibly fuel cut status.
+
+  0x05EB26 — Additional state helper, similar pattern.
+
+  0x00317C — Timer/counter utility (called with r4=16).
+    Likely a scheduler tick counter read.
+
+  0x003190 — Another timer utility, called after the counter read.
+
+  0x0BE53C — uint8_add_sat variant (called with r4=counter, r5=1).
+    Saturating increment of a byte counter.
+
+  0x80C6 (hw_port_write)
+    Hardware port write — takes fr4 as duty ratio (0.0-1.0),
+    writes to the fuel pump output compare register on the ATU.
+
+
+================================================================================
+SECTION 6: CALIBRATION REFERENCE
+================================================================================
+
+  Address    Type     Value     ECUFlash Name           Purpose
+  ─────────  ───────  ────────  ──────────────────────  ──────────────────
+  0x4BBA0    float    100.0%    (not defined)           Full pump duty
+  0x4BBAC    float    66.7%     Fuel Pump Duty          High running duty
+  0x4BBB0    float    33.3%    (not defined)            Low/idle duty
+  0x4BBF0    float    8.0       (not defined)           Min voltage for duty reduction
+  0xD6018    uint16   3750      (not defined)           Run-time gate A (~75s)
+  0xD601A    uint16   3750      (not defined)           Run-time gate B (~75s)
+
+  Descriptor: 0xAE774 — 1D int8, 2 entries
+    Data: 0xD6048, X-axis: 0xD6050
+    Fuel pump initial duty lookup (voltage × state)
+
+
+================================================================================
+SECTION 7: RAM ADDRESS REFERENCE
+================================================================================
+
+  Address      Type     Name                    Purpose
+  ───────────  ───────  ──────────────────────  ──────────────────
+  FFFF4130     float    ignition_switch_state   Key-on/battery voltage
+  FFFF6210     float    battery_voltage_adc     Battery voltage (ADC processed)
+  FFFF65AE     byte     steady_state_flag       Vehicle steady-state indicator
+  FFFF65C1     byte     throttle_state_byte     Throttle position state
+  FFFF67EC     uint16   engine_run_time         Engine run time (20ms ticks)
+  FFFF8354     float    fuel_pump_duty          Current pump duty % output
+  FFFF8366     struct   fuel_pump_workspace     14-byte state machine workspace
+  FFFF8366+00  byte     state_counter_main      Main state counter
+  FFFF8366+02  byte     pump_mode_flag_A        Pump mode A (high/low select)
+  FFFF8366+03  byte     pump_mode_flag_B        Pump mode B (on/off select)
+  FFFF8366+06  byte     pump_activation_flag    Pump activation inhibit
+  FFFF8366+0C  byte     transition_counter      Duty transition counter
+  FFFF8366+0D  byte     saturation_counter      Cycle saturation counter
+  FFFF8E98     byte     fuel_pump_dtc_flag      DTC inhibit flag (P0230)
+
+
+================================================================================
+SECTION 8: PUMP DUTY STATE MACHINE SUMMARY
+================================================================================
+
+  ┌─────────────────────┐
+  │   KEY ON (PRIME)    │  → 100% duty via hw_port_write
+  │   (Phase 1)         │     FFFF8354 = 0xFFFF (flag)
+  └─────────┬───────────┘
+            │
+            ▼
+  ┌─────────────────────┐
+  │ ENGINE CRANKING      │  Mode A=1, B=1 → 100% duty
+  │ (transition_ctr<47) │
+  └─────────┬───────────┘
+            │ transition_ctr >= 47
+            ▼
+  ┌─────────────────────┐
+  │ WARMUP               │  Mode A=0, B=1 → 66.7% duty
+  │ (run_time < 3750)   │  (high running duty)
+  └─────────┬───────────┘
+            │ run_time >= 3750 (~75 sec)
+            ▼
+  ┌─────────────────────┐
+  │ STEADY STATE         │  Mode A=1, B=0 → 33.3% duty
+  │ (normal operation)   │  (low/idle duty)
+  └─────────┬───────────┘
+            │ conditions change
+            ▼
+  ┌─────────────────────┐
+  │ DTC / OVERRIDE       │  Duty = 0.0% (pump OFF)
+  │ (P0230 or inhibit)  │  via fuel_pump_dtc_flag
+  └─────────────────────┘
+
+  Voltage safety: if battery < 8.0V, pump stays at higher duty
+  regardless of run-time thresholds.
+
+
+================================================================================
+SECTION 9: FINDINGS & RECOMMENDATIONS
+================================================================================
+
+1. The fuel pump has THREE duty levels, not just one. The ECUFlash
+   definition only exposes the 66.7% value at 0x4BBAC. Two additional
+   definitions should be added:
+   - 0x4BBA0 (100.0%) — "Fuel Pump Duty Max (Prime/Cranking)"
+   - 0x4BBB0 (33.3%) — "Fuel Pump Duty Low (Idle)"
+
+2. The run-time gate calibrations at D6018/D601A (both 3750 = ~75 sec)
+   control how long after startup before the pump reduces to low duty.
+   These should also get ECUFlash definitions.
+
+3. The voltage threshold at 0x4BBF0 (8.0V) prevents duty reduction
+   under low-voltage conditions — useful for cold cranking.
+
+4. The pump has a DTC inhibit path via FFFF8E98 — when P0230 (Fuel
+   Pump Primary Circuit) is detected, the pump control logic is
+   bypassed entirely.
+
+5. This function was previously labeled [CLOL] in task10_analysis.txt
+   call_52. It should be relabeled as the fuel pump controller since
+   the CL/OL connection is just a shared parent function at 0x47C40.

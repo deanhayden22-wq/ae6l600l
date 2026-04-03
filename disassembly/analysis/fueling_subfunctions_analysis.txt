@@ -1,0 +1,311 @@
+AE5L600L Fueling Sub-Function Forest Analysis (0x020000-0x02FFFF)
+================================================================================
+Code range: 0x020000 - 0x02FFFF (~64 KB)
+Total call targets: 491 unique functions, 1040 total calls into this range
+Classification: 155 flag readers, 336 larger functions
+
+Based on: Automated call-target scan + instruction pattern analysis
+
+
+================================================================================
+SECTION 1: OVERVIEW
+================================================================================
+
+The 0x020000-0x02FFFF range contains utility functions called from the
+main fueling pipeline (0x030000-0x03FFFF), timing tasks, diagnostic
+monitors, and sensor processing. The range breaks into these categories:
+
+  Category                          Count    Call Total
+  ────────────────────────────────  ─────    ──────────
+  State/flag readers (<=24 bytes)   155      ~350 calls
+  Diagnostic flag readers (0x97xx)   45      ~160 calls
+  Sensor processing utilities        ~80     ~200 calls
+  A/F learning helpers               ~30     ~100 calls
+  CL/OL transition utilities         ~20      ~60 calls
+  O2 sensor processing               ~15      ~40 calls
+  Larger subsystem functions         ~80     ~130 calls
+  Already named                       12     ~290 calls
+
+The majority of the call volume (350+ calls) goes to tiny flag readers
+that test a single RAM byte and return true/false. These are the ECU's
+standardized "is_condition_X_met" accessor functions.
+
+
+================================================================================
+SECTION 2: FLAG READER CLASSIFICATION
+================================================================================
+
+Flag readers follow a standard SH-2 pattern:
+  mov.l  @(pool),Rn      ; load RAM address
+  mov.b  @Rn,Rm          ; read byte
+  cmp/eq #1,R0           ; compare to 1
+  rts                    ; return
+  movt   Rn              ; T flag → result (in delay slot)
+
+They are the ECU's accessor layer — rather than reading RAM directly,
+the fueling pipeline calls these tiny functions, providing a single
+point where the flag check can be intercepted for diagnostics.
+
+2.1  Top Flag Readers (by call count)
+─────────────────────────────────────
+
+  Address    Calls  RAM        Proposed Label
+  ─────────  ─────  ─────────  ──────────────────────────
+  0x022F92   111    FFFF65F6   check_cl_active
+  0x022CF4   100    FFFF65C5   check_engine_running
+  0x02F8EA    65    FFFF726C   check_fuel_system_ready
+  0x0297A0    18    FFFF9704   diag_flag_P0031_read
+  0x0297B0    16    FFFF9705   diag_flag_P0032_read
+  0x022CEA    15    FFFF65B1   check_accel_pedal_idle
+  0x023E48    15    FFFF67FC   check_afl_ready
+  0x0281DC    15    FFFF96A8   check_diag_mode_active
+  0x0299BC    14    FFFF971C   diag_flag_read_971C
+  0x021D9A    12    FFFF6552   check_sensor_valid
+  0x02999C    10    FFFF971B   flkc_flag_slot15
+  0x0297D0     9    FFFF9707   diag_flag_read_9707
+  0x029B40     8    FFFF9741   diag_flag_read_9741
+  0x0298C8     7    FFFF9714   diag_flag_read_9714
+  0x029AC0     7    FFFF972D   diag_flag_read_972D
+  0x029AB0     7    FFFF972C   diag_flag_read_972C
+  0x029AA0     7    FFFF972E   diag_flag_read_972E
+  0x0278D2     7    FFFF6A29   check_maf_valid
+  0x02F8F4     6    FFFF726D   check_fuel_mode_byte_1
+  0x021016     6    FFFF647C   check_sensor_config_valid
+
+2.2  Diagnostic Monitor Flag Readers (0x0297xx-0x029Bxx)
+────────────────────────────────────────────────────────
+
+45 functions at 0x0297A0 through 0x029B60, each exactly 16 bytes.
+They read sequential bytes from FFFF9704-FFFF9742. These correspond
+to individual DTC monitor enable/active flags:
+
+  FFFF9704 = P0031 (O2 sensor heater circuit low)
+  FFFF9705 = P0032 (O2 sensor heater circuit high)
+  FFFF9706 = P0037 (rear O2 heater low)
+  FFFF9707 = P0038 (rear O2 heater high)
+  FFFF9708 = P0068 (MAP/MAF correlation)
+  FFFF9709 = P0101 (MAF range/performance)
+  FFFF970A = P0102 (MAF circuit low)
+  FFFF970B = P0103 (MAF circuit high)
+  FFFF970D = P0107 (MAP low)
+  FFFF970E = P0108 (MAP high)
+  FFFF970F = P0111 (IAT range)
+  FFFF9711 = P0116 (ECT range)
+  FFFF9713 = P0122 (TPS low)
+  FFFF9714 = P0123 (TPS high)
+  FFFF9715 = P0125 (ECT insufficient)
+  FFFF9716 = P0126 (ECT insufficient for stable)
+  FFFF9717 = P0128 (thermostat rationality)
+  FFFF9718 = P0131 (front O2 low)
+  FFFF9719 = P0132 (front O2 high)
+  FFFF971A = P0133 (front O2 slow response)
+  FFFF971B = P0134 (front O2 no activity)
+  FFFF971C = P0137 (rear O2 low)
+  FFFF971D = P0138 (rear O2 high)
+  FFFF971F = P0141 (rear O2 heater)
+  FFFF9720 = P0171 (system too lean bank 1)
+  FFFF9721 = P0172 (system too rich bank 1)
+  FFFF9722 = P0222 (TPS B low)
+  FFFF9723 = P0223 (TPS B high)
+  FFFF9724 = P0230 (fuel pump primary)
+  FFFF972C = P0461 (fuel level low)
+  FFFF972D = P0462 (fuel level high)
+  FFFF972E = P0463 (fuel level range)
+  FFFF972F = P0464 (fuel level intermittent)
+  FFFF9735 = P0500 (vehicle speed sensor)
+  FFFF9736 = P0502 (VSS low)
+  FFFF973B = P0604 (internal RAM)
+  FFFF973C = P0605 (internal ROM)
+  FFFF973D = P0606 (processor failure)
+  FFFF973E = P0638 (throttle actuator)
+  FFFF9741 = P0850 (park/neutral switch)
+  FFFF9742 = P1443 (vent control solenoid)
+
+  (Note: DTC-to-address mapping is approximate based on the DTC table
+   at 0x9A770. The sequential FFFF97xx layout matches the 93 DTC
+   definition structs.)
+
+
+================================================================================
+SECTION 3: SENSOR PROCESSING UTILITIES (0x0200xx-0x0270xx)
+================================================================================
+
+The 0x020000-0x027000 range contains sensor acquisition and
+conditioning functions. These are called from task10 (sensor task)
+and from the fueling pipeline for sensor validation.
+
+Key identified functions:
+
+  0x021016 (6 calls) — check_sensor_config_valid
+    Reads FFFF647C, returns boolean. Used to gate sensor processing.
+
+  0x021150 (2 calls) — sensor_scaling_A
+    Reads FFFF21D4 (calibration workspace). Multi-step computation.
+
+  0x021D9A (12 calls) — check_sensor_valid
+    Reads FFFF6552, checks two bytes at offset +1. Returns a
+    combined validity flag. Used across fueling and timing paths.
+
+  0x022CEA (15 calls) — check_accel_pedal_idle
+    Reads FFFF65B1 (accelerator pedal position state byte).
+    Returns 1 if pedal is at idle position.
+
+  0x022CF4 (100 calls) — check_engine_running
+    Reads FFFF65C5 (engine state flag). The most-called utility
+    after check_cl_active. Already labeled in Ghidra.
+
+  0x022F92 (111 calls) — check_cl_active
+    Reads FFFF65F6 (closed-loop active flag). The single
+    most-called function in this range. Already labeled in Ghidra.
+
+  0x023E48 (15 calls) — check_afl_ready
+    Reads FFFF67FC (A/F learning readiness flag).
+    Already named in fueling pipeline analysis.
+
+
+================================================================================
+SECTION 4: A/F LEARNING & CL/OL TRANSITION HELPERS (0x0278xx-0x029Bxx)
+================================================================================
+
+  0x0278D2 (7 calls) — check_maf_valid
+    Reads FFFF6A29 (MAF validity flag). Used by AFL pipeline.
+    Already named in fueling pipeline analysis.
+
+  0x0281DC (15 calls) — check_diag_mode_active
+    Reads FFFF96A8 (diagnostic test mode flag).
+    Named in fuel pump analysis. Used to inhibit normal operations
+    during dealer diagnostic sessions.
+
+  0x029858 (5 calls) — flkc_flag_dispatch_table_entry
+    Part of the FLKC flag dispatch table at 0x29858.
+    Already analyzed in mystery_subs_analysis.txt.
+
+  0x02999C (10 calls) — flkc_flag_slot15
+    Already labeled in Ghidra. Part of the flag dispatch system.
+
+
+================================================================================
+SECTION 5: FUELING STATUS READERS (0x02F8xx-0x02FFxx)
+================================================================================
+
+  0x02F8EA (65 calls) — check_fuel_system_ready
+    Reads FFFF726C (fuel system state). The third most-called
+    function in this range. FFFF726C is the master fuel system
+    readiness byte — when == 1, the fuel pipeline is initialized
+    and normal fueling calculations can proceed.
+
+  0x02F8F4 (6 calls) — check_fuel_mode_byte_1
+    Reads FFFF726D. Secondary fuel mode indicator.
+
+  0x02F8FE (4 calls) — check_fuel_mode_byte_2
+    Reads FFFF726E. Tertiary fuel mode indicator.
+
+  These three bytes at FFFF726C-726E form a fuel system status
+  triple that gates different phases of the fueling pipeline.
+
+
+================================================================================
+SECTION 6: LARGER UNANALYZED FUNCTIONS (0x02A000-0x02F800)
+================================================================================
+
+The range 0x02A000-0x02F800 contains ~80 larger functions (>24 bytes)
+with 1-4 callers each. Based on their literal pool references:
+
+  0x02A5E6 (3 calls) — reads FFFF6AE4 (likely MAF-related processing)
+  0x02B1DC (2 calls) — 28-byte function
+  0x02B220 (5 calls) — reads FFFFA179 (diagnostic workspace)
+  0x02B28C (2 calls) — reads FFFFA176 (diagnostic workspace)
+  0x02BDDC (3 calls) — unknown larger function
+  0x02D7E8 (4 calls) — reads FFFF7204 (fuel correction workspace)
+  0x02D92C (4 calls) — larger function
+  0x02F22A (2 calls) — reads FFFF7278 (fuel trim workspace)
+  0x02F822 (2 calls) — 28-byte fuel status helper
+  0x02F83E (2 calls) — 32-byte function, reads FFFF72C8
+
+These are low-call-count support functions. Most are intermediate
+computations in the AFL learning or fuel trim pipelines, called
+from the main dispatch chain in 0x030000-0x03FFFF.
+
+The 0x02C000-0x02D000 and 0x02D500-0x02E600 sub-ranges contain
+what appear to be per-cylinder or per-condition correction
+computators, based on their loop structures and 4-element
+array patterns in the literal pools.
+
+
+================================================================================
+SECTION 7: FUNCTION INVENTORY SUMMARY
+================================================================================
+
+Total functions in 0x020000-0x02FFFF: 491
+
+  Category                              Count   %
+  ────────────────────────────────────  ─────   ──
+  Diagnostic flag readers (16B each)     45     9%
+  Other flag/state readers (4-24B)      110    22%
+  Sensor processing (0x020xxx-0x027xxx)  ~80   16%
+  A/F learning helpers (0x0278xx-0x029B) ~30    6%
+  Fueling status readers (0x02F8xx+)     ~15    3%
+  Larger support functions               ~80   16%
+  Remaining (1-call, small)             ~131   27%
+
+  Already named/analyzed:                ~12    2%
+
+Key insight: ~31% of functions in this range are trivial flag readers
+(<=24 bytes) that simply test a RAM byte and return true/false. Another
+~27% are single-caller small helpers. The remaining ~40% are the
+substantive utility functions that warrant individual analysis.
+
+
+================================================================================
+SECTION 8: RAM ADDRESS REFERENCE (NEW)
+================================================================================
+
+  Address      Accessed by        Purpose
+  ───────────  ─────────────────  ──────────────────────
+  FFFF647C     0x021016           sensor_config_valid
+  FFFF647E     0x020FF6           sensor_config_byte_B
+  FFFF6480     0x021006           sensor_config_byte_C
+  FFFF6552     0x021D9A           sensor_validity_flag
+  FFFF65B1     0x022CEA           accel_pedal_idle_flag
+  FFFF65C5     0x022CF4           engine_running_flag
+  FFFF65F1     7 functions        startup_enrichment_state
+  FFFF65F6     0x022F92           cl_active_flag
+  FFFF67FC     0x023E48           afl_ready_flag
+  FFFF6A29     0x0278D2           maf_validity_flag
+  FFFF726C     0x02F8EA           fuel_system_ready
+  FFFF726D     0x02F8F4           fuel_mode_byte_1
+  FFFF726E     0x02F8FE           fuel_mode_byte_2
+  FFFF96A0     0x0281CC           diag_mode_flag_A
+  FFFF96A8     0x0281DC           diag_mode_active
+  FFFF9704-42  45 functions       DTC monitor status flags
+  FFFFA176-85  10 functions       diagnostic workspace flags
+
+
+================================================================================
+SECTION 9: RECOMMENDATIONS
+================================================================================
+
+1. The 155 flag readers should be batch-labeled in Ghidra using a
+   script. Each gets a name like "read_flag_XXXX" where XXXX is the
+   RAM address suffix.
+
+2. The 45 diagnostic flag readers (0x0297A0-0x029B60) should be
+   labeled with their DTC codes (e.g., "diag_check_P0031").
+
+3. The top 10 most-called unnamed functions should get Ghidra labels:
+   - 0x02F8EA → check_fuel_system_ready
+   - 0x022CEA → check_accel_pedal_idle
+   - 0x021D9A → check_sensor_valid
+   - 0x021016 → check_sensor_config_valid
+   - 0x0297A0 → diag_check_P0031
+   - 0x0297B0 → diag_check_P0032
+   - 0x0299BC → diag_check_P0137_rear_o2_low
+   - 0x02F8F4 → check_fuel_mode_byte_1
+   - 0x02B220 → diag_ws_check_A179
+
+4. The FFFF97xx RAM block (45 bytes from FFFF9704-FFFF9742) should
+   be documented as the DTC monitor active-flag array.
+
+5. The 0x02A000-0x02F800 range warrants targeted analysis of the
+   4-caller functions (0x02D7E8, 0x02D92C) which appear to be
+   fuel correction intermediate computators.

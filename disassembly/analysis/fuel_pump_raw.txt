@@ -1,0 +1,4494 @@
+AE5L600L Fuel Pump Control Disassembly Trace
+==============================================================================
+ROM: C:\Users\DeanHayden\OneDrive - Vytal\Documents\GitHub\ae6l600l\scripts\disasm\..\..\rom\ae5l600l.bin
+
+CALIBRATION VALUES:
+  0x4BBAC: 66.7000%  (Fuel Pump Duty High)
+  0x4BBB0: 33.3000%  (Fuel Pump Duty Low)
+  0x4BBA0: 100.0000%  (Fuel Pump Duty Max)
+
+
+==============================================================================
+  fuel_pump_duty_ctrl  @  0x4B970
+==============================================================================
+  04B970: 4F22  sts.l  PR,@-r15
+  04B972: D286  mov.l  @(0x4BB8C),r2  ; =0xFFFF4130 (RAM) [ignition_switch_state]
+  04B974: F428  fmov.s @r2,fr4
+  04B976: D286  mov.l  @(0x4BB90),r2  ; =0xFFFF6210 (RAM)
+  04B978: F528  fmov.s @r2,fr5
+  04B97A: D486  mov.l  @(0x4BB94),r4  ; =0x000AE774
+  04B97C: D286  mov.l  @(0x4BB98),r2  ; =0x000BE8E4 [table_desc_2d_typed]
+  04B97E: 420B  jsr    @r2
+  04B980: 0009  nop
+  04B982: D586  mov.l  @(0x4BB9C),r5  ; =0xFFFF8364 (RAM) [fuel_pump_workspace]
+  04B984: E0FC  mov    #-4,r0
+  04B986: F507  fmov.s fr0,@(r0,r5)
+  04B988: C785  mova   @(0x4BBA0),r0
+  04B98A: F808  fmov.s @r0,fr8
+  04B98C: E0F0  mov    #-16,r0
+  04B98E: F587  fmov.s fr8,@(r0,r5)
+  04B990: E0FF  mov    #-1,r0
+  04B992: 2501  mov.w  r0,@r5
+  04B994: 8155  mov.w  r0,@(10,r5)
+  04B996: E0F0  mov    #-16,r0
+  04B998: F456  fmov.s @(r0,r5),fr4
+  04B99A: F483  fdiv fr8,fr4
+  04B99C: D281  mov.l  @(0x4BBA4),r2  ; =0x000080C6 [hw_port_write]
+  04B99E: 422B  jmp    @r2
+  04B9A0: 4F26  lds.l  @r15+,PR
+  04B9A2: 4F13  .word  0x4F13
+  04B9A4: D080  mov.l  @(0x4BBA8),r0  ; =0xFFFF8354 (RAM) [fuel_pump_state]
+  04B9A6: 401E  ldc    r0,GBR
+  04B9A8: 7FE8  add    #-24,r15
+  04B9AA: C416  mov.b  @(22,GBR),r0
+  04B9AC: 8801  cmp/eq #1,r0
+  04B9AE: 8929  bt     0x4BA04
+  04B9B0: C414  mov.b  @(20,GBR),r0
+  04B9B2: 2008  tst r0,r0
+  04B9B4: 8B03  bf     0x4B9BE
+  04B9B6: C415  mov.b  @(21,GBR),r0
+  04B9B8: 2008  tst r0,r0
+  04B9BA: 8D23  bt/s   0x4BA04
+  04B9BC: 2F02  mov.l  r0,@r15
+  04B9BE: C414  mov.b  @(20,GBR),r0
+  04B9C0: 8801  cmp/eq #1,r0
+  04B9C2: 8B07  bf     0x4B9D4
+  04B9C4: C415  mov.b  @(21,GBR),r0
+  04B9C6: 1F01  mov.l  r0,@(4,r15)
+  04B9C8: 600C  extu.b r0,r0
+  04B9CA: 8801  cmp/eq #1,r0
+  04B9CC: 8B02  bf     0x4B9D4
+  04B9CE: C774  mova   @(0x4BBA0),r0
+  04B9D0: A019  bra    0x4BA06
+  04B9D2: F808  fmov.s @r0,fr8
+  04B9D4: C414  mov.b  @(20,GBR),r0
+  04B9D6: 2008  tst r0,r0
+  04B9D8: 8F08  bf/s   0x4B9EC
+  04B9DA: 1F02  mov.l  r0,@(8,r15)
+  04B9DC: C415  mov.b  @(21,GBR),r0
+  04B9DE: 1F03  mov.l  r0,@(12,r15)
+  04B9E0: 600C  extu.b r0,r0
+  04B9E2: 8801  cmp/eq #1,r0
+  04B9E4: 8B02  bf     0x4B9EC
+  04B9E6: C771  mova   @(0x4BBAC),r0
+  04B9E8: A00D  bra    0x4BA06
+  04B9EA: F808  fmov.s @r0,fr8
+  04B9EC: C414  mov.b  @(20,GBR),r0
+  04B9EE: 1F04  mov.l  r0,@(16,r15)
+  04B9F0: 600C  extu.b r0,r0
+  04B9F2: 8801  cmp/eq #1,r0
+  04B9F4: 8B06  bf     0x4BA04
+  04B9F6: C415  mov.b  @(21,GBR),r0
+  04B9F8: 2008  tst r0,r0
+  04B9FA: 8F03  bf/s   0x4BA04
+  04B9FC: 1F05  mov.l  r0,@(20,r15)
+  04B9FE: C76C  mova   @(0x4BBB0),r0
+  04BA00: A001  bra    0x4BA06
+  04BA02: F808  fmov.s @r0,fr8
+  04BA04: F88D  fldi0  fr8
+  04BA06: D268  mov.l  @(0x4BBA8),r2  ; =0xFFFF8354 (RAM) [fuel_pump_state]
+  04BA08: F28A  fmov.s fr8,@r2
+  04BA0A: F428  fmov.s @r2,fr4
+  04BA0C: C764  mova   @(0x4BBA0),r0
+  04BA0E: F808  fmov.s @r0,fr8
+  04BA10: F483  fdiv fr8,fr4
+  04BA12: D264  mov.l  @(0x4BBA4),r2  ; =0x000080C6 [hw_port_write]
+  04BA14: 7F18  add    #24,r15
+  04BA16: 422B  jmp    @r2
+  04BA18: 4F17  .word  0x4F17
+  04BA1A: 4F22  sts.l  PR,@-r15
+  04BA1C: B166  bsr    0x4BCEC
+  04BA1E: 0009  nop
+  04BA20: 4F26  lds.l  @r15+,PR
+  04BA22: 2F86  mov.l  r8,@-r15
+  04BA24: 2F96  mov.l  r9,@-r15
+  04BA26: 2FA6  mov.l  r10,@-r15
+  04BA28: 2FB6  mov.l  r11,@-r15
+  04BA2A: 2FC6  mov.l  r12,@-r15
+  04BA2C: 2FD6  mov.l  r13,@-r15
+  04BA2E: 2FE6  mov.l  r14,@-r15
+  04BA30: 4F22  sts.l  PR,@-r15
+  04BA32: FFEB  fmov.s fr14,@-r15
+  04BA34: 7FF0  add    #-16,r15
+  04BA36: D65F  mov.l  @(0x4BBB4),r6  ; =0xFFFF8E98 (RAM) [fuel_pump_flag]
+  04BA38: D25F  mov.l  @(0x4BBB8),r2  ; =0x000281DC [fuel_pump_helper_A]
+  04BA3A: 420B  jsr    @r2
+  04BA3C: 6D60  mov.b  @r6,r13
+  04BA3E: D25F  mov.l  @(0x4BBBC),r2  ; =0x0005EA4E [fuel_pump_helper_B]
+  04BA40: 420B  jsr    @r2
+  04BA42: 6B0C  extu.b r0,r11
+  04BA44: D25E  mov.l  @(0x4BBC0),r2  ; =0x0005EB1A [fuel_pump_helper_C]
+  04BA46: 420B  jsr    @r2
+  04BA48: 2F00  mov.b  r0,@r15
+  04BA4A: D25E  mov.l  @(0x4BBC4),r2  ; =0x0005EB26
+  04BA4C: 420B  jsr    @r2
+  04BA4E: 80F4  mov.b  r0,@(4,r15)
+  04BA50: 80F8  mov.b  r0,@(8,r15)
+  04BA52: D24E  mov.l  @(0x4BB8C),r2  ; =0xFFFF4130 (RAM) [ignition_switch_state]
+  04BA54: FE28  fmov.s @r2,fr14
+  04BA56: D65C  mov.l  @(0x4BBC8),r6  ; =0xFFFF65AE (RAM)
+  04BA58: 6A60  mov.b  @r6,r10
+  04BA5A: D65C  mov.l  @(0x4BBCC),r6  ; =0xFFFF67EC (RAM) [engine_run_time]
+  04BA5C: 6861  mov.w  @r6,r8
+  04BA5E: D65C  mov.l  @(0x4BBD0),r6  ; =0xFFFF65C1 (RAM)
+  04BA60: 6960  mov.b  @r6,r9
+  04BA62: D65C  mov.l  @(0x4BBD4),r6  ; =0xFFFF8F24 (RAM)
+  04BA64: 6E60  mov.b  @r6,r14
+  04BA66: D65C  mov.l  @(0x4BBD8),r6  ; =0xFFFF85D7 (RAM)
+  04BA68: D55C  mov.l  @(0x4BBDC),r5  ; =0x00022F92
+  04BA6A: 450B  jsr    @r5
+  04BA6C: 6C60  mov.b  @r6,r12
+  04BA6E: 80FC  mov.b  r0,@(12,r15)
+  04BA70: D65B  mov.l  @(0x4BBE0),r6  ; =0x000BE53C
+  04BA72: E501  mov    #1,r5
+  04BA74: D15B  mov.l  @(0x4BBE4),r1  ; =0xFFFF8366 (RAM)
+  04BA76: 6210  mov.b  @r1,r2
+  04BA78: 460B  jsr    @r6
+  04BA7A: 642C  extu.b r2,r4
+  04BA7C: D159  mov.l  @(0x4BBE4),r1  ; =0xFFFF8366 (RAM)
+  04BA7E: 2100  mov.b  r0,@r1
+  04BA80: D559  mov.l  @(0x4BBE8),r5  ; =0x0000317C
+  04BA82: 450B  jsr    @r5
+  04BA84: E410  mov    #16,r4
+  04BA86: 6403  mov    r0,r4
+  04BA88: D156  mov.l  @(0x4BBE4),r1  ; =0xFFFF8366 (RAM)
+  04BA8A: 841D  mov.b  @(13,r1),r0
+  04BA8C: E2FF  mov    #-1,r2
+  04BA8E: 3022  cmp/hs r2,r0
+  04BA90: 8903  bt     0x4BA9A
+  04BA92: D654  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BA94: 846D  mov.b  @(13,r6),r0
+  04BA96: 7001  add    #1,r0
+  04BA98: 806D  mov.b  r0,@(13,r6)
+  04BA9A: D554  mov.l  @(0x4BBEC),r5  ; =0x00003190
+  04BA9C: 450B  jsr    @r5
+  04BA9E: 0009  nop
+  04BAA0: 2DD8  tst r13,r13
+  04BAA2: 8901  bt     0x4BAA8
+  04BAA4: A0AA  bra    0x4BBFC
+  04BAA6: 0009  nop
+  04BAA8: 65EC  extu.b r14,r5
+  04BAAA: 6053  mov    r5,r0
+  04BAAC: 8801  cmp/eq #1,r0
+  04BAAE: 8B07  bf     0x4BAC0
+  04BAB0: 60CC  extu.b r12,r0
+  04BAB2: 8801  cmp/eq #1,r0
+  04BAB4: 8B04  bf     0x4BAC0
+  04BAB6: 84F4  mov.b  @(4,r15),r0
+  04BAB8: 8801  cmp/eq #1,r0
+  04BABA: 8B01  bf     0x4BAC0
+  04BABC: A09E  bra    0x4BBFC
+  04BABE: 0009  nop
+  04BAC0: 60B3  mov    r11,r0
+  04BAC2: 8801  cmp/eq #1,r0
+  04BAC4: 8B02  bf     0x4BACC
+  04BAC6: 60F0  mov.b  @r15,r0
+  04BAC8: 8801  cmp/eq #1,r0
+  04BACA: 8908  bt     0x4BADE
+  04BACC: 6053  mov    r5,r0
+  04BACE: 8801  cmp/eq #1,r0
+  04BAD0: 8B2D  bf     0x4BB2E
+  04BAD2: 84FC  mov.b  @(12,r15),r0
+  04BAD4: 8801  cmp/eq #1,r0
+  04BAD6: 8B2A  bf     0x4BB2E
+  04BAD8: 84F8  mov.b  @(8,r15),r0
+  04BADA: 8801  cmp/eq #1,r0
+  04BADC: 8B27  bf     0x4BB2E
+  04BADE: D641  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BAE0: 846C  mov.b  @(12,r6),r0
+  04BAE2: E62F  mov    #47,r6
+  04BAE4: 3062  cmp/hs r6,r0
+  04BAE6: 8B13  bf     0x4BB10
+  04BAE8: D63E  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BAEA: 846C  mov.b  @(12,r6),r0
+  04BAEC: E65E  mov    #94,r6
+  04BAEE: 3062  cmp/hs r6,r0
+  04BAF0: 8901  bt     0x4BAF6
+  04BAF2: A00E  bra    0x4BB12
+  04BAF4: E001  mov    #1,r0
+  04BAF6: D63B  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BAF8: 846C  mov.b  @(12,r6),r0
+  04BAFA: E68D  mov    #-115,r6
+  04BAFC: 3062  cmp/hs r6,r0
+  04BAFE: 8904  bt     0x4BB0A
+  04BB00: E001  mov    #1,r0
+  04BB02: DE38  mov.l  @(0x4BBE4),r14  ; =0xFFFF8366 (RAM)
+  04BB04: 80E2  mov.b  r0,@(2,r14)
+  04BB06: A008  bra    0x4BB1A
+  04BB08: 80E3  mov.b  r0,@(3,r14)
+  04BB0A: E000  mov    #0,r0
+  04BB0C: D635  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB0E: 806C  mov.b  r0,@(12,r6)
+  04BB10: E000  mov    #0,r0
+  04BB12: D634  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB14: 8062  mov.b  r0,@(2,r6)
+  04BB16: E000  mov    #0,r0
+  04BB18: 8063  mov.b  r0,@(3,r6)
+  04BB1A: D632  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB1C: 846C  mov.b  @(12,r6),r0
+  04BB1E: E6FF  mov    #-1,r6
+  04BB20: 3062  cmp/hs r6,r0
+  04BB22: 8972  bt     0x4BC0A
+  04BB24: D62F  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB26: 846C  mov.b  @(12,r6),r0
+  04BB28: 7001  add    #1,r0
+  04BB2A: A06E  bra    0x4BC0A
+  04BB2C: 806C  mov.b  r0,@(12,r6)
+  04BB2E: D62D  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB30: 6260  mov.b  @r6,r2
+  04BB32: E63F  mov    #63,r6
+  04BB34: 3262  cmp/hs r6,r2
+  04BB36: 8B06  bf     0x4BB46
+  04BB38: D62A  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB3A: 846D  mov.b  @(13,r6),r0
+  04BB3C: E61F  mov    #31,r6
+  04BB3E: 3062  cmp/hs r6,r0
+  04BB40: 8B01  bf     0x4BB46
+  04BB42: 2AA8  tst r10,r10
+  04BB44: 895A  bt     0x4BBFC
+  04BB46: C72A  mova   @(0x4BBF0),r0
+  04BB48: F808  fmov.s @r0,fr8
+  04BB4A: FE85  fcmp/gt fr8,fr14
+  04BB4C: 8B19  bf     0x4BB82
+  04BB4E: 659C  extu.b r9,r5
+  04BB50: 2558  tst r5,r5
+  04BB52: 8B05  bf     0x4BB60
+  04BB54: D227  mov.l  @(0x4BBF4),r2  ; =0x000D6018
+  04BB56: 6621  mov.w  @r2,r6
+  04BB58: 666D  extu.w r6,r6
+  04BB5A: 628D  extu.w r8,r2
+  04BB5C: 3263  cmp/ge r6,r2
+  04BB5E: 8B10  bf     0x4BB82
+  04BB60: 6053  mov    r5,r0
+  04BB62: 8801  cmp/eq #1,r0
+  04BB64: 8B05  bf     0x4BB72
+  04BB66: D224  mov.l  @(0x4BBF8),r2  ; =0x000D601A
+  04BB68: 6621  mov.w  @r2,r6
+  04BB6A: 666D  extu.w r6,r6
+  04BB6C: 628D  extu.w r8,r2
+  04BB6E: 3263  cmp/ge r6,r2
+
+  --- Literal Pool ---
+    0x04BB8C: 0xFFFF4130  RAM [ignition_switch_state]
+    0x04BB90: 0xFFFF6210  RAM [unknown]
+    0x04BB94: 0x000AE774
+    0x04BB98: 0x000BE8E4  [table_desc_2d_typed]
+    0x04BB9C: 0xFFFF8364  RAM [fuel_pump_workspace]
+    0x04BBA4: 0x000080C6  [hw_port_write]
+    0x04BBA8: 0xFFFF8354  RAM [fuel_pump_state]
+    0x04BBB4: 0xFFFF8E98  RAM [fuel_pump_flag]
+    0x04BBB8: 0x000281DC  [fuel_pump_helper_A]
+    0x04BBBC: 0x0005EA4E  [fuel_pump_helper_B]
+    0x04BBC0: 0x0005EB1A  [fuel_pump_helper_C]
+    0x04BBC4: 0x0005EB26
+    0x04BBC8: 0xFFFF65AE  RAM [unknown]
+    0x04BBCC: 0xFFFF67EC  RAM [engine_run_time]
+    0x04BBD0: 0xFFFF65C1  RAM [unknown]
+    0x04BBD4: 0xFFFF8F24  RAM [unknown]
+    0x04BBD8: 0xFFFF85D7  RAM [unknown]
+    0x04BBDC: 0x00022F92
+    0x04BBE0: 0x000BE53C
+    0x04BBE4: 0xFFFF8366  RAM [unknown]
+    0x04BBE8: 0x0000317C
+    0x04BBEC: 0x00003190
+    0x04BBF4: 0x000D6018
+    0x04BBF8: 0x000D601A
+
+  --- Subroutine calls ---
+    0x04B97E -> table_desc_2d_typed @ 0x0BE8E4
+    0x04BA1C -> FUN_04BCEC @ 0x04BCEC
+    0x04BA3A -> fuel_pump_helper_A @ 0x0281DC
+    0x04BA40 -> fuel_pump_helper_B @ 0x05EA4E
+    0x04BA46 -> fuel_pump_helper_C @ 0x05EB1A
+    0x04BA4C -> FUN_05EB26 @ 0x05EB26
+    0x04BA6A -> FUN_022F92 @ 0x022F92
+    0x04BA78 -> FUN_0BE53C @ 0x0BE53C
+    0x04BA82 -> FUN_00317C @ 0x00317C
+    0x04BA9C -> FUN_003190 @ 0x003190
+
+==============================================================================
+  fuel_pump_sub_A  @  0x4BA30
+==============================================================================
+  04BA30: 4F22  sts.l  PR,@-r15
+  04BA32: FFEB  fmov.s fr14,@-r15
+  04BA34: 7FF0  add    #-16,r15
+  04BA36: D65F  mov.l  @(0x4BBB4),r6  ; =0xFFFF8E98 (RAM) [fuel_pump_flag]
+  04BA38: D25F  mov.l  @(0x4BBB8),r2  ; =0x000281DC [fuel_pump_helper_A]
+  04BA3A: 420B  jsr    @r2
+  04BA3C: 6D60  mov.b  @r6,r13
+  04BA3E: D25F  mov.l  @(0x4BBBC),r2  ; =0x0005EA4E [fuel_pump_helper_B]
+  04BA40: 420B  jsr    @r2
+  04BA42: 6B0C  extu.b r0,r11
+  04BA44: D25E  mov.l  @(0x4BBC0),r2  ; =0x0005EB1A [fuel_pump_helper_C]
+  04BA46: 420B  jsr    @r2
+  04BA48: 2F00  mov.b  r0,@r15
+  04BA4A: D25E  mov.l  @(0x4BBC4),r2  ; =0x0005EB26
+  04BA4C: 420B  jsr    @r2
+  04BA4E: 80F4  mov.b  r0,@(4,r15)
+  04BA50: 80F8  mov.b  r0,@(8,r15)
+  04BA52: D24E  mov.l  @(0x4BB8C),r2  ; =0xFFFF4130 (RAM) [ignition_switch_state]
+  04BA54: FE28  fmov.s @r2,fr14
+  04BA56: D65C  mov.l  @(0x4BBC8),r6  ; =0xFFFF65AE (RAM)
+  04BA58: 6A60  mov.b  @r6,r10
+  04BA5A: D65C  mov.l  @(0x4BBCC),r6  ; =0xFFFF67EC (RAM) [engine_run_time]
+  04BA5C: 6861  mov.w  @r6,r8
+  04BA5E: D65C  mov.l  @(0x4BBD0),r6  ; =0xFFFF65C1 (RAM)
+  04BA60: 6960  mov.b  @r6,r9
+  04BA62: D65C  mov.l  @(0x4BBD4),r6  ; =0xFFFF8F24 (RAM)
+  04BA64: 6E60  mov.b  @r6,r14
+  04BA66: D65C  mov.l  @(0x4BBD8),r6  ; =0xFFFF85D7 (RAM)
+  04BA68: D55C  mov.l  @(0x4BBDC),r5  ; =0x00022F92
+  04BA6A: 450B  jsr    @r5
+  04BA6C: 6C60  mov.b  @r6,r12
+  04BA6E: 80FC  mov.b  r0,@(12,r15)
+  04BA70: D65B  mov.l  @(0x4BBE0),r6  ; =0x000BE53C
+  04BA72: E501  mov    #1,r5
+  04BA74: D15B  mov.l  @(0x4BBE4),r1  ; =0xFFFF8366 (RAM)
+  04BA76: 6210  mov.b  @r1,r2
+  04BA78: 460B  jsr    @r6
+  04BA7A: 642C  extu.b r2,r4
+  04BA7C: D159  mov.l  @(0x4BBE4),r1  ; =0xFFFF8366 (RAM)
+  04BA7E: 2100  mov.b  r0,@r1
+  04BA80: D559  mov.l  @(0x4BBE8),r5  ; =0x0000317C
+  04BA82: 450B  jsr    @r5
+  04BA84: E410  mov    #16,r4
+  04BA86: 6403  mov    r0,r4
+  04BA88: D156  mov.l  @(0x4BBE4),r1  ; =0xFFFF8366 (RAM)
+  04BA8A: 841D  mov.b  @(13,r1),r0
+  04BA8C: E2FF  mov    #-1,r2
+  04BA8E: 3022  cmp/hs r2,r0
+  04BA90: 8903  bt     0x4BA9A
+  04BA92: D654  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BA94: 846D  mov.b  @(13,r6),r0
+  04BA96: 7001  add    #1,r0
+  04BA98: 806D  mov.b  r0,@(13,r6)
+  04BA9A: D554  mov.l  @(0x4BBEC),r5  ; =0x00003190
+  04BA9C: 450B  jsr    @r5
+  04BA9E: 0009  nop
+  04BAA0: 2DD8  tst r13,r13
+  04BAA2: 8901  bt     0x4BAA8
+  04BAA4: A0AA  bra    0x4BBFC
+  04BAA6: 0009  nop
+  04BAA8: 65EC  extu.b r14,r5
+  04BAAA: 6053  mov    r5,r0
+  04BAAC: 8801  cmp/eq #1,r0
+  04BAAE: 8B07  bf     0x4BAC0
+  04BAB0: 60CC  extu.b r12,r0
+  04BAB2: 8801  cmp/eq #1,r0
+  04BAB4: 8B04  bf     0x4BAC0
+  04BAB6: 84F4  mov.b  @(4,r15),r0
+  04BAB8: 8801  cmp/eq #1,r0
+  04BABA: 8B01  bf     0x4BAC0
+  04BABC: A09E  bra    0x4BBFC
+  04BABE: 0009  nop
+  04BAC0: 60B3  mov    r11,r0
+  04BAC2: 8801  cmp/eq #1,r0
+  04BAC4: 8B02  bf     0x4BACC
+  04BAC6: 60F0  mov.b  @r15,r0
+  04BAC8: 8801  cmp/eq #1,r0
+  04BACA: 8908  bt     0x4BADE
+  04BACC: 6053  mov    r5,r0
+  04BACE: 8801  cmp/eq #1,r0
+  04BAD0: 8B2D  bf     0x4BB2E
+  04BAD2: 84FC  mov.b  @(12,r15),r0
+  04BAD4: 8801  cmp/eq #1,r0
+  04BAD6: 8B2A  bf     0x4BB2E
+  04BAD8: 84F8  mov.b  @(8,r15),r0
+  04BADA: 8801  cmp/eq #1,r0
+  04BADC: 8B27  bf     0x4BB2E
+  04BADE: D641  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BAE0: 846C  mov.b  @(12,r6),r0
+  04BAE2: E62F  mov    #47,r6
+  04BAE4: 3062  cmp/hs r6,r0
+  04BAE6: 8B13  bf     0x4BB10
+  04BAE8: D63E  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BAEA: 846C  mov.b  @(12,r6),r0
+  04BAEC: E65E  mov    #94,r6
+  04BAEE: 3062  cmp/hs r6,r0
+  04BAF0: 8901  bt     0x4BAF6
+  04BAF2: A00E  bra    0x4BB12
+  04BAF4: E001  mov    #1,r0
+  04BAF6: D63B  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BAF8: 846C  mov.b  @(12,r6),r0
+  04BAFA: E68D  mov    #-115,r6
+  04BAFC: 3062  cmp/hs r6,r0
+  04BAFE: 8904  bt     0x4BB0A
+  04BB00: E001  mov    #1,r0
+  04BB02: DE38  mov.l  @(0x4BBE4),r14  ; =0xFFFF8366 (RAM)
+  04BB04: 80E2  mov.b  r0,@(2,r14)
+  04BB06: A008  bra    0x4BB1A
+  04BB08: 80E3  mov.b  r0,@(3,r14)
+  04BB0A: E000  mov    #0,r0
+  04BB0C: D635  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB0E: 806C  mov.b  r0,@(12,r6)
+  04BB10: E000  mov    #0,r0
+  04BB12: D634  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB14: 8062  mov.b  r0,@(2,r6)
+  04BB16: E000  mov    #0,r0
+  04BB18: 8063  mov.b  r0,@(3,r6)
+  04BB1A: D632  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB1C: 846C  mov.b  @(12,r6),r0
+  04BB1E: E6FF  mov    #-1,r6
+  04BB20: 3062  cmp/hs r6,r0
+  04BB22: 8972  bt     0x4BC0A
+  04BB24: D62F  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB26: 846C  mov.b  @(12,r6),r0
+  04BB28: 7001  add    #1,r0
+  04BB2A: A06E  bra    0x4BC0A
+  04BB2C: 806C  mov.b  r0,@(12,r6)
+  04BB2E: D62D  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB30: 6260  mov.b  @r6,r2
+  04BB32: E63F  mov    #63,r6
+  04BB34: 3262  cmp/hs r6,r2
+  04BB36: 8B06  bf     0x4BB46
+  04BB38: D62A  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB3A: 846D  mov.b  @(13,r6),r0
+  04BB3C: E61F  mov    #31,r6
+  04BB3E: 3062  cmp/hs r6,r0
+  04BB40: 8B01  bf     0x4BB46
+  04BB42: 2AA8  tst r10,r10
+  04BB44: 895A  bt     0x4BBFC
+  04BB46: C72A  mova   @(0x4BBF0),r0
+  04BB48: F808  fmov.s @r0,fr8
+  04BB4A: FE85  fcmp/gt fr8,fr14
+  04BB4C: 8B19  bf     0x4BB82
+  04BB4E: 659C  extu.b r9,r5
+  04BB50: 2558  tst r5,r5
+  04BB52: 8B05  bf     0x4BB60
+  04BB54: D227  mov.l  @(0x4BBF4),r2  ; =0x000D6018
+  04BB56: 6621  mov.w  @r2,r6
+  04BB58: 666D  extu.w r6,r6
+  04BB5A: 628D  extu.w r8,r2
+  04BB5C: 3263  cmp/ge r6,r2
+  04BB5E: 8B10  bf     0x4BB82
+  04BB60: 6053  mov    r5,r0
+  04BB62: 8801  cmp/eq #1,r0
+  04BB64: 8B05  bf     0x4BB72
+  04BB66: D224  mov.l  @(0x4BBF8),r2  ; =0x000D601A
+  04BB68: 6621  mov.w  @r2,r6
+  04BB6A: 666D  extu.w r6,r6
+  04BB6C: 628D  extu.w r8,r2
+  04BB6E: 3263  cmp/ge r6,r2
+  04BB70: 8B07  bf     0x4BB82
+  04BB72: D61C  mov.l  @(0x4BBE4),r6  ; =0xFFFF8366 (RAM)
+  04BB74: 8466  mov.b  @(6,r6),r0
+  04BB76: 8801  cmp/eq #1,r0
+  04BB78: 8903  bt     0x4BB82
+  04BB7A: B116  bsr    0x4BDAA
+  04BB7C: 0009  nop
+  04BB7E: A041  bra    0x4BC04
+  04BB80: 0009  nop
+  04BB82: E001  mov    #1,r0
+  04BB84: DE17  mov.l  @(0x4BBE4),r14  ; =0xFFFF8366 (RAM)
+  04BB86: 80E2  mov.b  r0,@(2,r14)
+  04BB88: A03C  bra    0x4BC04
+  04BB8A: 80E3  mov.b  r0,@(3,r14)
+  04BB8C: FFFF  .word  0xFFFF
+  04BB8E: 4130  .word  0x4130
+  04BB90: FFFF  .word  0xFFFF
+  04BB92: 6210  mov.b  @r1,r2
+  04BB94: 000A  sts    MACH,r0
+  04BB96: E774  mov    #116,r7
+  04BB98: 000B  rts
+  04BB9A: E8E4  mov    #-28,r8
+  04BB9C: FFFF  .word  0xFFFF
+  04BB9E: 8364  .word  0x8364
+  04BBA0: 42C8  .word  0x42C8
+  04BBA2: 0000  .word  0x0000
+  04BBA4: 0000  .word  0x0000
+  04BBA6: 80C6  mov.b  r0,@(6,r12)
+  04BBA8: FFFF  .word  0xFFFF
+  04BBAA: 8354  .word  0x8354
+  04BBAC: 4285  .word  0x4285
+  04BBAE: 6666  mov.l  @r6+,r6
+  04BBB0: 4205  rotr  r2
+  04BBB2: 3333  cmp/ge r3,r3
+  04BBB4: FFFF  .word  0xFFFF
+  04BBB6: 8E98  .word  0x8E98
+  04BBB8: 0002  .word  0x0002
+  04BBBA: 81DC  mov.w  r0,@(24,r13)
+  04BBBC: 0005  mov.w  r0,@(r0,r0)
+  04BBBE: EA4E  mov    #78,r10
+  04BBC0: 0005  mov.w  r0,@(r0,r0)
+  04BBC2: EB1A  mov    #26,r11
+  04BBC4: 0005  mov.w  r0,@(r0,r0)
+  04BBC6: EB26  mov    #38,r11
+  04BBC8: FFFF  .word  0xFFFF
+  04BBCA: 65AE  exts.b r10,r5
+  04BBCC: FFFF  .word  0xFFFF
+  04BBCE: 67EC  extu.b r14,r7
+  04BBD0: FFFF  .word  0xFFFF
+  04BBD2: 65C1  mov.w  @r12,r5
+  04BBD4: FFFF  .word  0xFFFF
+  04BBD6: 8F24  bf/s   0x4BC22
+  04BBD8: FFFF  .word  0xFFFF
+  04BBDA: 85D7  mov.w  @(14,r13),r0
+  04BBDC: 0002  .word  0x0002
+  04BBDE: 2F92  mov.l  r9,@r15
+  04BBE0: 000B  rts
+  04BBE2: E53C  mov    #60,r5
+  04BBE4: FFFF  .word  0xFFFF
+  04BBE6: 8366  .word  0x8366
+  04BBE8: 0000  .word  0x0000
+  04BBEA: 317C  add r7,r1
+  04BBEC: 0000  .word  0x0000
+  04BBEE: 3190  cmp/eq r9,r1
+  04BBF0: 4100  shll  r1
+  04BBF2: 0000  .word  0x0000
+  04BBF4: 000D  mov.w  @(r0,r0),r0
+  04BBF6: 6018  swap.b r1,r0
+  04BBF8: 000D  mov.w  @(r0,r0),r0
+  04BBFA: 601A  negc r1,r0
+  04BBFC: E000  mov    #0,r0
+  04BBFE: DE7C  mov.l  @(0x4BDF0),r14  ; =0xFFFF8366 (RAM)
+  04BC00: 80E2  mov.b  r0,@(2,r14)
+  04BC02: 80E3  mov.b  r0,@(3,r14)
+  04BC04: E000  mov    #0,r0
+  04BC06: D67A  mov.l  @(0x4BDF0),r6  ; =0xFFFF8366 (RAM)
+  04BC08: 806C  mov.b  r0,@(12,r6)
+  04BC0A: 7F10  add    #16,r15
+  04BC0C: FEF9  fmov.s @r15+,fr14
+  04BC0E: 4F26  lds.l  @r15+,PR
+  04BC10: 6EF6  mov.l  @r15+,r14
+  04BC12: 6DF6  mov.l  @r15+,r13
+  04BC14: 6CF6  mov.l  @r15+,r12
+  04BC16: 6BF6  mov.l  @r15+,r11
+  04BC18: 6AF6  mov.l  @r15+,r10
+  04BC1A: 69F6  mov.l  @r15+,r9
+  04BC1C: 000B  rts
+  04BC1E: 68F6  mov.l  @r15+,r8
+  04BC20: E200  mov    #0,r2
+  04BC22: D674  mov.l  @(0x4BDF4),r6  ; =0xFFFF8373 (RAM)
+  04BC24: 000B  rts
+  04BC26: 2620  mov.b  r2,@r6
+  04BC28: 2FC6  mov.l  r12,@-r15
+  04BC2A: 2FD6  mov.l  r13,@-r15
+  04BC2C: 2FE6  mov.l  r14,@-r15
+  04BC2E: 4F22  sts.l  PR,@-r15
+
+  --- Literal Pool ---
+    0x04BBB4: 0xFFFF8E98  RAM [fuel_pump_flag]
+    0x04BBB8: 0x000281DC  [fuel_pump_helper_A]
+    0x04BBBC: 0x0005EA4E  [fuel_pump_helper_B]
+    0x04BBC0: 0x0005EB1A  [fuel_pump_helper_C]
+    0x04BBC4: 0x0005EB26
+    0x04BB8C: 0xFFFF4130  RAM [ignition_switch_state]
+    0x04BBC8: 0xFFFF65AE  RAM [unknown]
+    0x04BBCC: 0xFFFF67EC  RAM [engine_run_time]
+    0x04BBD0: 0xFFFF65C1  RAM [unknown]
+    0x04BBD4: 0xFFFF8F24  RAM [unknown]
+    0x04BBD8: 0xFFFF85D7  RAM [unknown]
+    0x04BBDC: 0x00022F92
+    0x04BBE0: 0x000BE53C
+    0x04BBE4: 0xFFFF8366  RAM [unknown]
+    0x04BBE8: 0x0000317C
+    0x04BBEC: 0x00003190
+    0x04BBF4: 0x000D6018
+    0x04BBF8: 0x000D601A
+    0x04BDF0: 0xFFFF8366  RAM [unknown]
+    0x04BDF4: 0xFFFF8373  RAM [unknown]
+
+  --- Subroutine calls ---
+    0x04BA3A -> fuel_pump_helper_A @ 0x0281DC
+    0x04BA40 -> fuel_pump_helper_B @ 0x05EA4E
+    0x04BA46 -> fuel_pump_helper_C @ 0x05EB1A
+    0x04BA4C -> FUN_05EB26 @ 0x05EB26
+    0x04BA6A -> FUN_022F92 @ 0x022F92
+    0x04BA78 -> FUN_0BE53C @ 0x0BE53C
+    0x04BA82 -> FUN_00317C @ 0x00317C
+    0x04BA9C -> FUN_003190 @ 0x003190
+    0x04BB7A -> FUN_04BDAA @ 0x04BDAA
+
+==============================================================================
+  task10_call52_clol_pump  @  0x47C40
+==============================================================================
+  047C40: 4F22  sts.l  PR,@-r15
+  047C42: 7FF4  add    #-12,r15
+  047C44: D229  mov.l  @(0x47CEC),r2  ; =0xFFFF36BE (RAM)
+  047C46: 6021  mov.w  @r2,r0
+  047C48: 81F4  mov.w  r0,@(8,r15)
+  047C4A: D229  mov.l  @(0x47CF0),r2  ; =0x00006B5A
+  047C4C: E600  mov    #0,r6
+  047C4E: 6563  mov    r6,r5
+  047C50: 420B  jsr    @r2
+  047C52: E404  mov    #4,r4
+  047C54: D227  mov.l  @(0x47CF4),r2  ; =0x000067DC
+  047C56: 420B  jsr    @r2
+  047C58: 6403  mov    r0,r4
+  047C5A: E001  mov    #1,r0
+  047C5C: D626  mov.l  @(0x47CF8),r6  ; =0xFFFF8323 (RAM) [ol_dispatch_gate]
+  047C5E: 2600  mov.b  r0,@r6
+  047C60: D226  mov.l  @(0x47CFC),r2  ; =0x0005AA74
+  047C62: 420B  jsr    @r2
+  047C64: 8061  mov.b  r0,@(1,r6)
+  047C66: D226  mov.l  @(0x47D00),r2  ; =0xFFFF8EDC (RAM) [sched_disable_flag]
+  047C68: 6620  mov.b  @r2,r6
+  047C6A: 626C  extu.b r6,r2
+  047C6C: 2228  tst r2,r2
+  047C6E: 8967  bt     0x47D40
+  047C70: E6FF  mov    #-1,r6
+  047C72: 666C  extu.b r6,r6
+  047C74: 3260  cmp/eq r6,r2
+  047C76: 8913  bt     0x47CA0
+  047C78: D222  mov.l  @(0x47D04),r2  ; =0x0002271C
+  047C7A: 420B  jsr    @r2
+  047C7C: 0009  nop
+  047C7E: D222  mov.l  @(0x47D08),r2  ; =0x0005AA9A
+  047C80: 420B  jsr    @r2
+  047C82: 0009  nop
+  047C84: D221  mov.l  @(0x47D0C),r2  ; =0x0005B1F6
+  047C86: 420B  jsr    @r2
+  047C88: 0009  nop
+  047C8A: D221  mov.l  @(0x47D10),r2  ; =0x0005CAD8
+  047C8C: 420B  jsr    @r2
+  047C8E: 0009  nop
+  047C90: D220  mov.l  @(0x47D14),r2  ; =0x0005CA22
+  047C92: 420B  jsr    @r2
+  047C94: 0009  nop
+  047C96: D220  mov.l  @(0x47D18),r2  ; =0x0005B0A0
+  047C98: 420B  jsr    @r2
+  047C9A: 0009  nop
+  047C9C: A520  bra    0x486E0
+  047C9E: 0009  nop
+  047CA0: D21E  mov.l  @(0x47D1C),r2  ; =0x00022724
+  047CA2: 420B  jsr    @r2
+  047CA4: 0009  nop
+  047CA6: D21E  mov.l  @(0x47D20),r2  ; =0x00021F4A
+  047CA8: 420B  jsr    @r2
+  047CAA: 0009  nop
+  047CAC: D21D  mov.l  @(0x47D24),r2  ; =0x0003E6B8
+  047CAE: 420B  jsr    @r2
+  047CB0: 0009  nop
+  047CB2: D21D  mov.l  @(0x47D28),r2  ; =0x0003E6E0
+  047CB4: 420B  jsr    @r2
+  047CB6: 0009  nop
+  047CB8: D21C  mov.l  @(0x47D2C),r2  ; =0x0009E178
+  047CBA: 420B  jsr    @r2
+  047CBC: 0009  nop
+  047CBE: D21C  mov.l  @(0x47D30),r2  ; =0x000A67CC
+  047CC0: 420B  jsr    @r2
+  047CC2: 0009  nop
+  047CC4: D210  mov.l  @(0x47D08),r2  ; =0x0005AA9A
+  047CC6: 420B  jsr    @r2
+  047CC8: 0009  nop
+  047CCA: D210  mov.l  @(0x47D0C),r2  ; =0x0005B1F6
+  047CCC: 420B  jsr    @r2
+  047CCE: 0009  nop
+  047CD0: D20F  mov.l  @(0x47D10),r2  ; =0x0005CAD8
+  047CD2: 420B  jsr    @r2
+  047CD4: 0009  nop
+  047CD6: D217  mov.l  @(0x47D34),r2  ; =0x0005AEB8
+  047CD8: 420B  jsr    @r2
+  047CDA: 0009  nop
+  047CDC: D216  mov.l  @(0x47D38),r2  ; =0x00091368
+  047CDE: 420B  jsr    @r2
+  047CE0: 0009  nop
+  047CE2: D216  mov.l  @(0x47D3C),r2  ; =0x00028200
+  047CE4: 420B  jsr    @r2
+  047CE6: 0009  nop
+  047CE8: A4FA  bra    0x486E0
+  047CEA: 0009  nop
+  047CEC: FFFF  .word  0xFFFF
+  047CEE: 36BE  addc r11,r6
+  047CF0: 0000  .word  0x0000
+  047CF2: 6B5A  negc r5,r11
+  047CF4: 0000  .word  0x0000
+  047CF6: 67DC  extu.b r13,r7
+  047CF8: FFFF  .word  0xFFFF
+  047CFA: 8323  .word  0x8323
+  047CFC: 0005  mov.w  r0,@(r0,r0)
+  047CFE: AA74  bra    0x471EA
+  047D00: FFFF  .word  0xFFFF
+  047D02: 8EDC  .word  0x8EDC
+  047D04: 0002  .word  0x0002
+  047D06: 271C  cmp/str r1,r7
+  047D08: 0005  mov.w  r0,@(r0,r0)
+  047D0A: AA9A  bra    0x47242
+  047D0C: 0005  mov.w  r0,@(r0,r0)
+  047D0E: B1F6  bsr    0x480FE
+  047D10: 0005  mov.w  r0,@(r0,r0)
+  047D12: CAD8  xor    #216,r0
+  047D14: 0005  mov.w  r0,@(r0,r0)
+  047D16: CA22  xor    #34,r0
+  047D18: 0005  mov.w  r0,@(r0,r0)
+  047D1A: B0A0  bsr    0x47E5E
+  047D1C: 0002  .word  0x0002
+  047D1E: 2724  mov.b  r2,@-r7
+  047D20: 0002  .word  0x0002
+  047D22: 1F4A  mov.l  r4,@(40,r15)
+  047D24: 0003  bsrf   r0
+  047D26: E6B8  mov    #-72,r6
+  047D28: 0003  bsrf   r0
+  047D2A: E6E0  mov    #-32,r6
+  047D2C: 0009  nop
+  047D2E: E178  mov    #120,r1
+  047D30: 000A  sts    MACH,r0
+  047D32: 67CC  extu.b r12,r7
+  047D34: 0005  mov.w  r0,@(r0,r0)
+  047D36: AEB8  bra    0x47AAA
+  047D38: 0009  nop
+  047D3A: 1368  mov.l  r6,@(32,r3)
+  047D3C: 0002  .word  0x0002
+  047D3E: 8200  .word  0x8200
+  047D40: D697  mov.l  @(0x47FA0),r6  ; =0x00006BC4
+  047D42: 460B  jsr    @r6
+  047D44: E411  mov    #17,r4
+  047D46: C802  tst    #2,r0
+  047D48: 0029  movt   r0
+  047D4A: CA01  xor    #1,r0
+  047D4C: 2008  tst r0,r0
+  047D4E: 8B25  bf     0x47D9C
+  047D50: D294  mov.l  @(0x47FA4),r2  ; =0x000BEAB8
+  047D52: 94CF  mov.w  @(0x47EF4),r4  ; =0x07D0 (2000)
+  047D54: 420B  jsr    @r2
+  047D56: 0009  nop
+  047D58: D691  mov.l  @(0x47FA0),r6  ; =0x00006BC4
+  047D5A: 460B  jsr    @r6
+  047D5C: E411  mov    #17,r4
+  047D5E: C802  tst    #2,r0
+  047D60: 0029  movt   r0
+  047D62: CA01  xor    #1,r0
+  047D64: 2008  tst r0,r0
+  047D66: 8B19  bf     0x47D9C
+  047D68: E201  mov    #1,r2
+  047D6A: 2F22  mov.l  r2,@r15
+  047D6C: D28E  mov.l  @(0x47FA8),r2  ; =0x0005CD4A
+  047D6E: 420B  jsr    @r2
+  047D70: 64F3  mov    r15,r4
+  047D72: 64F3  mov    r15,r4
+  047D74: 7404  add    #4,r4
+  047D76: D28D  mov.l  @(0x47FAC),r2  ; =0x000BE81C
+  047D78: E5E0  mov    #-32,r5
+  047D7A: 420B  jsr    @r2
+  047D7C: 655C  extu.b r5,r5
+  047D7E: D688  mov.l  @(0x47FA0),r6  ; =0x00006BC4
+  047D80: 460B  jsr    @r6
+  047D82: E411  mov    #17,r4
+  047D84: E2FE  mov    #-2,r2
+  047D86: 2029  and r2,r0
+  047D88: 650C  extu.b r0,r5
+  047D8A: D289  mov.l  @(0x47FB0),r2  ; =0x00006BF0
+  047D8C: 420B  jsr    @r2
+  047D8E: E411  mov    #17,r4
+  047D90: D288  mov.l  @(0x47FB4),r2  ; =0x000BE82C
+  047D92: 420B  jsr    @r2
+  047D94: 54F1  mov.l  @(4,r15),r4
+  047D96: D288  mov.l  @(0x47FB8),r2  ; =0x0000FACA
+  047D98: 420B  jsr    @r2
+  047D9A: 0009  nop
+  047D9C: 85F4  mov.w  @(8,r15),r0
+  047D9E: 620D  extu.w r0,r2
+  047DA0: 96A9  mov.w  @(0x47EF6),r6  ; =0x4055 (16469)
+  047DA2: 3260  cmp/eq r6,r2
+  047DA4: 8B01  bf     0x47DAA
+  047DA6: B4C4  bsr    0x48732
+  047DA8: 0009  nop
+  047DAA: D284  mov.l  @(0x47FBC),r2  ; =0x000588FA
+  047DAC: 420B  jsr    @r2
+  047DAE: 0009  nop
+  047DB0: D283  mov.l  @(0x47FC0),r2  ; =0x0004C828
+  047DB2: 420B  jsr    @r2
+  047DB4: 0009  nop
+  047DB6: D283  mov.l  @(0x47FC4),r2  ; =0x0001CB68
+  047DB8: 420B  jsr    @r2
+  047DBA: 0009  nop
+  047DBC: D282  mov.l  @(0x47FC8),r2  ; =0x0001CF0C
+  047DBE: 420B  jsr    @r2
+  047DC0: 0009  nop
+  047DC2: D282  mov.l  @(0x47FCC),r2  ; =0x00026104
+  047DC4: 420B  jsr    @r2
+  047DC6: 0009  nop
+  047DC8: D281  mov.l  @(0x47FD0),r2  ; =0x000231C2
+  047DCA: 420B  jsr    @r2
+  047DCC: 0009  nop
+  047DCE: D281  mov.l  @(0x47FD4),r2  ; =0x0002272C
+  047DD0: 420B  jsr    @r2
+  047DD2: 0009  nop
+  047DD4: D280  mov.l  @(0x47FD8),r2  ; =0x00022F1C
+  047DD6: 420B  jsr    @r2
+  047DD8: 0009  nop
+  047DDA: D280  mov.l  @(0x47FDC),r2  ; =0x00023270
+  047DDC: 420B  jsr    @r2
+  047DDE: 0009  nop
+  047DE0: D27F  mov.l  @(0x47FE0),r2  ; =0x0001D0E0
+  047DE2: 420B  jsr    @r2
+  047DE4: 0009  nop
+  047DE6: D27F  mov.l  @(0x47FE4),r2  ; =0x0002262C
+  047DE8: 420B  jsr    @r2
+  047DEA: 0009  nop
+  047DEC: D27E  mov.l  @(0x47FE8),r2  ; =0x0002260C
+  047DEE: 420B  jsr    @r2
+  047DF0: 0009  nop
+  047DF2: D27E  mov.l  @(0x47FEC),r2  ; =0x0001D26A
+  047DF4: 420B  jsr    @r2
+  047DF6: 0009  nop
+  047DF8: D27D  mov.l  @(0x47FF0),r2  ; =0x0002121C
+  047DFA: 420B  jsr    @r2
+  047DFC: 0009  nop
+  047DFE: D27D  mov.l  @(0x47FF4),r2  ; =0x0003E6A4
+  047E00: 420B  jsr    @r2
+  047E02: 0009  nop
+  047E04: D27C  mov.l  @(0x47FF8),r2  ; =0x0003E6E0
+  047E06: 420B  jsr    @r2
+  047E08: 0009  nop
+  047E0A: D27C  mov.l  @(0x47FFC),r2  ; =0x00024CF8
+  047E0C: 420B  jsr    @r2
+  047E0E: 0009  nop
+  047E10: D27B  mov.l  @(0x48000),r2  ; =0x0001F870
+  047E12: 420B  jsr    @r2
+  047E14: 0009  nop
+  047E16: D27B  mov.l  @(0x48004),r2  ; =0x00022D2C
+  047E18: 420B  jsr    @r2
+  047E1A: 0009  nop
+  047E1C: D27A  mov.l  @(0x48008),r2  ; =0x0001FA16
+  047E1E: 420B  jsr    @r2
+  047E20: 0009  nop
+  047E22: D27A  mov.l  @(0x4800C),r2  ; =0x0001FBF2
+  047E24: 420B  jsr    @r2
+  047E26: 0009  nop
+  047E28: D279  mov.l  @(0x48010),r2  ; =0x0001FD16
+  047E2A: 420B  jsr    @r2
+  047E2C: 0009  nop
+  047E2E: D279  mov.l  @(0x48014),r2  ; =0x0001FDF2
+  047E30: 420B  jsr    @r2
+  047E32: 0009  nop
+  047E34: D278  mov.l  @(0x48018),r2  ; =0x000207D4
+  047E36: 420B  jsr    @r2
+  047E38: 0009  nop
+  047E3A: D278  mov.l  @(0x4801C),r2  ; =0x00020678
+  047E3C: 420B  jsr    @r2
+  047E3E: 0009  nop
+  047E40: D277  mov.l  @(0x48020),r2  ; =0x00020E6A
+  047E42: 420B  jsr    @r2
+  047E44: 0009  nop
+  047E46: D277  mov.l  @(0x48024),r2  ; =0x00021D7C
+  047E48: 420B  jsr    @r2
+  047E4A: 0009  nop
+  047E4C: D276  mov.l  @(0x48028),r2  ; =0x00021E96
+  047E4E: 420B  jsr    @r2
+  047E50: 0009  nop
+  047E52: D276  mov.l  @(0x4802C),r2  ; =0x00024094
+  047E54: 420B  jsr    @r2
+  047E56: 0009  nop
+  047E58: D275  mov.l  @(0x48030),r2  ; =0x000242C2 (ROM cal: -4.684e+04)
+  047E5A: 420B  jsr    @r2
+  047E5C: 0009  nop
+  047E5E: D275  mov.l  @(0x48034),r2  ; =0x00022F50
+  047E60: 420B  jsr    @r2
+  047E62: 0009  nop
+  047E64: D274  mov.l  @(0x48038),r2  ; =0x0002527A (ROM cal: -6.502e+04)
+  047E66: 420B  jsr    @r2
+  047E68: 0009  nop
+  047E6A: D274  mov.l  @(0x4803C),r2  ; =0x00025848
+  047E6C: 420B  jsr    @r2
+  047E6E: 0009  nop
+  047E70: D273  mov.l  @(0x48040),r2  ; =0x00025C24
+  047E72: 420B  jsr    @r2
+  047E74: 0009  nop
+  047E76: D273  mov.l  @(0x48044),r2  ; =0x000263FA
+  047E78: 420B  jsr    @r2
+  047E7A: 0009  nop
+  047E7C: D272  mov.l  @(0x48048),r2  ; =0x00026634
+  047E7E: 420B  jsr    @r2
+  047E80: 0009  nop
+  047E82: D272  mov.l  @(0x4804C),r2  ; =0x00022688
+  047E84: 420B  jsr    @r2
+  047E86: 0009  nop
+  047E88: D271  mov.l  @(0x48050),r2  ; =0x0002269A
+  047E8A: 420B  jsr    @r2
+  047E8C: 0009  nop
+  047E8E: D271  mov.l  @(0x48054),r2  ; =0x000226A2
+  047E90: 420B  jsr    @r2
+  047E92: 0009  nop
+  047E94: D270  mov.l  @(0x48058),r2  ; =0x000588F0
+  047E96: 420B  jsr    @r2
+  047E98: 0009  nop
+  047E9A: D270  mov.l  @(0x4805C),r2  ; =0x00013330
+  047E9C: 420B  jsr    @r2
+  047E9E: 0009  nop
+  047EA0: D26F  mov.l  @(0x48060),r2  ; =0x0009EB62
+  047EA2: 420B  jsr    @r2
+  047EA4: 0009  nop
+  047EA6: D26F  mov.l  @(0x48064),r2  ; =0x0009DE08
+  047EA8: 420B  jsr    @r2
+  047EAA: 0009  nop
+  047EAC: D26E  mov.l  @(0x48068),r2  ; =0x000A6B90
+  047EAE: 420B  jsr    @r2
+  047EB0: 0009  nop
+  047EB2: D26E  mov.l  @(0x4806C),r2  ; =0x000A9902
+  047EB4: 420B  jsr    @r2
+  047EB6: 0009  nop
+  047EB8: D26D  mov.l  @(0x48070),r2  ; =0x000990EA
+  047EBA: 420B  jsr    @r2
+  047EBC: 0009  nop
+  047EBE: D26D  mov.l  @(0x48074),r2  ; =0x00058A84
+  047EC0: 420B  jsr    @r2
+  047EC2: 0009  nop
+  047EC4: D26C  mov.l  @(0x48078),r2  ; =0x0009DCCC
+  047EC6: 420B  jsr    @r2
+  047EC8: 0009  nop
+  047ECA: D26C  mov.l  @(0x4807C),r2  ; =0x0009CA10
+  047ECC: 420B  jsr    @r2
+  047ECE: 0009  nop
+  047ED0: D26B  mov.l  @(0x48080),r2  ; =0x0009CDE0
+  047ED2: 420B  jsr    @r2
+  047ED4: 0009  nop
+  047ED6: D26B  mov.l  @(0x48084),r2  ; =0x0009CC1C
+  047ED8: 420B  jsr    @r2
+  047EDA: 0009  nop
+  047EDC: D26A  mov.l  @(0x48088),r2  ; =0x0004C086
+  047EDE: 420B  jsr    @r2
+  047EE0: 0009  nop
+  047EE2: D26A  mov.l  @(0x4808C),r2  ; =0x0004E902
+  047EE4: 420B  jsr    @r2
+  047EE6: 0009  nop
+  047EE8: D269  mov.l  @(0x48090),r2  ; =0x0005CE6C
+  047EEA: 420B  jsr    @r2
+  047EEC: 0009  nop
+  047EEE: D269  mov.l  @(0x48094),r2  ; =0x0002FF74
+  047EF0: A002  bra    0x47EF8
+  047EF2: 0009  nop
+  047EF4: 07D0  .word  0x07D0
+  047EF6: 4055  .word  0x4055
+  047EF8: 420B  jsr    @r2
+  047EFA: 0009  nop
+  047EFC: D266  mov.l  @(0x48098),r2  ; =0x000303C0
+  047EFE: 420B  jsr    @r2
+  047F00: 0009  nop
+  047F02: D266  mov.l  @(0x4809C),r2  ; =0x0002EF08
+  047F04: 420B  jsr    @r2
+  047F06: 0009  nop
+  047F08: D265  mov.l  @(0x480A0),r2  ; =0x0003CD00
+  047F0A: 420B  jsr    @r2
+  047F0C: 0009  nop
+  047F0E: D265  mov.l  @(0x480A4),r2  ; =0x0002FA68
+  047F10: 420B  jsr    @r2
+  047F12: 0009  nop
+  047F14: D264  mov.l  @(0x480A8),r2  ; =0x0002FB68
+  047F16: 420B  jsr    @r2
+  047F18: 0009  nop
+  047F1A: D264  mov.l  @(0x480AC),r2  ; =0x00030430
+  047F1C: 420B  jsr    @r2
+  047F1E: 0009  nop
+  047F20: D263  mov.l  @(0x480B0),r2  ; =0x00030744
+  047F22: 420B  jsr    @r2
+  047F24: 0009  nop
+  047F26: D263  mov.l  @(0x480B4),r2  ; =0x00030B68
+  047F28: 420B  jsr    @r2
+  047F2A: 0009  nop
+  047F2C: D262  mov.l  @(0x480B8),r2  ; =0x00033278
+  047F2E: 420B  jsr    @r2
+  047F30: 0009  nop
+  047F32: D262  mov.l  @(0x480BC),r2  ; =0x00031600
+  047F34: 420B  jsr    @r2
+  047F36: 0009  nop
+  047F38: D261  mov.l  @(0x480C0),r2  ; =0x00032AA8
+  047F3A: 420B  jsr    @r2
+  047F3C: 0009  nop
+  047F3E: D261  mov.l  @(0x480C4),r2  ; =0x00031C9C
+  047F40: 420B  jsr    @r2
+  047F42: 0009  nop
+  047F44: D260  mov.l  @(0x480C8),r2  ; =0x00032958
+  047F46: 420B  jsr    @r2
+  047F48: 0009  nop
+  047F4A: D260  mov.l  @(0x480CC),r2  ; =0x00034488
+  047F4C: 420B  jsr    @r2
+  047F4E: 0009  nop
+  047F50: D25F  mov.l  @(0x480D0),r2  ; =0x000357D0
+  047F52: 420B  jsr    @r2
+  047F54: 0009  nop
+  047F56: D25F  mov.l  @(0x480D4),r2  ; =0x00034EC8
+  047F58: 420B  jsr    @r2
+  047F5A: 0009  nop
+  047F5C: D25E  mov.l  @(0x480D8),r2  ; =0x00036008
+  047F5E: 420B  jsr    @r2
+  047F60: 0009  nop
+  047F62: D25E  mov.l  @(0x480DC),r2  ; =0x00036A98
+  047F64: 420B  jsr    @r2
+  047F66: 0009  nop
+  047F68: D25D  mov.l  @(0x480E0),r2  ; =0x00036BF4
+  047F6A: 420B  jsr    @r2
+  047F6C: 0009  nop
+  047F6E: D25D  mov.l  @(0x480E4),r2  ; =0x00036E60
+  047F70: 420B  jsr    @r2
+  047F72: 0009  nop
+  047F74: D25C  mov.l  @(0x480E8),r2  ; =0x00037156
+  047F76: 420B  jsr    @r2
+  047F78: 0009  nop
+  047F7A: D25C  mov.l  @(0x480EC),r2  ; =0x0003756C
+  047F7C: 420B  jsr    @r2
+  047F7E: 0009  nop
+  047F80: D25B  mov.l  @(0x480F0),r2  ; =0x00037ABA
+  047F82: 420B  jsr    @r2
+  047F84: 0009  nop
+  047F86: D25B  mov.l  @(0x480F4),r2  ; =0x00038158
+  047F88: 420B  jsr    @r2
+  047F8A: 0009  nop
+  047F8C: D25A  mov.l  @(0x480F8),r2  ; =0x00038D16
+  047F8E: 420B  jsr    @r2
+  047F90: 0009  nop
+  047F92: D25A  mov.l  @(0x480FC),r2  ; =0x00038E30
+  047F94: 420B  jsr    @r2
+  047F96: 0009  nop
+  047F98: D259  mov.l  @(0x48100),r2  ; =0x000399EE
+  047F9A: A0B3  bra    0x48104
+  047F9C: 0009  nop
+  047F9E: 0000  .word  0x0000
+  047FA0: 0000  .word  0x0000
+  047FA2: 6BC4  mov.b  @r12+,r11
+  047FA4: 000B  rts
+  047FA6: EAB8  mov    #-72,r10
+  047FA8: 0005  mov.w  r0,@(r0,r0)
+  047FAA: CD4A  and.b  #74,@(r0,GBR)
+  047FAC: 000B  rts
+  047FAE: E81C  mov    #28,r8
+  047FB0: 0000  .word  0x0000
+  047FB2: 6BF0  mov.b  @r15,r11
+  047FB4: 000B  rts
+  047FB6: E82C  mov    #44,r8
+  047FB8: 0000  .word  0x0000
+  047FBA: FACA  fmov.s fr12,@r10
+  047FBC: 0005  mov.w  r0,@(r0,r0)
+  047FBE: 88FA  cmp/eq #-6,r0
+  047FC0: 0004  mov.b  r0,@(r0,r0)
+  047FC2: C828  tst    #40,r0
+  047FC4: 0001  .word  0x0001
+  047FC6: CB68  or     #104,r0
+  047FC8: 0001  .word  0x0001
+  047FCA: CF0C  or.b   #12,@(r0,GBR)
+  047FCC: 0002  .word  0x0002
+  047FCE: 6104  mov.b  @r0+,r1
+  047FD0: 0002  .word  0x0002
+  047FD2: 31C2  cmp/hs r12,r1
+  047FD4: 0002  .word  0x0002
+  047FD6: 272C  cmp/str r2,r7
+  047FD8: 0002  .word  0x0002
+  047FDA: 2F1C  cmp/str r1,r15
+  047FDC: 0002  .word  0x0002
+  047FDE: 3270  cmp/eq r7,r2
+  047FE0: 0001  .word  0x0001
+  047FE2: D0E0  mov.l  @(0x48364),r0  ; =0x0009A0CB
+  047FE4: 0002  .word  0x0002
+  047FE6: 262C  cmp/str r2,r6
+  047FE8: 0002  .word  0x0002
+  047FEA: 260C  cmp/str r0,r6
+  047FEC: 0001  .word  0x0001
+  047FEE: D26A  mov.l  @(0x48198),r2  ; =0xD28C420B
+  047FF0: 0002  .word  0x0002
+  047FF2: 121C  mov.l  r1,@(48,r2)
+  047FF4: 0003  bsrf   r0
+  047FF6: E6A4  mov    #-92,r6
+  047FF8: 0003  bsrf   r0
+  047FFA: E6E0  mov    #-32,r6
+  047FFC: 0002  .word  0x0002
+  047FFE: 4CF8  .word  0x4CF8
+  048000: 0001  .word  0x0001
+  048002: F870  fadd fr7,fr8
+  048004: 0002  .word  0x0002
+  048006: 2D2C  cmp/str r2,r13
+  048008: 0001  .word  0x0001
+  04800A: FA16  fmov.s @(r0,r1),fr10
+  04800C: 0001  .word  0x0001
+  04800E: FBF2  fmul fr15,fr11
+  048010: 0001  .word  0x0001
+  048012: FD16  fmov.s @(r0,r1),fr13
+  048014: 0001  .word  0x0001
+  048016: FDF2  fmul fr15,fr13
+  048018: 0002  .word  0x0002
+  04801A: 07D4  mov.b  r13,@(r0,r7)
+  04801C: 0002  .word  0x0002
+  04801E: 0678  .word  0x0678
+  048020: 0002  .word  0x0002
+  048022: 0E6A  sts    FPSCR,r14
+  048024: 0002  .word  0x0002
+  048026: 1D7C  mov.l  r7,@(48,r13)
+  048028: 0002  .word  0x0002
+  04802A: 1E96  mov.l  r9,@(24,r14)
+  04802C: 0002  .word  0x0002
+  04802E: 4094  .word  0x4094
+  048030: 0002  .word  0x0002
+  048032: 42C2  .word  0x42C2
+  048034: 0002  .word  0x0002
+  048036: 2F50  mov.b  r5,@r15
+  048038: 0002  .word  0x0002
+  04803A: 527A  mov.l  @(40,r7),r2
+  04803C: 0002  .word  0x0002
+  04803E: 5848  mov.l  @(32,r4),r8
+  048040: 0002  .word  0x0002
+  048042: 5C24  mov.l  @(16,r2),r12
+  048044: 0002  .word  0x0002
+  048046: 63FA  negc r15,r3
+  048048: 0002  .word  0x0002
+  04804A: 6634  mov.b  @r3+,r6
+  04804C: 0002  .word  0x0002
+  04804E: 2688  tst r8,r6
+  048050: 0002  .word  0x0002
+  048052: 269A  xor r9,r6
+  048054: 0002  .word  0x0002
+  048056: 26A2  mov.l  r10,@r6
+  048058: 0005  mov.w  r0,@(r0,r0)
+  04805A: 88F0  cmp/eq #-16,r0
+  04805C: 0001  .word  0x0001
+  04805E: 3330  cmp/eq r3,r3
+  048060: 0009  nop
+  048062: EB62  mov    #98,r11
+  048064: 0009  nop
+  048066: DE08  mov.l  @(0x48088),r14  ; =0x0004C086
+  048068: 000A  sts    MACH,r0
+  04806A: 6B90  mov.b  @r9,r11
+  04806C: 000A  sts    MACH,r0
+  04806E: 9902  mov.w  @(0x48076),r9  ; =0x8A84 (35460)
+  048070: 0009  nop
+  048072: 90EA  mov.w  @(0x4824A),r0  ; =0x0009 (9)
+  048074: 0005  mov.w  r0,@(r0,r0)
+  048076: 8A84  .word  0x8A84
+  048078: 0009  nop
+  04807A: DCCC  mov.l  @(0x483AC),r12  ; =0x000432B0
+  04807C: 0009  nop
+  04807E: CA10  xor    #16,r0
+  048080: 0009  nop
+  048082: CDE0  and.b  #224,@(r0,GBR)
+  048084: 0009  nop
+  048086: CC1C  tst.b  #28,@(r0,GBR)
+  048088: 0004  mov.b  r0,@(r0,r0)
+  04808A: C086  mov.b  r0,@(134,GBR)
+  04808C: 0004  mov.b  r0,@(r0,r0)
+  04808E: E902  mov    #2,r9
+  048090: 0005  mov.w  r0,@(r0,r0)
+  048092: CE6C  xor.b  #108,@(r0,GBR)
+  048094: 0002  .word  0x0002
+  048096: FF74  fcmp/eq fr7,fr15
+  048098: 0003  bsrf   r0
+  04809A: 03C0  .word  0x03C0
+  04809C: 0002  .word  0x0002
+  04809E: EF08  mov    #8,r15
+  0480A0: 0003  bsrf   r0
+  0480A2: CD00  and.b  #0,@(r0,GBR)
+  0480A4: 0002  .word  0x0002
+  0480A6: FA68  fmov.s @r6,fr10
+  0480A8: 0002  .word  0x0002
+  0480AA: FB68  fmov.s @r6,fr11
+  0480AC: 0003  bsrf   r0
+  0480AE: 0430  .word  0x0430
+  0480B0: 0003  bsrf   r0
+  0480B2: 0744  mov.b  r4,@(r0,r7)
+  0480B4: 0003  bsrf   r0
+  0480B6: 0B68  .word  0x0B68
+  0480B8: 0003  bsrf   r0
+  0480BA: 3278  sub r7,r2
+  0480BC: 0003  bsrf   r0
+  0480BE: 1600  mov.l  r0,@(0,r6)
+  0480C0: 0003  bsrf   r0
+  0480C2: 2AA8  tst r10,r10
+  0480C4: 0003  bsrf   r0
+  0480C6: 1C9C  mov.l  r9,@(48,r12)
+  0480C8: 0003  bsrf   r0
+  0480CA: 2958  tst r5,r9
+  0480CC: 0003  bsrf   r0
+  0480CE: 4488  .word  0x4488
+  0480D0: 0003  bsrf   r0
+  0480D2: 57D0  mov.l  @(0,r13),r7
+  0480D4: 0003  bsrf   r0
+  0480D6: 4EC8  .word  0x4EC8
+  0480D8: 0003  bsrf   r0
+  0480DA: 6008  swap.b r0,r0
+  0480DC: 0003  bsrf   r0
+  0480DE: 6A98  swap.b r9,r10
+  0480E0: 0003  bsrf   r0
+  0480E2: 6BF4  mov.b  @r15+,r11
+  0480E4: 0003  bsrf   r0
+  0480E6: 6E60  mov.b  @r6,r14
+  0480E8: 0003  bsrf   r0
+  0480EA: 7156  add    #86,r1
+  0480EC: 0003  bsrf   r0
+  0480EE: 756C  add    #108,r5
+  0480F0: 0003  bsrf   r0
+  0480F2: 7ABA  add    #-70,r10
+  0480F4: 0003  bsrf   r0
+  0480F6: 8158  mov.w  r0,@(16,r5)
+  0480F8: 0003  bsrf   r0
+  0480FA: 8D16  bt/s   0x4812A
+  0480FC: 0003  bsrf   r0
+  0480FE: 8E30  .word  0x8E30
+  048100: 0003  bsrf   r0
+  048102: 99EE  mov.w  @(0x482E2),r9  ; =0xD271 (53873)
+  048104: 420B  jsr    @r2
+  048106: 0009  nop
+  048108: D298  mov.l  @(0x4836C),r2  ; =0x0003A210 (ROM cal: -6.757e+04)
+  04810A: 420B  jsr    @r2
+  04810C: 0009  nop
+  04810E: D298  mov.l  @(0x48370),r2  ; =0x0003AB60
+  048110: 420B  jsr    @r2
+  048112: 0009  nop
+  048114: D297  mov.l  @(0x48374),r2  ; =0x0003A5E4
+  048116: 420B  jsr    @r2
+  048118: 0009  nop
+  04811A: D297  mov.l  @(0x48378),r2  ; =0x0003BCCC
+  04811C: 420B  jsr    @r2
+  04811E: 0009  nop
+  048120: D296  mov.l  @(0x4837C),r2  ; =0x0003C374
+  048122: 420B  jsr    @r2
+  048124: 0009  nop
+  048126: D296  mov.l  @(0x48380),r2  ; =0x0003C7D8
+  048128: 420B  jsr    @r2
+  04812A: 0009  nop
+  04812C: D295  mov.l  @(0x48384),r2  ; =0x0003EAA8
+  04812E: 420B  jsr    @r2
+  048130: 0009  nop
+  048132: D295  mov.l  @(0x48388),r2  ; =0x0003FA8C
+  048134: 420B  jsr    @r2
+  048136: 0009  nop
+  048138: D294  mov.l  @(0x4838C),r2  ; =0x000402D6
+  04813A: 420B  jsr    @r2
+  04813C: 0009  nop
+  04813E: D294  mov.l  @(0x48390),r2  ; =0x000403C4
+  048140: 420B  jsr    @r2
+  048142: 0009  nop
+  048144: D293  mov.l  @(0x48394),r2  ; =0x00040478
+  048146: 420B  jsr    @r2
+  048148: 0009  nop
+  04814A: D293  mov.l  @(0x48398),r2  ; =0x0004092A
+  04814C: 420B  jsr    @r2
+  04814E: 0009  nop
+  048150: D292  mov.l  @(0x4839C),r2  ; =0x000418FC
+  048152: 420B  jsr    @r2
+  048154: 0009  nop
+  048156: D292  mov.l  @(0x483A0),r2  ; =0x00041954
+  048158: 420B  jsr    @r2
+  04815A: 0009  nop
+  04815C: D291  mov.l  @(0x483A4),r2  ; =0x00041EE4
+  04815E: 420B  jsr    @r2
+  048160: 0009  nop
+  048162: D291  mov.l  @(0x483A8),r2  ; =0x00042E28
+  048164: 420B  jsr    @r2
+  048166: 0009  nop
+  048168: D290  mov.l  @(0x483AC),r2  ; =0x000432B0
+  04816A: 420B  jsr    @r2
+  04816C: 0009  nop
+  04816E: D290  mov.l  @(0x483B0),r2  ; =0x00043FE0
+  048170: 420B  jsr    @r2
+  048172: 0009  nop
+  048174: D28F  mov.l  @(0x483B4),r2  ; =0x0004421E
+  048176: 420B  jsr    @r2
+  048178: 0009  nop
+  04817A: D28F  mov.l  @(0x483B8),r2  ; =0x0004427C
+  04817C: 420B  jsr    @r2
+  04817E: 0009  nop
+  048180: D28E  mov.l  @(0x483BC),r2  ; =0x00044300
+  048182: 420B  jsr    @r2
+  048184: 0009  nop
+  048186: D28E  mov.l  @(0x483C0),r2  ; =0x0004590A
+  048188: 420B  jsr    @r2
+  04818A: 0009  nop
+  04818C: D28D  mov.l  @(0x483C4),r2  ; =0x00046158
+  04818E: 420B  jsr    @r2
+  048190: 0009  nop
+  048192: D28D  mov.l  @(0x483C8),r2  ; =0x0004F26C
+  048194: 420B  jsr    @r2
+  048196: 0009  nop
+  048198: D28C  mov.l  @(0x483CC),r2  ; =0x0004F574
+  04819A: 420B  jsr    @r2
+  04819C: 0009  nop
+  04819E: D28C  mov.l  @(0x483D0),r2  ; =0x0004FDB8
+  0481A0: 420B  jsr    @r2
+  0481A2: 0009  nop
+  0481A4: D28B  mov.l  @(0x483D4),r2  ; =0x000500E8
+  0481A6: 420B  jsr    @r2
+  0481A8: 0009  nop
+  0481AA: D28B  mov.l  @(0x483D8),r2  ; =0x00050A24
+  0481AC: 420B  jsr    @r2
+  0481AE: 0009  nop
+  0481B0: D28A  mov.l  @(0x483DC),r2  ; =0x00050A48
+  0481B2: 420B  jsr    @r2
+  0481B4: 0009  nop
+  0481B6: D28A  mov.l  @(0x483E0),r2  ; =0x00050DCC
+  0481B8: 420B  jsr    @r2
+  0481BA: 0009  nop
+  0481BC: D289  mov.l  @(0x483E4),r2  ; =0x00051AF4
+  0481BE: 420B  jsr    @r2
+  0481C0: 0009  nop
+  0481C2: D289  mov.l  @(0x483E8),r2  ; =0x00052E62
+  0481C4: 420B  jsr    @r2
+  0481C6: 0009  nop
+  0481C8: D288  mov.l  @(0x483EC),r2  ; =0x0005305E
+  0481CA: 420B  jsr    @r2
+  0481CC: 0009  nop
+  0481CE: D288  mov.l  @(0x483F0),r2  ; =0x0005323E
+  0481D0: 420B  jsr    @r2
+  0481D2: 0009  nop
+  0481D4: D287  mov.l  @(0x483F4),r2  ; =0x000535B6
+  0481D6: 420B  jsr    @r2
+  0481D8: 0009  nop
+  0481DA: D287  mov.l  @(0x483F8),r2  ; =0x000539BE
+  0481DC: 420B  jsr    @r2
+  0481DE: 0009  nop
+  0481E0: D286  mov.l  @(0x483FC),r2  ; =0x00053BFC
+  0481E2: 420B  jsr    @r2
+  0481E4: 0009  nop
+  0481E6: D286  mov.l  @(0x48400),r2  ; =0x00054228
+  0481E8: 420B  jsr    @r2
+  0481EA: 0009  nop
+  0481EC: D285  mov.l  @(0x48404),r2  ; =0x00054822
+  0481EE: 420B  jsr    @r2
+  0481F0: 0009  nop
+  0481F2: D285  mov.l  @(0x48408),r2  ; =0x00054FC4
+  0481F4: 420B  jsr    @r2
+  0481F6: 0009  nop
+  0481F8: D284  mov.l  @(0x4840C),r2  ; =0x00055588
+  0481FA: 420B  jsr    @r2
+  0481FC: 0009  nop
+  0481FE: D284  mov.l  @(0x48410),r2  ; =0x000559F8
+  048200: 420B  jsr    @r2
+  048202: 0009  nop
+  048204: D283  mov.l  @(0x48414),r2  ; =0x00055F18
+  048206: 420B  jsr    @r2
+  048208: 0009  nop
+  04820A: D283  mov.l  @(0x48418),r2  ; =0x00055F58
+  04820C: 420B  jsr    @r2
+  04820E: 0009  nop
+  048210: D282  mov.l  @(0x4841C),r2  ; =0x00056A8C
+  048212: 420B  jsr    @r2
+  048214: 0009  nop
+  048216: D282  mov.l  @(0x48420),r2  ; =0x00055BD4
+  048218: 420B  jsr    @r2
+  04821A: 0009  nop
+  04821C: D281  mov.l  @(0x48424),r2  ; =0x00056AEC
+  04821E: 420B  jsr    @r2
+  048220: 0009  nop
+  048222: D281  mov.l  @(0x48428),r2  ; =0x00056E78
+  048224: 420B  jsr    @r2
+  048226: 0009  nop
+  048228: D280  mov.l  @(0x4842C),r2  ; =0x0005AA9A
+  04822A: 420B  jsr    @r2
+  04822C: 0009  nop
+  04822E: D280  mov.l  @(0x48430),r2  ; =0x0001328E
+  048230: 420B  jsr    @r2
+  048232: 0009  nop
+  048234: D27F  mov.l  @(0x48434),r2  ; =0x00061514
+  048236: 420B  jsr    @r2
+  048238: 0009  nop
+  04823A: D27F  mov.l  @(0x48438),r2  ; =0x00061A6A
+  04823C: 420B  jsr    @r2
+  04823E: 0009  nop
+  048240: D27E  mov.l  @(0x4843C),r2  ; =0x00061BC8
+  048242: 420B  jsr    @r2
+  048244: 0009  nop
+  048246: D27E  mov.l  @(0x48440),r2  ; =0x00061FD4
+  048248: 420B  jsr    @r2
+  04824A: 0009  nop
+  04824C: D27D  mov.l  @(0x48444),r2  ; =0x000623EC
+  04824E: 420B  jsr    @r2
+  048250: 0009  nop
+  048252: D27D  mov.l  @(0x48448),r2  ; =0x00062EEC
+  048254: 420B  jsr    @r2
+  048256: 0009  nop
+  048258: D27C  mov.l  @(0x4844C),r2  ; =0x000633EC
+  04825A: 420B  jsr    @r2
+  04825C: 0009  nop
+  04825E: D27C  mov.l  @(0x48450),r2  ; =0x0006081C
+  048260: 420B  jsr    @r2
+  048262: 0009  nop
+  048264: D27B  mov.l  @(0x48454),r2  ; =0x0005F89C
+  048266: 420B  jsr    @r2
+  048268: 0009  nop
+  04826A: D27B  mov.l  @(0x48458),r2  ; =0x000601F8
+  04826C: 420B  jsr    @r2
+  04826E: 0009  nop
+  048270: D27A  mov.l  @(0x4845C),r2  ; =0x00011EAA
+  048272: 420B  jsr    @r2
+  048274: 0009  nop
+  048276: D27A  mov.l  @(0x48460),r2  ; =0x00058AA0
+  048278: 420B  jsr    @r2
+  04827A: 0009  nop
+  04827C: D279  mov.l  @(0x48464),r2  ; =0x00060308
+  04827E: 420B  jsr    @r2
+  048280: 0009  nop
+  048282: D279  mov.l  @(0x48468),r2  ; =0x000602FA
+  048284: 420B  jsr    @r2
+  048286: 0009  nop
+  048288: D278  mov.l  @(0x4846C),r2  ; =0x0004B970 [fuel_pump_duty_ctrl]
+  04828A: 420B  jsr    @r2
+  04828C: 0009  nop
+  04828E: D278  mov.l  @(0x48470),r2  ; =0x00027778
+  048290: 420B  jsr    @r2
+  048292: 0009  nop
+  048294: D277  mov.l  @(0x48474),r2  ; =0x000594F8
+  048296: 420B  jsr    @r2
+  048298: 0009  nop
+  04829A: D277  mov.l  @(0x48478),r2  ; =0x0005B1F6
+  04829C: 420B  jsr    @r2
+  04829E: 0009  nop
+  0482A0: D276  mov.l  @(0x4847C),r2  ; =0x0005CAD8
+  0482A2: 420B  jsr    @r2
+  0482A4: 0009  nop
+  0482A6: D276  mov.l  @(0x48480),r2  ; =0x0007EF4A
+  0482A8: 420B  jsr    @r2
+  0482AA: 0009  nop
+  0482AC: D275  mov.l  @(0x48484),r2  ; =0x0007E268
+  0482AE: 420B  jsr    @r2
+  0482B0: 0009  nop
+  0482B2: D275  mov.l  @(0x48488),r2  ; =0x0007E26C
+  0482B4: 420B  jsr    @r2
+  0482B6: 0009  nop
+  0482B8: D274  mov.l  @(0x4848C),r2  ; =0x00071788
+  0482BA: 420B  jsr    @r2
+  0482BC: 0009  nop
+  0482BE: D274  mov.l  @(0x48490),r2  ; =0x000719DC
+  0482C0: 420B  jsr    @r2
+  0482C2: 0009  nop
+  0482C4: D273  mov.l  @(0x48494),r2  ; =0x000664A2
+  0482C6: 420B  jsr    @r2
+  0482C8: 0009  nop
+  0482CA: D273  mov.l  @(0x48498),r2  ; =0x00067034
+  0482CC: 420B  jsr    @r2
+  0482CE: 0009  nop
+  0482D0: D272  mov.l  @(0x4849C),r2  ; =0x0006B410
+  0482D2: 420B  jsr    @r2
+  0482D4: 0009  nop
+  0482D6: D272  mov.l  @(0x484A0),r2  ; =0x00080ACC
+  0482D8: 420B  jsr    @r2
+  0482DA: 0009  nop
+  0482DC: D271  mov.l  @(0x484A4),r2  ; =0x0008CF40
+  0482DE: 420B  jsr    @r2
+  0482E0: 0009  nop
+  0482E2: D271  mov.l  @(0x484A8),r2  ; =0x0008D378
+  0482E4: 420B  jsr    @r2
+  0482E6: 0009  nop
+  0482E8: D270  mov.l  @(0x484AC),r2  ; =0x0008FA30
+  0482EA: 420B  jsr    @r2
+  0482EC: 0009  nop
+  0482EE: D270  mov.l  @(0x484B0),r2  ; =0x0007FF40
+  0482F0: 420B  jsr    @r2
+  0482F2: 0009  nop
+  0482F4: D26F  mov.l  @(0x484B4),r2  ; =0x00073164
+  0482F6: 420B  jsr    @r2
+  0482F8: 0009  nop
+  0482FA: D26F  mov.l  @(0x484B8),r2  ; =0x00074A82
+  0482FC: 420B  jsr    @r2
+  0482FE: 0009  nop
+  048300: D26E  mov.l  @(0x484BC),r2  ; =0x0007052C
+  048302: 420B  jsr    @r2
+  048304: 0009  nop
+  048306: D26E  mov.l  @(0x484C0),r2  ; =0x00070558
+  048308: 420B  jsr    @r2
+  04830A: 0009  nop
+  04830C: D26D  mov.l  @(0x484C4),r2  ; =0x0007F678
+  04830E: 420B  jsr    @r2
+  048310: 0009  nop
+  048312: D26D  mov.l  @(0x484C8),r2  ; =0x0007F680
+  048314: 420B  jsr    @r2
+  048316: 0009  nop
+  048318: D26C  mov.l  @(0x484CC),r2  ; =0x0006C6A4
+  04831A: 420B  jsr    @r2
+  04831C: 0009  nop
+  04831E: D26C  mov.l  @(0x484D0),r2  ; =0x0006C6BE
+  048320: 420B  jsr    @r2
+  048322: 0009  nop
+  048324: D26B  mov.l  @(0x484D4),r2  ; =0x0006C8CC
+  048326: 420B  jsr    @r2
+  048328: 0009  nop
+  04832A: D26B  mov.l  @(0x484D8),r2  ; =0x0006C8E6
+  04832C: 420B  jsr    @r2
+  04832E: 0009  nop
+  048330: D26A  mov.l  @(0x484DC),r2  ; =0x0006C3B4
+  048332: 420B  jsr    @r2
+  048334: 0009  nop
+  048336: D26A  mov.l  @(0x484E0),r2  ; =0x0006C3CE
+  048338: 420B  jsr    @r2
+  04833A: 0009  nop
+  04833C: D269  mov.l  @(0x484E4),r2  ; =0x00086374
+  04833E: 420B  jsr    @r2
+  048340: 0009  nop
+  048342: D269  mov.l  @(0x484E8),r2  ; =0x000863C4
+  048344: 420B  jsr    @r2
+  048346: 0009  nop
+  048348: D268  mov.l  @(0x484EC),r2  ; =0x00086394
+  04834A: 420B  jsr    @r2
+  04834C: 0009  nop
+  04834E: D268  mov.l  @(0x484F0),r2  ; =0x00087C76
+  048350: 420B  jsr    @r2
+  048352: 0009  nop
+  048354: D267  mov.l  @(0x484F4),r2  ; =0x00087D08
+  048356: 420B  jsr    @r2
+  048358: 0009  nop
+  04835A: D267  mov.l  @(0x484F8),r2  ; =0x00087C9E
+  04835C: 420B  jsr    @r2
+  04835E: 0009  nop
+  048360: D266  mov.l  @(0x484FC),r2  ; =0x0006E250
+  048362: 420B  jsr    @r2
+  048364: 0009  nop
+  048366: A0CB  bra    0x48500
+  048368: 0009  nop
+  04836A: 0000  .word  0x0000
+  04836C: 0003  bsrf   r0
+  04836E: A210  bra    0x48792
+  048370: 0003  bsrf   r0
+  048372: AB60  bra    0x47A36
+  048374: 0003  bsrf   r0
+  048376: A5E4  bra    0x48F42
+  048378: 0003  bsrf   r0
+  04837A: BCCC  bsr    0x47D16
+  04837C: 0003  bsrf   r0
+  04837E: C374  trapa  #116
+  048380: 0003  bsrf   r0
+  048382: C7D8  mova   @(0x486E4),r0
+  048384: 0003  bsrf   r0
+  048386: EAA8  mov    #-88,r10
+  048388: 0003  bsrf   r0
+  04838A: FA8C  fmov   fr8,fr10
+  04838C: 0004  mov.b  r0,@(r0,r0)
+  04838E: 02D6  mov.l  r13,@(r0,r2)
+  048390: 0004  mov.b  r0,@(r0,r0)
+  048392: 03C4  mov.b  r12,@(r0,r3)
+  048394: 0004  mov.b  r0,@(r0,r0)
+  048396: 0478  .word  0x0478
+  048398: 0004  mov.b  r0,@(r0,r0)
+  04839A: 092A  sts    PR,r9
+  04839C: 0004  mov.b  r0,@(r0,r0)
+  04839E: 18FC  mov.l  r15,@(48,r8)
+  0483A0: 0004  mov.b  r0,@(r0,r0)
+  0483A2: 1954  mov.l  r5,@(16,r9)
+  0483A4: 0004  mov.b  r0,@(r0,r0)
+  0483A6: 1EE4  mov.l  r14,@(16,r14)
+  0483A8: 0004  mov.b  r0,@(r0,r0)
+  0483AA: 2E28  tst r2,r14
+  0483AC: 0004  mov.b  r0,@(r0,r0)
+  0483AE: 32B0  cmp/eq r11,r2
+  0483B0: 0004  mov.b  r0,@(r0,r0)
+  0483B2: 3FE0  cmp/eq r14,r15
+  0483B4: 0004  mov.b  r0,@(r0,r0)
+  0483B6: 421E  ldc    r2,GBR
+  0483B8: 0004  mov.b  r0,@(r0,r0)
+  0483BA: 427C  shad   r7,r2
+  0483BC: 0004  mov.b  r0,@(r0,r0)
+  0483BE: 4300  shll  r3
+  0483C0: 0004  mov.b  r0,@(r0,r0)
+  0483C2: 590A  mov.l  @(40,r0),r9
+  0483C4: 0004  mov.b  r0,@(r0,r0)
+  0483C6: 6158  swap.b r5,r1
+  0483C8: 0004  mov.b  r0,@(r0,r0)
+  0483CA: F26C  fmov   fr6,fr2
+  0483CC: 0004  mov.b  r0,@(r0,r0)
+  0483CE: F574  fcmp/eq fr7,fr5
+  0483D0: 0004  mov.b  r0,@(r0,r0)
+  0483D2: FDB8  fmov.s @r11,fr13
+  0483D4: 0005  mov.w  r0,@(r0,r0)
+  0483D6: 00E8  .word  0x00E8
+  0483D8: 0005  mov.w  r0,@(r0,r0)
+  0483DA: 0A24  mov.b  r2,@(r0,r10)
+  0483DC: 0005  mov.w  r0,@(r0,r0)
+  0483DE: 0A48  .word  0x0A48
+  0483E0: 0005  mov.w  r0,@(r0,r0)
+  0483E2: 0DCC  mov.b  @(r0,r12),r13
+  0483E4: 0005  mov.w  r0,@(r0,r0)
+  0483E6: 1AF4  mov.l  r15,@(16,r10)
+  0483E8: 0005  mov.w  r0,@(r0,r0)
+  0483EA: 2E62  mov.l  r6,@r14
+  0483EC: 0005  mov.w  r0,@(r0,r0)
+  0483EE: 305E  addc r5,r0
+  0483F0: 0005  mov.w  r0,@(r0,r0)
+  0483F2: 323E  addc r3,r2
+  0483F4: 0005  mov.w  r0,@(r0,r0)
+  0483F6: 35B6  cmp/hi r11,r5
+  0483F8: 0005  mov.w  r0,@(r0,r0)
+  0483FA: 39BE  addc r11,r9
+  0483FC: 0005  mov.w  r0,@(r0,r0)
+  0483FE: 3BFC  add r15,r11
+  048400: 0005  mov.w  r0,@(r0,r0)
+  048402: 4228  shll16  r2
+  048404: 0005  mov.w  r0,@(r0,r0)
+  048406: 4822  sts.l  PR,@-r8
+  048408: 0005  mov.w  r0,@(r0,r0)
+  04840A: 4FC4  .word  0x4FC4
+  04840C: 0005  mov.w  r0,@(r0,r0)
+  04840E: 5588  mov.l  @(32,r8),r5
+  048410: 0005  mov.w  r0,@(r0,r0)
+  048412: 59F8  mov.l  @(32,r15),r9
+  048414: 0005  mov.w  r0,@(r0,r0)
+  048416: 5F18  mov.l  @(32,r1),r15
+  048418: 0005  mov.w  r0,@(r0,r0)
+  04841A: 5F58  mov.l  @(32,r5),r15
+  04841C: 0005  mov.w  r0,@(r0,r0)
+  04841E: 6A8C  extu.b r8,r10
+  048420: 0005  mov.w  r0,@(r0,r0)
+  048422: 5BD4  mov.l  @(16,r13),r11
+  048424: 0005  mov.w  r0,@(r0,r0)
+  048426: 6AEC  extu.b r14,r10
+  048428: 0005  mov.w  r0,@(r0,r0)
+  04842A: 6E78  swap.b r7,r14
+  04842C: 0005  mov.w  r0,@(r0,r0)
+  04842E: AA9A  bra    0x47966
+  048430: 0001  .word  0x0001
+  048432: 328E  addc r8,r2
+  048434: 0006  mov.l  r0,@(r0,r0)
+  048436: 1514  mov.l  r1,@(16,r5)
+  048438: 0006  mov.l  r0,@(r0,r0)
+  04843A: 1A6A  mov.l  r6,@(40,r10)
+  04843C: 0006  mov.l  r0,@(r0,r0)
+  04843E: 1BC8  mov.l  r12,@(32,r11)
+  048440: 0006  mov.l  r0,@(r0,r0)
+  048442: 1FD4  mov.l  r13,@(16,r15)
+  048444: 0006  mov.l  r0,@(r0,r0)
+  048446: 23EC  cmp/str r14,r3
+  048448: 0006  mov.l  r0,@(r0,r0)
+  04844A: 2EEC  cmp/str r14,r14
+  04844C: 0006  mov.l  r0,@(r0,r0)
+  04844E: 33EC  add r14,r3
+  048450: 0006  mov.l  r0,@(r0,r0)
+  048452: 081C  mov.b  @(r0,r1),r8
+  048454: 0005  mov.w  r0,@(r0,r0)
+  048456: F89C  fmov   fr9,fr8
+  048458: 0006  mov.l  r0,@(r0,r0)
+  04845A: 01F8  .word  0x01F8
+  04845C: 0001  .word  0x0001
+  04845E: 1EAA  mov.l  r10,@(40,r14)
+  048460: 0005  mov.w  r0,@(r0,r0)
+  048462: 8AA0  .word  0x8AA0
+  048464: 0006  mov.l  r0,@(r0,r0)
+  048466: 0308  .word  0x0308
+  048468: 0006  mov.l  r0,@(r0,r0)
+  04846A: 02FA  .word  0x02FA
+  04846C: 0004  mov.b  r0,@(r0,r0)
+  04846E: B970  bsr    0x47752
+  048470: 0002  .word  0x0002
+  048472: 7778  add    #120,r7
+  048474: 0005  mov.w  r0,@(r0,r0)
+  048476: 94F8  mov.w  @(0x4866A),r4  ; =0x420B (16907)
+  048478: 0005  mov.w  r0,@(r0,r0)
+  04847A: B1F6  bsr    0x4886A
+  04847C: 0005  mov.w  r0,@(r0,r0)
+  04847E: CAD8  xor    #216,r0
+  048480: 0007  mul.l  r0,r0
+  048482: EF4A  mov    #74,r15
+  048484: 0007  mul.l  r0,r0
+  048486: E268  mov    #104,r2
+  048488: 0007  mul.l  r0,r0
+  04848A: E26C  mov    #108,r2
+  04848C: 0007  mul.l  r0,r0
+  04848E: 1788  mov.l  r8,@(32,r7)
+  048490: 0007  mul.l  r0,r0
+  048492: 19DC  mov.l  r13,@(48,r9)
+  048494: 0006  mov.l  r0,@(r0,r0)
+  048496: 64A2  mov.l  @r10,r4
+  048498: 0006  mov.l  r0,@(r0,r0)
+  04849A: 7034  add    #52,r0
+  04849C: 0006  mov.l  r0,@(r0,r0)
+  04849E: B410  bsr    0x48CC2
+  0484A0: 0008  clrt
+  0484A2: 0ACC  mov.b  @(r0,r12),r10
+  0484A4: 0008  clrt
+  0484A6: CF40  or.b   #64,@(r0,GBR)
+  0484A8: 0008  clrt
+  0484AA: D378  mov.l  @(0x4868C),r3  ; =0xD271420B
+  0484AC: 0008  clrt
+  0484AE: FA30  fadd fr3,fr10
+  0484B0: 0007  mul.l  r0,r0
+  0484B2: FF40  fadd fr4,fr15
+  0484B4: 0007  mul.l  r0,r0
+  0484B6: 3164  div1 r6,r1
+  0484B8: 0007  mul.l  r0,r0
+  0484BA: 4A82  .word  0x4A82
+  0484BC: 0007  mul.l  r0,r0
+  0484BE: 052C  mov.b  @(r0,r2),r5
+  0484C0: 0007  mul.l  r0,r0
+  0484C2: 0558  .word  0x0558
+  0484C4: 0007  mul.l  r0,r0
+  0484C6: F678  fmov.s @r7,fr6
+  0484C8: 0007  mul.l  r0,r0
+  0484CA: F680  fadd fr8,fr6
+  0484CC: 0006  mov.l  r0,@(r0,r0)
+  0484CE: C6A4  mov.l  @(656,GBR),r0  ; GBR+0x290
+  0484D0: 0006  mov.l  r0,@(r0,r0)
+  0484D2: C6BE  mov.l  @(760,GBR),r0  ; GBR+0x2F8
+  0484D4: 0006  mov.l  r0,@(r0,r0)
+  0484D6: C8CC  tst    #204,r0
+  0484D8: 0006  mov.l  r0,@(r0,r0)
+  0484DA: C8E6  tst    #230,r0
+  0484DC: 0006  mov.l  r0,@(r0,r0)
+  0484DE: C3B4  trapa  #180
+  0484E0: 0006  mov.l  r0,@(r0,r0)
+  0484E2: C3CE  trapa  #206
+  0484E4: 0008  clrt
+  0484E6: 6374  mov.b  @r7+,r3
+  0484E8: 0008  clrt
+  0484EA: 63C4  mov.b  @r12+,r3
+  0484EC: 0008  clrt
+  0484EE: 6394  mov.b  @r9+,r3
+  0484F0: 0008  clrt
+  0484F2: 7C76  add    #118,r12
+  0484F4: 0008  clrt
+  0484F6: 7D08  add    #8,r13
+  0484F8: 0008  clrt
+  0484FA: 7C9E  add    #-98,r12
+  0484FC: 0006  mov.l  r0,@(r0,r0)
+  0484FE: E250  mov    #80,r2
+  048500: D292  mov.l  @(0x4874C),r2  ; =0x0006CDDC
+  048502: 420B  jsr    @r2
+  048504: 0009  nop
+  048506: D292  mov.l  @(0x48750),r2  ; =0x0007F02C
+  048508: 420B  jsr    @r2
+  04850A: 0009  nop
+  04850C: D291  mov.l  @(0x48754),r2  ; =0x0008E3E4
+  04850E: 420B  jsr    @r2
+  048510: 0009  nop
+  048512: D291  mov.l  @(0x48758),r2  ; =0x00081A64
+  048514: 420B  jsr    @r2
+  048516: 0009  nop
+  048518: D290  mov.l  @(0x4875C),r2  ; =0x00082A9C
+  04851A: 420B  jsr    @r2
+  04851C: 0009  nop
+  04851E: D290  mov.l  @(0x48760),r2  ; =0x000839F8
+  048520: 420B  jsr    @r2
+  048522: 0009  nop
+  048524: D28F  mov.l  @(0x48764),r2  ; =0x000843AC (ROM cal: -6.066e+04)
+  048526: 420B  jsr    @r2
+  048528: 0009  nop
+  04852A: D28F  mov.l  @(0x48768),r2  ; =0x00084A28
+  04852C: 420B  jsr    @r2
+  04852E: 0009  nop
+  048530: D28E  mov.l  @(0x4876C),r2  ; =0x0008C31E
+  048532: 420B  jsr    @r2
+  048534: 0009  nop
+  048536: D28E  mov.l  @(0x48770),r2  ; =0x0007FADC
+  048538: 420B  jsr    @r2
+  04853A: 0009  nop
+  04853C: D28D  mov.l  @(0x48774),r2  ; =0x0007FAE4
+  04853E: 420B  jsr    @r2
+  048540: 0009  nop
+  048542: D28D  mov.l  @(0x48778),r2  ; =0x00029BB4
+  048544: 420B  jsr    @r2
+  048546: 0009  nop
+  048548: D28C  mov.l  @(0x4877C),r2  ; =0x0007FC80
+  04854A: 420B  jsr    @r2
+  04854C: 0009  nop
+  04854E: D28C  mov.l  @(0x48780),r2  ; =0x0007FC88
+  048550: 420B  jsr    @r2
+  048552: 0009  nop
+  048554: D28B  mov.l  @(0x48784),r2  ; =0x0007FC90
+  048556: 420B  jsr    @r2
+  048558: 0009  nop
+  04855A: D28B  mov.l  @(0x48788),r2  ; =0x00087EF0
+  04855C: 420B  jsr    @r2
+  04855E: 0009  nop
+  048560: D28A  mov.l  @(0x4878C),r2  ; =0x00087EF8
+  048562: 420B  jsr    @r2
+  048564: 0009  nop
+  048566: D28A  mov.l  @(0x48790),r2  ; =0x000827FC
+  048568: 420B  jsr    @r2
+  04856A: 0009  nop
+  04856C: D289  mov.l  @(0x48794),r2  ; =0x00082804
+  04856E: 420B  jsr    @r2
+  048570: 0009  nop
+  048572: D289  mov.l  @(0x48798),r2  ; =0x0006FC14
+  048574: 420B  jsr    @r2
+  048576: 0009  nop
+  048578: D288  mov.l  @(0x4879C),r2  ; =0x0008608C
+  04857A: 420B  jsr    @r2
+  04857C: 0009  nop
+  04857E: D288  mov.l  @(0x487A0),r2  ; =0x00088520
+  048580: 420B  jsr    @r2
+  048582: 0009  nop
+  048584: D287  mov.l  @(0x487A4),r2  ; =0x0009068A
+  048586: 420B  jsr    @r2
+  048588: 0009  nop
+  04858A: D287  mov.l  @(0x487A8),r2  ; =0x0006E79C
+  04858C: 420B  jsr    @r2
+  04858E: 0009  nop
+  048590: D286  mov.l  @(0x487AC),r2  ; =0x00080530
+  048592: 420B  jsr    @r2
+  048594: 0009  nop
+  048596: D286  mov.l  @(0x487B0),r2  ; =0x0006D5B0
+  048598: 420B  jsr    @r2
+  04859A: 0009  nop
+  04859C: D285  mov.l  @(0x487B4),r2  ; =0x0006E5BC
+  04859E: 420B  jsr    @r2
+  0485A0: 0009  nop
+  0485A2: D285  mov.l  @(0x487B8),r2  ; =0x0008DA1C
+  0485A4: 420B  jsr    @r2
+  0485A6: 0009  nop
+  0485A8: D284  mov.l  @(0x487BC),r2  ; =0x00027C20
+  0485AA: 420B  jsr    @r2
+  0485AC: 0009  nop
+  0485AE: D284  mov.l  @(0x487C0),r2  ; =0x0007F8C8
+  0485B0: 420B  jsr    @r2
+  0485B2: 0009  nop
+  0485B4: D283  mov.l  @(0x487C4),r2  ; =0x00029D68
+  0485B6: 420B  jsr    @r2
+  0485B8: 0009  nop
+  0485BA: D283  mov.l  @(0x487C8),r2  ; =0x0002A428
+  0485BC: 420B  jsr    @r2
+  0485BE: 0009  nop
+  0485C0: D282  mov.l  @(0x487CC),r2  ; =0x0002BE78
+  0485C2: 420B  jsr    @r2
+  0485C4: 0009  nop
+  0485C6: D282  mov.l  @(0x487D0),r2  ; =0x0008F304
+  0485C8: 420B  jsr    @r2
+  0485CA: 0009  nop
+  0485CC: D281  mov.l  @(0x487D4),r2  ; =0x0008F58C
+  0485CE: 420B  jsr    @r2
+  0485D0: 0009  nop
+  0485D2: D281  mov.l  @(0x487D8),r2  ; =0x0008EFC8
+  0485D4: 420B  jsr    @r2
+  0485D6: 0009  nop
+  0485D8: D280  mov.l  @(0x487DC),r2  ; =0x0008F80C
+  0485DA: 420B  jsr    @r2
+  0485DC: 0009  nop
+  0485DE: D280  mov.l  @(0x487E0),r2  ; =0x0007D4B0
+  0485E0: 420B  jsr    @r2
+  0485E2: 0009  nop
+  0485E4: D27F  mov.l  @(0x487E4),r2  ; =0x00091368
+  0485E6: 420B  jsr    @r2
+  0485E8: 0009  nop
+  0485EA: D27F  mov.l  @(0x487E8),r2  ; =0x000967C8
+  0485EC: 420B  jsr    @r2
+  0485EE: 0009  nop
+  0485F0: D27E  mov.l  @(0x487EC),r2  ; =0x0009710C
+  0485F2: 420B  jsr    @r2
+  0485F4: 0009  nop
+  0485F6: D27E  mov.l  @(0x487F0),r2  ; =0x0008522C (ROM cal: -7.678e+04)
+  0485F8: 420B  jsr    @r2
+  0485FA: 0009  nop
+  0485FC: D27D  mov.l  @(0x487F4),r2  ; =0x0006F504
+  0485FE: 420B  jsr    @r2
+  048600: 0009  nop
+  048602: D27D  mov.l  @(0x487F8),r2  ; =0x0007CAF0
+  048604: 420B  jsr    @r2
+  048606: 0009  nop
+  048608: D27C  mov.l  @(0x487FC),r2  ; =0x0007CE48
+  04860A: 420B  jsr    @r2
+  04860C: 0009  nop
+  04860E: D27C  mov.l  @(0x48800),r2  ; =0x00090090
+  048610: 420B  jsr    @r2
+  048612: 0009  nop
+  048614: D27B  mov.l  @(0x48804),r2  ; =0x0007D144
+  048616: 420B  jsr    @r2
+  048618: 0009  nop
+  04861A: D27B  mov.l  @(0x48808),r2  ; =0x00096534
+  04861C: 420B  jsr    @r2
+  04861E: 0009  nop
+  048620: D27A  mov.l  @(0x4880C),r2  ; =0x0007120C
+  048622: 420B  jsr    @r2
+  048624: 0009  nop
+  048626: D27A  mov.l  @(0x48810),r2  ; =0x0002820C
+  048628: 420B  jsr    @r2
+  04862A: 0009  nop
+  04862C: D279  mov.l  @(0x48814),r2  ; =0x0005C9B4
+  04862E: 420B  jsr    @r2
+  048630: 0009  nop
+  048632: D279  mov.l  @(0x48818),r2  ; =0x0005CA22
+  048634: 420B  jsr    @r2
+  048636: 0009  nop
+  048638: D278  mov.l  @(0x4881C),r2  ; =0x0005D032
+  04863A: 420B  jsr    @r2
+  04863C: 0009  nop
+  04863E: D278  mov.l  @(0x48820),r2  ; =0x0005CF7C
+  048640: 420B  jsr    @r2
+  048642: 0009  nop
+  048644: D277  mov.l  @(0x48824),r2  ; =0x0005E96C
+  048646: 420B  jsr    @r2
+  048648: 0009  nop
+  04864A: D277  mov.l  @(0x48828),r2  ; =0x0003D708
+  04864C: 420B  jsr    @r2
+  04864E: 0009  nop
+  048650: D276  mov.l  @(0x4882C),r2  ; =0x00047018
+  048652: 420B  jsr    @r2
+  048654: 0009  nop
+  048656: D276  mov.l  @(0x48830),r2  ; =0x0001868C
+  048658: 420B  jsr    @r2
+  04865A: 0009  nop
+  04865C: D275  mov.l  @(0x48834),r2  ; =0x00018FFE
+  04865E: 420B  jsr    @r2
+  048660: 0009  nop
+  048662: D275  mov.l  @(0x48838),r2  ; =0x000190B0
+  048664: 420B  jsr    @r2
+  048666: 0009  nop
+  048668: D274  mov.l  @(0x4883C),r2  ; =0x0001A090
+  04866A: 420B  jsr    @r2
+  04866C: 0009  nop
+  04866E: D274  mov.l  @(0x48840),r2  ; =0x0001BC34
+  048670: 420B  jsr    @r2
+  048672: 0009  nop
+  048674: D273  mov.l  @(0x48844),r2  ; =0x0001C006
+  048676: 420B  jsr    @r2
+  048678: 0009  nop
+  04867A: D273  mov.l  @(0x48848),r2  ; =0x00016544
+  04867C: 420B  jsr    @r2
+  04867E: 0009  nop
+  048680: D272  mov.l  @(0x4884C),r2  ; =0x0001675C
+  048682: 420B  jsr    @r2
+  048684: 0009  nop
+  048686: D272  mov.l  @(0x48850),r2  ; =0x000142CC
+  048688: 420B  jsr    @r2
+  04868A: 0009  nop
+  04868C: D271  mov.l  @(0x48854),r2  ; =0x00016BE4
+  04868E: 420B  jsr    @r2
+  048690: 0009  nop
+  048692: D271  mov.l  @(0x48858),r2  ; =0x00018302
+  048694: 420B  jsr    @r2
+  048696: 0009  nop
+  048698: D270  mov.l  @(0x4885C),r2  ; =0x00017758
+  04869A: 420B  jsr    @r2
+  04869C: 0009  nop
+  04869E: D270  mov.l  @(0x48860),r2  ; =0x00017D3C
+  0486A0: 420B  jsr    @r2
+  0486A2: 0009  nop
+  0486A4: D26F  mov.l  @(0x48864),r2  ; =0x000BF604
+  0486A6: 420B  jsr    @r2
+  0486A8: 0009  nop
+  0486AA: D26F  mov.l  @(0x48868),r2  ; =0x0002D718
+  0486AC: 420B  jsr    @r2
+  0486AE: 0009  nop
+  0486B0: D26E  mov.l  @(0x4886C),r2  ; =0x0002E1A2
+  0486B2: 420B  jsr    @r2
+  0486B4: 0009  nop
+  0486B6: D26E  mov.l  @(0x48870),r2  ; =0x0002D45A
+  0486B8: 420B  jsr    @r2
+  0486BA: 0009  nop
+  0486BC: D26D  mov.l  @(0x48874),r2  ; =0x0002C078
+  0486BE: 420B  jsr    @r2
+  0486C0: 0009  nop
+  0486C2: D26D  mov.l  @(0x48878),r2  ; =0x000587FC
+  0486C4: 420B  jsr    @r2
+  0486C6: 0009  nop
+  0486C8: D26C  mov.l  @(0x4887C),r2  ; =0x0002B1DC
+  0486CA: 420B  jsr    @r2
+  0486CC: 0009  nop
+  0486CE: D26C  mov.l  @(0x48880),r2  ; =0x0002BDDC
+  0486D0: 420B  jsr    @r2
+  0486D2: 0009  nop
+  0486D4: D26B  mov.l  @(0x48884),r2  ; =0x00056CB4
+  0486D6: 420B  jsr    @r2
+  0486D8: 0009  nop
+  0486DA: D26B  mov.l  @(0x48888),r2  ; =0x0004B500
+  0486DC: 420B  jsr    @r2
+  0486DE: 0009  nop
+  0486E0: E000  mov    #0,r0
+  0486E2: D66A  mov.l  @(0x4888C),r6  ; =0xFFFF8323 (RAM) [ol_dispatch_gate]
+  0486E4: 8061  mov.b  r0,@(1,r6)
+  0486E6: 7F0C  add    #12,r15
+  0486E8: 4F26  lds.l  @r15+,PR
+  0486EA: 000B  rts
+  0486EC: 2600  mov.b  r0,@r6
+  0486EE: 4F22  sts.l  PR,@-r15
+  0486F0: E200  mov    #0,r2
+  0486F2: D666  mov.l  @(0x4888C),r6  ; =0xFFFF8323 (RAM) [ol_dispatch_gate]
+  0486F4: 2620  mov.b  r2,@r6
+  0486F6: D266  mov.l  @(0x48890),r2  ; =0x000588FE
+  0486F8: 420B  jsr    @r2
+  0486FA: 0009  nop
+  0486FC: D265  mov.l  @(0x48894),r2  ; =0x0001CB68
+  0486FE: 420B  jsr    @r2
+  048700: 0009  nop
+  048702: D265  mov.l  @(0x48898),r2  ; =0x0001CF0C
+  048704: 420B  jsr    @r2
+  048706: 0009  nop
+  048708: D264  mov.l  @(0x4889C),r2  ; =0x000261A8
+  04870A: 420B  jsr    @r2
+  04870C: 0009  nop
+  04870E: D264  mov.l  @(0x488A0),r2  ; =0x0005CBC8
+  048710: 420B  jsr    @r2
+  048712: 0009  nop
+  048714: D263  mov.l  @(0x488A4),r2  ; =0x00098482
+  048716: 420B  jsr    @r2
+  048718: 0009  nop
+  04871A: D263  mov.l  @(0x488A8),r2  ; =0x000A9914
+  04871C: 420B  jsr    @r2
+  04871E: 0009  nop
+  048720: D262  mov.l  @(0x488AC),r2  ; =0x0003D7F0
+  048722: 420B  jsr    @r2
+  048724: 0009  nop
+  048726: D262  mov.l  @(0x488B0),r2  ; =0x00047138
+  048728: 420B  jsr    @r2
+  04872A: 0009  nop
+  04872C: D252  mov.l  @(0x48878),r2  ; =0x000587FC
+  04872E: 422B  jmp    @r2
+  048730: 4F26  lds.l  @r15+,PR
+  048732: 2FC6  mov.l  r12,@-r15
+  048734: 2FD6  mov.l  r13,@-r15
+  048736: 2FE6  mov.l  r14,@-r15
+  048738: 4F22  sts.l  PR,@-r15
+  04873A: FFEB  fmov.s fr14,@-r15
+  04873C: 7FFC  add    #-4,r15
+  04873E: D25D  mov.l  @(0x488B4),r2  ; =0xFFFF36BE (RAM)
+  048740: 6621  mov.w  @r2,r6
+  048742: DE5D  mov.l  @(0x488B8),r14  ; =0xFFFF3D08 (RAM)
+  048744: DD5D  mov.l  @(0x488BC),r13  ; =0xFFFF3D10 (RAM)
+  048746: A0C0  bra    0x488CA
+  048748: FE8D  fldi0  fr14
+  04874A: 0000  .word  0x0000
+  04874C: 0006  mov.l  r0,@(r0,r0)
+  04874E: CDDC  and.b  #220,@(r0,GBR)
+  048750: 0007  mul.l  r0,r0
+  048752: F02C  fmov   fr2,fr0
+  048754: 0008  clrt
+  048756: E3E4  mov    #-28,r3
+  048758: 0008  clrt
+  04875A: 1A64  mov.l  r6,@(16,r10)
+  04875C: 0008  clrt
+  04875E: 2A9C  cmp/str r9,r10
+  048760: 0008  clrt
+  048762: 39F8  sub r15,r9
+  048764: 0008  clrt
+  048766: 43AC  shad   r10,r3
+  048768: 0008  clrt
+  04876A: 4A28  shll16  r10
+  04876C: 0008  clrt
+  04876E: C31E  trapa  #30
+  048770: 0007  mul.l  r0,r0
+  048772: FADC  fmov   fr13,fr10
+  048774: 0007  mul.l  r0,r0
+  048776: FAE4  fcmp/eq fr14,fr10
+  048778: 0002  .word  0x0002
+  04877A: 9BB4  mov.w  @(0x488E6),r11  ; =0x420B (16907)
+  04877C: 0007  mul.l  r0,r0
+  04877E: FC80  fadd fr8,fr12
+  048780: 0007  mul.l  r0,r0
+  048782: FC88  fmov.s @r8,fr12
+  048784: 0007  mul.l  r0,r0
+  048786: FC90  fadd fr9,fr12
+  048788: 0008  clrt
+  04878A: 7EF0  add    #-16,r14
+  04878C: 0008  clrt
+  04878E: 7EF8  add    #-8,r14
+  048790: 0008  clrt
+  048792: 27FC  cmp/str r15,r7
+  048794: 0008  clrt
+  048796: 2804  mov.b  r0,@-r8
+  048798: 0006  mov.l  r0,@(r0,r0)
+  04879A: FC14  fcmp/eq fr1,fr12
+  04879C: 0008  clrt
+  04879E: 608C  extu.b r8,r0
+  0487A0: 0008  clrt
+  0487A2: 8520  mov.w  @(0,r2),r0
+  0487A4: 0009  nop
+  0487A6: 068A  .word  0x068A
+  0487A8: 0006  mov.l  r0,@(r0,r0)
+  0487AA: E79C  mov    #-100,r7
+  0487AC: 0008  clrt
+  0487AE: 0530  .word  0x0530
+  0487B0: 0006  mov.l  r0,@(r0,r0)
+  0487B2: D5B0  mov.l  @(0x48A74),r5  ; =0x420B0009 (34.75)
+  0487B4: 0006  mov.l  r0,@(r0,r0)
+  0487B6: E5BC  mov    #-68,r5
+  0487B8: 0008  clrt
+  0487BA: DA1C  mov.l  @(0x4882C),r10  ; =0x00047018
+  0487BC: 0002  .word  0x0002
+  0487BE: 7C20  add    #32,r12
+  0487C0: 0007  mul.l  r0,r0
+  0487C2: F8C8  fmov.s @r12,fr8
+  0487C4: 0002  .word  0x0002
+  0487C6: 9D68  mov.w  @(0x4889A),r13  ; =0xCF0C (53004)
+  0487C8: 0002  .word  0x0002
+  0487CA: A428  bra    0x4901E
+  0487CC: 0002  .word  0x0002
+  0487CE: BE78  bsr    0x484C2
+  0487D0: 0008  clrt
+  0487D2: F304  fcmp/eq fr0,fr3
+  0487D4: 0008  clrt
+  0487D6: F58C  fmov   fr8,fr5
+  0487D8: 0008  clrt
+  0487DA: EFC8  mov    #-56,r15
+  0487DC: 0008  clrt
+  0487DE: F80C  fmov   fr0,fr8
+  0487E0: 0007  mul.l  r0,r0
+  0487E2: D4B0  mov.l  @(0x48AA4),r4  ; =0x420B0009 (34.75)
+  0487E4: 0009  nop
+  0487E6: 1368  mov.l  r6,@(32,r3)
+  0487E8: 0009  nop
+  0487EA: 67C8  swap.b r12,r7
+  0487EC: 0009  nop
+  0487EE: 710C  add    #12,r1
+  0487F0: 0008  clrt
+  0487F2: 522C  mov.l  @(48,r2),r2
+  0487F4: 0006  mov.l  r0,@(r0,r0)
+  0487F6: F504  fcmp/eq fr0,fr5
+  0487F8: 0007  mul.l  r0,r0
+  0487FA: CAF0  xor    #240,r0
+  0487FC: 0007  mul.l  r0,r0
+  0487FE: CE48  xor.b  #72,@(r0,GBR)
+  048800: 0009  nop
+  048802: 0090  .word  0x0090
+  048804: 0007  mul.l  r0,r0
+  048806: D144  mov.l  @(0x48918),r1  ; =0x420B0009 (34.75)
+  048808: 0009  nop
+  04880A: 6534  mov.b  @r3+,r5
+  04880C: 0007  mul.l  r0,r0
+  04880E: 120C  mov.l  r0,@(48,r2)
+  048810: 0002  .word  0x0002
+  048812: 820C  .word  0x820C
+  048814: 0005  mov.w  r0,@(r0,r0)
+  048816: C9B4  and    #180,r0
+  048818: 0005  mov.w  r0,@(r0,r0)
+  04881A: CA22  xor    #34,r0
+  04881C: 0005  mov.w  r0,@(r0,r0)
+  04881E: D032  mov.l  @(0x488E8),r0  ; =0x64C32E01
+  048820: 0005  mov.w  r0,@(r0,r0)
+  048822: CF7C  or.b   #124,@(r0,GBR)
+  048824: 0005  mov.w  r0,@(r0,r0)
+  048826: E96C  mov    #108,r9
+  048828: 0003  bsrf   r0
+  04882A: D708  mov.l  @(0x4884C),r7  ; =0x0001675C
+  04882C: 0004  mov.b  r0,@(r0,r0)
+  04882E: 7018  add    #24,r0
+  048830: 0001  .word  0x0001
+  048832: 868C  .word  0x868C
+  048834: 0001  .word  0x0001
+  048836: 8FFE  bf/s   0x48836
+  048838: 0001  .word  0x0001
+  04883A: 90B0  mov.w  @(0x4899E),r0  ; =0x0009 (9)
+  04883C: 0001  .word  0x0001
+  04883E: A090  bra    0x48962
+  048840: 0001  .word  0x0001
+  048842: BC34  bsr    0x480AE
+  048844: 0001  .word  0x0001
+  048846: C006  mov.b  r0,@(6,GBR)
+  048848: 0001  .word  0x0001
+  04884A: 6544  mov.b  @r4+,r5
+  04884C: 0001  .word  0x0001
+  04884E: 675C  extu.b r5,r7
+  048850: 0001  .word  0x0001
+  048852: 42CC  shad   r12,r2
+  048854: 0001  .word  0x0001
+  048856: 6BE4  mov.b  @r14+,r11
+  048858: 0001  .word  0x0001
+  04885A: 8302  .word  0x8302
+  04885C: 0001  .word  0x0001
+  04885E: 7758  add    #88,r7
+  048860: 0001  .word  0x0001
+  048862: 7D3C  add    #60,r13
+  048864: 000B  rts
+  048866: F604  fcmp/eq fr0,fr6
+  048868: 0002  .word  0x0002
+  04886A: D718  mov.l  @(0x488CC),r7  ; =0x8BF8DE03
+  04886C: 0002  .word  0x0002
+  04886E: E1A2  mov    #-94,r1
+  048870: 0002  .word  0x0002
+  048872: D45A  mov.l  @(0x489DC),r4  ; =0xD280420B
+  048874: 0002  .word  0x0002
+  048876: C078  mov.b  r0,@(120,GBR)
+  048878: 0005  mov.w  r0,@(r0,r0)
+  04887A: 87FC  .word  0x87FC
+  04887C: 0002  .word  0x0002
+  04887E: B1DC  bsr    0x48C3A
+  048880: 0002  .word  0x0002
+  048882: BDDC  bsr    0x4843E
+  048884: 0005  mov.w  r0,@(r0,r0)
+  048886: 6CB4  mov.b  @r11+,r12
+  048888: 0004  mov.b  r0,@(r0,r0)
+  04888A: B500  bsr    0x4928E
+  04888C: FFFF  .word  0xFFFF
+  04888E: 8323  .word  0x8323
+  048890: 0005  mov.w  r0,@(r0,r0)
+  048892: 88FE  cmp/eq #-2,r0
+  048894: 0001  .word  0x0001
+  048896: CB68  or     #104,r0
+  048898: 0001  .word  0x0001
+  04889A: CF0C  or.b   #12,@(r0,GBR)
+  04889C: 0002  .word  0x0002
+  04889E: 61A8  swap.b r10,r1
+  0488A0: 0005  mov.w  r0,@(r0,r0)
+  0488A2: CBC8  or     #200,r0
+  0488A4: 0009  nop
+  0488A6: 8482  mov.b  @(2,r8),r0
+  0488A8: 000A  sts    MACH,r0
+  0488AA: 9914  mov.w  @(0x488D6),r9  ; =0x0000 (0)
+  0488AC: 0003  bsrf   r0
+  0488AE: D7F0  mov.l  @(0x48C70),r7  ; =0x000849F4
+  0488B0: 0004  mov.b  r0,@(r0,r0)
+  0488B2: 7138  add    #56,r1
+  0488B4: FFFF  .word  0xFFFF
+  0488B6: 36BE  addc r11,r6
+  0488B8: FFFF  .word  0xFFFF
+  0488BA: 3D08  sub r0,r13
+  0488BC: FFFF  .word  0xFFFF
+  0488BE: 3D10  cmp/eq r1,r13
+  0488C0: D205  mov.l  @(0x488D8),r2  ; =0x000BDBCC [desc_read_float_safe]
+  0488C2: 64E3  mov    r14,r4
+  0488C4: 420B  jsr    @r2
+  0488C6: F4EC  fmov   fr14,fr4
+  0488C8: 7E08  add    #8,r14
+  0488CA: 3ED2  cmp/hs r13,r14
+  0488CC: 8BF8  bf     0x488C0
+  0488CE: DE03  mov.l  @(0x488DC),r14  ; =0xFFFF3D18 (RAM)
+  0488D0: DD03  mov.l  @(0x488E0),r13  ; =0xFFFF3D1C (RAM)
+  0488D2: A00C  bra    0x488EE
+  0488D4: EC00  mov    #0,r12
+  0488D6: 0000  .word  0x0000
+  0488D8: 000B  rts
+  0488DA: DBCC  mov.l  @(0x48C0C),r11  ; =0x0007EEEC
+  0488DC: FFFF  .word  0xFFFF
+  0488DE: 3D18  sub r1,r13
+  0488E0: FFFF  .word  0xFFFF
+  0488E2: 3D1C  add r1,r13
+  0488E4: D296  mov.l  @(0x48B40),r2  ; =0x000BE9A0
+  0488E6: 420B  jsr    @r2
+  0488E8: 64C3  mov    r12,r4
+  0488EA: 2E01  mov.w  r0,@r14
+  0488EC: 7E02  add    #2,r14
+  0488EE: 3ED2  cmp/hs r13,r14
+  0488F0: 8BF8  bf     0x488E4
+  0488F2: D294  mov.l  @(0x48B44),r2  ; =0x00004BCA
+  0488F4: 420B  jsr    @r2
+  0488F6: 0009  nop
+  0488F8: D293  mov.l  @(0x48B48),r2  ; =0x00021150
+  0488FA: 420B  jsr    @r2
+  0488FC: 0009  nop
+  0488FE: D293  mov.l  @(0x48B4C),r2  ; =0x0001D1FC
+  048900: 420B  jsr    @r2
+  048902: 0009  nop
+  048904: D292  mov.l  @(0x48B50),r2  ; =0x0001F896
+  048906: 420B  jsr    @r2
+  048908: 0009  nop
+  04890A: D292  mov.l  @(0x48B54),r2  ; =0x00020F32
+  04890C: 420B  jsr    @r2
+  04890E: 0009  nop
+  048910: D291  mov.l  @(0x48B58),r2  ; =0x00021E22
+  048912: 420B  jsr    @r2
+  048914: 0009  nop
+  048916: D291  mov.l  @(0x48B5C),r2  ; =0x0003E654
+  048918: 420B  jsr    @r2
+  04891A: 0009  nop
+  04891C: D290  mov.l  @(0x48B60),r2  ; =0x000230F4
+  04891E: 420B  jsr    @r2
+  048920: 0009  nop
+  048922: D290  mov.l  @(0x48B64),r2  ; =0x000242DE
+  048924: 420B  jsr    @r2
+  048926: 0009  nop
+  048928: D28F  mov.l  @(0x48B68),r2  ; =0x00024CB0
+  04892A: 420B  jsr    @r2
+  04892C: 0009  nop
+  04892E: D28F  mov.l  @(0x48B6C),r2  ; =0x0002524E
+  048930: 420B  jsr    @r2
+  048932: 0009  nop
+  048934: D28E  mov.l  @(0x48B70),r2  ; =0x00025866
+  048936: 420B  jsr    @r2
+  048938: 0009  nop
+  04893A: D28E  mov.l  @(0x48B74),r2  ; =0x00025C2C
+  04893C: 420B  jsr    @r2
+  04893E: 0009  nop
+  048940: D28D  mov.l  @(0x48B78),r2  ; =0x00024D7C
+  048942: 420B  jsr    @r2
+  048944: 0009  nop
+  048946: D28D  mov.l  @(0x48B7C),r2  ; =0x0001FA78
+  048948: 420B  jsr    @r2
+  04894A: 0009  nop
+  04894C: D28C  mov.l  @(0x48B80),r2  ; =0x0001FE10
+  04894E: 420B  jsr    @r2
+  048950: 0009  nop
+  048952: D28C  mov.l  @(0x48B84),r2  ; =0x00026754
+  048954: 420B  jsr    @r2
+  048956: 0009  nop
+  048958: D28B  mov.l  @(0x48B88),r2  ; =0x0004BFBC
+  04895A: 420B  jsr    @r2
+  04895C: 0009  nop
+  04895E: D28B  mov.l  @(0x48B8C),r2  ; =0x0004E8B8
+  048960: 420B  jsr    @r2
+  048962: 0009  nop
+  048964: D28A  mov.l  @(0x48B90),r2  ; =0x0002EE78
+  048966: 420B  jsr    @r2
+  048968: 0009  nop
+  04896A: D28A  mov.l  @(0x48B94),r2  ; =0x0002FCF0
+  04896C: 420B  jsr    @r2
+  04896E: 0009  nop
+  048970: D289  mov.l  @(0x48B98),r2  ; =0x000344BA
+  048972: 420B  jsr    @r2
+  048974: 0009  nop
+  048976: D289  mov.l  @(0x48B9C),r2  ; =0x000357E8
+  048978: 420B  jsr    @r2
+  04897A: 0009  nop
+  04897C: D288  mov.l  @(0x48BA0),r2  ; =0x00037118
+  04897E: 420B  jsr    @r2
+  048980: 0009  nop
+  048982: D288  mov.l  @(0x48BA4),r2  ; =0x00037A74
+  048984: 420B  jsr    @r2
+  048986: 0009  nop
+  048988: D287  mov.l  @(0x48BA8),r2  ; =0x00037F94
+  04898A: 420B  jsr    @r2
+  04898C: 0009  nop
+  04898E: D287  mov.l  @(0x48BAC),r2  ; =0x00038CA6
+  048990: 420B  jsr    @r2
+  048992: 0009  nop
+  048994: D286  mov.l  @(0x48BB0),r2  ; =0x0003CCA4
+  048996: 420B  jsr    @r2
+  048998: 0009  nop
+  04899A: D286  mov.l  @(0x48BB4),r2  ; =0x0003EAC4
+  04899C: 420B  jsr    @r2
+  04899E: 0009  nop
+  0489A0: D285  mov.l  @(0x48BB8),r2  ; =0x00041D84
+  0489A2: 420B  jsr    @r2
+  0489A4: 0009  nop
+  0489A6: D285  mov.l  @(0x48BBC),r2  ; =0x00042DB8
+  0489A8: 420B  jsr    @r2
+  0489AA: 0009  nop
+  0489AC: D284  mov.l  @(0x48BC0),r2  ; =0x0004304A
+  0489AE: 420B  jsr    @r2
+  0489B0: 0009  nop
+  0489B2: D284  mov.l  @(0x48BC4),r2  ; =0x00045874
+  0489B4: 420B  jsr    @r2
+  0489B6: 0009  nop
+  0489B8: D283  mov.l  @(0x48BC8),r2  ; =0x000460B4
+  0489BA: 420B  jsr    @r2
+  0489BC: 0009  nop
+  0489BE: D283  mov.l  @(0x48BCC),r2  ; =0x00052EC0
+  0489C0: 420B  jsr    @r2
+  0489C2: 0009  nop
+  0489C4: D282  mov.l  @(0x48BD0),r2  ; =0x00054194
+  0489C6: 420B  jsr    @r2
+  0489C8: 0009  nop
+  0489CA: D282  mov.l  @(0x48BD4),r2  ; =0x00054FD6
+  0489CC: 420B  jsr    @r2
+  0489CE: 0009  nop
+  0489D0: D281  mov.l  @(0x48BD8),r2  ; =0x0000317C
+  0489D2: 420B  jsr    @r2
+  0489D4: E410  mov    #16,r4
+  0489D6: D281  mov.l  @(0x48BDC),r2  ; =0x00056022
+  0489D8: 420B  jsr    @r2
+  0489DA: 2F02  mov.l  r0,@r15
+  0489DC: D280  mov.l  @(0x48BE0),r2  ; =0x00003190
+  0489DE: 420B  jsr    @r2
+  0489E0: 64F2  mov.l  @r15,r4
+  0489E2: D280  mov.l  @(0x48BE4),r2  ; =0x0005AAB2
+  0489E4: 420B  jsr    @r2
+  0489E6: 0009  nop
+  0489E8: D27F  mov.l  @(0x48BE8),r2  ; =0x0005CE40
+  0489EA: 420B  jsr    @r2
+  0489EC: 0009  nop
+  0489EE: D27F  mov.l  @(0x48BEC),r2  ; =0x00013274
+  0489F0: 420B  jsr    @r2
+  0489F2: 0009  nop
+  0489F4: D27E  mov.l  @(0x48BF0),r2  ; =0x00061B3C
+  0489F6: 420B  jsr    @r2
+  0489F8: 0009  nop
+  0489FA: D27E  mov.l  @(0x48BF4),r2  ; =0x0006085E
+  0489FC: 420B  jsr    @r2
+  0489FE: 0009  nop
+  048A00: D27D  mov.l  @(0x48BF8),r2  ; =0x0005F87E
+  048A02: 420B  jsr    @r2
+  048A04: 0009  nop
+  048A06: D27D  mov.l  @(0x48BFC),r2  ; =0x00011EEA
+  048A08: 420B  jsr    @r2
+  048A0A: 0009  nop
+  048A0C: D27C  mov.l  @(0x48C00),r2  ; =0x000594A0
+  048A0E: 420B  jsr    @r2
+  048A10: 0009  nop
+  048A12: D27C  mov.l  @(0x48C04),r2  ; =0x0005B21A
+  048A14: 420B  jsr    @r2
+  048A16: 0009  nop
+  048A18: D27B  mov.l  @(0x48C08),r2  ; =0x0007E294
+  048A1A: 420B  jsr    @r2
+  048A1C: 0009  nop
+  048A1E: D27B  mov.l  @(0x48C0C),r2  ; =0x0007EEEC
+  048A20: 420B  jsr    @r2
+  048A22: 0009  nop
+  048A24: D27A  mov.l  @(0x48C10),r2  ; =0x00071744
+  048A26: 420B  jsr    @r2
+  048A28: 0009  nop
+  048A2A: D27A  mov.l  @(0x48C14),r2  ; =0x0007326C
+  048A2C: 420B  jsr    @r2
+  048A2E: 0009  nop
+  048A30: D279  mov.l  @(0x48C18),r2  ; =0x00074C7E
+  048A32: 420B  jsr    @r2
+  048A34: 0009  nop
+  048A36: D279  mov.l  @(0x48C1C),r2  ; =0x00071A32
+  048A38: 420B  jsr    @r2
+  048A3A: 0009  nop
+  048A3C: D278  mov.l  @(0x48C20),r2  ; =0x00067460
+  048A3E: 420B  jsr    @r2
+  048A40: 0009  nop
+  048A42: D278  mov.l  @(0x48C24),r2  ; =0x00080AFA
+  048A44: 420B  jsr    @r2
+  048A46: 0009  nop
+  048A48: D277  mov.l  @(0x48C28),r2  ; =0x00070578
+  048A4A: 420B  jsr    @r2
+  048A4C: 0009  nop
+  048A4E: D277  mov.l  @(0x48C2C),r2  ; =0x0007F69A
+  048A50: 420B  jsr    @r2
+  048A52: 0009  nop
+  048A54: D276  mov.l  @(0x48C30),r2  ; =0x0006C6D8
+  048A56: 420B  jsr    @r2
+  048A58: 0009  nop
+  048A5A: D276  mov.l  @(0x48C34),r2  ; =0x0006C6E8
+  048A5C: 420B  jsr    @r2
+  048A5E: 0009  nop
+  048A60: D275  mov.l  @(0x48C38),r2  ; =0x0006C900
+  048A62: 420B  jsr    @r2
+  048A64: 0009  nop
+  048A66: D275  mov.l  @(0x48C3C),r2  ; =0x0006C910
+  048A68: 420B  jsr    @r2
+  048A6A: 0009  nop
+  048A6C: D274  mov.l  @(0x48C40),r2  ; =0x0006C3D6
+  048A6E: 420B  jsr    @r2
+  048A70: 0009  nop
+  048A72: D274  mov.l  @(0x48C44),r2  ; =0x00086310
+  048A74: 420B  jsr    @r2
+  048A76: 0009  nop
+  048A78: D273  mov.l  @(0x48C48),r2  ; =0x00087BBC
+  048A7A: 420B  jsr    @r2
+  048A7C: 0009  nop
+  048A7E: D273  mov.l  @(0x48C4C),r2  ; =0x0006E224
+  048A80: 420B  jsr    @r2
+  048A82: 0009  nop
+  048A84: D272  mov.l  @(0x48C50),r2  ; =0x0006CDB0
+  048A86: 420B  jsr    @r2
+  048A88: 0009  nop
+  048A8A: D272  mov.l  @(0x48C54),r2  ; =0x0007069C
+  048A8C: 420B  jsr    @r2
+  048A8E: 0009  nop
+  048A90: D271  mov.l  @(0x48C58),r2  ; =0x0008E48C
+  048A92: 420B  jsr    @r2
+  048A94: 0009  nop
+  048A96: D271  mov.l  @(0x48C5C),r2  ; =0x0007122C
+  048A98: 420B  jsr    @r2
+  048A9A: 0009  nop
+  048A9C: D270  mov.l  @(0x48C60),r2  ; =0x00081A80
+  048A9E: 420B  jsr    @r2
+  048AA0: 0009  nop
+  048AA2: D270  mov.l  @(0x48C64),r2  ; =0x00082A68
+  048AA4: 420B  jsr    @r2
+  048AA6: 0009  nop
+  048AA8: D26F  mov.l  @(0x48C68),r2  ; =0x000839C4
+  048AAA: 420B  jsr    @r2
+  048AAC: 0009  nop
+  048AAE: D26F  mov.l  @(0x48C6C),r2  ; =0x00084378
+  048AB0: 420B  jsr    @r2
+  048AB2: 0009  nop
+  048AB4: D26E  mov.l  @(0x48C70),r2  ; =0x000849F4
+  048AB6: 420B  jsr    @r2
+  048AB8: 0009  nop
+  048ABA: D26E  mov.l  @(0x48C74),r2  ; =0x00082210
+  048ABC: 420B  jsr    @r2
+  048ABE: 0009  nop
+  048AC0: D26D  mov.l  @(0x48C78),r2  ; =0x00081FA4
+  048AC2: 420B  jsr    @r2
+  048AC4: 0009  nop
+  048AC6: D26D  mov.l  @(0x48C7C),r2  ; =0x0008C374
+  048AC8: 420B  jsr    @r2
+  048ACA: 0009  nop
+  048ACC: D26C  mov.l  @(0x48C80),r2  ; =0x00087094
+  048ACE: 420B  jsr    @r2
+  048AD0: 0009  nop
+  048AD2: D26C  mov.l  @(0x48C84),r2  ; =0x000662D4
+  048AD4: 420B  jsr    @r2
+  048AD6: 0009  nop
+  048AD8: D26B  mov.l  @(0x48C88),r2  ; =0x0006B450
+  048ADA: 420B  jsr    @r2
+  048ADC: 0009  nop
+  048ADE: D26B  mov.l  @(0x48C8C),r2  ; =0x0008DD8C
+  048AE0: 420B  jsr    @r2
+  048AE2: 0009  nop
+  048AE4: D26A  mov.l  @(0x48C90),r2  ; =0x00090574
+  048AE6: 420B  jsr    @r2
+  048AE8: 0009  nop
+  048AEA: D26A  mov.l  @(0x48C94),r2  ; =0x0006E760
+  048AEC: 420B  jsr    @r2
+  048AEE: 0009  nop
+  048AF0: D269  mov.l  @(0x48C98),r2  ; =0x0006B7A4
+  048AF2: 420B  jsr    @r2
+  048AF4: 0009  nop
+  048AF6: D269  mov.l  @(0x48C9C),r2  ; =0x0008D324
+  048AF8: 420B  jsr    @r2
+  048AFA: 0009  nop
+  048AFC: D268  mov.l  @(0x48CA0),r2  ; =0x0007FAFE
+  048AFE: 420B  jsr    @r2
+  048B00: 0009  nop
+  048B02: D268  mov.l  @(0x48CA4),r2  ; =0x00029BD4
+  048B04: 420B  jsr    @r2
+  048B06: 0009  nop
+  048B08: D267  mov.l  @(0x48CA8),r2  ; =0x0007FCAA
+  048B0A: 420B  jsr    @r2
+  048B0C: 0009  nop
+  048B0E: D267  mov.l  @(0x48CAC),r2  ; =0x0007FCBA
+  048B10: 420B  jsr    @r2
+  048B12: 0009  nop
+  048B14: D266  mov.l  @(0x48CB0),r2  ; =0x00087F0C
+  048B16: 420B  jsr    @r2
+  048B18: 0009  nop
+  048B1A: D266  mov.l  @(0x48CB4),r2  ; =0x00082810
+  048B1C: 420B  jsr    @r2
+  048B1E: 0009  nop
+  048B20: D265  mov.l  @(0x48CB8),r2  ; =0x0006FC04
+  048B22: 420B  jsr    @r2
+  048B24: 0009  nop
+  048B26: D265  mov.l  @(0x48CBC),r2  ; =0x00088818
+  048B28: 420B  jsr    @r2
+  048B2A: 0009  nop
+  048B2C: D264  mov.l  @(0x48CC0),r2  ; =0x0008FD2E
+  048B2E: 420B  jsr    @r2
+  048B30: 0009  nop
+  048B32: D264  mov.l  @(0x48CC4),r2  ; =0x00088164
+  048B34: 420B  jsr    @r2
+  048B36: 0009  nop
+  048B38: D263  mov.l  @(0x48CC8),r2  ; =0x0006D5EA
+  048B3A: A0C7  bra    0x48CCC
+  048B3C: 0009  nop
+  048B3E: 0000  .word  0x0000
+  048B40: 000B  rts
+  048B42: E9A0  mov    #-96,r9
+  048B44: 0000  .word  0x0000
+  048B46: 4BCA  .word  0x4BCA
+  048B48: 0002  .word  0x0002
+  048B4A: 1150  mov.l  r5,@(0,r1)
+  048B4C: 0001  .word  0x0001
+  048B4E: D1FC  mov.l  @(0x48F40),r1  ; =0x0007D15C
+  048B50: 0001  .word  0x0001
+  048B52: F896  fmov.s @(r0,r9),fr8
+  048B54: 0002  .word  0x0002
+  048B56: 0F32  .word  0x0F32
+  048B58: 0002  .word  0x0002
+  048B5A: 1E22  mov.l  r2,@(8,r14)
+  048B5C: 0003  bsrf   r0
+  048B5E: E654  mov    #84,r6
+  048B60: 0002  .word  0x0002
+  048B62: 30F4  div1 r15,r0
+  048B64: 0002  .word  0x0002
+  048B66: 42DE  .word  0x42DE
+  048B68: 0002  .word  0x0002
+  048B6A: 4CB0  .word  0x4CB0
+  048B6C: 0002  .word  0x0002
+  048B6E: 524E  mov.l  @(56,r4),r2
+  048B70: 0002  .word  0x0002
+  048B72: 5866  mov.l  @(24,r6),r8
+  048B74: 0002  .word  0x0002
+  048B76: 5C2C  mov.l  @(48,r2),r12
+  048B78: 0002  .word  0x0002
+  048B7A: 4D7C  shad   r7,r13
+  048B7C: 0001  .word  0x0001
+  048B7E: FA78  fmov.s @r7,fr10
+  048B80: 0001  .word  0x0001
+  048B82: FE10  fadd fr1,fr14
+  048B84: 0002  .word  0x0002
+  048B86: 6754  mov.b  @r5+,r7
+  048B88: 0004  mov.b  r0,@(r0,r0)
+  048B8A: BFBC  bsr    0x48B06
+  048B8C: 0004  mov.b  r0,@(r0,r0)
+  048B8E: E8B8  mov    #-72,r8
+  048B90: 0002  .word  0x0002
+  048B92: EE78  mov    #120,r14
+  048B94: 0002  .word  0x0002
+  048B96: FCF0  fadd fr15,fr12
+  048B98: 0003  bsrf   r0
+  048B9A: 44BA  .word  0x44BA
+  048B9C: 0003  bsrf   r0
+  048B9E: 57E8  mov.l  @(32,r14),r7
+  048BA0: 0003  bsrf   r0
+  048BA2: 7118  add    #24,r1
+  048BA4: 0003  bsrf   r0
+  048BA6: 7A74  add    #116,r10
+  048BA8: 0003  bsrf   r0
+  048BAA: 7F94  add    #-108,r15
+  048BAC: 0003  bsrf   r0
+  048BAE: 8CA6  .word  0x8CA6
+  048BB0: 0003  bsrf   r0
+  048BB2: CCA4  tst.b  #164,@(r0,GBR)
+  048BB4: 0003  bsrf   r0
+  048BB6: EAC4  mov    #-60,r10
+  048BB8: 0004  mov.b  r0,@(r0,r0)
+  048BBA: 1D84  mov.l  r8,@(16,r13)
+  048BBC: 0004  mov.b  r0,@(r0,r0)
+  048BBE: 2DB8  tst r11,r13
+  048BC0: 0004  mov.b  r0,@(r0,r0)
+  048BC2: 304A  subc r4,r0
+  048BC4: 0004  mov.b  r0,@(r0,r0)
+  048BC6: 5874  mov.l  @(16,r7),r8
+  048BC8: 0004  mov.b  r0,@(r0,r0)
+  048BCA: 60B4  mov.b  @r11+,r0
+  048BCC: 0005  mov.w  r0,@(r0,r0)
+  048BCE: 2EC0  mov.b  r12,@r14
+  048BD0: 0005  mov.w  r0,@(r0,r0)
+  048BD2: 4194  .word  0x4194
+  048BD4: 0005  mov.w  r0,@(r0,r0)
+  048BD6: 4FD6  .word  0x4FD6
+  048BD8: 0000  .word  0x0000
+  048BDA: 317C  add r7,r1
+  048BDC: 0005  mov.w  r0,@(r0,r0)
+  048BDE: 6022  mov.l  @r2,r0
+  048BE0: 0000  .word  0x0000
+  048BE2: 3190  cmp/eq r9,r1
+  048BE4: 0005  mov.w  r0,@(r0,r0)
+  048BE6: AAB2  bra    0x4814E
+  048BE8: 0005  mov.w  r0,@(r0,r0)
+  048BEA: CE40  xor.b  #64,@(r0,GBR)
+  048BEC: 0001  .word  0x0001
+  048BEE: 3274  div1 r7,r2
+  048BF0: 0006  mov.l  r0,@(r0,r0)
+  048BF2: 1B3C  mov.l  r3,@(48,r11)
+  048BF4: 0006  mov.l  r0,@(r0,r0)
+  048BF6: 085E  mov.l  @(r0,r5),r8
+  048BF8: 0005  mov.w  r0,@(r0,r0)
+  048BFA: F87E  fmac   fr0,fr7,fr8
+  048BFC: 0001  .word  0x0001
+  048BFE: 1EEA  mov.l  r14,@(40,r14)
+  048C00: 0005  mov.w  r0,@(r0,r0)
+  048C02: 94A0  mov.w  @(0x48D46),r4  ; =0x0009 (9)
+  048C04: 0005  mov.w  r0,@(r0,r0)
+  048C06: B21A  bsr    0x4903E
+  048C08: 0007  mul.l  r0,r0
+  048C0A: E294  mov    #-108,r2
+  048C0C: 0007  mul.l  r0,r0
+  048C0E: EEEC  mov    #-20,r14
+  048C10: 0007  mul.l  r0,r0
+  048C12: 1744  mov.l  r4,@(16,r7)
+  048C14: 0007  mul.l  r0,r0
+  048C16: 326C  add r6,r2
+  048C18: 0007  mul.l  r0,r0
+  048C1A: 4C7E  .word  0x4C7E
+  048C1C: 0007  mul.l  r0,r0
+  048C1E: 1A32  mov.l  r3,@(8,r10)
+  048C20: 0006  mov.l  r0,@(r0,r0)
+  048C22: 7460  add    #96,r4
+  048C24: 0008  clrt
+  048C26: 0AFA  .word  0x0AFA
+  048C28: 0007  mul.l  r0,r0
+  048C2A: 0578  .word  0x0578
+  048C2C: 0007  mul.l  r0,r0
+  048C2E: F69A  fmov.s fr9,@r6
+  048C30: 0006  mov.l  r0,@(r0,r0)
+  048C32: C6D8  mov.l  @(864,GBR),r0  ; GBR+0x360
+  048C34: 0006  mov.l  r0,@(r0,r0)
+  048C36: C6E8  mov.l  @(928,GBR),r0  ; GBR+0x3A0
+  048C38: 0006  mov.l  r0,@(r0,r0)
+  048C3A: C900  and    #0,r0
+  048C3C: 0006  mov.l  r0,@(r0,r0)
+  048C3E: C910  and    #16,r0
+
+  --- Literal Pool ---
+    0x047CEC: 0xFFFF36BE  RAM [unknown]
+    0x047CF0: 0x00006B5A
+    0x047CF4: 0x000067DC
+    0x047CF8: 0xFFFF8323  RAM [ol_dispatch_gate]
+    0x047CFC: 0x0005AA74
+    0x047D00: 0xFFFF8EDC  RAM [sched_disable_flag]
+    0x047D04: 0x0002271C
+    0x047D08: 0x0005AA9A
+    0x047D0C: 0x0005B1F6
+    0x047D10: 0x0005CAD8
+    0x047D14: 0x0005CA22
+    0x047D18: 0x0005B0A0
+    0x047D1C: 0x00022724
+    0x047D20: 0x00021F4A
+    0x047D24: 0x0003E6B8
+    0x047D28: 0x0003E6E0
+    0x047D2C: 0x0009E178
+    0x047D30: 0x000A67CC
+    0x047D34: 0x0005AEB8
+    0x047D38: 0x00091368
+    0x047D3C: 0x00028200
+    0x047FA0: 0x00006BC4
+    0x047FA4: 0x000BEAB8
+    0x047FA8: 0x0005CD4A
+    0x047FAC: 0x000BE81C
+    0x047FB0: 0x00006BF0
+    0x047FB4: 0x000BE82C
+    0x047FB8: 0x0000FACA
+    0x047FBC: 0x000588FA
+    0x047FC0: 0x0004C828
+    0x047FC4: 0x0001CB68
+    0x047FC8: 0x0001CF0C
+    0x047FCC: 0x00026104
+    0x047FD0: 0x000231C2
+    0x047FD4: 0x0002272C
+    0x047FD8: 0x00022F1C
+    0x047FDC: 0x00023270
+    0x047FE0: 0x0001D0E0
+    0x047FE4: 0x0002262C
+    0x047FE8: 0x0002260C
+    0x047FEC: 0x0001D26A
+    0x047FF0: 0x0002121C
+    0x047FF4: 0x0003E6A4
+    0x047FF8: 0x0003E6E0
+    0x047FFC: 0x00024CF8
+    0x048000: 0x0001F870
+    0x048004: 0x00022D2C
+    0x048008: 0x0001FA16
+    0x04800C: 0x0001FBF2
+    0x048010: 0x0001FD16
+    0x048014: 0x0001FDF2
+    0x048018: 0x000207D4
+    0x04801C: 0x00020678
+    0x048020: 0x00020E6A
+    0x048024: 0x00021D7C
+    0x048028: 0x00021E96
+    0x04802C: 0x00024094
+    0x048030: 0x000242C2  (ROM: -4.684e+04)
+    0x048034: 0x00022F50
+    0x048038: 0x0002527A  (ROM: -6.502e+04)
+    0x04803C: 0x00025848
+    0x048040: 0x00025C24
+    0x048044: 0x000263FA
+    0x048048: 0x00026634
+    0x04804C: 0x00022688
+    0x048050: 0x0002269A
+    0x048054: 0x000226A2
+    0x048058: 0x000588F0
+    0x04805C: 0x00013330
+    0x048060: 0x0009EB62
+    0x048064: 0x0009DE08
+    0x048068: 0x000A6B90
+    0x04806C: 0x000A9902
+    0x048070: 0x000990EA
+    0x048074: 0x00058A84
+    0x048078: 0x0009DCCC
+    0x04807C: 0x0009CA10
+    0x048080: 0x0009CDE0
+    0x048084: 0x0009CC1C
+    0x048088: 0x0004C086
+    0x04808C: 0x0004E902
+    0x048090: 0x0005CE6C
+    0x048094: 0x0002FF74
+    0x048098: 0x000303C0
+    0x04809C: 0x0002EF08
+    0x0480A0: 0x0003CD00
+    0x0480A4: 0x0002FA68
+    0x0480A8: 0x0002FB68
+    0x0480AC: 0x00030430
+    0x0480B0: 0x00030744
+    0x0480B4: 0x00030B68
+    0x0480B8: 0x00033278
+    0x0480BC: 0x00031600
+    0x0480C0: 0x00032AA8
+    0x0480C4: 0x00031C9C
+    0x0480C8: 0x00032958
+    0x0480CC: 0x00034488
+    0x0480D0: 0x000357D0
+    0x0480D4: 0x00034EC8
+    0x0480D8: 0x00036008
+    0x0480DC: 0x00036A98
+    0x0480E0: 0x00036BF4
+    0x0480E4: 0x00036E60
+    0x0480E8: 0x00037156
+    0x0480EC: 0x0003756C
+    0x0480F0: 0x00037ABA
+    0x0480F4: 0x00038158
+    0x0480F8: 0x00038D16
+    0x0480FC: 0x00038E30
+    0x048100: 0x000399EE
+    0x048364: 0x0009A0CB
+    0x048198: 0xD28C420B
+    0x0483AC: 0x000432B0
+    0x04836C: 0x0003A210  (ROM: -6.757e+04)
+    0x048370: 0x0003AB60
+    0x048374: 0x0003A5E4
+    0x048378: 0x0003BCCC
+    0x04837C: 0x0003C374
+    0x048380: 0x0003C7D8
+    0x048384: 0x0003EAA8
+    0x048388: 0x0003FA8C
+    0x04838C: 0x000402D6
+    0x048390: 0x000403C4
+    0x048394: 0x00040478
+    0x048398: 0x0004092A
+    0x04839C: 0x000418FC
+    0x0483A0: 0x00041954
+    0x0483A4: 0x00041EE4
+    0x0483A8: 0x00042E28
+    0x0483B0: 0x00043FE0
+    0x0483B4: 0x0004421E
+    0x0483B8: 0x0004427C
+    0x0483BC: 0x00044300
+    0x0483C0: 0x0004590A
+    0x0483C4: 0x00046158
+    0x0483C8: 0x0004F26C
+    0x0483CC: 0x0004F574
+    0x0483D0: 0x0004FDB8
+    0x0483D4: 0x000500E8
+    0x0483D8: 0x00050A24
+    0x0483DC: 0x00050A48
+    0x0483E0: 0x00050DCC
+    0x0483E4: 0x00051AF4
+    0x0483E8: 0x00052E62
+    0x0483EC: 0x0005305E
+    0x0483F0: 0x0005323E
+    0x0483F4: 0x000535B6
+    0x0483F8: 0x000539BE
+    0x0483FC: 0x00053BFC
+    0x048400: 0x00054228
+    0x048404: 0x00054822
+    0x048408: 0x00054FC4
+    0x04840C: 0x00055588
+    0x048410: 0x000559F8
+    0x048414: 0x00055F18
+    0x048418: 0x00055F58
+    0x04841C: 0x00056A8C
+    0x048420: 0x00055BD4
+    0x048424: 0x00056AEC
+    0x048428: 0x00056E78
+    0x04842C: 0x0005AA9A
+    0x048430: 0x0001328E
+    0x048434: 0x00061514
+    0x048438: 0x00061A6A
+    0x04843C: 0x00061BC8
+    0x048440: 0x00061FD4
+    0x048444: 0x000623EC
+    0x048448: 0x00062EEC
+    0x04844C: 0x000633EC
+    0x048450: 0x0006081C
+    0x048454: 0x0005F89C
+    0x048458: 0x000601F8
+    0x04845C: 0x00011EAA
+    0x048460: 0x00058AA0
+    0x048464: 0x00060308
+    0x048468: 0x000602FA
+    0x04846C: 0x0004B970  [fuel_pump_duty_ctrl]
+    0x048470: 0x00027778
+    0x048474: 0x000594F8
+    0x048478: 0x0005B1F6
+    0x04847C: 0x0005CAD8
+    0x048480: 0x0007EF4A
+    0x048484: 0x0007E268
+    0x048488: 0x0007E26C
+    0x04848C: 0x00071788
+    0x048490: 0x000719DC
+    0x048494: 0x000664A2
+    0x048498: 0x00067034
+    0x04849C: 0x0006B410
+    0x0484A0: 0x00080ACC
+    0x0484A4: 0x0008CF40
+    0x0484A8: 0x0008D378
+    0x0484AC: 0x0008FA30
+    0x0484B0: 0x0007FF40
+    0x0484B4: 0x00073164
+    0x0484B8: 0x00074A82
+    0x0484BC: 0x0007052C
+    0x0484C0: 0x00070558
+    0x0484C4: 0x0007F678
+    0x0484C8: 0x0007F680
+    0x0484CC: 0x0006C6A4
+    0x0484D0: 0x0006C6BE
+    0x0484D4: 0x0006C8CC
+    0x0484D8: 0x0006C8E6
+    0x0484DC: 0x0006C3B4
+    0x0484E0: 0x0006C3CE
+    0x0484E4: 0x00086374
+    0x0484E8: 0x000863C4
+    0x0484EC: 0x00086394
+    0x0484F0: 0x00087C76
+    0x0484F4: 0x00087D08
+    0x0484F8: 0x00087C9E
+    0x0484FC: 0x0006E250
+    0x04868C: 0xD271420B
+    0x04874C: 0x0006CDDC
+    0x048750: 0x0007F02C
+    0x048754: 0x0008E3E4
+    0x048758: 0x00081A64
+    0x04875C: 0x00082A9C
+    0x048760: 0x000839F8
+    0x048764: 0x000843AC  (ROM: -6.066e+04)
+    0x048768: 0x00084A28
+    0x04876C: 0x0008C31E
+    0x048770: 0x0007FADC
+    0x048774: 0x0007FAE4
+    0x048778: 0x00029BB4
+    0x04877C: 0x0007FC80
+    0x048780: 0x0007FC88
+    0x048784: 0x0007FC90
+    0x048788: 0x00087EF0
+    0x04878C: 0x00087EF8
+    0x048790: 0x000827FC
+    0x048794: 0x00082804
+    0x048798: 0x0006FC14
+    0x04879C: 0x0008608C
+    0x0487A0: 0x00088520
+    0x0487A4: 0x0009068A
+    0x0487A8: 0x0006E79C
+    0x0487AC: 0x00080530
+    0x0487B0: 0x0006D5B0
+    0x0487B4: 0x0006E5BC
+    0x0487B8: 0x0008DA1C
+    0x0487BC: 0x00027C20
+    0x0487C0: 0x0007F8C8
+    0x0487C4: 0x00029D68
+    0x0487C8: 0x0002A428
+    0x0487CC: 0x0002BE78
+    0x0487D0: 0x0008F304
+    0x0487D4: 0x0008F58C
+    0x0487D8: 0x0008EFC8
+    0x0487DC: 0x0008F80C
+    0x0487E0: 0x0007D4B0
+    0x0487E4: 0x00091368
+    0x0487E8: 0x000967C8
+    0x0487EC: 0x0009710C
+    0x0487F0: 0x0008522C  (ROM: -7.678e+04)
+    0x0487F4: 0x0006F504
+    0x0487F8: 0x0007CAF0
+    0x0487FC: 0x0007CE48
+    0x048800: 0x00090090
+    0x048804: 0x0007D144
+    0x048808: 0x00096534
+    0x04880C: 0x0007120C
+    0x048810: 0x0002820C
+    0x048814: 0x0005C9B4
+    0x048818: 0x0005CA22
+    0x04881C: 0x0005D032
+    0x048820: 0x0005CF7C
+    0x048824: 0x0005E96C
+    0x048828: 0x0003D708
+    0x04882C: 0x00047018
+    0x048830: 0x0001868C
+    0x048834: 0x00018FFE
+    0x048838: 0x000190B0
+    0x04883C: 0x0001A090
+    0x048840: 0x0001BC34
+    0x048844: 0x0001C006
+    0x048848: 0x00016544
+    0x04884C: 0x0001675C
+    0x048850: 0x000142CC
+    0x048854: 0x00016BE4
+    0x048858: 0x00018302
+    0x04885C: 0x00017758
+    0x048860: 0x00017D3C
+    0x048864: 0x000BF604
+    0x048868: 0x0002D718
+    0x04886C: 0x0002E1A2
+    0x048870: 0x0002D45A
+    0x048874: 0x0002C078
+    0x048878: 0x000587FC
+    0x04887C: 0x0002B1DC
+    0x048880: 0x0002BDDC
+    0x048884: 0x00056CB4
+    0x048888: 0x0004B500
+    0x04888C: 0xFFFF8323  RAM [ol_dispatch_gate]
+    0x048890: 0x000588FE
+    0x048894: 0x0001CB68
+    0x048898: 0x0001CF0C
+    0x04889C: 0x000261A8
+    0x0488A0: 0x0005CBC8
+    0x0488A4: 0x00098482
+    0x0488A8: 0x000A9914
+    0x0488AC: 0x0003D7F0
+    0x0488B0: 0x00047138
+    0x0488B4: 0xFFFF36BE  RAM [unknown]
+    0x0488B8: 0xFFFF3D08  RAM [unknown]
+    0x0488BC: 0xFFFF3D10  RAM [unknown]
+    0x048A74: 0x420B0009  (float: 34.75)
+    0x048AA4: 0x420B0009  (float: 34.75)
+    0x048918: 0x420B0009  (float: 34.75)
+    0x0488E8: 0x64C32E01
+    0x0488CC: 0x8BF8DE03
+    0x0489DC: 0xD280420B
+    0x048C70: 0x000849F4
+    0x0488D8: 0x000BDBCC  [desc_read_float_safe]
+    0x0488DC: 0xFFFF3D18  RAM [unknown]
+    0x0488E0: 0xFFFF3D1C  RAM [unknown]
+    0x048C0C: 0x0007EEEC
+    0x048B40: 0x000BE9A0
+    0x048B44: 0x00004BCA
+    0x048B48: 0x00021150
+    0x048B4C: 0x0001D1FC
+    0x048B50: 0x0001F896
+    0x048B54: 0x00020F32
+    0x048B58: 0x00021E22
+    0x048B5C: 0x0003E654
+    0x048B60: 0x000230F4
+    0x048B64: 0x000242DE
+    0x048B68: 0x00024CB0
+    0x048B6C: 0x0002524E
+    0x048B70: 0x00025866
+    0x048B74: 0x00025C2C
+    0x048B78: 0x00024D7C
+    0x048B7C: 0x0001FA78
+    0x048B80: 0x0001FE10
+    0x048B84: 0x00026754
+    0x048B88: 0x0004BFBC
+    0x048B8C: 0x0004E8B8
+    0x048B90: 0x0002EE78
+    0x048B94: 0x0002FCF0
+    0x048B98: 0x000344BA
+    0x048B9C: 0x000357E8
+    0x048BA0: 0x00037118
+    0x048BA4: 0x00037A74
+    0x048BA8: 0x00037F94
+    0x048BAC: 0x00038CA6
+    0x048BB0: 0x0003CCA4
+    0x048BB4: 0x0003EAC4
+    0x048BB8: 0x00041D84
+    0x048BBC: 0x00042DB8
+    0x048BC0: 0x0004304A
+    0x048BC4: 0x00045874
+    0x048BC8: 0x000460B4
+    0x048BCC: 0x00052EC0
+    0x048BD0: 0x00054194
+    0x048BD4: 0x00054FD6
+    0x048BD8: 0x0000317C
+    0x048BDC: 0x00056022
+    0x048BE0: 0x00003190
+    0x048BE4: 0x0005AAB2
+    0x048BE8: 0x0005CE40
+    0x048BEC: 0x00013274
+    0x048BF0: 0x00061B3C
+    0x048BF4: 0x0006085E
+    0x048BF8: 0x0005F87E
+    0x048BFC: 0x00011EEA
+    0x048C00: 0x000594A0
+    0x048C04: 0x0005B21A
+    0x048C08: 0x0007E294
+    0x048C10: 0x00071744
+    0x048C14: 0x0007326C
+    0x048C18: 0x00074C7E
+    0x048C1C: 0x00071A32
+    0x048C20: 0x00067460
+    0x048C24: 0x00080AFA
+    0x048C28: 0x00070578
+    0x048C2C: 0x0007F69A
+    0x048C30: 0x0006C6D8
+    0x048C34: 0x0006C6E8
+    0x048C38: 0x0006C900
+    0x048C3C: 0x0006C910
+    0x048C40: 0x0006C3D6
+    0x048C44: 0x00086310
+    0x048C48: 0x00087BBC
+    0x048C4C: 0x0006E224
+    0x048C50: 0x0006CDB0
+    0x048C54: 0x0007069C
+    0x048C58: 0x0008E48C
+    0x048C5C: 0x0007122C
+    0x048C60: 0x00081A80
+    0x048C64: 0x00082A68
+    0x048C68: 0x000839C4
+    0x048C6C: 0x00084378
+    0x048C74: 0x00082210
+    0x048C78: 0x00081FA4
+    0x048C7C: 0x0008C374
+    0x048C80: 0x00087094
+    0x048C84: 0x000662D4
+    0x048C88: 0x0006B450
+    0x048C8C: 0x0008DD8C
+    0x048C90: 0x00090574
+    0x048C94: 0x0006E760
+    0x048C98: 0x0006B7A4
+    0x048C9C: 0x0008D324
+    0x048CA0: 0x0007FAFE
+    0x048CA4: 0x00029BD4
+    0x048CA8: 0x0007FCAA
+    0x048CAC: 0x0007FCBA
+    0x048CB0: 0x00087F0C
+    0x048CB4: 0x00082810
+    0x048CB8: 0x0006FC04
+    0x048CBC: 0x00088818
+    0x048CC0: 0x0008FD2E
+    0x048CC4: 0x00088164
+    0x048CC8: 0x0006D5EA
+    0x048F40: 0x0007D15C
+
+  --- Subroutine calls ---
+    0x047C50 -> FUN_006B5A @ 0x006B5A
+    0x047C56 -> FUN_0067DC @ 0x0067DC
+    0x047C62 -> FUN_05AA74 @ 0x05AA74
+    0x047C7A -> FUN_02271C @ 0x02271C
+    0x047C80 -> FUN_05AA9A @ 0x05AA9A
+    0x047C86 -> FUN_05B1F6 @ 0x05B1F6
+    0x047C8C -> FUN_05CAD8 @ 0x05CAD8
+    0x047C92 -> FUN_05CA22 @ 0x05CA22
+    0x047C98 -> FUN_05B0A0 @ 0x05B0A0
+    0x047CA2 -> FUN_022724 @ 0x022724
+    0x047CA8 -> FUN_021F4A @ 0x021F4A
+    0x047CAE -> FUN_03E6B8 @ 0x03E6B8
+    0x047CB4 -> FUN_03E6E0 @ 0x03E6E0
+    0x047CBA -> FUN_09E178 @ 0x09E178
+    0x047CC0 -> FUN_0A67CC @ 0x0A67CC
+    0x047CC6 -> FUN_05AA9A @ 0x05AA9A
+    0x047CCC -> FUN_05B1F6 @ 0x05B1F6
+    0x047CD2 -> FUN_05CAD8 @ 0x05CAD8
+    0x047CD8 -> FUN_05AEB8 @ 0x05AEB8
+    0x047CDE -> FUN_091368 @ 0x091368
+    0x047CE4 -> FUN_028200 @ 0x028200
+    0x047D0E -> FUN_0480FE @ 0x0480FE
+    0x047D1A -> FUN_047E5E @ 0x047E5E
+    0x047D42 -> FUN_006BC4 @ 0x006BC4
+    0x047D54 -> FUN_0BEAB8 @ 0x0BEAB8
+    0x047D5A -> FUN_006BC4 @ 0x006BC4
+    0x047D6E -> FUN_05CD4A @ 0x05CD4A
+    0x047D7A -> FUN_0BE81C @ 0x0BE81C
+    0x047D80 -> FUN_006BC4 @ 0x006BC4
+    0x047D8C -> FUN_006BF0 @ 0x006BF0
+    0x047D92 -> FUN_0BE82C @ 0x0BE82C
+    0x047D98 -> FUN_00FACA @ 0x00FACA
+    0x047DA6 -> FUN_048732 @ 0x048732
+    0x047DAC -> FUN_0588FA @ 0x0588FA
+    0x047DB2 -> FUN_04C828 @ 0x04C828
+    0x047DB8 -> FUN_01CB68 @ 0x01CB68
+    0x047DBE -> FUN_01CF0C @ 0x01CF0C
+    0x047DC4 -> FUN_026104 @ 0x026104
+    0x047DCA -> FUN_0231C2 @ 0x0231C2
+    0x047DD0 -> FUN_02272C @ 0x02272C
+    0x047DD6 -> FUN_022F1C @ 0x022F1C
+    0x047DDC -> FUN_023270 @ 0x023270
+    0x047DE2 -> FUN_01D0E0 @ 0x01D0E0
+    0x047DE8 -> FUN_02262C @ 0x02262C
+    0x047DEE -> FUN_02260C @ 0x02260C
+    0x047DF4 -> FUN_01D26A @ 0x01D26A
+    0x047DFA -> FUN_02121C @ 0x02121C
+    0x047E00 -> FUN_03E6A4 @ 0x03E6A4
+    0x047E06 -> FUN_03E6E0 @ 0x03E6E0
+    0x047E0C -> FUN_024CF8 @ 0x024CF8
+    0x047E12 -> FUN_01F870 @ 0x01F870
+    0x047E18 -> FUN_022D2C @ 0x022D2C
+    0x047E1E -> FUN_01FA16 @ 0x01FA16
+    0x047E24 -> FUN_01FBF2 @ 0x01FBF2
+    0x047E2A -> FUN_01FD16 @ 0x01FD16
+    0x047E30 -> FUN_01FDF2 @ 0x01FDF2
+    0x047E36 -> FUN_0207D4 @ 0x0207D4
+    0x047E3C -> FUN_020678 @ 0x020678
+    0x047E42 -> FUN_020E6A @ 0x020E6A
+    0x047E48 -> FUN_021D7C @ 0x021D7C
+    0x047E4E -> FUN_021E96 @ 0x021E96
+    0x047E54 -> FUN_024094 @ 0x024094
+    0x047E5A -> FUN_0242C2 @ 0x0242C2
+    0x047E60 -> FUN_022F50 @ 0x022F50
+    0x047E66 -> FUN_02527A @ 0x02527A
+    0x047E6C -> FUN_025848 @ 0x025848
+    0x047E72 -> FUN_025C24 @ 0x025C24
+    0x047E78 -> FUN_0263FA @ 0x0263FA
+    0x047E7E -> FUN_026634 @ 0x026634
+    0x047E84 -> FUN_022688 @ 0x022688
+    0x047E8A -> FUN_02269A @ 0x02269A
+    0x047E90 -> FUN_0226A2 @ 0x0226A2
+    0x047E96 -> FUN_0588F0 @ 0x0588F0
+    0x047E9C -> FUN_013330 @ 0x013330
+    0x047EA2 -> FUN_09EB62 @ 0x09EB62
+    0x047EA8 -> FUN_09DE08 @ 0x09DE08
+    0x047EAE -> FUN_0A6B90 @ 0x0A6B90
+    0x047EB4 -> FUN_0A9902 @ 0x0A9902
+    0x047EBA -> FUN_0990EA @ 0x0990EA
+    0x047EC0 -> FUN_058A84 @ 0x058A84
+    0x047EC6 -> FUN_09DCCC @ 0x09DCCC
+    0x047ECC -> FUN_09CA10 @ 0x09CA10
+    0x047ED2 -> FUN_09CDE0 @ 0x09CDE0
+    0x047ED8 -> FUN_09CC1C @ 0x09CC1C
+    0x047EDE -> FUN_04C086 @ 0x04C086
+    0x047EE4 -> FUN_04E902 @ 0x04E902
+    0x047EEA -> FUN_05CE6C @ 0x05CE6C
+    0x047EF8 -> FUN_02FF74 @ 0x02FF74
+    0x047EFE -> FUN_0303C0 @ 0x0303C0
+    0x047F04 -> FUN_02EF08 @ 0x02EF08
+    0x047F0A -> FUN_03CD00 @ 0x03CD00
+    0x047F10 -> FUN_02FA68 @ 0x02FA68
+    0x047F16 -> FUN_02FB68 @ 0x02FB68
+    0x047F1C -> FUN_030430 @ 0x030430
+    0x047F22 -> FUN_030744 @ 0x030744
+    0x047F28 -> FUN_030B68 @ 0x030B68
+    0x047F2E -> FUN_033278 @ 0x033278
+    0x047F34 -> FUN_031600 @ 0x031600
+    0x047F3A -> FUN_032AA8 @ 0x032AA8
+    0x047F40 -> FUN_031C9C @ 0x031C9C
+    0x047F46 -> FUN_032958 @ 0x032958
+    0x047F4C -> FUN_034488 @ 0x034488
+    0x047F52 -> FUN_0357D0 @ 0x0357D0
+    0x047F58 -> FUN_034EC8 @ 0x034EC8
+    0x047F5E -> FUN_036008 @ 0x036008
+    0x047F64 -> FUN_036A98 @ 0x036A98
+    0x047F6A -> FUN_036BF4 @ 0x036BF4
+    0x047F70 -> FUN_036E60 @ 0x036E60
+    0x047F76 -> FUN_037156 @ 0x037156
+    0x047F7C -> FUN_03756C @ 0x03756C
+    0x047F82 -> FUN_037ABA @ 0x037ABA
+    0x047F88 -> FUN_038158 @ 0x038158
+    0x047F8E -> FUN_038D16 @ 0x038D16
+    0x047F94 -> FUN_038E30 @ 0x038E30
+    0x04810A -> FUN_03A210 @ 0x03A210
+    0x048110 -> FUN_03AB60 @ 0x03AB60
+    0x048116 -> FUN_03A5E4 @ 0x03A5E4
+    0x04811C -> FUN_03BCCC @ 0x03BCCC
+    0x048122 -> FUN_03C374 @ 0x03C374
+    0x048128 -> FUN_03C7D8 @ 0x03C7D8
+    0x04812E -> FUN_03EAA8 @ 0x03EAA8
+    0x048134 -> FUN_03FA8C @ 0x03FA8C
+    0x04813A -> FUN_0402D6 @ 0x0402D6
+    0x048140 -> FUN_0403C4 @ 0x0403C4
+    0x048146 -> FUN_040478 @ 0x040478
+    0x04814C -> FUN_04092A @ 0x04092A
+    0x048152 -> FUN_0418FC @ 0x0418FC
+    0x048158 -> FUN_041954 @ 0x041954
+    0x04815E -> FUN_041EE4 @ 0x041EE4
+    0x048164 -> FUN_042E28 @ 0x042E28
+    0x04816A -> FUN_0432B0 @ 0x0432B0
+    0x048170 -> FUN_043FE0 @ 0x043FE0
+    0x048176 -> FUN_04421E @ 0x04421E
+    0x04817C -> FUN_04427C @ 0x04427C
+    0x048182 -> FUN_044300 @ 0x044300
+    0x048188 -> FUN_04590A @ 0x04590A
+    0x04818E -> FUN_046158 @ 0x046158
+    0x048194 -> FUN_04F26C @ 0x04F26C
+    0x04819A -> FUN_04F574 @ 0x04F574
+    0x0481A0 -> FUN_04FDB8 @ 0x04FDB8
+    0x0481A6 -> FUN_0500E8 @ 0x0500E8
+    0x0481AC -> FUN_050A24 @ 0x050A24
+    0x0481B2 -> FUN_050A48 @ 0x050A48
+    0x0481B8 -> FUN_050DCC @ 0x050DCC
+    0x0481BE -> FUN_051AF4 @ 0x051AF4
+    0x0481C4 -> FUN_052E62 @ 0x052E62
+    0x0481CA -> FUN_05305E @ 0x05305E
+    0x0481D0 -> FUN_05323E @ 0x05323E
+    0x0481D6 -> FUN_0535B6 @ 0x0535B6
+    0x0481DC -> FUN_0539BE @ 0x0539BE
+    0x0481E2 -> FUN_053BFC @ 0x053BFC
+    0x0481E8 -> FUN_054228 @ 0x054228
+    0x0481EE -> FUN_054822 @ 0x054822
+    0x0481F4 -> FUN_054FC4 @ 0x054FC4
+    0x0481FA -> FUN_055588 @ 0x055588
+    0x048200 -> FUN_0559F8 @ 0x0559F8
+    0x048206 -> FUN_055F18 @ 0x055F18
+    0x04820C -> FUN_055F58 @ 0x055F58
+    0x048212 -> FUN_056A8C @ 0x056A8C
+    0x048218 -> FUN_055BD4 @ 0x055BD4
+    0x04821E -> FUN_056AEC @ 0x056AEC
+    0x048224 -> FUN_056E78 @ 0x056E78
+    0x04822A -> FUN_05AA9A @ 0x05AA9A
+    0x048230 -> FUN_01328E @ 0x01328E
+    0x048236 -> FUN_061514 @ 0x061514
+    0x04823C -> FUN_061A6A @ 0x061A6A
+    0x048242 -> FUN_061BC8 @ 0x061BC8
+    0x048248 -> FUN_061FD4 @ 0x061FD4
+    0x04824E -> FUN_0623EC @ 0x0623EC
+    0x048254 -> FUN_062EEC @ 0x062EEC
+    0x04825A -> FUN_0633EC @ 0x0633EC
+    0x048260 -> FUN_06081C @ 0x06081C
+    0x048266 -> FUN_05F89C @ 0x05F89C
+    0x04826C -> FUN_0601F8 @ 0x0601F8
+    0x048272 -> FUN_011EAA @ 0x011EAA
+    0x048278 -> FUN_058AA0 @ 0x058AA0
+    0x04827E -> FUN_060308 @ 0x060308
+    0x048284 -> FUN_0602FA @ 0x0602FA
+    0x04828A -> fuel_pump_duty_ctrl @ 0x04B970
+    0x048290 -> FUN_027778 @ 0x027778
+    0x048296 -> FUN_0594F8 @ 0x0594F8
+    0x04829C -> FUN_05B1F6 @ 0x05B1F6
+    0x0482A2 -> FUN_05CAD8 @ 0x05CAD8
+    0x0482A8 -> FUN_07EF4A @ 0x07EF4A
+    0x0482AE -> FUN_07E268 @ 0x07E268
+    0x0482B4 -> FUN_07E26C @ 0x07E26C
+    0x0482BA -> FUN_071788 @ 0x071788
+    0x0482C0 -> FUN_0719DC @ 0x0719DC
+    0x0482C6 -> FUN_0664A2 @ 0x0664A2
+    0x0482CC -> FUN_067034 @ 0x067034
+    0x0482D2 -> FUN_06B410 @ 0x06B410
+    0x0482D8 -> FUN_080ACC @ 0x080ACC
+    0x0482DE -> FUN_08CF40 @ 0x08CF40
+    0x0482E4 -> FUN_08D378 @ 0x08D378
+    0x0482EA -> FUN_08FA30 @ 0x08FA30
+    0x0482F0 -> FUN_07FF40 @ 0x07FF40
+    0x0482F6 -> FUN_073164 @ 0x073164
+    0x0482FC -> FUN_074A82 @ 0x074A82
+    0x048302 -> FUN_07052C @ 0x07052C
+    0x048308 -> FUN_070558 @ 0x070558
+    0x04830E -> FUN_07F678 @ 0x07F678
+    0x048314 -> FUN_07F680 @ 0x07F680
+    0x04831A -> FUN_06C6A4 @ 0x06C6A4
+    0x048320 -> FUN_06C6BE @ 0x06C6BE
+    0x048326 -> FUN_06C8CC @ 0x06C8CC
+    0x04832C -> FUN_06C8E6 @ 0x06C8E6
+    0x048332 -> FUN_06C3B4 @ 0x06C3B4
+    0x048338 -> FUN_06C3CE @ 0x06C3CE
+    0x04833E -> FUN_086374 @ 0x086374
+    0x048344 -> FUN_0863C4 @ 0x0863C4
+    0x04834A -> FUN_086394 @ 0x086394
+    0x048350 -> FUN_087C76 @ 0x087C76
+    0x048356 -> FUN_087D08 @ 0x087D08
+    0x04835C -> FUN_087C9E @ 0x087C9E
+    0x048362 -> FUN_06E250 @ 0x06E250
+    0x04837A -> FUN_047D16 @ 0x047D16
+    0x04846E -> FUN_047752 @ 0x047752
+    0x04847A -> FUN_04886A @ 0x04886A
+    0x04849E -> FUN_048CC2 @ 0x048CC2
+    0x048502 -> FUN_06CDDC @ 0x06CDDC
+    0x048508 -> FUN_07F02C @ 0x07F02C
+    0x04850E -> FUN_08E3E4 @ 0x08E3E4
+    0x048514 -> FUN_081A64 @ 0x081A64
+    0x04851A -> FUN_082A9C @ 0x082A9C
+    0x048520 -> FUN_0839F8 @ 0x0839F8
+    0x048526 -> FUN_0843AC @ 0x0843AC
+    0x04852C -> FUN_084A28 @ 0x084A28
+    0x048532 -> FUN_08C31E @ 0x08C31E
+    0x048538 -> FUN_07FADC @ 0x07FADC
+    0x04853E -> FUN_07FAE4 @ 0x07FAE4
+    0x048544 -> FUN_029BB4 @ 0x029BB4
+    0x04854A -> FUN_07FC80 @ 0x07FC80
+    0x048550 -> FUN_07FC88 @ 0x07FC88
+    0x048556 -> FUN_07FC90 @ 0x07FC90
+    0x04855C -> FUN_087EF0 @ 0x087EF0
+    0x048562 -> FUN_087EF8 @ 0x087EF8
+    0x048568 -> FUN_0827FC @ 0x0827FC
+    0x04856E -> FUN_082804 @ 0x082804
+    0x048574 -> FUN_06FC14 @ 0x06FC14
+    0x04857A -> FUN_08608C @ 0x08608C
+    0x048580 -> FUN_088520 @ 0x088520
+    0x048586 -> FUN_09068A @ 0x09068A
+    0x04858C -> FUN_06E79C @ 0x06E79C
+    0x048592 -> FUN_080530 @ 0x080530
+    0x048598 -> FUN_06D5B0 @ 0x06D5B0
+    0x04859E -> FUN_06E5BC @ 0x06E5BC
+    0x0485A4 -> FUN_08DA1C @ 0x08DA1C
+    0x0485AA -> FUN_027C20 @ 0x027C20
+    0x0485B0 -> FUN_07F8C8 @ 0x07F8C8
+    0x0485B6 -> FUN_029D68 @ 0x029D68
+    0x0485BC -> FUN_02A428 @ 0x02A428
+    0x0485C2 -> FUN_02BE78 @ 0x02BE78
+    0x0485C8 -> FUN_08F304 @ 0x08F304
+    0x0485CE -> FUN_08F58C @ 0x08F58C
+    0x0485D4 -> FUN_08EFC8 @ 0x08EFC8
+    0x0485DA -> FUN_08F80C @ 0x08F80C
+    0x0485E0 -> FUN_07D4B0 @ 0x07D4B0
+    0x0485E6 -> FUN_091368 @ 0x091368
+    0x0485EC -> FUN_0967C8 @ 0x0967C8
+    0x0485F2 -> FUN_09710C @ 0x09710C
+    0x0485F8 -> FUN_08522C @ 0x08522C
+    0x0485FE -> FUN_06F504 @ 0x06F504
+    0x048604 -> FUN_07CAF0 @ 0x07CAF0
+    0x04860A -> FUN_07CE48 @ 0x07CE48
+    0x048610 -> FUN_090090 @ 0x090090
+    0x048616 -> FUN_07D144 @ 0x07D144
+    0x04861C -> FUN_096534 @ 0x096534
+    0x048622 -> FUN_07120C @ 0x07120C
+    0x048628 -> FUN_02820C @ 0x02820C
+    0x04862E -> FUN_05C9B4 @ 0x05C9B4
+    0x048634 -> FUN_05CA22 @ 0x05CA22
+    0x04863A -> FUN_05D032 @ 0x05D032
+    0x048640 -> FUN_05CF7C @ 0x05CF7C
+    0x048646 -> FUN_05E96C @ 0x05E96C
+    0x04864C -> FUN_03D708 @ 0x03D708
+    0x048652 -> FUN_047018 @ 0x047018
+    0x048658 -> FUN_01868C @ 0x01868C
+    0x04865E -> FUN_018FFE @ 0x018FFE
+    0x048664 -> FUN_0190B0 @ 0x0190B0
+    0x04866A -> FUN_01A090 @ 0x01A090
+    0x048670 -> FUN_01BC34 @ 0x01BC34
+    0x048676 -> FUN_01C006 @ 0x01C006
+    0x04867C -> FUN_016544 @ 0x016544
+    0x048682 -> FUN_01675C @ 0x01675C
+    0x048688 -> FUN_0142CC @ 0x0142CC
+    0x04868E -> FUN_016BE4 @ 0x016BE4
+    0x048694 -> FUN_018302 @ 0x018302
+    0x04869A -> FUN_017758 @ 0x017758
+    0x0486A0 -> FUN_017D3C @ 0x017D3C
+    0x0486A6 -> FUN_0BF604 @ 0x0BF604
+    0x0486AC -> FUN_02D718 @ 0x02D718
+    0x0486B2 -> FUN_02E1A2 @ 0x02E1A2
+    0x0486B8 -> FUN_02D45A @ 0x02D45A
+    0x0486BE -> FUN_02C078 @ 0x02C078
+    0x0486C4 -> FUN_0587FC @ 0x0587FC
+    0x0486CA -> FUN_02B1DC @ 0x02B1DC
+    0x0486D0 -> FUN_02BDDC @ 0x02BDDC
+    0x0486D6 -> FUN_056CB4 @ 0x056CB4
+    0x0486DC -> FUN_04B500 @ 0x04B500
+    0x0486F8 -> FUN_0588FE @ 0x0588FE
+    0x0486FE -> FUN_01CB68 @ 0x01CB68
+    0x048704 -> FUN_01CF0C @ 0x01CF0C
+    0x04870A -> FUN_0261A8 @ 0x0261A8
+    0x048710 -> FUN_05CBC8 @ 0x05CBC8
+    0x048716 -> FUN_098482 @ 0x098482
+    0x04871C -> FUN_0A9914 @ 0x0A9914
+    0x048722 -> FUN_03D7F0 @ 0x03D7F0
+    0x048728 -> FUN_047138 @ 0x047138
+    0x0487CE -> FUN_0484C2 @ 0x0484C2
+    0x048842 -> FUN_0480AE @ 0x0480AE
+    0x04887E -> FUN_048C3A @ 0x048C3A
+    0x048882 -> FUN_04843E @ 0x04843E
+    0x04888A -> FUN_04928E @ 0x04928E
+    0x0488C4 -> desc_read_float_safe @ 0x0BDBCC
+    0x0488E6 -> FUN_0BE9A0 @ 0x0BE9A0
+    0x0488F4 -> FUN_004BCA @ 0x004BCA
+    0x0488FA -> FUN_021150 @ 0x021150
+    0x048900 -> FUN_01D1FC @ 0x01D1FC
+    0x048906 -> FUN_01F896 @ 0x01F896
+    0x04890C -> FUN_020F32 @ 0x020F32
+    0x048912 -> FUN_021E22 @ 0x021E22
+    0x048918 -> FUN_03E654 @ 0x03E654
+    0x04891E -> FUN_0230F4 @ 0x0230F4
+    0x048924 -> FUN_0242DE @ 0x0242DE
+    0x04892A -> FUN_024CB0 @ 0x024CB0
+    0x048930 -> FUN_02524E @ 0x02524E
+    0x048936 -> FUN_025866 @ 0x025866
+    0x04893C -> FUN_025C2C @ 0x025C2C
+    0x048942 -> FUN_024D7C @ 0x024D7C
+    0x048948 -> FUN_01FA78 @ 0x01FA78
+    0x04894E -> FUN_01FE10 @ 0x01FE10
+    0x048954 -> FUN_026754 @ 0x026754
+    0x04895A -> FUN_04BFBC @ 0x04BFBC
+    0x048960 -> FUN_04E8B8 @ 0x04E8B8
+    0x048966 -> FUN_02EE78 @ 0x02EE78
+    0x04896C -> FUN_02FCF0 @ 0x02FCF0
+    0x048972 -> FUN_0344BA @ 0x0344BA
+    0x048978 -> FUN_0357E8 @ 0x0357E8
+    0x04897E -> FUN_037118 @ 0x037118
+    0x048984 -> FUN_037A74 @ 0x037A74
+    0x04898A -> FUN_037F94 @ 0x037F94
+    0x048990 -> FUN_038CA6 @ 0x038CA6
+    0x048996 -> FUN_03CCA4 @ 0x03CCA4
+    0x04899C -> FUN_03EAC4 @ 0x03EAC4
+    0x0489A2 -> FUN_041D84 @ 0x041D84
+    0x0489A8 -> FUN_042DB8 @ 0x042DB8
+    0x0489AE -> FUN_04304A @ 0x04304A
+    0x0489B4 -> FUN_045874 @ 0x045874
+    0x0489BA -> FUN_0460B4 @ 0x0460B4
+    0x0489C0 -> FUN_052EC0 @ 0x052EC0
+    0x0489C6 -> FUN_054194 @ 0x054194
+    0x0489CC -> FUN_054FD6 @ 0x054FD6
+    0x0489D2 -> FUN_00317C @ 0x00317C
+    0x0489D8 -> FUN_056022 @ 0x056022
+    0x0489DE -> FUN_003190 @ 0x003190
+    0x0489E4 -> FUN_05AAB2 @ 0x05AAB2
+    0x0489EA -> FUN_05CE40 @ 0x05CE40
+    0x0489F0 -> FUN_013274 @ 0x013274
+    0x0489F6 -> FUN_061B3C @ 0x061B3C
+    0x0489FC -> FUN_06085E @ 0x06085E
+    0x048A02 -> FUN_05F87E @ 0x05F87E
+    0x048A08 -> FUN_011EEA @ 0x011EEA
+    0x048A0E -> FUN_0594A0 @ 0x0594A0
+    0x048A14 -> FUN_05B21A @ 0x05B21A
+    0x048A1A -> FUN_07E294 @ 0x07E294
+    0x048A20 -> FUN_07EEEC @ 0x07EEEC
+    0x048A26 -> FUN_071744 @ 0x071744
+    0x048A2C -> FUN_07326C @ 0x07326C
+    0x048A32 -> FUN_074C7E @ 0x074C7E
+    0x048A38 -> FUN_071A32 @ 0x071A32
+    0x048A3E -> FUN_067460 @ 0x067460
+    0x048A44 -> FUN_080AFA @ 0x080AFA
+    0x048A4A -> FUN_070578 @ 0x070578
+    0x048A50 -> FUN_07F69A @ 0x07F69A
+    0x048A56 -> FUN_06C6D8 @ 0x06C6D8
+    0x048A5C -> FUN_06C6E8 @ 0x06C6E8
+    0x048A62 -> FUN_06C900 @ 0x06C900
+    0x048A68 -> FUN_06C910 @ 0x06C910
+    0x048A6E -> FUN_06C3D6 @ 0x06C3D6
+    0x048A74 -> FUN_086310 @ 0x086310
+    0x048A7A -> FUN_087BBC @ 0x087BBC
+    0x048A80 -> FUN_06E224 @ 0x06E224
+    0x048A86 -> FUN_06CDB0 @ 0x06CDB0
+    0x048A8C -> FUN_07069C @ 0x07069C
+    0x048A92 -> FUN_08E48C @ 0x08E48C
+    0x048A98 -> FUN_07122C @ 0x07122C
+    0x048A9E -> FUN_081A80 @ 0x081A80
+    0x048AA4 -> FUN_082A68 @ 0x082A68
+    0x048AAA -> FUN_0839C4 @ 0x0839C4
+    0x048AB0 -> FUN_084378 @ 0x084378
+    0x048AB6 -> FUN_0849F4 @ 0x0849F4
+    0x048ABC -> FUN_082210 @ 0x082210
+    0x048AC2 -> FUN_081FA4 @ 0x081FA4
+    0x048AC8 -> FUN_08C374 @ 0x08C374
+    0x048ACE -> FUN_087094 @ 0x087094
+    0x048AD4 -> FUN_0662D4 @ 0x0662D4
+    0x048ADA -> FUN_06B450 @ 0x06B450
+    0x048AE0 -> FUN_08DD8C @ 0x08DD8C
+    0x048AE6 -> FUN_090574 @ 0x090574
+    0x048AEC -> FUN_06E760 @ 0x06E760
+    0x048AF2 -> FUN_06B7A4 @ 0x06B7A4
+    0x048AF8 -> FUN_08D324 @ 0x08D324
+    0x048AFE -> FUN_07FAFE @ 0x07FAFE
+    0x048B04 -> FUN_029BD4 @ 0x029BD4
+    0x048B0A -> FUN_07FCAA @ 0x07FCAA
+    0x048B10 -> FUN_07FCBA @ 0x07FCBA
+    0x048B16 -> FUN_087F0C @ 0x087F0C
+    0x048B1C -> FUN_082810 @ 0x082810
+    0x048B22 -> FUN_06FC04 @ 0x06FC04
+    0x048B28 -> FUN_088818 @ 0x088818
+    0x048B2E -> FUN_08FD2E @ 0x08FD2E
+    0x048B34 -> FUN_088164 @ 0x088164
+    0x048B8A -> FUN_048B06 @ 0x048B06
+    0x048C06 -> FUN_04903E @ 0x04903E
+
+==============================================================================
+  fuel_pump_helper_A  @  0x281DC
+==============================================================================
+  0281DC: D506  mov.l  @(0x281F8),r5  ; =0xFFFF96A8 (RAM)
+  0281DE: 6050  mov.b  @r5,r0
+  0281E0: 8801  cmp/eq #1,r0
+  0281E2: 8B01  bf     0x281E8
+  0281E4: 000B  rts
+  0281E6: E001  mov    #1,r0
+  0281E8: 8451  mov.b  @(1,r5),r0
+  0281EA: 8801  cmp/eq #1,r0
+  0281EC: 8F01  bf/s   0x281F2
+  0281EE: E000  mov    #0,r0
+  0281F0: E002  mov    #2,r0
+  0281F2: 000B  rts
+  0281F4: 0009  nop
+  0281F6: 0000  .word  0x0000
+  0281F8: FFFF  .word  0xFFFF
+  0281FA: 96A8  mov.w  @(0x2834E),r6  ; =0x606C (24684)
+  0281FC: 000B  rts
+  0281FE: E000  mov    #0,r0
+  028200: D3C0  mov.l  @(0x28504),r3  ; =0x00029750
+  028202: 432B  jmp    @r3
+  028204: 0009  nop
+  028206: D3BF  mov.l  @(0x28504),r3  ; =0x00029750
+  028208: 432B  jmp    @r3
+  02820A: 0009  nop
+  02820C: A000  bra    0x28210
+  02820E: 0009  nop
+  028210: 2FD6  mov.l  r13,@-r15
+  028212: 2FE6  mov.l  r14,@-r15
+  028214: 4F22  sts.l  PR,@-r15
+  028216: 4F13  .word  0x4F13
+  028218: D0BB  mov.l  @(0x28508),r0  ; =0xFFFF9704 (RAM)
+  02821A: 401E  ldc    r0,GBR
+  02821C: 7F9C  add    #-100,r15
+  02821E: D2BB  mov.l  @(0x2850C),r2  ; =0x00058524
+  028220: 420B  jsr    @r2
+  028222: 0009  nop
+  028224: 2F00  mov.b  r0,@r15
+  028226: D7BA  mov.l  @(0x28510),r7  ; =0xFFFFAD52 (RAM)
+  028228: DEBA  mov.l  @(0x28514),r14  ; =0x0009A834
+  02822A: 95EE  mov.w  @(0x2840A),r5  ; =0x034A (842)
+  02822C: 6053  mov    r5,r0
+  02822E: 02EC  mov.b  @(r0,r14),r2
+  028230: 602C  extu.b r2,r0
+  028232: 067C  mov.b  @(r0,r7),r6
+  028234: 7501  add    #1,r5
+  028236: 6053  mov    r5,r0
+  028238: 02EC  mov.b  @(r0,r14),r2
+  02823A: 622C  extu.b r2,r2
+  02823C: 2629  and r2,r6
+  02823E: 4615  cmp/pl  r6
+  028240: 0029  movt   r0
+  028242: 80F4  mov.b  r0,@(4,r15)
+  028244: 7513  add    #19,r5
+  028246: 6053  mov    r5,r0
+  028248: 02EC  mov.b  @(r0,r14),r2
+  02824A: 602C  extu.b r2,r0
+  02824C: 067C  mov.b  @(r0,r7),r6
+  02824E: 7501  add    #1,r5
+  028250: 6053  mov    r5,r0
+  028252: 02EC  mov.b  @(r0,r14),r2
+  028254: 622C  extu.b r2,r2
+  028256: 2629  and r2,r6
+  028258: 4615  cmp/pl  r6
+  02825A: 0029  movt   r0
+  02825C: 80F8  mov.b  r0,@(8,r15)
+  02825E: 95D5  mov.w  @(0x2840C),r5  ; =0x04C6 (1222)
+  028260: 6053  mov    r5,r0
+  028262: 02EC  mov.b  @(r0,r14),r2
+  028264: 602C  extu.b r2,r0
+  028266: 067C  mov.b  @(r0,r7),r6
+  028268: 7501  add    #1,r5
+  02826A: 6053  mov    r5,r0
+  02826C: 02EC  mov.b  @(r0,r14),r2
+  02826E: 622C  extu.b r2,r2
+  028270: 2629  and r2,r6
+  028272: 4615  cmp/pl  r6
+  028274: 0029  movt   r0
+  028276: 80FC  mov.b  r0,@(12,r15)
+  028278: 95C9  mov.w  @(0x2840E),r5  ; =0x03FE (1022)
+  02827A: 6053  mov    r5,r0
+  02827C: 02EC  mov.b  @(r0,r14),r2
+  02827E: 602C  extu.b r2,r0
+  028280: 067C  mov.b  @(r0,r7),r6
+  028282: 7501  add    #1,r5
+  028284: 6053  mov    r5,r0
+  028286: 02EC  mov.b  @(r0,r14),r2
+  028288: 622C  extu.b r2,r2
+  02828A: 2629  and r2,r6
+  02828C: 4615  cmp/pl  r6
+  02828E: 0229  movt   r2
+  028290: E010  mov    #16,r0
+  028292: 0F24  mov.b  r2,@(r0,r15)
+  028294: 75D7  add    #-41,r5
+  028296: 6653  mov    r5,r6
+  028298: 6053  mov    r5,r0
+  02829A: 02EC  mov.b  @(r0,r14),r2
+  02829C: 602C  extu.b r2,r0
+  02829E: 057C  mov.b  @(r0,r7),r5
+  0282A0: 7601  add    #1,r6
+  0282A2: 6063  mov    r6,r0
+  0282A4: 02EC  mov.b  @(r0,r14),r2
+  0282A6: 622C  extu.b r2,r2
+  0282A8: 2529  and r2,r5
+  0282AA: 4515  cmp/pl  r5
+  0282AC: 0229  movt   r2
+  0282AE: E014  mov    #20,r0
+  0282B0: 0F24  mov.b  r2,@(r0,r15)
+  0282B2: DD99  mov.l  @(0x28518),r13  ; =0xFFFF3836 (RAM)
+  0282B4: 95AC  mov.w  @(0x28410),r5  ; =0x0F2A (3882)
+  0282B6: 6053  mov    r5,r0
+  0282B8: 02EC  mov.b  @(r0,r14),r2
+  0282BA: 602C  extu.b r2,r0
+  0282BC: 4000  shll  r0
+  0282BE: 06DC  mov.b  @(r0,r13),r6
+  0282C0: 7501  add    #1,r5
+  0282C2: 6053  mov    r5,r0
+  0282C4: 02EC  mov.b  @(r0,r14),r2
+  0282C6: 622C  extu.b r2,r2
+  0282C8: 2629  and r2,r6
+  0282CA: 4615  cmp/pl  r6
+  0282CC: 0229  movt   r2
+  0282CE: E018  mov    #24,r0
+  0282D0: 0F24  mov.b  r2,@(r0,r15)
+  0282D2: 75FF  add    #-1,r5
+  0282D4: 6653  mov    r5,r6
+  0282D6: 6053  mov    r5,r0
+  0282D8: 02EC  mov.b  @(r0,r14),r2
+  0282DA: 602C  extu.b r2,r0
+  0282DC: 4000  shll  r0
+  0282DE: 05DC  mov.b  @(r0,r13),r5
+  0282E0: 7601  add    #1,r6
+  0282E2: 6063  mov    r6,r0
+  0282E4: 02EC  mov.b  @(r0,r14),r2
+  0282E6: 622C  extu.b r2,r2
+  0282E8: 2529  and r2,r5
+  0282EA: 4515  cmp/pl  r5
+  0282EC: 0229  movt   r2
+  0282EE: E01C  mov    #28,r0
+  0282F0: 0F24  mov.b  r2,@(r0,r15)
+  0282F2: 968E  mov.w  @(0x28412),r6  ; =0x0142 (322)
+  0282F4: 6063  mov    r6,r0
+  0282F6: 02EC  mov.b  @(r0,r14),r2
+  0282F8: 602C  extu.b r2,r0
+  0282FA: 4000  shll  r0
+  0282FC: 05DC  mov.b  @(r0,r13),r5
+  0282FE: 7601  add    #1,r6
+  028300: 6063  mov    r6,r0
+  028302: 02EC  mov.b  @(r0,r14),r2
+  028304: 622C  extu.b r2,r2
+  028306: 2529  and r2,r5
+  028308: 4515  cmp/pl  r5
+  02830A: 0229  movt   r2
+  02830C: E020  mov    #32,r0
+  02830E: 0F24  mov.b  r2,@(r0,r15)
+  028310: 9580  mov.w  @(0x28414),r5  ; =0x08C2 (2242)
+  028312: 6053  mov    r5,r0
+  028314: 06EC  mov.b  @(r0,r14),r6
+  028316: 606C  extu.b r6,r0
+  028318: 067C  mov.b  @(r0,r7),r6
+  02831A: 7501  add    #1,r5
+  02831C: 6053  mov    r5,r0
+  02831E: 02EC  mov.b  @(r0,r14),r2
+  028320: 622C  extu.b r2,r2
+  028322: 2629  and r2,r6
+  028324: 4615  cmp/pl  r6
+  028326: 0229  movt   r2
+  028328: E024  mov    #36,r0
+  02832A: 0F24  mov.b  r2,@(r0,r15)
+  02832C: 75EB  add    #-21,r5
+  02832E: 6053  mov    r5,r0
+  028330: 06EC  mov.b  @(r0,r14),r6
+  028332: 606C  extu.b r6,r0
+  028334: 067C  mov.b  @(r0,r7),r6
+  028336: 7501  add    #1,r5
+  028338: 6053  mov    r5,r0
+  02833A: 02EC  mov.b  @(r0,r14),r2
+  02833C: 622C  extu.b r2,r2
+  02833E: 2629  and r2,r6
+  028340: 4615  cmp/pl  r6
+  028342: 0229  movt   r2
+  028344: E028  mov    #40,r0
+  028346: 0F24  mov.b  r2,@(r0,r15)
+  028348: 75EB  add    #-21,r5
+  02834A: 6053  mov    r5,r0
+  02834C: 06EC  mov.b  @(r0,r14),r6
+  02834E: 606C  extu.b r6,r0
+  028350: 067C  mov.b  @(r0,r7),r6
+  028352: 7501  add    #1,r5
+  028354: 6053  mov    r5,r0
+  028356: 02EC  mov.b  @(r0,r14),r2
+  028358: 622C  extu.b r2,r2
+  02835A: 2629  and r2,r6
+  02835C: 4615  cmp/pl  r6
+  02835E: 0229  movt   r2
+  028360: E02C  mov    #44,r0
+  028362: 0F24  mov.b  r2,@(r0,r15)
+  028364: 75C3  add    #-61,r5
+  028366: 6053  mov    r5,r0
+  028368: 02EC  mov.b  @(r0,r14),r2
+  02836A: 602C  extu.b r2,r0
+  02836C: 4000  shll  r0
+  02836E: 06DC  mov.b  @(r0,r13),r6
+  028370: 7501  add    #1,r5
+  028372: 6053  mov    r5,r0
+  028374: 02EC  mov.b  @(r0,r14),r2
+  028376: 622C  extu.b r2,r2
+  028378: 2629  and r2,r6
+  02837A: 4615  cmp/pl  r6
+  02837C: 0229  movt   r2
+  02837E: E030  mov    #48,r0
+  028380: 0F24  mov.b  r2,@(r0,r15)
+  028382: 9548  mov.w  @(0x28416),r5  ; =0x0EEE (3822)
+  028384: 6053  mov    r5,r0
+  028386: 02EC  mov.b  @(r0,r14),r2
+  028388: 602C  extu.b r2,r0
+  02838A: 4000  shll  r0
+  02838C: 06DC  mov.b  @(r0,r13),r6
+  02838E: 7501  add    #1,r5
+  028390: 6053  mov    r5,r0
+  028392: 02EC  mov.b  @(r0,r14),r2
+  028394: 622C  extu.b r2,r2
+  028396: 2629  and r2,r6
+  028398: 4615  cmp/pl  r6
+  02839A: 0229  movt   r2
+  02839C: E034  mov    #52,r0
+  02839E: 0F24  mov.b  r2,@(r0,r15)
+  0283A0: 953A  mov.w  @(0x28418),r5  ; =0x0B92 (2962)
+  0283A2: 6053  mov    r5,r0
+  0283A4: 02EC  mov.b  @(r0,r14),r2
+  0283A6: 602C  extu.b r2,r0
+  0283A8: 4000  shll  r0
+  0283AA: 06DC  mov.b  @(r0,r13),r6
+  0283AC: 7501  add    #1,r5
+  0283AE: 6053  mov    r5,r0
+  0283B0: 02EC  mov.b  @(r0,r14),r2
+  0283B2: 622C  extu.b r2,r2
+  0283B4: 2629  and r2,r6
+  0283B6: 4615  cmp/pl  r6
+  0283B8: 0229  movt   r2
+  0283BA: E038  mov    #56,r0
+  0283BC: 0F24  mov.b  r2,@(r0,r15)
+  0283BE: 75EB  add    #-21,r5
+  0283C0: 6053  mov    r5,r0
+  0283C2: 02EC  mov.b  @(r0,r14),r2
+  0283C4: 602C  extu.b r2,r0
+  0283C6: 4000  shll  r0
+  0283C8: 06DC  mov.b  @(r0,r13),r6
+  0283CA: 7501  add    #1,r5
+  0283CC: 6053  mov    r5,r0
+  0283CE: 02EC  mov.b  @(r0,r14),r2
+  0283D0: 622C  extu.b r2,r2
+  0283D2: 2629  and r2,r6
+  0283D4: 4615  cmp/pl  r6
+  0283D6: 0229  movt   r2
+  0283D8: E03C  mov    #60,r0
+  0283DA: 0F24  mov.b  r2,@(r0,r15)
+
+  --- Literal Pool ---
+    0x0281F8: 0xFFFF96A8  RAM [unknown]
+    0x028504: 0x00029750
+    0x028508: 0xFFFF9704  RAM [unknown]
+    0x02850C: 0x00058524
+    0x028510: 0xFFFFAD52  RAM [unknown]
+    0x028514: 0x0009A834
+    0x028518: 0xFFFF3836  RAM [unknown]
+
+  --- Subroutine calls ---
+    0x028220 -> FUN_058524 @ 0x058524
+
+==============================================================================
+  fuel_pump_helper_B  @  0x5EA4E
+==============================================================================
+  05EA4E: D651  mov.l  @(0x5EB94),r6  ; =0xFFFF8F1D (RAM)
+  05EA50: 6060  mov.b  @r6,r0
+  05EA52: C880  tst    #128,r0
+  05EA54: 0029  movt   r0
+  05EA56: 000B  rts
+  05EA58: CA01  xor    #1,r0
+  05EA5A: D64E  mov.l  @(0x5EB94),r6  ; =0xFFFF8F1D (RAM)
+  05EA5C: 6060  mov.b  @r6,r0
+  05EA5E: C840  tst    #64,r0
+  05EA60: 0029  movt   r0
+  05EA62: 000B  rts
+  05EA64: CA01  xor    #1,r0
+  05EA66: D64B  mov.l  @(0x5EB94),r6  ; =0xFFFF8F1D (RAM)
+  05EA68: 6060  mov.b  @r6,r0
+  05EA6A: C820  tst    #32,r0
+  05EA6C: 0029  movt   r0
+  05EA6E: 000B  rts
+  05EA70: CA01  xor    #1,r0
+  05EA72: D648  mov.l  @(0x5EB94),r6  ; =0xFFFF8F1D (RAM)
+  05EA74: 6060  mov.b  @r6,r0
+  05EA76: C810  tst    #16,r0
+  05EA78: 0029  movt   r0
+  05EA7A: 000B  rts
+  05EA7C: CA01  xor    #1,r0
+  05EA7E: D645  mov.l  @(0x5EB94),r6  ; =0xFFFF8F1D (RAM)
+  05EA80: 6060  mov.b  @r6,r0
+  05EA82: C802  tst    #2,r0
+  05EA84: 0029  movt   r0
+  05EA86: 000B  rts
+  05EA88: CA01  xor    #1,r0
+  05EA8A: D642  mov.l  @(0x5EB94),r6  ; =0xFFFF8F1D (RAM)
+  05EA8C: 6060  mov.b  @r6,r0
+  05EA8E: C801  tst    #1,r0
+  05EA90: 0029  movt   r0
+  05EA92: 000B  rts
+  05EA94: CA01  xor    #1,r0
+  05EA96: D640  mov.l  @(0x5EB98),r6  ; =0xFFFF8F1E (RAM)
+  05EA98: 6060  mov.b  @r6,r0
+  05EA9A: C808  tst    #8,r0
+  05EA9C: 0029  movt   r0
+  05EA9E: 000B  rts
+  05EAA0: CA01  xor    #1,r0
+  05EAA2: D63D  mov.l  @(0x5EB98),r6  ; =0xFFFF8F1E (RAM)
+  05EAA4: 6060  mov.b  @r6,r0
+  05EAA6: C804  tst    #4,r0
+  05EAA8: 0029  movt   r0
+  05EAAA: 000B  rts
+  05EAAC: CA01  xor    #1,r0
+  05EAAE: D63A  mov.l  @(0x5EB98),r6  ; =0xFFFF8F1E (RAM)
+  05EAB0: 6060  mov.b  @r6,r0
+  05EAB2: C801  tst    #1,r0
+  05EAB4: 0029  movt   r0
+  05EAB6: 000B  rts
+  05EAB8: CA01  xor    #1,r0
+  05EABA: D638  mov.l  @(0x5EB9C),r6  ; =0xFFFF8F1F (RAM)
+  05EABC: 6060  mov.b  @r6,r0
+  05EABE: C801  tst    #1,r0
+  05EAC0: 0029  movt   r0
+  05EAC2: 000B  rts
+  05EAC4: CA01  xor    #1,r0
+  05EAC6: D636  mov.l  @(0x5EBA0),r6  ; =0xFFFF8F20 (RAM)
+  05EAC8: 6060  mov.b  @r6,r0
+  05EACA: C880  tst    #128,r0
+  05EACC: 0029  movt   r0
+  05EACE: 000B  rts
+  05EAD0: CA01  xor    #1,r0
+  05EAD2: D634  mov.l  @(0x5EBA4),r6  ; =0xFFFF8F21 (RAM)
+  05EAD4: 6060  mov.b  @r6,r0
+  05EAD6: C880  tst    #128,r0
+  05EAD8: 0029  movt   r0
+  05EADA: 000B  rts
+  05EADC: CA01  xor    #1,r0
+  05EADE: D631  mov.l  @(0x5EBA4),r6  ; =0xFFFF8F21 (RAM)
+  05EAE0: 6060  mov.b  @r6,r0
+  05EAE2: C840  tst    #64,r0
+  05EAE4: 0029  movt   r0
+  05EAE6: 000B  rts
+  05EAE8: CA01  xor    #1,r0
+  05EAEA: D62E  mov.l  @(0x5EBA4),r6  ; =0xFFFF8F21 (RAM)
+  05EAEC: 6060  mov.b  @r6,r0
+  05EAEE: C820  tst    #32,r0
+  05EAF0: 0029  movt   r0
+  05EAF2: 000B  rts
+  05EAF4: CA01  xor    #1,r0
+  05EAF6: D62B  mov.l  @(0x5EBA4),r6  ; =0xFFFF8F21 (RAM)
+  05EAF8: 6060  mov.b  @r6,r0
+  05EAFA: C808  tst    #8,r0
+  05EAFC: 0029  movt   r0
+  05EAFE: 000B  rts
+  05EB00: CA01  xor    #1,r0
+  05EB02: D628  mov.l  @(0x5EBA4),r6  ; =0xFFFF8F21 (RAM)
+  05EB04: 6060  mov.b  @r6,r0
+  05EB06: C804  tst    #4,r0
+  05EB08: 0029  movt   r0
+  05EB0A: 000B  rts
+  05EB0C: CA01  xor    #1,r0
+  05EB0E: D625  mov.l  @(0x5EBA4),r6  ; =0xFFFF8F21 (RAM)
+  05EB10: 6060  mov.b  @r6,r0
+  05EB12: C802  tst    #2,r0
+  05EB14: 0029  movt   r0
+  05EB16: 000B  rts
+  05EB18: CA01  xor    #1,r0
+  05EB1A: D623  mov.l  @(0x5EBA8),r6  ; =0xFFFF8F22 (RAM)
+  05EB1C: 6060  mov.b  @r6,r0
+  05EB1E: C880  tst    #128,r0
+  05EB20: 0029  movt   r0
+  05EB22: 000B  rts
+  05EB24: CA01  xor    #1,r0
+  05EB26: D620  mov.l  @(0x5EBA8),r6  ; =0xFFFF8F22 (RAM)
+  05EB28: 6060  mov.b  @r6,r0
+  05EB2A: C840  tst    #64,r0
+  05EB2C: 0029  movt   r0
+  05EB2E: 000B  rts
+  05EB30: CA01  xor    #1,r0
+  05EB32: D61D  mov.l  @(0x5EBA8),r6  ; =0xFFFF8F22 (RAM)
+  05EB34: 6060  mov.b  @r6,r0
+  05EB36: C820  tst    #32,r0
+  05EB38: 0029  movt   r0
+  05EB3A: 000B  rts
+  05EB3C: CA01  xor    #1,r0
+  05EB3E: D61A  mov.l  @(0x5EBA8),r6  ; =0xFFFF8F22 (RAM)
+  05EB40: 6060  mov.b  @r6,r0
+  05EB42: C810  tst    #16,r0
+  05EB44: 0029  movt   r0
+  05EB46: 000B  rts
+  05EB48: CA01  xor    #1,r0
+  05EB4A: D618  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB4C: 6060  mov.b  @r6,r0
+  05EB4E: C880  tst    #128,r0
+  05EB50: 0029  movt   r0
+  05EB52: 000B  rts
+  05EB54: CA01  xor    #1,r0
+  05EB56: D615  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB58: 6060  mov.b  @r6,r0
+  05EB5A: C840  tst    #64,r0
+  05EB5C: 0029  movt   r0
+  05EB5E: 000B  rts
+  05EB60: CA01  xor    #1,r0
+  05EB62: D612  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB64: 6060  mov.b  @r6,r0
+  05EB66: C820  tst    #32,r0
+  05EB68: 0029  movt   r0
+  05EB6A: 000B  rts
+  05EB6C: CA01  xor    #1,r0
+  05EB6E: D60F  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB70: 6060  mov.b  @r6,r0
+  05EB72: C810  tst    #16,r0
+  05EB74: 0029  movt   r0
+  05EB76: 000B  rts
+  05EB78: CA01  xor    #1,r0
+  05EB7A: D60C  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB7C: 6060  mov.b  @r6,r0
+  05EB7E: C808  tst    #8,r0
+  05EB80: 0029  movt   r0
+  05EB82: 000B  rts
+  05EB84: CA01  xor    #1,r0
+  05EB86: D609  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB88: 6060  mov.b  @r6,r0
+  05EB8A: C804  tst    #4,r0
+  05EB8C: 0029  movt   r0
+  05EB8E: 000B  rts
+  05EB90: CA01  xor    #1,r0
+  05EB92: 0000  .word  0x0000
+  05EB94: FFFF  .word  0xFFFF
+  05EB96: 8F1D  bf/s   0x5EBD4
+  05EB98: FFFF  .word  0xFFFF
+  05EB9A: 8F1E  bf/s   0x5EBDA
+  05EB9C: FFFF  .word  0xFFFF
+  05EB9E: 8F1F  bf/s   0x5EBE0
+  05EBA0: FFFF  .word  0xFFFF
+  05EBA2: 8F20  bf/s   0x5EBE6
+  05EBA4: FFFF  .word  0xFFFF
+  05EBA6: 8F21  bf/s   0x5EBEC
+  05EBA8: FFFF  .word  0xFFFF
+  05EBAA: 8F22  bf/s   0x5EBF2
+  05EBAC: FFFF  .word  0xFFFF
+  05EBAE: 8F23  bf/s   0x5EBF8
+  05EBB0: 000B  rts
+  05EBB2: E81C  mov    #28,r8
+  05EBB4: FFFF  .word  0xFFFF
+  05EBB6: 8F12  bf/s   0x5EBDE
+  05EBB8: FFFF  .word  0xFFFF
+  05EBBA: 8F1C  bf/s   0x5EBF6
+  05EBBC: 000B  rts
+  05EBBE: E53C  mov    #60,r5
+  05EBC0: 0005  mov.w  r0,@(r0,r0)
+  05EBC2: D078  mov.l  @(0x5EDA4),r0  ; =0x72043D20
+  05EBC4: 000B  rts
+  05EBC6: E82C  mov    #44,r8
+  05EBC8: FFFF  .word  0xFFFF
+  05EBCA: 895C  bt     0x5EC86
+  05EBCC: 000B  rts
+  05EBCE: E5A8  mov    #-88,r5
+  05EBD0: 41C8  .word  0x41C8
+  05EBD2: 0000  .word  0x0000
+  05EBD4: 0005  mov.w  r0,@(r0,r0)
+  05EBD6: D09C  mov.l  @(0x5EE48),r0  ; =0xE5FE655C
+  05EBD8: 0005  mov.w  r0,@(r0,r0)
+  05EBDA: D0C0  mov.l  @(0x5EEDC),r0  ; =0x22692521
+  05EBDC: 0005  mov.w  r0,@(r0,r0)
+  05EBDE: D0E4  mov.l  @(0x5EF70),r0  ; =0xA0162501
+  05EBE0: 0005  mov.w  r0,@(r0,r0)
+  05EBE2: D108  mov.l  @(0x5EC04),r1  ; =0xC500E50B (-2062.32)
+  05EBE4: 4F22  sts.l  PR,@-r15
+  05EBE6: 4F13  .word  0x4F13
+  05EBE8: D09E  mov.l  @(0x5EE64),r0  ; =0xFFFF8F2A (RAM)
+  05EBEA: 401E  ldc    r0,GBR
+  05EBEC: 7FF8  add    #-8,r15
+  05EBEE: D29E  mov.l  @(0x5EE68),r2  ; =0x0000317C
+  05EBF0: E490  mov    #-112,r4
+  05EBF2: 420B  jsr    @r2
+  05EBF4: 644C  extu.b r4,r4
+  05EBF6: 1F01  mov.l  r0,@(4,r15)
+  05EBF8: D29C  mov.l  @(0x5EE6C),r2  ; =0x000BE554 [uint16_add_sat]
+  05EBFA: E501  mov    #1,r5
+  05EBFC: C500  mov.w  @(0,GBR),r0  ; GBR+0x0
+  05EBFE: 420B  jsr    @r2
+  05EC00: 640D  extu.w r0,r4
+  05EC02: C100  mov.w  r0,@(0,GBR)  ; GBR+0x0
+  05EC04: C500  mov.w  @(0,GBR),r0  ; GBR+0x0
+  05EC06: E50B  mov    #11,r5
+  05EC08: 3056  cmp/hi r5,r0
+  05EC0A: 8B04  bf     0x5EC16
+  05EC0C: B079  bsr    0x5ED02
+  05EC0E: 0009  nop
+  05EC10: D297  mov.l  @(0x5EE70),r2  ; =0x00057B02
+  05EC12: 420B  jsr    @r2
+  05EC14: 0009  nop
+  05EC16: C58F  mov.w  @(286,GBR),r0  ; GBR+0x11E
+  05EC18: E220  mov    #32,r2
+  05EC1A: 4218  shll8  r2
+  05EC1C: 2028  tst r2,r0
+  05EC1E: 891A  bt     0x5EC56
+  05EC20: D294  mov.l  @(0x5EE74),r2  ; =0x000BE53C
+  05EC22: E501  mov    #1,r5
+  05EC24: C40B  mov.b  @(11,GBR),r0
+  05EC26: 420B  jsr    @r2
+  05EC28: 640C  extu.b r0,r4
+  05EC2A: C00B  mov.b  r0,@(11,GBR)
+  05EC2C: C40B  mov.b  @(11,GBR),r0
+  05EC2E: 8803  cmp/eq #3,r0
+  05EC30: 8B13  bf     0x5EC5A
+  05EC32: 64F3  mov    r15,r4
+  05EC34: D290  mov.l  @(0x5EE78),r2  ; =0x000BE81C
+  05EC36: E5E0  mov    #-32,r5
+  05EC38: 420B  jsr    @r2
+  05EC3A: 655C  extu.b r5,r5
+  05EC3C: D58F  mov.l  @(0x5EE7C),r5  ; =0xFFFF903C (RAM)
+  05EC3E: 6250  mov.b  @r5,r2
+  05EC40: 95A1  mov.w  @(0x5ED86),r5  ; =0xF003 (61443)
+  05EC42: 2520  mov.b  r2,@r5
+  05EC44: 8451  mov.b  @(1,r5),r0
+  05EC46: C97F  and    #127,r0
+  05EC48: CB78  or     #120,r0
+  05EC4A: 8051  mov.b  r0,@(1,r5)
+  05EC4C: D28C  mov.l  @(0x5EE80),r2  ; =0x000BE82C
+
+  --- Literal Pool ---
+    0x05EB94: 0xFFFF8F1D  RAM [unknown]
+    0x05EB98: 0xFFFF8F1E  RAM [unknown]
+    0x05EB9C: 0xFFFF8F1F  RAM [unknown]
+    0x05EBA0: 0xFFFF8F20  RAM [unknown]
+    0x05EBA4: 0xFFFF8F21  RAM [unknown]
+    0x05EBA8: 0xFFFF8F22  RAM [unknown]
+    0x05EBAC: 0xFFFF8F23  RAM [unknown]
+    0x05EDA4: 0x72043D20
+    0x05EE48: 0xE5FE655C
+    0x05EEDC: 0x22692521
+    0x05EF70: 0xA0162501
+    0x05EC04: 0xC500E50B  (float: -2062.32)
+    0x05EE64: 0xFFFF8F2A  RAM [unknown]
+    0x05EE68: 0x0000317C
+    0x05EE6C: 0x000BE554  [uint16_add_sat]
+    0x05EE70: 0x00057B02
+    0x05EE74: 0x000BE53C
+    0x05EE78: 0x000BE81C
+    0x05EE7C: 0xFFFF903C  RAM [unknown]
+    0x05EE80: 0x000BE82C
+
+  --- Subroutine calls ---
+    0x05EBF2 -> FUN_00317C @ 0x00317C
+    0x05EBFE -> uint16_add_sat @ 0x0BE554
+    0x05EC0C -> FUN_05ED02 @ 0x05ED02
+    0x05EC12 -> FUN_057B02 @ 0x057B02
+    0x05EC26 -> FUN_0BE53C @ 0x0BE53C
+    0x05EC38 -> FUN_0BE81C @ 0x0BE81C
+
+==============================================================================
+  fuel_pump_helper_C  @  0x5EB1A
+==============================================================================
+  05EB1A: D623  mov.l  @(0x5EBA8),r6  ; =0xFFFF8F22 (RAM)
+  05EB1C: 6060  mov.b  @r6,r0
+  05EB1E: C880  tst    #128,r0
+  05EB20: 0029  movt   r0
+  05EB22: 000B  rts
+  05EB24: CA01  xor    #1,r0
+  05EB26: D620  mov.l  @(0x5EBA8),r6  ; =0xFFFF8F22 (RAM)
+  05EB28: 6060  mov.b  @r6,r0
+  05EB2A: C840  tst    #64,r0
+  05EB2C: 0029  movt   r0
+  05EB2E: 000B  rts
+  05EB30: CA01  xor    #1,r0
+  05EB32: D61D  mov.l  @(0x5EBA8),r6  ; =0xFFFF8F22 (RAM)
+  05EB34: 6060  mov.b  @r6,r0
+  05EB36: C820  tst    #32,r0
+  05EB38: 0029  movt   r0
+  05EB3A: 000B  rts
+  05EB3C: CA01  xor    #1,r0
+  05EB3E: D61A  mov.l  @(0x5EBA8),r6  ; =0xFFFF8F22 (RAM)
+  05EB40: 6060  mov.b  @r6,r0
+  05EB42: C810  tst    #16,r0
+  05EB44: 0029  movt   r0
+  05EB46: 000B  rts
+  05EB48: CA01  xor    #1,r0
+  05EB4A: D618  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB4C: 6060  mov.b  @r6,r0
+  05EB4E: C880  tst    #128,r0
+  05EB50: 0029  movt   r0
+  05EB52: 000B  rts
+  05EB54: CA01  xor    #1,r0
+  05EB56: D615  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB58: 6060  mov.b  @r6,r0
+  05EB5A: C840  tst    #64,r0
+  05EB5C: 0029  movt   r0
+  05EB5E: 000B  rts
+  05EB60: CA01  xor    #1,r0
+  05EB62: D612  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB64: 6060  mov.b  @r6,r0
+  05EB66: C820  tst    #32,r0
+  05EB68: 0029  movt   r0
+  05EB6A: 000B  rts
+  05EB6C: CA01  xor    #1,r0
+  05EB6E: D60F  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB70: 6060  mov.b  @r6,r0
+  05EB72: C810  tst    #16,r0
+  05EB74: 0029  movt   r0
+  05EB76: 000B  rts
+  05EB78: CA01  xor    #1,r0
+  05EB7A: D60C  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB7C: 6060  mov.b  @r6,r0
+  05EB7E: C808  tst    #8,r0
+  05EB80: 0029  movt   r0
+  05EB82: 000B  rts
+  05EB84: CA01  xor    #1,r0
+  05EB86: D609  mov.l  @(0x5EBAC),r6  ; =0xFFFF8F23 (RAM)
+  05EB88: 6060  mov.b  @r6,r0
+  05EB8A: C804  tst    #4,r0
+  05EB8C: 0029  movt   r0
+  05EB8E: 000B  rts
+  05EB90: CA01  xor    #1,r0
+  05EB92: 0000  .word  0x0000
+  05EB94: FFFF  .word  0xFFFF
+  05EB96: 8F1D  bf/s   0x5EBD4
+  05EB98: FFFF  .word  0xFFFF
+  05EB9A: 8F1E  bf/s   0x5EBDA
+  05EB9C: FFFF  .word  0xFFFF
+  05EB9E: 8F1F  bf/s   0x5EBE0
+  05EBA0: FFFF  .word  0xFFFF
+  05EBA2: 8F20  bf/s   0x5EBE6
+  05EBA4: FFFF  .word  0xFFFF
+  05EBA6: 8F21  bf/s   0x5EBEC
+  05EBA8: FFFF  .word  0xFFFF
+  05EBAA: 8F22  bf/s   0x5EBF2
+  05EBAC: FFFF  .word  0xFFFF
+  05EBAE: 8F23  bf/s   0x5EBF8
+  05EBB0: 000B  rts
+  05EBB2: E81C  mov    #28,r8
+  05EBB4: FFFF  .word  0xFFFF
+  05EBB6: 8F12  bf/s   0x5EBDE
+  05EBB8: FFFF  .word  0xFFFF
+  05EBBA: 8F1C  bf/s   0x5EBF6
+  05EBBC: 000B  rts
+  05EBBE: E53C  mov    #60,r5
+  05EBC0: 0005  mov.w  r0,@(r0,r0)
+  05EBC2: D078  mov.l  @(0x5EDA4),r0  ; =0x72043D20
+  05EBC4: 000B  rts
+  05EBC6: E82C  mov    #44,r8
+  05EBC8: FFFF  .word  0xFFFF
+  05EBCA: 895C  bt     0x5EC86
+  05EBCC: 000B  rts
+  05EBCE: E5A8  mov    #-88,r5
+  05EBD0: 41C8  .word  0x41C8
+  05EBD2: 0000  .word  0x0000
+  05EBD4: 0005  mov.w  r0,@(r0,r0)
+  05EBD6: D09C  mov.l  @(0x5EE48),r0  ; =0xE5FE655C
+  05EBD8: 0005  mov.w  r0,@(r0,r0)
+  05EBDA: D0C0  mov.l  @(0x5EEDC),r0  ; =0x22692521
+  05EBDC: 0005  mov.w  r0,@(r0,r0)
+  05EBDE: D0E4  mov.l  @(0x5EF70),r0  ; =0xA0162501
+  05EBE0: 0005  mov.w  r0,@(r0,r0)
+  05EBE2: D108  mov.l  @(0x5EC04),r1  ; =0xC500E50B (-2062.32)
+  05EBE4: 4F22  sts.l  PR,@-r15
+  05EBE6: 4F13  .word  0x4F13
+  05EBE8: D09E  mov.l  @(0x5EE64),r0  ; =0xFFFF8F2A (RAM)
+  05EBEA: 401E  ldc    r0,GBR
+  05EBEC: 7FF8  add    #-8,r15
+  05EBEE: D29E  mov.l  @(0x5EE68),r2  ; =0x0000317C
+  05EBF0: E490  mov    #-112,r4
+  05EBF2: 420B  jsr    @r2
+  05EBF4: 644C  extu.b r4,r4
+  05EBF6: 1F01  mov.l  r0,@(4,r15)
+  05EBF8: D29C  mov.l  @(0x5EE6C),r2  ; =0x000BE554 [uint16_add_sat]
+  05EBFA: E501  mov    #1,r5
+  05EBFC: C500  mov.w  @(0,GBR),r0  ; GBR+0x0
+  05EBFE: 420B  jsr    @r2
+  05EC00: 640D  extu.w r0,r4
+  05EC02: C100  mov.w  r0,@(0,GBR)  ; GBR+0x0
+  05EC04: C500  mov.w  @(0,GBR),r0  ; GBR+0x0
+  05EC06: E50B  mov    #11,r5
+  05EC08: 3056  cmp/hi r5,r0
+  05EC0A: 8B04  bf     0x5EC16
+  05EC0C: B079  bsr    0x5ED02
+  05EC0E: 0009  nop
+  05EC10: D297  mov.l  @(0x5EE70),r2  ; =0x00057B02
+  05EC12: 420B  jsr    @r2
+  05EC14: 0009  nop
+  05EC16: C58F  mov.w  @(286,GBR),r0  ; GBR+0x11E
+  05EC18: E220  mov    #32,r2
+  05EC1A: 4218  shll8  r2
+  05EC1C: 2028  tst r2,r0
+  05EC1E: 891A  bt     0x5EC56
+  05EC20: D294  mov.l  @(0x5EE74),r2  ; =0x000BE53C
+  05EC22: E501  mov    #1,r5
+  05EC24: C40B  mov.b  @(11,GBR),r0
+  05EC26: 420B  jsr    @r2
+  05EC28: 640C  extu.b r0,r4
+  05EC2A: C00B  mov.b  r0,@(11,GBR)
+  05EC2C: C40B  mov.b  @(11,GBR),r0
+  05EC2E: 8803  cmp/eq #3,r0
+  05EC30: 8B13  bf     0x5EC5A
+  05EC32: 64F3  mov    r15,r4
+  05EC34: D290  mov.l  @(0x5EE78),r2  ; =0x000BE81C
+  05EC36: E5E0  mov    #-32,r5
+  05EC38: 420B  jsr    @r2
+  05EC3A: 655C  extu.b r5,r5
+  05EC3C: D58F  mov.l  @(0x5EE7C),r5  ; =0xFFFF903C (RAM)
+  05EC3E: 6250  mov.b  @r5,r2
+  05EC40: 95A1  mov.w  @(0x5ED86),r5  ; =0xF003 (61443)
+  05EC42: 2520  mov.b  r2,@r5
+  05EC44: 8451  mov.b  @(1,r5),r0
+  05EC46: C97F  and    #127,r0
+  05EC48: CB78  or     #120,r0
+  05EC4A: 8051  mov.b  r0,@(1,r5)
+  05EC4C: D28C  mov.l  @(0x5EE80),r2  ; =0x000BE82C
+  05EC4E: 420B  jsr    @r2
+  05EC50: 64F2  mov.l  @r15,r4
+  05EC52: A002  bra    0x5EC5A
+  05EC54: 0009  nop
+  05EC56: E000  mov    #0,r0
+  05EC58: C00B  mov.b  r0,@(11,GBR)
+  05EC5A: C591  mov.w  @(290,GBR),r0  ; GBR+0x122
+  05EC5C: 2008  tst r0,r0
+  05EC5E: 8902  bt     0x5EC66
+  05EC60: C591  mov.w  @(290,GBR),r0  ; GBR+0x122
+  05EC62: 70FF  add    #-1,r0
+  05EC64: C191  mov.w  r0,@(290,GBR)  ; GBR+0x122
+  05EC66: D287  mov.l  @(0x5EE84),r2  ; =0x00003190
+  05EC68: 420B  jsr    @r2
+  05EC6A: 54F1  mov.l  @(4,r15),r4
+  05EC6C: 7F08  add    #8,r15
+  05EC6E: 4F17  .word  0x4F17
+  05EC70: 4F26  lds.l  @r15+,PR
+  05EC72: 000B  rts
+  05EC74: 0009  nop
+  05EC76: 2FD6  mov.l  r13,@-r15
+  05EC78: 2FE6  mov.l  r14,@-r15
+  05EC7A: 4F22  sts.l  PR,@-r15
+  05EC7C: 7FF8  add    #-8,r15
+  05EC7E: 64F3  mov    r15,r4
+  05EC80: D17D  mov.l  @(0x5EE78),r1  ; =0x000BE81C
+  05EC82: E5E0  mov    #-32,r5
+  05EC84: 410B  jsr    @r1
+  05EC86: 655C  extu.b r5,r5
+  05EC88: 9E7E  mov.w  @(0x5ED88),r14  ; =0xF004 (61444)
+  05EC8A: 84E1  mov.b  @(1,r14),r0
+  05EC8C: DD75  mov.l  @(0x5EE64),r13  ; =0xFFFF8F2A (RAM)
+  05EC8E: 80D2  mov.b  r0,@(2,r13)
+  05EC90: 60E0  mov.b  @r14,r0
+  05EC92: C9BF  and    #191,r0
+  05EC94: CBB8  or     #184,r0
+  05EC96: 2E00  mov.b  r0,@r14
+  05EC98: D679  mov.l  @(0x5EE80),r6  ; =0x000BE82C
+  05EC9A: 460B  jsr    @r6
+  05EC9C: 64F2  mov.l  @r15,r4
+  05EC9E: 60E0  mov.b  @r14,r0
+  05ECA0: C938  and    #56,r0
+  05ECA2: 80D3  mov.b  r0,@(3,r13)
+  05ECA4: 64F3  mov    r15,r4
+  05ECA6: 7404  add    #4,r4
+  05ECA8: D173  mov.l  @(0x5EE78),r1  ; =0x000BE81C
+  05ECAA: E5E0  mov    #-32,r5
+  05ECAC: 410B  jsr    @r1
+  05ECAE: 655C  extu.b r5,r5
+  05ECB0: 60E0  mov.b  @r14,r0
+  05ECB2: C987  and    #135,r0
+  05ECB4: CB80  or     #128,r0
+  05ECB6: 2E00  mov.b  r0,@r14
+  05ECB8: D671  mov.l  @(0x5EE80),r6  ; =0x000BE82C
+  05ECBA: 460B  jsr    @r6
+  05ECBC: 54F1  mov.l  @(4,r15),r4
+  05ECBE: E200  mov    #0,r2
+  05ECC0: 2D21  mov.w  r2,@r13
+  05ECC2: 84D3  mov.b  @(3,r13),r0
+  05ECC4: 2008  tst r0,r0
+  05ECC6: 8B12  bf     0x5ECEE
+  05ECC8: D66F  mov.l  @(0x5EE88),r6  ; =0xFFFF9048 (RAM)
+  05ECCA: 6261  mov.w  @r6,r2
+  05ECCC: E620  mov    #32,r6
+  05ECCE: 4618  shll8  r6
+  05ECD0: 2268  tst r6,r2
+  05ECD2: 8908  bt     0x5ECE6
+  05ECD4: 84D2  mov.b  @(2,r13),r0
+  05ECD6: 6603  mov    r0,r6
+  05ECD8: 84D4  mov.b  @(4,r13),r0
+  05ECDA: 3600  cmp/eq r0,r6
+  05ECDC: 8B07  bf     0x5ECEE
+  05ECDE: B0DD  bsr    0x5EE9C
+  05ECE0: 0009  nop
+  05ECE2: A009  bra    0x5ECF8
+  05ECE4: 0009  nop
+  05ECE6: B03C  bsr    0x5ED62
+  05ECE8: 0009  nop
+  05ECEA: A005  bra    0x5ECF8
+  05ECEC: 0009  nop
+  05ECEE: B008  bsr    0x5ED02
+  05ECF0: 0009  nop
+  05ECF2: D25F  mov.l  @(0x5EE70),r2  ; =0x00057B02
+  05ECF4: 420B  jsr    @r2
+  05ECF6: 0009  nop
+  05ECF8: 7F08  add    #8,r15
+  05ECFA: 4F26  lds.l  @r15+,PR
+  05ECFC: 6EF6  mov.l  @r15+,r14
+  05ECFE: 000B  rts
+  05ED00: 6DF6  mov.l  @r15+,r13
+  05ED02: 4F22  sts.l  PR,@-r15
+  05ED04: 7FFC  add    #-4,r15
+  05ED06: 64F3  mov    r15,r4
+  05ED08: D25B  mov.l  @(0x5EE78),r2  ; =0x000BE81C
+  05ED0A: E5E0  mov    #-32,r5
+  05ED0C: 420B  jsr    @r2
+  05ED0E: 655C  extu.b r5,r5
+  05ED10: 963B  mov.w  @(0x5ED8A),r6  ; =0xF002 (61442)
+  05ED12: 6060  mov.b  @r6,r0
+  05ED14: C95B  and    #91,r0
+  05ED16: 2600  mov.b  r0,@r6
+  05ED18: D259  mov.l  @(0x5EE80),r2  ; =0x000BE82C
+
+  --- Literal Pool ---
+    0x05EBA8: 0xFFFF8F22  RAM [unknown]
+    0x05EBAC: 0xFFFF8F23  RAM [unknown]
+    0x05EDA4: 0x72043D20
+    0x05EE48: 0xE5FE655C
+    0x05EEDC: 0x22692521
+    0x05EF70: 0xA0162501
+    0x05EC04: 0xC500E50B  (float: -2062.32)
+    0x05EE64: 0xFFFF8F2A  RAM [unknown]
+    0x05EE68: 0x0000317C
+    0x05EE6C: 0x000BE554  [uint16_add_sat]
+    0x05EE70: 0x00057B02
+    0x05EE74: 0x000BE53C
+    0x05EE78: 0x000BE81C
+    0x05EE7C: 0xFFFF903C  RAM [unknown]
+    0x05EE80: 0x000BE82C
+    0x05EE84: 0x00003190
+    0x05EE88: 0xFFFF9048  RAM [unknown]
+
+  --- Subroutine calls ---
+    0x05EBF2 -> FUN_00317C @ 0x00317C
+    0x05EBFE -> uint16_add_sat @ 0x0BE554
+    0x05EC0C -> FUN_05ED02 @ 0x05ED02
+    0x05EC12 -> FUN_057B02 @ 0x057B02
+    0x05EC26 -> FUN_0BE53C @ 0x0BE53C
+    0x05EC38 -> FUN_0BE81C @ 0x0BE81C
+    0x05EC4E -> FUN_0BE82C @ 0x0BE82C
+    0x05EC68 -> FUN_003190 @ 0x003190
+    0x05EC84 -> FUN_0BE81C @ 0x0BE81C
+    0x05EC9A -> FUN_0BE82C @ 0x0BE82C
+    0x05ECAC -> FUN_0BE81C @ 0x0BE81C
+    0x05ECBA -> FUN_0BE82C @ 0x0BE82C
+    0x05ECDE -> FUN_05EE9C @ 0x05EE9C
+    0x05ECE6 -> FUN_05ED62 @ 0x05ED62
+    0x05ECEE -> FUN_05ED02 @ 0x05ED02
+    0x05ECF4 -> FUN_057B02 @ 0x057B02
+    0x05ED0C -> FUN_0BE81C @ 0x0BE81C
+
+==============================================================================
+  hw_port_write  @  0x080C6
+==============================================================================
+  0080C6: 4F22  sts.l  PR,@-r15
+  0080C8: C715  mova   @(0x08120),r0
+  0080CA: F308  fmov.s @r0,fr3
+  0080CC: D20C  mov.l  @(0x08100),r2  ; =0xFFFF41DC (RAM)
+  0080CE: F432  fmul fr3,fr4
+  0080D0: D512  mov.l  @(0x0811C),r5  ; =0xFFFF443C (RAM)
+  0080D2: F43D  ftrc   fr4,FPUL
+  0080D4: D10F  mov.l  @(0x08114),r1  ; =0x000BE9C0
+  0080D6: 035A  sts    FPUL,r3
+  0080D8: 2232  mov.l  r3,@r2
+  0080DA: 6551  mov.w  @r5,r5
+  0080DC: 655D  extu.w r5,r5
+  0080DE: 410B  jsr    @r1
+  0080E0: 6433  mov    r3,r4
+  0080E2: 6503  mov    r0,r5
+  0080E4: 9206  mov.w  @(0x080F4),r2  ; =0xF594 (62868)
+  0080E6: 4F26  lds.l  @r15+,PR
+  0080E8: 000B  rts
+  0080EA: 2251  mov.w  r5,@r2
+  0080EC: 00E0  .word  0x00E0
+  0080EE: F400  fadd fr0,fr4
+  0080F0: F58C  fmov   fr8,fr5
+  0080F2: F584  fcmp/eq fr8,fr5
+  0080F4: F594  fcmp/eq fr9,fr5
+  0080F6: F59C  fmov   fr9,fr5
+  0080F8: F5A2  fmul fr10,fr5
+  0080FA: 0000  .word  0x0000
+  0080FC: 0001  .word  0x0001
+  0080FE: 0000  .word  0x0000
+  008100: FFFF  .word  0xFFFF
+  008102: 41DC  shad   r13,r1
+  008104: 000B  rts
+  008106: E81C  mov    #28,r8
+  008108: 0000  .word  0x0000
+  00810A: E6C4  mov    #-60,r6
+  00810C: 000B  rts
+  00810E: E82C  mov    #44,r8
+  008110: 000C  mov.b  @(r0,r0),r0
+  008112: 00AC  mov.b  @(r0,r10),r0
+  008114: 000B  rts
+  008116: E9C0  mov    #-64,r9
+  008118: FFFF  .word  0xFFFF
+  00811A: 4434  .word  0x4434
+  00811C: FFFF  .word  0xFFFF
+  00811E: 443C  shad   r3,r4
+  008120: 4780  .word  0x4780
+  008122: 0000  .word  0x0000
+  008124: D31C  mov.l  @(0x08198),r3  ; =0xFFFF4032 (RAM)
+  008126: 6231  mov.w  @r3,r2
+  008128: D11C  mov.l  @(0x0819C),r1  ; =0xFFFF41E4 (RAM)
+  00812A: 2121  mov.w  r2,@r1
+  00812C: 2FE6  mov.l  r14,@-r15
+  00812E: 4F22  sts.l  PR,@-r15
+  008130: D319  mov.l  @(0x08198),r3  ; =0xFFFF4032 (RAM)
+  008132: 7FFC  add    #-4,r15
+  008134: DE19  mov.l  @(0x0819C),r14  ; =0xFFFF41E4 (RAM)
+  008136: 6231  mov.w  @r3,r2
+  008138: D11A  mov.l  @(0x081A4),r1  ; =0x000BEA6C (ROM cal: -3.531e+04)
+  00813A: 2F21  mov.w  r2,@r15
+  00813C: D218  mov.l  @(0x081A0),r2  ; =0x000C0104
+  00813E: 6621  mov.w  @r2,r6
+  008140: 65E1  mov.w  @r14,r5
+  008142: 655D  extu.w r5,r5
+  008144: 64F1  mov.w  @r15,r4
+  008146: 410B  jsr    @r1
+  008148: 644D  extu.w r4,r4
+  00814A: 2E01  mov.w  r0,@r14
+  00814C: 63E1  mov.w  @r14,r3
+  00814E: 633D  extu.w r3,r3
+  008150: D215  mov.l  @(0x081A8),r2  ; =0x000C00B0 (ROM cal: 25)
+  008152: 435A  lds    r3,FPUL
+  008154: C716  mova   @(0x081B0),r0
+  008156: F32D  float  FPUL,fr3
+  008158: F028  fmov.s @r2,fr0
+  00815A: F302  fmul fr0,fr3
+  00815C: D313  mov.l  @(0x081AC),r3  ; =0x000C00B4 (ROM cal: -62.5)
+  00815E: F238  fmov.s @r3,fr2
+  008160: F008  fmov.s @r0,fr0
+  008162: F23E  fmac   fr0,fr3,fr2
+  008164: D113  mov.l  @(0x081B4),r1  ; =0xFFFF41E0 (RAM)
+  008166: F12A  fmov.s fr2,@r1
+  008168: 7F04  add    #4,r15
+  00816A: 4F26  lds.l  @r15+,PR
+  00816C: 000B  rts
+  00816E: 6EF6  mov.l  @r15+,r14
+  008170: D310  mov.l  @(0x081B4),r3  ; =0xFFFF41E0 (RAM)
+  008172: F438  fmov.s @r3,fr4
+  008174: D210  mov.l  @(0x081B8),r2  ; =0x000C0100 (ROM cal: 59.85)
+  008176: F328  fmov.s @r2,fr3
+  008178: F345  fcmp/gt fr4,fr3
+  00817A: 8D02  bt/s   0x08182
+  00817C: 0009  nop
+  00817E: A008  bra    0x08192
+  008180: E401  mov    #1,r4
+  008182: D10E  mov.l  @(0x081BC),r1  ; =0x000C00FC (ROM cal: -56.15)
+  008184: F218  fmov.s @r1,fr2
+  008186: F245  fcmp/gt fr4,fr2
+  008188: 8F02  bf/s   0x08190
+  00818A: 0009  nop
+  00818C: A001  bra    0x08192
+  00818E: E402  mov    #2,r4
+  008190: E400  mov    #0,r4
+  008192: 000B  rts
+  008194: 6043  mov    r4,r0
+  008196: 0000  .word  0x0000
+  008198: FFFF  .word  0xFFFF
+  00819A: 4032  .word  0x4032
+  00819C: FFFF  .word  0xFFFF
+  00819E: 41E4  .word  0x41E4
+  0081A0: 000C  mov.b  @(r0,r0),r0
+  0081A2: 0104  mov.b  r0,@(r0,r1)
+  0081A4: 000B  rts
+  0081A6: EA6C  mov    #108,r10
+  0081A8: 000C  mov.b  @(r0,r0),r0
+  0081AA: 00B0  .word  0x00B0
+  0081AC: 000C  mov.b  @(r0,r0),r0
+  0081AE: 00B4  mov.b  r11,@(r0,r0)
+  0081B0: 38A0  cmp/eq r10,r8
+  0081B2: 0000  .word  0x0000
+  0081B4: FFFF  .word  0xFFFF
+  0081B6: 41E0  .word  0x41E0
+  0081B8: 000C  mov.b  @(r0,r0),r0
+  0081BA: 0100  .word  0x0100
+  0081BC: 000C  mov.b  @(r0,r0),r0
+  0081BE: 00FC  mov.b  @(r0,r15),r0
+  0081C0: D31D  mov.l  @(0x08238),r3  ; =0xFFFF4058 (RAM)
+  0081C2: 6231  mov.w  @r3,r2
+  0081C4: D11D  mov.l  @(0x0823C),r1  ; =0xFFFF41EC (RAM)
+
+  --- Literal Pool ---
+    0x008100: 0xFFFF41DC  RAM [unknown]
+    0x00811C: 0xFFFF443C  RAM [unknown]
+    0x008114: 0x000BE9C0
+    0x008198: 0xFFFF4032  RAM [unknown]
+    0x00819C: 0xFFFF41E4  RAM [unknown]
+    0x0081A4: 0x000BEA6C  (ROM: -3.531e+04)
+    0x0081A0: 0x000C0104
+    0x0081A8: 0x000C00B0  (ROM: 25)
+    0x0081AC: 0x000C00B4  (ROM: -62.5)
+    0x0081B4: 0xFFFF41E0  RAM [unknown]
+    0x0081B8: 0x000C0100  (ROM: 59.85)
+    0x0081BC: 0x000C00FC  (ROM: -56.15)
+    0x008238: 0xFFFF4058  RAM [unknown]
+    0x00823C: 0xFFFF41EC  RAM [unknown]
