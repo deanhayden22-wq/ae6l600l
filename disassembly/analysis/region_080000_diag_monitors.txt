@@ -1,0 +1,241 @@
+Region 0x080000 — Diagnostic Monitor Function Cluster
+======================================================
+Analysis date: 2026-04-03
+Source: Ghidra export + raw SH-2 disassembly
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+The 0x080000-0x08FFFF region contains a large cluster of diagnostic monitor
+functions alongside the per-cylinder injection output pipeline (documented
+separately in percyl_injection_output_analysis.txt).  This analysis covers
+the diagnostic monitor subsystem.
+
+Key statistics:
+  - 72 DTC helper calls identified (34 dtc_set_pending + 38 dtc_clear)
+  - 36+ DTC check functions in the 0x087100-0x087600 sub-region
+  - Large descriptor table unpacking functions at 0x088D00-0x089000
+  - Total diagnostic-related functions estimated at 100+
+
+================================================================================
+2. FUNCTION TEMPLATES
+================================================================================
+
+Three distinct function templates were identified:
+
+─── Template A: Multi-condition DTC check (0x087100-0x087600) ──────────────────
+
+  Pattern (repeated ~36 times with 3 variants):
+    mov.l  @(pool),R1      ; R1 = diag_session_state (0xFFFFAD52)
+    mov.l  @(pool),R4      ; R4 = &dtc_struct_table[N] (0x9A834 + N*20)
+    mov    #imm,R0         ; condition setup
+    ...
+    tst    R2,R6           ; test sensor condition
+    ldc.l  @R15+,GBR       ; (register management)
+    bf     skip            ; if condition fails, skip to next or exit
+    bra    exit            ; jump to common exit (0x8758A)
+    ...
+    mov.l  @(pool),R7      ; R7 = dtc_maturation_timer (0xFFFF399E)
+
+  Three variants by complexity:
+    1-condition (9 instances)  — Check one sensor, set/clear DTC
+    2-condition (22 instances) — Check two sensors, both must pass
+    3-condition (15 instances) — Check three sensors, all must pass
+
+  DTC struct table at 0x9A834 (93 entries x 20 bytes):
+    Index 0: P0335 (Crankshaft Position Sensor A)
+    (Each function references a different DTC struct entry via R4 offset)
+
+  Key RAM:
+    0xFFFFAD52  diag_session_state    107 refs; active fault bitmask array
+    0xFFFF399E  dtc_maturation_timer  118 refs; DTC maturation counters
+
+─── Template B: GBR descriptor table unpack (0x088D00-0x089000) ────────────────
+
+  Example: FUN_00088E54, FUN_0008C0F8
+
+  Pattern:
+    sts.l  PR,@-R15
+    stc.l  GBR,@-R15
+    mov.l  @(pool),R0      ; R0 = desc_table_mirror (0xFFFF2F84)
+    ldc    R0,GBR          ; set GBR base
+    mov.l  @(pool),R14     ; R14 = uint16_pack (0xBE9B0)
+    [loop of 15-30 iterations:]
+      mov.b  @(disp,GBR),R0  ; read descriptor field
+      jsr    @R14              ; call uint16_pack
+      mov.l  R4,@R13          ; (setup for next iteration)
+      mov.w  R0,@(disp,GBR)  ; write packed result back
+    ldc.l  @R15+,GBR       ; restore GBR
+    lds.l  @R15+,PR
+    rts
+
+  This template performs bulk conversion of a descriptor table from one
+  format to another.  The GBR base at 0xFFFF2F84 (desc_table_mirror) is
+  a 222-byte workspace with 66 fields documented in gbr_structures.txt.
+
+  FUN_0008C0F8 is the largest function in the region (287 bytes) and
+  unpacks ~30 descriptor fields sequentially using uint16_pack.
+
+  FUN_00088E54 performs a similar unpack with uint16_pack at GBR offsets
+  0x00 through 0x4A (18 fields, alternating word/long access).
+
+  Key RAM:
+    0xFFFF2F84  desc_table_mirror  GBR base, 222 bytes, 66 fields
+                                   Documented in gbr_registry as
+                                   "desc_table_copy_2F84"
+
+  Library calls:
+    0x000BE9B0  uint16_pack        Pack float → uint16
+    0x000BE990  uint16_unpack      Unpack uint16 → float
+
+─── Template C: Sensor threshold comparison (0x088B00-0x088D00) ────────────────
+
+  Example: FUN_00088BD2
+
+  Pattern:
+    sts.l  PR,@-R15
+    add    #-4,R15          ; local variable space
+    mov    #0,R6            ; init counter
+    mov.l  @(pool),R4       ; R4 = workspace (0xFFFF2F88)
+    mov.l  @(pool),R5       ; R5 = uint16_unpack (0xBE990)
+    jsr    @R5              ; call uint16_unpack
+    ...
+    tst    R2,R2            ; test condition
+    bt     pass             ; branch if passed
+    bra    fail_exit        ; branch to DTC set path
+
+  This template:
+    1. Calls uint16_unpack to convert packed integer → float
+    2. Compares the float against a threshold
+    3. Repeats for multiple sensor channels (up to 6 in the sampled function)
+    4. If ANY condition fails, branches to a DTC-set exit path
+    5. If all conditions pass, falls through to DTC-clear path
+
+  The workspace addresses (0xFFFF2F88, 0xFFFF2F90, 0xFFFF2F98, 0xFFFF2FA0,
+  0xFFFF2FA8) are fields within the desc_table_mirror GBR structure.
+  Each is at +8 byte stride, corresponding to alternating word-read fields
+  documented in gbr_structures.txt.
+
+  This is the runtime sensor validation that feeds into the DTC check
+  functions in Template A.
+
+================================================================================
+3. DATA FLOW
+================================================================================
+
+  Sensor data (0xFFFF85xx, 0xFFFF8xxx)
+       ↓
+  [Template C: Sensor threshold comparison]
+  Unpack sensor values from desc_table_mirror workspace (0xFFFF2F84)
+  Compare against calibration thresholds
+       ↓
+  [Template A: Multi-condition DTC check]
+  Read diag_session_state (0xFFFFAD52)
+  Reference DTC struct table entry (0x9A834 + offset)
+  Evaluate 1-3 conditions
+       ↓
+  dtc_set_pending (0x9ED90) or dtc_clear (0x9EDEC)
+       ↓
+  dtc_maturation_timer (0xFFFF399E) updated
+
+  The descriptor table unpack functions (Template B) run earlier in the
+  task cycle to prepare the workspace that Templates A and C consume.
+
+================================================================================
+4. SUB-REGION MAP
+================================================================================
+
+  Address Range        Function Count  Template    Purpose
+  ──────────────────────────────────────────────────────────────
+  0x087100-0x087600    ~36            A           DTC check functions (1/2/3 cond)
+  0x088B00-0x088D00    ~8             C           Sensor threshold comparison
+  0x088D00-0x089000    ~6             B           GBR descriptor table unpack
+  0x089100-0x089D00    ~15            A+C mixed   Additional DTC checks + sensors
+  0x08C000-0x08CD00    ~12            B+A mixed   Large unpack + DTC checks
+  0x08CE00-0x08D100    ~8             A           More DTC check functions
+  0x08DD00-0x08F400    ~30            A+C mixed   Densest DTC monitor cluster
+  0x08F500-0x08FC00    ~12            A           Final DTC check functions
+
+================================================================================
+5. DTC MAPPING
+================================================================================
+
+The DTC struct table at 0x9A834 contains 93 entries.  Each 20-byte entry
+maps to one OBD-II P-code.  The functions in this region reference entries
+by loading the table base + offset into R4 before calling the DTC helpers.
+
+Known DTCs from dtc_table.txt:
+  Index  Address     P-Code   Description
+  ─────────────────────────────────────────────
+  0      0x9A834     P0335    Crankshaft Position Sensor A
+  1      0x9A848     P0336    CKP Sensor A Range/Performance
+  ...    (93 total entries, 20 bytes each, through 0x9B528)
+
+The ~36 DTC check functions at 0x087100-0x087600 likely cover a contiguous
+range of these DTC entries.  Full P-code assignment requires decoding the
+R4 offset in each function's literal pool.
+
+================================================================================
+6. KEY RAM MAP
+================================================================================
+
+  Address       Type     Name                    Refs   Purpose
+  ──────────────────────────────────────────────────────────────
+  0xFFFF2F84    struct   desc_table_mirror       6      GBR base, 222B, 66 fields
+  0xFFFF2F88    u16      desc_field_01           1      Sensor packed value (CKP?)
+  0xFFFF2F90    u16      desc_field_02           1      Sensor packed value
+  0xFFFF2F98    u16      desc_field_03           1      Sensor packed value
+  0xFFFF2FA0    u16      desc_field_04           1      Sensor packed value
+  0xFFFF2FA8    u16      desc_field_05           1      Sensor packed value
+  0xFFFF399E    u16      dtc_maturation_timer    118    DTC trip counter/timer
+  0xFFFFAD52    u8[]     diag_session_state      107    Active fault bitmask array
+
+================================================================================
+7. LIBRARY FUNCTION USAGE
+================================================================================
+
+  Address     Name              Calls from region   Purpose
+  ──────────────────────────────────────────────────────────────
+  0x0BE990    uint16_unpack     ~40                 Unpack u16 → float
+  0x0BE9B0    uint16_pack       ~80                 Pack float → u16
+  0x0BE9A0    uint8_pack        ~20                 Pack float → u8
+  0x09ED90    dtc_set_pending   34                  Set DTC pending flag
+  0x09EDEC    dtc_clear         38                  Clear DTC flag
+
+================================================================================
+8. PROPOSED GHIDRA LABELS
+================================================================================
+
+  Address    Proposed Label                    Template
+  ──────────────────────────────────────────────────────────
+  0x088BD2   diag_sensor_threshold_multi       C (6-channel sensor check)
+  0x088E54   diag_desc_unpack_18field          B (18-field GBR unpack)
+  0x08C0F8   diag_desc_unpack_30field          B (30-field GBR unpack, largest)
+  0x087100   dtc_check_P0335_area              A (first DTC check cluster)
+
+  Individual DTC check functions should be labeled as:
+    dtc_monitor_XX  (where XX is the index into the DTC struct table)
+  once the full P-code mapping is decoded.
+
+================================================================================
+9. SUMMARY
+================================================================================
+
+The diagnostic monitor cluster in 0x080000-0x08FFFF is a structured subsystem
+with three function templates:
+  A) Multi-condition DTC check (most numerous, ~70 functions)
+  B) GBR descriptor table unpack (~8 functions, some very large)
+  C) Sensor threshold comparison (~15 functions)
+
+Together they implement the OBD-II readiness monitor framework: unpack sensor
+data from descriptors, compare against calibration thresholds, and set/clear
+DTCs based on multi-condition evaluation with maturation timing.
+
+The 93-entry DTC struct table at 0x9A834 is the central registry.  Each
+function in this region services one or more DTC entries from that table.
+
+This region accounts for a significant portion of the ROM's diagnostic
+capability and is the primary location for individual OBD-II monitor
+implementations (as opposed to the DTC framework itself at 0x098000-0x0A5FFF
+which handles the state machine, freeze frames, and history).

@@ -1,0 +1,519 @@
+Region 0x070000-0x07FFFF Scout Analysis
+========================================
+AE5L600L ROM  |  Date: 2025-04-03
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+Region size:     65,536 bytes (64 KB)
+Code blocks:     47,104 bytes (71.9%)
+Float/cal data:  13,312 bytes (20.3%)
+Unmapped/gaps:    5,120 bytes (7.8%)
+
+Total functions:   217
+  Named (user):      6  (2.8%)
+  Auto (FUN_):     209
+  Thunks:            2
+
+Named functions:
+  0x0717B2  eeprom_read_helper          (non-emissions)
+  0x0758CA  task57_egr_emissions        (emissions -- Task 57 entry)
+  0x0758DE  egr_main_setup              (emissions)
+  0x07BF3C  egr_sub_a_maturation        (emissions)
+  0x07C242  egr_sub_b_completion        (emissions)
+  0x07C280  egr_output_handler          (emissions)
+
+Ghidra comments:  6  (all on the named functions above)
+Ghidra symbols:   6  (matching the named functions)
+
+================================================================================
+2. EGR/EMISSIONS vs NON-EMISSIONS BREAKDOWN
+================================================================================
+
+EGR/emissions functions (by GBR base or known EGR RAM references):  ~25
+  These use GBR bases FFFFA198, FFFFA156, or FFFFA158 and/or reference known
+  EGR-specific RAM (FFFFA1FA-A1FD counters, FFFFA17D completion flag, FFFF2BFA
+  channel selector, FFFF9FA4 timer, etc.).
+
+  Known EGR cluster:
+    0x074A82  (GBR=FFFFA156, large setup function with timer_read, critical_section)
+    0x0757C6-0x075846  (8 small helper functions, uint8_pack wrappers)
+    0x0758BE  thunk -> 0x07ADD8
+    0x0758C4  (small, pre-entry helper)
+    0x0758CA  task57_egr_emissions (Task 57 entry point)
+    0x0758DE  egr_main_setup
+    0x075C4A  (state machine extension)
+    0x077538, 0x07757C  (EGR computation helpers)
+    0x0778BC  (sensor read with EGR GBR)
+    0x07973E, 0x079770  (EEPROM + EGR RAM)
+    0x07ADD8  (timer + float ops, thunk target)
+    0x07AEEC  (sensor read + EGR context)
+    0x07BF3C  egr_sub_a_maturation
+    0x07C1D0  (EGR sub helper)
+    0x07C242  egr_sub_b_completion
+    0x07C280  egr_output_handler
+
+  NOTE: Per project policy, EGR/emissions functions are diagnostic monitors
+  only (no EGR valve on this turbo EJ255 engine). Not prioritized.
+
+Non-emissions functions:  ~192 (88.5%)
+  This is the VAST MAJORITY of the region. These functions handle:
+  - Sensor diagnostics (non-EGR DTCs)
+  - A/D converter reads and processing
+  - EEPROM/NV storage read/write
+  - Calibration table interpolation
+  - Float math computation chains
+  - Data pack/unpack for logging
+
+================================================================================
+3. SUB-REGION BREAKDOWN
+================================================================================
+
+Sub-region 0 (0x070000-0x070FFF):  10 functions, 0 named
+  Code: 0x070000-0x070B00, 0x070E00-0x070FFF
+  Data: 0x070B00-0x070E00
+  Character: A/D sensor read cluster. FUN_070400 family reads A/D channel 16
+    (get_ad_channel -> uint16_unpack -> get_ad_raw pattern). Multiple small
+    accessor functions at 0x07042E-0x070558 that return specific RAM values
+    (FFFF2508, FFFF2E38, FFFF2560, FFFF30BC, etc.).
+  Subsystem: Sensor data acquisition helpers
+
+Sub-region 1 (0x071000-0x071FFF):  31 functions, 1 named [eeprom_read_helper]
+  Code: 0x070E00-0x071800, 0x071A00-0x071FFF
+  Data: 0x071800-0x071A00
+  Character: DENSEST sub-region. Mix of:
+    - DTC monitor pairs (0x0710D2/0x071152 -- check_diag_state_2 + dtc_set/clear)
+    - EEPROM read/write cluster (0x071224, 0x0714A4, 0x0717B2, 0x0719E8)
+    - Sensor/calc chain (0x071672 -- A/D + pack/unpack)
+    - Float computation (0x071CE0, 0x071D14 -- float_clamp + float_mul)
+    - Interpolation (0x071D92 -- fmac_interp_2d)
+    - Several DTC set/clear helpers (0x071F48, 0x07200C, 0x072066)
+  Contains FUN_71A76 which is a MAJOR DISPATCHER calling 15+ sub-functions
+    via BSR: 0x72584, 0x724C8, 0x71B58, 0x71D08, 0x71D14, 0x71D92,
+    0x71F48, 0x7200C, 0x72066, 0x72108, 0x72218, 0x72272, 0x72314, etc.
+    Uses eeprom_op (0xBDBCC), check_diag_state, fmac_interp_2d, uint8_pack.
+  Subsystem: Diagnostic monitor orchestration + EEPROM management
+
+Sub-region 2 (0x072000-0x072FFF):  16 functions, 0 named
+  Code: 0x071A00-0x072900, 0x072900-0x073000 (data)
+  Data: 0x072900-0x073000
+  Character: Continuation of sub-region 1 dispatch targets.
+    - DTC monitor functions (0x072108, 0x072218, 0x072272 -- float_clamp + dtc ops)
+    - EEPROM functions (0x072314, 0x0723AC)
+    - Large DTC monitor pair (0x07267E, 0x0727F0 -- fmac_interp_2d + dtc ops)
+    - Sensor acquisition (0x072CE0 -- check_diag_state + get_ad_channel)
+  Subsystem: DTC monitor sub-functions (called from dispatcher at 0x71A76)
+
+Sub-region 3 (0x073000-0x073FFF):  9 functions, 0 named
+  Code: 0x073000-0x073B00, 0x073C00-0x073F00
+  Character: Data packing/unpacking cluster.
+    - FUN_073348/073386: uint8_unpack, uint16_unpack/pack pairs
+    - FUN_0731C4: Full EEPROM + pack/unpack chain
+    - FUN_0733B2, 0x0734C0: check_diag_state + pack/write
+    - FUN_073006: GBR=FFFF97F0, references ROM tables at 0x97C90
+  Subsystem: Data serialization / EEPROM storage helpers
+
+Sub-region 4 (0x074000-0x074FFF):  4 functions, 0 named
+  Code: 0x074000-0x074D00, 0x074E00-0x074FFF
+  Character: Mixed EGR setup and EEPROM save/load.
+    - FUN_074A82: Large function, GBR=FFFFA156 (EGR base), timer_read,
+      critical_section -- EGR initialization/state setup
+    - FUN_074C4C: Dispatcher calling 075826, 075846, 074E30 -- EGR-adjacent
+    - FUN_074E30: EEPROM + pack/unpack
+    - FUN_074FD0: uint16_unpack, uint8_unpack -- data deserialization
+  Subsystem: EGR state initialization + EEPROM persistence
+
+Sub-region 5 (0x075000-0x075FFF):  15 functions, 2 named [task57_egr, egr_main_setup]
+  Code: 0x075100-0x075400, 0x075700-0x075A00
+  Data: 0x075400-0x075700, 0x075A00-0x075C00, 0x075D00-0x076200
+  Character: TASK 57 ENTRY REGION. EGR/emissions diagnostic task entry point
+    and associated setup/helper functions. Large float data pool (0x075D00-0x076200).
+    - FUN_07515E, 0x0752D4: EEPROM + pack/unpack (non-EGR, data persistence)
+    - 0x0757C6-0x075846: Small EGR helper stubs (uint8_pack wrappers)
+    - 0x0758CA: task57_egr_emissions entry
+    - 0x0758DE: egr_main_setup
+    - 0x075C4A: EGR state machine extension
+  Subsystem: EGR task entry + EEPROM helpers
+
+Sub-region 6 (0x076000-0x076FFF):  2 functions, 0 named
+  Code: 0x076200-0x076A00, 0x076B00-0x076FFF
+  Character: Sparse. Only 2 functions detected.
+    - FUN_076032: get_ad_channel + get_ad_raw (sensor read)
+    - FUN_076164: critical_section (lock/unlock wrapper)
+  Subsystem: Sensor read + concurrency helper
+
+Sub-region 7 (0x077000-0x077FFF):  4 functions, 0 named
+  Code: 0x076B00-0x077700, 0x077800-0x077E00, 0x077F00-0x078200
+  Character: EGR computation and state management.
+    - FUN_077538: float_clamp + fmac_interp_2d (EGR computation)
+    - FUN_07757C: Called from EGR context (0x74A82)
+    - FUN_0778BC: Sensor read with EGR GBR reference
+    - FUN_077B8E: No identified library calls
+  Subsystem: EGR computation subroutines (called from Task 57)
+
+Sub-region 8 (0x078000-0x078FFF):  0 functions
+  Code: 0x078300-0x078500, 0x078800-0x078A00, 0x078B00-0x078F00
+  Data: 0x078500-0x078800, 0x078F00-0x079300
+  Character: Code blocks with NO Ghidra-identified function entries.
+    Likely contains code called via indirect dispatch or was not recognized
+    by Ghidra's auto-analysis. Significant float data pools.
+  Subsystem: Unknown -- needs manual investigation
+
+Sub-region 9 (0x079000-0x079FFF):  4 functions, 0 named
+  Code: 0x079300-0x079900, 0x079C00-0x079E00
+  Data: 0x079A00-0x079C00, 0x079E00-0x07A000
+  Character:
+    - FUN_079558: check_diag_bit_2, uint8_pack -- reads FFFFAF3B, iterates
+      over 5 RAM pairs (FFFF2DA0/2DE4 through FFFF2DD0/2DFC) calling 0x582E0
+      repeatedly. Pattern suggests multi-channel monitor state checking.
+    - FUN_07963C: Similar check_diag_bit_2 + uint8_pack pattern.
+    - FUN_09773E, 0x079770: EGR-related EEPROM access.
+  Subsystem: Multi-channel diagnostic monitors (non-EGR)
+
+Sub-region A (0x07A000-0x07AFFF):  3 functions, 0 named
+  Code: 0x07A000-0x07A400, 0x07A600-0x07A800, 0x07AB00-0x07AE00
+  Data: 0x07A400-0x07A600, 0x07A800-0x07AB00
+  Character:
+    - FUN_07A724: get_ad_channel + get_ad_raw + timer_read + float_clamp.
+      Sensor read with timeout logic -- likely a sensor validation function.
+  Subsystem: Sensor validation / timed sensor reads
+
+Sub-region B (0x07B000-0x07BFFF):  5 functions, 0 named (egr_sub_a at 0x7BF3C)
+  Code: 0x07AF00-0x07B400, 0x07B600-0x07B800, 0x07B900-0x07BF00
+  Data: 0x07B400-0x07B600, 0x07BF00-0x07C500 (large float pool)
+  Character:
+    - FUN_07B05A: fmac_interp + get_ad_channel + get_ad_raw + uint16_pack.
+      2D interpolation on live sensor data -- a SENSOR PROCESSING function.
+    - FUN_07B2D2: Similar get_ad + uint16_pack pattern.
+    - FUN_07B7A8, 07B8C2: EEPROM + float_mul + get_ad -- sensor data stored
+      to EEPROM with float scaling. Adaptation/learning storage.
+    - 0x07BF3C: egr_sub_a_maturation (named, emissions)
+  Subsystem: Sensor processing + adaptation storage
+
+Sub-region C (0x07C000-0x07CFFF):  23 functions, 2 named [egr_sub_b, egr_output]
+  Code: 0x07C500-0x07CA00
+  Data: 0x07CE00-0x07D000
+  Character: Dense cluster, partially EGR, partially non-EGR.
+    EGR: 0x07C1D0, 0x07C242, 0x07C280 (named)
+    Non-EGR sensor monitors:
+    - FUN_07C4D4, 07C510, 07C56C, 07C604, 07C6A4, 07C756:
+      All follow get_ad_channel + get_ad_raw pattern. Six sensor
+      acquisition functions reading via channel 16 with various
+      post-processing (uint16_pack, uint8_pack). Likely individual
+      sensor channel monitors.
+    - FUN_07C994: uint8_pack
+    - FUN_07C9F2, 07CA4C: dtc_set_pending + dtc_clear (DTC pairs)
+    - FUN_07CB30: check_diag_state_2 + float_safe_div + get_ad + timer_read.
+      Complex sensor diagnostic with division and timeout -- likely a
+      SENSOR RATIONALITY check.
+    - FUN_07CC30, 07CCD0: Float computation + DTC ops
+    - FUN_07CE48-07CEF4: Float clamp chains + DTC state
+    - FUN_07CF94: dtc_set_pending + dtc_clear
+  Subsystem: Sensor diagnostics + DTC state management
+
+Sub-region D (0x07D000-0x07DFFF):  22 functions, 0 named
+  Code: 0x07D000-0x07E300
+  Data: 0x07E300-0x07E600
+  Character: SECOND MAJOR DISPATCHER region.
+    - FUN_07D070: Multi-DTC handler -- reads 4 consecutive RAM bytes
+      (FFFF97FE-9801), compares against FFFFA239, calls dtc_set_pending
+      and dtc_clear in alternating pattern. DTC state machine for
+      multiple simultaneous fault codes.
+    - FUN_07D0E4-07D11C: Three more DTC set/clear pair functions.
+    - FUN_07D144: check_diag_state + uint16_pack + uint8_unpack
+    - FUN_07D1B0: COMPLEX function -- check_diag_bit + check_diag_state +
+      float_safe_div + fmac_interp + uint16_pack. Sensor diagnostic with
+      interpolation and fault detection. High-priority for analysis.
+    - FUN_07D3B8-07D4B0: EEPROM + sensor read cluster. Multiple functions
+      that read A/D channel then store to EEPROM. Adaptation/learning.
+    - FUN_07D526: DISPATCHER -- calls 10 sub-functions via BSR:
+      0x7D9F8, 0x7DA1C, 0x7DAB4, 0x7DAE8, 0x7DB0E, 0x7DB80, 0x7DC04,
+      0x7E13C, 0x7DC88, 0x7DF6C. Also calls 0x22F92 and uses timer_read.
+      This is a TASK-LEVEL coordinator for a secondary diagnostic monitor.
+    - FUN_07D9F8-07DC88: Sub-functions of the 0x7D526 dispatcher.
+  Cross-ref: 0x07D6CC referenced from cl_ol_analysis.txt as "diagnostic
+    function" reading FFFF79C4 (fuel trim related RAM).
+  Subsystem: Secondary diagnostic task + DTC state machines + sensor EEPROM
+
+Sub-region E (0x07E000-0x07EFFF):  32 functions, 0 named
+  Code: 0x07E600-0x07F200
+  Data: 0x07E300-0x07E600
+  Character: Dense sensor processing and monitoring cluster.
+    - FUN_07E014: EEPROM + float_mul (adaptation storage)
+    - FUN_07E13C: fmac_interp_2d (called from 0x7D526 dispatcher)
+    - FUN_07E268, 07E26C: get_ad_channel + get_ad_raw (sensor reads)
+    - FUN_07E664: NOTABLE -- calls get_ad_channel(16), get_ad_raw, then
+      fmac_interp_2d on result. Reads FFFF64C0, FFFFA32C, FFFF4024 (ADC
+      raw buffer base), FFFF249C/249E. Also calls 0x317C/0x3190 (A/D)
+      and 0xBEAB0 (2D interpolation). This is a SENSOR SCALING function
+      that converts raw A/D to engineering units via calibration table.
+    - FUN_07E864-07E9B4: 10 small functions in tight sequence (0x2C-0x3C
+      bytes each). Pattern suggests a REPETITIVE monitor block -- possibly
+      individual oxygen sensor or catalyst monitor sub-checks.
+    - FUN_07EADC-07ECD0: More small functions, similar tight packing.
+    - FUN_07EE00: get_ad + uint16_unpack + uint8_pack (sensor read+pack)
+    - FUN_07EF4A: float_clamp + uint16_unpack + uint8_pack
+  Subsystem: Sensor scaling/conversion + repetitive monitor sub-checks
+
+Sub-region F (0x07F000-0x07FFFF):  37 functions, 0 named
+  Code: 0x07F300-0x07F500, 0x07F600-0x07FA00, 0x07FB00-0x07FF00
+  Data: 0x07FF00-0x080000 (overflows to next region)
+  Character: LARGEST function count in any sub-region.
+    - FUN_07F02C-07F106: Float computation cluster (float_clamp,
+      fmac_interp_2d). Calibration table lookup functions.
+    - FUN_07F32A-07F5EE: DTC MONITOR CLUSTER. Six functions that all
+      follow pattern: read FFFF6624 + FFFF895C, compare against
+      calibration values (0xC5424, 0xC5428, 0xC47A7-A8), call
+      float_clamp, then dtc_set_pending/dtc_clear. These monitor
+      a specific sensor against high/low threshold pairs from
+      calibration. Likely SENSOR RANGE MONITORS (over-range,
+      under-range, rationality checks).
+    - FUN_07F678-07FC90: Dense sensor-read cluster. Multiple functions
+      using get_ad_channel + get_ad_raw + uint16_unpack + uint8_pack.
+      These read various sensor channels and pack results into RAM
+      structures. Some also use fmac_interp_2d for scaling.
+    - FUN_07FDBE-07FF6E: Small utility functions (uint8_pack,
+      check_diag_state + float_clamp).
+  Subsystem: Sensor range monitors + sensor data acquisition
+
+================================================================================
+4. SAMPLE DISASSEMBLY FINDINGS (NON-EMISSIONS)
+================================================================================
+
+--- FUN_070400 (Sensor read helper) ---
+  0x070400: 2FE6  mov.l  R14,@-R15
+  0x070402: 4F22  sts.l  PR,@-R15
+  0x070404: 7FFC  add    #-4,R15
+  0x070406: D22F  mov.l  @(0x0704C4),R2        ; =0x0000317C [get_ad_channel]
+  0x070408: 420B  jsr    @R2
+  0x07040A: E410  mov    #16,R4                 ; channel 16 (delay slot)
+  0x07040C: 2F02  mov.l  R0,@R15               ; save result
+  0x07040E: D42E  mov.l  @(0x0704C8),R4        ; =0xFFFF2504 (RAM)
+  0x070410: D22E  mov.l  @(0x0704CC),R2        ; =0x000BE980 [uint16_unpack]
+  0x070412: 420B  jsr    @R2
+  0x070414: EE00  mov    #0,R14                 ; (delay slot)
+  ...
+  0x07041E: D22C  mov.l  @(0x0704D0),R2        ; =0x00003190 [get_ad_raw]
+  0x070420: 420B  jsr    @R2
+  Pattern: get_ad_channel(16) -> uint16_unpack(FFFF2504) -> get_ad_raw()
+  Reads A/D channel, unpacks configuration, gets raw sensor value.
+
+--- FUN_0710D2 (DTC monitor function) ---
+  Calls: check_diag_state_2(0x584C8), check_diag_bit(0x582D2)
+  Loads: FFFF6390 (diag state), FFFF67EC (diag flags), FFFF9780 (DTC state)
+  Cal refs: 0xD8A94, 0xD8B1C, 0xD8A41 (threshold tables)
+  DTC ops: dtc_set_pending(0x9ED90), dtc_clear(0x9EDEC)
+  Also: float_clamp(0xBE53C)
+  Pattern: Check diagnostic preconditions -> compare sensor against
+    calibration thresholds -> set or clear DTC accordingly.
+
+--- FUN_071A76 (Major dispatcher) ---
+  15 BSR calls to sub-functions: 0x72584, 0x724C8, 0x71B58, 0x71D08,
+    0x71D14, 0x71D92, 0x71F48, 0x7200C, 0x72066, 0x72108, 0x72218,
+    0x72272, 0x72314, 0x726FE, 0x71436
+  JSR calls: eeprom_op(0xBDBCC) x3, check_diag_state(0x582AC),
+    fmac_interp_2d(0xBEAB0), check_diag_bit(0x582D2), 0x22F92 (timer/task)
+  This is a TASK-LEVEL ORCHESTRATOR that sequences diagnostic checks,
+    calibration lookups, EEPROM storage, and DTC management.
+
+--- FUN_073348 (Data serialization) ---
+  Calls: uint8_unpack(0xBE990) x2, uint16_unpack(0xBE980) x1
+  Reads: FFFF2580, FFFF2588, FFFF258E (sequential RAM structs)
+  Checks results and returns flag in R6.
+  Pattern: Deserialize multi-byte data from RAM structs, validate
+    each field, return composite status.
+
+--- FUN_07D070 (Multi-DTC state machine) ---
+  Reads 4 consecutive RAM bytes: FFFF97FE, FFFF97FF, FFFF9800, FFFF9801
+  Checks against FFFFA239 (compare register)
+  For each byte: compare -> dtc_set_pending or dtc_clear
+  Pattern: Iterate over 4 DTC state slots, setting or clearing faults
+    based on comparison against a master state byte. This is a BATCH
+    DTC PROCESSOR for related fault codes.
+
+--- FUN_07E664 (Sensor scaling function) ---
+  0x07E66C: D241  mov.l  @pool,R2              ; =0x0000317C [get_ad_channel]
+  0x07E66E: 420B  jsr    @R2
+  0x07E670: E410  mov    #16,R4                 ; channel 16 (delay slot)
+  Loads: FFFF64C0 (sensor float), FFFFA32C (scaling state), FFFF4024 (ADC base)
+  Calls: get_ad_raw(0x3190), fmac_interp_2d(0xBEAB0)
+  Cal refs: 0xD8AE8 (2D interpolation table), 0xC4B90, 0xC4B94
+  Pattern: Read raw A/D -> look up in 2D calibration table -> apply
+    scaling -> store converted value. Sensor-to-engineering-unit converter.
+
+--- FUN_07FC80 (A/D read + pack) ---
+  Loads: FFFFA38C, FFFFA38D (state bytes), FFFF366C, FFFF2E3C, FFFF2E3E
+  Calls: uint8_pack(0xBE9A0) x3, get_ad_channel(16), uint16_unpack(0xBE980) x3,
+    get_ad_raw(0x3190), uint8_pack again
+  Pattern: Read sensor, unpack configuration from multiple sources,
+    re-pack processed data into output RAM structures.
+
+================================================================================
+5. CROSS-REFERENCES FROM KNOWN CODE
+================================================================================
+
+From diag_tasks_analysis.txt:
+  - Task 57 (EGR/Emissions) entry at 0x758CA
+    Calls: 0x7BF3C (egr_sub_a), 0x7C242 (egr_sub_b), 0x7C280 (output)
+    Setup at 0x758DE, state machine at 0x7596A
+  - 0x077774 referenced from EGR state machine (BSR target)
+
+From cl_ol_analysis.txt:
+  - 0x07D6CC: "diagnostic function" reading FFFF79C4 (fuel trim RAM)
+    Referenced as reading CL/OL state for logging/diagnostic purposes.
+
+From task_call_graph.txt:
+  - No direct references found (task dispatcher addresses may be outside
+    the searched range, or functions are called indirectly via tables)
+
+From cal_crossref.txt:
+  - No direct references found (calibration cross-references don't
+    include this region's functions as consumers)
+
+================================================================================
+6. REGION CHARACTERIZATION SUMMARY
+================================================================================
+
+PRIMARY SUBSYSTEM: Sensor Diagnostic Monitors
+  The 0x070000-0x07FFFF region is predominantly a DIAGNOSTIC MONITORING
+  subsystem. It contains:
+
+  A) Task 57 (EGR/Emissions): ~25 functions (11.5%)
+     The only named/documented subsystem. Performs EGR diagnostic monitoring
+     (maturation counters, completion check, output handling). Per project
+     policy, this is a no-op monitor on the turbo EJ255 (no EGR valve).
+
+  B) Sensor Acquisition Layer: ~26 functions (12.0%)
+     Functions that read A/D channels (all observed using channel 16 selector),
+     apply calibration scaling via 2D interpolation tables, and pack results
+     into RAM structures. These form the INPUT PIPELINE for diagnostics.
+
+  C) DTC Monitor Functions: ~22 functions (10.1%)
+     Classic diagnostic monitor pattern: check preconditions via diag state
+     functions, compare sensor values against calibration thresholds, then
+     set or clear DTCs. Many work in set/clear pairs.
+
+  D) EEPROM Persistence Layer: ~20 functions (9.2%)
+     Read/write sensor adaptation data and diagnostic state to EEPROM.
+     Includes serialization (pack/unpack) and deserialization.
+
+  E) Two Major Dispatchers:
+     - FUN_071A76: Orchestrates 15+ sub-functions (sub-regions 1-2)
+     - FUN_07D526: Orchestrates 10 sub-functions (sub-region D)
+     These may be the main bodies of diagnostic TASKS called from the
+     scheduler. FUN_071A76 likely is or is called from a diagnostic
+     task entry point that was not captured in the task analysis.
+
+  F) Calibration Computation: ~13 functions (6.0%)
+     Float math chains (float_clamp, float_safe_div, fmac_interp/interp_2d)
+     that process sensor data against calibration tables.
+
+  G) Unidentified: ~86 functions (39.6%)
+     Functions with no recognized library calls in their immediate body.
+     Many of these are likely small helper/accessor functions, conditional
+     branches, or functions that primarily manipulate registers and RAM
+     without calling known library routines.
+
+LIBRARY USAGE (bounded to function boundaries):
+  uint8_pack:         43 functions
+  float_clamp:        35 functions
+  get_ad_channel:     26 functions
+  get_ad_raw:         26 functions
+  dtc_set_pending:    20 functions
+  eeprom_op:          20 functions
+  uint16_unpack:      19 functions
+  dtc_clear:          19 functions
+  check_diag_state:   16 functions
+  uint16_pack:        16 functions
+  check_diag_bit:     12 functions
+  fmac_interp_2d:     10 functions
+  check_diag_state_2:  7 functions
+  uint8_unpack:        7 functions
+  float_mul:           7 functions
+  timer_read:          6 functions
+  float_safe_div:      4 functions
+  critical_section:    4 functions
+  fmac_interp:         3 functions
+  check_diag_bit_2:    2 functions
+
+================================================================================
+7. NOTABLE NON-EMISSIONS FUNCTIONS (PRIORITY TARGETS)
+================================================================================
+
+HIGH PRIORITY (complex, non-EGR, multiple library calls):
+
+  0x071A76  Major dispatcher -- orchestrates 15+ diagnostic sub-functions
+            across sub-regions 1-2. Likely a task entry point or main body.
+            Uses eeprom_op, check_diag_state, fmac_interp_2d.
+
+  0x07D526  Secondary dispatcher -- orchestrates 10 sub-functions in sub-region D.
+            Uses timer_read. Possibly the Task 57 "companion" or a separate
+            diagnostic task (e.g., secondary air, catalyst, O2 sensor).
+
+  0x07D1B0  Complex diagnostic function -- check_diag_bit + check_diag_state +
+            float_safe_div + fmac_interp + uint16_pack. Sensor diagnostic
+            with interpolation-based threshold and fault detection.
+
+  0x07CB30  Sensor rationality check -- check_diag_state_2 + float_safe_div +
+            get_ad_channel + get_ad_raw + timer_read. Timed sensor validation
+            with division (ratio check).
+
+  0x07E664  Sensor scaling function -- get_ad_channel -> fmac_interp_2d ->
+            calibration lookup. Converts raw A/D to engineering units.
+
+  0x0714A4  Multi-library function -- check_diag_bit + eeprom_op +
+            float_safe_div + fmac_interp + timer_read + uint16_pack.
+            Likely a complete diagnostic monitor cycle in one function.
+
+MEDIUM PRIORITY (DTC monitor pairs, sensor chains):
+
+  0x0710D2/0x071152  DTC monitor pair with float_clamp thresholds
+  0x07267E/0x0727F0  DTC monitor pair with 2D interpolation thresholds
+  0x07F32A-07F5EE    Sensor range monitor cluster (6 functions)
+  0x07D070            Multi-DTC batch processor (4 simultaneous DTCs)
+  0x07B05A/07B2D2    Sensor processing with interpolation + packing
+  0x07B7A8/07B8C2    Sensor adaptation + EEPROM persistence
+
+LOW PRIORITY (small helpers, pack/unpack wrappers):
+  0x07069C, 0x0706E4, 0x071788, etc. -- Simple accessor functions
+
+================================================================================
+8. PROPOSED NEXT STEPS
+================================================================================
+
+1. IDENTIFY THE DISPATCHERS' PARENT TASKS
+   FUN_071A76 and FUN_07D526 are task-level coordinators. Trace backwards
+   from the task scheduler dispatch table to determine which task numbers
+   they belong to. This would unlock naming for ~25+ functions each.
+
+2. TRACE 0x07D6CC (CL/OL DIAGNOSTIC READER)
+   This function is cross-referenced from cl_ol_analysis.txt as reading
+   fuel trim state (FFFF79C4). It may be a diagnostic logging function
+   for the CL/OL system -- worth full disassembly.
+
+3. ANALYZE SUB-REGION 8 (0x078000-0x078FFF)
+   Zero Ghidra-detected functions despite significant code blocks.
+   Likely contains jump-table targets or indirectly-called routines.
+   Manual function discovery needed.
+
+4. MAP THE SENSOR RANGE MONITORS (0x07F32A-07F5EE)
+   These 6 functions share a clear pattern (threshold compare + DTC ops)
+   and reference calibration addresses 0xC5424, 0xC5428, 0xC47A7-A8.
+   Identifying which sensors they monitor would aid DTC diagnosis.
+
+5. RESOLVE A/D CHANNEL 16 SEMANTICS
+   All observed A/D calls use channel 16 (E410 delay slot). Per ADC
+   pipeline analysis, ADDR16 = "TGV Position / APP Indexed B" at MED
+   confidence. Having 49 functions all reading TGV seems unlikely --
+   channel 16 may be a multiplexer selector or function index rather
+   than a literal A/D channel number. Needs investigation.
+
+6. CROSS-REFERENCE RAM ADDRESSES
+   Several functions reference RAM in the 0xFFFF97xx-0xFFFFA3xx range
+   (diagnostic state workspace). Mapping these to known diagnostic
+   subsystems would accelerate identification.
+
+================================================================================
+END OF SCOUT ANALYSIS
+================================================================================

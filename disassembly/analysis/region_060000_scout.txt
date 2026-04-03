@@ -1,0 +1,451 @@
+Region 0x060000-0x06FFFF Scout Analysis
+==============================================================================
+ROM: AE5L600L (Subaru EJ255 turbo)
+Date: 2026-04-03
+Method: Ghidra XML function/symbol/comment extraction, raw SH-2 byte
+        disassembly, cross-reference search across all analysis files and maps.
+
+
+1. FUNCTION COUNT AND NAMING
+==============================================================================
+
+Total Ghidra FUNCTION entries:  173  (includes 2 thunks)
+Named (user-defined):             7  functions  (4.0%)
+Unnamed (FUN_/thunk_):          166  functions  (96.0%)
+
+Named functions:
+  0x0602DC  task53_diag_monitor          Task 53 entry point
+  0x062D0   evap_workspace_init          (duplicate name, see 0x665C0)
+  0x066580  task56_evap_purge            Task 56 entry point
+  0x0665C0  evap_workspace_init          EVAP cal cache loader
+  0x06F0B8  task58_maf_diag              Task 58 entry point
+  0x06F0CE  task58_maf_diag_part1        MAF precondition check
+  0x06F114  task58_maf_diag_part2        MAF maturation + DTC
+
+Named symbols (from SYMBOL_TABLE, includes aliases):
+  0x0602DC  task53_diag_monitor
+  0x06035A  task53_readiness_path_A / diag_readiness_path_a
+  0x060392  task53_readiness_path_B / diag_readiness_path_b
+  0x06048E  task53_readiness_compare / diag_readiness_output_filter
+  0x0627D8  vvt_error_feedback
+  0x066580  task56_evap_purge
+  0x0665C0  evap_workspace_init
+  0x066626  evap_ect_threshold_lookup
+  0x06665E  evap_condition_eval
+  0x066C40  task56_evap_test_sequence / evap_test_sequence
+  0x066D20  task56_evap_sub_disabled_A
+  0x066DEC  task56_evap_sub_disabled_B
+  0x066EBC  task56_evap_sub_disabled_C
+  0x06F0B8  task58_maf_diag
+  0x06F0CE  task58_maf_diag_part1 / maf_diag_precondition
+  0x06F114  task58_maf_diag_part2 / maf_diag_maturation
+  0x06F1AC  maf_diag_extended
+  0x06F260  task58_maf_diag_part3
+
+Ghidra comments: 18 entries in this range (all on the named functions above).
+
+Thunks:
+  0x06B754  thunk_FUN_0006BA6A
+  0x06F8B2  thunk_FUN_0006F968
+
+
+2. CROSS-REFERENCES FROM KNOWN CODE
+==============================================================================
+
+2a. Task call graph (task_call_graph.txt):
+  [53] task53_diag_monitor  @ 0x602DC
+  [56] task56_evap_purge    @ 0x66580
+  [58] task58_maf_diag      @ 0x6F0B8
+
+2b. Fuel pump pipeline dispatch (fuel_pump_raw.txt, 0x048234-0x048284):
+  The main engine management task pipeline at 0x048200 calls 10 functions
+  in this region sequentially via JSR. These are NOT fuel-pump-specific;
+  they are diagnostic monitor subroutines called from the same scheduler
+  slot. Call order:
+
+    0x061514  -> diagnostic monitor sub (desc_read_float, workspace ops)
+    0x061A6A  -> diagnostic monitor sub (workspace init, desc reads)
+    0x061BC8  -> diagnostic monitor sub
+    0x061FD4  -> diagnostic monitor sub
+    0x0623EC  -> diagnostic monitor sub
+    0x062EEC  -> diagnostic monitor sub
+    0x0633EC  -> diagnostic monitor sub
+    0x06081C  -> diagnostic monitor sub
+    0x0601F8  -> diagnostic readiness output (writes FFFF9074)
+    0x060308  -> diagnostic monitor sub (rtos_workspace_init, desc_read_float)
+    0x0602FA  -> diagnostic monitor sub
+
+2c. AVCS/VVT analysis (avcs_analysis.txt, avcs_raw.txt):
+  0x0627D8  vvt_error_feedback -- PID function reading 4 descriptor tables
+            (9x9, zeroed in stock). Writes FFFF920C-FFFF9228.
+
+2d. CL/OL analysis (cl_ol_state_machine.txt, disasm_3952C_annotated.txt):
+  0x063B00  pointer/data table referenced from CL/OL state machine
+  0x063B54  6-entry pointer table (RAM FFFF7BB4-7BBC + ROM 0x020103)
+  0x063E48, 0x063E58, 0x063E68, 0x063E78, 0x063E88, 0x063E98
+            -- knock/timing calibration data tables
+
+2e. Descriptor map (descriptor_map.txt):
+  Descriptor 215 (0x0AC298): data tables at 0x063D50, 0x063DB0
+  Named descriptors (named_descriptors.txt):
+    0x0AC298 1D_range[0..0]_f32_24   -> data at 0x063DB0
+    0x0AC41C 1D_ECT_i16_16           -> data at 0x0CC99A (outside region)
+
+2f. DTC helpers (dtc_helpers_raw.txt):
+  10 DTC helper pattern instances found in this region:
+    0x066CA8, 0x06A9D0, 0x06ACC8, 0x06B6E0, 0x06BA10,
+    0x06BAC8, 0x06BBD8, 0x06BFFC, 0x06C288, 0x06C3AC
+
+2g. Injection timing analysis:
+  0x06CDDC referenced as calibration data
+
+
+3. CODE VS DATA DISTRIBUTION
+==============================================================================
+
+From rom_region_map.txt, the 0x060000-0x06FFFF region contains:
+
+  Code blocks:      ~35 KB  (54%)
+  Float/data blocks: ~18 KB  (28%)
+  Gaps (unmapped):   ~12 KB  (18%)
+
+Major code clusters:
+  0x060100-0x060D00    2816 bytes  code (diagnostic readiness + early monitors)
+  0x061500-0x062200    3328 bytes  code (diagnostic pipeline subs)
+  0x062300-0x063600    4864 bytes  code (VVT feedback + more diag subs)
+  0x066500-0x067200    3328 bytes  code (EVAP purge system)
+  0x067F00-0x068900    2560 bytes  code
+  0x069400-0x069B00    1792 bytes  code
+  0x06AA00-0x06BB00    4352 bytes  code (DTC helper cluster)
+  0x06C700-0x06CE00    1792 bytes  code
+  0x06D800-0x06DF00    1792 bytes  code (uint16_pack loop pattern)
+  0x06E800-0x06F000    2048 bytes  code
+  0x06F200-0x06FB00    2304 bytes  code (MAF diag + sensor monitors)
+
+Major data blocks:
+  0x061000-0x061500    1280 bytes  float_data (literal pools for 0x061500 code)
+  0x063600-0x063B00    1024 bytes  mixed_data (RAM/ROM pointer tables)
+  0x063B00-0x063F00    1024 bytes  float_data (knock/timing cal refs)
+  0x064100-0x065D00    7168 bytes  float_data (MISIDENTIFIED -- actually
+                       12-byte pointer table entries: func_ptr + 2 cal addrs.
+                       All entries use func 0x0640F4 with sequential 0x0D92xx
+                       calibration addresses. This is a descriptor dispatch
+                       table, not float data.)
+  0x065F00-0x066500    1792 bytes  float_data (EVAP calibration data)
+  0x068900-0x068C00     768 bytes  float_data
+  0x06BB00-0x06BE00     768 bytes  float_data
+  0x06CE00-0x06D000     512 bytes  float_data
+  0x06FB00-0x06FE00     768 bytes  float_data (MAF diag literal pool)
+
+
+4. FUNCTION DENSITY PER 0x1000 BLOCK
+==============================================================================
+
+  0x060000:  7 functions    (task53 readiness + dispatch targets)
+  0x061000: 20 functions    (diagnostic pipeline subs, densely packed)
+  0x062000: 15 functions    (VVT feedback + diagnostic subs)
+  0x063000:  8 functions    (tail of diag pipeline + data tables)
+  0x064000:  0 functions    (pointer/data tables only)
+  0x065000:  0 functions    (data tables + uint8 data)
+  0x066000: 10 functions    (EVAP purge system)
+  0x067000:  6 functions
+  0x068000:  0 functions    (counted in 0x067xxx/0x069xxx)
+  0x069000:  2 functions
+  0x06A000:  0 functions    (counted in adjacent blocks)
+  0x06B000: 23 functions    (DTC helper cluster -- DENSEST)
+  0x06C000: 21 functions    (secondary DTC/diag monitors)
+  0x06D000: 16 functions    (uint16_pack batch loaders)
+  0x06E000: 18 functions    (sensor diagnostic monitors)
+  0x06F000: 27 functions    (MAF diag + sensor monitors -- MOST FUNCTIONS)
+
+
+5. SAMPLE DISASSEMBLY FINDINGS
+==============================================================================
+
+5a. FUN_000601F8 (dispatch target, 0x601F8)
+    Short function: loads FFFF9074, writes result, RTS.
+    Pattern: diagnostic readiness output register write.
+    RAM: FFFF9074 (diagnostic readiness word)
+
+5b. FUN_00061514 (dispatch target, 0x61514)
+    Heavy descriptor reader: 3x desc_read_float at entry, followed by
+    workspace field loads from FFFF6624, FFFF6350, FFFF912C, FFFF65FC,
+    FFFF67EC, FFFF85D7, FFFF6455. Calls local BSR at 0x616F0, 0x61652.
+    References calibration at 0x0D9E6C, 0x0D9FA8, 0x0D9FAC.
+    Pattern: diagnostic monitor with multi-table calibration lookup.
+
+5c. FUN_00061A6A (dispatch target, 0x61A6A)
+    Calls rtos_workspace_init (0x22F92), then enters a sequence of
+    14x desc_read_float (f28a opcode = fmov.s) reading from struct offsets.
+    Pointer table at 0x066234. Pattern: workspace initialization --
+    bulk-loads calibration values into a RAM workspace.
+
+5d. FUN_00069158 (mid-region, 0x69158)
+    Large function with full register save (R9-R14 pushed). Reads from
+    FFFF94BC, FFFF65FC, FFFF6624, FFFF63C4, FFFF6B30, FFFF69F0, FFFF69F4.
+    References cal addresses 0x0C51B0, 0x0C51B4, 0x0C51B8, 0x0C4912.
+    Calls desc_read_float_or_interp (0xBE554) via JSR.
+    Pattern: complex diagnostic monitor with state machine (multiple
+    branch paths, cal table lookups, conditional DTC logic).
+
+5e. FUN_0006B410-0x06B450 cluster (DTC helper area)
+    Three tiny functions (8-16 bytes each):
+    - 0x6B410: loads FFFF9544, RTS (status read)
+    - 0x6B418: loads FFFF9544, BRA to FUN_0006B716 (gateway)
+    - 0x6B454: calls uint16_unpack (0xBE990) with R4=FFFF2474,
+               then calls 0xBE980 with R4=FFFF247C.
+    Pattern: DTC workspace accessor stubs. Many small functions that
+    read/write DTC state through uint16_pack/unpack.
+
+5f. FUN_0006C790 (late region, 0x6C790)
+    Reads FFFF8CAA, FFFF233C. Calls unknown library at 0x5900, then
+    desc_read_float_or_interp (0xBE554). References FFFF9590 workspace,
+    cal addresses 0x0C480C, 0x0C480A. Calls uint8_pack (0xBE9A0).
+    Writes to FFFF249C workspace.
+    Pattern: diagnostic monitor with state-dependent cal lookup and
+    uint8 result packing.
+
+5g. FUN_0006D890 (upper region, 0x6D890)
+    Entry calls 3 local BSR subs (0x6DA84, 0x6DA9E, 0x6DB50) then
+    BRA to 0x6DB80. Sub at 0x6D8A2 loads uint16_pack (0xBE9B0) into
+    R14 and executes 12x JSR @R14 with sequential C2xx arguments
+    (descriptor indices 0x00-0x0B), then switches to uint8_pack
+    (0xBE9A0) for 3 more calls with C1xx arguments.
+    Pattern: batch workspace serializer -- packs 12 uint16 + 3 uint8
+    diagnostic results into a RAM output buffer (FFFF24A8+).
+
+5h. FUN_0006F504 (near MAF diag, 0x6F504)
+    Reads FFFF7E68, writes to FFFF96E8/96B4/96C0. Uses 0x7FFFFFFF
+    as float max sentinel. Calls uint8_pack (0xBE9A0) with workspace
+    at FFFF24F4. Pattern: sensor diagnostic output formatter.
+
+
+6. EXTERNAL CALL PROFILE
+==============================================================================
+
+Calls from this region to known library functions (by frequency):
+
+  desc_read_float (0xBE554):          114 calls  -- dominant pattern
+  uint8_pack (0xBE9A0):                81 calls
+  uint16_unpack (0xBE990):             77 calls
+  uint16_unpack_v2 (0xBE980):          60 calls
+  uint16_pack (0xBE9B0):               54 calls
+  desc_read_u16 (0xBE5D8):             46 calls
+  desc_counter_inc (0xBE53C):           38 calls
+  table_desc_1d_float (0xBE830):        36 calls
+  check_engine_running (0x582D2):       36 calls
+  dtc_set_pending (0x9ED90):            35 calls
+  table_lookup_2d (0xBEAB0):            34 calls
+  dtc_clear (0x9EDEC):                  31 calls
+  float_clamp (0xBE56C):                26 calls
+  desc_read_float_lerp (0xBEA40):       23 calls
+  float_max_clamp (0xBE960):            22 calls
+  check_diag_state (0x582AC):           21 calls
+  fmac_interp (0xBE598):                21 calls
+  diag_precondition_check (0x584C8):    20 calls
+  diag_state_update (0x58318):          20 calls
+  float_safe_div (0xBE628):             18 calls
+  float_min_clamp (0xBE970):            15 calls
+  float_abs (0xBE608):                  14 calls
+  desc_read_float_safe (0xBDBCC):       10 calls
+  table_desc_2d_typed (0xBE8E4):        10 calls
+  diag_monitor_check (0x584BE):         10 calls
+  check_engine_cranking (0x582E0):       9 calls
+  rtos_workspace_init (0x22F92):         8 calls
+  scheduler_gate (0x317C):               8 calls
+  diag_dtc_index_lookup (0x58404):       8 calls
+  peripheral_io_read (0x2F8EA):          7 calls
+  check_engine_status (0x3AB20):         5 calls
+
+Total: 1050+ external library calls from 173 functions.
+
+RAM workspace concentrations:
+  FFFF24xx:  183 refs  (diagnostic output buffer -- pack targets)
+  FFFF95xx:  124 refs  (diagnostic monitor workspaces)
+  FFFF91xx:  125 refs  (diagnostic state/result registers)
+  FFFF90xx:   98 refs  (diagnostic readiness/status)
+  FFFF96xx:   94 refs  (sensor diagnostic workspaces)
+  FFFF92xx:   72 refs  (VVT/timing diagnostic state)
+  FFFF65xx:   55 refs  (engine state inputs -- RPM, load, temps)
+  FFFF23xx:   67 refs  (calibration cache workspaces)
+  FFFF36xx:   38 refs  (additional state)
+  FFFF93xx:   34 refs  (EVAP diagnostic workspace)
+  Total: 534 unique RAM addresses, 1257 total references.
+
+Calibration ROM references:
+  0x0BExxx:  677 refs  (library function pointers -- expected)
+  0x0D9xxx:  235 refs  (calibration data -- diagnostic thresholds)
+  0x0C5xxx:  195 refs  (calibration data -- sensor limits)
+  0x0C4xxx:  156 refs  (calibration data -- EVAP/sensor thresholds)
+  0x0AFxxx:   44 refs  (descriptor definitions)
+  0x0D8xxx:   44 refs  (calibration data)
+
+
+7. REGION CHARACTERIZATION
+==============================================================================
+
+Primary subsystem: OBD-II DIAGNOSTIC MONITORS
+
+This region is almost entirely dedicated to on-board diagnostic (OBD-II)
+monitor functions. The evidence is overwhelming:
+
+  a) Three named diagnostic task entry points (task53, task56, task58)
+  b) 35 calls to dtc_set_pending, 31 to dtc_clear
+  c) 21 calls to check_diag_state, 20 to diag_precondition_check
+  d) 36 calls to check_engine_running (precondition for monitors)
+  e) Massive use of descriptor-based calibration reads (114x desc_read_float)
+  f) Heavy uint8_pack/uint16_pack usage for diagnostic result output
+  g) RAM workspace concentration in FFFF90xx-FFFF96xx (diagnostic state)
+  h) RAM output concentration in FFFF24xx (diagnostic output buffer)
+
+The region implements the following diagnostic monitor types:
+  - Diagnostic readiness computation (task53, 0x0602DC)
+  - EVAP purge system diagnostic (task56, 0x066580)
+  - MAF sensor diagnostic (task58, 0x06F0B8)
+  - VVT error feedback monitoring (0x0627D8)
+  - Multiple unnamed sensor/actuator diagnostic monitors
+  - DTC management helpers (set/clear/check patterns)
+  - Batch workspace serializers (pack diagnostic results)
+
+Function templates observed:
+  1. MONITOR ENTRY: check_diag_state -> check_engine_running ->
+     diag_precondition_check -> [monitor logic] -> dtc_set_pending/dtc_clear
+  2. CAL LOADER: rtos_workspace_init -> N x desc_read_float -> RTS
+  3. RESULT PACKER: load uint16_pack/uint8_pack ptr -> N x JSR with
+     sequential descriptor indices -> RTS
+  4. STATUS STUB: load RAM addr -> read/write -> RTS (2-4 instructions)
+
+
+8. SUB-REGION BREAKDOWN
+==============================================================================
+
+0x060000-0x063600  DIAGNOSTIC READINESS + PIPELINE MONITORS
+  - task53_diag_monitor entry and readiness computation (0x602DC-0x604C8)
+  - 10 diagnostic monitor subs called from main pipeline dispatch at
+    0x048234 (sequential JSR chain)
+  - VVT error feedback PID at 0x627D8
+  - Dense code: 20 functions in 0x061000-0x061FFF alone
+  - Calibration heavy: 0x0D9xxx references dominate
+
+0x063600-0x066500  DATA TABLES + CALIBRATION CACHES
+  - Pointer tables at 0x063600 (RAM/ROM address lists)
+  - Knock/timing calibration data at 0x063B00-0x063F00
+  - Large descriptor dispatch table at 0x064100-0x065D00 (IMPORTANT:
+    rom_region_map.txt labels this "float_data" but it is actually a
+    structured table of 12-byte entries: {func_ptr, cal_addr_1, cal_addr_2}.
+    All entries reference function 0x0640F4 with sequential 0x0D92xx
+    calibration addresses. This is a descriptor handler dispatch table.)
+  - EVAP calibration cache at 0x065F00-0x066500
+
+0x066500-0x067200  EVAP PURGE DIAGNOSTIC (TASK 56)
+  - task56_evap_purge entry at 0x66580
+  - evap_workspace_init, evap_ect_threshold_lookup, evap_condition_eval
+  - EVAP test sequence and disabled-path handlers
+  - Fully analyzed (18 comments in Ghidra)
+
+0x067200-0x069B00  UNNAMED SENSOR DIAGNOSTIC MONITORS
+  - 6 functions in 0x067xxx, 2 in 0x069xxx
+  - Sparse: large float_data gaps between code blocks
+  - Pattern: each function reads sensor state, looks up cal thresholds,
+    checks preconditions, sets/clears DTCs
+  - Likely candidates: catalyst, O2 sensor, or misfire monitors
+
+0x069F00-0x06BB00  DTC HELPER CLUSTER
+  - Densest cluster: 23 functions in 0x06Bxxx
+  - Many small (8-32 byte) accessor stubs
+  - Heavy uint16_unpack/uint16_pack usage
+  - Pattern: DTC workspace management -- read/write individual DTC
+    counters and status flags via pack/unpack helpers
+  - 10 DTC helper pattern instances identified in dtc_helpers_raw.txt
+
+0x06BB00-0x06D200  SECONDARY DIAGNOSTIC MONITORS
+  - 21 functions in 0x06Cxxx
+  - Calls to check_diag_state, uint8_pack, desc_read_float
+  - Pattern matches monitor template: precondition -> compute -> pack result
+  - Float data pools interleaved with code
+
+0x06D200-0x06E800  BATCH RESULT PACKERS + MORE MONITORS
+  - 16 functions in 0x06Dxxx, 18 in 0x06Exxx
+  - FUN_0006D890: batch serializer (12x uint16_pack + 3x uint8_pack)
+  - Pattern: aggregate diagnostic results into output buffers
+
+0x06E800-0x06FE00  MAF DIAGNOSTIC + SENSOR MONITORS
+  - task58_maf_diag entry at 0x6F0B8 (fully analyzed)
+  - 27 functions in 0x06Fxxx (most function-dense block)
+  - Sensor output formatters using uint8_pack
+  - Float max sentinel (0x7FFFFFFF) used for range checks
+
+
+9. KEY FINDINGS
+==============================================================================
+
+a) The 0x064100-0x065D00 "float_data" block is MISCLASSIFIED in
+   rom_region_map.txt. It is a structured descriptor dispatch table with
+   12-byte entries. Each entry contains a function pointer (0x0640F4) and
+   two sequential calibration addresses in the 0x0D92xx range. This table
+   likely drives a parametric diagnostic monitor framework.
+
+b) The 10 functions called from the 0x048234 dispatch chain are NOT
+   related to fuel pump control despite appearing in fuel_pump_raw.txt.
+   They are diagnostic monitor subroutines sharing a scheduler timeslot.
+
+c) The DTC helper cluster at 0x06AA00-0x06BB00 contains the bulk of
+   DTC state management logic. Many functions are tiny accessor stubs
+   (4-8 instructions) wrapping uint16_pack/unpack calls.
+
+d) RAM workspace FFFF24xx (183 references) is the primary diagnostic
+   output buffer. FFFF90xx-FFFF96xx (534 refs combined) hold diagnostic
+   monitor state and intermediate results.
+
+e) The function at 0x0640F4 (inside the "data" block) may be a generic
+   parametric monitor handler invoked via the dispatch table. It is not
+   listed as a Ghidra function, suggesting Ghidra missed it.
+
+
+10. PROPOSED NEXT STEPS
+==============================================================================
+
+HIGH PRIORITY:
+  1. Disassemble 0x0640F4 -- this is the dispatch table handler function
+     called by all 500+ entries in the 0x064100-0x065D00 table. Understanding
+     it unlocks the entire parametric monitor framework.
+
+  2. Trace the 10 pipeline functions called from 0x048234:
+     0x061514, 0x061A6A, 0x061BC8, 0x061FD4, 0x0623EC, 0x062EEC,
+     0x0633EC, 0x06081C, 0x0601F8, 0x060308, 0x0602FA
+     These are the core diagnostic monitors run every cycle.
+
+  3. Reclassify 0x064100-0x065D00 in rom_region_map.txt from "float_data"
+     to "descriptor_dispatch_table" (12-byte entries).
+
+MEDIUM PRIORITY:
+  4. Identify the unnamed monitors at 0x067200-0x069B00 and 0x06BB00-0x06D200.
+     Cross-reference their DTC indices with the dtc_table.txt to determine
+     which OBD-II monitors they implement (catalyst, O2, misfire, etc.).
+
+  5. Map the DTC helper stubs at 0x06B410-0x06BB00 to specific DTC codes
+     by tracing the uint16_pack workspace addresses back to dtc_table.txt.
+
+  6. Analyze the batch result packer at 0x06D890 to determine the complete
+     diagnostic output buffer layout at FFFF24A8+.
+
+LOW PRIORITY:
+  7. Verify 0x0640F4 is recognized as a function in Ghidra; if not, create it.
+
+  8. The sensor monitors near MAF diag (0x06E800-0x06F000) likely include
+     additional sensor rationality checks -- trace to identify.
+
+  9. Document the EVAP data tables at 0x065F00-0x066500 structure.
+
+
+11. RELATION TO OTHER ANALYZED REGIONS
+==============================================================================
+
+This region connects to:
+  - Task scheduler (task_call_graph.txt): tasks 53, 56, 58
+  - AVCS analysis: vvt_error_feedback at 0x627D8
+  - Knock/FLKC analysis: calibration data at 0x063E48-0x063E98
+  - CL/OL analysis: pointer tables at 0x063B00-0x063B6C
+  - DTC diagnostics analysis: task entries and DTC helpers
+  - Fuel pump raw: shares scheduler timeslot (0x048234 dispatch)
+  - Descriptor system: heavy consumer of 0xBExxx descriptor library

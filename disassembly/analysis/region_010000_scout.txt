@@ -1,0 +1,479 @@
+Region 0x010000-0x01FFFF Scout Analysis
+========================================
+Analysis date: 2026-04-03
+Source: Ghidra XML export + raw SH-2 disassembly of .bytes file
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+Total FUNCTION entries in Ghidra XML (ENTRY_POINT 0001xxxx):  264
+  User-named functions:    7   (2.7%)
+  Thunks:                  4   (1.5%)
+  Unnamed (FUN_):        253  (95.8%)
+
+Region size: 65,536 bytes (0x10000)
+  Code blocks (rom_region_map):   37,888 bytes  (57.8%)
+  Data blocks (rom_region_map):   16,128 bytes  (24.6%)
+  Unmapped:                       11,520 bytes  (17.6%)
+
+NOTE: Several "float_data" regions in rom_region_map are misclassified.
+Spot-checking 0x1A300-0x1A500 reveals SH-2 code (prologues, RTS, literal
+pool loads) that the byte-pattern heuristic mistook for float data. The
+true code percentage is likely 70-80%.
+
+================================================================================
+2. NAMED FUNCTIONS (Ghidra FUNCTION entries with user-assigned names)
+================================================================================
+
+  Address     Name                        Notes
+  ----------  --------------------------  ----------------------------------------
+  0x010800    event_notify                15 calls; state change dispatcher
+  0x010A46    rtos_task_gate              RTOS gate; R4=task_id; also isr_handler_0
+  0x010D58    isr_handler_20              ISR dispatch entry 20
+  0x0117E8    hw_register_set             16 calls; HW peripheral write
+  0x0117FC    hw_register_get             13 calls; HW peripheral read
+  0x011848    descriptor_interpolation    1D interp; 224-byte workspace; MAF etc
+  0x01CF16    engine_state_helper         10 calls; engine state utility
+
+================================================================================
+3. USER-DEFINED SYMBOLS (Ghidra SYMBOL_TABLE, includes non-function labels)
+================================================================================
+
+  Address     Symbol                              Type / Source
+  ----------  ----------------------------------  ----------------------------
+  0x010124    isr_handler_25                      ISR dispatch entry
+  0x0101BA    rom_integrity_check                 Task0 call_29; ROM checksum
+  0x01076A    charge_workspace_init               Init FFFF2060-20A8; also isr_handler_23
+  0x010800    event_notify                        (same as function)
+  0x010A46    rtos_task_gate                      (same as function)
+  0x010A78    rom_size_validator                   Task0 call_30; ROM size check
+  0x010CE2    scheduler_state_update              Task0 call_02; ATU HW config
+  0x010D58    isr_handler_20                      (same as function)
+  0x0117E8    hw_register_set                     (same as function)
+  0x0117FC    hw_register_get                     (same as function)
+  0x011848    descriptor_interpolation            (same as function)
+  0x011A7C    intake_channel_table                Data: 4-entry, 12-byte stride
+  0x011BA4    rtos_secondary_subtask_table        Data: RTOS sub-task dispatch
+  0x011CA8    rtos_task12_subtask_table            Data: Task 12 sub-functions
+  0x013D58    ssm_fuel_state_evaluator            ~500 bytes; SSM diagnostic
+  0x014004    cal_Max_Wastegate_Duty_Limit_...    Calibration value (RomRaider)
+  0x015400    dtc_readout_loop                    DTC mode $03 builder
+  0x01CF16    engine_state_helper                 (same as function)
+  0x01FE54    frontO2_comp_atm                    Front O2 atmospheric comp
+
+Total unique labeled addresses: 19 (some are data tables, not functions)
+
+================================================================================
+4. GHIDRA COMMENTS IN RANGE
+================================================================================
+
+17 COMMENT entries found. Key annotations:
+
+  0x010124  ISR dispatch table entry 25
+  0x0101BA  ROM checksum validator (incremental, reads 0xFFB80 descriptors)
+  0x01076A  Sub-table B [03a]; OL charge workspace init (FFFF2060-20A8)
+  0x010800  Event notification dispatcher; called by ram_word_update
+  0x010A46  RTOS task gate; accesses FFFF1288 (scheduler_state)
+  0x010A78  ROM size validator; sentinel 0xC33C3CC3; writes FFFF5BAC
+  0x010CE2  ATU HW reg config (F710/F718/F71C); prescaler at FFFF5BBE
+  0x010D58  ISR dispatch table entry 20
+  0x011848  Descriptor-based 1D interp; workspace 224 bytes
+  0x011A7C  Intake channel table (4 entries, per-channel raw/out/mask)
+  0x011BA4  RTOS secondary sub-task table (flags + func_ptr pairs)
+  0x011CA8  Sub-task table for Task 12 (communication/diag sub-functions)
+  0x013D58  SSM fuel state evaluator; MAF/RPM/BPW/boost/FLKC readers
+  0x014004  RomRaider: Max Wastegate Duty Limit Post-Compensation
+  0x015400  DTC processing loop; OBD-II mode $03 response builder
+  0x01CF16  Engine state utility; called from AFL/timing/boost
+  0x01FE54  Front O2 atmospheric compensation; descriptor at 0xAAE78
+
+================================================================================
+5. CROSS-REFERENCES FROM KNOWN CODE
+================================================================================
+
+5.1  References from analysis files
+------------------------------------
+
+  Source File                     Target          Context
+  ----------------------------   -----------     ----------------------------------
+  accel_enrichment_analysis      0x01CF16        Sequential JSR chain (engine_state_helper)
+  adc_pipeline_trace             0x010800        Event processing call
+  boost_control_raw              0x01CF16        Loaded as literal pool target
+  clol_gap_closure               0x013D58        SSM fuel state evaluator
+                                 0x0108DA        Injection-related init (R4=3)
+                                 0x010942        Injection-related init
+                                 0x010950        Injection init
+                                 0x011880        Hardware timer read
+  cl_ol_analysis                 0x013D58        SSM diagnostic function (CL/OL flag reader)
+  cl_ol_master_analysis          0x01CF46        Bit 3 of FFFF61F4 test
+                                 0x01FD7C        ECU state flag (FFFF63A4)
+  dtc_diagnostics_analysis       0x015400        DTC readout loop
+  fueling_pipeline_analysis      0x011848        Per-cylinder descriptor read (4x loop)
+                                 0x01D1FC        Sensor processing
+                                 0x01F896        Sensor processing
+                                 0x01FA78        Control loop
+                                 0x01FE10        Control loop
+                                 0x013274        Boost/throttle
+                                 0x011EEA        Boost actuation
+  fuel_path_helpers              0x0107B6        charge_calc_active
+                                 0x0107F4        charge_calc_idle
+                                 0x011ABE        Secondary dispatch table base
+                                 0x011B74        Injection descriptor table
+                                 0x011BC4        Fuel vtable ROM source
+  fuel_pump_raw                  0x01CB68        Called via JSR (fuel pump context)
+                                 0x01CF0C        Called via JSR
+                                 0x01D0E0        Called via JSR
+                                 0x01D26A        Called via JSR
+  task0_background               0x010CE2        scheduler_state_update
+                                 0x010D10        background_prescaler
+                                 0x01096C        sensor_dispatch_thunk
+                                 0x0101BA        rom_integrity_check
+                                 0x010A78        rom_size_validator
+  task_scheduler_analysis        0x010A46        Task gate function
+                                 0x01076A        charge_workspace_init
+  task10_analysis                0x0100E4        Sensor byte reads
+                                 0x010C9C        ATU timer config
+                                 0x010962        Timer sub-function
+                                 0x0108DA        Mode dispatch (R4=1, R4=2)
+                                 0x010950        Sensor dispatch
+  startup_hw_init_analysis       0x012600-       213 BSP functions classified
+                                 0x01E3FF        (83% HW peripheral config)
+
+5.2  Cross-references from cal_crossref.txt
+--------------------------------------------
+
+  0x014004    cal_Max_Wastegate_Duty_Limit_Post_Compensation
+
+5.3  Internal function call graph (within 0x10000-0x1FFFF)
+-----------------------------------------------------------
+
+  Target      Ref Count   Notes
+  ----------  ---------   --------------------------------
+  0x016708       5        (unnamed, GPIO area)
+  0x010800       4        event_notify
+  0x011CE8       4        (data table ref?)
+  0x016558       4        (unnamed, GPIO area)
+  0x011880       3        (hardware timer read)
+  0x011D0C       3        (data table ref?)
+  0x014278       3        (unnamed, timer area)
+  0x01D742       3        (unnamed, sensor processing)
+
+================================================================================
+6. LIBRARY FUNCTION CALL CENSUS (from literal pool analysis)
+================================================================================
+
+Calls from 0x10000-0x1FFFF to known library functions:
+
+  Library Function          Refs    Notes
+  -----------------------   ----    ----------------------------------
+  uint8_pack (0xBE9A0)      108     Dominant: packs byte results to RAM
+  interp_1d (0xBE554)        76     1D interpolation
+  interp_1d_B (0xBE56C)      48     1D interpolation variant
+  table_lookup2 (0xBE830)    42     Descriptor table lookup
+  struct_init2 (0xBE82C)     39     Struct/workspace teardown
+  unpack_helper (0xBE980)    39     Byte unpack from RAM
+  struct_init (0xBE81C)      38     Struct/workspace init
+  pack_helper (0xBE960)      23     Generic pack
+  table_lookup (0xBE8E4)     20     Descriptor table lookup
+  fmac_interp (0xBE598)      19     Fused multiply-accumulate interp
+  float_safe_div (0xBE628)   12     Safe division
+  interp_2d (0xBE5A8)        11     2D interpolation
+  interp_1d_C (0xBE588)      10     1D interpolation variant C
+  check_diag_state (0x582AC)  5     Diagnostic state check
+  uint16_pack (0xBE9B0)       5     16-bit pack
+  interp_variant (0xBE5D8)    4     Interpolation variant
+  float_init2 (0xBDB80)       4     Float workspace init
+  event_notify (0x10800)      4     Internal: event dispatcher
+  check_engine_status (3AB20)  3    Engine status check
+  float_init (0xBDB6E)        2     Float workspace init
+  uint16_unpack (0xBE990)     2     16-bit unpack
+
+Top unknown ROM call targets (not yet named):
+  0x0BDBCC:  68 refs   (float/math library - needs identification)
+  0x0BE53C:  41 refs   (interpolation library - needs identification)
+  0x00317C:  33 refs   (low-level utility / scheduler)
+  0x003190:  32 refs   (low-level utility / scheduler)
+  0x0BDCB6:  30 refs   (float/math library - needs identification)
+  0x0BEA40:  25 refs   (pack/unpack library - needs identification)
+  0x0BE970:  24 refs   (pack/unpack library - needs identification)
+  0x022CF4:  22 refs   (engine control function)
+
+Descriptor table references (0x0AA000-0x0AFFFF):
+  83 unique descriptor addresses referenced, 86 total loads.
+  These span 0x0AA760 through 0x0AFDXX, covering most of the
+  calibration descriptor space. Confirms heavy use of the standard
+  Denso descriptor-based table lookup pattern throughout this region.
+
+================================================================================
+7. SAMPLE DISASSEMBLY (8 functions)
+================================================================================
+
+7.1  event_notify @ 0x010800 (validation target)
+-------------------------------------------------
+  Known function (15 callers). Event notification dispatcher.
+  010800: 4F22  sts.l  pr,@-r15        ; prologue
+  010804: D317  mov.l  @(010864),R3    ; =0x000BE81C (struct_init)
+  010806: 7FF4  add    #-12,R15        ; 12-byte workspace
+  01080E: 430B  jsr    @R3             ; struct_init(workspace, 0xE0)
+  010816: B188  bsr    0x010B2A        ; internal subroutine
+  01081A: D313  mov.l  @(010868),R3    ; =0x000BE82C (struct_init2)
+  01081C: 430B  jsr    @R3             ; struct_init2(workspace)
+  010824: 000B  rts
+  Pattern: struct_init/work/struct_init2 sandwich (standard Denso template)
+
+7.2  FUN_00010448 @ 0x010448 (early region, unnamed)
+-----------------------------------------------------
+  Large function with register saves (R8-R15). Calls:
+    - struct_init (0xBE81C) with 0xE0 workspace
+    - 0x0000F7FC (fuel system function, external)
+    - struct_init2 (0xBE82C)
+    - BSR 0x0105AA (local subroutine)
+  Uses R4=4/8 as mode selectors. Accesses 0xB000/0x8000 bitmasks.
+  Likely: multi-mode sensor/actuator init dispatcher.
+  RAM refs: none in first 80 instructions (all ROM pool loads).
+
+7.3  FUN_00012740 @ 0x012740 (mid-early, sensor I/O)
+------------------------------------------------------
+  Checks state flags, conditionally calls:
+    - uint16_pack (0xBE9B0) with R4=0
+    - interp_1d (0xBE554) with R5=1
+  RAM: FFFF5C0C (sensor workspace), FFFF20AC (scheduler), FFFF5BE2 (state)
+  Pattern: conditional sensor value packing based on engine state.
+  Subsystem: sensor conditioning / output packaging.
+
+7.4  FUN_00013772 @ 0x013772 (mid, state machine)
+---------------------------------------------------
+  Small leaf function (~30 instructions, 1 RTS). No subroutine calls.
+  Reads FFFF5C96, performs multi-level state comparison (cmp #1, #2).
+  Writes state values (0, 1, 2) based on conditions.
+  Pattern: 3-state state machine evaluator. Pure logic, no table lookups.
+  Subsystem: engine state classification / mode selector.
+
+7.5  FUN_00014540 @ 0x014540 (diagnostic area)
+------------------------------------------------
+  Large function, saves R8-R14 (7 regs). Heavy FPU usage (F-prefix opcodes).
+  Calls:
+    - 0xBE5A8 (interp_2d) via R14 register (called 3+ times)
+    - 0xBE5D8 (interp_variant)
+    - 0x029B40 (external: engine control)
+  RAM: FFFF5D27, FFFF5DAC, FFFF6624, FFFF6254, FFFF85D7, FFFF65AB
+  Multiple C4xx (GBR-relative) accesses suggest descriptor-workspace usage.
+  Pattern: multi-axis interpolation with FPU math (float accumulation).
+  Subsystem: sensor processing / output computation with calibration tables.
+
+7.6  FUN_00017AB8 @ 0x017AB8 (gap area, I/O config)
+-----------------------------------------------------
+  Allocates 108-byte stack frame. Calls:
+    - unpack_helper (0xBE980) - read sensor byte
+    - uint8_pack (0xBE9A0) - write result byte
+    - 0x016558 (internal, GPIO area)
+    - 0x00317C (low-level scheduler/utility)
+    - 0x063690 (external function)
+    - 0x005EA4 (external function)
+    - interp_1d_C (0xBE588)
+  RAM: FFFF5F1C, FFFF5E40 (sensor_data_misc), FFFF5F4A/4C/54
+  Pattern: read sensor, interpolate, pack result. Multi-channel I/O.
+  Subsystem: extended I/O / sensor conditioning (GPIO port area).
+
+7.7  FUN_0001A090 @ 0x01A090 (late-mid, sensor batch)
+-------------------------------------------------------
+  No subroutine calls (leaf function). Uses GBR-relative loads (C0xx).
+  Reads 7 RAM addresses: FFFF6155, FFFF5FCC, FFFF5FCB, FFFF5FC3,
+    FFFF5FC2, FFFF5F46, FFFF6188.
+  Writes 0xFF to FFFF6188, stores multiple GBR offsets.
+  Pattern: batch register/flag initialization. Sets up sensor workspace
+  for a processing pass. Initializes ADC channel status + I/O state.
+  Subsystem: ADC pipeline / sensor workspace init.
+
+7.8  FUN_0001F6E0 @ 0x01F6E0 (late region, control)
+------------------------------------------------------
+  Saves R11-R14, allocates stack workspace. FPU usage present.
+  Calls:
+    - 0x0297B0 (external: engine control chain)
+    - 0x0BDBCC (float math library - 68 total refs from this region)
+  RAM: FFFF6350 (ect_current), FFFF72A1, FFFF65F6, FFFF65C2 (throttle),
+    FFFF65BD (engine_state_byte), FFFF61F4, FFFF4144, FFFF6360, FFFF217C
+  Checks FFFF61F4 bit (same bit 3 test as cl_ol_master sub_1CF46).
+  Pattern: engine-state-gated sensor/control computation with FPU.
+  Subsystem: sensor processing / control output (ECT, throttle, engine state).
+
+================================================================================
+8. REGION CHARACTERIZATION
+================================================================================
+
+8.1  Primary Subsystems
+-----------------------
+
+This region serves as the BOARD SUPPORT PACKAGE (BSP) layer for the Denso
+SH7058 ECU platform. It sits between the low-level kernel (0x000-0x0FC00)
+and the application-level engine control code (0x20000+). The region contains:
+
+  1. RTOS INFRASTRUCTURE (0x10000-0x10D58)
+     - Task gate function, ISR handlers, event notification
+     - ROM integrity checking, scheduler state management
+     - The "plumbing" that connects the RTOS scheduler to task functions
+
+  2. DATA TABLES (0x11A00-0x12600, interspersed throughout)
+     - Intake channel tables, sub-task dispatch tables
+     - Fuel system dispatch tables (injection descriptors)
+     - RTOS secondary sub-task configuration
+
+  3. HARDWARE PERIPHERAL CONFIGURATION (0x12600-0x1A200)
+     - 213 functions (per startup_hw_init_analysis): 83% HW config
+     - GPIO port setup, ATU timer configuration, ADC channels
+     - Sensor I/O conditioning, DMA controller setup
+     - This is the densest zone: 0x15000-0x16FFF has 68 functions
+
+  4. SENSOR PROCESSING & CONTROL (0x1A200-0x1BFFF, 0x1CF00-0x1FFFF)
+     - ADC pipeline processing, sensor conditioning
+     - Engine state utilities, descriptor-based interpolation
+     - DTC/diagnostic support, SSM formatting
+     - O2 sensor compensation, fuel state evaluation
+
+8.2  Function Templates
+-----------------------
+
+Three dominant patterns across the region:
+
+  Pattern A: struct_init/work/struct_init2 sandwich
+    - 38 struct_init + 39 struct_init2 calls = ~39 functions use this
+    - Allocates workspace, does computation, tears down
+    - Standard Denso framework pattern
+
+  Pattern B: unpack/interpolate/pack pipeline
+    - 108 uint8_pack + 39 unpack_helper + 76 interp_1d calls
+    - Read sensor byte -> interpolate via descriptor -> write result byte
+    - The dominant pattern for HW config / sensor conditioning functions
+
+  Pattern C: GBR-relative state machine
+    - C0xx/C4xx opcodes for fast workspace access
+    - Small leaf functions testing/setting state flags
+    - Used for engine state classification, mode selectors
+
+8.3  Key RAM Workspace Regions
+------------------------------
+
+  RAM Range          Usage in this region           Ref Count
+  ----------------   ---------------------------    ---------
+  FFFF20xx-21xx      Scheduler/timer workspace       ~30
+  FFFF5Bxx-5Cxx      ADC config + sensor workspace   ~50
+  FFFF5Dxx-5Exx      Extended I/O + GPIO config       ~60
+  FFFF5Fxx           GPIO port data, I/O state        ~40
+  FFFF60xx-61xx      ADC conditioning workspaces      ~25
+  FFFF62xx-63xx      Sensor values (MAF, ECT, etc)    ~20
+  FFFF64xx-65xx      Engine state, throttle, load     ~25
+
+================================================================================
+9. SUB-REGION BREAKDOWN
+================================================================================
+
+  Range               Funcs  Density   Content
+  ------------------  -----  -------   ----------------------------------------
+  0x10000-0x10FFF       18   medium    RTOS infra: task gate, ISR handlers,
+                                       event_notify, ROM check, scheduler
+  0x11000-0x11FFF       25   medium    Descriptor interp, HW reg helpers,
+                                       data tables (intake ch, sub-task tbl)
+  0x12000-0x12FFF        7   sparse    Mixed code/data; sensor conditioning
+  0x13000-0x13FFF        9   sparse    SSM diagnostic, state machines,
+                                       boost/throttle helpers
+  0x14000-0x14FFF       18   medium    Timer config (ATU), DTC processing,
+                                       wastegate cal, FPU interpolation
+  0x15000-0x15FFF       33   DENSE     Injection channel HW, DTC readout,
+                                       sensor I/O conditioning
+  0x16000-0x16FFF       35   DENSE     GPIO port config (densest sub-region),
+                                       small state-test functions
+  0x17000-0x17FFF       17   medium    Extended I/O port, literal pool heavy,
+                                       large gap 0x170xx-0x176xx (data tables)
+  0x18000-0x18FFF       13   sparse    HW peripheral config continuation
+  0x19000-0x19FFF        4   SPARSE    Large gap 0x190B0-0x19D7A (3.2KB);
+                                       likely undiscovered data tables
+  0x1A000-0x1AFFF        2   SPARSE    Giant gap 0x1A18E-0x1BBF0 (6.7KB);
+                                       but 0x1A900-0x1BB00 = 4.6KB code block.
+                                       rom_region_map missed functions here.
+  0x1B000-0x1BFFF        3   sparse    End of big code block; float data tables
+  0x1C000-0x1CFFF       11   medium    Engine state utilities, fuel pump calls
+  0x1D000-0x1DFFF       22   medium    Sensor processing, multi-axis interp,
+                                       heavy FPU usage; fuel_pump callers
+  0x1E000-0x1EFFF       14   medium    Extended init, O2 comp, sensor batch
+  0x1F000-0x1FFFF       33   DENSE     Thunk cluster (0x1F3xx), control loops,
+                                       fuel/sensor processing, front O2 comp
+
+================================================================================
+10. ROM_REGION_MAP CORRECTIONS
+================================================================================
+
+Several "float_data" classifications are suspect. Spot-checked:
+
+  0x1A300-0x1A500 (768 bytes, "float_data"): Actually SH-2 CODE.
+    Contains prologues (4F22), RTS (000B), literal pool loads.
+    The byte-pattern heuristic was fooled by instruction regularity.
+
+  0x10300-0x10700 (1024 bytes): Needs verification. May contain
+    mixed code + literal pools (which look like float data).
+
+  0x10800-0x10A00 (512 bytes, "float_data"): Suspect -- event_notify
+    is at 0x10800 and confirmed as code.
+
+These should be re-verified with prologue/RTS scanning.
+
+================================================================================
+11. PROPOSED NEXT STEPS
+================================================================================
+
+Priority 1 (High value, lower effort):
+  a. NAME the top internal call targets:
+     - 0x016708 (5 refs, GPIO area)
+     - 0x016558 (4 refs, GPIO area)
+     - 0x011880 (3 refs, HW timer read)
+     - 0x014278 (3 refs, timer area)
+     - 0x01D742 (3 refs, sensor processing)
+  b. NAME the top unknown library functions called from this region:
+     - 0x0BDBCC (68 refs, float math)
+     - 0x0BE53C (41 refs, interpolation)
+     - 0x0BDCB6 (30 refs, float math)
+     - 0x0BEA40 (25 refs, pack/unpack)
+     - 0x0BE970 (24 refs, pack/unpack)
+  c. Correct rom_region_map for the misclassified code regions
+     (0x10800, 0x1A300, others)
+
+Priority 2 (Medium effort):
+  d. Trace the 0x1A900-0x1BB00 code block (4.6KB, ~0 functions in Ghidra).
+     This is a significant blind spot: Ghidra found only 2 functions in
+     0x1A000-0x1AFFF but the rom_region_map shows a large code block.
+     Likely: Ghidra missed function entries due to indirect calls.
+  e. Trace the 0x19000-0x19FFF sparse zone (only 4 functions in 4KB).
+     The 3.2KB gap may contain data tables or indirect-called functions.
+  f. Map the 83 descriptor table references (0x0AA760-0x0AFDXX) to
+     their calibration semantics via the descriptor_map.
+
+Priority 3 (Lower priority):
+  g. Cross-reference the 0x1F3xx thunk cluster (10 tiny functions at
+     0x1F38C-0x1F3D0, each 4 bytes) to identify their jump targets.
+  h. Classify the remaining 253 unnamed functions using the three
+     dominant patterns (struct sandwich, unpack/interp/pack, GBR state).
+  i. Build a call graph for this region showing which task entry points
+     reach which BSP functions.
+
+================================================================================
+12. SUMMARY
+================================================================================
+
+The 0x010000-0x01FFFF region is the Denso SH7058 Board Support Package:
+RTOS infrastructure, hardware peripheral configuration, sensor I/O
+conditioning, and low-level engine state utilities. It bridges the RTOS
+kernel to the application-layer engine control code.
+
+Of 264 Ghidra functions, only 7 have names (2.7%). The 19 user-defined
+symbols (including data labels) cover the most critical entry points but
+leave 95%+ of the region unnamed. The dominant calling pattern is
+uint8_pack (108 calls) + interp_1d (76 calls) + unpack_helper (39 calls),
+confirming this is primarily a sensor read-interpolate-write pipeline.
+
+The largest blind spots are:
+  - 0x1A900-0x1BB00: 4.6KB code block with almost no Ghidra functions
+  - 0x19000-0x19FFF: only 4 functions in 4KB (possibly data tables)
+  - 0x12000-0x12FFF: 7 functions in 4KB (mixed code/data)
+
+Naming the top 5 internal call targets and top 5 unknown library functions
+would propagate labels to ~200+ call sites across this region and beyond.

@@ -1,0 +1,159 @@
+Region 0x080000 — Descriptor Table and Code Structure Analysis
+===============================================================
+Analysis date: 2026-04-03
+Source: Ghidra export + raw SH-2 disassembly
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+The rom_region_map.txt classified two sub-regions as "float_data" based on
+byte pattern heuristics:
+  - 0x086500-0x086900 ("bbf'p" pattern)
+  - 0x087100-0x087600 ("Lb,%)E" / "Lb,&)F" / "Lb,!)A" patterns)
+
+Detailed analysis reveals BOTH regions are actually SH-2 CODE, not data.
+The byte sequences that looked like repeated float patterns are actually
+SH-2 instruction opcodes interpreted as ASCII.  The rom_region_map heuristic
+was fooled by the regularity of the instruction patterns.
+
+================================================================================
+2. REGION A: 0x086500-0x086900 — Sensor Float Read Stubs
+================================================================================
+
+Structure:
+  This region contains a sequence of small code stubs with a repeating pattern:
+    F828        fmov.s  @R2,FR8         ; load float from RAM
+    E0xx        mov     #offset,R0      ; set displacement
+    FF87        fdiv    FR8,FR15        ; divide (or fmov.s store)
+    D2xx        mov.l   @(pool),R2      ; load next RAM address
+
+  Each 8-byte stub loads a float from one RAM address, performs an FPU
+  operation, then advances to the next address via the literal pool.
+
+Literal pool (at 0x086744-0x086770):
+  0xFFFF855C, 0xFFFF8558, 0xFFFF8550, 0xFFFF8584,
+  0xFFFF85C0, 0xFFFF85C4, 0xFFFF8554, 0xFFFF8570,
+  0xFFFF8798, 0xFFFF8CE0, 0xFFFF9758, 0xFFFF975C
+
+  These are all in the sensor data RAM area (0xFFFF8xxx-0xFFFF9xxx),
+  likely processed sensor outputs.
+
+Pointer table at 0x0866D0:
+  A structured pointer table follows the code stubs:
+    0x00090000  ROM pointer (literal pool base / jump table ref)
+    0x0000317C  ROM pointer (function address)
+    0xFFFF20F4  RAM — scheduler/timer workspace
+    0xFFFF64C0  RAM — engine state variable
+    0xFFFF21D4  RAM — scheduler/timer workspace
+    0xFFFF64B0  RAM — engine state variable
+    0xFFFF64A8  RAM — engine state variable
+    0xFFFF64D8  RAM — engine state variable
+    0xFFFF64DC  RAM — engine state variable
+    0xFFFF64B8  RAM — engine state variable
+    0xFFFF6624  RAM
+    0xFFFF6794  RAM
+    0xFFFF679C  RAM
+    0xFFFF67A4  RAM
+    0xFFFF842C  RAM — sensor workspace
+    0xFFFF8438  RAM — sensor workspace
+    0xFFFF8448  RAM — sensor workspace
+    0xFFFF8444  RAM — sensor workspace
+    0xFFFF8440  RAM — sensor workspace
+    0xFFFF85B8  RAM — sensor workspace
+
+Purpose:
+  This is a sensor data aggregation pipeline.  The code stubs sequentially
+  read floating-point sensor values from RAM, perform arithmetic (division,
+  accumulation), and store results.  The pointer table provides the linkage
+  between sensor RAM locations and engine state variables.
+
+Proposed label: sensor_float_aggregation_block
+
+================================================================================
+3. REGION B: 0x087100-0x087600 — DTC Diagnostic Check Functions
+================================================================================
+
+Structure:
+  This region contains ~36 small diagnostic check functions.  Each follows
+  the same template:
+
+    D1xx        mov.l  @(pool),R1      ; R1 = diag_session_state (0xFFFFAD52)
+    D4xx        mov.l  @(pool),R4      ; R4 = DTC struct entry (0x9A834 + N*20)
+    E066        mov    #102,R0         ; fixed register setup
+    ...
+    2629        mov.l  R2,@R6          ; condition check
+    4615        ldc.l  @R15+,GBR       ; (register ops)
+    8B01        bf     +1              ; conditional branch
+    A2xx        bra    exit            ; branch to exit/continuation
+    0009        nop
+    D7xx        mov.l  @(pool),R7      ; R7 = dtc_maturation_timer (0xFFFF399E)
+    ...         (condition evaluation and DTC set/clear logic)
+
+Key references:
+  0xFFFFAD52  diag_session_state   107 refs ROM-wide; active fault bitmask
+  0xFFFF399E  dtc_maturation_timer 118 refs ROM-wide; DTC maturation counter
+  0x0009A834  DTC struct table     93 entries x 20 bytes; P0335 at index 0
+
+  The DTC struct table at 0x9A834 identifies which OBD-II code each function
+  monitors.  The first entry (index 0) is P0335 (Crankshaft Position Sensor A).
+
+Pattern variants:
+  Three instruction sequence variants were identified, matching the three
+  "Lb," ASCII patterns in rom_region_map:
+    - "Lb,%)E" → Standard 2-condition check (most common, 22 instances)
+    - "Lb,&)F" → Extended 3-condition check (15 instances)
+    - "Lb,!)A" → Simple 1-condition check (9 instances)
+
+  These correspond to the number of sensor conditions evaluated before
+  setting or clearing the DTC.
+
+DTC struct entry format (from dtc_table.txt):
+  Offset  Size  Field
+  0x00    1     Enable flag (0=disabled, 1=enabled, 2=pending)
+  0x01    1     Condition count
+  0x04    2     DTC code (SAE P-code in packed format)
+  0x06    1     Maturation threshold
+  0x07    1     Clear threshold
+
+Functions in this region monitor DTCs including:
+  P0335  Crankshaft Position Sensor A
+  (Additional P-codes at 20-byte intervals in the DTC struct table)
+
+Proposed labels:
+  The individual functions should be labeled as dtc_monitor_Pxxxx once
+  the specific DTC code for each is decoded from the struct table offset
+  used in R4.
+
+================================================================================
+4. CORRECTIONS TO ROM REGION MAP
+================================================================================
+
+The following rom_region_map entries should be reclassified:
+
+  Current:
+    0x086C00-0x087000  1024 bytes  float_data    ← WRONG (code literal pools)
+    0x087100-0x087600  1280 bytes  float_data    ← WRONG (SH-2 code)
+
+  Corrected:
+    0x086C00-0x087000  1024 bytes  mixed_data    (literal pools for 0x086500 code)
+    0x087100-0x087600  1280 bytes  code          (DTC diagnostic check functions)
+
+Note: The rom_region_map is generated heuristically and cannot distinguish
+SH-2 instruction patterns from float data when the opcode bytes happen to
+have float-like bit patterns.
+
+================================================================================
+5. SUMMARY
+================================================================================
+
+What was thought to be "two unmapped descriptor tables" is actually:
+  A) A sensor float aggregation pipeline (code + literal pool) at 0x086500
+  B) ~36 DTC diagnostic check functions at 0x087100
+
+Both are functional code, not calibration data.  The rom_region_map
+misclassified them.  The DTC check functions at 0x087100 are part of the
+broader diagnostic monitor subsystem that spans most of the 0x080000 region.
+
+This confirms the scouting assessment: the 0x080000-0x08FFFF region is
+primarily diagnostic monitor code with embedded literal pools.

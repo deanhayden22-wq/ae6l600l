@@ -1,0 +1,402 @@
+Per-Cylinder Injection Output Functions — Region 0x080000
+=========================================================
+Analysis date: 2026-04-03
+Source: Ghidra export + raw SH-2 disassembly
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+Seven functions form the per-cylinder injection output pipeline.  They are
+dispatched from a consecutive pointer table at ROM 0x48754-0x4876C, which is
+part of the fuel_pulse_width_calc jump table (documented in
+injection_timing_analysis.txt § 3.7).
+
+The dispatch order in the table is:
+
+  Table Offset   ROM Address   Function
+  ───────────────────────────────────────────
+  0x48754        0x08E3E4      Stage 0 — Pre-calc (ECT-based conditioning)
+  0x48758        0x081A64      Stage 1 — Diag gate + interpolation
+  0x4875C        0x082A9C      Stage 2 — GBR workspace init + pack
+  0x48760        0x0839F8      Stage 3 — Float load + GBR workspace init + pack
+  0x48764        0x0843AC      Stage 4 — Short state read
+  0x48768        0x084A28      Stage 5 — Engine status gate + state write
+  0x4876C        0x08C31E      Stage 6 — Constant write (final)
+
+These are NOT per-cylinder clones (one function per cylinder).  They are
+sequential STAGES of a single per-cylinder output pipeline, each called in
+order for the active cylinder.
+
+================================================================================
+2. COMMON INFRASTRUCTURE
+================================================================================
+
+Shared call targets:
+  0x0582AC  check_diag_state     100 calls ROM-wide; reads FFFF36F0 mode byte
+  0x03AB20  check_engine_status  35 calls ROM-wide; reads FFFF7C68
+
+Shared library routines:
+  0x0BE598  fmac_interp_uint16   Float multiply-accumulate + uint16 interpolation
+  0x0BE5D8  axis_frac_to_uint16  Axis fractional position to uint16 converter
+  0x0BE628  float_safe_div       Divide with zero protection
+  0x0BE9A0  uint8_pack           Pack float → uint8 and write to workspace
+  0x0BE9B0  uint16_pack          Pack float → uint16 and write to workspace
+
+Key RAM addresses:
+  0xFFFF43FC  sensor_misc_state      25 refs; misc sensor status byte
+  0xFFFF7C9D  fuel_state_byte        32 refs; fuel system state/flag
+  0xFFFF4144  ect_output_fmac        ECT output (°C, float) from ADC pipeline
+  0xFFFF2EBC  pack_workspace_A       uint16_pack output workspace
+  0xFFFF2EC8  pack_workspace_B       uint16_pack output workspace
+
+Per-function RAM workspaces (sequential in 0xFFFFA4xx-0xFFFFABxx):
+  0xFFFFA48A  stage2_base            FUN_082A9C primary RAM
+  0xFFFFA494  stage2_gbr_base        GBR-relative workspace (confirmed in gbr_registry)
+  0xFFFFA4BA  stage2_output
+  0xFFFFA4D0  stage3_base            FUN_0839F8 primary RAM
+  0xFFFFA4D4  stage3_gbr_base        GBR-relative workspace (confirmed in gbr_registry)
+  0xFFFFA4F9  stage3_output
+  0xFFFFA518  stage4_output          FUN_0843AC output
+  0xFFFFA52D  stage5_output          FUN_084A28 output
+  0xFFFFA827  stage6_output          FUN_08C31E output
+  0xFFFFAB60  stage0_output          FUN_08E3E4 output
+
+Calibration data:
+  0x0C545C  ECT-based threshold table (86.1, 30.0, 57.0, -7.0, 70.0, 2500.0,
+            15.0, 400.0) — temperature and RPM thresholds for output conditioning
+
+================================================================================
+3. INDIVIDUAL FUNCTION ANALYSIS
+================================================================================
+
+─── Stage 0: FUN_0008E3E4 — Pre-calc / ECT Conditioning ───────────────────────
+
+  Entry: 0x08E3E4    Size: ~34 bytes    Ends: 0x08E406
+
+  Disassembly:
+    08E3E4: 4F22          sts.l  PR,@-R15           ; save return addr
+    08E3E6: B045          bsr    0x8E474             ; call ect_threshold_calc
+    08E3E8: 0009          nop                        ; delay slot
+    08E3EA: D685          mov.l  @(0x8E600),R6       ; =0xFFFF65C2 (engine state flag)
+    08E3EC: 6260          mov.b  @R6,R2              ; read engine state
+    08E3EE: D685          mov.l  @(0x8E604),R6       ; =0xFFFFAB60 (stage0 output)
+    08E3F0: 2620          mov.b  R2,@R6              ; write engine state → output
+    08E3F2: D285          mov.l  @(0x8E608),R2       ; =0x000582AC (check_diag_state)
+    08E3F4: 420B          jsr    @R2                  ; call check_diag_state
+    08E3F6: 0009          nop
+    08E3F8: 620C          extu.b R0,R2               ; zero-extend result
+    08E3FA: 2228          tst    R2,R2               ; test if diag mode active
+    08E3FC: 8B01          bf     skip                ; if active, skip pipeline
+    08E3FE: A589          bra    0x8EF14             ; jump to continuation
+    08E400: 4F26          lds.l  @R15+,PR
+    08E402: 4F26          lds.l  @R15+,PR
+    08E404: 000B          rts
+    08E406: 0009          nop
+
+  Sub-function at 0x8E474 (ect_threshold_calc):
+    08E474: D269          mov.l  @(0x8E61C),R2       ; =0xFFFF4144 (ect_output_fmac)
+    08E476: F928          fmov.s @R2,FR9             ; FR9 = ECT temperature (°C)
+    08E478: D669          mov.l  @(0x8E620),R6       ; =0xFFFFA8B0 (threshold workspace)
+    08E47A: E0F8          mov    #-8,R0              ; offset -8
+    08E47C: F697          fmov.s @(R0,R6),FR6        ; load threshold from workspace
+    08E47E: F966          fcmp/gt FR6,FR9            ; ECT > threshold?
+    08E480: E0FC          mov    #-4,R0              ; offset -4
+    08E482: F697          fmov.s @(R0,R6),FR6        ; load second threshold
+    08E484: D267          mov.l  @(0x8E624),R2       ; =0x000C545C (cal table)
+    08E486: F828          fmov.s @R2,FR8             ; load cal value (86.1°C)
+    08E488: 000B          rts
+    08E48A: F68A          fmov.s FR8,@R6             ; store to workspace
+
+  Purpose: Reads ECT (coolant temperature), compares against thresholds in
+  a workspace at 0xFFFFA8B0, loads calibration constants from 0xC545C
+  (temperature thresholds: 86.1°C, 30.0°C, 57.0°C, -7.0°C, etc.).
+  Copies an engine state byte (0xFFFF65C2) to output workspace (0xFFFFAB60).
+  Then gates the pipeline on check_diag_state — if diagnostic mode is active,
+  the per-cylinder pipeline is skipped entirely.
+
+  Label: percyl_precalc_ect_gate
+
+─── Stage 1: FUN_00081A64 — Diag Gate + Interpolation ─────────────────────────
+
+  Entry: 0x081A64    Size: ~28 bytes    Ends: 0x081A7E
+
+  Disassembly:
+    081A64: 4F22          sts.l  PR,@-R15
+    081A66: D26F          mov.l  @(0x81C24),R2       ; =0x000582AC (check_diag_state)
+    081A68: 420B          jsr    @R2
+    081A6A: 0009          nop
+    081A6C: 620C          extu.b R0,R2
+    081A6E: 2228          tst    R2,R2
+    081A70: 8B03          bf     +3                  ; if diag mode, skip
+    081A72: B1CF          bsr    0x81E14             ; call interp_pipeline
+    081A74: 0009          nop
+    081A76: A21C          bra    0x81EB2             ; continue to next
+    081A78: 4F26          lds.l  @R15+,PR
+    081A7A: 4F26          lds.l  @R15+,PR
+    081A7C: 000B          rts
+    081A7E: 0009          nop
+
+  Sub-function at 0x81E14 (interp_pipeline):
+    Calls fmac_interp_uint16 (0xBE598) 4 times, float_safe_div (0xBE628),
+    axis_frac_to_uint16 (0xBE5D8).  Reads descriptor at 0x09800C.
+    This is a table interpolation pipeline that:
+      1. Performs FMAC interpolation on fuel table values
+      2. Applies axis scaling via axis_frac_to_uint16
+      3. Performs safe division for normalization
+      4. Repeats for a second table dimension
+
+  Purpose: Conditional interpolation stage — only runs if NOT in diagnostic
+  mode.  Performs multi-dimensional table interpolation to convert computed
+  fuel values into per-cylinder output format.
+
+  Label: percyl_interp_gate
+
+─── Stage 2: FUN_00082A9C — GBR Workspace Init + Pack A ───────────────────────
+
+  Entry: 0x082A9C    Size: ~54 bytes    Ends: 0x082ACE
+
+  Disassembly:
+    082A9C: E6FF          mov    #-1,R6              ; R6 = 0xFF
+    082A9E: D27F          mov.l  @(0x82C9C),R2       ; =0xFFFFA48A
+    082AA0: A00D          bra    +0x0D               ; branch into body
+    082AA2: 2261          mov.w  R6,@R2              ; write 0xFF to FFFFA48A
+    --- body continues at 082AA4 ---
+    082AA4: 4F22          sts.l  PR,@-R15
+    082AA6: 4F13          stc.l  GBR,@-R15           ; save GBR
+    082AA8: D07D          mov.l  @(0x82CA0),R0       ; =0xFFFFA494
+    082AAA: 401E          ldc    R0,GBR              ; set GBR = FFFFA494
+    082AAC: E000          mov    #0,R0
+    082AAE: B75E          bsr    0x8396E             ; call pack_workspace_sub_A
+    082AB0: C000          mov.b  R0,@(R0,GBR)        ; GBR[0] = 0
+    082AB2: E000          mov    #0,R0
+    082AB4: C110          mov.w  R0,@(0x20,GBR)      ; GBR[0x20] = 0
+    082AB6: C024          mov.b  R0,@(0x24,GBR)      ; GBR[0x24] = 0
+    082AB8: C025          mov.b  R0,@(0x25,GBR)      ; GBR[0x25] = 0
+    082ABA: 4F17          ldc.l  @R15+,GBR           ; restore GBR
+    082ABC: 4F26          lds.l  @R15+,PR
+    082ABE: E000          mov    #0,R0
+    082AC0: D678          mov.l  @(0x82CA4),R6       ; =0xFFFFA4BA
+    082AC2: 2600          mov.b  R0,@R6              ; clear output byte
+    082AC4: 8061          mov.w  R0,@(2,R6)          ; clear output word
+    082AC6: 6060          mov.b  @R6,R0
+    082AC8: 8062          mov.w  R0,@(4,R6)
+    082ACA: 8461          mov.w  @(2,R6),R0
+    082ACC: 000B          rts
+    082ACE: 8063          mov.w  R0,@(6,R6)          ; mirror bytes
+
+  Sub-function at 0x8396E (pack_workspace_sub_A):
+    Sets GBR workspace at FFFF2EBC.
+    Calls uint16_pack (0xBE9B0) twice, uint8_pack (0xBE9A0) twice.
+    Packs float values into integer format for hardware output.
+
+  Purpose: Initializes a GBR-relative workspace at 0xFFFFA494, calls the
+  packing sub-function to convert floats to integers, clears output fields
+  at 0xFFFFA4BA.  This converts the interpolated fuel values from Stage 1
+  into packed integer form suitable for the ATU hardware.
+
+  Label: percyl_pack_workspace_A
+
+─── Stage 3: FUN_000839F8 — Float Load + GBR Workspace Init + Pack B ──────────
+
+  Entry: 0x0839F8    Size: ~80 bytes    Ends: 0x083A46
+
+  Disassembly:
+    0839F8: D283          mov.l  @(0x83C08),R2       ; =0xFFFF43FC (sensor_misc_state)
+    0839FA: F828          fmov.s @R2,FR8             ; FR8 = float from sensor state
+    0839FC: D583          mov.l  @(0x83C0C),R5       ; =0xFFFFA4D0 (stage3 workspace)
+    0839FE: E014          mov    #0x14,R0
+    083A00: F587          fmov.s @(R0,R5),FR5        ; load float from workspace+0x14
+    083A02: C783          mova   @(pool),R0          ; literal pool ref
+    083A04: F808          fadd   FR0,FR8             ; FR8 += FR0
+    083A06: E0F8          mov    #-8,R0
+    083A08: F587          fmov.s @(R0,R5),FR5        ; load from workspace-8
+    083A0A: C782          mova   @(pool),R0
+    083A0C: F808          fadd   FR0,FR8
+    083A0E: E0FC          mov    #-4,R0
+    083A10: F587          fmov.s @(R0,R5),FR5
+    083A12: E0FF          mov    #-1,R0
+    083A14: A00E          bra    +0x0E               ; branch to GBR init section
+    083A16: 8151          mov.w  R5,@(2,R1)
+    --- GBR init section ---
+    083A18: 4F22          sts.l  PR,@-R15
+    083A1A: 4F13          stc.l  GBR,@-R15
+    083A1C: D07E          mov.l  @(0x83C18),R0       ; =0xFFFFA4D4
+    083A1E: 401E          ldc    R0,GBR              ; GBR = FFFFA4D4
+    083A20: E000          mov    #0,R0
+    083A22: B480          bsr    0x84326             ; call pack_workspace_sub_B
+    083A24: C000          mov.b  R0,@(R0,GBR)
+    083A26: E000          mov    #0,R0
+    083A28: C10E          mov.w  R0,@(0x1C,GBR)
+    083A2A: C024          mov.b  R0,@(0x24,GBR)
+    083A2C: C110          mov.w  R0,@(0x20,GBR)
+    083A2E: C111          mov.w  R0,@(0x22,GBR)
+    083A30: 4F17          ldc.l  @R15+,GBR
+    083A32: 4F26          lds.l  @R15+,PR
+    083A34: E000          mov    #0,R0
+    083A36: D679          mov.l  @(0x83C1C),R6       ; =0xFFFFA4F9
+    083A38: 2600          mov.b  R0,@R6
+    083A3A: 8061          mov.w  R0,@(2,R6)
+    083A3C: 8062          mov.w  R0,@(4,R6)
+    083A3E: 6060          mov.b  @R6,R0
+    083A40: 8063          mov.w  R0,@(6,R6)
+    083A42: 8461          mov.w  @(2,R6),R0
+    083A44: 000B          rts
+    083A46: 8064          mov.w  R0,@(8,R6)
+
+  Sub-function at 0x84326 (pack_workspace_sub_B):
+    Identical structure to pack_workspace_sub_A but uses workspace FFFF2EC8.
+    Calls uint16_pack (0xBE9B0) twice, uint8_pack (0xBE9A0) twice.
+
+  Purpose: Loads float data from sensor_misc_state (0xFFFF43FC) and workspace
+  at FFFFA4D0, performs float accumulation, then initializes GBR workspace
+  at 0xFFFFA4D4 and packs to integers.  Clears output fields at 0xFFFFA4F9.
+  This is a parallel packing stage using a second workspace (B).
+
+  Label: percyl_pack_workspace_B
+
+─── Stage 4: FUN_000843AC — Short State Read ───────────────────────────────────
+
+  Entry: 0x0843AC    Size: ~18 bytes    Ends: 0x0843BC
+
+  Disassembly:
+    0843AC: C76C          mova   @(pool),R0          ; literal pool ref
+    0843AE: F808          fadd   FR0,FR8             ; accumulate float
+    0843B0: D56C          mov.l  @(0x84564),R5       ; =0xFFFFA518 (stage4 workspace)
+    0843B2: E0EC          mov    #-0x14,R0
+    0843B4: F587          fmov.s @(R0,R5),FR5        ; read workspace-0x14
+    0843B6: D66C          mov.l  @(0x84568),R6       ; =0xFFFF7C9D (fuel_state_byte)
+    0843B8: 6060          mov.b  @R6,R0              ; read fuel state
+    0843BA: 000B          rts
+    0843BC: 8052          mov.w  R0,@(4,R5)          ; write to workspace+4
+
+  Purpose: Very short function.  Reads a float value from workspace-0x14,
+  accumulates, then reads fuel_state_byte (0xFFFF7C9D) and stores it
+  into the stage4 output workspace.  This captures the current fuel
+  system state for the per-cylinder output decision.
+
+  Label: percyl_state_capture
+
+─── Stage 5: FUN_00084A28 — Engine Status Gate + State Write ───────────────────
+
+  Entry: 0x084A28    Size: ~22 bytes    Ends: 0x084A3C
+
+  Disassembly:
+    084A28: 4F22          sts.l  PR,@-R15
+    084A2A: D284          mov.l  @(0x84C3C),R2       ; =0x0003AB20 (check_engine_status)
+    084A2C: 420B          jsr    @R2                  ; call check_engine_status
+    084A2E: 0009          nop
+    084A30: D583          mov.l  @(0x84C40),R5       ; =0xFFFFA52D (stage5 output)
+    084A32: 8052          mov.w  R0,@(4,R5)          ; write engine status result
+    084A34: D683          mov.l  @(0x84C44),R6       ; =0xFFFF7C9D (fuel_state_byte)
+    084A36: 6260          mov.b  @R6,R2              ; read fuel_state_byte
+    084A38: 4F26          lds.l  @R15+,PR
+    084A3A: 000B          rts
+    084A3C: 2520          mov.b  R2,@R5              ; write fuel state → output
+
+  Purpose: Calls check_engine_status (0x3AB20) which reads engine state
+  from 0xFFFF7C68.  Stores result into workspace at 0xFFFFA52D+4.
+  Also reads fuel_state_byte and stores to workspace base.
+  This gates on engine running status for injection output decisions.
+
+  Label: percyl_engine_status_gate
+
+─── Stage 6: FUN_0008C31E — Constant Write (Final) ────────────────────────────
+
+  Entry: 0x08C31E    Size: 8 bytes    Ends: 0x08C324
+
+  Disassembly:
+    08C31E: E202          mov    #2,R2               ; R2 = 2
+    08C320: D682          mov.l  @(0x8C52C),R6       ; =0xFFFFA827 (stage6 output)
+    08C322: 000B          rts
+    08C324: 2620          mov.b  R2,@R6              ; write 2 → output
+
+  Purpose: Writes constant value 2 to stage6 output workspace.
+  This appears to be a completion marker or output mode flag that signals
+  the per-cylinder pipeline has completed all stages.  The value 2 likely
+  indicates "normal injection mode" (vs. 0=off, 1=cranking, etc.).
+
+  Label: percyl_completion_flag
+
+================================================================================
+4. PIPELINE SUMMARY
+================================================================================
+
+  Stage  Address   Label                      Action
+  ─────────────────────────────────────────────────────────────────────────
+  0      0x8E3E4   percyl_precalc_ect_gate    Read ECT, compare thresholds,
+                                              gate on diagnostic mode
+  1      0x81A64   percyl_interp_gate         Conditional fuel table
+                                              interpolation (multi-dim FMAC)
+  2      0x82A9C   percyl_pack_workspace_A    Init GBR workspace A, pack
+                                              floats → uint16/uint8
+  3      0x839F8   percyl_pack_workspace_B    Float accumulation + init GBR
+                                              workspace B, pack floats
+  4      0x843AC   percyl_state_capture       Read fuel_state_byte, store
+                                              to output workspace
+  5      0x84A28   percyl_engine_status_gate  Check engine running status,
+                                              capture fuel state
+  6      0x8C31E   percyl_completion_flag     Write completion marker (=2)
+
+  Flow: The dispatcher calls these 7 stages in sequence for each cylinder's
+  injection event.  Stage 0 gates the entire pipeline on ECT thresholds
+  and diagnostic mode.  Stages 1-3 perform the actual computation (table
+  interpolation → float packing).  Stages 4-5 capture engine/fuel state.
+  Stage 6 writes a completion flag.
+
+  The packed integer outputs (in the GBR workspaces at FFFFA494 and
+  FFFFA4D4) are subsequently consumed by the ATU event setup ISR at
+  0x0DE4 (Vec 204), which loads them into hardware compare registers
+  to fire the injector at the correct crank angle.
+
+================================================================================
+5. RAM MAP ADDITIONS
+================================================================================
+
+  Address        Type    Name                          Purpose
+  ──────────────────────────────────────────────────────────────────────
+  0xFFFF2EBC     struct  percyl_pack_workspace_A       uint16_pack output
+  0xFFFF2EC8     struct  percyl_pack_workspace_B       uint16_pack output
+  0xFFFF65C2     u8      engine_state_flag             Engine state (copied in Stage 0)
+  0xFFFFA48A     u16     percyl_stage2_init_word       Written 0xFF on entry
+  0xFFFFA494     struct  percyl_gbr_workspace_A        GBR base for Stage 2 (64B)
+  0xFFFFA4BA     struct  percyl_stage2_output          6-byte output (cleared)
+  0xFFFFA4D0     struct  percyl_stage3_base             Stage 3 float source
+  0xFFFFA4D4     struct  percyl_gbr_workspace_B        GBR base for Stage 3 (64B)
+  0xFFFFA4F9     struct  percyl_stage3_output          8-byte output (cleared)
+  0xFFFFA518     struct  percyl_stage4_workspace       Stage 4 state capture
+  0xFFFFA52D     struct  percyl_stage5_workspace       Stage 5 engine status
+  0xFFFFA827     u8      percyl_completion_flag        =2 when pipeline complete
+  0xFFFFA8B0     struct  percyl_ect_threshold_ws       ECT threshold workspace
+  0xFFFFAB60     u8      percyl_engine_state_copy      Engine state from Stage 0
+
+================================================================================
+6. CALIBRATION MAP ADDITIONS
+================================================================================
+
+  ROM Address    Type     Name                          Values
+  ──────────────────────────────────────────────────────────────────────
+  0x0C545C       float[8] percyl_ect_thresholds         86.1, 30.0, 57.0, -7.0,
+                                                        70.0, 2500.0, 15.0, 400.0
+                          (Temperature thresholds in °C and RPM thresholds)
+
+  0x09800C       desc     percyl_interp_descriptor      Descriptor for Stage 1
+                          (multi-dimensional fuel table interpolation)
+
+================================================================================
+7. PROPOSED GHIDRA LABELS
+================================================================================
+
+  Address    Current Name       Proposed Label
+  ─────────────────────────────────────────────────────
+  0x08E3E4   FUN_0008e3e4      percyl_precalc_ect_gate
+  0x081A64   FUN_00081a64      percyl_interp_gate
+  0x082A9C   FUN_00082a9c      percyl_pack_workspace_A
+  0x0839F8   FUN_000839f8      percyl_pack_workspace_B
+  0x0843AC   FUN_000843ac      percyl_state_capture
+  0x084A28   FUN_00084a28      percyl_engine_status_gate
+  0x08C31E   FUN_0008c31e      percyl_completion_flag
+  0x081E14   FUN_00081e14      percyl_interp_pipeline
+  0x08396E   FUN_0008396e      percyl_pack_sub_A
+  0x084326   FUN_00084326      percyl_pack_sub_B
+  0x08E474   FUN_0008e474      percyl_ect_threshold_calc
