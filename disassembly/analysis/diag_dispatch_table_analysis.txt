@@ -1,0 +1,226 @@
+Diagnostic Monitor Dispatch Table Analysis (0x064100-0x065CFC)
+===============================================================
+ROM: AE5L600L (Subaru EJ255 turbo, Denso SH7058, SH-2 CPU)
+Date: 2026-04-03
+
+CORRECTION: The region_060000_scout.txt stated "All entries use func
+0x0640F4 with sequential 0x0D92xx calibration addresses." This was
+INCORRECT. Only the first 24 entries use 0x0640F4; the remaining 573
+entries use ~95 unique handler functions in the 0x05D000-0x05E900 range.
+
+
+================================================================================
+1. TABLE STRUCTURE
+================================================================================
+
+Location:    0x064100 - 0x065CFC
+Entry size:  12 bytes (3 x uint32, big-endian)
+Entry count: 597 (including ~5 garbage entries at tail)
+Valid count: ~592
+
+Each entry:
+  [+0] uint32  func_ptr_A   -- function pointer (handler/action A)
+  [+4] uint32  func_ptr_B   -- function pointer (handler/action B)
+  [+8] uint32  func_ptr_C   -- function pointer (handler/action C)
+
+Preamble data at 0x0640D4-0x0640FF (44 bytes before table):
+  Contains table metadata / index arrays used by the dispatcher.
+
+Table tail (0x065CC0-0x065CFC): Contains garbage/padding values
+  (e.g., 0x04050607, 0x08090A0B) -- sequential byte patterns
+  likely from a memory initialization pattern, not valid entries.
+
+
+================================================================================
+2. HANDLER FUNCTION STATISTICS
+================================================================================
+
+Unique function pointers: 95
+
+Top handlers by frequency:
+  0x05E76A:  270 entries  (45.6%)  rts; nop        -- NO-OP (skip)
+  0x05D1D0:  159 entries  (26.9%)  read 0x064239   -- status byte read
+  0x05DCAE:   25 entries  ( 4.2%)  (handler stub)
+  0x05DCCE:   24 entries  ( 4.1%)  (handler stub)
+  0x0640F4:   24 entries  ( 4.1%)  TABLE SELF-REF  -- first 24 entries only
+  0x05D1CA:    6 entries  ( 1.0%)  read 0x064238   -- status byte read B
+
+  Remaining 89 unique ptrs: 1 entry each (individual handlers)
+
+Handler categories:
+  NO-OP (0x05E76A):        rts; nop -- immediate return, monitor disabled
+  STATUS READERS (0x05D1xx): 2-instruction read-byte-and-return stubs
+  BYTE WRITERS (0x05E76E+): Store R4 to a fixed RAM address, return
+  FLOAT READERS (0x05E774+): Call interp/pack library, write float to RAM
+  WORD WRITERS (0x05E788+): Call uint8_pack, write word to RAM
+  COMPLEX (0x05D204+): Multi-instruction with FPU, descriptor lookups
+
+
+================================================================================
+3. HANDLER FUNCTION ANALYSIS
+================================================================================
+
+3a. NO-OP handler: 0x05E76A
+    05E76A: rts
+    05E76C: nop
+    Used by 270 entries (45.6%). These monitor slots are DISABLED.
+
+3b. Status byte reader: 0x05D1D0
+    05D1D0: mov.l  @(0x05D294),R2   ; =0x00064239
+    05D1D2: rts
+    05D1D4: mov.b  @R2,R0           ; return byte at 0x064239
+    Used by 159 entries (26.9%). Returns a fixed status byte from the
+    table preamble area. This is likely a "default/pass" return.
+
+3c. Status byte reader B: 0x05D1CA
+    05D1CA: mov.l  @(0x05D290),R2   ; =0x00064238
+    05D1CC: rts
+    05D1CE: mov.b  @R2,R0           ; return byte at 0x064238
+
+3d. Calibration byte readers: 0x05D1DA-0x05D1FE
+    Each reads a single byte from sequential 0x0D97Fx addresses:
+      0x05D1DA: reads 0xFFFF8F0B (RAM)
+      0x05D1E0: reads 0x0D97F0 (ROM cal)
+      0x05D1E6: reads 0x0D97F1
+      0x05D1EC: reads 0x0D97F2
+      0x05D1F2: reads 0x0D97F3
+      0x05D1F4: reads 0x0D97F4
+      0x05D1FE: reads 0xFFFFAF73 (RAM, diag_fault_history)
+    These return DTC enable/disable bytes from calibration tables.
+
+3e. RAM byte writers: 0x05E76E, 0x05E7A8, 0x05E7AE, 0x05E7B4
+    Write R4 (input param) to a fixed RAM byte:
+      0x05E76E: writes FFFF36BE
+      0x05E7A8: writes FFFF8F11
+      0x05E7AE: writes FFFF8F1D
+      0x05E7B4: (similar pattern)
+
+3f. Float pack handlers: 0x05E774, 0x05E788, 0x05E798
+    Call library functions (0xBE588 interp, 0xBE9A0 uint8_pack)
+    and write results to RAM workspace addresses:
+      0x05E774: calls interp(fldi1, fldi0), writes float to FFFF8F04
+      0x05E788: calls uint8_pack, writes to FFFF36BA
+      0x05E798: calls uint8_pack, writes to FFFF36BC
+
+3g. Complex handlers (0x05D204, 0x05D560, 0x05D8A8, 0x05DA28, etc.)
+    Full functions with:
+    - Register save/restore
+    - Float workspace reads (FFFF4144, FFFF6350, etc.)
+    - Descriptor table lookups via 0xBE5A8/0xBE8E4
+    - Conditional DTC state updates
+    - Multiple output writes
+    These are the REAL diagnostic monitor logic functions.
+
+
+================================================================================
+4. TABLE SECTIONS
+================================================================================
+
+Section 1: Entries 0-23 (0x064100-0x06421C)
+  All use 0x0640F4 as func_ptr_A. The "cal" fields are byte addresses
+  in the 0x0D92E2-0x0D930B range (sequential, 2 bytes per entry).
+  This section likely controls DTC enable/disable flags via byte
+  lookups. 0x0640F4 is NOT code -- it's a reference to the table
+  preamble (self-referencing entries for config data).
+
+Section 2: Entries 26-591 (0x064238-0x065CB4)
+  Uses handler stubs in the 0x05D000-0x05E900 range. Each entry
+  defines three function pointers for a diagnostic monitor slot:
+    [A] = precondition/read function
+    [B] = main check function
+    [C] = output/write function
+
+  Most entries have at least one NO-OP (0x05E76A) or status reader
+  (0x05D1D0), meaning the monitor is partially or fully disabled.
+
+Section 3: Entries 592-596 (0x065CC0-0x065CFC)
+  Garbage/padding -- sequential byte patterns, not valid entries.
+
+
+================================================================================
+5. HANDLER CLUSTER MAP (0x05D1C0-0x05E920)
+================================================================================
+
+The handler stubs span ~5.7 KB in the 0x050000 region:
+
+  0x05D1C0-0x05D1D8   State machine tail + status readers
+  0x05D1DA-0x05D200   Calibration byte readers (0x0D97Fx)
+  0x05D204-0x05D478   Complex monitor handlers (individual)
+  0x05D478-0x05DC88   Complex handlers continued
+  0x05DC88-0x05DCCE   Small stubs + no-ops
+  0x05DCCE-0x05DDF4   Complex handlers
+  0x05DDF4-0x05E204   Mid-size handlers (compare, branch, write)
+  0x05E204-0x05E4C6   Complex handlers (float math)
+  0x05E4C6-0x05E76A   Complex handlers (DTC set/clear)
+  0x05E76A-0x05E920   Simple stubs: no-op, byte write, float write
+
+Total unique handler functions: 95
+  No-ops/stubs: ~10
+  Status readers: ~15
+  Complex monitors: ~70
+
+These 70 complex handler functions ARE the actual diagnostic monitor
+logic. They implement threshold comparisons, DTC maturation, and
+sensor rationality checks for specific OBD-II monitors.
+
+
+================================================================================
+6. CONNECTION TO DTC FRAMEWORK
+================================================================================
+
+The dispatch table connects to the DTC infrastructure at:
+  - DTC struct table at 0x9A834 (referenced by region_080000 monitors)
+  - DTC enable/disable bytes at 0x0D92E2-0x0D930B (section 1)
+  - DTC enable bytes at 0x0D97F0-0x0D97F4 (calibration byte readers)
+  - DTC readiness flags at FFFF9704-FFFF9742 (45 DTC flag readers in 0x020000)
+  - Diagnostic session state at FFFF8F0B, FFFF8F11, FFFF8F1D
+
+The dispatcher (likely in the 0x058xxx area, referenced via literal
+pools at 0x058D08/0x058D0C) iterates the table, calling each entry's
+three function pointers in sequence. Entries where all three are
+0x05E76A (no-op) are completely disabled monitors.
+
+
+================================================================================
+7. TUNING RELEVANCE
+================================================================================
+
+For DTC disable:
+  The simplest approach is patching the 0x0D92xx byte table that
+  controls the first 24 entries. For the remaining monitors, the
+  dispatch table entries themselves can be patched to replace handler
+  pointers with 0x05E76A (no-op) to disable specific monitors.
+
+For DTC threshold modification:
+  The ~70 complex handler functions reference calibration tables in
+  the 0x0D9xxx range. Modifying these calibration bytes changes
+  diagnostic thresholds without patching code.
+
+KEY FINDING: The 597-entry table is a COMPLETE map of all OBD-II
+diagnostic monitors. Each slot's three function pointers fully define
+the monitor's behavior. Replacing any pointer with 0x05E76A disables
+that aspect of the monitor.
+
+
+================================================================================
+8. GHIDRA LABELS TO ADD
+================================================================================
+
+  0x064100  diag_monitor_dispatch_table      597-entry dispatch (12B/entry)
+  0x0640D4  diag_monitor_table_preamble      Table metadata (44 bytes)
+  0x05E76A  diag_monitor_noop                No-op handler (rts;nop)
+  0x05D1D0  diag_monitor_status_read         Default status byte reader
+  0x05D1CA  diag_monitor_status_read_B       Status byte reader B
+  0x05D1DA  diag_monitor_cal_read_8F0B       Read FFFF8F0B
+  0x05D1E0  diag_monitor_cal_read_D97F0      Read DTC enable 0x0D97F0
+  0x05D1E6  diag_monitor_cal_read_D97F1      Read DTC enable 0x0D97F1
+  0x05D1EC  diag_monitor_cal_read_D97F2      Read DTC enable 0x0D97F2
+  0x05D1F2  diag_monitor_cal_read_D97F3      Read DTC enable 0x0D97F3
+  0x05D1F8  diag_monitor_cal_read_D97F4      Read DTC enable 0x0D97F4
+  0x05D1FE  diag_monitor_read_fault_hist     Read FFFFAF73 fault history
+  0x05E76E  diag_monitor_write_36BE          Write byte to FFFF36BE
+  0x05E774  diag_monitor_interp_write_8F04   Interp + write float FFFF8F04
+  0x05E788  diag_monitor_pack_write_36BA     uint8_pack -> FFFF36BA
+  0x05E798  diag_monitor_pack_write_36BC     uint8_pack -> FFFF36BC
+  0x05E7A8  diag_monitor_write_8F11          Write byte to FFFF8F11
+  0x05E7AE  diag_monitor_write_8F1D          Write byte to FFFF8F1D

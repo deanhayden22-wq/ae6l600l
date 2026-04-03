@@ -1,0 +1,768 @@
+Region 0x020000-0x02FFFF Scout Analysis
+========================================
+ROM: AE5L600L (Subaru EJ255 turbo, Denso SH7058, SH-2 CPU)
+Date: 2026-04-03
+Method: SH-2 byte disassembly, cross-reference search across all analysis
+        files and maps, fueling_subfunctions_analysis.txt integration,
+        fuel_pump_raw.txt dispatch table extraction.
+Note: Ghidra XML export not available for this session. Function counts
+      are derived from fueling_subfunctions_analysis.txt (automated
+      call-target scan) and rom_region_map.txt code block analysis.
+
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+Total unique call targets in this range:  491  (per fueling_subfunctions_analysis)
+  Named/analyzed:                          ~12  (2.4%)
+  Flag readers (<=24 bytes):               155  (31.6%)
+  Diagnostic flag readers (0x97xx):         45  (9.2%)
+  Larger functions (>24 bytes):            ~279 (56.8%)
+
+Region size: 65,536 bytes (0x10000)
+  Code blocks (rom_region_map):   ~32,768 bytes  (50.0%)
+  Float/data blocks:              ~16,384 bytes  (25.0%)
+  Gaps (unmapped):                ~16,384 bytes  (25.0%)
+
+NOTE: The 0x028100-0x029700 block (5,632 bytes) is classified as
+"float_data" in rom_region_map.txt but spot-checking reveals it
+contains actual SH-2 code (GBR-relative access, JSR to 0xBE9A0,
+conditional branches). This is a MISCLASSIFICATION. The true code
+percentage is likely 60-65%.
+
+Calibration cross-reference:
+  0x020384  cal_Engine_Load_Limit_A_Maximum  (from cal_crossref.txt)
+
+This is the ONLY named calibration value in the entire region. The
+address 0x020384 is in a literal pool, not a function entry.
+
+
+================================================================================
+2. NAMED FUNCTIONS AND KEY IDENTIFICATIONS
+================================================================================
+
+From fueling_subfunctions_analysis.txt and cross-reference search:
+
+  Address     Proposed Name               Calls  RAM         Source
+  ----------  --------------------------  -----  ----------  ------------------
+  0x022F92    check_cl_active             111    FFFF65F6    subfunctions_analysis
+  0x022CF4    check_engine_running        100    FFFF65C5    subfunctions_analysis
+  0x02F8EA    check_fuel_system_ready      65    FFFF726C    subfunctions_analysis
+  0x0297A0    diag_check_P0031             18    FFFF9704    subfunctions_analysis
+  0x0297B0    diag_check_P0032             16    FFFF9705    subfunctions_analysis
+  0x022CEA    check_accel_pedal_idle       15    FFFF65B1    subfunctions_analysis
+  0x023E48    check_afl_ready              15    FFFF67FC    subfunctions_analysis
+  0x0281DC    check_diag_mode_active       15    FFFF96A8    fuel_pump_analysis
+  0x0299BC    diag_check_P0137             14    FFFF971C    subfunctions_analysis
+  0x021D9A    check_sensor_valid           12    FFFF6552    subfunctions_analysis
+  0x02999C    flkc_flag_slot15             10    FFFF971B    subfunctions_analysis
+  0x0278D2    check_maf_valid               7    FFFF6A29    subfunctions_analysis
+
+From cl_ol_comprehensive_review.txt:
+  0x022CF4    Engine condition check (reads FFFF65C5)
+  0x022F92    CL state check (reads FFFF65F6)
+  0x0297B0    DTC flag reader (reads FFFF9705)
+  0x029AA0    DTC flag reader (reads FFFF972E)
+
+From cl_ol_state_machine.txt:
+  0x021D9A    Called from CL/OL transition (sensor validity)
+  0x021DAE    Called from CL/OL transition (related to 0x021D9A)
+  0x029808    Called from CL/OL state machine
+  0x029818    Called from CL/OL state machine
+
+From diag_tasks_analysis.txt:
+  0x022F92    Startup/initialization state check
+  0x02F8EA    Unknown helper (used by task53 readiness)
+
+From boost_control_analysis.txt:
+  0x022CF4    check_engine_running (called from boost control)
+  0x022F92    engine state check utility (called from boost control)
+
+
+================================================================================
+3. CROSS-REFERENCES FROM KNOWN CODE
+================================================================================
+
+3.1  Fueling Pipeline Dispatch Tables (fuel_pump_raw.txt)
+---------------------------------------------------------
+
+The fueling pipeline at 0x047C00-0x048C00 contains 3 major JSR dispatch
+chains that call 63 functions in this region. These represent the BULK
+of the callers:
+
+  Dispatch Chain A (0x047C7A-0x047E90): 32 function calls
+    Sensor/enrichment pipeline:
+      0x02271C, 0x022724, 0x021F4A, 0x028200, 0x026104, 0x0231C2,
+      0x02272C, 0x022F1C, 0x023270, 0x02262C, 0x02260C, 0x02121C,
+      0x024CF8, 0x022D2C, 0x0207D4, 0x020678, 0x020E6A, 0x021D7C,
+      0x021E96, 0x024094, 0x0242C2, 0x022F50, 0x02527A, 0x025848,
+      0x025C24, 0x0263FA, 0x026634, 0x022688, 0x02269A, 0x0226A2,
+      0x02FF74, 0x02EF08
+
+  Dispatch Chain B (0x048290-0x0485C2): 6 function calls
+    Fuel trim/learning:
+      0x027778, 0x029BB4, 0x027C20, 0x029D68, 0x02A428, 0x02BE78
+
+  Dispatch Chain C (0x048628-0x0486D0): 6 function calls
+    Fuel correction:
+      0x02820C, 0x02D718, 0x02E1A2, 0x02D45A, 0x02C078, 0x02B1DC,
+      0x02BDDC, 0x0261A8
+
+  Dispatch Chain D (0x0488FA-0x04896C): 14 function calls
+    Enrichment calculations (documented in fueling_pipeline_analysis):
+      0x021150 (sensor processing), 0x020F32 (sensor processing),
+      0x021E22 (calibration lookup), 0x0230F4 (enrichment calc),
+      0x0242DE (enrichment calc), 0x024CB0 (enrichment calc),
+      0x02524E (enrichment calc), 0x025866 (enrichment calc),
+      0x025C2C (enrichment calc), 0x024D7C (enrichment calc),
+      0x026754 (control loop), 0x02EE78 (IPW calc),
+      0x02FCF0 (IPW calc)
+
+  Additional isolated calls:
+      0x029BD4 (from 0x048B04)
+      0x02FA68, 0x02FB68 (from fuel pump pipeline)
+
+3.2  CL/OL State Machine (cl_ol_state_machine.txt)
+----------------------------------------------------
+
+The CL/OL state machine at 0x035800-0x037100 calls these functions
+repeatedly via literal pool JSR:
+
+  0x022CF4  (6 references) -- check_engine_running, used as gate
+  0x022F92  (3 references) -- check_cl_active
+  0x021D9A  (3 references) -- check_sensor_valid
+  0x021DAE  (3 references) -- sensor validity variant
+  0x0297B0  (1 reference)  -- diag_check_P0032
+  0x029AA0  (1 reference)  -- diag_check_P0463
+  0x0297F4  (1 reference)  -- diag flag reader
+  0x029804  (1 reference)  -- diag flag reader
+  0x029808  (1 reference)  -- diag flag reader
+  0x029818  (1 reference)  -- diag flag reader
+
+3.3  Boost Control (boost_control_analysis.txt)
+------------------------------------------------
+
+  0x022CF4  -- check_engine_running (from 0x05486A)
+  0x022F92  -- engine state check (from 0x054A5C)
+
+3.4  Accel Enrichment (accel_enrichment_analysis.txt)
+-----------------------------------------------------
+
+  0x0278DE  -- throttle delta state calculator (FUN_000278DE)
+  0x029BA4  -- clamp/limit helper (FUN_00029BA4)
+  0x022CF4  -- condition query (descriptor args)
+  0x0297A0  -- condition query B (descriptor args)
+  0x0299BC  -- condition query C (descriptor args)
+
+3.5  Task Call Graph (task_call_graph.txt)
+------------------------------------------
+
+No task entry points found in the 0x020000-0x02FFFF range.
+This region contains NO task entry points -- it is purely a
+UTILITY LIBRARY called from task functions in other regions.
+
+
+================================================================================
+4. CODE VS DATA DISTRIBUTION
+================================================================================
+
+From rom_region_map.txt:
+
+  Code blocks:
+    0x020100-0x020300     512 bytes
+    0x020400-0x021000    3072 bytes
+    0x021100-0x021500    1024 bytes
+    0x021600-0x021C00    1536 bytes
+    0x021E00-0x022300    1280 bytes
+    0x022400-0x022700     768 bytes
+    0x022D00-0x023B00    3584 bytes
+    0x023C00-0x024400    2048 bytes
+    0x024800-0x025000    2048 bytes
+    0x025100-0x025400     768 bytes
+    0x025500-0x026200    3328 bytes
+    0x026400-0x026700     768 bytes
+    0x026800-0x026B00     768 bytes
+    0x026D00-0x026F00     512 bytes
+    0x027000-0x027200     512 bytes
+    0x027400-0x027700     768 bytes
+    0x027C00-0x028100    1280 bytes
+    0x029900-0x029E00    1280 bytes
+    0x029F00-0x02A200     768 bytes
+    0x02A500-0x02A700     512 bytes
+    0x02AD00-0x02AF00     512 bytes
+    0x02B000-0x02BD00    3328 bytes
+    0x02BE00-0x02C000     512 bytes
+    0x02C600-0x02C800     512 bytes
+    0x02CB00-0x02CD00     512 bytes
+    0x02D500-0x02D900    1024 bytes
+    0x02E200-0x02E600    1024 bytes
+    0x02E800-0x02EA00     512 bytes
+    0x02F000-0x02F600    1536 bytes
+    0x02F700-0x02FC00    1280 bytes
+    0x02FD00-0x030200    1280 bytes
+
+  Float/data blocks:
+    0x021C00-0x021E00     512 bytes
+    0x022700-0x022900     512 bytes
+    0x022A00-0x022D00     768 bytes
+    0x024400-0x024600     512 bytes  (mixed_data)
+    0x026200-0x026400     512 bytes
+    0x026B00-0x026D00     512 bytes
+    0x027200-0x027400     512 bytes
+    0x028100-0x029700    5632 bytes  (MISCLASSIFIED -- contains code)
+    0x02A700-0x02AD00    1536 bytes
+    0x02C200-0x02C600    1024 bytes
+    0x02C800-0x02CB00     768 bytes
+    0x02CD00-0x02CF00     512 bytes
+    0x02D000-0x02D200     512 bytes
+    0x02D300-0x02D500     512 bytes
+    0x02DB00-0x02E000    1280 bytes
+    0x02E600-0x02E800     512 bytes
+    0x02EA00-0x02EC00     512 bytes
+    0x02ED00-0x02F000     768 bytes
+
+  Total mapped code:      ~33,280 bytes (50.8%)
+  Total float/data:       ~15,360 bytes (23.4%)
+  Gaps (unmapped):        ~16,896 bytes (25.8%)
+
+
+================================================================================
+5. FUNCTION DENSITY PER 0x1000 BLOCK
+================================================================================
+
+Estimated function counts from code block analysis and call targets:
+
+  0x020000:  ~25 functions  DENSE   sensor conditioning, GBR workspace init
+  0x021000:  ~20 functions  medium  sensor processing, check_sensor_valid
+  0x022000:  ~30 functions  DENSE   check_engine_running, check_cl_active,
+                                    enrichment helpers, state flag readers
+  0x023000:  ~15 functions  medium  enrichment calc, afl_ready check
+  0x024000:  ~20 functions  medium  enrichment calc cluster (workspace init)
+  0x025000:  ~18 functions  medium  enrichment calc continuation
+  0x026000:  ~12 functions  sparse  control loop helpers
+  0x027000:  ~10 functions  sparse  MAF validation, fuel trim helpers
+  0x028000:  ~45 functions  DENSE   DTC workspace + flag readers (MISCLASSIFIED
+                                    region: 0x028100-0x029700 is mostly code)
+  0x029000:  ~50 functions  DENSEST DTC flag reader cluster (45 @16B each),
+                                    FLKC flag dispatch, diag state functions
+  0x02A000:  ~10 functions  sparse  larger support functions
+  0x02B000:  ~20 functions  medium  diagnostic workspace flag readers
+                                    (FFFFA179-A185 cluster)
+  0x02C000:  ~15 functions  medium  fuel correction, CAN/EEPROM helpers
+  0x02D000:  ~12 functions  sparse  per-cylinder fuel correction workspace
+  0x02E000:  ~10 functions  sparse  fuel trim intermediates
+  0x02F000:  ~25 functions  DENSE   fuel system status readers, IPW calcs,
+                                    fuel pipeline tail functions
+
+
+================================================================================
+6. EXTERNAL CALL PROFILE (Library Functions Called FROM This Region)
+================================================================================
+
+From disassembly sample analysis across ~30 functions:
+
+  Library Function            Address     Refs    Notes
+  -------------------------   ---------   ----    ---------------------------------
+  uint8_pack (BE9A0)          0xBE9A0     40+     Pack byte result to RAM
+  uint16_pack (BE9B0)         0xBE9B0     25+     Pack uint16 result
+  uint16_unpack (BE980)       0xBE980     20+     Unpack uint16 from RAM
+  uint16_unpack_v2 (BE990)    0xBE990     15+     Unpack uint16 variant
+  float_safe_div (BE628)      0xBE628     10+     Safe float division
+  float_clamp_min (BE970)     0xBE970     8+      Float minimum clamp
+  float_compare (BE608)       0xBE608     5+      Float comparison
+  table_desc_1d (BE830)       0xBE830     8+      1D descriptor table lookup
+  interp_2d (BEAB0)           0xBEAB0     6+      2D interpolation
+  interp_1d (BE554)           0xBE554     5+      1D interpolation
+  fmac_interp (BE598)         0xBE598     4+      Fused multiply-accumulate interp
+  desc_counter_inc (BE53C)    0xBE53C     4+      Descriptor counter increment
+  desc_read_float (BDBCC)     0xBDBCC     4+      Descriptor float read
+  struct_init (BE81C)         0xBE81C     3+      Struct/workspace init
+  struct_init2 (BE82C)        0xBE82C     3+      Struct/workspace teardown
+  desc_clamp (BEA40)          0xBEA40     3+      Descriptor-based clamp
+
+  Low-level functions called:
+  get_ad_channel (317C)       0x00317C    3+      A/D channel select
+  get_ad_raw (3190)           0x003190    3+      A/D raw read
+  check_diag_state (582AC)    0x0582AC    2+      Diagnostic state check
+  check_engine_status (3AB20) 0x03AB20    1+      Engine status
+  eeprom_helper (6B5A)        0x006B5A    4+      EEPROM read/write
+  eeprom_conv (67A6)          0x0067A6    3+      EEPROM data conversion
+  eeprom_write (6884)         0x006884    2+      EEPROM write
+  eeprom_commit (67DC)        0x0067DC    2+      EEPROM commit
+  eeprom_read (6828)          0x006828    1+      EEPROM read
+
+
+================================================================================
+7. SAMPLE DISASSEMBLY FINDINGS (8 Functions)
+================================================================================
+
+7.1  check_cl_active @ 0x022F92 (111 callers, #1 most-called)
+---------------------------------------------------------------
+  022F92: D617  mov.l  @(0x022FF0),R6   ; =0xFFFF65F6 (RAM)
+  022F94: 6060  mov.b  @R6,R0
+  022F96: 8801  cmp/eq #1,R0
+  022F98: 000B  rts
+  022F9A: 0029  movt   R0              ; T flag -> R0 (delay slot)
+
+  CLASSIC flag reader: 10 bytes. Reads FFFF65F6 (closed-loop active flag),
+  returns 1 if == 1, else 0. This is the single most-called function in the
+  entire 0x020000-0x02FFFF range.
+
+7.2  check_engine_running @ 0x022CF4 (100 callers, #2 most-called)
+-------------------------------------------------------------------
+  022CF4: D60C  mov.l  @(0x022D28),R6   ; =0xFFFF65C5 (RAM)
+  022CF6: 6060  mov.b  @R6,R0
+  022CF8: 8801  cmp/eq #1,R0
+  022CFA: 000B  rts
+  022CFC: 0029  movt   R0              ; T flag -> R0 (delay slot)
+
+  Same pattern as check_cl_active. Reads FFFF65C5 (engine running flag).
+  Used as a gate by the CL/OL state machine, boost control, fueling
+  pipeline, and diagnostic monitors.
+
+7.3  DTC Flag Reader Cluster @ 0x0297A0 (45 functions, 16 bytes each)
+---------------------------------------------------------------------
+  0297A0: D65C  mov.l  @(0x029914),R6   ; =0xFFFF9704
+  0297A2: 6260  mov.b  @R6,R2
+  0297A4: 2228  tst    R2,R2
+  0297A6: 8F01  bf/s   0x0297AC
+  0297A8: E002  mov    #2,R0
+  0297AA: E000  mov    #0,R0
+  0297AC: 000B  rts
+  0297AE: 0009  nop
+
+  Pattern: read RAM byte at FFFF97xx, return 2 if nonzero, 0 if zero.
+  45 sequential functions reading FFFF9704 through FFFF9742, mapping 1:1
+  to DTC codes P0031 through P1443. DIFFERENT from the standard flag
+  reader pattern: returns 2/0 instead of 1/0 (diagnostic mode indicator).
+
+7.4  FUN_022D2C @ 0x022D2C (sensor conditioning, dispatch target)
+------------------------------------------------------------------
+  Saves R14, allocates stack. Reads FFFF6624 (rpm_current), FFFF65AE
+  (engine state byte), FFFF6350 (ect_current). Compares RPM against
+  calibration threshold (literal pool float). If conditions met, reads
+  FFFF65E8 workspace, checks byte at offset+3, calls descriptor table
+  lookup (0xBE874) with descriptor at 0xAADE0. Manages a countdown
+  counter at FFFF65E8+1. Writes output to FFFF65E8+3.
+  Pattern: RPM/ECT-gated sensor conditioning with hysteresis counter.
+  Subsystem: Engine warmup enrichment state manager.
+
+7.5  FUN_0207D4 @ 0x0207D4 (fuel conditioning, dispatch target)
+----------------------------------------------------------------
+  Reads FFFF4130 (float workspace), compares against two calibration
+  thresholds at 0xC33C4 and 0xC33C8. Writes 0 or 1 to FFFF6456
+  (fuel state flag). Sets GBR to FFFF643C for subsequent code block.
+  Heavy FPU usage: reads FFFF4024 (ADC raw buffer), calls fmac_interp
+  (0xBE598) for sensor scaling.
+  Pattern: Hysteresis comparator with float thresholds.
+  Subsystem: Fuel system sensor threshold evaluator.
+
+7.6  FUN_02D718 @ 0x02D718 (per-cylinder fuel correction)
+-----------------------------------------------------------
+  Full register save (R8-R14). Double nested loop: outer loop R10=0..1
+  (2 banks), inner loop R14=0..5 (6 entries per bank). Calls 0x6B5A
+  (EEPROM helper) and 0x67A6 (EEPROM conversion) in inner loop body.
+  Writes results as 16-bit words to FFFF7204 + sequential offsets
+  (12 bytes per bank = 24 bytes total, 12 uint16 values).
+  Pattern: Per-cylinder/per-bank fuel correction table loader from EEPROM.
+  Subsystem: A/F learning correction storage initialization.
+
+7.7  FUN_02EE78 @ 0x02EE78 (IPW pack, dispatch chain D target)
+---------------------------------------------------------------
+  Calls uint8_pack (0xBE9A0) 5x sequentially with R4=0, writing
+  results to FFFF3158, FFFF315A, FFFF315C, FFFF3160, FFFF315E.
+  Pattern: Batch workspace serializer -- packs 5 injector pulse width
+  values into a RAM output buffer at FFFF3158+.
+  Subsystem: IPW output packing for injector driver.
+
+7.8  FUN_02C078 @ 0x02C078 (CAN/EEPROM communication helper)
+-------------------------------------------------------------
+  Calls 0x6B5A (EEPROM helper) with channel=0, limit=127. Reads 16-bit
+  result, splits into high/low bytes, writes to FFFF6C4C (byte array).
+  Sets magic values (0x5A=90) at offsets +3, +4, +9. Contains state
+  machine checking FFFF8E98, FFFF8E9A, FFFF8E9B. Calls 0x6884 (EEPROM
+  write), 0x67DC (EEPROM commit), 0x6828 (EEPROM read) for data
+  persistence. Uses counter at FFFF6C4C+5 with limit=32 (0x20).
+  Pattern: EEPROM read/write state machine with retry logic.
+  Subsystem: Non-volatile parameter storage (learned values persistence).
+
+
+================================================================================
+8. REGION CHARACTERIZATION
+================================================================================
+
+8.1  Primary Subsystem: FUELING UTILITY LIBRARY
+------------------------------------------------
+
+This region is the ENGINE CONTROL UTILITY LIBRARY -- a collection of
+accessor functions, condition checkers, enrichment calculators, and
+fuel correction helpers called from the main fueling pipeline
+(0x030000-0x04FFFF), timing tasks, CL/OL state machine, boost control,
+and diagnostic monitors. It contains NO task entry points.
+
+The region serves as the "leaf function" layer of the Denso ECU
+architecture:
+
+  Tier 1: Task entry points (0x030000-0x09FFFF)
+           Call into...
+  Tier 2: THIS REGION (0x020000-0x02FFFF) -- utility functions
+           Call into...
+  Tier 3: Library functions (0x0BE000-0x0BFFFF) -- math/pack/interp
+           and low-level hardware I/O (0x000000-0x00FFFF)
+
+8.2  Function Categories
+-------------------------
+
+Category A: FLAG READERS (155 functions, ~31% of region)
+  Standard 10-16 byte functions that read a single RAM byte and return
+  a boolean or mode value. Three sub-types:
+    - Engine state readers (FFFF64xx-FFFF66xx): ~30 functions
+    - Fuel system readers (FFFF726x): ~15 functions
+    - DTC monitor flag readers (FFFF97xx): 45 functions
+
+Category B: SENSOR CONDITIONING (0x020000-0x027000, ~80 functions)
+  Functions called from the fueling dispatch chains that read sensor
+  values, apply calibration lookups, and write conditioned results
+  to workspace RAM. Heavy FPU usage, descriptor table references
+  (0xAAExx, 0xABxxx), calibration data reads (0xC30xx-0xC35xx).
+
+Category C: ENRICHMENT CALCULATORS (0x023000-0x026000, ~30 functions)
+  Called from dispatch chain D (0x0488FA). Implement startup enrichment,
+  warmup enrichment, post-start enrichment, and transient fuel
+  correction computations. Reference FFFF2220 (enrichment workspace),
+  FFFF6620 (enrichment output), FFFF6810 (injector timing workspace).
+
+Category D: A/F LEARNING HELPERS (0x027800-0x029B00, ~30 functions)
+  MAF validation, fuel trim state management, per-cylinder correction
+  loading from EEPROM. Reference FFFF7204 (fuel correction workspace),
+  FFFF3474 (learning state), FFFF212C (AFL workspace).
+
+Category E: FUEL CORRECTION / IPW (0x02A000-0x02F800, ~80 functions)
+  Larger support functions for fuel correction computation, IPW
+  calculation, CAN data packaging, EEPROM persistence. Reference
+  FFFF6C4C (CAN data buffer), FFFF3158 (IPW workspace), FFFF7278
+  (fuel trim workspace), FFFF72C8 (fuel output workspace).
+
+Category F: DIAGNOSTIC WORKSPACE READERS (0x02B000-0x02B300, ~11 functions)
+  Cluster of flag readers for FFFFA176-FFFFA185 (diagnostic workspace
+  flags). Use bit-test pattern (tst #0x01,R0) instead of cmp/eq #1.
+
+8.3  Function Templates
+------------------------
+
+Template 1: STANDARD FLAG READER (155 instances)
+  mov.l  @(pool),Rn   ; load RAM address
+  mov.b  @Rn,R0       ; read byte
+  cmp/eq #1,R0        ; compare to 1
+  rts
+  movt   Rn           ; T flag -> result (delay slot)
+  Size: 10 bytes. Returns 1/0.
+
+Template 2: DTC FLAG READER (45 instances)
+  mov.l  @(pool),R6   ; load FFFF97xx
+  mov.b  @R6,R2       ; read byte
+  tst    R2,R2        ; test zero
+  bf/s   +4
+  mov    #2,R0        ; return 2 if nonzero
+  mov    #0,R0        ; return 0 if zero
+  rts
+  Size: 16 bytes. Returns 2/0 (diagnostic mode indicator).
+
+Template 3: DIAGNOSTIC WORKSPACE BIT-TEST (11 instances)
+  mov.l  @(pool),R6   ; load FFFFA17x-A18x
+  mov.b  @R6,R0       ; read byte
+  tst    #0x01,R0     ; test bit 0
+  movt   R0           ; return T flag
+  rts
+  Size: 12 bytes. Returns 1 if bit 0 is clear.
+
+Template 4: ENRICHMENT CALCULATOR (30+ instances)
+  push registers
+  sts.l  PR,@-R15
+  [push FPU regs]
+  mov.l  @(pool),Rn   ; load workspace RAM address
+  [read multiple RAM values]
+  [call float_safe_div / float_clamp / interp_1d / interp_2d]
+  [conditional branches based on engine state]
+  [write result to workspace]
+  [pop FPU regs]
+  lds.l  @R15+,PR
+  rts
+  Size: 100-400 bytes. Heavy FPU usage.
+
+Template 5: IPW PACK / BATCH SERIALIZER (5+ instances)
+  sts.l  PR,@-R15
+  [load uint8_pack/uint16_pack address into Rn]
+  [N x JSR @Rn with sequential R4 arguments]
+  lds.l  @R15+,PR
+  rts
+  Size: 30-80 bytes. Packs computed values to output buffer.
+
+Template 6: EEPROM STATE MACHINE (4+ instances)
+  [read state flags from FFFF8E9x]
+  [call EEPROM helpers at 0x6B5A / 0x67A6 / 0x6884 / 0x67DC]
+  [manage retry counter]
+  [conditional write/commit]
+  Size: 200-400 bytes.
+
+8.4  Key RAM Workspace Regions
+-------------------------------
+
+  RAM Range          Usage                                  Est. Refs
+  ----------------   ------------------------------------   ---------
+  FFFF21xx           AFL workspace, enrichment counters      ~25
+  FFFF31xx           IPW workspace (FFFF3158-3168)           ~40
+  FFFF40xx           ADC raw buffer base, float workspace    ~15
+  FFFF41xx           Timer workspace                         ~10
+  FFFF64xx-66xx      Engine state, sensor values, flags      ~200
+                     (FFFF6350=ECT, FFFF6364=MAP,
+                      FFFF6624=RPM, FFFF65C5=engine_running,
+                      FFFF65F6=cl_active, FFFF65BD=engine_state)
+  FFFF67xx           Diagnostic flags, AFL ready             ~30
+  FFFF6Axx           MAF workspace                           ~15
+  FFFF6Cxx           CAN data buffer                         ~10
+  FFFF72xx           Fuel system state/workspace             ~50
+                     (FFFF726C=fuel_ready, FFFF7204=fuel_corr,
+                      FFFF7278=fuel_trim, FFFF72C8=fuel_output)
+  FFFF74xx           GBR-relative workspace                  ~30
+                     (GBR base: FFFF7450 for fuel pipeline)
+  FFFF8Exx           EEPROM state, map switch flags          ~15
+  FFFF96xx           Diagnostic mode flags                   ~20
+  FFFF97xx           DTC monitor active-flag array           ~160
+                     (45 bytes, FFFF9704-FFFF9742)
+  FFFFAxxx           Diagnostic workspace flags              ~25
+                     (FFFFA176-FFFFA185)
+
+
+================================================================================
+9. SUB-REGION BREAKDOWN
+================================================================================
+
+  Range               Content                                    Code/Data
+  ------------------  ----------------------------------------   ----------
+  0x020000-0x020FFF   Sensor conditioning: GBR workspace at       3.6KB code
+                      FFFF74B4, float comparisons with cal at     gap at
+                      0xC3030-C3154, descriptor lookups at        0x020300
+                      0xAAE00-AAE3C, float_safe_div, interp
+
+  0x021000-0x021FFF   Sensor processing: check_sensor_valid       2.6KB code
+                      (0x021D9A/021DAE), sensor_scaling_A         0.5KB data
+                      (0x021150), calibration lookup helpers
+
+  0x022000-0x022FFF   FLAG READER HUB: check_engine_running       3.6KB code
+                      (0x022CF4), check_cl_active (0x022F92),     1.3KB data
+                      check_accel_pedal_idle (0x022CEA),
+                      FUN_022D2C (warmup enrichment state),
+                      enrichment helpers. MOST-CALLED sub-region.
+
+  0x023000-0x023FFF   Enrichment calculations: check_afl_ready    2.0KB code
+                      (0x023E48), FUN_0230F4 (enrichment timer    gap
+                      + workspace manager with float_safe_div
+                      and float_clamp_min)
+
+  0x024000-0x024FFF   Enrichment calc cluster: FUN_024094         2.6KB code
+                      (workspace init, writes FFFF6810 with 6     0.5KB data
+                      float cal values from 0xC3488-C3498),
+                      FUN_024150 (large function: reads ECT,
+                      MAP, engine state, calls interp_2d and
+                      float_clamp_min, descriptor-based lookup)
+
+  0x025000-0x025FFF   Enrichment calc continuation: 0x02527A,     4.1KB code
+                      0x025848, 0x025C24. Sensor processing
+                      with 2D interpolation, float math
+
+  0x026000-0x026FFF   Control loop helpers: 0x026104 (dispatch    2.5KB code
+                      target), 0x0263FA, 0x026634, 0x0261A8.     1.0KB data
+                      check_cl_active wrappers, enrichment
+                      output packaging
+
+  0x027000-0x027FFF   MAF/fuel trim: check_maf_valid (0x0278D2),  1.8KB code
+                      FUN_027778 (fuel trim dispatch target),     1.0KB data
+                      FUN_027C20 (fuel trim helper)
+
+  0x028000-0x028FFF   MIXED CODE/DATA: 0x028100-0x029700 labeled  1.3KB code
+                      "float_data" but contains code (GBR ops,    5.6KB data
+                      JSR to BE9A0, conditional branches).        (MISCLASS)
+                      FUN_028200, FUN_02820C (dispatch targets).
+                      0x028500+ contains literal pool data for
+                      DTC workspace code.
+
+  0x029000-0x029FFF   DTC FLAG READER CLUSTER: 45 sequential      1.3KB code
+                      16-byte functions at 0x0297A0-0x029B60.     5.6KB data
+                      FUN_029750 (diag state dispatcher calling   (shared w/
+                      0x058524, 0x0582AC). FLKC flag dispatch.    0x028xxx)
+
+  0x02A000-0x02AFFF   Larger support functions: FUN_02A428         1.3KB code
+                      (dispatch target from chain B).              1.5KB data
+                      Few functions, widely spaced.
+
+  0x02B000-0x02BFFF   Diagnostic workspace flag readers:           3.3KB code
+                      11 bit-test functions at 0x02B220-02B298    gap
+                      reading FFFFA176-FFFFA185. FUN_02B1DC
+                      (dispatch target: calls 0x02ACD4, then
+                      branches to 0x02B0D0). Float computation
+                      at 0x02B2D0: reads FFFF6364, FFFF6350,
+                      FFFF67EC, FFFF8EAC.
+
+  0x02C000-0x02CFFF   EEPROM/CAN helpers: FUN_02C078 (EEPROM      1.0KB code
+                      state machine with retry logic, writes      2.3KB data
+                      FFFF6C4C CAN buffer). Small correction
+                      functions.
+
+  0x02D000-0x02DFFF   Per-cylinder fuel correction: FUN_02D718     1.5KB code
+                      (double loop loading 12 values from         2.3KB data
+                      EEPROM into FFFF7204 workspace).
+                      FUN_02D77A/D790/D7A0/D7BC (IPW pack
+                      and fuel mode byte helpers)
+
+  0x02E000-0x02EFFF   Fuel trim intermediates: FUN_02E1A2          1.5KB code
+                      (dispatch target). FUN_02EE78 (IPW batch    2.3KB data
+                      serializer to FFFF3158). FUN_02EF08
+                      (calls check_cl_active, branches to
+                      fuel pipeline tail functions)
+
+  0x02F000-0x02FFFF   Fuel system tail: check_fuel_system_ready    4.1KB code
+                      (0x02F8EA), check_fuel_mode (0x02F8F4/FE).  0.8KB data
+                      FUN_02FCF0 (IPW pack with interp_1d call
+                      gated by engine state + fuel mode).
+                      FUN_02FF74 (dispatch target). Dense BSR
+                      chains linking sub-functions within this
+                      sub-region. GBR base FFFF726C used.
+
+
+================================================================================
+10. ROM_REGION_MAP CORRECTIONS
+================================================================================
+
+10.1  0x028100-0x029700 (5,632 bytes, "float_data"): CONTAINS CODE
+  Disassembly at 0x028100 shows: GBR-relative reads (C4xx), conditional
+  branches (8Bxx/89xx), JSR to 0xBE9A0 (uint8_pack), float loads from
+  FFFF6A64/6A74/63B0. The byte-pattern heuristic was confused by the
+  interleaved literal pool data (RAM addresses look like float values).
+  The block likely contains 50+ functions with literal pools between them.
+
+10.2  0x022A00-0x022D00 (768 bytes, "float_data"): LIKELY CODE
+  This region sits between two confirmed code blocks (0x022400-0x022700
+  and 0x022D00-0x023B00). The 0x022CF4 function (check_engine_running)
+  has its literal pool at 0x022D28. Adjacent literal pools may have
+  been misidentified as float data.
+
+10.3  The many small "float_data" blocks (512 bytes each) interspersed
+  throughout the region are likely genuine literal pools for adjacent
+  code blocks, not misclassifications. The 12-16 byte flag readers
+  have 4-8 byte literal pools each, creating a dense code+pool pattern
+  that the heuristic correctly identifies as float_data in most cases.
+
+
+================================================================================
+11. PROPOSED NEXT STEPS
+================================================================================
+
+HIGH PRIORITY:
+
+  1. BATCH-LABEL the 155 flag readers in Ghidra.
+     Each gets a name based on its RAM address:
+       0x022F92 -> check_cl_active
+       0x022CF4 -> check_engine_running
+       0x02F8EA -> check_fuel_system_ready
+       ...etc (see fueling_subfunctions_analysis.txt Section 2)
+     This propagates labels to 350+ call sites across the ROM.
+
+  2. BATCH-LABEL the 45 DTC flag readers at 0x0297A0-0x029B60.
+     Each maps to a specific DTC code:
+       0x0297A0 -> diag_check_P0031  (FFFF9704)
+       0x0297B0 -> diag_check_P0032  (FFFF9705)
+       ...etc (see fueling_subfunctions_analysis.txt Section 2.2)
+
+  3. TRACE the 32 dispatch chain A targets (0x047C7A-0x047E90).
+     These are the core sensor conditioning and enrichment functions
+     called every fueling cycle. Understanding their order reveals
+     the fuel computation pipeline structure.
+
+MEDIUM PRIORITY:
+
+  4. Reclassify 0x028100-0x029700 in rom_region_map.txt from
+     "float_data" to "code" (mixed code + literal pools).
+
+  5. Analyze FUN_022D2C fully (warmup enrichment state manager).
+     It reads RPM, ECT, engine state and manages a hysteresis
+     counter at FFFF65E8. This controls warmup enrichment decay.
+
+  6. Analyze FUN_02D718 fully (per-cylinder fuel correction loader).
+     The double-loop EEPROM read into FFFF7204 is likely the A/F
+     learning storage initialization. Understanding the 12-value
+     structure would map the per-cylinder correction layout.
+
+  7. Trace the 6 dispatch chain B targets (0x048290-0x0485C2).
+     These are the fuel trim/learning pipeline functions.
+
+  8. Map the FFFFA176-FFFFA185 flag cluster (11 functions at
+     0x02B220-02B298) to their diagnostic subsystem meaning.
+
+LOW PRIORITY:
+
+  9. The ~80 enrichment calculator functions (0x023000-0x026000)
+     follow a common template. A systematic trace through their
+     descriptor references (0xAAExx) would identify which
+     enrichment each one computes (startup, warmup, post-start,
+     transient, altitude, etc.).
+
+  10. The EEPROM state machine at FUN_02C078 manages learned
+      parameter persistence. Full analysis would reveal the
+      non-volatile storage layout at FFFF6C4C+.
+
+  11. Cross-reference the 0xC30xx-0xC35xx calibration addresses
+      with the definitions XML to identify specific calibration
+      table names for the sensor conditioning functions.
+
+
+================================================================================
+12. SUMMARY
+================================================================================
+
+The 0x020000-0x02FFFF region is the Denso ECU's ENGINE CONTROL UTILITY
+LIBRARY. It contains 491 unique function targets with only ~12 named
+(2.4%). The region sits between the RTOS/BSP layer (0x010000-0x01FFFF)
+and the application-level task functions (0x030000+), providing:
+
+  1. FLAG READERS (155 functions, 31%): Standardized accessors for
+     engine state, fuel mode, and DTC monitor flags. The top 3
+     (check_cl_active, check_engine_running, check_fuel_system_ready)
+     account for 276 calls across the ROM.
+
+  2. SENSOR CONDITIONING (~80 functions, 16%): Calibration table
+     lookups, float-to-engineering-unit conversions, threshold
+     comparators with hysteresis.
+
+  3. ENRICHMENT CALCULATORS (~30 functions, 6%): Startup, warmup,
+     and transient fuel enrichment computation with countdown timers
+     and descriptor-based calibration.
+
+  4. FUEL CORRECTION & IPW (~80 functions, 16%): Per-cylinder
+     correction loading, fuel trim intermediate calculations,
+     IPW workspace packing.
+
+  5. DTC FLAG READERS (45 functions, 9%): Sequential readers for
+     the DTC monitor active-flag array at FFFF9704-FFFF9742.
+
+  6. EEPROM HELPERS (~10 functions, 2%): Non-volatile storage for
+     learned parameters with state machine retry logic.
+
+KEY INSIGHT: This region has NO task entry points. Every function here
+is called from task functions in 0x030000-0x09FFFF. The 63 direct
+dispatch targets from the fueling pipeline (fuel_pump_raw.txt) account
+for the majority of the substantive functions. Naming these dispatch
+targets would unlock understanding of the fuel computation pipeline.
+
+LARGEST BLIND SPOT: The 0x028100-0x029700 block (5.6KB) is
+misclassified as "float_data" but contains code. This likely holds
+50+ additional functions that are currently invisible to analysis.
+
+HIGHEST-IMPACT ACTION: Batch-labeling the 200 flag/DTC readers would
+propagate names to 500+ call sites across the ROM, dramatically
+improving readability of every subsystem that references this region.
+
+================================================================================
+END OF SCOUT ANALYSIS
+================================================================================

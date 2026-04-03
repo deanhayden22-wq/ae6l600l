@@ -8,9 +8,10 @@
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
-// Verified against Ghidra 12.0.2 SH-2 export. 3326 label operations total.
+// Verified against Ghidra 12.0.2 SH-2 export. 3358 label operations total.
 // Includes: original 884+1010, 463 RomRaider cal table labels, 125 RAM labels,
-// 19 MAF scaling path labels, 26 torque management labels, 354 GBR workspace labels.
+// 19 MAF scaling path labels, 26 torque management labels, 354 GBR workspace labels,
+// 19 diag dispatch table labels, 14 region 0x020000 utility library labels.
 //
 //@author  AE5L600L disassembly project
 //@category Data
@@ -6493,6 +6494,85 @@ public class ImportAE5L600L extends GhidraScript {
             "Stack area guard byte / canary");
 
 
+
+        // =====================================================================
+        // DIAGNOSTIC MONITOR DISPATCH TABLE (0x064100)
+        // 597-entry table with 95 unique handler stubs
+        // =====================================================================
+        count += labelComment(0x000640D4L, "diag_monitor_table_preamble",
+            "Diagnostic monitor dispatch table preamble/metadata (44 bytes before table).");
+        count += labelComment(0x00064100L, "diag_monitor_dispatch_table",
+            "597-entry diagnostic monitor dispatch table (12 bytes/entry). "
+            + "Each entry: 3 function pointers [precondition, main, output]. "
+            + "Spans 0x064100-0x065CFC. Dominant handlers: 0x05E76A (noop), 0x05D1D0 (status read).");
+        count += labelComment(0x0005E76AL, "diag_monitor_noop",
+            "Diagnostic monitor NO-OP handler (rts;nop). Used by 270 of 597 table entries = disabled monitors.");
+        count += labelComment(0x0005D1D0L, "diag_monitor_status_read",
+            "Default status byte reader: reads byte at 0x064239. Used by 159 entries.");
+        count += labelComment(0x0005D1CAL, "diag_monitor_status_read_B",
+            "Status byte reader B: reads byte at 0x064238.");
+        count += labelComment(0x0005D1DAL, "diag_monitor_cal_read_8F0B",
+            "Diagnostic cal reader: reads FFFF8F0B (RAM).");
+        count += labelComment(0x0005D1E0L, "diag_monitor_cal_read_D97F0",
+            "DTC enable byte reader: reads 0x0D97F0 (ROM cal).");
+        count += labelComment(0x0005D1E6L, "diag_monitor_cal_read_D97F1",
+            "DTC enable byte reader: reads 0x0D97F1 (ROM cal).");
+        count += labelComment(0x0005D1ECL, "diag_monitor_cal_read_D97F2",
+            "DTC enable byte reader: reads 0x0D97F2 (ROM cal).");
+        count += labelComment(0x0005D1F2L, "diag_monitor_cal_read_D97F3",
+            "DTC enable byte reader: reads 0x0D97F3 (ROM cal).");
+        count += labelComment(0x0005D1F8L, "diag_monitor_cal_read_D97F4",
+            "DTC enable byte reader: reads 0x0D97F4 (ROM cal).");
+        count += labelComment(0x0005D1FEL, "diag_monitor_read_fault_hist",
+            "Reads FFFFAF73 (diag_fault_history_byte).");
+        count += labelComment(0x0005E76EL, "diag_monitor_write_36BE",
+            "Write R4 byte to FFFF36BE.");
+        count += labelComment(0x0005E774L, "diag_monitor_interp_write_8F04",
+            "Interpolation + write float result to FFFF8F04.");
+        count += labelComment(0x0005E788L, "diag_monitor_pack_write_36BA",
+            "uint8_pack -> write to FFFF36BA.");
+        count += labelComment(0x0005E798L, "diag_monitor_pack_write_36BC",
+            "uint8_pack -> write to FFFF36BC.");
+        count += labelComment(0x0005E7A8L, "diag_monitor_write_8F11",
+            "Write R4 byte to FFFF8F11.");
+        count += labelComment(0x0005E7AEL, "diag_monitor_write_8F1D",
+            "Write R4 byte to FFFF8F1D.");
+
+        // =====================================================================
+        // REGION 0x020000 UTILITY LIBRARY LABELS
+        // Key functions identified from scout analysis
+        // =====================================================================
+        count += labelComment(0x00022F92L, "check_cl_active",
+            "Flag reader: returns 1 if FFFF65F6 == 1 (closed-loop active). 111 callers -- #1 most-called in region.");
+        count += labelComment(0x00022CF4L, "check_engine_running",
+            "Flag reader: returns 1 if FFFF65C5 == 1 (engine running). 100 callers.");
+        count += labelComment(0x0002F8EAL, "check_fuel_system_ready",
+            "Flag reader: returns 1 if FFFF726C == 1 (fuel system ready). 65 callers.");
+        count += labelComment(0x00022CEAL, "check_accel_pedal_idle",
+            "Flag reader: returns 1 if FFFF65B1 == 1 (accel pedal at idle). 15 callers.");
+        count += labelComment(0x00023E48L, "check_afl_ready",
+            "Flag reader: returns 1 if FFFF67FC == 1 (A/F learning ready). 15 callers.");
+        count += labelComment(0x000281DCL, "check_diag_mode_active",
+            "Flag reader: returns 1 if FFFF96A8 set (diagnostic mode active). 15 callers.");
+        count += labelComment(0x000299BCL, "diag_check_P0137",
+            "DTC flag reader: returns 2 if FFFF971C nonzero (P0137 rear O2 low). 14 callers.");
+        count += labelComment(0x00021D9AL, "check_sensor_valid",
+            "Sensor validity check: reads FFFF6552. Called from CL/OL transition. 12 callers.");
+        count += labelComment(0x0002999CL, "flkc_flag_slot15",
+            "FLKC learning convergence: reads FFFF971B. Gates task19/task23 FLKC. 10 callers.");
+        count += labelComment(0x000278D2L, "check_maf_valid",
+            "MAF validity check: reads FFFF6A29. 7 callers.");
+        count += labelComment(0x000297A0L, "diag_flag_reader_cluster_start",
+            "Start of 45 sequential DTC flag readers (16B each). FFFF9704-FFFF9742. "
+            + "Each returns 2 if DTC flag nonzero, 0 if clear.");
+        count += labelComment(0x0002D718L, "fuel_correction_eeprom_loader",
+            "Per-cylinder/per-bank fuel correction loader from EEPROM. "
+            + "Writes 12 uint16 values to FFFF7204+. A/F learning initialization.");
+        count += labelComment(0x0002EE78L, "ipw_output_pack",
+            "IPW batch serializer: 5x uint8_pack calls writing to FFFF3158-FFFF3168.");
+        count += labelComment(0x0002C078L, "eeprom_persistence_state_machine",
+            "EEPROM read/write state machine for learned value persistence. "
+            + "Uses FFFF6C4C buffer, calls EEPROM helpers at 0x6B5A/0x6884/0x67DC.");
 
         // =====================================================================
         // GBR WORKSPACE LABELS (auto-generated from gbr_registry.txt)

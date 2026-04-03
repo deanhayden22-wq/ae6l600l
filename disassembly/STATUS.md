@@ -22,9 +22,9 @@
 | Descriptors catalogued | 760 (1D: 621, 2D: 139) |
 | RAM addresses catalogued | 4,456 |
 | GBR bases identified | 459 (445 labeled, 14 already covered) |
-| Ghidra label operations | 3,326 |
+| Ghidra label operations | 3,358 |
 | Scheduler tasks documented | 59 |
-| Analysis files produced | 76 |
+| Analysis files produced | 79 |
 
 ---
 
@@ -65,7 +65,7 @@ Region             Functions  Named   %     Status
 --------------------------------------------------------------
 0x000-0x00F (64K)    383       76    19%    Partial — RTOS, ISR, ADC, startup
 0x010-0x01F (64K)    264        7     2%    SCOUTED — BSP/RTOS infra (low tuning value)
-0x020-0x02F (64K)    364       30     8%    Partial — fueling, diagnostics (LARGEST GAP)
+0x020-0x02F (64K)    364       30     8%    SCOUTED — engine control utility library
 0x030-0x03F (64K)    257       54    21%    Partial — CL/OL, AFC, timing
 0x040-0x04F (64K)    209       71    33%    BEST — knock, ignition, injection
 0x050-0x05F (64K)    242       35    14%    Partial — ETB, boost, diagnostics
@@ -83,20 +83,19 @@ Region             Functions  Named   %     Status
 
 ### HIGH (tuning-relevant, direct impact on table editing)
 
-1. **0x0640F4 — Parametric diagnostic monitor framework**
-   - Handles 500+ dispatch table entries at 0x064100-0x065D00
-   - Understanding this unlocks bulk DTC disable/thresholds for the entire OBD-II monitor set
-   - Currently misclassified as "float_data" in rom_region_map
+1. ~~**0x0640F4 — Parametric diagnostic monitor framework**~~ -- DONE
+   - 597-entry dispatch table at 0x064100 with 95 unique handler stubs
+   - See `analysis/diag_dispatch_table_analysis.txt`
 
-2. **0x020000-0x02FFFF — Systematic scout needed**
-   - 334 unnamed functions (largest blind spot by count)
-   - Partially explored through fueling/diagnostic analysis
-   - Likely contains additional fueling sub-functions, sensor conditioning, enrichment helpers
+2. ~~**0x020000-0x02FFFF — Systematic scout**~~ -- DONE
+   - Identity: Engine control utility library (491 call targets, no task entry points)
+   - 155 flag readers, 45 DTC flag readers, ~80 enrichment calculators
+   - Misclassified code block at 0x028100-0x029700
+   - See `analysis/region_020000_scout.txt`
 
-3. **463 unmapped RomRaider calibration definitions**
-   - 622 total definitions, only 159 labeled in Ghidra
-   - Mapping these connects table names in RomRaider to actual code paths
-   - Can be done with a script (match addresses from XML to Ghidra labels)
+3. **Batch-label 200 flag/DTC reader stubs in 0x020000**
+   - Mechanical labeling of template functions (check_xx, diag_check_Pxxxx)
+   - Would propagate names to 500+ call sites across the ROM
 
 ### MEDIUM (diagnostic/sensor, useful for understanding DTCs)
 
@@ -158,9 +157,9 @@ Region             Functions  Named   %     Status
 - ~~**Map remaining 463 calibration defs**~~ -- Done. All 622 RomRaider defs now in ImportAE5L600L.java.
 - ~~**Bulk-label GBR bases**~~ -- Done. 354 new GBR workspace labels added (region-prefixed). Total Ghidra labels: 3,326.
 
-### Phase 2: Targeted analysis (manual Ghidra work)
-- **Disassemble 0x0640F4** (parametric monitor handler) — Single function that unlocks understanding of 500+ dispatch entries. Highest ROI target.
-- **Scout 0x020000-0x02FFFF** — Systematic survey of the largest unnamed region. Use the same methodology as 0x010000/060000/070000/080000 scouts.
+### Phase 2: Targeted analysis -- COMPLETE
+- ~~**Analyze 0x064100 dispatch table**~~ -- Done. 597-entry diagnostic monitor dispatch table with 95 handler stubs. DTC disable = replace func ptr with 0x05E76A (noop).
+- ~~**Scout 0x020000-0x02FFFF**~~ -- Done. Engine control utility library: 155 flag readers, 45 DTC flag readers, ~80 enrichment calcs, ~80 fuel correction/IPW functions. No task entry points.
 
 ### Phase 3: Deepen existing coverage
 - **Trace sensor diagnostic dispatchers** (0x071A76, 0x07D526) to understand DTC enable/disable paths.

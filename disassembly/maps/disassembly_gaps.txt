@@ -83,7 +83,7 @@ Region-by-region breakdown of unnamed functions:
   ─────────────────────────────────────────────────────────────
   0x000000-0x00FFFF    307    383    19%     Partially explored (RTOS, ISR, ADC)
   0x010000-0x01FFFF    257    264     2%     SCOUTED — BSP/RTOS infrastructure
-  0x020000-0x02FFFF    334    364     8%     Partially explored (fueling, diag)
+  0x020000-0x02FFFF    334    364     8%     SCOUTED — engine control utility library
   0x030000-0x03FFFF    203    257    21%     Partially explored (CL/OL, AFC, timing)
   0x040000-0x04FFFF    138    209    33%     Best coverage (knock, ignition, injection)
   0x050000-0x05FFFF    207    242    14%     Partially explored (ETB, boost, diag)
@@ -220,20 +220,25 @@ REMAINING PRIORITY TARGETS
 
 HIGH VALUE (tuning-relevant):
   1. Per-cylinder injection output pipeline at 0x080000 — DONE
-  2. Parametric diagnostic monitor framework at 0x0640F4 — TODO
+  2. Diagnostic monitor dispatch table at 0x064100 — DONE (2026-04-03)
+     597-entry table with 95 unique handler stubs in 0x05Dxxx-0x05Exxx.
+     See diag_dispatch_table_analysis.txt.
 
 MEDIUM VALUE (diagnostic/sensor):
   3. Sensor diagnostic dispatchers at 0x071A76 and 0x07D526
   4. EEPROM adaptation persistence functions in 0x070000 region
   5. Sensor rationality check at 0x07CB30
+  6. 0x020000 utility library — batch-label 200 flag/DTC reader stubs
 
 LOW VALUE (infrastructure):
-  6. BSP internal call targets in 0x010000 (label propagation)
-  7. 0x020000 fueling sub-functions (334 unnamed, partially explored)
+  7. BSP internal call targets in 0x010000 (label propagation)
 
-4. 0x020000-0x02FFFF (334 functions, 8% named)
-   Largest region by unnamed count. Partially explored via fueling/diag analysis.
-   Needs systematic scouting to identify remaining subsystems.
+0x020000-0x02FFFF (491 call targets, ~12 named)
+   SCOUTED 2026-04-03. See region_020000_scout.txt.
+   Identity: Engine control utility library (no task entry points).
+   155 flag readers (31%), 45 DTC flag readers, ~80 enrichment calcs.
+   Misclassified code block at 0x028100-0x029700 (labeled float_data).
+   High-leverage targets: check_cl_active (111 callers), check_engine_running (100).
 
 ================================================================================
 CALIBRATION MAPPING STATUS (updated 2026-04-03)
@@ -264,7 +269,7 @@ Labels are systematically named by RAM region:
 Regions: sys, cal, io, adc, fuel, afc, afl, tim, kflk, idle, eng, ign,
          sens, boost, sched, evap, learn, diag, dtc, stk
 
-Total Ghidra label operations: 3,326 (was 2,972)
+Total Ghidra label operations: 3,358 (was 2,972)
 
 ================================================================================
 METHODOLOGY NOTES
