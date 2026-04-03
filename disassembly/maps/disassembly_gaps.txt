@@ -236,16 +236,35 @@ LOW VALUE (infrastructure):
    Needs systematic scouting to identify remaining subsystems.
 
 ================================================================================
-CALIBRATION MAPPING GAPS
+CALIBRATION MAPPING STATUS (updated 2026-04-03)
 ================================================================================
 
 From cal_crossref.txt:
   Total RomRaider definitions: 622
-  Labeled in Ghidra:           159
-  Unmapped:                    463
+  Labeled in Ghidra:           622 (all 463 unmapped defs added to ImportAE5L600L.java)
+  Unmapped:                      0
 
 The two descriptor tables at 0x0865xx and 0x0870xx contain calibration pointers
-not yet mapped to any RomRaider definition.
+not yet mapped to any RomRaider definition (these are ROM-internal, not in
+RomRaider XML).
+
+================================================================================
+GBR WORKSPACE LABELING STATUS (added 2026-04-03)
+================================================================================
+
+From gbr_registry.txt:
+  Total GBR bases:               459
+  Previously named:               91
+  Previously unnamed (???):      368
+  New labels generated:          354  (remaining 14 already had labels in Ghidra)
+  Added to ImportAE5L600L.java:  354
+
+Labels are systematically named by RAM region:
+  gbr_{region}_{addr} — e.g., gbr_fuel_77BC, gbr_diag_A350
+Regions: sys, cal, io, adc, fuel, afc, afl, tim, kflk, idle, eng, ign,
+         sens, boost, sched, evap, learn, diag, dtc, stk
+
+Total Ghidra label operations: 3,326 (was 2,972)
 
 ================================================================================
 METHODOLOGY NOTES
