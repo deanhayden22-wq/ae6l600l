@@ -7,7 +7,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
 
 
 ================================================================================
-  GAP 1: FUN_0003643A — THROTTLE/SENSOR INPUT SOURCE
+  GAP 1: ol_condition_checker — THROTTLE/SENSOR INPUT SOURCE
 ================================================================================
 
   Question: Does the OL condition checker read live sensor values or
@@ -15,7 +15,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
 
   ANSWER: ALL LIVE VALUES.
 
-  FUN_0003643A reads these RAM addresses at entry:
+  ol_condition_checker reads these RAM addresses at entry:
 
     FR14 = FFFF6624  (MAF — live mass airflow, float)
     FR13 = FFFF62DC  (engine load — live, float)
@@ -39,7 +39,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
   FFFF74B0), not for reading sensor inputs.
 
   IMPLICATION FOR WOT DELAY:
-  Since FUN_0003643A reads live sensor values, the WOT delay is NOT caused
+  Since ol_condition_checker reads live sensor values, the WOT delay is NOT caused
   by stale snapshot data.  The delay must come from:
     a) The hysteresis thresholds at ROM 0xCC180-0xCC1D4 (10 pairs of float
        thresholds indexed by FFFF6810 condition selector 1-5)
@@ -153,10 +153,10 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
 
 
 ================================================================================
-  GAP 4: FUN_36E60 — DEAD CODE CONFIRMATION
+  GAP 4: clol_post_transition — DEAD CODE CONFIRMATION
 ================================================================================
 
-  FUN_36E60 is the Phase 7 entry point (ol_post_transition).  It consists
+  clol_post_transition is the Phase 7 entry point (ol_post_transition).  It consists
   of TWO sub-functions:
 
   SUB-A (0x36E60 - 0x36E84): Small wrapper
@@ -215,7 +215,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
     - Engine state is valid
 
   The earlier analysis mentioning CC270 = 0.0 may have been referencing
-  a different offset or calibration.  The actual gate in FUN_36E86 is
+  a different offset or calibration.  The actual gate in clol_post_transition_sub is
   an integer comparison on FFFF67EC, not a float check.
 
   ADDITIONAL DISCOVERY — Phase 7 sub-C (0x36F76 - 0x36FFF+):
@@ -517,7 +517,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
   CONCLUSIONS
 ================================================================================
 
-1. GAP 1 CLOSED: FUN_0003643A reads ALL LIVE sensor values (FFFF6624,
+1. GAP 1 CLOSED: ol_condition_checker reads ALL LIVE sensor values (FFFF6624,
    FFFF65FC, FFFF6350, FFFF6898, FFFF62DC, FFFF63F8).  No snapshot reads.
    WOT delay is caused by hysteresis thresholds, not stale data.
 
@@ -528,7 +528,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
    evaluator that computes diagnostic output parameters from live sensors
    and FLKC convergence states.  The 7/8/10 encoding is a derived result.
 
-4. GAP 4 CLOSED: FUN_36E60 Phase 7 is NOT dead code.  The enrichment path
+4. GAP 4 CLOSED: clol_post_transition Phase 7 is NOT dead code.  The enrichment path
    requires 4+ conditions (GBR flags from prior phases + engine state +
    FFFF67EC counter threshold).  Additionally, a previously undocumented
    third sub-function (ol_transition_completion_check @ 0x36F76) was found.

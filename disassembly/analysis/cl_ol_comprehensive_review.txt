@@ -7,12 +7,12 @@ TABLE OF CONTENTS
   1.  Overview — How CL/OL Works in This ECU
   2.  Execution Order — The 7-Phase Pipeline
   3.  The Counter Mechanism (counter_A / counter_B)
-  4.  The Condition Checker (FUN_0003643A) — Complete Logic Map
+  4.  The Condition Checker (ol_condition_checker) — Complete Logic Map
   5.  The Diagnostic Flag at 0xFFFF79C7 (GBR+0x23)
   6.  The Hysteresis Mechanism — OL-to-CL Return Logic
-  7.  FUN_00036E60 — Post-Transition Handler (Full Disassembly Analysis)
-  8.  FUN_00036F76 — Secondary Post-Transition Handler
-  9.  FUN_0003700A — Threshold Comparator Subroutine
+  7.  clol_post_transition — Post-Transition Handler (Full Disassembly Analysis)
+  8.  clol_post_transition_B — Secondary Post-Transition Handler
+  9.  clol_threshold_comparator — Threshold Comparator Subroutine
   10. Stock vs Modified Calibration Changes
   11. The Observed Problem (3-21.csv Log Analysis)
   12. What We Still Do Not Fully Understand
@@ -52,50 +52,50 @@ SECTION 2: EXECUTION ORDER — THE 7-PHASE PIPELINE
 The CL/OL state machine runs from two dispatch tables each cycle:
 
   Dispatch Table B @ 0x4A0B8 (runs FIRST):
-    [14] FUN_0003580C  — Phase 1: State Snapshot + OL Enrichment Computation
-    [15] FUN_0003605E  — Phase 2: Condition Evaluation (calls FUN_0003643A)
+    [14] clol_transition_core  — Phase 1: State Snapshot + OL Enrichment Computation
+    [15] ol_fuel_map_selector  — Phase 2: Condition Evaluation (calls ol_condition_checker)
 
   Dispatch Table A @ 0x480B8 (runs SECOND):
-    [6]  FUN_000357D0  — Phase 3: Initialization (re-arms snapshot counter)
-    [8]  FUN_00036008  — Phase 4: Delay Manager A (calls condition checker AGAIN)
-    [9]  FUN_00036A98  — Phase 5: Hysteresis Handler
-    [10] FUN_00036BF4  — Phase 6: Delay Manager B (counter-based delay)
-    [11] FUN_00036E60  — Phase 7: Post-Transition Handler (final commit)
+    [6]  clol_transition_sub_B  — Phase 3: Initialization (re-arms snapshot counter)
+    [8]  clol_delay_manager_A  — Phase 4: Delay Manager A (calls condition checker AGAIN)
+    [9]  clol_hysteresis_handler  — Phase 5: Hysteresis Handler
+    [10] clol_delay_manager_B  — Phase 6: Delay Manager B (counter-based delay)
+    [11] clol_post_transition  — Phase 7: Post-Transition Handler (final commit)
 
 Per-cycle flow in pseudocode:
 
-  PHASE 1 — State Snapshot (FUN_0003580C):
+  PHASE 1 — State Snapshot (clol_transition_core):
     if master_counter >= threshold(CAL@0xCBBEF):
         snapshot ECT, RPM, throttle, MAP, MAF, BPW, load, gear
         compute OL enrichment from fuel map tables
         reset master_counter = 0
     master_counter = clamp(master_counter + 1)
 
-  PHASE 2 — Condition Evaluation (FUN_0003643A, called via 0x3605E):
+  PHASE 2 — Condition Evaluation (ol_condition_checker, called via 0x3605E):
     Check all CL-to-OL trigger conditions (RPM, throttle, load, etc.)
     Write counter_B (delay threshold) and diagnostic flag
 
-  PHASE 3 — Initialization (FUN_000357D0):
+  PHASE 3 — Initialization (clol_transition_sub_B):
     Write 0xFF to master_counter at RAM[FFFF7986]
     Write 0x200 to RAM[FFFF794C]
     This re-arms Phase 1 for next cycle
 
-  PHASE 4 — Delay Manager A (FUN_00036008):
-    Calls condition checker (FUN_0003643A) AGAIN
-    Calls hysteresis sub (FUN_00036978) for throttle/BPW comparison
+  PHASE 4 — Delay Manager A (clol_delay_manager_A):
+    Calls condition checker (ol_condition_checker) AGAIN
+    Calls hysteresis sub (clol_hysteresis_sub) for throttle/BPW comparison
     Updates mode state variables
 
-  PHASE 5 — Hysteresis Handler (FUN_00036A98):
+  PHASE 5 — Hysteresis Handler (clol_hysteresis_handler):
     Prevents rapid CL/OL oscillation
     Checks throttle and BPW against thresholds minus hysteresis values
     Both must be below threshold to allow OL-to-CL return
 
-  PHASE 6 — Delay Manager B (FUN_00036BF4):
+  PHASE 6 — Delay Manager B (clol_delay_manager_B):
     Counter-based delay for CL-to-OL transition
     In modified ROM: delay=0, so this is effectively bypassed
     In stock ROM: delay=750, requires counter to accumulate
 
-  PHASE 7 — Post-Transition Handler (FUN_00036E60):
+  PHASE 7 — Post-Transition Handler (clol_post_transition):
     Commits final mode change
     Snapshots RPM and sensor data for transition logic
     Sets up threshold comparison flags for smooth transitions
@@ -111,7 +111,7 @@ Two 16-bit counters at 0xFFFF79C2 and 0xFFFF79C4 are central to the CL/OL
 delay mechanism:
 
   counter_A @ 0xFFFF79C2 (GBR+0x36 with GBR=0xFFFF798C)
-    - READ by the main evaluator FUN_0003606C at:
+    - READ by the main evaluator ol_enrichment_dispatch at:
         0x0360A8: mov.w @(54,GBR),R0  — reads counter_A
         0x0360DC: mov.w @(54,GBR),R0  — reads counter_A again
     - COMPARED against counter_B at:
@@ -122,10 +122,10 @@ delay mechanism:
 
   counter_B @ 0xFFFF79C4 (GBR+0x38 with GBR=0xFFFF798C, or
                            GBR+0x20 with GBR=0xFFFF79A4)
-    - WRITTEN by FUN_0003643A (condition checker) at multiple points:
+    - WRITTEN by ol_condition_checker (condition checker) at multiple points:
         0x036336, 0x0363A6, 0x03641C, 0x03682C
-    - READ by FUN_0003606C at 0x0360AC
-    - READ by FUN_0003643A itself for internal comparison
+    - READ by ol_enrichment_dispatch at 0x0360AC
+    - READ by ol_condition_checker itself for internal comparison
     - READ by diagnostic function at 0x07D6CC
     - This IS the "delay counter threshold" — the value the condition
       checker outputs based on which trigger fired
@@ -151,12 +151,12 @@ delay mechanism:
 
 
 ================================================================================
-SECTION 4: THE CONDITION CHECKER (FUN_0003643A) — COMPLETE LOGIC MAP
+SECTION 4: THE CONDITION CHECKER (ol_condition_checker) — COMPLETE LOGIC MAP
 ================================================================================
 
 ROM address: 0x0003643A - 0x00036846
 GBR: 0xFFFF79A4 (set at 0x03644E)
-Called from: FUN_00036008 (Phase 4) and FUN_0003605E (Phase 2)
+Called from: clol_delay_manager_A (Phase 4) and ol_fuel_map_selector (Phase 2)
 
 This function evaluates ALL conditions that trigger a CL-to-OL transition.
 It outputs two values:
@@ -284,7 +284,7 @@ SECTION 5: THE DIAGNOSTIC FLAG AT 0xFFFF79C7 (GBR+0x23)
 This flag has been EXHAUSTIVELY traced through the entire ROM.
 
 WRITES:
-  - Written by FUN_0003643A at 0x036830 (epilogue): always writes 0
+  - Written by ol_condition_checker at 0x036830 (epilogue): always writes 0
   - Written EARLIER on the throttle exceeded path: writes 1
   - On the throttle path, function exits before reaching the epilogue,
     so the value of 1 is preserved
@@ -313,13 +313,13 @@ CONCLUSION: The flag at 0xFFFF79C7 is a DIAGNOSTIC-ONLY variable.
 SECTION 6: THE HYSTERESIS MECHANISM — OL-TO-CL RETURN LOGIC
 ================================================================================
 
-Handled by FUN_00036978 (Phase 4 sub) and FUN_00036A98/B48 (Phase 5).
+Handled by clol_hysteresis_sub (Phase 4 sub) and clol_hysteresis_handler/B48 (Phase 5).
 
 PURPOSE: Once the ECU enters OL, the hysteresis mechanism prevents
 immediate return to CL when conditions briefly drop below threshold.
 This prevents oscillation at the boundary.
 
-HOW IT WORKS (FUN_00036978, GBR=0xFFFF79CC):
+HOW IT WORKS (clol_hysteresis_sub, GBR=0xFFFF79CC):
 
   The function reads:
     MAF from RAM[FFFF6624]
@@ -368,7 +368,7 @@ EFFECT OF MODIFIED VALUES:
 
 
 ================================================================================
-SECTION 7: FUN_00036E60 — POST-TRANSITION HANDLER (FULL DISASSEMBLY ANALYSIS)
+SECTION 7: clol_post_transition — POST-TRANSITION HANDLER (FULL DISASSEMBLY ANALYSIS)
 ================================================================================
 
 ROM address: 0x00036E60 - 0x00036F76
@@ -470,7 +470,7 @@ This function consists of TWO sub-functions at the entry point:
         FR15 = float(CAL[0xCC28C])  // = 0.2
 
     // Step 4: Call threshold comparator subroutine
-    call FUN_0003700A()           // updates flags at GBR+16,17,18
+    call clol_threshold_comparator()           // updates flags at GBR+16,17,18
                                   // (FFFF7A3C, FFFF7A3D, FFFF7A3E)
 
     // Step 5: Counter gate check
@@ -541,12 +541,12 @@ This function consists of TWO sub-functions at the entry point:
     // Restore registers and return
 
   CRITICAL FINDING:
-    FUN_00036E60 does NOT write to FFFF7448 (the CL/OL mode flag).
-    FUN_00036E60 does NOT write to FFFF79C6 (the mode state flag).
-    FUN_00036E60 does NOT write to FFFF79F2 (the OL active flag).
-    FUN_00036E60 does NOT produce the SSM values 7, 8, or 10.
+    clol_post_transition does NOT write to FFFF7448 (the CL/OL mode flag).
+    clol_post_transition does NOT write to FFFF79C6 (the mode state flag).
+    clol_post_transition does NOT write to FFFF79F2 (the OL active flag).
+    clol_post_transition does NOT produce the SSM values 7, 8, or 10.
 
-    Instead, FUN_00036E60 manages TRANSITION SMOOTHING. It computes a
+    Instead, clol_post_transition manages TRANSITION SMOOTHING. It computes a
     blending rate (0.1 or 0.2) that controls how quickly the enrichment
     transitions between CL and OL states. The output at 0xFFFF7A14 is
     consumed by downstream fuel calculation code as a transition factor.
@@ -557,13 +557,13 @@ This function consists of TWO sub-functions at the entry point:
 
 
 ================================================================================
-SECTION 8: FUN_00036F76 — SECONDARY POST-TRANSITION HANDLER
+SECTION 8: clol_post_transition_B — SECONDARY POST-TRANSITION HANDLER
 ================================================================================
 
 ROM address: 0x00036F76 - 0x00037008
 GBR: 0xFFFF7A24
 
-This function immediately follows FUN_36E60 and appears to be called from
+This function immediately follows clol_post_transition and appears to be called from
 the same dispatch chain. It performs additional transition management.
 
   GBR = 0xFFFF7A24
@@ -616,15 +616,15 @@ the same dispatch chain. It performs additional transition management.
 
 
 ================================================================================
-SECTION 9: FUN_0003700A — THRESHOLD COMPARATOR SUBROUTINE
+SECTION 9: clol_threshold_comparator — THRESHOLD COMPARATOR SUBROUTINE
 ================================================================================
 
 ROM address: 0x0003700A - 0x00037082
 GBR: 0xFFFF7A2C (set at 0x037012)
-Called from: FUN_00036E60 main body
+Called from: clol_post_transition main body
 
 This subroutine performs three pairs of threshold comparisons on the
-sensor snapshots stored by FUN_36E60's main body.
+sensor snapshots stored by clol_post_transition's main body.
 
   R14 = 0xFFFF7A3C (pointer to sensor snapshot block)
 
@@ -669,12 +669,12 @@ sensor snapshots stored by FUN_36E60's main body.
   MAF > 0. In practice, MAF is always > 0 when the engine is running,
   so GBR+18 (0xFFFF7A3E) will always be 0.
 
-  This means the condition flag C check in FUN_36E60's main body:
+  This means the condition flag C check in clol_post_transition's main body:
       if GBR+30 != 1: goto DEFAULT_PATH
   will ALWAYS fail (GBR+30 = 0xFFFF7A3E = 0), because the MAF threshold
   is set to 0.0/0.0 in both stock and modified ROMs.
 
-  CONSEQUENCE: The enrichment adjustment logic in FUN_36E60 (Steps 5-7)
+  CONSEQUENCE: The enrichment adjustment logic in clol_post_transition (Steps 5-7)
   can NEVER execute in the current calibration. The function always takes
   the DEFAULT_PATH, writing FR14 (0.1) to FFFF7A38 and 0.0 to FFFF7A14.
 
@@ -750,7 +750,7 @@ The following calibration values were changed from stock to modified:
   | (CC208, float)           |           |           |                           |
   +--------------------------+-----------+-----------+---------------------------+
 
-  VALUES THAT DID NOT CHANGE (relevant to FUN_36E60):
+  VALUES THAT DID NOT CHANGE (relevant to clol_post_transition):
     CC284 = 0.1 (blending rate A) — same in both
     CC288 = 0.1 (blending rate B) — same in both
     CC28C = 0.2 (upper blending rate A) — same in both
@@ -780,7 +780,7 @@ threshold at approximately 3399 RPM.
 
 WHY THIS HAPPENS — ANALYSIS FROM CODE:
 
-The condition checker (FUN_0003643A) evaluates conditions in a SPECIFIC
+The condition checker (ol_condition_checker) evaluates conditions in a SPECIFIC
 ORDER. The order matters because some conditions EXIT EARLY:
 
   1. Per-gear RPM limits — checked FIRST
@@ -812,7 +812,7 @@ it only engages when RPM crosses the per-gear threshold.
 POSSIBLE EXPLANATIONS:
 
   1. SNAPSHOT TIMING: The condition checker operates on SNAPSHOTTED data,
-     not live sensor data. Phase 1 (FUN_0003580C) snapshots engine state
+     not live sensor data. Phase 1 (clol_transition_core) snapshots engine state
      only when the master counter reaches the threshold (CAL@0xCBBEF).
      If the snapshot cycle is slow, there could be a delay between the
      throttle actually exceeding 37.884 and the condition checker seeing
@@ -820,7 +820,7 @@ POSSIBLE EXPLANATIONS:
 
   2. CONDITION CHECKER CALL ORDER: The condition checker is called TWICE
      per cycle (Phase 2 and Phase 4). But the main evaluator
-     (FUN_0003606C) that actually applies the OL enrichment runs between
+     (ol_enrichment_dispatch) that actually applies the OL enrichment runs between
      these calls. If the first call sets counter_B but the evaluator
      has not yet processed it, there could be a one-cycle delay.
 
@@ -861,7 +861,7 @@ SECTION 12: WHAT WE STILL DO NOT FULLY UNDERSTAND
 ================================================================================
 
   1. WHERE IS THE SSM CL/OL MODE VALUE (7/8/10) GENERATED?
-     We traced FUN_36E60 expecting it to write the 7/8/10 mode value.
+     We traced clol_post_transition expecting it to write the 7/8/10 mode value.
      It does not. It does not write to FFFF7448 either. The SSM mode
      value (7=off, 8=CL, 10=OL) is produced by SSM protocol formatting
      code, likely in the diagnostic function area around 0x013D58, based
@@ -877,12 +877,12 @@ SECTION 12: WHAT WE STILL DO NOT FULLY UNDERSTAND
 
   3. HOW EXACTLY DOES THE SNAPSHOT CYCLE WORK?
      The master counter at FFFF7986 controls when Phase 1 takes a new
-     snapshot. It is reset to 0xFF by Phase 3 (FUN_357D0), then Phase 1
+     snapshot. It is reset to 0xFF by Phase 3 (clol_transition_sub_B), then Phase 1
      increments it and compares against threshold CAL@0xCBBEF. We do not
      know the exact value of this threshold byte, which determines the
      snapshot rate.
 
-  4. WHAT IS THE ROLE OF FUN_36E60 SUB-A vs SUB-B?
+  4. WHAT IS THE ROLE OF clol_post_transition SUB-A vs SUB-B?
      Sub-A (0x36E60-0x36E84) appears to be a separate, tiny function that
      is likely called independently — it has its own RTS. It writes a
      blending rate. Sub-B (0x36E86+) is the main body. They share literal
@@ -896,7 +896,7 @@ SECTION 12: WHAT WE STILL DO NOT FULLY UNDERSTAND
      different unit or might represent a percentage/scaling factor rather
      than raw RPM.
 
-  6. THE FUN_36E60 ENRICHMENT PATH IS DEAD CODE
+  6. THE clol_post_transition ENRICHMENT PATH IS DEAD CODE
      Due to CAL[CC270] = 0.0, the condition flag at FFFF7A3E is always 0,
      which causes the enrichment adjustment logic (Steps 5-7) to always
      take the DEFAULT_PATH. This means the threshold checks at CC274-CC280
@@ -919,12 +919,12 @@ Based on the code analysis, the following changes would address the slow
 CL-to-OL transition at WOT:
 
   1. VERIFY THE THROTTLE INPUT SOURCE
-     The most important next step is to determine whether FUN_0003643A
+     The most important next step is to determine whether ol_condition_checker
      reads the LIVE throttle value or the SNAPSHOT throttle value. If it
      reads the snapshot, the delay is inherent to the snapshot cycle and
      cannot be fixed by changing thresholds alone.
 
-     How to check: Disassemble FUN_0003643A fully around the throttle
+     How to check: Disassemble ol_condition_checker fully around the throttle
      comparison (CHECK 3) and trace the RAM address it reads. If it reads
      from FFFF793C (snapshot block) rather than FFFF69F0 (live sensor),
      that confirms the snapshot theory.
@@ -972,7 +972,7 @@ CL-to-OL transition at WOT:
 
 
 ================================================================================
-APPENDIX A: RAM ADDRESS MAP FOR FUN_36E60 AND RELATED
+APPENDIX A: RAM ADDRESS MAP FOR clol_post_transition AND RELATED
 ================================================================================
 
   Address       Size   Description
@@ -992,23 +992,23 @@ APPENDIX A: RAM ADDRESS MAP FOR FUN_36E60 AND RELATED
   FFFF79C6      byte   Mode state flag (0=none, 1=CL, 2=blending)
   FFFF79C7      byte   Diagnostic flag (1=throttle, 0=other) — SSM only
   FFFF79F2      byte   OL active flag
-  FFFF7A14      float  Transition output (written by FUN_36E60)
-  FFFF7A20      float  Blending rate parameter (written by FUN_36E60 sub-A)
-  FFFF7A24      float  Transition factor (written by FUN_36F76)
-  FFFF7A28      byte   State variable (read by FUN_36E60 as GBR+8)
-  FFFF7A2C      float  RPM snapshot (written by FUN_36E60)
-  FFFF7A30      float  Sensor snapshot (written by FUN_36E60)
-  FFFF7A34      float  MAF snapshot (written by FUN_36E60)
-  FFFF7A38      float  Blending rate output (written by FUN_36E60)
-  FFFF7A3C      byte   Condition flag B (set by FUN_3700A)
-  FFFF7A3D      byte   Condition flag A (set by FUN_3700A)
-  FFFF7A3E      byte   Condition flag C (set by FUN_3700A, always 0)
+  FFFF7A14      float  Transition output (written by clol_post_transition)
+  FFFF7A20      float  Blending rate parameter (written by clol_post_transition sub-A)
+  FFFF7A24      float  Transition factor (written by clol_post_transition_B)
+  FFFF7A28      byte   State variable (read by clol_post_transition as GBR+8)
+  FFFF7A2C      float  RPM snapshot (written by clol_post_transition)
+  FFFF7A30      float  Sensor snapshot (written by clol_post_transition)
+  FFFF7A34      float  MAF snapshot (written by clol_post_transition)
+  FFFF7A38      float  Blending rate output (written by clol_post_transition)
+  FFFF7A3C      byte   Condition flag B (set by clol_threshold_comparator)
+  FFFF7A3D      byte   Condition flag A (set by clol_threshold_comparator)
+  FFFF7A3E      byte   Condition flag C (set by clol_threshold_comparator, always 0)
   FFFF9705      byte   DTC flag A (read by 0x0297B0)
   FFFF972E      byte   DTC flag B (read by 0x029AA0)
 
 
 ================================================================================
-APPENDIX B: CALIBRATION ADDRESS MAP FOR FUN_36E60 AND RELATED
+APPENDIX B: CALIBRATION ADDRESS MAP FOR clol_post_transition AND RELATED
 ================================================================================
 
   Address    Type    Value (stock=mod)  Description
@@ -1035,7 +1035,7 @@ APPENDIX C: OL ENRICHMENT ACCUMULATOR (0xFFFF798C) — WRITE SITES
 ================================================================================
 
 FFFF798C is the primary OL enrichment accumulator float. It is read with
-fmov.s throughout the OL computation and written by FUN_0003606C
+fmov.s throughout the OL computation and written by ol_enrichment_dispatch
 (GBR=0xFFFF798C). All writes use R12=0xFFFF79F0 with R0=-100 (effective
 address = FFFF79F0 - 100 = FFFF798C), via fmov.s FR8,@(R0,R12).
 

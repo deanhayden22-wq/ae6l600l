@@ -28,7 +28,7 @@ SECTION 1: THE TWO INDEPENDENT CL/OL PATHS
 
   PATH A — OL Enrichment State Machine (7-Phase Pipeline):
     Controls: OL fuel enrichment computation
-    Condition checker: FUN_0003643A (throttle/RPM/load/BPW thresholds)
+    Condition checker: ol_condition_checker (throttle/RPM/load/BPW thresholds)
     Delay control: counter_B at FFFF79C4, set by CBC62 (modified=0)
     When delay=0: OL enrichment is computed immediately
     Flags written: FFFF79F2 (OL active), FFFF79C6 (mode state, always 0)
@@ -51,15 +51,15 @@ SECTION 2: PATH A — OL ENRICHMENT STATE MACHINE
 
   Dispatched from two periodic task tables each cycle:
 
-    Table B [14] FUN_0003580C — Phase 1: State Snapshot + OL Enrichment
-    Table B [15] FUN_0003605E — Phase 2: Condition Evaluation
-    Table A [6]  FUN_000357D0 — Phase 3: Initialization
-    Table A [8]  FUN_00036008 — Phase 4: Delay Manager A
-    Table A [9]  FUN_00036A98 — Phase 5: Hysteresis Handler
-    Table A [10] FUN_00036BF4 — Phase 6: Delay Manager B
-    Table A [11] FUN_00036E60 — Phase 7: Post-Transition Handler
+    Table B [14] clol_transition_core — Phase 1: State Snapshot + OL Enrichment
+    Table B [15] ol_fuel_map_selector — Phase 2: Condition Evaluation
+    Table A [6]  clol_transition_sub_B — Phase 3: Initialization
+    Table A [8]  clol_delay_manager_A — Phase 4: Delay Manager A
+    Table A [9]  clol_hysteresis_handler — Phase 5: Hysteresis Handler
+    Table A [10] clol_delay_manager_B — Phase 6: Delay Manager B
+    Table A [11] clol_post_transition — Phase 7: Post-Transition Handler
 
-  The condition checker (FUN_0003643A) evaluates:
+  The condition checker (ol_condition_checker) evaluates:
     CHECK 1: Per-gear RPM limits (CC180-CC1A4) — checked FIRST
     CHECK 2: Neutral RPM limits
     CHECK 3: Throttle maximum (CC1D8) — stock 91.0 deg (108.3% display)
@@ -454,7 +454,7 @@ SECTION 12: WRITE 4 FILTER — FFFF798C UPDATE ALGORITHM (0x36238-0x36306)
   Path A (OL enrichment) and Path B (CL/OL mode flag). Path B checks
   if FFFF798C is near zero (within 3.05e-5) to allow CL mode.
 
-  WRITE 4 runs inside Phase 2 (FUN_0003605E) when mode state
+  WRITE 4 runs inside Phase 2 (ol_fuel_map_selector) when mode state
   (FFFF79C6) is 0 — the normal runtime state.
 
   TWO INPUTS determine the path:

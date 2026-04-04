@@ -19,15 +19,15 @@ SECTION 1: EXECUTION ORDER AND DISPATCH
 The CL/OL state machine is dispatched from two periodic task tables:
 
   Dispatch Table A @ 0x480B8 (fueling task, executed periodically):
-    [6]  0x357D0  FUN_000357D0  CL/OL transition sub B (initialization)
-    [8]  0x36008  FUN_00036008  CL/OL delay manager A (main evaluator)
-    [9]  0x36A98  FUN_00036A98  CL/OL hysteresis handler
-    [10] 0x36BF4  FUN_00036BF4  CL/OL delay manager B
-    [11] 0x36E60  FUN_00036E60  Post-transition handler
+    [6]  0x357D0  clol_transition_sub_B  CL/OL transition sub B (initialization)
+    [8]  0x36008  clol_delay_manager_A  CL/OL delay manager A (main evaluator)
+    [9]  0x36A98  clol_hysteresis_handler  CL/OL hysteresis handler
+    [10] 0x36BF4  clol_delay_manager_B  CL/OL delay manager B
+    [11] 0x36E60  clol_post_transition  Post-transition handler
 
   Dispatch Table B @ 0x4A0B8 (secondary fueling task):
-    [14] 0x3580C  FUN_0003580C  CL/OL transition CORE (state snapshot + OL calc)
-    [15] 0x3605E  -> branches to FUN_0003643A (condition checker) then 0x36848
+    [14] 0x3580C  clol_transition_core  CL/OL transition CORE (state snapshot + OL calc)
+    [15] 0x3605E  -> branches to ol_condition_checker (condition checker) then 0x36848
 
   EXECUTION ORDER per cycle:
     1. Table B[14]: 0x3580C  - Snapshots engine state, computes OL enrichment
@@ -45,14 +45,14 @@ SECTION 2: GBR LAYOUT / RAM STATE VARIABLES
 
 Three distinct GBR base registers are used by the CL/OL subsystem:
 
---- GBR = 0xFFFF7954 (set at 0x035814, used by FUN_0003580C) ---
+--- GBR = 0xFFFF7954 (set at 0x035814, used by clol_transition_core) ---
 
   +0x18 (0xFFFF796C): word    Counter/state (accessed indirectly via R14=0xFFFF7988)
   +0x30 (0xFFFF7984): word    Gear ratio / RPM snapshot (written from FFFF6A22)
   +0x32 (0xFFFF7986): byte    Master transition counter / mode indicator
-                               Written by FUN_357D0 (set to 0xFF = init)
-                               Written by FUN_3580C (set to 0 after processing)
-                               Read by FUN_3580C to gate state snapshot
+                               Written by clol_transition_sub_B (set to 0xFF = init)
+                               Written by clol_transition_core (set to 0 after processing)
+                               Read by clol_transition_core to gate state snapshot
                                Value compared with CAL@0xCBBEF threshold
   +0x34 (0xFFFF7988): base    R14 pointer for indirect float storage
   +0x36 (0xFFFF798A): byte    Gear position snapshot (from FFFF6254)
@@ -70,7 +70,7 @@ Three distinct GBR base registers are used by the CL/OL subsystem:
 
 
 --- GBR = 0xFFFF798C (set at 0x03607E, 0x036856) ---
-    Used by FUN_0003606C and FUN_00036848
+    Used by ol_enrichment_dispatch and clol_post_condition_handler
 
   +0x1B (0xFFFF79A7): byte    (unnamed state)
   +0x36 (0xFFFF79C2): word    CL/OL delay counter comparison A
@@ -94,14 +94,14 @@ Three distinct GBR base registers are used by the CL/OL subsystem:
 
 
 --- GBR = 0xFFFF79A4 (set at 0x03644E) ---
-    Used by FUN_0003643A (condition checker)
+    Used by ol_condition_checker (condition checker)
 
   +0x00 (0xFFFF79A4): word    Internal counter A (via sub-GBR 0xFFFF79C0+0x00)
   +0x1C (0xFFFF79C0): GBR sub-base for counter operations
   +0x20 (0xFFFF79C4): word    COUNTER VALUE (output from condition checker)
-                               Written by FUN_0003643A at multiple points
-                               Read by FUN_0003606C at 0x0360AC and 0x0360E0
-                               Read by FUN_0003643A itself at 0x036336, 0x0363A6, 0x03641C
+                               Written by ol_condition_checker at multiple points
+                               Read by ol_enrichment_dispatch at 0x0360AC and 0x0360E0
+                               Read by ol_condition_checker itself at 0x036336, 0x0363A6, 0x03641C
                                Read by diagnostic function at 0x07D6CC
   +0x23 (0xFFFF79C7): byte    FLAG BYTE (throttle exceeded indicator)
                                Written at 0x036830: always 0 in the visible path
@@ -115,7 +115,7 @@ Three distinct GBR base registers are used by the CL/OL subsystem:
 SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
 ================================================================================
 
---- FUN_000357D0 (0x357D0-0x357E8) - CL/OL transition sub B ---
+--- clol_transition_sub_B (0x357D0-0x357E8) - CL/OL transition sub B ---
   GBR: 0xFFFF7954 (inherited from caller context)
   Purpose: Initialize CL/OL transition state, call subroutines
   Actions:
@@ -126,7 +126,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
   At 0x357E8: Tail-call to 0x0BDBCC (table utility) with R4=FFFF318C
 
 
---- FUN_000357F0 (0x357F0-0x35808) - CL/OL transition sub B helper ---
+--- clol_transition_sub_B_helper (0x357F0-0x35808) - CL/OL transition sub B helper ---
   Purpose: Check validity via table utility, return boolean
   Actions:
     1. Calls 0x0BDCB6 (A/F learning range validity check) with R4=FFFF318C
@@ -135,7 +135,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     4. Returns R14 in R0
 
 
---- FUN_0003580C (0x3580C-0x3589E) - CL/OL Transition CORE ---
+--- clol_transition_core (0x3580C-0x3589E) - CL/OL Transition CORE ---
   GBR: 0xFFFF7954 (set at 0x035814)
   Purpose: Main state snapshot and OL enrichment computation
   Critical RAM reads:
@@ -177,7 +177,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     - Else: skip enrichment
 
 
---- FUN_00036008 (0x36008-0x36028) - CL/OL Delay Manager A ---
+--- clol_delay_manager_A (0x36008-0x36028) - CL/OL Delay Manager A ---
   Purpose: Main CL/OL evaluator entry point (dispatch table A)
   Actions:
     1. Store float from literal pool to RAM[FFFF79F4-0x50] (=FFFF79A4)
@@ -189,7 +189,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     7. Return
 
 
---- FUN_0003602A (0x3602A-0x36058) - CL/OL Delay Manager A Sub ---
+--- clol_delay_manager_A_sub (0x3602A-0x36058) - CL/OL Delay Manager A Sub ---
   Purpose: Reset OL state if certain conditions met
   Actions:
     1. Call 0x22F92 (utility function)
@@ -200,14 +200,14 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     3. Return
 
 
---- FUN_00036062 (0x36062-0x3606C) - CL/OL Delay Manager A Setup ---
+--- clol_delay_manager_A_setup (0x36062-0x3606C) - CL/OL Delay Manager A Setup ---
   Purpose: Short wrapper - calls CL/OL sub then jumps to post-condition
   Actions:
     1. Call 0x36962 (CL/OL sub)
     2. Jump to 0x36848 (post-condition handler)
 
 
---- FUN_0003606C (0x3606C-0x36278) - CL/OL MAIN EVALUATOR ---
+--- ol_enrichment_dispatch (0x3606C-0x36278) - CL/OL MAIN EVALUATOR ---
   GBR: 0xFFFF798C (set at 0x03607E)
   Purpose: The heart of the CL/OL decision logic
 
@@ -337,7 +337,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     // Return
 
 
---- FUN_0003643A (0x3643A-0x36846) - CONDITION CHECKER ---
+--- ol_condition_checker (0x3643A-0x36846) - CONDITION CHECKER ---
   GBR: 0xFFFF79A4 (set at 0x03644E)
   Purpose: Evaluate ALL CL/OL transition conditions
   [Already fully disassembled by user - summary of outputs]
@@ -367,7 +367,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     11. MAF-based counter step (CAL[0xCE640])
 
 
---- FUN_00036848 (0x36848-0x36962) - POST-CONDITION HANDLER ---
+--- clol_post_condition_handler (0x36848-0x36962) - POST-CONDITION HANDLER ---
   GBR: 0xFFFF798C (set at 0x036856)
   Purpose: Process results from condition checker, set CL/OL mode
 
@@ -379,7 +379,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     // Update mode state variables
 
 
---- FUN_00036962 (0x36962-0x36978) - CL/OL Sub ---
+--- clol_sub_36962 (0x36962-0x36978) - CL/OL Sub ---
   Purpose: Save/restore GBR context for condition checker
 
   Algorithm:
@@ -388,7 +388,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     // Return
 
 
---- FUN_00036978 (0x36978-0x36A98) - CL/OL Sub 2 ---
+--- clol_hysteresis_sub (0x36978-0x36A98) - CL/OL Sub 2 ---
   Purpose: Post-condition processing, update delay counters
 
   Algorithm:
@@ -398,7 +398,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     // Return mode indicator
 
 
---- FUN_00036A98 (0x36A98-0x36AB2) - HYSTERESIS HANDLER ENTRY ---
+--- clol_hysteresis_handler (0x36A98-0x36AB2) - HYSTERESIS HANDLER ENTRY ---
   Purpose: Entry point for hysteresis logic (prevents CL/OL oscillation)
 
   Actions:
@@ -409,7 +409,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     5. Return
 
 
---- FUN_00036AB2 (0x36AB2-0x36B48) - HYSTERESIS HANDLER MAIN ---
+--- clol_hysteresis_main (0x36AB2-0x36B48) - HYSTERESIS HANDLER MAIN ---
   Purpose: Core hysteresis logic
 
   Reads:
@@ -463,7 +463,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     }
 
 
---- FUN_00036B48 (0x36B48-0x36BF4) - HYSTERESIS SUB ---
+--- clol_hysteresis_sub_B (0x36B48-0x36BF4) - HYSTERESIS SUB ---
   Purpose: Compute hysteresis comparison values
   Calibration:
     0x0CC228: Throttle hysteresis lookup
@@ -487,7 +487,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     }
 
 
---- FUN_00036BF4 (0x36BF4-0x36E60) - DELAY MANAGER B ---
+--- clol_delay_manager_B (0x36BF4-0x36E60) - DELAY MANAGER B ---
   Purpose: Counter-based delay for CL->OL transition
   GBR: (varies, uses multiple state bases)
 
@@ -520,7 +520,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     //   decrement counter (or reset)
 
 
---- FUN_00036E60 (0x36E60-0x36F6E) - POST-TRANSITION HANDLER ---
+--- clol_post_transition (0x36E60-0x36F6E) - POST-TRANSITION HANDLER ---
   Purpose: Final mode commit and output generation
   GBR: (uses state from previous functions)
 
@@ -545,7 +545,7 @@ SECTION 4: COMPLETE PSEUDOCODE STATE MACHINE
 
 function CL_OL_StateMachine_PerCycle():
 
-    // ===== PHASE 1: STATE SNAPSHOT (FUN_0003580C, Table B[14]) =====
+    // ===== PHASE 1: STATE SNAPSHOT (clol_transition_core, Table B[14]) =====
     GBR = 0xFFFF7954
     master_counter = RAM[FFFF7986]  // byte
     threshold = CAL[0x0CBBEF]       // byte threshold
@@ -576,7 +576,7 @@ function CL_OL_StateMachine_PerCycle():
     RAM[FFFF7986] = min(RAM[FFFF7986] + 1, max_value)
 
 
-    // ===== PHASE 2: CONDITION EVALUATION (Table B[15] -> FUN_0003643A) =====
+    // ===== PHASE 2: CONDITION EVALUATION (Table B[15] -> ol_condition_checker) =====
     // This calls the big condition checker
     GBR = 0xFFFF79A4
 
@@ -658,19 +658,19 @@ function CL_OL_StateMachine_PerCycle():
         return
 
 
-    // ===== PHASE 3: INITIALIZATION (FUN_000357D0, Table A[6]) =====
+    // ===== PHASE 3: INITIALIZATION (clol_transition_sub_B, Table A[6]) =====
     // Write 0xFF to FFFF7986 (reset master counter)
     // Write 0x200 to FFFF794C
     // This re-arms the state snapshot for next cycle
 
 
-    // ===== PHASE 4: DELAY MANAGER A (FUN_00036008, Table A[8]) =====
+    // ===== PHASE 4: DELAY MANAGER A (clol_delay_manager_A, Table A[8]) =====
     // Calls condition checker AGAIN (0x3643A)
     // Processes results via 0x36978
     // Updates delay counters and mode state
 
 
-    // ===== PHASE 5: HYSTERESIS (FUN_00036A98, Table A[9]) =====
+    // ===== PHASE 5: HYSTERESIS (clol_hysteresis_handler, Table A[9]) =====
     // Prevents rapid CL<->OL oscillation
     // Uses hysteresis values:
     //   Throttle: CAL[0xCC178] (stock=3.9, modified=8.4 deg)
@@ -682,7 +682,7 @@ function CL_OL_StateMachine_PerCycle():
     //   BOTH conditions must be true simultaneously
 
 
-    // ===== PHASE 6: DELAY MANAGER B (FUN_00036BF4, Table A[10]) =====
+    // ===== PHASE 6: DELAY MANAGER B (clol_delay_manager_B, Table A[10]) =====
     // Counter-based delay for CL->OL transition
     //
     // IF delay_value (CAL[0xCBC62]) == 0:
@@ -698,7 +698,7 @@ function CL_OL_StateMachine_PerCycle():
     //     counter decreases or resets
 
 
-    // ===== PHASE 7: POST-TRANSITION (FUN_00036E60, Table A[11]) =====
+    // ===== PHASE 7: POST-TRANSITION (clol_post_transition, Table A[11]) =====
     // Commits the final CL/OL mode change
     // Enables/disables AFC (air/fuel correction)
     // Sets enrichment output values
@@ -714,7 +714,7 @@ Accessed as: GBR+0x23 with GBR=0xFFFF79A4
 
 --- WRITES ---
 
-  Location: 0x036830 (inside FUN_0003643A epilogue)
+  Location: 0x036830 (inside ol_condition_checker epilogue)
   Instruction: C023  mov.b R0,@(35,GBR)  ; -> RAM 0xFFFF79C7
   Context:
     0x03682C: C110  mov.w R0,@(32,GBR)   ; write counter to FFFF79C4
@@ -722,7 +722,7 @@ Accessed as: GBR+0x23 with GBR=0xFFFF79A4
     0x036830: C023  mov.b R0,@(35,GBR)   ; write 0 to FFFF79C7 (DEFAULT PATH)
     0x036832: [function epilogue follows]
 
-  The flag is written in the EPILOGUE of FUN_0003643A, just before the function
+  The flag is written in the EPILOGUE of ol_condition_checker, just before the function
   returns. At this point, R0 is always 0 (mov #0,R0 at 0x36832E).
 
   HOWEVER: The flag is also written EARLIER in the function on the throttle
@@ -793,7 +793,7 @@ Accessed as: GBR+0x23 with GBR=0xFFFF79A4
 --- SUMMARY ---
 
   The flag at 0xFFFF79C7 is:
-  1. WRITTEN by FUN_0003643A (the condition checker) to indicate
+  1. WRITTEN by ol_condition_checker (the condition checker) to indicate
      which path triggered the CL->OL transition
   2. READ ONLY by the diagnostic/SSM function at 0x013D58
   3. NOT READ by any CL/OL state machine function
@@ -807,8 +807,8 @@ Accessed as: GBR+0x23 with GBR=0xFFFF79A4
 
   The COUNTER VALUE at GBR+0x20 (0xFFFF79C4) is the operationally
   significant output from the condition checker. It IS read by:
-  - FUN_0003606C at 0x0360AC and 0x0360E0 (delay manager comparison)
-  - FUN_0003643A itself at 0x036336, 0x0363A6, 0x03641C (internal)
+  - ol_enrichment_dispatch at 0x0360AC and 0x0360E0 (delay manager comparison)
+  - ol_condition_checker itself at 0x036336, 0x0363A6, 0x03641C (internal)
   - Diagnostic function at 0x07D6CC (logging)
 
 
@@ -855,7 +855,7 @@ SECTION 7: KEY FINDINGS
    then Table A runs (init, delay, hysteresis, delay B, post-transition).
 
 2. THE ACTUAL CL/OL MODE CHANGE occurs in:
-   - FUN_00036E60 (post-transition handler, Table A[11])
+   - clol_post_transition (post-transition handler, Table A[11])
    This is the final function that commits the mode change by writing
    the OL/CL mode flags and enabling/disabling AFC.
 

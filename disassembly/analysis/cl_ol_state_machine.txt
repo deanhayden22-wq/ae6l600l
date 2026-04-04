@@ -9,7 +9,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 ================================================================================
 
 ==============================================================================
-  FUN_000357D0 - CL/OL transition sub B (dispatch table A entry)
+  clol_transition_sub_B - CL/OL transition sub B (dispatch table A entry)
   Address range: 0x0357D0 - 0x0357F0 (32 bytes)
 ==============================================================================
   0x0357D0:  4F22    sts.l PR,@-R15
@@ -31,7 +31,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_000357F0 - CL/OL transition sub B helper
+  clol_transition_sub_B_helper - CL/OL transition sub B helper
   Address range: 0x0357F0 - 0x03580C (28 bytes)
 ==============================================================================
   0x0357F0:  2FE6    mov.l R14,@-R15
@@ -51,7 +51,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_0003580C - CL/OL transition CORE (dispatch table B entry) [part 1]
+  clol_transition_core - CL/OL transition CORE (dispatch table B entry) [part 1]
   Address range: 0x03580C - 0x035900 (244 bytes)
   GBR = 0xFFFF7954
 ==============================================================================
@@ -180,7 +180,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036008 - CL/OL delay manager A (dispatch table A entry)
+  clol_delay_manager_A - CL/OL delay manager A (dispatch table A entry)
   Address range: 0x036008 - 0x03602A (34 bytes)
 ==============================================================================
   0x036008:  4F22    sts.l PR,@-R15
@@ -203,7 +203,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_0003602A - CL/OL delay manager A sub
+  clol_delay_manager_A_sub - CL/OL delay manager A sub
   Address range: 0x03602A - 0x036062 (56 bytes)
 ==============================================================================
   0x03602A:  4F22    sts.l PR,@-R15
@@ -237,7 +237,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036062 - CL/OL delay manager A setup
+  clol_delay_manager_A_setup - CL/OL delay manager A setup
   Address range: 0x036062 - 0x03606C (10 bytes)
 ==============================================================================
   0x036062:  4F22    sts.l PR,@-R15
@@ -248,7 +248,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_0003606C - CL/OL condition caller (calls 0x3643A)
+  ol_enrichment_dispatch - CL/OL condition caller (calls 0x3643A)
   Address range: 0x03606C - 0x036278 (524 bytes)
   GBR = 0xFFFF798C
 ==============================================================================
@@ -517,7 +517,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036848 - Post-condition handler (after 0x3643A returns)
+  clol_post_condition_handler - Post-condition handler (after 0x3643A returns)
   Address range: 0x036848 - 0x036962 (282 bytes)
   GBR = 0xFFFF798C
 ==============================================================================
@@ -665,7 +665,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036962 - CL/OL sub
+  clol_sub_36962 - CL/OL sub
   Address range: 0x036962 - 0x036978 (22 bytes)
 ==============================================================================
   0x036962:  4F22    sts.l PR,@-R15
@@ -682,7 +682,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036978 - CL/OL sub 2
+  clol_hysteresis_sub - CL/OL sub 2
   Address range: 0x036978 - 0x036A98 (288 bytes)
   GBR = 0xFFFF79CC
 ==============================================================================
@@ -833,7 +833,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036A98 - Hysteresis handler entry (dispatch table A)
+  clol_hysteresis_handler - Hysteresis handler entry (dispatch table A)
   Address range: 0x036A98 - 0x036AB2 (26 bytes)
 ==============================================================================
   0x036A98:  E000    mov #0,R0
@@ -852,7 +852,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036AB2 - Hysteresis handler main
+  clol_hysteresis_main - Hysteresis handler main
   Address range: 0x036AB2 - 0x036BF4 (322 bytes)
 ==============================================================================
   0x036AB2:  2FD6    mov.l R13,@-R15
@@ -1019,7 +1019,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036B48 - Hysteresis sub
+  clol_hysteresis_sub_B - Hysteresis sub
   Address range: 0x036B48 - 0x036BF4 (172 bytes)
 ==============================================================================
   0x036B48:  2FE6    mov.l R14,@-R15
@@ -1111,7 +1111,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036BF4 - Delay manager B (dispatch table A)
+  clol_delay_manager_B - Delay manager B (dispatch table A)
   Address range: 0x036BF4 - 0x036E60 (620 bytes)
 ==============================================================================
   0x036BF4:  D279    mov.l @(0x036DDC),R2  ; =0xFFFF6350  (RAM 6350)
@@ -1427,7 +1427,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ==============================================================================
-  FUN_00036E60 - Post-transition handler (dispatch table A)
+  clol_post_transition - Post-transition handler (dispatch table A)
   Address range: 0x036E60 - 0x036FA0 (320 bytes)
   GBR = 0xFFFF7A24
 ==============================================================================
@@ -1594,13 +1594,13 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 
 
 ================================================================================
-EXTENDED DISASSEMBLY: FUN_0003580C — Full transition core
+EXTENDED DISASSEMBLY: clol_transition_core — Full transition core
   Main CL/OL transition function called from dispatch table B
   Tracing from 0x3580C to function end (rts)
 ================================================================================
 
 ==============================================================================
-  FUN_0003580C - CL/OL transition CORE (FULL) - ends at 0x0359A4
+  clol_transition_core - CL/OL transition CORE (FULL) - ends at 0x0359A4
   Address range: 0x03580C - 0x0359A4 (408 bytes)
 ==============================================================================
   0x03580C:  2FE6    mov.l R14,@-R15
@@ -1809,12 +1809,12 @@ EXTENDED DISASSEMBLY: FUN_0003580C — Full transition core
   0x0359A2:  6DF6    mov.l @R15+,R13
 
 
-  --- Literal Pool: after FUN_0003580C (0x0359A4-0x0359A8) ---
+  --- Literal Pool: after clol_transition_core (0x0359A4-0x0359A8) ---
   0x0359A4:  D421E500    .long =0xD421E500
 
 
 ================================================================================
-LITERAL POOLS FOR FUN_0003643A (condition checker, already disassembled)
+LITERAL POOLS FOR ol_condition_checker (condition checker, already disassembled)
   GBR = 0xFFFF79A4 for this function
 ================================================================================
 
@@ -1936,12 +1936,12 @@ LITERAL POOLS FOR FUN_0003643A (condition checker, already disassembled)
 
 
 ================================================================================
-EXTENDED: Full flow from FUN_0003606C through end of condition checking
+EXTENDED: Full flow from ol_enrichment_dispatch through end of condition checking
   Main CL/OL evaluation path
 ================================================================================
 
 ==============================================================================
-  FUN_0003606C extended - Full delay manager / condition evaluator
+  ol_enrichment_dispatch extended - Full delay manager / condition evaluator
   Address range: 0x03606C - 0x036278 (524 bytes)
   GBR = 0xFFFF798C
 ==============================================================================
@@ -2209,7 +2209,7 @@ EXTENDED: Full flow from FUN_0003606C through end of condition checking
   0x036276:  0000    .word 0x0000
 
 
-  --- Literal Pool: Pool for FUN_0003606C (0x036278-0x036534) ---
+  --- Literal Pool: Pool for ol_enrichment_dispatch (0x036278-0x036534) ---
   0x036278:  FFFF79F4    .long =0xFFFF79F4  (RAM 79F4)
   0x03627C:  000AD998    .long =0x000AD998  (ROM @0x0AD998)
   0x036280:  00022F92    .long =0x00022F92  (ROM @0x022F92)
@@ -2388,7 +2388,7 @@ EXTENDED: Full flow from FUN_0003606C through end of condition checking
 
 
 ==============================================================================
-  FUN_0003643A - Condition checker (first code section before pool)
+  ol_condition_checker - Condition checker (first code section before pool)
   Address range: 0x03643A - 0x036534 (250 bytes)
   GBR = 0xFFFF79A4
 ==============================================================================
@@ -2520,7 +2520,7 @@ EXTENDED: Full flow from FUN_0003606C through end of condition checking
 
 
 ==============================================================================
-  FUN_0003643A - Condition checker (second code section)
+  ol_condition_checker - Condition checker (second code section)
   Address range: 0x0365E0 - 0x0367B8 (472 bytes)
   GBR = 0xFFFF79A4
 ==============================================================================
@@ -2763,7 +2763,7 @@ EXTENDED: Full flow from FUN_0003606C through end of condition checking
 
 
 ==============================================================================
-  FUN_00036830-0x36A0C - Post-condition and hysteresis prep
+  clol_post_condition_epilogue-0x36A0C - Post-condition and hysteresis prep
   Address range: 0x036830 - 0x036A0C (476 bytes)
   GBR = 0xFFFF79A4
 ==============================================================================
@@ -3236,7 +3236,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
 --- Full hysteresis handler 0x36A98-0x36BF4 ---
 
 ==============================================================================
-  FUN_00036A98/36AB2 - Hysteresis handler (COMPLETE)
+  clol_hysteresis_handler/36AB2 - Hysteresis handler (COMPLETE)
   Address range: 0x036A98 - 0x036BF4 (348 bytes)
 ==============================================================================
   0x036A98:  E000    mov #0,R0
@@ -3420,7 +3420,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
 --- Full delay manager B 0x36BF4-0x36E60 ---
 
 ==============================================================================
-  FUN_00036BF4 - Delay manager B (COMPLETE)
+  clol_delay_manager_B - Delay manager B (COMPLETE)
   Address range: 0x036BF4 - 0x036E60 (620 bytes)
 ==============================================================================
   0x036BF4:  D279    mov.l @(0x036DDC),R2  ; =0xFFFF6350  (RAM 6350)
@@ -3737,7 +3737,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
 --- Post-transition handler 0x36E60 ---
 
 ==============================================================================
-  FUN_00036E60 - Post-transition handler (ends 0x036E86)
+  clol_post_transition - Post-transition handler (ends 0x036E86)
   Address range: 0x036E60 - 0x036E86 (38 bytes)
 ==============================================================================
   0x036E60:  4F22    sts.l PR,@-R15
@@ -3761,7 +3761,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036E84:  F29A    fmov.s FR9,@R2
 
 
-  --- Literal Pool: Pool after FUN_00036E60 (0x036E88-0x036F88) ---
+  --- Literal Pool: Pool after clol_post_transition (0x036E88-0x036F88) ---
   0x036E88:  2FE64F22    .long =0x2FE64F22
   0x036E8C:  FFEBFFFB    .long =0xFFEBFFFB
   0x036E90:  4F13D080    .long =0x4F13D080
