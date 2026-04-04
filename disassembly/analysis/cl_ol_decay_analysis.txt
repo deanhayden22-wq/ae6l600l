@@ -7,20 +7,20 @@ WRITE SITE
 ----------
 ROM 0x3620E: fmov.s FR0,@(R0,R12)
   R0 = -16 (signed)
-  R12 = 0xFFFF79F0 (struct base, held throughout sub_36070)
+  R12 = 0xFFFF79F0 (struct base, held throughout clol_main_transition)
   Write address: 0xFFFF79F0 - 16 = 0xFFFF79E0
 
 CALL CHAIN
 ----------
-sub_36070 (main CL/OL transition function):
+clol_main_transition (main CL/OL transition function):
   ROM 0x36204: mov.l @(0xE8,PC),R4  -> R4 = 0xAD090 (descriptor ptr)
-  ROM 0x36206: mov.l @(0xC,R15),R5  -> R5 = 0xBE830 (Subaru 1D lookup fn)
+  ROM 0x36206: mov.l @(0xC,R15),R5  -> R5 = 0xBE830 (table_lookup_1D)
   ROM 0x36208: jsr @R5               (call BE830)
   ROM 0x3620A: fmov.s @R15+,FR4     (delay: FR4 = input value from stack)
   ROM 0x3620C: mov #-16,R0
   ROM 0x3620E: fmov.s FR0,@(R0,R12) (WRITE FR0 to FFFF79E0)
 
-LOOKUP FUNCTION sub_BE830
+LOOKUP FUNCTION table_lookup_1D (0xBE830)
 --------------------------
 Standard Subaru 1D table interpolation function.
   R4 = descriptor pointer = 0xAD090
@@ -29,7 +29,7 @@ Standard Subaru 1D table interpolation function.
 
 Descriptor at ROM 0xAD090 (16 bytes):
   +0  u16 = 0x0009  -> count = 9 entries
-  +2  u8  = 0x08    -> interp_type = 8 (dispatch to sub_BEB6C)
+  +2  u8  = 0x08    -> interp_type = 8 (dispatch to interp_1d_uint16)
   +4  u32 = 0x000CE580 -> axis_ptr
   +8  u32 = 0x000CE5A4 -> val_ptr
   +12 f32 = 0x38000000 = 1/32768 -> scale factor
@@ -56,7 +56,7 @@ VALUE TABLE (ROM 0xCE5A4, 9 x u16):
   [7]  0x0025 = 37     (7000-8000 RPM)
   [8]  0x0025 = 37
 
-INTERPOLATION sub_BEB6C (interp_type=0x08)
+INTERPOLATION interp_1d_uint16 (interp_type=0x08, 0xBEB6C)
 -------------------------------------------
 This is a FLOOR/STEP lookup for u16 tables (NOT linear interpolation):
   Output = float(u16_val[floor_index])

@@ -94,8 +94,8 @@ Purpose: Compute per-cylinder knock level vs RPM/load threshold.
   GBR = 0xFFFF80FC  (knock_det_GBR_base)
 
   Key inputs:
-    fr15 = @0xFFFF6624  (proc_6624 - RPM-like scaled value, 301 refs in ROM)
-    fr14 = @0xFFFF63F8  (proc_63F8 - load/TPS-like value, 205 refs)
+    fr15 = @0xFFFF6624  (rpm_current - RPM-like scaled value, 301 refs in ROM)
+    fr14 = @0xFFFF63F8  (iat_current - load/TPS-like value, 205 refs)
     r11  = @0xFFFF67EC  (word: some timing/counter value)
     fr8  = @knock_ref_level_fr (0xFFFF4304) - background ADC reference
     r9   = 0xFFFF8158  (knock struct base)
@@ -130,9 +130,9 @@ Purpose: Compute per-cylinder knock level vs RPM/load threshold.
     0xFFFF4308  knock_status_4308
     0xFFFF81AC  knock_status_81AC
     0xFFFF80FC  knock_det_GBR_base
-    0xFFFF6624  proc_6624 (RPM-like)
-    0xFFFF63F8  proc_63F8 (load-like)
-    0xFFFF67EC  proc_67EC_word
+    0xFFFF6624  rpm_current (RPM-like)
+    0xFFFF63F8  iat_current (load-like)
+    0xFFFF67EC  atm_pressure_current_word
     0xFFFF4304  knock_ref_level_fr
     0xFFFF8158  knock_struct_8158
     0x000AE284  [3D table descriptor: RPM/load knock threshold]
@@ -152,13 +152,13 @@ Purpose: Post-detector processing: RPM gate, knock level classification.
   GBR = 0xFFFF81AC  (knock_status_81AC base)
 
   Step A: RPM gate check
-    fr8 = @0xFFFF6624 (proc_6624)
+    fr8 = @0xFFFF6624 (rpm_current)
     r5  = cyl_idx + 2  (from GBR+0 + 2)
     Compare vs threshold @0x000D2989 (byte table)
     Compare fr8 vs 12799.8f (0x000D2D54/58):
       -> If fr8 > 12799.8: knock_rpmgate (GBR+44 = 0xFFFF81D8) = 1
       -> else: knock_rpmgate = 0
-    Note: 12799.8 / ~1.778 = ~7200 RPM (RPM = proc_6624 / 1.778)
+    Note: 12799.8 / ~1.778 = ~7200 RPM (RPM = rpm_current / 1.778)
 
   Step B: Knock enable check
     Read @0x000D298B: byte knock_enable_flag
@@ -205,7 +205,7 @@ Purpose: Reads knock signal vs threshold, calls Pull3DFloat for retard amount.
   GBR = 0xFFFF80FC  (knock_det_GBR_base)
 
   Inputs:
-    fr13 = @0xFFFF6624 (proc_6624 = RPM-like)
+    fr13 = @0xFFFF6624 (rpm_current = RPM-like)
     fr14 = @0xFFFF81F4 (some float)
     r11  = 0xFFFF8128 (sub-struct base)
     fr8  = @(r11-32)  (knock struct float)
@@ -251,7 +251,7 @@ Purpose: Per-cylinder-event FLKC update. Handles:
     r13   = knock_event_flag (byte from 0xFFFF81BA)
     r14   = knock_suppress_flag (byte from 0xFFFF7D18; 1 = suppress FLKC)
     r12   = FLKC_load_flag (byte from 0xFFFF82A0)
-    fr14  = proc_6624 (RPM-like float)
+    fr14  = rpm_current (RPM-like float)
     fr8   = FLKC_work_bank2 (saved to @(4,r15))
     fr13  = FLKC_work_bank1 (@0xFFFF3234)
     fr12  = @0xFFFF8290
@@ -501,7 +501,7 @@ KEY CALIBRATION TABLE VALUES (ROM constants)
   0x42C00000   96.0f     Knock intensity band threshold 4
   0x42800000   64.0f     Knock intensity band threshold 5
 
-  RPM SCALING: proc_6624 (0xFFFF6624) stores RPM * (16/9) ~= RPM * 1.7778
+  RPM SCALING: rpm_current (0xFFFF6624) stores RPM * (16/9) ~= RPM * 1.7778
     -> 12799.8 / 1.7778 = ~7200 RPM (redline gate threshold)
 
   FLKC SIGN CONVENTION: Positive value = retard (contrary to RomRaider display)
@@ -579,10 +579,10 @@ CALL FLOW DIAGRAM
 OPEN QUESTIONS
 ================================================================================
 
-  1. proc_6624 (0xFFFF6624): Confirmed as RPM-scaled variable (RPM * 16/9).
+  1. rpm_current (0xFFFF6624): Confirmed as RPM-scaled variable (RPM * 16/9).
      Source: unknown - likely computed from crank timer ISR.
 
-  2. proc_63F8 (0xFFFF63F8): Load-like variable used as Y-axis in 3D tables.
+  2. iat_current (0xFFFF63F8): Load-like variable used as Y-axis in 3D tables.
      Likely MAP or normalized load. Needs further tracing.
 
   3. 0xFFFF8258 (knock_metric): Cumulative knock signal used as fr15 in

@@ -228,7 +228,7 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
     FFFF63F8  RPM (float)
     FFFF6624  engine_load (float)
     FFFF6350  ECT (float)
-    FFFF65FC  (unknown byte)
+    FFFF65FC  engine_load_current (float)
     FFFF68DC  (unknown float)
     FFFF78B0  (AFC PI working struct)
     FFFF8E7E  operating_mode_flag (byte)
@@ -858,7 +858,7 @@ SECTION 8: MAIN IPW CALCULATOR — func_38158
   CC354: WOT load threshold (118.0 g/rev)
   CC358: WOT load hysteresis (119.0 g/rev)
   CC35C: ipw_output_struct minimum gate (0.0)
-  CC360: FFFF65FC minimum gate (0.0)
+  CC360: engine_load_current minimum gate (0.0)
   CC364: injector_data offset (0.0 — tunable deadband)
   CC368: sensor_89C4 gate threshold (0.0)
   CC36C: blend channel A clamp reference (0.0)
@@ -1118,7 +1118,7 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
   ─────────────
   FR12 = engine_load_float    (FFFF6624)
   FR14 = FFFF62F8             (MAP/load derivative — possibly filtered RPM)
-  FR15 = FFFF65FC             (unknown float — possibly TPS derivative)
+  FR15 = FFFF65FC             (engine_load_current)
   FR8  = ECT_float            (FFFF6350) → stack+0
   FR8  = ect_warmup_correction(FFFF7F68) → stack+4   [reads Section 10 output]
   FR8  = fuel_ipw_output_struct(FFFF7FBC) → stack+8

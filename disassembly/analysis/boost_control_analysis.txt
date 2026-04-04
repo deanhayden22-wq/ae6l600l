@@ -41,7 +41,7 @@ SECTION 1: TASK 51 -- BOOST/WASTEGATE TARGET CALCULATION
   Inputs:
     FFFF64F5  boost_related_flag (u8)  -- loaded into R14
     FFFF65C0  throttle_position (u8)   -- loaded into R13
-    FFFF65FC  unknown sensor value     -- loaded into FR8
+    FFFF65FC  engine_load_current       -- loaded into FR8
     FFFF6624  rpm_current (float)      -- loaded into FR15
     FFFF6640  maf_voltage_left (float) -- loaded into FR13
     FFFF6644  maf_voltage_right (float)-- loaded into FR12
@@ -58,7 +58,7 @@ SECTION 1: TASK 51 -- BOOST/WASTEGATE TARGET CALCULATION
        cal[0xD6720] = 4.0 (enable threshold)
        cal[0xD6724] = 5.0 (disable threshold)
 
-     Compares FR8 (sensor value from FFFF65FC) against thresholds:
+     Compares FR8 (engine_load_current from FFFF65FC) against thresholds:
        If FR8 > 4.0:  set GBR+0x80 = 1 (enable boost control)
        If FR8 <= 5.0:  set GBR+0x80 = 0 (disable boost control)
        (Hysteresis: enable at 4.0, hold until > 5.0)
@@ -309,7 +309,7 @@ SECTION 6: KEY RAM ADDRESSES (BOOST WORKSPACE)
   External RAM:
   FFFF64F5      --           boost_related_flag       u8       External enable/disable flag
   FFFF65C0      --           throttle_position        u8       Throttle position
-  FFFF65FC      --           sensor_value_unknown     float    Compared against enable thresholds
+  FFFF65FC      --           engine_load_current      float    Compared against enable thresholds
   FFFF6624      --           rpm_current              float    Engine RPM
   FFFF6640      --           maf_voltage_left         float    MAF sensor left bank
   FFFF6644      --           maf_voltage_right        float    MAF sensor right bank
@@ -366,7 +366,7 @@ SECTION 8: SYSTEM FLOW SUMMARY (PER SCHEDULER CYCLE)
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   1. Set GBR = 0xFFFF8B50 (boost workspace)
   2. Call check_engine_running
-  3. Read throttle_pos, sensor_FFFF65FC, RPM, MAF L/R
+  3. Read throttle_pos, engine_load_current, RPM, MAF L/R
   4. Apply enable hysteresis on sensor value (4.0/5.0 thresholds)
   5. Select ECT correction factor (0.7 or 2.0 based on MAF R sign)
   6. If engine not running: zero all outputs, exit

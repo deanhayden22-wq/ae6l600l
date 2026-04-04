@@ -5782,7 +5782,7 @@ SECTION 1: THE TWO INDEPENDENT CL/OL PATHS
     NO DEPENDENCY on CBC62 delay parameter
 
   These two paths use DIFFERENT conditions to determine mode. Path A uses
-  the condition checker (FUN_0003643A) with throttle/RPM/load thresholds.
+  the condition checker (ol_condition_checker) with throttle/RPM/load thresholds.
   Path B uses a completely different set of flags (FFFF8E98, FFFF7452,
   FFFF744E) derived from sensor processing functions.
 
@@ -5947,12 +5947,12 @@ SECTION 6: FFFF79C6 (MODE STATE FLAG) — ALWAYS ZERO
   FFFF79C6 is NEVER WRITTEN anywhere in the stock ROM.
   It is initialized to 0 by the SH7055 startup RAM clear.
 
-  FUN_0003606C reads it at 0x0361EC and switches on the value:
+  ol_enrichment_dispatch reads it at 0x0361EC and switches on the value:
     - Value 1 (CL path): copies enrichment directly  -> DEAD CODE
     - Value 2 (blending path): MAC blending          -> DEAD CODE
     - Value 0 (default): normal enrichment path      -> ALWAYS TAKEN
 
-  The mode_state==1 and mode_state==2 paths in FUN_0003606C are
+  The mode_state==1 and mode_state==2 paths in ol_enrichment_dispatch are
   unreachable code in the stock and modified ROMs. They appear to be
   hooks for aftermarket ECU patches that could inject mode overrides
   by writing to this RAM address.
@@ -5987,7 +5987,7 @@ SECTION 7: AFL SYSTEM ARCHITECTURE
     9. FFFF8F24 recheck
     10. FFFF7BE2 must be 0
 
-  NOTE ON CONDITION 7: FFFF7A20 is always 0.1 (written by FUN_36E60
+  NOTE ON CONDITION 7: FFFF7A20 is always 0.1 (written by clol_post_transition
   sub-A). 0.1 > 0.003906, so this condition may ALWAYS FAIL, which
   would mean AFL learning is permanently frozen. This needs further
   investigation — either:
