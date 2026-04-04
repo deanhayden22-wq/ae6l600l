@@ -279,17 +279,18 @@
 #define pEngineLoad ((float*)0xFFFF65FC)                /* engine_load_current, 135 refs */
 #define pThrottlePlate ((float*)0xFFFF65C0)             /* throttle_position, 89 refs */
 
-/* [UNVERIFIED] Requested torque — 0xFFFF854C not in RAM reference (0 literal pool refs).
- * OEM boost code uses throttle_position/engine_load as WGDC inputs, not a dedicated
- * torque variable. Only used in MerpMod custom PGWG/WGDC/TargetBoost table lookups.
- * torque_ratio (float) found at 0xFFFF62F8 but is a ratio, not absolute torque. */
-#define pReqTorque ((float*)0xFFFF854C)
+/* [VERIFIED - binary] Requested torque output — SI-DRIVE selected.
+ * Traced from ROM binary: function at 0x4FCB0 calls Pull3D (0xBDD9C) with
+ * Req Torque descriptors (Sport=0xAF2D4, SportSharp=0xAF2F0, Intelligent=0xAF30C),
+ * then stores the SI-DRIVE-selected result to 0xFFFF85D0 (literal pool 0x4FD1C).
+ * All three modes write to the same address via fmov.s FRn,@R5 at 0x4FCD8/FCE2/FCE4. */
+#define pReqTorque ((float*)0xFFFF85D0)
 
-/* [VERIFIED - disassembly] Current gear — low byte of gear position word at 0xFFFF5E74.
- * torque_management_analysis.txt Section 8: switch on gear position (0xFFFF5E74) for
- * per-gear RPM thresholds. Big-endian word: high byte=0x00, low byte=gear (1-6).
- * Also: gear_current as float at 0xFFFF679C (map_switching_analysis.txt line 210). */
-#define pCurrentGear ((unsigned char*)0xFFFF5E75)
+/* [VERIFIED - binary] Current gear — OEM rev limiter literal pool at 0x3B794.
+ * Code at 0x3B69A: mov.l @(0x3B794),R6 loads 0xFFFF5E95, then
+ * 0x3B69C: mov.b @R6,R14 reads the gear byte (explicit byte access).
+ * Also referenced in torque request function pool at 0x4FD24 as 0xFFFF5E94 (word). */
+#define pCurrentGear ((unsigned char*)0xFFFF5E95)
 
 /* [HIGH CONF] AF sensor 1 resistance — same ADC pipeline address as AE5K700V.
  * Same physical ECU hardware (SH7058), ADC channel assignments don't change
