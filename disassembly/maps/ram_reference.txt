@@ -536,9 +536,9 @@ FULL ALPHABETICAL INDEX (named addresses only)
   knock_state_var                           0xFFFF8318    17 refs  Knock state variable
   fuel_pump_workspace                       0xFFFF8366    18 refs  Fuel pump state machine workspace (14 bytes). Contains mode flags, transition/saturation counters. See fuel_pump_analysis.txt.
   knock_workspace_C                         0xFFFF8391    18 refs  Knock/FLKC workspace variable C
-  dtc_monitor_flag_P0134                    0xFFFF971B     0 refs  DTC monitor active flag for P0134 (front O2 no activity). Part of 45-byte DTC flag array FFFF9704-9742.
-  dtc_monitor_flag_P0108                    0xFFFF970E     1 refs  DTC monitor active flag for P0108 (MAP high). Part of 45-byte DTC flag array FFFF9704-9742.
-  dtc_monitor_flag_array_base               0xFFFF9704     0 refs  Base of 45-byte DTC monitor status flag array (FFFF9704-FFFF9742). Each byte = 1 if DTC monitor is active. 45 accessor functions at 0x0297A0-0x029B60 read individual flags.
+  dtc_monitor_flag_P0134                    0xFFFF971B     0 refs  DTC monitor active flag for P0134 (front O2 no activity). Part of 45-byte DTC flag array FFFF9704-9742. Also: FLKC convergence slot 15 — read by flkc_state_flag_reader_table+0x144 (0x2999C); gates FLKC consolidation (task19), per-cyl FLKC propagation (task23), and EVAP test enable (task56). See mystery_subs_analysis.txt.
+  dtc_monitor_flag_P0108                    0xFFFF970E     1 refs  DTC monitor active flag for P0108 (MAP high). Part of 45-byte DTC flag array FFFF9704-9742. Also: FLKC convergence slot 0 — read by flkc_state_flag_reader_table (0x29858); gates knock flag updates (task11) and timing corrections (task29). See mystery_subs_analysis.txt.
+  dtc_monitor_flag_array_base               0xFFFF9704     0 refs  Base of 45-byte DTC monitor status flag array (FFFF9704-FFFF9742). Each byte = 1 if DTC monitor is active/converged. Accessor dispatch table at 0x29858 (flkc_state_flag_reader_table) provides stub readers for offsets +0x0A through +0x33. FLKC/knock tasks read these as learning convergence state. See mystery_subs_analysis.txt.
   load_timing_output                        0xFFFF80C8     0 refs  Load-dependent timing output (float). Ta
   ltft_workspace                            0xFFFF7B60     0 refs  LTFT learning workspace.
   maf_correction_factor                     0xFFFF41DC     0 refs  MAF correction factor (float). Written b

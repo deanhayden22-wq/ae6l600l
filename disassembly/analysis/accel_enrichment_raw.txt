@@ -59,7 +59,7 @@ Role:   Top-level transient fuel dispatcher. Reads throttle delta inputs,
   0371AA: D281  mov.l   @(0x204,PC),R2       ; =0xFFFF6350  input_float_B (IPW or MAF)
   0371AC: F828  fmov.s  @R2,FR8              ; FR8 = input_float_B
   0371AE: E0FC  mov     #-4,R0
-  0371B0: D280  mov.l   @(0x200,PC),R2       ; =0x00029BA4  FUN_00029BA4 (clamp/limit)
+  0371B0: D280  mov.l   @(0x200,PC),R2       ; =0x00029BA4  (clamp/limit helper)
   0371B2: 420B  jsr     @R2
   0371B4: FE87  fmov.s  FR8,@(R0,R14)        ; (delay slot) workspace[-4] = FR8
 
@@ -137,13 +137,13 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
   03BB88: D25A  mov.l   @(0x168,PC),R2       ; =0x0001CF16  FUN_0001CF16 (mode query)
   03BB8A: 420B  jsr     @R2
   03BB8C: 0009  nop
-  03BB8E: D25A  mov.l   @(0x168,PC),R2       ; =0x00022CF4  FUN_00022CF4 (cond query)
+  03BB8E: D25A  mov.l   @(0x168,PC),R2       ; =0x00022CF4  check_engine_running
   03BB90: 420B  jsr     @R2
   03BB92: 80F4  ; arg: workspace field +0x14 (mov.b R0,@(0x14,R0) descriptor)
-  03BB94: D259  mov.l   @(0x164,PC),R2       ; =0x000297A0  FUN_000297A0 (cond query B)
+  03BB94: D259  mov.l   @(0x164,PC),R2       ; =0x000297A0  condition_evaluator
   03BB96: 420B  jsr     @R2
   03BB98: 80F8  ; arg: workspace field +0x18
-  03BB9A: D559  mov.l   @(0x164,PC),R5       ; =0x000299BC  FUN_000299BC (cond query C)
+  03BB9A: D559  mov.l   @(0x164,PC),R5       ; =0x000299BC  flkc_state_flag_reader_table+0x164
   03BB9C: 450B  jsr     @R5
   03BB9E: 80FC  ; arg: workspace field +0x1C
 
@@ -388,12 +388,12 @@ REFERENCED RAM ADDRESSES
 ================================================================================
 REFERENCED CODE / DESCRIPTOR ADDRESSES
 ================================================================================
-  0x0001CF16  FUN_0001CF16  mode state query
-  0x00022CF4  FUN_00022CF4  condition query (descriptor calling convention)
-  0x000278DE  FUN_000278DE  throttle delta / state calculator
-  0x000297A0  FUN_000297A0  condition query B
-  0x000299BC  FUN_000299BC  condition query C
-  0x00029BA4  FUN_00029BA4  clamp/limit function
+  0x0001CF16  timing_mode_selector      mode state query
+  0x00022CF4  check_engine_running      condition query (descriptor calling convention)
+  0x000278DE  throttle_delta_calc       throttle delta / state calculator
+  0x000297A0  condition_evaluator       condition query B (descriptor args)
+  0x000299BC  flkc_flag_reader+0x164    condition query C (flag table slot)
+  0x00029BA4  clamp_limit_helper        clamp/limit function
   0x0003D2FC  FUN_enrich_apply  enrichment output application (tail-call target)
   0x000BE53C  DESC_ramp_counter  ramp/counter descriptor table entry
   0x03735A    FUN_03735A    tau/alpha rising time constant handler

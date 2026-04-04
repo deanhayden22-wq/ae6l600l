@@ -52,7 +52,7 @@ SECTION 2: CALL CHAIN AND FUNCTION INVENTORY
 Scheduler → fuel_transient_comp @ 0x37186
               │
               ├─ FUN_000278DE         throttle delta state calculator
-              ├─ FUN_00029BA4         clamp/limit helper
+              ├─ 0x29BA4              clamp/limit helper
               │
               ├─ BSR FUN_037492       tip-in ramp state machine
               ├─ BSR FUN_03735A       tau/alpha rising time constant
@@ -63,10 +63,10 @@ Scheduler → fuel_transient_comp @ 0x37186
 
 Separate caller → fuel_accel_enrich @ 0x3BB6C
                     │
-                    ├─ JSR FUN_0001CF16    mode state query
-                    ├─ JSR FUN_00022CF4    condition query (descriptor args)
-                    ├─ JSR FUN_000297A0    condition query B (descriptor args)
-                    ├─ JSR FUN_000299BC    condition query C (descriptor args)
+                    ├─ JSR timing_mode_selector @ 0x1CF16
+                    ├─ JSR check_engine_running @ 0x22CF4
+                    ├─ JSR condition_evaluator @ 0x297A0
+                    ├─ JSR flkc_state_flag_reader_table+0x164 @ 0x299BC
                     ├─ JSR DESC_0xBE53C    ramp/counter descriptor (x2)
                     └─ JMP FUN_0003D2FC    enrichment output application (tail-call)
 
@@ -89,13 +89,13 @@ PROLOGUE
 INPUT LOADING
   FR15 ← [0xFFFF7D68]  throttle_delta_pos (positive throttle rate of change)
   FR14 ← [0xFFFF7D6C]  throttle_delta_neg (negative throttle rate of change)
-  Calls FUN_000278DE to update throttle delta state. Return value (mode byte)
+  Calls 0x278DE to update throttle delta state. Return value (mode byte)
   stored to [0xFFFF7A5C].
 
   R14 ← 0xFFFF7A6C     (transient workspace base)
   [R14-12] ← [0xFFFF69F4]  current_throttle (float)
   [R14-4]  ← [0xFFFF6350]  input_float_B (likely normalized IPW or MAF)
-  (limit/clamp via FUN_00029BA4 applied in delay slot)
+  (limit/clamp via 0x29BA4 applied in delay slot)
 
 SUB-FUNCTION DISPATCH
   The function sequentially calls 6 sub-handlers via BSR:
