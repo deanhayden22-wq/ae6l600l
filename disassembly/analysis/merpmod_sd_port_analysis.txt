@@ -1,0 +1,482 @@
+================================================================================
+MERPMOD SPEED DENSITY PORT — COMPLETE ANALYSIS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+================================================================================
+
+
+OVERVIEW
+--------
+MerpMod Speed Density replaces/blends the stock MAF sensor reading with a
+calculated airflow value derived from the ideal gas law. It hooks into two
+points in the stock ROM via literal pool pointer substitution (OpReplace4Bytes):
+
+  1. Memory reset hook — initializes MerpMod RAM variables at boot
+  2. MAF calculation hook — intercepts MAF scaling to inject SD logic
+
+Both hooks work identically: the patcher overwrites a 4-byte pointer in a
+ROM literal pool. The stock code's MOV.L + JSR sequence remains untouched;
+only the target address changes.
+
+Build configuration: SDOnly (SD_HACKS=1, all others disabled)
+Source: merp mod/MerpMod-master/MerpMod/
+
+
+================================================================================
+SECTION 1: TARGET CONFIGURATION
+================================================================================
+
+Files created:
+  Targets/AE5L600L.h        — ROM/RAM addresses
+  Targets/AE5L600LConfig.h  — Build options (MT, no DMAP)
+  SDOnly.h                  — Feature flags (SD only)
+
+ROM infrastructure:
+  dCalId            0x00002000       Calibration ID location
+  dEcuId            0x00002004       ECU identifier location
+  dRomHoleStart     0x000DAE8C       Start of free ROM (118 KB block)
+  pRamHoleStart     0xFFFFC000       Start of free RAM (8 KB)
+
+Table pull functions (OEM ROM routines MerpMod calls back into):
+  sPull2DFloat      0x000BE830       table_desc_1d_float (1D descriptor → float)
+  sPull3DFloat      0x000BE8E4       table_desc_2d_typed (2D descriptor → float, type-dispatched)
+
+Hook addresses (literal pool entries patched by SharpTune):
+  hMafCalc          0x00004A88       Literal pool in MAF linearization function (0x4A2C)
+  sMafCalc          0x00004A2C       MAF linearization function entry
+  hMemoryReset      0x00000D64       Literal pool in reset handler (0x0C14)
+  sMemoryReset      0x0000065C       RTOS startup function
+
+Engine parameter RAM pointers:
+  pEngineSpeed      (float*)0xFFFF6624    RPM (301 refs)
+  pVehicleSpeed     (float*)0xFFFF61CC    Vehicle speed (56 refs)
+  pCoolantTemp      (float*)0xFFFF6350    ECT
+  pAtmoPress        (float*)0xFFFF6364    Atmospheric pressure
+  pManifoldAbsolutePressure  (float*)0xFFFF6898    MAP absolute (48 refs)
+  pIntakeAirTemp    (float*)0xFFFF63F8    IAT
+  pMassAirFlow      (float*)0xFFFF6254    MAF current g/s (51 refs)
+  pMafSensorVoltage (short*)0xFFFF4042    Raw MAF ADC uint16 (ADDR15)
+  pEngineLoad       (float*)0xFFFF65FC    Engine load g/rev (135 refs)
+  pThrottlePlate    (float*)0xFFFF65C0    Throttle position (89 refs)
+
+CRITICAL NOTE — MAP vs MRP:
+  0xFFFF6898 = manifold_pressure (absolute MAP, 48 refs) ← CORRECT for SD
+  0xFFFF69F0 = boost_pressure (MRP = MAP - ATM, 32 refs) ← WRONG for SD
+  SD formula needs absolute pressure. MRP would double-subtract atmosphere.
+
+
+================================================================================
+SECTION 2: HOOK MECHANISM — VERIFIED FROM ROM BYTES
+================================================================================
+
+Both hooks use MerpMod's OpReplace4Bytes metadata operation. The patcher:
+  1. Reads 4 bytes at the hook address
+  2. Verifies they match the expected oldval
+  3. Writes the new function address (newval)
+
+This is literal pool pointer substitution, NOT instruction patching.
+The MOV.L and JSR instructions in the stock code remain byte-identical.
+
+
+HOOK 1: Memory Reset (hMemoryReset = 0x0D64)
+─────────────────────────────────────────────
+
+Raw ROM bytes at 0x0D60-0x0D6F (verified):
+  f75c ffff 0000 065c 0000 8000 0000 ffff
+
+  0x0D64 contains: 0x0000065C (RTOS startup) ← patched to Initializer
+
+Reset handler disassembly (0x0C0C-0x0C1C, verified from bytes):
+  0C0C: B008  BSR  0x0C20              ; hardware init A
+  0C0E: 0009  NOP
+  0C10: B020  BSR  0x0C54              ; hardware init B
+  0C12: 0009  NOP
+  0C14: D353  MOV.L @(0x0D64), R3     ; R3 = *(0x0D64) = Initializer
+  0C16: E500  MOV   #0, R5
+  0C18: 430B  JSR   @R3               ; call Initializer()
+  0C1A: 6453  MOV   R5, R4            ; delay slot: R4 = 0
+  0C1C: AFFE  BRA   0x0C1C            ; infinite loop (RTOS runs via interrupts)
+
+MOV.L displacement calculation:
+  PC = 0x0C14, PC & ~3 = 0x0C14, disp = 0x53
+  address = 0x0C14 + 4 + 0x53×4 = 0x0C18 + 0x14C = 0x0D64 ✓
+
+Metadata (from Metadata.c):
+  op:      OpReplace4Bytes
+  address: 0x0D64 (hMemoryReset)
+  oldval:  0x0000065C (sMemoryReset)
+  newval:  (int)Initializer
+
+
+HOOK 2: MAF Calculation (hMafCalc = 0x4A88)
+────────────────────────────────────────────
+
+Raw ROM bytes at 0x4A7C-0x4A93 (verified):
+  ffff 4042 38a0 0000 000a f45c 000b e830
+  ffff 40b4 000d 8aa0 000d 8aa2
+
+Literal pool contents:
+  0x4A7C: 0xFFFF4042   Raw MAF ADC address
+  0x4A80: 0x38A00000   Float constant = 5.0/65536 = 0.0000762939 (ADC→voltage)
+  0x4A84: 0x000AF45C   MAF scaling descriptor (54-point voltage→g/s table)
+  0x4A88: 0x000BE830   table_desc_1d_float ← patched to ComputeMassAirFlow
+  0x4A8C: 0xFFFF40B4   MAF g/s output address
+
+MAF linearization function disassembly (0x4A2C-0x4A4C, verified from bytes):
+  4A2C: 4F22  STS.L  PR, @-R15          ; save return address
+  4A2E: D413  MOV.L  @(0x4A7C), R4      ; R4 = 0xFFFF4042
+  4A30: C713  MOVA   @(0x4A80), R0      ; R0 = addr of scale constant
+  4A32: 6441  MOV.W  @R4, R4            ; R4 = *(uint16*)0xFFFF4042 (raw ADC)
+  4A34: F208  FMOV.S @R0, FR2           ; FR2 = 5.0/65536
+  4A36: 644D  EXTU.W R4, R4             ; zero-extend uint16
+  4A38: D313  MOV.L  @(0x4A88), R3      ; R3 = ComputeMassAirFlow (was 0xBE830)
+  4A3A: 445A  LDS    R4, FPUL           ; FPUL = raw ADC integer
+  4A3C: D411  MOV.L  @(0x4A84), R4      ; R4 = 0xAF45C (MAF descriptor)
+  4A3E: F32D  FLOAT  FPUL, FR3          ; FR3 = (float)raw_ADC
+  4A40: F43C  FMOV   FR3, FR4           ; FR4 = raw ADC as float
+  4A42: 430B  JSR    @R3                ; CALL ComputeMassAirFlow
+  4A44: F422  FMUL   FR2, FR4           ; delay slot: FR4 × (5/65536) = voltage
+  ────── ComputeMassAirFlow executes here ──────
+  4A46: D211  MOV.L  @(0x4A8C), R2      ; R2 = 0xFFFF40B4
+  4A48: 4F26  LDS.L  @R15+, PR          ; restore return address
+  4A4A: 000B  RTS                        ; return to Task 10
+  4A4C: F20A  FMOV.S FR0, @R2           ; delay slot: store result to 0xFFFF40B4
+
+MOV.L displacement calculations:
+  D413 at 0x4A2E: (0x4A2C + 4) + 0x13×4 = 0x4A30 + 0x4C = 0x4A7C ✓
+  D313 at 0x4A38: (0x4A38 + 4) + 0x13×4 = 0x4A3C + 0x4C = 0x4A88 ✓
+  D411 at 0x4A3C: (0x4A3C + 4) + 0x11×4 = 0x4A40 + 0x44 = 0x4A84 ✓
+  D211 at 0x4A46: (0x4A44 + 4) + 0x11×4 = 0x4A48 + 0x44 = 0x4A8C ✓
+
+Calling convention at JSR:
+  R4  = 0x000AF45C    → ComputeMassAirFlow receives as: TwoDTable* MafScalingTable
+  FR4 = voltage (V)   → ComputeMassAirFlow receives as: float MafVoltage
+
+ADC scale factor verification:
+  0x38A00000 IEEE 754: sign=0, exp=0x71=113, mantissa=0x200000
+  value = 1.25 × 2^(113-127) = 1.25 × 2^(-14) = 1.25/16384 = 0.000076293945
+  = 5.0 / 65536 exactly
+  MerpMod constant: MafVoltageToInternalUnits = 65536/5.0 = 13107.2 ← matches
+
+Metadata (from Metadata.c):
+  op:      OpReplace4Bytes
+  address: 0x4A88 (hMafCalc)
+  oldval:  0x000BE830 (sPull2DFloat)
+  newval:  (int)ComputeMassAirFlow
+
+
+================================================================================
+SECTION 3: BOOT EXECUTION PATH
+================================================================================
+
+1. ECU powers on
+2. Reset vector at 0x000000 → SP loaded from 0x000004 = 0xFFFFBFA0
+3. Execution begins at 0x000C0C (reset_entry_point)
+4. BSR 0x0C20: hardware init A (WDT, ATU)
+5. BSR 0x0C54: hardware init B
+6. MOV.L @(0x0D64), R3 → R3 = Initializer (patched, was 0x065C)
+7. JSR @R3 → call Initializer()
+
+Inside Initializer() (Initializer.c line 19):
+  8.  MemoryResetHooked()
+      → function pointer stored in ROM hole, value = 0x065C
+      → calls original RTOS startup: registers task tables, enables timer
+      → returns (RTOS scheduler will run via timer interrupts)
+
+  9.  ResetRamVariables() (since RAM_PERSIST = 0):
+      a. ClearRamVariables(0xFFFFC000, end)
+         → zeroes all bytes from pRamHoleStart to RamHoleEndMarker
+         → clears ~96 bytes of MerpMod RAM workspace
+
+      b. PopulateRamVariables():
+         → pRamVariables->MafMode = DefaultMafMode = MafModeSensor (0x01)
+         → pRamVariables->ECUIdentifier = *(long*)0x2004
+         → pRamVariables->HardResetFlag = HardResetFlagDisabled
+         (all other feature blocks skipped: REVLIM_HACKS=0, CEL_HACKS=0, etc.)
+
+10. Initializer() returns
+11. Execution reaches 0x0C1C: BRA 0x0C1C (infinite idle loop)
+12. RTOS task scheduler runs via timer interrupts, dispatching tasks
+
+
+================================================================================
+SECTION 4: RUNTIME EXECUTION PATH (every Task 10 cycle)
+================================================================================
+
+Timer interrupt fires → RTOS dispatcher → Task 10 call list → call_17:
+
+  1. JSR 0x4A2C (MAF linearization / frontO2_scaling_init)
+
+  2. Function reads raw MAF ADC:
+     *(uint16*)0xFFFF4042 → raw 16-bit value (e.g., 32768 for 2.5V)
+
+  3. Converts to float voltage:
+     voltage = (float)raw_ADC × (5.0/65536)
+     e.g., 32768 × 0.0000762939 = 2.5V
+
+  4. Loads function pointer from literal pool at 0x4A88:
+     After patching: ComputeMassAirFlow address (was 0xBE830)
+
+  5. Loads MAF descriptor from literal pool at 0x4A84:
+     R4 = 0x000AF45C (54-point MAF voltage→g/s table)
+
+  6. JSR @R3 → ComputeMassAirFlow(R4=0xAF45C, FR4=voltage)
+
+  ────── Inside ComputeMassAirFlow (SpeedDensity.c) ──────
+
+  7. STEP 1 — Stock MAF reading:
+     MafFromSensor = Pull2DHooked(MafScalingTable, MafVoltage)
+       Pull2DHooked = function pointer → 0xBE830 (table_desc_1d_float)
+       Calls OEM 1D interpolation with descriptor 0xAF45C
+       54-point table: 0.898V→1.098 g/s ... 5.000V→375.347 g/s
+       Result stored to pRamVariables->MafFromSensor
+
+  8. STEP 2 — Volumetric Efficiency lookup:
+     VE = Pull3DHooked(&VolumetricEfficiencyTable1, MAP, RPM)
+       Pull3DHooked = function pointer → 0xBE8E4 (table_desc_2d_typed)
+       MAP = *(float*)0xFFFF6898 (absolute manifold pressure)
+       RPM = *(float*)0xFFFF6624
+       MerpMod's 24×24 VE table (uint16 data, in ROM hole)
+       Type dispatch: byte[desc+16] = 0x08 → interp_2d_uint16 @ 0xBEC78
+       Post-interp scaling: result = offset + multiplier × raw_value
+         multiplier = 0.0000457763672 (= 1.5/32767)
+         offset = 0.0
+         e.g., raw 11000 → 0.5035 VE
+
+  9. STEP 3 — Intake air temperature:
+     IAT_K = *(float*)0xFFFF63F8 + 273.15
+     e.g., 25°C → 298.15 K
+
+  10. STEP 4 — Atmospheric compensation:
+      AtmoComp = Pull3DHooked(&AtmosphericCompensationTable, MAP, AtmoPress)
+        AtmoPress = *(float*)0xFFFF6364
+        MerpMod's 7×7 table (in ROM hole)
+
+  11. STEP 5 — Speed Density formula:
+      MafFromSD = Displacement × RPM × MAP × VE × AtmoComp
+                  × SpeedDensityConstant / IAT_K
+
+      Constants:
+        Displacement         = 2.46 (liters, 2013 WRX EJ255)
+        SpeedDensityConstant = 0.003871098 (ideal gas law factor)
+        CelsiusToKelvin      = 273.15
+
+  12. STEP 6 — Mode selection:
+      switch (pRamVariables->MafMode):
+
+        MafModeSensor (0x01, DEFAULT):
+          return MafFromSensor
+          → stock behavior, SD calculated but not used
+
+        MafModeSpeedDensity (0x02):
+          return MafFromSD
+          → pure calculated airflow, MAF sensor ignored
+
+        MafModeBlending (0x03):
+          ratio = Pull3DHooked(&SDBlendingTable, MAP, RPM)
+            MerpMod's 10×10 blending table
+            ratio 0.0 = pure sensor, 1.0 = pure SD
+          result = (MafFromSD × ratio) + (MafFromSensor × (1 - ratio))
+          return result
+
+  ────── Return to 0x4A2C ──────
+
+  13. Result in FR0 stored to *(float*)0xFFFF40B4 (MAF g/s output)
+
+  14. Output propagates through ECU:
+      0xFFFF40B4 (2 direct consumers)
+        → 0xFFFF6254 (maf_current, 51 consumers)
+        │    ├── Base fuel map selection (0x30ACC)
+        │    ├── Fuel correction aggregator (0x3160A)
+        │    ├── AFL airflow processor (0x34EC8)
+        │    ├── CL/OL transition logic
+        │    ├── Ignition timing tasks
+        │    └── Knock detection tasks
+        │
+        → 0xFFFF620C (accel enrichment airflow, 43 consumers)
+
+      The rest of the ECU sees a normal MAF g/s value.
+      No downstream code is aware of the SD substitution.
+
+
+================================================================================
+SECTION 5: table_desc_2d_typed MULTIPLIER/OFFSET VERIFICATION
+================================================================================
+
+The OEM 2D typed interpolation function at 0xBE8E4 was verified to apply
+multiplier and offset from the descriptor for integer data types.
+
+Function structure (0xBE8E4-0xBE912, verified from bytes):
+
+  Prologue:
+    4F12  STS.L  FPSCR, @-R15
+    4F22  STS.L  PR, @-R15
+    B256  BSR    0xBED98              ; 2D axis search (both dimensions)
+    4F02  STS.L  MACH, @-R15
+
+  Type dispatch:
+    E010  MOV    #16, R0
+    304C  ADD    R4, R0               ; R0 = desc + 0x10
+    6600  MOV.B  @R0, R6              ; R6 = type byte at desc[16]
+    C708  MOVA   0xBE914, R0          ; R0 = jump table base
+    056E  MOV.L  @(R0,R6), R5         ; R5 = jump_table[type]
+    5143  MOV.L  @(12,R4), R1         ; R1 = data pointer from desc[0x0C]
+    450B  JSR    @R5                  ; call type-specific interpolation
+
+  Jump table at 0xBE914 (verified from bytes):
+    +0x00: 0x000BEBC0  interp_2d_float32   ← type 0x00
+    +0x04: 0x000BEC4C  interp_2d_uint8     ← type 0x04
+    +0x08: 0x000BEC78  interp_2d_uint16    ← type 0x08 (MerpMod VE table)
+    +0x0C: 0x000BEBF0  interp_2d_int8      ← type 0x0C
+    +0x10: 0x000BEC1C  interp_2d_int16     ← type 0x10
+
+  Post-interp scaling:
+    2668  TST    R6, R6               ; type == 0? (float)
+    8D04  BT/S   skip_scaling         ; if float, skip (no scaling needed)
+    F12C  FMOV   FR2, FR1             ; delay slot
+    7414  ADD    #20, R4              ; R4 = desc + 0x14 (MULTIPLIER)
+    F049  FMOV.S @R4+, FR0           ; FR0 = *(float*)(desc+0x14) = multiplier
+    F148  FMOV.S @R4, FR1            ; FR1 = *(float*)(desc+0x18) = offset
+    F12E  FMAC   FR0, FR2, FR1       ; FR1 = offset + multiplier × raw_result
+  skip_scaling:
+    F01C  FMOV   FR1, FR0            ; FR0 = final scaled result
+
+  Epilogue:
+    4F06  LDS.L  @R15+, MACH
+    4F26  LDS.L  @R15+, PR
+    000B  RTS
+    4F16  LDS.L  @R15+, FPSCR
+
+MerpMod ThreeDTable struct layout (matches OEM descriptor format):
+  +0x00  short columnCount     ← OEM: axis dimension info
+  +0x02  short rowCount
+  +0x04  float* columnHeaders  ← OEM: axis 1 pointer
+  +0x08  float* rowHeaders     ← OEM: axis 2 pointer
+  +0x0C  void*  tableCells     ← OEM: data pointer
+  +0x10  int    tableType      ← OEM: type byte (MSB in big-endian)
+  +0x14  float  multiplier     ← OEM: scaling multiplier
+  +0x18  float  offset         ← OEM: scaling offset
+
+VE table type: UInt16Table3D = 0x08000000
+  → byte[desc+16] = 0x08 → dispatches to interp_2d_uint16
+  → FMAC applies multiplier (0.0000457763672) and offset (0.0)
+  → raw uint16 value 11000 → 11000 × 0.0000457763672 = 0.5035 VE
+
+
+================================================================================
+SECTION 6: RAM LAYOUT
+================================================================================
+
+MerpMod RAM workspace: 0xFFFFC000 (pRamHoleStart)
+Size: ~96 bytes for SD-only build
+
+RAM region validation:
+  SH7058 RAM:     0xFFFF8000 - 0xFFFFFFFF (32 KB)
+  Stack init:     0xFFFFBFA0 (grows DOWN, away from RAM hole)
+  Highest OEM:    0xFFFFB71C (dtc_master_enable)
+  MerpMod start:  0xFFFFC000 (2,276 bytes above highest OEM variable)
+  MerpMod end:    ~0xFFFFC060 (96 bytes)
+  I/O registers:  0xFFFFF800+ (14,208 bytes above MerpMod end)
+
+  Zero literal pool references to 0xFFFFC000-0xFFFFDFFF in entire disassembly.
+  Three other MerpMod targets use RAM holes above 0xFFFFC000:
+    A2ZJD02G: 0xFFFFC360
+    A2ZJ710J: 0xFFFFC430
+    A2WC012E: 0xFFFFCA00
+
+RamVariables struct (SD_HACKS only):
+  +0x00  RamVariableStart      (byte, marker)
+  +0x01  VinAuth               (byte)
+  +0x02  CruiseCoastLast       (byte)
+  +0x03  CruiseResumeLast      (byte)
+  +0x04  ECUIdentifier         (long, 4 bytes)
+  +0x08  HardResetFlag         (byte)
+  +0x09  blank0-2              (3 bytes padding)
+  +0x0C  SDInitFlag            (byte)
+  +0x0D  MafMode               (byte: 0x01=sensor, 0x02=SD, 0x03=blend)
+  +0x0E  SDempty               (2 bytes padding)
+  +0x10  VolumetricEfficiency   (float)
+  +0x14  MafFromSpeedDensity    (float)
+  +0x18  MafFromSensor          (float)
+  +0x1C  AtmosphericCompensation (float)
+  +0x20  SDMafBlendRatio        (float)
+  +0x24  SDMafFromBlend         (float)
+  ...
+  +end   RamHoleEndMarker       (long + char)
+
+
+================================================================================
+SECTION 7: ROM HOLE LAYOUT
+================================================================================
+
+MerpMod code and tables are placed in the ROM hole starting at 0x0DAE8C.
+Total free space: 118 KB (0x0DAE8C - 0x0F8900).
+SD-only footprint: ~20-30 KB.
+
+Sections (placed by linker):
+  RomHole_Code                 — Compiled MerpMod functions
+  RomHole_Functions            — Function pointers:
+    Pull3DHooked → 0xBE8E4     (table_desc_2d_typed)
+    Pull2DHooked → 0xBE830     (table_desc_1d_float)
+    MemoryResetHooked → 0x065C (RTOS startup)
+  RomHole_SpeedDensityTables   — Calibration data:
+    VolumetricEfficiencyTable1  (24×24, uint16, ~1.2 KB)
+    AtmosphericCompensationTable (7×7, ~200 B)
+    SDBlendingTable             (10×10, uint8, ~200 B)
+    Constants: CelsiusToKelvin, SpeedDensityConstant, Displacement, DefaultMafMode
+  DefinitionData               — ECUFlash/RomRaider parameter definitions
+  MetaData                     — Patch metadata (hook entries)
+
+
+================================================================================
+SECTION 8: INITIAL DISCOVERY ERROR — hMafCalc
+================================================================================
+
+During the porting process, hMafCalc was initially set to 0x009A6A — the
+BRA instruction in the 320ms MAF dispatch prescaler. This was WRONG.
+
+The BRA at 0x9A6A contains opcode 0xA501 (a 2-byte branch instruction),
+NOT a 4-byte function pointer. MerpMod's SD hook uses OpReplace4Bytes
+with oldval = sPull2DFloat (0x000BE830). The patcher would have either:
+  a) Failed the oldval verification (0xA5010009 ≠ 0x000BE830), or
+  b) Corrupted the instruction stream if verification was bypassed
+
+The correct address was found by searching the ROM binary for all literal
+pool entries containing 0x000BE830, then identifying which one is in the
+MAF processing code path:
+
+  xxd search: grep "000b e830" in ROM binary
+  Result at offset 0x4A88: part of the literal pool for function 0x4A2C
+  Verified: 0x4A84=descriptor, 0x4A88=Pull2DFloat, 0x4A8C=output address
+
+The function at 0x4A2C is called from Task 10 as call_17. It processes the
+MAF sensor ADC reading through the descriptor interpolation and stores the
+result. This is where the SD hook intercepts — replacing the Pull2DFloat
+call with ComputeMassAirFlow.
+
+Lesson: MerpMod hooks are ALWAYS literal pool pointer substitutions,
+not instruction patches. Verify by reading Metadata.c first.
+
+
+================================================================================
+SECTION 9: VERIFICATION CHECKLIST
+================================================================================
+
+  [✓] 0x0D64 contains 0x0000065C (verified: raw ROM bytes)
+  [✓] 0x0C14 MOV.L loads from 0x0D64 (verified: instruction decode, disp calc)
+  [✓] 0x0C18 JSR @R3 calls the loaded address (verified: opcode 430B)
+  [✓] 0x4A88 contains 0x000BE830 (verified: raw ROM bytes)
+  [✓] 0x4A38 MOV.L loads from 0x4A88 (verified: instruction decode, disp calc)
+  [✓] 0x4A42 JSR @R3 calls the loaded address (verified: opcode 430B)
+  [✓] FR4 = voltage in volts, not raw ADC (verified: delay slot FMUL by 5/65536)
+  [✓] Scale factor 0x38A00000 = 5.0/65536 = 0.0000762939 (verified: IEEE 754 decode)
+  [✓] MerpMod's 13107.2 counts/V = 65536/5.0 (matches)
+  [✓] table_desc_2d_typed applies multiplier from desc+0x14 (verified: ADD #20 R4, FMOV, FMAC)
+  [✓] type 0x08 dispatches to interp_2d_uint16 at 0xBEC78 (verified: jump table bytes)
+  [✓] Float types (0x00) skip scaling via BT/S (verified: TST R6,R6 + BT/S)
+  [✓] ThreeDTable struct layout matches OEM descriptor format (verified: offset alignment)
+  [✓] RAM hole 0xFFFFC000 is valid SH7058 RAM (verified: within 0xFFFF8000-0xFFFFFFFF)
+  [✓] RAM hole has zero OEM references (verified: grep of ram_reference.txt)
+  [✓] Result stored to 0xFFFF40B4 → propagates to 0xFFFF6254 (51 consumers)
+  [✓] All 42 MerpMod targets use literal pool hooks (verified: Metadata.c OpReplace4Bytes)
+
+Last verified: 2026-04-04
