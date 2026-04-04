@@ -40,7 +40,7 @@ EcuHacksMain();
 	float OutputValue;
 
 	#if POLF_RAM_TUNING
-		if(pRamVariables->POLFRamFlag = 0x01)
+		if(pRamVariables->POLFRamFlag == 0x01)
 		{
 			OutputValue = Pull3DHooked(&FuelRamTable, *pEngineLoad, *pEngineSpeed);
 		}

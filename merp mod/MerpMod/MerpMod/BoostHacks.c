@@ -36,7 +36,7 @@ EcuHacksMain();
 	float WGDCMaxComp;
 
 	#if PGWG_RAMTUNING
-		if(pRamVariables->PGWGRamFlag = 0x01)
+		if(pRamVariables->PGWGRamFlag == 0x01)
 		{
 			PGWGInitial = Pull3DHooked(&PGWGRamTable, cgear, *pEngineSpeed);
 			PGWGMax = PGWGInitial;
@@ -44,7 +44,7 @@ EcuHacksMain();
 		else
 		{
 	#endif
-	
+
 	#if SWITCH_HACKS
 		PGWGInitial = BlendAndSwitch(PGWGTableGroup, cgear, *pEngineSpeed);
 		PGWGMax = PGWGInitial;
@@ -59,7 +59,7 @@ EcuHacksMain();
 
 
 	#if WGDC_RAMTUNING
-		if(pRamVariables->WGDCInitialRamFlag = 0x01)
+		if(pRamVariables->WGDCInitialRamFlag == 0x01)
 		{
 			WGDCInitialComp = Pull3DHooked(&WGDCInitialRamTable, *pReqTorque, *pEngineSpeed);
 			WGDCMaxComp = Pull3DHooked(&WGDCMaxRamTable, *pReqTorque, *pEngineSpeed);
@@ -97,13 +97,8 @@ EcuHacksMain();
 		}
 		#endif
 		#if WGDC_LOCK
-		#if PROG_MODE
-		else
-		#else
-		else if
-		#endif
 		//Apply locks
-		(*pEngineSpeed < RPMLockWGDC && *pThrottlePlate > ThrottleLockWGDC)
+		else if (*pEngineSpeed < RPMLockWGDC && *pThrottlePlate > ThrottleLockWGDC)
 		{
 			pRamVariables->WGDCInitialOutput = 100.0;
 			pRamVariables->WGDCMaxOutput = 100.0;
@@ -143,27 +138,27 @@ void TargetBoostHack()
 	float TargetBoostComp;
 
 	#if PGWG_RAMTUNING
-		if(pRamVariables->PGWGRamFlag = 0x01)
+		if(pRamVariables->PGWGRamFlag == 0x01)
 		{
 			PGTB = Pull3DHooked(&PGTBRamTable, cgear, *pEngineSpeed);
 		}
 		else
 		{
 	#endif
-		
+
 	#if SWITCH_HACKS
 		PGTB = BlendAndSwitch(PGTBTableGroup, cgear, *pEngineSpeed);
 	#else
 		PGTB = Pull3DHooked(PGTBTable1i, cgear, *pEngineSpeed);
 	#endif
-		
-	#if PGTB_RAMTUNING
+
+	#if PGWG_RAMTUNING
 		}
 	#endif
 	
 	
 	#if TARGET_BOOST_RAMTUNING
-		if(pRamVariables->TargetBoostRamFlag = 0x01)
+		if(pRamVariables->TargetBoostRamFlag == 0x01)
 		{
 			TargetBoostComp = Pull3DHooked(&TargetBoostRamTable, *pReqTorque, *pEngineSpeed);
 		}

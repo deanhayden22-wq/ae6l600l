@@ -36,7 +36,7 @@ float TimingHack()
 	pRamVariables->SubtractiveKCA = subIam *  pRamVariables->MaxSubtractiveKCA;
 	
 #if TIMING_RAM_TUNING
-	if(pRamVariables->WGDCMaxRamFlag = 0x01)
+	if(pRamVariables->WGDCMaxRamFlag == 0x01)
 	{
 		OutputValue = Pull3DHooked(&TimingRamTable, *pEngineLoad, *pEngineSpeed);
 	}

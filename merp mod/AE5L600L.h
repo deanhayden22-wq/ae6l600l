@@ -8,12 +8,15 @@
  * Cross-referenced with AE5K700V (2013 WRX, same generation).
  *
  * STATUS KEY:
- *   [VERIFIED]     - Confirmed via binary analysis & cross-reference
- *   [HIGH CONF]    - Derived from literal pool / descriptor / code tracing
+ *   [VERIFIED - disassembly]  - Confirmed against verified disassembly/maps/ram_reference.txt
+ *   [VERIFIED]                - Confirmed via binary analysis & cross-reference
+ *   [HIGH CONF]               - Derived from literal pool / descriptor / code tracing
+ *   [UNVERIFIED]              - Not found in disassembly; kept from AE5K700V, may be wrong
+ *   [SUSPECT]                 - Found in disassembly but labeled as something different
  *
- * All addresses derived from binary analysis of the AE5L600L ROM,
- * cross-referenced with AE5K700V/AE5IB00V/AE5F301C targets and
- * the TinyWrex patch at 0xF1000.
+ * Addresses originally derived from AE5K700V cross-reference.
+ * Corrected 2026-04-04 against verified AE5L600L disassembly
+ * (858 RAM addresses, 760 calibration descriptors, 59-task scheduler map).
  */
 
 #define MOD_ECUID 8A12587007FF
@@ -57,15 +60,18 @@
 // Switch Hacks (Cranking Fuel Tables)
 /////////////////////
 
-/* [HIGH CONF] Cranking fuel table descriptor addresses.
- * Based on descriptor analysis in the 0xAE980+ region.
- * Cross-referenced with AE5K700V descriptor pattern - same addresses. */
-#define tCrankingFuelA (0x000AE990)
-#define tCrankingFuelB (0x000AE9A4)
-#define tCrankingFuelC (0x000AE9B8)
-#define tCrankingFuelD (0x000AE9CC)
-#define tCrankingFuelE (0x000AE9E0)
-#define tCrankingFuelF (0x000AE9F4)
+/* [VERIFIED - disassembly] Cranking fuel table descriptor addresses.
+ * Corrected from AE5K700V (0xAE990-0xAE9F4, which are unrelated tables).
+ * Verified via startup_enrichment_analysis.txt Section 2:
+ *   6 ECT-indexed base IPW tables, 16 elements each, uint8, scale 8.0.
+ *   Selected by 2x3 matrix of mode bytes (FFFF90C1 x FFFF72A1).
+ *   ECT axis: 0xCC624 (16 float32, -40 to 110 deg F). */
+#define tCrankingFuelA (0x000AC8D0)
+#define tCrankingFuelB (0x000AC8E4)
+#define tCrankingFuelC (0x000AC8F8)
+#define tCrankingFuelD (0x000AC90C)
+#define tCrankingFuelE (0x000AC920)
+#define tCrankingFuelF (0x000AC934)
 
 /////////////////////
 // Rev Limit Hack
@@ -74,9 +80,13 @@
 /* [HIGH CONF] Rev limit function area identified via literal pool analysis.
  * Literal pool at 0x3B79C/0x3B7A8 reference rev limit tables (stock:CC500/CC50C,
  * patched to 0xF1000 by TinyWrex for launch control).
- * Function prolog (sts.l pr) at 0x3B66C. Task[57] at 0x4AE24 -> 0x758CA
- * (wrapper function that calls the rev limit routine).
- * pFlagsRevLim at 0xFFFF7CB8 from literal pool 0x3B7AC. */
+ * Function prolog (sts.l pr) at 0x3B66C.
+ * pFlagsRevLim at 0xFFFF7CB8 from literal pool 0x3B7AC.
+ *
+ * WARNING: hRevLimDelete at 0x4AE24 is task[57] in the 59-entry scheduler,
+ * which dispatches to 0x0758CA = EGR/Emissions Control (not rev limiter).
+ * Patching this entry replaces the EGR task with MerpMod rev limiter code.
+ * Side effect: OEM EGR control is disabled, which may trigger emissions DTCs. */
 #define hRevLimDelete (0x0004AE24)
 #define sRevLimStart (0x0003B66C)
 #define sRevLimEnd (0x0003B76A)
@@ -215,17 +225,20 @@
 
 /* [VERIFIED] Cruise control and input flag addresses.
  * Resume/Coast/Brake match AE5K700V exactly - confirmed via literal pool
- * refs at 0x1A24C, 0x147E0, 0x1A248 respectively.
- * Clutch = 0xFFFF65FC confirmed by TinyWrex patch at 0xF1038 and
- * literal pool refs at 0x120B0, 0x122EC, 0x125AC, 0x12800, 0x13A78.
- * (AE5K700V uses 0xFFFF65F4 for clutch - 8 bytes different.) */
+ * refs at 0x1A24C, 0x147E0, 0x1A248 respectively. */
 #define pResumeFlags ((unsigned char*)0xFFFF5FCB)
 #define ResumeBitMask ((unsigned char)0x01)
 #define pCoastFlags ((unsigned char*)0xFFFF5FCA)
 #define CoastBitMask ((unsigned char)0x01)
 #define pBrakeFlags ((unsigned char*)0xFFFF5FCC)
 #define BrakeBitMask ((unsigned char)0x01)
-#define pClutchFlags ((unsigned char*)0xFFFF65FC)
+
+/* [VERIFIED - disassembly] Clutch state byte.
+ * ram_reference.txt: clutch_state = 0xFFFF5BE3 (33 refs, task50 map switching).
+ * Previous value 0xFFFF65FC is engine_load_current (135 refs, float) —
+ * reading it as unsigned char with bitmask produced load-dependent behavior.
+ * The TinyWrex patch at 0xF1038 was likely also incorrect (same AE5K700V copy). */
+#define pClutchFlags ((unsigned char*)0xFFFF5BE3)
 #define ClutchBitMask ((unsigned char)0x01)
 
 /////////////////////
@@ -233,38 +246,41 @@
 /////////////////////
 
 /* Engine parameter RAM addresses.
- * Cross-referenced against all three AE5-series targets:
- *   AE5F301C (2013 WRX AT), AE5IB00V (2013 WRX MT), AE5K700V (2013 WRX MT)
- *
- * [VERIFIED] Identical across ALL three AE5 targets (high confidence):
- *   pIntakeAirTemp, pMassAirFlow, pMafSensorVoltage, pAf1Res
- *
- * [HIGH CONF] Match AE5K700V (same vehicle, same trans - likely identical):
- *   pFbkc1/4, pIam1/4, pEngineSpeed, pVehicleSpeed, pCoolantTemp,
- *   pAtmoPress, pManifoldAbsolutePressure, pEngineLoad, pReqTorque,
- *   pThrottlePlate, pCurrentGear
- *   NOTE: These DO vary between AE5 targets (e.g. pEngineSpeed is 0x69C8
- *   in AE5F301C, 0x663C in AE5IB00V, 0x6648 in AE5K700V).
- *   Verify via SSM routine if this ROM differs from AE5K700V.
+ * Corrected 2026-04-04 against verified AE5L600L disassembly.
+ * Source: disassembly/maps/ram_reference.txt (858 addresses, 497 named).
  *
  * pMassAirFlow confirmed at 0xFFFF40B4 (literal pool 0x4A8C).
  * pMafSensorVoltage confirmed at 0xFFFF4042 (literal pool 0x4A7C). */
+
+/* [UNVERIFIED] FBKC/IAM byte variants — not found in ram_reference.txt.
+ * Kept from AE5K700V. pFbkc4 is 16 bytes from knock_learning_value (0xFFFF81F0). */
 #define pFbkc1 ((unsigned char*)0xFFFF689F)
 #define pFbkc4 ((float*)0xFFFF81E0)
 #define pIam1 ((unsigned char*)0xFFFF68A1)
-#define pIam4 ((float*)0xFFFF32D8)
-#define pEngineSpeed ((float*)0xFFFF6648)
-#define pVehicleSpeed ((float*)0xFFFF6624)
-#define pCoolantTemp ((float*)0xFFFF4144)
-#define pAtmoPress ((float*)0xFFFF68C4)
-#define pManifoldAbsolutePressure ((float*)0xFFFF6214)
-#define pIntakeAirTemp ((float*)0xFFFF4128)
-#define pMassAirFlow ((float*)0xFFFF40B4)
-#define pMafSensorVoltage ((short*)0xFFFF4042)
-#define pEngineLoad ((float*)0xFFFF63FC)
+
+/* [VERIFIED - disassembly] IAM float — ram_IAM at 0xFFFF3234.
+ * Confirmed in cl_ol_analysis.txt, fueling_pipeline_analysis.txt, and
+ * 8 scheduler tasks. Used for OL fuel map switching (threshold 0.5 at 0xCC16C). */
+#define pIam4 ((float*)0xFFFF3234)
+
+/* [VERIFIED - disassembly] Core engine parameters. */
+#define pEngineSpeed ((float*)0xFFFF6624)              /* rpm_current, 301 refs */
+#define pVehicleSpeed ((float*)0xFFFF61CC)              /* vehicle_speed, 56 refs */
+#define pCoolantTemp ((float*)0xFFFF6350)               /* ect_current, 205 refs */
+#define pAtmoPress ((float*)0xFFFF67EC)                 /* atm_pressure_current, 99 refs */
+#define pManifoldAbsolutePressure ((float*)0xFFFF6898)   /* manifold_pressure, 48 refs */
+#define pIntakeAirTemp ((float*)0xFFFF63F8)             /* iat_current, 86 refs */
+#define pMassAirFlow ((float*)0xFFFF40B4)               /* [VERIFIED] literal pool 0x4A8C */
+#define pMafSensorVoltage ((short*)0xFFFF4042)          /* [VERIFIED] literal pool 0x4A7C */
+#define pEngineLoad ((float*)0xFFFF65FC)                /* engine_load_current, 135 refs */
+#define pThrottlePlate ((float*)0xFFFF65C0)             /* throttle_position, 89 refs */
+
+/* [UNVERIFIED] Not found in disassembly — kept from AE5K700V. */
 #define pReqTorque ((float*)0xFFFF854C)
-#define pThrottlePlate ((float*)0xFFFF62E4)
 #define pCurrentGear ((unsigned char*)0xFFFF6835)
+
+/* [SUSPECT] Labeled cam_angle_sensor (19 refs) in ram_reference.txt.
+ * May not be AF sensor 1 resistance. No better candidate found. */
 #define pAf1Res ((float*)0xFFFF40C8)
 
 /////////////////////
