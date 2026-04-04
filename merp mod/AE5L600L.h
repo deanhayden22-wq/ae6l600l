@@ -252,11 +252,15 @@
  * pMassAirFlow confirmed at 0xFFFF40B4 (literal pool 0x4A8C).
  * pMafSensorVoltage confirmed at 0xFFFF4042 (literal pool 0x4A7C). */
 
-/* [UNVERIFIED] FBKC/IAM byte variants — not found in ram_reference.txt.
- * Kept from AE5K700V. pFbkc4 is 16 bytes from knock_learning_value (0xFFFF81F0). */
+/* [UNVERIFIED] FBKC/IAM byte variants — not in ram_reference.txt.
+ * Unused when pFbkc4/pIam4 are defined (IDATranslation.h prefers float). */
 #define pFbkc1 ((unsigned char*)0xFFFF689F)
-#define pFbkc4 ((float*)0xFFFF81E0)
 #define pIam1 ((unsigned char*)0xFFFF68A1)
+
+/* [VERIFIED - disassembly] FBKC float — knock_flkc_report.txt line 576.
+ * Committed FBKC output written by function ~0x73600.
+ * Companion: 0xFFFF93E0 = FLKC (RomRaider display, inverted sign). */
+#define pFbkc4 ((float*)0xFFFF93DC)
 
 /* [VERIFIED - disassembly] IAM float — ram_IAM at 0xFFFF3234.
  * Confirmed in cl_ol_analysis.txt, fueling_pipeline_analysis.txt, and
@@ -275,12 +279,22 @@
 #define pEngineLoad ((float*)0xFFFF65FC)                /* engine_load_current, 135 refs */
 #define pThrottlePlate ((float*)0xFFFF65C0)             /* throttle_position, 89 refs */
 
-/* [UNVERIFIED] Not found in disassembly — kept from AE5K700V. */
+/* [UNVERIFIED] Requested torque — 0xFFFF854C not in RAM reference (0 literal pool refs).
+ * OEM boost code uses throttle_position/engine_load as WGDC inputs, not a dedicated
+ * torque variable. Only used in MerpMod custom PGWG/WGDC/TargetBoost table lookups.
+ * torque_ratio (float) found at 0xFFFF62F8 but is a ratio, not absolute torque. */
 #define pReqTorque ((float*)0xFFFF854C)
-#define pCurrentGear ((unsigned char*)0xFFFF6835)
 
-/* [SUSPECT] Labeled cam_angle_sensor (19 refs) in ram_reference.txt.
- * May not be AF sensor 1 resistance. No better candidate found. */
+/* [VERIFIED - disassembly] Current gear — low byte of gear position word at 0xFFFF5E74.
+ * torque_management_analysis.txt Section 8: switch on gear position (0xFFFF5E74) for
+ * per-gear RPM thresholds. Big-endian word: high byte=0x00, low byte=gear (1-6).
+ * Also: gear_current as float at 0xFFFF679C (map_switching_analysis.txt line 210). */
+#define pCurrentGear ((unsigned char*)0xFFFF5E75)
+
+/* [HIGH CONF] AF sensor 1 resistance — same ADC pipeline address as AE5K700V.
+ * Same physical ECU hardware (SH7058), ADC channel assignments don't change
+ * between firmware revisions. The disassembly label "cam_angle_sensor" at this
+ * address may be a mislabel in the analysis. Used by CEL flash EGT monitoring. */
 #define pAf1Res ((float*)0xFFFF40C8)
 
 /////////////////////
