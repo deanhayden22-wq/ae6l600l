@@ -8,11 +8,14 @@
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
-// Verified against Ghidra 12.0.2 SH-2 export. 3398 label operations total.
+// Verified against Ghidra 12.0.2 SH-2 export. 3453 label operations total.
 // Includes: original 884+1010, 463 RomRaider cal table labels, 125 RAM labels,
 // 19 MAF scaling path labels, 26 torque management labels, 354 GBR workspace labels,
 // 19 diag dispatch table labels, 14 region 0x020000 utility labels,
-// 40 flag/DTC reader labels (byte pattern scan).
+// 40 flag/DTC reader labels (byte pattern scan),
+// 34 sensor diagnostic / EEPROM adaptation labels,
+// 5 BSP internal call target labels,
+// 16 region 0x080000 per-cylinder injection + diagnostic monitor labels.
 //
 //@author  AE5L600L disassembly project
 //@category Data
@@ -7486,6 +7489,196 @@ public class ImportAE5L600L extends GhidraScript {
             "GBR workspace base (1 use). Region: stack_area.");
         count += labelComment(0xFFFFB210L, "gbr_stk_B210",
             "GBR workspace base (1 use). Region: stack_area.");
+
+
+        // =====================================================================
+        // SENSOR DIAGNOSTIC / EEPROM ADAPTATION LABELS
+        // From sensor_diag_analysis.txt — dispatchers, rationality, EEPROM
+        // 34 labels
+        // =====================================================================
+
+        // --- Sensor Diagnostic Dispatcher 1 (DISABLED) ---
+        count += labelComment(0x00071A76L, "sensor_diag_dispatch_1_disabled",
+            "DISABLED sensor diagnostic dispatcher — rts/nop stub. Real body at 0x071ABA.");
+        count += labelComment(0x00071A7AL, "sensor_diag_state_helper",
+            "Packs uint8(0) -> FFFF255E (diagnostic state byte).");
+        count += labelComment(0x00071A8EL, "sensor_diag_eeprom_init",
+            "Initializes 3 EEPROM diagnostic slots: FFFF2544/254C/2554 via eeprom_op.");
+        count += labelComment(0x00071ABAL, "sensor_diag_dispatch_1_body",
+            "Real dispatcher body: 13 BSR calls — sensor acq, FPU compute, float clamp, "
+            + "6 DTC monitor pairs, EEPROM storage, final handler. GBR=FFFF7C9F.");
+        count += labelComment(0x00071AFAL, "sensor_conditional_calc",
+            "Conditional sensor computation: sensor_val - offset + corrections, float_abs, "
+            + "float_clamp. Output -> FFFF97B0/97B4. Cal bounds at 0xC50B4.");
+        count += labelComment(0x00071B58L, "sensor_computation_fpu",
+            "FPU-heavy sensor computation sub (called from dispatcher 1 body).");
+        count += labelComment(0x00071D08L, "sensor_float_clamp_a",
+            "Float clamp A (called from dispatcher 1 body).");
+        count += labelComment(0x00071D14L, "sensor_float_clamp_b",
+            "Float clamp B (called from dispatcher 1 body).");
+        count += labelComment(0x00071D92L, "sensor_float_interpolation",
+            "Float interpolation sub (called from dispatcher 1 body).");
+        count += labelComment(0x00071F48L, "sensor_dtc_monitor_pair_1",
+            "DTC monitor set/clear pair 1 (called from dispatcher 1 body).");
+        count += labelComment(0x0007200CL, "sensor_dtc_monitor_pair_2",
+            "DTC monitor set/clear pair 2 (called from dispatcher 1 body).");
+        count += labelComment(0x00072066L, "sensor_dtc_monitor_pair_3",
+            "DTC monitor set/clear pair 3 (called from dispatcher 1 body).");
+        count += labelComment(0x00072108L, "sensor_dtc_monitor_4",
+            "DTC monitor 4 (called from dispatcher 1 body).");
+        count += labelComment(0x00072218L, "sensor_dtc_monitor_5",
+            "DTC monitor 5 (called from dispatcher 1 body).");
+        count += labelComment(0x00072272L, "sensor_dtc_monitor_6",
+            "DTC monitor 6 (called from dispatcher 1 body).");
+        count += labelComment(0x00072314L, "sensor_eeprom_storage",
+            "EEPROM storage call (called from dispatcher 1 body).");
+        count += labelComment(0x000723ACL, "sensor_final_handler",
+            "Final handler (tail-call from dispatcher 1 body).");
+        count += labelComment(0x00072584L, "sensor_data_acq_a",
+            "Sensor data acquisition A (called from dispatcher 1 body).");
+        count += labelComment(0x000724C8L, "sensor_data_acq_b",
+            "Sensor data acquisition B (called from dispatcher 1 body).");
+
+        // --- Sensor Diagnostic Dispatcher 2 (Catalyst/O2 monitor) ---
+        count += labelComment(0x0007D526L, "o2_catalyst_diag_dispatch",
+            "Catalyst/O2 sensor diagnostic monitor — outer dispatch shell. "
+            + "10 BSR calls + tail-call to EEPROM adapt store at 0x07E014.");
+        count += labelComment(0x0007D554L, "o2_diag_init",
+            "O2 diagnostic workspace init. GBR=FFFFA248. Sets enable flag FFFFA291, "
+            + "zeros counters, sets 9 sentinel floats to 8000.0.");
+        count += labelComment(0x0007D620L, "o2_catalyst_diag_coordinator",
+            "Core O2/catalyst diagnostic logic (~470 bytes). 16+ sensor floats, "
+            + "~20 qualification gates (CL, fuel trim, MAP, learning), maturation counters. "
+            + "DTCs: P0130(0x82), P0133(0x85), P0132(0x84), P0131(0x83).");
+        count += labelComment(0x0007E014L, "o2_eeprom_adapt_store",
+            "EEPROM adaptation store (tail-call from O2 dispatch shell).");
+
+        // --- Sensor Rationality Check ---
+        count += labelComment(0x0007CB30L, "sensor_rationality_check",
+            "4-channel sensor baseline validation against MAP-derived bounds. "
+            + "254 bytes. Inputs: FFFF7D94-7DA4 baselines, FFFF6624 MAP. "
+            + "Debounce: 2-count qualification. Workspace: FFFFA228.");
+        count += labelComment(0x0007CC30L, "sensor_maturation_update",
+            "Multi-channel maturation counter (~158 bytes). Reads fault_detected "
+            + "(FFFFA228[0]), processes 4 channel states [5-8], increments counters [1-4].");
+        count += labelComment(0x0007CCD0L, "sensor_dtc_dispatch",
+            "DTC dispatch for O2 sensor codes (~252 bytes). Threshold at cal 0xC47CB. "
+            + "P0130(0x82), P0133(0x85), P0132(0x84), P0131(0x83). MIL-enabled.");
+
+        // --- EEPROM Adaptation Persistence ---
+        count += labelComment(0x00071224L, "eeprom_adapt_init",
+            "EEPROM adaptation init. Zeros FFFF2530, conditionally zeros FFFF2538/253C, "
+            + "sets defaults at FFFF2520/2528/2530.");
+        count += labelComment(0x00071268L, "eeprom_adapt_validate",
+            "EEPROM validation: reads 5 slots (FFFF2520-253C) via desc_read_int_safe. "
+            + "Returns 0=valid, 1=corrupt.");
+        count += labelComment(0x000712CCL, "eeprom_cycle_trigger",
+            "EEPROM cycle trigger: calls eeprom_read_check + eeprom_state_machine.");
+        count += labelComment(0x000717B2L, "eeprom_maturation_check",
+            "EEPROM maturation counter: increments FFFF979D if state matches expected, "
+            + "else resets to 0xFF.");
+        count += labelComment(0x000717ECL, "eeprom_write_state_machine",
+            "EEPROM hysteresis write controller (~154 bytes). UP/DOWN counters at FFFF9794. "
+            + "Thresholds: cal 0xC4838 (up), 0xC483A (down). Prevents premature EEPROM writes.");
+        count += labelComment(0x0007B7A8L, "eeprom_conditional_adapt_writer",
+            "Conditional adaptation writer (~278 bytes). Stores sensor corrections "
+            + "(FFFF259C-25AC) to EEPROM when no faults; resets to defaults when DTCs present. "
+            + "Cross-ref: dtc_struct 0x9A834+0x322/323.");
+
+        // --- Sensor Diagnostic RAM Workspace Labels ---
+        count += labelComment(0xFFFFA228L, "ws_sensor_rationality",
+            "Sensor rationality workspace (11 bytes). fault_detected[0], maturation_ctr[1-4], "
+            + "channel_state[5-8], qualification_ctr[9], prev_state[10].");
+        count += labelComment(0xFFFFA248L, "ws_o2_catalyst_diag",
+            "O2/catalyst diagnostic workspace (GBR base, ~80 bytes). "
+            + "Measurement slots, sentinel floats (8000.0 init), history arrays.");
+
+
+        // =====================================================================
+        // BSP INTERNAL CALL TARGETS (region 0x010000)
+        // Top-5 high-caller-count BSP/RTOS infrastructure functions
+        // 5 labels
+        // =====================================================================
+        count += labelComment(0x00016708L, "gpio_fault_status_eval",
+            "3 callers. Evaluates fuel_pump_dtc (FFFF8E98) + I/O flags; "
+            + "writes composite fault status to FFFF5E54.");
+        count += labelComment(0x00016558L, "battery_voltage_state_eval",
+            "4 callers. Compares battery voltage (FFFF4130) against 9.0V/9.5V "
+            + "hysteresis thresholds (cal 0xC152C/C1530); sets low-voltage flag FFFF5E45.");
+        count += labelComment(0x00011880L, "atu_timer_capture_read",
+            "4 callers. Reads ATU timer counter at FFFFF738 with overflow-bit handling; "
+            + "struct_init/struct_init2 sandwich.");
+        count += labelComment(0x00014278L, "bit_test_nz",
+            "Returns 1 if (R4 & R5) != 0. Part of trio: bit_test/bit_extract/byte_pair_merge "
+            + "at 0x14278/82/8C.");
+        count += labelComment(0x0001D742L, "sensor_adc_scaling_compute",
+            "Fixed-point multi-channel ADC scaling with cal coefficients (0xC3048-C307C); "
+            + "writes 3 scaled results to sensor workspace struct at FFFF623C.");
+
+
+        // =====================================================================
+        // REGION 0x080000-0x08FFFF: PER-CYLINDER INJECTION + DIAGNOSTIC MONITORS
+        // From percyl_injection_output_analysis.txt, region_080000_descriptor_tables.txt,
+        // region_080000_diag_monitors.txt
+        // 16 labels (227 Ghidra functions in region, 0% were named)
+        // =====================================================================
+
+        // --- Per-Cylinder Injection Output Pipeline (7 stages, dispatched from 0x48754-0x4876C) ---
+        count += labelComment(0x0008E3E4L, "percyl_precalc_ect_gate",
+            "Stage 0: Read ECT from FFFF4144, compare thresholds (cal 0xC545C), "
+            + "gate pipeline on check_diag_state.");
+        count += labelComment(0x0008E474L, "percyl_ect_threshold_calc",
+            "Sub of Stage 0: Load ECT float, compare against workspace FFFFA8B0 thresholds.");
+        count += labelComment(0x00081A64L, "percyl_interp_gate",
+            "Stage 1: Gate on check_diag_state, then call interp_pipeline for "
+            + "multi-dim fuel table interpolation.");
+        count += labelComment(0x00081E14L, "percyl_interp_pipeline",
+            "Sub of Stage 1: 4x fmac_interp_uint16 + axis_frac_to_uint16 + float_safe_div. "
+            + "Reads desc at 0x09800C.");
+        count += labelComment(0x00082A9CL, "percyl_pack_workspace_A",
+            "Stage 2: Init GBR workspace at FFFFA494, call pack_sub_A, "
+            + "clear output at FFFFA4BA.");
+        count += labelComment(0x0008396EL, "percyl_pack_sub_A",
+            "Sub of Stage 2: GBR=FFFF2EBC, 2x uint16_pack + 2x uint8_pack. "
+            + "Float-to-integer packing.");
+        count += labelComment(0x000839F8L, "percyl_pack_workspace_B",
+            "Stage 3: Float accumulation from FFFF43FC, init GBR workspace at FFFFA4D4, "
+            + "clear output at FFFFA4F9.");
+        count += labelComment(0x00084326L, "percyl_pack_sub_B",
+            "Sub of Stage 3: GBR=FFFF2EC8, 2x uint16_pack + 2x uint8_pack. "
+            + "Parallel packing workspace B.");
+        count += labelComment(0x000843ACL, "percyl_state_capture",
+            "Stage 4: Read float from workspace, read fuel_state_byte (FFFF7C9D), "
+            + "store to output at FFFFA518.");
+        count += labelComment(0x00084A28L, "percyl_engine_status_gate",
+            "Stage 5: Call check_engine_status (0x3AB20), store result + fuel_state_byte "
+            + "to output at FFFFA52D.");
+        count += labelComment(0x0008C31EL, "percyl_completion_flag",
+            "Stage 6: Write constant 2 to FFFFA827. Pipeline completion marker "
+            + "(2=normal injection mode).");
+
+        // --- Sensor Float Aggregation (misclassified as float_data, actually code) ---
+        count += labelComment(0x00086500L, "sensor_float_aggregation_block",
+            "Sensor float read stubs: sequential fmov.s/fdiv pipeline reading "
+            + "FFFF85xx-FFFF97xx sensor RAM.");
+
+        // --- DTC Diagnostic Check Functions (misclassified as float_data, actually code) ---
+        count += labelComment(0x00087100L, "dtc_check_cluster_start",
+            "Start of ~36 DTC check functions (1/2/3-condition variants). "
+            + "Refs diag_session_state FFFFAD52, DTC struct table 0x9A834.");
+
+        // --- Diagnostic Monitor Cluster (Template B: GBR descriptor unpack) ---
+        count += labelComment(0x00088E54L, "diag_desc_unpack_18field",
+            "Template B: GBR unpack 18 fields at FFFF2F84 offsets 0x00-0x4A "
+            + "via uint16_pack (0xBE9B0).");
+        count += labelComment(0x0008C0F8L, "diag_desc_unpack_30field",
+            "Template B: Largest function in region (287 bytes). GBR unpack ~30 "
+            + "descriptor fields via uint16_pack.");
+
+        // --- Diagnostic Monitor Cluster (Template C: Sensor threshold comparison) ---
+        count += labelComment(0x00088BD2L, "diag_sensor_threshold_multi",
+            "Template C: 6-channel sensor threshold comparison. Unpack via "
+            + "uint16_unpack (0xBE990), branch to DTC set/clear.");
 
 
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);

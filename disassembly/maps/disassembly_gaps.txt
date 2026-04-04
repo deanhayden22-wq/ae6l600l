@@ -94,8 +94,9 @@ Region-by-region breakdown of unnamed functions:
 REGION 0x080000-0x08FFFF — SCOUTED 2026-04-03
 ================================================================================
 
-227 functions, 0% named, zero in task_call_graph or cal_crossref.
+227 functions, 16 labeled (7%), zero in task_call_graph or cal_crossref.
 87% of functions are <=64 bytes (descriptor-handler stubs).
+16 key functions labeled in ImportAE5L600L.java (2026-04-03).
 
 ANALYSIS COMPLETE — 3 analysis files written 2026-04-03:
   percyl_injection_output_analysis.txt  — 7-stage per-cylinder output pipeline
@@ -185,7 +186,7 @@ Priority: MEDIUM.  Top target: disassemble 0x0640F4 (parametric monitor handler
 for 500+ dispatch table entries).
 
 ================================================================================
-REGION 0x070000-0x07FFFF — SCOUTED 2026-04-03
+REGION 0x070000-0x07FFFF — ANALYZED 2026-04-03
 ================================================================================
 
 217 functions, 6 named (2.8%).  See region_070000_scout.txt.
@@ -199,16 +200,35 @@ Identity: Sensor diagnostic monitoring subsystem.
     - 13 calibration computation functions (interpolation, float math)
     - 86 unidentified small helpers/accessors
 
-Two major dispatcher functions: FUN_071A76 (calls 15+ subs) and
-FUN_07D526 (calls 10 subs) — likely task-level entry points.
+ANALYSIS COMPLETE — see sensor_diag_analysis.txt (2026-04-03):
 
-Sub-region 0x078000-0x078FFF has code blocks but zero Ghidra-detected
-functions — needs manual investigation.
+  Dispatcher 1 (0x071A76): DISABLED (rts/nop stub). Real body at 0x071ABA:
+    13-function BSR chain — sensor acquisition, FPU computation, float clamp,
+    6 DTC monitor pairs, EEPROM storage, final handler. Would use cal bounds
+    at 0xC50B4 if enabled.
+
+  Dispatcher 2 (0x07D526): ACTIVE — Catalyst/O2 sensor diagnostic monitor.
+    20+ qualification cascade (CL state, fuel trim cross-validation, MAP,
+    learning flag), multi-stage maturation counters. GBR=FFFFA248.
+    DTCs: P0130 (0x82), P0133 (0x85), P0132 (0x84), P0131 (0x83).
+
+  Sensor Rationality Check (0x07CB30): 4-channel baseline validation against
+    MAP-derived bounds. 2-count debounce. Workspace at FFFFA228.
+    Maturation counter (0x07CC30) feeds DTC dispatch (0x07CCD0).
+
+  EEPROM Adaptation Persistence (0x071224, 0x071268, 0x0712CC, 0x0717B2,
+    0x0717EC, 0x07B7A8): Init, validation, cycle trigger, maturation counter,
+    hysteresis write controller (UP/DOWN counters, cal 0xC4838/C483A),
+    conditional adaptation writer (resets learned values when DTCs present).
+
+  34 sensor diag labels + 5 BSP labels added to ImportAE5L600L.java (total: 3,437).
+
+Sub-region 0x078000-0x078FFF — RESOLVED (2026-04-03):
+  All 13 functions are EGR emissions diagnostic subs called from egr_main_setup
+  (0x0758DE) via indirect JSR. No EGR valve on turbo EJ255 — skip per policy.
+  Ghidra missed them due to indirect calls + literal pool confusion.
 
 0x07D6CC cross-referenced from CL/OL analysis as fuel trim diagnostic reader.
-
-Priority: MEDIUM.  Top targets: dispatchers 0x071A76 and 0x07D526,
-complex diagnostic function 0x07D1B0, sensor rationality check 0x07CB30.
 
 ================================================================================
 REMAINING PRIORITY TARGETS
@@ -220,14 +240,23 @@ HIGH VALUE (tuning-relevant):
      597-entry table with 95 unique handler stubs in 0x05Dxxx-0x05Exxx.
      See diag_dispatch_table_analysis.txt.
 
-MEDIUM VALUE (diagnostic/sensor):
-  3. Sensor diagnostic dispatchers at 0x071A76 and 0x07D526
-  4. EEPROM adaptation persistence functions in 0x070000 region
-  5. Sensor rationality check at 0x07CB30
-  6. 0x020000 utility library — batch-label 200 flag/DTC reader stubs
+MEDIUM VALUE (diagnostic/sensor) — ALL DONE:
+  3. Sensor diagnostic dispatchers at 0x071A76 and 0x07D526 — DONE (2026-04-03)
+     Dispatcher 1 = disabled stub; Dispatcher 2 = catalyst/O2 monitor.
+     See sensor_diag_analysis.txt.
+  4. EEPROM adaptation persistence functions in 0x070000 region — DONE (2026-04-03)
+     6 functions: init, validation, cycle trigger, maturation, hysteresis write, conditional writer.
+     See sensor_diag_analysis.txt.
+  5. Sensor rationality check at 0x07CB30 — DONE (2026-04-03)
+     4-channel MAP-bounded validation, 2-count debounce, P0130-P0133 DTC dispatch.
+     See sensor_diag_analysis.txt.
+  6. 0x020000 utility library — batch-label 200 flag/DTC reader stubs — DONE
 
-LOW VALUE (infrastructure):
-  7. BSP internal call targets in 0x010000 (label propagation)
+LOW VALUE (infrastructure) — ALL DONE:
+  7. BSP internal call targets in 0x010000 — DONE (2026-04-03)
+     5 functions labeled: gpio_fault_status_eval (3 callers), battery_voltage_state_eval (4),
+     atu_timer_capture_read (4), bit_test_nz (1), sensor_adc_scaling_compute (1).
+     Actual caller counts much lower than scout estimate (~13 total, not 200+).
 
 0x020000-0x02FFFF (491 call targets, ~12 named)
    SCOUTED 2026-04-03. See region_020000_scout.txt.
@@ -245,9 +274,9 @@ From cal_crossref.txt:
   Labeled in Ghidra:           622 (all 463 unmapped defs added to ImportAE5L600L.java)
   Unmapped:                      0
 
-The two descriptor tables at 0x0865xx and 0x0870xx contain calibration pointers
-not yet mapped to any RomRaider definition (these are ROM-internal, not in
-RomRaider XML).
+NOTE: The "descriptor tables" at 0x0865xx and 0x0870xx are actually SH-2 code
+(sensor float aggregation + DTC check functions), not calibration descriptors.
+See region_080000_descriptor_tables.txt. No unmapped calibration data exists here.
 
 ================================================================================
 GBR WORKSPACE LABELING STATUS (added 2026-04-03)
@@ -265,7 +294,7 @@ Labels are systematically named by RAM region:
 Regions: sys, cal, io, adc, fuel, afc, afl, tim, kflk, idle, eng, ign,
          sens, boost, sched, evap, learn, diag, dtc, stk
 
-Total Ghidra label operations: 3,398 (was 2,972)
+Total Ghidra label operations: 3,453 (was 3,437)
 
 ================================================================================
 METHODOLOGY NOTES
