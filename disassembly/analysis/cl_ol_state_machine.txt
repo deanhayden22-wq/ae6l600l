@@ -1,14 +1,12 @@
 ================================================================================
-  COMPLETE CL/OL STATE MACHINE DISASSEMBLY AND TRACE
-  Subaru ECU ROM AE5L600L - Renesas SH7055 (SH-2)
-  Stock ROM: ae5l600l.bin
-  Modified ROM: AE5L600L 20g rev 20.5 tiny wrex.bin
+CL/OL STATE MACHINE — COMPLETE DISASSEMBLY AND TRACE
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
 
 
-################################################################################
-# PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
-################################################################################
+================================================================================
+PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
+================================================================================
 
 ==============================================================================
   FUN_000357D0 - CL/OL transition sub B (dispatch table A entry)
@@ -1595,11 +1593,11 @@
   0x036F9E:  D24C    mov.l @(0x0370D0),R2  ; =0xFFFF7A24  (RAM 7A24)
 
 
-################################################################################
-# EXTENDED DISASSEMBLY: FUN_0003580C - Full transition core
-# This is the main CL/OL transition function called from dispatch table B
-# Tracing from 0x3580C to function end (rts)
-################################################################################
+================================================================================
+EXTENDED DISASSEMBLY: FUN_0003580C — Full transition core
+  Main CL/OL transition function called from dispatch table B
+  Tracing from 0x3580C to function end (rts)
+================================================================================
 
 ==============================================================================
   FUN_0003580C - CL/OL transition CORE (FULL) - ends at 0x0359A4
@@ -1815,10 +1813,10 @@
   0x0359A4:  D421E500    .long =0xD421E500
 
 
-################################################################################
-# LITERAL POOLS for FUN_0003643A (condition checker, already disassembled)
-# GBR = 0xFFFF79A4 for this function
-################################################################################
+================================================================================
+LITERAL POOLS FOR FUN_0003643A (condition checker, already disassembled)
+  GBR = 0xFFFF79A4 for this function
+================================================================================
 
   --- Literal Pool: Pool A (per-gear RPM limit check) (0x036534-0x0365E0) ---
   0x036534:  FFFF79C0    .long =0xFFFF79C0  (RAM 79C0)
@@ -1937,10 +1935,10 @@
   0x036A94:  000CC174    .long =0x000CC174  (CAL @0x0CC174)
 
 
-################################################################################
-# EXTENDED: Full flow from FUN_0003606C through end of condition checking
-# This is the main CL/OL evaluation path
-################################################################################
+================================================================================
+EXTENDED: Full flow from FUN_0003606C through end of condition checking
+  Main CL/OL evaluation path
+================================================================================
 
 ==============================================================================
   FUN_0003606C extended - Full delay manager / condition evaluator
@@ -3009,10 +3007,10 @@
   0x036A0A:  4F26    lds.l @R15+,PR
 
 
-################################################################################
-# PART 2: ROM-WIDE SEARCH FOR ACCESSES TO 0xFFFF79C7
+================================================================================
+PART 2: ROM-WIDE SEARCH FOR ACCESSES TO 0xFFFF79C7
 # (GBR+0x23 with GBR=0xFFFF79A4 - the throttle exceeded flag)
-################################################################################
+================================================================================
 
 --- Method 1: GBR-relative accesses ---
 
@@ -3057,9 +3055,9 @@
   0x036428: mov.b R0,@(8,GBR)  [write byte]  -> RAM 0xFFFF79C8 (GBR+0x24)
 
 
-################################################################################
-# PART 3: STOCK vs MODIFIED CALIBRATION VALUES (CL/OL related)
-################################################################################
+================================================================================
+PART 3: STOCK vs MODIFIED CALIBRATION VALUES (CL/OL related)
+================================================================================
 
   0x0CBC5A: CL Delay Engine Load Counter Threshold
     Stock: 313  Modified: 200  *** CHANGED ***
@@ -3151,9 +3149,9 @@
     [7] 0x0CE65C: Stock=3.0000  Mod=3.0000
 
 
-################################################################################
-# PART 4: DISPATCH TABLE ENTRIES
-################################################################################
+================================================================================
+PART 4: DISPATCH TABLE ENTRIES
+================================================================================
 
 --- Dispatch Table A @ 0x480B8 (fueling) ---
   [ 0] 0x0480B8: 0x00033278
@@ -3199,9 +3197,9 @@
   [19] 0x04A104: 0x000403C4
 
 
-################################################################################
-# PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
-################################################################################
+================================================================================
+PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
+================================================================================
 
 --- Flag write at 0x36830 region (writes GBR+0x23) ---
 
@@ -3830,9 +3828,9 @@
   0x036F84:  0009600C    .long =0x0009600C  (ROM @0x09600C)
 
 
-################################################################################
-# PART 6: EXTENDED SEARCH - All GBR=0xFFFF79A4 and nearby GBR values
-################################################################################
+================================================================================
+PART 6: EXTENDED SEARCH - All GBR=0xFFFF79A4 and nearby GBR values
+================================================================================
 
 --- All locations setting GBR = 0xFFFF79A4 ---
 
@@ -3841,10 +3839,10 @@
 --- All locations setting GBR = 0xFFFF798C ---
 
 
-################################################################################
-# PART 7: Exhaustive search for reads of FFFF79C4/79C7
+================================================================================
+PART 7: Exhaustive search for reads of FFFF79C4/79C7
 # (counter word at GBR+0x20 and flag byte at GBR+0x23)
-################################################################################
+================================================================================
 
 --- All accesses to 0xFFFF79C4 (counter word GBR+0x20) ---
   0x0360AC: mov.w @(56,GBR),R0  [read word]  (GBR=0xFFFF798C)
@@ -3877,10 +3875,10 @@
     0x036428: mov.b R0,@(8,GBR)  [write byte]
 
 
-################################################################################
-# PART 8: Search for tst.b/and.b/or.b/xor.b @(R0,GBR) patterns
+================================================================================
+PART 8: Search for tst.b/and.b/or.b/xor.b @(R0,GBR) patterns
 # that could access 0xFFFF79C7 with R0=offset
-################################################################################
+================================================================================
 
   Checking GBR=0xFFFF79A4 (needs R0=0x23):
     (none found)

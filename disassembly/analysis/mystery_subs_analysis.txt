@@ -1,5 +1,8 @@
-AE5L600L — Mystery Subroutine Analysis
-========================================
+================================================================================
+MYSTERY SUBROUTINES — ANALYSIS
+AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+================================================================================
+
 Addresses: 0x29858 / 0x2999C / 0x2F8FE
 Generated from: disassembly/analysis/mystery_subs_raw.txt
 
@@ -8,9 +11,9 @@ called repeatedly across multiple scheduler tasks (11, 18, 19, 23, 25, 29, 8, 10
 but had no prior analysis or labels.
 
 
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
   FINDING 1: 0x29858 is not a single function — it is a DISPATCH TABLE
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
 
 0x29858 is the base of a large array of identical 8-instruction (16-byte)
 "read-flag-and-return" stubs.  Each stub:
@@ -98,9 +101,9 @@ flag slot.  The offset encodes which byte in the learning state array to check.
   Table name: flkc_state_flag_reader_table @ 0x29858
 
 
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
   FINDING 2: 0x2999C is NOT a separate function
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
 
 0x2999C is simply offset +0x144 into the 0x29858 dispatch table.
 It is the stub that reads FFFF971B (learning state slot 15).
@@ -133,9 +136,9 @@ they specifically need slot 15 (FFFF971B).
   convergence (FFFF971B != 0) before starting EVAP pressure decay test.
 
 
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
   FINDING 3: 0x2F8FE — Check tip-in/transient sub-flag (FFFF726E)
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
 
 0x2F8FE is a 6-instruction leaf stub:
 
@@ -227,9 +230,9 @@ The full transient correction function begins at 0x2F984 (separate entry point).
   Purpose: compute and store transient tip-in fuel correction multipliers
 
 
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
   RAM SUMMARY
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
 
   Address     Size  Label                      Source
   ──────────  ────  ─────────────────────────  ──────────────────────────────
@@ -248,9 +251,9 @@ The full transient correction function begins at 0x2F984 (separate entry point).
   FFFF3244    1B    flkc_fg_R0_init            FLKC R0 initialization flags
 
 
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
   ROM CALIBRATION SUMMARY
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
 
   Address    Label                         Used by
   ─────────  ────────────────────────────  ────────────────────────────────
@@ -269,9 +272,9 @@ The full transient correction function begins at 0x2F984 (separate entry point).
   0xD2995    knock_count_thresh_val        task11: knock flag threshold byte
 
 
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
   FUNCTION LABELS
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
 
   Address    Label
   ─────────  ───────────────────────────────────────────────────────────────
@@ -300,9 +303,9 @@ The full transient correction function begins at 0x2F984 (separate entry point).
              FFFF72E8/72F4/7300. Only updates in CL mode.
 
 
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
   FINDING 4: ALL REMAINING task_call_graph "Unknown" ENTRIES RESOLVED
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
 
 The task_call_graph.txt listed 44 unique "Unknown" addresses across 59 tasks.
 Cross-referencing against all analysis files resolves every one:
@@ -458,9 +461,9 @@ Cross-referencing against all analysis files resolves every one:
              EGR diagnostic monitor phase B. Called by task57.
 
 
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
   CONCLUSIONS
-══════════════════════════════════════════════════════════════════════════════
+================================================================================
 
 1. The "mystery" at 0x29858 was a dispatch table masquerading as a function.
    The disassembler treated the first stub as the function entry, but the
