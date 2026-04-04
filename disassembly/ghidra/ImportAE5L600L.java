@@ -1632,9 +1632,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7829L, "cl_speed_table_sel",
             "Speed table selector (byte). 0=use threshold 1 (FFFF7454), 1=use threshold 2 (FFFF7456). "
             + "Selects which speed lookup table drives the CL speed condition.");
-        count += labelComment(0xFFFF67ECL, "vehicle_speed_word",
-            "Vehicle speed derived value (unsigned word). Compared against cl_speed_threshold_1/2 "
-            + "in cl_master_readiness_eval speed condition check.");
+        // NOTE: 0xFFFF67EC was previously mislabeled "vehicle_speed_word" here.
+        // Actual vehicle speed is at 0xFFFF61CC. This address is atm_pressure_current
+        // (99 refs, float). Correct label applied at line ~2162. Stale label removed.
         count += labelComment(0xFFFF61F4L, "engine_mode_bits",
             "Engine mode flag byte. Bit 3: early exit for cl_master_readiness_eval — if set, "
             + "forces FFFF7452/7450/7451 = 0 immediately. Also tested by sub_1CF46 (0x1CF46).");
