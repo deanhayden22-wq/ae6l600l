@@ -1,8 +1,9 @@
 # AE5L600L ROM Analysis
 
-## Experimental directories
+## Do NOT reference
 
-- `patches/` - Experimental patches with unverified addresses and logic. Do not reference or rely on for analysis.
+- `patches/` - Experimental patches with unverified addresses and logic.
+- `merp mod/archive_v1/` - Archived MerpMod port (v1). Contains known errors. Do not use for reference.
 
 ## Verified directories
 
@@ -12,4 +13,4 @@ When analyzing the ROM, use content from:
 - `rom/` - Stock ROM binaries
 - `scripts/` - Analysis scripts
 - `logs/` - Data logs
-- `merp mod/` - MerpMod port (use in conjunction with verified disassembly for cross-referencing and error checking)
+- `merp mod/` - Active MerpMod port (fresh files only, not archive)
