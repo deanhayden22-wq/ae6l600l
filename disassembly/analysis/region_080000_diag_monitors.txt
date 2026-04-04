@@ -55,7 +55,7 @@ Three distinct function templates were identified:
 
 ─── Template B: GBR descriptor table unpack (0x088D00-0x089000) ────────────────
 
-  Example: FUN_00088E54, FUN_0008C0F8
+  Example: diag_desc_unpack_18field, diag_desc_unpack_30field
 
   Pattern:
     sts.l  PR,@-R15
@@ -76,10 +76,10 @@ Three distinct function templates were identified:
   format to another.  The GBR base at 0xFFFF2F84 (desc_table_mirror) is
   a 222-byte workspace with 66 fields documented in gbr_structures.txt.
 
-  FUN_0008C0F8 is the largest function in the region (287 bytes) and
+  diag_desc_unpack_30field is the largest function in the region (287 bytes) and
   unpacks ~30 descriptor fields sequentially using uint16_pack.
 
-  FUN_00088E54 performs a similar unpack with uint16_pack at GBR offsets
+  diag_desc_unpack_18field performs a similar unpack with uint16_pack at GBR offsets
   0x00 through 0x4A (18 fields, alternating word/long access).
 
   Key RAM:
@@ -93,7 +93,7 @@ Three distinct function templates were identified:
 
 ─── Template C: Sensor threshold comparison (0x088B00-0x088D00) ────────────────
 
-  Example: FUN_00088BD2
+  Example: diag_sensor_threshold_multi
 
   Pattern:
     sts.l  PR,@-R15

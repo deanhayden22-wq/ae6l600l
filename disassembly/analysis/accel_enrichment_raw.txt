@@ -42,7 +42,7 @@ Role:   Top-level transient fuel dispatcher. Reads throttle delta inputs,
   037194: FE28  fmov.s  @R2,FR14             ; FR14 = throttle_delta_neg
 
   ; --- call throttle delta / state calculator ---
-  037196: D283  mov.l   @(0x20C,PC),R2       ; =0x000278DE  FUN_000278DE
+  037196: D283  mov.l   @(0x20C,PC),R2       ; =0x000278DE  throttle_delta_calc
   037198: 420B  jsr     @R2
   03719A: 0009  nop
   03719C: D282  mov.l   @(0x208,PC),R2       ; =0xFFFF7A5C  transient_mode_byte
@@ -65,30 +65,30 @@ Role:   Top-level transient fuel dispatcher. Reads throttle delta inputs,
 
   ; --- dispatch to 6 sub-handlers ---
   ; sub1: tip-in rate / ramp state machine
-  0371B6: B16C  bsr     037492               ; -> FUN_037492
+  0371B6: B16C  bsr     037492               ; -> tip_in_ramp
   0371B8: 2E00  mov.b   R0,@R14              ; (delay slot) store result to workspace[0]
 
   ; sub2: tau/alpha rising time constant
-  0371BA: B0CE  bsr     03735A               ; -> FUN_03735A
+  0371BA: B0CE  bsr     03735A               ; -> tau_rising_handler
   0371BC: 0009  nop
 
   ; sub3: tau/alpha falling time constant
-  0371BE: B125  bsr     03740C               ; -> FUN_03740C
+  0371BE: B125  bsr     03740C               ; -> tau_falling_handler
   0371C0: 0009  nop
 
   ; sub4: overrun fuel cut handler
-  0371C2: B145  bsr     037450               ; -> FUN_037450
+  0371C2: B145  bsr     037450               ; -> overrun_fuel_cut
   0371C4: 0009  nop
 
   ; sub5: additional transient condition check
-  0371C6: B050  bsr     03726A               ; -> FUN_03726A
+  0371C6: B050  bsr     03726A               ; -> transient_condition_check
   0371C8: 0009  nop
 
   ; sub6: final enrichment computation (tip-in amount calc)
   0371CA: 64E3  mov     R14,R4               ; R4 = workspace_base
   0371CC: 74D8  add     #-40,R4              ; R4 = workspace_base - 40 (history buffer)
   0371CE: F4FC  fmov    FR15,FR4             ; FR4 = throttle_delta_pos
-  0371D0: B009  bsr     0371E6               ; -> FUN_0371E6 (final enrichment calc)
+  0371D0: B009  bsr     0371E6               ; -> transient_final_enrichment (final enrichment calc)
   0371D2: F5EC  fmov    FR14,FR5             ; (delay slot) FR5 = throttle_delta_neg
 
   ; --- store final result back to workspace ---
@@ -134,7 +134,7 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
 
   ; --- state/condition queries (Renesas descriptor calling convention) ---
   ; Each JSR reads args from words embedded after the call (via saved PR)
-  03BB88: D25A  mov.l   @(0x168,PC),R2       ; =0x0001CF16  FUN_0001CF16 (mode query)
+  03BB88: D25A  mov.l   @(0x168,PC),R2       ; =0x0001CF16  timing_mode_selector
   03BB8A: 420B  jsr     @R2
   03BB8C: 0009  nop
   03BB8E: D25A  mov.l   @(0x168,PC),R2       ; =0x00022CF4  check_engine_running
@@ -334,7 +334,7 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
   ; EPILOGUE: tail-call to enrichment output function
   ; ============================================================
 
-  03BCBA: D21C  mov.l   @(0x70,PC),R2    ; =0x0003D2FC  FUN_enrich_apply (output fn)
+  03BCBA: D21C  mov.l   @(0x70,PC),R2    ; =0x0003D2FC  enrich_apply (output fn)
   03BCBC: 7F14  add     #20,R15          ; deallocate local frame
   03BCBE: FFF9  fmov.s  @R15+,FR15       ; restore FR15
   03BCC0: FEF9  fmov.s  @R15+,FR14       ; restore FR14
@@ -394,11 +394,11 @@ REFERENCED CODE / DESCRIPTOR ADDRESSES
   0x000297A0  condition_evaluator       condition query B (descriptor args)
   0x000299BC  flkc_flag_reader+0x164    condition query C (flag table slot)
   0x00029BA4  clamp_limit_helper        clamp/limit function
-  0x0003D2FC  FUN_enrich_apply  enrichment output application (tail-call target)
+  0x0003D2FC  enrich_apply  enrichment output application (tail-call target)
   0x000BE53C  DESC_ramp_counter  ramp/counter descriptor table entry
-  0x03735A    FUN_03735A    tau/alpha rising time constant handler
-  0x03740C    FUN_03740C    tau/alpha falling time constant handler
-  0x037450    FUN_037450    overrun fuel cut handler
-  0x037492    FUN_037492    tip-in rate / ramp state machine
-  0x03726A    FUN_03726A    additional transient condition check
-  0x0371E6    FUN_0371E6    final enrichment computation
+  0x03735A    tau_rising_handler    tau/alpha rising time constant handler
+  0x03740C    tau_falling_handler    tau/alpha falling time constant handler
+  0x037450    overrun_fuel_cut    overrun fuel cut handler
+  0x037492    tip_in_ramp    tip-in rate / ramp state machine
+  0x03726A    transient_condition_check    additional transient condition check
+  0x0371E6    transient_final_enrichment    final enrichment computation

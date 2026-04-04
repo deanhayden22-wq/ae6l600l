@@ -42,7 +42,7 @@ Key behavioral characteristics:
       tip-out decay: 505.0 × throttle delta
   - RPM inhibit threshold: 1260 RPM (enrichment blocked above this)
   - Decay gain threshold: 10000.0 (internal float used for saturating logic)
-  - Final output routed via tail-call to FUN_enrich_apply @ 0x3D2FC
+  - Final output routed via tail-call to enrich_apply @ 0x3D2FC
 
 
 ================================================================================
@@ -51,15 +51,15 @@ SECTION 2: CALL CHAIN AND FUNCTION INVENTORY
 
 Scheduler → fuel_transient_comp @ 0x37186
               │
-              ├─ FUN_000278DE         throttle delta state calculator
+              ├─ throttle_delta_calc         throttle delta state calculator
               ├─ 0x29BA4              clamp/limit helper
               │
-              ├─ BSR FUN_037492       tip-in ramp state machine
-              ├─ BSR FUN_03735A       tau/alpha rising time constant
-              ├─ BSR FUN_03740C       tau/alpha falling time constant
-              ├─ BSR FUN_037450       overrun fuel cut handler
-              ├─ BSR FUN_03726A       additional transient condition check
-              └─ BSR FUN_0371E6       final enrichment computation
+              ├─ BSR tip_in_ramp       tip-in ramp state machine
+              ├─ BSR tau_rising_handler       tau/alpha rising time constant
+              ├─ BSR tau_falling_handler       tau/alpha falling time constant
+              ├─ BSR overrun_fuel_cut       overrun fuel cut handler
+              ├─ BSR transient_condition_check       additional transient condition check
+              └─ BSR transient_final_enrichment       final enrichment computation
 
 Separate caller → fuel_accel_enrich @ 0x3BB6C
                     │
@@ -68,7 +68,7 @@ Separate caller → fuel_accel_enrich @ 0x3BB6C
                     ├─ JSR condition_evaluator @ 0x297A0
                     ├─ JSR flkc_state_flag_reader_table+0x164 @ 0x299BC
                     ├─ JSR DESC_0xBE53C    ramp/counter descriptor (x2)
-                    └─ JMP FUN_0003D2FC    enrichment output application (tail-call)
+                    └─ JMP enrich_apply    enrichment output application (tail-call)
 
 Note: fuel_accel_enrich has a separate call path from fuel_transient_comp.
 It is not called from within fuel_transient_comp. Both are periodic tasks
@@ -269,7 +269,7 @@ void fuel_accel_enrich() {
 
 epilogue:
     // tail-call to enrichment output application
-    JMP FUN_0003D2FC;   // applies workspace state to fuel output
+    JMP enrich_apply;   // applies workspace state to fuel output
 }
 
 
@@ -293,7 +293,7 @@ alternate operating conditions (possibly closed-loop vs open-loop mode).
 
 The gain values (510.0, 505.0) are multiplicative factors applied to the
 throttle delta float. The exact throttle delta units determine actual enrichment
-magnitude — the delta is computed by FUN_000278DE and passed as a float in the
+magnitude — the delta is computed by throttle_delta_calc and passed as a float in the
 range observed from ROM context (~0.0 to ~1.0 normalized TPS).
 
 Example at 10% TPS opening:
@@ -347,12 +347,12 @@ ADDRESS       NAME                     TYPE    NOTES
 0xFFFF6624    curr_throttle_pos        float   Current throttle position (fuel_accel_enrich FR9)
 0xFFFF620C    current_rpm              float   Current RPM (fuel_accel_enrich FR13)
 0xFFFF69F4    current_throttle         float   fuel_transient_comp FR8 source
-0xFFFF7A5C    transient_mode_byte      byte    Output of FUN_000278DE (mode/state)
+0xFFFF7A5C    transient_mode_byte      byte    Output of throttle_delta_calc (mode/state)
 0xFFFF7A6C    transient_workspace      base    fuel_transient_comp R14 workspace
   [R14-12]                             float   current_throttle copy
   [R14-8]                              float   previous_throttle (shifted each cycle)
   [R14-4]                              float   input_float_B copy (clamped)
-  [R14+0]                              byte    returned from FUN_037492
+  [R14+0]                              byte    returned from tip_in_ramp
 0xFFFF7CE0    enrich_workspace         base    fuel_accel_enrich R14 workspace
   +0 (0xFFFF7CE0)  active_flag         byte    1=enrichment active, 0=idle
   +1 (0xFFFF7CE1)  field_1             byte    sub-state (set 0 or 1 by state machine)
@@ -392,7 +392,7 @@ to be neighboring calibration for a different subsystem (possibly rev limiters o
 RPM-based fuel cut thresholds adjacent to the accel enrichment block).
 
 Sub-function calibration (tau/alpha, overrun) is located in the sub-function
-bodies (FUN_03735A, FUN_03740C, FUN_037450) — not yet disassembled in detail.
+bodies (tau_rising_handler, tau_falling_handler, overrun_fuel_cut) — not yet disassembled in detail.
 From prior context (summary), the tau calibration region includes:
   Tau rising:  3.4× cold → 0.4× hot  (ECT-indexed multiplier table)
   Tau falling: 1.4× cold → 0.3× hot  (ECT-indexed multiplier table)
@@ -452,15 +452,15 @@ SECTION 11: SYSTEM ARCHITECTURE DIAGRAM
   │  │ Throttle Delta Inputs                                │   │
   │  │  [0xFFFF7D68] throttle_delta_pos → FR15              │   │
   │  │  [0xFFFF7D6C] throttle_delta_neg → FR14              │   │
-  │  │  FUN_000278DE → mode_byte [0xFFFF7A5C]               │   │
+  │  │  throttle_delta_calc → mode_byte [0xFFFF7A5C]               │   │
   │  └──────────────────────────────────────────────────────┘   │
   │                                                              │
   │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
-  │  │ FUN_037492  │ │ FUN_03735A  │ │ FUN_03740C  │           │
+  │  │ tip_in_ramp  │ │ tau_rising_handler  │ │ tau_falling_handler  │           │
   │  │ Tip-in ramp │ │ Tau rising  │ │ Tau falling │           │
   │  └─────────────┘ └─────────────┘ └─────────────┘           │
   │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐           │
-  │  │ FUN_037450  │ │ FUN_03726A  │ │ FUN_0371E6  │           │
+  │  │ overrun_fuel_cut  │ │ transient_condition_check  │ │ transient_final_enrichment  │           │
   │  │ Overrun cut │ │ Trans.cond  │ │ Final enrich│           │
   │  └─────────────┘ └─────────────┘ └─────────────┘           │
   └──────────────────────────────────────────────────────────────┘
@@ -492,7 +492,7 @@ SECTION 11: SYSTEM ARCHITECTURE DIAGRAM
   │  └────────────────┬────────────────────────────────────┘    │
   │                   │                                          │
   │                   ▼                                          │
-  │       tail-call: JMP FUN_0003D2FC                           │
+  │       tail-call: JMP enrich_apply                           │
   │       (enrichment output application)                        │
   └──────────────────────────────────────────────────────────────┘
 

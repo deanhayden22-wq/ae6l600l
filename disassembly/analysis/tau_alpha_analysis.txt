@@ -77,17 +77,17 @@ SECTION 3: CALL CHAIN AND FUNCTION INVENTORY
 
 fuel_transient_comp @ 0x37186
   │
-  ├─ BSR FUN_037492 (1st)    tip-in ramp state machine
-  ├─ BSR FUN_03735A (2nd)    TAU RISING  ← this subsystem
-  ├─ BSR FUN_03740C (3rd)    TAU FALLING ← this subsystem
-  ├─ BSR FUN_037450 (4th)    overrun fuel cut
-  ├─ BSR FUN_03726A (5th)    transient condition check
-  └─ BSR FUN_0371E6 (6th)    final enrichment computation
+  ├─ BSR tip_in_ramp (1st)    tip-in ramp state machine
+  ├─ BSR tau_rising_handler (2nd)    TAU RISING  ← this subsystem
+  ├─ BSR tau_falling_handler (3rd)    TAU FALLING ← this subsystem
+  ├─ BSR overrun_fuel_cut (4th)    overrun fuel cut
+  ├─ BSR transient_condition_check (5th)    transient condition check
+  └─ BSR transient_final_enrichment (6th)    final enrichment computation
 
-FUN_03735A (tau rising):
+tau_rising_handler (tau rising):
   └─ JSR DESC_0BEA40         tau rising table lookup
 
-FUN_03740C (tau falling):
+tau_falling_handler (tau falling):
   └─ JSR DESC_0BDBCC         tau falling table apply
 
 Both functions reference shared tau workspace at 0xFFFF7A60 and accumulator
@@ -247,7 +247,7 @@ SECTION 8: TAU VARIANTS A, B, C EXPLAINED
 Four falling tau tables exist: PRIMARY + A + B + C. These correspond to
 different operating conditions selected by the falling_mode_byte (0xFFFFAF3B):
 
-  falling_mode_byte == 1  → PRIMARY PATH via FUN_03740C main branch
+  falling_mode_byte == 1  → PRIMARY PATH via tau_falling_handler main branch
                              Uses PRIMARY table (0xCD746) in DESC_0BDBCC
 
 The other variants (A, B, C) are selected by the descriptor based on:
@@ -271,7 +271,7 @@ SECTION 9: LOAD THRESHOLD GATE (720.0)
 
 CAL @ 0xCC2B0 = 720.0
 
-This value is compared against current_load_signal (0xFFFF8EAC) in FUN_03740C:
+This value is compared against current_load_signal (0xFFFF8EAC) in tau_falling_handler:
   if (load_signal >= 720.0) → PRIMARY PATH (active falling tau correction)
   if (load_signal < 720.0)  → ACCUMULATION PATH (history-based fallback)
 
@@ -298,19 +298,19 @@ SECTION 10: INTERACTION WITH TIP-IN ENRICHMENT
 The Tau-Alpha system (this subsystem) and Tip-In Enrichment (Subsystem 1) are
 both called from fuel_transient_comp in sequence:
 
-  1. BSR FUN_037492  → tip-in ramp (throttle-position-rate based)
-  2. BSR FUN_03735A  → TAU RISING  (load-rate based, this subsystem)
-  3. BSR FUN_03740C  → TAU FALLING (load-rate based, this subsystem)
-  4. BSR FUN_037450  → overrun cut
-  5. BSR FUN_03726A  → condition check
-  6. BSR FUN_0371E6  → FINAL computation (combines all corrections)
+  1. BSR tip_in_ramp  → tip-in ramp (throttle-position-rate based)
+  2. BSR tau_rising_handler  → TAU RISING  (load-rate based, this subsystem)
+  3. BSR tau_falling_handler  → TAU FALLING (load-rate based, this subsystem)
+  4. BSR overrun_fuel_cut  → overrun cut
+  5. BSR transient_condition_check  → condition check
+  6. BSR transient_final_enrichment  → FINAL computation (combines all corrections)
 
 Both tip-in and tau write to the same workspace region:
-  Tip-in writes to:  workspace[0] (mode byte via FUN_037492)
+  Tip-in writes to:  workspace[0] (mode byte via tip_in_ramp)
   Tau rising reads:  workspace[-12] (tau_accum_rising) and workspace[-8] (prev load)
   Tau rising writes: workspace[-12] (updated accumulator)
 
-The final computation sub (FUN_0371E6) receives:
+The final computation sub (transient_final_enrichment) receives:
   R4  = workspace_base - 40   (history buffer start)
   FR4 = throttle_delta_pos    (from fuel_transient_comp inputs)
   FR5 = throttle_delta_neg    (from fuel_transient_comp inputs)
@@ -330,18 +330,18 @@ SECTION 11: COMPLETE RAM MAP
 ADDRESS       NAME                   TYPE    SOURCE/NOTES
 -----------   --------------------   ------  --------------------------------
 0xFFFF3194    tau_accum_falling      float   Falling tau accumulator; R4 source in
-                                             FUN_03740C; updated by DESC_0BDBCC
+                                             tau_falling_handler; updated by DESC_0BDBCC
 0xFFFF7A54    tau_accum_rising       float   [tau_workspace - 12]; FR5 source in
-                                             FUN_03735A; result written back here
+                                             tau_rising_handler; result written back here
 0xFFFF7A58    prev_load_signal       float   [tau_workspace - 8]; FR6 source in
-                                             FUN_03735A (previous cycle value)
-0xFFFF7A60    tau_workspace          float   R6 base in FUN_03735A; current_load
+                                             tau_rising_handler (previous cycle value)
+0xFFFF7A60    tau_workspace          float   R6 base in tau_rising_handler; current_load
                                              value (= fuel_transient_comp R14[-12])
-0xFFFF7A74    tau_state_flag         byte    Read + written in FUN_03740C;
+0xFFFF7A74    tau_state_flag         byte    Read + written in tau_falling_handler;
                                              gates PRIMARY vs ACCUMULATION path
-0xFFFF8EAC    current_load_signal    float   FR8 source in FUN_03740C;
+0xFFFF8EAC    current_load_signal    float   FR8 source in tau_falling_handler;
                                              compared against 720.0 threshold
-0xFFFFAF3B    falling_mode_byte      byte    R14 source in FUN_03740C;
+0xFFFFAF3B    falling_mode_byte      byte    R14 source in tau_falling_handler;
                                              == 1 enables tau falling PRIMARY path
 
 
@@ -390,7 +390,7 @@ SECTION 13: SYSTEM ARCHITECTURE DIAGRAM
   └───────────────┬─────────────────────────────────────────────────────────┘
                   │
   ┌───────────────▼──────────────────┐    ┌────────────────────────────────┐
-  │  FUN_03735A — TAU RISING         │    │  FUN_03740C — TAU FALLING      │
+  │  tau_rising_handler — TAU RISING         │    │  tau_falling_handler — TAU FALLING      │
   │  DESC_0BEA40 table lookup        │    │  mode check:                   │
   │                                  │    │   mode==1 AND flag==0          │
   │  Tau_RisingLoad_A @ 0xCD6E6      │    │   AND load >= 720.0            │
@@ -409,7 +409,7 @@ SECTION 13: SYSTEM ARCHITECTURE DIAGRAM
                   └────────────────┬────────────────────────┘
                                    │
                     ┌──────────────▼──────────────────────┐
-                    │  FUN_0371E6 — FINAL COMPUTATION      │
+                    │  transient_final_enrichment — FINAL COMPUTATION      │
                     │  (called last from fuel_transient_comp) │
                     │  Blends tau rising + tau falling +    │
                     │  tip-in + all transient corrections   │

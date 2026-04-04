@@ -90,7 +90,7 @@ Sub-region 1 (0x071000-0x071FFF):  31 functions, 1 named [eeprom_read_helper]
     - Float computation (0x071CE0, 0x071D14 -- float_clamp + float_mul)
     - Interpolation (0x071D92 -- fmac_interp_2d)
     - Several DTC set/clear helpers (0x071F48, 0x07200C, 0x072066)
-  Contains FUN_71A76 which is a MAJOR DISPATCHER calling 15+ sub-functions
+  Contains sensor_diag_dispatch_1_disabled which is a MAJOR DISPATCHER calling 15+ sub-functions
     via BSR: 0x72584, 0x724C8, 0x71B58, 0x71D08, 0x71D14, 0x71D92,
     0x71F48, 0x7200C, 0x72066, 0x72108, 0x72218, 0x72272, 0x72314, etc.
     Uses eeprom_op (0xBDBCC), check_diag_state, fmac_interp_2d, uint8_pack.
@@ -187,7 +187,7 @@ Sub-region B (0x07B000-0x07BFFF):  5 functions, 0 named (egr_sub_a at 0x7BF3C)
     - FUN_07B05A: fmac_interp + get_ad_channel + get_ad_raw + uint16_pack.
       2D interpolation on live sensor data -- a SENSOR PROCESSING function.
     - FUN_07B2D2: Similar get_ad + uint16_pack pattern.
-    - FUN_07B7A8, 07B8C2: EEPROM + float_mul + get_ad -- sensor data stored
+    - eeprom_conditional_adapt_writer, 07B8C2: EEPROM + float_mul + get_ad -- sensor data stored
       to EEPROM with float scaling. Adaptation/learning storage.
     - 0x07BF3C: egr_sub_a_maturation (named, emissions)
   Subsystem: Sensor processing + adaptation storage
@@ -205,10 +205,10 @@ Sub-region C (0x07C000-0x07CFFF):  23 functions, 2 named [egr_sub_b, egr_output]
       sensor channel monitors.
     - FUN_07C994: uint8_pack
     - FUN_07C9F2, 07CA4C: dtc_set_pending + dtc_clear (DTC pairs)
-    - FUN_07CB30: check_diag_state_2 + float_safe_div + get_ad + timer_read.
+    - sensor_rationality_check: check_diag_state_2 + float_safe_div + get_ad + timer_read.
       Complex sensor diagnostic with division and timeout -- likely a
       SENSOR RATIONALITY check.
-    - FUN_07CC30, 07CCD0: Float computation + DTC ops
+    - sensor_maturation_update, 07CCD0: Float computation + DTC ops
     - FUN_07CE48-07CEF4: Float clamp chains + DTC state
     - FUN_07CF94: dtc_set_pending + dtc_clear
   Subsystem: Sensor diagnostics + DTC state management
@@ -228,7 +228,7 @@ Sub-region D (0x07D000-0x07DFFF):  22 functions, 0 named
       interpolation and fault detection. High-priority for analysis.
     - FUN_07D3B8-07D4B0: EEPROM + sensor read cluster. Multiple functions
       that read A/D channel then store to EEPROM. Adaptation/learning.
-    - FUN_07D526: DISPATCHER -- calls 10 sub-functions via BSR:
+    - o2_catalyst_diag_dispatch: DISPATCHER -- calls 10 sub-functions via BSR:
       0x7D9F8, 0x7DA1C, 0x7DAB4, 0x7DAE8, 0x7DB0E, 0x7DB80, 0x7DC04,
       0x7E13C, 0x7DC88, 0x7DF6C. Also calls 0x22F92 and uses timer_read.
       This is a TASK-LEVEL coordinator for a secondary diagnostic monitor.
@@ -241,7 +241,7 @@ Sub-region E (0x07E000-0x07EFFF):  32 functions, 0 named
   Code: 0x07E600-0x07F200
   Data: 0x07E300-0x07E600
   Character: Dense sensor processing and monitoring cluster.
-    - FUN_07E014: EEPROM + float_mul (adaptation storage)
+    - o2_eeprom_adapt_store: EEPROM + float_mul (adaptation storage)
     - FUN_07E13C: fmac_interp_2d (called from 0x7D526 dispatcher)
     - FUN_07E268, 07E26C: get_ad_channel + get_ad_raw (sensor reads)
     - FUN_07E664: NOTABLE -- calls get_ad_channel(16), get_ad_raw, then
@@ -309,7 +309,7 @@ Sub-region F (0x07F000-0x07FFFF):  37 functions, 0 named
   Pattern: Check diagnostic preconditions -> compare sensor against
     calibration thresholds -> set or clear DTC accordingly.
 
---- FUN_071A76 (Major dispatcher) ---
+--- sensor_diag_dispatch_1_disabled (Major dispatcher) ---
   15 BSR calls to sub-functions: 0x72584, 0x724C8, 0x71B58, 0x71D08,
     0x71D14, 0x71D92, 0x71F48, 0x7200C, 0x72066, 0x72108, 0x72218,
     0x72272, 0x72314, 0x726FE, 0x71436
@@ -400,10 +400,10 @@ PRIMARY SUBSYSTEM: Sensor Diagnostic Monitors
      Includes serialization (pack/unpack) and deserialization.
 
   E) Two Major Dispatchers:
-     - FUN_071A76: Orchestrates 15+ sub-functions (sub-regions 1-2)
-     - FUN_07D526: Orchestrates 10 sub-functions (sub-region D)
+     - sensor_diag_dispatch_1_disabled: Orchestrates 15+ sub-functions (sub-regions 1-2)
+     - o2_catalyst_diag_dispatch: Orchestrates 10 sub-functions (sub-region D)
      These may be the main bodies of diagnostic TASKS called from the
-     scheduler. FUN_071A76 likely is or is called from a diagnostic
+     scheduler. sensor_diag_dispatch_1_disabled likely is or is called from a diagnostic
      task entry point that was not captured in the task analysis.
 
   F) Calibration Computation: ~13 functions (6.0%)
@@ -484,7 +484,7 @@ LOW PRIORITY (small helpers, pack/unpack wrappers):
 ================================================================================
 
 1. IDENTIFY THE DISPATCHERS' PARENT TASKS
-   FUN_071A76 and FUN_07D526 are task-level coordinators. Trace backwards
+   sensor_diag_dispatch_1_disabled and o2_catalyst_diag_dispatch are task-level coordinators. Trace backwards
    from the task scheduler dispatch table to determine which task numbers
    they belong to. This would unlock naming for ~25+ functions each.
 

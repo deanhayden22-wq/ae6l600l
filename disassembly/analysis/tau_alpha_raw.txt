@@ -18,7 +18,7 @@ NOTE ON DECODE ISSUES:
 
 
 ================================================================================
-FUN_03735A — tau_rising_handler @ 0x037186 (called from fuel_transient_comp)
+tau_rising_handler — tau_rising_handler @ 0x037186 (called from fuel_transient_comp)
 ================================================================================
 Address:  0x03735A
 Size:     0x20 bytes code + literal pool
@@ -58,7 +58,7 @@ Role:     Apply rising-load tau time constant via descriptor table lookup.
 
 
 ================================================================================
-FUN_03740C — tau_falling_handler @ 0x03740C (called from fuel_transient_comp)
+tau_falling_handler — tau_falling_handler @ 0x03740C (called from fuel_transient_comp)
 ================================================================================
 Address:  0x03740C
 Size:     0x50 bytes
@@ -165,8 +165,8 @@ REFERENCED RAM ADDRESSES
   0xFFFF7A58   prev_load_signal     float  [= tau_workspace - 8]
   0xFFFF7A60   tau_workspace        float  current load (tau_rising R6 base)
   0xFFFF7A74   tau_state_flag       byte   mode/state flag for falling tau
-  0xFFFF8EAC   current_load_signal  float  (FR8 source in FUN_03740C)
-  0xFFFFAF3B   falling_mode_byte    byte   (R14 source in FUN_03740C)
+  0xFFFF8EAC   current_load_signal  float  (FR8 source in tau_falling_handler)
+  0xFFFFAF3B   falling_mode_byte    byte   (R14 source in tau_falling_handler)
 
 ================================================================================
 REFERENCED CODE / DESCRIPTOR ADDRESSES

@@ -18,9 +18,9 @@ adjusting the target throttle plate opening angle based on desired idle
 airflow, with ignition timing used as a fast-acting correction path.
 
 Architecture:
-  Task 54 (scheduler task) -> Enable/disable state machine (FUN_0004bc28)
-  FUN_0004c828             -> Main idle dispatcher (19 handler blocks)
-  FUN_0004c01a             -> DTC enable condition checker
+  Task 54 (scheduler task) -> Enable/disable state machine (idle_enable_disable)
+  idle_main_dispatcher             -> Main idle dispatcher (19 handler blocks)
+  idle_dtc_condition_check             -> DTC enable condition checker
   Handler blocks 0x4CB-0x4DF -> Individual ISC control cases
 
 GBR Workspaces:
@@ -46,7 +46,7 @@ SECTION 1: TASK 54 WRAPPER AND ENABLE/DISABLE STATE MACHINE
   This byte is likely a "task executed" flag or watchdog latch.
 
 
-  FUN_0004bc28 @ 0x04BC28  (enable/disable logic)
+  idle_enable_disable @ 0x04BC28  (enable/disable logic)
   ---------------------------------------------------------------
   Entry: Called separately (not from wrapper -- separate dispatch)
   Prologue: Saves R12-R14, PR, GBR; sets GBR = 0xFFFF8364
@@ -118,10 +118,10 @@ SECTION 1: TASK 54 WRAPPER AND ENABLE/DISABLE STATE MACHINE
 
 
 ================================================================================
-SECTION 2: MAIN IDLE DISPATCHER (FUN_0004c828)
+SECTION 2: MAIN IDLE DISPATCHER (idle_main_dispatcher)
 ================================================================================
 
-  FUN_0004c828 @ 0x04C828
+  idle_main_dispatcher @ 0x04C828
   ---------------------------------------------------------------
   Entry: Called from main control loop (not directly from task 54)
   Prologue: Saves R10-R14, PR, GBR; sets GBR = 0xFFFF837B
@@ -385,10 +385,10 @@ SECTION 7: IDLE AIRFLOW TARGETING (DBW INTERFACE)
 
 
 ================================================================================
-SECTION 8: DTC ENABLE/CONDITION CHECKER (FUN_0004c01a)
+SECTION 8: DTC ENABLE/CONDITION CHECKER (idle_dtc_condition_check)
 ================================================================================
 
-  FUN_0004c01a @ 0x04C01A
+  idle_dtc_condition_check @ 0x04C01A
   ---------------------------------------------------------------
   Purpose: Checks multiple diagnostic enable conditions for idle DTCs
   Returns: R0 = 1 if any DTC enable condition is set, 0 if all clear
@@ -540,7 +540,7 @@ SECTION 12: SYSTEM ARCHITECTURE SUMMARY
                                  │
                     ┌────────────▼────────────┐
                     │  Enable/Disable Logic   │
-                    │  FUN_0004bc28           │
+                    │  idle_enable_disable           │
                     │  GBR = 0xFFFF8364       │
                     │                         │
                     │  Checks: idle_request,  │
@@ -550,7 +550,7 @@ SECTION 12: SYSTEM ARCHITECTURE SUMMARY
                                  │
                     ┌────────────▼────────────┐
                     │   Main Dispatcher       │
-                    │   FUN_0004c828          │
+                    │   idle_main_dispatcher          │
                     │   GBR = 0xFFFF837B      │
                     │                         │
                     │   12-channel sensor     │

@@ -51,16 +51,16 @@ Key RAM addresses:
   0xFFFF2EC8  pack_workspace_B       uint16_pack output workspace
 
 Per-function RAM workspaces (sequential in 0xFFFFA4xx-0xFFFFABxx):
-  0xFFFFA48A  stage2_base            FUN_082A9C primary RAM
+  0xFFFFA48A  stage2_base            percyl_pack_workspace_A primary RAM
   0xFFFFA494  stage2_gbr_base        GBR-relative workspace (confirmed in gbr_registry)
   0xFFFFA4BA  stage2_output
-  0xFFFFA4D0  stage3_base            FUN_0839F8 primary RAM
+  0xFFFFA4D0  stage3_base            percyl_pack_workspace_B primary RAM
   0xFFFFA4D4  stage3_gbr_base        GBR-relative workspace (confirmed in gbr_registry)
   0xFFFFA4F9  stage3_output
-  0xFFFFA518  stage4_output          FUN_0843AC output
-  0xFFFFA52D  stage5_output          FUN_084A28 output
-  0xFFFFA827  stage6_output          FUN_08C31E output
-  0xFFFFAB60  stage0_output          FUN_08E3E4 output
+  0xFFFFA518  stage4_output          percyl_state_capture output
+  0xFFFFA52D  stage5_output          percyl_engine_status_gate output
+  0xFFFFA827  stage6_output          percyl_completion_flag output
+  0xFFFFAB60  stage0_output          percyl_precalc_ect_gate output
 
 Calibration data:
   0x0C545C  ECT-based threshold table (86.1, 30.0, 57.0, -7.0, 70.0, 2500.0,
@@ -70,7 +70,7 @@ Calibration data:
 3. INDIVIDUAL FUNCTION ANALYSIS
 ================================================================================
 
-─── Stage 0: FUN_0008E3E4 — Pre-calc / ECT Conditioning ───────────────────────
+─── Stage 0: percyl_precalc_ect_gate — Pre-calc / ECT Conditioning ───────────────────────
 
   Entry: 0x08E3E4    Size: ~34 bytes    Ends: 0x08E406
 
@@ -117,7 +117,7 @@ Calibration data:
 
   Label: percyl_precalc_ect_gate
 
-─── Stage 1: FUN_00081A64 — Diag Gate + Interpolation ─────────────────────────
+─── Stage 1: percyl_interp_gate — Diag Gate + Interpolation ─────────────────────────
 
   Entry: 0x081A64    Size: ~28 bytes    Ends: 0x081A7E
 
@@ -152,7 +152,7 @@ Calibration data:
 
   Label: percyl_interp_gate
 
-─── Stage 2: FUN_00082A9C — GBR Workspace Init + Pack A ───────────────────────
+─── Stage 2: percyl_pack_workspace_A — GBR Workspace Init + Pack A ───────────────────────
 
   Entry: 0x082A9C    Size: ~54 bytes    Ends: 0x082ACE
 
@@ -197,7 +197,7 @@ Calibration data:
 
   Label: percyl_pack_workspace_A
 
-─── Stage 3: FUN_000839F8 — Float Load + GBR Workspace Init + Pack B ──────────
+─── Stage 3: percyl_pack_workspace_B — Float Load + GBR Workspace Init + Pack B ──────────
 
   Entry: 0x0839F8    Size: ~80 bytes    Ends: 0x083A46
 
@@ -255,7 +255,7 @@ Calibration data:
 
   Label: percyl_pack_workspace_B
 
-─── Stage 4: FUN_000843AC — Short State Read ───────────────────────────────────
+─── Stage 4: percyl_state_capture — Short State Read ───────────────────────────────────
 
   Entry: 0x0843AC    Size: ~18 bytes    Ends: 0x0843BC
 
@@ -277,7 +277,7 @@ Calibration data:
 
   Label: percyl_state_capture
 
-─── Stage 5: FUN_00084A28 — Engine Status Gate + State Write ───────────────────
+─── Stage 5: percyl_engine_status_gate — Engine Status Gate + State Write ───────────────────
 
   Entry: 0x084A28    Size: ~22 bytes    Ends: 0x084A3C
 
@@ -301,7 +301,7 @@ Calibration data:
 
   Label: percyl_engine_status_gate
 
-─── Stage 6: FUN_0008C31E — Constant Write (Final) ────────────────────────────
+─── Stage 6: percyl_completion_flag — Constant Write (Final) ────────────────────────────
 
   Entry: 0x08C31E    Size: 8 bytes    Ends: 0x08C324
 
@@ -387,16 +387,16 @@ Calibration data:
 7. PROPOSED GHIDRA LABELS
 ================================================================================
 
-  Address    Current Name       Proposed Label
+  Address    Label
   ─────────────────────────────────────────────────────
-  0x08E3E4   FUN_0008e3e4      percyl_precalc_ect_gate
-  0x081A64   FUN_00081a64      percyl_interp_gate
-  0x082A9C   FUN_00082a9c      percyl_pack_workspace_A
-  0x0839F8   FUN_000839f8      percyl_pack_workspace_B
-  0x0843AC   FUN_000843ac      percyl_state_capture
-  0x084A28   FUN_00084a28      percyl_engine_status_gate
-  0x08C31E   FUN_0008c31e      percyl_completion_flag
-  0x081E14   FUN_00081e14      percyl_interp_pipeline
-  0x08396E   FUN_0008396e      percyl_pack_sub_A
-  0x084326   FUN_00084326      percyl_pack_sub_B
-  0x08E474   FUN_0008e474      percyl_ect_threshold_calc
+  0x08E3E4   percyl_precalc_ect_gate
+  0x081A64   percyl_interp_gate
+  0x082A9C   percyl_pack_workspace_A
+  0x0839F8   percyl_pack_workspace_B
+  0x0843AC   percyl_state_capture
+  0x084A28   percyl_engine_status_gate
+  0x08C31E   percyl_completion_flag
+  0x081E14   percyl_interp_pipeline
+  0x08396E   percyl_pack_sub_A
+  0x084326   percyl_pack_sub_B
+  0x08E474   percyl_ect_threshold_calc

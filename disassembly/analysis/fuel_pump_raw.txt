@@ -302,10 +302,10 @@ CALIBRATION VALUES:
     0x04BA40 -> fuel_pump_helper_B @ 0x05EA4E
     0x04BA46 -> fuel_pump_helper_C @ 0x05EB1A
     0x04BA4C -> FUN_05EB26 @ 0x05EB26
-    0x04BA6A -> FUN_022F92 @ 0x022F92
-    0x04BA78 -> FUN_0BE53C @ 0x0BE53C
-    0x04BA82 -> FUN_00317C @ 0x00317C
-    0x04BA9C -> FUN_003190 @ 0x003190
+    0x04BA6A -> check_cl_active @ 0x022F92
+    0x04BA78 -> uint8_add_sat @ 0x0BE53C
+    0x04BA82 -> irq_level_set @ 0x00317C
+    0x04BA9C -> irq_level_restore @ 0x003190
 
 ==============================================================================
   fuel_pump_sub_A  @  0x4BA30
@@ -594,10 +594,10 @@ CALIBRATION VALUES:
     0x04BA40 -> fuel_pump_helper_B @ 0x05EA4E
     0x04BA46 -> fuel_pump_helper_C @ 0x05EB1A
     0x04BA4C -> FUN_05EB26 @ 0x05EB26
-    0x04BA6A -> FUN_022F92 @ 0x022F92
-    0x04BA78 -> FUN_0BE53C @ 0x0BE53C
-    0x04BA82 -> FUN_00317C @ 0x00317C
-    0x04BA9C -> FUN_003190 @ 0x003190
+    0x04BA6A -> check_cl_active @ 0x022F92
+    0x04BA78 -> uint8_add_sat @ 0x0BE53C
+    0x04BA82 -> irq_level_set @ 0x00317C
+    0x04BA9C -> irq_level_restore @ 0x003190
     0x04BB7A -> FUN_04BDAA @ 0x04BDAA
 
 ==============================================================================
@@ -3071,8 +3071,8 @@ CALIBRATION VALUES:
     0x048F40: 0x0007D15C
 
   --- Subroutine calls ---
-    0x047C50 -> FUN_006B5A @ 0x006B5A
-    0x047C56 -> FUN_0067DC @ 0x0067DC
+    0x047C50 -> calc_table_offset @ 0x006B5A
+    0x047C56 -> io_sched_event_atomic_2 @ 0x0067DC
     0x047C62 -> FUN_05AA74 @ 0x05AA74
     0x047C7A -> FUN_02271C @ 0x02271C
     0x047C80 -> FUN_05AA9A @ 0x05AA9A
@@ -3094,16 +3094,16 @@ CALIBRATION VALUES:
     0x047CE4 -> FUN_028200 @ 0x028200
     0x047D0E -> FUN_0480FE @ 0x0480FE
     0x047D1A -> FUN_047E5E @ 0x047E5E
-    0x047D42 -> FUN_006BC4 @ 0x006BC4
+    0x047D42 -> io_write_word_atomic @ 0x006BC4
     0x047D54 -> FUN_0BEAB8 @ 0x0BEAB8
-    0x047D5A -> FUN_006BC4 @ 0x006BC4
+    0x047D5A -> io_write_word_atomic @ 0x006BC4
     0x047D6E -> FUN_05CD4A @ 0x05CD4A
     0x047D7A -> FUN_0BE81C @ 0x0BE81C
-    0x047D80 -> FUN_006BC4 @ 0x006BC4
-    0x047D8C -> FUN_006BF0 @ 0x006BF0
+    0x047D80 -> io_write_word_atomic @ 0x006BC4
+    0x047D8C -> io_write_2word_atomic @ 0x006BF0
     0x047D92 -> FUN_0BE82C @ 0x0BE82C
-    0x047D98 -> FUN_00FACA @ 0x00FACA
-    0x047DA6 -> FUN_048732 @ 0x048732
+    0x047D98 -> cl_finalize_injection_sync @ 0x00FACA
+    0x047DA6 -> isr22_injection_pw_apply @ 0x048732
     0x047DAC -> FUN_0588FA @ 0x0588FA
     0x047DB2 -> FUN_04C828 @ 0x04C828
     0x047DB8 -> FUN_01CB68 @ 0x01CB68
@@ -3164,27 +3164,27 @@ CALIBRATION VALUES:
     0x047F0A -> FUN_03CD00 @ 0x03CD00
     0x047F10 -> FUN_02FA68 @ 0x02FA68
     0x047F16 -> FUN_02FB68 @ 0x02FB68
-    0x047F1C -> FUN_030430 @ 0x030430
-    0x047F22 -> FUN_030744 @ 0x030744
-    0x047F28 -> FUN_030B68 @ 0x030B68
-    0x047F2E -> FUN_033278 @ 0x033278
-    0x047F34 -> FUN_031600 @ 0x031600
-    0x047F3A -> FUN_032AA8 @ 0x032AA8
-    0x047F40 -> FUN_031C9C @ 0x031C9C
-    0x047F46 -> FUN_032958 @ 0x032958
-    0x047F4C -> FUN_034488 @ 0x034488
-    0x047F52 -> FUN_0357D0 @ 0x0357D0
-    0x047F58 -> FUN_034EC8 @ 0x034EC8
-    0x047F5E -> FUN_036008 @ 0x036008
-    0x047F64 -> FUN_036A98 @ 0x036A98
-    0x047F6A -> FUN_036BF4 @ 0x036BF4
-    0x047F70 -> FUN_036E60 @ 0x036E60
-    0x047F76 -> FUN_037156 @ 0x037156
-    0x047F7C -> FUN_03756C @ 0x03756C
-    0x047F82 -> FUN_037ABA @ 0x037ABA
-    0x047F88 -> FUN_038158 @ 0x038158
-    0x047F8E -> FUN_038D16 @ 0x038D16
-    0x047F94 -> FUN_038E30 @ 0x038E30
+    0x047F1C -> status_byte_copy @ 0x030430
+    0x047F22 -> sensor_prep @ 0x030744
+    0x047F28 -> base_fuel_table_calc @ 0x030B68
+    0x047F2E -> fuel_precalc @ 0x033278
+    0x047F34 -> fuel_init_flag_writer @ 0x031600
+    0x047F3A -> fuel_correction_array @ 0x032AA8
+    0x047F40 -> fuel_percyl_array_init @ 0x031C9C
+    0x047F46 -> fuel_correction_filter_init @ 0x032958
+    0x047F4C -> afl_sub_dispatcher @ 0x034488
+    0x047F52 -> clol_transition_sub_B @ 0x0357D0
+    0x047F58 -> afl_airflow_processor @ 0x034EC8
+    0x047F5E -> clol_delay_manager_A @ 0x036008
+    0x047F64 -> clol_hysteresis_handler @ 0x036A98
+    0x047F6A -> clol_delay_manager_B @ 0x036BF4
+    0x047F70 -> ol_post_correction_select @ 0x036E60
+    0x047F76 -> fuel_trim_input @ 0x037156
+    0x047F7C -> injector_trim_init @ 0x03756C
+    0x047F82 -> injector_trim_application @ 0x037ABA
+    0x047F88 -> main_ipw_calculator @ 0x038158
+    0x047F8E -> ltft_learning_init @ 0x038D16
+    0x047F94 -> ltft_learning_algorithm @ 0x038E30
     0x04810A -> FUN_03A210 @ 0x03A210
     0x048110 -> FUN_03AB60 @ 0x03AB60
     0x048116 -> FUN_03A5E4 @ 0x03A5E4
@@ -3192,9 +3192,9 @@ CALIBRATION VALUES:
     0x048122 -> FUN_03C374 @ 0x03C374
     0x048128 -> FUN_03C7D8 @ 0x03C7D8
     0x04812E -> FUN_03EAA8 @ 0x03EAA8
-    0x048134 -> FUN_03FA8C @ 0x03FA8C
+    0x048134 -> warmup_state_init @ 0x03FA8C
     0x04813A -> FUN_0402D6 @ 0x0402D6
-    0x048140 -> FUN_0403C4 @ 0x0403C4
+    0x048140 -> ect_warmup_correction @ 0x0403C4
     0x048146 -> FUN_040478 @ 0x040478
     0x04814C -> FUN_04092A @ 0x04092A
     0x048152 -> FUN_0418FC @ 0x0418FC
@@ -3211,19 +3211,19 @@ CALIBRATION VALUES:
     0x048194 -> FUN_04F26C @ 0x04F26C
     0x04819A -> FUN_04F574 @ 0x04F574
     0x0481A0 -> FUN_04FDB8 @ 0x04FDB8
-    0x0481A6 -> FUN_0500E8 @ 0x0500E8
+    0x0481A6 -> etb_sensor_init @ 0x0500E8
     0x0481AC -> FUN_050A24 @ 0x050A24
     0x0481B2 -> FUN_050A48 @ 0x050A48
     0x0481B8 -> FUN_050DCC @ 0x050DCC
     0x0481BE -> FUN_051AF4 @ 0x051AF4
-    0x0481C4 -> FUN_052E62 @ 0x052E62
+    0x0481C4 -> etb_pedal_process @ 0x052E62
     0x0481CA -> FUN_05305E @ 0x05305E
     0x0481D0 -> FUN_05323E @ 0x05323E
     0x0481D6 -> FUN_0535B6 @ 0x0535B6
     0x0481DC -> FUN_0539BE @ 0x0539BE
     0x0481E2 -> FUN_053BFC @ 0x053BFC
-    0x0481E8 -> FUN_054228 @ 0x054228
-    0x0481EE -> FUN_054822 @ 0x054822
+    0x0481E8 -> etb_clutch_process @ 0x054228
+    0x0481EE -> etb_boost_limit @ 0x054822
     0x0481F4 -> FUN_054FC4 @ 0x054FC4
     0x0481FA -> FUN_055588 @ 0x055588
     0x048200 -> FUN_0559F8 @ 0x0559F8
@@ -3361,10 +3361,10 @@ CALIBRATION VALUES:
     0x04869A -> FUN_017758 @ 0x017758
     0x0486A0 -> FUN_017D3C @ 0x017D3C
     0x0486A6 -> FUN_0BF604 @ 0x0BF604
-    0x0486AC -> FUN_02D718 @ 0x02D718
+    0x0486AC -> fuel_correction_eeprom_loader @ 0x02D718
     0x0486B2 -> FUN_02E1A2 @ 0x02E1A2
     0x0486B8 -> FUN_02D45A @ 0x02D45A
-    0x0486BE -> FUN_02C078 @ 0x02C078
+    0x0486BE -> eeprom_persistence_state_machine @ 0x02C078
     0x0486C4 -> FUN_0587FC @ 0x0587FC
     0x0486CA -> FUN_02B1DC @ 0x02B1DC
     0x0486D0 -> FUN_02BDDC @ 0x02BDDC
@@ -3386,7 +3386,7 @@ CALIBRATION VALUES:
     0x04888A -> FUN_04928E @ 0x04928E
     0x0488C4 -> desc_read_float_safe @ 0x0BDBCC
     0x0488E6 -> FUN_0BE9A0 @ 0x0BE9A0
-    0x0488F4 -> FUN_004BCA @ 0x004BCA
+    0x0488F4 -> charge_validation_check @ 0x004BCA
     0x0488FA -> FUN_021150 @ 0x021150
     0x048900 -> FUN_01D1FC @ 0x01D1FC
     0x048906 -> FUN_01F896 @ 0x01F896
@@ -3405,9 +3405,9 @@ CALIBRATION VALUES:
     0x048954 -> FUN_026754 @ 0x026754
     0x04895A -> FUN_04BFBC @ 0x04BFBC
     0x048960 -> FUN_04E8B8 @ 0x04E8B8
-    0x048966 -> FUN_02EE78 @ 0x02EE78
+    0x048966 -> ipw_output_pack @ 0x02EE78
     0x04896C -> FUN_02FCF0 @ 0x02FCF0
-    0x048972 -> FUN_0344BA @ 0x0344BA
+    0x048972 -> afl_range_loop @ 0x0344BA
     0x048978 -> FUN_0357E8 @ 0x0357E8
     0x04897E -> FUN_037118 @ 0x037118
     0x048984 -> FUN_037A74 @ 0x037A74
@@ -3423,9 +3423,9 @@ CALIBRATION VALUES:
     0x0489C0 -> FUN_052EC0 @ 0x052EC0
     0x0489C6 -> FUN_054194 @ 0x054194
     0x0489CC -> FUN_054FD6 @ 0x054FD6
-    0x0489D2 -> FUN_00317C @ 0x00317C
+    0x0489D2 -> irq_level_set @ 0x00317C
     0x0489D8 -> FUN_056022 @ 0x056022
-    0x0489DE -> FUN_003190 @ 0x003190
+    0x0489DE -> irq_level_restore @ 0x003190
     0x0489E4 -> FUN_05AAB2 @ 0x05AAB2
     0x0489EA -> FUN_05CE40 @ 0x05CE40
     0x0489F0 -> FUN_013274 @ 0x013274
@@ -3756,7 +3756,7 @@ CALIBRATION VALUES:
     0x028518: 0xFFFF3836  RAM [unknown]
 
   --- Subroutine calls ---
-    0x028220 -> FUN_058524 @ 0x058524
+    0x028220 -> diag_read_state_E @ 0x058524
 
 ==============================================================================
   fuel_pump_helper_B  @  0x5EA4E
@@ -4041,11 +4041,11 @@ CALIBRATION VALUES:
     0x05EE80: 0x000BE82C
 
   --- Subroutine calls ---
-    0x05EBF2 -> FUN_00317C @ 0x00317C
+    0x05EBF2 -> irq_level_set @ 0x00317C
     0x05EBFE -> uint16_add_sat @ 0x0BE554
     0x05EC0C -> FUN_05ED02 @ 0x05ED02
     0x05EC12 -> FUN_057B02 @ 0x057B02
-    0x05EC26 -> FUN_0BE53C @ 0x0BE53C
+    0x05EC26 -> uint8_add_sat @ 0x0BE53C
     0x05EC38 -> FUN_0BE81C @ 0x0BE81C
 
 ==============================================================================
@@ -4328,14 +4328,14 @@ CALIBRATION VALUES:
     0x05EE88: 0xFFFF9048  RAM [unknown]
 
   --- Subroutine calls ---
-    0x05EBF2 -> FUN_00317C @ 0x00317C
+    0x05EBF2 -> irq_level_set @ 0x00317C
     0x05EBFE -> uint16_add_sat @ 0x0BE554
     0x05EC0C -> FUN_05ED02 @ 0x05ED02
     0x05EC12 -> FUN_057B02 @ 0x057B02
-    0x05EC26 -> FUN_0BE53C @ 0x0BE53C
+    0x05EC26 -> uint8_add_sat @ 0x0BE53C
     0x05EC38 -> FUN_0BE81C @ 0x0BE81C
     0x05EC4E -> FUN_0BE82C @ 0x0BE82C
-    0x05EC68 -> FUN_003190 @ 0x003190
+    0x05EC68 -> irq_level_restore @ 0x003190
     0x05EC84 -> FUN_0BE81C @ 0x0BE81C
     0x05EC9A -> FUN_0BE82C @ 0x0BE82C
     0x05ECAC -> FUN_0BE81C @ 0x0BE81C

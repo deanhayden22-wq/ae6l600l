@@ -279,7 +279,7 @@ Structure — wrapper calling 4 sub-functions:
   0x3CD3E: BSR    0x3CF96         ; post-processing
   0x3CD42: BRA    0x3CFDA         ; finalizer (tail-jump)
 
-Separate thunk entry at 0x3CD46 → FUN_0003d21a.
+Separate thunk entry at 0x3CD46 → startup_mode_switch.
 
 
   ─── Inputs ──────────────────────────────────────────────────────────────
@@ -323,7 +323,7 @@ Separate thunk entry at 0x3CD46 → FUN_0003d21a.
     0x3A000000 = 0.00048828125   (1/2048)
 
 
-  ─── Time-Based Mode Switch (FUN_0003d21a) ───────────────────────────────
+  ─── Time-Based Mode Switch (startup_mode_switch) ───────────────────────────────
 
   Called via thunk at 0x3CD46.  Implements a run-time-dependent mode switch:
 
@@ -494,7 +494,7 @@ Expected logic (from 32BITBASE descriptions):
 
 Most likely location: embedded within warmup enrichment 0x3CD34 as a
 conditional branch on high ECT, or could be a separate function not yet
-identified.  The time-based mode switch at FUN_0003d21a (comparing engine
+identified.  The time-based mode switch at startup_mode_switch (comparing engine
 run time against threshold) may be part of the hotstart/warmstart
 discrimination logic.
 

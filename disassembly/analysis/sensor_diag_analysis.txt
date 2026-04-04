@@ -27,7 +27,7 @@ Architecture:
 
 
 ================================================================================
-SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- FUN_071A76
+SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- sensor_diag_dispatch_1_disabled
 ================================================================================
 
   Entry Point and Stub
@@ -39,10 +39,10 @@ SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- FUN_071A76
 
   This means the dispatcher is currently inactive. It was likely disabled
   during development or is conditionally patched elsewhere. The real
-  dispatcher body follows at FUN_071ABA.
+  dispatcher body follows at sensor_diag_dispatch_1_body.
 
 
-  FUN_071ABA -- Main Dispatcher Body
+  sensor_diag_dispatch_1_body -- Main Dispatcher Body
   -----------------------------------------------------------------------
   Entry point: 0x071ABA
   Size: ~62 bytes (dispatcher shell)
@@ -73,9 +73,9 @@ SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- FUN_071A76
 
   Call Graph:
 
-    FUN_071A76 (DISABLED entry -- rts/nop)
+    sensor_diag_dispatch_1_disabled (DISABLED entry -- rts/nop)
      |
-     +-- FUN_071ABA (real dispatcher)
+     +-- sensor_diag_dispatch_1_body (real dispatcher)
      |    |
      |    +-- 0x072584  sensor_data_acq_a
      |    +-- 0x0724C8  sensor_data_acq_b
@@ -92,19 +92,19 @@ SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- FUN_071A76
      |    +-- 0x072314  eeprom_storage
      |    +-- 0x0723AC  final_handler (tail-call)
      |
-     +-- FUN_071AFA (conditional sensor calc)
+     +-- sensor_conditional_calc (conditional sensor calc)
      |    +-- 0x022F92  timer/task state read
      |    +-- 0xBE960  float_abs
      |    +-- 0xBEA40  float_clamp_range
      |
-     +-- FUN_071A8E (EEPROM initialization)
+     +-- sensor_diag_eeprom_init (EEPROM initialization)
      |    +-- 0xBDBCC  eeprom_op (x3)
      |
-     +-- FUN_071A7A (helper)
+     +-- sensor_diag_state_helper (helper)
           +-- uint8_pack(0) -> FFFF255E
 
 
-  FUN_071AFA -- Conditional Sensor Computation
+  sensor_conditional_calc -- Conditional Sensor Computation
   -----------------------------------------------------------------------
   Called via bra from 0x071AB2.
 
@@ -134,7 +134,7 @@ SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- FUN_071A76
     }
 
 
-  FUN_071A8E -- EEPROM Diagnostic Initialization
+  sensor_diag_eeprom_init -- EEPROM Diagnostic Initialization
   -----------------------------------------------------------------------
   Initializes three EEPROM adaptation slots to known values:
 
@@ -143,10 +143,10 @@ SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- FUN_071A76
     eeprom_op(FFFF2554, cal_val); // calibration default from literal pool
 
   These are diagnostic adaptation values -- correction factors that the
-  sensor computation path (FUN_071AFA) uses during active monitoring.
+  sensor computation path (sensor_conditional_calc) uses during active monitoring.
 
 
-  FUN_071A7A -- Simple State Helper
+  sensor_diag_state_helper -- Simple State Helper
   -----------------------------------------------------------------------
   Packs uint8 zero and stores to FFFF255E (diagnostic state byte).
 
@@ -156,19 +156,19 @@ SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- FUN_071A76
   Tuning Relevance:
   -----------------------------------------------------------------------
   This entire dispatcher is DISABLED (entry returns immediately). If it were
-  active, the sensor computation at FUN_071AFA would use calibration bounds
+  active, the sensor computation at sensor_conditional_calc would use calibration bounds
   at 0x0C50B4 for clamping, and the DTC monitors would set/clear fault codes
   based on the computed results. Since it is stubbed out, no DTCs from this
   dispatcher can fire in the stock ROM.
 
   If re-enabling this dispatcher (e.g., by patching the rts/nop at 0x071A76
-  to a branch into 0x071ABA), ensure the EEPROM init path (FUN_071A8E) runs
+  to a branch into 0x071ABA), ensure the EEPROM init path (sensor_diag_eeprom_init) runs
   first to set valid adaptation defaults, or stale EEPROM data at
   FFFF2544-2554 could cause immediate false faults.
 
 
 ================================================================================
-SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- FUN_07D526
+SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- o2_catalyst_diag_dispatch
 ================================================================================
 
   Purpose: Catalyst/O2 sensor diagnostic monitor. Implements OBD-II catalyst
@@ -177,7 +177,7 @@ SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- FUN_07D526
   maturation counters.
 
 
-  FUN_07D526 -- Outer Dispatch Shell
+  o2_catalyst_diag_dispatch -- Outer Dispatch Shell
   -----------------------------------------------------------------------
   Entry point: 0x07D526
   Size: 46 bytes (shell only)
@@ -195,7 +195,7 @@ SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- FUN_07D526
 
   Call Graph:
 
-    FUN_07D526 (outer dispatch)
+    o2_catalyst_diag_dispatch (outer dispatch)
      +-- 0x07D9F8   sub_monitor_1
      +-- 0x07DA1C   sub_monitor_2
      +-- 0x07DAB4   sub_monitor_3
@@ -209,7 +209,7 @@ SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- FUN_07D526
      +-- 0x07E014   eeprom_adapt_store (tail-call)
 
 
-  FUN_07D554 -- Real Dispatcher Body (Initialization)
+  o2_diag_init -- Real Dispatcher Body (Initialization)
   -----------------------------------------------------------------------
   Falls through from 0x07D554. Sets up the diagnostic workspace.
 
@@ -253,7 +253,7 @@ SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- FUN_07D526
   always trigger an update.
 
 
-  FUN_07D620 -- Catalyst/O2 Diagnostic Coordinator
+  o2_catalyst_diag_coordinator -- Catalyst/O2 Diagnostic Coordinator
   -----------------------------------------------------------------------
   Entry point: 0x07D620
   Size: ~470 bytes (0x07D620-0x07D9F6)
@@ -370,9 +370,9 @@ SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- FUN_07D526
     }
 
 
-  DTC Mapping (from FUN_07CCD0)
+  DTC Mapping (from sensor_dtc_dispatch)
   -----------------------------------------------------------------------
-  The maturation counters feed into DTC dispatch at FUN_07CCD0. When a
+  The maturation counters feed into DTC dispatch at sensor_dtc_dispatch. When a
   counter reaches its calibration threshold (from 0xC47CB), the
   corresponding DTC is set pending:
 
@@ -438,7 +438,7 @@ SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- FUN_07D526
 
 
 ================================================================================
-SECTION 3: SENSOR RATIONALITY CHECK -- FUN_07CB30
+SECTION 3: SENSOR RATIONALITY CHECK -- sensor_rationality_check
 ================================================================================
 
   Purpose: Cross-validates 4 sensor baseline readings against MAP-derived
@@ -446,7 +446,7 @@ SECTION 3: SENSOR RATIONALITY CHECK -- FUN_07CB30
   debounced fault is set and routed to DTC dispatch.
 
 
-  FUN_07CB30 -- Main Rationality Check
+  sensor_rationality_check -- Main Rationality Check
   -----------------------------------------------------------------------
   Entry point: 0x07CB30
   Size: 254 bytes (0x07CB30-0x07CC2E)
@@ -541,7 +541,7 @@ SECTION 3: SENSOR RATIONALITY CHECK -- FUN_07CB30
   sensor glitches during rapid operating point changes.
 
 
-  FUN_07CC30 -- Multi-Channel Maturation Counter
+  sensor_maturation_update -- Multi-Channel Maturation Counter
   -----------------------------------------------------------------------
   Entry point: 0x07CC30
   Size: ~158 bytes (0x07CC30-0x07CCCE)
@@ -571,7 +571,7 @@ SECTION 3: SENSOR RATIONALITY CHECK -- FUN_07CB30
   double-counting on the next iteration.
 
 
-  FUN_07CCD0 -- DTC Dispatch
+  sensor_dtc_dispatch -- DTC Dispatch
   -----------------------------------------------------------------------
   Entry point: 0x07CCD0
   Size: ~252 bytes (0x07CCD0-0x07CDCC)
@@ -618,7 +618,7 @@ SECTION 3: SENSOR RATIONALITY CHECK -- FUN_07CB30
 
   Call Graph:
 
-    FUN_07CB30 (rationality check)
+    sensor_rationality_check (rationality check)
      +-- 0x3AB20   timer/engine_state
      +-- 0x584C8   check_diag_state_2
      +-- 0xBE628   float_safe_div
@@ -627,10 +627,10 @@ SECTION 3: SENSOR RATIONALITY CHECK -- FUN_07CB30
      +-- uint8_add_sat
      |
      v
-    FUN_07CC30 (maturation update)
+    sensor_maturation_update (maturation update)
      |
      v
-    FUN_07CCD0 (DTC dispatch)
+    sensor_dtc_dispatch (DTC dispatch)
      +-- dtc_set_pending (0x09ED90)
      +-- dtc_clear_fault (0x09EDEC)
 
@@ -664,7 +664,7 @@ SECTION 4: EEPROM ADAPTATION PERSISTENCE
   writes from transient conditions.
 
 
-  FUN_071224 -- EEPROM Initialization
+  eeprom_adapt_init -- EEPROM Initialization
   -----------------------------------------------------------------------
   Entry point: 0x071224
 
@@ -688,7 +688,7 @@ SECTION 4: EEPROM ADAPTATION PERSISTENCE
     }
 
 
-  FUN_071268 -- EEPROM Validation
+  eeprom_adapt_validate -- EEPROM Validation
   -----------------------------------------------------------------------
   Entry point: 0x071268
 
@@ -706,7 +706,7 @@ SECTION 4: EEPROM ADAPTATION PERSISTENCE
 
   desc_read_int_safe (0xBDCB6) includes checksum or range validation --
   if any read returns a nonzero error code, the entire set is flagged
-  as corrupt and the init function (FUN_071224) must re-run.
+  as corrupt and the init function (eeprom_adapt_init) must re-run.
 
 
   eeprom_read_helper (0x0717B2) -- Maturation Counter
@@ -733,7 +733,7 @@ SECTION 4: EEPROM ADAPTATION PERSISTENCE
   value requires a full re-maturation sequence.
 
 
-  FUN_0717EC -- EEPROM Write State Machine (Hysteresis Controller)
+  eeprom_write_state_machine -- EEPROM Write State Machine (Hysteresis Controller)
   -----------------------------------------------------------------------
   Entry point: 0x0717EC
   Size: ~154 bytes (0x0717EC-0x071886)
@@ -794,7 +794,7 @@ SECTION 4: EEPROM ADAPTATION PERSISTENCE
   state for a sufficient period.
 
 
-  FUN_07B7A8 -- Conditional Adaptation Writer
+  eeprom_conditional_adapt_writer -- Conditional Adaptation Writer
   -----------------------------------------------------------------------
   Entry point: 0x07B7A8
   Size: ~278 bytes (0x07B7A8-0x07B8BE)
@@ -851,27 +851,27 @@ SECTION 4: EEPROM ADAPTATION PERSISTENCE
 
   Call Graph:
 
-    FUN_071224 (EEPROM init)
+    eeprom_adapt_init (EEPROM init)
      +-- 0xBDBCC  eeprom_op (x3)
      +-- uint16_pack
 
-    FUN_071268 (EEPROM validation)
+    eeprom_adapt_validate (EEPROM validation)
      +-- 0xBDCB6  desc_read_int_safe (x3)
      +-- 0xBE990  uint16_unpack (x2)
 
-    FUN_0712CC (EEPROM cycle trigger)
-     +-- FUN_0714A4  eeprom_read_check
-     +-- FUN_07132C  eeprom_state_machine
+    eeprom_cycle_trigger (EEPROM cycle trigger)
+     +-- eeprom_read_check  eeprom_read_check
+     +-- eeprom_state_machine  eeprom_state_machine
 
     0x0717B2 (maturation counter)
      +-- uint8_add_sat
 
-    FUN_0717EC (write state machine)
+    eeprom_write_state_machine (write state machine)
      +-- uint16_add_sat
      +-- uint8_pack
      +-- uint16_unpack
 
-    FUN_07B7A8 (conditional adaptation writer)
+    eeprom_conditional_adapt_writer (conditional adaptation writer)
      +-- 0xBE608   float_in_range (x3)
      +-- 0xBDBCC   eeprom_op (x3 write, x3 reset)
      +-- get_ad_channel(16)
@@ -883,14 +883,14 @@ SECTION 4: EEPROM ADAPTATION PERSISTENCE
   - EEPROM adaptation slots (FFFF2520-253C, FFFF259C-25AC) persist across
     key cycles. After reflashing, these values retain their previous state
     unless explicitly cleared. A battery disconnect or EEPROM reset via
-    scan tool will force re-initialization via FUN_071224.
+    scan tool will force re-initialization via eeprom_adapt_init.
 
-  - The hysteresis write controller (FUN_0717EC) uses calibration
+  - The hysteresis write controller (eeprom_write_state_machine) uses calibration
     thresholds at 0xC4838 and 0xC483A. Reducing these thresholds would
     cause more frequent EEPROM writes (faster adaptation convergence but
     increased EEPROM wear). Stock values provide conservative protection.
 
-  - The conditional adaptation writer (FUN_07B7A8) resets learned values
+  - The conditional adaptation writer (eeprom_conditional_adapt_writer) resets learned values
     when DTCs are present. This means clearing a DTC code will trigger a
     re-learning period where fuel trim may be temporarily off until new
     adaptation values mature and are written.

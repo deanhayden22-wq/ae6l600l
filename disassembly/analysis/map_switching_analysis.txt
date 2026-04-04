@@ -98,7 +98,7 @@ Two independent countdown timers gate the switching:
 
   The uint16 counters at D29AC-D29B2 (50/38/100/38) are the counter
   initialization values used elsewhere in the map switch framework
-  (cross-referenced by the timer reload paths in FUN_0x022CF4).
+  (cross-referenced by the timer reload paths in check_engine_running @ 0x022CF4).
 
 3.2  Primary Switching Path (0x3F462 → 0x3F49A)
 ────────────────────────────────────────────────
@@ -114,7 +114,7 @@ Triggered when flkc_mode_byte (r12) == 1 (non-idle, non-FLKC):
 
 Conditions (ALL must be true):
   1. timing_state_A (r11) == 1
-  2. FUN_0x5EB32 returned 1 (check_engine_running equivalent)
+  2. check_engine_running returned 1 (check_engine_running equivalent)
   3. timing_state_B (r10) == 1
   4. ECT-based blend correction (FFFF7F68) > 0.0
   5. RPM > MapSwitch_EngineSpeedThreshold (D2A08 = 2000 RPM)
