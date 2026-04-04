@@ -1,1 +1,0 @@
-#define GITVERSION AE5L600L_v1
