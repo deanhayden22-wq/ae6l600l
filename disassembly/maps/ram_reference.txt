@@ -29,7 +29,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      56  0xFFFF61CC  vehicle_speed                        56 refs. Vehicle speed (float). Read by timing, CL/OL, 
      51  0xFFFF6254  maf_current                          51 refs. MAF sensor value (float, g/s). Read by AFL pip
      48  0xFFFF25CC  system_tick_counter                  48 refs. System tick/event counter.
-     48  0xFFFF6364  atm_pressure                         48 refs. Atmospheric pressure sensor (task33 timing blend). Was ect_startup.
+     48  0xFFFF6364  ect_startup                          48 refs. ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Read by AFL, delay_manager_B, timing blend.
      48  0xFFFF6898  manifold_pressure                    48 refs. Manifold pressure (float). Read by frontO2, PS
      45  0xFFFF3480  cal_mirror_base                      45 refs. Calibration mirror base. Referenced by various
      43  0xFFFF620C  airflow_maf_current                  Current MAF/airflow (float). Used by accel enrichment a
@@ -278,7 +278,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   airflow_maf_current                       0xFFFF620C    43 refs  Current MAF/airflow (float). Used by acc
   alt_blend_ratio                           0xFFFF7F1C     0 refs  Alternative blend ratio (task50).
   atm_blend_correction                      0xFFFF7F6C     0 refs  Atmospheric correction (task33).
-  atm_pressure                              0xFFFF6364    48 refs  Atmospheric pressure sensor (task33 timing blend). Was ect_startup.
+  ect_startup                               0xFFFF6364    48 refs  ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Was mislabeled atm_pressure.
   atm_pressure_current                      0xFFFF67EC    99 refs  99 refs. Atmospheric/barometric pressure
   atu_counter_threshold                     0xFFFF4124     0 refs  ATU counter/threshold channel. Used by I
   atu_timer_period                          0xFFFF447C     5 refs  ATU timer period/register (word)
@@ -739,7 +739,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF62F8     0  torque_ratio                         Requested torque ratio (task50 map switching).
   0xFFFF6350   205  ect_current                          205 refs. Coolant temperature (float). Read by PSE
   0xFFFF6354    69  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float
-  0xFFFF6364    48  atm_pressure                         48 refs. Atmospheric pressure sensor (task33 timing blend). Was ect_startup.
+  0xFFFF6364    48  ect_startup                          48 refs. ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Was mislabeled atm_pressure.
   0xFFFF63B0    16  adc_processed_temperature_B           ADC processed temperature B (float). ECT/IAT sensor region.
   0xFFFF63C4    43  iat_related_sensor                   IAT-related sensor value (float). Read by task56 E
   0xFFFF63CC    16  ram_ECT                              Coolant temperature / ECT (float)

@@ -50,7 +50,7 @@ Engine parameter RAM pointers:
   pEngineSpeed      (float*)0xFFFF6624    RPM (301 refs)
   pVehicleSpeed     (float*)0xFFFF61CC    Vehicle speed (56 refs)
   pCoolantTemp      (float*)0xFFFF6350    ECT
-  pAtmoPress        (float*)0xFFFF6364    Atmospheric pressure
+  pAtmoPress        (float*)0xFFFF67EC    Atmospheric pressure (99 refs, atm_pressure_current)
   pManifoldAbsolutePressure  (float*)0xFFFF6898    MAP absolute (48 refs)
   pIntakeAirTemp    (float*)0xFFFF63F8    IAT
   pMassAirFlow      (float*)0xFFFF6254    MAF current g/s (51 refs)
@@ -248,7 +248,7 @@ Timer interrupt fires → RTOS dispatcher → Task 10 call list → call_17:
 
   10. STEP 4 — Atmospheric compensation:
       AtmoComp = Pull3DHooked(&AtmosphericCompensationTable, MAP, AtmoPress)
-        AtmoPress = *(float*)0xFFFF6364
+        AtmoPress = *(float*)0xFFFF67EC
         MerpMod's 7×7 table (in ROM hole)
 
   11. STEP 5 — Speed Density formula:

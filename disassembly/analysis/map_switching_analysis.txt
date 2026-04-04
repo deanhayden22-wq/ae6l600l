@@ -368,14 +368,14 @@ Task 33 is a dispatcher that calls three sub-functions:
 ────────────────────────────────────────────────────────
   Reads:
     iat_current (FFFF63F8)
-    FFFF6364 (unknown sensor, possibly atmospheric pressure)
+    FFFF6364 (ect_startup — NOT atmospheric pressure, see merpmod_sd_port_analysis correction)
     rpm_current (FFFF6624)
 
   Evaluates descriptor @ 0xAE38C via table_desc_2d_typed.
   Result stored to FFFF7F70.
 
   Then evaluates descriptor @ 0xADC14 via table_desc_1d_float
-  with fr4 = FFFF6364 (atmospheric pressure?).
+  with fr4 = FFFF6364 (ect_startup, NOT atmospheric pressure).
   Multiplies result by FFFF7F70, stores to FFFF7F6C.
 
   This appears to be an atmospheric/altitude compensation for the
@@ -474,7 +474,7 @@ SECTION 8: RAM ADDRESS REFERENCE
   ───────────  ──────  ─────────────────────────  ─────  ──────────────────────
   FFFF5BE3     byte    clutch_state               50     Clutch engagement state
   FFFF62F8     float   torque_ratio               50     Requested torque ratio
-  FFFF6364     float   atm_pressure               33     Atmospheric pressure (?)
+  FFFF6364     float   ect_startup                33     ECT at start / secondary RPM (NOT atmospheric pressure)
   FFFF65BF     byte    accel_state                50     Acceleration state flag
   FFFF65FC     float   load_current               50     Engine load (g/rev)
   FFFF7E90     -       task50_gbr_base            50     GBR base for task 50

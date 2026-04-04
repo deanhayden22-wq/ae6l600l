@@ -34,7 +34,7 @@
 #define pEngineSpeed ((float*)0xFFFF6624)
 #define pVehicleSpeed ((float*)0xFFFF61CC)
 #define pCoolantTemp ((float*)0xFFFF6350)
-#define pAtmoPress ((float*)0xFFFF6364)
+#define pAtmoPress ((float*)0xFFFF67EC)
 #define pManifoldAbsolutePressure ((float*)0xFFFF6898)
 #define pIntakeAirTemp ((float*)0xFFFF63F8)
 #define pMassAirFlow ((float*)0xFFFF6254)
