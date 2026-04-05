@@ -1,0 +1,129 @@
+<rom>
+	<romid>
+		<xmlid>AE5L600L_MerpMod_SD</xmlid>
+		<internalidaddress>2004</internalidaddress>
+		<internalidstring>AE5L600L</internalidstring>
+		<ecuid>8A12587007</ecuid>
+		<make>Subaru</make>
+		<market>USDM</market>
+		<model>Impreza</model>
+		<submodel>WRX</submodel>
+		<transmission>MT</transmission>
+		<year>13</year>
+		<flashmethod>subarucan</flashmethod>
+		<memmodel>SH7058</memmodel>
+		<checksummodule>subarudbw</checksummodule>
+	</romid>
+
+	<include>AE5L600L</include>
+
+	<!-- ================================================================== -->
+	<!-- MerpMod SD-Only Scalings                                           -->
+	<!-- ================================================================== -->
+
+	<!-- VE: uint16, multiplier 1.5/32767, range 0-1.5 -->
+	<scaling name="MerpMod_VE" units="VE (0-1.5)" toexpr="x*0.0000457763672" frexpr="x/0.0000457763672" format="%.4f" min="0" max="1.5" inc="0.0001" storagetype="uint16" endian="big"/>
+
+	<!-- AtmComp: uint16, multiplier 2/32767, range 0-2 -->
+	<scaling name="MerpMod_AtmComp" units="Multiplier (0-2)" toexpr="x*0.000061037" frexpr="x/0.000061037" format="%.4f" min="0" max="2.0" inc="0.0001" storagetype="uint16" endian="big"/>
+
+	<!-- Blending: uint8, multiplier 1/255, range 0-1 (0=sensor, 1=SD) -->
+	<scaling name="MerpMod_BlendRatio" units="Ratio (0=MAF, 1=SD)" toexpr="x*0.003921568627451" frexpr="x/0.003921568627451" format="%.3f" min="0" max="1.0" inc="0.004" storagetype="uint8" endian="big"/>
+
+	<!-- Float axes (MAP in kPa abs, RPM, atmospheric pressure in mmHg) -->
+	<scaling name="MerpMod_MAP_kPa" units="MAP (kPa abs)" toexpr="x" frexpr="x" format="%.0f" min="0" max="2500" inc="10" storagetype="float" endian="big"/>
+	<scaling name="MerpMod_RPM" units="RPM" toexpr="x" frexpr="x" format="%.0f" min="0" max="10000" inc="100" storagetype="float" endian="big"/>
+	<scaling name="MerpMod_AtmPressure_mmHg" units="Atm Pressure (mmHg)" toexpr="x" frexpr="x" format="%.0f" min="400" max="900" inc="10" storagetype="float" endian="big"/>
+	<scaling name="MerpMod_Float" units="" toexpr="x" frexpr="x" format="%.6f" min="-1000" max="1000" inc="0.001" storagetype="float" endian="big"/>
+	<scaling name="MerpMod_MafMode" units="Mode (1=MAF, 2=SD, 3=Blend)" toexpr="x" frexpr="x" format="%.0f" min="0" max="3" inc="1" storagetype="uint8" endian="big"/>
+
+	<!-- ================================================================== -->
+	<!-- MerpMod SD Constants (ROM hole 0xDAE8C+)                           -->
+	<!-- ================================================================== -->
+
+	<table name="MerpMod SD - Celsius to Kelvin" category="MerpMod Speed Density" address="dae8c" type="1D" scaling="MerpMod_Float">
+		<description>Conversion constant: 273.15. Do not change unless you know what you are doing.</description>
+	</table>
+
+	<table name="MerpMod SD - Speed Density Constant" category="MerpMod Speed Density" address="dae90" type="1D" scaling="MerpMod_Float">
+		<description>Ideal gas law constant for SD calculation: 0.003871098. Derived from engine displacement and gas properties.</description>
+	</table>
+
+	<table name="MerpMod SD - Engine Displacement" category="MerpMod Speed Density" address="dae94" type="1D" scaling="MerpMod_Float">
+		<description>Engine displacement in liters. Stock EJ255: 2.46L.</description>
+	</table>
+
+	<!-- ================================================================== -->
+	<!-- Volumetric Efficiency Table 1 (24x24 uint16)                       -->
+	<!-- Descriptor at 0xDAEA0, data at 0xDAF7C                             -->
+	<!-- Columns = MAP (kPa abs), Rows = RPM                                -->
+	<!-- ================================================================== -->
+
+	<table name="MerpMod SD - Volumetric Efficiency 1" category="MerpMod Speed Density" address="daf7c" type="3D" scaling="MerpMod_VE" sizey="24" sizex="24">
+		<description>Primary VE table. Maps manifold pressure and RPM to volumetric efficiency (0-1.5). This is the core of the speed density airflow calculation. Tune this to match your engine's actual breathing characteristics.</description>
+		<table name="MAP (kPa abs)" address="daebc" type="X Axis" elements="24" scaling="MerpMod_MAP_kPa"/>
+		<table name="Engine Speed (RPM)" address="daf1c" type="Y Axis" elements="24" scaling="MerpMod_RPM"/>
+	</table>
+
+	<!-- ================================================================== -->
+	<!-- Atmospheric Compensation Table (7x7 uint16)                        -->
+	<!-- Descriptor at 0xDB3FC, data at 0xDB450                             -->
+	<!-- Columns = MAP (kPa abs), Rows = Atmospheric Pressure (mmHg)        -->
+	<!-- Default: all 1.0x (no compensation)                                -->
+	<!-- ================================================================== -->
+
+	<table name="MerpMod SD - Atmospheric Compensation" category="MerpMod Speed Density" address="db450" type="3D" scaling="MerpMod_AtmComp" sizey="7" sizex="7">
+		<description>Atmospheric pressure compensation for SD airflow. Maps MAP and barometric pressure to a correction multiplier. Default is flat 1.0x (no altitude compensation). Tune for altitude if needed.</description>
+		<table name="MAP (kPa abs)" address="db418" type="X Axis" elements="7" scaling="MerpMod_MAP_kPa"/>
+		<table name="Atmospheric Pressure (mmHg)" address="db434" type="Y Axis" elements="7" scaling="MerpMod_AtmPressure_mmHg"/>
+	</table>
+
+	<!-- ================================================================== -->
+	<!-- SD/MAF Blending Table (10x10 uint8)                                -->
+	<!-- Descriptor at 0xDB4B4, data at 0xDB520                             -->
+	<!-- Columns = MAP (kPa abs), Rows = RPM                                -->
+	<!-- Values: 0.0 = pure MAF sensor, 1.0 = pure SD                      -->
+	<!-- Only used when MafMode = 3 (Blending)                              -->
+	<!-- ================================================================== -->
+
+	<table name="MerpMod SD - MAF/SD Blending Ratio" category="MerpMod Speed Density" address="db520" type="3D" scaling="MerpMod_BlendRatio" sizey="10" sizex="10">
+		<description>Blending ratio between MAF sensor and SD-calculated airflow. Only active in MafMode=3 (Blending). 0.0 = 100% MAF sensor, 1.0 = 100% Speed Density. Default transitions to SD above ~700 kPa MAP.</description>
+		<table name="MAP (kPa abs)" address="db4d0" type="X Axis" elements="10" scaling="MerpMod_MAP_kPa"/>
+		<table name="Engine Speed (RPM)" address="db4f8" type="Y Axis" elements="10" scaling="MerpMod_RPM"/>
+	</table>
+
+	<!-- ================================================================== -->
+	<!-- RAM Parameters (for RomRaider logger / RAM tuning)                 -->
+	<!-- Base address: 0xFFFFC000 (pRamHoleStart)                           -->
+	<!-- Use SSM addresses (lower 24 bits): 0xFFC000+offset                 -->
+	<!-- ================================================================== -->
+
+	<table name="MerpMod SD - MAF Mode" category="MerpMod Speed Density - RAM" address="ffc00d" type="1D" scaling="MerpMod_MafMode">
+		<description>Speed Density mode switch. 1=MAF sensor (stock), 2=Speed Density only, 3=MAF/SD blending. Change via RAM tuning to activate SD.</description>
+	</table>
+
+	<table name="MerpMod SD - Volumetric Efficiency (live)" category="MerpMod Speed Density - RAM" address="ffc010" type="1D" scaling="MerpMod_Float">
+		<description>Current VE value from table lookup (live). Read-only monitor.</description>
+	</table>
+
+	<table name="MerpMod SD - MAF from SD (live)" category="MerpMod Speed Density - RAM" address="ffc014" type="1D" scaling="MerpMod_Float">
+		<description>SD-calculated airflow in g/s (live). Always computed regardless of MafMode.</description>
+	</table>
+
+	<table name="MerpMod SD - MAF from Sensor (live)" category="MerpMod Speed Density - RAM" address="ffc018" type="1D" scaling="MerpMod_Float">
+		<description>Stock MAF sensor airflow in g/s (live). This is what the ECU sees from the MAF sensor.</description>
+	</table>
+
+	<table name="MerpMod SD - Atmospheric Compensation (live)" category="MerpMod Speed Density - RAM" address="ffc01c" type="1D" scaling="MerpMod_Float">
+		<description>Atmospheric compensation multiplier (live). Default table outputs 1.0x.</description>
+	</table>
+
+	<table name="MerpMod SD - Blend Ratio (live)" category="MerpMod Speed Density - RAM" address="ffc024" type="1D" scaling="MerpMod_Float">
+		<description>Current MAF/SD blend ratio (live). Only populated in MafMode=3. 0.0=pure MAF, 1.0=pure SD.</description>
+	</table>
+
+	<table name="MerpMod SD - Blended MAF Output (live)" category="MerpMod Speed Density - RAM" address="ffc028" type="1D" scaling="MerpMod_Float">
+		<description>Blended airflow output in g/s (live). Only populated in MafMode=3.</description>
+	</table>
+
+</rom>
