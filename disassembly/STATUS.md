@@ -22,7 +22,7 @@
 | Descriptors catalogued | 760 (1D: 621, 2D: 139) |
 | RAM addresses catalogued | 858 significant (497 named, all >= 5 refs named) |
 | GBR bases identified | 459 (445 labeled, 14 already covered) |
-| Ghidra label operations | 3,453 |
+| Ghidra label operations | 3,445 |
 | Scheduler tasks documented | 59 |
 | Analysis files produced | 62 (all standardized format) |
 

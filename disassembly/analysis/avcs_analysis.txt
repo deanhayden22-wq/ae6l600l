@@ -40,10 +40,10 @@ SECTION 1: MAIN AVCS CONTROL FUNCTION
 
   Inputs:
     FFFF63C4  ect_current (float) -- loaded into FR14
-    FFFF6624  engine_load (float) -- loaded into FR15
-    FFFF6350  rpm_current (float) -- loaded into FR12
+    FFFF6624  rpm_current (float) -- loaded into FR15
+    FFFF6350  ect_current (float) -- loaded into FR12
     FFFF67EC  engine_run_time (u16) -- loaded into R11
-    FFFF6254  engine_state (u8) -- loaded into R14
+    FFFF6254  maf_current (u8) -- loaded into R14
     FFFF40C8  cam_angle_sensor (float) -- actual cam position
     FFFF7480  intake_avcs_workspace (struct, R8 base)
     FFFF76F4  exhaust_avcs_workspace (struct, R9 base)
@@ -81,7 +81,7 @@ SECTION 1: MAIN AVCS CONTROL FUNCTION
            because the exhaust duty correction table is zeroed.
 
   4. CONDITIONAL PATHS (0x031E58-0x031EBE):
-     If engine_state == 1 (running, warmed up):
+     If maf_current == 1 (running, warmed up):
        Jump to 0x031E98 -- standard duty output path
        Looks up descriptor 0xACE0C via table_desc_2d
      Else if enable byte set:
@@ -213,10 +213,10 @@ SECTION 6: KEY RAM ADDRESSES
   Address       Type      Description
   -----------------------------------------------------------------------
   FFFF40C8      float     cam_angle_sensor (actual cam position, degrees)
-  FFFF6254      u8        engine_state (running/warmup/cranking)
-  FFFF6350      float     rpm_current
+  FFFF6254      u8        maf_current (MAF sensor value)
+  FFFF6350      float     ect_current
   FFFF63C4      float     ect_current (coolant temp)
-  FFFF6624      float     engine_load
+  FFFF6624      float     rpm_current
   FFFF67EC      u16       engine_run_time (seconds)
   FFFF7480      struct    intake_avcs_workspace (base pointer)
   FFFF7480-12   float     intake_previous_output

@@ -8,7 +8,7 @@
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
-// Verified against Ghidra 12.0.2 SH-2 export. 3453 label operations total.
+// Verified against Ghidra 12.0.2 SH-2 export. 3445 label operations total.
 // Includes: original 884+1010, 463 RomRaider cal table labels, 125 RAM labels,
 // 19 MAF scaling path labels, 26 torque management labels, 354 GBR workspace labels,
 // 19 diag dispatch table labels, 14 region 0x020000 utility labels,
@@ -1330,14 +1330,12 @@ public class ImportAE5L600L extends GhidraScript {
             "AFC final blend = P_total*alpha + I_total*(1-alpha). Written by afc_pi_output.");
         count += labelComment(0xFFFF8E7EL, "afc_enable_flag_A",
             "PI output enable flag A (byte). Must == 1 for afc_pi_output to compute.");
-        count += labelComment(0xFFFF85D7L, "afc_enable_flag_B",
-            "PI output enable flag B (byte). Controls alpha blend activation.");
+        // REMOVED: 0xFFFF85D7 "afc_enable_flag_B" — wrong. Correct: fuel_system_state (line 2238)
 
         // Additional RAM used by fuel_correction_final
         count += labelComment(0xFFFF78B0L, "afc_axis_val_A",
             "AFC additional axis value A (float). Input to P/I normalizer lookups.");
-        count += labelComment(0xFFFF65FCL, "afc_axis_val_B",
-            "AFC additional axis value B (float). Alpha activation check input.");
+        // REMOVED: 0xFFFF65FC "afc_axis_val_B" — wrong. Correct: engine_load_current (line 2160)
         count += labelComment(0xFFFF68DCL, "ram_coolant_alt",
             "Coolant temperature alternate/computed (float). Input to P/I gain lookups.");
         count += labelComment(0xFFFF653CL, "ram_sensor_val",
@@ -1365,14 +1363,11 @@ public class ImportAE5L600L extends GhidraScript {
             "Global CL enable flag (byte). Must be non-zero for CL fueling.");
         count += labelComment(0xFFFF7BE2L, "cl_enable_final",
             "CL enable final check flag (byte). Last gate in cl_active_check.");
-        count += labelComment(0xFFFF6350L, "ram_RPM",
-            "Current engine RPM (float)");
-        count += labelComment(0xFFFF63F8L, "ram_MAF",
-            "Mass air flow (float, g/s)");
+        // REMOVED: 0xFFFF6350 "ram_RPM" — wrong. This is ECT, not RPM. Correct: ect_current (line 2157)
+        // REMOVED: 0xFFFF63F8 "ram_MAF" — wrong. This is IAT, not MAF. Correct: iat_current (line 2166)
         count += labelComment(0xFFFF63CCL, "ram_ECT",
             "Coolant temperature / ECT (float)");
-        count += labelComment(0xFFFF6624L, "ram_MAF_alt",
-            "MAF alternate/computed value (float, g/s)");
+        // REMOVED: 0xFFFF6624 "ram_MAF_alt" — wrong. This is RPM, not MAF. Correct: rpm_current (line 2154)
         count += labelComment(0xFFFF3234L, "ram_IAM",
             "Ignition Advance Multiplier current value (float). Also used by FLKC.");
 
@@ -1722,10 +1717,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "OL_DelayB_Counter_Max (CBC6A=188). Gated by OL_DelayB_SpeedGate (CBC6E=624).");
 
         // ── Path A sensor RAM variables (used in ol_condition_checker and clol_transition_core) ──
-        count += labelComment(0xFFFF6350L, "engine_rpm",
-            "Engine speed (RPM, float). Read by ol_condition_checker (0x3643A), "
-            + "cl_master_readiness_eval (0x3162C), clol_delay_manager_B (0x36BF4). "
-            + "In cl_master_readiness: FFFF6350 >= -15.0 (sanity check, always true in operation).");
+        // REMOVED: 0xFFFF6350 "engine_rpm" — wrong. This is ECT, not RPM. Correct: ect_current (line 2157)
         count += labelComment(0xFFFF62DCL, "engine_load_metric",
             "Engine load metric (float). Read by ol_condition_checker as FR13. "
             + "Compared against OL_Condition_Load_A/B thresholds (90.0/91.0). "
@@ -1734,15 +1726,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Secondary RPM or engine state float. Read by clol_delay_manager_B (0x36BF4) as FR9. "
             + "Compared against OL_DelayB_Thresh_A_Lo / OL_DelayB_Thresh_B_Lo (0.0). "
             + "Physical meaning TBD — consistently paired with FFFF6350 in delay manager B.");
-        count += labelComment(0xFFFF6624L, "engine_rpm_or_maf",
-            "Engine state float (RPM or MAF, context-dependent). "
-            + "ol_condition_checker: compared against per-gear RPM limits (3700-5400 RPM). "
-            + "cl_master_readiness_eval: FFFF745D set=1 when this <= 1000 (hysteresis). "
-            + "LIKELY RPM given the per-gear thresholds; the 1000 hysteresis = idle RPM range.");
-        count += labelComment(0xFFFF65FCL, "vehicle_speed",
-            "Vehicle speed (float). Read by ol_condition_checker (FR15). "
-            + "Compared against OL_Condition_Speed_Lo (CC1F4=130.0) and _Hi (CC1F8=140.0). "
-            + "Speed gate for ol_cond_flag_speed (FFFF7A04).");
+        // REMOVED: 0xFFFF6624 "engine_rpm_or_maf" — wrong. Correct: rpm_current (line 2154)
+        // REMOVED: 0xFFFF65FC "vehicle_speed" — wrong. This is engine_load, not speed. Correct: engine_load_current (line 2160)
         count += labelComment(0xFFFF6898L, "rpm_delta",
             "RPM change rate / delta (float). Read by ol_condition_checker (FR12). "
             + "Compared against OL_Condition_RPMDelta_Lo/Hi (CC1DC=691.9/CC1E0=699.9). "

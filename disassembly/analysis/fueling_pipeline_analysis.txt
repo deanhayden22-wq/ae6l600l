@@ -176,8 +176,8 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
 
   INPUTS:
     FFFF6354  (unknown sensor float — secondary lambda?)
-    FFFF63F8  RPM (float)
-    FFFF6624  engine_load (float)
+    FFFF63F8  iat_current (float)
+    FFFF6624  rpm_current (float)
     FFFF62F8  (unknown sensor float)
     FFFF782C  (AFC working struct — struct offsets -88, -52, -48, -44)
     FFFF67EC  (uint16 — operating state)
@@ -225,19 +225,19 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
   configurable alpha factor.
 
   INPUTS:
-    FFFF63F8  RPM (float)
-    FFFF6624  engine_load (float)
+    FFFF63F8  iat_current (float)
+    FFFF6624  rpm_current (float)
     FFFF6350  ECT (float)
     FFFF65FC  engine_load_current (float)
     FFFF68DC  (unknown float)
     FFFF78B0  (AFC PI working struct)
     FFFF8E7E  operating_mode_flag (byte)
-    FFFF85D7  status_byte (byte)
+    FFFF85D7  fuel_system_state (byte)
     FFFF7870  (output address)
 
   ALGORITHM:
     1. Read sensor inputs (RPM, load, ECT)
-    2. Check operating_mode_flag and status_byte for gate conditions
+    2. Check operating_mode_flag and fuel_system_state for gate conditions
     3. P-component: Two descriptor lookups
        - desc 0xACEA0 → P-gain load component
        - desc 0xACEB4 → P-gain RPM component
@@ -684,7 +684,7 @@ SECTION 8: MAIN IPW CALCULATOR — func_38158
   --------------------------------------------------------------
   GBR = FFFF7AF8 (fuel_ipw_state_C)
   Inputs: FR12=load_sensor_B(FFFF6354), FR13=ipw_output_struct(FFFF7FBC),
-          FR15=injector_data(FFFF895C), FR14=engine_load(FFFF6624),
+          FR15=injector_data(FFFF895C), FR14=rpm_current(FFFF6624),
           FR7=FFFF65FC, R13=FFFF67EC(word), R14=FFFF6254(byte),
           R12=FFFF65C0(byte)
 
@@ -729,7 +729,7 @@ SECTION 8: MAIN IPW CALCULATOR — func_38158
   ---------------------------------------------------------------------
   GBR = FFFF7AF4 (fuel_ipw_state_B)
   R10 = FFFF7B40 (fuel_ipw_state_D struct base)
-  Inputs: FR14=engine_load(FFFF6624), FR13=ECT_float(FFFF6350),
+  Inputs: FR14=rpm_current(FFFF6624), FR13=ECT_float(FFFF6350),
           FR15=sensor_8998, FR12=sensor_89C4, R13=FFFF67EC(word),
           R12=FFFF6254(byte), R14=FFFF647D(byte), stack+8/12/16=per_cyl_A/B/C
 
@@ -737,7 +737,7 @@ SECTION 8: MAIN IPW CALCULATOR — func_38158
     (same physical address as sub-function A's GBR_A+64 = FFFF7AF8+64)
 
   Load delta:
-    R10[-60] = engine_load(FR14) - fuel_ipw_state_C(R10[-72])
+    R10[-60] = rpm_current(FR14) - fuel_ipw_state_C(R10[-72])
 
   BLEND CHANNEL A (if WOT_active):
     ECT table (desc 0xAD470): threshold = table_lookup_1D(ECT)
@@ -836,7 +836,7 @@ SECTION 8: MAIN IPW CALCULATOR — func_38158
   R10[-72] = FFFF7AF8  fuel_ipw_state_C (sub-fn A output)
   R10[-68] = FFFF7AFC  per_cyl_B-C blend product
   R10[-64] = FFFF7B00  per_cyl_C blend factor
-  R10[-60] = FFFF7B04  load_delta (engine_load - state_C)
+  R10[-60] = FFFF7B04  load_delta (rpm_current - state_C)
   R10[-56] = FFFF7B08  blend_channel_A_path1
   R10[-52] = FFFF7B0C  blend_channel_A_path2
   R10[-48] = FFFF7B10  blend_channel_A_clamped
@@ -1116,7 +1116,7 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
 
   INPUT LOADING
   ─────────────
-  FR12 = engine_load_float    (FFFF6624)
+  FR12 = rpm_current           (FFFF6624)
   FR14 = FFFF62F8             (MAP/load derivative — possibly filtered RPM)
   FR15 = FFFF65FC             (engine_load_current)
   FR8  = ECT_float            (FFFF6350) → stack+0
@@ -1124,7 +1124,7 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
   FR8  = fuel_ipw_output_struct(FFFF7FBC) → stack+8
   R12  = byte @ FFFF8F16      (mode A flag)
   R11  = byte @ FFFF8F24      (mode B flag)
-  R10  = byte @ status_byte   (FFFF85D7)
+  R10  = byte @ fuel_system_state (FFFF85D7)
   R14  = byte @ FFFF5BE3      (warmup transition flag)
   R13  = byte @ FFFF65BF      (warmup transition flag B)
   R9   = byte @ FFFF7D18      (via func_5EB32)
@@ -1583,7 +1583,7 @@ STRUCT LAYOUT (FFFF8920-FFFF89D0, base ref = FFFF8964):
 READ SITES of FFFF895C in the fuel pipeline:
   func_38158  @ 0x3819C  FR15 = FFFF895C  (Main IPW Calculator input)
   func_3895C  @ 0x3895E  FR14 = FFFF895C  (IPW sub-calc, reads alongside ECT)
-  func_304BE  @ 0x304E4  FR15 = FFFF895C  (delta = engine_load - FFFF895C)
+  func_304BE  @ 0x304E4  FR15 = FFFF895C  (delta = rpm_current - FFFF895C)
   func_3757E  @ 0x3758E  FR8  = FFFF895C  (copies to FFFF7AB0+offset area)
   func_37604  @ 0x37634  FR14 = FFFF895C  (correction reference computation)
   func_403C4  @ 0x404A4  FR8  = FFFF895C  ; then 0x404A8: write FR8 to FFFF7F8C
@@ -1598,7 +1598,7 @@ SEMANTIC: FFFF895C holds a RATE-LIMITED, CLAMPED float derived from a
   composite of sensor struct fields.  It is produced by a scheduler-dispatched
   function (func_517A0) that is independent of the direct fuel pipeline.
   The fuel pipeline READS it as a reference/base quantity alongside
-  engine_load_float for delta and correction computations.  The label
+  rpm_current for delta and correction computations.  The label
   "injector_data" from the initial survey is misleading — it is better
   described as "sensor_composite_895C" or "inj_base_ref_float".
 

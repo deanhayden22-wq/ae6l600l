@@ -15,7 +15,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x602DE:  D275  mov.l  @(0x604B4),R2                         ; =0xFFFF4158 (RAM) [sched_tick_count]
   0x602E0:  6222  mov.l  @R2,R2                                
   0x602E2:  425A  lds    R2,FPUL                               
-  0x602E4:  F82D  ftrc   FR8,FPUL                              
+  0x602E4:  F82D  float  FPUL,FR8                              
   0x602E6:  C774  mova   @(0x604B8),R0                         
   0x602E8:  F908  fmov.s @R0,FR9                               
   0x602EA:  F892  fmul   FR9,FR8                               
@@ -45,7 +45,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6031A:  D26D  mov.l  @(0x604D0),R2                         ; =0xFFFF9084 (RAM) [diag_readiness_val]
   0x6031C:  E0FC  mov    #-4,R0                                
   0x6031E:  F287  fmov.s FR8,@(R0,R2)                          
-  0x60320:  F88D  sts    FPUL,R8                               
+  0x60320:  F88D  fldi0  FR8                               
   0x60322:  F28A  fmov.s FR8,@R2                               
   0x60324:  4F26  lds.l  @R15+,PR                              
   0x60326:  000B  rts                                          
@@ -84,7 +84,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6035E:  D65E  mov.l  @(0x604D8),R6                         ; =0xFFFF8E98 (RAM) [engine_state_flag]
   0x60360:  6E60  mov.b  @R6,R14                               
   0x60362:  D25E  mov.l  @(0x604DC),R2                         ; =0x000BE598 (ROM) [table_1d_lookup]
-  0x60364:  F58D  sts    FPUL,R5                               
+  0x60364:  F58D  fldi0  FR5                               
   0x60366:  C75E  mova   @(0x604E0),R0                         
   0x60368:  F408  fmov.s @R0,FR4                               
   0x6036A:  D55E  mov.l  @(0x604E4),R5                         ; =0xFFFF4494 (RAM) [diag_threshold_input]
@@ -94,7 +94,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x60372:  2EE8  tst    R14,R14                               
   0x60374:  8D04  bt/s   0x60380                               
   0x60376:  F50C  fmov   FR0,FR5                               
-  0x60378:  F88D  sts    FPUL,R8                               
+  0x60378:  F88D  fldi0  FR8                               
   0x6037A:  D255  mov.l  @(0x604D0),R2                         ; =0xFFFF9084 (RAM) [diag_readiness_val]
   0x6037C:  A006  bra    0x6038C                               
   0x6037E:  F28A  fmov.s FR8,@R2                               
@@ -140,7 +140,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x603C4:  D251  mov.l  @(0x6050C),R2                         ; =0xFFFF6354 (RAM) [vehicle_speed]
   0x603C6:  FE28  fmov.s @R2,FR14                              
   0x603C8:  D644  mov.l  @(0x604DC),R6                         ; =0x000BE598 (ROM) [table_1d_lookup]
-  0x603CA:  F58D  sts    FPUL,R5                               
+  0x603CA:  F58D  fldi0  FR5                               
   0x603CC:  C744  mova   @(0x604E0),R0                         
   0x603CE:  F408  fmov.s @R0,FR4                               
   0x603D0:  D544  mov.l  @(0x604E4),R5                         ; =0xFFFF4494 (RAM) [diag_threshold_input]
@@ -247,7 +247,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x60490:  E0FC  mov    #-4,R0                                
   0x60492:  F866  fmov.s @(R0,R6),FR8                          
   0x60494:  F68A  fmov.s FR8,@R6                               
-  0x60496:  F88D  sts    FPUL,R8                               
+  0x60496:  F88D  fldi0  FR8                               
   0x60498:  E0F4  mov    #-12,R0                               
   0x6049A:  F966  fmov.s @(R0,R6),FR9                          
   0x6049C:  F895  fcmp/gt FR9,FR8                              
@@ -672,7 +672,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x666AA:  8939  bt     0x66720                               
   0x666AC:  D21A  mov.l  @(0x66718),R2                         ; =0x000BEAB0 (ROM)
   0x666AE:  420B  jsr    @R2                                   
-  0x666B0:  F58D  sts    FPUL,R5                               
+  0x666B0:  F58D  fldi0  FR5                               
   0x666B2:  D21A  mov.l  @(0x6671C),R2                         ; =0x000C50E8 (ROM)
   0x666B4:  F828  fmov.s @R2,FR8                               
   0x666B6:  F805  fcmp/gt FR0,FR8                              
@@ -877,7 +877,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66844:  C765  mova   @(0x669DC),R0                         
   0x66846:  F608  fmov.s @R0,FR6                               
   0x66848:  420B  jsr    @R2                                   
-  0x6684A:  F58D  sts    FPUL,R5                               
+  0x6684A:  F58D  fldi0  FR5                               
   0x6684C:  620C  extu.b R0,R2                                 
   0x6684E:  2228  tst    R2,R2                                 
   0x66850:  890B  bt     0x6686A                               
@@ -1114,7 +1114,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66A1E:  FE4C  fmov   FR4,FR14                              
   0x66A20:  6E43  mov    R4,R14                                
   0x66A22:  D59C  mov.l  @(0x66C94),R5                         ; =0x000BE5D8 (ROM)
-  0x66A24:  F68D  sts    FPUL,R6                               
+  0x66A24:  F68D  fldi0  FR6                               
   0x66A26:  C79C  mova   @(0x66C98),R0                         
   0x66A28:  F508  fmov.s @R0,FR5                               
   0x66A2A:  D49C  mov.l  @(0x66C9C),R4                         ; =0x000C5100 (ROM)
@@ -1153,7 +1153,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66A6C:  2C20  mov.b  R2,@R12                               
   0x66A6E:  F4EC  fmov   FR14,FR4                              
   0x66A70:  D588  mov.l  @(0x66C94),R5                         ; =0x000BE5D8 (ROM)
-  0x66A72:  F68D  sts    FPUL,R6                               
+  0x66A72:  F68D  fldi0  FR6                               
   0x66A74:  C788  mova   @(0x66C98),R0                         
   0x66A76:  450B  jsr    @R5                                   
   0x66A78:  F508  fmov.s @R0,FR5                               
@@ -1202,7 +1202,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66ACE:  FE4C  fmov   FR4,FR14                              
   0x66AD0:  6E43  mov    R4,R14                                
   0x66AD2:  D570  mov.l  @(0x66C94),R5                         ; =0x000BE5D8 (ROM)
-  0x66AD4:  F68D  sts    FPUL,R6                               
+  0x66AD4:  F68D  fldi0  FR6                               
   0x66AD6:  C770  mova   @(0x66C98),R0                         
   0x66AD8:  F508  fmov.s @R0,FR5                               
   0x66ADA:  D47C  mov.l  @(0x66CCC),R4                         ; =0x000C5104 (ROM)
@@ -1241,7 +1241,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66B1C:  2C20  mov.b  R2,@R12                               
   0x66B1E:  F4EC  fmov   FR14,FR4                              
   0x66B20:  D55C  mov.l  @(0x66C94),R5                         ; =0x000BE5D8 (ROM)
-  0x66B22:  F68D  sts    FPUL,R6                               
+  0x66B22:  F68D  fldi0  FR6                               
   0x66B24:  C75C  mova   @(0x66C98),R0                         
   0x66B26:  450B  jsr    @R5                                   
   0x66B28:  F508  fmov.s @R0,FR5                               
@@ -1330,7 +1330,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66BCE:  6E43  mov    R4,R14                                
   0x66BD0:  2F00  mov.b  R0,@R15                               
   0x66BD2:  D630  mov.l  @(0x66C94),R6                         ; =0x000BE5D8 (ROM)
-  0x66BD4:  F68D  sts    FPUL,R6                               
+  0x66BD4:  F68D  fldi0  FR6                               
   0x66BD6:  C730  mova   @(0x66C98),R0                         
   0x66BD8:  F508  fmov.s @R0,FR5                               
   0x66BDA:  D547  mov.l  @(0x66CF8),R5                         ; =0x000C5108 (ROM)
@@ -1350,7 +1350,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66BF6:  FEF1  fsub   FR15,FR14                             
   0x66BF8:  F4EC  fmov   FR14,FR4                              
   0x66BFA:  D626  mov.l  @(0x66C94),R6                         ; =0x000BE5D8 (ROM)
-  0x66BFC:  F68D  sts    FPUL,R6                               
+  0x66BFC:  F68D  fldi0  FR6                               
   0x66BFE:  C726  mova   @(0x66C98),R0                         
   0x66C00:  460B  jsr    @R6                                   
   0x66C02:  F508  fmov.s @R0,FR5                               
@@ -1745,14 +1745,14 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66EE4:  E4FF  mov    #-1,R4                                
   0x66EE6:  D127  mov.l  @(0x66F84),R1                         ; =0x000BE598 (ROM) [table_1d_lookup]
   0x66EE8:  644D  extu.w R4,R4                                 
-  0x66EEA:  F58D  sts    FPUL,R5                               
+  0x66EEA:  F58D  fldi0  FR5                               
   0x66EEC:  410B  jsr    @R1                                   
   0x66EEE:  F49D  .word  0xF49D                                
   0x66EF0:  FE0C  fmov   FR0,FR14                              
   0x66EF2:  66F1  mov.w  @R15,R6                               
   0x66EF4:  646D  extu.w R6,R4                                 
   0x66EF6:  D123  mov.l  @(0x66F84),R1                         ; =0x000BE598 (ROM) [table_1d_lookup]
-  0x66EF8:  F58D  sts    FPUL,R5                               
+  0x66EF8:  F58D  fldi0  FR5                               
   0x66EFA:  410B  jsr    @R1                                   
   0x66EFC:  F49D  .word  0xF49D                                
   0x66EFE:  F50C  fmov   FR0,FR5                               
@@ -1761,7 +1761,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66F04:  F4EC  fmov   FR14,FR4                              
   0x66F06:  F40C  fmov   FR0,FR4                               
   0x66F08:  D620  mov.l  @(0x66F8C),R6                         ; =0x000BE5D8 (ROM)
-  0x66F0A:  F68D  sts    FPUL,R6                               
+  0x66F0A:  F68D  fldi0  FR6                               
   0x66F0C:  C720  mova   @(0x66F90),R0                         
   0x66F0E:  460B  jsr    @R6                                   
   0x66F10:  F508  fmov.s @R0,FR5                               
@@ -1775,13 +1775,13 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66F20:  D618  mov.l  @(0x66F84),R6                         ; =0x000BE598 (ROM) [table_1d_lookup]
   0x66F22:  85F2  mov.w  @(4,R15),R0                           
   0x66F24:  640D  extu.w R0,R4                                 
-  0x66F26:  F58D  sts    FPUL,R5                               
+  0x66F26:  F58D  fldi0  FR5                               
   0x66F28:  460B  jsr    @R6                                   
   0x66F2A:  F49D  .word  0xF49D                                
   0x66F2C:  FE0C  fmov   FR0,FR14                              
   0x66F2E:  85F4  mov.w  @(8,R15),R0                           
   0x66F30:  640D  extu.w R0,R4                                 
-  0x66F32:  F58D  sts    FPUL,R5                               
+  0x66F32:  F58D  fldi0  FR5                               
   0x66F34:  D613  mov.l  @(0x66F84),R6                         ; =0x000BE598 (ROM) [table_1d_lookup]
   0x66F36:  460B  jsr    @R6                                   
   0x66F38:  F49D  .word  0xF49D                                
@@ -1791,7 +1791,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66F40:  F4EC  fmov   FR14,FR4                              
   0x66F42:  F40C  fmov   FR0,FR4                               
   0x66F44:  D211  mov.l  @(0x66F8C),R2                         ; =0x000BE5D8 (ROM)
-  0x66F46:  F68D  sts    FPUL,R6                               
+  0x66F46:  F68D  fldi0  FR6                               
   0x66F48:  C711  mova   @(0x66F90),R0                         
   0x66F4A:  420B  jsr    @R2                                   
   0x66F4C:  F508  fmov.s @R0,FR5                               
@@ -2425,7 +2425,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6F1E0:  C71B  mova   @(0x6F250),R0                         
   0x6F1E2:  F608  fmov.s @R0,FR6                               
   0x6F1E4:  460B  jsr    @R6                                   
-  0x6F1E6:  F58D  sts    FPUL,R5                               
+  0x6F1E6:  F58D  fldi0  FR5                               
   0x6F1E8:  660C  extu.b R0,R6                                 
   0x6F1EA:  2668  tst    R6,R6                                 
   0x6F1EC:  8B04  bf     0x6F1F8                               

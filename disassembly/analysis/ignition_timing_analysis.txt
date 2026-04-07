@@ -72,16 +72,16 @@ SECTION 2: PHASE 1 -- BASE TIMING
   starting point for all timing calculations.
 
   Inputs:
-    FFFF6624  engine_load (float)
-    FFFF65FC  manifold_pressure (float)
-    FFFF6350  rpm_current (float)
+    FFFF6624  rpm_current (float)
+    FFFF65FC  engine_load_current (float)
+    FFFF6350  ect_current (float)
     FFFF63F8  iat_current (float)
     FFFF62F8  ect_derived (float)
     FFFF62FC  secondary_load (float)
     FFFF7354  throttle_filtered (float)
     FFFF73E8  fuel_system_related (float)
     FFFF805C  timing_workspace (float)
-    FFFF620C  speed_related (float)
+    FFFF620C  airflow_maf_current (float)
     FFFF64F5  engine_state_byte
 
   Process:
@@ -116,9 +116,9 @@ SECTION 2: PHASE 1 -- BASE TIMING
   Used for smooth transitions between operating regions.
 
   Inputs:
-    FFFF6624  engine_load
-    FFFF65FC  manifold_pressure
-    FFFF6350  rpm_current
+    FFFF6624  rpm_current
+    FFFF65FC  engine_load_current
+    FFFF6350  ect_current
     FFFF62F8  ect_derived
     FFFF5BE3  engine_state_byte_B
     FFFF65BF  running_flag
@@ -157,9 +157,9 @@ SECTION 2: PHASE 1 -- BASE TIMING
   advance from 2D maps.
 
   Inputs (14 RAM addresses):
-    FFFF6624  engine_load
-    FFFF65FC  manifold_pressure
-    FFFF6350  rpm_current
+    FFFF6624  rpm_current
+    FFFF65FC  engine_load_current
+    FFFF6350  ect_current
     FFFF6354  rpm_secondary
     FFFF63F8  iat_current
     FFFF67EC  engine_run_time (u16)
@@ -237,7 +237,7 @@ SECTION 3: PHASE 2 -- CORRECTIONS
   Uses 11 descriptors with 2D maps indexed by:
     - RPM x ECT (16x2, 8x2 maps)
     - RPM x Load (16x6 map)
-  Reads engine_load, ect, iat, rpm, fuel_system_state.
+  Reads rpm_current, ect, iat, engine_load_current, fuel_system_state.
   GBR = 0xFFFF8000 (correction workspace).
 
   Key calibrations:
@@ -259,8 +259,8 @@ SECTION 3: PHASE 2 -- CORRECTIONS
   Computes ignition output parameters including coil dwell time.
 
   Inputs:
-    FFFF6624  engine_load
-    FFFF6350  rpm_current
+    FFFF6624  rpm_current
+    FFFF6350  ect_current
     FFFF65C0  engine_state
     FFFF5BE2  condition_flags
     FFFF65BF  running_flag
@@ -342,7 +342,7 @@ SECTION 3: PHASE 2 -- CORRECTIONS
   -----------------------------------------------------------------------
   task46: MPS-based injection timing. Uses 3 descriptors for MPS-
           dependent timing offsets. Output at FFFF80E4.
-  task47: Map switch and low-PW handler. Checks engine_load, rpm,
+  task47: Map switch and low-PW handler. Checks rpm_current, engine_load_current,
           ect. Multiple calibration thresholds for transitions between
           timing maps. Significant: cal 0xD2D20=100, 0xD2D28=10000,
           0xD2D38=11000 suggest RPM or load boundaries.
@@ -358,7 +358,7 @@ SECTION 4: PHASE 3 -- FINAL TIMING & PER-CYLINDER
   corrections onto the base timing value.
 
   Inputs:
-    FFFF6624  engine_load
+    FFFF6624  rpm_current
     FFFF63F8  iat_current
     FFFF65C0  engine_state
     FFFF6812  cylinder_index
@@ -396,9 +396,9 @@ SECTION 4: PHASE 3 -- FINAL TIMING & PER-CYLINDER
   This is scheduler task 0 -- highest priority, runs first.
 
   Inputs:
-    FFFF6624  engine_load
+    FFFF6624  rpm_current
     FFFF63F8  iat_current
-    FFFF6350  rpm_current
+    FFFF6350  ect_current
     FFFF81E8  per_cylinder_timing_array
 
   Process:
@@ -514,11 +514,11 @@ SECTION 6: KEY RAM ADDRESS MAP
 
   Address       Type    Description
   -----------------------------------------------------------------------
-  FFFF6350      float   rpm_current (primary)
+  FFFF6350      float   ect_current (primary)
   FFFF6354      float   rpm_secondary
   FFFF63F8      float   iat_current
-  FFFF6624      float   engine_load (301 refs -- core variable)
-  FFFF65FC      float   manifold_pressure
+  FFFF6624      float   rpm_current (301 refs -- core variable)
+  FFFF65FC      float   engine_load_current
   FFFF65C0      u8      engine_state_byte
   FFFF65BF      u8      running_flag
   FFFF6812      u8      cylinder_index (0-3)

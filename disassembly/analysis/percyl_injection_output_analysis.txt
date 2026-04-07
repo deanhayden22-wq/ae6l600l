@@ -100,7 +100,7 @@ Calibration data:
     08E478: D669          mov.l  @(0x8E620),R6       ; =0xFFFFA8B0 (threshold workspace)
     08E47A: E0F8          mov    #-8,R0              ; offset -8
     08E47C: F697          fmov.s @(R0,R6),FR6        ; load threshold from workspace
-    08E47E: F966          fcmp/gt FR6,FR9            ; ECT > threshold?
+    08E47E: F966          fmov.s  @(R0,R6),FR9       ; ECT > threshold?
     08E480: E0FC          mov    #-4,R0              ; offset -4
     08E482: F697          fmov.s @(R0,R6),FR6        ; load second threshold
     08E484: D267          mov.l  @(0x8E624),R2       ; =0x000C545C (cal table)
@@ -178,12 +178,12 @@ Calibration data:
     082ABE: E000          mov    #0,R0
     082AC0: D678          mov.l  @(0x82CA4),R6       ; =0xFFFFA4BA
     082AC2: 2600          mov.b  R0,@R6              ; clear output byte
-    082AC4: 8061          mov.w  R0,@(2,R6)          ; clear output word
+    082AC4: 8061          mov.b  R0,@(1,R6)          ; clear output word
     082AC6: 6060          mov.b  @R6,R0
-    082AC8: 8062          mov.w  R0,@(4,R6)
-    082ACA: 8461          mov.w  @(2,R6),R0
+    082AC8: 8062          mov.b  R0,@(2,R6)
+    082ACA: 8461          mov.b  @(1,R6),R0
     082ACC: 000B          rts
-    082ACE: 8063          mov.w  R0,@(6,R6)          ; mirror bytes
+    082ACE: 8063          mov.b  R0,@(3,R6)          ; mirror bytes
 
   Sub-function at 0x8396E (pack_workspace_sub_A):
     Sets GBR workspace at FFFF2EBC.
@@ -208,11 +208,11 @@ Calibration data:
     0839FE: E014          mov    #0x14,R0
     083A00: F587          fmov.s @(R0,R5),FR5        ; load float from workspace+0x14
     083A02: C783          mova   @(pool),R0          ; literal pool ref
-    083A04: F808          fadd   FR0,FR8             ; FR8 += FR0
+    083A04: F808          fmov.s @R0,FR8             ; FR8 += FR0
     083A06: E0F8          mov    #-8,R0
     083A08: F587          fmov.s @(R0,R5),FR5        ; load from workspace-8
     083A0A: C782          mova   @(pool),R0
-    083A0C: F808          fadd   FR0,FR8
+    083A0C: F808          fmov.s @R0,FR8
     083A0E: E0FC          mov    #-4,R0
     083A10: F587          fmov.s @(R0,R5),FR5
     083A12: E0FF          mov    #-1,R0
@@ -236,13 +236,13 @@ Calibration data:
     083A34: E000          mov    #0,R0
     083A36: D679          mov.l  @(0x83C1C),R6       ; =0xFFFFA4F9
     083A38: 2600          mov.b  R0,@R6
-    083A3A: 8061          mov.w  R0,@(2,R6)
-    083A3C: 8062          mov.w  R0,@(4,R6)
+    083A3A: 8061          mov.b  R0,@(1,R6)
+    083A3C: 8062          mov.b  R0,@(2,R6)
     083A3E: 6060          mov.b  @R6,R0
-    083A40: 8063          mov.w  R0,@(6,R6)
-    083A42: 8461          mov.w  @(2,R6),R0
+    083A40: 8063          mov.b  R0,@(3,R6)
+    083A42: 8461          mov.b  @(1,R6),R0
     083A44: 000B          rts
-    083A46: 8064          mov.w  R0,@(8,R6)
+    083A46: 8064          mov.b  R0,@(4,R6)
 
   Sub-function at 0x84326 (pack_workspace_sub_B):
     Identical structure to pack_workspace_sub_A but uses workspace FFFF2EC8.
@@ -261,14 +261,14 @@ Calibration data:
 
   Disassembly:
     0843AC: C76C          mova   @(pool),R0          ; literal pool ref
-    0843AE: F808          fadd   FR0,FR8             ; accumulate float
+    0843AE: F808          fmov.s @R0,FR8             ; accumulate float
     0843B0: D56C          mov.l  @(0x84564),R5       ; =0xFFFFA518 (stage4 workspace)
     0843B2: E0EC          mov    #-0x14,R0
     0843B4: F587          fmov.s @(R0,R5),FR5        ; read workspace-0x14
     0843B6: D66C          mov.l  @(0x84568),R6       ; =0xFFFF7C9D (fuel_state_byte)
     0843B8: 6060          mov.b  @R6,R0              ; read fuel state
     0843BA: 000B          rts
-    0843BC: 8052          mov.w  R0,@(4,R5)          ; write to workspace+4
+    0843BC: 8052          mov.b  R0,@(2,R5)          ; write to workspace+4
 
   Purpose: Very short function.  Reads a float value from workspace-0x14,
   accumulates, then reads fuel_state_byte (0xFFFF7C9D) and stores it
@@ -287,7 +287,7 @@ Calibration data:
     084A2C: 420B          jsr    @R2                  ; call check_engine_status
     084A2E: 0009          nop
     084A30: D583          mov.l  @(0x84C40),R5       ; =0xFFFFA52D (stage5 output)
-    084A32: 8052          mov.w  R0,@(4,R5)          ; write engine status result
+    084A32: 8052          mov.b  R0,@(2,R5)          ; write engine status result
     084A34: D683          mov.l  @(0x84C44),R6       ; =0xFFFF7C9D (fuel_state_byte)
     084A36: 6260          mov.b  @R6,R2              ; read fuel_state_byte
     084A38: 4F26          lds.l  @R15+,PR

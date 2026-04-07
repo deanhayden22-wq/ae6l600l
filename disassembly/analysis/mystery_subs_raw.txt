@@ -372,7 +372,7 @@ Callers from task_call_graph.txt:
   0x2FA14:  D212  mov.l  @(0x2FA60),R2                         ; =0x000BE56C (ROM)
   0x2FA16:  C713  mova   @(0x2FA64),R0                         
   0x2FA18:  F608  fmov.s @R0,FR6                               
-  0x2FA1A:  F58D  sts    FPUL,R5                               
+  0x2FA1A:  F58D  fldi0  FR5                               
   0x2FA1C:  FEF9  fmov.s @R15+,FR14                            
   0x2FA1E:  4F26  lds.l  @R15+,PR                              
   0x2FA20:  422B  jmp    @R2                                   
@@ -693,7 +693,7 @@ Callers from task_call_graph.txt:
   0x44422:  EE00  mov    #0,R14                                
   0x44424:  E001  mov    #1,R0                                 
   0x44426:  C043  mov.b  R0,@(67,GBR)                          
-  0x44428:  F58D  sts    FPUL,R5                               
+  0x44428:  F58D  fldi0  FR5                               
   0x4442A:  D64C  mov.l  @(0x4455C),R6                         ; =0xFFFF81F0 (RAM) [knock_GBR_base]
   0x4442C:  A1CD  bra    0x447CA                               
   0x4442E:  F65A  fmov.s FR5,@R6                               
@@ -756,7 +756,7 @@ Callers from task_call_graph.txt:
   0x442AC:  8801  cmp/eq #1,R0                                 
   0x442AE:  8B01  bf     0x442B4                               
   0x442B0:  A010  bra    0x442D4                               
-  0x442B2:  F88D  sts    FPUL,R8                               
+  0x442B2:  F88D  fldi0  FR8                               
   0x442B4:  66F0  mov.b  @R15,R6                               
   0x442B6:  2668  tst    R6,R6                                 
   0x442B8:  8B0A  bf     0x442D0                               
@@ -1016,7 +1016,7 @@ Callers from task_call_graph.txt:
   0x45F0A:  D455  mov.l  @(0x46060),R4                         ; =0xFFFF3234 (RAM) [IAM_value]
   0x45F0C:  D255  mov.l  @(0x46064),R2                         ; =0x000BDBCC (ROM)
   0x45F0E:  422B  jmp    @R2                                   
-  0x45F10:  F48D  sts    FPUL,R4                               
+  0x45F10:  F48D  fldi0  FR4                               
   0x45F12:  4F22  sts.l  PR,@-R15                              
   0x45F14:  FFEB  fmov.s FR14,@-R15                            
   0x45F16:  FFFB  fmov.s FR15,@-R15                            
@@ -1057,7 +1057,7 @@ Callers from task_call_graph.txt:
   0x46826:  6DE3  mov    R14,R13                               
   0x46828:  EC23  mov    #35,R12                               
   0x4682A:  A007  bra    0x4683C                               
-  0x4682C:  FE8D  sts    FPUL,R14                              
+  0x4682C:  FE8D  fldi0  FR14                              
   0x4682E:  D432  mov.l  @(0x468F8),R4                         ; =0xFFFF3248 (RAM) [flkc_fg_var]
   0x46830:  34DC  add    R13,R4                                
   0x46832:  D222  mov.l  @(0x468BC),R2                         ; =0x000BDBCC (ROM)

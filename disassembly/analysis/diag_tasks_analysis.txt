@@ -46,9 +46,9 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
 
     Inputs read:
       FFFF67EC  engine_run_time (u16, seconds)
-      FFFF85D7  warmup_complete (u8, 0/1)
-      FFFF6624  engine_load (float)
-      FFFF65FC  manifold_pressure (float)
+      FFFF85D7  fuel_system_state (u8, 0/1)
+      FFFF6624  rpm_current (float)
+      FFFF65FC  engine_load_current (float)
       FFFF895C  afl_learning_val (float)
       FFFF7FBC  timing_correction (float)
       FFFF6354  vehicle_speed (float)
@@ -64,18 +64,18 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
     2. If engine_run_time < cal[0xD9A3C] (u16, = 0 -- always passes):
        readiness = 1D table lookup on vehicle_speed via desc 0xAF5CC
 
-    3. If warmup NOT complete:
+    3. If fuel_system_state NOT set:
        Branch to step 8 (fallback)
 
-    4. If manifold_pressure > cal[0xD9A40] (= 4.0 g/rev):
+    4. If engine_load_current > cal[0xD9A40] (= 4.0 g/rev):
        Sub-check: if timing_correction > cal[0xD9A48] (= 65535.0, disabled):
          readiness = cal[0xD9A60] = 1.0  (override)
-       Sub-check: if engine_load > cal[0xD9A44] (= 1000.0, disabled):
+       Sub-check: if rpm_current > cal[0xD9A44] (= 1000.0, disabled):
          Branch to step 8
        Otherwise:
          readiness = cal[0xD9A50] = 0.125  (low readiness)
 
-    5. If afl_learning_val > engine_load:
+    5. If afl_learning_val > rpm_current:
        readiness = cal[0xD9A5C] = 0.005  (warmup incomplete)
 
     6. If table_lookup_result > previous_readiness (FFFF9090-8):
@@ -98,11 +98,11 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
   -----------------------------------------------------------------------
     0xD9A3C:  0 (u16)    RPM threshold -- always pass
     0xD9A3E:  ?          Readiness counter threshold
-    0xD9A40:  4.0        Manifold pressure threshold (g/rev)
+    0xD9A40:  4.0        Engine load threshold (g/rev)
     0xD9A44:  1000.0     Load upper limit (effectively disabled)
     0xD9A48:  65535.0    Timing threshold (effectively disabled)
     0xD9A4C:  1.0        Default/immediate readiness
-    0xD9A50:  0.125      Low readiness (manifold pressure high)
+    0xD9A50:  0.125      Low readiness (engine load high)
     0xD9A54:  1.0        Fallback readiness
     0xD9A58:  0.05       Minimum readiness
     0xD9A5C:  0.005      Warmup incomplete readiness
@@ -113,11 +113,11 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
     FFFF4158   u32    Scheduler tick count (input)
     FFFF4494   u16    Diagnostic threshold input
     FFFF8E98   u8     Engine state flag
-    FFFF65C0   u8     Engine state byte (stored to ctrl struct)
+    FFFF65C0   u8     Throttle position (stored to ctrl struct)
     FFFF67EC   u16    Engine run time (seconds)
-    FFFF85D7   u8     Warmup complete flag
-    FFFF6624   float  Engine load (g/rev)
-    FFFF65FC   float  Manifold pressure
+    FFFF85D7   u8     Fuel system state
+    FFFF6624   float  RPM current
+    FFFF65FC   float  Engine load current
     FFFF895C   float  A/F learning value
     FFFF7FBC   float  Timing correction
     FFFF6354   float  Vehicle speed
@@ -265,7 +265,7 @@ TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
     Calls 0x584D2 (check_monitor_enable variant)
     Reads:
       - RPM (FFFF6350) -> FR8
-      - Manifold pressure (FFFF65FC) -> FR9
+      - Engine load current (FFFF65FC) -> FR9
       - FFFF63C4 (IAT-related?) -> FR6
       - FFFF63FC (barometric?) -> FR4
       - Engine run time (FFFF67EC)
@@ -274,7 +274,7 @@ TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
       - Monitor enable returned 1
       - Engine run time >= threshold at 0xC48DC (u16)
       - RPM >= threshold at 0xC50DC (float)
-      - Manifold pressure >= threshold at 0xC50E0 (float)
+      - Engine load current >= threshold at 0xC50E0 (float)
       - IAT-related value >= threshold at 0xC50E4 (float)
       - Purge valve flow (from 0xBEAB0 lookup) >= threshold at 0xC50E8
 
@@ -300,7 +300,7 @@ TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
     FFFF63CC   float  ECT
     FFFF63FC   float  Barometric / atmospheric pressure
     FFFF6350   float  RPM
-    FFFF65FC   float  Manifold pressure
+    FFFF65FC   float  Engine load current
     FFFF67EC   u16    Engine run time
 
   Calibration:
@@ -309,7 +309,7 @@ TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
     0xACF78    desc   ECT-based EVAP upper threshold table
     0xC48DC    u16    Min engine run time for EVAP test
     0xC50DC    float  Min RPM for EVAP test
-    0xC50E0    float  Min manifold pressure
+    0xC50E0    float  Min engine load current
     0xC50E4    float  Min IAT-related threshold
     0xC50E8    float  Min purge flow rate
 
@@ -340,7 +340,7 @@ TASK 57: EGR / EMISSIONS CONTROL @ 0x758CA
         FFFFA224-0x64 through FFFFA224-0x50 (FFFFA1C0-FFFFA1D4)
       - Byte at offset +61 -> stack[4]
 
-    Reads engine_load (FFFF6624) -> stores to GBR base (FFFFA198)
+    Reads rpm_current (FFFF6624) -> stores to GBR base (FFFFA198)
     Calls 0xBE82C with stack[0] parameter
 
     Enters critical section (0xBA84):
@@ -430,7 +430,7 @@ TASK 57: EGR / EMISSIONS CONTROL @ 0x758CA
 
   RAM Summary:
   -----------------------------------------------------------------------
-    FFFFA198   float  Engine load (copied from FFFF6624)
+    FFFFA198   float  RPM current (copied from FFFF6624)
     FFFFA198   GBR    EGR state base (main task)
     FFFFA156   GBR    EGR maturation counter base (sub_a)
     FFFFA158   GBR    EGR output handler base (sub_c)
@@ -471,13 +471,13 @@ TASK 58: MAF SENSOR DIAGNOSTIC @ 0x6F0B8
     Call check_engine_running(R4=39) -> DTC index 39 = P0000 (internal)
     Call check_diag_preconditions -> reads FFFFAE08
     Read IAT (FFFF4130) -> FR8
-    Read engine_load (FFFF6624) -> FR9
+    Read rpm_current (FFFF6624) -> FR9
 
     Gates (all must pass):
       - check_engine_running returned 1
       - check_diag_preconditions returned 1
       - IAT >= threshold at 0xD8B14
-      - engine_load >= threshold at 0xD8B18
+      - rpm_current >= threshold at 0xD8B18
 
     Result: FFFF96A4 = 1 if all pass, 0 if any fail
 
@@ -510,13 +510,13 @@ TASK 58: MAF SENSOR DIAGNOSTIC @ 0x6F0B8
   -----------------------------------------------------------------------
     Reads FFFF65A9 (engine state extended)
     Calls check_diag_state (0x582AC)
-    Reads engine_load (FFFF6624), IAT (FFFF4130), engine_run_time (FFFF67EC)
+    Reads rpm_current (FFFF6624), IAT (FFFF4130), engine_run_time (FFFF67EC)
 
     If engine state == 1:
-      Call 0xBE608 (range check) with engine_load, scale factor
+      Call 0xBE608 (range check) with rpm_current, scale factor
       If range check passes AND diag_state active:
         Check IAT against threshold (from literal pool)
-        Check engine_load against threshold
+        Check rpm_current against threshold
         Check engine_run_time >= 125 seconds
         Check diag_state == 1 or 2
         If all pass: R11 = 1 (extended check passed)
@@ -539,7 +539,7 @@ TASK 58: MAF SENSOR DIAGNOSTIC @ 0x6F0B8
   Calibration:
   -----------------------------------------------------------------------
     0xD8B14    float  IAT minimum threshold for MAF diag
-    0xD8B18    float  Engine load minimum threshold for MAF diag
+    0xD8B18    float  RPM minimum threshold for MAF diag
     0xD8A40    u8     MAF maturation threshold (counter must reach this)
 
 
@@ -646,7 +646,7 @@ KEY NEW ROM ADDRESSES DISCOVERED
   0x0AF5CC      desc    Vehicle speed readiness table
   0x0C48DC      cal     EVAP min engine run time (u16)
   0x0C50DC      cal     EVAP min RPM (float)
-  0x0C50E0      cal     EVAP min manifold pressure (float)
+  0x0C50E0      cal     EVAP min engine load current (float)
   0x0C50E4      cal     EVAP min IAT threshold (float)
   0x0C50E8      cal     EVAP min purge flow (float)
   0x0D8AB8      cal     MPS min engine run time (u16)

@@ -9,9 +9,9 @@ NOTE ON DECODE ISSUES:
     disp = 0x22, target = ((03735E+4)&~3) + 0x22*4 = 037360 + 0x88 = 0x0373E8
     So R0 = ROM address 0x0373E8 (literal pool data pointer)
 
-  0xF48D at 037434 = fsts FPUL,FR4          (delay slot of BRA)
+  0xF48D at 037434 = fldi0 FR4              (delay slot of BRA)
     Format: 1111nnnn00001101  n=4 → 0xF40D... actually n=4, m=8, sub=D:
-    0xF48D & 0xF0FF = 0xF00D → fsts FPUL,FRn with n=4 ✓
+    0xF48D & 0xF0FF = 0xF08D → fldi0 FRn with n=4 ✓
 
   0x4F26 in epilogues = LDS.L @R15+,PR      (not LDC.L GBR)
     See accel_enrichment_analysis.txt for full encoding note.
@@ -93,7 +93,7 @@ Role:     Apply falling-load tau time constant. Handles fuel film EVAPORATION
   03742E: F985  fcmp/gt FR8,FR9            ; FR9 > FR8 (720 > load_signal)?
   037430: 8901  bt       037436            ; load < 720 → alt path
   037432: A004  bra     03743E             ; load >= 720 → apply falling tau directly
-  037434: F48D  fsts    FPUL,FR4           ; (delay) FR4 = FPUL (tau from prior FTRC)
+  037434: F48D  fldi0   FR4                ; (delay) FR4 = 0.0
 
   ; --- alt path: load from workspace history buffer and accumulate ---
   037436: D53A  mov.l   @(0xE8,PC),R5      ; R5 = 0xFFFF7A74  workspace reference

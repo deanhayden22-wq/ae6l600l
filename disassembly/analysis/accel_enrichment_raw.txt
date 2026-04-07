@@ -56,8 +56,8 @@ Role:   Top-level transient fuel dispatcher. Reads throttle delta inputs,
   0371A8: FE87  fmov.s  FR8,@(R0,R14)        ; workspace[-12] = current_throttle
 
   ; --- load second float input, call limit/clamp function ---
-  0371AA: D281  mov.l   @(0x204,PC),R2       ; =0xFFFF6350  input_float_B (IPW or MAF)
-  0371AC: F828  fmov.s  @R2,FR8              ; FR8 = input_float_B
+  0371AA: D281  mov.l   @(0x204,PC),R2       ; =0xFFFF6350  ect_current (coolant temperature, float)
+  0371AC: F828  fmov.s  @R2,FR8              ; FR8 = ect_current
   0371AE: E0FC  mov     #-4,R0
   0371B0: D280  mov.l   @(0x200,PC),R2       ; =0x00029BA4  (clamp/limit helper)
   0371B2: 420B  jsr     @R2
@@ -124,13 +124,13 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
   03BB78: 7FEC  add     #-20,R15             ; allocate 20-byte local frame
 
   ; --- load inputs ---
-  03BB7A: D25B  mov.l   @(0x16C,PC),R2       ; =0xFFFF65FC  prev_throttle_pos (float)
-  03BB7C: FC28  fmov.s  @R2,FR12             ; FR12 = previous throttle position
-  03BB7E: D25B  mov.l   @(0x16C,PC),R2       ; =0xFFFF6624  curr_throttle_pos (float)
-  03BB80: F928  fmov.s  @R2,FR9              ; FR9 = current throttle position
-  03BB82: FF9A  fmov.s  FR9,@R15             ; stack[0] = curr_throttle (saved)
-  03BB84: D25A  mov.l   @(0x168,PC),R2       ; =0xFFFF620C  current_rpm (float)
-  03BB86: FD28  fmov.s  @R2,FR13             ; FR13 = current RPM
+  03BB7A: D25B  mov.l   @(0x16C,PC),R2       ; =0xFFFF65FC  engine_load_current (float)
+  03BB7C: FC28  fmov.s  @R2,FR12             ; FR12 = engine_load_current
+  03BB7E: D25B  mov.l   @(0x16C,PC),R2       ; =0xFFFF6624  rpm_current (float)
+  03BB80: F928  fmov.s  @R2,FR9              ; FR9 = rpm_current
+  03BB82: FF9A  fmov.s  FR9,@R15             ; stack[0] = rpm_current (saved)
+  03BB84: D25A  mov.l   @(0x168,PC),R2       ; =0xFFFF620C  airflow_maf_current (float)
+  03BB86: FD28  fmov.s  @R2,FR13             ; FR13 = airflow_maf_current
 
   ; --- state/condition queries (Renesas descriptor calling convention) ---
   ; Each JSR reads args from words embedded after the call (via saved PR)
@@ -188,7 +188,7 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
 
   ; --- check tip-out condition: FR14 (tip-out gain) > FR12 (prev throttle) ---
   03BBD2: E000  mov     #0,R0
-  03BBD4: FEC5  fcmp/gt FR12,FR14           ; tip-out gain > prev_throttle?
+  03BBD4: FEC5  fcmp/gt FR12,FR14           ; tip-out gain > engine_load_current?
   03BBD6: 8F0B  bf/s     03BBF0             ; no -> check decay condition
   03BBD8:       ; mov.b R0,@(0x6,R14)       ; [0x80E6] (delay slot) clear workspace[6]
 
@@ -198,22 +198,22 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
   03BBDE: 8B07  bf       03BBF0             ; flag set -> check decay
   03BBE0: D24E  mov.l   @(0x138,PC),R2      ; =0x000CC52C  rpm_threshold = 1260.0
   03BBE2: F828  fmov.s  @R2,FR8
-  03BBE4: F8D5  fcmp/gt FR13,FR8            ; RPM > 1260?
-  03BBE6: 8B03  bf       03BBF0             ; RPM <= 1260 -> check decay
+  03BBE4: F8D5  fcmp/gt FR13,FR8            ; airflow_maf_current > 1260?
+  03BBE6: 8B03  bf       03BBF0             ; airflow_maf_current <= 1260 -> check decay
   03BBE8: E010  mov     #16,R0
   03BBEA: 07FC  mov.b   @(R0,R15),R7        ; R7 = frame[16] (last condition)
   03BBEC: 2778  tst     R7,R7
   03BBEE: 890B  bt       03BC08             ; all conditions met -> DEACTIVATE
 
-  ; --- DECAY path: enrichment decaying (FR8=curr_throttle > decay_gain=10000?) ---
-  03BBF0: F8F8  fmov.s  @R15,FR8            ; FR8 = curr_throttle (saved at frame[0])
+  ; --- DECAY path: enrichment decaying (FR8=rpm_current > decay_gain=10000?) ---
+  03BBF0: F8F8  fmov.s  @R15,FR8            ; FR8 = rpm_current (saved at frame[0])
   03BBF2: D24B  mov.l   @(0x12C,PC),R2      ; =0x000CC530  decay_gain = 10000.0
   03BBF4: F928  fmov.s  @R2,FR9             ; FR9 = 10000.0
-  03BBF6: F985  fcmp/gt FR8,FR9             ; 10000 > curr_throttle? (i.e. not maxed)
+  03BBF6: F985  fcmp/gt FR8,FR9             ; 10000 > rpm_current? (i.e. not maxed)
   03BBF8: 8B03  bf       03BC02             ; no -> check RPM threshold
   03BBFA: D248  mov.l   @(0x120,PC),R2      ; =0x000CC52C  rpm_threshold = 1260.0
   03BBFC: F828  fmov.s  @R2,FR8
-  03BBFE: F8D5  fcmp/gt FR13,FR8            ; RPM > 1260?
+  03BBFE: F8D5  fcmp/gt FR13,FR8            ; airflow_maf_current > 1260?
   03BC00: 8902  bt       03BC08             ; yes -> DEACTIVATE (skip decay, deactivate)
   03BC02: 84F4  mov.b   @(0x04,R15),R0      ; R0 = frame[4] (sub-condition flag)
   03BC04: 8801  cmp/eq  #1,R0             ; sub-condition == 1?
@@ -267,7 +267,7 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
 
   ; --- check tip-in trigger: FR15 (tip-in gain) > FR12 (prev throttle)? ---
   03BC4E: E000  mov     #0,R0
-  03BC50: FFC5  fcmp/gt FR12,FR15         ; tip-in gain > prev_throttle?
+  03BC50: FFC5  fcmp/gt FR12,FR15         ; tip-in gain > engine_load_current?
   03BC52: 8F07  bf/s     03BC64           ; no -> check throttle/condition
   03BC54:       ; mov.b R0,@(0x7,R14)  [0x80E7]  (delay) workspace[7] = 0
   03BC56: 84FC  mov.b   @(0x0C,R15),R0   ; R0 = frame[12] (condition flag)
@@ -279,10 +279,10 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
   03BC62: 8B1A  bf       03BC9A          ; no -> counter check (no trigger)
 
   ; --- throttle check before activation ---
-  03BC64: F8F8  fmov.s  @R15,FR8         ; FR8 = curr_throttle (frame[0])
+  03BC64: F8F8  fmov.s  @R15,FR8         ; FR8 = rpm_current (frame[0])
   03BC66: D22E  mov.l   @(0xB8,PC),R2    ; =0x000CC530  decay_gain = 10000.0
   03BC68: F928  fmov.s  @R2,FR9          ; FR9 = 10000.0
-  03BC6A: F985  fcmp/gt FR8,FR9          ; 10000 > curr_throttle?
+  03BC6A: F985  fcmp/gt FR8,FR9          ; 10000 > rpm_current?
   03BC6C: 8915  bt       03BC9A          ; throttle > 10000 -> no activation
   03BC6E: 84F4  mov.b   @(0x04,R15),R0  ; R0 = frame[4]
   03BC70: 2008  tst     R0,R0
@@ -366,10 +366,10 @@ REFERENCED CALIBRATION ADDRESSES (confirmed float32 big-endian unless noted)
 ================================================================================
 REFERENCED RAM ADDRESSES
 ================================================================================
-  0xFFFF65FC  prev_throttle_pos    float (FR12 source)
-  0xFFFF6350  input_float_B        float (IPW or MAF signal)
-  0xFFFF620C  current_rpm          float (FR13 source)
-  0xFFFF6624  curr_throttle_pos    float (FR9 source)
+  0xFFFF65FC  engine_load_current   float (FR12 source)
+  0xFFFF6350  ect_current           float (coolant temperature)
+  0xFFFF620C  airflow_maf_current   float (FR13 source)
+  0xFFFF6624  rpm_current           float (FR9 source)
   0xFFFF69F4  current_throttle     float (fuel_transient_comp FR8 source)
   0xFFFF7A5C  transient_mode_byte  byte
   0xFFFF7A6C  transient_workspace  base (fuel_transient_comp R14)

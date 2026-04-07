@@ -94,7 +94,7 @@ Stores result to fuel_cut_bitmask at FFFF82B8.
 046C0E: 8801  cmp/eq #1,R0
 046C10: 8B02  bf     0x046C18
 046C12: 60E3  mov    R14,R0
-046C14: CB82  or.b   #0x82,@(R0,GBR)      ; R14 |= 0x0082 (cyl 1)
+046C14: CB82  or     #0x82,R0              ; R14 |= 0x0082 (cyl 1)
 046C16: 6E03  mov    R0,R14
 046C18: 84FC  mov.b  @(12,R15),R0         ; cyl_2 cut (from stack)?
 046C1A: 8801  cmp/eq #1,R0

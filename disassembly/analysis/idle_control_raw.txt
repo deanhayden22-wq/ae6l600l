@@ -139,8 +139,8 @@ GBR = 0xFFFF8364
 
   ; --- Epilogue ---
   04BCDE: 7F04  add     #4,R15
-  04BCE0: 4F17  lds.l   @R15+,PR
-  04BCE2: 4F26  ldc.l   @R15+,GBR
+  04BCE0: 4F17  ldc.l   @R15+,GBR
+  04BCE2: 4F26  lds.l   @R15+,PR
   04BCE4: 6EF6  mov.l   @R15+,R14
   04BCE6: 6DF6  mov.l   @R15+,R13
   04BCE8: 000B  rts
@@ -221,7 +221,7 @@ idle_dtc_condition_check @ 0x04C01A  (DTC enable condition checker)
   ; --- Epilogue ---
   04C076: 60F0  mov.b   @R15,R0                 ; R0 = result
   04C078: 7F04  add     #4,R15
-  04C07A: 4F26  ldc.l   @R15+,GBR
+  04C07A: 4F26  lds.l   @R15+,PR
   04C07C: 6EF6  mov.l   @R15+,R14
   04C07E: 6DF6  mov.l   @R15+,R13
   04C080: 6CF6  mov.l   @R15+,R12
@@ -328,8 +328,8 @@ GBR = 0xFFFF837B
 
   ; --- Epilogue ---
   04CA3C: 7F1C  add     #28,R15
-  04CA3E: 4F17  lds.l   @R15+,PR
-  04CA40: 4F26  ldc.l   @R15+,GBR
+  04CA3E: 4F17  ldc.l   @R15+,GBR
+  04CA40: 4F26  lds.l   @R15+,PR
   04CA42: 6EF6  mov.l   @R15+,R14
   04CA44: 6DF6  mov.l   @R15+,R13
   04CA46: 6CF6  mov.l   @R15+,R12
@@ -380,8 +380,8 @@ GBR = 0xFFFF837E
   04CE06: CF80  or.b    #0x80,@(R0,GBR)         ; set bit 7 @ GBR+0x84
   04CE08: 7002  add     #2,R0                   ; R0 = 0x86
   04CE0A: CF10  or.b    #0x10,@(R0,GBR)         ; set bit 4 @ GBR+0x86
-  04CE0C: 4F17  lds.l   @R15+,PR
-  04CE0E: 4F26  ldc.l   @R15+,GBR
+  04CE0C: 4F17  ldc.l   @R15+,GBR
+  04CE0E: 4F26  lds.l   @R15+,PR
 
   ; (Note: there are 18 more similar handler blocks)
   ; Each sets different state/mode/output combinations depending on

@@ -41,8 +41,8 @@ Primary cranking gate:  FFFF65F1  (labeled transient_enable_gate)
     the determination happens upstream based on crank sync + RPM
 
 Secondary engine state bytes:
-  FFFF65C0  engine_state_byte     (State 1 = cranking, State 2 = warmup)
-  FFFF6254  ecu_state_mode_flag   (mode flag for table selection)
+  FFFF65C0  throttle_position     (State 1 = cranking, State 2 = warmup)
+  FFFF6254  maf_current           (mode flag for table selection)
   FFFFA56B  engine_running_flag   (CL readiness edge detection)
   FFFF65BF  running_flag          (ignition dwell control gate)
 
@@ -102,8 +102,8 @@ Core:   0x2FAD4
 Gate:   FFFF65F1 == 0 AND FFFF726C == 1
 
 Inputs:
-  FR15 = float@FFFF6624  (engine_load)
-  FR14 = float@FFFF6350  (RPM)
+  FR15 = float@FFFF6624  (rpm_current)
+  FR14 = float@FFFF6350  (ECT)
   Mode:  0x22CF4 (engine_mode_check) + FFFF90BE (ect_mode_flag)
 
 Descriptor selection (2D table, RPM × ECT):
@@ -288,7 +288,7 @@ Separate thunk entry at 0x3CD46 → startup_mode_switch.
   FFFF69F0  IAT (intake air temperature, float)
   FFFF7448  fuel mode flag
   FFFF7453  fuel status
-  FFFF6254  ECU state/mode flag
+  FFFF6254  maf_current (MAF sensor value)
   FFFF8F24  global CL enable flag
   FFFF7885  fuel enrichment status byte
   FFFF7C68  engine status flag (gates AFL)
@@ -356,7 +356,7 @@ Separate thunk entry at 0x3CD46 → startup_mode_switch.
 
   ─── Warmup Complete Flag ────────────────────────────────────────────────
 
-  FFFF85D7  warmup_complete / afc_enable_flag_B / fuel_system_state
+  FFFF85D7  fuel_system_state
     - 60 references across the ROM
     - Read by: AFC PI controller (0x340A0), AFL learning, CL/OL transition,
       diagnostic readiness (0x60392), ignition timing, idle control
@@ -381,7 +381,7 @@ Consumer:  0x3F374  (ect_warmup_consumer, 2050 bytes — per-cylinder timing)
 Mode selection — 2 flags select among 4 ECT curves:
 
   Flag A:  FFFF90BE  (ect_mode_flag)
-  Flag B:  FFFF6254  (ecu_state_mode_flag)
+  Flag B:  FFFF6254  (maf_current)
 
   ┌──────────────┬────────────────────┬────────────────────┐
   │              │ Flag B == 1        │ Flag B != 1        │
@@ -640,8 +640,8 @@ SECTION 12: COMPLETE RAM VARIABLE CATALOG
   Address     Name                    Type     Purpose
   ──────────  ──────────────────────  ───────  ─────────────────────────
   FFFF65F1    cranking_gate           byte     0=cranking, ≠0=running
-  FFFF65C0    engine_state_byte       byte     1=crank, 2=warmup, etc.
-  FFFF6254    ecu_state_mode_flag     byte     table/curve selection
+  FFFF65C0    throttle_position       byte     1=crank, 2=warmup, etc.
+  FFFF6254    maf_current             byte     table/curve selection
   FFFF65BF    running_flag            byte     ignition dwell gate
   FFFFA56B    engine_running_flag     byte     CL readiness edge detect
 
@@ -666,7 +666,7 @@ SECTION 12: COMPLETE RAM VARIABLE CATALOG
   FFFF7448    fuel_mode_flag          —        fuel mode state
   FFFF7453    fuel_status             —        fuel status byte
   FFFF7885    fuel_enrich_status      byte     enrichment status
-  FFFF85D7    warmup_complete         byte     master warmup-done flag
+  FFFF85D7    fuel_system_state       byte     master warmup-done flag
 
   ─── ECT Timing Correction Variables ─────────────────────────────────
 
@@ -703,7 +703,7 @@ SECTION 13: CROSS-REFERENCES TO OTHER ANALYSES
     - Rising/falling load handlers @ 0x03735A / 0x03740C
 
   cl_ol_master_analysis.txt / cl_ol_state_machine.txt
-    - FFFF85D7 warmup_complete flag gates CL/OL transition
+    - FFFF85D7 fuel_system_state flag gates CL/OL transition
     - No cranking fuel logic in CL/OL state machine
 
   ignition_timing_analysis.txt

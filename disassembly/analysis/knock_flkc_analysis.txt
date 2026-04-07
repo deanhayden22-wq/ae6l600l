@@ -1124,7 +1124,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43FD6: 7F04  add    #4,r15                           
   43FD8: FEF9  fmov.s @r15+,fr14                       
   43FDA: 4F26  lds.l  @r15+,pr                         
-  43FDC: 422B  jsr    @r2                                ; CALL @ 0x03190
+  43FDC: 422B  jmp    @r2                                ; CALL @ 0x03190
   43FDE: 6EF6  mov.l  @r15+,r14                        
   43FE0: 2F96  mov.l  r9,@-r15                         
   43FE2: 2FA6  mov.l  r10,@-r15                        
@@ -1788,7 +1788,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45E88: C9F3  and    #0xF3,r0                         
   45E8A: CB08  or     #0x08,r0                         
   45E8C: D270  mov.l  @(0x46050),r2  ; =0x00046A3A     
-  45E8E: 422B  jsr    @r2                                ; CALL @ 0x46A3A
+  45E8E: 422B  jmp    @r2                                ; CALL @ 0x46A3A
   45E90: 2600  mov.b  r0,@r6                             ; -> 0xFFFF3244 (FLKC_enable_byte)
   45E92: 000B  rts                                     
   45E94: 0009  nop                                     
@@ -1852,7 +1852,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45F08: 2600  mov.b  r0,@r6                             ; -> 0xFFFF3244 (FLKC_enable_byte)
   45F0A: D455  mov.l  @(0x46060),r4  ; =0xFFFF3234 (FLKC_work_bank1)
   45F0C: D255  mov.l  @(0x46064),r2  ; =0x000BDBCC (write_float_ptr)
-  45F0E: 422B  jsr    @r2                                ; CALL write_float_ptr @ 0xBDBCC
+  45F0E: 422B  jmp    @r2                                ; CALL write_float_ptr @ 0xBDBCC
   45F10: F48D  fldi0  fr4                              
   45F12: 4F22  sts.l  pr,@-r15                         
   45F14: FFEB  fmov.s fr14,@-r15                       
