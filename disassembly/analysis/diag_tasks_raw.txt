@@ -120,7 +120,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6039C:  FFEB  fmov.s FR14,@-R15                            
   0x6039E:  FFFB  fmov.s FR15,@-R15                            
   0x603A0:  7FF8  add    #-8,R15                               
-  0x603A2:  D653  mov.l  @(0x604F0),R6                         ; =0xFFFF67EC (RAM) [engine_run_time]
+  0x603A2:  D653  mov.l  @(0x604F0),R6                         ; =0xFFFF67EC (RAM) [atm_pressure_current]
   0x603A4:  6E61  mov.w  @R6,R14                               
   0x603A6:  D653  mov.l  @(0x604F4),R6                         ; =0xFFFF85D7 (RAM) [warmup_complete]
   0x603A8:  D253  mov.l  @(0x604F8),R2                         ; =0x0002F8EA (ROM)
@@ -137,7 +137,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x603BE:  FD28  fmov.s @R2,FR13                              
   0x603C0:  D251  mov.l  @(0x60508),R2                         ; =0xFFFF7FBC (RAM) [timing_correction]
   0x603C2:  FC28  fmov.s @R2,FR12                              
-  0x603C4:  D251  mov.l  @(0x6050C),R2                         ; =0xFFFF6354 (RAM) [vehicle_speed]
+  0x603C4:  D251  mov.l  @(0x6050C),R2                         ; =0xFFFF6354 (RAM) [ect_raw_adc]
   0x603C6:  FE28  fmov.s @R2,FR14                              
   0x603C8:  D644  mov.l  @(0x604DC),R6                         ; =0x000BE598 (ROM) [table_1d_lookup]
   0x603CA:  F58D  fldi0  FR5                               
@@ -374,7 +374,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x900E8:  420B  jsr    @R2                                   
   0x900EA:  E448  mov    #72,R4                                
   0x900EC:  6203  mov    R0,R2                                 
-  0x900EE:  D583  mov.l  @(0x902FC),R5                         ; =0xFFFF67EC (RAM) [engine_run_time]
+  0x900EE:  D583  mov.l  @(0x902FC),R5                         ; =0xFFFF67EC (RAM) [atm_pressure_current]
   0x900F0:  6551  mov.w  @R5,R5                                
   0x900F2:  60F0  mov.b  @R15,R0                               
   0x900F4:  8801  cmp/eq #1,R0                                 
@@ -648,7 +648,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6667A:  F668  fmov.s @R6,FR6                               
   0x6667C:  D620  mov.l  @(0x66700),R6                         ; =0xFFFF63FC (RAM)
   0x6667E:  F468  fmov.s @R6,FR4                               
-  0x66680:  D520  mov.l  @(0x66704),R5                         ; =0xFFFF67EC (RAM) [engine_run_time]
+  0x66680:  D520  mov.l  @(0x66704),R5                         ; =0xFFFF67EC (RAM) [atm_pressure_current]
   0x66682:  8801  cmp/eq #1,R0                                 
   0x66684:  8F4C  bf/s   0x66720                               
   0x66686:  6551  mov.w  @R5,R5                                
@@ -2413,7 +2413,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6F1C8:  FF28  fmov.s @R2,FR15                              
   0x6F1CA:  D21E  mov.l  @(0x6F244),R2                         ; =0xFFFF4130 (RAM) [iat_adc_value]
   0x6F1CC:  FE28  fmov.s @R2,FR14                              
-  0x6F1CE:  D61E  mov.l  @(0x6F248),R6                         ; =0xFFFF67EC (RAM) [engine_run_time]
+  0x6F1CE:  D61E  mov.l  @(0x6F248),R6                         ; =0xFFFF67EC (RAM) [atm_pressure_current]
   0x6F1D0:  6D61  mov.w  @R6,R13                               
   0x6F1D2:  EC00  mov    #0,R12                                
   0x6F1D4:  60E3  mov    R14,R0                                

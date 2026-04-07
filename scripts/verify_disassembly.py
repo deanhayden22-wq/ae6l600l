@@ -371,8 +371,9 @@ RE_GBR = re.compile(
 )
 
 # RAM mapping: "FFFF6624  rpm_current" in structured input blocks
+# Require name to be at least 3 chars to avoid matching register names like R2, R14
 RE_RAM_MAPPING = re.compile(
-    r'(?:0x)?(FFFF[0-9A-Fa-f]{4})\s+([\w_]+)\s+\(',
+    r'(?:0x)?(FFFF[0-9A-Fa-f]{4})\s+([\w_]{3,})\s+\(',
 )
 
 # mov.l literal pool reference with comment: "D27F  mov.l ... ; =0xFFFF7986"
@@ -658,8 +659,13 @@ def load_canonical_ram():
         return canonical
     with open(ram_ref_path, 'r', encoding='utf-8', errors='replace') as f:
         for line in f:
-            m = re.search(r'0x(FFFF[0-9A-Fa-f]{4})\s+([\w_]+)', line)
-            if m:
+            # ram_reference.txt has multiple formats:
+            #   "  301  0xFFFF6624  rpm_current  ..." (top section: refcount addr name)
+            #   "  0xFFFF6624   301  rpm_current  ..." (bottom section: addr refcount name)
+            #   "  rpm_current  0xFFFF6624  301 refs" (alpha section: name addr refcount)
+            # Match address then skip optional ref count (pure digits) to find the name
+            m = re.search(r'0x(FFFF[0-9A-Fa-f]{4})\s+(?:\d+\s+)?([a-zA-Z][\w_]{2,})', line)
+            if m and m.group(2) not in ('refs', 'ref', 'bytes'):
                 canonical[m.group(1).upper()] = m.group(2)
     return canonical
 

@@ -45,13 +45,13 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
     condition that fails determines the readiness value.
 
     Inputs read:
-      FFFF67EC  engine_run_time (u16, seconds)
+      FFFF67EC  atm_pressure_current (float, atmospheric pressure)
       FFFF85D7  fuel_system_state (u8, 0/1)
       FFFF6624  rpm_current (float)
       FFFF65FC  engine_load_current (float)
       FFFF895C  afl_learning_val (float)
       FFFF7FBC  timing_correction (float)
-      FFFF6354  vehicle_speed (float)
+      FFFF6354  ect_raw_adc (float)
 
     Call: 0x2F8EA -- unknown helper, result stored to stack
     Call: table_1d_lookup with FFFF4494 input
@@ -61,8 +61,8 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
     1. If helper returned 1:
        readiness = cal[0xD9A4C] = 1.0  (full readiness immediately)
 
-    2. If engine_run_time < cal[0xD9A3C] (u16, = 0 -- always passes):
-       readiness = 1D table lookup on vehicle_speed via desc 0xAF5CC
+    2. If atm_pressure_current < cal[0xD9A3C] (float, = 0 -- always passes):
+       readiness = 1D table lookup on ect_raw_adc via desc 0xAF5CC
 
     3. If fuel_system_state NOT set:
        Branch to step 8 (fallback)
@@ -140,13 +140,13 @@ TASK 55: MPS DIAGNOSTIC (MAP SWITCH) @ 0x900B4
     1. Read IAT value (FFFF4130) into FR14
     2. Call check_diag_preconditions (0x584BE) -- reads FFFFAE08
     3. Call check_engine_running (0x582D2) with R4=72 (DTC index 72)
-    4. Read engine_run_time (FFFF67EC)
+    4. Read atm_pressure_current (FFFF67EC)
 
   Gate Conditions (all must pass):
     - check_diag_preconditions returned 1
     - check_engine_running returned 1
     - IAT >= threshold at 0xD8B14 (float)
-    - engine_run_time >= threshold at 0xD8AB8 (u16)
+    - atm_pressure_current >= threshold at 0xD8AB8 (float)
 
   If ALL gates pass:
     Read mps_diag_state (FFFFABF4)
@@ -264,7 +264,7 @@ TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
     Sets GBR = FFFF933C (EVAP diagnostic state base)
     Calls 0x584D2 (check_monitor_enable variant)
     Reads:
-      - RPM (FFFF6350) -> FR8
+      - ect_current (FFFF6350) -> FR8
       - Engine load current (FFFF65FC) -> FR9
       - FFFF63C4 (IAT-related?) -> FR6
       - FFFF63FC (barometric?) -> FR4
@@ -299,7 +299,7 @@ TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
     FFFF63C4   float  IAT-related sensor value
     FFFF63CC   float  ECT
     FFFF63FC   float  Barometric / atmospheric pressure
-    FFFF6350   float  RPM
+    FFFF6350   float  ect_current
     FFFF65FC   float  Engine load current
     FFFF67EC   u16    Engine run time
 
@@ -510,14 +510,14 @@ TASK 58: MAF SENSOR DIAGNOSTIC @ 0x6F0B8
   -----------------------------------------------------------------------
     Reads FFFF65A9 (engine state extended)
     Calls check_diag_state (0x582AC)
-    Reads rpm_current (FFFF6624), IAT (FFFF4130), engine_run_time (FFFF67EC)
+    Reads rpm_current (FFFF6624), IAT (FFFF4130), atm_pressure_current (FFFF67EC)
 
     If engine state == 1:
       Call 0xBE608 (range check) with rpm_current, scale factor
       If range check passes AND diag_state active:
         Check IAT against threshold (from literal pool)
         Check rpm_current against threshold
-        Check engine_run_time >= 125 seconds
+        Check atm_pressure_current >= 125
         Check diag_state == 1 or 2
         If all pass: R11 = 1 (extended check passed)
 

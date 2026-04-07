@@ -2731,8 +2731,8 @@ Code is at ROM 0x34490-0x34EC8, dispatched from 0x4A0E8 (entry: 0x3452A).
       1. RAM[FFFF8F24] — Global enable flag
       2. Comparison vs calibration @ 0xCC020 (= 70.0) — likely MAF threshold
          FFFF78A0[-20] (float) must be <= 70.0 g/s
-      3. RAM[FFFF73A4] — via BE608 table processor check
-      4. RAM[FFFF7354] — via BE608 table processor check
+      3. RAM[FFFF73A4] — fuel_correction_A (via BE608 table processor)
+      4. RAM[FFFF7354] — throttle_filtered (via BE608 table processor)
       5. RAM[FFFF7374] — via BE608 table processor check
       6. RAM[FFFF7A14] — via BE608 table processor check
       7. RAM[FFFF7A20] — via BE608 table processor check
@@ -3061,10 +3061,10 @@ SECTION 9: RAM VARIABLE MAP (ALL AFC-RELATED)
   FFFF6A28        ???     Referenced in CL/OL delay
   FFFF7324        float   Referenced in A/F learning entry
   FFFF733C        float   Referenced in A/F learning
-  FFFF7354        float   CL condition check variable #1
+  FFFF7354        float   throttle_filtered
   FFFF7374        float   CL condition check variable #2
-  FFFF73A4        float   CL condition check variable #3
-  FFFF7448        byte    Common flag (used by learning + scheduler)
+  FFFF73A4        float   fuel_correction_A
+  FFFF7448        byte    clol_mode_flag (1=CL, 0=OL)
   FFFF7453        byte    Common flag
   FFFF7464        ???     Referenced in CL fueling target
   FFFF7704        ???     Referenced in A/F learning
@@ -5799,7 +5799,7 @@ SECTION 2: WHY AFC DROPS IMMEDIATELY BUT AFL LINGERS
     The AFC PI controller at 0x342A8 reads FFFF7448 every cycle.
     When FFFF7448 = 0 (OL), AFC correction output = 0.
     AFC drops immediately because FFFF7448 transitions to 0 promptly
-    (the FFFF7448 writer at 0x031528 clears it as soon as FFFF744B != 0
+    (the clol_mode_flag writer at 0x031528 clears it as soon as FFFF744B != 0
     OR the mode conditions fail).
 
   AFL (A/F Learning) — NOT GATED BY FFFF7448 FOR APPLICATION:
@@ -5883,7 +5883,7 @@ SECTION 4: THE LEAN CONDITION MECHANISM
     - If injectors are under-fueling, AFL learns a POSITIVE correction
 
   On CL->OL transition (WOT, boost):
-    - AFC drops to 0 immediately (FFFF7448 clears)
+    - AFC drops to 0 immediately (clol_mode_flag clears)
     - OL enrichment computation kicks in (Path A, delay=0)
     - OL fuel maps provide the "correct" fuel for high-load operation
     - BUT: AFL correction from CL is STILL applied as a multiplier
@@ -5903,7 +5903,7 @@ SECTION 4: THE LEAN CONDITION MECHANISM
 
 
 ================================================================================
-SECTION 5: FFFF7448 WRITER — COMPLETE LOGIC
+SECTION 5: clol_mode_flag (FFFF7448) WRITER — COMPLETE LOGIC
 ================================================================================
 
   Single writer: Function at ROM 0x031528
@@ -5919,7 +5919,7 @@ SECTION 5: FFFF7448 WRITER — COMPLETE LOGIC
     FFFF744A = (FFFF7452==1 AND FFFF744E==1) ? 1 : 0
     FFFF7449 = (FFFF7452==1 AND FFFF744E==2) ? 1 : 0
 
-  PHASE 3 — Final FFFF7448 computation (0x03155C-0x03158E):
+  PHASE 3 — Final clol_mode_flag computation (0x03155C-0x03158E):
 
     if (FFFF744B != 0):
         FFFF7448 = 0                    // CL inhibited
@@ -5978,8 +5978,8 @@ SECTION 7: AFL SYSTEM ARCHITECTURE
   CL ACTIVE CHECK (0x345A4) — 10 CONDITIONS:
     1. FFFF8F24 != 0 -> fail (global inhibit)
     2. MAF > 70.0 g/s (CC020) -> fail (max airflow for learning)
-    3. FFFF73A4 check (threshold 0.003906)
-    4. FFFF7354 check (threshold 0.000244)
+    3. FFFF73A4 fuel_correction_A (threshold 0.003906)
+    4. FFFF7354 throttle_filtered (threshold 0.000244)
     5. FFFF7374 check (threshold 0.000244)
     6. FFFF7A14 check (threshold 0.000977) — transition output, always 0.0
     7. FFFF7A20 check (threshold 0.003906) — blending rate, always 0.1
@@ -6102,7 +6102,7 @@ SECTION 10: THE "DELAY" MISCONCEPTION
   Timeline of a WOT event:
     t=0.000s: Throttle exceeds 37.884 deg, condition checker fires
     t=0.000s: counter_B = 0, OL enrichment computed immediately (Path A)
-    t=0.000s: FFFF7448 clears (Path B), AFC drops to 0
+    t=0.000s: clol_mode_flag clears (Path B), AFC drops to 0
     t=0.000s: AFL learning freezes
     t=0.000s: AFL APPLICATION continues with last CL-learned values
     t=0.000s+: OL fuel = OL_map * (1.0 + AFL_trim_from_CL)
@@ -6172,7 +6172,7 @@ SECTION 12: AFL FUNCTION ADDRESS MAP
   0x37B74       AFL application (writes FFFF7AB4 multiplier)
   0x37F00       AFL multiplier computation subroutine
   0x0301E4      Fuel pulse width calculation (reads FFFF7AB4)
-  0x031528      FFFF7448 writer (CL/OL mode flag)
+  0x031528      clol_mode_flag (FFFF7448) writer
   0x031590      FFFF7449 computation
   0x0315BA      FFFF744A computation
   0x031966      FFFF7452 master readiness writer

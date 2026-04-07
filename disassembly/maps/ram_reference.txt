@@ -20,7 +20,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      92  0xFFFF3B06  diag_indexed_lookup_table            Diagnostic indexed lookup table. Accessed at FFFF3B06 +
      89  0xFFFF65C0  throttle_position                    89 refs. Throttle position (float). Read by AFL, timing
      86  0xFFFF63F8  iat_current                          86 refs. Intake air temperature (float). Read by AFL, C
-     77  0xFFFF4130  ignition_switch_state                77 refs. Ignition/key switch state. Read by frontO2, id
+     77  0xFFFF4130  atm_pressure_baro                    77 refs. Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline.
      76  0xFFFF3836  io_ign_driver_ctrl                   InternalIO ignition driver control register (31 refs).
      69  0xFFFF6354  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float). Re
      69  0xFFFFADAC  diag_request_state                   69 refs. Diagnostic request/response state. Read by DTC
@@ -33,7 +33,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      48  0xFFFF6898  manifold_pressure                    48 refs. Manifold pressure (float). Read by frontO2, PS
      45  0xFFFF3480  cal_mirror_base                      45 refs. Calibration mirror base. Referenced by various
      43  0xFFFF620C  airflow_maf_current                  Current MAF/airflow (float). Used by accel enrichment a
-     43  0xFFFF63C4  iat_related_sensor                   IAT-related sensor value (float). Read by task56 EVAP c
+     43  0xFFFF63C4  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
      41  0xFFFF366C  io_inj_driver_ctrl                   InternalIO injection driver control register (31 refs).
      39  0xFFFF8E46  fuel_mode_flags                      39 refs. Fuel mode flags register.
      37  0xFFFF895C  fuel_ign_shared_state                Shared fuel/ignition state (float). 28 pool refs. Read 
@@ -485,7 +485,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   gbr_base_timing_ws                        0xFFFF7F10     0 refs  GBR base for task30 base timing workspac
   IAM_compensation_ws                       0xFFFF80C0     0 refs  IAM compensation workspace (float). Task
   iat_current                               0xFFFF63F8    86 refs  86 refs. Intake air temperature (float).
-  iat_related_sensor                        0xFFFF63C4    43 refs  IAT-related sensor value (float). Read b
+  ect_compensation                          0xFFFF63C4    43 refs  ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
   idle_control_GBR                          0xFFFF837E    20 refs  39 refs. Idle control GBR base (19 GBR u
   idle_sensor_ref                           0xFFFF83A5    21 refs  Idle control sensor comparison reference
   idle_workspace_GBR                        0xFFFF83AC    19 refs  26 refs. Secondary idle GBR workspace (7
@@ -493,7 +493,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   ign_ext_counter_A                         0xFFFF8D04     6 refs  Ignition extended workspace counter
   ign_ext_workspace_B                       0xFFFF8D2C     6 refs  Ignition/knock extended workspace B (GBR base)
   ign_output_workspace                      0xFFFF8098     0 refs  Ignition output workspace (float). Task3
-  ignition_switch_state                     0xFFFF4130    77 refs  77 refs. Ignition/key switch state. Read
+  atm_pressure_baro                         0xFFFF4130    77 refs  Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline.
   ignition_system_state                     0xFFFF8910    16 refs  Ignition system state. Referenced in ign
   ignition_timing_workspace                 0xFFFF7F08    20 refs  Ignition timing workspace variable (floa
   inj_channel_enable                        0xFFFF3474     0 refs  Injection channel enable mask. 0xFF = al
@@ -717,7 +717,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF3C80    12  cal_mirror_timer_workspace            Cal mirror timer workspace. Cal mirror timer region.
   0xFFFF4024    56  ATU_primary_ctrl                     ATU primary control register. 36 code refs — maste
   0xFFFF40C8    19  cam_angle_sensor                     Actual cam position from CMP/CKP (float, degrees).
-  0xFFFF4130    77  ignition_switch_state                77 refs. Ignition/key switch state. Read by frontO
+  0xFFFF4130    77  atm_pressure_baro                    Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline.
   0xFFFF4144    20  ect_output_fmac                      ECT output (degrees C, float). ADC pipeline ADDR29 -> FMAC call_08.
   0xFFFF43FC    25  sensor_misc_state                    25 refs. Misc sensor state.
   0xFFFF5BE2    14  engine_condition_flags                Engine condition flags byte. Read by task10, task30, task38.
@@ -741,7 +741,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF6354    69  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float
   0xFFFF6364    48  ect_startup                          48 refs. ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Was mislabeled atm_pressure.
   0xFFFF63B0    16  adc_processed_temperature_B           ADC processed temperature B (float). ECT/IAT sensor region.
-  0xFFFF63C4    43  iat_related_sensor                   IAT-related sensor value (float). Read by task56 E
+  0xFFFF63C4    43  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
   0xFFFF63CC    16  ram_ECT                              Coolant temperature / ECT (float)
   0xFFFF63F8    86  iat_current                          86 refs. Intake air temperature (float). Read by A
   0xFFFF6430    19  adc_processed_secondary              ADC processed secondary sensor value

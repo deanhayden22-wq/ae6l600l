@@ -124,7 +124,7 @@ pump_mode_B. Called via BSR from the task10_call52 parent function.
   r13 = fuel_pump_flag      (FFFF8E98, byte)
   r11 = fuel_pump_helper_B result (engine_running check)
   r10 = FFFF65AE            (unknown sensor flag)
-  r8  = engine_run_time     (FFFF67EC, uint16, in 20ms ticks)
+  r8  = atm_pressure_current (FFFF67EC, float, atmospheric pressure)
   r9  = FFFF65C1            (throttle-related state byte)
   r14 → fr14 = ignition_switch_state (FFFF4130, float)
   r12 = FFFF85D7            (timing state)
@@ -180,7 +180,7 @@ pump_mode_B. Called via BSR from the task10_call52 parent function.
     D6018 = 3750 (uint16) — ~75 seconds at 20ms/tick
     D601A = 3750 (uint16) — same value, for different state
 
-  If engine_run_time >= threshold → transition allowed.
+  If atm_pressure_current >= threshold → transition allowed.
   These control how long after engine start before the pump can
   reduce duty from 100% to 66.7%.
 
@@ -247,7 +247,7 @@ SECTION 7: RAM ADDRESS REFERENCE
   FFFF6210     float    battery_voltage_adc     Battery voltage (ADC processed)
   FFFF65AE     byte     steady_state_flag       Vehicle steady-state indicator
   FFFF65C1     byte     throttle_state_byte     Throttle position state
-  FFFF67EC     uint16   engine_run_time         Engine run time (20ms ticks)
+  FFFF67EC     float    atm_pressure_current    Atmospheric pressure
   FFFF8354     float    fuel_pump_duty          Current pump duty % output
   FFFF8366     struct   fuel_pump_workspace     14-byte state machine workspace
   FFFF8366+00  byte     state_counter_main      Main state counter

@@ -119,7 +119,7 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
   scaling. Serves as the sensor preparation stage for the AFC loop.
 
   INPUTS:
-    FFFF6350  ECT (float)
+    FFFF6350  ect_current (float)
     FFFF6254  (unknown sensor byte)
     FFFF65C0  (unknown sensor byte)
     FFFF6540  sensor_state (float) — loaded when first_call=0
@@ -227,7 +227,7 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
   INPUTS:
     FFFF63F8  iat_current (float)
     FFFF6624  rpm_current (float)
-    FFFF6350  ECT (float)
+    FFFF6350  ect_current (float)
     FFFF65FC  engine_load_current (float)
     FFFF68DC  (unknown float)
     FFFF78B0  (AFC PI working struct)
@@ -942,7 +942,7 @@ SECTION 10: ECT WARMUP CORRECTION — func_403C4  (Table B[19])
 
   RAM
   ---
-  FFFF6350  ECT_float             (engine coolant temp, float)
+  FFFF6350  ect_current            (engine coolant temp, float)
   FFFF6254  gear/op mode byte     (1 = specific AT or mode condition)
   FFFF90BE  ect_mode_flag         (byte, 0 or non-zero)
   FFFF7F68  ect_warmup_correction (float output; consumed by func @ 0x3F500)
@@ -1186,7 +1186,7 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
   // Mode 90: direct sum; else: rate_limit_interp for FFFF7F6C channel
   FR0 += FFFF7F0C + stack+4 - stack+8  [+/- adjustment]
 
-  // Add to FFFF81DC base (per-cylinder correction base struct)
+  // Add to FFFF81DC per_cyl_base_corr (per-cylinder correction base struct)
   for i in [0, 4, 8, 12]:
       stack+(32+i) = FFFF81DC[i] + FR0      // 4 per-channel adjusted targets
 
@@ -1398,7 +1398,7 @@ SECTION 14: INJECTOR DEAD TIME — func_303C0 / InjectorLatency @ 0xD106C
   Address: 0x303C0 – 0x30406
   Dispatcher: scheduler table @ 0x0E644 (entry adjacent to ISR22 at 0x48732)
 
-    FR4 = float @ FFFF4130 (battery_voltage_float)
+    FR4 = float @ FFFF4130 (atm_pressure_baro)
     FR5 = float @ FFFF6210 (ECT or secondary axis — unused in stock tune)
     R4  = 0xAD7E0          (InjectorLatency descriptor)
     R2  = 0xBE944          (table_lookup_2D_int)
@@ -1443,7 +1443,7 @@ SECTION 14: INJECTOR DEAD TIME — func_303C0 / InjectorLatency @ 0xD106C
 
   OUTPUT RAM ADDRESSES
   ──────────────────────
-  FFFF4130  battery_voltage_float     (input: read by this function)
+  FFFF4130  atm_pressure_baro         (atmospheric pressure / baro, float)
   FFFF7350  injector_dead_time_ticks  (output: uint16 timer count)
   FFFF4280  injector_dead_time_applied (output: applied to hardware timer)
 

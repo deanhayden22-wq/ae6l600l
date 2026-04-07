@@ -44,7 +44,7 @@ Secondary engine state bytes:
   FFFF65C0  throttle_position     (State 1 = cranking, State 2 = warmup)
   FFFF6254  maf_current           (mode flag for table selection)
   FFFFA56B  engine_running_flag   (CL readiness edge detection)
-  FFFF65BF  running_flag          (ignition dwell control gate)
+  FFFF65BF  accel_state           (acceleration state flag)
 
 The cranking fuel path executes from ISR dispatch entry 15 at 0x4A94C
 (isr_task_scheduler).  Three functions are called in sequence:
@@ -642,7 +642,7 @@ SECTION 12: COMPLETE RAM VARIABLE CATALOG
   FFFF65F1    cranking_gate           byte     0=cranking, ≠0=running
   FFFF65C0    throttle_position       byte     1=crank, 2=warmup, etc.
   FFFF6254    maf_current             byte     table/curve selection
-  FFFF65BF    running_flag            byte     ignition dwell gate
+  FFFF65BF    accel_state             byte     acceleration state flag
   FFFFA56B    engine_running_flag     byte     CL readiness edge detect
 
   ─── Cranking Fuel Variables ─────────────────────────────────────────

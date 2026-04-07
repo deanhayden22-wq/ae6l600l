@@ -76,7 +76,7 @@ SECTION 2: PHASE 1 -- BASE TIMING
     FFFF65FC  engine_load_current (float)
     FFFF6350  ect_current (float)
     FFFF63F8  iat_current (float)
-    FFFF62F8  ect_derived (float)
+    FFFF62F8  torque_ratio (float)
     FFFF62FC  secondary_load (float)
     FFFF7354  throttle_filtered (float)
     FFFF73E8  fuel_system_related (float)
@@ -119,15 +119,15 @@ SECTION 2: PHASE 1 -- BASE TIMING
     FFFF6624  rpm_current
     FFFF65FC  engine_load_current
     FFFF6350  ect_current
-    FFFF62F8  ect_derived
+    FFFF62F8  torque_ratio
     FFFF5BE3  engine_state_byte_B
-    FFFF65BF  running_flag
+    FFFF65BF  accel_state
     FFFF7D18  fuel_system_state
     FFFF7E90  GBR base (blend workspace)
     FFFF7FBC  timing_correction
     FFFF81DC  knock_related
     FFFF8258  flkc_related
-    FFFF85D7  warmup_complete
+    FFFF85D7  fuel_system_state
     FFFF8F16  blend_state_A
     FFFF8F24  blend_state_B
     FFFF7F04  blend_intermediate_A
@@ -162,7 +162,7 @@ SECTION 2: PHASE 1 -- BASE TIMING
     FFFF6350  ect_current
     FFFF6354  rpm_secondary
     FFFF63F8  iat_current
-    FFFF67EC  engine_run_time (u16)
+    FFFF67EC  atm_pressure_current (float)
     FFFF6898  secondary_input
     FFFF5DB8  condition_flag_A
     FFFF5BE2  engine_state_byte_A
@@ -261,9 +261,9 @@ SECTION 3: PHASE 2 -- CORRECTIONS
   Inputs:
     FFFF6624  rpm_current
     FFFF6350  ect_current
-    FFFF65C0  engine_state
+    FFFF65C0  throttle_position
     FFFF5BE2  condition_flags
-    FFFF65BF  running_flag
+    FFFF65BF  accel_state
     FFFF8910  system_state
     FFFF895C  AFL_value
     FFFF8098  ign_output_workspace
@@ -360,7 +360,7 @@ SECTION 4: PHASE 3 -- FINAL TIMING & PER-CYLINDER
   Inputs:
     FFFF6624  rpm_current
     FFFF63F8  iat_current
-    FFFF65C0  engine_state
+    FFFF65C0  throttle_position
     FFFF6812  cylinder_index
     FFFF80F8  final_timing_output
 
@@ -519,11 +519,11 @@ SECTION 6: KEY RAM ADDRESS MAP
   FFFF63F8      float   iat_current
   FFFF6624      float   rpm_current (301 refs -- core variable)
   FFFF65FC      float   engine_load_current
-  FFFF65C0      u8      engine_state_byte
-  FFFF65BF      u8      running_flag
+  FFFF65C0      u8      throttle_position
+  FFFF65BF      u8      accel_state
   FFFF6812      u8      cylinder_index (0-3)
   FFFF6898      float   secondary_input
-  FFFF67EC      u16     engine_run_time (seconds)
+  FFFF67EC      float   atm_pressure_current (atmospheric pressure)
   FFFF7EC0      --      GBR base: task49 workspace (base advance)
   FFFF7E90      --      GBR base: task50 workspace (blend)
   FFFF7F10      --      GBR base: task30 workspace (base timing)

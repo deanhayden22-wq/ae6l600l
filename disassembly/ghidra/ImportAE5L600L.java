@@ -1350,8 +1350,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Fuel correction parameter D (float). Read by fuel_correction_final.");
         count += labelComment(0xFFFF77DCL, "fuel_corr_cl_target_A",
             "CL target comp A output (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF63C4L, "ram_engine_param",
-            "Engine parameter (float). Read by fuel_correction_final secondary computation.");
+        count += labelComment(0xFFFF63C4L, "ect_compensation",
+            "ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.");
 
         count += labelComment(0xFFFF316CL, "afl_table_base",
             "A/F Learning table base in RAM (4 ranges x 8 bytes = 32 bytes)");
@@ -2182,8 +2182,8 @@ public class ImportAE5L600L extends GhidraScript {
             "19 refs. O2 sensor voltage or lambda value.");
 
         // ── Sensor / Input Block (0xFFFF4xxx) ──────────────────────────────
-        count += labelComment(0xFFFF4130L, "ignition_switch_state",
-            "77 refs. Ignition/key switch state. Read by frontO2, idle, boost. 4th most-referenced.");
+        count += labelComment(0xFFFF4130L, "atm_pressure_baro",
+            "Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline. Real battery voltage is at FFFF41E0.");
         count += labelComment(0xFFFF4024L, "sensor_group_base",
             "56 refs. Sensor processing group base. GBR base (1 use). Read by frontO2.");
         count += labelComment(0xFFFF43FCL, "sensor_misc_state",
@@ -4628,8 +4628,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Monitoring state byte: 1=transitioning, 2=active. Read by task58 maturation.");
         count += labelComment(0xFFFF65A9L, "engine_state_extended",
             "Engine state extended byte. Read by task58 extended MAF diagnostics.");
-        count += labelComment(0xFFFF63C4L, "iat_related_sensor",
-            "IAT-related sensor value (float). Read by task56 EVAP condition eval.");
+        count += labelComment(0xFFFF63C4L, "ect_compensation",
+            "ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.");
         count += labelComment(0xFFFF63FCL, "barometric_pressure",
             "Barometric/atmospheric pressure (float). Read by task56 EVAP.");
         count += labelComment(0xFFFF3B06L, "diag_indexed_lookup_table",
@@ -6351,8 +6351,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Engine state variable A. Near engine_state_extended (0xFFFF65A9L).");
         count += labelComment(0xFFFF65ABL, "engine_state_ext_byte_B",
             "Engine state extended byte B. Adjacent to engine_state_extended (+2).");
-        count += labelComment(0xFFFF65BFL, "warmup_transition_flag_B",
-            "Warmup transition flag B (byte). Read by fueling pipeli");
+        count += labelComment(0xFFFF65BFL, "accel_state",
+            "Acceleration state flag (task50 map switching).");
         count += labelComment(0xFFFF6810L, "ol_condition_selector",
             "OL condition selector byte (1-5). Selects ROM threshold");
         count += labelComment(0xFFFF682CL, "adc_processed_misc",

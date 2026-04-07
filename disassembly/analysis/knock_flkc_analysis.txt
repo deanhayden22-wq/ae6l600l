@@ -1013,7 +1013,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43EF8: FFFF  ??fpu    ; 0xFFFF                       
   43EFA: 4309  shlr2  r3                               
   43EFC: FFFF  ??fpu    ; 0xFFFF                       
-  43EFE: 430D  ??       ; 0x430D (grp4)                
+  43EFE: 430D  shld   r0,r3                
   43F00: FFFF  ??fpu    ; 0xFFFF                       
   43F02: 80FC  mov.b  r0,@(12,r15)                     
   43F04: FFFF  ??fpu    ; 0xFFFF                       
@@ -1036,19 +1036,19 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43F26: 2D68  tst  r6,r13                             
   43F28: 000D  mov.w  @(r0,r0),r0                      
   43F2A: 2D70  mov.b  r7,@r13                            ; -> 0xFFFFFFE4
-  43F2C: 000A  ??       ; 0x000A                       
+  43F2C: 000A  sts    mach,r0                       
   43F2E: E0F8  mov    #-8,r0                           
   43F30: 000B  rts                                     
   43F32: E830  mov    #48,r8                           
   43F34: FFFF  ??fpu    ; 0xFFFF                       
   43F36: 81D8  mov.w  r0,@(16,r13)                     
-  43F38: 000A  ??       ; 0x000A                       
+  43F38: 000A  sts    mach,r0                       
   43F3A: E00C  mov    #12,r0                           
-  43F3C: 000A  ??       ; 0x000A                       
+  43F3C: 000A  sts    mach,r0                       
   43F3E: E020  mov    #32,r0                           
   43F40: 000D  mov.w  @(r0,r0),r0                      
   43F42: 2D78  tst  r7,r13                             
-  43F44: 000A  ??       ; 0x000A                       
+  43F44: 000A  sts    mach,r0                       
   43F46: E10C  mov    #12,r1                           
   43F48: 000B  rts                                     
   43F4A: E628  mov    #40,r6                           
@@ -1064,9 +1064,9 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43F5E: 317C  add  r7,r1                              
   43F60: 0000  ??       ; 0x0000                       
   43F62: 3190  cmp/eq  r9,r1                           
-  43F64: 000A  ??       ; 0x000A                       
+  43F64: 000A  sts    mach,r0                       
   43F66: E26C  mov    #108,r2                          
-  43F68: 000A  ??       ; 0x000A                       
+  43F68: 000A  sts    mach,r0                       
   43F6A: E278  mov    #120,r2                          
   43F6C: 0000  ??       ; 0x0000                       
   43F6E: A638  bra    0x44BE2                          
@@ -1417,7 +1417,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4453A: 63F8  swap.b  r15,r3                          
   4453C: FFFF  ??fpu    ; 0xFFFF                       
   4453E: 6624  mov.b  @r2+,r6                          
-  44540: 0002  ??       ; 0x0002                       
+  44540: 0002  stc    sr,r0                       
   44542: 2F92  mov.l  r9,@r15                          
   44544: FFFF  ??fpu    ; 0xFFFF                       
   44546: 8224  ??       ; 0x8224 (grp8)                
@@ -1435,15 +1435,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4455E: 81F0  mov.w  r0,@(0,r15)                      
   44560: 0001  ??       ; 0x0001                       
   44562: CF22  or.b   #0x22,@(r0,GBR)                  
-  44564: 0002  ??       ; 0x0002                       
+  44564: 0002  stc    sr,r0                       
   44566: F8FE  fmac   fr0,fr15,fr8                     
-  44568: 0002  ??       ; 0x0002                       
+  44568: 0002  stc    sr,r0                       
   4456A: 9858  mov.w  @(0x4461E),r8  ; =0x420B         
   4456C: FFFF  ??fpu    ; 0xFFFF                       
   4456E: 81BA  mov.w  r0,@(20,r11)                     
   44570: FFFF  ??fpu    ; 0xFFFF                       
   44572: 81BB  mov.w  r0,@(22,r11)                     
-  44574: 0002  ??       ; 0x0002                       
+  44574: 0002  stc    sr,r0                       
   44576: 997C  mov.w  @(0x44672),r9  ; =0x0F54         
   44578: FFFF  ??fpu    ; 0xFFFF                       
   4457A: 7F10  add    #16,r15                          
@@ -1677,7 +1677,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45DAA: 29A6  mov.l  r10,@-r9                         
   45DAC: FFFF  ??fpu    ; 0xFFFF                       
   45DAE: 827D  ??       ; 0x827D (grp8)                
-  45DB0: 0002  ??       ; 0x0002                       
+  45DB0: 0002  stc    sr,r0                       
   45DB2: 9858  mov.w  @(0x45E66),r8  ; =0x6060         
   45DB4: FFFF  ??fpu    ; 0xFFFF                       
   45DB6: 81BA  mov.w  r0,@(20,r11)                     
@@ -1693,7 +1693,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45DCA: 8298  ??       ; 0x8298 (grp8)                
   45DCC: 000B  rts                                     
   45DCE: E588  mov    #-120,r5                         
-  45DD0: 000A  ??       ; 0x000A                       
+  45DD0: 000A  sts    mach,r0                       
   45DD2: E134  mov    #52,r1                           
   45DD4: 000B  rts                                     
   45DD6: E8AC  mov    #-84,r8                          
@@ -1705,7 +1705,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45DE2: E554  mov    #84,r5                           
   45DE4: 000B  rts                                     
   45DE6: E960  mov    #96,r9                           
-  45DE8: 000A  ??       ; 0x000A                       
+  45DE8: 000A  sts    mach,r0                       
   45DEA: E2CC  mov    #-52,r2                          
   45DEC: 000B  rts                                     
   45DEE: E830  mov    #48,r8                           
@@ -2242,7 +2242,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   465C6: 2F3C  cmp/str  r3,r15                         
   465C8: FFFF  ??fpu    ; 0xFFFF                       
   465CA: 8290  ??       ; 0x8290 (grp8)                
-  465CC: 0002  ??       ; 0x0002                       
+  465CC: 0002  stc    sr,r0                       
   465CE: 9858  mov.w  @(0x46682),r8  ; =0x600C         
   465D0: FFFF  ??fpu    ; 0xFFFF                       
   465D2: 7D18  add    #24,r13                          
@@ -2642,7 +2642,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   468E6: 6624  mov.b  @r2+,r6                          
   468E8: FFFF  ??fpu    ; 0xFFFF                       
   468EA: 63F8  swap.b  r15,r3                          
-  468EC: 0002  ??       ; 0x0002                       
+  468EC: 0002  stc    sr,r0                       
   468EE: 999C  mov.w  @(0x46A2A),r9  ; =0x32C3         
   468F0: FFFF  ??fpu    ; 0xFFFF                       
   468F2: 65BD  extu.w  r11,r5                          
