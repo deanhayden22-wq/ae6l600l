@@ -3,6 +3,20 @@ CL/OL STATE MACHINE — COMPLETE ANALYSIS AND PSEUDOCODE
 AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
 
+*** SUPERSEDED — DO NOT USE AS PRIMARY REFERENCE ***
+Canonical source: cl_ol_master_analysis.txt
+
+KNOWN ERRORS IN THIS FILE:
+  - RAM address identities are WRONG throughout (FFFF6624 called "MAF"
+    but is RPM; FFFF6350 called "RPM" but is ECT; FFFF65FC called "BPW"
+    but is engine_load_current). Verified from ROM bytes 2026-04-07.
+  - Section 3 ol_enrichment_dispatch counter comparison sense is INVERTED
+    (says counter_A >= counter_B → enrichment=0; master_analysis has
+    the correct logic).
+  - Section 3 clol_post_transition description is WRONG (claims it writes
+    mode flags; it actually manages transition smoothing only).
+
+
 TABLE OF CONTENTS
   1.  Execution Order and Dispatch
   2.  GBR Layout / RAM State Variables

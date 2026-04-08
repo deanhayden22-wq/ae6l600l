@@ -3,6 +3,20 @@ CL/OL REMAINING GAP CLOSURE — ANALYSIS
 AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
 
+*** PARTIALLY SUPERSEDED ***
+Canonical source: cl_ol_master_analysis.txt
+
+KNOWN ERRORS IN THIS FILE:
+  - GAP 1 variable names are WRONG (FFFF6624 called "MAF" but is RPM;
+    FFFF6350 called "RPM" but is ECT; FFFF65FC called "BPW" but is
+    engine_load_current). Verified from ROM bytes 2026-04-07.
+  - GAP 1 conclusion "ALL LIVE VALUES" is still correct — the condition
+    checker does read live sensor RAM, not snapshot copies.
+  - GAP 2 (CBBEF=1, snapshot every tick) is still correct.
+  - GAP 3 (SSM mode formatting) is still correct.
+  - GAP 4 (clol_post_transition dead code) is still correct.
+
+
 Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
 
 

@@ -3,6 +3,40 @@ CL/OL TRANSITION & AFL PERSISTENCE — CONSOLIDATED ANALYSIS
 AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
 
+CORRECTION NOTICE (2026-04-07)
+------------------------------
+ROM-verified address identity corrections applied throughout this file.
+Previous versions had the condition checker register-to-address mapping
+WRONG — the analysis author associated the per-gear RPM comparison with
+the wrong source register. Verified by disassembling ol_condition_checker
+(0x3643A) entry sequence from stock ROM bytes:
+
+  0x36452: R2 = 0xFFFF6624  →  FR14 = [FFFF6624]   ← compared against
+  0x36454: fmov.s @R2,FR14      per-gear RPM thresholds (CC180-CC1A4)
+
+  0x3645A: R2 = 0xFFFF6350  →  FR8  = [FFFF6350]   ← pushed to stack,
+  0x3645C: fmov.s @R2,FR8       NOT the RPM comparison register
+
+  0x36460: R2 = 0xFFFF65FC  →  FR15 = [FFFF65FC]
+  0x36462: fmov.s @R2,FR15
+
+CORRECTED IDENTITIES (verified against ImportAE5L600L.java + ROM bytes):
+  FFFF6624 = rpm_current      (301 refs) — WAS mislabeled "MAF"
+  FFFF6350 = ect_current      (205 refs) — WAS mislabeled "RPM"
+  FFFF65FC = engine_load_current (135 refs) — WAS mislabeled "BPW"
+  FFFF63C4 = ect_compensation  (43 refs) — WAS mislabeled "engine load"
+  FFFF63F8 = iat_current       (86 refs) — WAS mislabeled "MAP"
+  FFFF62DC = fuel_rate         (20 refs) — WAS mislabeled "sensor value"
+
+NOTE: Sections 7, 10, and 13 contain secondary address references
+(e.g., hysteresis handler inputs, AFC pipeline axes) that may also
+have incorrect labels. These are marked [NEEDS VERIFICATION] where
+the correct identity could not be confirmed from ROM bytes alone.
+
+THIS FILE supersedes cl_ol_analysis.txt, cl_ol_comprehensive_review.txt,
+cl_ol_state_machine.txt, and clol_gap_closure.txt. Those files retain
+the OLD WRONG address labels and should not be used as primary reference.
+
 
 TABLE OF CONTENTS
   1.  The Two Independent CL/OL Paths
@@ -28,7 +62,7 @@ SECTION 1: THE TWO INDEPENDENT CL/OL PATHS
 
   PATH A — OL Enrichment State Machine (7-Phase Pipeline):
     Controls: OL fuel enrichment computation
-    Condition checker: ol_condition_checker (throttle/RPM/load/BPW thresholds)
+    Condition checker: ol_condition_checker (throttle/RPM/load thresholds)
     Delay control: counter_B at FFFF79C4, set by CBC62 (modified=0)
     When delay=0: OL enrichment is computed immediately
     Flags written: FFFF79F2 (OL active), FFFF79C6 (mode state, always 0)
@@ -134,7 +168,7 @@ SECTION 4: FFFF7452 MASTER CL READINESS — FULL LOGIC
      (sub_1CF46 at ROM 0x01CF46 checks this)
 
   2. SPEED CONDITION (composite of many sub-checks):
-     a. RPM (FFFF6350) >= -15.0 (sanity check, always true)
+     a. ECT (FFFF6350) >= -15.0 (sanity: coolant never below -15°C)
      b. Speed table check: word@FFFF67EC >= table_lookup(FFFF6354)
         Table selected by byte@FFFF7829 (0=table1, 1=table2)
      c. AF sensor 1 (FFFF798C) within +/- 3.05e-5 of zero
@@ -145,8 +179,8 @@ SECTION 4: FFFF7452 MASTER CL READINESS — FULL LOGIC
   3. THROTTLE CONDITION:
      At least one of these hysteresis flags must be 1:
        FFFF7458: RPM delta (FFFF6898-FFFF620C) <= 570 (hyst 570/580)
-       FFFF745D: MAF (FFFF6624) <= 1000 (hyst 1000/1100)
-       FFFF745E: MAF table lookup result vs threshold
+       FFFF745D: RPM (FFFF6624) <= 1000 (hyst 1000/1100)
+       FFFF745E: RPM table lookup result vs threshold
      AND byte@FFFF65F6 != 1 (engine started flag)
      AND byte@FFFF7464 == 0
 
@@ -293,9 +327,9 @@ SECTION 7: AFL APPLICATION FUNCTION (0x37B74) — GATE ANALYSIS
 
   sub_37DD2 (GBR=FFFF7AD0) — HYSTERESIS HANDLER:
     Three hysteresis checks → master enable at FFFF7ADC:
-      Hyst 1: FFFF63C4 (load) vs CC314/CC318 = 0.0/0.0 (DEAD)
+      Hyst 1: FFFF63C4 (ect_compensation) vs CC314/CC318 = 0.0/0.0 (DEAD)
       Hyst 2: FFFF7AD8 vs CC31C/CC320 = 118.0/119.0 (unknown param)
-      Hyst 3: FFFF65FC (BPW) vs CC324/CC328 = 0.0/0.0 (DEAD)
+      Hyst 3: FFFF65FC (engine_load_current) vs CC324/CC328 = 0.0/0.0 (DEAD)
     FFFF7ADC = 1 only if all three pass AND FFFF7AD0==0 AND FFFF7AD2==0
 
   sub_37E70 (GBR=FFFF7AC0) — RAMP MULTIPLIER:
@@ -376,11 +410,11 @@ SECTION 10: CALIBRATION REFERENCE
 
   Address   Value    Description
   -------   -----    -----------
-  CBE64     -15.0    RPM lower sanity bound
+  CBE64     -15.0    ECT lower sanity bound (°C)
   CBE68     570.0    RPM delta hysteresis ON
   CBE6C     580.0    RPM delta hysteresis OFF
-  CBE70     1000.0   MAF hysteresis ON (g/s)
-  CBE74     1100.0   MAF hysteresis OFF (g/s)
+  CBE70     1000.0   RPM hysteresis ON (FFFF6624)
+  CBE74     1100.0   RPM hysteresis OFF (FFFF6624)
   CBE78     0.11     FFFF7BA8 upper bound for CL readiness
   CBE7C     -0.03    FFFF77DC lower bound (FFFF7453 only)
   CBE80     0.0      FFFF77DC upper bound (FFFF7453 only)
@@ -390,7 +424,7 @@ SECTION 10: CALIBRATION REFERENCE
   CBE90     0.5      Coolant flag 1 ON
   CBE94     5.0      Coolant flag 2 ON
   CBE98     5.0      Coolant flag 2 OFF
-  CBEA0     20.0     MAF table hysteresis offset
+  CBEA0     20.0     RPM table hysteresis offset
   CBEA4     -1.0     FFFF77C8 lower threshold
   CBBD6     4 (byte) Delay counter threshold
 
@@ -545,7 +579,7 @@ SECTION 13: AFC PIPELINE — COMPLETE ARCHITECTURE
     9. BRA 0x33460  tail-call aggregator
 
   --- cl_fuel_target_A (0x33CC0, 24 instructions) ---
-  Pure 2D table lookup: RPM (FFFF63F8) × Engine Load (FFFF6624).
+  Pure 2D table lookup: IAT (FFFF63F8) × RPM (FFFF6624). [NEEDS VERIFICATION]
   Selects one of 4 table descriptors by mode × AT/MT flag:
     0xAD8D4 / 0xAD8B8 (MT, mode 1/0)
     0xAD90C / 0xAD8F0 (AT, mode 1/0)
@@ -697,8 +731,8 @@ RAM ADDRESS MAP (ALL TRACED ADDRESSES)
   FFFF7458   byte    RPM delta hysteresis flag
   FFFF745B   byte    Delay counter 1 (FFFFA56B edge detector)
   FFFF745C   byte    Delay counter 2 (FFFFACF0 edge detector)
-  FFFF745D   byte    MAF hysteresis flag
-  FFFF745E   byte    MAF table hysteresis flag
+  FFFF745D   byte    RPM hysteresis flag (FFFF6624 <= 1000)
+  FFFF745E   byte    RPM table hysteresis flag
   FFFF745F   byte    Coolant flag 1
   FFFF7460   byte    Coolant flag 2
   FFFF7BA8   float   AFR deviation metric (from func_3952C, max 0.03, always < 0.11)
@@ -745,7 +779,7 @@ ROM FUNCTION MAP
 ================================================================================
 
   --- Path A ---
-  0x0003643A  Condition checker (throttle/RPM/load/BPW evaluation)
+  0x0003643A  Condition checker (throttle/RPM/load evaluation)
   0x0003580C  Phase 1: State snapshot + OL enrichment
   0x000357D0  Phase 3: Initialization
   0x00036008  Phase 4: Delay manager A
