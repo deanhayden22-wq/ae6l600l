@@ -113,9 +113,10 @@ SECTION 1: TASK 51 -- BOOST/WASTEGATE TARGET CALCULATION
           FR4 = FR0 * FR14 + FR4   (fmac: multiply-accumulate)
           where FR14 = ECT factor (0.7 or 2.0 from step 3)
 
-       f) Call 0xBE960 (float_max variant):
+       f) Call 0xBE960 (float_min = min(FR4, FR5)):
           FR4 = correction, FR5 = boost error from R12-124
-          Result clamped and stored to [FFFF8B50]
+          Result = min(correction, boost_error), stored to [FFFF8B50]
+          NOTE: Previously mislabelled "float_max". BE960 = min().
 
        g) MAF left bank error:
           FR8 = maf_voltage_left - [FFFF8B50]
@@ -182,8 +183,9 @@ SECTION 2: INTERMEDIATE FUNCTION (0x0549D4-0x0549F8)
   1. Read ignition_switch_state -> FR8
   2. Shift previous filtered value: workspace[-4] -> workspace[-8]
   3. Store new raw value: FR8 -> workspace[-4]
-  4. Call float_max (0xBE960) with current and previous
+  4. Call float_min (0xBE960) = min(current, previous)
   5. Store filtered result to [FFFF8B9C]
+  NOTE: Previously mislabelled "float_max". BE960 = min().
 
 
 ================================================================================
@@ -273,7 +275,7 @@ SECTION 5: DESCRIPTOR SUMMARY
   0xAEFF0    1D     6       RPM 0-5000           10,10,20,30,40,50      WG duty RPM scaling factor
   0xAEFFC    1D     10      Error -800 to 0      10..0 (ramp down)      Boost error correction
   0xBE830    --     --      (function)           table_desc_1d_float    Descriptor lookup utility
-  0xBE960    --     --      (function)           float_max/clamp        Max/clamp utility
+  0xBE960    --     --      (function)           float_min = min(FR4,FR5)
   0xBE53C    --     --      (function)           uint8_add_sat          Counter increment utility
   0xBEA40    --     --      (function)           boost_feedback_lerp    Feedback interpolation
 

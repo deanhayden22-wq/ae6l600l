@@ -318,10 +318,17 @@ Calls flkc_state_flag_reader_slot15 @ 0x2999C (FFFF971B convergence check) → r
 5.3  Blend State = 1 (active blending)
 ──────────────────────────────────────
   Reads FFFF7F3C, subtracts TimBlend_RatioCeiling (D2B1C = 1.0).
-  Calls float_max(result, 0.0) at 0xBE960.
+  Calls float_min(result, 0.0) at 0xBE960.
   Stores clamped result back to FFFF7F3C.
 
-  This ensures the blend ratio never exceeds 1.0 (full non-cruise).
+  CORRECTION: BE960 = min(FR4, FR5), not max. The operation is:
+    FFFF7F3C = min(FFFF7F3C - 1.0, 0.0)
+  This produces a non-positive value (how far below 1.0, capped at 0).
+  FFFF7F3C is a scratch variable — the result is likely used downstream
+  as a correction term, not as the final blend ratio itself.
+  Previous description "ensures blend ratio never exceeds 1.0" was based
+  on the incorrect assumption that BE960 = max(). Needs re-verification
+  of how this scratch value feeds into the final blend output.
 
 
 ================================================================================

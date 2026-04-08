@@ -424,10 +424,10 @@ public class ImportAE5L600L extends GhidraScript {
             "fr4/fr5 with zero-division guard. If fr5==0: returns +/-max based on sign of fr4");
         count += labelComment(0x000BE800, "float_clamp_with_step",
             "Soft clamp from above. If fr4>fr5: 1, if fr4>fr5-fr6: 0, else: fr4");
-        count += labelComment(0x000BE960, "float_max",
-            "Returns max(fr4, fr5). Called by PI controller for I-term floor");
-        count += labelComment(0x000BE970, "float_min",
-            "Returns min(fr4, fr5). Called by PI controller for I-term cap");
+        count += labelComment(0x000BE960, "float_min",
+            "Returns min(fr4, fr5). fcmp/gt FR4,FR5 → picks smaller. Called by PI controller for I-term cap");
+        count += labelComment(0x000BE970, "float_max",
+            "Returns max(fr4, fr5). fcmp/gt FR5,FR4 → picks larger. Called by PI controller for I-term floor");
         count += labelComment(0x000BEA40, "float_lerp",
             "Linear interpolation with NaN guard. result = fr4 + (fr5-fr4)*(1-fr6), convergence check via fr7");
         count += labelComment(0x000BEAB0, "float_abs_diff",
@@ -1116,17 +1116,18 @@ public class ImportAE5L600L extends GhidraScript {
         // ── Path A: WRITE4 / enrichment decay filter ──
         // FUN_0003606C (ol_enrichment_dispatch) at 0x36204 calls 1D lookup using AD090 descriptor,
         // result written to FFFF79E0 each cycle (the enrichment decay rate per task cycle).
-        count += labelComment(0x000AD090, "OL_Enrich_DecayRate_Desc",
-            "OL enrichment decay rate 1D descriptor (16 bytes). Axis: RPM 0-8000 (9 points). "
+        count += labelComment(0x000AD090, "OL_Enrich_RampRate_Desc",
+            "OL enrichment ramp rate 1D descriptor (16 bytes). Axis: RPM 0-8000 (9 points). "
             + "Values: step-floor u16 table at CE5A4, scale 1/32768. "
-            + "Output FFFF79E0 subtracted from FFFF798C each cycle to decay OL blend back to 0. "
-            + "At 0-4000 RPM: 100/32768 = 0.003052/cycle → ~1.68s to decay 0.512 at 100Hz.");
-        count += labelComment(0x000CE580, "OL_Enrich_DecayRate_Axis",
-            "OL enrichment decay rate RPM axis: 9 × f32: 0/1000/2000/3000/4000/5000/6000/7000/8000 RPM.");
-        count += labelComment(0x000CE5A4, "OL_Enrich_DecayRate_Table",
-            "OL enrichment decay rate step table: 9 × u16: [100,100,100,100,100,50,50,37,37]. "
-            + "Scale by 1/32768 for per-cycle decay rate. Higher = faster CL→OL transition. "
-            + "Stock at 0-4000 RPM: 100 = ~1.68s decay. At 7000+ RPM: 37 = ~4.53s (intentionally slower).");
+            + "Output FFFF79E0 ADDED to FFFF798C each cycle in FILTERED_UPDATE (0x36262: fadd). "
+            + "float_max (0xBE970) clamps result above floor target (FFFF7990). "
+            + "At 0-4000 RPM: 100/32768 = 0.003052/cycle. Higher = faster OL enrichment ramp.");
+        count += labelComment(0x000CE580, "OL_Enrich_RampRate_Axis",
+            "OL enrichment ramp rate RPM axis: 9 × f32: 0/1000/2000/3000/4000/5000/6000/7000/8000 RPM.");
+        count += labelComment(0x000CE5A4, "OL_Enrich_RampRate_Table",
+            "OL enrichment ramp rate step table: 9 × u16: [100,100,100,100,100,50,50,37,37]. "
+            + "Scale by 1/32768 for per-cycle ramp step. Higher = faster CL→OL transition. "
+            + "Stock at 0-4000 RPM: 100 = 0.003052/cycle. At 7000+ RPM: 37 = 0.001129/cycle (intentionally slower).");
 
         // ── Path A: post-condition handler (0x36848) enrichment table descriptors ──
         // At 0x368D2 / 0x368EC: CC224 is used as enrichment accumulation offset
@@ -1166,7 +1167,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "Stock=0.0 effectively disables this gate.");
         count += labelComment(0x000CC230, "OL_Hyst_RateLimit",
             "OL hysteresis sub rate limit = 0.004. "
-            + "clol_hysteresis_sub (0x36B8A): applied via float_max (0xBE960) "
+            + "clol_hysteresis_sub (0x36B8A): applied via float_min (0xBE960) "
             + "to limit rate of change of enrichment working value at FFFF7A0C.");
 
         // ── Path A: delay manager B (0x36BF4) calibrations ──
@@ -1198,10 +1199,10 @@ public class ImportAE5L600L extends GhidraScript {
             + "clol_delay_manager_B (0x36CD6): word@FFFF67EC vs 624 to gate enrichment ramp.");
         count += labelComment(0x000CC254, "OL_DelayB_RateLimit_A",
             "OL delay manager B rate limit A = 0.3. "
-            + "clol_delay_manager_B (0x36D5A): rate-limits FFFF7A1C-4 via float_max (0xBE960).");
+            + "clol_delay_manager_B (0x36D5A): rate-limits FFFF7A1C-4 via float_min (0xBE960).");
         count += labelComment(0x000CC258, "OL_DelayB_RateLimit_B",
             "OL delay manager B rate limit B = 0.15. "
-            + "clol_delay_manager_B (0x36CE6): FFFF7A1C step-rate via rate_limit_interp (0xBE970).");
+            + "clol_delay_manager_B (0x36CE6): FFFF7A1C step-rate via float_max (0xBE970).");
 
         // Path B (FFFF7452) readiness thresholds — all identical stock vs modified
         count += labelComment(0x000CBBEF, "CL_Phase1_Counter_Threshold",
@@ -5073,10 +5074,10 @@ public class ImportAE5L600L extends GhidraScript {
             "2D table lookup utility.");
         count += labelComment(0x000BE944, "table_lookup_2D_int",
             "2D table lookup returning integer.");
-        count += labelComment(0x000BE960, "float_max",
-            "Returns max(FR4, FR5) in FR0.");
-        count += labelComment(0x000BE970, "rate_limit_interp",
-            "Rate-limited interpolation utility.");
+        count += labelComment(0x000BE960, "float_min",
+            "Returns min(FR4, FR5) in FR0. fcmp/gt FR4,FR5.");
+        count += labelComment(0x000BE970, "float_max",
+            "Returns max(FR4, FR5) in FR0. fcmp/gt FR5,FR4.");
         count += labelComment(0x000BEAB0, "table_lookup_err_scale",
             "Table lookup with error scaling.");
 

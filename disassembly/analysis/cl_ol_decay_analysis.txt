@@ -1,7 +1,16 @@
 ================================================================================
-CL/OL DECAY DELTA — FFFF79E0 ANALYSIS
+CL/OL RAMP DELTA — FFFF79E0 ANALYSIS
 AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
+
+CORRECTION NOTICE (2026-04-07)
+------------------------------
+Original analysis incorrectly described FFFF79E0 as a NEGATIVE decay delta.
+The table lookup produces POSITIVE values (u16 × 1/32768), no fneg exists
+in the code path, and the FILTERED_UPDATE at 0x36262 uses fadd (not fsub).
+0xBE970 is float_max (not float_min as Ghidra import previously labelled).
+The mechanism is a RAMP-UP of the OL enrichment accumulator with a floor
+clamp, not a decay. All references to "decay" have been corrected to "ramp."
 
 WRITE SITE
 ----------
@@ -72,23 +81,45 @@ OUTPUT (value written to FFFF79E0)
   5000 - 6000    50        50/32768 = 0.001526 per cycle
   7000 - 8000    37        37/32768 = 0.001129 per cycle
 
-DECAY TIMING (at 100Hz ECU cycle rate)
+USAGE IN FILTERED_UPDATE (0x36250-0x36270)
+--------------------------------------------
+FFFF79E0 is POSITIVE and ADDED to FFFF798C each cycle via fadd (0x36262).
+The result is clamped from below by float_max (0xBE970) against the
+blended target floor (FFFF7990):
+
+  0x03625A: FR4 = [FFFF798C]           ; current accumulator
+  0x036260: FR8 = [FFFF79E0]           ; ramp step (POSITIVE)
+  0x036262: FR4 = FR4 + FR8            ; fadd — accumulator INCREASES
+  0x036268: jsr 0xBE970                ; float_max(FR4, FR5)
+  0x03626A: FR5 = [FFFF7990]           ; delay slot: floor = blended target
+  0x036270: [FFFF798C] = FR0           ; result = max(ramped, floor)
+
+This ramps FFFF798C upward during the FILTERED_UPDATE path of WRITE 4.
+The max() clamp ensures FFFF798C never drops below the blended target.
+
+NOTE: OL→CL transition (FFFF798C returning to zero) appears to happen
+via DIRECT_ASSIGN (0x362F8), which snaps FFFF798C to the new target
+in one cycle — NOT through gradual decay via this table.
+
+RAMP TIMING (at 100Hz ECU cycle rate)
 ----------------------------------------
-FFFF798C += FFFF79E0 each cycle (value is NEGATIVE = decrement).
-Initial FFFF798C ~ 0.512 (estimated from 1.68s timing).
+Per-cycle step sizes and approximate time to ramp accumulator by 0.512:
 
-  At 0-4000 RPM:    0.512 / 0.003052 / 100Hz = ~1.68 seconds to decay to 0
-  At 5000-6000 RPM: 0.512 / 0.001526 / 100Hz = ~3.35 seconds
-  At 7000-8000 RPM: 0.512 / 0.001129 / 100Hz = ~4.53 seconds
+  RPM range     step/cycle    ~time to ramp 0.512
+  ---------     ----------    -------------------
+  0   - 4000    0.003052      0.512 / 0.003052 / 100Hz = ~1.68 seconds
+  5000 - 6000   0.001526      0.512 / 0.001526 / 100Hz = ~3.35 seconds
+  7000 - 8000   0.001129      0.512 / 0.001129 / 100Hz = ~4.53 seconds
 
-(At higher RPM, CL->OL transition takes LONGER -- this may be intentional.)
+(At higher RPM, the ramp is SLOWER — this may be intentional to smooth
+the OL enrichment ramp-in at high RPM.)
 
 TUNING
 -------
-To make the CL->OL transition FASTER: INCREASE u16 values at ROM 0xCE5A4.
+To make the OL enrichment ramp FASTER: INCREASE u16 values at ROM 0xCE5A4.
 To make it SLOWER: DECREASE them.
 
-Example: doubling all values halves the decay time (~0.84s at low RPM):
+Example: doubling all values halves the ramp time (~0.84s at low RPM):
   ROM 0xCE5A4: 0x00C8 0x00C8 0x00C8 0x00C8 0x00C8 0x0064 0x0064 0x004A 0x004A
   (200, 200, 200, 200, 200, 100, 100, 74, 74)
 
@@ -100,8 +131,14 @@ confirm what signal is being fed to the lookup before modifying the table.
 
 KEY ROM ADDRESSES FOR PATCHING
 --------------------------------
-  0xCE5A4  u16[9]: value table (what to patch for faster/slower decay)
+  0xCE5A4  u16[9]: value table (what to patch for faster/slower ramp)
   0xCE580  f32[9]: axis breakpoints (do not patch unless changing RPM axis)
   0xAD09C  f32:    scale = 0x38000000 = 1/32768 (do not patch)
   0xAD090  struct: 16-byte descriptor (do not patch)
   0x3620E  code:   fmov.s FR0,@(R0,R12) write site (do not patch)
+
+FUNCTION CLARIFICATION (verified from ROM bytes)
+-------------------------------------------------
+  0xBE960: float_min — returns min(FR4, FR5). Opcode F455 = fcmp/gt FR4,FR5.
+  0xBE970: float_max — returns max(FR4, FR5). Opcode F545 = fcmp/gt FR5,FR4.
+  Previous Ghidra labels had these SWAPPED (BE960="float_max", BE970="float_min").

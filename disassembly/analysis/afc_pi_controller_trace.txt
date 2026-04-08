@@ -59,7 +59,7 @@ SECTION 1: PI CONTROLLER (0x342A8) — REGISTER-LEVEL TRACE
     The PI error is NOT (measured_AFR - target_AFR).
     It is (conditioned_O2_sensor - aggregator_correction_state).
     FFFF6540 = conditioned O2 value (from Stage 3, rate-limited ±0.02/cycle)
-    FFFF77C8 = aggregator output (from Stage 9, rate-limited via rate_limit_interp)
+    FFFF77C8 = aggregator output (from Stage 9, clamped via float_clamp (0xBE56C))
 
 
   P-TERM EVALUATION (0x342DC-0x342FE):
@@ -138,16 +138,18 @@ SECTION 1: PI CONTROLLER (0x342A8) — REGISTER-LEVEL TRACE
       0x34350:  FR4 = float@FFFF7818           ; current I-term
       0x34352:  FR8 = float@CC00C = 1.0        ; step size
       0x34356:  FR4 = FR4 - 1.0                ; step down
-      0x34358:  jsr float_max                   ; rich-direction clamp
+      0x34358:  jsr float_min (0xBE960)        ; rich-direction ceiling clamp
       0x3435E:  write FR0 to FFFF7818           ; store clamped result
+      ; min(FR4, FR5) caps I-term from above (ceiling)
 
     Path 3 — Lean correction (I-term < 0.0):
       0x3436A:  R6 = &FFFF7864
       0x3436E:  FR4 = float@FFFF7818           ; current I-term
       0x34370:  FR8 = float@CC00C = 1.0        ; step size
       0x34374:  FR4 = FR4 + 1.0                ; step up
-      0x34376:  jsr rate_limit_interp                   ; lean-direction clamp
+      0x34376:  jsr float_max (0xBE970)        ; lean-direction floor clamp
       0x3437C:  write FR0 to FFFF7818           ; store clamped result
+      ; max(FR4, FR5) prevents I-term from going below floor
 
     Path 4 — Disabled / within limits:
       0x34388:  FR5 = 0.0
@@ -207,7 +209,7 @@ SECTION 2: TAIL AGGREGATOR — afc_output (FFFF77C8) WRITER (0x33460)
     Operation: same as Path 1 — direct copy FFFF77BC → FFFF77C8
     Result: FFFF77C8 = FFFF77BC (immediate, when bounds pass)
 
-  Write Path 3 (0x33618-0x33634) — RATE-LIMITED (normal path):
+  Write Path 3 (0x33618-0x33634) — CLAMPED (normal path):
     Condition: bounds check from Path 2 failed (fallthrough)
     Operation:
       FR4 = float@FFFF77C4           ; current intermediate
@@ -215,11 +217,14 @@ SECTION 2: TAIL AGGREGATOR — afc_output (FFFF77C8) WRITER (0x33460)
       FR4 = FR4 + 1.0                ; add offset to intermediate
       FR6 = float@FFFF77BC           ; target (base value)
       FR5 = float@CBF58 = 0.9        ; clamp factor
-      FR0 = rate_limit_interp(FR4, FR5, FR6) ; rate_limit_interp
+      FR0 = float_clamp(FR4, FR5, FR6) ; 0xBE56C: clamp(FR4, min=FR5, max=FR6)
       write FR0 to FFFF77C4          ; update intermediate
       FR8 = float@FFFF77C4           ; reload
       write FR8 to FFFF77C8          ; propagate to output
-    Result: FFFF77C8 = rate_limit_interp(FFFF77C4 + 1.0, 0.9, FFFF77BC)
+    Result: FFFF77C8 = clamp(FFFF77C4 + 1.0, 0.9, FFFF77BC)
+    NOTE: Calls 0xBE56C (3-arg float_clamp), NOT 0xBE970 (2-arg float_max).
+    Previously mislabelled "rate_limit_interp". The function clamps the
+    intermediate value to [0.9, base_value], preventing overshoot.
 
   CALIBRATION CONSTANTS:
     CBF44 = 5.0     Path 2 upper bound for table lookup result
@@ -240,7 +245,7 @@ SECTION 3: AFC SIGNAL FLOW — CORRECTED ARCHITECTURE
     error = FFFF6540 - FFFF77C8
     where:
       FFFF6540 = O2 sensor after Stage 3 conditioning (rate-limited ±0.02/cycle)
-      FFFF77C8 = tail aggregator output (rate-limited via rate_limit_interp, clamp=0.9)
+      FFFF77C8 = tail aggregator output (clamped to [0.9, base] via float_clamp (0xBE56C))
 
   The PI controller drives the conditioned sensor toward the aggregator
   state, NOT toward a target AFR. Both signals are independently
@@ -293,11 +298,26 @@ SECTION 5: OPEN QUESTIONS
      Stage 3 (afc_sensor_prep at 0x33658) reads it as input but the
      actual ADC pipeline writer has not been traced.
 
-  2. rate_limit_interp INTERNALS — NOT YET TRACED
-     The rate_limit_interp function is called in both the tail
-     aggregator (FFFF77C8 path) and the PI output stage. Understanding
-     its exact clamping behavior would clarify the rate at which
-     FFFF77C8 tracks changes.
+  2. rate_limit_interp INTERNALS — RESOLVED
+     The "rate_limit_interp" label was incorrect. Two different functions
+     were conflated under this name:
+
+     a) Tail aggregator (FFFF77C8 path, Write Path 3 at 0x33628):
+        Calls 0xBE56C = float_clamp(FR4, FR5, FR6) — a 3-argument
+        clamp function. Clamps the intermediate to [0.9, FFFF77BC].
+        This is NOT 0xBE970.
+
+     b) PI controller Path 3 (lean-direction, 0x34376):
+        Calls 0xBE970 = float_max(FR4, FR5) — a 2-argument max().
+        Returns max(I_term + 1.0, floor). Floor clamp on I-term.
+
+     The original analysis described both as "rate_limit_interp" because
+     the Ghidra import had 0xBE970 mislabelled. They are distinct
+     functions at different addresses with different argument counts.
+
+     0xBE960 = float_min = min(FR4, FR5): 8 instructions, fcmp/gt FR4,FR5
+     0xBE970 = float_max = max(FR4, FR5): 8 instructions, fcmp/gt FR5,FR4
+     0xBE56C = float_clamp(FR4, FR5, FR6): 3-arg range clamp
 
   3. FFFF77BC COMPUTATION — PARTIALLY TRACED
      The base value at FFFF77BC is itself computed from multiple

@@ -1086,9 +1086,11 @@ WRITE 4 — ROM 0x36238-0x36306: FILTERED UPDATE (else path, mode = 0)
 
   FILTERED_UPDATE (0x36250-0x36270):
     FFFF7990 = FR15 * [FFFF79A0]          ; target × blend coefficient
-    FR4 = [FFFF798C] + [FFFF79E0]         ; current + decay delta (negative)
-    [FFFF798C] = max(FR4, [FFFF7990])     ; clamp via 0xBE970
-    This is exponential decay with a floor clamp at the blended target.
+    FR4 = [FFFF798C] + [FFFF79E0]         ; current + ramp step (POSITIVE)
+    [FFFF798C] = max(FR4, [FFFF7990])     ; floor clamp via 0xBE970 (float_max)
+    This is a ramp-up with a floor clamp at the blended target.
+    NOTE: FFFF79E0 is POSITIVE (u16 × 1/32768), not negative.
+    See corrected cl_ol_decay_analysis.txt.
 
   DIRECT_ASSIGN (0x362F8-0x36306):
     FFFF7990 = FR15 * [FFFF79A0]          ; target × blend coefficient

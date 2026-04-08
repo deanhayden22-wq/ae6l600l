@@ -473,9 +473,11 @@ SECTION 12: WRITE 4 FILTER — FFFF798C UPDATE ALGORITHM (0x36238-0x36306)
 
   FILTERED_UPDATE path (0x36250-0x36270):
     FFFF7990 = FR15 * FFFF79A0         // target × blend coefficient
-    FR4 = FFFF798C + FFFF79E0          // current + decay delta (negative)
+    FR4 = FFFF798C + FFFF79E0          // current + ramp step (POSITIVE)
     FFFF798C = max(FR4, FFFF7990)      // clamp: don't drop below target
-    // Subroutine 0xBE970 (clamp_lower) computes the max()
+    // Subroutine 0xBE970 (float_max) computes the max()
+    // NOTE: FFFF79E0 is POSITIVE (u16 table × 1/32768). This is a
+    // ramp-up, not a decay. See corrected cl_ol_decay_analysis.txt.
 
   DIRECT_ASSIGN path (0x362F8-0x36306):
     FFFF7990 = FR15 * FFFF79A0         // target × blend coefficient

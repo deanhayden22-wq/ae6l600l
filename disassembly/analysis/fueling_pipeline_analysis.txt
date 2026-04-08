@@ -140,7 +140,7 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
        - Read value from aggregator struct via @R11
        - Call table_lookup_err_scale (0xBEAB0) with FR4=FR14, FR5=struct value
        - Check result: if R14 == 1, proceed with rate-limited update
-       - Multiple paths with rate_limit_interp (0xBE970) and 0xBE960 calls
+       - Multiple paths with float_max (0xBE970) and float_min (0xBE960) calls
        - Rate limiting uses calibration constants:
          0xCBF74 = -0.02 (negative rate limit)
          0xCBF78 = +0.02 (positive rate limit)
@@ -160,8 +160,8 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
   SUBROUTINES (12 internal helpers + 3 library calls):
     0x32F5A, 0x32F66         (fuel correction helpers)
     0x3355A-0x335D2          (10 inline subroutines — sensor conditioning)
-    0xBE960                  (float_max: returns max(FR4, FR5) in FR0)
-    0xBE970                  (rate_limit_interp)
+    0xBE960                  (float_min: returns min(FR4, FR5) in FR0)
+    0xBE970                  (float_max: returns max(FR4, FR5) in FR0)
     0xBEAB0                  (table_lookup_err_scale)
 
   OUTPUT: Conditioned sensor value written to aggregator_struct
@@ -250,7 +250,7 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
        - desc 0xAD928 → 2D[11×10] blend table
     6. Blend computation: out = P * alpha + I * (1 - alpha)
        where alpha comes from desc 0xAD928
-    7. Rate limiting via 0xBE970 (rate_limit_interp)
+    7. Rate limiting via 0xBE970 (float_max)
     8. Calibration constants:
        0xCBFF4 = 4.0 (gain scaler)
        0xCBFF8 = 10.0 (rate limit high)
@@ -762,7 +762,7 @@ SECTION 8: MAIN IPW CALCULATOR — func_38158
     float_clamp_apply(-1.0, 1.0) → R10[-48]
 
     Rate gate (GBR+76):
-      if GBR+76 == 0: rate_limit_interp(0.0, prev, R10[-76]) → R10[-44]
+      if GBR+76 == 0: float_max(0.0, prev) → R10[-44]
       else: hysteresis-tracked → R10[-44]
 
   BLEND CHANNEL B (if WOT_active, 0x3850A):
@@ -798,7 +798,7 @@ SECTION 8: MAIN IPW CALCULATOR — func_38158
   1D TRIM LOOKUP (0x386DA):
     desc 0xAC698: gain = table_lookup_1D(R10[-16])
     GBR+35*2 vs GBR+12 compare
-    rate_limit_interp → R10[-12]
+    float_max → R10[-12]
 
   FINAL OUTPUT BLEND (0x38708 - 0x38844):
     if stack+4 == 1 (init): jump to epilogue (write 0.0)
@@ -1106,8 +1106,8 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
              0x22F92  (unknown ECT sub — takes FR14=ECT_float)
              0xBE56C  float_clamp_apply
              0xBE830  table_lookup_1D
-             0xBE960  float_max
-             0xBE970  rate_limit_interp
+             0xBE960  float_min
+             0xBE970  float_max
              0xAB69C  descriptor for table_lookup_1D (mode correction table)
              0xADA98  descriptor for table_lookup_1D (GBR+40 init table)
              0x4059E  unknown
@@ -1164,7 +1164,7 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
             FR13, FR12, FR15 = similar sums with per-cylinder offsets
             → bra L_3F760
 
-  Mode != 90 (default): calls rate_limit_interp sequentially for each
+  Mode != 90 (default): calls float_max (0xBE970) sequentially for each
             FFFF803C/805C → FFFF8028 → FFFF80C4 → FFFF7F6C → FFFF80F0
             then reconstructs 4 channel targets
             → bra L_3F760
@@ -1183,14 +1183,14 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
   COMMON OUTPUT PATH (L_3F88E)
   ─────────────────────────────
 
-  // Mode 90: direct sum; else: rate_limit_interp for FFFF7F6C channel
+  // Mode 90: direct sum; else: float_max (0xBE970) for FFFF7F6C channel
   FR0 += FFFF7F0C + stack+4 - stack+8  [+/- adjustment]
 
   // Add to FFFF81DC per_cyl_base_corr (per-cylinder correction base struct)
   for i in [0, 4, 8, 12]:
       stack+(32+i) = FFFF81DC[i] + FR0      // 4 per-channel adjusted targets
 
-  // Rate-limit each of 4 channels individually via rate_limit_interp (0xBE970)
+  // Rate-limit each of 4 channels individually via float_max (0xBE970)
   // using FFFF7F04[-64] as upper limit and FFFF7F04[-68] as lower limit:
   FFFF7EB0 = rate_limit(FR14, limits)    // channel 0 after rate limit
   FFFF7EB4 = rate_limit(FR13, limits)    // channel 1
@@ -1528,14 +1528,14 @@ CONFIRMED WRITE SITE: func_517A0 @ 0x5189C
   Prologue:     push R8-R14, sts.l PR, push FR12-FR15, add #-12,R15 (12 locals)
 
   Computation sequence leading to the write (FFFF8964 = struct base in R14):
-    a) FR0 is produced by rate_limit_interp (0xBE970) called at 0x5188E
+    a) FR0 is produced by float_max (0xBE970) called at 0x5188E
        with FR5 = (rate_limit pass from 0x5186E call) and FR5 (1000.0 clamp)
     b) FR14 = running composite (0x51884: fmov FR0,FR14 after the computation):
          FR0  += @(FFFF8964-4)  = FFFF8960  [add recent computed field]
          FR0  -= @(FFFF8964-48) = FFFF8934  [subtract reference term A]
          FR0  -= @(FFFF8964-28) = FFFF8948  [subtract reference term B]
     c) 0x51898: fmov FR14,FR4 (FR4 = composite FR14 for float_max)
-    d) 0x51896: jsr float_max (0xBE960), FR0 = float_max(FR4, FR5=prev_limit)
+    d) 0x51896: jsr float_min (0xBE960), FR0 = min(FR4, FR5=prev_limit)
     e) 0x5189A: R0 = -8
     f) 0x5189C: fmov.s FR0,@(R0,R14)  ; WRITE to FFFF895C
     g) 0x5189E: fmov.s @(R0,R14),FR8  ; READ BACK FFFF895C -> FR8
