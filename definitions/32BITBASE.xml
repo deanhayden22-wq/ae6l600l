@@ -1361,10 +1361,11 @@
 		</table>
 	</table>
 
-	<table name="CL to OL Enrichment Threshold (MAF)" category="Fueling - CL/OL Transition" type="2D" level="3" scaling="%">
-		<description>With CL to OL Delay set to 0, this table controls when OL enrichment begins. The enrichment computation runs every cycle and this table determines the enrichment output based on MAF. When the output is non-zero, OL mode activates. Axis is MAF (g/s), data is enrichment intermediate value.</description>
-		<table name="Mass Airflow" type="Y Axis" elements="6" scaling="MassAirflow(g/s)1"/>
-	</table>
+	<!-- REMOVED: "CL to OL Enrichment Threshold (MAF)" was a duplicate of
+	     "Minimum Primary Open Loop Enrichment (Throttle)" (same ROM address).
+	     Axis is throttle plate opening % (10.93-89.06), not MAF g/s.
+	     Code input traced to FFFF64D8 (throttle_raw). Correct entry exists
+	     under "Fueling - Primary Open Loop" category above. -->
 
 	<table name="Injector Latency_" category="Fueling - Injectors" type="3D" level="2" scaling="Latency(ms)">
 		<description>Injector latency (dead-time)</description>

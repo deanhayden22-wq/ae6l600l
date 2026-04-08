@@ -303,9 +303,10 @@
 	<table name="CL Delay Maximum Engine Speed (Neutral)" category="Fueling - CL/OL Transition" address="cc1a8">
 	</table>
 
-	<table name="CL to OL Enrichment Threshold (MAF)" category="Fueling - CL/OL Transition" address="ccda0">
-		<table name="Mass Airflow" address="ccd88"/>
-	</table>
+	<!-- REMOVED: "CL to OL Enrichment Threshold (MAF)" at ccda0 was a duplicate
+	     of "Minimum Primary Open Loop Enrichment (Throttle)" (same address).
+	     Axis at ccd88 is throttle % (10.93-89.06), not MAF. Input is FFFF64D8
+	     (throttle_raw). Correct entry exists earlier in this file. -->
 
 	<table name="Injector Latency_" category="Fueling - Injector" address="d106c">
 		<table name="Battery Output" address="d104c"/>
@@ -1909,8 +1910,8 @@
 		<description>Ceiling value for the timing blend ratio. Stock value: 1.0.</description>
 	</table>
 
-	<table name="AFL Decay Rate (CL to OL Transition Speed)" category="Fueling - CL/OL Transition" address="ce5a4" type="2D" level="3" scaling="AFLDecayRate">
-		<description>Controls how quickly the A/F Learning (AFL) correction decays toward zero when transitioning from closed loop to open loop. This is an additive decay applied each ECU cycle to the internal AFL accumulator (FFFF798C). When the accumulator reaches near-zero the CL to OL mode switch fires. Higher values = faster decay = faster CL to OL transition. Stock value at low RPM (0-4000): 0.003052 (~1.68s transition at WOT from ~2900 RPM). The axis is engine speed (RPM). Note: this table controls the natural transition timing built into the ECU - it is NOT the CL to OL Delay counter parameter.</description>
+	<table name="OL Enrichment Ramp Rate" category="Fueling - CL/OL Transition" address="ce5a4" type="2D" level="3" scaling="AFLDecayRate">
+		<description>Controls how quickly the OL enrichment accumulator (FFFF798C) ramps up during the FILTERED_UPDATE path of the CL/OL transition. This is a POSITIVE per-cycle step added to the accumulator via fadd (ROM 0x36262), with float_max (0xBE970) clamping the result above the blended target floor. Higher values = faster ramp = faster CL to OL enrichment activation. Stock at 0-4000 RPM: 100/32768 = 0.003052/cycle. At 7000+ RPM: 37/32768 = 0.001129/cycle (intentionally slower). Not related to AFL. Axis is engine speed (RPM). Note: this table does NOT control the CL to OL Delay counter.</description>
 		<table name="Engine Speed" type="X Axis" address="ce580" elements="9" scaling="RPM"/>
 	</table>
 

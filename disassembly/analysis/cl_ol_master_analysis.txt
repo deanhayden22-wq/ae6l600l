@@ -447,17 +447,30 @@ SECTION 11: OPEN QUESTIONS — ALL RESOLVED
 
 
 ================================================================================
-SECTION 12: WRITE 4 FILTER — FFFF798C UPDATE ALGORITHM (0x36238-0x36306)
+SECTION 12: FFFF798C UPDATE ALGORITHM — CORRECTED (2026-04-07)
 ================================================================================
 
   FFFF798C is the OL enrichment accumulator and the BRIDGE between
   Path A (OL enrichment) and Path B (CL/OL mode flag). Path B checks
   if FFFF798C is near zero (within 3.05e-5) to allow CL mode.
 
-  WRITE 4 runs inside Phase 2 (ol_fuel_map_selector) when mode state
-  (FFFF79C6) is 0 — the normal runtime state.
+  MODE STATE (FFFF79C6) — DEAD CODE
+  ----------------------------------
+  The mode state byte at FFFF79C6 is read at 0x0361EC and tested at
+  0x036210 (mode=1 → WRITE 2) and 0x036220 (mode=2 → WRITE 3).
+  However, FFFF79C6 is NEVER WRITTEN to a non-zero value by any CL/OL
+  function in the analyzed code. It stays at 0 (its reset value).
 
-  TWO INPUTS determine the path:
+  This means:
+    WRITE 2 (mode=1, direct copy from FFFF79B8): DEAD CODE — never fires
+    WRITE 3 (mode=2, fmac blend): DEAD CODE — never fires
+    WRITE 4 (mode=0, filtered update): THE ONLY ACTIVE PATH at runtime
+
+  All runtime accumulator updates go through WRITE 4 exclusively.
+
+  WRITE 4 — THE ACTIVE PATH (0x36238-0x36306)
+  ---------------------------------------------
+  TWO INPUTS determine the sub-path:
     stack[32] = range_check(enrichment_value, 0.0, tolerance)
                0 = enrichment IS near zero (CL conditions)
                nonzero = enrichment NOT near zero (OL active)
@@ -465,30 +478,47 @@ SECTION 12: WRITE 4 FILTER — FFFF798C UPDATE ALGORITHM (0x36238-0x36306)
                0 = accumulator at target (settled)
                nonzero = accumulator NOT at target (still ramping)
 
-  CONTROL FLOW:
+  DECISION TREE:
     if enrichment near zero AND accumulator at target → DIRECT_ASSIGN
     if enrichment near zero AND accumulator NOT at target → FILTERED
     if enrichment NOT near zero AND OL NOT active → FILTERED
     if enrichment NOT near zero AND OL active → check settled → either
 
-  FILTERED_UPDATE path (0x36250-0x36270):
+  FILTERED_UPDATE path (0x36250-0x36270) — RAMP UP:
     FFFF7990 = FR15 * FFFF79A0         // target × blend coefficient
     FR4 = FFFF798C + FFFF79E0          // current + ramp step (POSITIVE)
-    FFFF798C = max(FR4, FFFF7990)      // clamp: don't drop below target
-    // Subroutine 0xBE970 (float_max) computes the max()
-    // NOTE: FFFF79E0 is POSITIVE (u16 table × 1/32768). This is a
-    // ramp-up, not a decay. See corrected cl_ol_decay_analysis.txt.
+    FFFF798C = max(FR4, FFFF7990)      // floor clamp via float_max (0xBE970)
 
-  DIRECT_ASSIGN path (0x362F8-0x36306):
+    FFFF79E0 is POSITIVE (u16 table at CE5A4 × 1/32768, via fadd at 0x36262).
+    This RAMPS the accumulator UPWARD each cycle. The max() clamp prevents
+    it from dropping below the blended target floor. At low RPM, the step
+    is 0.003052/cycle. See cl_ol_decay_analysis.txt for full timing.
+
+  DIRECT_ASSIGN path (0x362F8-0x36306) — SNAP:
     FFFF7990 = FR15 * FFFF79A0         // target × blend coefficient
-    FFFF798C = FFFF7990                // snap to blended target
+    FFFF798C = FFFF7990                // snap to blended target in one cycle
 
-  RESPONSE TIME: When Path A fires at WOT, FFFF798C jumps from 0.0
-  to the blended enrichment target in ONE task cycle (~10ms). The
-  blend coefficient (FFFF79A0, ~0.1 from CC284) times a typical OL
-  enrichment of 0.3 gives 0.03, which vastly exceeds the 3.05e-5
-  tolerance in Path B's near-zero check. Path B switches within 1-2
-  cycles of Path A firing.
+  CL→OL TRANSITION (entering open loop):
+    When Path A fires at WOT, FFFF798C jumps from 0.0 to the blended
+    enrichment target in ONE task cycle (~10ms) via DIRECT_ASSIGN. The
+    blend coefficient (FFFF79A0, ~0.1 from CC284) times a typical OL
+    enrichment of 0.3 gives 0.03, vastly exceeding the 3.05e-5 tolerance
+    in Path B's near-zero check. Path B switches within 1-2 cycles.
+
+  OL→CL TRANSITION (returning to closed loop):
+    When the driver lifts off throttle:
+    1. Path A condition checker stops triggering → enrichment input drops
+    2. Enrichment approaches zero → stack[32] = 0 (enrichment near zero)
+    3. Once accumulator reaches the new near-zero target:
+       stack[36] = 0 (at target) → DIRECT_ASSIGN fires
+    4. FFFF798C snaps to ~0 in ONE cycle via DIRECT_ASSIGN
+    5. Path B condition 2c passes (FFFF798C within ±3.05e-5 of zero)
+    6. FFFF7448 = 1 → CL mode restored
+
+    NOTE: The CE5A4 ramp rate table does NOT control OL→CL timing.
+    OL→CL happens via DIRECT_ASSIGN (instant snap), not gradual decay.
+    The CE5A4 table controls CL→OL ramp-up speed in the FILTERED_UPDATE
+    path, which fires when the system is ramping enrichment upward.
 
 
 ================================================================================
@@ -770,8 +800,8 @@ ROM FUNCTION MAP
   0x000BE554  Saturating word add
   0x000BE830  Table interpolation (Pull3DFloat)
   0x000BE8E4  2D table interpolation (RPM×Load style)
-  0x000BE960  Clamp lower (max)
-  0x000BE970  Clamp upper (min)
+  0x000BE960  float_min — min(FR4, FR5). Opcode F455 = fcmp/gt FR4,FR5.
+  0x000BE970  float_max — max(FR4, FR5). Opcode F545 = fcmp/gt FR5,FR4.
   0x000BEA40  Blend/clamp
   0x000BEAB0  Table lookup (error scaling)
 

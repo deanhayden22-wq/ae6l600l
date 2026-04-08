@@ -1681,9 +1681,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF79C7L, "clol_diagnostic_flag",
             "CL/OL diagnostic flag (byte). Set by ol_condition_checker (0x3643A) to indicate "
             + "which condition triggered the OL transition. Used for SSM/diagnostics.");
-        count += labelComment(0xFFFF79E0L, "ol_decay_delta",
-            "OL enrichment decay delta (float, negative). Added to ol_enrichment_accum in "
-            + "WRITE 4 filtered path: accum = max(accum + decay_delta, target).");
+        count += labelComment(0xFFFF79E0L, "ol_ramp_step",
+            "OL enrichment ramp step (float, POSITIVE). From table CE5A4 via BE830. "
+            + "ADDED to ol_enrichment_accum via fadd at 0x36262 in WRITE 4 FILTERED_UPDATE: "
+            + "accum = max(accum + ramp_step, target_floor). Ramps accumulator upward.");
         count += labelComment(0xFFFF79F8L, "ol_enrich_func_ptr",
             "OL enrichment pipeline function pointer (4 bytes). "
             + "post_condition_handler (0x36848) writes AD998 or AD9B4 here (descriptor ptr). "
@@ -3915,7 +3916,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0AC5A8L, "desc_1D_range_10_0_i16_6",
             "RR: Primary Open Loop Fueling Compensation (Timing Compensation)_");
         count += labelComment(0x0AC5D0L, "desc_1D_range_11_89_i16_6",
-            "RR: CL to OL Enrichment Threshold (MAF)");
+            "Minimum Primary Open Loop Enrichment (Throttle). Axis=throttle_raw (FFFF64D8), "
+            + "range 10.93-89.06%. Input at ROM 0x0360BE. NOT MAF-indexed.");
         count += label(0x0AC760L, "desc_1D_range_300_650_i16_8");
         count += label(0x0ACE6CL, "desc_1D_range_0_0_u8_9");
         count += label(0x0ACEF0L, "desc_1D_range_0_0_f32_6_ACEF0");
