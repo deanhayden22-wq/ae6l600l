@@ -166,7 +166,7 @@ It outputs two values:
 The function reads engine state variables:
   FFFF5E94: gear position
   FFFF6350: RPM
-  FFFF69F0: throttle position
+  FFFF69F0: IAT (intake air temperature)
   FFFF63C4: engine load
   FFFF65FC: base pulse width (BPW)
   FFFF63CC: ECT (coolant temperature)
@@ -905,10 +905,10 @@ SECTION 12: WHAT WE STILL DO NOT FULLY UNDERSTAND
      variant), but we cannot confirm this without Subaru engineering docs.
 
   7. EXACTLY WHICH RAM ADDRESS IS THE "LIVE" vs "SNAPSHOT" THROTTLE?
-     The condition checker reads throttle from a specific RAM address.
+     The condition checker reads IAT from a specific RAM address.
      We need to confirm whether this is the live sensor value (e.g.,
-     FFFF69F0) or the snapshot copy (FFFF793C). This distinction is
-     critical for understanding the WOT delay problem.
+     FFFF69F0 = iat_input_float) or the snapshot copy (FFFF793C).
+     This distinction is critical for understanding the WOT delay problem.
 
 
 ================================================================================
@@ -924,7 +924,7 @@ CL-to-OL transition at WOT:
      reads the snapshot, the delay is inherent to the snapshot cycle and
      cannot be fixed by changing thresholds alone.
 
-     How to check: Disassemble ol_condition_checker fully around the throttle
+     How to check: Disassemble ol_condition_checker fully around the IAT
      comparison (CHECK 3) and trace the RAM address it reads. If it reads
      from FFFF793C (snapshot block) rather than FFFF69F0 (live sensor),
      that confirms the snapshot theory.
@@ -965,7 +965,7 @@ CL-to-OL transition at WOT:
      a snapshot/latency issue rather than a threshold issue.
 
   7. DATALOG THE SNAPSHOT VARIABLES
-     If possible, log the snapshot addresses (FFFF793C for throttle,
+     If possible, log the snapshot addresses (FFFF793C for IAT,
      FFFF7950 for load) alongside the live sensor addresses (FFFF69F0,
      FFFF63C4) to confirm whether there is a time lag between them.
      This would definitively answer the snapshot question.

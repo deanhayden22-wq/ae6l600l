@@ -109,7 +109,7 @@ Disassembly:
 
 Literal pool:
   [0x0666C4] = 0x000BE9B0  → uint16_pack
-  [0x0666C8] = 0xFFFF2368  → evap_workspace_slot0 (standalone dword)
+  [0x0666C8] = 0xFFFF2368  → evap_workspace_base (standalone dword, slot 0)
   [0x0666CC] = 0xFFFF236C  → evap_workspace_base (array base for slots 1-11)
   [0x0666D0] = 0x000BE9A0  → uint8_pack
 
@@ -133,7 +133,7 @@ Pseudocode:
   }
 
 RAM:
-  0xFFFF2368        evap_workspace_slot0 (uint32, packed uint16 = 0)
+  0xFFFF2368        evap_workspace_base (uint32, packed uint16 = 0, slot 0)
   0xFFFF236C-237C   evap_workspace_slots[1..5] (uint32 each, packed uint16 = 0)
   0xFFFF2380-238A   evap_workspace_flags[0..5] (uint16 each, packed uint8 = 1)
 

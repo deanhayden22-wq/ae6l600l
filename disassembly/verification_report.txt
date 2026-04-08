@@ -13,10 +13,9 @@ VERIFICATION STATISTICS
   checked_movl_comment: 1439
   errors_func_entry: 1
   warnings_mnemonic: 156
-  warnings_ram_canonical: 15
 
 TOTAL ERRORS:   1
-TOTAL WARNINGS: 171
+TOTAL WARNINGS: 156
 
 ================================================================================
 ERRORS (data does not match ROM)
@@ -345,39 +344,6 @@ WARNINGS (potential issues, review recommended)
       Mnemonic differs at 0x046908: claimed '??fpu' vs decoded '???'
     knock_flkc_analysis.txt:2660
       Mnemonic differs at 0x04690A: claimed '??' vs decoded '???'
-
-  [RAM_CANONICAL] (15 warnings)
-  ------------------------------------------------------------
-    CROSS-FILE
-      RAM 0xFFFF7D68: analysis uses 'throttle_delta_pos', canonical ram_reference.txt says 'timing_blend_state'
-    CROSS-FILE
-      RAM 0xFFFF77C8: analysis uses 'WRITER', canonical ram_reference.txt says 'afc_output'
-    CROSS-FILE
-      RAM 0xFFFF895C: analysis uses 'afl_learning_val', canonical ram_reference.txt says 'fuel_ign_shared_state'
-    CROSS-FILE
-      RAM 0xFFFF7FBC: analysis uses 'timing_correction', canonical ram_reference.txt says 'previous_timing_output'
-    CROSS-FILE
-      RAM 0xFFFF2368: analysis uses 'evap_workspace_slot0', canonical ram_reference.txt says 'evap_workspace_base'
-    CROSS-FILE
-      RAM 0xFFFF8366: analysis uses 'workspace', canonical ram_reference.txt says 'knock_workspace_B'
-    CROSS-FILE
-      RAM 0xFFFF6540: analysis uses 'sensor_state', canonical ram_reference.txt says 'o2_sensor_conditioned'
-    CROSS-FILE
-      RAM 0xFFFF8E7E: analysis uses 'operating_mode_flag', canonical ram_reference.txt says 'afc_enable_flag_A'
-    CROSS-FILE
-      RAM 0xFFFF65BD: analysis uses 'decel_flag', canonical ram_reference.txt says 'engine_state_byte'
-    CROSS-FILE
-      RAM 0xFFFF7F68: analysis uses 'ect_warmup_correction', canonical ram_reference.txt says 'ect_blend_correction'
-    CROSS-FILE
-      RAM 0xFFFF805C: analysis uses 'timing_workspace', canonical ram_reference.txt says 'timing_corr_5C'
-    CROSS-FILE
-      RAM 0xFFFF8088: analysis uses 'workspace', canonical ram_reference.txt says 'knock_retard_accum'
-    CROSS-FILE
-      RAM 0xFFFF69FC: analysis uses 'ECT', canonical ram_reference.txt says 'ect_input_float'
-    CROSS-FILE
-      RAM 0xFFFF69F0: analysis uses 'IAT', canonical ram_reference.txt says 'boost_pressure'
-    CROSS-FILE
-      RAM 0xFFFFAF3B: analysis uses 'falling_mode_byte', canonical ram_reference.txt says 'comms_state_byte'
 
 ================================================================================
 RESULT: 1 ERROR(S) FOUND — review needed

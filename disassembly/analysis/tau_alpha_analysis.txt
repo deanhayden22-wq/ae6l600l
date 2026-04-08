@@ -138,7 +138,7 @@ SECTION 5: tau_falling_handler @ 0x3740C
 Address:  0x03740C
 Size:     0x50 bytes (80 bytes)
 Inputs:
-  R14  ← [0xFFFFAF3B]  falling_mode_byte   (byte, mode/state selector)
+  R14  ← [0xFFFFAF3B]  comms_state_byte    (byte, used here as tau falling mode selector)
   FR4  ← [0xFFFF3194]  tau_accum_falling   (current falling tau accumulator)
   FR8  ← [0xFFFF8EAC]  current_load_signal (used for 720.0 gate comparison)
   [0xFFFF7A74]          tau_state_flag      (byte, gating condition)
@@ -245,9 +245,9 @@ SECTION 8: TAU VARIANTS A, B, C EXPLAINED
 ================================================================================
 
 Four falling tau tables exist: PRIMARY + A + B + C. These correspond to
-different operating conditions selected by the falling_mode_byte (0xFFFFAF3B):
+different operating conditions selected by comms_state_byte (0xFFFFAF3B):
 
-  falling_mode_byte == 1  → PRIMARY PATH via tau_falling_handler main branch
+  comms_state_byte == 1   → PRIMARY PATH via tau_falling_handler main branch
                              Uses PRIMARY table (0xCD746) in DESC_0BDBCC
 
 The other variants (A, B, C) are selected by the descriptor based on:
@@ -341,7 +341,7 @@ ADDRESS       NAME                   TYPE    SOURCE/NOTES
                                              gates PRIMARY vs ACCUMULATION path
 0xFFFF8EAC    current_load_signal    float   FR8 source in tau_falling_handler;
                                              compared against 720.0 threshold
-0xFFFFAF3B    falling_mode_byte      byte    R14 source in tau_falling_handler;
+0xFFFFAF3B    comms_state_byte       byte    R14 source in tau_falling_handler;
                                              == 1 enables tau falling PRIMARY path
 
 
@@ -385,7 +385,7 @@ SECTION 13: SYSTEM ARCHITECTURE DIAGRAM
   │  [0xFFFF7A54]  tau_accum_rising              ──→  TAU RISING (in/out)  │
   │  [0xFFFF8EAC]  current_load_signal           ──→  TAU FALLING          │
   │  [0xFFFF3194]  tau_accum_falling             ──→  TAU FALLING (in/out) │
-  │  [0xFFFFAF3B]  falling_mode_byte             ──→  TAU FALLING          │
+  │  [0xFFFFAF3B]  comms_state_byte              ──→  TAU FALLING          │
   │  [0xFFFF7A74]  tau_state_flag                ──→  TAU FALLING gate     │
   └───────────────┬─────────────────────────────────────────────────────────┘
                   │

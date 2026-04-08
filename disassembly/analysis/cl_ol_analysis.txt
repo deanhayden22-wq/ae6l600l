@@ -61,7 +61,7 @@ Three distinct GBR base registers are used by the CL/OL subsystem:
   Indirect via R14=0xFFFF7988:
   +0xD0 (-48, 0xFFFF7938): float  ECT snapshot (from FFFF63CC)
   +0xCC (-52, 0xFFFF7934): float  RPM snapshot (from FFFF6350)
-  +0xD4 (-44, 0xFFFF793C): float  Throttle snapshot (from FFFF69F0)
+  +0xD4 (-44, 0xFFFF793C): float  IAT snapshot (from FFFF69F0, iat_input_float)
   +0xD8 (-40, 0xFFFF7940): float  BPW lookup result (from table processor)
   +0xDC (-36, 0xFFFF7944): float  MAF snapshot (from FFFF6624)
   +0xE0 (-32, 0xFFFF7948): float  Base pulse width (from FFFF65FC)
@@ -142,7 +142,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     FFFF7986 (byte): Master counter, compared with CAL@0xCBBEF
     FFFF63CC: ECT (coolant temp)
     FFFF6350: RPM
-    FFFF69F0: Throttle position
+    FFFF69F0: IAT (intake air temperature)
     FFFF63FC: MAP
     FFFF6A22: Gear/RPM word
     FFFF6254: Gear position byte
@@ -554,7 +554,7 @@ function CL_OL_StateMachine_PerCycle():
         // Snapshot all engine parameters
         state.ECT      = RAM[FFFF63CC]   // coolant temp
         state.RPM      = RAM[FFFF6350]   // engine speed
-        state.throttle = RAM[FFFF69F0]   // throttle position
+        state.IAT      = RAM[FFFF69F0]   // intake air temperature
         state.MAP      = RAM[FFFF63FC]   // manifold pressure
         state.MAF      = RAM[FFFF6624]   // mass airflow
         state.BPW      = RAM[FFFF65FC]   // base pulse width

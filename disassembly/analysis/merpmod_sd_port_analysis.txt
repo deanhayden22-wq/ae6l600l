@@ -60,8 +60,9 @@ Engine parameter RAM pointers:
 
 CRITICAL NOTE — MAP vs MRP:
   0xFFFF6898 = manifold_pressure (absolute MAP, 48 refs) ← CORRECT for SD
-  0xFFFF69F0 = boost_pressure (MRP = MAP - ATM, 32 refs) ← WRONG for SD
-  SD formula needs absolute pressure. MRP would double-subtract atmosphere.
+  0xFFFF69F0 = iat_input_float (intake air temperature, 32 refs)
+  NOTE: Previously misidentified as boost_pressure/MRP. Confirmed IAT via
+  ADC write-path trace: cal range -40..120 C, paired with ECT (FFFF69FC).
 
 
 ================================================================================

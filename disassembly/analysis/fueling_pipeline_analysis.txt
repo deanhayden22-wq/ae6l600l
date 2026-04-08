@@ -122,7 +122,7 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
     FFFF6350  ect_current (float)
     FFFF6254  (unknown sensor byte)
     FFFF65C0  (unknown sensor byte)
-    FFFF6540  sensor_state (float) — loaded when first_call=0
+    FFFF6540  o2_sensor_conditioned (float) — loaded when first_call=0
     FFFF7448  CLOL_mode_flag (byte) — loaded when first_call=0
 
   ALGORITHM:
@@ -130,7 +130,7 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
     2. Load ECT into FR15, read two sensor bytes into R13/R12
     3. Call sub_22CF4 (AT/MT detection)
     4. If first_call_flag (R6) == 0:
-       - Load sensor_state (FFFF6540) into FR14
+       - Load o2_sensor_conditioned (FFFF6540) into FR14
        - Load CLOL_mode_flag (FFFF7448) into R14
        - Jump to main processing
     5. If first_call_flag != 0:
@@ -231,7 +231,7 @@ Only runs when CL mode is active (FFFF65F0 matches ROM 0xCBBD8-DB).
     FFFF65FC  engine_load_current (float)
     FFFF68DC  (unknown float)
     FFFF78B0  (AFC PI working struct)
-    FFFF8E7E  operating_mode_flag (byte)
+    FFFF8E7E  afc_enable_flag_A (byte)
     FFFF85D7  fuel_system_state (byte)
     FFFF7870  (output address)
 
@@ -885,7 +885,7 @@ SECTION 9: FUEL OVERRUN CUTOFF — func_3EB8C  (Table B[18])
 
   PSEUDOCODE
   ----------
-  decel_flag = byte @ FFFF65BD        ; 0 = throttle closed / decel
+  engine_state_byte @ FFFF65BD         ; 0 = throttle closed / decel
 
   if decel_flag == 0:
     counter = word @ FFFF7E8E
@@ -902,7 +902,7 @@ SECTION 9: FUEL OVERRUN CUTOFF — func_3EB8C  (Table B[18])
 
   RAM
   ---
-  FFFF65BD  decel_flag         (byte, 0=decel; 12+ refs across fuel code)
+  FFFF65BD  engine_state_byte  (byte, 0=decel in this context; multi-purpose state byte)
   FFFF7E8C  overrun_state      (byte, 0=normal / 1=fuel cut active)
   FFFF7E8E  overrun_counter    (word, scheduler tick counter)
 
@@ -919,7 +919,7 @@ SECTION 10: ECT WARMUP CORRECTION — func_403C4  (Table B[19])
   Address:   0x403C4 - 0x403FA  (56 bytes, 28 instructions)
   Purpose:   Mode-selected ECT-based correction factor. Chooses between
              four 1D curves based on two operating-mode flags, then writes
-             result float to ect_warmup_correction.
+             result float to ect_blend_correction.
 
   PSEUDOCODE
   ----------
@@ -934,7 +934,7 @@ SECTION 10: ECT WARMUP CORRECTION — func_403C4  (Table B[19])
     if R5 == 1: desc = 0xADBEC   ; 1D_ECT_i16_16 → data @ D3226
     else:       desc = 0xADC00   ; 1D_ECT_i16_16 → data @ D3236
 
-  ect_warmup_correction (FFFF7F68) = table_lookup_1D(FR4=ECT, desc)
+  ect_blend_correction (FFFF7F68) = table_lookup_1D(FR4=ECT, desc)
 
   NOTE: All 4 tables are 16-point, axis scale 0.351562°C/count, start -45°C
   (spans approx. -45°C to +117°C at 0.35°C steps). In stock tune all four
@@ -945,7 +945,7 @@ SECTION 10: ECT WARMUP CORRECTION — func_403C4  (Table B[19])
   FFFF6350  ect_current            (engine coolant temp, float)
   FFFF6254  gear/op mode byte     (1 = specific AT or mode condition)
   FFFF90BE  ect_mode_flag         (byte, 0 or non-zero)
-  FFFF7F68  ect_warmup_correction (float output; consumed by func @ 0x3F500)
+  FFFF7F68  ect_blend_correction (float output; consumed by func @ 0x3F500)
 
   DESCRIPTORS
   -----------
@@ -1095,7 +1095,7 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
 
   Address  : 0x3F374 – 0x3FB74  (2050 bytes, 1025 instructions + embedded subs)
   Called by: fuel_dispatch_table_B (exact slot TBD)
-  Reads    : ect_warmup_correction (FFFF7F68) — output of Section 10
+  Reads    : ect_blend_correction (FFFF7F68) — output of Section 10
   Outputs  : 8 per-channel clamped warmup corrections
              FFFF7E90[0..7] × 4 bytes = FFFF7E90–FFFF7EAC
              (= GBR+0 through GBR+28 in the FFFF7E90 struct)
@@ -1120,7 +1120,7 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
   FR14 = FFFF62F8             (MAP/load derivative — possibly filtered RPM)
   FR15 = FFFF65FC             (engine_load_current)
   FR8  = ECT_float            (FFFF6350) → stack+0
-  FR8  = ect_warmup_correction(FFFF7F68) → stack+4   [reads Section 10 output]
+  FR8  = ect_blend_correction(FFFF7F68) → stack+4   [reads Section 10 output]
   FR8  = fuel_ipw_output_struct(FFFF7FBC) → stack+8
   R12  = byte @ FFFF8F16      (mode A flag)
   R11  = byte @ FFFF8F24      (mode B flag)
@@ -1250,7 +1250,7 @@ SECTION 12: ECT WARMUP CONSUMER — func_3F374  (Table B[?])
   DATA FLOW SUMMARY
   ──────────────────
   Section 10 (func_403C4):
-    ECT → table_lookup_1D → FFFF7F68 (ect_warmup_correction)
+    ECT → table_lookup_1D → FFFF7F68 (ect_blend_correction)
 
   Section 12 (func_3F374):
     FFFF7F68 → stack+4 (input)

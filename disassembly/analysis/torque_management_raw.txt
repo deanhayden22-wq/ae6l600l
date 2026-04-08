@@ -13,7 +13,7 @@ a calibratable tick threshold. Once threshold reached, sets overrun_state=1
 (fuel cut active). Tail-calls fuel_cut_gating to apply per-cylinder masks.
 
 03EB8C: 4F22  sts.l  PR,@-R15
-03EB8E: D20D  mov.l  @(0x03EBC4),R2       ; R2 = 0xFFFF65BD (decel_flag)
+03EB8E: D20D  mov.l  @(0x03EBC4),R2       ; R2 = 0xFFFF65BD (engine_state_byte, 0=decel)
 03EB90: 6620  mov.b  @R2,R6               ; R6 = decel_flag
 03EB92: 2668  tst    R6,R6                ; decel active? (flag == 0)
 03EB94: 8B0F  bf     0x03EBB6            ; not decel -> clear state
@@ -42,7 +42,7 @@ a calibratable tick threshold. Once threshold reached, sets overrun_state=1
 03EBC2: 4F26  lds.l  @R15+,PR
 
 Literal pool:
-  0x03EBC4: 0xFFFF65BD  (decel_flag — 0=decel, 1=normal)
+  0x03EBC4: 0xFFFF65BD  (engine_state_byte — 0=decel, 1=normal)
   0x03EBC8: 0xFFFF7E8C  (overrun_state byte + overrun_counter word at +2)
   0x03EBCC: 0x000D29AA  (cal: overrun tick threshold = 16)
   0x03EBD0: 0x000BE554  (ramp_counter routine)
@@ -146,7 +146,7 @@ manages a counter in torque_req_workspace (FFFF7CBC). When counter >= 2,
 sets state = 1 (torque request mode active). Tail-calls 0x3D2FC.
 
 ; Entry: checks decel_flag and manages overrun counter
-03B7C6: D20E  mov.l  @(0x03B800),R2       ; R2 = 0xFFFF65BD (decel_flag)
+03B7C6: D20E  mov.l  @(0x03B800),R2       ; R2 = 0xFFFF65BD (engine_state_byte, 0=decel)
 03B7C8: 6620  mov.b  @R2,R6
 03B7CA: 2668  tst    R6,R6                ; decel active?
 03B7CC: 8B11  bf     0x03B7F2            ; no -> clear

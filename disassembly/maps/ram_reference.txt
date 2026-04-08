@@ -36,14 +36,14 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      43  0xFFFF63C4  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
      41  0xFFFF366C  io_inj_driver_ctrl                   InternalIO injection driver control register (31 refs).
      39  0xFFFF8E46  fuel_mode_flags                      39 refs. Fuel mode flags register.
-     37  0xFFFF895C  fuel_ign_shared_state                Shared fuel/ignition state (float). 28 pool refs. Read 
+     37  0xFFFF895C  injector_data                        Rate-limited sensor composite (float). 28 pool refs. Was fuel_ign_shared_state. See fueling_pipeline Section 15.
      36  0xFFFF6155  adc_channel_status                   36 refs. ADC channel status/index (byte). GBR base (4 u
      36  0xFFFFAF3B  comms_state_byte                     36 refs. Communications protocol state byte.
      34  0xFFFF65BD  engine_state_byte                    34 refs. Engine state byte (cranking/running/etc).
      34  0xFFFF6C48  battery_voltage                      34 refs. Battery voltage (float). Read by injector late
      33  0xFFFF5BE3  clutch_state                         33 refs. Clutch engagement state (task50 map switching). Was peripheral_status.
      33  0xFFFF8EDC  ol_dispatch_gate                     OL enrichment dispatch gate (byte). Checked by all 4 OL
-     32  0xFFFF69F0  boost_pressure                       32 refs. Boost pressure (float). Read by AFL. GBR base 
+     32  0xFFFF69F0  iat_input_float                      32 refs. Intake air temperature (float, -40..120 C). Read by AFL, startup enrichment. GBR base
      32  0xFFFF7C9D  fuel_state_byte                      32 refs. Fuel state byte/flag.
      32  0xFFFF9058  sched_state_A                        32 refs. Scheduler state variable A.
      32  0xFFFFACE0  diag_output_buffer                   32 refs. Diagnostic output buffer pointer.
@@ -80,13 +80,13 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      19  0xFFFF6430  adc_processed_secondary              ADC processed secondary sensor value
      19  0xFFFF653C  o2_sensor_voltage                    19 refs. O2 sensor voltage or lambda value.
      19  0xFFFF77C8  afc_output                           19 refs. AFC output value. Referenced in fuel_correctio
-     19  0xFFFF7D68  timing_blend_state                   19 refs. Timing blend state variable.
+     19  0xFFFF7D68  throttle_delta_pos                   19 refs. Positive throttle rate of change (float). Used by accel enrichment.
      19  0xFFFF83AC  idle_workspace_GBR                   26 refs. Secondary idle GBR workspace (7 GBR uses).
      19  0xFFFF9070  scheduler_state_B                    Scheduler state variable B
      18  0xFFFF3158  afl_diagnostic_flag                  AFL state / diagnostic flag. Checked by fueling pipelin
      18  0xFFFF5E40  sensor_data_misc                     Sensor data miscellaneous
      18  0xFFFF7E68  fuel_timing_corr                     Fuel timing correction variable
-     18  0xFFFF8366  knock_workspace_B                    Knock/FLKC workspace variable B
+     18  0xFFFF8366  fuel_pump_workspace                  Fuel pump state machine (14-byte struct). Was knock_workspace_B (misidentified).
      18  0xFFFF8391  knock_workspace_C                    Knock/FLKC workspace variable C
      18  0xFFFFB6E1  stack_guard_byte                     Stack area guard byte / canary
      17  0xFFFF20F4  system_config_timer_A                System config/timer variable A. System state cluster.
@@ -313,7 +313,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   boost_gbr_base                            0xFFFF8B50     0 refs  Boost control GBR base. Current target v
   boost_ign_switch_filter_ws                0xFFFF8B9C     0 refs  Ignition switch EMA filter workspace (st
   boost_maf_error                           0xFFFF8B58     0 refs  MAF error: maf_left - target (float). In
-  boost_pressure                            0xFFFF69F0    32 refs  32 refs. Boost pressure (float). Read by
+  iat_input_float                           0xFFFF69F0    32 refs  32 refs. Intake air temperature (float, -40..120 C). Read by
   boost_rpm_error_filtered                  0xFFFF8B84     0 refs  Filtered RPM error (float). IIR-filtered
   boost_rpm_filtered_prev                   0xFFFF8B7C     0 refs  Previous RPM filtered value (float). Use
   boost_wg_duty_final                       0xFFFF8B5C     0 refs  Final wastegate duty output (float). Aft
@@ -470,7 +470,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   fuel_enrichment_A                         0xFFFF76D4     0 refs  Fuel enrichment term A (float). Summed w
   fuel_enrichment_B                         0xFFFF7878     7 refs  Fuel enrichment term B (float). Summed w
   fuel_enrichment_C                         0xFFFF7AE4     0 refs  Fuel enrichment term C (float). Summed w
-  fuel_ign_shared_state                     0xFFFF895C    37 refs  Shared fuel/ignition state (float). 28 p
+  injector_data                             0xFFFF895C    37 refs  Rate-limited sensor composite (float). Was fuel_ign_shared_state. See fueling_pipeline Section 15.
   fuel_ipw_state_B                          0xFFFF7AF4     0 refs  Final IPW correction output (float).
   fuel_mode_flags                           0xFFFF8E46    39 refs  39 refs. Fuel mode flags register.
   fuel_per_cyl_struct                       0xFFFF7344     0 refs  Per-cylinder fuel struct (8 x float fina
@@ -657,7 +657,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   timer_config_block                        0xFFFF233C    20 refs  Timer configuration block (16 bytes). In
   timer_counter_B                           0xFFFF367C    25 refs  25 refs. Timer/counter B.
   timer_counter_C                           0xFFFF3674    25 refs  25 refs. Timer/counter C.
-  timing_blend_state                        0xFFFF7D68    19 refs  19 refs. Timing blend state variable.
+  throttle_delta_pos                        0xFFFF7D68    19 refs  19 refs. Positive throttle rate of change (float). Used by accel enrichment.
   timing_comp_lowpw_state                   0xFFFF80EC     0 refs  Low-PW ignition timing deactivation stat
   timing_corr_28                            0xFFFF8028     0 refs  Timing correction positive (task50).
   timing_corr_38                            0xFFFF8038     0 refs  Timing correction negative (task50).
@@ -759,7 +759,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF6810    22  ol_condition_selector                OL condition selector byte (1-5). Selects ROM thre
   0xFFFF682C    22  adc_processed_misc                   ADC processed miscellaneous sensor value
   0xFFFF6898    48  manifold_pressure                    48 refs. Manifold pressure (float). Read by frontO
-  0xFFFF69F0    32  boost_pressure                       32 refs. Boost pressure (float). Read by AFL. GBR 
+  0xFFFF69F0    32  iat_input_float                      32 refs. Intake air temperature (float, -40..120 C). Read by AFL, startup enrichment. GBR
   0xFFFF6C48    34  battery_voltage                      34 refs. Battery voltage (float). Read by injector
   0xFFFF71EA    22  fuel_timing_state                    Fuel timing state variable
   0xFFFF77C8    19  afc_output                           19 refs. AFC output value. Referenced in fuel_corr
@@ -768,7 +768,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF7BE4    11  transient_fuel_comp                  Transient fuel compensation value (float). AFC working value.
   0xFFFF7C9D    32  fuel_state_byte                      32 refs. Fuel state byte/flag.
   0xFFFF7D04    10  fuel_timing_state_B                  Fuel/timing state variable B. Fuel/timing region.
-  0xFFFF7D68    19  timing_blend_state                   19 refs. Timing blend state variable.
+  0xFFFF7D68    19  throttle_delta_pos                   19 refs. Positive throttle rate of change (float). Used by accel enrichment.
   0xFFFF7E68    18  fuel_timing_corr                     Fuel timing correction variable
   0xFFFF7E90    25  task50_gbr_base                      GBR base for task50 timing blend. Was warmup_corr_cyl0.
   0xFFFF7F04     0  pre_ratio                            Pre-computed blend ratio (task50).
@@ -797,7 +797,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF81F0    30  knock_learning_value                 30 refs. Knock learning value (task50). Was knock_state_base.
   0xFFFF8260     0  knock_corr_advance                   Knock correction advance (task50).
   0xFFFF8318    17  knock_state_var                      Knock state variable
-  0xFFFF8366    18  knock_workspace_B                    Knock/FLKC workspace variable B
+  0xFFFF8366    18  fuel_pump_workspace                  Fuel pump state machine (14-byte struct). Was knock_workspace_B (misidentified).
   0xFFFF837B    13  idle_dispatch_workspace               Main idle dispatcher state (GBR base). 39 fields, 129 accesses.
   0xFFFF837E    20  idle_control_GBR                     39 refs. Idle control GBR base (19 GBR uses). Prim
   0xFFFF8387    13  knock_flkc_post_retard                Knock/FLKC post-retard state (GBR base). Adjacent to knock_workspace_B/C.
@@ -809,7 +809,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF85E4    11  fuel_knock_state_var                  Fuel/knock state variable. Near fuel_system_state (0xFFFF85D7).
   0xFFFF87E4    26  timing_correction_A                  26 refs. Timing correction value A.
   0xFFFF8910    16  ignition_system_state                Ignition system state. Referenced in ignition timi
-  0xFFFF895C    37  fuel_ign_shared_state                Shared fuel/ignition state (float). 28 pool refs. 
+  0xFFFF895C    37  injector_data                        Rate-limited sensor composite (float). Was fuel_ign_shared_state. See fueling_pipeline Section 15. 
   0xFFFF8998    11  sensor_struct_8998                   Sensor struct base (GBR at 0x52092).
   0xFFFF89E8    14  knock_sensor_state_B                  Knock sensor state variable B. Knock/FLKC cluster.
   0xFFFF8A74    20  knock_flkc_state                     Knock/FLKC state variable

@@ -238,7 +238,7 @@ The primary torque reduction tool during deceleration.
   Entry: 0x03EB8C (fuel_dispatch_table_B[18])
 
   Logic:
-    if decel_flag (FFFF65BD) == 0:          // throttle closed
+    if engine_state_byte (FFFF65BD) == 0:   // throttle closed / decel
       overrun_counter++ (FFFF7E8E)
       if overrun_counter >= 16:             // 16 × 20ms = 320ms
         overrun_state = 1 (FFFF7E8C)       // activate fuel cut
@@ -418,7 +418,7 @@ SECTION 12: KEY RAM ADDRESSES
   ├──────────────┼───────────┼──────┼──────────────────────────────────────┤
   │ 0xFFFF5DB5   │ byte      │    - │ SI-DRIVE mode (0=S, 1=SS, 2=I)      │
   │ 0xFFFF5E74   │ word      │    - │ Gear position                        │
-  │ 0xFFFF65BD   │ byte      │    - │ Decel flag (0=decel, 1=normal)       │
+  │ 0xFFFF65BD   │ byte      │    - │ engine_state_byte (0=decel, 1=normal) │
   │ 0xFFFF65C0   │ byte      │   89 │ Throttle position (DBW actual)       │
   │ 0xFFFF65FC   │ float     │    - │ APP (accelerator pedal position)     │
   │ 0xFFFF6350   │ float     │  90+ │ Engine RPM                           │

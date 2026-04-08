@@ -71,8 +71,8 @@ Role:     Apply falling-load tau time constant. Handles fuel film EVAPORATION
   03740E: 4F22  sts.l   PR,@-R15
 
   ; --- load state and current tau accumulator ---
-  037410: D640  mov.l   @(0x100,PC),R6      ; R6 = 0xFFFFAF3B  falling_mode_byte (addr)
-  037412: 6E60  mov.b   @R6,R14             ; R14 = falling_mode_byte value
+  037410: D640  mov.l   @(0x100,PC),R6      ; R6 = 0xFFFFAF3B  comms_state_byte (addr)
+  037412: 6E60  mov.b   @R6,R14             ; R14 = comms_state_byte value (tau falling mode selector)
   037414: D240  mov.l   @(0x100,PC),R2      ; R2 = 0xFFFF3194  tau_accum_falling (float)
   037416: F428  fmov.s  @R2,FR4             ; FR4 = current tau accumulator value
   037418: D240  mov.l   @(0x100,PC),R2      ; R2 = 0xFFFF8EAC  current_load_signal (float)
@@ -115,7 +115,7 @@ Role:     Apply falling-load tau time constant. Handles fuel film EVAPORATION
   03744E: 6EF6  mov.l   @R15+,R14          ; (delay) restore R14
 
   ; --- literal pool ---
-  ;   037514: 0xFFFFAF3B   falling_mode_byte
+  ;   037514: 0xFFFFAF3B   comms_state_byte (tau falling mode selector)
   ;   037518: 0xFFFF3194   tau_accum_falling
   ;   03751C: 0xFFFF8EAC   current_load_signal
   ;   037520: 0xFFFF7A74   tau_state_flag
@@ -166,7 +166,7 @@ REFERENCED RAM ADDRESSES
   0xFFFF7A60   tau_workspace        float  current load (tau_rising R6 base)
   0xFFFF7A74   tau_state_flag       byte   mode/state flag for falling tau
   0xFFFF8EAC   current_load_signal  float  (FR8 source in tau_falling_handler)
-  0xFFFFAF3B   falling_mode_byte    byte   (R14 source in tau_falling_handler)
+  0xFFFFAF3B   comms_state_byte     byte   (R14 source in tau_falling_handler; tau reads as mode selector)
 
 ================================================================================
 REFERENCED CODE / DESCRIPTOR ADDRESSES

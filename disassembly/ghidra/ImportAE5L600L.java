@@ -2166,8 +2166,8 @@ public class ImportAE5L600L extends GhidraScript {
             "20 refs. Fuel injection rate (float). Read by timing, boost.");
         count += labelComment(0xFFFF6898L, "manifold_pressure",
             "48 refs. Manifold pressure (float). Read by frontO2, PSE, CL/OL, base timing.");
-        count += labelComment(0xFFFF69F0L, "boost_pressure",
-            "32 refs. Boost pressure (float). Read by AFL. GBR base (5 uses).");
+        count += labelComment(0xFFFF69F0L, "iat_input_float",
+            "32 refs. Intake air temperature (float, -40..120 C). Read by AFL, startup enrichment. GBR base (5 uses). Was 'boost_pressure' (misidentified).");
         count += labelComment(0xFFFF6C48L, "battery_voltage",
             "34 refs. Battery voltage (float). Read by injector latency, diag.");
 
@@ -2274,8 +2274,8 @@ public class ImportAE5L600L extends GhidraScript {
             "17 refs. Timing state variable. Referenced by task35_timing_corr.");
         count += labelComment(0xFFFF7E90L, "timing_output_A",
             "25 refs. Timing output value A.");
-        count += labelComment(0xFFFF7D68L, "timing_blend_state",
-            "19 refs. Timing blend state variable.");
+        count += labelComment(0xFFFF7D68L, "throttle_delta_pos",
+            "19 refs. Positive throttle rate of change (float). Used by accel enrichment. Was timing_blend_state.");
         count += labelComment(0xFFFF7FBCL, "timing_final_advance",
             "14 refs. Final timing advance value.");
         count += labelComment(0xFFFF7C9DL, "fuel_state_byte",
@@ -4332,9 +4332,9 @@ public class ImportAE5L600L extends GhidraScript {
             "ISR dispatch table (54 entries x 4 bytes). Maps ISR index to handler address.");
 
         // -- Shared Fuel/Ignition State --
-        count += labelComment(0xFFFF895CL, "fuel_ign_shared_state",
-            "Shared fuel/ignition state (float). 28 pool refs. Read by task38_ign_output. "
-            + "Previously labeled injector_data — used by BOTH fuel injection and ignition timing systems.");
+        count += labelComment(0xFFFF895CL, "injector_data",
+            "Rate-limited sensor composite (float). 28 pool refs. Read by task38_ign_output. "
+            + "Was fuel_ign_shared_state. Write-site traced in fueling_pipeline Section 15.");
 
         // =====================================================================
         // ISR HANDLERS — Injection/Ignition Hardware Interface
@@ -6381,8 +6381,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Knock window state workspace (GBR base). Task08.");
         count += labelComment(0xFFFF8318L, "knock_state_var",
             "Knock state variable");
-        count += labelComment(0xFFFF8366L, "knock_workspace_B",
-            "Knock/FLKC workspace variable B");
+        count += labelComment(0xFFFF8366L, "fuel_pump_workspace",
+            "Fuel pump state machine (14-byte struct). Was knock_workspace_B (misidentified). See fuel_pump_analysis.txt.");
         count += labelComment(0xFFFF837BL, "idle_dispatch_workspace",
             "Main idle dispatcher state (GBR base). 39 fields, 129 accesses.");
         count += labelComment(0xFFFF8387L, "knock_flkc_workspace",

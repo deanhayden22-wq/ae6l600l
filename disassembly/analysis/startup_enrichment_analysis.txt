@@ -284,8 +284,8 @@ Separate thunk entry at 0x3CD46 → startup_mode_switch.
 
   ─── Inputs ──────────────────────────────────────────────────────────────
 
-  FFFF69FC  ECT (coolant temperature, float)
-  FFFF69F0  IAT (intake air temperature, float)
+  FFFF69FC  ect_input_float (coolant temperature, float)
+  FFFF69F0  iat_input_float (intake air temperature, float)
   FFFF7448  fuel mode flag
   FFFF7453  fuel status
   FFFF6254  maf_current (MAF sensor value)
@@ -294,7 +294,7 @@ Separate thunk entry at 0x3CD46 → startup_mode_switch.
   FFFF7C68  engine status flag (gates AFL)
   FFFF94B1  status byte
   FFFFA56A  status flag
-  FFFFAF3B  falling mode byte
+  FFFFAF3B  comms_state_byte (tau falling mode selector)
   FFFFACE6  status flag
 
 
@@ -373,9 +373,9 @@ SECTION 7: ECT WARMUP TIMING CORRECTION (0x403C4 — Table B[19])
   *** NOTE: Despite executing in fueling pipeline B, this is an IGNITION ***
   *** TIMING correction, not a fuel enrichment function.                 ***
 
-Function:  0x403C4  (ect_warmup_correction)
+Function:  0x403C4  (ect_blend_correction)
 Pipeline:  fuel_dispatch_table_B[19]
-Output:    FFFF7F68  (ect_warmup_correction, float)
+Output:    FFFF7F68  (ect_blend_correction, float)
 Consumer:  0x3F374  (ect_warmup_consumer, 2050 bytes — per-cylinder timing)
 
 Mode selection — 2 flags select among 4 ECT curves:
@@ -660,8 +660,8 @@ SECTION 12: COMPLETE RAM VARIABLE CATALOG
 
   FFFF7878    fuel_enrichment_B       float    warmup/transient enrichment
   FFFF7D70    warmup_mode_output      float    time-based mode switch out
-  FFFF69FC    ECT_input               float    coolant temp for lookups
-  FFFF69F0    IAT_input               float    intake air temp for lookups
+  FFFF69FC    ect_input_float          float    coolant temp for lookups
+  FFFF69F0    iat_input_float          float    intake air temp for lookups
   FFFF6A22    engine_run_time         uint16   run time counter
   FFFF7448    fuel_mode_flag          —        fuel mode state
   FFFF7453    fuel_status             —        fuel status byte
@@ -672,7 +672,7 @@ SECTION 12: COMPLETE RAM VARIABLE CATALOG
 
   FFFF90BE    ect_mode_flag           byte     timing curve selection
   FFFF6350    ECT_float               float    coolant temp (timing input)
-  FFFF7F68    ect_warmup_correction   float    timing correction output
+  FFFF7F68    ect_blend_correction   float    timing correction output
   FFFF7E94    warmup_corr_cyl1        float    per-cylinder timing adj
   FFFF7E98    warmup_corr_cyl2        float    per-cylinder timing adj
   FFFF7E9C    warmup_corr_cyl3        float    per-cylinder timing adj
@@ -683,7 +683,7 @@ SECTION 12: COMPLETE RAM VARIABLE CATALOG
   FFFF7C68    engine_status_flag      —        gates AFL
   FFFF94B1    status_byte             byte     referenced in AFL
   FFFFA56A    status_flag             —        additional status
-  FFFFAF3B    falling_mode_byte       byte     falling load transient
+  FFFFAF3B    comms_state_byte         byte     tau falling mode selector
   FFFFACE6    status_flag             —        additional status
 
 
