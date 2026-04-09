@@ -2028,7 +2028,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x00021016, "check_sensor_config_valid");
         count += label(0x00021D9A, "check_sensor_valid");
         count += label(0x00022CEA, "check_accel_pedal_idle");
-        count += label(0x0002F8EA, "check_fuel_system_ready");
+        count += label(0x0002F8EA, "check_transient_flag");
         count += label(0x0002F8F4, "check_fuel_mode_byte_1");
         count += label(0x0002F8FE, "check_fuel_mode_byte_2");
         // Diagnostic monitor flag readers (each reads a DTC status byte)
@@ -3720,7 +3720,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0ACD34L, "desc_1D_RPM_u8_8");
         count += label(0x0ACE54L, "desc_1D_RPM_wide_f32_6_ACE54");
         count += labelComment(0x0AD090L, "desc_1D_RPM_wide_u8_9",
-            "RR: AFL Decay Rate (CL to OL Transition Speed)");
+            "RR: OL Enrichment Ramp Rate (CL to OL Transition Speed). WAS: AFL Decay Rate.");
         count += labelComment(0x0AD0A4L, "desc_1D_RPM_wide_u8_16_AD0A4",
             "RR: CL to OL Transition with Delay (Base Pulse Width)");
         count += label(0x0AD0F0L, "desc_1D_RPM_wide_u8_16_AD0F0");
@@ -6540,8 +6540,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Flag reader: returns 1 if FFFF65F6 == 1 (closed-loop active). 111 callers -- #1 most-called in region.");
         count += labelComment(0x00022CF4L, "check_engine_running",
             "Flag reader: returns 1 if FFFF65C5 == 1 (engine running). 100 callers.");
-        count += labelComment(0x0002F8EAL, "check_fuel_system_ready",
-            "Flag reader: returns 1 if FFFF726C == 1 (fuel system ready). 65 callers.");
+        count += labelComment(0x0002F8EAL, "check_transient_flag",
+            "Flag reader: returns 1 if FFFF726C == 1 (transient_state_flag). 65 callers.");
         count += labelComment(0x00022CEAL, "check_accel_pedal_idle",
             "Flag reader: returns 1 if FFFF65B1 == 1 (accel pedal at idle). 15 callers.");
         count += labelComment(0x00023E48L, "check_afl_ready",
