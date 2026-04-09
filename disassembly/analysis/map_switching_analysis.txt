@@ -7,7 +7,8 @@ Subsystem: Cruise/Non-Cruise Map Switching + Timing Blend Interpolation
 Tasks: 31, 32, 33, 50
 Code range: 0x3F368 - 0x410D4
 Calibration range: 0xD29AC - 0xD2B1C
-Primary RAM: 0xFFFF7F60 (map_ratio), 0xFFFF7F0C (timing_blend_gbr)
+Primary RAM: 0xFFFF7F60 (map_ratio workspace base), 0xFFFF7F0C (timing_blend_gbr)
+  NOTE: The actual blend ratio output is at 0xFFFF7F4C (offset -0x14 from base).
 Based on: map_switching_raw.txt disassembly trace
 
 

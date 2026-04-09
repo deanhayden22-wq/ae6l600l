@@ -3,6 +3,18 @@ ACCELERATION ENRICHMENT / TIP-IN TRANSIENT FUELING - ANALYSIS
 ROM: AE5L600L  |  ECU: Renesas SH7058 (SH-2)  |  2013 Subaru WRX MT
 ================================================================================
 
+CORRECTION NOTICE (2026-04-08)
+------------------------------
+Variable names for core RAM addresses were WRONG in the original analysis.
+Corrected identities (verified from ImportAE5L600L.java + ROM bytes):
+  FFFF65FC = engine_load_current  — WAS mislabeled "prev_throttle_pos"
+  FFFF6624 = rpm_current          — WAS mislabeled "curr_throttle_pos"
+  FFFF620C = airflow_maf_current  — WAS mislabeled "current_rpm"
+The pseudocode in Sections 4-5 describes behaviors using the WRONG variable
+names. The register loads are correct but the semantic interpretation
+(e.g., "throttle delta") is actually operating on load rate / airflow.
+
+
 TABLE OF CONTENTS
   1. System Overview
   2. Call Chain and Function Inventory
@@ -134,9 +146,9 @@ PROLOGUE AND STACK FRAME
     [R15+20+] FR12, FR13, FR14, FR15, PR, R14  saved registers
 
 INPUTS LOADED
-  FR12 ← [0xFFFF65FC]  prev_throttle_pos
-  FR9  ← [0xFFFF6624]  curr_throttle_pos
-  FR13 ← [0xFFFF620C]  current_rpm
+  FR12 ← [0xFFFF65FC]  engine_load_current   (WAS: prev_throttle_pos)
+  FR9  ← [0xFFFF6624]  rpm_current           (WAS: curr_throttle_pos)
+  FR13 ← [0xFFFF620C]  airflow_maf_current   (WAS: current_rpm)
 
 CONDITION QUERIES
   Four sequential JSR calls (0x1CF16, 0x22CF4, 0x297A0, 0x299BC) populate
@@ -176,7 +188,7 @@ struct Workspace {  // base: 0xFFFF7CE0
 };
 
 void fuel_accel_enrich() {
-    float prev_tps  = RAM[0xFFFF65FC];   // FR12
+    float engine_load = RAM[0xFFFF65FC];  // FR12 (WAS: prev_tps)
     float curr_tps  = RAM[0xFFFF6624];   // FR9
     float curr_rpm  = RAM[0xFFFF620C];   // FR13
 
@@ -343,7 +355,7 @@ SECTION 8: COMPLETE RAM MAP
 ADDRESS       NAME                     TYPE    NOTES
 -----------   ----------------------   ------  -----------------------------------
 0xFFFF6350    input_float_B            float   Likely normalized IPW or MAF signal
-0xFFFF65FC    prev_throttle_pos        float   Previous throttle position (fuel_accel_enrich FR12)
+0xFFFF65FC    engine_load_current      float   Engine load g/rev (WAS: prev_throttle_pos) (FR12)
 0xFFFF6624    curr_throttle_pos        float   Current throttle position (fuel_accel_enrich FR9)
 0xFFFF620C    current_rpm              float   Current RPM (fuel_accel_enrich FR13)
 0xFFFF69F4    current_throttle         float   fuel_transient_comp FR8 source
@@ -382,12 +394,12 @@ ADDRESS       TYPE    VALUE        NAME / DESCRIPTION
 0x000CC530    float   10000.0      decay_gain       (saturation sentinel value)
 
 Calibration region context (0xCC500-0xCC538 float dump):
-  0xCC500: 6700.0   0xCC504: 6680.0   0xCC508: 6700.0   0xCC50C: 6680.0
-  0xCC510: 6700.0   0xCC514: 6680.0   0xCC518: 1260.0   [rpm_threshold start]
+  0xCC500: 6700.0   0xCC504: 6650.0   0xCC508: 6700.0   0xCC50C: 6650.0
+  0xCC510: 6700.0   0xCC514: 6650.0   0xCC518: 1260.0   [rpm_threshold start]
   0xCC51C: 510.0    0xCC520: 510.0    0xCC524: 505.0    0xCC528: 505.0
   0xCC52C: 1260.0   0xCC530: 10000.0  0xCC534: 168.0    0xCC538: 20.0
 
-The values at 0xCC500-0xCC518 (6700.0, 6680.0 alternating, then 1260.0) appear
+The values at 0xCC500-0xCC518 (6700.0, 6650.0 alternating, then 1260.0) appear
 to be neighboring calibration for a different subsystem (possibly rev limiters or
 RPM-based fuel cut thresholds adjacent to the accel enrichment block).
 

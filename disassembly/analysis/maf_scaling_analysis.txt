@@ -339,11 +339,12 @@ MAF feeds into the fueling pipeline at multiple dispatch table entries:
   [16] 0x37186  Transient fuel comp — load rate from MAF delta
   [18] 0x3EB8C  Overrun fuel cutoff — MAF threshold check
 
-  AFL airflow range breakpoints @ 0x0CC074:
-    Range 0:  < 5.6 g/s   (idle)
-    Range 1:  5.6 - 10.0 g/s  (light cruise)
-    Range 2:  10.0 - 50.0 g/s (part throttle)
-    Range 3:  > 50.0 g/s  (heavy load / boost)
+  AFL airflow range breakpoints @ 0x0CC074 (4 x float32):
+    Breakpoints: [5.6, 10.0, 50.0, 80.0] g/s (verified from ROM)
+    Range 0:  < 5.6 g/s        (idle)
+    Range 1:  5.6 - 10.0 g/s   (light cruise)
+    Range 2:  10.0 - 50.0 g/s  (part throttle)
+    Range 3:  50.0 - 80.0 g/s  (heavy load / boost)
 
   Learning rate (from 0x34CC8):
     < 35 g/s:  88 scheduler ticks between updates (slow learn)

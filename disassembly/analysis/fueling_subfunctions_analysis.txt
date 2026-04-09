@@ -55,7 +55,7 @@ point where the flag check can be intercepted for diagnostics.
   ─────────  ─────  ─────────  ──────────────────────────
   0x022F92   111    FFFF65F6   check_cl_active
   0x022CF4   100    FFFF65C5   check_engine_running
-  0x02F8EA    65    FFFF726C   check_fuel_system_ready
+  0x02F8EA    65    FFFF726C   check_transient_flag
   0x0297A0    18    FFFF9704   diag_flag_P0031_read
   0x0297B0    16    FFFF9705   diag_flag_P0032_read
   0x022CEA    15    FFFF65B1   check_accel_pedal_idle
@@ -190,7 +190,7 @@ SECTION 4: A/F LEARNING & CL/OL TRANSITION HELPERS (0x0278xx-0x029Bxx)
 SECTION 5: FUELING STATUS READERS (0x02F8xx-0x02FFxx)
 ================================================================================
 
-  0x02F8EA (65 calls) — check_fuel_system_ready
+  0x02F8EA (65 calls) — check_transient_flag
     Reads FFFF726C (fuel system state). The third most-called
     function in this range. FFFF726C is the master fuel system
     readiness byte — when == 1, the fuel pipeline is initialized
@@ -274,7 +274,7 @@ SECTION 8: RAM ADDRESS REFERENCE (NEW)
   FFFF65F6     0x022F92           cl_active_flag
   FFFF67FC     0x023E48           afl_ready_flag
   FFFF6A29     0x0278D2           maf_validity_flag
-  FFFF726C     0x02F8EA           fuel_system_ready
+  FFFF726C     0x02F8EA           transient_flag
   FFFF726D     0x02F8F4           fuel_mode_byte_1
   FFFF726E     0x02F8FE           fuel_mode_byte_2
   FFFF96A0     0x0281CC           diag_mode_flag_A
@@ -295,7 +295,7 @@ SECTION 9: RECOMMENDATIONS
    labeled with their DTC codes (e.g., "diag_check_P0031").
 
 3. The top 10 most-called unnamed functions should get Ghidra labels:
-   - 0x02F8EA → check_fuel_system_ready
+   - 0x02F8EA → check_transient_flag
    - 0x022CEA → check_accel_pedal_idle
    - 0x021D9A → check_sensor_valid
    - 0x021016 → check_sensor_config_valid

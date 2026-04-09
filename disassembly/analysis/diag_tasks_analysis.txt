@@ -114,7 +114,7 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
     FFFF4494   u16    Diagnostic threshold input
     FFFF8E98   u8     Engine state flag
     FFFF65C0   u8     Throttle position (stored to ctrl struct)
-    FFFF67EC   u16    Engine run time (seconds)
+    FFFF67EC   float  Atmospheric pressure (atm_pressure_current) [WAS: u16 engine run time — WRONG]
     FFFF85D7   u8     Fuel system state
     FFFF6624   float  RPM current
     FFFF65FC   float  Engine load current
@@ -200,7 +200,7 @@ TASK 55: MPS DIAGNOSTIC (MAP SWITCH) @ 0x900B4
   -----------------------------------------------------------------------
     FFFFABF4   u8     MPS maturation counter
     FFFF4130   float  IAT ADC value
-    FFFF67EC   u16    Engine run time
+    FFFF67EC   float  Atmospheric pressure [WAS: u16 engine run time — WRONG]
     FFFF44E8   u8[2]  MPS current readings (2 channels)
     FFFFAE08   u8     Diagnostic precondition flag
 
@@ -268,7 +268,7 @@ TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
       - Engine load current (FFFF65FC) -> FR9
       - FFFF63C4 (IAT-related?) -> FR6
       - FFFF63FC (barometric?) -> FR4
-      - Engine run time (FFFF67EC)
+      - Atmospheric pressure (FFFF67EC)
 
     Gate conditions (all must pass for EVAP test):
       - Monitor enable returned 1
@@ -301,7 +301,7 @@ TASK 56: EVAP PURGE DIAGNOSTIC @ 0x66580
     FFFF63FC   float  Barometric / atmospheric pressure
     FFFF6350   float  ect_current
     FFFF65FC   float  Engine load current
-    FFFF67EC   u16    Engine run time
+    FFFF67EC   float  Atmospheric pressure [WAS: u16 engine run time — WRONG]
 
   Calibration:
   -----------------------------------------------------------------------

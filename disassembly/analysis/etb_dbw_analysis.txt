@@ -4,6 +4,9 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
 
 Code range: 0x050000 - 0x054851 (~18.4 KB)
+NOTE: This is the low-level throttle plate motor driver. The torque
+request / APP-to-throttle translation is in torque_management_analysis.txt.
+Workspace at FFFF88E8-8BFF overlaps with boost control (FFFF8B50-8BD0).
 Called from: task10_call52 (0x47C40) Dispatch Table A -- 13 entries
             task10_sub_0x049082 Dispatch Table B -- 28 entries
             Additional callers: 0x04A752, 0x04F19C, 0x0489C0

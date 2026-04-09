@@ -3,6 +3,16 @@ BOOST CONTROL SYSTEM -- COMPLETE ANALYSIS
 AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2)
 ================================================================================
 
+CORRECTION NOTICE (2026-04-08)
+------------------------------
+All 5 clamping call sites in this file call 0xBE960 (float_min), NOT
+0xBE970 (float_max). Lines 24, 132, 139, 146, 383, 419 describe the
+behavior as "float_max(duty - rate, 0.0)" — this is WRONG.
+The actual operation is float_min (min of two values). The ramp-down
+mechanism works because FR5 holds a stored reference value, not 0.0.
+The effective behavior is min(duty - rate, reference) which constrains
+the output downward. Sections 6 and 9 descriptions need re-derivation.
+
 
 OVERVIEW
 --------

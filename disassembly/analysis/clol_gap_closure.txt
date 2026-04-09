@@ -15,6 +15,9 @@ KNOWN ERRORS IN THIS FILE:
   - GAP 2 (CBBEF=1, snapshot every tick) is still correct.
   - GAP 3 (SSM mode formatting) is still correct.
   - GAP 4 (clol_post_transition dead code) is still correct.
+  - GAP 1 GBR offset MATH ERROR: claims GBR+0x5C = FFFF74AC, but
+    GBR=FFFF79A4 + 0x5C = FFFF7A00 (not 74AC). The output addresses
+    FFFF74AC-74B0 would require GBR=FFFF7450, not FFFF79A4.
 
 
 Closes gaps identified in cl_ol_comprehensive_review.txt Section 12

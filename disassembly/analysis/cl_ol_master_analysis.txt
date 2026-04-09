@@ -392,6 +392,10 @@ SECTION 9: WHAT THE DATALOG ACTUALLY SHOWS
 SECTION 10: CALIBRATION REFERENCE
 ================================================================================
 
+  NOTE: "Modified" values below reflect an OLDER tune revision. Current
+  values (rev 20.5+) differ — see project_ol_trigger_matrix.md in memory
+  for the latest thresholds. Stock values are from ae5l600l.bin (unchanged).
+
   --- Path A (Condition Checker) Thresholds ---
 
   Address   Parameter                    Stock      Modified
@@ -526,7 +530,7 @@ SECTION 12: FFFF798C UPDATE ALGORITHM — CORRECTED (2026-04-07)
     FFFF79E0 is POSITIVE (u16 table at CE5A4 × 1/32768, via fadd at 0x36262).
     This RAMPS the accumulator UPWARD each cycle. The max() clamp prevents
     it from dropping below the blended target floor. At low RPM, the step
-    is 0.003052/cycle. See cl_ol_decay_analysis.txt for full timing.
+    is 0.003052/cycle. See cl_ol_ramp_analysis.txt for full timing.
 
   DIRECT_ASSIGN path (0x362F8-0x36306) — SNAP:
     FFFF7990 = FR15 * FFFF79A0         // target × blend coefficient

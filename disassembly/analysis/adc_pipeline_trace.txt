@@ -237,7 +237,7 @@ Bulk reader: 0x040DE | GBR base: 0xFFFF4024 | 32 channels
     ADDR29 = Coolant Temp (ECT)    -> 0xFFFF405E (raw) -> 0xFFFF4144 (�C float)
     ADDR30 = Intake Air Temp (IAT) -> 0xFFFF4060 (raw) -> 0xFFFF4128 (�C float)
     ADDR26 = Fuel Temperature      -> 0xFFFF4058 (raw) -> 0xFFFF41F4 (�C float)
-    ADDR14 = Atmospheric/Baro Pres -> 0xFFFF4040 (raw) -> 0xFFFF42FC (kPa float)
+    ADDR14 = Atmospheric/Baro Pres -> 0xFFFF4040 (raw) -> 0xFFFF42FC (mmHg float) [WAS: kPa — WRONG per maf_scaling_analysis formula]
 
   KEY RAM ADDRESSES FOR DOWNSTREAM USE:
     0xFFFF4024 = ADC raw buffer base (32 x 16-bit words)

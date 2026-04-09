@@ -359,8 +359,11 @@ KEY CALIBRATION TABLES
   0xCC308     AFLRPMThreshold         float32     (min RPM for AFL trim)
   0xCC30C     AFLECTThreshold         float32     (ECT gate for AFL)
   0xCD2E6     CrankingFuel_IPW_A      uint16×16   68.4ms-2.4ms (ECT indexed)
-  0xD106C     InjectorLatency         uint16×15   Dead-time table (3×5, voltage)
-  0xD108C     InjLatencyAxis          float32×3   Voltage axis: 5.0, 7.0, 10.0V
+  0xD106C     InjectorLatency         uint16×15   Dead-time table (5 cols × 3 rows, VBatt × secondary)
+  *** D108C REMOVED: was inside u16 data at D106C, misread as float axis.
+      Actual VBatt axis: 0xD104C [6.5, 9.0, 11.5, 14.0, 16.5]V (float32×5).
+      Secondary axis: 0xD1060 [-1000, 0, 1000] (float32×3).
+      Descriptor: 0xAD7E0. See injector_deadtime_analysis.txt.
 
   IGNITION TIMING:
   0xD2D14     TimingCompClampLow      float32     MPS timing lower bound
