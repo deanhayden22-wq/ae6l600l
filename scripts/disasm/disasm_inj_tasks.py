@@ -26,7 +26,7 @@ def s12(v): return v - 0x1000 if v > 0x7FF else v
 
 LABELS = {
     0xFFFF7AB4: "afl_multiplier_output", 0xFFFF895C: "injector_data",
-    0xFFFF63F8: "RPM_float", 0xFFFF62F8: "engine_load",
+    0xFFFF63F8: "iat_current", 0xFFFF62F8: "engine_load",
     0xFFFF6540: "sensor_state", 0xFFFF77C8: "CL_base_params",
     0xFFFF7D68: "transient_fuel", 0xFFFF80E4: "inj_pw_primary",
     0xFFFF80F8: "final_timing_output", 0xFFFF668C: "inj_timing_state",
@@ -35,7 +35,7 @@ LABELS = {
     0xFFFF5FB8: "maf_value", 0xFFFF7448: "CLOL_mode_flag",
     0xFFFF65C0: "throttle_pos", 0xFFFF6812: "boost_pressure_w",
     0xFFFF80EC: "inj_comp_state", 0xFFFF5BE3: "ect_byte",
-    0xFFFF6624: "engine_load_float", 0xFFFF65BF: "throttle_byte",
+    0xFFFF6624: "rpm_current", 0xFFFF65BF: "throttle_byte",
     0xFFFF77DC: "CL_target_comp_A", 0xFFFF77E0: "CL_target_comp_B",
     0xFFFF781C: "AFC_pipeline_result", 0xFFFF7864: "AFC_struct_base",
     0xFFFF7BA8: "AFC_PI_struct_base", 0xFFFF7348: "fuel_base_factor",
@@ -45,7 +45,7 @@ LABELS = {
     0xFFFF7344: "fuel_struct_base", 0xFFFF80C8: "timing_lu_state",
     0xFFFF80DA: "timing_lu_flag", 0xFFFF8910: "ign_output_state",
     0xFFFF8098: "ign_ctrl_a", 0xFFFF80AE: "ign_ctrl_b",
-    0xFFFF6364: "rpm_period",
+    0xFFFF6364: "ect_startup",
 }
 
 SUB_NAMES = {

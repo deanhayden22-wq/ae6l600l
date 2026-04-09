@@ -208,8 +208,8 @@ SECTION 4: MONITOR TASKS
   sub_60392: The main readiness computation. Reads:
     - FFFF67EC (engine run time, u16)
     - FFFF85D7 (warmup complete flag)
-    - FFFF6624 (engine load -- 301 ROM references)
-    - FFFF65FC (manifold pressure)
+    - FFFF6624 (rpm_current -- 301 ROM references)
+    - FFFF65FC (engine_load_current)
     - FFFF895C (AFL learning value)
     - FFFF7FBC (timing correction)
     - FFFF6354 (vehicle speed)
@@ -248,7 +248,7 @@ SECTION 4: MONITOR TASKS
   Part 1 (sub at 0x6F0CE):
     Calls 0x582D2 (check_engine_running, R4=39)
     Calls 0x584BE (check_diag_preconditions)
-    Reads FFFF4130 (IAT value) and FFFF6624 (load)
+    Reads FFFF4130 (IAT value) and FFFF6624 (rpm_current)
     Checks IAT against threshold at 0xD8B14
     Checks load against threshold at 0xD8B18
     Writes pass/fail to FFFF96A4

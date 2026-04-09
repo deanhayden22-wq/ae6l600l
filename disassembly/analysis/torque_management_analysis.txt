@@ -1,6 +1,15 @@
 ================================================================================
 TORQUE MANAGEMENT / TORQUE REQUEST MODEL — COMPLETE ANALYSIS
 AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
+
+CORRECTION NOTICE (2026-04-08)
+------------------------------
+RAM address identity corrections applied. Previous versions had wrong
+labels from pre-2026-04-07 analysis. Corrected identities:
+  FFFF6624 = rpm_current      (WAS: "MAF"/"MAF alt")
+  FFFF6350 = ect_current      (WAS: "RPM"/"Engine RPM")
+  FFFF65FC = engine_load_current (WAS: "APP")
+  FFFF63F8 = iat_current      (WAS: "RPM alt")
 ================================================================================
 
 
@@ -98,32 +107,32 @@ The torque request main function at 0x3B810 manages whether torque request
 processing is active. It reads live sensor data and applies multiple gates.
 
   Inputs:
-    FR14 = APP position (0xFFFF65FC, float)
-    FR15 = MAF alt (0xFFFF6624, float)
-    FR8  = RPM alt (0xFFFF63F8, float)
+    FR14 = engine_load_current (0xFFFF65FC, float)
+    FR15 = rpm_current (0xFFFF6624, float)
+    FR8  = iat_current (0xFFFF63F8, float)
     R2   = throttle position (0xFFFF65C0, byte)
 
   Workspace: 0xFFFF7CC8
     +0x00: counter (word)
     +0x0B: torque_request_active flag (byte, 0 or 1)
     +0x0E: secondary counter (word)
-    -0x08: previous MAF (float, for rate-of-change)
-    -0x04: previous APP (float, for rate-of-change)
+    -0x08: previous RPM (float, for rate-of-change)
+    -0x04: previous engine_load (float, for rate-of-change)
 
   Enable conditions (ALL must pass):
     1. APP > 1.0 (minimum pedal input)
     2. APP > 0.46 (minimum pedal input, CC570) [WAS: RPM_alt — WRONG]
-    3. MAF < 1000.0 (not already at high load)
-    4. MAF > 2000.0 condition NOT met (absolute ceiling)
+    3. RPM < 1000.0 (minimum RPM gate)
+    4. RPM > 2000.0 condition NOT met (RPM ceiling)
     5. Counter >= 125 ticks AND secondary counter >= 125 ticks
-    6. Rate-of-change check: |MAF_delta| / |MAF_error| < 2000.0
+    6. Rate-of-change check: |RPM_delta| / |RPM_error| < 2000.0
     7. APP delta < 50.0 (no sudden pedal transient)
 
   Thresholds (ROM @ 0xCC570-CC584):
     0xCC570: 0.46    — minimum APP for torque request enable
-    0xCC574: 1000.0  — MAF upper gate
-    0xCC578: 2000.0  — MAF absolute maximum
-    0xCC57C: 1500.0  — MAF secondary threshold
+    0xCC574: 1000.0  — RPM lower gate
+    0xCC578: 2000.0  — RPM upper threshold
+    0xCC57C: 1500.0  — RPM secondary threshold
     0xCC580: 2000.0  — rate-of-change threshold
     0xCC584: 50.0    — APP delta threshold
 
@@ -138,9 +147,9 @@ The second part of the torque request block sets RPM-based hysteresis
 flags used by the CL/OL fueling system and timing system.
 
   Inputs:
-    FR14 = RPM (0xFFFF6350)
-    FR12 = APP (0xFFFF65FC)
-    FR15 = MAF (0xFFFF6624)
+    FR14 = ect_current (0xFFFF6350)
+    FR12 = engine_load_current (0xFFFF65FC)
+    FR15 = rpm_current (0xFFFF6624)
     GBR  = 0xFFFF7CCA (hysteresis workspace)
 
   Called subroutines:
@@ -155,18 +164,17 @@ flags used by the CL/OL fueling system and timing system.
   ├───────────┼──────────────────────────────────────────────────┤
   │ FFFF7458  │ Torque request enable — multi-condition gate     │
   │           │ Requires: engine running, no decel, no idle,     │
-  │           │ APP > threshold, MAF within range, no transient  │
+  │           │ APP > threshold, RPM within range, no transient  │
   ├───────────┼──────────────────────────────────────────────────┤
-  │ FFFF745E  │ RPM hysteresis A — ON: MAF>5600, OFF: MAF<5100  │
-  │ FFFF745F  │ RPM hysteresis B — ON: MAF>4000, OFF: MAF<3500  │
-  │ FFFF7460  │ RPM hysteresis C — ON: MAF>2600, OFF: MAF<1900  │
-  │ FFFF7461  │ RPM hysteresis D — ON: MAF>2600                 │
+  │ FFFF745E  │ RPM hysteresis A — ON: RPM>5600, OFF: RPM<5100  │
+  │ FFFF745F  │ RPM hysteresis B — ON: RPM>4000, OFF: RPM<3500  │
+  │ FFFF7460  │ RPM hysteresis C — ON: RPM>2600, OFF: RPM<1900  │
+  │ FFFF7461  │ RPM hysteresis D — ON: RPM>2600                 │
   └───────────┴──────────────────────────────────────────────────┘
 
-  Note: These flags use MAF (not RPM) for hysteresis — the thresholds
-  at 0xCC588-CC5A0 are airflow values in g/s, not RPM. This creates
-  load-dependent CL/OL transition behavior, matching the MAF-centric
-  architecture of this ECU.
+  Note: These flags use RPM (0xFFFF6624 = rpm_current) for hysteresis —
+  the thresholds at 0xCC588-CC5A0 are RPM values. This creates
+  RPM-dependent CL/OL transition behavior.
 
 
 ================================================================================
@@ -420,9 +428,9 @@ SECTION 12: KEY RAM ADDRESSES
   │ 0xFFFF5E74   │ word      │    - │ Gear position                        │
   │ 0xFFFF65BD   │ byte      │    - │ engine_state_byte (0=decel, 1=normal) │
   │ 0xFFFF65C0   │ byte      │   89 │ Throttle position (DBW actual)       │
-  │ 0xFFFF65FC   │ float     │    - │ APP (accelerator pedal position)     │
-  │ 0xFFFF6350   │ float     │  90+ │ Engine RPM                           │
-  │ 0xFFFF6624   │ float     │    - │ MAF alternate value                  │
+  │ 0xFFFF65FC   │ float     │    - │ engine_load_current                  │
+  │ 0xFFFF6350   │ float     │  90+ │ ect_current (coolant temperature)    │
+  │ 0xFFFF6624   │ float     │    - │ rpm_current                          │
   │ 0xFFFF7CBC   │ struct    │    - │ Torque request workspace              │
   │ 0xFFFF7CC8   │ struct    │    - │ Torque request workspace (alt)        │
   │ 0xFFFF7E8C   │ byte      │    - │ Overrun state (0=normal, 1=fuel cut) │
@@ -489,18 +497,18 @@ SECTION 13: CALIBRATION TABLE SUMMARY
   │ Address  │ Name                                 │ Stock Value      │
   ├──────────┼──────────────────────────────────────┼──────────────────┤
   │ 0xCC570  │ Min APP for torque request            │ 0.46             │
-  │ 0xCC574  │ MAF upper gate                        │ 1000.0 g/s       │
-  │ 0xCC578  │ MAF absolute maximum                  │ 2000.0 g/s       │
-  │ 0xCC57C  │ MAF secondary threshold               │ 1500.0 g/s       │
+  │ 0xCC574  │ RPM lower gate                        │ 1000.0 RPM       │
+  │ 0xCC578  │ RPM upper threshold                   │ 2000.0 RPM       │
+  │ 0xCC57C  │ RPM secondary threshold               │ 1500.0 RPM       │
   │ 0xCC580  │ Rate-of-change threshold              │ 2000.0           │
   │ 0xCC584  │ APP delta threshold                   │ 50.0             │
-  │ 0xCC588  │ RPM hyst A ON                         │ 5600.0 g/s       │
-  │ 0xCC58C  │ RPM hyst A OFF                        │ 5100.0 g/s       │
-  │ 0xCC590  │ RPM hyst B ON                         │ 4000.0 g/s       │
-  │ 0xCC594  │ RPM hyst B OFF                        │ 3500.0 g/s       │
-  │ 0xCC598  │ RPM hyst C ON                         │ 2600.0 g/s       │
-  │ 0xCC59C  │ RPM hyst C OFF                        │ 1900.0 g/s       │
-  │ 0xCC5A0  │ RPM hyst D ON                         │ 2600.0 g/s       │
+  │ 0xCC588  │ RPM hyst A ON                         │ 5600.0 RPM       │
+  │ 0xCC58C  │ RPM hyst A OFF                        │ 5100.0 RPM       │
+  │ 0xCC590  │ RPM hyst B ON                         │ 4000.0 RPM       │
+  │ 0xCC594  │ RPM hyst B OFF                        │ 3500.0 RPM       │
+  │ 0xCC598  │ RPM hyst C ON                         │ 2600.0 RPM       │
+  │ 0xCC59C  │ RPM hyst C OFF                        │ 1900.0 RPM       │
+  │ 0xCC5A0  │ RPM hyst D ON                         │ 2600.0 RPM       │
   └──────────┴──────────────────────────────────────┴──────────────────┘
 
 
@@ -510,7 +518,7 @@ SECTION 14: COMPLETE TORQUE MANAGEMENT ARCHITECTURE DIAGRAM
 
   ┌─────────────────────────────────────────────────────────────────────┐
   │  DRIVER INPUT                                                      │
-  │  Accelerator Pedal (APP) -> ADDR12/16 -> FFFF65FC (float)          │
+  │  Accelerator Pedal (APP) -> ADDR12 (FFFF40D0) / ADDR16 (FFFF40B8) │
   │  SI-DRIVE Mode Switch -> FFFF5DB5 (byte: 0/1/2)                   │
   └───────────────────────────────┬─────────────────────────────────────┘
                                   │

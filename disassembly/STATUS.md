@@ -34,7 +34,7 @@ Every named function in these subsystems is fully analyzed with disassembly, pse
 
 | Subsystem | Functions | Key Files |
 |-----------|-----------|-----------|
-| CL/OL Fuel Control | 16 | cl_ol_state_machine.txt, cl_ol_comprehensive_review.txt (6 files) |
+| CL/OL Fuel Control | 16 | cl_ol_master_analysis.txt (canonical), cl_ol_ramp_analysis.txt (6 files) |
 | Fueling Pipeline | 39 entries | fueling_pipeline_analysis.txt (2-table dispatch, 19+20 entries) |
 | Knock / FLKC | 5 | knock_flkc_analysis.txt (163 KB) |
 | Ignition Timing | 3 | ignition_timing_analysis.txt + descriptors |

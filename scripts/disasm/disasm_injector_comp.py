@@ -40,7 +40,7 @@ LABELS = {
     0xFFFF7B74: "fuel_blend_C",
     0xFFFF7B78: "fuel_blend_D",
     0xFFFF895C: "injector_data",
-    0xFFFF63F8: "RPM_float",
+    0xFFFF63F8: "iat_current",
     0xFFFF62F8: "engine_load",
     0xFFFF6540: "sensor_state",
     0xFFFF77C8: "CL_base_params",

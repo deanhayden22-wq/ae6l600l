@@ -1075,11 +1075,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CC1F0, "OL_Condition_Load_B_Hi",
             "OL condition flag B (FFFF7A01) hi threshold = 91.0. "
             + "FFFF7A01 cleared=0 when FFFF62DC > 91.0.");
-        // FR15=FFFF65FC (vehicle speed) vs CC1F4 (labeled) / CC1F8:
+        // FR15=FFFF65FC (engine_load_current) vs CC1F4 (labeled) / CC1F8:
         count += labelComment(0x000CC1F8, "OL_Condition_Speed_Hi",
             "OL condition flag speed hysteresis hi = 140.0. "
             + "Speed flag cleared=0 when FFFF65FC > 140.0. Pair with CC1F4 (lo=130.0). ol_condition_checker.");
-        // FFFF63F8 (engine load g/rev) vs CC204 (labeled) / CC208:
+        // FFFF63F8 (iat_current) vs CC204 (labeled) / CC208:
         count += labelComment(0x000CC208, "OL_Condition_EngLoad_Hi",
             "OL condition engine load hysteresis hi = 4.9 g/rev. "
             + "Pair with CC204 (lo=4.8 g/rev). ol_condition_checker. "
@@ -1157,10 +1157,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CBC68, "OL_Hyst_Timer_Threshold",
             "OL hysteresis handler timer threshold (word) = 56. "
             + "clol_hysteresis_handler: enrichment state timer must reach 56 counts.");
-        count += labelComment(0x000CC228, "OL_Hyst_MAF_Threshold",
-            "OL hysteresis handler MAF gate threshold = 2000.0. "
-            + "clol_hysteresis_handler (0x36B0C): FFFF6624 must be < 2000 for hysteresis sub. "
-            + "In practice always passes (MAF << 2000 in any units).");
+        count += labelComment(0x000CC228, "OL_Hyst_RPM_Threshold",
+            "OL hysteresis handler RPM gate threshold = 2000.0. "
+            + "clol_hysteresis_handler (0x36B0C): rpm_current (FFFF6624) must be < 2000 for hysteresis sub. "
+            + "In practice always passes (RPM << 2000 at hysteresis entry).");
         count += labelComment(0x000CC22C, "OL_Hyst_Speed_Threshold",
             "OL hysteresis handler speed gate threshold = 0.0. "
             + "clol_hysteresis_handler (0x36B2C): FFFF65FC must be <= 0.0. "
@@ -1220,12 +1220,12 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CBE6C, "CL_RPMDelta_Hyst_OFF",
             "CL readiness RPM delta hysteresis OFF threshold (float) = 580.0. "
             + "FFFF7458 cleared=0 if delta > 580.");
-        count += labelComment(0x000CBE70, "CL_MAF_Hyst_ON",
-            "CL readiness MAF hysteresis ON threshold (float) = 1000.0 g/s. "
-            + "FFFF745D set=1 if FFFF6624 <= 1000.");
-        count += labelComment(0x000CBE74, "CL_MAF_Hyst_OFF",
-            "CL readiness MAF hysteresis OFF threshold (float) = 1100.0 g/s. "
-            + "FFFF745D cleared=0 if FFFF6624 > 1100.");
+        count += labelComment(0x000CBE70, "CL_RPM_Hyst_ON",
+            "CL readiness RPM hysteresis ON threshold (float) = 1000.0 RPM. "
+            + "FFFF745D set=1 if rpm_current (FFFF6624) <= 1000.");
+        count += labelComment(0x000CBE74, "CL_RPM_Hyst_OFF",
+            "CL readiness RPM hysteresis OFF threshold (float) = 1100.0 RPM. "
+            + "FFFF745D cleared=0 if rpm_current (FFFF6624) > 1100.");
         count += labelComment(0x000CBE78, "CL_AFRDeviation_Max",
             "CL readiness AFR deviation upper bound (float) = 0.11. "
             + "FFFF7BA8 must be < 0.11 for cl_master_readiness. "
@@ -1610,9 +1610,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF745CL, "cl_delay_counter_2",
             "CL readiness delay counter 2 (byte). Resets on FFFFACF0 rising edge. "
             + "Must reach threshold 4 (CBE6=CAL@CBBD6) before CL is allowed.");
-        count += labelComment(0xFFFF745DL, "cl_maf_hyst",
-            "MAF (FFFF6624) hysteresis flag (byte). Set=1 if MAF <= 1000 (CBE70). "
-            + "Cleared=0 if MAF > 1100 (CBE74). Second of 3 throttle-condition flags.");
+        count += labelComment(0xFFFF745DL, "cl_rpm_hyst",
+            "RPM (FFFF6624) hysteresis flag (byte). Set=1 if RPM <= 1000 (CBE70). "
+            + "Cleared=0 if RPM > 1100 (CBE74). Second of 3 throttle-condition flags.");
         count += labelComment(0xFFFF745EL, "cl_speed_table_hyst",
             "Speed table lookup hysteresis flag (byte). Set=1 if table_result > FFFF620C. "
             + "Cleared=0 if (table_result - 20.0) > FFFF620C (CBE A0 offset). Third throttle flag.");
@@ -1724,8 +1724,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Engine load metric (float). Read by ol_condition_checker as FR13. "
             + "Compared against OL_Condition_Load_A/B thresholds (90.0/91.0). "
             + "Exact physical unit TBD — values of 90-91 suggest throttle degrees or normalized load.");
-        count += labelComment(0xFFFF6364L, "engine_rpm_secondary",
-            "Secondary RPM or engine state float. Read by clol_delay_manager_B (0x36BF4) as FR9. "
+        count += labelComment(0xFFFF6364L, "ect_startup",
+            "ECT at engine start / secondary ECT float. Read by clol_delay_manager_B (0x36BF4) as FR9. "
             + "Compared against OL_DelayB_Thresh_A_Lo / OL_DelayB_Thresh_B_Lo (0.0). "
             + "Physical meaning TBD — consistently paired with FFFF6350 in delay manager B.");
         // REMOVED: 0xFFFF6624 "engine_rpm_or_maf" — wrong. Correct: rpm_current (line 2154)
@@ -3135,13 +3135,13 @@ public class ImportAE5L600L extends GhidraScript {
 
         // Torque management — functions traced in torque_management_analysis.txt
         count += labelComment(0x0003B810L, "torque_request_main",
-            "Torque request enable logic. Reads APP (FFFF65FC), MAF (FFFF6624), "
-            + "RPM (FFFF63F8), throttle (FFFF65C0). Manages workspace at FFFF7CC8. "
-            + "Multi-condition gate: APP>1.0, RPM>0.46, MAF<1000, 125-tick counters.");
+            "Torque request enable logic. Reads engine_load (FFFF65FC), rpm (FFFF6624), "
+            + "iat (FFFF63F8), throttle (FFFF65C0). Manages workspace at FFFF7CC8. "
+            + "Multi-condition gate: load>1.0, iat>0.46, rpm<1000, 125-tick counters.");
         count += labelComment(0x0003B8E6L, "torque_request_hyst_gates",
-            "CL/OL RPM/MAF hysteresis gate setter. GBR=FFFF7CCA. "
-            + "Sets flags FFFF7458 (torque enable), FFFF745E-7461 (MAF hysteresis). "
-            + "Thresholds at CC588-CC5A0 (airflow g/s, not RPM).");
+            "CL/OL RPM hysteresis gate setter. GBR=FFFF7CCA. "
+            + "Sets flags FFFF7458 (torque enable), FFFF745E-7461 (RPM hysteresis). "
+            + "Thresholds at CC588-CC5A0 (RPM brackets).");
         count += labelComment(0x0003B7C4L, "torque_request_decel_gate",
             "Torque request decel counter. Checks FFFF65BD (decel flag), "
             + "manages counter at FFFF7CBC. Tail-calls 0x3D2FC.");

@@ -80,7 +80,7 @@ Per-cycle flow in pseudocode:
 
   PHASE 1 — State Snapshot (clol_transition_core):
     if master_counter >= threshold(CAL@0xCBBEF):
-        snapshot ECT, RPM, throttle, MAP, MAF, BPW, load, gear
+        snapshot ECT, RPM, throttle, MAP, load, gear
         compute OL enrichment from fuel map tables
         reset master_counter = 0
     master_counter = clamp(master_counter + 1)
@@ -179,19 +179,19 @@ It outputs two values:
 
 The function reads engine state variables:
   FFFF5E94: gear position
-  FFFF6350: RPM
+  FFFF6350: ect_current (ECT)
   FFFF69F0: IAT (intake air temperature)
-  FFFF63C4: engine load
-  FFFF65FC: base pulse width (BPW)
+  FFFF63C4: ect_compensation
+  FFFF65FC: engine_load_current
   FFFF63CC: ECT (coolant temperature)
-  FFFF6624: MAF (mass airflow)
+  FFFF6624: rpm_current (RPM)
 
 INPUT VARIABLES AND WHAT THEY REPRESENT:
   - Gear position determines which RPM threshold table to use
   - RPM is the primary per-gear OL trigger
   - Throttle position has its own maximum threshold (CC1D8)
   - Engine load has its own threshold (CC204)
-  - BPW, MAF, and ECT are secondary triggers
+  - Engine load, RPM, and ECT are secondary triggers
   - Vehicle speed has a separate maximum (CC1F4)
 
 COMPLETE LOGIC FLOW (pseudocode):
@@ -200,7 +200,7 @@ COMPLETE LOGIC FLOW (pseudocode):
 
       // ---- CHECK 1: Per-Gear RPM Limits ----
       gear = RAM[FFFF5E94]
-      RPM = float(RAM[FFFF6350])
+      ECT = float(RAM[FFFF6350])
 
       // 10 threshold pairs at CAL[0xCC180 - 0xCC1A4]
       // Each gear has ON and OFF thresholds (hysteresis pair)
@@ -261,8 +261,8 @@ COMPLETE LOGIC FLOW (pseudocode):
       // ---- CHECKS 8-11: Delay-Based Transition ----
       // These use tables for gradual transition:
       //   CAL[0xCCD78]: Throttle threshold with delay (all zeros in both ROMs)
-      //   CAL[0xCE5F8]: BPW threshold with delay (all zeros in both ROMs)
-      //   CAL[0xCE640]: MAF-based counter step [0,0,0,0,0,1,2,3]
+      //   CAL[0xCE5F8]: engine_load threshold with delay (all zeros in both ROMs)
+      //   CAL[0xCE640]: RPM-based counter step [0,0,0,0,0,1,2,3]
       // In modified ROM with delay=0, these are moot
 
       // ---- NO CONDITION TRIGGERED ----
@@ -336,11 +336,11 @@ This prevents oscillation at the boundary.
 HOW IT WORKS (clol_hysteresis_sub, GBR=0xFFFF79CC):
 
   The function reads:
-    MAF from RAM[FFFF6624]
+    RPM from RAM[FFFF6624]
     Sensor value from RAM[FFFF62DC] (secondary throttle/load metric)
     Correction from RAM[FFFF7348]
 
-  It performs a table lookup via ROM@0xAC5BC using MAF, then:
+  It performs a table lookup via ROM@0xAC5BC using RPM, then:
 
   // Throttle hysteresis check
   throttle_lookup = table_result
@@ -423,18 +423,18 @@ This function consists of TWO sub-functions at the entry point:
 
   RAM READS:
     FFFF67EC (word): RPM raw value (from engine speed sensor) -> R14
-    FFFF6350 (float): RPM (floating point) -> stored at 0xFFFF7A2C
+    FFFF6350 (float): ect_current (ECT) -> stored at 0xFFFF7A2C
     FFFF62F8 (float): sensor value (likely secondary throttle) -> stored at 0xFFFF7A30
-    FFFF6624 (float): MAF -> stored at 0xFFFF7A34
+    FFFF6624 (float): rpm_current (RPM) -> stored at 0xFFFF7A34
     FFFF7A28 (byte): GBR+8, state variable
     FFFF7A3D (byte): GBR+29, condition flag A
     FFFF7A3C (byte): GBR+28, condition flag B
     FFFF7A3E (byte): GBR+30, condition flag C
 
   RAM WRITES:
-    FFFF7A2C (float): RPM snapshot (via R1 + (-16))
+    FFFF7A2C (float): ECT snapshot (via R1 + (-16))
     FFFF7A30 (float): sensor snapshot (via R1 + (-12))
-    FFFF7A34 (float): MAF snapshot (via R1 + (-8))
+    FFFF7A34 (float): RPM snapshot (via R1 + (-8))
     FFFF7A38 (float): output value (via R1 + (-4))
     FFFF7A14 (float): final output (via R1 + (-28))
 
@@ -455,10 +455,10 @@ This function consists of TWO sub-functions at the entry point:
     CAL[0xCC28C] = 0.2    (upper blending rate, non-condition path)
     CAL[0xCC290] = 0.2    (upper blending rate, condition path)
     CAL[0xCBC70] = 1250   (counter threshold for main gate, word)
-    CAL[0xCC278] = 105.0  (RPM high threshold for enrichment gate)
-    CAL[0xCC27C] = 12000.0 (MAF high threshold for enrichment gate)
-    CAL[0xCC274] = 102.0  (RPM low threshold for enrichment gate)
-    CAL[0xCC280] = 12800.0 (MAF low threshold for enrichment gate)
+    CAL[0xCC278] = 105.0  (ECT high threshold for enrichment gate)
+    CAL[0xCC27C] = 12000.0 (RPM high threshold for enrichment gate)
+    CAL[0xCC274] = 102.0  (ECT low threshold for enrichment gate)
+    CAL[0xCC280] = 12800.0 (RPM low threshold for enrichment gate)
 
   NONE of these calibration values differ between stock and modified ROMs.
 
@@ -519,26 +519,26 @@ This function consists of TWO sub-functions at the entry point:
 
     // Step 7: ALL CONDITIONS PASSED — enrichment adjustment logic
     R1 = 0xFFFF7A3C
-    RPM_snapshot = float(R1 + (-16))       // FFFF7A2C
-    MAF_snapshot = float(R1 + (-8))        // FFFF7A34
+    ECT_snapshot = float(R1 + (-16))       // FFFF7A2C
+    RPM_snapshot = float(R1 + (-8))        // FFFF7A34
 
-    // Upper threshold check: RPM > 105.0 AND MAF > 12000.0
-    if RPM_snapshot > float(CAL[0xCC278]):  // RPM > 105.0?
-        // RPM exceeded upper threshold -> skip upper write
-    else if MAF_snapshot > float(CAL[0xCC27C]):  // MAF > 12000.0?
-        // MAF also not exceeded -> write upper rate
+    // Upper threshold check: ECT > 105.0 AND RPM > 12000.0
+    if ECT_snapshot > float(CAL[0xCC278]):  // ECT > 105.0?
+        // ECT exceeded upper threshold -> skip upper write
+    else if RPM_snapshot > float(CAL[0xCC27C]):  // RPM > 12000.0?
+        // RPM also not exceeded -> write upper rate
         float(R1 + (-4)) = FR15            // FFFF7A38 = 0.2 (upper rate)
 
-    // Lower threshold check: RPM > 102.0 AND MAF > 12800.0
-    if RPM_snapshot > float(CAL[0xCC274]):  // RPM > 102.0?
-        // RPM exceeded lower threshold -> write lower rate
+    // Lower threshold check: ECT > 102.0 AND RPM > 12800.0
+    if ECT_snapshot > float(CAL[0xCC274]):  // ECT > 102.0?
+        // ECT exceeded lower threshold -> write lower rate
         float(R1 + (-4)) = FR14            // FFFF7A38 = 0.1 (lower rate)
-    else if MAF_snapshot > float(CAL[0xCC280]):  // MAF > 12800.0?
-        // MAF not exceeded either -> write lower rate
+    else if RPM_snapshot > float(CAL[0xCC280]):  // RPM > 12800.0?
+        // RPM not exceeded either -> write lower rate
         float(R1 + (-4)) = FR14
         // fall through (keep lower rate)
     else:
-        // Neither RPM nor MAF exceeded lower threshold
+        // Neither ECT nor RPM exceeded lower threshold
         float(R1 + (-4)) = FR14            // FFFF7A38 = 0.1
 
     // Read back the value we just wrote
@@ -584,8 +584,8 @@ the same dispatch chain. It performs additional transition management.
 
   engine_ok = call 0x022CF4()
 
-  MAF = float(RAM[FFFF6624])
-  BPW = float(RAM[FFFF65FC])
+  RPM = float(RAM[FFFF6624])
+  engine_load = float(RAM[FFFF65FC])
 
   // Select table descriptor based on engine condition
   if engine_ok == 1:
@@ -593,8 +593,8 @@ the same dispatch chain. It performs additional transition management.
   else:
       table_desc = CAL[0xAD9EC]
 
-  // 2D table lookup (MAF x BPW -> transition factor)
-  result = table_lookup_2d(table_desc, MAF, BPW)
+  // 2D table lookup (RPM x engine_load -> transition factor)
+  result = table_lookup_2d(table_desc, RPM, engine_load)
 
   // Store result
   float(RAM[FFFF7A24]) = result
@@ -611,9 +611,9 @@ the same dispatch chain. It performs additional transition management.
           GBR+4 = 1                 // set transition flag
   else:
       // Above threshold path
-      RPM = float(RAM[FFFF6350])
-      RPM_min = float(CAL[0xCC25C])
-      if RPM > RPM_min:
+      ECT = float(RAM[FFFF6350])
+      ECT_min = float(CAL[0xCC25C])
+      if ECT > ECT_min:
           GBR+27 = 0               // reset counter
           // Additional counter logic with second threshold
           counter2 = byte(GBR+28) + 1
@@ -642,9 +642,9 @@ sensor snapshots stored by clol_post_transition's main body.
 
   R14 = 0xFFFF7A3C (pointer to sensor snapshot block)
 
-  // MAF table lookup
-  MAF_snapshot = float(R14 + (-8))         // FFFF7A34
-  FR0 = table_lookup(CAL@0xAD0F0, MAF_snapshot)
+  // RPM table lookup
+  RPM_snapshot = float(R14 + (-8))         // FFFF7A34
+  FR0 = table_lookup(CAL@0xAD0F0, RPM_snapshot)
 
   // --- Pair 1: Secondary sensor vs threshold ---
   sensor_value = float(R14 + (-12))        // FFFF7A30
@@ -653,39 +653,39 @@ sensor snapshots stored by clol_post_transition's main body.
   if sensor_value > float(CAL[0xCC268]):   // > 8.96?
       GBR+16 = 0                           // FFFF7A3C = 0 (condition not met)
 
-  // --- Pair 2: RPM vs threshold ---
-  RPM_value = float(R14 + (-16))           // FFFF7A2C
-  RPM_cal = float(CAL[0xCC264])            // = 101.0
-  if RPM_value > RPM_cal:
-      // RPM below threshold (inverted comparison)
+  // --- Pair 2: ECT vs threshold ---
+  ECT_value = float(R14 + (-16))           // FFFF7A2C
+  ECT_cal = float(CAL[0xCC264])            // = 101.0
+  if ECT_value > ECT_cal:
+      // ECT below threshold (inverted comparison)
       // do nothing
   else:
       GBR+17 = 1                           // FFFF7A3D = 1
 
-  RPM_upper = float(CAL[0xCC260])          // = 100.0
-  if RPM_value > RPM_upper:
+  ECT_upper = float(CAL[0xCC260])          // = 100.0
+  if ECT_value > ECT_upper:
       GBR+17 = 0                           // FFFF7A3D = 0
 
-  // --- Pair 3: MAF vs threshold ---
-  MAF_value = float(R14 + (-8))            // FFFF7A34
-  MAF_cal = float(CAL[0xCC270])            // = 0.0
-  if MAF_value > MAF_cal:
+  // --- Pair 3: RPM vs threshold ---
+  RPM_value = float(R14 + (-8))            // FFFF7A34
+  RPM_cal = float(CAL[0xCC270])            // = 0.0
+  if RPM_value > RPM_cal:
       // do nothing
   else:
       GBR+18 = 1                           // FFFF7A3E = 1
 
-  MAF_upper = float(CAL[0xCC26C])          // = 0.0
-  if MAF_value > MAF_upper:
+  RPM_upper = float(CAL[0xCC26C])          // = 0.0
+  if RPM_value > RPM_upper:
       GBR+18 = 0                           // FFFF7A3E = 0
 
   NOTE: With CAL[0xCC270] = 0.0 and CAL[0xCC26C] = 0.0, Pair 3 will
-  set GBR+18 = 1 only when MAF <= 0, then immediately clear it when
-  MAF > 0. In practice, MAF is always > 0 when the engine is running,
+  set GBR+18 = 1 only when RPM <= 0, then immediately clear it when
+  RPM > 0. In practice, RPM is always > 0 when the engine is running,
   so GBR+18 (0xFFFF7A3E) will always be 0.
 
   This means the condition flag C check in clol_post_transition's main body:
       if GBR+30 != 1: goto DEFAULT_PATH
-  will ALWAYS fail (GBR+30 = 0xFFFF7A3E = 0), because the MAF threshold
+  will ALWAYS fail (GBR+30 = 0xFFFF7A3E = 0), because the RPM threshold
   is set to 0.0/0.0 in both stock and modified ROMs.
 
   CONSEQUENCE: The enrichment adjustment logic in clol_post_transition (Steps 5-7)
@@ -770,7 +770,7 @@ The following calibration values were changed from stock to modified:
     CC28C = 0.2 (upper blending rate A) — same in both
     CC290 = 0.2 (upper blending rate B) — same in both
     CBC70 = 1250 (counter gate threshold) — same in both
-    CC274-CC280 (RPM/MAF enrichment thresholds) — same in both
+    CC274-CC280 (ECT/RPM enrichment thresholds) — same in both
     CC260-CC270 (sub threshold pairs) — same in both
 
   KEY INSIGHT: The modified ROM aggressively pushes the ECU into OL:
@@ -981,7 +981,7 @@ CL-to-OL transition at WOT:
   7. DATALOG THE SNAPSHOT VARIABLES
      If possible, log the snapshot addresses (FFFF793C for IAT,
      FFFF7950 for load) alongside the live sensor addresses (FFFF69F0,
-     FFFF63C4) to confirm whether there is a time lag between them.
+     FFFF63C4 [ect_compensation]) to confirm whether there is a time lag between them.
      This would definitively answer the snapshot question.
 
 
@@ -992,12 +992,12 @@ APPENDIX A: RAM ADDRESS MAP FOR clol_post_transition AND RELATED
   Address       Size   Description
   ----------    ----   -------------------------------------------------
   FFFF62F8      float  Sensor value (secondary throttle/load metric)
-  FFFF6350      float  RPM (floating point)
+  FFFF6350      float  ect_current (ECT)
   FFFF6400      float  RPM-related threshold value
-  FFFF6624      float  MAF (mass airflow)
+  FFFF6624      float  rpm_current (RPM)
   FFFF65C0      byte   Engine running state
   FFFF65C5      byte   Engine condition flag (1 = running normally)
-  FFFF65FC      float  BPW (base pulse width)
+  FFFF65FC      float  engine_load_current
   FFFF67EC      word   RPM raw value (from speed sensor)
   FFFF7348      float  Correction value (BPW-related)
   FFFF7448      byte   CL/OL mode flag (1=CL, else=OL) — NOT written by 36E60
@@ -1010,9 +1010,9 @@ APPENDIX A: RAM ADDRESS MAP FOR clol_post_transition AND RELATED
   FFFF7A20      float  Blending rate parameter (written by clol_post_transition sub-A)
   FFFF7A24      float  Transition factor (written by clol_post_transition_B)
   FFFF7A28      byte   State variable (read by clol_post_transition as GBR+8)
-  FFFF7A2C      float  RPM snapshot (written by clol_post_transition)
+  FFFF7A2C      float  ECT snapshot (written by clol_post_transition)
   FFFF7A30      float  Sensor snapshot (written by clol_post_transition)
-  FFFF7A34      float  MAF snapshot (written by clol_post_transition)
+  FFFF7A34      float  RPM snapshot (written by clol_post_transition)
   FFFF7A38      float  Blending rate output (written by clol_post_transition)
   FFFF7A3C      byte   Condition flag B (set by clol_threshold_comparator)
   FFFF7A3D      byte   Condition flag A (set by clol_threshold_comparator)
@@ -1027,21 +1027,21 @@ APPENDIX B: CALIBRATION ADDRESS MAP FOR clol_post_transition AND RELATED
 
   Address    Type    Value (stock=mod)  Description
   --------   -----   -----------------  -----------------------------------------
-  0xCC260    float   100.0              RPM threshold 3 (sub comparator)
-  0xCC264    float   101.0              RPM on threshold (sub comparator)
+  0xCC260    float   100.0              ECT threshold 3 (sub comparator)
+  0xCC264    float   101.0              ECT on threshold (sub comparator)
   0xCC268    float   8.96               Sensor off threshold (sub comparator)
-  0xCC26C    float   0.0                MAF off threshold (sub comparator)
-  0xCC270    float   0.0                MAF on threshold (sub comparator)
-  0xCC274    float   102.0              RPM low threshold (enrichment gate)
-  0xCC278    float   105.0              RPM high threshold (enrichment gate)
-  0xCC27C    float   12000.0            MAF high threshold (enrichment gate)
-  0xCC280    float   12800.0            MAF low threshold (enrichment gate)
+  0xCC26C    float   0.0                RPM off threshold (sub comparator)
+  0xCC270    float   0.0                RPM on threshold (sub comparator)
+  0xCC274    float   102.0              ECT low threshold (enrichment gate)
+  0xCC278    float   105.0              ECT high threshold (enrichment gate)
+  0xCC27C    float   12000.0            RPM high threshold (enrichment gate)
+  0xCC280    float   12800.0            RPM low threshold (enrichment gate)
   0xCC284    float   0.1                Blending rate A (non-condition)
   0xCC288    float   0.1                Blending rate B (condition-1)
   0xCC28C    float   0.2                Upper blending rate A
   0xCC290    float   0.2                Upper blending rate B
   0xCBC70    word    1250               Counter gate threshold
-  0xAD0F0    desc    (table descriptor) MAF lookup table for sub comparator
+  0xAD0F0    desc    (table descriptor) RPM lookup table for sub comparator
 
 
 ================================================================================

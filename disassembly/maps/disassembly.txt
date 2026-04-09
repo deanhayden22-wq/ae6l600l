@@ -2587,7 +2587,7 @@ CL delay counter to zero:
   Literal pool clusters in the CL/OL transition code:
 
   0x35120-0x351D8 (46 entries) — Initial CL/OL check
-    Reads: RPM (FFFF6350), MAF (FFFF6624), ECT (FFFF63CC),
+    Reads: ECT (FFFF6350), RPM (FFFF6624), ECT (FFFF63CC),
            Gear (FFFF5E94), Vehicle Speed
     Refs:  CC0AC-CC0D0 calibration, multiple table processor calls
 
@@ -3040,18 +3040,18 @@ SECTION 9: RAM VARIABLE MAP (ALL AFC-RELATED)
   FFFF6254        byte    ECU state/mode flag
   FFFF62DC        ???     Referenced in OL map selection
   FFFF62F8        ???     Referenced in A/F learning
-  FFFF6350        float   Current RPM
+  FFFF6350        float   ect_current (coolant temperature)
   FFFF6354        float   RPM (alternate/smoothed?)
   FFFF6364        float   Engine load (calculated)
-  FFFF63C4        float   Engine load (alternate)
+  FFFF63C4        float   ect_compensation
   FFFF63CC        float   Coolant temperature (ECT)
-  FFFF63F8        float   MAF (mass air flow, g/s)
+  FFFF63F8        float   iat_current (intake air temp)
   FFFF63FC        float   Additional airflow metric
   FFFF64D8        ???     Referenced in A/F learning
   FFFF6540        ???     Referenced in A/F learning
   FFFF65C0-65C2   ???     Referenced in CL/OL transition
-  FFFF65FC        ???     Referenced in CL/OL and A/F learning
-  FFFF6624        float   MAF (alternate/computed)
+  FFFF65FC        float   engine_load_current
+  FFFF6624        float   rpm_current
   FFFF67EC        ???     Referenced in A/F learning
   FFFF6810        ???     Referenced in CL/OL transition
   FFFF6898        ???     Referenced in CL/OL transition
@@ -3400,12 +3400,12 @@ SECTION 10: PI CONTROLLER FULL DECOMPILATION
 ─── 0x340A0: afc_pi_output_stage — P AND I GAIN COMPUTATION ───────────────
 
   INPUTS (loaded at entry):
-    FR12 = [FFFF6624]     MAF (alternate/computed)
-    FR15 = [FFFF6350]     RPM
-    FR14 = [FFFF63F8]     MAF (primary sensor)
+    FR12 = [FFFF6624]     rpm_current
+    FR15 = [FFFF6350]     ect_current (coolant temperature)
+    FR14 = [FFFF63F8]     iat_current (intake air temp)
     FR13 = [FFFF68DC]     load variable
     FR9  = [FFFF78B0]     CL/OL state variable (saved to stack)
-    FR8  = [FFFF65FC]     condition variable (saved to stack)
+    FR8  = [FFFF65FC]     engine_load_current (saved to stack)
 
   ENABLE CHECK:
     flag_A = byte[FFFF8E7E]

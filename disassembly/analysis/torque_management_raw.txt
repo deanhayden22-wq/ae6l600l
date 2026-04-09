@@ -4,6 +4,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
 
 
+CORRECTION NOTICE (2026-04-08)
+------------------------------
+RAM address identity corrections applied to comments and labels.
+Disassembly hex and opcodes are unchanged.
+  FFFF6624 = rpm_current      (WAS: "MAF"/"MAF alt")
+  FFFF6350 = ect_current      (WAS: "RPM")
+  FFFF65FC = engine_load_current (WAS: "APP")
+  FFFF63F8 = iat_current      (WAS: "RPM alt"/"RPM_alt")
+
 ================================================================================
 SECTION 1: OVERRUN FUEL CUTOFF @ 0x03EB8C
 ================================================================================
@@ -172,14 +181,14 @@ sets state = 1 (torque request mode active). Tail-calls 0x3D2FC.
 SECTION 4: TORQUE REQUEST MAIN FUNCTION @ 0x03B810
 ================================================================================
 
-Main torque request logic. Reads APP (accelerator pedal position), MAF,
-RPM, and throttle position. Gates on APP > 1.0 to enter torque request
-processing. Applies RPM and MAF threshold checks from calibration data
+Main torque request logic. Reads engine_load (load position), rpm,
+iat, and throttle position. Gates on engine_load > 1.0 to enter torque request
+processing. Applies iat and rpm threshold checks from calibration data
 (CC570/CC574/CC578). Uses 125-tick counter thresholds (CBD96/CBD98) and
 rate-of-change error scaling (BEAB0). Output: torque_request_active flag
 stored to workspace[+11].
 
-; Reads: APP (FFFF65FC), MAF (FFFF6624), RPM (FFFF63F8), throttle (FFFF65C0)
+; Reads: engine_load (FFFF65FC), rpm (FFFF6624), iat (FFFF63F8), throttle (FFFF65C0)
 ; Manages torque request state at FFFF7CC8
 
 03B810: 2FD6  mov.l  R13,@-R15
@@ -187,35 +196,35 @@ stored to workspace[+11].
 03B814: 4F22  sts.l  PR,@-R15
 03B816: FFEB  fmov.s FR14,@-R15
 03B818: FFFB  fmov.s FR15,@-R15
-03B81A: D26C  mov.l  @(0x03B9CC),R2       ; FR14 = APP (FFFF65FC)
+03B81A: D26C  mov.l  @(0x03B9CC),R2       ; FR14 = engine_load_current (FFFF65FC)
 03B81C: FE28  fmov.s @R2,FR14
-03B81E: D26C  mov.l  @(0x03B9D0),R2       ; FR15 = MAF alt (FFFF6624)
+03B81E: D26C  mov.l  @(0x03B9D0),R2       ; FR15 = rpm_current (FFFF6624)
 03B820: FF28  fmov.s @R2,FR15
-03B822: D26C  mov.l  @(0x03B9D4),R2       ; FR8 = RPM_alt (FFFF63F8)
+03B822: D26C  mov.l  @(0x03B9D4),R2       ; FR8 = iat_current (FFFF63F8)
 03B824: F828  fmov.s @R2,FR8
 03B826: D26C  mov.l  @(0x03B9D8),R2       ; R2 = throttle_pos (FFFF65C0)
 03B828: F99D  fldi1  FR9                   ; FR9 = 1.0
-03B82A: F9E5  fcmp/gt FR14,FR9            ; APP > 1.0?
+03B82A: F9E5  fcmp/gt FR14,FR9            ; engine_load > 1.0?
 03B82C: 8D04  bt/s   0x03B838            ; yes -> process torque request
 03B82E: 6220  mov.b  @R2,R2               ; R2 = throttle byte
-; ... APP <= 1.0 path: clear workspace, early exit
+; ... engine_load <= 1.0 path: clear workspace, early exit
 03B830: E200  mov    #0,R2
 03B832: DD6A  mov.l  @(0x03B9DC),R13      ; R13 = FFFF7CC8 (workspace)
 03B834: A015  bra    0x03B862
 03B836: 2D21  mov.w  R2,@R13              ; workspace.counter = 0
 
-; APP > 1.0 path: check thresholds
+; engine_load > 1.0 path: check thresholds
 03B838: D669  mov.l  @(0x03B9E0),R6       ; cal @ CC570 = 0.46
 03B83A: F968  fmov.s @R6,FR9
-03B83C: F985  fcmp/gt FR8,FR9             ; RPM_alt > 0.46?
+03B83C: F985  fcmp/gt FR8,FR9             ; iat_current > 0.46?
 03B83E: 8910  bt     0x03B862            ; no -> skip
 03B840: D668  mov.l  @(0x03B9E4),R6       ; cal @ CC574 = 1000.0
 03B842: F868  fmov.s @R6,FR8
-03B844: F8F5  fcmp/gt FR15,FR8            ; MAF > 1000.0?
+03B844: F8F5  fcmp/gt FR15,FR8            ; rpm > 1000.0?
 03B846: 890C  bt     0x03B862            ; yes -> skip (already beyond range)
 03B848: D667  mov.l  @(0x03B9E8),R6       ; cal @ CC578 = 2000.0
 03B84A: F868  fmov.s @R6,FR8
-03B84C: F8F5  fcmp/gt FR15,FR8            ; MAF > 2000.0?
+03B84C: F8F5  fcmp/gt FR15,FR8            ; rpm > 2000.0?
 03B84E: 8B08  bf     0x03B862            ; no -> continue normally
 ; ... counter management with 125-tick thresholds (CBD96/CBD98)
 ; ... rate-of-change checks with BEAB0 (error scaling)
@@ -223,14 +232,14 @@ stored to workspace[+11].
 ; Stored to workspace[+11]
 
 Literal pool:
-  0x03B9CC: 0xFFFF65FC  (APP position, float)
-  0x03B9D0: 0xFFFF6624  (MAF alt value, float)
-  0x03B9D4: 0xFFFF63F8  (RPM alt, float)
+  0x03B9CC: 0xFFFF65FC  (engine_load_current, float)
+  0x03B9D0: 0xFFFF6624  (rpm_current, float)
+  0x03B9D4: 0xFFFF63F8  (iat_current, float)
   0x03B9D8: 0xFFFF65C0  (throttle_position, byte)
   0x03B9DC: 0xFFFF7CC8  (torque_request_workspace)
-  0x03B9E0: 0x000CC570  (threshold: 0.46 — minimum APP for torque request)
-  0x03B9E4: 0x000CC574  (threshold: 1000.0 — MAF upper gate)
-  0x03B9E8: 0x000CC578  (threshold: 2000.0 — MAF absolute max)
+  0x03B9E0: 0x000CC570  (threshold: 0.46 — minimum iat for torque request)
+  0x03B9E4: 0x000CC574  (threshold: 1000.0 — rpm upper gate)
+  0x03B9E8: 0x000CC578  (threshold: 2000.0 — rpm absolute max)
   0x03B9EC: 0x000BE554  (ramp_counter)
   0x03B9F0: 0x000CBD96  (counter threshold = 125)
   0x03B9F4: 0x000CBD98  (counter threshold = 125)
@@ -240,34 +249,34 @@ Literal pool:
 SECTION 5: CL/OL RPM HYSTERESIS GATE @ 0x03B8E6
 ================================================================================
 
-Second half of the torque request block. Reads RPM, APP, MAF, and throttle
+Second half of the torque request block. Reads ect, engine_load, rpm, and throttle
 to set multiple hysteresis flags at GBR-relative offsets (GBR base = FFFF7CCA).
 Calls check_engine_running (0x29AA0), engine_state_check (0x297A0), and
 two additional state checkers (0x582AC, 0x1CF16). Writes RPM threshold
 flags that control CL/OL switching and torque request enable.
 
 ; This is the second half of the torque request block.
-; Reads RPM (FFFF6350), APP (FFFF65FC), MAF (FFFF6624), throttle (FFFF65C0)
+; Reads ect (FFFF6350), engine_load (FFFF65FC), rpm (FFFF6624), throttle (FFFF65C0)
 ; Sets multiple hysteresis flags at GBR+offset (GBR=FFFF7CCA base)
 ; Calls check_engine_running (0x29AA0), engine_state_check (0x297A0),
 ; and two additional state checkers (0x582AC, 0x1CF16)
 ;
 ; RPM threshold flags written:
 ;   FFFF7458 (GBR+8):  torque request enable flag — complex multi-condition gate
-;   FFFF745E (GBR+14): MAF hysteresis flag A — thresholds 5600/5100 RPM (CC588/CC58C)
-;   FFFF745F (GBR+15): MAF hysteresis flag B — thresholds 4000/3500 RPM (CC590/CC594)
-;   FFFF7460 (GBR+16): MAF hysteresis flag C — thresholds 2600/1900 RPM (CC598/CC59C)
-;   FFFF7461 (GBR+17): MAF hysteresis flag D — threshold 2600 RPM (CC5A0)
+;   FFFF745E (GBR+14): RPM hysteresis flag A — thresholds 5600/5100 RPM (CC588/CC58C)
+;   FFFF745F (GBR+15): RPM hysteresis flag B — thresholds 4000/3500 RPM (CC590/CC594)
+;   FFFF7460 (GBR+16): RPM hysteresis flag C — thresholds 2600/1900 RPM (CC598/CC59C)
+;   FFFF7461 (GBR+17): RPM hysteresis flag D — threshold 2600 RPM (CC5A0)
 
 Literal pool:
   0x03BA08: 0xFFFF7CCA  (GBR base for hysteresis workspace)
-  0x03BA0C: 0xFFFF6350  (RPM)
+  0x03BA0C: 0xFFFF6350  (ect_current)
   0x03BA14: 0x000297A0  (engine_state_check)
   0x03BA18: 0x000582AC  (state_checker_A)
   0x03BA1C: 0x0001CF16  (state_checker_B)
   0x03BA20: 0xFFFF85D7  (engine_status_byte)
-  0x03BA24: RPM threshold float
-  0x03BA28: APP threshold float
+  0x03BA24: ect threshold float
+  0x03BA28: engine_load threshold float
 
 
 ================================================================================
@@ -275,19 +284,19 @@ SECTION 6: OVERRUN RESUME ENRICHMENT / PER-GEAR RPM DISPATCH @ 0x03EBD8
 ================================================================================
 
 Large function (>500 bytes). Manages overrun resume enrichment and per-gear
-RPM threshold dispatch for map switching. Reads vehicle speed, RPM, APP,
-MAF, gear position, engine status, throttle, and run state. Switches on
+RPM threshold dispatch for map switching. Reads vehicle speed, ect, engine_load,
+rpm, gear position, engine status, throttle, and run state. Switches on
 gear (1-5) to select per-gear RPM thresholds from calibration (D2A74-D2A84).
 When overrun is active and RPM drops below the per-gear threshold, applies
 resume enrichment pulse (CC49C = 1400 us initial PW) with RPM delta
 activation (CC498 = -17 RPM) and counter threshold (CC4EC = 1800 RPM).
 
 ; Large function (>500 bytes). Reads:
-;   FR14 = vehicle_speed (FFFF6364)
-;   FR12 = RPM (FFFF6350)
-;   FR13 = APP (FFFF65FC)
-;   FR15 = MAF alt (FFFF6624)
-;   FR9  = MAF (saved to stack)
+;   FR14 = ect_startup (FFFF6364)
+;   FR12 = ect_current (FFFF6350)
+;   FR13 = engine_load_current (FFFF65FC)
+;   FR15 = rpm_current (FFFF6624)
+;   FR9  = rpm (saved to stack)
 ;   R13  = gear (FFFF5E74)
 ;   R12  = engine_status (FFFF85D7)
 ;   R11  = throttle_position (FFFF65C0)
@@ -301,7 +310,7 @@ activation (CC498 = -17 RPM) and counter threshold (CC4EC = 1800 RPM).
 ;   These are the Map Switching Per-Gear RPM Thresholds
 ;
 ; Stores per-gear threshold to FFFF7F08[-48] (workspace)
-; Also reads MAF thresholds D2A68/D2A6C (60.0/0.0) and D2A70 (5.0 min torque)
+; Also reads rpm thresholds D2A68/D2A6C (60.0/0.0) and D2A70 (5.0 min torque)
 ;
 ; Resume enrichment logic:
 ;   If overrun active AND RPM below threshold:
@@ -310,9 +319,9 @@ activation (CC498 = -17 RPM) and counter threshold (CC4EC = 1800 RPM).
 ;     Counter threshold: CC4EC = 1800 RPM
 
 Literal pool (selected):
-  0x03EDEC: 0xFFFF6350  (RPM)
-  0x03EDF0: 0xFFFF65FC  (APP)
-  0x03EDF4: 0xFFFF6624  (MAF alt)
+  0x03EDEC: 0xFFFF6350  (ect_current)
+  0x03EDF0: 0xFFFF65FC  (engine_load_current)
+  0x03EDF4: 0xFFFF6624  (rpm_current)
   0x03EE00: 0xFFFF5E74  (gear position)
   0x03EE04: 0xFFFF85D7  (engine_status_byte)
   0x03EE08: 0xFFFF65C0  (throttle_position)

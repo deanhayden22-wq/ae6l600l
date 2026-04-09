@@ -74,13 +74,13 @@ Three distinct GBR base registers are used by the CL/OL subsystem:
 
   Indirect via R14=0xFFFF7988:
   +0xD0 (-48, 0xFFFF7938): float  ECT snapshot (from FFFF63CC)
-  +0xCC (-52, 0xFFFF7934): float  RPM snapshot (from FFFF6350)
+  +0xCC (-52, 0xFFFF7934): float  ECT snapshot (from FFFF6350)
   +0xD4 (-44, 0xFFFF793C): float  IAT snapshot (from FFFF69F0, iat_input_float)
   +0xD8 (-40, 0xFFFF7940): float  BPW lookup result (from table processor)
-  +0xDC (-36, 0xFFFF7944): float  MAF snapshot (from FFFF6624)
-  +0xE0 (-32, 0xFFFF7948): float  Base pulse width (from FFFF65FC)
-  +0xE4 (-28, 0xFFFF794C): float  MAP snapshot (from FFFF63F8)
-  +0xE8 (-24, 0xFFFF7950): float  Engine load (from FFFF63C4)
+  +0xDC (-36, 0xFFFF7944): float  rpm_current snapshot (from FFFF6624)
+  +0xE0 (-32, 0xFFFF7948): float  engine_load_current (from FFFF65FC)
+  +0xE4 (-28, 0xFFFF794C): float  iat_current snapshot (from FFFF63F8)
+  +0xE8 (-24, 0xFFFF7950): float  ect_compensation (from FFFF63C4)
 
 
 --- GBR = 0xFFFF798C (set at 0x03607E, 0x036856) ---
@@ -155,16 +155,16 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
   Critical RAM reads:
     FFFF7986 (byte): Master counter, compared with CAL@0xCBBEF
     FFFF63CC: ECT (coolant temp)
-    FFFF6350: RPM
+    FFFF6350: ect_current
     FFFF69F0: IAT (intake air temperature)
     FFFF63FC: MAP
     FFFF6A22: Gear/RPM word
     FFFF6254: Gear position byte
-    FFFF6624: MAF
-    FFFF65FC: Base pulse width
-    FFFF63F8: MAP (variant)
+    FFFF6624: rpm_current
+    FFFF65FC: engine_load_current
+    FFFF63F8: iat_current
     FFFF8F24: Global CL enable flag
-    FFFF63C4: Engine load
+    FFFF63C4: ect_compensation
 
   Algorithm:
     1. Set GBR = 0xFFFF7954
@@ -172,7 +172,7 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
     3. Compare with threshold at CAL[0xCBBEF]
     4. If counter < threshold: skip to step 9
     5. Snapshot all engine parameters to RAM block at FFFF7938-FFFF7950
-    6. Copy gear, MAF, BPW, MAP, ECT, global CL flag
+    6. Copy gear, RPM, load, IAT, ECT, global CL flag
     7. Call subroutines: 0x358A0, 0x359A4, 0x35DE4, 0x35E2C
        - These perform OL enrichment table lookups and blending
     8. Clear counter: RAM[FFFF7986] = 0
@@ -226,8 +226,8 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
   Purpose: The heart of the CL/OL decision logic
 
   Reads:
-    FFFF6624: MAF (mass airflow sensor)
-    FFFF63F8: MAP
+    FFFF6624: rpm_current
+    FFFF63F8: iat_current
     FFFF3234: IAM (ignition advance multiplier) -> FR13
     FFFF62DC: (sensor value)
     FFFF64D8: (sensor value)
@@ -251,8 +251,8 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
 
   Algorithm (pseudocode):
     GBR = 0xFFFF798C
-    MAF = RAM[FFFF6624]
-    MAP = RAM[FFFF63F8]
+    rpm_current = RAM[FFFF6624]
+    iat_current = RAM[FFFF63F8]
     IAM = RAM[FFFF3234]   // float, Ignition Advance Multiplier
 
     counter_A = GBR+0x36  // word at FFFF79C2 (delay counter A)
@@ -293,12 +293,12 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
                     // Use failsafe OL map (low IAM)
                     desc = 0xAD674
                 }
-                OL_comp = table_lookup_2d(desc, MAF, MAP)
+                OL_comp = table_lookup_2d(desc, rpm_current, iat_current)
                 OL_enrichment = OL_raw + OL_comp
             } else {
                 // Non-standard calibration byte:
                 // Multi-table blended computation
-                OL_comp1 = table_lookup_2d(0xAD674, MAF, MAP)
+                OL_comp1 = table_lookup_2d(0xAD674, rpm_current, iat_current)
                 OL_comp2 = intermediate
                 OL_enrichment = (1.0 - IAM) * comp + IAM * base
             }
@@ -311,8 +311,8 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
             } else {
                 desc_a = 0xAD700; desc_b = 0xAD6C8
             }
-            comp1 = table_lookup_2d(desc_a, MAF, MAP)
-            comp2 = table_lookup_2d(desc_b, MAF, MAP)
+            comp1 = table_lookup_2d(desc_a, rpm_current, iat_current)
+            comp2 = table_lookup_2d(desc_b, rpm_current, iat_current)
             // Blend: result = (1 - blend_factor) * comp2 + blend_factor * comp1
             OL_enrichment = fmac(blend, comp1, comp2)
         }
@@ -427,8 +427,8 @@ SECTION 3: PER-FUNCTION ANNOTATED DISASSEMBLY SUMMARY
   Purpose: Core hysteresis logic
 
   Reads:
-    FFFF6624: MAF
-    FFFF65FC: Base pulse width
+    FFFF6624: rpm_current
+    FFFF65FC: engine_load_current
     FFFF65C0: Engine running state -> R13
     FFFF67EC: (word, state variable)
     FFFF7A0C: Base pointer for hysteresis state block
@@ -567,12 +567,12 @@ function CL_OL_StateMachine_PerCycle():
     if (master_counter >= threshold):
         // Snapshot all engine parameters
         state.ECT      = RAM[FFFF63CC]   // coolant temp
-        state.RPM      = RAM[FFFF6350]   // engine speed
+        state.ECT      = RAM[FFFF6350]   // ect_current
         state.IAT      = RAM[FFFF69F0]   // intake air temperature
         state.MAP      = RAM[FFFF63FC]   // manifold pressure
-        state.MAF      = RAM[FFFF6624]   // mass airflow
-        state.BPW      = RAM[FFFF65FC]   // base pulse width
-        state.load     = RAM[FFFF63C4]   // engine load
+        state.RPM      = RAM[FFFF6624]   // rpm_current
+        state.load     = RAM[FFFF65FC]   // engine_load_current
+        state.ect_comp = RAM[FFFF63C4]   // ect_compensation
         state.gear     = RAM[FFFF6254]   // gear position
         state.CL_enable= RAM[FFFF8F24]   // global CL enable
 
@@ -599,7 +599,7 @@ function CL_OL_StateMachine_PerCycle():
         // CHECK 1: Per-gear RPM limits
         //
         gear = RAM[FFFF5E94]
-        RPM = RAM[FFFF6350]
+        ECT = RAM[FFFF6350]
         rpm_on  = CAL[0xCC180 + gear*8]     // on threshold
         rpm_off = CAL[0xCC180 + gear*8 + 4]  // off threshold (hysteresis pair)
 

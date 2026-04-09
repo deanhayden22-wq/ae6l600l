@@ -60,7 +60,7 @@ KNOWN_FUNCS = {
     0x000BDE68: "float_max",
     0x000BDE78: "float_min",
     0x000BDE28: "float_clamp",
-    0x000BE960: "float_max",
+    0x000BE960: "float_min",
     0x000BE970: "rate_limit_interp",
     0x000BEA40: "float_lerp",
     0x000BE554: "uint16_add_sat",

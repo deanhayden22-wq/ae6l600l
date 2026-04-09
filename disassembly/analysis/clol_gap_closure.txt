@@ -34,12 +34,12 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
 
   ol_condition_checker reads these RAM addresses at entry:
 
-    FR14 = FFFF6624  (MAF — live mass airflow, float)
+    FR14 = FFFF6624  (rpm_current — live RPM, float)
     FR13 = FFFF62DC  (engine load — live, float)
-    FR8  = FFFF6350  (RPM — live, float)
-    FR15 = FFFF65FC  (BPW — live base pulse width, float)
+    FR8  = FFFF6350  (ect_current — live coolant temp, float)
+    FR15 = FFFF65FC  (engine_load_current — live engine load, float)
     FR12 = FFFF6898  (boost/load — live, float)
-    FR8  = FFFF63F8  (secondary RPM/speed — live, float)
+    FR8  = FFFF63F8  (iat_current — live intake air temp, float)
 
   NONE of these are from the snapshot block (FFFF793C-7960 area).
   The function reads directly from the live ADC-processed values.
@@ -70,12 +70,12 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
   paths: one for when check_cl returns 1 (threshold pair A at 0xCC180-0xCC1A4)
   and one when it returns 0 (threshold pair B at 0xCC1B0-0xCC1D4).
 
-  After threshold selection, FR14 (MAF) is compared against the high/low
+  After threshold selection, FR14 (rpm_current) is compared against the high/low
   thresholds with hysteresis, writing results to:
-    GBR+0x5C = FFFF74AC  (MAF condition flag)
+    GBR+0x5C = FFFF74AC  (RPM condition flag)
     GBR+0x5D = FFFF74AD  (load condition flag)
     GBR+0x5E = FFFF74AE  (load condition flag 2)
-    GBR+0x60 = FFFF74B0  (BPW condition flag)
+    GBR+0x60 = FFFF74B0  (engine load condition flag)
 
   Each flag: 1 = threshold exceeded (condition met), 0 = below (cleared).
   Hysteresis: separate high and low thresholds prevent flag chattering.
@@ -121,11 +121,11 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
   fuel system state evaluator that computes diagnostic parameters.
 
   Input reads at entry:
-    FR13 = FFFF6624  (MAF)
+    FR13 = FFFF6624  (rpm_current)
     FR9  = FFFF8558  (fuel system status float)
     FR14 = FFFF6898  (boost/load)
-    FR15 = FFFF6364  (RPM float variant)
-    FR12 = FFFF6350  (RPM)
+    FR15 = FFFF6364  (ect_startup)
+    FR12 = FFFF6350  (ect_current)
     R10  = FFFF85D7  (fuel_system_state byte)
     R7   = result of check_cl_active (0x22F92)
 
@@ -187,7 +187,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
   SUB-B (0x36E86 - 0x36F74): Main post-transition body
     - GBR = FFFF7A20
     - Reads FFFF67EC (word, into R14)
-    - Reads FFFF6350 (RPM), FFFF62F8, FFFF6624 (MAF) into FPU
+    - Reads FFFF6350 (ect_current), FFFF62F8, FFFF6624 (rpm_current) into FPU
     - Stores to FFFF7A3C struct at offsets -16, -12, -8
     - Calls 0x297B0 and 0x29AA0 (FLKC state readers → R15 and @(4,R15))
     - Calls 0x22CF4 again for gate check
@@ -207,8 +207,8 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
       Checks 0x22CF4 result == 1
 
       ALL FOUR conditions must be met.  If so:
-        Compares RPM (struct[-16]) against thresholds at ROM 0xCC278/0xCC27C
-        Compares MAF (struct[-8]) against thresholds at ROM 0xCC274/0xCC280
+        Compares ect_current (struct[-16]) against thresholds at ROM 0xCC278/0xCC27C
+        Compares rpm_current (struct[-8]) against thresholds at ROM 0xCC274/0xCC280
         Based on results, writes either FR15 or FR14 to struct[-4]
 
     DEAD CODE STATUS:
@@ -239,7 +239,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
   There is a THIRD sub-function starting at 0x36F76 that was not previously
   documented.  It:
     - Sets GBR = FFFF7A24
-    - Reads FFFF6624 (MAF) and FFFF65FC (BPW) into FPU
+    - Reads FFFF6624 (rpm_current) and FFFF65FC (engine_load_current) into FPU
     - Calls 0xBE8E4 (table_2d_lookup) with descriptors from 0xAD9EC/0xADA08
     - Stores result to FFFF7A24
     - Compares result against FFFF6400 (threshold)
@@ -250,7 +250,7 @@ Closes gaps identified in cl_ol_comprehensive_review.txt Section 12
     - Sets GBR+0x04 (FFFF7454) = 1 when either counter exceeds threshold
 
   This is the OL-to-CL transition completion detector:
-    - Monitors MAF*BPW correction factor
+    - Monitors rpm_current*engine_load_current correction factor
     - Counts consecutive cycles where correction is within/outside bounds
     - When count threshold is met, sets a flag signaling transition complete
 

@@ -39,7 +39,7 @@ KNOWN_LABELS = {
     0xFFFF76C8: "fuel_pw_final",
     0xFFFF76CC: "fuel_pw_cyl1",
     0xFFFF76D0: "fuel_pw_cyl2",
-    0xBE960: "float_max",
+    0xBE960: "float_min",
     0xBE970: "rate_limit_interp",
 }
 
@@ -47,7 +47,7 @@ KNOWN_SUBS = {
     0x3190: "injector_output",
     0x48732: "isr22_dead_time",
     0x82DE: "per_cyl_pulse_emit",
-    0xBE960: "float_max",
+    0xBE960: "float_min",
     0xBE970: "rate_limit_interp",
     0x4760A: "pulse_lookup",
     0x30378: "injector_latency_user",

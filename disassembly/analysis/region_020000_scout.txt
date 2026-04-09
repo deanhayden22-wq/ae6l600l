@@ -267,7 +267,7 @@ From disassembly sample analysis across ~30 functions:
   uint16_unpack (BE980)       0xBE980     20+     Unpack uint16 from RAM
   uint16_unpack_v2 (BE990)    0xBE990     15+     Unpack uint16 variant
   float_safe_div (BE628)      0xBE628     10+     Safe float division
-  float_clamp_min (BE970)     0xBE970     8+      Float minimum clamp
+  float_clamp_max (BE970)     0xBE970     8+      Float maximum clamp
   float_compare (BE608)       0xBE608     5+      Float comparison
   table_desc_1d (BE830)       0xBE830     8+      1D descriptor table lookup
   interp_2d (BEAB0)           0xBEAB0     6+      2D interpolation
@@ -514,7 +514,7 @@ Template 6: EEPROM STATE MACHINE (4+ instances)
   FFFF40xx           ADC raw buffer base, float workspace    ~15
   FFFF41xx           Timer workspace                         ~10
   FFFF64xx-66xx      Engine state, sensor values, flags      ~200
-                     (FFFF6350=ECT, FFFF6364=MAP,
+                     (FFFF6350=ECT, FFFF6364=ect_startup,
                       FFFF6624=RPM, FFFF65C5=engine_running,
                       FFFF65F6=cl_active, FFFF65BD=engine_state)
   FFFF67xx           Diagnostic flags, AFL ready             ~30

@@ -36,11 +36,11 @@ def flt(a):
     except: return None
 
 KNOWN_RAM = {
-    0xFFFF6350: "rpm_current",
+    0xFFFF6350: "ect_current",
     0xFFFF6354: "vehicle_speed",
-    0xFFFF6624: "engine_load",
-    0xFFFF63CC: "ect_current",
-    0xFFFF65FC: "manifold_pressure",
+    0xFFFF6624: "rpm_current",
+    0xFFFF63CC: "ram_ECT",
+    0xFFFF65FC: "engine_load_current",
     0xFFFF5E94: "gear_position",
     0xFFFF3234: "IAM_value",
     0xFFFF81BA: "KNOCK_FLAG",

@@ -106,7 +106,7 @@ INPUT LOADING
 
   R14 ← 0xFFFF7A6C     (transient workspace base)
   [R14-12] ← [0xFFFF69F4]  current_throttle (float)
-  [R14-4]  ← [0xFFFF6350]  input_float_B (likely normalized IPW or MAF)
+  [R14-4]  ← [0xFFFF6350]  ect_current (coolant temperature)
   (limit/clamp via 0x29BA4 applied in delay slot)
 
 SUB-FUNCTION DISPATCH
@@ -188,8 +188,8 @@ struct Workspace {  // base: 0xFFFF7CE0
 };
 
 void fuel_accel_enrich() {
-    float engine_load = RAM[0xFFFF65FC];  // FR12 (WAS: prev_tps)
-    float curr_tps  = RAM[0xFFFF6624];   // FR9
+    float engine_load = RAM[0xFFFF65FC];  // FR12 (engine_load_current)
+    float rpm        = RAM[0xFFFF6624];  // FR9 (rpm_current)
     float curr_rpm  = RAM[0xFFFF620C];   // FR13
 
     // query conditions (fill frame flags)
@@ -354,16 +354,16 @@ SECTION 8: COMPLETE RAM MAP
 
 ADDRESS       NAME                     TYPE    NOTES
 -----------   ----------------------   ------  -----------------------------------
-0xFFFF6350    input_float_B            float   Likely normalized IPW or MAF signal
+0xFFFF6350    ect_current              float   Coolant temperature (ECT) (fuel_transient_comp)
 0xFFFF65FC    engine_load_current      float   Engine load g/rev (WAS: prev_throttle_pos) (FR12)
-0xFFFF6624    curr_throttle_pos        float   Current throttle position (fuel_accel_enrich FR9)
+0xFFFF6624    rpm_current              float   Current RPM (fuel_accel_enrich FR9)
 0xFFFF620C    current_rpm              float   Current RPM (fuel_accel_enrich FR13)
 0xFFFF69F4    current_throttle         float   fuel_transient_comp FR8 source
 0xFFFF7A5C    transient_mode_byte      byte    Output of throttle_delta_calc (mode/state)
 0xFFFF7A6C    transient_workspace      base    fuel_transient_comp R14 workspace
   [R14-12]                             float   current_throttle copy
   [R14-8]                              float   previous_throttle (shifted each cycle)
-  [R14-4]                              float   input_float_B copy (clamped)
+  [R14-4]                              float   ect_current copy (clamped)
   [R14+0]                              byte    returned from tip_in_ramp
 0xFFFF7CE0    enrich_workspace         base    fuel_accel_enrich R14 workspace
   +0 (0xFFFF7CE0)  active_flag         byte    1=enrichment active, 0=idle

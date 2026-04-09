@@ -277,10 +277,10 @@ SECTION 2: SENSOR DIAGNOSTIC DISPATCHER 2 -- o2_catalyst_diag_dispatch
     FFFF7334     FR         Engine parameter 4
     FFFF733C     FR         Engine parameter 5
     FFFF77D8     FR         Filtered sensor value
-    FFFF6624     FR         RPM / engine load
-    FFFF6350     FR         Vehicle speed
-    FFFF6364     FR         Throttle position
-    FFFF63F8     FR         Boost/manifold pressure A
+    FFFF6624     FR         rpm_current
+    FFFF6350     FR         ect_current
+    FFFF6364     FR         ect_startup
+    FFFF63F8     FR         iat_current
     FFFF63FC     FR         Boost/manifold pressure B
     FFFF69F0     FR         Intake air temperature (IAT)
     FFFF7D68     FR         Diagnostic intermediate
@@ -946,9 +946,9 @@ KEY RAM ADDRESS SUMMARY
 
   Sensor Inputs (read by dispatcher 2 / rationality check):
   -----------------------------------------------------------------------
-    FFFF6350     float   Vehicle speed
-    FFFF6364     float   Throttle position
-    FFFF6624     float   RPM / engine load / MAP
+    FFFF6350     float   ect_current
+    FFFF6364     float   ect_startup
+    FFFF6624     float   rpm_current
     FFFF653C     float   Sensor value (dispatcher 1 input)
     FFFF69F0     float   Intake air temperature (IAT)
     FFFF7328     float   Engine parameter 1

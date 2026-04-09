@@ -46,7 +46,7 @@ KNOWN_FUNCS = {
     0x0BE588: "fmac_interp_uint8",
     0x0BE830: "table_desc_1d_float", 0x0BE8E4: "table_desc_2d_typed",
     0x0BE874: "LowPW_TableProcessor", 0x0BE8AC: "table_desc_1d_uint16",
-    0x0BE960: "float_max", 0x0BE970: "float_min",
+    0x0BE960: "float_min", 0x0BE970: "float_max",
     0x0BE9A0: "uint8_pack", 0x0BE980: "uint8_unpack",
     0x0BE9B0: "uint16_pack", 0x0BE990: "uint16_unpack",
     0x0BE608: "float_deadband_check", 0x0BE628: "float_safe_div",

@@ -127,11 +127,11 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x603AA:  420B  jsr    @R2                                   
   0x603AC:  6D60  mov.b  @R6,R13                               
   0x603AE:  2F00  mov.b  R0,@R15                               
-  0x603B0:  D252  mov.l  @(0x604FC),R2                         ; =0xFFFF6624 (RAM) [engine_load]
+  0x603B0:  D252  mov.l  @(0x604FC),R2                         ; =0xFFFF6624 (RAM) [rpm_current]
   0x603B2:  F928  fmov.s @R2,FR9                               
   0x603B4:  E004  mov    #4,R0                                 
   0x603B6:  FF97  fmov.s FR9,@(R0,R15)                         
-  0x603B8:  D251  mov.l  @(0x60500),R2                         ; =0xFFFF65FC (RAM) [manifold_pressure]
+  0x603B8:  D251  mov.l  @(0x60500),R2                         ; =0xFFFF65FC (RAM) [engine_load_current]
   0x603BA:  FF28  fmov.s @R2,FR15                              
   0x603BC:  D251  mov.l  @(0x60504),R2                         ; =0xFFFF895C (RAM) [injector_data]
   0x603BE:  FD28  fmov.s @R2,FR13                              
@@ -640,9 +640,9 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6666A:  420B  jsr    @R2                                   
   0x6666C:  0009  nop                                          
   0x6666E:  600C  extu.b R0,R0                                 
-  0x66670:  D620  mov.l  @(0x666F4),R6                         ; =0xFFFF6350 (RAM) [rpm_current]
+  0x66670:  D620  mov.l  @(0x666F4),R6                         ; =0xFFFF6350 (RAM) [ect_current]
   0x66672:  F868  fmov.s @R6,FR8                               
-  0x66674:  D620  mov.l  @(0x666F8),R6                         ; =0xFFFF65FC (RAM) [manifold_pressure]
+  0x66674:  D620  mov.l  @(0x666F8),R6                         ; =0xFFFF65FC (RAM) [engine_load_current]
   0x66676:  F968  fmov.s @R6,FR9                               
   0x66678:  D620  mov.l  @(0x666FC),R6                         ; =0xFFFF63C4 (RAM)
   0x6667A:  F668  fmov.s @R6,FR6                               
@@ -1882,7 +1882,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x7592E:  E03D  mov    #61,R0                                
   0x75930:  006C  mov.b  @(R0,R6),R0                           
   0x75932:  80F4  mov.b  R0,@(4,R15)                           
-  0x75934:  D248  mov.l  @(0x75A58),R2                         ; =0xFFFF6624 (RAM) [engine_load]
+  0x75934:  D248  mov.l  @(0x75A58),R2                         ; =0xFFFF6624 (RAM) [rpm_current]
   0x75936:  F828  fmov.s @R2,FR8                               
   0x75938:  D243  mov.l  @(0x75A48),R2                         ; =0xFFFFA198 (RAM) [egr_gbr_base]
   0x7593A:  F28A  fmov.s FR8,@R2                               
@@ -2291,7 +2291,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6F0DE:  660C  extu.b R0,R6                                 
   0x6F0E0:  D228  mov.l  @(0x6F184),R2                         ; =0xFFFF4130 (RAM) [iat_adc_value]
   0x6F0E2:  F828  fmov.s @R2,FR8                               
-  0x6F0E4:  D228  mov.l  @(0x6F188),R2                         ; =0xFFFF6624 (RAM) [engine_load]
+  0x6F0E4:  D228  mov.l  @(0x6F188),R2                         ; =0xFFFF6624 (RAM) [rpm_current]
   0x6F0E6:  F928  fmov.s @R2,FR9                               
   0x6F0E8:  60F0  mov.b  @R15,R0                               
   0x6F0EA:  8801  cmp/eq #1,R0                                 
@@ -2409,7 +2409,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6F1C0:  420B  jsr    @R2                                   
   0x6F1C2:  6E60  mov.b  @R6,R14                               
   0x6F1C4:  2F00  mov.b  R0,@R15                               
-  0x6F1C6:  D21E  mov.l  @(0x6F240),R2                         ; =0xFFFF6624 (RAM) [engine_load]
+  0x6F1C6:  D21E  mov.l  @(0x6F240),R2                         ; =0xFFFF6624 (RAM) [rpm_current]
   0x6F1C8:  FF28  fmov.s @R2,FR15                              
   0x6F1CA:  D21E  mov.l  @(0x6F244),R2                         ; =0xFFFF4130 (RAM) [iat_adc_value]
   0x6F1CC:  FE28  fmov.s @R2,FR14                              

@@ -192,7 +192,7 @@ The full transient correction function begins at 0x2F984 (separate entry point).
 
   ─── task08 (knock_window) @ 0x44E04 ─────────────────────────────────────────
   Call sequence:
-    1. Load RPM (FFFF6350), FFFF6898, IAM (FFFF3234) into FR14/FR15/FR12
+    1. Load ECT (FFFF6350), FFFF6898, IAM (FFFF3234) into FR14/FR15/FR12
     2. Call 0x2F8FE → store at @R15 (local var 0) and @R15+4
        "is transient knock inhibit active?"
     3. Call 0x58524 (diag_read_state_E) → store at @R15+4
@@ -219,7 +219,7 @@ The full transient correction function begins at 0x2F984 (separate entry point).
   It is NOT called by tasks 8/10/11 — they only use the 0x2F8FE entry point.
   0x2F984:
     - Guards on transient_state_flag (FFFF726C) == 1 and FFFF65F1 != 0
-    - Reads FFFF620C (airflow/MAF), FFFF64D8 (engine load), FFFF6364 (RPM float)
+    - Reads FFFF620C (airflow/MAF), FFFF64D8 (engine load), FFFF6364 (ect_startup)
     - Calls table_1d_desc with descriptors 0xAC34C, 0xAC360, 0xAC374
       (tip-in enrichment vs RPM/load lookups)
     - Float multiply chain with stored results at FFFF72E8, FFFF72F4, FFFF7300

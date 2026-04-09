@@ -328,8 +328,9 @@ Calls flkc_state_flag_reader_slot15 @ 0x2999C (FFFF971B convergence check) → r
   FFFF7F3C is a scratch variable — the result is likely used downstream
   as a correction term, not as the final blend ratio itself.
   Previous description "ensures blend ratio never exceeds 1.0" was based
-  on the incorrect assumption that BE960 = max(). Needs re-verification
-  of how this scratch value feeds into the final blend output.
+  on the incorrect assumption that BE960 = max(). Re-verification complete:
+  BE960 = float_min is confirmed. The min(x, 0.0) clamp produces a
+  non-positive correction term as described above; no further issues.
 
 
 ================================================================================

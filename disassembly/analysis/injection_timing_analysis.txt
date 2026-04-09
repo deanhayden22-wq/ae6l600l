@@ -45,7 +45,7 @@ NOT as individual scheduler tasks. The chain is:
      - GBR = 0xFFFF77BC (fuel pipeline struct base)
      - Uses R9 = 0xFFFF7828 as major struct base with offsets -108 to -12
      - INPUTS:
-       0xFFFF63C4  - processed sensor value (float)
+       0xFFFF63C4  - ect_compensation (float)
        0xFFFF68D8  - secondary sensor (float)
        0xFFFF7828  - aggregator struct (many float fields)
        0xFFFF8E7E  - operating mode flag (byte)
@@ -79,7 +79,7 @@ NOT as individual scheduler tasks. The chain is:
        a) Any of three sub results (0x297C0, 0x297A0, 0x2997EC) == 2 (transient)
        b) Transient flag (0xFFFF726C) == 1
        c) Engine status flag (0xFFFF7C68) == 1
-       d) Engine load (0xFFFF6624) < threshold at 0xCC2F0
+       d) RPM (0xFFFF6624) < threshold at 0xCC2F0
      - COMPUTATION (when gates pass):
        FR4 = 1.0 + ([R13-28] * [R13-24] * [R13-20] * [R13-16])
        FMAC: accumulate corrections from table lookups
@@ -119,11 +119,11 @@ NOT as individual scheduler tasks. The chain is:
 1.5  injector_trim_application @ 0x37ABA (146 bytes)
      - Handles AFL learning table updates
      - INPUTS:
-       0xFFFF6364  - RPM (float)
-       0xFFFF6350  - ECT (float)
+       0xFFFF6364  - ect_startup (float)
+       0xFFFF6350  - ect_current (float)
        0xFFFF31AC  - primary AFL learning data
        0xFFFF31A4  - secondary AFL learning data
-     - Gate: RPM > threshold (0xCC308), ECT within range (0xCC30C)
+     - Gate: ect_startup > threshold (0xCC308), ect_current within range (0xCC30C)
      - Calls 0xBEA40 (interpolation) twice with different parameters
      - Calls 0xBDBCC (learning table write) twice
      - Calls 0x37F00 (afl_multiplier_computation)
