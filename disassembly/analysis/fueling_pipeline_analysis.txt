@@ -911,6 +911,20 @@ SECTION 9: FUEL OVERRUN CUTOFF — func_3EB8C  (Table B[18])
   D29AA:  FuelCut_DecelTickThreshold  (uint16 = 16 ticks; adjacent byte
           at D29AB = 0x32 = 50, likely FuelCut_ResumeThreshold)
 
+  CROSS-REFERENCES
+  ----------------
+  The overrun pre-cut ENRICHMENT code path (which fires a fuel pulse to
+  cool cylinders before cut fully activates) is NOT in this function.
+  It lives in the transient fueling dispatcher region at 0x3A610-0x3A682.
+  See accel_enrichment_analysis.txt for full disassembly, including:
+    - 5 gating conditions
+    - Enrichment cal 0xCC49C = 1400 usec + injector deadtime (FFFF734C)
+    - Tiered RPM system at 0x3AFF6 (thresholds 0xCC4EC/CC4F0/CC4F4)
+
+  The resume RPM threshold table is at 0xCEED0 (u16 * 0.1953125 scaling,
+  16-entry 1D indexed by ECT at 0xCC624). Stock value: 900 RPM flat.
+  See torque_management_analysis.txt for calibration summary.
+
 
 ================================================================================
 SECTION 10: ECT WARMUP CORRECTION — func_403C4  (Table B[19])

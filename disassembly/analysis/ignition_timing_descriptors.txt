@@ -433,6 +433,133 @@ task32_timing_blend_app: Timing blend application (ECT-indexed 1D curves)
            110 |   111 | 39.02
 
 ================================================================================
+task34_timing_throttle: Transient timing targets (throttle-based)
+  (8 descriptors)
+  Wrapper @ 0x40516 calls sub @ 0x40520.
+  Computes transient timing TARGET (not retard offset), centered at 20 deg.
+  Active below 2300 RPM (cal 0xD2B28). Above 2300, base map takes authority.
+================================================================================
+
+--- [task34_timing_throttle #0] -----------------------------------------------
+  Descriptor @ 0xAE158
+    Type: 1D_float  (9 entries)
+    Axis ptr: 0x0D3CC0  (rate-of-change, -20..+20)
+    Data ptr: 0x0D3CE4
+
+          Axis |     Data
+    -----------+-----------
+       -20.00  |  -200.00
+       -10.00  |  -200.00
+        -5.00  |  -200.00
+        -2.00  |  -200.00
+         0.00  |  -200.00
+         2.00  |  -200.00
+         5.00  |  -200.00
+        10.00  |  -200.00
+        20.00  |  -200.00
+
+  NOTE: All -200 = saturation/passthrough. This table is flat in stock ROM.
+
+--- [task34_timing_throttle #1] -----------------------------------------------
+  Descriptor @ 0xADC28
+    Type: 1D_scaled  (8 entries, u8, scale=1.0)
+    Axis ptr: 0x0D3298  (load, 0..14 g/rev)
+    Data ptr: 0x0D32B8
+
+          Axis |   Raw | Scaled
+    -----------+-------+-----------
+         0.00  |     1 |  1.00
+         3.20  |     1 |  1.00
+         6.40  |     1 |  1.00
+         8.00  |     1 |  1.00
+         9.60  |     1 |  1.00
+        11.40  |     1 |  1.00
+        13.00  |     1 |  1.00
+        14.00  |     1 |  1.00
+
+  NOTE: All 1.0 = no load dependency in stock ROM.
+
+--- [task34_timing_throttle #2] -----------------------------------------------
+  Descriptor @ 0xAE3A8
+    Type: 2D  (9 cols x 3 rows, u8, scale=0.15625)
+    X-axis ptr: 0x0D4E08  (delta, -200..+200)
+    Y-axis ptr: 0x0D4E2C  (RPM: 700, 1250, 1500)
+    Data ptr:   0x0D4E38
+
+          |  -200  -100   -50   -25     0    25    50   100   200
+    ------+------------------------------------------------------
+      700 | 17.97 18.44 19.22 19.53 20.00 20.94 22.03 22.97 23.44
+     1250 | 15.94 17.50 18.44 19.22 20.00 21.56 22.97 24.53 25.00
+     1500 | 15.47 17.03 17.97 19.06 20.00 22.50 24.06 25.47 25.94
+
+--- [task34_timing_throttle #3] -----------------------------------------------
+  Descriptor @ 0xAE3C4
+    Type: 2D  (9 cols x 3 rows, u8, scale=0.15625)
+    X-axis ptr: 0x0D4E54  (delta, -200..+200)
+    Y-axis ptr: 0x0D4E78  (RPM: 700, 1250, 1500)
+    Data ptr:   0x0D4E84
+
+  Identical to descriptor #2 in stock ROM.
+
+--- [task34_timing_throttle #4] -----------------------------------------------
+  Descriptor @ 0xAE3E0
+    Type: 2D  (9 cols x 9 rows, u8, scale=0.15625)
+    X-axis ptr: 0x0D4EA0  (delta, -200..+200)
+    Y-axis ptr: 0x0D4EC4  (delta, -20..+20)
+    Data ptr:   0x0D4EE8
+
+          |  -200  -100   -50   -25     0    25    50   100   200
+    ------+------------------------------------------------------
+      -20 | 18.44 20.00 20.94 22.03 23.75 25.47 25.94 25.94 25.94
+      -15 | 17.03 18.44 20.00 20.94 22.66 24.53 25.47 25.94 25.94
+      -10 | 15.78 17.50 19.06 20.00 21.72 23.75 24.69 25.47 25.94
+       -5 | 15.00 16.56 17.97 19.22 20.94 22.97 24.06 25.00 25.94
+        0 | 14.53 15.94 17.03 18.44 20.00 22.50 23.44 24.53 25.94
+        5 | 14.06 15.47 16.56 17.97 19.84 21.41 22.81 24.06 25.47
+       10 | 14.06 15.00 15.94 17.81 19.53 20.94 22.19 23.44 25.00
+       15 | 14.06 14.53 15.47 17.50 19.06 20.47 21.56 22.66 24.06
+       20 | 14.06 14.06 15.00 17.03 18.44 20.00 20.78 22.03 22.97
+
+  NOTE: Both axes are rate-of-change (delta x delta cross-reference).
+  Center (0,0) = 20.0 deg. Max retard (20,-200) = 14.06 deg.
+
+--- [task34_timing_throttle #5] -----------------------------------------------
+  Descriptor @ 0xAE3FC
+    Type: 2D  (9 cols x 9 rows, u8, scale=0.15625)
+    X-axis ptr: 0x0D4F3C  (delta, -200..+200)
+    Y-axis ptr: 0x0D4F60  (delta, -20..+20)
+    Data ptr:   0x0D4F84
+
+  Identical to descriptor #4 in stock ROM.
+
+--- [task34_timing_throttle #6] -----------------------------------------------
+  Descriptor @ 0xAE418
+    Type: 2D  (9 cols x 2 rows, u8, scale=0.15625)
+    X-axis ptr: 0x0D4FD8  (delta, -75..+75)
+    Y-axis ptr: 0x0D4FFC  (RPM: 750, 1000)
+    Data ptr:   0x0D5004
+
+          |   -75   -50   -30   -15     0    15    30    50    75
+    ------+------------------------------------------------------
+      750 | 11.41 14.38 16.56 18.91 20.00 21.72 23.44 24.06 24.06
+     1000 | 13.44 15.62 17.34 18.75 20.00 21.25 22.66 24.38 26.56
+
+--- [task34_timing_throttle #7] -----------------------------------------------
+  Descriptor @ 0xAE434
+    Type: 2D  (9 cols x 2 rows, u8, scale=0.15625)
+    X-axis ptr: 0x0D5018  (delta, -75..+75)
+    Y-axis ptr: 0x0D503C  (RPM: 0, 1000)
+    Data ptr:   0x0D5044
+
+          |   -75   -50   -30   -15     0    15    30    50    75
+    ------+------------------------------------------------------
+        0 | 14.06 14.06 15.94 17.97 20.00 22.50 25.00 25.00 25.00
+     1000 | 14.06 14.06 15.94 17.97 20.00 22.50 25.00 25.00 25.00
+
+  NOTE: Flat across RPM in stock ROM (both rows identical).
+
+
+================================================================================
 task36_timing_percond: Per-condition timing corrections
   (6 descriptors)
 ================================================================================

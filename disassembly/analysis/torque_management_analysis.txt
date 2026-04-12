@@ -256,13 +256,29 @@ The primary torque reduction tool during deceleration.
 
   After state determination, tail-calls fuel_cut_gating @ 0x46BCC.
 
-  Resume enrichment (0x03EBD8):
-    When fuel cut deactivates, a resume enrichment pulse prevents lean
-    stumble during tip-in from decel:
-    - Initial pulse width: 1400 us (0xCC49C)
-    - RPM delta threshold: -17 RPM (0xCC498) — RPM must be dropping
-    - Counter threshold: 1800 RPM (0xCC4EC)
-    - Decay factor: 0.85 (0xCC4A0)
+  Pre-cut enrichment (code path @ 0x3A610, in transient fuel dispatcher):
+    Fires a fuel pulse to cool cylinders before fuel cut fully activates.
+    Not a resume enrichment — fires BEFORE cut, not on resume.
+    - Initial pulse width: 1400 us (0xCC49C) — fuel portion only
+      Injector dead time (FFFF734C, ~648 us at 14V) added on top
+      Logged IPW = 1400 + 648 = 2048 us = 2.048ms
+    - RPM delta threshold: -17 RPM/cycle (0xCC498)
+    - Decay factor: 0.85 per cycle (0xCC4A0)
+    - 5 gating conditions must pass (see accel_enrichment_analysis.txt)
+    - Output bypasses normal fuel calc, writes directly to injector HW
+
+  Tiered RPM fuel cut system (code @ 0x3AFF6):
+    3 RPM thresholds select a behavior tier:
+    - 0xCC4EC = 2250 RPM (Low)   [stock: 1800]
+    - 0xCC4F0 = 3000 RPM (Mid)   [stock: 2500]
+    - 0xCC4F4 = 4500 RPM (High)  [stock: 4500]
+    Per-tier counter thresholds at 0xCBCC0 (u16):
+      Tier 0/1: 38 ticks (~1520ms), Tier 2/3: 6 ticks (~240ms)
+    Per-tier behavior calibrations at 0xCBD00+ (u16 arrays, 20-byte stride)
+
+  Resume RPM threshold (0xCEED0):
+    1D table, 16 ECT entries, u16 * 0.1953125 scaling
+    ECT axis at 0xCC624. Stock: 900 RPM flat across all ECT.
 
 
 ================================================================================
@@ -482,14 +498,20 @@ SECTION 13: CALIBRATION TABLE SUMMARY
 
   Overrun / Deceleration:
   ┌──────────┬──────────────────────────────────────┬──────────────────┐
-  │ Address  │ Name                                 │ Stock Value      │
+  │ Address  │ Name                                 │ Value            │
   ├──────────┼──────────────────────────────────────┼──────────────────┤
-  │ 0xD29AA  │ Overrun Tick Threshold                │ 16 (320ms)       │
-  │ 0xCC498  │ Overrun Enrich RPM Delta Activation    │ -17.0 RPM        │
-  │ 0xCC49C  │ Overrun Initial Enrichment PW          │ 1400.0 us        │
-  │ 0xCC4A0  │ Overrun Enrichment Decay Factor        │ 0.85             │
-  │ 0xCC4EC  │ Overrun Cut Counter RPM Threshold      │ 1800.0 RPM       │
-  │ 0xCEED0  │ Overrun Resume RPM Threshold           │ 0.0 (disabled?)  │
+  │ 0xD29AA  │ Overrun Tick Threshold                │ 16 (640ms @25Hz) │
+  │ 0xCC498  │ Overrun Enrich RPM Delta Activation    │ -17.0 RPM/cycle  │
+  │ 0xCC49C  │ Overrun Pre-Cut Enrichment PW          │ 1400.0 us (fuel) │
+  │          │   (deadtime FFFF734C ~648us added)     │ =2048us logged   │
+  │ 0xCC4A0  │ Overrun Enrichment Decay Factor        │ 0.85 per cycle   │
+  │ 0xCC4EC  │ Overrun Cut RPM Tier Low               │ 2250 [stk: 1800] │
+  │ 0xCC4F0  │ Overrun Cut RPM Tier Mid               │ 3000 [stk: 2500] │
+  │ 0xCC4F4  │ Overrun Cut RPM Tier High              │ 4500 [stk: 4500] │
+  │ 0xCBCC0  │ Per-Tier Counter Thresholds (u16x4)    │ 38,38,6,6 ticks  │
+  │ 0xCBD00  │ Per-Tier Behavior Cals (u16 arrays)    │ (20-byte stride)  │
+  │ 0xCEED0  │ Overrun Resume RPM Threshold           │ 900 RPM (flat)   │
+  │          │   (u16 * 0.1953125, ECT axis @CC624)  │ all 16 ECT cells │
   └──────────┴──────────────────────────────────────┴──────────────────┘
 
   Torque Request Enable:

@@ -403,13 +403,101 @@ The values at 0xCC500-0xCC518 (6700.0, 6650.0 alternating, then 1260.0) appear
 to be neighboring calibration for a different subsystem (possibly rev limiters or
 RPM-based fuel cut thresholds adjacent to the accel enrichment block).
 
-Sub-function calibration (tau/alpha, overrun) is located in the sub-function
-bodies (tau_rising_handler, tau_falling_handler, overrun_fuel_cut) — not yet disassembled in detail.
-From prior context (summary), the tau calibration region includes:
-  Tau rising:  3.4× cold → 0.4× hot  (ECT-indexed multiplier table)
-  Tau falling: 1.4× cold → 0.3× hot  (ECT-indexed multiplier table)
-  Overrun cut: -17.0 RPM/cycle activation threshold, 2250 RPM cut threshold
-  ECT comp B:  uint16 curve 0x7000→lower (big-endian, scale ÷32768)
+Sub-function calibration (tau/alpha) is located in the sub-function
+bodies (tau_rising_handler, tau_falling_handler). From prior context:
+  Tau rising:  3.4x cold -> 0.4x hot  (ECT-indexed multiplier table)
+  Tau falling: 1.4x cold -> 0.3x hot  (ECT-indexed multiplier table)
+  ECT comp B:  uint16 curve 0x7000->lower (big-endian, scale /32768)
+
+
+OVERRUN PRE-CUT ENRICHMENT — 0x3A610 to 0x3A682
+------------------------------------------------------------------------
+Separate from the overrun_fuel_cut sub at 0x37450 (which manages the
+cut/resume state machine), the enrichment code path lives in the
+transient fueling dispatcher region. It fires a fuel pulse to cool
+cylinders before fuel cut fully activates.
+
+  Function: 0x3A610 - 0x3A682  (114 bytes)
+
+  5 gating conditions (all must pass for enrichment to fire):
+    1. Workspace byte @(3,R7) == 1       (R7 = FFFF7C60 base)
+    2. R14 != 0                          (state flag from FFFF7C9D)
+    3. Byte from FFFF6254 == 1           (torque-related condition)
+    4. FR8 (from FFFF6634) > -17.0       (RPM delta > threshold)
+       Threshold: 0xCC498 = -17.0 RPM/cycle
+    5. R5 (from FFFF7D18) != 0           (fuel system state)
+
+  Enrichment path (when all gates pass):
+    1. JSR 0x317C with R4=16             (raise interrupt priority)
+    2. FR8 = 1400.0                      (cal 0xCC49C, microseconds)
+    3. Store FR8 to workspace [R7-56]
+    4. FR9 = FR8 + FR14                  FR14 = float @ FFFF734C
+       FFFF734C = injector dead time (float, usec)
+       At 14V battery: ~648 usec (matches InjLat table raw 3225 * 0.2)
+       So: FR9 = 1400 + 648 = 2048 usec = 2.048ms total IPW
+    5. Store FR9 to workspace [R7-52]
+    6. JSR 0xDCE4 with R4=0, R5=7, R6=FFFF7C28
+       (conversion to hardware injector ticks)
+    7. JSR 0x3190                        (hardware injector write)
+
+  Calibrations:
+    0xCC498 = -17.0    RPM delta activation threshold (RPM/cycle)
+    0xCC49C = 1400.0   Enrichment pulse width (microseconds, fuel only)
+                       Deadtime is added on top; logged IPW = cal + ~648
+    0xCC4A0 = 0.85     Enrichment decay factor per cycle
+
+  RAM:
+    FFFF734C   injector_dead_time (float, usec) — added to enrichment
+    FFFF7C60   workspace base (GBR-relative offsets used)
+    FFFF7C9D   state flag (byte)
+    FFFF7D18   fuel system state (byte)
+    FFFF6254   torque-related condition (byte)
+    FFFF6634   RPM delta / rate-of-change (float)
+
+  Output is written directly to hardware via 0x3190 (injector gate),
+  bypassing the normal fuel_pulse_width_calc pipeline.
+
+
+OVERRUN FUEL CUT TIERED RPM SYSTEM — 0x3AFF6
+------------------------------------------------------------------------
+The fuel cut activation uses a 3-tier RPM system that selects per-tier
+counter thresholds and behavior calibrations.
+
+  Tier selection (at 0x3AFF6):
+    Compares rpm_current against 3 thresholds:
+    Tier 0: RPM < threshold_0     (stock 1800, this ROM 2250)
+    Tier 1: threshold_0 <= RPM < threshold_1  (stock 2500, this ROM 3000)
+    Tier 2: threshold_1 <= RPM < threshold_2  (stock 4500, this ROM 4500)
+    Tier 3: RPM >= threshold_2
+
+  RPM tier thresholds:
+    0xCC4EC = 2250.0 RPM  (Low)   [stock: 1800.0]
+    0xCC4F0 = 3000.0 RPM  (Mid)   [stock: 2500.0]
+    0xCC4F4 = 4500.0 RPM  (High)  [stock: 4500.0]
+
+  Per-tier counter thresholds (u16 at 0xCBCC0, 2-byte stride):
+    Tier 0: 38 ticks  (~1520ms at 25Hz scheduler)
+    Tier 1: 38 ticks  (~1520ms)
+    Tier 2:  6 ticks  (~240ms)
+    Tier 3:  6 ticks  (~240ms)
+
+  After counter threshold is met, R1 (tier * 4) indexes into per-tier
+  behavior calibration arrays via dispatch tables:
+    Dispatch A @ 0x63BB0  -> pointers into 0xCBCC2+ (counter values)
+    Dispatch B @ 0x63C50  -> pointers into 0xCBD02+ (behavior params)
+    Dispatch C @ 0x63CF0  -> pointers into 0xCBD04+ (behavior params)
+
+  Per-tier behavior data (u16 arrays, 20-byte stride at 0xCBD00):
+    Tier 0: 13 50 44 94 75 150 56 125 75 100  (largest values)
+    Tier 1: 13 50 44 81 38  75 50 100 25  50
+    Tier 2: 13 75 19 50  9  19  6  13  6  13  (smallest values)
+    Tier 3: 13 75 75 100 38 63 50 100 63  88
+
+  NOTE: Tiers 0 and 1 have the same counter threshold (38 ticks) but
+  different behavior parameters. Tier 0 has larger values, suggesting
+  more transitional fuel during the cut ramp-down. Raising the RPM
+  tier thresholds from stock (1800/2500) to (2250/3000) keeps more
+  of the low-RPM range in the more-fueled tier 0.
 
 
 ================================================================================

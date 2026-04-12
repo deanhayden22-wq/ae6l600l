@@ -218,9 +218,83 @@ SECTION 3: PHASE 2 -- CORRECTIONS
 
   task34_timing_throttle @ 0x40516
   -----------------------------------------------------------------------
-  Throttle-based timing correction. Uses 8 descriptors including
-  2D maps of 9x3, 9x9, and 9x2 dimensions. Produces throttle-
-  dependent advance/retard stored at FFFF7F82.
+  Throttle-based transient timing correction. Wrapper at 0x40516
+  (10 bytes) calls subroutine task34_throttle_calc_sub @ 0x40520.
+
+  This subsystem computes a TRANSIENT TIMING TARGET (not a retard
+  offset) that replaces or blends with the base timing during rapid
+  throttle changes. All 2D tables are centered at 20.0 degrees at
+  zero rate-of-change, with symmetric swing for positive (tip-in)
+  and negative (tip-out) transients.
+
+  The system deactivates above 2300 RPM (cal 0xD2B28), at which
+  point the base timing map takes full authority. This transition
+  is instantaneous -- there is no blend or taper.
+
+  Inputs (15 RAM addresses):
+    FFFF5BE2  engine_state_byte_A
+    FFFF6254  torque_related
+    FFFF65C0  throttle_position (u8)
+    FFFF65C6  throttle_related_A (byte, near throttle_position)
+    FFFF65C7  throttle_related_B (byte)
+    FFFF65C8  throttle_related_C (byte)
+    FFFF65FC  engine_load_current (float)
+    FFFF6624  rpm_current (float)
+    FFFF6630  maf_voltage_A (float)
+    FFFF663C  maf_voltage_B (float)
+    FFFF67EC  atm_pressure_current (float)
+    FFFF7F74  workspace
+    FFFF7FBC  previous_timing_output (float)
+    FFFF895C  AFL_value (float)
+    FFFF8A74  knock_flkc_state
+    FFFF8E09  unknown_state_byte
+
+  Output:
+    FFFF7F82  throttle_timing_correction (stored result)
+    FFFF7F8C  workspace (near output)
+
+  Descriptors (8 total):
+    0xAE158   1D float, 9pt   Rate-of-change saturation check
+                              (axis -20..+20, all values -200.0 stock)
+    0xADC28   1D u8, 8pt      Load weighting (axis 0..14 g/rev,
+                              all values 1.0 stock -- no load dependency)
+    0xAE3A8   2D 9x3          Transient target A (low RPM)
+                              X: delta (-200..+200), Y: RPM (700, 1250, 1500)
+                              Center (X=0): 20.0 deg, range ~15-26 deg
+    0xAE3C4   2D 9x3          Transient target B (low RPM)
+                              Identical to A in stock ROM
+    0xAE3E0   2D 9x9          Transient target A (delta cross-ref)
+                              X: delta (-200..+200), Y: delta (-20..+20)
+                              Center: 20.0 deg, range ~14-26 deg
+    0xAE3FC   2D 9x9          Transient target B (delta cross-ref)
+                              Identical to A in stock ROM
+    0xAE418   2D 9x2          Low-RPM transient target A
+                              X: delta (-75..+75), Y: RPM (750, 1000)
+                              Center: 20.0 deg, range ~11-26 deg
+    0xAE434   2D 9x2          Low-RPM transient target B
+                              X: delta (-75..+75), Y: RPM (0, 1000)
+                              Center: 20.0 deg, range ~14-25 deg
+
+  Key calibrations:
+    0xD2B20 = 0.0       minimum/zero threshold
+    0xD2B24 = 5000.0    RPM ceiling
+    0xD2B28 = 2300.0    RPM deactivation threshold (above this, task34
+                        releases and base timing takes full authority)
+    0xD2B2C = 14.0      load/throttle threshold
+    0xD2B30 = 20.0      center timing value (matches 2D table centers)
+    0xD2B34 = 300.0     RPM hysteresis lower
+    0xD2B38 = 400.0     RPM hysteresis upper
+    0xD2B3C = 195.0     delta clamp (near axis max of 200)
+    0xD2B40 = -200.0    saturation floor A
+    0xD2B44 = -199.0    saturation floor B
+    0xD2B48 = 2000.0    RPM reference
+
+  NOTE: The instantaneous release at 2300 RPM can cause a large timing
+  discontinuity during tip-in from decel. If RPM crosses 2300 upward
+  while the transient target is low (e.g. 3-4 deg under tip-out
+  conditions), the base map value (~20+ deg) takes over immediately.
+  This ~15+ degree timing jump can trigger knock on heat-soaked
+  cylinders after fuel cut.
 
   task35_timing_corr @ 0x418AC
   -----------------------------------------------------------------------
@@ -573,6 +647,17 @@ SECTION 7: KEY CALIBRATION MAP
   0xD2AF0   600.0     30      Warmup RPM threshold
   0xD2AF4   69.65     30      Temperature threshold (deg C)
   0xD2B14   6000.0    32      Blend RPM threshold
+  0xD2B20   0.0       34      Minimum/zero threshold
+  0xD2B24   5000.0    34      RPM ceiling
+  0xD2B28   2300.0    34      RPM deactivation threshold
+  0xD2B2C   14.0      34      Load/throttle threshold
+  0xD2B30   20.0      34      Center timing value
+  0xD2B34   300.0     34      RPM hysteresis lower
+  0xD2B38   400.0     34      RPM hysteresis upper
+  0xD2B3C   195.0     34      Delta clamp
+  0xD2B40   -200.0    34      Saturation floor A
+  0xD2B44   -199.0    34      Saturation floor B
+  0xD2B48   2000.0    34      RPM reference
   0xD2BF0   4.0       36      Per-cond correction scale
   0xD2BF4   0.7       36      Per-cond blend factor
   0xD2BF8   0.02      36      Per-cond step size
@@ -616,6 +701,14 @@ SECTION 8: KEY DESCRIPTOR MAP (Timing Tables)
   0xAE0EC     36     2D 8x2     Per-condition B
   0xAE0F8     12     1D         Knock post-processing C
   0xAE10C     12     1D         Knock post-processing D
+  0xAE158     34     1D 9pt     Rate-of-change saturation (all -200 stock)
+  0xADC28     34     1D 8pt     Load weighting (all 1.0 stock)
+  0xAE3A8     34     2D 9x3     Transient target A (delta x RPM, low)
+  0xAE3C4     34     2D 9x3     Transient target B (delta x RPM, low)
+  0xAE3E0     34     2D 9x9     Transient target A (delta x delta)
+  0xAE3FC     34     2D 9x9     Transient target B (delta x delta)
+  0xAE418     34     2D 9x2     Low-RPM transient target A (delta x RPM)
+  0xAE434     34     2D 9x2     Low-RPM transient target B (delta x RPM)
   0xAE164     35     1D         General timing correction
   0xAE26C     12     1D         Knock retard limit
   0xAE278     12     1D         Knock retard scaling
