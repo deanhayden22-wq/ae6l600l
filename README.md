@@ -53,6 +53,7 @@ This repo holds:
 | `scripts/decode/` | Table/descriptor decoders. |
 | `scripts/mapping/` | Descriptor scanning, GBR resolution, RAM-ref tracing. |
 | `scripts/trace/` | RAM read/write tracers. |
+| `docs/` | Active-tune reasoning: rev history, open issues, subsystem notes, methodology. Start at [docs/README.md](docs/README.md). |
 
 ---
 
@@ -99,11 +100,15 @@ real changes.
 
 ---
 
-## What this README does NOT contain
+## Active-tune reasoning
 
-The active reasoning behind the current tune — open issues, design
-state of the pedal map, AVCS load-band rules, the boost-transition vs
-turbo-regime caveat — lives outside the repo (in the maintainer's
-working notes). The repo captures the **state** of the ROM and the
-**process** for analyzing logs; the **interpretation** does not travel
-with a clone today. That's a known gap.
+`docs/` captures the active reasoning behind the current tune — what
+each rev changed, the open issues list, subsystem notes (pedal-throttle
+architecture, 20G turbo character, AVCS findings, OL fueling identity
+rule), and the methodology (cruise residency, pedal-correction event
+detection, the stock comparator caveat, the verify-before-asserting
+rule). Start at [docs/README.md](docs/README.md).
+
+These are point-in-time captures from working notes, not live state.
+ROM bins overwrite in place — the table values described in `docs/` may
+not match the current ROM. Re-verify before acting.
