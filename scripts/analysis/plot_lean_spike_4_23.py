@@ -18,27 +18,16 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
 LOGS = REPO / "logs" / "4-23"
-OUT = Path("/sessions/great-gifted-clarke/mnt/ae6l600l/mnt/ae6l600l".replace(
-    "/sessions/great-gifted-clarke/mnt/ae6l600l/mnt/ae6l600l",
-    "/sessions/great-gifted-clarke/mnt/ae6l600l"
-))
-# Actually save plots to workspace folder so the user can view them
-OUT = Path("/sessions/great-gifted-clarke/mnt/ae6l600l") / ".plots_4_23"
-OUT = Path("/sessions/great-gifted-clarke/mnt/ae6l600l")  # placeholder overwritten below
-
-# Save to the Cowork workspace folder
-WORKSPACE_OUT = Path("/sessions/great-gifted-clarke/mnt/ae6l600l")
 
 RPM_MIN, RPM_MAX = 3000, 5000
 LOAD_MIN, LOAD_MAX = 0.5, 0.9
 MAF_MIN, MAF_MAX = 40, 70
 AFR_LEAN = 13.0
 
-SAVE_DIR = Path("/sessions/great-gifted-clarke/mnt/ae6l600l/logs/4-23/plots")
+SAVE_DIR = REPO / "logs" / "4-23" / "plots"
 SAVE_DIR.mkdir(parents=True, exist_ok=True)
 # Also copy final PNGs to the shared workspace folder at the end
-SHARE_DIR = Path("/sessions/great-gifted-clarke/mnt/ae6l600l")  # not used; we save to workspace directly
-SHARE_DIR = Path("/sessions/great-gifted-clarke/mnt/ae6l600l/logs/4-23/plots")
+SHARE_DIR = SAVE_DIR
 
 
 def load(path):

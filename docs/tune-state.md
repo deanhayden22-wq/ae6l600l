@@ -12,6 +12,19 @@ in RPM × Load tables, applied across AVCS, base timing, knock advance,
 OL, and CL fueling comp. The same residency-on-grid method applies to
 all of them — see `methodology/cruise-residency.md`.
 
+## Pre-20.7 history
+
+This document starts at 20.9. Earlier revs (`AE5L600L 20g rev 20.7
+tiny wrex.bin`, `20.8`, etc., plus the stock `ae5l600l.bin` and the
+`13 20g Base rev 25 e garn.hex` starting point in `rom/`) exist as
+binaries but their per-rev change history wasn't captured in working
+notes that travel with the repo. If you need to know what changed in
+an older rev, byte-diff the bins directly (e.g.,
+`scripts/analysis/cross_rev_diff.py` once axis-mismatch support
+lands — see [avcs.md](avcs.md) "Pending tool enhancements"). The
+trend store at `scripts/analysis/trends/knock_by_cell.csv` does carry
+older revs as `rom_rev` rows for ghost-zone analysis.
+
 ## What each rev changed
 
 ### 20.9 → 20.10 (cruise smoothness session, ended 2026-04-25)

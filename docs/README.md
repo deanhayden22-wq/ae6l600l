@@ -19,6 +19,11 @@ before making a decision.
 - [open-issues.md](open-issues.md) — the active issues list. Symptoms,
   data location, what's been tried, what's next. Updated per rev.
 
+**Workflow**
+
+- [workflow.md](workflow.md) — the drive→log→ingest→diff→propose→flash
+  iteration loop. Read this before running any analysis script.
+
 **Subsystem notes**
 
 - [pedal-throttle.md](pedal-throttle.md) — three-table pedal-to-throttle
@@ -27,8 +32,15 @@ before making a decision.
 - [turbo-character.md](turbo-character.md) — 20G spool data, boost
   attainment, response-lag findings. The reason most low-RPM under-
   response complaints are not pedal-map fixable.
+- [boost-control.md](boost-control.md) — Task 51 / Task 52 architecture,
+  Target Boost / Initial WG / Max WG tables, PID terms, knock-driven
+  disable conditions.
 - [avcs.md](avcs.md) — AVCS findings: stock-comparator caveat, AVCS-MAF
   coupling result, available analysis tools.
+- [knock.md](knock.md) — knock detection pipeline, FLKC sign convention,
+  ghost-zone analysis, boost-control coupling.
+- [transient-fuel.md](transient-fuel.md) — accel enrichment + tau-alpha
+  wall-film dynamics. Levers for the AVCS-ramp-lag knock open issue.
 - [ol-fueling.md](ol-fueling.md) — five OL fueling tables, the
   "identity-of-three" rule, where it lives in the def XML.
 
@@ -56,17 +68,13 @@ before making a decision.
   rule: don't reverse-engineer values from saturated/lossy data; defend
   claims with numbers; ask before assuming.
 
-## What's still missing
+## See also
 
-These are not yet captured here:
-
-- Boost control (Target Boost, Initial WG Duty, Max WG Duty) — relevant
-  to low-RPM response, mentioned in open issues but not yet a working
-  doc.
-- Transient fuel / accel enrichment — analysis exists in
-  `disassembly/analysis/accel_enrichment_analysis.txt` and
-  `tau_alpha_analysis.txt` but no synthesis here.
-- Knock subsystem behavior — `disassembly/analysis/knock_flkc_*.txt`
-  has the disassembly; the trends-store side
-  (`scripts/analysis/trends/knock_by_cell.csv` ghost-knock zones) is
-  documented in open-issues.md but not in its own doc.
+- [../README.md](../README.md) — top-level repo orientation, directory
+  map, source-of-truth rules.
+- [../CONTRIBUTING.md](../CONTRIBUTING.md) — commit-message convention,
+  doc-update conventions, script path conventions.
+- `scripts/analysis/log_review_checklist.md` — the per-log review SOP
+  (eight steps with locked filter constants).
+- `logs/REVIEW_LOG.md` — append-only per-log review history.
+- `scripts/analysis/trends/` — append-only per-metric CSVs.

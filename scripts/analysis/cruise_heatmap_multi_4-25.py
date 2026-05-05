@@ -3,18 +3,21 @@
 20.9 vs 20.10 side-by-side, sharing the same cruise filter as the AVCS analysis.
 """
 import csv, json, os, struct, sys
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.patches import Rectangle
 import matplotlib.lines as mlines
 
-OUT = "/sessions/tender-wizardly-brown/mnt/outputs"
-ROM_DIR = "/sessions/tender-wizardly-brown/mnt/ae6l600l/rom"
-LOG = "/sessions/tender-wizardly-brown/mnt/ae6l600l/logs/4-25/4-25 full.csv"
+REPO = Path(__file__).resolve().parents[2]
+OUT = REPO / "logs" / "4-25" / "plots"
+OUT.mkdir(parents=True, exist_ok=True)
+ROM_DIR = REPO / "rom"
+LOG = REPO / "logs" / "4-25" / "4-25 full.csv"
 ROMS = {
-    "20.9":  os.path.join(ROM_DIR, "AE5L600L 20g rev 20.9 tiny wrex.bin"),
-    "20.10": os.path.join(ROM_DIR, "AE5L600L 20g rev 20.10 tiny wrex.bin"),
+    "20.9":  str(ROM_DIR / "AE5L600L 20g rev 20.9 tiny wrex.bin"),
+    "20.10": str(ROM_DIR / "AE5L600L 20g rev 20.10 tiny wrex.bin"),
 }
 
 # (table_addr, load_addr, n_load, rpm_addr, n_rpm, dtype_word, scaler_fn, fmt, name, cliff_thresh)
@@ -204,7 +207,7 @@ def render_table(tname, spec):
         f"4-25 cruise residency on {tname}  --  filter: CL=8, MPH>20, RPM-std<100, accel-std<1, throttle-std<1\n"
         f"Total cruise: {dt[cruise].sum():.0f} s",
         fontsize=11)
-    out_png = os.path.join(OUT, f"heatmap_{tname}_4-25.png")
+    out_png = str(OUT / f"heatmap_{tname}_4-25.png")
     fig.savefig(out_png, dpi=140, bbox_inches="tight")
     plt.close(fig)
     print(f"  saved: {out_png}", flush=True)

@@ -9,11 +9,13 @@ Per project definitions XML (AE5L600L 2013 USDM Impreza WRX MT.xml):
 import struct
 import json
 import os
+from pathlib import Path
 
-ROM_DIR = "/sessions/tender-wizardly-brown/mnt/ae6l600l/rom"
+REPO = Path(__file__).resolve().parents[2]
+ROM_DIR = REPO / "rom"
 ROMS = {
-    "20.9":  os.path.join(ROM_DIR, "AE5L600L 20g rev 20.9 tiny wrex.bin"),
-    "20.10": os.path.join(ROM_DIR, "AE5L600L 20g rev 20.10 tiny wrex.bin"),
+    "20.9":  str(ROM_DIR / "AE5L600L 20g rev 20.9 tiny wrex.bin"),
+    "20.10": str(ROM_DIR / "AE5L600L 20g rev 20.10 tiny wrex.bin"),
 }
 
 LOAD_ADDR  = 0xda8e4   # 18 floats (g/rev)
@@ -47,8 +49,11 @@ for tag, path in ROMS.items():
     print("Sample row[0]:", [f"{v:.2f}" for v in table[0]])
     print("Sample row[-1]:", [f"{v:.2f}" for v in table[-1]])
 
-with open("/sessions/tender-wizardly-brown/mnt/outputs/avcs_tables.json", "w") as f:
+OUT_PATH = REPO / "logs" / "4-25" / "avcs_tables_209_vs_2010.json"
+OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+with open(OUT_PATH, "w") as f:
     json.dump(result, f, indent=2)
+print(f"\nWrote {OUT_PATH}")
 
 print("\n=== DIFF (20.10 - 20.9) ===")
 diffs = []

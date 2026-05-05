@@ -104,11 +104,16 @@ real changes.
 
 `docs/` captures the active reasoning behind the current tune — what
 each rev changed, the open issues list, subsystem notes (pedal-throttle
-architecture, 20G turbo character, AVCS findings, OL fueling identity
-rule), and the methodology (cruise residency, pedal-correction event
-detection, the stock comparator caveat, the verify-before-asserting
-rule). Start at [docs/README.md](docs/README.md).
+architecture, 20G turbo character, boost control, AVCS, knock, OL
+fueling, transient fuel), and the methodology (cruise residency,
+pedal-correction detection, the stock-comparator caveat, the verify-
+before-asserting rule). Start at [docs/README.md](docs/README.md).
 
 These are point-in-time captures from working notes, not live state.
 ROM bins overwrite in place — the table values described in `docs/` may
 not match the current ROM. Re-verify before acting.
+
+## Contributing
+
+[CONTRIBUTING.md](CONTRIBUTING.md) — commit-message convention, where
+new docs and scripts go, line-ending rule.

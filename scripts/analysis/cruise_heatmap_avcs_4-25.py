@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """4-25 log cruise residency heatmap on Intake AVCS Cruise grid (20.9 vs 20.10)."""
 import csv, json, os, sys
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.patches import Rectangle
 import matplotlib.lines as mlines
 
-OUT = "/sessions/tender-wizardly-brown/mnt/outputs"
-LOG = "/sessions/tender-wizardly-brown/mnt/ae6l600l/logs/4-25/4-25 full.csv"
+REPO = Path(__file__).resolve().parents[2]
+OUT = REPO / "logs" / "4-25" / "plots"
+OUT.mkdir(parents=True, exist_ok=True)
+LOG = REPO / "logs" / "4-25" / "4-25 full.csv"
+AVCS_JSON = REPO / "logs" / "4-25" / "avcs_tables_209_vs_2010.json"
 
-with open(os.path.join(OUT, "avcs_tables.json")) as f:
+with open(AVCS_JSON) as f:
     avcs = json.load(f)
 load_axis = np.array(avcs["20.9"]["load"])
 rpm_axis  = np.array(avcs["20.9"]["rpm"])
@@ -141,7 +145,7 @@ fig.suptitle(
     f"filter: CL=8, MPH>20, RPM-std<100, accel-std<1, throttle-std<1\n"
     f"Total cruise: {dt[cruise].sum():.0f} s ({cruise.sum()} samples)", fontsize=11)
 
-out_png = os.path.join(OUT, "avcs_cruise_heatmap_4-25_v2.png")
+out_png = str(OUT / "avcs_cruise_heatmap_4-25_v2.png")
 fig.savefig(out_png, dpi=140, bbox_inches="tight")
 print("Saved:", out_png, flush=True)
 
