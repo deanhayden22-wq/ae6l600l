@@ -282,6 +282,136 @@ def compute_wot_pulls(df, log_date, rom_rev, log_path, samples_per_sec=25):
     return pd.DataFrame(rows)
 
 
+def compute_pull_ramps(df, log_date, rom_rev, log_path, samples_per_sec=25):
+    """Detect throttle events ("pulls") and capture boost-ramp metrics.
+
+    Pull = contiguous run of smoothed APP >= 30 lasting >= 0.6s, with peak
+    mrp >= 5 psi inside the run. Captures pulls regardless of how the
+    driver got there (slam, roll-on, sustained partial), then tags each
+    by entry condition so future cross-rev comparisons can control for it.
+
+    Entry condition (look at 1.0s prior to pull start):
+      post_dfco    — min(mrp) <= -7 in prior window (decel fuel cut /
+                     hard vacuum). Turbo started at zero spool.
+      post_coast   — max(APP) < 5 in prior window AND min(mrp) > -7. Foot
+                     off pedal but engine wasn't in DFCO.
+      post_partial — max(APP) >= 5 in prior window. Driver was already
+                     on throttle to some degree; turbo pre-loaded.
+
+    Ramp metrics: time-from-pedal-on / -from-APP100% / -from-Throttle100%
+    to peak mrp, plus AVCS path, wgdc, target attainment, and min FBKC.
+    Comparison across revs only stays defensible when bucketed by
+    entry_condition — e.g. a post_partial pull will reach peak mrp faster
+    than a post_dfco pull on the same ROM (turbo was pre-spooled, not
+    spooled faster).
+    """
+    n = len(df)
+    win = samples_per_sec
+    if n < 2 * win:
+        return pd.DataFrame()
+
+    t = df["time"].to_numpy()
+    rpm = df["RPM"].to_numpy()
+    mph = df["MPH"].to_numpy() if "MPH" in df.columns else np.full(n, np.nan)
+    app = df["Accelerator"].to_numpy()
+    thr = df["Throttle"].to_numpy()
+    mrp = df["mrp"].to_numpy()
+    avcs = df["avcs"].to_numpy() if "avcs" in df.columns else np.full(n, np.nan)
+    wgdc = df["wgdc"].to_numpy() if "wgdc" in df.columns else np.full(n, np.nan)
+    fbkc = df["FBKC"].to_numpy() if "FBKC" in df.columns else np.full(n, np.nan)
+    target = df["Trgt_Boost"].to_numpy() if "Trgt_Boost" in df.columns else np.full(n, np.nan)
+
+    # 3-sample centered smoothing on APP/throttle to suppress 1-sample noise.
+    app_s = pd.Series(app).rolling(3, center=True, min_periods=1).mean().to_numpy()
+    thr_s = pd.Series(thr).rolling(3, center=True, min_periods=1).mean().to_numpy()
+
+    on = (app_s >= 30).astype(int)
+    edges = np.diff(on, prepend=0, append=0)
+    starts = np.where(edges == 1)[0]
+    ends = np.where(edges == -1)[0]
+
+    min_run = int(0.6 * samples_per_sec)
+    rows = []
+    pull_id = 0
+    for s_i, e_i in zip(starts, ends):
+        seg_len = e_i - s_i
+        if seg_len < min_run:
+            continue
+        seg_mrp = mrp[s_i:e_i]
+        if not np.isfinite(seg_mrp).any() or np.nanmax(seg_mrp) < 5.0:
+            continue
+
+        # Entry condition window: 1s before s_i
+        plo = max(0, s_i - win)
+        pa = app_s[plo:s_i]
+        pm = mrp[plo:s_i]
+        if pa.size < 5:
+            entry = "unknown"
+        elif np.isfinite(pm).any() and np.nanmin(pm) <= -7.0:
+            entry = "post_dfco"
+        elif np.isfinite(pa).any() and np.nanmax(pa) < 5.0:
+            entry = "post_coast"
+        else:
+            entry = "post_partial"
+
+        peak_off = int(np.nanargmax(seg_mrp))
+        peak_idx = s_i + peak_off
+        peak_mrp = float(mrp[peak_idx])
+
+        # First sample inside the run where APP_s >= 30 — this is "pedal on"
+        pedal_on_idx = s_i
+
+        # First samples where APP_s >= 99 / Throttle_s >= 99 inside the run
+        seg_app = app_s[s_i:e_i]
+        seg_thr = thr_s[s_i:e_i]
+        a99 = np.where(seg_app >= 99.0)[0]
+        t99 = np.where(seg_thr >= 99.0)[0]
+        app100_idx = s_i + int(a99[0]) if a99.size else None
+        thr100_idx = s_i + int(t99[0]) if t99.size else None
+
+        t_pedal = float(t[pedal_on_idx])
+
+        def safe(arr, idx):
+            return float(arr[idx]) if idx is not None and np.isfinite(arr[idx]) else np.nan
+
+        row = {
+            "log_date": log_date, "rom_rev": rom_rev, "log_path": log_path,
+            "pull_id": pull_id,
+            "entry_condition": entry,
+            "pedal_on_t": t_pedal,
+            "pedal_on_RPM": float(rpm[pedal_on_idx]),
+            "pedal_on_mrp": float(mrp[pedal_on_idx]),
+            "pedal_on_mph": float(mph[pedal_on_idx]),
+            "app100_t_offset": (float(t[app100_idx] - t_pedal) if app100_idx is not None else np.nan),
+            "app100_RPM": safe(rpm, app100_idx),
+            "app100_mrp": safe(mrp, app100_idx),
+            "thr100_t_offset": (float(t[thr100_idx] - t_pedal) if thr100_idx is not None else np.nan),
+            "thr100_RPM": safe(rpm, thr100_idx),
+            "thr100_mrp": safe(mrp, thr100_idx),
+            "peak_mrp": peak_mrp,
+            "peak_t_offset": float(t[peak_idx] - t_pedal),
+            "peak_RPM": float(rpm[peak_idx]),
+            "time_pedal_to_peak": float(t[peak_idx] - t_pedal),
+            "time_app100_to_peak": (float(t[peak_idx] - t[app100_idx]) if app100_idx is not None else np.nan),
+            "time_thr100_to_peak": (float(t[peak_idx] - t[thr100_idx]) if thr100_idx is not None else np.nan),
+            "avcs_at_pedal_on": float(avcs[pedal_on_idx]),
+            "avcs_at_peak": float(avcs[peak_idx]),
+            "avcs_max": float(np.nanmax(avcs[s_i:e_i])) if np.isfinite(avcs[s_i:e_i]).any() else np.nan,
+            "wgdc_at_peak": float(wgdc[peak_idx]),
+            "wgdc_max": float(np.nanmax(wgdc[s_i:e_i])) if np.isfinite(wgdc[s_i:e_i]).any() else np.nan,
+            "peak_mph": float(np.nanmax(mph[s_i:e_i])) if np.isfinite(mph[s_i:e_i]).any() else np.nan,
+            "target_at_peak": safe(target, peak_idx),
+            "target_attainment": (peak_mrp / float(target[peak_idx])) if (np.isfinite(target[peak_idx]) and target[peak_idx] > 0) else np.nan,
+            "min_fbkc": float(np.nanmin(fbkc[s_i:e_i])) if np.isfinite(fbkc[s_i:e_i]).any() else np.nan,
+            "knock_during": int(np.any(fbkc[s_i:e_i] < 0)),
+            "duration_s": float(t[e_i - 1] - t[s_i]),
+        }
+        rows.append(row)
+        pull_id += 1
+
+    return pd.DataFrame(rows)
+
+
 def compute_maf_corr(df, log_date, rom_rev, log_path):
     filt = (
         (df["FFB"] <= 14.7)
@@ -447,6 +577,10 @@ def ingest_one(log_path, log_date, rom_rev):
     counts["wot_pulls"] = append_idempotent(
         TRENDS_DIR / "wot_pulls.csv",
         compute_wot_pulls(df, log_date, rom_rev, rel_path, samples_per_sec=sps),
+        ["log_date", "rom_rev", "log_path"])
+    counts["pull_ramps"] = append_idempotent(
+        TRENDS_DIR / "pull_ramps.csv",
+        compute_pull_ramps(df, log_date, rom_rev, rel_path, samples_per_sec=sps),
         ["log_date", "rom_rev", "log_path"])
     counts["maf_corr_by_mafcell"] = append_idempotent(
         TRENDS_DIR / "maf_corr_by_mafcell.csv",

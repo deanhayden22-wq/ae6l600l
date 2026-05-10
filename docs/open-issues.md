@@ -1,6 +1,7 @@
 # Open issues — AE5L600L tuning
 
-Captured 2026-05-04. Active rev: **20.11**.
+Last updated 2026-05-08 after 5-8 log review and Dean review pass.
+Active rev: **20.11**.
 
 Each entry: symptom → where it shows in data → what's been tried →
 what's next.
@@ -69,9 +70,14 @@ diverge from this snapshot.
   boost yet. **No pedal map can fix this.**
 - **Lever (NOT in pedal map):** Target Boost (0xC1340), Initial WG Duty
   (0xC1150), Max WG Duty (0xC0F58), AVCS at cruise/light-load.
-- **Next:** Round 2 after v9 verification — boost-control table review.
-  Need a fresh log on v9 first to understand the new operating-point
-  distribution before changing boost strategy.
+- **Status (2026-05-08):** Dean reports drive on 20.11 felt good in
+  this regime ("really good today"). Provisionally close, but verify
+  on next drive before retiring — 5-8 log had no sustained WOT pulls
+  and didn't hit the response-lag conditions head-on. One more log
+  with deliberate low-RPM tip-ins, then close if subjective and
+  measured response both look fine.
+- **If next log confirms:** Close as accepted. Boost-control table
+  review (Round 2) deferred — only revisit if a regression appears.
 
 ---
 
@@ -122,29 +128,32 @@ diverge from this snapshot.
   20.11, or (b) reverting just the timing/AVCS changes — observe which
   restores knock margin.
 
-### AVCS commands 0° in non-cruise high-load (load 1.0–1.4 × RPM 3000–4500)
+### Tip-in enrichment expires before AVCS finishes ramping (post-DFCO) — CLOSED on 5-8 evidence (2026-05-08)
 
-- **Symptom:** `4-27 20.10/log0002.csv` shows AVCS pinned at 0° during
-  6-second steady tip-in acceleration; knock fires at the upper end.
-- **Where:** Non-cruise path of AVCS (table 0xdac34 per project XML;
-  Dean changed this in 20.10).
-- **Hypothesis:** Either Dean's 20.10 AVCS Non-Cruise edit set this
-  region to 0°, or it was already 0° pre-20.10 and the OL leanout
-  exposed the marginality.
-- **Next:** extract Intake Cam Advance Non-Cruise from 20.9 vs 20.10
-  bins; compare cells in 3000–4500 RPM × 1.0–1.4 load.
-
-### Tip-in enrichment expires before AVCS finishes ramping (post-DFCO)
-
-- **Symptom:** `4-27 20.10/log0003.csv` shows AVCS ramping 0→23° over
-  ~2.5s after DFCO; AFC accel enrichment expires partway through; knock
-  fires while AVCS still mid-ramp.
-- **AVCS ramp rate observed:** ~18°/s.
-- **Lever:** Extending AFC decay rate / magnitude tables would keep
-  fuel-cooling active during the AVCS ramp window.
-- **Next:** locate accel enrichment decay/magnitude tables in def XML
-  (analysis already exists per
-  `disassembly/analysis/accel_enrichment_analysis.txt`).
+- **Original symptom:** `4-27 20.10/log0003.csv` showed AVCS ramping
+  0→23° over ~2.5s after DFCO; AFC accel enrichment expired partway
+  through; knock fired while AVCS still mid-ramp (FBKC min -7.0,
+  70 fbkc<0 samples in the post-DFCO window). AVCS ramp rate ~18°/s.
+- **Lever (kept on file):** Extending AFC decay rate / magnitude tables
+  would keep fuel-cooling active during the AVCS ramp window. Def XML
+  analysis exists at `disassembly/analysis/accel_enrichment_analysis.txt`.
+- **Re-screen on 5-8 20.11 (2026-05-08):** 33 post-DFCO tip-ins detected
+  (DFCO via AFR=20.33, APP rise ≥5% within 1s of exit). Of those, 9 had
+  cold AVCS at exit (≤2°) — the structural match to the original. **3 of
+  9 hit the original prerequisite (AFC expired before AVCS reached 90% of
+  peak); 0 of 9 produced any FBKC<0.** Cleanest match: t=2065.12, AVCS
+  1→23° over 1.76s, AFC active 0.96s — no knock. Trend file
+  `scripts/analysis/trends/postdfco_tipins_5_8.csv`.
+- **One residual event:** t=420.84 had FBKC down to -2.8 in the post-DFCO
+  window, but AVCS exit was 18° (already advanced) and knock fired at
+  avcs=19° AFTER ramp completed — high-load spool tip-in pattern, not
+  AVCS-ramp pattern. Severity also lower than original (-2.8 vs -7.0).
+- **Cross-check on full-log knock distribution:** 196 of 276 FBKC<0
+  samples in 5-8 fall within 3s of a DFCO exit, but 187/196 (95%) at
+  AVCS >15° (settled). 0 samples at AVCS ≤5°. Post-DFCO knock in this
+  log is ghost-zone knock, not AVCS-ramp knock.
+- **Caveat:** n=9 cold-AVCS events from a single 30-min log. Reopen if
+  a future log shows knock during a cold-AVCS post-DFCO ramp.
 
 ### +0.22 AFR cmd-vs-actual delta in 4000–4500 cell (engine richer than commanded)
 
@@ -153,27 +162,73 @@ diverge from this snapshot.
   (improved to +0.14 in 20.10 but not eliminated).
 - **Hypothesis:** MAF over-read, or injector flow scaling overestimating
   delivered fuel mass.
-- **Next:** check injector flow scaling table value vs known injector
-  size; check for any RPM-bin-specific MAF cal anomaly.
+- **Plan for 20.12 (Dean, 2026-05-08):** MAF rescale targeted for the
+  20.12 rev. Pre-rescale workflow: pull MAF g/s vs commanded AFR
+  delta from 5-8 log (and prior backfill where comparable conditions
+  exist) → identify breakpoints needing adjustment → emit a proposed
+  MAF curve diff before flashing. Trends data already in
+  `scripts/analysis/trends/maf_corr_by_mafcell.csv` and
+  `maf_scaling_breakpoints.csv` — start there.
+- **Coupling note:** AVCS edits in cruise zone don't materially shift
+  MAF readings (median |ΔMAF| 1.7% across 20.9→20.10 cross-rev diff
+  at fixed pedal). Safe to iterate MAF independent of cruise AVCS.
 
 ---
 
 ## Open (earlier sessions)
 
-### Base Timing Cruise (1900, 0.94) vs (1900, 1.20) cliff
+### Cruise-zone advance cliffs — analyze on the COMBINED map (BTC + KCA·IAM)
 
-- **Symptom:** 20.10 base timing cruise edits bumped (1900, 0.94)
-  +1.05° without touching (1900, 1.20) → load-direction cliff grew to
-  7.03°.
-- **Priority:** Lower — cruise residency at (1900, 0.94) is only ~7s
-  on the 4-25 baseline.
-- **Next:** Soften when revisiting base timing.
+**Methodology change (Dean, 2026-05-08):** Stop scoring Base Timing
+Cruise (BTC, 0xd4714) and Knock Correction Adv Max Cruise (KCA, 0xd5904)
+as separate cliffs. The advance the engine actually sees in cruise is
+**Sum = BTC + (KCA × IAM)**, with IAM=1.0 at no learned-knock damage.
+Score cliffs on the Sum map.
 
-### Knock Correction Adv Max Cruise — 4.57° cliff at 0.94→1.20 (2200–3300 RPM)
+**Sum at 0.94→1.20 boundary (20.11, IAM=1.0):**
 
-- **Stacks with** base timing cliffs at the same boundary.
-- **Combined swing** ~10° if load wanders across.
-- **Next:** smooth at next cruise-tuning iteration.
+| RPM | BTC@.94 | KCA@.94 | Sum@.94 | BTC@1.20 | KCA@1.20 | Sum@1.20 | ΔSum |
+|----:|--------:|--------:|--------:|---------:|---------:|---------:|-----:|
+| 1600 | 16.91 | 0.00 | 16.91 | 10.23 | 5.27 | 15.51 | **−1.41** |
+| 1900 | 18.67 | 0.00 | 18.67 | 11.64 | 5.27 | 16.91 | **−1.76** |
+| 2200 | 19.38 | 0.00 | 19.38 | 12.70 | 4.57 | 17.27 | **−2.11** |
+| 2600 | 20.43 | 0.00 | 20.43 | 14.10 | 4.57 | 18.67 | **−1.76** |
+| 3000 | 20.78 | 0.00 | 20.78 | 14.45 | 4.57 | 19.02 | **−1.76** |
+| 3300 | 21.48 | 0.00 | 21.48 | 15.16 | 4.57 | 19.73 | **−1.76** |
+
+The 0.94→1.20 boundary **does not stack** — BTC drops ~−6.5° but KCA
+rises +4.6 to +5.3° (KCA Cruise has zeros across the 0.27/0.50/0.65/0.94
+columns then jumps to ~5°). Net Sum cliff is only −1.4 to −2.1°. The
+prior "stacking ~10° swing" framing in earlier notes was wrong — they
+oppose, not stack.
+
+**Largest Sum cliffs in the cruise zone are at 0.65→0.94** (KCA = 0 on
+both sides, so it's pure BTC):
+
+| RPM | Sum@.65 | Sum@.94 | ΔSum |
+|----:|--------:|--------:|-----:|
+|  800 | 19.38 | 11.64 | **−7.73** |
+| 1200 | 21.84 | 16.21 | **−5.62** |
+| 1600 | 22.54 | 16.91 | **−5.62** |
+| 1900 | 23.95 | 18.67 | **−5.27** |
+| 2200 | 24.65 | 19.38 | **−5.27** |
+| 2600 | 25.70 | 20.43 | **−5.27** |
+| 3000 | 26.05 | 20.78 | **−5.27** |
+| 3300 | 26.41 | 21.48 | **−4.92** |
+
+**Priority:** Cruise residency at 0.65 column is also limited (light
+loads), so this cliff matters mainly when load briefly transits across
+it during pedal modulation. Lower priority than the 5-8 ghost-zone
+knock issue.
+
+**Next when revisiting:** Soften the 0.65→0.94 column step in BTC by
+shaving 1–2° from the 0.65-column rows in the 800–2200 RPM band, so
+Sum delta moves into the −3 to −4° range. Don't touch the 0.94→1.20
+boundary unless KCA is also re-shaped at the same time.
+
+**Tooling todo:** Add Sum-map computation to `cross_rev_diff.py` /
+new helper, so cliff scoring is always done on Sum, not on BTC and
+KCA separately.
 
 ---
 
@@ -184,3 +239,13 @@ diverge from this snapshot.
 - **Resolved in 20.10** — cliff count 55 → 37, cruise-on-cliff cells
   dropped to 3.
 - **Status:** Dean confirmed "nailed it" per cruise-smoothness session.
+
+### AVCS pinned at 0° in non-cruise high-load (load 1.0–1.4 × RPM 3000–4500)
+
+- **Original symptom:** `4-27 20.10/log0002.csv` showed AVCS at 0°
+  during 6-second steady tip-in; knock at upper end.
+- **Resolution (Dean, 2026-05-08):** Caused by ECU restart, not a
+  table value. AVCS was sitting in the post-restart re-learn / warm-up
+  state; not a calibration issue.
+- **Status:** Closed. If pattern reappears in a log without a recent
+  restart event, reopen.

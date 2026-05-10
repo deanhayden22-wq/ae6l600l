@@ -32,8 +32,8 @@ older revs as `rom_rev` rows for ghost-zone analysis.
 | Table | Change |
 |---|---|
 | **Intake AVCS Cruise** | Cliff count 55 → 37. Cruise-on-cliff cells dropped to 3 (near 5–5.5° threshold floor in 0.20–0.30 load corner at 1900–2200 RPM). Closed. |
-| **Base Timing Cruise** | 47 cells changed. 0.27/0.50 load columns pulled −1.4 to −2.8° at 1600–5550 RPM (those cols sat at 30°+ advance). 0.94 column got selective bumps at 1900–3000 RPM. **Side effect:** bumping (1900, 0.94) +1.05° without touching (1900, 1.20) grew that pair's load-direction cliff to 7.03°. Outstanding, lower priority — only ~7s residency. |
-| **Knock Correction Adv Max Cruise** | Unchanged from 20.9. Has its own 4.57° cliff at the 0.94→1.20 boundary (2200–3300 RPM) which **stacks** with base timing cliffs at the same boundary. Combined effective swing ~10° if load wanders across. |
+| **Base Timing Cruise** | 47 cells changed. 0.27/0.50 load columns pulled −1.4 to −2.8° at 1600–5550 RPM (those cols sat at 30°+ advance). 0.94 column got selective bumps at 1900–3000 RPM. **Side effect:** BTC-only delta at the (1900, 0.94)→(1900, 1.20) pair grew to 7.03°. **Score on Sum map (BTC + KCA·IAM), not BTC alone** — see open-issues.md. |
+| **Knock Correction Adv Max Cruise** | Unchanged from 20.9. Has its own 4.57° step at the 0.94→1.20 boundary (2200–3300 RPM) but that step **opposes** BTC at the same boundary (BTC drops, KCA rises). Net Sum cliff at this pair is only −1.4 to −2.1°, not the previously-noted ~10°. Worst Sum cliff in the cruise zone is at **0.65→0.94** (KCA=0 on both sides), where Sum drops 4.9–7.7° depending on RPM. See `open-issues.md` "Cruise-zone advance cliffs" for the full table. |
 | **OL B Low / B High** | At the 4-25 snapshot, unchanged. Superseded by 4-27 amendment below. |
 | **CL Fueling Target Comp A (Load)** | Unchanged. Essentially flat. |
 

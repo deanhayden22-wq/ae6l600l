@@ -94,6 +94,32 @@ the prior sample (FLKC decrement = learned-knock event).
 
 2.5  **Append rows to `trends/wot_pulls.csv`.**
 
+2.6  **Pull ramp metrics** — broader detector than the TPS≥95 WOT rule.
+     Captures every contiguous APP≥30 block lasting ≥0.6s with peak
+     mrp ≥5 psi, then tags each pull by entry condition for cross-rev
+     comparison.
+
+     Entry conditions (1.0s window before pull start):
+     - `post_dfco`   — `min(mrp) ≤ −7` in prior 1s. Turbo started at
+                       zero spool (decel fuel cut / full vacuum).
+     - `post_coast`  — `max(APP) < 5` AND `min(mrp) > −7` in prior 1s.
+                       Foot off pedal, engine not in DFCO.
+     - `post_partial`— `max(APP) ≥ 5` in prior 1s. Driver was already
+                       on throttle to some degree; turbo pre-loaded.
+
+     Per pull, record: pedal_on_t/RPM/mrp/mph, t-offset and conditions
+     at APP=100% and Throttle=100%, peak mrp + RPM + t-offset, AVCS
+     path (at pedal-on, at peak, max during pull), wgdc at/max,
+     target_attainment (peak_mrp / Trgt_Boost), min FBKC, knock_during.
+
+     **Cross-rev comparison rule:** never compare ramp times across
+     revs without controlling for `entry_condition`. A `post_partial`
+     pull will reach peak mrp faster than a `post_dfco` pull on the
+     same ROM because the turbo was already loaded — that is a driver
+     input difference, not a tune change.
+
+     **Append rows to `trends/pull_ramps.csv`.**
+
 ---
 
 ## Step 3 — MAF correction (closed-loop fuel trim)
@@ -284,6 +310,7 @@ Append a section to `logs/REVIEW_LOG.md` using this template:
 | Cruise residency (per `feedback_cruise_residency_method.md`) | CL/OL=8, MPH>20, std(RPM,1s)<low, std(accel,1s)<low, std(Throttle,1s)<low |
 | MAF correction | FFB≤14.7, |correction|<25, Accelerator>2, CL/OL=8 |
 | WOT pull | Throttle>95% sustained ≥25 samples |
+| Throttle event (pull_ramps) | smoothed APP≥30 sustained ≥15 samples, peak mrp ≥5 psi |
 | Knock event | FBKC<0 OR FLKC[t]<FLKC[t-1] |
 | Steady-state (for cliff residency / VE) | std(RPM,1s)<50, std(load or mrp,1s)<threshold, std(Throttle,1s)<1% |
 

@@ -12,6 +12,7 @@ without also updating that file.
 |--|--|--|
 | `knock_by_cell.csv` | (log, rom_rev, rpm_bin, load_bin) | 1.4 |
 | `wot_pulls.csv` | (log, rom_rev, pull) | 2.2 |
+| `pull_ramps.csv` | (log, rom_rev, pull) | 2.6 |
 | `maf_corr_by_mafcell.csv` | (log, rom_rev, mafv_bin, mafgs_bin) | 3.3 |
 | `cliffs_flagged.csv` | (log, rom_rev, table, cell-pair) | 4.5 |
 | `stutter_events.csv` | (log, rom_rev, event) | 5.6 |
