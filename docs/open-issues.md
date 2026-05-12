@@ -1,7 +1,7 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-05-08 after 5-8 log review and Dean review pass.
-Active rev: **20.11**.
+Last updated 2026-05-10 after 20.12 build (not yet flashed).
+**On car right now:** 20.11 (`e937ccff...`). **Staged for next flash:** 20.12 (`534720b8...`), pending MAF rescale addition.
 
 Each entry: symptom → where it shows in data → what's been tried →
 what's next.
@@ -9,6 +9,40 @@ what's next.
 This is a working list, not a final state. Update as issues open and
 close per ROM rev. The same content lives in working memory and may
 diverge from this snapshot.
+
+---
+
+## 20.12 watch — pre-drive scoring gates (opened 2026-05-10)
+
+20.12 is built but not flashed. Next drive is on 20.11 to gather MAF
+correction data; MAF Sensor Scaling edits get added to 20.12 before it
+goes on the car. These gates apply to the first 20.12-flashed log.
+
+Three subsystem-level hypotheses bundled into 20.12. Cross-subsystem
+attribution is feasible here because each change lives in a different
+load band: AVCS in coast/light-cruise (0.20-0.50), Base Timing across
+both cruise and high-load, WGDC in spool/boost. The scorecard's per-
+thread metrics resolve them independently.
+
+| hypothesis | change | win signal (next log) | target |
+|---|---|---|---|
+| AVCS plateau extension softens 28-36 MPH stutter | AVCS Cruise/NC 12 cells, 0.20+0.30 col plateau on 2200-3400 RPM | AVCS-led cluster count in 2500-3000 × 0.20-0.30 zone | drop from 19 → ≤10 |
+| AVCS plateau also drops global stutter signature | (same) | `cross_thread.stutter_signature_per_min` | drop from 2.20 → <1.80 |
+| BT retard reduces cruise-side timing oscillation | BT × 4 variants, 30 cells, −0.35 to −1.05° | `timing_sum.timing_osc_per_min` | drop from 0.94 → <0.70 |
+| BT retard reduces OL knock zone events | (same) | `timing_sum.total_knock_per_min` and `min_fbkc_depth` | knock <0.40/min, depth shallower than −4.0° |
+| Max WG spool reduction smooths boost build | Max WG 70 cells in 1350-2200 RPM | `wgdc.mean_target_attainment` stable or improved; pull ramps smoother | attainment stays 0.75-0.90, no overshoot >1.05 |
+
+**Methodology notes for the 20.12 review:**
+- Re-run `python3 scripts/analysis/scorecard.py` after ingesting next 20.12 log; compare delta_vs_prior on the metrics above.
+- Re-run `python3 scripts/analysis/cell_residency.py --revs 20.11 20.12` once 20.12 logs land to confirm the AVCS-edited cells got enough samples to score.
+- Per `feedback_residency_threshold_rule`: the 3 AVCS edits at (3800, 0.20/0.30/0.50) are sub-1% residency = unverifiable by design. Accepted as shape-only edits, not as testable hypotheses.
+- Per `feedback_verify_rom_changes_against_user_claims`: the BT changeset wasn't in the original 20.12 plan (initially announced as AVCS+WGDC). rom_diff surfaced it; confirmed intentional after surfacing. Workflow working as intended.
+
+**If any gate fails on next log:**
+- AVCS-led cluster count stays >12 → the (2500, 0.20/0.30) drop was insufficient; consider further pull in 20.13.
+- timing_osc per min unchanged → the BT retard didn't reach the right cells for the stutter mode; re-examine whether the timing oscillation is downstream of AVCS rather than driven by BT.
+- Knock per min worsens → the BT retard wasn't aggressive enough, OR the cells touched don't match the actual knock cells. Re-bin knock by exact RPM/load and compare.
+- WGDC pull-ramp attainment drops below 0.70 → spool reduction was too aggressive; restore some of the 1600-1900 cells.
 
 ---
 

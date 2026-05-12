@@ -1,6 +1,6 @@
 # Tune state — AE5L600L 20G
 
-Captured 2026-05-04. Active rev: **20.11**.
+Captured 2026-05-10. On car: **20.11** (md5 `e937ccff...`). Built but not flashed: **20.12** (md5 `534720b8...`, pending MAF rescale before flash).
 
 ROM revs are in `rom/AE5L600L 20g rev X.Y tiny wrex.bin`. Bins are
 overwritten in place — same filename, new content — so a recorded hash
@@ -136,6 +136,63 @@ File: `rom/AE5L600L 20g rev 20.11.bin`.
 (a) 35 mph stutter resolved, (b) FBKC events at 2200–3000 / 1.0–1.3
 reduced, (c) trim corrections at 1.30V and 2.39V MAF cells move toward
 zero.
+
+**20.11 in-rev findings (post-drive analysis, 5-8 + 5-10 logs):**
+The 35 MPH stutter wasn't fully resolved. AVCS-led stutter clusters
+concentrated at 2500-3000 RPM × 0.20-0.30 load (25 clusters / 82 total
+on 20.11) — see `scripts/analysis/trends/stutter_clusters.csv`. Root
+cause traced to a single-cell peak at (2500, 0.20) = 18° on the AVCS
+Cruise table, anomalously higher than its 13.5° / 15° neighbors,
+inherited from 20.10. The 20.11 fix at 1600/1900 cells didn't reach
+this peak. → motivates 20.12 AVCS plateau extension.
+
+### 20.11 → 20.12 (2026-05-10)
+
+File: `rom/AE5L600L 20g rev 20.12.bin` (md5
+`534720b84959cac2a0f14ee641cc6360`).
+
+- **AVCS Intake Cruise (0xDA96C) + Non-Cruise (0xDAC34)** — paired,
+  identical 12-cell edit per table. Plateau extension on the 0.20 and
+  0.30 load columns to match higher-load (0.50+) column shape.
+  - 0.20 column: (2200) 13.5→14.0, **(2500) 18.0→15.0**, (2800) 15.0
+    (keep), (3000) 12.5→14.0, (3400) 9.0→10.0, plus shape-only
+    (3800) 5.0→6.25.
+  - 0.30 column: (2200) 17.5→18.0, **(2500) 19.5→18.0**, (2800)
+    17.5→18.0, (3000) 15.5→17.0, (3400) 12.25→13.25, plus shape-only
+    (3800) 8.0→9.25.
+  - 0.50 column: shape-only (3800) 11.0→11.76.
+  - The (3800) edits at all three loads are sub-1% strict-cruise
+    residency, accepted as shape-only edits per the residency
+    threshold rule — they smooth the column but won't appear in
+    logs to verify.
+  - Targets the 2500-3000 RPM × 0.20-0.30 AVCS-led stutter zone
+    (19 of 25 clusters on 20.11 fired in this region).
+- **Base Timing × 4 variants** (Primary Cruise/NC, Reference Cruise/NC
+  — locked-identity holds, all four byte-identical to each other):
+  30 cells retarded per table, -0.35 to -1.05°.
+  - Cruise-side cells (2800-4150 RPM × 0.20-0.70 load): pulls
+    timing in the AVCS-led stutter zone (timing osc is a
+    co-participant in the stutter signature).
+  - High-load cells (2800-4150 RPM × 2.25-4.00 load): pulls timing
+    in the post-20.10 OL knock zone (3500-4500 RPM × high load,
+    14 FBKC events on 20.11's 5-10 log).
+  - One rev tests both hypotheses simultaneously. Scorecard's
+    `timing_osc_per_min` resolves the cruise-side question;
+    `total_knock_per_min` and `min_fbkc_depth` resolve the OL
+    question.
+- **Max Wastegate Duty (0xC0F58)** — 70 cells reduced, -0.4 to -2.1%.
+  Spool-region focus: 1350-2200 RPM band gets the bulk of the pulls.
+  Absolute max raw stays at 32768 (50.0% full-range). Reduces spool
+  aggressiveness, not the ceiling — `glide-not-slam` per memory.
+- **Initial WG Duty (0xC1150):** UNCHANGED.
+- **Target Boost (0xC1340):** UNCHANGED.
+- **MAF Sensor Scaling (0xD8C9C):** UNCHANGED (deferred to 20.13+
+  pending more 20.11/20.12 cruise samples per small-sample reasoning).
+- **0xF1054 (2 bytes):** changed; possible FFS RPM delta or similar.
+  Identity to confirm on next verification pass.
+
+**Verification pending on 20.12.** Pre-drive scoring gates in
+`docs/open-issues.md` "20.12 watch" section.
 
 ## Baseline log
 

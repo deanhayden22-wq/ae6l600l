@@ -122,6 +122,112 @@ the prior sample (FLKC decrement = learned-knock event).
 
 ---
 
+## Step 2.7 — WOT shortlist (cross-rev comparison set)
+
+**Purpose:** WOT operating points are touched so rarely per drive that
+every qualifying pull is high-value. Step 2 + 2.6 capture summary stats
+for every pull; this step preserves the **full shape** of qualifying
+pulls so we can overlay them across revs and gears.
+
+Substance bar (must all be true to qualify):
+
+- Throttle ≥ 95% sustained ≥ 50 consecutive samples (≥ 2 s at 25 Hz).
+- peak mrp during the Throttle-high window ≥ 7 psi. (Below this the
+  turbo never leaves pre-spool and the pull tells us nothing about
+  WGDC slam behavior. Above 10 we lose under-attainment pulls. 7 is
+  the floor that keeps both.)
+- Knock pulls are NOT disqualified — tag them and keep them; they are
+  the most informative pulls for the cells they touch.
+
+**Pull type tagging** (recorded, not used for qualification):
+
+- `true_wot` — APP ≥ 95% for ≥ 80% of the Throttle-high window.
+- `throttle_saturated` — APP < 95% AND Throttle = 100% for ≥ 80% of
+  the window. (Pedal map saturating throttle below APP=100; these
+  pulls are critical because they exercise the saturation region.)
+- `mixed` — neither rule satisfied for ≥ 80%.
+
+**Gear handling** (multi-gear pulls allowed):
+
+2.7.1  Compute per-sample `gear_ratio = RPM / max(MPH, 1)` over the
+       Throttle-high window. Bucket into gear bands. [VERIFY: gear
+       ratio breakpoints for this trans — confirm against a known
+       single-gear pull before locking thresholds.]
+
+2.7.2  Detect shift events as `RPM[t] − RPM[t+5] ≥ 300` (RPM drop
+       ≥300 within 200 ms = upshift). Record the sample index of each
+       shift in `shift_samples`. Pulls through shifts are kept whole,
+       not split — downstream tools crop to a single gear when needed.
+
+2.7.3  `gear_path` field: comma-separated gear sequence with shift
+       markers, e.g. `3,3->4@s12345,4`.
+
+**Per-pull capture:**
+
+2.7.4  **Trajectory** — for every sample in the pull (start of
+       Throttle-high to end + 5 samples of lift): write one row to
+       `trends/wot_trajectories.csv` with:
+       pull_id, rom_rev, sample_offset (0-indexed within pull),
+       RPM, MPH, gear (auto-detected), APP, Throttle, mrp, target_mrp,
+       wgdc, Tdp, tdi, AVCS_intake, Timing, FFB, wbo2, MAF_gs, FBKC,
+       FLKC, IAM.
+
+       `pull_id` format: `<rom_rev>__<log_basename>__s<start_sample>`
+       (unique across all logs and revs).
+
+2.7.5  **Phased summary** — auto-detect phases per the 20.11 anchor
+       structure and write one row to `trends/wot_shortlist.csv`:
+       - Phase boundaries (auto-detected from mrp/target gap):
+         - `pre_spool` — start to first sample where mrp ≥ 10 psi
+         - `main_spool` — mrp 10 psi to within 3 psi of target
+         - `target_approach` — gap < 3 psi to peak mrp
+         - `hold_fade` — peak to driver lift
+       - Per-pull row columns:
+         pull_id, rom_rev, log_path, log_date, pull_type, gear_path,
+         shift_samples, start_RPM, peak_RPM, RPM_span, duration_s,
+         pre_spool_duration_s, main_spool_duration_s,
+         target_approach_duration_s, hold_fade_duration_s,
+         entry_mrp, peak_mrp, target_mrp_at_peak,
+         attainment_pct (peak_mrp / target_mrp_at_peak),
+         peak_under_target_psi (target − peak; negative = overshoot),
+         slam_magnitude (max wgdc − min wgdc across target_approach),
+         min_Tdp, max_Tdp, max_tdi, peak_wgdc, hold_wgdc_median,
+         AVCS_at_pull_start, AVCS_at_peak, AVCS_at_lift,
+         timing_at_peak, mean_wbo2, mean_AFR_delta (wbo2 − FFB shifted
+         8 samples for transport lag), min_FBKC, flkc_decrements,
+         knock_during, writeup_path.
+
+2.7.6  **Per-pull writeup** — for each qualifying pull, generate a
+       markdown file at `logs/wot_pulls/<rom_rev>__<log_basename>__s<start_sample>.md`
+       using the 20.11 anchor (`project_wot_pull_diagnostic.md`) as the
+       template: 5-phase decomposition, key facts, gap-to-target at
+       peak and hold, slam decomposition (Tdp vs IAT-comp vs tdi
+       contributions to wgdc swing), AVCS path, knock if any.
+
+       Writeup files are NOT promoted to memory automatically. Only
+       pulls Dean designates as canonical anchors get a memory entry
+       (like the 20.11 pull at s19168).
+
+2.7.7  **Cross-rev comparison plot** — when this rev has ≥1 qualifying
+       pull and prior revs have ≥1 qualifying pull in the same gear
+       (per `gear_path` first segment), generate an overlay PNG at
+       `scripts/analysis/plots/wot_overlay__<gear>__<date>.png`:
+       - Top panel: mrp and target_mrp vs RPM, one trace per rev.
+       - Middle panel: wgdc vs RPM, one trace per rev.
+       - Bottom panel: Tdp vs RPM, one trace per rev.
+       - Pulls aligned on RPM, not time (different turbo lag per rev
+         shouldn't shift the curves).
+       - Legend: `<rom_rev>__<pull_id>`.
+
+2.7.8  **Append rows** to `trends/wot_shortlist.csv` and
+       `trends/wot_trajectories.csv`.
+
+2.7.9  Cross-check qualifying pulls against prior-flagged WGDC zones
+       from `project_open_issues.md`. Any pull that lands in a cell
+       we changed since last review = high-priority writeup.
+
+---
+
 ## Step 3 — MAF correction (closed-loop fuel trim)
 
 **Goal:** track per-cell mean/median fuel trim on the **MAF Scaling
@@ -184,6 +290,16 @@ Tables to scan (addresses in `reference_cruise_tuning_tables.md` memory):
      - sample_count of cells on each side of the cliff (steady-state,
        std on 1-s window low).
      - residency_pct = samples_at_cliff / total_samples_in_log.
+
+4.2.1  **Residency-threshold rule (2026-05-10):** drop any cliff where
+       **both** sides have <1% strict-cruise residency in this log.
+       The car never drives there; the cliff is unverifiable from logs,
+       and editing those cells is theater — no future log will confirm
+       or refute the change. Sub-1% cells stay out of
+       `cliffs_flagged.csv`. The rule also gates which cells get edited:
+       table changes proposed in cells with <1% residency should be
+       flagged "low-validation" in the writeup since the next drive
+       won't generate enough samples to score them.
 
 4.3  Rank by `residency_samples × |delta|`. Worst actor first.
 
@@ -271,6 +387,10 @@ Append a section to `logs/REVIEW_LOG.md` using this template:
 
 **Knock:** <event count>, top cells: <(rpm,load): n>, ghost zones: <list>
 **WOT:** <pull count>, knock-during: <n>, fueling notes: <...>
+**WOT shortlist:** <qualifying pull count>, by pull_type: <true_wot:n, throttle_saturated:n, mixed:n>, by gear: <3:n, 4:n, ...>
+  | pull_id | gear | RPM span | peak mrp / target | attainment | slam | knock |
+  | ------- | ---- | -------- | ----------------- | ---------- | ---- | ----- |
+  (one row per qualifying pull this log; writeups linked at `logs/wot_pulls/`)
 **MAF corr:** filtered samples: <n>, drift cells: <list with delta>
 **Cliffs:** <count by table, top 3 by residency × delta>
 **Stutter:** <count by signal type, top 3 events>
@@ -310,6 +430,7 @@ Append a section to `logs/REVIEW_LOG.md` using this template:
 | Cruise residency (per `feedback_cruise_residency_method.md`) | CL/OL=8, MPH>20, std(RPM,1s)<low, std(accel,1s)<low, std(Throttle,1s)<low |
 | MAF correction | FFB≤14.7, |correction|<25, Accelerator>2, CL/OL=8 |
 | WOT pull | Throttle>95% sustained ≥25 samples |
+| WOT shortlist (qualifying) | Throttle≥95% sustained ≥50 samples AND peak mrp ≥7 psi |
 | Throttle event (pull_ramps) | smoothed APP≥30 sustained ≥15 samples, peak mrp ≥5 psi |
 | Knock event | FBKC<0 OR FLKC[t]<FLKC[t-1] |
 | Steady-state (for cliff residency / VE) | std(RPM,1s)<50, std(load or mrp,1s)<threshold, std(Throttle,1s)<1% |

@@ -19,6 +19,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+import wot_shortlist
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TRENDS_DIR = REPO_ROOT / "scripts" / "analysis" / "trends"
 LOGS_DIR = REPO_ROOT / "logs"
@@ -582,6 +584,16 @@ def ingest_one(log_path, log_date, rom_rev):
         TRENDS_DIR / "pull_ramps.csv",
         compute_pull_ramps(df, log_date, rom_rev, rel_path, samples_per_sec=sps),
         ["log_date", "rom_rev", "log_path"])
+    counts["wot_shortlist"] = append_idempotent(
+        TRENDS_DIR / "wot_shortlist.csv",
+        wot_shortlist.compute_shortlist(df, log_date, rom_rev, rel_path, samples_per_sec=sps),
+        ["log_date", "rom_rev", "log_path"])
+    counts["wot_trajectories"] = append_idempotent(
+        TRENDS_DIR / "wot_trajectories.csv",
+        wot_shortlist.compute_trajectories(df, log_date, rom_rev, rel_path, samples_per_sec=sps),
+        ["log_date", "rom_rev", "log_path"])
+    counts["wot_writeups"] = wot_shortlist.write_writeups(
+        df, log_date, rom_rev, rel_path, samples_per_sec=sps)
     counts["maf_corr_by_mafcell"] = append_idempotent(
         TRENDS_DIR / "maf_corr_by_mafcell.csv",
         compute_maf_corr(df, log_date, rom_rev, rel_path),
