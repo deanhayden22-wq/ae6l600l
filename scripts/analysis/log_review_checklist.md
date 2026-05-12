@@ -131,11 +131,19 @@ pulls so we can overlay them across revs and gears.
 
 Substance bar (must all be true to qualify):
 
-- Throttle ≥ 95% sustained ≥ 50 consecutive samples (≥ 2 s at 25 Hz).
-- peak mrp during the Throttle-high window ≥ 7 psi. (Below this the
-  turbo never leaves pre-spool and the pull tells us nothing about
-  WGDC slam behavior. Above 10 we lose under-attainment pulls. 7 is
-  the floor that keeps both.)
+- Throttle ≥ 95% sustained ≥ 25 consecutive samples (≥ 1 s at 25 Hz).
+  Rationale (2026-05-11 corpus calibration): across 354 minutes of
+  logs we have exactly 4 throttle-high runs ≥ 0.4 s — and threshold
+  85/90/95/99 all hit the same 4. The throttle floor isn't gating
+  anything; duration is. Original 2 s bar caught 1 pull; 1 s catches
+  2 (adds the 4-24 1.88 s pull that missed by 120 ms). The brief
+  sub-1 s stabs that 1 s excludes are <5 psi or peak-only blips —
+  they're noise.
+- peak mrp during the Throttle-high window ≥ 7 psi. NOT binding given
+  the corpus (every qualifying run hit ≥ 15 psi anyway), but the
+  threshold is kept to exclude any future pull that never leaves
+  pre-spool. If a future log has a sub-7-psi sustained pull worth
+  capturing, revisit.
 - Knock pulls are NOT disqualified — tag them and keep them; they are
   the most informative pulls for the cells they touch.
 
@@ -430,7 +438,7 @@ Append a section to `logs/REVIEW_LOG.md` using this template:
 | Cruise residency (per `feedback_cruise_residency_method.md`) | CL/OL=8, MPH>20, std(RPM,1s)<low, std(accel,1s)<low, std(Throttle,1s)<low |
 | MAF correction | FFB≤14.7, |correction|<25, Accelerator>2, CL/OL=8 |
 | WOT pull | Throttle>95% sustained ≥25 samples |
-| WOT shortlist (qualifying) | Throttle≥95% sustained ≥50 samples AND peak mrp ≥7 psi |
+| WOT shortlist (qualifying) | Throttle≥95% sustained ≥25 samples (≥1 s) AND peak mrp ≥7 psi |
 | Throttle event (pull_ramps) | smoothed APP≥30 sustained ≥15 samples, peak mrp ≥5 psi |
 | Knock event | FBKC<0 OR FLKC[t]<FLKC[t-1] |
 | Steady-state (for cliff residency / VE) | std(RPM,1s)<50, std(load or mrp,1s)<threshold, std(Throttle,1s)<1% |

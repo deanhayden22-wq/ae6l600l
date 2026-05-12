@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 WOT_MIN_THROTTLE = 95.0
-WOT_MIN_RUN_SAMPLES = 50        # >=2s at 25 Hz
+WOT_MIN_RUN_SAMPLES = 25        # >=1s at 25 Hz (verified against 11-log corpus 2026-05-11: 2s bar caught 1 pull, 1s catches the 4-24 1.92s pull too)
 WOT_MIN_PEAK_MRP = 7.0          # psi (clears pre-spool)
 WOT_TYPE_APP_HIGH = 95.0
 WOT_TYPE_THR_FULL = 99.0
