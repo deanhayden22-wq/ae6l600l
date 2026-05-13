@@ -29,6 +29,43 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+## ingest 2026-05-12 (rev 20.11) auto-rollup (2026-05-13 00:03)
+
+## VE proxy: 20.11 vs 20.10
+  cells with data — 20.10: 200, 20.11: 185
+  overlap (≥30 samples in each): 113
+  cells with |Δ| ≥ 3%: 37
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.10 → 20.11):
+    1200 ×  -7.0   12.03 →  13.42 g/s  (+11.56%, n=98/31)
+    3300 ×  -8.5   22.57 →  24.34 g/s  (+7.86%, n=271/449)
+    2200 × -10.5    8.44 →   9.00 g/s  (+6.61%, n=891/1214)
+    1900 × -10.0    8.88 →   9.36 g/s  (+5.34%, n=198/207)
+    2600 ×  -0.5   48.01 →  50.45 g/s  (+5.08%, n=270/34)
+    3300 ×  -8.0   25.93 →  27.16 g/s  (+4.74%, n=98/449)
+    2200 ×  -9.5   12.70 →  13.21 g/s  (+4.03%, n=859/765)
+    3300 ×  -7.5   28.63 →  29.70 g/s  (+3.72%, n=123/585)
+    3000 ×  -5.5   34.31 →  35.53 g/s  (+3.56%, n=481/243)
+    2200 ×  -2.0   40.49 →  39.21 g/s  (-3.15%, n=378/350)
+
+  Top VE LOSSES:
+    1200 ×  -8.5    8.55 →   7.22 g/s  (-15.56%, n=811/299)
+    1200 × -10.5    5.94 →   5.40 g/s  (-9.18%, n=66/173)
+    3300 × -11.0   10.79 →   9.83 g/s  (-8.88%, n=304/420)
+    1900 ×  -5.0   24.22 →  22.42 g/s  (-7.44%, n=178/288)
+     800 × -10.0    4.07 →   3.78 g/s  (-7.11%, n=87/389)
+    3300 ×  -5.0   44.06 →  41.07 g/s  (-6.78%, n=79/209)
+    1900 ×  -4.5   25.80 →  24.12 g/s  (-6.48%, n=212/47)
+     800 ×  -8.0    6.05 →   5.69 g/s  (-6.06%, n=30/45)
+    3300 × -10.0   17.39 →  16.42 g/s  (-5.57%, n=97/191)
+     800 ×  -8.5    5.73 →   5.44 g/s  (-5.20%, n=245/308)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+              20.10: cells= 52  mean|c|= 1.92%  median|c|= 1.93%  in_tol= 50.0%  max= 6.0%
+              20.11: cells= 52  mean|c|= 1.42%  median|c|= 1.28%  in_tol= 84.6%  max= 3.7%
+    verdict: MIXED — VE down but trim tighter (correcting prior over-scale?)
+
+
 ## auto-generated rev rollup (2026-05-12 01:28)
 
 ## VE proxy: stock vs old_2023_base
@@ -546,6 +583,180 @@ Per-entry template:
 | AVCS Intake Cruise | 4 | 13 | 0xDA9D8–0xDAA48 |
 | AVCS Intake Non-Cruise | 4 | 13 | 0xDACA0–0xDAD10 |
 | Firmware checksum (auto) | 1 | 4 | 0xFFB88–0xFFB8C |
+
+## 2026-05-12 — log: logs/5-12 20.11/5-12.csv — rom: 20.11
+
+Log: 17,715 rows / 11.81 min @ 25 Hz. Schema 34 cols (includes KNOCK_FLAG).
+20.12 still staged, NOT flashed — md5 `74f59846…` unchanged on disk since
+2026-05-11 01:25:33 UTC. 6th log on 20.11.
+
+**Drive shape:** RPM 353–4530 (median 1840); MPH 0–62 (median 25); CL/OL
+state 8 (CL) 16,260 / 10 (OL) 1,453 / 0 (key-on, 2 samples only). Throttle
+peak **32.2%**, APP peak **29.0%**, **mrp peak 0.43 psi** — no boost, no
+WOT. IAM=1.000 throughout (sample 0 was the key-on IAM=0 artifact, cleared
+by sample 1). FLKC start=0, end=0, min=0 — no learned-knock decrement.
+Strict-cruise filter passes 5,363 samples = 30.3% of log = 3.58 min.
+
+**Single-event log.** ALL 56 FBKC<0 samples fall inside ONE 2.20-second
+window (samples 8065–8120, time 322.6→324.8 s). Zero FBKC<0 outside that
+window. The pull is a **partial-throttle cruise climb** with the following
+trajectory:
+- RPM 2009 → 4448 in 2.5 s
+- Load 0.22 → 1.20 g/rev (climbed into the mid-load band)
+- mrp -10.01 → -2.18 psi (vacuum throughout — turbo never produced boost)
+- APP 0 → 25.5%, TPS 12 → 31% (held ~24-30% APP for the climb)
+- wgdc 0 → 74.9% (cap pegged at the 20.11 Max WGDC ceiling, not at 100)
+- AVCS 17° → peak 21° → falls to 4° as RPM climbs past 4000
+- Timing 17 → 27.5 → pulled back to 11° at end of event
+- CL/OL transitions CL=8 → OL=10 at sample 8102 (RPM 3660 / load 1.06)
+- Lag-corrected AFR delta (wbo2[t+8] − FFB[t]): min −1.77 (engine richer
+  by 1.77 AFR at OL transition), max +1.10 (early CL phase). Median −0.34.
+
+**Knock:** 56 FBKC<0 samples, depths {-1.4, -1.05, -0.7, -0.35}, 1 FBKC
+event. 0 FLKC decrements. 20 KNOCK_FLAG=1 samples (no overlap with FBKC<0,
+no co-occurrence within 200ms). 9 cell rows appended to knock_by_cell.csv.
+
+**Knock by cell:**
+- Ghost zone (2200-3300 × 1.0-1.4): 33 FBKC<0 samples, ALL at load_bin=1.00
+  (zero at 1.17 / 1.36 columns). Concentrated at the **left edge** of the
+  zone — different distribution from 5-8 (spread across all 3 cols) and
+  5-11/log0001 (heavy at 2200×1.00 specifically).
+- High-RPM extension (3700-4400 × 1.0-1.17): 23 FBKC<0 samples — NEW
+  signal at these cells. Prior 20.11 logs had 0 samples here.
+  - 4000 × 1.17: 6 samples, depth -0.35
+  - 4400 × 1.17: 7 samples, depth -0.35
+  - All from the same pull bleeding into OL territory at the RPM tail.
+
+**Ghost-zone re-check (FBKC<0 / zone-min, warm-only):**
+- 20.10 pooled (n=2): **85.4/min**
+- 20.11 pooled (n=3, prior): **217/min**
+- 5-12 alone: 33 FBKC<0 / 0.10 zone-min = **278/min** (rate matches log0001)
+- 20.11 pooled (n=4 incl. 5-12): rate stays elevated
+- Verdict: 4th 20.11 log to confirm ghost-zone elevation vs 20.10. Cluster
+  reproducible. No FLKC ratchet this time — looser hold than 5-10/log0003
+  (which carried FLKC=−1 across the drive). FBKC handled it.
+
+**WOT (TPS>95):** 0 pulls. Throttle never exceeded 32.2%. wot_shortlist=0,
+wot_trajectories=0, wot_writeups=0.
+
+**Pull ramps (APP≥30 ≥0.6s, peak mrp ≥5):** 0 pulls. The partial-throttle
+climb peaked at APP=25.5% and mrp=-2.18 — fails both criteria. The detector
+working as designed; the event of interest is sub-threshold for "pull"
+classification but is captured by knock_by_cell as the single FBKC cluster.
+
+**MAF corr (filter: FFB≤14.7, |corr|<25, APP>2, CL=8):** 65 cells appended.
+Trim health (cells ≥30 samples):
+- 5-12: 25 cells, mean|c| **2.01%**, in_tol 52.0%, max 4.44%
+- 5-11 pooled (n=3): 84 cells, mean|c| 1.75%, in_tol 60.7%, max 5.15%
+- 5-10: 23 cells, mean|c| 0.99%, in_tol 95.7%, max 3.20%
+- 5-12 is WORSE than both prior windows. mean|c| up +0.26%, in_tol down 8.7pp.
+- **Monotonic slope walk in V=1.91→2.28 band** (cell mean correction):
+  V=1.91 → -1.79%, V=2.05 → -0.21%, V=2.17 → -2.14%, V=2.25 → -3.52%,
+  V=2.28 → -4.44%, V=2.39 → -3.82%, V=2.45 → -3.37%. Engine running
+  ~3-4% richer than commanded across the 30-42 g/s mid-airflow band
+  (highway cruise / partial-throttle). MAF over-reading in this V range.
+- This is a different V band from the historical 4000-4500 OL concern
+  (V=3.5-4.5). 5-12 saw very little high-V residency (no WOT). The mid-V
+  slope walk is a fresh signal worth tracking.
+
+**Cliffs (cruise residency check on 20.11-edited zones):** Cliff scan still
+not auto-ingested; manual residency check below.
+- AVCS edit 1900 × 0.20-0.30: **5.37% cruise residency** ✓ (above 1% rule)
+- AVCS edit 2200 × 0.20-0.30: **6.86% cruise residency** ✓
+- AVCS edit 2500 × 0.20-0.30: 0.34% cruise residency ✗ (sub-1% — this log
+  can't validate the 2500 RPM AVCS edit)
+- BTC cliff 1900 × 0.65-0.94: 3.64% cruise residency ✓
+- BTC cliff 2200 × 0.65-0.94: **7.53% cruise residency** ✓ (highest)
+
+**Stutter:** 67 events.
+- ffb_wbo2_divergence: 19
+- rpm_swing_steady_tps: 18
+- avcs_oscillation: 13 (median magnitude 15°, clustered at 2000-2250 RPM ×
+  load 0.21-0.28 — same 2000-RPM band signature as 5-11/log0001's 16/21
+  AVCS osc cluster)
+- afr_osc: 8
+- throttle_hunt_at_steady_app: 5
+- timing_osc: 4
+- **AVCS-swing rate at 28-36 MPH × APP≤20 (strict SOP detector): 3 clusters
+  in 1.14 inband-min = 2.63 clu/min.** LOWER than all prior 20.11 logs
+  (3.73-6.14) and lower than 5-2 (5.84, 20.10). Two reasonable readings:
+  (a) cruise stutter regime got smaller exposure in 5-12 — only 1.14
+  inband-min vs 1.43/0.98 in 5-11 logs. Small-sample variance. (b) Real
+  reduction, possible if drive context (longer steady-cruise stretches at
+  speed) muted the trigger. Don't read a step-down from a 1-log point.
+
+**VE proxy (cells ≥3% drift vs 5-11 pooled, ≥30 samples each side):**
+- Largest gains: 1200 × -8.5 (+17%, low n), 800 × -9.0 (+15%, idle),
+  3300 × -6.0 (+12%), 800 × -9.5 (+11%), 2200 × -10.5 (+11%).
+- Largest losses: 1200 × -9.5 (-9%, n_5-12=3373 / n_prior=533), 1900 × -7.5 (-8%).
+- Mostly low-mrp cruise/idle cells. Heavy weighting in 5-12 at specific
+  RPM × mrp combos (long cruise climb visiting different residency than
+  prior logs) — likely sample-distribution variance within bin, not true
+  VE shift. The MAF over-reading direction (sec above) is consistent with
+  the +11-17% reading-up cluster — if MAF reads 3-4% high at mid-V, the VE
+  proxy will skew up by the same amount in cells residing in that V band.
+
+**KNOCK_FLAG (20 samples):**
+- Same characterization as log0001: clustered at low-RPM/low-load
+  (500-2250 × 0.25-0.5). 12/20 in CL state, 8/20 in OL.
+- ZERO co-occurrence with FBKC<0 (not even within ±200ms). Reinforces the
+  "leading-indicator gated by transient_knock_inhibit / FLKC learning"
+  interpretation — events that the ECU detected but didn't pull timing for.
+
+**Prior-flagged areas re-checked:**
+- **Ghost zone 2200-3300 × 1.0-1.4 (open since 5-3, elevated since 5-8):**
+  STILL ELEVATED. 4th 20.11 log to reproduce. 5-12 specifically lit up the
+  load=1.0 column edge during a partial-throttle climb. Rate ≈ log0001.
+  Not resolving on its own. Lever decision still pending — MAF revert vs
+  timing extend vs AVCS-toward-stock.
+- **Historic concern 4000-4500 × 0.7-1.3 (open since 4-28):** This log
+  introduced FRESH FBKC<0 evidence at this cell (15 samples at 4000-4400
+  × 1.0-1.17, all from the partial-throttle pull tail in OL). Prior 20.11
+  logs hadn't visited these cells under conditions producing FBKC. This
+  expands the cluster's footprint from "high-load WOT-adjacent" to also
+  "partial-throttle climb into OL transition" — broader than expected.
+- **High-load lean at 3750-4250 OL (5-11 new finding):** 5-12 visited this
+  band but at low load (1.0-1.2 g/rev, not 2.5-3.4 where 5-11 saw it). Not
+  a refresh of that measurement. AFR delta at the OL transition this log
+  was negative (engine richer) — opposite of 5-11's high-load delta.
+- **MAF cmd-vs-actual delta refresh at 4000-4500 × 0.7-1.3:** Engine in
+  this cell hit FBKC<0 in 5-12. At-cell wbo2-vs-FFB lag-shifted = up to
+  −1.4 AFR (engine RICHER than cmd by 1.4 AFR) at the OL transition end
+  — same direction as the historic +0.22 finding, magnitude much larger.
+  Caveat: only the tail end of a 2.2s pull, n~10 lagged samples — not a
+  steady-state measurement.
+- **28-36 MPH AVCS-swing stutter (5-10 staged):** 5-12 rate 2.63 clu/min is
+  LOWER than 20.11 pooled. The "monotonic 20.11 elevation vs 20.10" claim
+  remains unsupported under strict SOP detector across 4 20.11 logs.
+- **KNOCK_FLAG characterization:** Reinforced — 20 KNOCK_FLAG=1 samples,
+  zero overlap with FBKC<0. Disassembly trace from 5-11 holds.
+
+**New issues:**
+- **Mid-V MAF slope walk (V=1.91→2.45 band)**: monotonic negative drift
+  -1.79 → -4.44% across n≥45 samples per cell. Different V band from
+  historic concern. Per `feedback_maf_no_cellwise_patches.md`, this is the
+  exact slope-walk signature the methodology warns about — track for at
+  least 1 more log before considering a region refit.
+- **High-RPM/low-load FBKC extension (4000-4400 × 1.0-1.17)**: 15 fresh
+  FBKC<0 samples at cells previously unobserved on 20.11. Same root pull
+  as ghost zone. If the next log reproduces, the ghost zone footprint
+  extends 1100 RPM further up than current "2200-3300" framing.
+
+**Staged for next session:**
+- Decide on 20.13 plan now that 20.12 is BUILT but not flashed AND we have
+  the cleanest single-event ghost-zone signature on 20.11. Three options
+  still on the table from the 5-11 review (MAF revert / timing extend /
+  AVCS toward stock); the 5-12 evidence on mid-V MAF slope walk is the
+  newest input — argues for MAF revert/refit as a candidate.
+- Flash 20.12 to see if WGDC cap + L=1.67-2.83 timing pull shifts the
+  partial-throttle climb behavior. Open question: 20.12 doesn't directly
+  touch the 2200-3300 × 1.0-1.2 cells where 5-12 fired (it pulls timing
+  at L=1.67+). So 20.12 may NOT move the 5-12-style event.
+- Add cliff scan to ingest pipeline (still on prior staging list).
+- Get one more 20.11 log with WOT pull conditions to re-measure the
+  4000-4400 cluster under high-load OL, before deciding lever for 20.13.
+
+---
 
 ## 2026-05-11 — log: logs/5-11 20.11/log0001.csv — rom: 20.11
 
