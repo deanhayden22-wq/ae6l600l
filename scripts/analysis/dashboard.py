@@ -3,18 +3,24 @@
 Regeneratable scorecard dashboard.
 
 Reads the live trends store and emits a self-contained HTML file with:
-- Top: KPI cards for the active rev (auto-detected as last rev in REV_ORDER
+- KPI cards for the active rev (auto-detected as last rev in REV_ORDER
   present in scorecard.csv)
 - Per-rev metric trends (line chart)
-- Active-rev cluster signal-set distribution (bar chart)
-- Active-rev RPM × dominant-signal stacked bar
-- Table of every 20.11 AVCS-led cluster with location
+- Active-rev cluster signal-set distribution + RPM x dominant-signal stack
+- AVCS-led cluster table
+- ROM changeset for active transition (+ prior, collapsible)
+- Knock event map (RPM x load, residency-overlaid)
+- MAF residual surface (mafv x mafgs, sample-weighted)
 
-Re-run anytime to refresh against current trends data.
+The HTML body/JS lives in scripts/analysis/dashboard_template.html.
+
+ROM changeset depends on scripts/analysis/trends/rom_changeset.json - run
+  python3 scripts/analysis/rom_changeset.py
+to refresh it after any .bin lands.
 
 Usage:
     python3 scripts/analysis/dashboard.py
-    python3 scripts/analysis/dashboard.py --rev 20.10
+    python3 scripts/analysis/dashboard.py --rev 20.11
     python3 scripts/analysis/dashboard.py --out /path/to/dashboard.html
 """
 from __future__ import annotations
@@ -28,9 +34,10 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TRENDS_DIR = REPO_ROOT / "scripts" / "analysis" / "trends"
+TEMPLATE_PATH = Path(__file__).parent / "dashboard_template.html"
 DEFAULT_OUT = REPO_ROOT / "scorecard_dashboard.html"
 
-REV_ORDER = ["old_2023_base", "stock", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12"]
+REV_ORDER = ["old_2023_base", "stock", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12", "20.13"]
 
 
 def trend_series(sc: pd.DataFrame, thread: str, metric: str, revs: list[str]) -> list:
@@ -52,23 +59,140 @@ def latest_metric(sc: pd.DataFrame, rev: str, thread: str, metric: str) -> tuple
     )
 
 
+def _nearest(value: float, grid: list[float]) -> float:
+    return min(grid, key=lambda g: abs(g - value))
+
+
+def build_knock_map(rev: str) -> dict:
+    """Per-rev knock heatmap on knock_by_cell axes, with nearest-neighbor
+    residency overlay from cell_residency.csv (grids differ - residency is
+    a heuristic context overlay, not an exact join)."""
+    kc = pd.read_csv(TRENDS_DIR / "knock_by_cell.csv", dtype={"rom_rev": str})
+    res = pd.read_csv(TRENDS_DIR / "cell_residency.csv")
+
+    active = kc[kc["rom_rev"] == rev].copy()
+    rpm_grid = sorted(kc["rpm_bin"].dropna().unique().tolist())
+    load_grid = sorted(kc["load_bin"].dropna().unique().tolist())
+    res_rpm = sorted(res["rpm_bp"].unique().tolist())
+    res_load = sorted(res["load_bp"].unique().tolist())
+
+    agg = (
+        active.groupby(["rpm_bin", "load_bin"], dropna=False)
+        .agg(
+            n_fbkc=("event_count_fbkc", "sum"),
+            n_flkc=("event_count_flkc", "sum"),
+        )
+        .reset_index()
+    )
+
+    res_map = {
+        (float(r["rpm_bp"]), float(r["load_bp"])): float(r["active_pct"])
+        for _, r in res.iterrows()
+    }
+
+    cells = []
+    max_events = 0
+    for load in load_grid:
+        row = []
+        for rpm in rpm_grid:
+            hit = agg[(agg["rpm_bin"] == rpm) & (agg["load_bin"] == load)]
+            n_fbkc = int(hit["n_fbkc"].iloc[0]) if len(hit) else 0
+            n_flkc = int(hit["n_flkc"].iloc[0]) if len(hit) else 0
+            n_total = n_fbkc + n_flkc
+            max_events = max(max_events, n_total)
+            r_rpm = _nearest(rpm, res_rpm) if res_rpm else 0
+            r_load = _nearest(load, res_load) if res_load else 0
+            residency_pct = res_map.get((r_rpm, r_load), 0.0)
+            row.append({
+                "fbkc": n_fbkc,
+                "flkc": n_flkc,
+                "n": n_total,
+                "res_pct": round(residency_pct, 3),
+            })
+        cells.append(row)
+
+    return {
+        "rev": rev,
+        "rpm": rpm_grid,
+        "load": load_grid,
+        "cells": cells,
+        "max_events": int(max_events),
+        "n_logs_for_rev": int(active["log_path"].nunique()) if len(active) else 0,
+    }
+
+
+def build_maf_residual(rev: str) -> dict:
+    """Per-rev MAF residual heatmap. mean_correction positive = ECU added
+    fuel (MAF underreporting / lean); negative = rich."""
+    mc = pd.read_csv(TRENDS_DIR / "maf_corr_by_mafcell.csv", dtype={"rom_rev": str})
+    active = mc[mc["rom_rev"] == rev].copy()
+
+    mafv_grid = sorted(active["mafv_bin"].dropna().unique().tolist())
+    mafgs_grid = sorted(active["mafgs_bin"].dropna().unique().tolist())
+
+    def _w_mean(g):
+        sc = g["sample_count"].sum()
+        if sc <= 0:
+            return pd.Series({"mean_corr": float("nan"), "n": 0})
+        return pd.Series({
+            "mean_corr": (g["mean_correction"] * g["sample_count"]).sum() / sc,
+            "n": int(sc),
+        })
+
+    grouped = (
+        active.groupby(["mafv_bin", "mafgs_bin"], dropna=False)
+        .apply(_w_mean, include_groups=False)
+        .reset_index()
+    )
+
+    cells = []
+    abs_max = 0.0
+    for mafgs in mafgs_grid:
+        row = []
+        for mafv in mafv_grid:
+            hit = grouped[(grouped["mafv_bin"] == mafv) & (grouped["mafgs_bin"] == mafgs)]
+            if len(hit) and pd.notna(hit["mean_corr"].iloc[0]):
+                v = float(hit["mean_corr"].iloc[0])
+                n = int(hit["n"].iloc[0])
+                abs_max = max(abs_max, abs(v))
+                row.append({"v": round(v, 2), "n": n})
+            else:
+                row.append({"v": None, "n": 0})
+        cells.append(row)
+
+    return {
+        "rev": rev,
+        "mafv": [round(v, 3) for v in mafv_grid],
+        "mafgs": [round(v, 2) for v in mafgs_grid],
+        "cells": cells,
+        "abs_max": round(abs_max, 2),
+        "n_cells": sum(1 for row in cells for c in row if c["v"] is not None),
+        "n_logs_for_rev": int(active["log_path"].nunique()) if len(active) else 0,
+    }
+
+
+def build_changeset() -> dict:
+    path = TRENDS_DIR / "rom_changeset.json"
+    if not path.exists():
+        return {"transitions": [], "missing": True}
+    return json.loads(path.read_text())
+
+
 def build_data(rev: str) -> dict:
     sc = pd.read_csv(TRENDS_DIR / "scorecard_latest.csv", dtype={"rom_rev": str})
     revs = [r for r in REV_ORDER if r in sc["rom_rev"].values]
 
-    # ---- KPI cards (active rev value + Δ vs prior)
     kpi_specs = [
         ("Stutter signature / min", "cross_thread", "stutter_signature_per_min", "lower_is_better"),
         ("Total knock / min", "timing_sum", "total_knock_per_min", "lower_is_better"),
         ("MAF trim |mean| %", "ol_fueling", "maf_corr_mean_abs_pct", "lower_is_better"),
-        ("Min FBKC depth (°)", "timing_sum", "min_fbkc_depth", "higher_is_better"),
+        ("Min FBKC depth (deg)", "timing_sum", "min_fbkc_depth", "higher_is_better"),
     ]
     kpis = []
     for label, t, m, dir_ in kpi_specs:
         v, _, dprior = latest_metric(sc, rev, t, m)
         kpis.append({"label": label, "value": v, "delta_prior": dprior, "dir": dir_})
 
-    # ---- Trend chart
     trend_metrics = [
         ("stutter signature", "#534AB7", None, "cross_thread", "stutter_signature_per_min"),
         ("throttle hunt",     "#185FA5", [4, 3], "pedal_throttle", "throttle_hunt_per_min"),
@@ -84,13 +208,12 @@ def build_data(rev: str) -> dict:
             "data": trend_series(sc, thr, met, revs),
         })
 
-    # ---- Stutter clusters for active rev
     cl = pd.read_csv(TRENDS_DIR / "stutter_clusters.csv", dtype={"rom_rev": str})
     active = cl[cl["rom_rev"] == rev].copy()
     n_clusters = len(active)
 
     sigset_counts = active["signal_set"].value_counts().head(6)
-    # Pretty-label signal sets
+
     def _pretty(s: str) -> str:
         return (s.replace("ffb_wbo2_divergence", "FFB-wbo2")
                   .replace("avcs_oscillation", "AVCS")
@@ -99,9 +222,9 @@ def build_data(rev: str) -> dict:
                   .replace("timing_osc", "timing osc")
                   .replace("afr_osc", "AFR osc")
                   .replace("+", " + "))
+
     sigset_data = [{"label": _pretty(s), "n": int(n)} for s, n in sigset_counts.items()]
 
-    # ---- RPM band × dominant signal
     rpm_bins = [0, 1500, 2000, 2500, 3000, 3500, 4000, 8000]
     rpm_labels = ["<1500", "1500-2000", "2000-2500", "2500-3000", "3000-3500", "3500-4000", "4000+"]
     if n_clusters:
@@ -120,7 +243,6 @@ def build_data(rev: str) -> dict:
     rpm_stack = []
     if len(rpm_x):
         for sig in rpm_x.columns:
-            data = [int(rpm_x.loc[b, sig]) if b in rpm_x.index else 0 for b in rpm_labels if b in rpm_x.index]
             full = [int(rpm_x.loc[b, sig]) if (b in rpm_x.index) else 0 for b in rpm_labels]
             rpm_stack.append({
                 "label": _pretty(sig),
@@ -128,7 +250,6 @@ def build_data(rev: str) -> dict:
                 "data": full,
             })
 
-    # ---- AVCS-led cluster table for active rev
     avcs_led = active[active["signal_set"].str.contains("avcs_oscillation", na=False)].copy()
     avcs_led = avcs_led.sort_values("rpm_mean")
     avcs_rows = []
@@ -143,6 +264,15 @@ def build_data(rev: str) -> dict:
             "sigs": _pretty(r["signal_set"]),
         })
 
+    knock_map = build_knock_map(rev)
+    maf_residual = build_maf_residual(rev)
+    changeset = build_changeset()
+    active_transition = None
+    for t in changeset.get("transitions", []):
+        if t["after_rev"] == rev:
+            active_transition = t
+            break
+
     return {
         "rev": rev,
         "revs": revs,
@@ -154,188 +284,12 @@ def build_data(rev: str) -> dict:
         "rpm_labels": rpm_labels,
         "rpm_stack": rpm_stack,
         "avcs_rows": avcs_rows,
+        "knock_map": knock_map,
+        "maf_residual": maf_residual,
+        "changeset": changeset,
+        "active_transition": active_transition,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-
-
-HTML_TEMPLATE = r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>AE5L600L scorecard – rev __REV__</title>
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; color: #222; background: #fafaf8; }
-  h1 { font-size: 22px; font-weight: 500; margin: 0 0 0.25rem; }
-  .meta { color: #666; font-size: 13px; margin-bottom: 1.5rem; }
-  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
-  .kpi { background: #fff; border-radius: 8px; padding: 1rem; border: 0.5px solid #ddd; }
-  .kpi-label { font-size: 13px; color: #666; margin-bottom: 4px; }
-  .kpi-value { font-size: 24px; font-weight: 500; }
-  .kpi-delta { font-size: 12px; margin-top: 4px; }
-  .kpi-delta.bad { color: #A32D2D; }
-  .kpi-delta.good { color: #3B6D11; }
-  .kpi-delta.neutral { color: #666; }
-  .panel { background: #fff; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; border: 0.5px solid #ddd; }
-  .panel-title { font-size: 14px; color: #666; margin: 0 0 8px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #666; }
-  .legend span { display: flex; align-items: center; gap: 4px; }
-  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-  .chart-wrap { position: relative; height: 280px; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { text-align: left; font-weight: 500; border-bottom: 1px solid #ddd; padding: 4px 6px; color: #666; }
-  td { padding: 3px 6px; border-bottom: 0.5px solid #eee; }
-  .footer { color: #888; font-size: 12px; margin-top: 1.5rem; text-align: right; }
-</style>
-</head>
-<body>
-<h1>AE5L600L tuning scorecard — active rev __REV__</h1>
-<div class="meta">Generated __TS__ — re-run <code>python3 scripts/analysis/dashboard.py</code> to refresh</div>
-
-<div class="kpi-grid" id="kpis"></div>
-
-<div class="panel">
-  <div class="panel-title">Per-rev metric trends (events/min)</div>
-  <div class="legend" id="trend-legend"></div>
-  <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-</div>
-
-<div class="two-col">
-  <div class="panel">
-    <div class="panel-title">Active-rev cluster signal-sets (<span id="n-clusters"></span> clusters)</div>
-    <div class="chart-wrap"><canvas id="sigsetChart"></canvas></div>
-  </div>
-  <div class="panel">
-    <div class="panel-title">RPM band × dominant signal</div>
-    <div class="chart-wrap"><canvas id="rpmStackChart"></canvas></div>
-  </div>
-</div>
-
-<div class="panel">
-  <div class="panel-title">AVCS-led clusters (n=<span id="n-avcs"></span>) — sorted by RPM</div>
-  <table id="avcs-table"><thead><tr>
-    <th>log</th><th>t (s)</th><th>n</th><th>RPM</th><th>load</th><th>APP %</th><th>signals</th>
-  </tr></thead><tbody></tbody></table>
-</div>
-
-<div class="footer">scorecard data: <code>scripts/analysis/trends/scorecard_latest.csv</code> · clusters: <code>scripts/analysis/trends/stutter_clusters.csv</code></div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script>
-const DATA = __DATA__;
-
-function renderKPIs() {
-  const el = document.getElementById('kpis');
-  for (const k of DATA.kpis) {
-    const dprior = k.delta_prior;
-    let cls = 'neutral', arrow = '';
-    if (!isNaN(dprior) && dprior !== null) {
-      const improving = (k.dir === 'lower_is_better') ? (dprior < 0) : (dprior > 0);
-      cls = improving ? 'good' : (dprior === 0 ? 'neutral' : 'bad');
-      arrow = dprior > 0 ? '↑' : (dprior < 0 ? '↓' : '·');
-    }
-    const dstr = isNaN(dprior) || dprior === null ? '—' : `${arrow} ${dprior >= 0 ? '+' : ''}${dprior.toFixed(2)} vs prior`;
-    el.insertAdjacentHTML('beforeend', `
-      <div class="kpi">
-        <div class="kpi-label">${k.label}</div>
-        <div class="kpi-value">${k.value !== null && !isNaN(k.value) ? k.value.toFixed(2) : '—'}</div>
-        <div class="kpi-delta ${cls}">${dstr}</div>
-      </div>`);
-  }
-}
-
-function renderTrendChart() {
-  const el = document.getElementById('trend-legend');
-  for (const t of DATA.trends) {
-    el.insertAdjacentHTML('beforeend',
-      `<span><span class="legend-swatch" style="background:${t.color}"></span>${t.label}</span>`);
-  }
-  new Chart(document.getElementById('trendChart'), {
-    type: 'line',
-    data: {
-      labels: DATA.revs,
-      datasets: DATA.trends.map(t => ({
-        label: t.label, data: t.data,
-        borderColor: t.color, backgroundColor: t.color,
-        borderWidth: 1.5, borderDash: t.dash || [],
-        pointRadius: 3, pointHoverRadius: 5, tension: 0.2,
-      })),
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-      scales: {
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.08)' } },
-        x: { grid: { display: false } },
-      },
-    },
-  });
-}
-
-function renderSigsetChart() {
-  document.getElementById('n-clusters').textContent = DATA.n_clusters;
-  const labels = DATA.sigset_data.map(d => d.label);
-  const data = DATA.sigset_data.map(d => d.n);
-  const palette = ['#D85A30','#534AB7','#BA7517','#0F6E56','#185FA5','#D4537E'];
-  new Chart(document.getElementById('sigsetChart'), {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{ data: data, backgroundColor: palette.slice(0, data.length), borderWidth: 0 }],
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.08)' }, ticks: { precision: 0 } },
-        y: { grid: { display: false }, ticks: { font: { size: 10 } } },
-      },
-    },
-  });
-}
-
-function renderRpmStackChart() {
-  new Chart(document.getElementById('rpmStackChart'), {
-    type: 'bar',
-    data: {
-      labels: DATA.rpm_labels,
-      datasets: DATA.rpm_stack.map(s => ({
-        label: s.label, data: s.data, backgroundColor: s.color, borderWidth: 0,
-      })),
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, position: 'bottom',
-        labels: { boxWidth: 10, boxHeight: 10, font: { size: 10 }, padding: 6 } } },
-      scales: {
-        x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.08)' }, ticks: { precision: 0 } },
-      },
-    },
-  });
-}
-
-function renderAvcsTable() {
-  document.getElementById('n-avcs').textContent = DATA.n_avcs_clusters;
-  const tb = document.querySelector('#avcs-table tbody');
-  for (const r of DATA.avcs_rows) {
-    tb.insertAdjacentHTML('beforeend', `<tr>
-      <td>${r.log}</td><td>${r.t}</td><td>${r.n}</td>
-      <td>${r.rpm}</td><td>${r.load}</td><td>${r.app}</td>
-      <td>${r.sigs}</td></tr>`);
-  }
-}
-
-renderKPIs();
-renderTrendChart();
-renderSigsetChart();
-renderRpmStackChart();
-renderAvcsTable();
-</script>
-</body>
-</html>
-"""
 
 
 def main():
@@ -351,15 +305,23 @@ def main():
         raise SystemExit("no revs found in scorecard")
 
     data = build_data(active)
-    html = (HTML_TEMPLATE
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    html = (template
             .replace("__REV__", active)
             .replace("__TS__", data["generated_at"])
             .replace("__DATA__", json.dumps(data)))
     out = Path(args.out)
-    out.write_text(html)
+    out.write_text(html, encoding="utf-8")
     print(f"Wrote {out}")
     print(f"  active rev: {active}")
     print(f"  clusters: {data['n_clusters']} ({data['n_avcs_clusters']} AVCS-led)")
+    if data["active_transition"]:
+        t = data["active_transition"]
+        print(f"  ROM diff {t['before_rev']} -> {t['after_rev']}: {t['n_diff_bytes']} bytes in {t['n_runs']} runs")
+    km = data["knock_map"]
+    print(f"  knock map: {len(km['rpm'])}x{len(km['load'])} grid, max {km['max_events']} events, {km['n_logs_for_rev']} logs")
+    mr = data["maf_residual"]
+    print(f"  MAF residual: {mr['n_cells']} cells, +/-{mr['abs_max']}%, {mr['n_logs_for_rev']} logs")
 
 
 if __name__ == "__main__":

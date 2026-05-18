@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AE5L600L scorecard - rev __REV__</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; color: #222; background: #fafaf8; }
+  h1 { font-size: 22px; font-weight: 500; margin: 0 0 0.25rem; }
+  .meta { color: #666; font-size: 13px; margin-bottom: 1.5rem; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .kpi { background: #fff; border-radius: 8px; padding: 1rem; border: 0.5px solid #ddd; }
+  .kpi-label { font-size: 13px; color: #666; margin-bottom: 4px; }
+  .kpi-value { font-size: 24px; font-weight: 500; }
+  .kpi-delta { font-size: 12px; margin-top: 4px; }
+  .kpi-delta.bad { color: #A32D2D; }
+  .kpi-delta.good { color: #3B6D11; }
+  .kpi-delta.neutral { color: #666; }
+  .panel { background: #fff; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; border: 0.5px solid #ddd; }
+  .panel-title { font-size: 14px; color: #666; margin: 0 0 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #666; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .chart-wrap { position: relative; height: 280px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; font-weight: 500; border-bottom: 1px solid #ddd; padding: 4px 6px; color: #666; }
+  td { padding: 3px 6px; border-bottom: 0.5px solid #eee; }
+  .footer { color: #888; font-size: 12px; margin-top: 1.5rem; text-align: right; }
+  .section-h { font-size: 16px; font-weight: 500; margin: 1.5rem 0 0.5rem; color: #333; }
+  table.heat { width: auto; border-collapse: collapse; font-size: 10px; font-variant-numeric: tabular-nums; }
+  table.heat th, table.heat td { border: 0.5px solid #eee; padding: 2px 4px; text-align: right; min-width: 28px; }
+  table.heat th { background: #f7f7f5; color: #444; font-weight: 500; }
+  table.heat td.axis { background: #f7f7f5; color: #444; font-weight: 500; text-align: right; }
+  table.heat td.empty { background: #fafafa; color: #ccc; }
+  table.heat td.low-res { opacity: 0.30; }
+  .heat-wrap { overflow-x: auto; padding: 4px 0; }
+  .heat-legend { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #666; margin-left: 12px; vertical-align: middle; }
+  .heat-swatch { display: inline-block; width: 12px; height: 12px; border: 0.5px solid #ccc; vertical-align: middle; }
+  .caveat { font-size: 11px; color: #888; font-style: italic; margin: 6px 0 0; }
+  table.changeset { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.changeset th { text-align: left; font-weight: 500; border-bottom: 1px solid #ddd; padding: 4px 6px; color: #666; }
+  table.changeset td { padding: 3px 6px; border-bottom: 0.5px solid #eee; }
+  table.changeset td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.changeset td.addr { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: #555; }
+  .transition-pill { display: inline-block; padding: 1px 6px; border-radius: 999px; background: #eef; color: #335; font-size: 11px; margin-right: 6px; }
+  details.changeset-prior { margin-top: 10px; }
+  details.changeset-prior > summary { cursor: pointer; color: #666; font-size: 12px; padding: 4px 0; }
+</style>
+</head>
+<body>
+<h1>AE5L600L tuning scorecard - active rev __REV__</h1>
+<div class="meta">Generated __TS__ - re-run <code>python3 scripts/analysis/dashboard.py</code> to refresh</div>
+
+<div class="kpi-grid" id="kpis"></div>
+
+<div class="panel">
+  <div class="panel-title">Per-rev metric trends (events/min)</div>
+  <div class="legend" id="trend-legend"></div>
+  <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+</div>
+
+<div class="two-col">
+  <div class="panel">
+    <div class="panel-title">Active-rev cluster signal-sets (<span id="n-clusters"></span> clusters)</div>
+    <div class="chart-wrap"><canvas id="sigsetChart"></canvas></div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">RPM band x dominant signal</div>
+    <div class="chart-wrap"><canvas id="rpmStackChart"></canvas></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">AVCS-led clusters (n=<span id="n-avcs"></span>) - sorted by RPM</div>
+  <table id="avcs-table"><thead><tr>
+    <th>log</th><th>t (s)</th><th>n</th><th>RPM</th><th>load</th><th>APP %</th><th>signals</th>
+  </tr></thead><tbody></tbody></table>
+</div>
+
+<div class="section-h">Changes &amp; impact</div>
+
+<div class="panel" id="changeset-panel">
+  <div class="panel-title">ROM changeset - active transition <span id="changeset-active-pill"></span></div>
+  <div id="changeset-active"></div>
+  <details class="changeset-prior">
+    <summary>All prior transitions</summary>
+    <div id="changeset-prior"></div>
+  </details>
+  <p class="caveat">Bytes/labels from rom_diff.py KNOWN_TABLES (verified addresses). Unknown-region bytes are real edits not yet decoded into the labeled table list.</p>
+</div>
+
+<div class="panel">
+  <div class="panel-title">Knock event map - rev <span id="knock-rev"></span> (FBKC + FLKC counts per RPM x load cell, <span id="knock-nlogs"></span> logs)
+    <span class="heat-legend">events:
+      <span class="heat-swatch" style="background:#fff"></span>0
+      <span class="heat-swatch" style="background:#fde0c8"></span>low
+      <span class="heat-swatch" style="background:#e8763d"></span>mid
+      <span class="heat-swatch" style="background:#7a2818"></span>high
+    </span>
+  </div>
+  <div class="heat-wrap"><table class="heat" id="knock-table"></table></div>
+  <p class="caveat">Greyed cells: nearest-neighbor residency &lt; 1% (from aggregate cell_residency.csv; grids differ from knock_by_cell, so this is a heuristic context overlay, not an exact join).</p>
+</div>
+
+<div class="panel">
+  <div class="panel-title">MAF residual surface - rev <span id="maf-rev"></span> (sample-weighted mean ECU correction %, <span id="maf-nlogs"></span> logs, <span id="maf-ncells"></span> cells)
+    <span class="heat-legend">trim:
+      <span class="heat-swatch" style="background:#2b6bb0"></span>rich (-)
+      <span class="heat-swatch" style="background:#fff"></span>0
+      <span class="heat-swatch" style="background:#b03030"></span>lean (+)
+    </span>
+  </div>
+  <div class="heat-wrap"><table class="heat" id="maf-table"></table></div>
+  <p class="caveat">Positive = ECU adding fuel (MAF underreporting). Symmetric scale: +/-<span id="maf-abs-max"></span>%. Empty cells = no samples this rev.</p>
+</div>
+
+<div class="footer">scorecard data: <code>scripts/analysis/trends/scorecard_latest.csv</code> | clusters: <code>stutter_clusters.csv</code> | changeset: <code>rom_changeset.json</code> | knock: <code>knock_by_cell.csv</code> | MAF: <code>maf_corr_by_mafcell.csv</code></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const DATA = __DATA__;
+
+function renderKPIs() {
+  const el = document.getElementById('kpis');
+  for (const k of DATA.kpis) {
+    const dprior = k.delta_prior;
+    let cls = 'neutral', arrow = '';
+    if (!isNaN(dprior) && dprior !== null) {
+      const improving = (k.dir === 'lower_is_better') ? (dprior < 0) : (dprior > 0);
+      cls = improving ? 'good' : (dprior === 0 ? 'neutral' : 'bad');
+      arrow = dprior > 0 ? '↑' : (dprior < 0 ? '↓' : '·');
+    }
+    const dstr = isNaN(dprior) || dprior === null ? '-' : (arrow + ' ' + (dprior >= 0 ? '+' : '') + dprior.toFixed(2) + ' vs prior');
+    el.insertAdjacentHTML('beforeend',
+      '<div class="kpi"><div class="kpi-label">' + k.label + '</div>' +
+      '<div class="kpi-value">' + (k.value !== null && !isNaN(k.value) ? k.value.toFixed(2) : '-') + '</div>' +
+      '<div class="kpi-delta ' + cls + '">' + dstr + '</div></div>');
+  }
+}
+
+function renderTrendChart() {
+  const el = document.getElementById('trend-legend');
+  for (const t of DATA.trends) {
+    el.insertAdjacentHTML('beforeend',
+      '<span><span class="legend-swatch" style="background:' + t.color + '"></span>' + t.label + '</span>');
+  }
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: DATA.revs,
+      datasets: DATA.trends.map(function(t) { return {
+        label: t.label, data: t.data,
+        borderColor: t.color, backgroundColor: t.color,
+        borderWidth: 1.5, borderDash: t.dash || [],
+        pointRadius: 3, pointHoverRadius: 5, tension: 0.2,
+      }; }),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.08)' } },
+        x: { grid: { display: false } },
+      },
+    },
+  });
+}
+
+function renderSigsetChart() {
+  document.getElementById('n-clusters').textContent = DATA.n_clusters;
+  const labels = DATA.sigset_data.map(function(d) { return d.label; });
+  const data = DATA.sigset_data.map(function(d) { return d.n; });
+  const palette = ['#D85A30','#534AB7','#BA7517','#0F6E56','#185FA5','#D4537E'];
+  new Chart(document.getElementById('sigsetChart'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: palette.slice(0, data.length), borderWidth: 0 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.08)' }, ticks: { precision: 0 } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      },
+    },
+  });
+}
+
+function renderRpmStackChart() {
+  new Chart(document.getElementById('rpmStackChart'), {
+    type: 'bar',
+    data: { labels: DATA.rpm_labels, datasets: DATA.rpm_stack.map(function(s) { return {
+      label: s.label, data: s.data, backgroundColor: s.color, borderWidth: 0,
+    }; }) },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, font: { size: 10 }, padding: 6 } } },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.08)' }, ticks: { precision: 0 } },
+      },
+    },
+  });
+}
+
+function renderAvcsTable() {
+  document.getElementById('n-avcs').textContent = DATA.n_avcs_clusters;
+  const tb = document.querySelector('#avcs-table tbody');
+  for (const r of DATA.avcs_rows) {
+    tb.insertAdjacentHTML('beforeend',
+      '<tr><td>' + r.log + '</td><td>' + r.t + '</td><td>' + r.n + '</td>' +
+      '<td>' + r.rpm + '</td><td>' + r.load + '</td><td>' + r.app + '</td>' +
+      '<td>' + r.sigs + '</td></tr>');
+  }
+}
+
+function fmtTransitionRow(t) {
+  const labeledBytes = t.tables.filter(function(b) { return b.name !== '(unknown region)'; }).reduce(function(s, b) { return s + b.n_bytes; }, 0);
+  const headerRow = '<div style="margin: 4px 0 6px"><span class="transition-pill">' + t.before_rev + ' → ' + t.after_rev + '</span>' +
+    '<span style="color:#666;font-size:12px">' + t.n_diff_bytes + ' bytes in ' + t.n_runs + ' runs | ' + labeledBytes + ' labeled</span></div>';
+  const rows = t.tables.map(function(b) {
+    const isUnk = b.name === '(unknown region)';
+    const nameCell = isUnk ? '<em style="color:#888">' + b.name + '</em>' : b.name;
+    const addr = '0x' + b.addr_min.toString(16).toUpperCase() + '-0x' + b.addr_max.toString(16).toUpperCase();
+    return '<tr><td>' + nameCell + '</td><td class="num">' + b.n_runs + '</td><td class="num">' + b.n_bytes + '</td><td class="addr">' + addr + '</td></tr>';
+  }).join('');
+  return headerRow + '<table class="changeset"><thead><tr><th>Table region</th><th class="num">runs</th><th class="num">bytes</th><th>addr range</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function renderChangeset() {
+  const cs = DATA.changeset || {};
+  if (cs.missing || !cs.transitions || !cs.transitions.length) {
+    document.getElementById('changeset-active').innerHTML =
+      '<p class="caveat">rom_changeset.json not found. Run <code>python3 scripts/analysis/rom_changeset.py</code> first.</p>';
+    return;
+  }
+  const active = DATA.active_transition;
+  const pill = document.getElementById('changeset-active-pill');
+  if (active) {
+    pill.innerHTML = '<span class="transition-pill">' + active.before_rev + ' → ' + active.after_rev + '</span>';
+    document.getElementById('changeset-active').innerHTML = fmtTransitionRow(active);
+  } else {
+    document.getElementById('changeset-active').innerHTML =
+      '<p class="caveat">No transition ending at rev ' + DATA.rev + '.</p>';
+  }
+  const prior = cs.transitions.filter(function(t) { return !active || t.after_rev !== active.after_rev; });
+  document.getElementById('changeset-prior').innerHTML =
+    prior.slice().reverse().map(fmtTransitionRow).join('<hr style="border:0;border-top:0.5px solid #eee;margin:10px 0">');
+}
+
+function knockColor(n, max) {
+  if (n === 0 || max === 0) return '#ffffff';
+  const t = Math.min(1, n / max);
+  const stops = [[255,255,255],[253,224,200],[232,118,61],[122,40,24]];
+  const segIdx = Math.min(stops.length - 2, Math.floor(t * (stops.length - 1)));
+  const frac = (t * (stops.length - 1)) - segIdx;
+  const a = stops[segIdx], b = stops[segIdx+1];
+  const r = Math.round(a[0] + (b[0] - a[0]) * frac);
+  const g = Math.round(a[1] + (b[1] - a[1]) * frac);
+  const bb = Math.round(a[2] + (b[2] - a[2]) * frac);
+  return 'rgb(' + r + ',' + g + ',' + bb + ')';
+}
+
+function renderKnockMap() {
+  const k = DATA.knock_map;
+  document.getElementById('knock-rev').textContent = k.rev;
+  document.getElementById('knock-nlogs').textContent = k.n_logs_for_rev;
+  const tbl = document.getElementById('knock-table');
+  if (!k.rpm.length || !k.load.length) {
+    tbl.innerHTML = '<tr><td>(no knock data this rev)</td></tr>';
+    return;
+  }
+  const loadRows = k.load.slice().reverse();
+  let head = '<thead><tr><th>load / RPM</th>' + k.rpm.map(function(r) { return '<th>' + r + '</th>'; }).join('') + '</tr></thead>';
+  let body = '<tbody>';
+  for (const load of loadRows) {
+    const loadIdx = k.load.indexOf(load);
+    body += '<tr><td class="axis">' + load + '</td>';
+    for (let rpmIdx = 0; rpmIdx < k.rpm.length; rpmIdx++) {
+      const cell = k.cells[loadIdx][rpmIdx];
+      const lowRes = cell.res_pct < 1.0;
+      const clsArr = [];
+      if (cell.n === 0) clsArr.push('empty');
+      if (lowRes) clsArr.push('low-res');
+      const cls = clsArr.join(' ');
+      const bg = cell.n === 0 ? '' : ('background:' + knockColor(cell.n, k.max_events) + ';');
+      const title = 'RPM ' + k.rpm[rpmIdx] + ', load ' + load + ': FBKC ' + cell.fbkc + ', FLKC ' + cell.flkc + ', residency ' + cell.res_pct + '%';
+      body += '<td class="' + cls + '" style="' + bg + '" title="' + title + '">' + (cell.n || '') + '</td>';
+    }
+    body += '</tr>';
+  }
+  body += '</tbody>';
+  tbl.innerHTML = head + body;
+}
+
+function mafColor(v, absMax) {
+  if (v === null || v === undefined || absMax === 0) return '#ffffff';
+  const t = Math.max(-1, Math.min(1, v / absMax));
+  if (t < 0) {
+    const k = Math.abs(t);
+    const r = Math.round(255 - (255 - 43) * k);
+    const g = Math.round(255 - (255 - 107) * k);
+    const b = Math.round(255 - (255 - 176) * k);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  } else {
+    const r = Math.round(255 - (255 - 176) * t);
+    const g = Math.round(255 - (255 - 48) * t);
+    const b = Math.round(255 - (255 - 48) * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+}
+
+function renderMafResidual() {
+  const m = DATA.maf_residual;
+  document.getElementById('maf-rev').textContent = m.rev;
+  document.getElementById('maf-nlogs').textContent = m.n_logs_for_rev;
+  document.getElementById('maf-ncells').textContent = m.n_cells;
+  document.getElementById('maf-abs-max').textContent = m.abs_max.toFixed(2);
+  const tbl = document.getElementById('maf-table');
+  if (!m.mafv.length || !m.mafgs.length) {
+    tbl.innerHTML = '<tr><td>(no MAF residual data this rev)</td></tr>';
+    return;
+  }
+  const mafgsRows = m.mafgs.slice().reverse();
+  let head = '<thead><tr><th>g/s / V</th>' + m.mafv.map(function(v) { return '<th>' + v + '</th>'; }).join('') + '</tr></thead>';
+  let body = '<tbody>';
+  for (const gs of mafgsRows) {
+    const gsIdx = m.mafgs.indexOf(gs);
+    body += '<tr><td class="axis">' + gs + '</td>';
+    for (let vIdx = 0; vIdx < m.mafv.length; vIdx++) {
+      const cell = m.cells[gsIdx][vIdx];
+      if (cell.v === null) {
+        body += '<td class="empty"></td>';
+      } else {
+        const bg = mafColor(cell.v, m.abs_max);
+        const title = 'MAFv ' + m.mafv[vIdx] + ', g/s ' + gs + ': mean trim ' + cell.v + '%, n=' + cell.n;
+        body += '<td style="background:' + bg + '" title="' + title + '">' + cell.v.toFixed(1) + '</td>';
+      }
+    }
+    body += '</tr>';
+  }
+  body += '</tbody>';
+  tbl.innerHTML = head + body;
+}
+
+renderKPIs();
+renderTrendChart();
+renderSigsetChart();
+renderRpmStackChart();
+renderAvcsTable();
+renderChangeset();
+renderKnockMap();
+renderMafResidual();
+</script>
+</body>
+</html>
