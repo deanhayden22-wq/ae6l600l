@@ -1,6 +1,7 @@
 # Tune state — AE5L600L 20G
 
-Captured 2026-05-10. On car: **20.11** (md5 `e937ccff...`). Built but not flashed: **20.12** (md5 `534720b8...`, pending MAF rescale before flash).
+Captured 2026-05-17 after 20.12 verification drive (6 logs, 5.7 h) and 20.13 build.
+**On car right now:** 20.12 (md5 `534720b8…`). **Staged for next flash:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). MAF rescale work is in progress on the 20.12 5-17 evidence — slated for 20.14, not in 20.13.
 
 ROM revs are in `rom/AE5L600L 20g rev X.Y tiny wrex.bin`. Bins are
 overwritten in place — same filename, new content — so a recorded hash
@@ -132,19 +133,41 @@ File: `rom/AE5L600L 20g rev 20.11.bin`.
 - **0xffb88 region** updated automatically (firmware
   checksum/signature).
 
-**Verification pending on 20.11.** When driven and logged, check:
-(a) 35 mph stutter resolved, (b) FBKC events at 2200–3000 / 1.0–1.3
-reduced, (c) trim corrections at 1.30V and 2.39V MAF cells move toward
-zero.
+**20.11 in-rev findings (cumulative over 6 logs: 5-8, 5-10/log0003,
+5-11/log0001+0002+0003, 5-12; full per-log writeups in
+`logs/REVIEW_LOG.md`):**
 
-**20.11 in-rev findings (post-drive analysis, 5-8 + 5-10 logs):**
-The 35 MPH stutter wasn't fully resolved. AVCS-led stutter clusters
-concentrated at 2500-3000 RPM × 0.20-0.30 load (25 clusters / 82 total
-on 20.11) — see `scripts/analysis/trends/stutter_clusters.csv`. Root
-cause traced to a single-cell peak at (2500, 0.20) = 18° on the AVCS
-Cruise table, anomalously higher than its 13.5° / 15° neighbors,
-inherited from 20.10. The 20.11 fix at 1600/1900 cells didn't reach
-this peak. → motivates 20.12 AVCS plateau extension.
+- *35 MPH stutter not fully resolved.* AVCS-led clusters concentrated
+  at 2500-3000 RPM × 0.20-0.30 load (25/82 clusters on 20.11). Root
+  cause: a single-cell peak at (2500, 0.20) = 18° on AVCS Cruise,
+  inherited from 20.10 — the 20.11 1600/1900 fix didn't reach it.
+  Motivated 20.12's AVCS plateau extension.
+- *Ghost zone 2200-3300 × 1.0-1.4 g/rev elevated on 20.11.* 4 of 4
+  zone-exposed logs fired FBKC<0 in zone. 20.10 pooled = 85.4
+  FBKC<0/zone-min; 20.11 pooled = ≥217/zone-min. IAM held 1.000 in
+  every log. Not single-log noise.
+- *5-12 added a high-RPM ghost extension* at 4000-4400 × 1.0-1.17
+  (15 fresh FBKC<0 from one partial-throttle climb pull).
+- *5-11/log0001 added a low-RPM ghost extension* at 1250-1750 × 1.0
+  (23 FBKC<0). All three sub-zones likely share a root.
+- *Post-20.10 OL knock 3500-4500 × high-load still firing.* 5-10's
+  log0003 ratcheted FLKC=-1 across two pulls; 5-11/log0001's WOT pull
+  (sole sustained TPS>95 on 20.11) hit FBKC -1.4 / FLKC -1.0 at
+  4039-4497 × 3.43-3.86, then recovered. Motivated 20.12's BT retard
+  at L=2.25-4.00 and Max WG cut.
+- *WOT health (5-11/log0001):* peak mrp 21.74 psi at 4071 RPM, target
+  22.29, 97.5% attainment. Healthy. 5-10 had 1.04-1.05 over-target on
+  similar RPM, which is what the Max WG cut was sized against.
+- *AVCS-swing "regression" claim from 5-10 doesn't hold up* under
+  strict-SOP measurement. Recomputed: 4-27=1.84, 5-2=5.84, 5-8=3.73,
+  5-10=4.19, 5-11=5.60, 5-12=2.63 clu/min. 20.11 vs 20.10 inconclusive.
+  AVCS osc at 2000-RPM band is real (16/21 events in 5-11/log0001)
+  but the monotonic upward trend was a methodology artifact.
+- *MAF rescale moved trim health right direction.* 20.10 in_tol 50%,
+  mean|c| 1.92%; 20.11 in_tol 82-89%, mean|c| 1.05-1.34% across 4
+  logs. But 5-12 introduced a new mid-V slope walk (V=1.91→2.45,
+  -1.79% → -4.44% — engine ~3-4% richer than cmd in that band).
+  Tracked but didn't trigger action on 20.12.
 
 ### 20.11 → 20.12 (2026-05-10)
 
@@ -191,8 +214,90 @@ File: `rom/AE5L600L 20g rev 20.12.bin` (md5
 - **0xF1054 (2 bytes):** changed; possible FFS RPM delta or similar.
   Identity to confirm on next verification pass.
 
-**Verification pending on 20.12.** Pre-drive scoring gates in
-`docs/open-issues.md` "20.12 watch" section.
+**20.12 flashed between 5-12 and 5-17.** Verification drive on 5-17
+produced 6 logs in `logs/5-17 20.12/` (log0002, log0003-0006, log0007;
+total ~5.7 h of operation — log0002 at 157.6 min and log0007 at 133.7
+min are full road sessions, the rest are 12-14 min each).
+
+**20.12 verification — 5-17 logs vs 20.11 baseline (scorecard delta):**
+
+| Gate | 20.11 → 20.12 | Result |
+|---|---|---|
+| AVCS plateau drops global stutter signature (gate <1.80) | 1.89 → 1.37 | **PASS** (-0.53) |
+| BT retard reduces cruise-side timing osc (gate <0.70/min) | 0.87 → 0.71 | **MARGINAL** (-0.17, just over gate) |
+| BT retard reduces OL knock events (gate <0.40/min) | 0.64 → 0.26 | **PASS** (-0.38) |
+| BT retard reduces FBKC depth (gate shallower than -4.0°) | -4.2° → -7.0° | **FAIL — regressed -2.8°** |
+| Max WG smooths spool (attn 0.75-0.90, no overshoot >1.05) | attn 0.77 → 0.83; peak mrp 13.56 → 9.87 psi; 0 overshoot pulls | **PASS** |
+| AVCS-led clusters at 2500-3000 × 0.20-0.30 (gate ≤10, was 19) | TBD — needs per-cell cluster re-bin on 5-17 data | Open |
+
+Also moved on 5-17 data:
+- `rpm_swing_per_min`: 2.38 → 1.07 (-1.31, big improvement)
+- `throttle_hunt_per_min`: 0.50 → 0.23 (-0.27)
+- `afr_osc_per_min`: 1.20 → 0.90 (-0.30)
+- `ffb_wbo2_div_per_min`: 2.81 → 2.05 (-0.76)
+- `maf_corr_mean_pct`: -1.08% → **+1.83%** (sign flip; engine now leaner
+  than commanded — likely the long log0007 sat in cells where wbo2
+  ran lean of FFB; 20.12 didn't touch MAF directly)
+- `maf_corr_mean_abs_pct`: 1.43% → 2.39% (trim health degraded)
+
+**Headline 20.12 read:** 3 gates passed, 1 marginal, 1 regressed. The
+event-count regression (FBKC depth -4.2 → -7.0) is concentrated in
+the **ghost zone proper at 2600-3300 RPM × 1.0-2.0 g/rev** — the BT
+retard was applied at L=2.25-4.00 and missed the dominant ghost
+cells. log0007 hit this cluster hard:
+
+- 2600 × 1.17: 81 FBKC<0, min -7.0°
+- 2600 × 1.36: 23 FBKC<0, min -7.0°
+- 2600 × 1.51: 23 FBKC<0, min -6.65°
+- 2600 × 1.64-1.95: 30 FBKC<0, min -5.6 to -6.3°
+- 3000 × 1.95-2.6: 89 FBKC<0, min -3.85 to -5.6°
+- 3300 × 1.51-1.95: 44 FBKC<0, min -5.6 to -6.65°
+- Plus FLKC ratchet at 3300-4000 × 2.0-3.0 (57 FLKC events on 5-17).
+
+This is a worse cluster (deeper) than anything seen on 20.11 — both
+the OL knock zone and the ghost zone proper need attention in 20.13.
+
+### 20.12 → 20.13 (2026-05-17 — built today, not flashed)
+
+File: `rom/AE5L600L 20g rev 20.13.bin`.
+
+Rom byte-diff (`scripts/analysis/rom_diff.py`): **436 bytes** in **44
+runs**.
+
+| Table region | runs | bytes | addr range |
+|---|---:|---:|---|
+| AVCS Intake Cruise (`0xDA96C`) | 9 | 35 | 0xDA96D–0xDAA90 |
+| AVCS Intake Non-Cruise (`0xDAC34`) | 8 | 34 | 0xDAC58–0xDAD58 |
+| Firmware checksum (auto) | 1 | 4 | 0xFFB88–0xFFB8C |
+| OL fueling block (multiple tables) | 26 | 426 | 0xCFD68–0xDA932 |
+
+The 426-byte OL block falls in the address range covering Primary OL
+Fueling and its KCA-related variants:
+
+- Primary OL Fueling (KCA Alternate Mode) — `0xCFD30`
+- Primary OL Fueling (Failsafe)(KCA Alternate Mode) — `0xCFEF0`
+- Primary OL Fueling (KCA Additive B Low) — `0xD0244`
+- Primary OL Fueling (KCA Additive B High) — `0xD0404`
+- Primary OL Fueling (Failsafe) — `0xD05C4`
+
+This is the **OL richening** session driven by today's ghost-zone
+review: Dean richened a substantial portion of the high-RPM /
+mid-to-high-load OL map in response to the 5-17 FBKC depth -7.0
+cluster. Per the "all-three rule" for OL fueling
+(see [ol-fueling.md](ol-fueling.md)), Primary OL B Low / B High / KCA
+Alt are kept byte-identical to each other; the rom_diff is consistent
+with that pattern.
+
+**AVCS edits in 20.13** (9 + 8 runs across Cruise + Non-Cruise) extend
+the 20.12 plateau work — exact cell-by-cell breakdown not extracted
+yet; rev_comparison.py against 20.12 would surface it.
+
+**MAF Sensor Scaling (0xD8C9C):** UNCHANGED. MAF rescale work is in
+progress against the 20.12 5-17 evidence (Dean working on it manually
+— "a lot of info, going to take some time"). Targeted for 20.14.
+
+**Verification pending on 20.13.** Pre-drive scoring gates in
+`docs/open-issues.md` "20.13 watch" section.
 
 ## Baseline log
 

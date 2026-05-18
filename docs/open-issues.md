@@ -1,7 +1,7 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-05-10 after 20.12 build (not yet flashed).
-**On car right now:** 20.11 (`e937ccff...`). **Staged for next flash:** 20.12 (`534720b8...`), pending MAF rescale addition.
+Last updated 2026-05-17 after 20.12 verification drive (5-17, 6 logs, 5.7 h) and 20.13 build.
+**On car right now:** 20.12 (`534720b8…`). **Staged for next flash:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). MAF rescale work is in progress on 5-17 evidence — slated for 20.14.
 
 Each entry: symptom → where it shows in data → what's been tried →
 what's next.
@@ -12,37 +12,74 @@ diverge from this snapshot.
 
 ---
 
-## 20.12 watch — pre-drive scoring gates (opened 2026-05-10)
+## 20.12 watch — gate scoring after 5-17 drive (CLOSED 2026-05-17)
 
-20.12 is built but not flashed. Next drive is on 20.11 to gather MAF
-correction data; MAF Sensor Scaling edits get added to 20.12 before it
-goes on the car. These gates apply to the first 20.12-flashed log.
+20.12 was flashed between 5-12 and 5-17. Verification drive on 5-17
+produced 6 logs / ~5.7 h on `logs/5-17 20.12/` (log0002, 0003-0006,
+0007 — log0002 and log0007 are full road sessions). Scoring against
+the pre-drive gates:
 
-Three subsystem-level hypotheses bundled into 20.12. Cross-subsystem
-attribution is feasible here because each change lives in a different
-load band: AVCS in coast/light-cruise (0.20-0.50), Base Timing across
-both cruise and high-load, WGDC in spool/boost. The scorecard's per-
-thread metrics resolve them independently.
+| hypothesis | gate | actual | verdict |
+|---|---|---|---|
+| AVCS plateau extension softens 28-36 MPH stutter | AVCS-led cluster ≤10 in 2500-3000 × 0.20-0.30 (was 19) | per-cell cluster re-bin not yet run on 5-17 data | OPEN — needs cluster re-bin |
+| AVCS plateau drops global stutter signature | `stutter_signature_per_min` 2.20 → <1.80 | 1.89 → **1.37** | **PASS** (-0.53) |
+| BT retard reduces cruise-side timing oscillation | `timing_osc_per_min` 0.94 → <0.70 | 0.87 → **0.71** | **MARGINAL** (just over gate) |
+| BT retard reduces OL knock events | `total_knock_per_min` <0.40, `min_fbkc_depth` shallower than -4.0° | 0.64 → 0.26 ✓; -4.2° → **-7.0°** ✗ | **MIXED** — events down but depth REGRESSED |
+| Max WG spool reduction smooths boost build | attainment 0.75-0.90, no overshoot >1.05 | attn 0.77 → 0.83; peak mrp 13.56 → 9.87 psi; 0 overshoot pulls | **PASS** |
+
+**Where the FBKC depth regression came from:** 20.12's BT retard at
+2800-4150 × **2.25-4.00** missed the dominant cluster, which on 5-17
+fired at 2600-3300 × **1.0-2.0** g/rev. log0007 shows:
+
+- 2600 × 1.17: 81 FBKC<0, min -7.0°
+- 2600 × 1.36-1.95: 76 FBKC<0, min -5.6 to -7.0°
+- 3000 × 1.95-2.6: 89 FBKC<0, min -3.85 to -5.6°
+- 3300 × 1.51-1.95: 44 FBKC<0, min -5.6 to -6.65°
+- Plus 57 FLKC events at 3300-4000 × 2.0-3.0 (ratchet still firing
+  in this band even though FBKC events dropped overall).
+
+This cluster overlaps the ghost zone (2200-3300 × 1.0-1.4) and
+extends both up in RPM and up in load. **Dean's response in 20.13:
+richen the OL map** (rom_diff shows 426 bytes in the OL fueling block
+at 0xCFD68-0xDA932 covering Primary OL Fueling + KCA variants) plus
+further AVCS work. See [tune-state.md](tune-state.md) "20.12 → 20.13"
+for the changeset.
+
+**Also moved on 5-17:**
+- `rpm_swing_per_min`: 2.38 → 1.07 (-1.31, big improvement)
+- `throttle_hunt_per_min`: 0.50 → 0.23 (-0.27)
+- `afr_osc_per_min`: 1.20 → 0.90 (-0.30)
+- `ffb_wbo2_div_per_min`: 2.81 → 2.05 (-0.76)
+- `maf_corr_mean_pct`: -1.08% → **+1.83%** (sign flip; 20.12 didn't
+  touch MAF directly — probably long log0007 cell exposure pulled the
+  pooled mean lean)
+- `maf_corr_mean_abs_pct`: 1.43% → 2.39% (trim health degraded)
+
+---
+
+## 20.13 watch — pre-drive scoring gates (opened 2026-05-17)
+
+20.13 is built but not flashed. These gates apply to the first
+20.13-flashed log.
 
 | hypothesis | change | win signal (next log) | target |
 |---|---|---|---|
-| AVCS plateau extension softens 28-36 MPH stutter | AVCS Cruise/NC 12 cells, 0.20+0.30 col plateau on 2200-3400 RPM | AVCS-led cluster count in 2500-3000 × 0.20-0.30 zone | drop from 19 → ≤10 |
-| AVCS plateau also drops global stutter signature | (same) | `cross_thread.stutter_signature_per_min` | drop from 2.20 → <1.80 |
-| BT retard reduces cruise-side timing oscillation | BT × 4 variants, 30 cells, −0.35 to −1.05° | `timing_sum.timing_osc_per_min` | drop from 0.94 → <0.70 |
-| BT retard reduces OL knock zone events | (same) | `timing_sum.total_knock_per_min` and `min_fbkc_depth` | knock <0.40/min, depth shallower than −4.0° |
-| Max WG spool reduction smooths boost build | Max WG 70 cells in 1350-2200 RPM | `wgdc.mean_target_attainment` stable or improved; pull ramps smoother | attainment stays 0.75-0.90, no overshoot >1.05 |
+| OL richening eliminates the 2600-3300 × 1.0-2.0 FBKC depth cluster | OL fueling block 426 bytes / 26 runs at 0xCFD68-0xDA932 (Primary OL + KCA variants) | `timing_sum.min_fbkc_depth` and per-cell FBKC at 2600-3300 × 1.0-2.0 | depth shallower than -4.5°; per-cell FBKC<0 sample count at 2600×1.17 drops from 81 → <20 |
+| OL richening reduces FLKC ratchet at 3300-4000 × 2.0-3.0 | (same) | `timing_sum.flkc_events_per_min` and per-cell FLKC events at 3300-4000 × 2.0-3.0 | flkc events <0.05/min (was 0.17/min on 20.12) |
+| Further AVCS work tightens the AVCS-led cluster | AVCS Cruise/NC 9+8 runs (35+34 bytes) extending 20.12 plateau | `avcs_osc_per_min`; per-cell residency at touched AVCS cells | avcs_osc <1.0/min (was 1.13 on 20.12); AVCS-led cluster count at 2500-3000 × 0.20-0.30 drops further |
+| OL richening doesn't blow back into pre-20.10 wbo2 lag | `ffb_wbo2_div_per_min` and at-cell wbo2-vs-FFB delta | divergence stays ≤2.5/min; no lean spikes >+0.5 AFR on partial-throttle climbs | |
 
-**Methodology notes for the 20.12 review:**
-- Re-run `python3 scripts/analysis/scorecard.py` after ingesting next 20.12 log; compare delta_vs_prior on the metrics above.
-- Re-run `python3 scripts/analysis/cell_residency.py --revs 20.11 20.12` once 20.12 logs land to confirm the AVCS-edited cells got enough samples to score.
-- Per `feedback_residency_threshold_rule`: the 3 AVCS edits at (3800, 0.20/0.30/0.50) are sub-1% residency = unverifiable by design. Accepted as shape-only edits, not as testable hypotheses.
-- Per `feedback_verify_rom_changes_against_user_claims`: the BT changeset wasn't in the original 20.12 plan (initially announced as AVCS+WGDC). rom_diff surfaced it; confirmed intentional after surfacing. Workflow working as intended.
+**Methodology notes for the 20.13 review:**
+- Re-run `python3 scripts/analysis/scorecard.py --recompute-durations` after ingesting 20.13 logs (the `--recompute-durations` flag is needed when new rom_rev_map entries land).
+- For the OL richening verdict, compare per-cell FBKC<0 sample counts at the cells listed in the 20.12 cluster (above) — these are the cells the richen was sized to address.
+- Per `feedback_verify_rom_changes_against_user_claims`: 20.13 rom_diff surfaces ~436 bytes across AVCS + OL fueling block. Dean announced OL richening + MAF work; the OL block matches. The AVCS edits are an additional load on top of 20.12's plateau — flag in next session if not already discussed.
+- MAF rescale is NOT in 20.13. Slated for 20.14. Don't propose MAF changes until that work lands.
 
 **If any gate fails on next log:**
-- AVCS-led cluster count stays >12 → the (2500, 0.20/0.30) drop was insufficient; consider further pull in 20.13.
-- timing_osc per min unchanged → the BT retard didn't reach the right cells for the stutter mode; re-examine whether the timing oscillation is downstream of AVCS rather than driven by BT.
-- Knock per min worsens → the BT retard wasn't aggressive enough, OR the cells touched don't match the actual knock cells. Re-bin knock by exact RPM/load and compare.
-- WGDC pull-ramp attainment drops below 0.70 → spool reduction was too aggressive; restore some of the 1600-1900 cells.
+- min_fbkc_depth stays at -7.0 → OL richening was insufficient at the dominant cells. Re-shape the OL targets at 2600-3300 × 1.0-2.0 by 0.3-0.5 AFR more, OR layer a BT retard on the L=1.0-2.0 columns that 20.12 missed.
+- flkc events stay elevated at 3300-4000 × 2.0-3.0 → boost overshoot is reaching cells the OL doesn't cover (CL-rich region) — consider another Max WG pull in the 3000-4000 RPM band.
+- avcs_osc per min doesn't move → the 20.13 AVCS edit didn't reach the dominant osc cells. Re-bin AVCS osc events by exact RPM/load and compare against the edited cell coords.
+- ffb_wbo2_div regresses → check at-cell wbo2-FFB at the richened cells; OL leanout might be inverted (too rich → ECU's MAF correction loop fights it).
 
 ---
 
@@ -115,52 +152,78 @@ thread metrics resolve them independently.
 
 ---
 
-## Observation phase (opened 2026-05-03)
+## Active — lever in flight (escalated 2026-05-17)
 
-### Ghost-knock zone: 2200–3300 RPM × 1.0–1.4 g/rev (5-rev persistence)
+### Ghost-knock zone: now 2200–3300 RPM × 1.0–2.0 g/rev (5-rev + 20.11 + 20.12 persistence; OL-richen lever flying in 20.13)
 
-- **Symptom:** Knock has appeared in **every** rom_rev (stock + 20.7 +
-  20.8 + 20.9 + 20.10) in cells (2200, 1.17), (2600, 1.0), (3300,
-  1.36) — 5/5 revs each. Adjacent cells in zone hit 4/5. Source:
-  `scripts/analysis/trends/knock_by_cell.csv` from 11-log backfill.
-- **Stock-vs-20.10 table compare in this zone:**
+- **Persistence backstory:** Knock has appeared in **every** rom_rev
+  (stock + 20.7 + 20.8 + 20.9 + 20.10) in cells (2200, 1.17), (2600,
+  1.0), (3300, 1.36) — 5/5 revs each. Adjacent cells 4/5. On 20.11,
+  4 of 4 zone-exposed logs fired in zone at ~217 FBKC<0/zone-min vs
+  20.10's 85/zone-min. **On 20.12, the cluster expanded outward and
+  deepened** — 5-17 log0007 hit FBKC -7.0° at 2600×1.17 (n=81), -7.0°
+  at 2600×1.36, -6.65° at 2600×1.51 and 3300×1.51, plus 57 FLKC events
+  in the adjacent 3300-4000 × 2.0-3.0 band. Reframing the zone as
+  **2200-3300 × 1.0-2.0** per 20.12 evidence (the old "1.0-1.4"
+  framing was too narrow).
+- **What 20.12 tried and missed:** BT retard at 2800-4150 × 2.25-4.00
+  + AVCS plateau extension at 0.20-0.30 + Max WG cut. The BT retard
+  was applied at L=2.25-4.00 — one load band ABOVE where the cluster
+  actually fired (L=1.0-2.0). Total knock events dropped (0.64 →
+  0.26/min) but FBKC depth got worse (-4.2° → -7.0°) because the
+  dominant cluster never got addressed.
+- **20.13 lever in flight (built 2026-05-17, not flashed):** OL
+  fueling richen — 426 bytes in 26 runs across the OL block
+  (0xCFD68-0xDA932), covering Primary OL Fueling + KCA Alternate Mode
+  + KCA Additive B Low/High + Failsafe variants. Plus further AVCS
+  edits (35+34 bytes across Cruise + Non-Cruise) extending 20.12's
+  plateau work. Scoring gates in the "20.13 watch" section above.
+- **Stock-vs-20.10 table compare in this zone (kept for reference):**
 
   | Table | Comparison |
   |---|---|
   | Base Timing Cruise | ±2° (similar) |
   | Base Timing Non-Cruise | 20.10 is **5–17° LESS** than stock at load=1.0 (already conservative) |
   | KCA Max Cruise | 20.10 = 0° at load=1.0 (was 3–4° on stock); recovery disabled |
-  | AVCS Cruise/Non-Cruise | 20.10 is **+5 to +11° more advance** than stock (10–15° → 20–23.5°) — flagged as the most likely contributor to persistence |
-  | OL Fueling | doesn't apply (this zone runs CL=8 in logs) |
+  | AVCS Cruise/Non-Cruise | 20.10 is **+5 to +11° more advance** than stock (10–15° → 20–23.5°) — flagged in early sessions as likely contributor |
+  | OL Fueling | NOW APPLIES — load extension into 1.5-2.0 + FLKC ratchet at 3300-4000 × 2.0-3.0 puts the cluster squarely into OL territory; that's why 20.13's lever is OL-side |
 
-- **Decision (Dean, 2026-05-03):** Hold further table changes. Existing
-  20.x timing + AVCS smoothing is in place; observe whether it resolves
-  before iterating.
-- **How to apply:** Do **not** propose new edits to Base Timing / AVCS
-  / KCA in 2200–3300 / 1.0–1.4 until at least one fresh log on the
-  currently-flashed rev has been ingested. Watch for reduction in
-  `event_count_fbkc` per cell across new logs in `knock_by_cell.csv`.
-  If knock persists or grows after 2–3 fresh logs on flashed rev,
-  revisit with AVCS-toward-stock as the leading candidate.
+- **Open levers if 20.13 OL richen is insufficient:** (a) layer BT
+  retard on L=1.0-2.0 columns at 2600-3300 (which 20.12's L=2.25-4.00
+  retard missed), (b) revert some of 20.11's MAF rescale (the rescale
+  improved trim health but coincides with the 20.11 ghost-zone
+  intensification — Dean is doing MAF analysis separately for 20.14),
+  (c) AVCS-toward-stock in 2200-3300 × 1.0-1.4 (-5 to -11°).
 - **Workflow:** New log → `python3 scripts/analysis/log_review_ingest.py
-  --log <path> --date <YYYY-MM-DD> --rom <rev>` → diff
-  `trends/knock_by_cell.csv` against prior rev rows.
+  --log <path> --date <YYYY-MM-DD> --rom <rev>` → re-run scorecard
+  with `--recompute-durations` → check per-cell FBKC<0 counts at the
+  cluster cells listed above.
 
 ---
 
-## Open (from 4-27 chat, 2026-04-28)
+## Open (from 4-27 chat, 2026-04-28; updated through 20.12 evidence)
 
-### Knock at high-RPM mid-load OL after 20.10 OL leanout
+### Knock at high-RPM mid-load OL after 20.10 OL leanout — folded into ghost-zone lever for 20.13
 
-- **Symptom:** 4-27 logs show 9–34% knock samples in 3500–5500 RPM ×
-  0.7–1.6 load OL cells; pre-20.10 these were 0.0%. Worst cell
-  3500–4500 / 1.3–1.6 → 34.1% (n=85, FBKC min −2.10°).
-- **Confound:** 20.10 also changed timing (Base Timing Primary +
-  Reference, Cruise + Non-Cruise) and AVCS (Intake Cam Advance Cruise
-  + Non-Cruise) — knock cannot be attributed to OL leanout alone.
-- **Next:** disentangle by either (a) reverting just the OL leanout in
-  20.11, or (b) reverting just the timing/AVCS changes — observe which
-  restores knock margin.
+- **Symptom history:** 4-27 logs showed 9–34% knock samples in
+  3500–5500 RPM × 0.7–1.6 OL; 5-10/log0003 ratcheted FLKC=-1 across
+  two WOT pulls at 4000-4400 × 1.5-3.2; 5-11/log0001's WOT pull hit
+  FBKC -1.4 / FLKC -1.0 at 4039-4497 × 3.43-3.86; **5-17 log0007 shows
+  57 FLKC events at 3300-4000 × 2.0-3.0 — the cluster is still active
+  on 20.12.**
+- **20.12 partially addressed it:** BT retard at 2800-4150 × 2.25-4.00
+  + Max WG cut. Total knock event rate dropped (0.64 → 0.26/min); peak
+  mrp dropped 13.56 → 9.87 psi. But FBKC depth got worse (-4.2° →
+  -7.0°) and FLKC events stayed (57 on 5-17 vs 26 on 20.11).
+- **Now coupled with the ghost zone.** The 5-17 cluster spans
+  2600-4000 RPM × 1.0-3.0 load — the historical "ghost zone" and the
+  "post-20.10 OL knock" are not separate clusters anymore. Both folded
+  into the same 20.13 OL-richen lever (see ghost-zone entry above).
+- **Status:** Open, lever flying in 20.13. If 20.13 doesn't move the
+  3300-4000 × 2.0-3.0 FLKC ratchet specifically, the open levers are
+  another Max WG pull in 3000-4000 RPM or a layered BT retard on
+  L=2.0-3.0 (which 20.12 covered at L=2.25-4.0 only — the 2.0 column
+  is just outside).
 
 ### Tip-in enrichment expires before AVCS finishes ramping (post-DFCO) — CLOSED on 5-8 evidence (2026-05-08)
 
@@ -189,20 +252,24 @@ thread metrics resolve them independently.
 - **Caveat:** n=9 cold-AVCS events from a single 30-min log. Reopen if
   a future log shows knock during a cold-AVCS post-DFCO ramp.
 
-### +0.22 AFR cmd-vs-actual delta in 4000–4500 cell (engine richer than commanded)
+### AFR cmd-vs-actual delta — now MAF analysis is the work item for 20.14
 
-- **Symptom:** Steady-state OL operation in 4000–4500 RPM × 0.7–1.3
-  load shows engine delivering ~0.22 AFR richer than FFB commands
-  (improved to +0.14 in 20.10 but not eliminated).
-- **Hypothesis:** MAF over-read, or injector flow scaling overestimating
-  delivered fuel mass.
-- **Plan for 20.12 (Dean, 2026-05-08):** MAF rescale targeted for the
-  20.12 rev. Pre-rescale workflow: pull MAF g/s vs commanded AFR
-  delta from 5-8 log (and prior backfill where comparable conditions
-  exist) → identify breakpoints needing adjustment → emit a proposed
-  MAF curve diff before flashing. Trends data already in
-  `scripts/analysis/trends/maf_corr_by_mafcell.csv` and
-  `maf_scaling_breakpoints.csv` — start there.
+- **History:** Steady-state OL operation in 4000-4500 × 0.7-1.3 showed
+  engine ~+0.22 AFR richer than cmd on 4-27 (20.10); improved to +0.14
+  in early 20.10 amendments but never zeroed. 20.11 MAF rescale moved
+  trim health right direction (in_tol 50% → 82-89%) but didn't
+  resolve. 5-11 showed engine -0.34 AFR LEANER than cmd at adjacent
+  high-load OL cells (3750-4250 × 1.3-3.4) — sign flipped at different
+  cells. 5-12 showed a new mid-V slope walk at V=1.91-2.45 (engine
+  3-4% richer than cmd in that band).
+- **5-17 / 20.12 read:** Pooled `maf_corr_mean_pct` flipped again:
+  -1.08% on 20.11 → +1.83% on 20.12 (engine now ~2% leaner than cmd
+  on average). Trim health degraded: `maf_corr_mean_abs_pct` 1.43% →
+  2.39%. 20.12 didn't touch MAF — the shift is from drive context
+  (long log0007 sat in cells where wbo2 ran lean of FFB).
+- **Status (2026-05-17):** Dean is doing manual MAF analysis on the
+  5-17 evidence — "a lot of info, going to take some time". Slated for
+  20.14, NOT in 20.13. Until then, don't propose MAF table changes.
 - **Coupling note:** AVCS edits in cruise zone don't materially shift
   MAF readings (median |ΔMAF| 1.7% across 20.9→20.10 cross-rev diff
   at fixed pedal). Safe to iterate MAF independent of cruise AVCS.
