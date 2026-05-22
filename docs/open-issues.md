@@ -131,6 +131,40 @@ worked.**
 
 ## Staged for verification (opened during pedal-tuning, 2026-04-27/28)
 
+### Low-RPM "sluggish off the line" + lingering stutter — pedal hump staged for 20.14 (2026-05-22)
+
+- **Symptom (Dean):** sluggish off the line; low RPM "not super smooth /
+  a bit stuttery" though "felt pretty good overall."
+- **Root cause (5-22 analysis):** 20.13's pedal map gives <half the
+  low-RPM throttle stock does at light pedal (16.5% APP @ 800 RPM:
+  commanded throttle 8.6% vs stock 18.9%). The cruise-hunting fix that
+  lowered the 16.5% column also inverted stock's low-RPM tip-in hump.
+- **Lever staged:** 8-cell pedal-hump restore (16.5% + 25% columns, rows
+  800-2000), partial toward stock, monotonicity-capped. Full cell list
+  in [tune-state.md](tune-state.md) "20.13 → 20.14". Recovers ~70-80% of
+  stock low-RPM throttle without touching the 2700-3300 hunt rows.
+- **The low-RPM stutter is TRANSIENT, not steady-state.** Held steady
+  (foot+RPM+load), low-RPM oscillation is ≤1% on every signal (AVCS
+  range≥8 = 0.9%, timing std>2 = 1.0%). The roughness is during load/
+  throttle transitions through the lugging zone — partly inherent to a
+  built turbo engine down low. So the lever is *less time in the zone*,
+  which the pedal hump does directly (gets through it faster).
+- **No pedal-chasing.** In low-speed take-offs, APP-vs-RPM correlation
+  median −0.50 (foot eases as revs climb) while commanded throttle holds/
+  rises — the torque-based DBW scales throttle up with RPM correctly. No
+  mid-pull throttle deficit. Take-off pedal range: ~11% → ~24% peak.
+- **AVCS NOT needed broadly** (see 20.14 deferrals in tune-state). Only
+  confirmed steady hunt is the 0.20-load column at 2800-3000 (the 25-mph
+  cruise stutter, gate-3 miss) — ~4% of low-RPM time; optional micro-fix
+  later, may be masked by faster transit from the pedal hump.
+- **Cruise residency (5-22):** city (20-55 mph) lives at 10% APP /
+  2400-3200 RPM; highway (65-90 mph) lives at 16.5% APP / 2800-3600 —
+  i.e. highway cruise sits ON the hunt band. Verdict: don't bump throttle
+  in cruise (re-raises hunt gain where you spend cruise time); the
+  10→16.5 cliff that caused the hunt is already smoothed (18.8 → ~12-13
+  RQTQ/% pedal, matching the 16.5→25 slope) so no remaining cliff to
+  smooth either. Cruise zone is in good shape — leave it.
+
 ### Cruise pedal hunting at 12–22% APP / 2700–3300 RPM
 
 - **Symptom:** `4-24/log0004.csv` (50.9k samples) shows constant pedal

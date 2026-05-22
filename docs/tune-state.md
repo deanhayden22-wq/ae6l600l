@@ -1,7 +1,7 @@
 # Tune state — AE5L600L 20G
 
 Captured 2026-05-22 after the 20.13 verification drive (1 log, ~166 min).
-**On car right now:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). MAF rescale work is in progress on the 20.12 5-17 evidence — slated for 20.14, not yet built.
+**On car right now:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). **Staged:** 20.14 (`rom/AE5L600L 20g rev 20.14.bin` exists — pedal-hump build) — see "20.13 → 20.14" below. MAF rescale (Dean working offline) also slated for 20.14.
 
 ROM revs are in `rom/AE5L600L 20g rev X.Y tiny wrex.bin`. Bins are
 overwritten in place — same filename, new content — so a recorded hash
@@ -370,6 +370,71 @@ session). Scored against the pre-drive gates:
   20.13 didn't touch MAF; drive-context shift). Slight regressions:
   `afr_osc_per_min` 0.904 → 1.011, `stutter_signature_per_min` 1.366 →
   1.451 (minor; possibly the OL richen adding small AFR ripple).
+
+### 20.13 → 20.14 (staged 2026-05-22 — pedal map; bin exists, not yet driven)
+
+Driven by Dean's "sluggish off the line" report. Analysis on the 5-22
+log established that 20.13's pedal map gives **less than half** the
+low-RPM throttle stock does at light pedal (16.5% APP @ 800 RPM:
+commanded throttle 8.6% vs stock 18.9%) — the cruise-hunting fix that
+lowered the 16.5% column also flattened/inverted stock's low-RPM
+"tip-in hump." See `methodology/` and the new `pedal-map.md` /
+`feedback`/`project` memory for the DBW pedal→ratio→throttle chain.
+
+**1. Pedal-map hump restore (Sport map `0xF99E0`; i==s==sharp identical).**
+8 cells, low-RPM launch block only, partial-restore toward stock
+(monotonicity-capped under the unchanged 31% column):
+
+| RPM | APP col | 20.13 RQTQ | → 20.14 | raw |
+|---|---|---|---|---|
+| 800 | 16.5% | 109.9 | 135 | 17280 |
+| 1200 | 16.5% | 127.2 | 150 | 19200 |
+| 1600 | 16.5% | 135.1 | 155 | 19840 |
+| 2000 | 16.5% | 133.5 | 155 | 19840 |
+| 800 | 25% | 137.4 | 150 | 19200 |
+| 1200 | 25% | 165.6 | 178 | 22784 |
+| 1600 | 25% | 194.2 | 210 | 26880 |
+| 2000 | 25% | 197.8 | 218 | 27904 |
+
+(Values scaled Requested Torque, ×128 = raw uint16. 10% column left
+alone — already ≥ stock. All rows ≥2400 left alone — keeps clear of the
+2700-3300 steady-cruise hunt band and the spool region.) Recovers ~70-80%
+of the stock low-RPM throttle: commanded throttle at 16.5%@800 goes
+8.6% → 15.4% (stock 18.9). **Dean applied + lightly smoothed this in his
+tool**; the smoothed commanded-throttle surface was reviewed — monotonic
+across the driving range (only inversion is the 6400-RPM rev-limiter
+taper), hump restored, 2700-3300 hunt rows untouched (gain stays 0.83
+vs stock 0.97 %thr/%APP).
+
+**Push-further rule (if still soft):** each cell must stay below the cell
+to its right; the 16.5% column has the most headroom under its 25%
+neighbor. Going fully to stock requires lifting 31%/37%/44% too, which
+re-creates stock's steep 10%→16.5% tip-in cliff (the thing the hunt fix
+removed) — so increment the 800-1600 rows modestly, don't overshoot.
+
+**2. MAF rescale** — Dean working offline on the 20.12 5-17 evidence.
+Not yet specified.
+
+**Evaluated and DEFERRED for 20.14 (with reasons):**
+- **AVCS:** no broad work. With steady inputs at low RPM, true AVCS
+  hunting is <1% — most low-RPM cam motion is legitimate commanded sweep.
+  Only confirmed steady hunt is the 0.20-load column at 2800-3000 (the
+  25-mph cruise stutter; gate-3 miss) — ~4% of low-RPM time. Optional
+  micro-smooth later if it nags; the pedal hump may mask it by getting
+  through the light-load zone faster.
+- **Timing cliffs / knock:** not the low-RPM smoothness lever. Steady
+  low-RPM timing osc is ~1%, only 3% knock-adjacent, and clusters at
+  0.30 load (not the 0.65→0.94 BTC cliff). Dean accepts the shallow
+  -1.4 to -2.8° FBKC ("noisy engine, not worried").
+
+**Key finding behind the deferrals:** the low-RPM "not super smooth"
+feel is **transient (load/throttle transitions), not steady-state
+hunt** — held steady, the engine is calm (≤1% osc on AVCS/timing/RPM).
+So the lever is spending *less time* in the low-RPM transition zone,
+which the pedal hump does directly. Also confirmed: during take-offs
+the driver is **not** pedal-chasing — APP-vs-RPM correlation median
+−0.50 (foot eases as revs climb) while commanded throttle holds/rises;
+the torque-based DBW scales throttle up with RPM correctly.
 
 ## Baseline log
 
