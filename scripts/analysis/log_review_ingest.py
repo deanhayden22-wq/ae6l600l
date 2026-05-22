@@ -638,7 +638,7 @@ def main():
                 report = "\n".join(format_report(compare(a, b)) for a, b in zip(revs[:-1], revs[1:]))
                 review = REPO_ROOT / "logs" / "REVIEW_LOG.md"
                 if review.exists():
-                    text = review.read_text()
+                    text = review.read_text(encoding="utf-8")
                 else:
                     text = ""
                 from datetime import datetime
@@ -650,7 +650,7 @@ def main():
                     text = text.replace(marker, marker + section, 1)
                 else:
                     text += section
-                review.write_text(text)
+                review.write_text(text, encoding="utf-8")
                 print(f"  -> appended rev rollup to logs/REVIEW_LOG.md")
         except Exception as e:
             print(f"  -> rev rollup skipped: {e}")
@@ -677,7 +677,7 @@ def main():
                         prev = revs[i-1]
                         report = format_report(compare(prev, rev))
                         review = REPO_ROOT / "logs" / "REVIEW_LOG.md"
-                        text = review.read_text() if review.exists() else ""
+                        text = review.read_text(encoding="utf-8") if review.exists() else ""
                         stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
                         section = f"\n## ingest {args.date} (rev {rev}) auto-rollup ({stamp})\n\n" + report + "\n"
                         marker = "<!-- Entries below this line, newest first -->"
@@ -685,7 +685,7 @@ def main():
                             text = text.replace(marker, marker + section, 1)
                         else:
                             text += section
-                        review.write_text(text)
+                        review.write_text(text, encoding="utf-8")
                         print("  -> appended rev rollup to logs/REVIEW_LOG.md")
         except Exception as e:
             print(f"  -> rev rollup skipped: {e}")
