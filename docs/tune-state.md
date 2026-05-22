@@ -1,7 +1,7 @@
 # Tune state — AE5L600L 20G
 
-Captured 2026-05-17 after 20.12 verification drive (6 logs, 5.7 h) and 20.13 build.
-**On car right now:** 20.12 (md5 `534720b8…`). **Staged for next flash:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). MAF rescale work is in progress on the 20.12 5-17 evidence — slated for 20.14, not in 20.13.
+Captured 2026-05-22 after the 20.13 verification drive (1 log, ~166 min).
+**On car right now:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). MAF rescale work is in progress on the 20.12 5-17 evidence — slated for 20.14, not yet built.
 
 ROM revs are in `rom/AE5L600L 20g rev X.Y tiny wrex.bin`. Bins are
 overwritten in place — same filename, new content — so a recorded hash
@@ -261,43 +261,115 @@ the OL knock zone and the ghost zone proper need attention in 20.13.
 
 File: `rom/AE5L600L 20g rev 20.13.bin`.
 
-Rom byte-diff (`scripts/analysis/rom_diff.py`): **436 bytes** in **44
-runs**.
+Rom byte-diff (`scripts/analysis/rom_diff.py`): **439 bytes** in **43
+runs** (after the 5-21 axis revert — see #3 below). Full cell-by-cell
+decode done 2026-05-21 (byte-diff of the two bins, all changed tables
+decoded in scaled units).
 
 | Table region | runs | bytes | addr range |
 |---|---:|---:|---|
-| AVCS Intake Cruise (`0xDA96C`) | 9 | 35 | 0xDA96D–0xDAA90 |
-| AVCS Intake Non-Cruise (`0xDAC34`) | 8 | 34 | 0xDAC58–0xDAD58 |
+| AVCS Intake Cruise (`0xDA96C`) | 9 | 38 | 0xDA96D–0xDAA90 |
+| AVCS Intake Non-Cruise (`0xDAC34`) | 8 | 37 | 0xDAC58–0xDAD58 |
 | Firmware checksum (auto) | 1 | 4 | 0xFFB88–0xFFB8C |
-| OL fueling block (multiple tables) | 26 | 426 | 0xCFD68–0xDA932 |
+| OL fueling block (3 tables, all-three) | 24 | 426 | 0xCFD68–0xD04F1 |
+| **Timing Compensation A (IAT)** (`0xD3288`) | 1 | 11 | 0xD328D–0xD3298 |
 
-The 426-byte OL block falls in the address range covering Primary OL
-Fueling and its KCA-related variants:
+(`rom_diff.py`'s KNOWN_TABLES doesn't carry the OL-fueling, IAT-comp, or
+AVCS-axis addresses, so it lumps them into "(unknown region)
+0xCFD68–0xDA932". The table above is the resolved identity per
+`definitions/AE5L600L 2013 USDM Impreza WRX MT.xml`.)
+
+**1. OL richening (DOCUMENTED, intentional).** Three tables changed
+**byte-identically** — 117 cells each, same coords, same values
+(all-three rule confirmed, see [ol-fueling.md](ol-fueling.md)):
 
 - Primary OL Fueling (KCA Alternate Mode) — `0xCFD30`
-- Primary OL Fueling (Failsafe)(KCA Alternate Mode) — `0xCFEF0`
 - Primary OL Fueling (KCA Additive B Low) — `0xD0244`
 - Primary OL Fueling (KCA Additive B High) — `0xD0404`
-- Primary OL Fueling (Failsafe) — `0xD05C4`
 
-This is the **OL richening** session driven by today's ghost-zone
-review: Dean richened a substantial portion of the high-RPM /
-mid-to-high-load OL map in response to the 5-17 FBKC depth -7.0
-cluster. Per the "all-three rule" for OL fueling
-(see [ol-fueling.md](ol-fueling.md)), Primary OL B Low / B High / KCA
-Alt are kept byte-identical to each other; the rom_diff is consistent
-with that pattern.
+(Failsafe `0xD05C4` and Failsafe-KCA-Alt `0xCFEF0` were **not** touched.)
+Predominantly richer, sized to the 5-17 knock clusters:
+- 2600-3300 RPM × 1.0-2.0 load: −0.1 to −0.5 AFR (the FBKC −7.0° depth
+  cluster).
+- High-RPM/high-load 4000-5500 × 1.36-1.95: the largest pulls, −0.7 to
+  **−1.04 AFR** (the FLKC ratchet band at 3300-4000 × 2.0-3.0 and above).
+- A handful of low-RPM/high-load cells (800-1900 × 2.28-2.90) leaned
+  slightly +0.07 to +0.23 — gradient smoothing, not a richening target.
 
-**AVCS edits in 20.13** (9 + 8 runs across Cruise + Non-Cruise) extend
-the 20.12 plateau work — exact cell-by-cell breakdown not extracted
-yet; rev_comparison.py against 20.12 would surface it.
+**2. AVCS plateau extension (DOCUMENTED, intentional).** Cruise +
+Non-Cruise, **20 paired cells** (byte-identical between the two tables):
+0.30 column lifted 0→5°; 0.50 column flattened to a 10° plateau across
+1900-3400 (was 1.75-7.0°); 0.60/0.70 selective bumps; and the 18° peak
+**trimmed to 17°** at high-RPM/high-load (0.80×4150, 0.90×4750,
+1.00×5500) plus 1.20×1100 17→16°. Extends 20.12's plateau work.
+
+**3. Three changes NOT in the original announcement (surfaced by the
+5-21 diff per `feedback_verify_rom_changes_against_user_claims`; Dean
+confirmed to document and keep — all judged in-line with active knock
+issues):**
+
+- **Timing Compensation A (IAT)** (`0xD3288`, scaling
+  `IgnitionTimingCorrection(degrees)`, axis = intake-air temp −40→110°C):
+  11 cells, **added retard at hot IAT** (cells ≤0°C untouched):
+  10°C −0.70°; 20-30°C −1.05°; 40-70°C −0.70°; 80-90°C −0.35°;
+  100-110°C −1.05°. End state: −1.41° at 10°C ramping to −8.09° at
+  110°C. **Alignment:** IAT rises under sustained boost, so this is a
+  second lever (IAT axis) on the **same** high-load knock cluster the OL
+  richen targets — complementary, plausibly helpful. **Caveat:** it
+  confounds 20.13 knock attribution (OL-richen vs IAT-retard both pull
+  the same cells the same way; scorecard can't separate them).
+- **AVCS Cruise RPM axis** breakpoint idx1 had moved **1100 → 1300 RPM**
+  (`0xDA930`) while the Non-Cruise axis (`0xDABF4`) stayed at 1100 —
+  this was an **accidental** edit (would have de-paired the two AVCS
+  tables' RPM axes). **Reverted locally 2026-05-21**; both axes are back
+  at 1100 in the bin. This is why the diff is now 439 bytes / 43 runs
+  (was 440 / 44).
+- **AVCS Cruise-only cell** (0.20 load, 1000 RPM): 0.50 → 0.00°, with
+  **no** matching Non-Cruise edit. Sub-1% residency → shape-only per the
+  residency-threshold rule; not a testable hypothesis. Kept.
 
 **MAF Sensor Scaling (0xD8C9C):** UNCHANGED. MAF rescale work is in
 progress against the 20.12 5-17 evidence (Dean working on it manually
 — "a lot of info, going to take some time"). Targeted for 20.14.
 
-**Verification pending on 20.13.** Pre-drive scoring gates in
-`docs/open-issues.md` "20.13 watch" section.
+**20.13 flashed; verified on 5-22 (2026-05-22).** One long log
+`logs/5-22 20.13/log0001.csv` (249,171 samples / ~166 min, 1 road
+session). Scored against the pre-drive gates:
+
+| Gate | 20.12 → 20.13 | Result |
+|---|---|---|
+| OL richen kills FBKC depth (gate shallower than -4.5°) | -7.0° → **-2.8°** | **PASS** |
+| FLKC ratchet at 3300-4000 × 2.0-3.0 (gate <0.05/min) | 0.166 → **0.000**/min (55 → **0** events) | **PASS (strong)** |
+| AVCS work tightens cluster (gate avcs_osc <1.0/min) | 1.127 → 1.114 | **FAIL — didn't move** |
+| OL richen no wbo2 blowback (gate ≤2.5/min) | 2.05 → 2.00 | **PASS** |
+
+- **IAM held 1.000 the entire drive; FLKC never ratcheted negative
+  anywhere.** No learned-knock damage. The severe knock is gone.
+- **Caveat — knock is de-fanged, not eliminated.** Depth dropped
+  decisively (nothing deeper than -2.8° in the whole 2600-3300 × 1.0-2.0
+  band, was -7.0°) but shallow FBKC trims got **more frequent and more
+  spread**. Cluster band fbkc<0 samples: 20.12 log0007 = 468 (deepest
+  -7.0°) → 20.13 = 774 (deepest -2.8°), and the 3000-RPM row + upper
+  3300 row (1.36-1.95) now show shallow knock that 20.12 log0007 didn't.
+  Normalized by duration the shallow-knock rate rose ~33%. Reading: the
+  cells are still right at the knock threshold; the ECU now catches it
+  with many small -1.0 to -2.8° trims instead of occasional -7.0° slams.
+- **ATTRIBUTION CONFOUND stands:** OL richen and the IAT retard both
+  pull these same cells the same way — this is "OL richen AND/OR IAT
+  retard worked," not OL richen alone.
+- **AVCS gate failed for a clear reason:** the 20.13 edit lifted the
+  0.30/0.50 columns, but the residency-weighted oscillation lives in the
+  **0.20 load column at 2800-3000 RPM** (3000×0.20: 46→48 events;
+  2800×0.20: 25→28; 2500×0.20: 19→19 — essentially untouched). 123 of
+  185 osc events still in the 2500-3000 × 0.20-0.30 zone. Next AVCS lever
+  is the 0.20 column, not 0.30+.
+- **Also moved (scorecard, 20.12 → 20.13):** `mean_target_attainment`
+  0.829 → **0.955** (boost healthier, 37 pulls, 0 wgdc-pegged);
+  `rpm_swing_per_min` 1.069 → 0.921; `ffb_wbo2_div` 2.05 → 2.00;
+  `maf_corr_mean_abs_pct` 2.393 → **1.121** (trim health improved — but
+  20.13 didn't touch MAF; drive-context shift). Slight regressions:
+  `afr_osc_per_min` 0.904 → 1.011, `stutter_signature_per_min` 1.366 →
+  1.451 (minor; possibly the OL richen adding small AFR ripple).
 
 ## Baseline log
 

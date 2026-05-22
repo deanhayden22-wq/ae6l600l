@@ -1,7 +1,7 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-05-17 after 20.12 verification drive (5-17, 6 logs, 5.7 h) and 20.13 build.
-**On car right now:** 20.12 (`534720b8…`). **Staged for next flash:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). MAF rescale work is in progress on 5-17 evidence — slated for 20.14.
+Last updated 2026-05-22 after the 20.13 verification drive (5-22, 1 log, ~166 min).
+**On car right now:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). MAF rescale work is in progress on 5-17 evidence — slated for 20.14.
 
 Each entry: symptom → where it shows in data → what's been tried →
 what's next.
@@ -57,22 +57,68 @@ for the changeset.
 
 ---
 
-## 20.13 watch — pre-drive scoring gates (opened 2026-05-17)
+## 20.13 watch — gate scoring after 5-22 drive (CLOSED 2026-05-22)
 
-20.13 is built but not flashed. These gates apply to the first
-20.13-flashed log.
+20.13 flashed; verified on one ~166-min log `logs/5-22 20.13/log0001.csv`.
+Scoring against the pre-drive gates:
 
-| hypothesis | change | win signal (next log) | target |
+| hypothesis | gate | actual | verdict |
 |---|---|---|---|
-| OL richening eliminates the 2600-3300 × 1.0-2.0 FBKC depth cluster | OL fueling block 426 bytes / 26 runs at 0xCFD68-0xDA932 (Primary OL + KCA variants) | `timing_sum.min_fbkc_depth` and per-cell FBKC at 2600-3300 × 1.0-2.0 | depth shallower than -4.5°; per-cell FBKC<0 sample count at 2600×1.17 drops from 81 → <20 |
-| OL richening reduces FLKC ratchet at 3300-4000 × 2.0-3.0 | (same) | `timing_sum.flkc_events_per_min` and per-cell FLKC events at 3300-4000 × 2.0-3.0 | flkc events <0.05/min (was 0.17/min on 20.12) |
-| Further AVCS work tightens the AVCS-led cluster | AVCS Cruise/NC 9+8 runs (35+34 bytes) extending 20.12 plateau | `avcs_osc_per_min`; per-cell residency at touched AVCS cells | avcs_osc <1.0/min (was 1.13 on 20.12); AVCS-led cluster count at 2500-3000 × 0.20-0.30 drops further |
-| OL richening doesn't blow back into pre-20.10 wbo2 lag | `ffb_wbo2_div_per_min` and at-cell wbo2-vs-FFB delta | divergence stays ≤2.5/min; no lean spikes >+0.5 AFR on partial-throttle climbs | |
+| OL richening eliminates the 2600-3300 × 1.0-2.0 FBKC depth cluster | depth shallower than -4.5°; per-cell FBKC<0 at 2600×1.17 drops 81 → <20 | depth -7.0° → **-2.8°** ✓; per-cell 2600×1.17 81 → **129** ✗ (but all shallow, max -1.4°) | **MIXED** — depth fixed, count rose |
+| OL richening reduces FLKC ratchet at 3300-4000 × 2.0-3.0 | flkc events <0.05/min (was 0.17/min) | 0.166 → **0.000**/min; 55 → **0** events in band | **PASS (strong)** |
+| Further AVCS work tightens the AVCS-led cluster | avcs_osc <1.0/min (was 1.13); cluster count at 2500-3000 × 0.20-0.30 drops | 1.127 → **1.114** (flat); zone osc 109 → **123** | **FAIL** |
+| OL richening doesn't blow back into wbo2 lag | divergence ≤2.5/min; no lean spikes >+0.5 AFR | 2.05 → **2.00** | **PASS** |
+
+**Headline:** the dangerous part of the ghost zone is gone — deepest
+FBKC in the whole 2600-3300 × 1.0-2.0 band went -7.0° → -2.8°, the
+3300-4000 × 2.0-3.0 FLKC ratchet went from 55 events to **zero**, and
+**IAM held 1.000 the entire drive with FLKC never ratcheting negative**.
+No learned-knock damage anywhere.
+
+**But the zone is de-fanged, not eliminated.** Shallow FBKC trims got
+more frequent and more widespread: cluster-band fbkc<0 samples 468
+(20.12 log0007, deepest -7.0°) → 774 (20.13, deepest -2.8°); the
+3000-RPM row (3000 × 1.0-1.51) and the upper 3300 row (3300 × 1.36-1.95)
+now carry shallow knock that 20.12 log0007 didn't show. Duration-
+normalized, shallow-knock rate rose ~33%. The cells are still sitting
+right at the knock threshold — the ECU now catches it early with many
+small -1.0 to -2.8° trims instead of occasional -7.0° slams. **This is
+acceptable as-is** (no deep knock, no IAM damage), but the zone is not
+"resolved" — it's been moved from dangerous to benign.
+
+**Attribution confound stands (per the pre-drive note):** OL richen and
+the IAT retard both pull these cells the same direction; the scorecard
+can't separate them. The knock pass is "OL richen AND/OR IAT retard
+worked."
+
+**Why the AVCS gate failed:** the 20.13 AVCS edit lifted the 0.30/0.50
+columns, but the residency-weighted oscillation lives in the **0.20 load
+column at 2800-3000 RPM** — which the edit barely touched (only the
+sub-1% (0.20, 1000) cell was zeroed). Per-cell osc on 5-22: 3000×0.20 =
+48 (was 46), 2800×0.20 = 28 (was 25), 2500×0.20 = 19 (unchanged). 123 of
+185 osc events still in the 2500-3000 × 0.20-0.30 zone. **Next AVCS
+lever: the 0.20 column at 2800-3000 RPM, not the 0.30+ columns already
+worked.**
+
+**Boost/secondary movement (20.12 → 20.13):** `mean_target_attainment`
+0.829 → 0.955 (37 pulls, 0 wgdc-pegged, healthy); `rpm_swing_per_min`
+1.069 → 0.921; `maf_corr_mean_abs_pct` 2.393 → 1.121 (trim health up —
+20.13 didn't touch MAF, drive-context shift). Minor regressions:
+`afr_osc_per_min` 0.904 → 1.011 and `stutter_signature_per_min` 1.366 →
+1.451 (small; possibly OL richen adding AFR ripple — watch, don't act).
+
+---
+
+## Superseded — 20.13 pre-drive gates (opened 2026-05-17, scored above)
 
 **Methodology notes for the 20.13 review:**
 - Re-run `python3 scripts/analysis/scorecard.py --recompute-durations` after ingesting 20.13 logs (the `--recompute-durations` flag is needed when new rom_rev_map entries land).
 - For the OL richening verdict, compare per-cell FBKC<0 sample counts at the cells listed in the 20.12 cluster (above) — these are the cells the richen was sized to address.
-- Per `feedback_verify_rom_changes_against_user_claims`: 20.13 rom_diff surfaces ~436 bytes across AVCS + OL fueling block. Dean announced OL richening + MAF work; the OL block matches. The AVCS edits are an additional load on top of 20.12's plateau — flag in next session if not already discussed.
+- Per `feedback_verify_rom_changes_against_user_claims`: full 5-21 cell-by-cell diff = **439 bytes** (after the axis revert below). OL block matches the announcement (3 tables, 117 cells each, all-three rule holds, richer at the knock cluster). AVCS = 20-cell paired plateau extension. **Three items were NOT in the original announcement** (details in [tune-state.md](tune-state.md) "20.12 → 20.13"):
+  1. **Timing Comp A (IAT)** `0xD3288` — 11-cell hot-IAT retard (−0.35 to −1.05° at 10-110°C). KEPT — a second lever on the same high-load knock cluster as the OL richen.
+  2. **AVCS Cruise RPM axis** idx1 1100→1300 — **ACCIDENTAL, reverted locally 2026-05-21** (both axes back at 1100). Was a stray byte that would have de-paired the AVCS RPM axes.
+  3. **AVCS Cruise-only cell** (0.20, 1000) 0.50→0.00 — KEPT, sub-1% residency, shape-only.
+- **ATTRIBUTION CONFOUND for the knock verdict:** the IAT retard (#1 above) and the OL richen both pull the *same* high-load knock cells in the *same* direction. If 20.13 knock improves, the scorecard cannot separate which lever did it. Note this when scoring the OL-richening gates — a pass is "OL richen AND/OR IAT retard worked," not OL richen alone.
 - MAF rescale is NOT in 20.13. Slated for 20.14. Don't propose MAF changes until that work lands.
 
 **If any gate fails on next log:**
@@ -172,12 +218,15 @@ for the changeset.
   actually fired (L=1.0-2.0). Total knock events dropped (0.64 →
   0.26/min) but FBKC depth got worse (-4.2° → -7.0°) because the
   dominant cluster never got addressed.
-- **20.13 lever in flight (built 2026-05-17, not flashed):** OL
-  fueling richen — 426 bytes in 26 runs across the OL block
-  (0xCFD68-0xDA932), covering Primary OL Fueling + KCA Alternate Mode
-  + KCA Additive B Low/High + Failsafe variants. Plus further AVCS
-  edits (35+34 bytes across Cruise + Non-Cruise) extending 20.12's
-  plateau work. Scoring gates in the "20.13 watch" section above.
+- **20.13 lever landed & scored (5-22):** OL fueling richen + IAT
+  retard + AVCS plateau extension. **Result: severe knock eliminated,
+  zone de-fanged but not gone.** Deepest FBKC -7.0° → -2.8° across the
+  whole band; 3300-4000 × 2.0-3.0 FLKC ratchet 55 events → 0; IAM held
+  1.000. But shallow FBKC (-1.0 to -2.8°) is now more frequent and
+  spread into the 3000-RPM row and upper 3300 row. Cells still sit at
+  the knock threshold. Full scoring in the "20.13 watch (CLOSED)"
+  section above. Knock improvement is OL-richen AND/OR IAT-retard
+  (confounded — both pull the same cells).
 - **Stock-vs-20.10 table compare in this zone (kept for reference):**
 
   | Table | Comparison |
