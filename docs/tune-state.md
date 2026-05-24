@@ -1,7 +1,9 @@
 # Tune state — AE5L600L 20G
 
-Captured 2026-05-22 after the 20.13 verification drive (1 log, ~166 min).
-**On car right now:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). **Staged:** 20.14 (`rom/AE5L600L 20g rev 20.14.bin` exists — pedal-hump build) — see "20.13 → 20.14" below. MAF rescale (Dean working offline) also slated for 20.14.
+Captured 2026-05-23 after the 20.14 verification drives (3 logs on 5-23: 24-min warm city, 8.9-min cold around-town, 253-min way-home).
+**On car right now:** 20.14 (`rom/AE5L600L 20g rev 20.14.bin` — pedal-hump build, driven).
+**Staged for next flash:** 20.15 (tip-in enrichment fix) — see "20.14 → 20.15" below.
+**MAF rescale status:** Dean verified converged on 378k-sample offline analysis (5-23). No MAF changes needed for 20.15. The 8-50 g/s cruise band runs −0.1% to −1.4% (median ≈ −0.5%); only the 161-180 g/s band shows a coherent −3 to −5.7% lean across 3 cells but residency is lower (boost-build transient territory). Defer.
 
 ROM revs are in `rom/AE5L600L 20g rev X.Y tiny wrex.bin`. Bins are
 overwritten in place — same filename, new content — so a recorded hash
@@ -413,7 +415,10 @@ re-creates stock's steep 10%→16.5% tip-in cliff (the thing the hunt fix
 removed) — so increment the 800-1600 rows modestly, don't overshoot.
 
 **2. MAF rescale** — Dean working offline on the 20.12 5-17 evidence.
-Not yet specified.
+Outcome (5-23 analysis, 378k samples): current MAF curve is converged
+across the cruise band (8-50 g/s runs −0.1% to −1.4%). No MAF table
+changes shipped in 20.14. See `### 20.14 verification drive` below for
+the residency-weighted check.
 
 **Evaluated and DEFERRED for 20.14 (with reasons):**
 - **AVCS:** no broad work. With steady inputs at low RPM, true AVCS
@@ -435,6 +440,100 @@ which the pedal hump does directly. Also confirmed: during take-offs
 the driver is **not** pedal-chasing — APP-vs-RPM correlation median
 −0.50 (foot eases as revs climb) while commanded throttle holds/rises;
 the torque-based DBW scales throttle up with RPM correctly.
+
+### 20.14 verification drive (5-23, three logs)
+
+Flashed and driven 2026-05-23. Three logs: log0001 (warm, 24 min city,
+WOT pull, 125 FBKC<0 with min −4.2°), log0002 (cold start, 8.9 min,
+0 knock, 25-mph AVCS hunting), log0003 (BIG way-home, 253 min, 21 psi
+peak boost, 699 FBKC<0, FLKC latched in some boost cells).
+
+**Pedal-hump scoring:**
+- **PASS** — stutter_events/min: 6.02 (20.13) → **3.95** (20.14 big log) = −34%. The 20.14 lever measurably reduced stutter signature.
+- **Subjective:** Dean reports sluggishness fix achieved; low-RPM transit feel is improved.
+- Cold 25-mph stutter still present but separate mechanism — AVCS oil-hydraulics-limited cam tracking during warmup (`avcs_pct_zero` 86% in first 100s, then bimodal 0°↔20° as oil warms). Not a calibration issue; oil viscosity. No calibration lever in this ROM gates AVCS by ECT directly. Accept as cold-start character.
+
+**MAF check** (`378k samples, Dean's offline analysis`):
+| g/s range | avg correction | comment |
+|---|---|---|
+| 8–50 (cruise band) | −0.1% to −1.4%, median ≈ −0.5% | **clean** |
+| 50–90 (mid-load) | +0.81 to +2.56% | mild positive bias, 4-cell coherent |
+| 89–135 | −1.13 to −0.30% | near-neutral |
+| 161–180 | −3.07 to −5.73% | coherent 3-cell lean band; lower residency (boost build) |
+| 203–286 | mixed, max +3.76% | high-boost samples, noisier |
+| 349+ g/s | flagged unused | exclude |
+
+**Verdict: no MAF changes for 20.15.** The 161-180 band is the only candidate for a future minor bump (+3-5%) and is deferred until more samples accumulate.
+
+**Lean-on-accel discovery (the headline new finding):**
+Diagnosed across all three logs and especially log0003. 279
+tip-in-shortfall lean events in 253 min (1.1/min), median lean peak
++7.22 AFR, in OL at throttle-opening transitions. Mechanism: tip-in
+enrichment effectively inactive in 20.14 due to two coupled issues:
+
+1. **Min Throttle Activation at 2.0%** (20.x value vs stock/garn 0.85%) — DBW-smoothed pedal ramps produce ~1.5-2%/sample throttle Δ, below the gate.
+2. **BoostErr comp curve calibrated for stock's structurally-elevated target boost.** Stock keeps target ~5-12 psi ABOVE achievable at light-throttle/mid-RPM, so BE during transients lives ABOVE the 9.9 psi axis top (comp = 0%, neutral). The 20.x base was edited to bring target closer to achievable, which moved BE distribution into the 2-6 psi range (BE comp = −50 to −80%, suppression zone). See `project_target_boost_tipin_coupling.md` memory for the coupling.
+
+Sample-105349 root cause walk-through preserved in
+`scripts/analysis/quick_5_23_105385_drill.py` output.
+
+**Knock map after shift-knock filter** (see
+`project_shift_knock_filter.md`): 699 raw FBKC<0 reduced to **447
+real load-knock samples** (36% were shift-related false positives,
+including ALL of the 1600/1900 × 1.00 cells). The cleaned cluster is
+2600-3700 RPM × 1.00-1.17 load, peak −8.05° at 3000/1.17. This may
+partially resolve with the 20.15 tip-in fix (less transient lean →
+less heat dump arriving at the transition cusp).
+
+### 20.14 → 20.15 (staged 2026-05-23 — tip-in enrichment fix)
+
+The full changeset, with byte-level edits to flash:
+
+**1. Min Tip-in Throttle Activation** (`0xCC4A0`, float, %):
+- 2.00 → **0.85** (match stock/garn — DBW-smoothed ramps now pass first gate)
+
+**2. Min Tip-in IPW Activation** (`0xCC4A4`, float × 0.004 → ms):
+- 1.32 ms (raw float 330) → **1.00 ms** (raw float 250)
+- Lets smaller computed enrichments still apply; smooth-ramp throttle changes now have a chance to clear post-comp.
+
+**3. Tip-in Applied Counter Threshold A** (`0xCD165`, 16 uint8, ECT-indexed):
+- All 16 cells: 3 → **5** (match garn)
+- Extends the enrichment window from ~160ms to ~265ms.
+
+**4. Tip-in Applied Counter Threshold B** (`0xCD175`, 16 uint8):
+- All 16 cells: 3 → **5** (paired with A)
+
+**5. Tip-in BoostErr comp axis compression** (`0xCD128`, 9 floats × 4 bytes):
+- Compresses the axis from 0-9.9 psi to **0-6.7253 psi** to fit the observed BE distribution. **DATA bytes at `0xCD14C` UNCHANGED** (preserves the Subaru-tuned S-curve shape).
+
+| cell | current axis psi | **new axis psi** | raw float (current) | **raw float (new)** | comp % at this cell |
+|---:|---:|---:|---:|---:|---:|
+| 0 | 0.00 | **0.000** | 0.0000 | **0.0000** | −90.62 |
+| 1 | 1.24 | **0.930** | 64.1265 | **48.0949** | −87.50 |
+| 2 | 2.48 | **1.860** | 128.2531 | **96.1898** | −81.25 |
+| 3 | 3.71 | **2.790** | 191.8624 | **144.2847** | −73.44 |
+| 4 | 4.95 | **3.710** | 255.9890 | **191.8624** | −63.28 |
+| 5 | 6.19 | **4.640** | 320.1155 | **239.9573** | −50.00 |
+| 6 | 7.43 | **5.570** | 384.2420 | **288.0522** | −32.03 |
+| 7 | 8.66 | **6.500** | 447.8514 | **336.1471** | −5.47 |
+| 8 | 9.90 | **6.7253** | 511.9780 | **347.7985** | 0.00 |
+
+Anything BE > 6.7253 psi clamps at comp = 0 (neutral). The tight final cell (6.50 → 6.7253, 0.23 psi span) creates a sharp "soft clamp" shoulder.
+
+**Why this combination:**
+- Throttle gate at 0.85% + IPW gate at 1.0 ms together let smooth pedal ramps with reasonable RPM comp clear the floor at moderate BE.
+- Applied counter 5 doubles the enrichment window so tip-in lasts long enough to bridge the AFC-PI catch-up time.
+- The BE axis compression is shape-preserving (zero data bytes change). It moves the Subaru-tuned S-curve to operate at the BE values you actually see (2-6 psi instead of 7-12 psi).
+- **No changes to RPM comp.** Already aggressive in 20.x (+71% at 2800 RPM, +87% at 3600). Doesn't need a touch and adding a 5th lever hurts test attribution.
+- **No changes to base Tip-in A/B tables.** 20.x values are already 17-32% bigger than stock — magnitude is fine, the gates were the bottleneck.
+- **No changes to target boost map or its compensations.** This avoids re-touching the WGDC/spool work from 20.12.
+
+**Coverage prediction:** ~30-45% of the 279 lean events should now fire tip-in (those with throttle stab ≥7% AND BE ≥ 4-6 psi). Smooth ramps under ~4-5% per sample remain blocked by the 1.0 ms IPW gate and won't fire. That's acceptable; the deepest lean events tend to be the harder stabs.
+
+**Gates for scoring 20.15** (see `open-issues.md` for the full table):
+- **G1 (primary):** tip-in-shortfall events/min: 1.10 → target **< 0.8** (a ≥30% reduction)
+- **G2:** median lean peak: 7.22 AFR → target **< 6.0**
+- **G3 (regression check):** CL steady cruise AFC mean shifts: must stay **within ±1.5%** (no over-enrichment in steady cruise)
 
 ## Baseline log
 

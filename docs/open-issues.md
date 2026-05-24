@@ -1,7 +1,9 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-05-22 after the 20.13 verification drive (5-22, 1 log, ~166 min).
-**On car right now:** 20.13 (`rom/AE5L600L 20g rev 20.13.bin`). MAF rescale work is in progress on 5-17 evidence — slated for 20.14.
+Last updated 2026-05-23 after the 20.14 verification drives (3 logs on 5-23, ~286 min total).
+**On car right now:** 20.14 (`rom/AE5L600L 20g rev 20.14.bin` — pedal hump driven).
+**Staged for next flash:** 20.15 (tip-in enrichment fix).
+**MAF rescale:** CLOSED — Dean's 378k-sample offline check showed the current curve is converged in the cruise band. No changes needed.
 
 Each entry: symptom → where it shows in data → what's been tried →
 what's next.
@@ -129,9 +131,30 @@ worked.**
 
 ---
 
+## 20.14 watch — gate scoring after 5-23 drives (CLOSED 2026-05-23)
+
+20.14 was flashed and driven on 2026-05-23 (3 logs: 24-min warm,
+8.9-min cold, 253-min way-home — ~286 min total).
+
+| hypothesis | gate | actual | verdict |
+|---|---|---|---|
+| Pedal hump restores low-RPM throttle | low-RPM transit time / stutter signature | stutter_events/min 6.02 → 3.95 (−34%) | **PASS** |
+| Pedal hump fixes felt sluggishness | subjective Dean report | "sluggishness fix achieved" | **PASS** |
+| Pedal hump doesn't re-create cruise hunt | AVCS std at highway 60-95 mph cruise | 0.71° (rock solid) | **PASS** |
+| MAF rescale (deferred from 20.13) | 8-50 g/s correction in tolerance | −0.1 to −1.4%, median ≈ −0.5% | **PASS** (no change needed) |
+
+**New issue discovered (escalated to 20.15 lever):**
+- Lean-on-accel transients in OL — 279 events / 253 min, median +7.22 AFR lean, identified as tip-in enrichment shortfall (see new section "Active — lever in flight" below).
+
+**Existing issues still open (carry over):**
+- Cold 25-mph AVCS hunting — confirmed in log0002. Mechanism is oil-hydraulics-limited cam tracking during warmup (cam pct_zero = 86% first 100s, then bimodal 0°↔20° toggle as oil warms). No calibration lever in this ROM gates AVCS by ECT directly. **Accept as cold-start character.**
+- Transition-cusp knock 2600-3700 × 1.00-1.17 — survives shift-knock filter (447 of 699 raw FBKC<0 samples are real load knock; peak −8.05° at 3000/1.17). May partially resolve with the 20.15 tip-in fix if heat-dump from transient lean is contributing. If not, revisit base timing or OL targets in 20.16+.
+
+---
+
 ## Staged for verification (opened during pedal-tuning, 2026-04-27/28)
 
-### Low-RPM "sluggish off the line" + lingering stutter — pedal hump staged for 20.14 (2026-05-22)
+### Low-RPM "sluggish off the line" — pedal hump (CLOSED 2026-05-23 — see 20.14 watch above)
 
 - **Symptom (Dean):** sluggish off the line; low RPM "not super smooth /
   a bit stuttery" though "felt pretty good overall."
@@ -232,7 +255,39 @@ worked.**
 
 ---
 
-## Active — lever in flight (escalated 2026-05-17)
+## Active — lever in flight (escalated 2026-05-23)
+
+### Lean-on-accel transients in OL — tip-in enrichment fix flying in 20.15
+
+- **Symptom:** wbo2 climbs to 16-20 AFR for 200-400ms during pedal-opening transitions in OL, while ECU is commanding FFB ~10-13. Lean recovers in 1-2s as AFC PI catches up.
+- **Sample drill:** sample 105349 in `logs/5-23 20.14/log0003.csv` — 70 mph 5th-gear stab after lift. Throttle climbed 9.4 → 20% over 0.32s (~1.5%/sample). MAF jumped 10.2 → 30.8 g/s (+65 g/s/s). IPW climbed 2.3 → 3.3 ms — *not enough to keep up with MAF rate*. wbo2 peaked at 16.7. Full trace in `scripts/analysis/quick_5_23_105385_drill.py`.
+- **Drive-wide sweep:** 279 lean events in 253-min way-home log (1.1/min in OL). Median throttle change at event onset: 1.96%/sample (right at the 2.0% activation threshold). Median lean peak: +7.22 AFR. Median BoostErr: 3.62 psi.
+- **Root cause (NEW insight 5-23):** tip-in is effectively dormant for DBW-smoothed pedal ramps in 20.14 due to two coupled issues:
+  1. **Throttle activation gate at 2.0%** (stock/garn 0.85%) — most smooth ramps don't pass
+  2. **BoostErr comp calibrated for stock's structurally-elevated target boost.** Stock target sits 5-12 psi above achievable at light-throttle cells, so BE during transients lives above the comp axis top (9.9 psi → comp=0%). The 20.x base brought target close to achievable, moving BE into the 2-6 psi range (comp = −50 to −80%, suppression zone).
+- **Lever staged for 20.15 (5 edits, see `tune-state.md`):**
+  - Min Throttle Activation 2.00 → 0.85% (`0xCC4A0`)
+  - Min IPW Activation 1.32 → 1.0 ms (`0xCC4A4`)
+  - Applied Counter A & B both: 3 → 5 (`0xCD165` / `0xCD175`)
+  - BoostErr axis: compress 0-9.9 psi → 0-6.7253 psi (`0xCD128`) — preserves S-curve shape, no data byte changes
+  - **NO** changes to RPM comp, base tip-in A/B, or target boost map (deliberately — single-variable test discipline)
+- **Coverage prediction:** ~30-45% of the 279 lean events should fire tip-in after the change.
+
+### Pre-drive gates for scoring 20.15
+
+| gate | metric | source | current | target |
+|---|---|---|---|---|
+| **G1: tip-in shortfall events** | OL-opening lean events ≥2 AFR for ≥100ms, per minute | sweep tool (`scripts/analysis/tipin_lean_event_sweep.py`) | 1.10/min | **<0.8/min** (≥30% reduction) |
+| G2: median lean peak | peak (wbo2 − FFB) within events | sweep | 7.22 | **<6.0** |
+| G3: BE-coverage shift | % lean events with BE ≥ 5 psi vs < 5 psi | sweep + classifier | 26% above 5 | **>40% above 5** (means tip-in caught the easy-to-fire half) |
+| G4: knock at transition cusp | shift-filtered FBKC<0 events at 2600-3700 × 1.0-1.17 | `knock_shift_filter.py` | 304 samples | **<200** (only counts if 20.15's tip-in fixes the upstream heat issue) |
+| G5: cruise regression check | CL steady cruise AFC mean | filter throttle_d ≈ 0, CL=8, RPM ≥ 1200 | +0.93% | **±1.5%** (no over-enrichment) |
+
+**If any gate fails:**
+- G1 or G2 fails by a lot → IPW activation gate is still too high for smooth ramps. Try dropping to 0.7 ms next rev. Or bump the base tip-in A/B values (currently in 20.x already 17-32% bigger than stock — could go further).
+- G3 fails → the lean events are in the smooth-ramp regime that the IPW gate still blocks, regardless of BE comp. Either accept that those events are non-tip-in (might be tau / load filter), or bigger IPW gate cut.
+- G4 doesn't move → transition-cusp knock isn't downstream of the tip-in lean. Go after it directly via base timing pull at 2600-3700 × 1.0-1.17 or richen OL targets there.
+- G5 drifts negative >2% → tip-in is over-enriching in CL cruise. Tighten the BE comp axis cells 0-2 (raise the attenuation back toward original 20.14 values at the low-BE end).
 
 ### Ghost-knock zone: now 2200–3300 RPM × 1.0–2.0 g/rev (5-rev + 20.11 + 20.12 persistence; OL-richen lever flying in 20.13)
 
