@@ -29,6 +29,27 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+## 2026-05-25 — log: 5-25 20.15/log0001.csv — rom: 20.15 — DATA INVALID (AVCS LOCKOUT)
+
+12.05 min, 12893 samples, 17.83 Hz. Drive shape: stop-and-go around-town with a mid-drive gas-station stop. **Post-reflash AVCS lockout active for the whole drive** — known intermittent quirk that a restart clears (see new memory `project_avcs_post_reflash_lockout.md`).
+
+**AVCS lockout evidence:**
+- Whole-log AVCS p95 = 7°, max = 11° (vs 22° / 31° on the 20.14 5-23 baseline)
+- RPM 2000-3500 band: AVCS median 5-6° (working: ~19°)
+- WOT pull at 4304 RPM: AVCS max 8° (working: 22-25°)
+- 99.9% of samples at AVCS ≤ 10°
+
+**Verdict: log is unusable for 20.15 gate scoring.** Knock metrics, fueling metrics, stutter signatures, and lean-event magnitudes are all contaminated because the cam was in the wrong place. Pre-drive gate readings (G1 marginal, G2 fail, G4 pass strong, G5 mixed) are not meaningful — discarded.
+
+**What survives the contamination:**
+- G3 BE-coverage shift (85.7% of events at BE ≥ 5 psi vs target >40%) — pure ROM-byte check, axis compression is in the bin and operating as designed.
+
+**Lesson saved as memory:** `project_avcs_post_reflash_lockout.md` — on any first log after a fresh reflash, sanity-check AVCS p95 across the drive before scoring anything else. If p95 < 12°, treat as locked out and ask Dean to restart and re-drive.
+
+**Required next step:** Dean restarts the car (clears AVCS lockout), drives a normal 30-60 min mixed log. Re-run gate scoring on that.
+
+---
+
 ## ingest 2026-05-23 (rev 20.14) auto-rollup (2026-05-23 19:46)
 
 ## VE proxy: 20.14 vs 20.13

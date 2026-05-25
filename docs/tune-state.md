@@ -1,8 +1,9 @@
 # Tune state — AE5L600L 20G
 
-Captured 2026-05-23 after the 20.14 verification drives (3 logs on 5-23: 24-min warm city, 8.9-min cold around-town, 253-min way-home).
-**On car right now:** 20.14 (`rom/AE5L600L 20g rev 20.14.bin` — pedal-hump build, driven).
-**Staged for next flash:** 20.15 (tip-in enrichment fix) — see "20.14 → 20.15" below.
+Captured 2026-05-25 after the 20.15 verification drive — but the drive captured a **post-reflash AVCS lockout** (see `[[avcs-post-reflash-lockout-known-quirk]]` memory): cam was stuck at 0-10° across the whole drive when it should have been 18-22°. **The log is unusable for 20.15 evaluation.** Need a new log after a restart clears the AVCS state.
+
+**On car right now:** 20.15 (`rom/AE5L600L 20g rev 20.15.bin` — tip-in enrichment fix, driven but unverified).
+**Staged for next flash:** none. Need a clean log (post-restart, AVCS working normally) to evaluate 20.15.
 **MAF rescale status:** Dean verified converged on 378k-sample offline analysis (5-23). No MAF changes needed for 20.15. The 8-50 g/s cruise band runs −0.1% to −1.4% (median ≈ −0.5%); only the 161-180 g/s band shows a coherent −3 to −5.7% lean across 3 cells but residency is lower (boost-build transient territory). Defer.
 
 ROM revs are in `rom/AE5L600L 20g rev X.Y tiny wrex.bin`. Bins are
@@ -534,6 +535,41 @@ Anything BE > 6.7253 psi clamps at comp = 0 (neutral). The tight final cell (6.5
 - **G1 (primary):** tip-in-shortfall events/min: 1.10 → target **< 0.8** (a ≥30% reduction)
 - **G2:** median lean peak: 7.22 AFR → target **< 6.0**
 - **G3 (regression check):** CL steady cruise AFC mean shifts: must stay **within ±1.5%** (no over-enrichment in steady cruise)
+
+### 20.15 verification drive (5-25, 1 log, ~12 min — DATA INVALID, AVCS LOCKED OUT)
+
+Flashed and driven 2026-05-25. Single log `logs/5-25 20.15/log0001.csv` (12893 samples / 12.05 min, 17.83 Hz). **Data is unusable for 20.15 evaluation:** post-reflash AVCS lockout was active for the whole drive (known quirk — see `[[avcs-post-reflash-lockout-known-quirk]]`). Restart between flash and drive would have cleared it.
+
+**AVCS lockout evidence (vs 20.14 5-23 log0003 baseline):**
+
+| RPM band | 20.15 (5-25) median | 20.14 (5-23) median |
+|---:|---:|---:|
+| 1500-2000 | 4° | 9° |
+| 2000-2500 | 5° | **19°** |
+| 2500-3000 | 5° | **19°** |
+| 3000-3500 | 6° | **19°** |
+| 3500-4000 | 7° | **17°** |
+
+Whole-log AVCS p95 = 7°, max = 11° (vs 22° and 31° on 20.14). 99.9% of samples at AVCS ≤ 10°. WOT pull at 4304 RPM topped out at 8° (should be 22-25°).
+
+**What this contaminates:**
+- Lean-event magnitudes (cylinder fill state is wrong → tip-in fueling references the wrong VE)
+- Knock metrics ("zero knock" is meaningless under retarded cam)
+- Cruise AFC drift (the -3.4% low-load richening goes away with working AVCS)
+- Stutter / RPM swing rates (stutter mechanisms are AVCS-coupled)
+- Target attainment / WGDC metrics
+
+**What survives:**
+- G3 BE-coverage shift was 85.7% (BE ≥ 5 psi at event start, vs target >40%). This is a ROM-byte-pure check — the BE axis compression is in the bytes, operates the same regardless of cam state. The BE distribution moving into the comp's coverage zone is real and confirms the axis edit landed.
+- Knock at the transition cusp (zero in this log) needs to be re-verified on a clean drive.
+
+### 20.15 → next steps (still tip-in fix in flight; no new lever staged)
+
+**Required:** Dean restarts the car to clear the AVCS lockout, then drives a normal log (target 30-60 min mixed highway + city). Re-score against the same G1-G5 gates with the clean log.
+
+The contingency lever (drop **Min Tip-in IPW Activation (0xCC4A4)** from 1.0 → 0.7 ms, raw 250 → 175) stays in the queue for *if* G1/G2 miss on a clean log. Not staging it yet — there's no signal to act on from data this contaminated.
+
+**Lesson learned (saved as memory):** On any first log after a fresh reflash, run an AVCS sanity pass *before* scoring anything else: if AVCS p95 across the log is < ~12°, treat as locked out and ask for a restart-and-redrive.
 
 ## Baseline log
 

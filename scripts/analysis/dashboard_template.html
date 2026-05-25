@@ -59,6 +59,13 @@
   <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
 </div>
 
+<div class="panel">
+  <div class="panel-title">Boost &amp; WGDC per rev &mdash; mean WOT-pull peak MRP &amp; wastegate target attainment</div>
+  <div class="legend" id="wgdc-legend"></div>
+  <div class="chart-wrap"><canvas id="wgdcChart"></canvas></div>
+  <p class="caveat">Per-rev means across captured WOT pull-ramps; pull count per rev shown in tooltip. Peak MRP = manifold relative pressure at pull peak; attainment = peak MRP / target boost. Revs before 20.8 have no captured pulls.</p>
+</div>
+
 <div class="two-col">
   <div class="panel">
     <div class="panel-title">Active-rev cluster signal-sets (<span id="n-clusters"></span> clusters)</div>
@@ -114,7 +121,7 @@
   <p class="caveat">Positive = ECU adding fuel (MAF underreporting). Symmetric scale: +/-<span id="maf-abs-max"></span>%. Empty cells = no samples this rev.</p>
 </div>
 
-<div class="footer">scorecard data: <code>scripts/analysis/trends/scorecard_latest.csv</code> | clusters: <code>stutter_clusters.csv</code> | changeset: <code>rom_changeset.json</code> | knock: <code>knock_by_cell.csv</code> | MAF: <code>maf_corr_by_mafcell.csv</code></div>
+<div class="footer">scorecard data: <code>scripts/analysis/trends/scorecard_latest.csv</code> | clusters: <code>stutter_clusters.csv</code> | changeset: <code>rom_changeset.json</code> | knock: <code>knock_by_cell.csv</code> | MAF: <code>maf_corr_by_mafcell.csv</code> | WGDC: <code>pull_ramps.csv</code></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
@@ -161,6 +168,47 @@ function renderTrendChart() {
       scales: {
         y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.08)' } },
         x: { grid: { display: false } },
+      },
+    },
+  });
+}
+
+function renderWgdcChart() {
+  const w = DATA.wgdc;
+  if (!w || !w.revs.length) return;
+  const el = document.getElementById('wgdc-legend');
+  el.insertAdjacentHTML('beforeend',
+    '<span><span class="legend-swatch" style="background:#185FA5"></span>peak MRP (psi)</span>' +
+    '<span><span class="legend-swatch" style="background:#0F6E56"></span>target attainment (%)</span>');
+  new Chart(document.getElementById('wgdcChart'), {
+    data: {
+      labels: w.revs,
+      datasets: [
+        { type: 'bar', label: 'peak MRP (psi)', data: w.peak_mrp,
+          backgroundColor: 'rgba(24,95,165,0.65)', borderWidth: 0,
+          yAxisID: 'yMrp', order: 2 },
+        { type: 'line', label: 'target attainment (%)', data: w.attainment_pct,
+          borderColor: '#0F6E56', backgroundColor: '#0F6E56', borderWidth: 1.5,
+          pointRadius: 3, pointHoverRadius: 5, tension: 0.2,
+          yAxisID: 'yAtt', order: 1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false, callbacks: {
+          afterBody: function(items) { return 'pulls: ' + w.n_pulls[items[0].dataIndex]; },
+        } },
+      },
+      scales: {
+        x: { grid: { display: false } },
+        yMrp: { position: 'left', beginAtZero: true,
+          grid: { color: 'rgba(0,0,0,0.08)' },
+          title: { display: true, text: 'peak MRP (psi)' } },
+        yAtt: { position: 'right', beginAtZero: true, suggestedMax: 100,
+          grid: { display: false },
+          title: { display: true, text: 'attainment (%)' } },
       },
     },
   });
@@ -345,6 +393,7 @@ function renderMafResidual() {
 
 renderKPIs();
 renderTrendChart();
+renderWgdcChart();
 renderSigsetChart();
 renderRpmStackChart();
 renderAvcsTable();

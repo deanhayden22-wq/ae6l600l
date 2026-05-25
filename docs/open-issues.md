@@ -1,8 +1,8 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-05-23 after the 20.14 verification drives (3 logs on 5-23, ~286 min total).
-**On car right now:** 20.14 (`rom/AE5L600L 20g rev 20.14.bin` — pedal hump driven).
-**Staged for next flash:** 20.15 (tip-in enrichment fix).
+Last updated 2026-05-25 — 20.15 verification drive captured but **data is invalid (AVCS post-reflash lockout)**. Restart-and-redrive needed before any 20.15 scoring is meaningful.
+**On car right now:** 20.15 (`rom/AE5L600L 20g rev 20.15.bin` — tip-in enrichment fix driven but unverified).
+**Staged for next flash:** none. 20.15 still in flight; need clean log first.
 **MAF rescale:** CLOSED — Dean's 378k-sample offline check showed the current curve is converged in the cruise band. No changes needed.
 
 Each entry: symptom → where it shows in data → what's been tried →
@@ -255,7 +255,32 @@ worked.**
 
 ---
 
-## Active — lever in flight (escalated 2026-05-23)
+## 20.15 watch — post-reflash AVCS LOCKOUT contaminated 5-25 drive (data invalid)
+
+20.15 was flashed and driven 2026-05-25. The drive captured a **post-reflash AVCS lockout** (see `[[avcs-post-reflash-lockout-known-quirk]]` memory) — known intermittent quirk where AVCS doesn't engage on the first start after a flash. A restart clears it.
+
+**AVCS lockout symptom on this log:**
+- Whole-log AVCS p95 = 7°, max = 11° (vs ~22° / ~31° on a working drive)
+- Median AVCS in the 2000-3500 RPM band: 5-6° (vs ~19° normal)
+- WOT pull at 4304 RPM topped out at 8° (should be 22-25°)
+- 99.9% of samples ≤ 10° advance
+
+**What's contaminated** (all metric categories that depend on cam being where it should be):
+- Lean-event magnitudes (G2)
+- Knock-rate and depth (G4 — "zero knock" is meaningless under retarded cam)
+- Cruise AFC drift (G5 — the -3.4% low-load richening goes away with working AVCS)
+- Stutter / RPM swing / target attainment
+
+**What survives:**
+- **G3 BE-coverage shift** (events with BE ≥ 5 psi: 85.7% vs target >40%) — this is a ROM-byte-pure check. The BE axis compression is in the bin, operating exactly as designed. The lever landed structurally.
+
+**No 20.15 conclusions and no 20.16 levers are being staged from this log.** Required: Dean restarts to clear AVCS, then a normal 30-60 min drive. Re-score G1-G5 from there.
+
+The pre-drive contingency (drop **Min Tip-in IPW Activation 0xCC4A4** from 1.0 → 0.7 ms) is still in the queue *if* G1/G2 miss on a clean drive. Not staged yet.
+
+---
+
+## Active — lever in flight (escalated 2026-05-23, partially verified 2026-05-25)
 
 ### Lean-on-accel transients in OL — tip-in enrichment fix flying in 20.15
 

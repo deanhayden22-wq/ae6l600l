@@ -37,7 +37,7 @@ TRENDS_DIR = REPO_ROOT / "scripts" / "analysis" / "trends"
 TEMPLATE_PATH = Path(__file__).parent / "dashboard_template.html"
 DEFAULT_OUT = REPO_ROOT / "scorecard_dashboard.html"
 
-REV_ORDER = ["old_2023_base", "stock", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12", "20.13"]
+REV_ORDER = ["old_2023_base", "stock", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12", "20.13", "20.14"]
 
 
 def trend_series(sc: pd.DataFrame, thread: str, metric: str, revs: list[str]) -> list:
@@ -273,6 +273,24 @@ def build_data(rev: str) -> dict:
             active_transition = t
             break
 
+    # ----- boost / WGDC per-rev series (pull-ramp means) -----
+    wgdc_revs, wgdc_mrp, wgdc_att, wgdc_pulls = [], [], [], []
+    for r in revs:
+        mrp_v, _, _ = latest_metric(sc, r, "wgdc", "mean_peak_mrp")
+        att_v, _, _ = latest_metric(sc, r, "wgdc", "mean_target_attainment")
+        if pd.isna(mrp_v) and pd.isna(att_v):
+            continue
+        prow = sc[(sc["rom_rev"] == r) & (sc["thread"] == "wgdc")
+                  & (sc["metric"] == "mean_peak_mrp")]
+        npulls = (int(prow["n_pulls"].iloc[0])
+                  if len(prow) and pd.notna(prow["n_pulls"].iloc[0]) else 0)
+        wgdc_revs.append(r)
+        wgdc_mrp.append(round(mrp_v, 2) if pd.notna(mrp_v) else None)
+        wgdc_att.append(round(att_v * 100, 1) if pd.notna(att_v) else None)
+        wgdc_pulls.append(npulls)
+    wgdc = {"revs": wgdc_revs, "peak_mrp": wgdc_mrp,
+            "attainment_pct": wgdc_att, "n_pulls": wgdc_pulls}
+
     return {
         "rev": rev,
         "revs": revs,
@@ -288,6 +306,7 @@ def build_data(rev: str) -> dict:
         "maf_residual": maf_residual,
         "changeset": changeset,
         "active_transition": active_transition,
+        "wgdc": wgdc,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
 
