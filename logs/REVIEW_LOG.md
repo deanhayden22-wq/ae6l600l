@@ -29,6 +29,211 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+## 2026-05-30 — log: 5-30 20.16/log0001.csv — rom: 20.16 — **CATASTROPHIC −11.8° KNOCK + IDC SATURATION; ANCHOR/BUILD MISMATCH FLAGGED**
+
+48.8 min, 67,872 samples @ 25 Hz, 35 cols.
+
+**ROM fingerprint — CRITICAL DRIFT:** Current 20.16.bin md5 = `b8bd7091b918ab16820eb05dd7aebf7e` (mtime 2026-05-30 14:16:45 UTC). Anchor was `9e47549801946d8ada6c4a6e562f49f4`. **Dean re-flashed 20.16 today.** Re-ran binary diff vs 20.15:
+
+- **Target Boost (0xC1340): RAISED at 16 cells.** Anchor said "UNCHANGED." Actual deltas +1.99 to +8.01 psi. Headline cells: +7.00, +7.50, +8.01 psi. This is the dominant change in the new build.
+- **Initial WGDC (0xC1150): LOWERED at 2 cells.** 70.20%→67.01% and 66.95%→63.96% (Δ ≈ −3 pts each). Anchor said "raised to ~67% at WOT column" — current build has the lower values, not the raise.
+- **Base Timing × 4 tables (all identical):** 5 small runs each, much smaller pyramid than anchor described.
+- **Sport + Sport Sharp + Intelligent pedal maps:** all 3 updated identically (12-cell Sport diff shown earlier, repeated in Sharp/Intel).
+- **MAF Sensor Scaling: UNCHANGED** (matches anchor — only thing that does).
+- 185 bytes / 81 runs total.
+
+The active build is DIFFERENT from what the anchor described. Treat all anchor-cited 20.16 claims as stale; this entry reflects the build actually flashed today.
+
+**Drive shape:** mostly partial-throttle cruise with a few aggressive tip-ins. 78% CL=8, 20% OL=10, 1.6% warm-up. Peak MAF V 4.34 (well under 4.8). Throttle≥95% sustained ≥1 s: 0 qualifying pulls. 9 APP-based pull ramps detected; two were ramps the driver shoved to TPS=100% briefly but never sustained.
+
+**HEADLINE EVENT #1 — Sample 67380–67429 (t=2923.4–2925.3 s): FBKC ratchet to −11.80°.**
+Tip-in from coast into spool. At first knock onset (s67380): RPM 2627 × **load 1.045 g/rev** × mrp 2.71 psi (climbing, target 3.6) × Throttle 25.88% × APP 23.14% × Timing 16° × **AVCS 19-20°** × wgdc pegged 74.9 × wbo2 13.37 / FFB 12.35 (engine 1.0 AFR RICHER than commanded after lag — **not a lean failure**). FBKC ratchets in 9 samples (0.36 s): −1.4, −2.8, −4.2, −5.6, −7.0, −8.4, −9.8, −11.2, −11.8. Held at −11.8 for ~2 s. Driver lifted; re-attempted same spool 0.5 s later (s67442); cell fired again at −1.4. **IAM stayed 1.0, FLKC stayed 0** — no learning damage, but the FBKC budget got fully spent twice on the same operating cell within 1.5 s.
+
+The first-knock cell (2627, 1.045) sits squarely in the **2200-3300 × 1.0-1.4 ghost zone** that's persisted across 6+ revs. The 20.16 base-timing pull at 2600-3300 × L=1.67-2.37 **does not cover this cell** (load axis lower than pull region). Mechanism candidates: AVCS plateau at 19-20° + raised Target Boost driving harder spool into the cell + un-pulled timing.
+
+**HEADLINE EVENT #2 — Sample 26357 (t=1070.9 s): IDC saturated at 101.86%.**
+At PARTIAL THROTTLE (TPS 54.51%, APP 53.73%), RPM 4923 × load 3.81 × mrp 17.68 psi (target 17.90 → attainment 0.99). IPW 24.83 ms at 4923 RPM = injector duty cycle physically ≥100%. wbo2 10.46 / FFB 11.10 → engine 0.6 AFR richer than commanded. 3 samples ≥100% IDC, 49 samples ≥85% IDC. The 20.16 Target Boost raises plus the existing OL fueling tables are demanding more fuel than the injectors can deliver at this duty cycle. **Injector swap (already on the horizon per `project_injector_upgrade.md`) is no longer optional under the 20.16 boost targets.**
+
+**Knock summary:**
+- FBKC<0 samples: 411 across 11 clusters / 36 deepening events / FBKC min −11.80
+- FLKC stayed at 0 throughout (no learned ratchet)
+- IAM stayed at 1.0 throughout (no learned timing damage)
+- Top clusters: s67380-67429 (n=104, RPM 2298-2668, the −11.8 event), s37658-37761 (n=104, similar zone, FBKC min −11.2), s37269-37314 (n=46, −4.2), s37347-37385 (n=39, −7.0)
+
+**Ghost-zone (2200-3300 × 1.0-1.4) FBKC<0 rate (apples-to-apples, samp/zone-min):**
+- 20.13 5-22: 22.2
+- 20.14 5-23 L3: 14.1
+- 20.15 5-28: 24.2
+- **20.16 5-30: 156.0** — 6.4× worse than 20.15. Even excluding the −11.8 cluster, the remainder of the ghost-zone samples still puts the rate at ~50/min — 2× the 20.15 baseline.
+
+**AFL drift — HOLDING, not deepening.** CL filter (CL=8, FFB≤14.7, |corr|<25, APP>2): n=23,865.
+- AFL median: **−2.34** (identical to 5-28)
+- AFL mean:  −1.46 (improved from 5-28 −1.85)
+- >|2%|: 53.5% (was 56.5%)
+- AFC mean: −0.37 (clean, not clamping)
+- AFL by MAF V band: AFL=−2.34 floor at V=1.6–2.0 (light cruise), then AFL=0 at V≥2.1 — same shape as 5-28; not deepening but not reverting. ROM didn't touch MAF Scaling, so this is unchanged sensor/injector/fuel-pressure drift — consistent with the hypothesis space in `project_afl_drift_5_28.md`.
+
+**Tip-in lean spikes (strict detector, n=60 in this log):**
+- Overall mean lean: +3.83 AFR (vs 5-28 +2.35, +63% regression direction)
+- <1500 RPM: +4.11 (vs 5-28 +3.12)
+- 1500-2000 RPM: +3.37 (vs 5-28 +2.99) — still better than 20.14 L3 +4.73
+- 2000-2500 RPM: +3.60 (vs 5-28 +2.52)
+- **Caveat: n=60 vs 5-28 n=1816** — small sample. Direction is concerning but not statistically locked. The 20.16 pedal map raised APP=16.5% column (+0.24 to +0.98%), which would deliver MORE air sooner during a tip-in — that mechanism is consistent with bigger lean spikes if accel-enrichment can't keep up. Worth a focused tip-in log next session.
+
+**AVCS swing in 28-36 MPH × APP≤20:**
+- Inband samples: 9,202 (6.13 min)
+- AVCS swings (rolling 1 s, max−min ≥10°, std(RPM)<50, std(load)<0.05): 380 samples → **2.48 clu/min**
+- vs 5-2 (20.10): 5.84, 5-11 (20.11): 5.60 — **down**. The 20.16 build is calmer in this band.
+
+**WOT pulls:** 0 qualifying (Throttle≥95% sustained ≥1 s with peak mrp ≥7). 9 partial-throttle ramps with peak mrp 6-19 psi; best attainment 1.08 (s33654, 3rd-gear partial). Boost in-boost median attainment 0.857, mean 0.711 — undertarget. New higher Target Boost in 20.16 isn't being reached; the turbo isn't natural-flow-capable at the new targets in the operating-points logged.
+
+**FLKC zone (3000 × 2.13) targeted by 20.16 base-timing pull:** only 101 samples landed inside the pulled box (2600-3300 × 1.67-2.37) — engine never made the load to test it. Cannot score the pull from this log.
+
+**MAF V peak:** 4.34 V — well under 4.8 bar.
+**IAM:** 1.0 throughout — no learned timing damage.
+
+**Prior-flagged areas re-checked:**
+- **Ghost-zone knock 2200-3300 × 1.0-1.4:** **MAJOR REGRESSION.** 156 samp/min vs 20.15's 24.2. Driven by Target Boost raise causing harder spool into un-protected ghost zone cells.
+- **AFL drift:** **STEADY** at −2.34 median. Not deepening, not reverting. Open.
+- **20.15 tip-in fix:** **PROVISIONAL REGRESSION** (+3.83 vs +2.35), but n=60 is too small. Re-log needed.
+- **FLKC 3400-3800 × high-load (5-28 ratched to −1.75):** **NOT RE-OBSERVED** in this log (9 FBKC<0 in the box, no FLKC). Either zone wasn't visited under conditions to trigger or the 20.16 timing pull helped; can't separate.
+- **AVCS 28-36 MPH cruise band:** **IMPROVED.** 2.48 clu/min vs 5.6-5.8 prior.
+
+**New issues / surfaced:**
+- **(P0) Ghost-zone regression severe enough to risk IAM ratchet.** Two −11.x knock events in the same log. If next drive repeats the partial-throttle spool through 2627×1.05, FLKC will start ratcheting. Action candidates: extend 20.16 base-timing pull DOWN to L=1.0-1.2 at R=2400-3000, OR pull AVCS back from 20° plateau at the same cell, OR drop Target Boost back at the cells driving harder spool into the ghost zone. Need to pick one to attribute.
+- **(P0) Injector saturation at partial-throttle high-boost OL.** IDC>100% at TPS 54% × RPM 4923. The 20.16 boost raise pushes existing injectors past their physical limit. Injector swap is now blocking further boost work; alternatively, OL fueling target leaned out at this cell to reduce IPW demand.
+
+**Staged for next session:**
+- Re-flash decision needed: roll Target Boost back to 20.15 at the ghost-zone-feeding cells, OR pull timing at L=1.0-1.2 × R=2400-3000 in next build, OR leave 20.16 alone and gather more data to see if knock reproduces.
+- Update `current_rev_anchor.md` to reflect ACTUAL 20.16 build (b8bd7091, not 9e475498). Anchor's "Target Boost UNCHANGED" / "Initial WGDC raised" claims are wrong for the current build.
+- One more 20.16 log to confirm AFL drift status (drift is steady, not deepening — close to acting on MAF investigation if it holds 2 more logs).
+- Targeted tip-in log on 20.16 — Dean does deliberate small APP rises across 1000-3000 RPM band, 30+ events min, so lean-spike regression can be confirmed/refuted at n≥200.
+
+---
+
+## 2026-05-28 — log: 5-28 20.15/log0001.csv — rom: 20.15 — TIP-IN FIX PARTIAL CONFIRM; AFL drift + transient FLKC -1.75 flagged
+
+164.2 min, 246,366 samples @ 25 Hz, 35 cols. ROM bin md5 `55f28ef9d7c22344a79b3f20a9994f5e` (unchanged from 5-24 — same 20.15 build that produced 5-25 and 5-26 logs). This is the 3rd 20.15 log and the biggest by far.
+
+**Drive shape:** Heavily cruise-weighted — 73% of warm samples in 2500-3500 RPM band, only 71 in-boost samples (mrp>5 with throttle>50), Throttle>95% for 12 samples total (0.5 s), peak MAF V=4.0, peak IDC 77.2%. No qualifying WOT pulls.
+
+**AVCS sanity (post-reflash lockout check):** PASS — overall p95=21°, max=30°, 2000-3500 band median=19°, p95=21°. Cam working.
+
+**Baseline-sweep health bars:**
+- AFL: median **-2.34%**, mean -1.85%, 56.5% of CL samples outside ±2% (acceptable but at the edge of the ±5% ideal-window margin). **Drift trend:** AFL median has walked 0 → 0 → -1.07 → **-2.34** across 5-22 (20.13) / 5-23 L1 (20.14) / 5-23 L3 (20.14) / 5-28 (20.15). Monotonic and now sitting outside the ±2% ideal band. Convention reminder: AFL negative = ECU has learned engine runs rich and is pulling fuel via long-term trim. Consistent with MAF over-reading at the V-range exercised by this drive (V=1.5-3.0 cruise).
+- AFC: mean +1.18%, clamp <0.05%. Clean.
+- IDC: peak 77.2%, p99 29.7% — under the 85% bar.
+- MAF V: peak 4.0 V, no samples >4.8 V — under the bar (and no WOT to exercise high-V region).
+- Boost: only 71 samples in boost. p05 mrp-target delta -8.64 (target running ahead in low-spool transitions). Can't draw conclusions on boost control from this log.
+
+**Knock:** 1153 FBKC<0 samples / 32 deepening events / FBKC min -7.00. FLKC traveled **down to -1.75** (deeper than any prior 20.15 log; deeper than 5-23 20.14 L3's -1.0 latch), then recovered to 0 by end of log. Time at FLKC<0: 11.3 s (vs 5-23 L3's 42.7 s, vs 5-26's 0 s). Less persistent but more intense single excursion.
+
+  Top knock cells (FBKC<0 sample count):
+  - (2500, 1.19): 154
+  - (3250, 1.19): 143
+  - (3250, 1.02): 114
+  - (2750, 1.19): 102
+  All squarely inside the **2200-3300 × 1.0-1.4 ghost zone**.
+
+  **Ghost-zone knock rate (apples-to-apples, FBKC<0 samples per zone-minute):**
+  - 20.13 5-22: 22.2 samp/min
+  - 20.14 5-23 L3: 14.1 samp/min
+  - 20.15 5-28: 24.2 samp/min
+  Ghost zone is alive and active on 20.15. Not regressed vs 20.13 baseline; not improved vs 20.14.
+
+  **FLKC walk events (all OL, 3400-3800 RPM × load 2.0-3.1 × mrp 7-18 psi — the "high-RPM mid-load OL" open-issue cluster):**
+  - s=182165 (R3426 × L=3.07 × 17.97 psi): instant -1.0 ratchet (large single step, unusual)
+  - s=186771-186778 (R3386-3413 × L=2.5-2.7): standard 0→-0.75 ratchet
+  - s=196044-196051 (R3400-3429 × L=2.0-2.2): standard 0→-0.75
+  - s=199983-199993 (R3407-3415 × L=2.99-3.11 × 17.4 psi): **walked to -1.75 (biggest)**
+  - s=222902-223017 (R3404-3565 × L=2.6-2.9): walked to -1.5
+  - s=223047-223050: brief +1.25/-1.25 spike-recover
+  20.15 didn't touch base timing or boost in this zone (only tip-in fueling), so the persistence is expected.
+
+**Tip-in lean-spike (strict detector — CL/OL=7 excluded, fuel-cut excluded, wbo2 saturation gated):**
+
+| RPM band | 20.14 5-23 L3 (n=1703) | 20.15 5-26 (n=122) | 20.15 5-28 (n=1816) |
+|---|---|---|---|
+| <1500 | +3.39 | +3.08 | +3.12 |
+| 1500-2000 | +4.73 | +2.06 | **+2.99** (−37% vs L3) |
+| 2000-2500 | +2.84 | +2.64 | +2.52 (−11%) |
+| 2500-3000 | +2.54 | +1.28 (n=4) | **+2.06** (−19%) |
+| 3000-3500 | +2.35 | +2.12 (n=3) | +2.06 (−12%) |
+| 3500+ | +2.21 | — | +3.00 (n=25 — small) |
+| OVERALL | +2.85 | +2.55 | **+2.35** (−18%) |
+
+Note: prior 5-26 review compared bands with a stricter (now-irreproducible) detector that produced n=38 / +2.21 overall. Under a uniform same-code rerun applied to all three logs, 20.14 L3 lands at +2.85 overall (not +2.57 quoted in memory), 5-26 at +2.55, and 5-28 at +2.35. The improvement direction holds — 20.15 is better than 20.14 baseline in 1500-3500 RPM bands — but the magnitude is closer to **18% overall** than the 40-50% the 5-26 single-log suggested. The 5-26 numbers were small-sample optimism.
+
+**<1500 band shows no meaningful improvement** on 5-28 (n=246, +3.12 vs L3 n=316, +3.39). The 20.15 changeset's APP-gate at 0.85% may still be above the tiniest tip-in deltas at very low RPM, or the BE-axis isn't active at idle-region loads. Worth a future look.
+
+**Worst lean spikes are detector artifacts:** Top 5 spikes on 5-28 (8.7-14.4 lean) are all wbo2-transport-lag artifacts at coast→tip-in transitions where wbo2 was still saturated lean (>17 AFR) from prior DFCO/idle when the tip-in fired. The 8-sample lag-shift isn't enough at <1500 RPM where exhaust transport is slower. Detector enhancement deferred (gate on pre-tipin wbo2 saturation).
+
+**MAF correction by V band (re-check of 5-12 mid-V slope walk):** 5-12 had a monotonic negative drift at V=1.91-2.45. **Does NOT cleanly reproduce on 5-28.** Pattern is now:
+- V=1.55-1.65 cluster: median -2.34% (small but offset)
+- V=1.80-1.85 cluster: median -2.34/-1.56% (n=4345/3847, real)
+- V=1.90-2.10: median 0 to +0.78% (slightly positive — opposite of 5-12)
+- V=2.15-2.90: median 0 to -0.78%
+No basis for a mid-V refit on this evidence. The AFL whole-log drift is the cleaner signal.
+
+**Stutter quick check (28-36 MPH × APP≤20, 1s AVCS swing ≥10°, std(RPM)<50, std(load)<0.05):** 607 windows in 8.37 in-band minutes = 72.5/min. Vastly higher than 5-11's 5.60/min under the same SOP. Worth a careful look but I want to re-verify the methodology against the 5-11 detector code before raising it as a regression — could be a noise difference between the two implementations.
+
+**Prior-flagged areas re-checked:**
+- AVCS post-reflash lockout: PASSED (cam healthy whole log).
+- 20.15 tip-in fix: PARTIALLY CONFIRMED. 18% overall reduction vs L3 holds at n=1816. Strongest in 1500-2000 (-37%). No real improvement <1500 RPM.
+- Ghost-zone knock (2200-3300 × 1.0-1.4): UNCHANGED — 24.2 samp/min vs 20.13 baseline 22.2.
+- High-RPM mid-load OL FLKC cluster (3400-3800 × 2.0-3.1): ACTIVE — went to -1.75 transiently. 20.15 didn't address this zone; persistence expected.
+
+**New observations:**
+- **AFL monotonic drift toward -2.34% median across 20.13→20.14→20.15.** Long-term trim is increasingly pulling fuel — engine learned-rich. Direction: MAF over-read in cruise V-range, OR injector-flow drift, OR fuel-pressure drift. Watch on next log; if it continues, candidate for action.
+- 5-12 V=1.91-2.45 monotonic slope walk did NOT reproduce. Pattern now scattered, not monotonic.
+
+**Staged for next session:**
+- Resolve stutter-detector methodology (72.5/min vs historical 5.6/min suggests measurement difference, not 13× regression). Pin the exact filter & re-baseline.
+- One more substantial drive on 20.15 to lock in tip-in improvement (now n=1953 across 5-26+5-28 — call it confirmed at -18% overall if the next log holds).
+- Decide on AFL drift: re-measure next log; if median stays ≤-2.0%, plan a MAF mid-V investigation against WB residuals (Josh F exp fit per `feedback_maf_no_cellwise_patches.md`).
+- 20.15 still has no high-load OL action — FLKC excursion to -1.75 in 5-28 reinforces that the 4000-4400 × L≥1.5 cluster is open. Next ROM iteration candidate.
+
+---
+
+## 2026-05-26 — log: 5-26 20.15/log0001.csv — rom: 20.15 — TIP-IN FIX VALID (single log, n=38)
+
+26.3 min drive across 4 chunks, 39,510 samples at 25 Hz. Mostly 1800-2300 RPM around-town. Bin md5 `55f28ef9d7c22344a79b3f20a9994f5e`, mtime 2026-05-24 02:10:13 UTC.
+
+**AVCS sanity (post-reflash lockout check):** PASSED — warm p95=20°, max=28°, median 18° in 2000-3500 RPM band. The 5-25 lockout cleared with restart. Log is valid for scoring.
+
+**Tip-in lean-spike comparison (peak `wbo2 − FFB` first 1 s post-tipin, 320 ms lag-corrected, fuel-cut filtered):**
+
+| RPM band | 20.14 5-23 L1 (n=35) | 20.14 5-23 L3 (n=463) | 20.15 5-26 (n=38) |
+|---|---|---|---|
+| <1500 | +4.38 | +4.51 | **+2.73** (−40% vs L3) |
+| 1500-2000 | +2.75 | +3.83 | **+1.86** (−51% vs L3) |
+| 2000-2500 | +2.08 | +2.40 | **+1.82** |
+| 2500-3000 | +0.49 | +2.23 | **+1.51** |
+| 3000-3500 | +0.78 (n=1) | +2.16 | +3.11 (n=2) |
+| OVERALL | +3.22 | +2.57 | **+2.21** |
+
+20.15 changeset (accel-enrich throttle gate 2.0→0.85%, IPW gate 1.32→1.0 ms, applied counter 3→5, BE axis 0→6.7253 psi) is doing what it was designed to do. Biggest wins in the bands that historically had the worst spikes.
+
+**Knock at tip-in:** 2/38 events (5.3%), comparable to 20.14 L1 (8.6%) and L3 (3.5%). No regression.
+- s=19038: FBKC −1.4 on low-RPM 798→1637 tip-in, mrp stayed in vacuum — ghost-zone signature, not tip-in fueling.
+- s=25854: FBKC −2.8 at boost-crossing moment (mrp first +0 at s=25901, BE=−5.88 psi). Spool-up knock, not tip-in.
+
+**Worst lean spike:** +5.51 at s=21006 (RPM 690.75, OL state). KNOCK_FLAG ×3 but FBKC=0. Very-low-RPM corner — possibly below the new gate window. Worth eyeballing if Dean cares.
+
+**IPW step in 400 ms post-tipin:** median 1.54 ms on 20.15 vs 2.05 ms on 20.14 L3 — smaller bump, longer apply, smoother delivery. Consistent with design intent.
+
+**Prior-flagged areas re-checked:**
+- AVCS post-reflash lockout: resolved by restart, log valid.
+- Tip-in lean spike: improved across all bands with sufficient n.
+
+**New issues:** None opened. 3000-3500 band (n=2) and very-low-RPM corner (n=1 at +5.51 spike) under-sampled.
+
+**Staged for next session:**
+- 1-2 more mixed 20.15 logs to confirm lean-spike improvement at n>100.
+- Full SOP review on next 20.15 log (knock, MAF corr, cliffs, stutter, VE, WOT) — Dean called this thread short, full diag is next thread.
+
+---
+
 ## 2026-05-25 — log: 5-25 20.15/log0001.csv — rom: 20.15 — DATA INVALID (AVCS LOCKOUT)
 
 12.05 min, 12893 samples, 17.83 Hz. Drive shape: stop-and-go around-town with a mid-drive gas-station stop. **Post-reflash AVCS lockout active for the whole drive** — known intermittent quirk that a restart clears (see new memory `project_avcs_post_reflash_lockout.md`).

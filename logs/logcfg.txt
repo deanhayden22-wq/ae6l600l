@@ -12,11 +12,6 @@ paramid = 0xFF6852
 databits = 16
 scalingrpn = 14.7,x,.0004882812,*,/
 
-;P56 - A/F Sensor #1 Resistance(ohm)
-paramname = EGT
-paramid = 0x000044
-scalingrpn = x
-
 ;P3 - A/F Correction #1(%)
 paramname = AFC
 paramid = 0x000009
@@ -48,6 +43,12 @@ scalingrpn = x,128,-,2,/
 ;P11 - Intake Air Temperature(F)
 paramname = IAT
 paramid = 0x000012
+scalingrpn = 32,9,x,40,-,*,5,/,+
+sampinterval = 20
+
+;P2 - Coolant Temperature(F)
+paramname = ECT
+paramid = 0x000008
 scalingrpn = 32,9,x,40,-,*,5,/,+
 sampinterval = 20
 

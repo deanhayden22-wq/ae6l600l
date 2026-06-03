@@ -1,9 +1,9 @@
 # Tune state — AE5L600L 20G
 
-Captured 2026-05-25 after the 20.15 verification drive — but the drive captured a **post-reflash AVCS lockout** (see `[[avcs-post-reflash-lockout-known-quirk]]` memory): cam was stuck at 0-10° across the whole drive when it should have been 18-22°. **The log is unusable for 20.15 evaluation.** Need a new log after a restart clears the AVCS state.
+Captured 2026-06-02. 20.15's tip-in enrichment fix is **CONFIRMED** (5-26 + 5-28 clean logs, ~18% overall lean-spike reduction at combined n=1953). 20.16 was flashed and driven 5-30 and surfaced **two P0 regressions** (ghost-zone −11.8° knock + injector IDC saturation >100%). 20.17 was built 2026-06-02 in response but is **not yet driven** — and its intent needs a one-line confirmation from Dean (see "20.16 → 20.17" below). The earlier 5-25 AVCS-lockout note is preserved in the "20.15 verification drive (5-25…)" section.
 
-**On car right now:** 20.15 (`rom/AE5L600L 20g rev 20.15.bin` — tip-in enrichment fix, driven but unverified).
-**Staged for next flash:** none. Need a clean log (post-restart, AVCS working normally) to evaluate 20.15.
+**On car right now:** 20.16 (`rom/AE5L600L 20g rev 20.16.bin` — Target Boost raise + base-timing pull; driven 5-30, two P0 regressions found).
+**Staged / built next:** 20.17 (`rom/AE5L600L 20g rev 20.17.bin` — top-end Target Boost held flat + WGDC / Turbo-Dynamics + OL-fueling KCA + per-gear timing comp; built 2026-06-02, not yet driven, **intent unconfirmed**).
 **MAF rescale status:** Dean verified converged on 378k-sample offline analysis (5-23). No MAF changes needed for 20.15. The 8-50 g/s cruise band runs −0.1% to −1.4% (median ≈ −0.5%); only the 161-180 g/s band shows a coherent −3 to −5.7% lean across 3 cells but residency is lower (boost-build transient territory). Defer.
 
 ROM revs are in `rom/AE5L600L 20g rev X.Y tiny wrex.bin`. Bins are
@@ -570,6 +570,46 @@ Whole-log AVCS p95 = 7°, max = 11° (vs 22° and 31° on 20.14). 99.9% of sampl
 The contingency lever (drop **Min Tip-in IPW Activation (0xCC4A4)** from 1.0 → 0.7 ms, raw 250 → 175) stays in the queue for *if* G1/G2 miss on a clean log. Not staging it yet — there's no signal to act on from data this contaminated.
 
 **Lesson learned (saved as memory):** On any first log after a fresh reflash, run an AVCS sanity pass *before* scoring anything else: if AVCS p95 across the log is < ~12°, treat as locked out and ask for a restart-and-redrive.
+
+### 20.15 verification drives (5-26 + 5-28 — tip-in fix CONFIRMED)
+
+Two clean post-restart logs (AVCS healthy on both). **The tip-in enrichment fix works.**
+
+- **5-26** (`logs/5-26 20.15/log0001.csv`, 26.3 min, n=38 warm tip-ins): first clean read looked great (−40 to −51% in the worst bands) but n=38 is small.
+- **5-28** (`logs/5-28 20.15/log0001.csv`, 164 min, n=1816): the real confirmation. **~18% overall lean-spike reduction vs 20.14 L3** under a uniform same-code rerun (the 5-26 40-50% was small-sample optimism). Strongest in 1500-2000 RPM (−37%). No meaningful improvement <1500 RPM — the gate may still sit above the tiniest tip-in deltas there. Combined n=1953; call it confirmed at −18%.
+
+**New issues surfaced on 5-28 (carried to open-issues):**
+- **AFL drift:** long-term fuel trim has walked monotonically 0 → 0 → −1.07 → −2.34 median across 20.13 → 20.14 L1 → 20.14 L3 → 20.15. Engine learned-rich; candidates are MAF over-read in the cruise V-range, injector-flow drift, or fuel-pressure drift. Watch; act if it holds ≤ −2.0.
+- **FLKC transient to −1.75** in the 3400-3800 RPM × high-load OL zone (the long-standing high-RPM mid-load OL cluster). 20.15 didn't touch this zone, so persistence is expected.
+- Ghost-zone knock (2200-3300 × 1.0-1.4) UNCHANGED at 24.2 samp/min (vs 20.13 baseline 22.2).
+
+### 20.15 → 20.16 (Target Boost raise + base-timing pull; flashed & driven 5-30)
+
+**Build / anchor mismatch:** the flashed 20.16 (md5 `b8bd7091…`) differs from what the working anchor described. Binary diff vs 20.15 showed the *actual* changes were **Target Boost RAISED at 16 cells** (+2.0 to +8.0 psi — the anchor had said "unchanged"), Initial WGDC lowered at 2 cells, four small Base Timing pulls, and all three pedal maps updated identically. MAF scaling unchanged.
+
+**5-30 drive (`logs/5-30 20.16/log0001.csv`, 48.8 min) — TWO P0 regressions:**
+
+1. **Ghost-zone knock REGRESSION.** FBKC ratcheted to **−11.80°** twice (same 2627 × 1.05 cell, 1.5 s apart). Ghost-zone FBKC<0 rate **156 samp/min vs 20.15's 24.2 (6.4×)** — ~50/min even excluding the −11.8 cluster. Mechanism: the raised Target Boost spools harder into the un-protected ghost-zone cells, and the 20.16 base-timing pull sits one load band above where the cell actually fires so it doesn't cover it. IAM stayed 1.0 / FLKC stayed 0 — no learned damage *yet*, but two −11.x events in one drive is one repeat away from an IAM ratchet.
+2. **Injector IDC saturation.** IDC hit **101.86%** at partial throttle (TPS 54%, 4923 RPM, 17.68 psi). 3 samples ≥100%, 49 ≥85%. The 20.16 boost raise pushes the current injectors past their physical limit. **Injector swap is now blocking further boost work.**
+
+AFL held steady at −2.34 median (not deepening). AVCS healthy. AVCS 28-36 MPH cruise band actually IMPROVED (2.48 clu/min vs 5.6-5.8 prior).
+
+### 20.16 → 20.17 (built 2026-06-02 — NOT yet driven; INTENT NEEDS CONFIRMATION)
+
+> ⚠️ This section documents the byte-level **WHAT** (measured from the 20.16→20.17 binary diff). The **why is unconfirmed** — Dean needs to supply the one-line intent before this is flashed.
+
+341 bytes / 35 runs changed vs 20.16. Tables touched (mapped to `definitions/AE5L600L 2013 USDM Impreza WRX MT.xml`):
+
+| Table | Addr | What changed |
+|---|---|---|
+| **Target Boost_** | c1340 | **Top-end RAISED / taper killed.** On the 25% and 31% pedal paths, boost now holds ~15 psi flat from 3600-6400 RPM instead of drooping to 4-8 psi (25% path: +2.7 to +8.3 psi at 3600-6400; 31% path: +2.5 to +7.2 psi at 5200-6400). **Ghost-zone cells (2200-3300, low pedal) are largely unchanged (+0.0).** |
+| Max Wastegate Duty_ | c0f58 | changed (165 bytes) |
+| Initial Wastegate Duty_ | c1150 | changed |
+| Turbo Dynamics Proportional | c0d28 | changed |
+| OL Fueling — KCA Alternate Mode / Additive B Low / Additive B High | cfd30 / d0244 / d0404 | three tables changed (137 bytes each) |
+| Timing Comp Per Gear — Activation RPM / 5th gear | d2d38 / d5454 | changed |
+
+**Tension to resolve before flashing:** 20.17 RAISES top-end boost, but the 5-30 log already showed injectors saturating (IDC >100%) at 17 psi. Either (a) the new injectors are assumed on-car for 20.17, or (b) the OL-fueling KCA edits lean the top-end to keep IPW in range. Also, 20.17 does **not** appear to address the 20.16 ghost-zone knock regression — those cells are unchanged on the logged pedal paths. Confirm the plan. (Comparison tool: `scripts/analysis/pedal_boost_2017_compare.py`; plot `plots/pedal_boost_2016_vs_2017.png`.)
 
 ## Baseline log
 

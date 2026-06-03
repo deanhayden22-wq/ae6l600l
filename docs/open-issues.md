@@ -1,8 +1,8 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-05-25 — 20.15 verification drive captured but **data is invalid (AVCS post-reflash lockout)**. Restart-and-redrive needed before any 20.15 scoring is meaningful.
-**On car right now:** 20.15 (`rom/AE5L600L 20g rev 20.15.bin` — tip-in enrichment fix driven but unverified).
-**Staged for next flash:** none. 20.15 still in flight; need clean log first.
+Last updated 2026-06-02 — 20.15 tip-in fix **CONFIRMED** on clean 5-26/5-28 logs (~18% lean-spike reduction, combined n=1953). 20.16 driven 5-30 surfaced **two P0 regressions** (ghost-zone −11.8° knock, injector IDC >100%). 20.17 built 2026-06-02 (top-end boost) but **intent unconfirmed** and not yet driven.
+**On car right now:** 20.16 (`rom/AE5L600L 20g rev 20.16.bin` — Target Boost raise + base-timing pull; two P0s found 5-30).
+**Staged / built next:** 20.17 (`rom/AE5L600L 20g rev 20.17.bin` — top-end Target Boost held flat + WGDC / Turbo-Dynamics / OL-fueling KCA / per-gear timing; not yet driven, intent unconfirmed). See `tune-state.md` "20.16 → 20.17".
 **MAF rescale:** CLOSED — Dean's 378k-sample offline check showed the current curve is converged in the cruise band. No changes needed.
 
 Each entry: symptom → where it shows in data → what's been tried →
@@ -11,6 +11,31 @@ what's next.
 This is a working list, not a final state. Update as issues open and
 close per ROM rev. The same content lives in working memory and may
 diverge from this snapshot.
+
+---
+
+## 20.16 watch — TWO P0 REGRESSIONS (5-30 drive) — OPEN
+
+20.16 (Target Boost raise + base-timing pull) flashed and driven 2026-05-30 (`logs/5-30 20.16/log0001.csv`, 48.8 min). Two P0s, neither learned-damaging yet (IAM 1.0, FLKC 0 all log) but both one repeat from harm.
+
+### P0-1: Ghost-zone knock REGRESSION (2200-3300 × 1.0-1.4)
+- **Symptom:** FBKC ratcheted to **−11.80°** twice in 1.5 s on the same 2627 × 1.05 cell (coast→spool tip-ins). Ghost-zone FBKC<0 rate **156 samp/min vs 20.15's 24.2 (6.4×)**; ~50/min even excluding the −11.8 cluster.
+- **Mechanism:** the 20.16 Target Boost raise spools harder into the un-protected ghost-zone cells. The 20.16 base-timing pull sits one load band ABOVE where the cell fires (it covers 1.67-2.37, the cell is at 1.05) so it does nothing here.
+- **Candidate levers (pick one to attribute):** (a) extend the base-timing pull DOWN to L=1.0-1.2 at R=2400-3000; (b) pull AVCS back from the 19-20° plateau at that cell; (c) roll Target Boost back at the cells feeding the harder spool.
+- **Note:** 20.17 does NOT address this — its Target Boost edits are top-end; the ghost-zone cells are unchanged on the logged pedal paths.
+
+### P0-2: Injector IDC saturation >100%
+- **Symptom:** IDC hit **101.86%** at partial throttle (TPS 54%, 4923 RPM, 17.68 psi). 3 samples ≥100%, 49 ≥85%. IPW 24.83 ms at 4923 RPM = duty ≥100%.
+- **Cause:** the 20.16 boost raise pushes the current injectors past their physical limit. Fuel — not knock — is now the top-end ceiling under 20.16 targets.
+- **Status:** injector swap (already on the horizon) is now **blocking** further boost work. 20.17 raises top-end boost further, which makes this worse unless new injectors are on-car or OL-KCA leans the top-end (see tune-state "20.16 → 20.17" tension).
+
+### AFL drift — WATCH (opened 5-28, holding 5-30)
+- **Symptom:** long-term fuel trim has walked monotonically 0 → 0 → −1.07 → −2.34 median across 20.13 → 20.14 L1 → 20.14 L3 → 20.15, and held at −2.34 on 20.16 (not deepening, not reverting). Engine learned-rich; >|2%| on ~53% of CL samples.
+- **Candidates:** MAF over-read in the cruise V-range (floor at V=1.6-2.0), injector-flow drift, or fuel-pressure drift. ROM hasn't touched MAF scaling, so this is hardware/sensor drift.
+- **Next:** if it holds ≤ −2.0 for one more log, plan a MAF mid-V investigation against WB residuals (Josh F exp fit per `feedback_maf_no_cellwise_patches.md`).
+
+### FLKC transient −1.75 in 3400-3800 × high-load OL (carried from 5-28)
+- 5-28 walked FLKC to −1.75 (deepest 20.15 excursion) in the long-standing high-RPM mid-load OL cluster; not re-observed on 5-30 (zone not revisited under trigger conditions). 20.15/20.16 didn't address this zone. Still OPEN — next ROM iteration candidate.
 
 ---
 
@@ -280,7 +305,9 @@ The pre-drive contingency (drop **Min Tip-in IPW Activation 0xCC4A4** from 1.0 �
 
 ---
 
-## Active — lever in flight (escalated 2026-05-23, partially verified 2026-05-25)
+## CLOSED — tip-in enrichment fix VERIFIED in 20.15 (5-26 + 5-28, ~18% reduction)
+
+**Result (2026-06-02):** the 5 staged edits work. On the 5-28 log (n=1816 tip-ins) the fix delivers **~18% overall lean-spike reduction vs 20.14 L3**, strongest in 1500-2000 RPM (−37%). The 5-26 single-log 40-50% was small-sample optimism; the uniform same-code rerun lands at 18%. No meaningful gain <1500 RPM (gate may still sit above the tiniest deltas there — left as a minor open item). Combined n=1953. The contingency lever (drop IPW gate 1.0 → 0.7 ms) was NOT needed and is dropped from the queue. Original analysis kept below for the verification trail.
 
 ### Lean-on-accel transients in OL — tip-in enrichment fix flying in 20.15
 
