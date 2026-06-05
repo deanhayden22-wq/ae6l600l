@@ -1,8 +1,8 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-06-02 — 20.15 tip-in fix **CONFIRMED** on clean 5-26/5-28 logs (~18% lean-spike reduction, combined n=1953). 20.16 driven 5-30 surfaced **two P0 regressions** (ghost-zone −11.8° knock, injector IDC >100%). 20.17 built 2026-06-02 (top-end boost) but **intent unconfirmed** and not yet driven.
-**On car right now:** 20.16 (`rom/AE5L600L 20g rev 20.16.bin` — Target Boost raise + base-timing pull; two P0s found 5-30).
-**Staged / built next:** 20.17 (`rom/AE5L600L 20g rev 20.17.bin` — top-end Target Boost held flat + WGDC / Turbo-Dynamics / OL-fueling KCA / per-gear timing; not yet driven, intent unconfirmed). See `tune-state.md` "20.16 → 20.17".
+Last updated 2026-06-04 — 20.17 driven 6-3 (`logs/6-3 20.17/log0001.csv`), **part-throttle only**. The high-load FLKC knock mechanism was fully solved this session and the fix is flying, but the 17-psi condition was never reached → **WOT test pending** (see FLKC entry). 20.15 tip-in fix was a real ~18% gain but tip-in remains substantially attenuated (re-confirmed 20.17, 140/154 events −84%) — being reworked toward 20.17a.
+**On car right now:** 20.17 (`rom/AE5L600L 20g rev 20.17.bin` — target → ~17 to arm Turbo Dynamics + WGDC down + TD-negative up + per-gear 5th timing comp + OL richen; driven 6-3, TD-arm confirmed, knock fix UNTESTED).
+**Prior P0s (from 20.16, still open):** ghost-zone −11.8° knock (2200-3300 × 1.0-1.4) + injector IDC >100% at top end — see "20.16 watch". (6-3 in-zone IDC was fine at 54-62%, but that was part-throttle, ≤14.3 psi.)
 **MAF rescale:** CLOSED — Dean's 378k-sample offline check showed the current curve is converged in the cruise band. No changes needed.
 
 Each entry: symptom → where it shows in data → what's been tried →
@@ -13,6 +13,19 @@ close per ROM rev. The same content lives in working memory and may
 diverge from this snapshot.
 
 ---
+
+## 20.17a watch — tip-in cusp-knock TEST (built 6-4, OPEN)
+
+Perceived "tip-in knock" lives at **1600-3000 RPM × load 1.0-1.25**. Deep dive on the 6-3 20.17 log established two things that reframe it:
+
+- **It's transient-bound, not steady** — 1.04 min of steady cusp cruise fired 0 knock; all fires followed a stab/load-change at the *same* load steady cruise sits at calmly. Knock fires at near-commanded mixture ~0.5 s after the acute lean (which is largely wbo2 recovering from fuel-cut).
+- **It's probably NOT a tip-in fuel deficit** — 20.x already runs MORE tip-in than stock on every lever and sees the same BE at stab (~2.3 psi), yet **stock had ZERO cusp transient knock**. Likely the built-engine/20G airflow transient into knock-marginal cells. Memory: `[[cusp-transient-knock-is-not-a-tip-in-fuel-deficit-likely-hardware-transient]]`.
+
+**20.17a = single-variable test.** Only the BE-comp DATA (`0xCD14C`) low-BE cells were lifted (−88/−58/−40/−25/−14/−7/−3/−1/0; ~3× tip-in at the cusp, deep-settled unchanged). Full byte table + rationale in `tune-state.md` "20.17 → 20.17a".
+
+- **Gates:** G1 cusp stab-lean 2.24 → <1.5; G2 fewer cusp transient knock-fires, nothing deeper than −2.8°; G3 steady AFC ±1.5%, IDC <85%, watch cold richness.
+- **DECISIVE:** lean drops but knock persists → it was never fuel; stop touching tip-in, look at load/timing substrate. Both drop → fuel was the lever. **Do not move AVCS yet** (possible original cliff cause).
+- Dead ends ruled out this session: `cc4ec` is a decel-fuelcut tier boundary (not an overrun-cut lever, mislabeled); raising base/RPM-comp/gate further is fighting a system already richer than stock.
 
 ## 20.16 watch — TWO P0 REGRESSIONS (5-30 drive) — OPEN
 
@@ -34,8 +47,15 @@ diverge from this snapshot.
 - **Candidates:** MAF over-read in the cruise V-range (floor at V=1.6-2.0), injector-flow drift, or fuel-pressure drift. ROM hasn't touched MAF scaling, so this is hardware/sensor drift.
 - **Next:** if it holds ≤ −2.0 for one more log, plan a MAF mid-V investigation against WB residuals (Josh F exp fit per `feedback_maf_no_cellwise_patches.md`).
 
-### FLKC transient −1.75 in 3400-3800 × high-load OL (carried from 5-28)
-- 5-28 walked FLKC to −1.75 (deepest 20.15 excursion) in the long-standing high-RPM mid-load OL cluster; not re-observed on 5-30 (zone not revisited under trigger conditions). 20.15/20.16 didn't address this zone. Still OPEN — next ROM iteration candidate.
+### FLKC −1.75 in 3400-3800 × high-load OL — MECHANISM SOLVED (6-04), fix flying in 20.17, WOT TEST PENDING
+- **What it is (solved this session):** genuine knock from the boost OVERSHOOT. The 5th-gear target was capped at 12.7 (below the 15 psi spring), so boost floored at the spring and ran UNCONTROLLED to 17-18 psi; 17 psi at 3400-3800 is knock-limited to ~7.5-8° and FLKC (the per-cell *Fine Correction* — retard 1.01 / adv 0.25 / delay 90, grid `0xD2F0C`/`0xD2F28`) pulled to −1.75. FLKC is INDEPENDENT of FBKC and load-gated; knock detection has NO boost/MAP input (RPM×IAT, re-verified from `0xAE284` axis bytes) — overboost reaches it via LOAD + cylinder pressure. Full mechanism: `[[knock-detector-has-no-boost-input]]`.
+- **Why TD couldn't fight the overshoot before:** Turbo Dynamics was hard-zeroed because target (12.7) sat under its activation gate (`0xC0BD4` = enable >13 psi).
+- **20.17 fix (flying):** target → ~17 (clears the 13 gate → arms TD to *control* boost instead of overshooting), WGDC down, TD-negative up, per-gear 5th timing comp populated (−1.08/−1.56° @ load 2.5/3.0 — `[[per-gear-timing-comp-5th-lever]]`), AVCS-pull held as fallback.
+- **20.17 drive (6-3 log) — PARTIAL validation only:** TD **ARMED** ✓ (tdi/Tdp now live vs hard-0 before — the gate fix worked), AVCS valid (p95 29°), boost controlled, AFR rich/good, **zero FLKC**. BUT never went WOT (max 51% throttle, max 14.3 psi) → **the 17-psi knock condition was never recreated, so the fix is UNTESTED at the conditions that matter.**
+- **Open action items:**
+  1. **WOT 5th-gear pull at 3400-3800 needed** to validate. Note: target=17 + TD armed means that pull WILL now drive boost to ~17 in the zone (controlled, not an overshoot) — so it's both the test and the first real exposure.
+  2. **Verify the per-gear 5th timing comp actually arms BEFORE that pull** — its load activation (`0xD2D40` enable>0 / disable<8 g/rev) looked possibly inert; if it isn't arming, 17 psi runs at the old too-aggressive timing and FLKC (or sub-sample knock) finds it.
+  3. **Fallback if 15 psi still knocks at the spring floor:** drop AVCS in the Non-Cruise high-load cells (cylinder-pressure lever that works *under* the spring; cam is at ~28° advance there). The real "more power here" path is octane/E85 + new injectors, not more boost at less timing (knock-limited zone, ~7.5° at 17 psi cool IAT = boost-heavy/timing-light = heat). No EGT probe = flying blind on the thermal floor.
 
 ---
 

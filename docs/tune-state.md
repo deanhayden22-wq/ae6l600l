@@ -1,9 +1,9 @@
 # Tune state — AE5L600L 20G
 
-Captured 2026-06-02. 20.15's tip-in enrichment fix is **CONFIRMED** (5-26 + 5-28 clean logs, ~18% overall lean-spike reduction at combined n=1953). 20.16 was flashed and driven 5-30 and surfaced **two P0 regressions** (ghost-zone −11.8° knock + injector IDC saturation >100%). 20.17 was built 2026-06-02 in response but is **not yet driven** — and its intent needs a one-line confirmation from Dean (see "20.16 → 20.17" below). The earlier 5-25 AVCS-lockout note is preserved in the "20.15 verification drive (5-25…)" section.
+Captured 2026-06-04. 20.17 was driven 6-3 — a gentle 7-session commute (64 min sampled, **peak mrp only 14.35 psi**, so its top-end boost intent is still UNTESTED). Valid data (AVCS healthy, IAM 1.0 all drive). The drive was used for a deep **tip-in cusp-knock** investigation (1600-3000 × load 1.0-1.25). **20.17a built 2026-06-04**: single-variable BE-comp data reshape to defeat the low-BE tip-in cut. The earlier 5-25 AVCS-lockout note is preserved below.
 
-**On car right now:** 20.16 (`rom/AE5L600L 20g rev 20.16.bin` — Target Boost raise + base-timing pull; driven 5-30, two P0 regressions found).
-**Staged / built next:** 20.17 (`rom/AE5L600L 20g rev 20.17.bin` — top-end Target Boost held flat + WGDC / Turbo-Dynamics + OL-fueling KCA + per-gear timing comp; built 2026-06-02, not yet driven, **intent unconfirmed**).
+**On car right now:** 20.17 (driven 6-3). **Built & staged to flash next:** 20.17a (`rom/AE5L600L 20g rev 20.17a.bin` — BE-comp `0xCD14C` low-BE cells lifted; everything else held).
+**Key reframe this session:** the cusp transient knock is probably **NOT a tip-in fuel deficit** — 20.x already runs more tip-in than stock on every lever, yet stock had zero cusp transient knock. Likely the built-engine/20G airflow transient into knock-marginal cells. 20.17a is the clean test (see `20.17 → 20.17a`). Don't move AVCS yet.
 **MAF rescale status:** Dean verified converged on 378k-sample offline analysis (5-23). No MAF changes needed for 20.15. The 8-50 g/s cruise band runs −0.1% to −1.4% (median ≈ −0.5%); only the 161-180 g/s band shows a coherent −3 to −5.7% lean across 3 cells but residency is lower (boost-build transient territory). Defer.
 
 ROM revs are in `rom/AE5L600L 20g rev X.Y tiny wrex.bin`. Bins are
@@ -610,6 +610,44 @@ AFL held steady at −2.34 median (not deepening). AVCS healthy. AVCS 28-36 MPH 
 | Timing Comp Per Gear — Activation RPM / 5th gear | d2d38 / d5454 | changed |
 
 **Tension to resolve before flashing:** 20.17 RAISES top-end boost, but the 5-30 log already showed injectors saturating (IDC >100%) at 17 psi. Either (a) the new injectors are assumed on-car for 20.17, or (b) the OL-fueling KCA edits lean the top-end to keep IPW in range. Also, 20.17 does **not** appear to address the 20.16 ghost-zone knock regression — those cells are unchanged on the logged pedal paths. Confirm the plan. (Comparison tool: `scripts/analysis/pedal_boost_2017_compare.py`; plot `plots/pedal_boost_2016_vs_2017.png`.)
+
+### 20.17 verification drive (6-3) — tip-in cusp-knock deep dive (NOT a boost test)
+
+`logs/6-3 20.17/log0001.csv` — 7-session commute, 98,427 samples / **64 min sampled** (big overnight gaps). **Peak mrp only 14.35 psi** → never made real boost, so 20.17's top-end intent is **still untested**. Data valid: AVCS p95 20°, **IAM 1.0 the whole drive**, FLKC 0, peak IDC 72.6% (no saturation). None of the 20.16 P0s reproduced (no −11.8° slam).
+
+**The whole drive was used to characterize the perceived "tip-in knock."** Findings (scripts: `tipin_knock_levers_2017.py`, `cusp_knock_steady_vs_transient.py`, `cusp_longitudinal.py`, `knock_vs_lean_timing.py`):
+
+- **10 knock-fires** (FBKC down-steps), all at **load ≈ 1.0, RPM 1600-3000**, max depth −2.8° (de-fanged, IAM intact). 9/10 preceded by a throttle stab.
+- **Cusp knock is TRANSIENT-bound:** 1.04 min of steady cusp cruise (no stab, load flat) fired **0** knock; all fires followed a stab/load-change at the *same* load steady cruise sits at calmly.
+- **Knock fires at near-commanded mixture** (median +0.9 AFR lean at the instant), ~0.5 s AFTER the acute lean peak. The acute "+9 AFR" lean is largely `wbo2` recovering out of fuel-cut, not in-cylinder.
+- **It is probably NOT a tip-in fuel deficit.** Stock vs 20.17: 20.17 already runs MORE tip-in on every lever (base +30%, RPM comp higher, BE-comp less-attenuating via compressed axis, IPW gate 1.0 vs stock 1.32 ms) and sees the same BE during stabs (~2.3 psi), yet **stock logs had ZERO cusp transient knock** and 20.17 has ~11/min. Differentiator is hardware (built engine + 20G airflow step), not fueling. See memory `[[cusp-transient-knock-is-not-a-tip-in-fuel-deficit-likely-hardware-transient]]`.
+- **`cc4ec` is NOT an overrun-cut RPM threshold** (Ghidra mislabel) — it's a decel-fuelcut tier boundary, and raising it is fuel-favorable. Decel is not a lever here. Memory `[[cc4ec-is-a-decel-fuelcut-tier-boundary-not-an-overrun-cut-rpm-threshold]]`.
+
+### 20.17 → 20.17a (built 2026-06-04 — single-variable tip-in test)
+
+**One change: BE-comp DATA (`0xCD14C`), low-BE cells lifted.** Everything else held (base, RPM comp, gates, axis, AVCS, timing, decel).
+
+| cell | BE psi | 20.17 comp% | → 20.17a comp% | byte |
+|---:|---:|---:|---:|---|
+| 0 | 0.00 | −88 | −88 (keep) | 0F |
+| 1 | 0.93 | −85 | **−58** | 36 |
+| 2 | 1.86 | −80 | **−40** | 4D |
+| 3 | 2.79 | −72 | **−25** | 60 |
+| 4 | 3.71 | −62 | **−14** | 6E |
+| 5 | 4.64 | −48 | **−7** | 77 |
+| 6 | 5.57 | −31 | **−3** | 7C |
+| 7 | 6.50 | −5.5 | **−1** | 7F |
+| 8 | 6.73 | 0 | 0 (keep) | 80 |
+
+Bytes @ `0xCD14C`: `0F 36 4D 60 6E 77 7C 7F 80`. Delivers ~**3× tip-in at the cusp** (BE 1-3 psi); deep-settled (BE>6.7) **unchanged** (cell 8 kept). Rationale: the BE comp is blind to wall-wetting (only gates on spool/boost-error), so it cuts fuel in the early-stab window where the lean is. Dean chose to defeat that cut rather than chase target boost (which caused the 20.16 regression).
+
+**Pre-drive gates (score on cusp 1600-3000 × load 1.0-1.25):**
+- **G1 (lean):** median cusp stab-lean (wbo2−FFB) 2.24 → target **< 1.5**.
+- **G2 (the goal):** fewer cusp transient knock-fires; nothing deeper than −2.8°.
+- **G3 (regression):** steady-cruise AFC within ±1.5%; peak IDC < ~85%; watch cold-start tip-in richness (ECT comp no longer tamed by BE cut).
+- **DECISIVE READ:** if G1 improves but G2 doesn't → knock was never fuel; stop touching tip-in, it's the load/timing/hardware substrate. If both improve, fuel was the lever.
+
+**Verify on ingest:** confirm the byte diff is BE-comp-only before scoring (per `feedback_verify_rom_changes_against_user_claims`). Flash + restart (AVCS lockout), normal commute with coast-then-stabs; no WOT needed.
 
 ## Baseline log
 

@@ -45,8 +45,8 @@ LOGS_DIR = REPO_ROOT / "logs"
 
 # Canonical rev order. Append new revs here.
 REV_ORDER = [
-    "old_2023_base", "stock", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12",
-    "20.13", "20.14",
+    "stock", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12",
+    "20.13", "20.14", "20.15", "20.16",
 ]
 DEFAULT_BASELINE = "stock"
 
@@ -346,8 +346,10 @@ def assemble_scorecard(stutter_rates, stutter_sig, knock_rates,
         (maf_rev, "rom_rev"),
     ]:
         revs_set.update(df[col].dropna().tolist())
-    revs = sorted(revs_set,
-                  key=lambda r: REV_ORDER.index(r) if r in REV_ORDER else 999)
+    # Only emit rows for revs in REV_ORDER. Anything else (e.g. old_2023_base)
+    # is filtered out so it doesn't skew the dashboard y-axis.
+    revs_set = {r for r in revs_set if r in REV_ORDER}
+    revs = sorted(revs_set, key=lambda r: REV_ORDER.index(r))
 
     for rev in revs:
         # ----- pedal_throttle -----
