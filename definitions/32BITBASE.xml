@@ -220,6 +220,8 @@
 	<scaling name="clusterfueleffcomp" units="Estimated Fuel Efficiency Correction" toexpr="x" frexpr="x" format="%.3f" min="0" max="2" inc="0.1" storagetype="float" endian="big"/>
 	<scaling name="counterthreshold" units="counter threshold" toexpr="x" frexpr="x" format="%.0f" min="0" max="1250" inc="1" storagetype="uint8" endian="big"/>
 	<scaling name="counterthreshold1" units="counter threshold" toexpr="x" frexpr="x" format="%.0f" min="1" max="100" inc="1" storagetype="uint16" endian="big"/>
+	<scaling name="KnockWindowLength(count)" units="counter ticks" toexpr="x" frexpr="x" format="%.0f" min="0" max="65535" inc="1" storagetype="uint16" endian="big"/>
+	<scaling name="KnockAccumBleed(raw)" units="raw (accumulator units/tick)" toexpr="x" frexpr="x" format="%.4f" min="0" max="2" inc="0.0005" storagetype="float" endian="big"/>
 	<scaling name="cumulativethrottleanglechange" units="cumulative throttle angle change" toexpr="x" frexpr="x" format="%.2f" min="0" max="50" inc="0.1" storagetype="float" endian="big"/>
 	<scaling name="cumulativethrottleanglechange1" units="cumulative throttle angle change" toexpr="x*.001907349" frexpr="x/.001907349" format="%.2f" min="0" max="50" inc="0.1" storagetype="uint16" endian="big"/>
 	<scaling name="degreesofcorrection" units="degrees of correction" toexpr="x" frexpr="x" format="%.2f" min="-11.75" max="8" inc="0.1" storagetype="float" endian="big"/>
@@ -2661,6 +2663,48 @@
 		<description>When feedback correction is negative and the knock signal is then clear, feedback correction does not immediately reset to zero. Instead, the negative correction is increased by the value in this table for each time period that passes with no knock as determined by the 'Feedback Correction Negative Advance Delay' table. Feedback correction will never be greater than zero.</description>
 		<table type="Static Y Axis" elements="1">
 			<data>Change in Negative Feedback Correction After Each 'No Knock' Delay</data>
+		</table>
+	</table>
+
+	<table name="Post-Transient Knock Window A Length" category="Ignition Timing - Knock Control" type="2D" level="2" scaling="KnockWindowLength(count)">
+		<description>Duration (counter ticks) of post-transient knock window A after arming event A. While active (and master transient flag clear, and throttle-state byte == 1), the knock accumulator is bled down each task pass by 'Post-Transient Knock Accumulator Bleed A'. 0 = window disabled. Factory: 0 on all EJ255 (WRX) cals checked; window B (not A) = 438 on EJ257 (STI) cals. Tick unit unverified (~8 ms if same family as Feedback Correction Negative Advance Delay; 438 ~= 3.5 s). Mechanism trace: disassembly/analysis/transient_knock_window_trace.txt (window fn 0x40A9C, AE5L600L addresses).</description>
+		<table type="Static Y Axis" elements="1">
+			<data>Window A Ticks (0 = disabled)</data>
+		</table>
+	</table>
+
+	<table name="Post-Transient Knock Window B Length" category="Ignition Timing - Knock Control" type="2D" level="2" scaling="KnockWindowLength(count)">
+		<description>Duration (counter ticks) of post-transient knock window B after arming event B (event source not yet traced; NOT gated on throttle-state byte). While active, knock accumulator (RAM FFFF7FBC on AE5L600L) is bled down by 'Post-Transient Knock Accumulator Bleed B' per task pass, clamped at 0. FACTORY: 438 on every EJ257 (STI) cal checked (AE5K500V, AE5L500V, AE5L700V); 0 on every EJ255 (WRX) cal (AE5L500L, AE5L600L, AE5Q100L). Effect direction (sensitize vs desensitize) NOT yet proven - see trace file before relying on it. Trace: disassembly/analysis/transient_knock_window_trace.txt.</description>
+		<table type="Static Y Axis" elements="1">
+			<data>Window B Ticks (0 = disabled; STI factory = 438)</data>
+		</table>
+	</table>
+
+	<table name="Post-Transient Knock Accumulator Bleed A" category="Ignition Timing - Knock Control" type="2D" level="2" scaling="KnockAccumBleed(raw)">
+		<description>Per-task-pass subtraction applied to the knock accumulator while post-transient window A is active. Factory 0.015 on all cals checked (unreachable where window length = 0). Accumulator is clamped to [0, max]; units unverified.</description>
+		<table type="Static Y Axis" elements="1">
+			<data>Bleed per tick (factory 0.015)</data>
+		</table>
+	</table>
+
+	<table name="Post-Transient Knock Accumulator Bleed B" category="Ignition Timing - Knock Control" type="2D" level="2" scaling="KnockAccumBleed(raw)">
+		<description>Per-task-pass subtraction applied to the knock accumulator while post-transient window B is active. Factory 0.015 on all cals checked, including the STI cals where window B = 438 is armed.</description>
+		<table type="Static Y Axis" elements="1">
+			<data>Bleed per tick (factory 0.015)</data>
+		</table>
+	</table>
+
+	<table name="Knock Accumulator Bleed (alt path 1)" category="Ignition Timing - Knock Control" type="2D" level="2" scaling="KnockAccumBleed(raw)">
+		<description>Accumulator subtraction on an alternate (window-inactive) branch of the knock threshold task (store path 0x41544 family, AE5L600L). Factory 0.7. Semantics partially traced - do not edit without reading the trace file.</description>
+		<table type="Static Y Axis" elements="1">
+			<data>Bleed (factory 0.7)</data>
+		</table>
+	</table>
+
+	<table name="Knock Accumulator Bleed (alt path 2)" category="Ignition Timing - Knock Control" type="2D" level="2" scaling="KnockAccumBleed(raw)">
+		<description>Accumulator subtraction on a second alternate branch (R11==1 variant). Factory 0.7. Semantics partially traced - do not edit without reading the trace file.</description>
+		<table type="Static Y Axis" elements="1">
+			<data>Bleed (factory 0.7)</data>
 		</table>
 	</table>
 

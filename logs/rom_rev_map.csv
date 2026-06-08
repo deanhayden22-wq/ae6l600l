@@ -1,15 +1,15 @@
 log_path,log_date,rom_rev,confidence,note
-3-31 black.csv,2023-03-31,old_2023_base,high,3 years ago - same car - rom = 13 20g Base rev 25 e garn.hex (10Hz logger schema)
-3-21.csv,2026-03-21,stock,high,pre-MerpMod
-3-30.csv,2026-03-30,stock,high,pre-MerpMod
-4-1.csv,2026-04-01,stock,high,pre-MerpMod (20.7 saved 2026-04-04)
-4-11.csv,2026-04-11,20.7,high,
-4-12 big.csv,2026-04-12,20.7,high,
-4-23/log0001.csv,2026-04-23,20.8,high,
-4-23/log0002.csv,2026-04-23,20.8,high,
-4-24/4-24 full.csv,2026-04-24,20.8,high,user-confirmed; 20.9 finalized after this drive
-4-25/4-25 full.csv,2026-04-25,20.9,high,user-confirmed
-4-27 20.10/4-27.csv,2026-04-27,20.10,high,folder name confirms
+Older/3-31 black.csv,2023-03-31,old_2023_base,high,3 years ago - same car - rom = 13 20g Base rev 25 e garn.hex (10Hz logger schema)
+Older/3-21.csv,2026-03-21,stock,high,pre-MerpMod
+Older/3-30.csv,2026-03-30,stock,high,pre-MerpMod
+Older/4-1.csv,2026-04-01,stock,high,pre-MerpMod (20.7 saved 2026-04-04)
+Older/4-11.csv,2026-04-11,20.7,high,
+Older/4-12 big.csv,2026-04-12,20.7,high,
+April/4-23/log0001.csv,2026-04-23,20.8,high,
+April/4-23/log0002.csv,2026-04-23,20.8,high,
+April/4-24/4-24 full.csv,2026-04-24,20.8,high,user-confirmed; 20.9 finalized after this drive
+April/4-25/4-25 full.csv,2026-04-25,20.9,high,user-confirmed
+April/4-27 20.10/4-27.csv,2026-04-27,20.10,high,folder name confirms
 5-2/5-2.csv,2026-05-02,20.10,high,user-confirmed (20.11 not flashed)
 5-8 20.11/5-8.csv,2026-05-08,20.11,high,first log on 20.11
 5-10 20.11/log0003.csv,2026-05-10,20.11,high,second log on 20.11 (7.3 min; 6 post_dfco pulls)
@@ -31,5 +31,6 @@ log_path,log_date,rom_rev,confidence,note
 5-26 20.15/log0001.csv,2026-05-26,20.15,high,2nd log on 20.15 (26.3 min n=38 warm tip-ins; tip-in fix appeared -40 to -51% but 5-28 n=1816 shows actual improvement is ~18% overall)
 5-28 20.15/log0001.csv,2026-05-28,20.15,high,3rd log on 20.15 (164.2 min big cruise drive; n=1816 tip-ins confirms ~18% overall lean-spike reduction vs 20.14 L3; AVCS healthy p95=21; AFL drifted to median -2.34; FLKC transient to -1.75 in 3400-3800 OL high-load zone)
 5-30 20.16/log0001.csv,2026-05-30,20.16,high,"1st log on 20.16 (48.8 min; CATASTROPHIC -11.80 FBKC twice in 2200-3300x1.0-1.4 ghost zone @156 samp/min = 6.4x vs 20.15, driven by raised Target Boost spooling into un-protected cells; IDC saturated >100% at partial-throttle 4923 RPM = injector limit; IAM/FLKC stayed clean; AFL steady -2.34; flashed build md5 b8bd7091 differs from anchor)"
-
 6-3 20.17/log0001.csv,2026-06-03,20.17,high,"7-session commute 64min sampled; peak mrp 14.35psi (NO real boost - top-end intent UNTESTED); valid data AVCS p95 20 IAM 1.0 all-drive FLKC 0 IDC peak 72.6%; none of 20.16 P0s reproduced; used for tip-in cusp-knock deep dive: 10 knock-fires at 1600-3000xload1.0 max -2.8deg, TRANSIENT-bound (0 steady knock), fires at near-commanded mixture ~0.5s after acute lean - probably NOT a fuel deficit (20.x runs more tip-in than stock on every lever yet stock had 0 cusp transient knock); 20.17a BE-comp 0xCD14C low-BE reshape staged as single-var test"
+6-5 20.17a/log0001.csv,2026-06-05,20.17a,high,"1st log on 20.17a (32.3min ONE continuous segment; AVCS p95 20 IAM 1.0 FLKC 0 IDC peak 70.4%; peak mrp 13.77psi - NO real boost 3rd log running, top-end UNTESTED). AS-DRIVEN bin had BE-comp lift PLUS accidental decel-tier change 0xCC4EC 2250/3000/4500->1000/2000/3500 (reverted post-drive, on-disk bin now BE-comp-only). G1 cusp stab-lean 2.24->2.08 (real non-DFCO 1.76) FAIL despite tip-in firing +2.05ms IPW - lean is wall-wetting not fuel deficit; G2 no real cusp knock deeper than -1.4 shift-filtered (deep -8.40 is overrun noise at -1.2psi vacuum); cusp residency only 0.59min (low power vs 6-3 1.63); DECISIVE: cusp lean/knock NOT a tip-in fuel deficit - move to load/timing/AVCS substrate"
+6-7 BIG 20.17a fixed/log0001.csv,2026-06-07,20.17a,high,"502min BIGGEST log; fixed bin verified (BE-comp-only vs 20.17; decel tiers restored vs 6-5 oopsie). Decel revert CONFIRMED killed deep overrun FBKC (0.124->0.016/min). Cusp at 12x power: non-DFCO stab-lean 1.71 unchanged (fuel theory dead); STEADY cusp fires real 1.70/min incl -8.05 chain at 2140-2270x1.15 -> substrate next. FIRST real boost: 19.7psi peak, knock-free 17-19psi, wbo2 10.6, tracking -3.5psi under target; IDC 85.5% at 57% throttle = injector ceiling measured. FLKC transient cluster -1.0 highway 2800-3250x1.2-1.5 recovered. AFL drift reproduces: 0->-2.34 re-learn. AVCS p95 23 IAM 1.0."

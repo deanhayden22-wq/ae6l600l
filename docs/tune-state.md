@@ -1,8 +1,8 @@
 # Tune state — AE5L600L 20G
 
-Captured 2026-06-04. 20.17 was driven 6-3 — a gentle 7-session commute (64 min sampled, **peak mrp only 14.35 psi**, so its top-end boost intent is still UNTESTED). Valid data (AVCS healthy, IAM 1.0 all drive). The drive was used for a deep **tip-in cusp-knock** investigation (1600-3000 × load 1.0-1.25). **20.17a built 2026-06-04**: single-variable BE-comp data reshape to defeat the low-BE tip-in cut. The earlier 5-25 AVCS-lockout note is preserved below.
+Captured 2026-06-04, updated 2026-06-05. 20.17 was driven 6-3 — a gentle 7-session commute (64 min sampled, **peak mrp only 14.35 psi**, so its top-end boost intent is still UNTESTED). Valid data (AVCS healthy, IAM 1.0 all drive). The drive was used for a deep **tip-in cusp-knock** investigation (1600-3000 × load 1.0-1.25). **20.17a built 2026-06-04**: single-variable BE-comp data reshape to defeat the low-BE tip-in cut. **Driven 6-5** (32 min, thin cusp data): first read says the cusp lean/knock is **NOT a tip-in fuel deficit** — see `20.17a verification drive (6-5)`. The earlier 5-25 AVCS-lockout note is preserved below.
 
-**On car right now:** 20.17 (driven 6-3). **Built & staged to flash next:** 20.17a (`rom/AE5L600L 20g rev 20.17a.bin` — BE-comp `0xCD14C` low-BE cells lifted; everything else held).
+**On car for the 6-5 drive:** 20.17a *as-driven* = BE-comp `0xCD14C` lift PLUS an **accidental decel-tier change** (`0xCC4EC`: 2250/3000/4500 → 1000/2000/3500 RPM, a walked-back "stock decel" leftover). Dean reverted the decel post-drive (his tool recomputed the checksum), so the **on-disk `rom/AE5L600L 20g rev 20.17a.bin` is now BE-comp-only** (11-byte diff vs 20.17 = BE-comp data + checksum). **Staged to flash next:** that clean 20.17a bin, for a **weekend long drive** (more cusp residency + ideally a real boost pull). **Verdict so far (6-5, thin data):** cusp lean/knock is NOT a tip-in fuel deficit — confirm on the weekend.
 **Key reframe this session:** the cusp transient knock is probably **NOT a tip-in fuel deficit** — 20.x already runs more tip-in than stock on every lever, yet stock had zero cusp transient knock. Likely the built-engine/20G airflow transient into knock-marginal cells. 20.17a is the clean test (see `20.17 → 20.17a`). Don't move AVCS yet.
 **MAF rescale status:** Dean verified converged on 378k-sample offline analysis (5-23). No MAF changes needed for 20.15. The 8-50 g/s cruise band runs −0.1% to −1.4% (median ≈ −0.5%); only the 161-180 g/s band shows a coherent −3 to −5.7% lean across 3 cells but residency is lower (boost-build transient territory). Defer.
 
@@ -648,6 +648,109 @@ Bytes @ `0xCD14C`: `0F 36 4D 60 6E 77 7C 7F 80`. Delivers ~**3× tip-in at the c
 - **DECISIVE READ:** if G1 improves but G2 doesn't → knock was never fuel; stop touching tip-in, it's the load/timing/hardware substrate. If both improve, fuel was the lever.
 
 **Verify on ingest:** confirm the byte diff is BE-comp-only before scoring (per `feedback_verify_rom_changes_against_user_claims`). Flash + restart (AVCS lockout), normal commute with coast-then-stabs; no WOT needed.
+
+### 20.17a verification drive (6-5) — BE-comp lift: cusp lean/knock is NOT fuel (thin data; confirm on weekend)
+
+`logs/6-5 20.17a/log0001.csv` — 48,440 samples / 25 Hz = **32.3 min, one
+continuous segment**. Sanity gate PASS (AVCS p95 20°, max 28°; IAM 1.0, FLKC 0).
+**Third log running with no real boost** (peak mrp 13.77 psi; the lone
+100%-throttle sample made 3 psi) — top-end/WOT intent still untested. Peak IDC
+70.4%, no saturation.
+
+**The verify-on-ingest step earned its keep** (`feedback_verify_rom_changes_against_user_claims`):
+the as-driven bin was NOT BE-comp-only — it also had `0xCC4EC` decel-tier
+boundaries lowered (2250/3000/4500 → 1000/2000/3500 RPM), an accidental
+walked-back-"stock decel" leftover. Dean reverted it after the drive; on-disk
+20.17a is now BE-comp-only. **This 6-5 log carries a decel confound the weekend
+log won't.**
+
+**Gate scoring (cusp 1600-3000 × load 1.00-1.25):**
+
+| gate | target | result |
+|---|---|---|
+| G1 cusp stab-lean | < 1.5 AFR | 2.24 → **2.08** (real non-DFCO 1.76) — **FAIL** |
+| G2 fewer fires / nothing deeper than −2.8° | — | shift-filtered ≤ −1.4°; deep −8.40° is overrun noise |
+| G3a steady-cruise AFC | ±1.5% | −1.80% mean / −1.56% median — WATCH |
+| G3b peak IDC | < 85% | 70.4% — **PASS** |
+
+- **Tip-in IS firing harder** (median IPW jump +2.05 ms at cusp stabs, BE-at-stab
+  3.29 psi median) yet the real non-DFCO stab-lean only fell 2.24 → 1.76 AFR. The
+  DFCO-recovery portion (15/54 stabs) sits at 3.22 AFR — wbo2 climbing out of
+  fuel-cut, unfixable by tip-in by definition. Residual lean = wall-wetting /
+  sensor-lag, not deliverable fuel.
+- **The deep FBKC is noise:** all 4 episodes ≤ −3° are at mrp ≤ 1.3 psi (the
+  −8.40° at **−1.2 psi vacuum**), shift/overrun transients. Real cusp knock stays
+  ≤ −1.4° (shallower than 20.17's −2.8°). IAM/FLKC never moved.
+- Cusp residency only **0.59 min** (vs 1.63 on 6-3; steady residency 0.24 min) —
+  low test power. Two steady-context cusp fires appeared (20.17 had zero), at
+  rich/neutral mixture.
+- **Cold over-richness did NOT appear** (the G3 worry): 150 warmup tip-ins
+  (ECT<160 °F) ran +0.25 AFR (at command), warmup peak IDC 70%.
+
+**Decisive read:** G1 barely moved *despite confirmed +2 ms fuel delivery*, and G2
+showed no fuel-attributable knock change. **The cusp lean/knock is not a tip-in
+fuel deficit** — next lever is the load/timing/AVCS substrate, not tip-in fuel
+(memory `[[cusp-transient-knock-is-not-a-tip-in-fuel-deficit-likely-hardware-transient]]`).
+Two caveats keep the thread formally open: thin cusp residency, and the decel
+confound. **The weekend long drive on the clean BE-comp-only bin settles it**
+(more cusp residency, ideally a real boost pull; also watch whether the overrun
+FBKC false-positives drop once the decel tiers are back at 2250/3000/4500 — that
+would retroactively confirm the lowered tiers fed them).
+
+Longitudinal stab-lean trend (`scripts/analysis/cusp_longitudinal.py`): 20.14
+3.40 → 20.15 2.96 → 20.17 2.24 → **20.17a 2.08** — the lowest in the series, but
+the floor is wall-wetting, not deliverable fuel.
+
+### 20.17a verification drive (6-7 BIG, fixed bin) — thread SETTLED: not fuel; steady cusp knock confirmed; first real boost
+
+`logs/6-7 BIG 20.17a fixed/log0001.csv` — 753,009 samples / 25 Hz = **502 min,
+largest log in corpus (2x the 5-23 L3)**. 13 recording segments. Sanity PASS
+(AVCS p95 23°, IAM 1.0). Bin verified before scoring: on-disk 20.17a md5
+`234c0839…` = 20.17 + BE-comp lift ONLY (7 bytes `0xCD14D-53` + checksum); the
+6-5 decel-tier oopsie is reverted (verified against git HEAD build).
+
+**Decel-revert A/B — CONFIRMED.** Deep (≤−3°) overrun-context FBKC episodes:
+6-3 clean tiers 0.000/min → 6-5 oopsie tiers 0.124/min → 6-7 fixed 0.016/min.
+The lowered decel tiers were the feeder. Closed.
+
+**Cusp at 12x test power (20.5 min residency):**
+
+| gate | result |
+|---|---|
+| G1 stab-lean | 2.42 overall / **1.71 non-DFCO** (n=472) — unchanged vs 6-5's 1.76. Fuel-deficit theory dead with real statistics. |
+| G2 fires | 63 = 3.07/min overall. **STEADY-context fires are real: 18 / 10.59 min = 1.70/min**, typical −1.4°, one chain to −8.05 (episode min −10.15) at 2140-2270 × ~1.15 (s=347153, fueled, near-commanded mixture). |
+| G3a cruise AFC | +0.28% mean — PASS (6-5's −1.80 was AFC/AFL split migration, not a real fix) |
+| G3b IDC | **85.5% at 57% throttle** — at the flag line without a WOT pull |
+
+6-3's "transient-bound, 0 steady knock" was a residency artifact (1.6 min of
+cusp vs 20.5 here). **The cusp knocks in steady state too** — shallow, but with
+one deep walk. Next lever = load/timing/AVCS substrate. Tip-in fuel thread closed.
+
+**First real boost on any 20.17x log:** peak mrp 19.71 psi, 585 samples >15 psi.
+Knock-free at 17-19 psi (FBKC 0 through both stabs), wbo2 10.6-11.1, Timing ~9.5°.
+Boost tracking median **−3.46 psi UNDER target** in spool (p95 −0.08, max over
++1.45) — targets are optimistic vs natural flow, no overboost, no slam (wgdc 80%
+saturated at spool / ~60-64% settled). BUT both qualifying pulls were short stabs
+(1.2 s / 1.6 s, 2nd-gear + high-gear roll-on at 2700-3000) — **the top-end taper
+verdict and the 3400-3800 WOT FLKC test are STILL pending a clean 3rd-gear pull
+to 6000+.** And at 85.5% IDC from 57% throttle, that pull will exceed 85% —
+injector swap is now blocking, measured not extrapolated.
+
+**Backstop:** FLKC one transient cluster (139 decrements / 15.9 min, floor −1.0)
+at 2800-3250 × 1.2-1.5 during a 76-93 MPH highway stint; fully recovered, 0 for
+final 5 h — same family as 5-28's 3400-3800 cluster. AFL re-walked from
+reflash-zero to −2.34 median (drift REPRODUCES from a clean slate; per-cell MAF
+corrections still mild). Deepest event −10.85 = DFCO-resume + 2→3 shift riding
+−8° into a 10 psi partial pull (overrun-resume family, FLKC didn't learn). Cold
+start clean. 20.16 P0s stayed dead.
+
+Longitudinal stab-lean trend: 20.14 3.40 → 20.15 2.96 → 20.17 2.24 → 20.17a 2.08
+→ **6-7 2.42 overall / 1.71 non-DFCO** — the non-DFCO floor is flat across ~3×
+fuel authority. Wall-wetting/sensor-lag, confirmed.
+
+**Trends-store note (6-7 session):** first-instance fire rates now in
+`scripts/analysis/trends/zone_fire_rates.csv` (legacy FBKC<0 samp/min is
+inflated by retard-holding chains — use fires/min for cross-rev claims).
 
 ## Baseline log
 

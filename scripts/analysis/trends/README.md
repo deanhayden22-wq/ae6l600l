@@ -14,7 +14,6 @@ without also updating that file.
 | `wot_pulls.csv` | (log, rom_rev, pull) | 2.2 |
 | `pull_ramps.csv` | (log, rom_rev, pull) | 2.6 |
 | `maf_corr_by_mafcell.csv` | (log, rom_rev, mafv_bin, mafgs_bin) | 3.3 |
-| `cliffs_flagged.csv` | (log, rom_rev, table, cell-pair) | 4.5 |
 | `stutter_events.csv` | (log, rom_rev, event) | 5.6 |
 | `ve_proxy.csv` | (log, rom_rev, rpm_bin, mrp_bin) | 6.1 |
 

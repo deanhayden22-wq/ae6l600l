@@ -1,0 +1,197 @@
+================================================================================
+TRANSIENT KNOCK INHIBIT + DORMANT POST-TRANSIENT KNOCK WINDOW
+Traced 2026-06-07 (session: shift-knock mitigation hunt)
+Method: literal-pool scan for RAM flag addresses + sh2_disasm.py around each
+        reference. GBR bases resolved per-function from `ldc R0,GBR` preambles
+        (NOTE: sh2_disasm.py GBR comments assume GBR=FFFF7450 — WRONG inside
+        these modules; bases noted per function below).
+================================================================================
+
+PART 1 — FFFF726E (transient_knock_inhibit) writer: FOUND
+--------------------------------------------------------------------------------
+Known consumers (prior trace, mystery_subs_analysis.txt): tasks 8/10/11 call
+stub 0x2F8FE and ABORT knock flag/window processing when FFFF726E == 1.
+
+Literal pools containing 0xFFFF726E in the whole ROM: exactly two.
+  0x2F970  — reader stub 0x2F8FE (known)
+  0x2F6AC  — writer function 0x2F550 (NEW)
+
+Writer 0x2F550 (verified disasm):
+  R0 = byte[FFFF65C1]
+  if R0 == 1:
+      FR0 = table_1d(desc 0xAC338, arg = [FFFF6350] (ECT))   ; helper 0xBE830
+      [FFFF7288] = FR0          ; ECT-indexed multiplier while inhibit active
+      [FFFF726E] = 1
+  else:
+      [FFFF7288] = 1.0
+      [FFFF726E] = 0
+
+So: FFFF726E is a hard mirror of FFFF65C1. There is NO duration calibration on
+726E itself — the inhibit lasts exactly as long as FFFF65C1 == 1.
+
+FFFF65C1: labeled "throttle state byte" (fuel_pump_analysis.txt). All six
+pooled references are READS (0x126E6, 0x2F552, 0x2FBA8, 0x2FD5C/0x2FD94/0x2FE84,
+0x41614, 0x4BA5E). Writer uses computed addressing — NOT YET LOCATED. Scans
+performed: direct pools for 65C1 (6, all reads), mov.b R0,@(disp,Rn) reachable
+from any pool value in FFFF65B2..FFFF65C1 (zero hits), add-then-store patterns
+(zero hits). Next approach: trace the throttle/transient state machine that
+also maintains FFFF726C (17 pool sites), or emulate.
+
+Descriptor 0xAC338 raw: 00100400 000CC624 000CC830 3C000000 (16-element 1D
+table, axis 0xCC624, data 0xCC830) — not yet decoded.
+
+PART 2 — DORMANT POST-TRANSIENT KNOCK WINDOW (NEW DISCOVERY)
+--------------------------------------------------------------------------------
+A second, separate mechanism. Factory-calibrated to ZERO duration = disabled.
+
+State (struct around FFFF7FE8):
+  FFFF7FE8 (word) ctrA   — seeded 0xFFFF by init fn 0x4092E (GBR=FFFF7FD4)
+  FFFF7FEA (word) ctrB   — seeded 0xFFFF
+  FFFF7FEE (byte) flagA  — "event A occurred" arm
+  FFFF7FEF (byte) flagB  — "event B occurred" arm
+  FFFF7FDC (byte) window_flag — the output
+
+Window flag computation, fn 0x40A9C (pool refs, no GBR trick):
+  if [FFFF726C] (master transient, via stub 0x2F8EA) != 0:  window_flag = 0
+  else if flagA==1 AND ctrA < word[0xD29C2] AND byte[FFFF65C0]==1: window_flag = 1
+  else if flagB==1 AND ctrB < word[0xD29C4]:                       window_flag = 1
+  else: window_flag = 0
+
+Calibrations (stock AND 20.17a — never touched in 20.x):
+  0xD29C2 (word) window A length = 0      <- DISABLED
+  0xD29C4 (word) window B length = 0      <- DISABLED
+  counters seeded 0xFFFF at init = "expired"
+
+Second writer of window_flag: fn 0x40976 (GBR=FFFF7FBC) at 0x40994 — clears it
+when check_cl_active (0x22F92) returns 1 (partially traced).
+
+CONSUMER (the payoff), fn 0x410F0 (GBR=FFFF7FBC) — knock threshold computation:
+  read window_flag at 0x412BA and (inverted gate) at 0x4146E.
+  When window_flag == 1 (0x412C4..0x412D6 path):
+     FR4 = float[FFFF7FBC] (knock threshold base float)
+     FR4 = FR4 - float[0xD2BCC]     ; cal = 0.015 (stock & 20.17a)
+     -> store path 0x41544
+  Sibling path uses float[0xD2BD0] = 0.015 (gated on cal byte 0xD297B == 0xFF).
+  When window_flag == 0, alternate path at 0x4147C gated by RPM-band words
+  0xD29B8 (=0) / 0xD29B6 (=375) and floats 0xD2B4C (=510.0) / 0xD2B50 (=100.0)
+  / 0xD2B54 (=4.68).
+
+INTERPRETATION (verified parts vs open parts):
+  VERIFIED: Subaru shipped a post-transient-event knock-threshold-modifier
+  window. Its duration cals are zero, so the threshold offset (0.015) is
+  unreachable. Arming events exist (flagA/flagB) and an offset exists.
+  OPEN before any flash experiment:
+   1. What sets flagA (FFFF7FEE) / flagB (FFFF7FEF)? (= which transient events;
+      writes are GBR/computed — not yet found)
+   2. What increments ctrA/ctrB and at what rate? (counter unit: per-rev,
+      per-ignition, per-10ms task tick — defines what "window length N" means)
+   3. SIGN of the threshold change: FR4 = base - 0.015 — whether subtracting
+      makes detection MORE or LESS sensitive depends on the comparison
+      direction at the 0x41544 store path. MUST be resolved before arming;
+      if it sensitizes, this is the opposite of what we want.
+
+PART 2b — STORE PATH DECODED (2026-06-08): FFFF7FBC is an ACCUMULATOR
+--------------------------------------------------------------------------------
+Store path 0x41544 (common exit of all the threshold-modifier branches):
+  FR0 = clamp(FR4, min=0.0, max=float[FFFF7FC0])   ; helper 0xBE56C, FR5=fldi0
+  float[FFFF7FBC] = FR0
+And the branches feeding FR4:
+  0x41520: FR4 = [FFFF7FBC] + stack[40]            ; INCREMENT path
+  window_flag==1 (0x412C4): FR4 = [FFFF7FBC] - 0.015 (cal 0xD2BCC)  ; BLEED
+  variants: - cal 0xD2BC8 / - cal 0xD2BB0 depending on R11/byte cals
+Plus fn 0x40976: [FFFF7FBC] = 0.0 when check_cl_active(0x22F92)==1 (hard reset).
+
+So the armed window does NOT apply a one-shot threshold offset. It BLEEDS a
+bounded accumulator (float, [0 .. FFFF7FC0-max]) down by 0.015 per task
+invocation for the window duration. 438 ticks x 0.015 = 6.57 total bleed
+capacity — likely enough to fully drain and hold at floor for most of the
+window. The accumulator increments back along the 0x41520 path under
+calm/eligibility conditions (cals 0xD2B4C=510.0, 0xD2B50=100.0, 0xD2B54=4.68,
+RPM words 0xD29B8/0xD29B6=0/375 — semantics not fully decoded).
+
+SIGN STILL AMBIGUOUS, two live readings:
+  (a) accumulator = learned noise-floor / threshold ADDER:
+      bleed-down => lower threshold => MORE sensitive during window
+      ("re-learn noise floor after transient")
+  (b) accumulator = knock-evidence integrator toward a trip point:
+      bleed-down => harder to trip => LESS sensitive during window
+      (rattle rejection)
+Settling it statically requires finding the comparison consumer of FFFF7FBC /
+FFFF7FC0 (no further pooled readers found in the module — likely consumed via
+computed/GBR access; next session). Empirical disambiguation is cheap and
+engine-safe: arm factory config, A/B shift-knock fire rate vs the 6-7 baseline.
+
+PART 3 — relevance to shift-knock mitigation (6-7 review thread)
+--------------------------------------------------------------------------------
+6-7 data: 52% of SHIFT/MAYBE knock fires occur within 1.0 s of DFCO-resume vs
+3% of real LOAD-class fires (17:1 separation). A post-resume knock window that
+desensitizes detection for ~1 s would surgically remove the shift-rattle
+false positives without touching steady-state protection — IF the dormant
+window's arming events and sign cooperate. Otherwise the fallback lever is
+the FBKC no-knock advance delay 0xD29DE (70 -> 35) which halves the duration
+of any false retard (13 s -> 6.5 s from -8.4 deg).
+================================================================================
+
+================================================================================
+PART 4 — CROSS-ROM FACTORY CALIBRATION CHECK (2026-06-08)
+================================================================================
+Method: masked-opcode signature search (pool-load displacement bytes wildcarded)
+for the window-flag fn (stock 0x40A9C skeleton) and consumer fn (stock 0x412AA
+skeleton), then pool-decode the per-ROM cal addresses. Pipeline sanity-checked
+against ae5l600l.bin (reproduces 0xD29C2/0xD29C4 = 0/0, offsets 0.015).
+
+ROMs: rom/reference/ (stock downloads via RomRaider Stock ROM List, Dean's
+forum account, 2026-06-08).
+
+  CALID      model                 window fn   winA        winB         thr offsets
+  AE5K500V   2012 USDM STI MT      0x409EE     0xD2A50=0   0xD2A52=438  (consumer skeleton differs — offsets not decoded)
+  AE5L500V   2013 USDM STI MT      0x41364     0xD37DE=0   0xD37E0=438  0xD39EC=0.015  0xD39F0=0.015
+  AE5L700V   2013 USDM STI 6MT*    0x413F0     0xD37E2=0   0xD37E4=438  0xD39F0=0.015  0xD39F4=0.015
+  AE5Q100L   2014 USDM WRX MT      0x40CCC     0xD2A42=0   0xD2A44=0    0xD2C4C=0.015  0xD2C50=0.015
+  AE5L600L   2013 USDM WRX MT(own) 0x40A9C     0xD29C2=0   0xD29C4=0    0xD2BCC=0.015  0xD2BD0=0.015
+  AE5L500L   2013 USDM WRX MT      0x40A78     0xD29BE=0   0xD29C0=0    0xD2BC8=0.015  0xD2BCC=0.015
+  AZ1G502L   2009 JDM STI AT       fn skeleton NOT FOUND (older code rev — needs looser mask)
+  AZ1L100X   2013 USDM FXT MT      fn skeleton NOT FOUND
+  EE5I920T   2010 USDM LGT MT      fn skeleton NOT FOUND
+
+2026-06-08 addendum (*attribution corrected): AE5L700V is the 2013 STI 6MT —
+confirmed via Subaru TSB "Reprogramming File Availability for DTCs P0341/P0346"
+(subaru.oemdtc.com/6867): 2013MY STI 6MT pak 22765AF182 -> NEW CID AE5L700V;
+2013MY WRX 5MT -> AE5L700L. The Stock ROM List's "WRX" label was wrong; Dean
+called the supersession (700V supersedes the 2013 STI line incl. 500V).
+Cal-region block similarity corroborated (700V<->500V 53.8%, highest pairing).
+
+FINAL PATTERN (clean): window B = 438 on every STI cal checked (2012 AE5K500V,
+2013 AE5L500V, 2013-TSB AE5L700V). Window B = 0 on every WRX cal checked
+(AE5L500L, AE5L600L, 2014 AE5Q100L). The V/L CALID suffix = STI/WRX. The
+window was armed on STI from the start (500V pre-dates the TSB), so it is an
+STI-line calibration trait, not a TSB fix. Arming on the WRX = copying an
+EJ257-line setting onto the EJ255 — same sensor/code, different engine
+acoustics; factory-proven on the closest cousin, not on the twin.
+
+HEADLINE: Subaru SHIPPED window B armed at 438 counts on 2012 STI, 2013 STI,
+and AE5L700V — the sibling 2013 USDM WRX MT cal to our AE5L600L. Same 0.015
+threshold offsets everywhere; only the duration differs. So the mechanism is
+factory-proven on the same engine/generation, including a same-model-year WRX.
+
+Window B is the path NOT gated on the throttle-state byte (no 65C0==1
+requirement) — pure "event B happened, counter below 438".
+
+STILL OPEN (required before flashing):
+  1. Event B semantics — what sets flagB (FFFF7FEF-equiv). Factory-armed on
+     same-gen cals lowers the risk of copying 438, but we should know what
+     window we're arming.
+  2. Counter tick unit. IF same tick family as the FBKC no-knock delay
+     (70 counts ~= 0.56 s measured), 438 ~= 3.5 s. ESTIMATE ONLY — verify by
+     finding the ctrB incrementer.
+  3. Effect sign (sensitize/desensitize) — unresolved from disassembly, but
+     note: either sign is engine-safe to A/B (more sensitivity = more
+     protection; less = the factory-shipped config of 700V/STI cals).
+  4. Pool-decode 700V's OTHER knock scalars (FBKC/FLKC ranges) to see if
+     Subaru paired the armed window with different ranges. NOTE: naive
+     uniform-shift comparison (+0xE20) FAILED — cal blocks shift non-uniformly;
+     only pool-decoded values are valid.
+
+CANDIDATE EDIT (single-variable, pending the opens): 0xD29C4: 0 -> 438 (0x01B6)
+on AE5L600L — byte-for-byte copy of the factory 700V/STI configuration.
+================================================================================

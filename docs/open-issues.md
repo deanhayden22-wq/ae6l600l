@@ -1,7 +1,7 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-06-04 — 20.17 driven 6-3 (`logs/6-3 20.17/log0001.csv`), **part-throttle only**. The high-load FLKC knock mechanism was fully solved this session and the fix is flying, but the 17-psi condition was never reached → **WOT test pending** (see FLKC entry). 20.15 tip-in fix was a real ~18% gain but tip-in remains substantially attenuated (re-confirmed 20.17, 140/154 events −84%) — being reworked toward 20.17a.
-**On car right now:** 20.17 (`rom/AE5L600L 20g rev 20.17.bin` — target → ~17 to arm Turbo Dynamics + WGDC down + TD-negative up + per-gear 5th timing comp + OL richen; driven 6-3, TD-arm confirmed, knock fix UNTESTED).
+Last updated 2026-06-05 — 20.17a driven 6-5 (`logs/6-5 20.17a/log0001.csv`, 32 min, thin cusp data): **the cusp lean/knock is NOT a tip-in fuel deficit** (G1 barely moved despite +2 ms more IPW; deep FBKC is overrun noise) → move to the load/timing/AVCS substrate. See "20.17a watch". Still **part-throttle only — 3rd log running with no real boost** (peak 13.77 psi), so the 20.17 top-end / 17-psi FLKC fix is STILL untested (WOT test pending). 20.15 tip-in fix was a real ~18% gain; tip-in is now ~3× lifted at the cusp via 20.17a BE-comp but the residual lean is wall-wetting, not fuel.
+**On car for 6-5:** 20.17a *as-driven* = BE-comp lift + an accidental `0xCC4EC` decel-tier change (reverted post-drive). **On-disk `rom/AE5L600L 20g rev 20.17a.bin` is now BE-comp-only**, staged for the weekend long drive. (Underlying 20.17 base: target → ~17 to arm Turbo Dynamics + WGDC down + TD-negative up + per-gear 5th timing comp + OL richen; TD-arm confirmed 6-3, high-load knock fix still UNTESTED.)
 **Prior P0s (from 20.16, still open):** ghost-zone −11.8° knock (2200-3300 × 1.0-1.4) + injector IDC >100% at top end — see "20.16 watch". (6-3 in-zone IDC was fine at 54-62%, but that was part-throttle, ≤14.3 psi.)
 **MAF rescale:** CLOSED — Dean's 378k-sample offline check showed the current curve is converged in the cruise band. No changes needed.
 
@@ -14,7 +14,81 @@ diverge from this snapshot.
 
 ---
 
-## 20.17a watch — tip-in cusp-knock TEST (built 6-4, OPEN)
+## ACTIVE — shift/overrun knock mitigation (opened 6-7, investigation 6-7/6-8)
+
+**Symptom:** deep FBKC chains (−4 to −10.85°) triggered by shift/DFCO-resume
+rattle, not real knock. 6-7 first-instance data: 52% of SHIFT/MAYBE fires within
+1.0 s of DFCO-resume vs 3% of real LOAD-class — time-since-resume separates the
+populations 17:1; load does NOT (4/10 deep shift events at load ≥1.3, incl. both
+worst). Cost is real: recovery is +0.35°/0.56 s, so a false −8.4° = ~13 s of
+degraded timing right after a shift.
+
+**Rejected:** raising FBKC min load to 1.3 (Dean's first instinct). FLKC's own
+floor is 1.25/1.30 (0xD2F7C), so 0.95–1.3 would have NO knock response at all —
+and that band holds 80% of real LOAD-class knock incl. the −10.15 steady cusp
+chain. Also misses both worst shift events (load ≥1.3). Note: FBKC min load was
+already raised 0.75/0.80 → 0.95/1.00 in 20.x; garn runs 1.0/1.05 but pairs it
+with FLKC floor LOWERED to 0.95 (continuous coverage — different architecture).
+
+**Primary lever found (6-7/6-8 disassembly + cross-ROM survey):** factory
+post-transient knock window, dormant on WRX cals. Window B (0xD29C4, uint16)
+= 438 on every STI cal checked, 0 on every WRX cal. While active it bleeds the
+knock accumulator (FFFF7FBC) by 0.015/tick (0xD2BCC/0xD2BD0). Full trace:
+`disassembly/analysis/transient_knock_window_trace.txt`. ECUFlash defs added
+2026-06-08 ("Post-Transient Knock Window A/B Length", "...Accumulator Bleed
+A/B" + 2 alt-path bleeds). Survey data: `rom/reference/README.md`.
+
+**Open before flash:** effect SIGN unproven (noise-floor adder → sensitizes vs
+evidence-integrator → desensitizes); event-B source untraced; tick unit
+unverified (~8 ms family → 438 ≈ 3.5 s). Either sign is engine-safe to A/B.
+
+**Plan (Dean to schedule):**
+1. 20.18 candidate = single-variable: arm window B 0 → 438 (factory STI value,
+   bleed untouched). Purpose of first log = sign determination via shift-class
+   fires/min vs 6-7 baseline (`trends/zone_fire_rates.csv` + knock_shift_filter).
+   Do NOT soften (438/2 or 0.015/2) on the first test — weakens the signal;
+   tune duration only after the direction is known.
+2. Fallback/companion lever (proven plumbing): FBKC no-knock advance delay
+   0xD29DE 70 → 35 — halves false-pull duration (13 s → 6.5 s from −8.4°).
+   Hold for 20.19 to keep attribution clean.
+3. Next disassembly session: FFFF7FBC comparison consumer (sign, static), flagB
+   writer (event B), ctrB incrementer (tick unit), FFFF65C1 writer (the other
+   inhibit's duration source).
+
+## ACTIVE — steady-state cusp knock: substrate work (opened 6-7)
+
+**6-7 BIG log (502 min, fixed bin) settled the 20.17a test — see `tune-state.md`
+"20.17a verification drive (6-7 BIG)".** Outcomes:
+- **NOT a tip-in fuel deficit (final):** non-DFCO stab-lean flat at 1.71 AFR across
+  ~3× BE-comp authority. Tip-in fuel thread CLOSED.
+- **Steady-state cusp knock confirmed** at 12x residency: 1.70 fires/min in steady
+  context, typical −1.4°, one fueled chain to −8.05 (episode −10.15) at 2140-2270 ×
+  ~1.15. The "transient-only" comfort from 6-3 was a test-power artifact.
+- **Decel-tier oopsie confirmed as the deep-overrun-FBKC feeder** (0.124/min on the
+  6-5 bin → 0.016/min after revert). CLOSED.
+- **Next lever: load/timing/AVCS substrate at 1600-3000 × 1.0-1.25.** Candidates
+  from the 6-3 deep dive: 20.x added AVCS advance / pulled-base-timing interaction
+  at the cusp; design a single-variable test. Do NOT stack with the pending
+  injector/boost work.
+- Cross-rev metric note: use `trends/zone_fire_rates.csv` fires/min (first-instance)
+  for any cusp/ghost rate claim; the legacy samp/min metric double-counts retard-holds.
+
+## 20.17a watch — tip-in cusp-knock TEST — CLOSED 2026-06-07 (settled by 6-7 BIG log)
+
+**6-5 first read (`logs/6-5 20.17a/log0001.csv`, 32.3 min, thin cusp data — DECISIVE branch fired: NOT fuel).**
+Sanity PASS (AVCS p95 20°, IAM 1.0, FLKC 0). 3rd log running with **no real boost**
+(peak mrp 13.77 psi) — top-end still untested. **G1 FAIL** (cusp stab-lean 2.24 → 2.08;
+real non-DFCO 1.76) *despite tip-in firing +2.05 ms more IPW* — the residual lean is
+wall-wetting/sensor-lag, not deliverable fuel. **G2 no fuel-attributable change** —
+shift/overrun-filtered, no real cusp knock deeper than −1.4°; the scary −8.40° FBKC is
+overrun noise at −1.2 psi vacuum. G3b IDC 70% PASS; G3a cruise AFC −1.8% WATCH; cold
+over-richness did not appear (+0.25 AFR warmup tip-ins). **Read: the cusp lean/knock is
+NOT a tip-in fuel deficit → move to the load/timing/AVCS substrate, not more tip-in fuel.**
+Two caveats keep it formally open: cusp residency was only 0.59 min (low power), and the
+as-driven bin carried an **accidental `0xCC4EC` decel-tier change** (2250/3000/4500 →
+1000/2000/3500, reverted post-drive — on-disk bin is now BE-comp-only). **Weekend long
+drive on the clean bin settles it.** Full scoring in `tune-state.md` "20.17a verification
+drive (6-5)" + `REVIEW_LOG.md` 6-5 entry.
 
 Perceived "tip-in knock" lives at **1600-3000 RPM × load 1.0-1.25**. Deep dive on the 6-3 20.17 log established two things that reframe it:
 
@@ -31,23 +105,33 @@ Perceived "tip-in knock" lives at **1600-3000 RPM × load 1.0-1.25**. Deep dive 
 
 20.16 (Target Boost raise + base-timing pull) flashed and driven 2026-05-30 (`logs/5-30 20.16/log0001.csv`, 48.8 min). Two P0s, neither learned-damaging yet (IAM 1.0, FLKC 0 all log) but both one repeat from harm.
 
-### P0-1: Ghost-zone knock REGRESSION (2200-3300 × 1.0-1.4)
+### P0-1: Ghost-zone knock REGRESSION (2200-3300 × 1.0-1.4) — NOT REPRODUCED on 20.17/20.17a (6-7 update)
+- **6-7 update:** under the consistent first-instance metric (`zone_fire_rates.csv`),
+  ghost-zone fires/min: 20.16 **17.7** → 20.17 2.33 → 20.17a 2.27 pooled (1.97 on the
+  502-min 6-7 log). No −11.8 events since 5-30; IAM 1.0 throughout. The 20.16 spike was
+  real and the 20.17 boost-path reshape removed the trigger. Residual 2/min sits slightly
+  above the 20.12-20.15 era (0.6-1.7) — folded into the steady-cusp substrate thread above.
+  Downgraded from P0; keep the cell on watch in each review.
 - **Symptom:** FBKC ratcheted to **−11.80°** twice in 1.5 s on the same 2627 × 1.05 cell (coast→spool tip-ins). Ghost-zone FBKC<0 rate **156 samp/min vs 20.15's 24.2 (6.4×)**; ~50/min even excluding the −11.8 cluster.
 - **Mechanism:** the 20.16 Target Boost raise spools harder into the un-protected ghost-zone cells. The 20.16 base-timing pull sits one load band ABOVE where the cell fires (it covers 1.67-2.37, the cell is at 1.05) so it does nothing here.
 - **Candidate levers (pick one to attribute):** (a) extend the base-timing pull DOWN to L=1.0-1.2 at R=2400-3000; (b) pull AVCS back from the 19-20° plateau at that cell; (c) roll Target Boost back at the cells feeding the harder spool.
 - **Note:** 20.17 does NOT address this — its Target Boost edits are top-end; the ghost-zone cells are unchanged on the logged pedal paths.
 
-### P0-2: Injector IDC saturation >100%
+### P0-2: Injector IDC saturation >100% — CEILING NOW MEASURED (6-7 update)
+- **6-7 update:** IDC peaked **85.5% at 57% throttle** (5204 RPM, 17.7 psi, MAF 4.08 V) —
+  no >100% repeat, but the margin to saturation at full pedal is gone. Injector swap remains
+  BLOCKING for sustained top-end work; one diagnostic WOT pull is acceptable exposure,
+  repeated pulls are not.
 - **Symptom:** IDC hit **101.86%** at partial throttle (TPS 54%, 4923 RPM, 17.68 psi). 3 samples ≥100%, 49 ≥85%. IPW 24.83 ms at 4923 RPM = duty ≥100%.
 - **Cause:** the 20.16 boost raise pushes the current injectors past their physical limit. Fuel — not knock — is now the top-end ceiling under 20.16 targets.
 - **Status:** injector swap (already on the horizon) is now **blocking** further boost work. 20.17 raises top-end boost further, which makes this worse unless new injectors are on-car or OL-KCA leans the top-end (see tune-state "20.16 → 20.17" tension).
 
-### AFL drift — WATCH (opened 5-28, holding 5-30)
+### AFL drift — WATCH, REPRODUCES FROM CLEAN SLATE (6-7 update: fresh-reflash re-learned 0 → −2.34 over 8 h; AFC not clamping; per-cell MAF corr mild ≤2.2%; fold into pre-injector-swap MAF baseline refit rather than standalone fix)
 - **Symptom:** long-term fuel trim has walked monotonically 0 → 0 → −1.07 → −2.34 median across 20.13 → 20.14 L1 → 20.14 L3 → 20.15, and held at −2.34 on 20.16 (not deepening, not reverting). Engine learned-rich; >|2%| on ~53% of CL samples.
 - **Candidates:** MAF over-read in the cruise V-range (floor at V=1.6-2.0), injector-flow drift, or fuel-pressure drift. ROM hasn't touched MAF scaling, so this is hardware/sensor drift.
 - **Next:** if it holds ≤ −2.0 for one more log, plan a MAF mid-V investigation against WB residuals (Josh F exp fit per `feedback_maf_no_cellwise_patches.md`).
 
-### FLKC −1.75 in 3400-3800 × high-load OL — MECHANISM SOLVED (6-04), fix flying in 20.17, WOT TEST PENDING
+### FLKC −1.75 in 3400-3800 × high-load OL — MECHANISM SOLVED (6-04), WOT TEST STILL PENDING (6-7: no 3400-3800 WOT exposure; NEW sibling cluster at 2800-3250 × 1.2-1.5, transient −1.0, fully recovered — 2nd instance of the boost-transition-band FLKC family)
 - **What it is (solved this session):** genuine knock from the boost OVERSHOOT. The 5th-gear target was capped at 12.7 (below the 15 psi spring), so boost floored at the spring and ran UNCONTROLLED to 17-18 psi; 17 psi at 3400-3800 is knock-limited to ~7.5-8° and FLKC (the per-cell *Fine Correction* — retard 1.01 / adv 0.25 / delay 90, grid `0xD2F0C`/`0xD2F28`) pulled to −1.75. FLKC is INDEPENDENT of FBKC and load-gated; knock detection has NO boost/MAP input (RPM×IAT, re-verified from `0xAE284` axis bytes) — overboost reaches it via LOAD + cylinder pressure. Full mechanism: `[[knock-detector-has-no-boost-input]]`.
 - **Why TD couldn't fight the overshoot before:** Turbo Dynamics was hard-zeroed because target (12.7) sat under its activation gate (`0xC0BD4` = enable >13 psi).
 - **20.17 fix (flying):** target → ~17 (clears the 13 gate → arms TD to *control* boost instead of overshooting), WGDC down, TD-negative up, per-gear 5th timing comp populated (−1.08/−1.56° @ load 2.5/3.0 — `[[per-gear-timing-comp-5th-lever]]`), AVCS-pull held as fallback.

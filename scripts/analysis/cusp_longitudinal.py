@@ -28,6 +28,7 @@ REV_LOGS = {
  '20.15':['logs/5-26 20.15/log0001.csv','logs/5-28 20.15/log0001.csv'],   # 5-25 excluded: AVCS lockout
  '20.16':['logs/5-30 20.16/log0001.csv'],
  '20.17':['logs/6-3 20.17/log0001.csv'],
+ '20.17a':['logs/6-5 20.17a/log0001.csv'],   # BE-comp lift test (as-driven also had decel 0xCC4EC change, reverted after)
 }
 DT=0.04; W1=25; W15=38   # 25Hz windows: 1.0s, 1.5s
 

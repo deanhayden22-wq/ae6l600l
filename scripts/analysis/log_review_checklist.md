@@ -313,7 +313,7 @@ Tables to scan (addresses in `reference_cruise_tuning_tables.md` memory):
 
 4.4  Cross-check against prior-flagged cliffs from Step 0.
 
-4.5  **Append rows to `trends/cliffs_flagged.csv`.**
+4.5  ~~Append rows to `trends/cliffs_flagged.csv`.~~ **RETIRED 2026-06-07** (Dean's call — CSV was orphaned/header-only since 5-04; cliff findings go in the REVIEW_LOG entry directly)
 
 ---
 
