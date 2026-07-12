@@ -111,9 +111,11 @@ def build_series(lh, z, tip):
 
 LEDGER = [
     # (issue, status, css, now, next lever)
-    ("DFCO-resume deep knock (wall-wetting)", "ACTIVE", "active",
-     "{resume_share} of deep (≤−3°) events corpus-wide fire ≤5 s after DFCO exit; 7-12: 8/12",
-     "Warm rising-tau restore (0xCD6E6 ECT 80–110 cols) — single-var rev, flash BEFORE 20.19"),
+    ("Deep transient/stab knock (≤−3°)", "CONTAINED — WATCH", "watch",
+     "{resume_share} of deep events corpus-wide fire ≤5 s after DFCO exit — but that tags stabs, "
+     "not a resume mechanism; fuel levers exhausted (tau cut is DELIBERATE: stops enrichment "
+     "stacking OL 11.1→FFB 10.1); all contained, IAM 1.0",
+     "20.19 as-built (load-comp substrate pull lowers timing demand in the band); tau restore RETRACTED 7-12"),
     ("Cruise-band fueling error (~2% over-read)", "ACTIVE", "active",
      "Total trim (AFC+AFL) steady CL cruise: {trim_now} — flat since 6-7 despite AFL moving",
      "WB-driven region refit at pre-injector-swap MAF baseline; do NOT cell-patch"),
@@ -188,8 +190,8 @@ Hidden when zone residency &lt; {MIN_ZONE_RES_MIN} min.</p>
 <div class="chart-wrap"><canvas id="c1"></canvas></div>
 
 <h2>2 · Deep knock (≤−3°) per hour — resume family vs everything else</h2>
-<p class="hint">The stacked red is what the tau rev targets. If the tau restore works, red
-shrinks and gray stays put.</p>
+<p class="hint">Red = deep events ≤5 s after DFCO exit (i.e. stabs from coast). Fuel-side fix
+retracted 7-12 — this is substrate; watch whether 20.19's load-comp pull moves it.</p>
 <div class="chart-wrap"><canvas id="c2"></canvas></div>
 
 <h2>3 · FLKC tier engagement</h2>

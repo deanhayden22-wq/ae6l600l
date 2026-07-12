@@ -177,17 +177,32 @@ the 6-21 cusp-specific 2.16 figure — NOT directly comparable, do not trend the
 before any trends-CSV-based cross-rev claim.
 
 **Staged for next session:**
-- **Warm rising-tau restore (0xCD6E6) is the single-lever test this log argues for.** 8/12 deep
-  events are DFCO-resume/stab (wall-wetting family per 6-9 verdict; cc49c was ruled out for
-  tip-back-in by disassembly — it only fires on RPM-falling/overrun). Verified on the on-disk
-  20.18 bin 7-12: warm cols (ECT 80–110 axis pts) at load 3.0/8.0 rows = 0.25–0.35 vs stock
-  0.50–0.60 (load 1.4 row = stock), AND load axis moved 2.0/4.0/8.0 → 1.4/3.0/8.0, pulling the
-  halved row down into stab-load territory. Hot day = high ECT = weakest tau columns — consistent
-  with today's deep-resume-knock elevation. Proposed: restore 80–110 cols on the 3.0/8.0 rows
-  toward stock, single-var, before flashing 20.19's load-comp/AVCS trims (different family).
+- ~~Warm rising-tau restore (0xCD6E6)~~ **RETRACTED same day — see amendment below.**
 - Clean 3rd-gear WOT pull to redline still owed — but IDC hit 114.9% at 6052/18.7 psi today;
   margin at the top is zero, decide injector timing first.
-- Backfill trends ingest 6-13 → 7-12.
+- Backfill trends ingest 6-13 → 7-12. **DONE same day** (commit 2f0b5a9: 7 logs, all trend
+  surfaces through 20.18, rect zone + log_health.csv added).
+
+**AMENDMENT (same day, after Dean supplied the tau history):** The warm-tau cut was DELIBERATE,
+not inherited-unexplained: with tau at stock, leaning into high-boost zones stacked transient
+enrichment on the OL map — map commanded 11.1, FFB delivered ~10.1 — maxing injectors early.
+Dean landed the current values where high-load pulls command ≈ the OL map. Two measurements on
+the 7-12 log then killed the restore proposal outright:
+1. **The deep-resume knock events don't consult the halved cells.** 6/8 never exceeded load 1.4
+   in the 2 s pre-onset window; the load ≤1.4 row is ALREADY STOCK. Restoring the 3.0/8.0 warm
+   columns adds nothing at the loads where the deep events fire.
+2. **The landing criterion still holds on 20.18:** settled high-load OL FFB sits +0.24 AFR rich
+   of the OL B map (n=37); rising-load transients stack +0.47 median / +0.97 peak (redline stab:
+   map 11.0, FFB 10.04 at the IDC-114.9% moment). Restoring warm tau would widen exactly this
+   stack with injectors already saturated.
+Also downgraded: "resume family" may be stab-selection — aggressive stabs in normal driving
+follow coasts, so ≤5 s-from-IPW=0 tags stabs, not a distinct resume mechanism; the stab-lean
+fuel thread already died on 6-5/6-7 BE-comp evidence. Deep transient knock = the transient face
+of the edge-of-knock substrate, contained by FBKC/FLKC (IAM 1.0 throughout).
+**Revised next flash: 20.19 as-built** (Engine Load Comp Cruise+NC pull in the cusp band —
+lowers calc load → timing demand where BOTH knock flavors fire — plus 12 AVCS trim cells).
+Score it on: rect/cusp fires/min (zone_fire_rates), deep events/hr (log_health), FLKC
+engagement, with weather noted — 7-12 showed hot+AC inflates rates ~+70% at fixed ROM.
 
 ---
 
