@@ -233,12 +233,20 @@ const boundaries = {{
     ctx.restore();
   }}
 }};
-const X = {{ ticks: {{ autoSkip: true, maxRotation: 0, font: {{size:10}} }} }};
+// x labels: show only the ticks that matter -- first log, every ROM-flash
+// boundary, and ALWAYS the newest log (autoSkip was dropping it).
+// offset insets first/last points from the chart edges so the newest
+// point doesn't render clipped against the border.
+const keepTick = (i) => i === 0 || i === S.labels.length - 1 || S.rev_bounds.includes(i);
+const X = {{ offset: true, ticks: {{ autoSkip: false, maxRotation: 0, font: {{size:10}},
+  callback: function(v, i) {{ return keepTick(i) ? this.getLabelForValue(v) : null; }} }} }};
 const common = {{ responsive: true, maintainAspectRatio: false, spanGaps: false,
   plugins: {{ legend: {{ labels: {{ boxWidth: 12 }} }} }} }};
+const lastIdx = S.labels.length - 1;
 function line(d, label, color, extra={{}}) {{
+  const r = d.map((_, i) => i === lastIdx ? 5 : 2.5);
   return Object.assign({{ data: d, label: label, borderColor: color, backgroundColor: color,
-    borderWidth: 1.6, pointRadius: 2.5, tension: 0.15 }}, extra);
+    borderWidth: 1.6, pointRadius: r, tension: 0.15 }}, extra);
 }}
 new Chart(c1, {{ type:'line', plugins:[boundaries], options: Object.assign({{scales:{{x:X,
     y:{{title:{{display:true,text:'fires/min'}}}},
