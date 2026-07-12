@@ -186,16 +186,29 @@ def load_log(path: Path) -> pd.DataFrame:
         df["mrp"] = df["MAP"] - df["ATM(psi)"]
     if "IDC" not in df.columns and "IPW" in df.columns:
         df["IDC"] = df["IPW"] * df["RPM"] / 1200
-    if "correction" not in df.columns:
-        clol = df["CL/OL"]
-        cl = (clol == 8)
-        ol_with_o2 = (clol == 10)
-        corr = np.full(len(df), np.nan)
-        corr[cl] = (df.loc[cl, "AFC"] + df.loc[cl, "AFL"]).to_numpy()
-        if df["AFR"].notna().any():
-            mask = ol_with_o2 & df["AFR"].notna() & (df["wbo2"] > 0)
-            corr[mask] = ((1 - df.loc[mask, "AFR"] / df.loc[mask, "wbo2"]) * 100).to_numpy()
-        df["correction"] = corr
+    # `correction` is ALWAYS recomputed, never trusted from the file.
+    #
+    # 1. The stored column is not self-consistent across the corpus. It came from
+    #    the LibreOffice LogBooster macro, but the formula was hand-edited at
+    #    various points. The 20.10/20.11-era logs (5-2, 5-8, 5-10, 5-11, 5-12,
+    #    4-25, 4-27, 3-30, 6-15) differ from the canonical definition by -0.2 to
+    #    -2.6 on the mean, on 12-30% of post-filter rows. 5-17 20.12 forward is
+    #    clean. Recomputing here normalizes every log on read, archive untouched.
+    # 2. The previous fallback used AFR (stock narrowband O2) in the open-loop
+    #    branch. Canonical uses FFB (commanded AFR). Different quantity.
+    #
+    # Canonical (LogBooster; matches scripts/combine_logs.py):
+    #     CL/OL == 8  -> AFC + AFL
+    #     CL/OL == 10 -> (1 - FFB / wbo2) * 100
+    #     otherwise   -> NaN
+    clol = df["CL/OL"]
+    cl = (clol == 8)
+    ol = (clol == 10)
+    corr = np.full(len(df), np.nan)
+    corr[cl] = (df.loc[cl, "AFC"] + df.loc[cl, "AFL"]).to_numpy()
+    ol_ok = ol & df["FFB"].notna() & (df["wbo2"] > 0)
+    corr[ol_ok] = ((1 - df.loc[ol_ok, "FFB"] / df.loc[ol_ok, "wbo2"]) * 100).to_numpy()
+    df["correction"] = corr
     # Old logs may lack Accelerator: fall back to Throttle for the "engine being driven" proxy.
     if "Accelerator" not in df.columns:
         df["Accelerator"] = df["Throttle"]

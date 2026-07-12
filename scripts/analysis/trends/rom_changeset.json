@@ -11,7 +11,8 @@
     "20.15",
     "20.16",
     "20.17",
-    "20.17a"
+    "20.17a",
+    "20.18"
   ],
   "transitions": [
     {
@@ -86,6 +87,34 @@
           "addr_max": 895924
         },
         {
+          "name": "Engine Load Compensation Cruise (axes+data)",
+          "n_runs": 1,
+          "n_bytes": 240,
+          "addr_min": 801753,
+          "addr_max": 801993
+        },
+        {
+          "name": "Engine Load Compensation Non-Cruise (axes+data)",
+          "n_runs": 1,
+          "n_bytes": 240,
+          "addr_min": 802009,
+          "addr_max": 802249
+        },
+        {
+          "name": "Boost Error axis",
+          "n_runs": 1,
+          "n_bytes": 52,
+          "addr_min": 789765,
+          "addr_max": 789817
+        },
+        {
+          "name": "Tau Input A Rising Load Activation",
+          "n_runs": 3,
+          "n_bytes": 30,
+          "addr_min": 841470,
+          "addr_max": 841541
+        },
+        {
           "name": "Overrun Fueling RPM Resume Threshold",
           "n_runs": 1,
           "n_bytes": 23,
@@ -101,8 +130,8 @@
         },
         {
           "name": "(unknown region)",
-          "n_runs": 222,
-          "n_bytes": 10223,
+          "n_runs": 216,
+          "n_bytes": 9661,
           "addr_min": 81925,
           "addr_max": 1047544
         }
@@ -166,6 +195,20 @@
           "addr_max": 875053
         },
         {
+          "name": "Engine Load Compensation Cruise (axes+data)",
+          "n_runs": 7,
+          "n_bytes": 36,
+          "addr_min": 801900,
+          "addr_max": 801969
+        },
+        {
+          "name": "Engine Load Compensation Non-Cruise (axes+data)",
+          "n_runs": 7,
+          "n_bytes": 36,
+          "addr_min": 802156,
+          "addr_max": 802225
+        },
+        {
           "name": "Firmware checksum (auto)",
           "n_runs": 1,
           "n_bytes": 4,
@@ -174,9 +217,9 @@
         },
         {
           "name": "(unknown region)",
-          "n_runs": 83,
-          "n_bytes": 545,
-          "addr_min": 801900,
+          "n_runs": 69,
+          "n_bytes": 473,
+          "addr_min": 875276,
           "addr_max": 1047544
         }
       ]
@@ -413,10 +456,17 @@
           "addr_max": 1047436
         },
         {
-          "name": "(unknown region)",
-          "n_runs": 2,
-          "n_bytes": 5,
+          "name": "Boost Error axis",
+          "n_runs": 1,
+          "n_bytes": 3,
           "addr_min": 789797,
+          "addr_max": 789800
+        },
+        {
+          "name": "(unknown region)",
+          "n_runs": 1,
+          "n_bytes": 2,
+          "addr_min": 987220,
           "addr_max": 987222
         }
       ]
@@ -617,6 +667,20 @@
           "addr_max": 791686
         },
         {
+          "name": "Boost Error axis",
+          "n_runs": 1,
+          "n_bytes": 15,
+          "addr_min": 789765,
+          "addr_max": 789780
+        },
+        {
+          "name": "Turbo Dynamics Proportional",
+          "n_runs": 1,
+          "n_bytes": 12,
+          "addr_min": 789800,
+          "addr_max": 789812
+        },
+        {
           "name": "Firmware checksum (auto)",
           "n_runs": 1,
           "n_bytes": 4,
@@ -625,9 +689,9 @@
         },
         {
           "name": "(unknown region)",
-          "n_runs": 40,
-          "n_bytes": 147,
-          "addr_min": 789765,
+          "n_runs": 38,
+          "n_bytes": 120,
+          "addr_min": 790252,
           "addr_max": 873571
         }
       ]
@@ -655,6 +719,86 @@
           "addr_max": 840020
         }
       ]
+    },
+    {
+      "before_rev": "20.17a",
+      "after_rev": "20.18",
+      "before_bin": "AE5L600L 20g rev 20.17a.bin",
+      "after_bin": "AE5L600L 20g rev 20.18.bin",
+      "n_diff_bytes": 502,
+      "n_runs": 38,
+      "tables": [
+        {
+          "name": "Engine Load Compensation Cruise (axes+data)",
+          "n_runs": 4,
+          "n_bytes": 197,
+          "addr_min": 801753,
+          "addr_max": 801993
+        },
+        {
+          "name": "Engine Load Compensation Non-Cruise (axes+data)",
+          "n_runs": 4,
+          "n_bytes": 197,
+          "addr_min": 802009,
+          "addr_max": 802249
+        },
+        {
+          "name": "MAF Sensor Scaling",
+          "n_runs": 10,
+          "n_bytes": 107,
+          "addr_min": 887965,
+          "addr_max": 888148
+        },
+        {
+          "name": "Max Wastegate Duty",
+          "n_runs": 7,
+          "n_bytes": 70,
+          "addr_min": 790450,
+          "addr_max": 790654
+        },
+        {
+          "name": "Boost Error axis",
+          "n_runs": 1,
+          "n_bytes": 15,
+          "addr_min": 789781,
+          "addr_max": 789796
+        },
+        {
+          "name": "Turbo Dynamics Proportional",
+          "n_runs": 2,
+          "n_bytes": 13,
+          "addr_min": 789800,
+          "addr_max": 789818
+        },
+        {
+          "name": "Initial Wastegate Duty",
+          "n_runs": 6,
+          "n_bytes": 12,
+          "addr_min": 791006,
+          "addr_max": 791158
+        },
+        {
+          "name": "Tau Input A Rising Load Activation",
+          "n_runs": 2,
+          "n_bytes": 9,
+          "addr_min": 841446,
+          "addr_max": 841478
+        },
+        {
+          "name": "Firmware checksum (auto)",
+          "n_runs": 1,
+          "n_bytes": 4,
+          "addr_min": 1047432,
+          "addr_max": 1047436
+        },
+        {
+          "name": "Post-Transient Knock Window A/B Length",
+          "n_runs": 1,
+          "n_bytes": 2,
+          "addr_min": 862660,
+          "addr_max": 862662
+        }
+      ]
     }
   ],
   "known_tables": [
@@ -674,9 +818,39 @@
       "addr_end": 791936
     },
     {
+      "name": "Boost Error axis",
+      "addr_start": 789764,
+      "addr_end": 789800
+    },
+    {
+      "name": "Turbo Dynamics Proportional",
+      "addr_start": 789800,
+      "addr_end": 789818
+    },
+    {
+      "name": "Engine Load Compensation Cruise (axes+data)",
+      "addr_start": 801752,
+      "addr_end": 802006
+    },
+    {
+      "name": "Engine Load Compensation Non-Cruise (axes+data)",
+      "addr_start": 802008,
+      "addr_end": 802262
+    },
+    {
       "name": "Overrun Fueling RPM Resume Threshold",
       "addr_start": 847568,
       "addr_end": 847632
+    },
+    {
+      "name": "Tau Input A Rising Load Activation",
+      "addr_start": 841446,
+      "addr_end": 841542
+    },
+    {
+      "name": "Post-Transient Knock Window A/B Length",
+      "addr_start": 862658,
+      "addr_end": 862662
     },
     {
       "name": "Base Timing Primary Cruise",

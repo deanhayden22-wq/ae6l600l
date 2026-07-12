@@ -40,8 +40,25 @@ KNOWN_TABLES: list[tuple[int, int, str]] = [
     (0xC0F58, 0xC0F58 + 0x1F8, "Max Wastegate Duty"),
     (0xC1150, 0xC1150 + 0x1F8, "Initial Wastegate Duty"),
     (0xC1340, 0xC1340 + 0x240, "Target Boost"),
+    # ---- Boost control - Turbo Dynamics (Boost Error axis = 9 float;
+    #      Proportional correction = 9 uint16). Addrs from WRX def @0xC0D04/0xC0D28.
+    (0xC0D04, 0xC0D04 + 0x24,  "Boost Error axis"),
+    (0xC0D28, 0xC0D28 + 0x12,  "Turbo Dynamics Proportional"),
+    # ---- Engine Load Compensation (axes + data, contiguous 254-byte blocks).
+    #      MP axis 11 float @0xC3BD8, RPM axis 14 float @0xC3C04, data 11x14
+    #      uint8 @0xC3C3C; non-cruise block mirrors at +0x100. See
+    #      memory/project_engine_load_comp_fix.md.
+    (0xC3BD8, 0xC3BD8 + 0xFE,  "Engine Load Compensation Cruise (axes+data)"),
+    (0xC3CD8, 0xC3CD8 + 0xFE,  "Engine Load Compensation Non-Cruise (axes+data)"),
     # ---- Overrun
     (0xCEED0, 0xCEED0 + 0x40,  "Overrun Fueling RPM Resume Threshold"),
+    # ---- Alpha transient fueling (Tau): Rising-Load A activation,
+    #      16 ECT x 3 load uint16 @0xCD6E6.
+    (0xCD6E6, 0xCD6E6 + 0x60,  "Tau Input A Rising Load Activation"),
+    # ---- Post-transient knock window (factory accumulator-bleed window;
+    #      A @0xD29C2, B @0xD29C4, each 1 cell uint16). Window B = 0 on WRX
+    #      cals, 438 on STI; armed in 20.18. See transient_knock_window_trace.
+    (0xD29C2, 0xD29C2 + 0x4,   "Post-Transient Knock Window A/B Length"),
     # ---- Base Timing × 4 variants (Primary / Reference × Cruise / NC)
     (0xD4714, 0xD4714 + 0x200, "Base Timing Primary Cruise"),
     (0xD48D4, 0xD48D4 + 0x200, "Base Timing Primary Non-Cruise"),
@@ -177,8 +194,6 @@ def main():
             sys.exit(f"could not resolve .bin for rev {args.after!r}")
     else:
         ap.error("provide either --before / --after revs OR --before-bin / --after-bin paths")
-
-    result = diff_bins(bp, ap_)
 
     result = diff_bins(bp, ap_)
     print(format_report(result))

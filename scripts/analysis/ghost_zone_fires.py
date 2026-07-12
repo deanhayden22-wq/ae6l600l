@@ -14,6 +14,7 @@ event identifies the knock cell; subsequent samples carry the learned retard.
 Zones:
   ghost = 2200-3300 RPM x load 1.0-1.4   (legacy ghost-knock zone)
   cusp  = 1600-3000 RPM x load 1.00-1.25 (cusp band per cusp_longitudinal.py)
+  rect  = 2250-3150 RPM x load 1.05-1.40 (5th-gear passing rectangle, 6-21)
 
 Both fires/min and the legacy FBKC<0 samp/min are emitted so the two can be
 compared rev-over-rev.
@@ -44,6 +45,9 @@ OUT = TRENDS_DIR / "zone_fire_rates.csv"
 ZONES = {
     "ghost": dict(rpm=(2200, 3300), load=(1.0, 1.4)),
     "cusp": dict(rpm=(1600, 3000), load=(1.00, 1.25)),
+    # 5th-gear passing rectangle, locked 6-21 (project_5th_gear_passing_knock).
+    # Added 2026-07-12 so cross-rev rect claims come from the store, not ad-hoc scripts.
+    "rect": dict(rpm=(2250, 3150), load=(1.05, 1.40)),
 }
 
 
