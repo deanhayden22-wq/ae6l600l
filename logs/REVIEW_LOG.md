@@ -204,6 +204,24 @@ lowers calc load → timing demand where BOTH knock flavors fire — plus 12 AVC
 Score it on: rect/cusp fires/min (zone_fire_rates), deep events/hr (log_health), FLKC
 engagement, with weather noted — 7-12 showed hot+AC inflates rates ~+70% at fixed ROM.
 
+**AMENDMENT 2 (same day — outside-the-box sweep):**
+- **AVCS knock-cell plateau found (prime substrate suspect).** Stock intake-cam table dives
+  to 0–15° at exactly 2000–3400 × load 1.10–1.40 (factory anti-knock valley: 0.0° at
+  2300×1.25); the 20.8 base map filled it to a flat 20–25.5° and it's byte-stable through
+  20.19. Every "NOT cam" verdict only verified actual-tracks-target. Corpus: stock cusp
+  0.38 fires/min max −1.4 vs 20.x pooled 2.82/min to −11.8; deep (≤−4) cusp knock first
+  appears at 20.8. Confounds noted (thin stock residency, March weather, VF52 regime, 20.8
+  changed everything at once). **20.20 candidate: half-carve the valley (1.10–1.40 cols
+  only, ≈10–13°), after 20.19 baselines.** Details: memory project_avcs_knock_cell_plateau.
+- **Window B acquitted as the stab-rate culprit:** consistent onset-only detector shows cusp
+  stab-context fires FLAT across the arming boundary (6-7: 2.62/min → 6-21: 2.63/min); the
+  old 6.59→9.42 "jump" was the legacy counter's artifact. Steady-context walked 0.74→1.26→
+  1.97/min across the same span — 3-way confounded (load-comp reshape / weather / window B),
+  sign test still open but demoted.
+- **Tau corpus scan (tau_effect_scan.csv):** cut era holds the landing criterion everywhere
+  (rising stack +0.38 pooled, settled +0.14, never the old ~1.0); the pre-cut counterfactual
+  predates the corpus; 20.18's row-1 warm restore was a measurable no-op. Tau book closed.
+
 ---
 
 ## 2026-06-15 — ROM binary-diff: 20.17a → 20.18 (no log; bin diff only)
@@ -2870,24 +2888,4 @@ prior best):**
 - G2 fires: 63 total = 3.07/min overall (6-3: ~6.1/min). **STEADY-context fires now
   resolved: 18 fires / 10.59 min = 1.70/min**, typical depth −1.4°, two chains to −2.8,
   one chain to **−8.05 at 2140-2270 × 1.15 (s=347153, fueled IPW≈7, lean +0.8, no stab)**.
-  Cusp knock is REAL in steady state, not transient-only — 6-3's "0 steady fires" was a
-  power artifact (1.6 min residency). Substrate (load/timing/AVCS) confirmed as next lever.
-
-**Deepest event −10.85° (s=586922):** DFCO-resume + 2→3 shift at ~3200 × 1.5; fired ~0.5 s
-after IPW=0 exit, then rode −8° through a 10 psi partial pull (load to 2.29). Overrun-resume
-family, not steady boost knock. FLKC did not learn from it; full recovery after.
-
-**WOT/boost behavior:** mrp peak 19.7 @ 4687 RPM vs Trgt 18.5 (+1.2 over, driver-lift
-confound); in-boost tracking (mrp>10 & Trgt>10, 100 s) err median **−3.46 psi UNDER
-target**, p95 −0.08, max over +1.45 — targets are optimistic vs natural flow mid-spool,
-no overboost problem, no slam (Tdp small corrections, wgdc 80% saturated at spool /
-~60-64% settled). Fueling at mrp>15: wbo2 median 10.63 (slightly richer than 11.0-11.3
-target band), Timing median 9.5°, **FBKC 0 throughout both stabs — knock-free at 17-19 psi**.
-
-**IDC 85.5% peak at 57% throttle / 5204 RPM / 17.7 psi — AT the flag line without a full
-pull.** Injector ceiling now measured, not extrapolated. MAF V peak 4.12 OK.
-
-**FLKC:** one transient cluster — 139 decrements over 15.9 min (s=271859-295766), floor
-−1.0, at 2800-3250 × 1.2-1.5 during a 76-93 MPH highway stint with repeated light
-boost-onsets (Thr 30-46%, mrp 0-3 psi, near-commanded mixture). Fully recovered; 0 for the
-final 5 h. Same family as 5-28's 3400-3800 OL transient — the boost-transi
+  Cusp knock is
