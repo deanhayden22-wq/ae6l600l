@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 OUT_PATH = REPO_ROOT / "scripts" / "analysis" / "trends" / "rom_changeset.json"
 
 # Mirror dashboard.py REV_ORDER. stock baseline is the first comparable bin.
-REV_ORDER = ["stock", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12", "20.13", "20.14", "20.15", "20.16", "20.17", "20.17a", "20.18",]
+REV_ORDER = ["stock", "garn_base", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12", "20.13", "20.14", "20.15", "20.16", "20.17", "20.17a", "20.18",]
 
 
 def _table_summary(diff_tables: dict) -> list[dict]:

@@ -2888,4 +2888,24 @@ prior best):**
 - G2 fires: 63 total = 3.07/min overall (6-3: ~6.1/min). **STEADY-context fires now
   resolved: 18 fires / 10.59 min = 1.70/min**, typical depth −1.4°, two chains to −2.8,
   one chain to **−8.05 at 2140-2270 × 1.15 (s=347153, fueled IPW≈7, lean +0.8, no stab)**.
-  Cusp knock is
+  Cusp knock is REAL in steady state, not transient-only — 6-3's "0 steady fires" was a
+  power artifact (1.6 min residency). Substrate (load/timing/AVCS) confirmed as next lever.
+
+**Deepest event −10.85° (s=586922):** DFCO-resume + 2→3 shift at ~3200 × 1.5; fired ~0.5 s
+after IPW=0 exit, then rode −8° through a 10 psi partial pull (load to 2.29). Overrun-resume
+family, not steady boost knock. FLKC did not learn from it; full recovery after.
+
+**WOT/boost behavior:** mrp peak 19.7 @ 4687 RPM vs Trgt 18.5 (+1.2 over, driver-lift
+confound); in-boost tracking (mrp>10 & Trgt>10, 100 s) err median **−3.46 psi UNDER
+target**, p95 −0.08, max over +1.45 — targets are optimistic vs natural flow mid-spool,
+no overboost problem, no slam (Tdp small corrections, wgdc 80% saturated at spool /
+~60-64% settled). Fueling at mrp>15: wbo2 median 10.63 (slightly richer than 11.0-11.3
+target band), Timing median 9.5°, **FBKC 0 throughout both stabs — knock-free at 17-19 psi**.
+
+**IDC 85.5% peak at 57% throttle / 5204 RPM / 17.7 psi — AT the flag line without a full
+pull.** Injector ceiling now measured, not extrapolated. MAF V peak 4.12 OK.
+
+**FLKC:** one transient cluster — 139 decrements over 15.9 min (s=271859-295766), floor
+−1.0, at 2800-3250 × 1.2-1.5 during a 76-93 MPH highway stint with repeated light
+boost-onsets (Thr 30-46%, mrp 0-3 psi, near-commanded mixture). Fully recovered; 0 for the
+final 5 h. Same family as 5-28's 3400-3800 OL transient — the boost-transi

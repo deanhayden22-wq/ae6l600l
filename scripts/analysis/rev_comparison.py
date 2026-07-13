@@ -28,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 TRENDS_DIR = REPO_ROOT / "scripts" / "analysis" / "trends"
 
 # Rev order for --auto. Read from rom_rev_map.csv if available else use this.
-DEFAULT_REV_ORDER = ["stock", "old_2023_base", "20.7", "20.8", "20.9", "20.10", "20.11"]
+DEFAULT_REV_ORDER = ["stock", "garn_base", "old_2023_base", "20.7", "20.8", "20.9", "20.10", "20.11"]
 
 
 def _agg_rev(ve: pd.DataFrame, rev: str) -> pd.DataFrame:

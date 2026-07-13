@@ -23,7 +23,7 @@ import pandas as pd
 ROOT = Path(".")
 revmap = pd.read_csv(ROOT / "logs" / "rom_rev_map.csv")
 NEED = ["wbo2", "FFB", "Throttle", "RPM", "CL/OL", "FBKC"]
-order = ["stock","20.7","20.8","20.9","20.10","20.11","20.12","20.13","20.14","20.15","20.16","20.17","20.17a","20.18"]
+order = ["stock","garn_base","20.7","20.8","20.9","20.10","20.11","20.12","20.13","20.14","20.15","20.16","20.17","20.17a","20.18"]
 
 def sweep_log(path):
     try:

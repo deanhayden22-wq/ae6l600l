@@ -37,7 +37,7 @@ TRENDS_DIR = REPO_ROOT / "scripts" / "analysis" / "trends"
 TEMPLATE_PATH = Path(__file__).parent / "dashboard_template.html"
 DEFAULT_OUT = REPO_ROOT / "scorecard_dashboard.html"
 
-REV_ORDER = ["stock", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12", "20.13", "20.14", "20.15", "20.16", "20.17", "20.17a", "20.18",]
+REV_ORDER = ["stock", "garn_base", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12", "20.13", "20.14", "20.15", "20.16", "20.17", "20.17a", "20.18",]
 
 
 def trend_series(sc: pd.DataFrame, thread: str, metric: str, revs: list[str]) -> list:

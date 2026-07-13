@@ -83,6 +83,10 @@ def resolve_bin(rev: str) -> Path | None:
     if rev == "stock":
         p = ROM_DIR / "ae5l600l.bin"
         return p if p.exists() else None
+    if rev == "garn_base":
+        # raw binary despite the .hex extension (verified 2026-07-12)
+        p = ROM_DIR / "13 20g Base rev 25 e garn.hex"
+        return p if p.exists() else None
     # 20.X — try both naming styles
     candidates = [
         ROM_DIR / f"AE5L600L 20g rev {rev} tiny wrex.bin",
