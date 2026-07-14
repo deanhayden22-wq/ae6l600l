@@ -55,6 +55,8 @@ OLD_TO_NEW_COLUMNS = {
     "Engine Speed (rpm)": "RPM",
     "Feedback Knock Correction (1-byte)** (degrees)": "FBKC",
     "Feedback Knock Correction (4-byte) (degrees)": "FBKC",
+    "Feedback Knock Correction (4-byte)* (degrees)": "FBKC",
+    "Intake VVT Advance Angle Left (degrees)": "avcs",
     "Final Fueling Base (2-byte)* (estimated AFR)": "FFB",
     "Fine Learning Knock Correction (degrees)": "FLKC",
     "IAM (multiplier)": "IAM",

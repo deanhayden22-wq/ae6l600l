@@ -29,6 +29,57 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+## 2026-07-13 — DEEP-HISTORY AUDIT (Car folder archive, 2023→2026) — CAM IS THE LAST UNTESTED LEVER
+
+**Source:** Desktop/Car folder — full rev lineage (garn a–h, lettered L→P11x, AI 2–20, 20–20.4)
++ Logs/2023.7z (227 csvs, Jan–Nov 2023) + 2024/2025 zips + 2026 folders. Silver-car bins
+present (separate car — VF52→11-blade stage 2; excluded).
+
+**Finding 1 — measured cam at the knock box is ~19–21° in EVERY driven era, 2023→2026.**
+Bins tell a different story (L/N/O/P command 15.0; garn b–d command 10.0) but the LOGS from
+those eras measured 20.0 at the box — the saved bins were not what was driven (third
+bins-vs-road divergence today, after the "stock" mislabel and the stock-valley-never-ran
+finding). THE CAR HAS NEVER DRIVEN THE KNOCK CELLS AT MILD CAM outside reflash lockouts
+(5.5 min corpus-wide, 2026: 0.90 fires/min, 0 deep — vs 1.41/min, 0.276 deep/min normal-cam;
+suggestive, thin).
+
+**Finding 2 — the box knock is PERMANENT, not a regression.** Every era shows 0.4–5
+first-instance fires/min at 1600–3200 × 1.0–1.35: garn-rev 2023 ~0.5–1.4, summer-2023 L-era
+2.0–5.1 (with deep −4.2/−5.6), P11-fall-2023 2.9–3.9 (0 deep), 2026 spring 1.1–2.1, 2026
+summer 2.9–5.1. Never absent, never IAM-threatening. Three years of timing/fuel/boost/tau
+work modulated it; nothing eliminated it.
+
+**Finding 3 — era/IAT/delay attribution is CONFOUNDED at this residency** (1–4.5 min per
+era×IAT cell). Delay-125 eras trend cleaner than delay-70 eras but the summer-2023 L-era
+(delay 125) is the dirtiest cell in the table, and within-2023 the cool logs out-knocked the
+hot ones (5.1 vs 2.0/min) — opposite of 2026. The 7-12 IAT-dominance read did not survive
+either. Nothing here is clean enough to act on alone.
+
+**VERDICT (Dean's call, 2026-07-13): AVCS carve REINSTATED as the decisive ELIMINATION
+experiment** — not on the dead factory-valley argument, but because cam is literally the last
+untested lever at these cells. Both outcomes are decisive: knock drops → real combustion
+knock, keep carve, consider timing give-back; knock unchanged → with fuel/timing/tau/boost/cam
+all acquitted, the NOISE hypothesis (sensor artifact — mechanical/lash; note 8/12 deep 7-12
+events sit ≤5 s after DFCO exit = torque-reversal moments) becomes primary → respond
+detection-side (delay revert, thresholds) + accept-and-contain, stop spending timing.
+**Design:** carve on TOP OF 20.18 (NOT 20.19 — its load-comp reshape moves the load calc and
+muddies the cam A/B vs the two clean 20.18 baselines 6-21/7-12); core 50% toward stock at
+1900–3400 × 1.1–1.3, residency-informed edges per the 7-12 analysis (−1° blend at 1.0 col;
+−2° at 1.5 × 2800–3400 only; no edits ≤1600 (launch cells, stock agrees) or ≥3800; Cruise ≡
+NC). Score IAT-matched: zone_fire_rates (cusp/rect) + log_health deep-split vs 6-21 (IAT 88)
+and 7-12 (IAT 97). AVCS post-reflash lockout check applies (ironically, lockout minutes are
+bonus mild-cam data — log them, don't discard).
+
+**Housekeeping:** channel mapper extended — old logger names "Feedback Knock Correction
+(4-byte)* (degrees)" (asterisk variant) and "Intake VVT Advance Angle Left (degrees)" now map
+to FBKC/avcs; one missing asterisk had blinded 57 of the 2023 logs. 94/156 old files still
+fail to parse (format variants — open item). 4 logs carry per-cylinder Knock Sum channels
+(which-cylinder question — open item). 2023 scan artifacts: outputs/scan2023_v2.csv.
+Standing rule learned three times today: BINS AND LABELS LIE; LOGS ARE GROUND TRUTH — verify
+what was DRIVEN from measured channels before any era claim.
+
+---
+
 ## ingest 2026-07-12 (rev 20.18) auto-rollup (2026-07-12 17:39)
 
 ## VE proxy: 20.18 vs 20.17a
@@ -2856,56 +2907,4 @@ Next lever is the load/timing/AVCS substrate, not tip-in fuel.
 modest knock-rate power; (2) this log carried the decel confound (reverted
 post-drive). The weekend long drive on the clean BE-comp-only bin — more cusp
 residency, ideally a real boost pull — settles both. Decel revert is itself a
-variable between this log and the weekend log: if the deep overrun FBKC
-false-positives vanish, that retroactively confirms the decel lowering fed them.
-
-## 2026-06-07 — log: logs/6-7 BIG 20.17a fixed/log0001.csv — rom: 20.17a (fixed bin — decel tiers reverted)
-
-**Bin verification (changeset claim VERIFIED):** on-disk 20.17a md5 `234c0839f06950d283c55564008a5278`.
-Diff vs 20.17 = 7 bytes BE-comp DATA (0xCD14D-0xCD153) + checksum → BE-comp-only confirmed.
-Diff vs as-driven-6-5 build (git HEAD, md5 b933666a) = decel tiers 0xCC4EC/F0/F4 restored
-1000/2000/3500 → 2250/3000/4500 RPM + checksum. Dean's "fixed the overrun oopsie" claim is exact.
-
-**Sanity gate: PASS.** AVCS p95 (RPM>2000) = 23°, IAM 1.000 all drive. 753,009 samples /
-25 Hz = **502 min — largest log in corpus (2x the 5-23 L3)**. 13 recording segments —
-locate by sample index. ECT 66→205 °F (cold start included). IAT peaked 153 °F during
-14.9 min of stationary heat-soak idling (benign).
-
-**Coverage: FIRST real boost on any 20.17x log.** Peak mrp 19.71 psi; 585 samples >15 psi;
-2 qualifying WOT pulls (s=36334: 1.2 s, peak 19.0; s=601071: 1.6 s, peak 13.9) — both short
-stabs, no full sweep. 4500+ RPM residency still thin (0.6 min total). Top-end taper verdict
-partial: no taper through 5400 RPM, boost holds 17+.
-
-**Headline 1 — overrun-FBKC A/B (decel revert): CONFIRMED.** Deep (≤−3°) IPW=0-context
-episodes: 6-3 clean tiers 0.000/min (0 in 65.6 min) → 6-5 oopsie tiers 0.124/min (4 in
-32.3 min) → 6-7 fixed tiers 0.016/min (8 in 502 min). The accidental decel-tier lowering
-was the feeder of the deep overrun FBKC false-positives, as hypothesized 6-5.
-
-**Headline 2 — cusp (1600-3000 × 1.00-1.25) at real test power (20.5 min residency, 12x
-prior best):**
-- G1 stab-lean: 847 in-zone stabs, median 2.42 overall / **1.71 non-DFCO** (6-5: 1.76;
-  6-3: 2.24 overall). Unchanged — fuel-deficit theory stays dead.
-- G2 fires: 63 total = 3.07/min overall (6-3: ~6.1/min). **STEADY-context fires now
-  resolved: 18 fires / 10.59 min = 1.70/min**, typical depth −1.4°, two chains to −2.8,
-  one chain to **−8.05 at 2140-2270 × 1.15 (s=347153, fueled IPW≈7, lean +0.8, no stab)**.
-  Cusp knock is REAL in steady state, not transient-only — 6-3's "0 steady fires" was a
-  power artifact (1.6 min residency). Substrate (load/timing/AVCS) confirmed as next lever.
-
-**Deepest event −10.85° (s=586922):** DFCO-resume + 2→3 shift at ~3200 × 1.5; fired ~0.5 s
-after IPW=0 exit, then rode −8° through a 10 psi partial pull (load to 2.29). Overrun-resume
-family, not steady boost knock. FLKC did not learn from it; full recovery after.
-
-**WOT/boost behavior:** mrp peak 19.7 @ 4687 RPM vs Trgt 18.5 (+1.2 over, driver-lift
-confound); in-boost tracking (mrp>10 & Trgt>10, 100 s) err median **−3.46 psi UNDER
-target**, p95 −0.08, max over +1.45 — targets are optimistic vs natural flow mid-spool,
-no overboost problem, no slam (Tdp small corrections, wgdc 80% saturated at spool /
-~60-64% settled). Fueling at mrp>15: wbo2 median 10.63 (slightly richer than 11.0-11.3
-target band), Timing median 9.5°, **FBKC 0 throughout both stabs — knock-free at 17-19 psi**.
-
-**IDC 85.5% peak at 57% throttle / 5204 RPM / 17.7 psi — AT the flag line without a full
-pull.** Injector ceiling now measured, not extrapolated. MAF V peak 4.12 OK.
-
-**FLKC:** one transient cluster — 139 decrements over 15.9 min (s=271859-295766), floor
-−1.0, at 2800-3250 × 1.2-1.5 during a 76-93 MPH highway stint with repeated light
-boost-onsets (Thr 30-46%, mrp 0-3 psi, near-commanded mixture). Fully recovered; 0 for the
-final 5 h. Same family as 5-28's 3400-3800 OL transient — the boost-transi
+variable between this log and the weeke
