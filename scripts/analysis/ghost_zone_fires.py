@@ -59,19 +59,28 @@ def one_log(path: Path, log_date: str, rom_rev: str) -> list[dict]:
     sps = detect_sample_rate(df["time"].to_numpy())
     dt_min = 1.0 / sps / 60.0
     rdt = df["time"].diff()
-    # fire = FBKC down-step inside a contiguous segment (no clock jump)
+    # fire = FBKC down-step inside a contiguous segment (no clock jump).
+    # Counts EVERY deepening step, incl. within an active retard chain.
     fire = (df["FBKC"].diff() <= -0.3) & (rdt > 0) & (rdt < 1)
+    # onset = down-step FROM ZERO — the strict first-instance event definition
+    # per feedback_first_knock_cell_attribution. Discovered 2026-07-15: the 7-12
+    # review's "matched cross-log" rates (rect 1.97/3.41 per min) were onsets;
+    # this store's fires_per_min (3.38/6.16) were all-steps. Both are now emitted.
+    onset = fire & (df["FBKC"].shift(1) == 0)
     rel = str(path.relative_to(REPO_ROOT)).replace("\\", "/")
     rows = []
     for zname, z in ZONES.items():
         m = df["RPM"].between(*z["rpm"]) & df["load"].between(*z["load"])
         res_min = m.sum() * dt_min
         n_fires = int((fire & m).sum())
+        n_onsets = int((onset & m).sum())
         n_neg = int((df["FBKC"] < 0)[m].sum())
         rows.append(dict(
             log_date=log_date, rom_rev=rom_rev, log_path=rel, zone=zname,
             residency_min=round(res_min, 3), n_fires=n_fires,
             fires_per_min=round(n_fires / res_min, 3) if res_min > 0.05 else np.nan,
+            n_onsets=n_onsets,
+            onsets_per_min=round(n_onsets / res_min, 3) if res_min > 0.05 else np.nan,
             fbkc_neg_samples=n_neg,
             fbkc_neg_samp_per_min=round(n_neg * dt_min / res_min / dt_min, 1) if res_min > 0.05 else np.nan,
             min_fbkc_in_zone=float(df.loc[m, "FBKC"].min()) if m.any() else np.nan,
@@ -98,17 +107,4 @@ def main() -> None:
             continue
         if not p.exists():
             print(f"  SKIP (missing): {rel}", file=sys.stderr)
-            continue
-        rows = one_log(p, str(r["log_date"]), str(r["rom_rev"]))
-        out_rows.extend(rows)
-        for x in rows:
-            print(f"{x['log_date']} {x['rom_rev']:>14s} {x['zone']:5s} "
-                  f"res {x['residency_min']:7.2f} min  fires {x['n_fires']:3d}  "
-                  f"{x['fires_per_min'] if x['fires_per_min'] == x['fires_per_min'] else float('nan'):6.2f}/min  "
-                  f"legacy {x['fbkc_neg_samp_per_min']}")
-    pd.DataFrame(out_rows).to_csv(OUT, index=False)
-    print(f"\nwrote {OUT} ({len(out_rows)} rows)")
-
-
-if __name__ == "__main__":
-    main()
+       

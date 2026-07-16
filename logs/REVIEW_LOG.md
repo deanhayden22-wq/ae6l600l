@@ -29,6 +29,118 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+## ingest 2026-07-15 (rev 20.18a) auto-rollup (2026-07-15 20:57)
+
+## VE proxy: 20.18a vs 20.18
+  cells with data — 20.18: 318, 20.18a: 157
+  overlap (≥30 samples in each): 106
+  cells with |Δ| ≥ 3%: 54
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.18 → 20.18a):
+    3700 × -10.5   13.18 →  15.63 g/s  (+18.61%, n=65/89)
+     800 ×  -7.5    5.93 →   6.59 g/s  (+11.04%, n=6511/569)
+    3700 × -11.0    9.84 →  10.64 g/s  (+8.11%, n=219/118)
+    2200 × -10.0    9.54 →  10.08 g/s  (+5.65%, n=1582/101)
+    1200 ×  -8.5    7.94 →   8.33 g/s  (+4.98%, n=1071/2586)
+    3000 ×  -4.0   41.35 →  43.28 g/s  (+4.67%, n=3147/118)
+     800 ×  -9.0    4.53 →   4.73 g/s  (+4.56%, n=2400/305)
+    3700 ×  -6.0   39.66 →  41.25 g/s  (+4.01%, n=726/34)
+    3300 ×  -5.0   40.19 →  41.72 g/s  (+3.80%, n=2671/79)
+    1200 ×  -9.0    7.19 →   7.44 g/s  (+3.47%, n=2267/1128)
+
+  Top VE LOSSES:
+    2200 × -11.0    7.72 →   6.33 g/s  (-17.91%, n=5587/116)
+    2600 × -10.0   12.01 →  10.18 g/s  (-15.24%, n=2103/32)
+    1200 ×  -7.5   10.31 →   9.02 g/s  (-12.49%, n=327/306)
+    1900 ×  -8.0   14.64 →  12.97 g/s  (-11.43%, n=302/40)
+    1900 ×  -9.5    9.89 →   8.81 g/s  (-10.95%, n=888/88)
+    2600 ×  +4.0   72.15 →  64.64 g/s  (-10.41%, n=87/57)
+    2600 ×  +3.0   63.76 →  57.52 g/s  (-9.78%, n=73/31)
+    1600 ×  -9.5    8.73 →   7.92 g/s  (-9.24%, n=983/79)
+    2600 ×  +2.5   61.17 →  55.67 g/s  (-8.99%, n=176/51)
+    2600 ×  -9.5   14.48 →  13.19 g/s  (-8.88%, n=3305/32)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+              20.18: cells= 69  mean|c|= 1.62%  median|c|= 1.75%  in_tol= 69.6%  max= 3.3%
+             20.18a: cells= 38  mean|c|= 2.58%  median|c|= 2.18%  in_tol= 47.4%  max= 6.0%
+    verdict: LOSS — VE down + trim worse
+
+
+## 2026-07-15 — log: 7-15 20.18a/7-15 20.18a.csv — rom: 20.18a (AVCS CARVE, first driven log)
+
+**Setup verified:** rom_diff 20.18 → 20.18a re-confirmed: 280 B / 25 runs = AVCS Intake Cruise
+(0xDA97A–0xDAB0E) + NC (0xDAC42–0xDADD6, byte-identical edit) + checksum. md5 fb5807e4… matches
+the 7-14 anchor. Cell decode: core box 1900–3400 × L 1.1–1.3 carved 20–23.5° → **10–11.75°**
+(−10 to −11.75°); blend cols at L 0.8/0.9/1.0/1.5 as designed. **DESIGN DEVIATION: rows
+1000–1600 ALSO carved (e.g. 1600×1.3: 22.21→12.79) and 3800 row + 4150×1.3 tapered — the 7-13
+design entry said no edits ≤1600 or ≥3800. Flagged to Dean (intentional?).**
+**Driven-bin confirmed from log:** steady carve-core cam med 12.5°, resid +0.36° vs 20.18a
+targets (−10.07 vs 20.18). **No reflash lockout** (per-segment avcs p95 16–20°, max 29).
+
+**Log:** 6 short around-town segments, 31.5 min total, warm (seg IAT med 88–106°F — overlaps
+7-12 hot baseline). NO qualifying WOT pull, no highway/5th-gear. Coverage thin: rect residency
+0.85 min, ghost 1.24 min, cusp 0.91 min (baselines had 7.6–16 min).
+
+**Knock (headline — carve elimination test, EARLY READ):**
+- **Zero fires in rect (0/0.85 min) and ghost (0/1.24 min).** Whole-log FBKC min **−1.4**,
+  FLKC 0 decrements, IAM 1.0. Zero deep events anywhere.
+- **[RESOLVED same session] Metric discrepancy:** the 7-12 "matched cross-log" rates (rect
+  1.97→3.41/min) were **onsets-from-zero** (down-step with FBKC==0 prior — the strict
+  first-instance definition); the store's fires_per_min (3.38→6.16) counts **every down-step**
+  incl. within-chain deepening. Reproduced exactly. ghost_zone_fires.py now emits BOTH
+  (n_onsets/onsets_per_min added; store fully regenerated, 43 logs).
+- Poisson read on the zero, both metrics: all-steps rect P(0|0.85 min) ≈ 5.7% (6-21) / 0.5%
+  (7-12); **onsets rect P(0) ≈ 18.8% (6-21) / 5.6% (7-12)**. IAT-matched comparator is 7-12.
+  Under the stricter onset metric the zero is suggestive, not significant.
+- The only 2 fires: 1784×1.02 and 1712×1.22 RPM×load, both **−1.4 trivial**, 11.6–14.1 s after
+  DFCO exit (outside <5 s resume family), first has KNOCK_FLAG=1 (noise-reject flagged). Both
+  sit in rows that WERE carved (~12–13° commanded) — trivial fires persist under mild cam;
+  faint first hint that the noise floor doesn't go to zero.
+- **Verdict: LEANS knock-drop, NOT callable.** Deep-rate unreadable at this residency
+  (P(0 deep|0.85 min) ≈ 41–57% even at baseline rates). Need a highway/5th-gear log with
+  ≥8–10 min box residency.
+
+**Carve cost watch (CORRECTED same session — match on THROTTLE, not load):** the first pass
+matched RPM×load cells (−0.3 to −1.0%) but load is MAF-derived, so it hides VE loss. Steady
+warm RPM×Throttle-matched cells in the box (load>0.85): **median MAF −2.0% vs 7-12, −3.9% vs
+6-21**; ~1% of that is baro (7-15 ATM 14.22 vs 14.36 psi) + ~1% IAT vs 6-21 → **net carve VE
+cost ≈ −1 to −3% at matched pedal**, and it scales with the carve: deepest-carved cells (cam
+10–12°, thr 24–27%) run −5 to −9%, lightly-carved 21%-thr column −2% to flat — weather can't
+produce that cell structure. Load at matched throttle fell 0.02–0.04. Caveat: 7-15 cells are
+thin (n 19–165 vs thousands). This is the predicted earlier-IVC filling loss, real but modest;
+Dean to seat-check. Spool/transient feel unmeasurable (no scoreable pulls). Boost: 161 samples
+>7 psi, med 5.5 psi under target (spool-dominated), peak mrp 19.4, wgdc max 74.9. One 1.28 s
+throttle-saturated stab shortlisted (s42845, knock-free, attainment 48%) — ran with cam ~0°
+the whole stab; same-metric dead-cam rate (cmd≥8°, avcs≤1°, warm) is 7.6% on this log vs
+5.9%/3.0% on 7-12/6-21 → within normal transient/DFCO behavior, NOT a new anomaly, but it
+depresses that stab's spool numbers.
+
+**Backstop sweep:**
+- AFL med −0.78 (fresh post-reflash relearn, max 0.0/min −4.69); steady-CL-cruise TOTAL trim
+  **−1.56** (n=4.8k) vs −2.34 on 7-12 — improving, keep watching.
+- AFC −25 saturation: 168 samples, 157 cold warmup (ECT 84–100°F post-reflash), 11 warm
+  (0.44 s, log0002) — transient, not a concern.
+- IDC peak 91.2% @4747 (brief; known injector ceiling). MAF(V) 4.16. Tip-in stab lean med
+  0.59 AFR (n=64, detector not strictly matched — no strong claim).
+- **CL=8 with FFB<13.8 confirmed functionally OL** (Dean's row-46358 question): AFC/AFL frozen
+  through the FFB 12.8→11.0 stretch (s46360–46410), wbo2 tracks OL command, narrowband pegged.
+  12.3% of flagged-CL samples. Consistent with cc170=13.82 being the real switch. These regions
+  are valid for manual MAF math (lag-shift wbo2, skip transitions).
+- Rest is clean: no tip-in lean spikes of note, no overrun-FBKC regression visible (residency
+  thin), MPH max 66.
+
+**Bookkeeping (closed this session):** 7-15 ingested (log_review_ingest: ve_proxy 157 rows,
+maf_corr 99, stutter 260, wot 1, knock_by_cell 13 — rollup below); zone_fire_rates regenerated
+corpus-wide with the new onsets metric; rom_rev_map row added; rect-rate discrepancy resolved
+(see above). Ingest gap flagged on 7-12 was already closed same-day (log_health/ve_proxy
+current through 7-12 before this session).
+
+**Staged for next session:**
+- Get a highway/5th-gear log on 20.18a: ≥8–10 min in rect at steady cruise + passing pulls —
+  that's the log that calls the elimination test. Note IAT.
+- Ask Dean: 1000–1600-row + 3800-row carve = intentional design change? Also seat-check the
+  −1 to −3% matched-pedal airflow cost.
+
 ## 2026-07-13 — DEEP-HISTORY AUDIT (Car folder archive, 2023→2026) — CAM IS THE LAST UNTESTED LEVER
 
 **Source:** Desktop/Car folder — full rev lineage (garn a–h, lettered L→P11x, AI 2–20, 20–20.4)
@@ -2879,32 +2991,4 @@ sensor-lag, **not a deliverable-fuel deficit**.
 
 **G2 — deep numbers are noise.** Whole-log FBKC min −8.40°, cusp min −4.20°, BUT
 all 4 deep (≤−3°) episodes are overrun/shift artifacts at mrp ≤ 1.3 psi (the
-−8.40 is at **−1.2 psi vacuum**; 2 shift-classified, 1 high-gear coast, 1 light
-stab in 5th at 0.7 psi). Shift/decel-filtered, no real cusp knock deeper than
-~−1.4° (≤ 20.17's −2.8°). IAM/FLKC never moved. New vs 20.17: 2 steady-context
-cusp fires (−1.4°, at rich/neutral mixture) where 6-3 had 0 — but cusp residency
-was only **0.59 min vs 1.63 on 6-3**, so low test power. (The aggravated overrun
-FBKC false-positives are plausibly the now-reverted decel-tier lowering pushing
-low-RPM decel into harsher cut tiers — confirm/deny on the weekend clean-bin log.)
-
-**G3 — mostly clean.** Peak IDC 70.4% < 85 (PASS). Steady-cruise AFC −1.80% mean
-(just outside ±1.5% — WATCH; reads like the ongoing MAF/AFL rich drift, not the
-tip-in lift). AFL −0.75%, but short post-reflash log → drift trend not evaluable
-(same caveat as 6-3). **Cold over-richness did NOT appear:** 150 warmup tip-ins
-(ECT<160 °F) ran +0.25 AFR (at command, slightly lean), warmup peak IDC 70%. The
-feared "ECT comp untamed by the BE cut → cold rich" did not materialize.
-
-### Decisive read
-
-Pre-drive rule was: G1 improves but G2 doesn't → knock was never fuel. **That is
-what happened — and stronger:** G1 barely improved *despite confirmed +2 ms fuel
-delivery*, and the real non-DFCO lean held at 1.76 AFR. Both the cusp lean and the
-cusp knock are insensitive to ~3× tip-in BE-comp authority. **The cusp lean/knock
-is not a tip-in fuel deficit** (confirms `[[cusp-transient-knock-is-not-a-tip-in-fuel-deficit-likely-hardware-transient]]`).
-Next lever is the load/timing/AVCS substrate, not tip-in fuel.
-
-**Before closing the tip-in thread:** (1) cusp residency was thin (0.59 min) —
-modest knock-rate power; (2) this log carried the decel confound (reverted
-post-drive). The weekend long drive on the clean BE-comp-only bin — more cusp
-residency, ideally a real boost pull — settles both. Decel revert is itself a
-variable between this log and the weeke
+−8.40 is at **−1.2 psi
