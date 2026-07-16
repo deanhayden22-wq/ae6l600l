@@ -138,8 +138,9 @@ current through 7-12 before this session).
 **Staged for next session:**
 - Get a highway/5th-gear log on 20.18a: ≥8–10 min in rect at steady cruise + passing pulls —
   that's the log that calls the elimination test. Note IAT.
-- Ask Dean: 1000–1600-row + 3800-row carve = intentional design change? Also seat-check the
-  −1 to −3% matched-pedal airflow cost.
+- ~~Ask Dean: 1000–1600-row + 3800-row carve intentional?~~ CONFIRMED 7-15: intentional
+  smoothing. Seat-check the −1 to −3% matched-pedal airflow cost on the next drive; include
+  a few deliberate 20–30% pedal holds at 2500–3200 on the highway log to firm up the number.
 
 ## 2026-07-13 — DEEP-HISTORY AUDIT (Car folder archive, 2023→2026) — CAM IS THE LAST UNTESTED LEVER
 
@@ -2989,6 +2990,4 @@ climbing out of fuel-cut, not fixable by tip-in); real non-DFCO stabs (39/54) =
 lean only moved 2.24 → 1.76. The residual cusp lean is wall-wetting / wbo2
 sensor-lag, **not a deliverable-fuel deficit**.
 
-**G2 — deep numbers are noise.** Whole-log FBKC min −8.40°, cusp min −4.20°, BUT
-all 4 deep (≤−3°) episodes are overrun/shift artifacts at mrp ≤ 1.3 psi (the
-−8.40 is at **−1.2 psi
+**G2 — deep numbers are noise.** Whole-log FBKC min 
