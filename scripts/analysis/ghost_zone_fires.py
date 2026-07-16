@@ -107,4 +107,17 @@ def main() -> None:
             continue
         if not p.exists():
             print(f"  SKIP (missing): {rel}", file=sys.stderr)
-       
+            continue
+        rows = one_log(p, str(r["log_date"]), str(r["rom_rev"]))
+        out_rows.extend(rows)
+        for x in rows:
+            print(f"{x['log_date']} {x['rom_rev']:>14s} {x['zone']:5s} "
+                  f"res {x['residency_min']:7.2f} min  fires {x['n_fires']:3d}  "
+                  f"{x['fires_per_min'] if x['fires_per_min'] == x['fires_per_min'] else float('nan'):6.2f}/min  "
+                  f"legacy {x['fbkc_neg_samp_per_min']}")
+    pd.DataFrame(out_rows).to_csv(OUT, index=False)
+    print(f"\nwrote {OUT} ({len(out_rows)} rows)")
+
+
+if __name__ == "__main__":
+    main()

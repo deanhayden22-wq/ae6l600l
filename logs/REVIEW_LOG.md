@@ -2990,4 +2990,27 @@ climbing out of fuel-cut, not fixable by tip-in); real non-DFCO stabs (39/54) =
 lean only moved 2.24 → 1.76. The residual cusp lean is wall-wetting / wbo2
 sensor-lag, **not a deliverable-fuel deficit**.
 
-**G2 — deep numbers are noise.** Whole-log FBKC min 
+**G2 — deep numbers are noise.** Whole-log FBKC min −8.40°, cusp min −4.20°, BUT
+all 4 deep (≤−3°) episodes are overrun/shift artifacts at mrp ≤ 1.3 psi (the
+−8.40 is at **−1.2 psi vacuum**; 2 shift-classified, 1 high-gear coast, 1 light
+stab in 5th at 0.7 psi). Shift/decel-filtered, no real cusp knock deeper than
+~−1.4° (≤ 20.17's −2.8°). IAM/FLKC never moved. New vs 20.17: 2 steady-context
+cusp fires (−1.4°, at rich/neutral mixture) where 6-3 had 0 — but cusp residency
+was only **0.59 min vs 1.63 on 6-3**, so low test power. (The aggravated overrun
+FBKC false-positives are plausibly the now-reverted decel-tier lowering pushing
+low-RPM decel into harsher cut tiers — confirm/deny on the weekend clean-bin log.)
+
+**G3 — mostly clean.** Peak IDC 70.4% < 85 (PASS). Steady-cruise AFC −1.80% mean
+(just outside ±1.5% — WATCH; reads like the ongoing MAF/AFL rich drift, not the
+tip-in lift). AFL −0.75%, but short post-reflash log → drift trend not evaluable
+(same caveat as 6-3). **Cold over-richness did NOT appear:** 150 warmup tip-ins
+(ECT<160 °F) ran +0.25 AFR (at command, slightly lean), warmup peak IDC 70%. The
+feared "ECT comp untamed by the BE cut → cold rich" did not materialize.
+
+### Decisive read
+
+Pre-drive rule was: G1 improves but G2 doesn't → knock was never fuel. **That is
+what happened — and stronger:** G1 barely improved *despite confirmed +2 ms fuel
+delivery*, and the real non-DFCO lean held at 1.76 AFR. Both the cusp lean and the
+cusp knock are insensitive to ~3× tip-in BE-comp authority. **The cusp lean/knock
+is not a tip-in fuel deficit** (confirms `[[cusp-transient-knock-is-not-a-tip-in-fuel-deficit-likely-hardw
