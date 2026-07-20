@@ -1,0 +1,13 @@
+Quarantined 2026-07-18 by log-review cleanup.
+
+WHAT: log0001-0004.csv here are BYTE-IDENTICAL (sha256-verified) to
+      "7-17 2 20.18a"/log0001-0004.csv -- yesterday's 2nd session. They were
+      re-pulled onto the 7-18 SD copy because the card wasn't cleared, and got
+      concatenated into the 7-18 combined CSV (116,639 rows = 32.3% of it).
+
+FIX:  "7-18 20.18a/7-18 20.18a.csv" was rebuilt from ONLY the 7 genuinely-new
+      logs (log0005-0011) via scripts/combine_logs.py. The old contaminated
+      combine is preserved here as *_CONTAMINATED_360917rows.csv.
+
+SAFE TO DELETE: yes. The 4 raw logs still live in "7-17 2 20.18a/"; the
+      contaminated combine is reconstructable.

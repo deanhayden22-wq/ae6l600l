@@ -1,0 +1,66 @@
+================================================================================
+FBKC PATH + FBKC->FLKC HANDOFF TRACE
+Traced 2026-07-20 (session: "FLKC without FBKC?" question)
+Method: literal-pool scan for FBKC/FLKC scalar addrs (0xD2DCC etc.) to locate
+        code, then sh2_disasm.py. Code is identical across 20.x revs (only cal
+        tables differ), so disasm from stock bin; GBR resolved per fn from prologue.
+Pairs with: knock_flkc_report.txt (FLKC-focused) + reference_knock_control_cascade.
+================================================================================
+
+HEADLINE
+--------
+FBKC and FLKC BOTH engage off the SAME binary flag: knock_event_flag @0xFFFF81BA
+(set by knock_detector when knock exceeds the RPM/load detection threshold).
+There is NO separate, lower "sub-FBKC" threshold feeding FLKC. The earlier
+graded / separate-trigger hypothesis is REFUTED by the code. => Real FLKC
+learning requires knock events that ALSO trigger FBKC. (Dean's instinct: correct.)
+
+FBKC APPLY FUNCTION  (~0x443A0-0x447D0, GBR=0xFFFF7450)
+------------------------------------------------------
+Head reads (the trigger):
+  0x443C2  R11 = byte @0xFFFF81BA (knock_event_flag)   <-- PRIMARY FBKC trigger
+  0x443C6  R12 = byte @0xFFFF81BB (knock_flag_B, secondary)
+FBKC variable = 0xFFFF81F0 (float; this is the logged FBKC value).
+Retard apply (0x446EA-0x44728):
+  if R12(81BB)==1:  FBKC -= [0x000D2DE8]                 (secondary-flag step)
+  elif R11(81BA)==1: FBKC -= 1.4 (0x000D2DCC); clamp >= -11.8 (0x000D2DC8, via
+                    max_float 0xBE960); writeback @0xFFFF81F0
+No-knock recovery (0x44738):
+  cnt = word @0xFFFF7484; if cnt >= 70 (0x000D29DE):
+     FBKC += 0.35 (0x000D2DD0); clamp <= 0; writeback
+Extra enable gates checked before the retard (all must be 1): bytes @0xFFFF74AA,
+  0xFFFF7494, 0xFFFF7495, 0xFFFF74AB, 0xFFFF74AC (GBR+5A/44/45/5B/5C). FBKC can be
+  SUPPRESSED here even when 81BA is set. (What sets each = NOT yet traced.)
+
+FLKC SLOW STATE MACHINE  flkc_paths_FG (0x463BA-0x469BA, GBR=0xFFFF8290)
+-----------------------------------------------------------------------
+Head: fr15=@0xFFFF8258 (knock_metric, cumulative float); r7=@0xFFFF81BA
+      (knock_event_flag); r1=@0xFFFF7D18 (suppress); enable=@0xFFFF3244; active=@0xFFFF8233.
+FORK @0x46460:  tst r7(81BA);  ==0 -> RECOVERY path;  !=0 -> ENGAGE path (0x46618).
+ENGAGE (0x46618; requires 81BA!=0):
+  gated by metric fr15 vs 0x000D2F40, per-cyl FLKC vs 0, then:
+    if 81BB==1: retard by 0x000D2F64 (bigger step)
+    elif @0xFFFF7461==1: retard by 1.01 (0x000D2F50); clamp to -15 (0x000D2F4C)
+RECOVERY: FLKC_counter word @0xFFFF8294 >= 90 (0x000D29EE) AND metric-gated ->
+  advance +0.25 (0x000D2F48); clamp.
+FLKC_counter @0xFFFF8294 (0x46856-0x46874) = NO-KNOCK TIMER:
+  if 81BA != 0 (knock):  counter = 0            (RESET)
+  else (no knock):       counter += 1 (saturating)
+  => counts consecutive QUIET events; reaching 90 permits the +0.25 recovery.
+  It is NOT a knock accumulator toward engage. (Old "counter builds on knock"
+  framing was backwards.)
+
+HANDOFF CONCLUSION
+------------------
+1. One detector -> knock_event_flag(0xFFFF81BA) -> BOTH FBKC(-1.4) and FLKC(-1.01)
+   engage off it. Shared trigger, confirmed at the instruction level.
+2. knock_metric(0xFFFF8258) MODULATES FLKC step/recovery gating; it is NOT a
+   separate sub-threshold engage trigger.
+3. d29ee(=90)=FLKC RECOVERY no-knock delay. d29de(=70)=FBKC recovery no-knock delay.
+   Both are recovery timers, not knock-accumulate thresholds.
+4. Therefore "FBKC=0 while FLKC learns" is NOT a second knock path. It is either:
+     (a) FBKC suppressed by its extra enable gates (74AA/7494/7495/74AB/74AC) on
+         that event while FLKC still engaged (FBKC has MORE gates than FLKC), or
+     (b) log-side coarse-FLKC-grid attribution (FLKC table >=1.25, coarser than the
+         base grid; only ~3 true 0->-1.0 snaps on 7-19, rest were cell traversal).
+   Open: trace what sets the 74xx FBKC enables + reconcile against a log to pick a/b.

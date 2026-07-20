@@ -1,6 +1,7 @@
 {
   "rev_order": [
     "stock",
+    "garn_base",
     "20.8",
     "20.9",
     "20.10",
@@ -12,51 +13,161 @@
     "20.16",
     "20.17",
     "20.17a",
-    "20.18"
+    "20.18",
+    "20.18a",
+    "20.19"
   ],
   "transitions": [
     {
       "before_rev": "stock",
-      "after_rev": "20.8",
+      "after_rev": "garn_base",
       "before_bin": "ae5l600l.bin",
-      "after_bin": "AE5L600L 20g rev 20.8 tiny wrex.bin",
-      "n_diff_bytes": 11826,
-      "n_runs": 261,
+      "after_bin": "13 20g Base rev 25 e garn.hex",
+      "n_diff_bytes": 7796,
+      "n_runs": 285,
       "tables": [
         {
           "name": "Initial Wastegate Duty",
-          "n_runs": 4,
-          "n_bytes": 727,
-          "addr_min": 790866,
+          "n_runs": 3,
+          "n_bytes": 653,
+          "addr_min": 790924,
           "addr_max": 791690
         },
         {
           "name": "AVCS Intake Non-Cruise",
-          "n_runs": 8,
-          "n_bytes": 532,
+          "n_runs": 6,
+          "n_bytes": 494,
           "addr_min": 896062,
           "addr_max": 896628
         },
         {
+          "name": "AVCS Intake Cruise",
+          "n_runs": 7,
+          "n_bytes": 454,
+          "addr_min": 895376,
+          "addr_max": 895924
+        },
+        {
           "name": "Base Timing Primary Cruise",
           "n_runs": 2,
-          "n_bytes": 430,
+          "n_bytes": 426,
           "addr_min": 870475,
           "addr_max": 870918
         },
         {
           "name": "Base Timing Primary Non-Cruise",
           "n_runs": 2,
-          "n_bytes": 430,
+          "n_bytes": 426,
           "addr_min": 870923,
           "addr_max": 871366
         },
         {
           "name": "Base Timing Reference Cruise",
           "n_runs": 2,
-          "n_bytes": 430,
+          "n_bytes": 426,
           "addr_min": 871371,
           "addr_max": 871814
+        },
+        {
+          "name": "Knock Adv Max Cruise",
+          "n_runs": 11,
+          "n_bytes": 403,
+          "addr_min": 874756,
+          "addr_max": 875295
+        },
+        {
+          "name": "Max Wastegate Duty",
+          "n_runs": 1,
+          "n_bytes": 329,
+          "addr_min": 790420,
+          "addr_max": 790749
+        },
+        {
+          "name": "Engine Load Compensation Cruise (axes+data)",
+          "n_runs": 2,
+          "n_bytes": 234,
+          "addr_min": 801753,
+          "addr_max": 801993
+        },
+        {
+          "name": "Engine Load Compensation Non-Cruise (axes+data)",
+          "n_runs": 2,
+          "n_bytes": 234,
+          "addr_min": 802009,
+          "addr_max": 802249
+        },
+        {
+          "name": "Sport Pedal Map",
+          "n_runs": 21,
+          "n_bytes": 118,
+          "addr_min": 1022458,
+          "addr_max": 1022760
+        },
+        {
+          "name": "Overrun Fueling RPM Resume Threshold",
+          "n_runs": 1,
+          "n_bytes": 15,
+          "addr_min": 847584,
+          "addr_max": 847599
+        },
+        {
+          "name": "Turbo Dynamics Proportional",
+          "n_runs": 2,
+          "n_bytes": 9,
+          "addr_min": 789802,
+          "addr_max": 789816
+        },
+        {
+          "name": "Boost Error axis",
+          "n_runs": 1,
+          "n_bytes": 7,
+          "addr_min": 789765,
+          "addr_max": 789772
+        },
+        {
+          "name": "Firmware checksum (auto)",
+          "n_runs": 1,
+          "n_bytes": 4,
+          "addr_min": 1047432,
+          "addr_max": 1047436
+        },
+        {
+          "name": "(unknown region)",
+          "n_runs": 221,
+          "n_bytes": 5138,
+          "addr_min": 81925,
+          "addr_max": 1047544
+        }
+      ]
+    },
+    {
+      "before_rev": "garn_base",
+      "after_rev": "20.8",
+      "before_bin": "13 20g Base rev 25 e garn.hex",
+      "after_bin": "AE5L600L 20g rev 20.8 tiny wrex.bin",
+      "n_diff_bytes": 9761,
+      "n_runs": 297,
+      "tables": [
+        {
+          "name": "Base Timing Primary Cruise",
+          "n_runs": 6,
+          "n_bytes": 673,
+          "addr_min": 870164,
+          "addr_max": 870918
+        },
+        {
+          "name": "AVCS Intake Cruise",
+          "n_runs": 15,
+          "n_bytes": 444,
+          "addr_min": 895352,
+          "addr_max": 895916
+        },
+        {
+          "name": "AVCS Intake Non-Cruise",
+          "n_runs": 15,
+          "n_bytes": 444,
+          "addr_min": 896064,
+          "addr_max": 896628
         },
         {
           "name": "Max Wastegate Duty",
@@ -66,39 +177,60 @@
           "addr_max": 790810
         },
         {
+          "name": "Initial Wastegate Duty",
+          "n_runs": 5,
+          "n_bytes": 374,
+          "addr_min": 790866,
+          "addr_max": 791366
+        },
+        {
+          "name": "Knock Adv Max Cruise",
+          "n_runs": 2,
+          "n_bytes": 369,
+          "addr_min": 875069,
+          "addr_max": 875510
+        },
+        {
+          "name": "Base Timing Primary Non-Cruise",
+          "n_runs": 5,
+          "n_bytes": 367,
+          "addr_min": 870926,
+          "addr_max": 871366
+        },
+        {
+          "name": "Base Timing Reference Cruise",
+          "n_runs": 5,
+          "n_bytes": 367,
+          "addr_min": 871374,
+          "addr_max": 871814
+        },
+        {
           "name": "Sport Pedal Map",
-          "n_runs": 6,
-          "n_bytes": 332,
+          "n_runs": 7,
+          "n_bytes": 328,
           "addr_min": 1022434,
           "addr_max": 1022789
         },
         {
-          "name": "Knock Adv Max Cruise",
-          "n_runs": 5,
-          "n_bytes": 323,
-          "addr_min": 874896,
-          "addr_max": 875306
-        },
-        {
-          "name": "AVCS Intake Cruise",
-          "n_runs": 6,
-          "n_bytes": 266,
-          "addr_min": 895638,
-          "addr_max": 895924
+          "name": "Target Boost",
+          "n_runs": 8,
+          "n_bytes": 258,
+          "addr_min": 791382,
+          "addr_max": 791688
         },
         {
           "name": "Engine Load Compensation Cruise (axes+data)",
-          "n_runs": 1,
-          "n_bytes": 240,
+          "n_runs": 8,
+          "n_bytes": 158,
           "addr_min": 801753,
-          "addr_max": 801993
+          "addr_max": 801989
         },
         {
           "name": "Engine Load Compensation Non-Cruise (axes+data)",
-          "n_runs": 1,
-          "n_bytes": 240,
+          "n_runs": 8,
+          "n_bytes": 158,
           "addr_min": 802009,
-          "addr_max": 802249
+          "addr_max": 802245
         },
         {
           "name": "Boost Error axis",
@@ -130,8 +262,8 @@
         },
         {
           "name": "(unknown region)",
-          "n_runs": 216,
-          "n_bytes": 9661,
+          "n_runs": 205,
+          "n_bytes": 7496,
           "addr_min": 81925,
           "addr_max": 1047544
         }
@@ -797,6 +929,96 @@
           "n_bytes": 2,
           "addr_min": 862660,
           "addr_max": 862662
+        }
+      ]
+    },
+    {
+      "before_rev": "20.18",
+      "after_rev": "20.18a",
+      "before_bin": "AE5L600L 20g rev 20.18.bin",
+      "after_bin": "AE5L600L 20g rev 20.18a.bin",
+      "n_diff_bytes": 280,
+      "n_runs": 25,
+      "tables": [
+        {
+          "name": "AVCS Intake Cruise",
+          "n_runs": 12,
+          "n_bytes": 138,
+          "addr_min": 895354,
+          "addr_max": 895758
+        },
+        {
+          "name": "AVCS Intake Non-Cruise",
+          "n_runs": 12,
+          "n_bytes": 138,
+          "addr_min": 896066,
+          "addr_max": 896470
+        },
+        {
+          "name": "Firmware checksum (auto)",
+          "n_runs": 1,
+          "n_bytes": 4,
+          "addr_min": 1047432,
+          "addr_max": 1047436
+        }
+      ]
+    },
+    {
+      "before_rev": "20.18a",
+      "after_rev": "20.19",
+      "before_bin": "AE5L600L 20g rev 20.18a.bin",
+      "after_bin": "AE5L600L 20g rev 20.19.bin",
+      "n_diff_bytes": 273,
+      "n_runs": 102,
+      "tables": [
+        {
+          "name": "Base Timing Primary Cruise",
+          "n_runs": 22,
+          "n_bytes": 57,
+          "addr_min": 870164,
+          "addr_max": 870669
+        },
+        {
+          "name": "Base Timing Primary Non-Cruise",
+          "n_runs": 18,
+          "n_bytes": 48,
+          "addr_min": 870683,
+          "addr_max": 871117
+        },
+        {
+          "name": "Base Timing Reference Cruise",
+          "n_runs": 18,
+          "n_bytes": 48,
+          "addr_min": 871131,
+          "addr_max": 871565
+        },
+        {
+          "name": "Knock Adv Max Cruise",
+          "n_runs": 14,
+          "n_bytes": 41,
+          "addr_min": 874828,
+          "addr_max": 875053
+        },
+        {
+          "name": "Base Timing Reference Non-Cruise",
+          "n_runs": 14,
+          "n_bytes": 39,
+          "addr_min": 871579,
+          "addr_max": 871803
+        },
+        {
+          "name": "Firmware checksum (auto)",
+          "n_runs": 1,
+          "n_bytes": 4,
+          "addr_min": 1047432,
+          "addr_max": 1047436
+        },
+        {
+          "name": "(unknown region)",
+          "n_runs": 15,
+          "n_bytes": 52,
+          "addr_min": 864909,
+          "addr_max": 875501
         }
       ]
     }

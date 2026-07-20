@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 
 revmap = pd.read_csv("logs/rom_rev_map.csv")
-order = ["stock","garn_base","20.7","20.8","20.9","20.10","20.11","20.12","20.13","20.14","20.15","20.16","20.17","20.17a","20.18"]
+from rev_order import REV_ORDER as order  # canonical list — append new revs in rev_order.py
 NEED = ["wbo2","FFB","Throttle","RPM","IPW","MAF","CL/OL"]
 L = 8
 

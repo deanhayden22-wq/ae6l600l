@@ -115,18 +115,20 @@ LEDGER = [
      "{resume_share} of deep events corpus-wide fire ≤5 s after DFCO exit — but that tags stabs, "
      "not a resume mechanism; fuel levers exhausted (tau cut is DELIBERATE: stops enrichment "
      "stacking OL 11.1→FFB 10.1); all contained, IAM 1.0",
-     "20.19 as-built (load-comp substrate pull lowers timing demand in the band); tau restore RETRACTED 7-12"),
+     "AVCS carve elimination test RUNNING (20.18a since 7-14; 49.6 min pooled: 0 deep, floor -1.4); "
+     "decisive highway log pending; delay revert 70->125 queued if knock unchanged"),
     ("Cruise-band fueling error (~2% over-read)", "ACTIVE", "active",
      "Total trim (AFC+AFL) steady CL cruise: {trim_now} — flat since 6-7 despite AFL moving",
      "WB-driven region refit at pre-injector-swap MAF baseline; do NOT cell-patch"),
     ("Injector ceiling", "HW-BLOCKED", "blocked",
      "IDC {idc_now}% peak @ 6052 RPM / 18.7 psi (7-12); mixture held, margin zero",
      "Injector swap decision gates all top-end work incl. the missing redline pull"),
-    ("5th-gear rect / steady cusp knock", "CONTAINED — WATCH", "watch",
-     "~2% tip-over, FBKC+FLKC handling it (IAM 1.0 throughout); hot+AC day = +73% fires/min",
-     "No clean gated fix exists; optional ~1° at low-load ignition cells; re-score after tau rev"),
+    ("5th-gear rect / steady cusp knock", "TESTING — CARVE", "watch",
+     "Carve pooled rect 0.65 onsets/min vs 1.97-3.41 baseline (P 0.19/0.03), retard duty at corpus low "
+     "(0.17-0.23% vs 0.59-0.61%); cool-day confound on 7-16; leans knock-drop, NOT callable",
+     "Weekend highway/5th-gear log with >=8-10 min rect residency calls the elimination test"),
     ("AFL drift toward rich", "RECOVERING", "watch",
-     "med −1.56, end-of-day 0.0 on 7-12 (was −6.25 in leak era) — redistribution, see fueling error",
+     "med −0.78 flat on 7-15/7-16 (was −6.25 leak era, −2.34 on 6-21) — redistribution, see fueling error",
      "Watch next log; folds into MAF refit"),
     ("Idle-band MAF (1.18–1.30 V)", "WATCH", "watch",
      "+3.4% on 7-12 (was +0.78 on 6-21) — AC compressor confound, not actionable",
@@ -139,6 +141,10 @@ LEDGER = [
      "Tune timing/fuel for actual mrp; no action"),
     ("Load-comp lean dead zone", "RESOLVED", "resolved",
      "−0.8% on 7-12 (was +4–8% lean pre-20.18)", "Regression tripwire only"),
+    ("AVCS carve pedal/VE cost", "WATCH — PRICED", "watch",
+     "Carved cells need +2-4 APP pts at matched airflow (control cells flat); matched-cell trim "
+     "-1.95 on both carve logs vs -1.56 pre-carve; power path (L>=1.5/WOT) untouched",
+     "Track spool_per_log + total_trim_matched_med; price into keep-vs-revert when knock verdict lands"),
     ("Pedal hunting · cusp stutter · decel-tier overrun knock · 20.16 P0s · boost leak",
      "RESOLVED / CLOSED", "resolved",
      "All confirmed stable through 7-12", "Tripwires only — no active tracking"),

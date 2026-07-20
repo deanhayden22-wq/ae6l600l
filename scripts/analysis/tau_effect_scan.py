@@ -43,7 +43,8 @@ BINS = {
     "20.13": "AE5L600L 20g rev 20.13.bin", "20.14": "AE5L600L 20g rev 20.14.bin",
     "20.15": "AE5L600L 20g rev 20.15.bin", "20.16": "AE5L600L 20g rev 20.16.bin",
     "20.17": "AE5L600L 20g rev 20.17.bin", "20.17a": "AE5L600L 20g rev 20.17a.bin",
-    "20.18": "AE5L600L 20g rev 20.18.bin",
+    "20.18": "AE5L600L 20g rev 20.18.bin", "20.18a": "AE5L600L 20g rev 20.18a.bin",
+    "20.19": "AE5L600L 20g rev 20.19.bin",
 }
 
 def ol_map(rev):

@@ -43,12 +43,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 TRENDS_DIR = REPO_ROOT / "scripts" / "analysis" / "trends"
 LOGS_DIR = REPO_ROOT / "logs"
 
-# Canonical rev order. Append new revs here.
-REV_ORDER = [
-    "stock", "garn_base", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12",
-    "20.13", "20.14", "20.15", "20.16", "20.17", "20.17a", "20.18",
-]
-DEFAULT_BASELINE = "garn_base"
+# Canonical rev order lives in rev_order.py — append new revs THERE.
+from rev_order import REV_ORDER, DEFAULT_BASELINE
 
 # Stutter signature: ≥N distinct signal types within window_s of each other
 STUTTER_SIG_MIN_SIGNALS = 2
