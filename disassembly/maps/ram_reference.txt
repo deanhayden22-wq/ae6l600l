@@ -1,6 +1,34 @@
 AE5L600L Consolidated RAM Reference Map
 ==============================================================================================================
 Total addresses: 858 | Named: 497 | Unnamed: 361 (low-ref infrastructure, excluded)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! CORRECTIONS 2026-07-26 -- FOUR CORE IDENTITIES IN THIS FILE WERE WRONG    !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!!   FFFF63F8 : was iat_current         -> ENGINE LOAD (g/rev)
+!!   FFFF65FC : was engine_load_current -> VEHICLE SPEED (km/h)
+!!   FFFF620C : was airflow_maf_current -> MANIFOLD PRESSURE
+!!   FFFF61CC : was vehicle_speed       -> DIAG MONITOR STATUS BYTES (not a float)
+
+  Method that settled it (three independent derivations agreeing):
+   1. Definition-named axes. A RAM variable is traced to the lookup axis it
+      feeds; the definition XMLs NAME that axis. 0xFFFF63F8 feeds 21/21 axes
+      named "Engine Load"; 0xFFFF620C feeds one named "Manifold Pressure".
+   2. Axis breakpoint envelope. 0xFFFF65FC feeds axes spanning 0..300, while
+      every definition-named load axis spans 0.2..8.
+   3. Access-width census. 0xFFFF61CC: 26 int8 accesses, ZERO float.
+
+  ALSO SUSPECT (storage width claimed float, code only ever uses int8):
+!!     FFFF65C0 throttle_position  89 int8 / 0 float
+!!     FFFF6254 maf_current        51 int8 / 0 float
+  Those two are flagged CONFLICT in docs/verification-status.md; the NAME may
+  still be right, but the "(float)" in their description is not supported.
+
+  Per-address verification flags: docs/verification-status.md
+  Full evidence: docs/corrections.md item 9
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 All addresses with >= 5 refs are named. Top 200 most-referenced: 100% coverage.
 Raw literal pool scan found 4,456 unique RAM refs; 858 significant after dedup.
 Sources: Ghidra import (373), Task10 analysis (61), manual (29), ram_map_raw (501), map_switching_analysis (20)
@@ -12,27 +40,27 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
   -----  ----------  -----------------------------------  -------------------------------------------------------
     301  0xFFFF6624  rpm_current                          301 refs. Current RPM (float). Read by frontO2, AFL, CL
     205  0xFFFF6350  ect_current                          205 refs. Coolant temperature (float). Read by PSE, AFC
-    135  0xFFFF65FC  engine_load_current                  135 refs. Engine load in g/rev (float). Also load_current (task50 map switching).
+    135  0xFFFF65FC  vehicle_speed_kmh                    CORRECTED 2026-07-26: VEHICLE SPEED (km/h, float), NOT engine load. See docs/corrections.md item 9.
     118  0xFFFF399E  dtc_maturation_timer                 118 refs. DTC maturation timer/counter. Read primarily 
     107  0xFFFFAD52  diag_session_state                   107 refs. Diagnostic session state. Read by diag/DTC fr
      99  0xFFFF67EC  atm_pressure_current                 99 refs. Atmospheric/barometric pressure (float). Read 
      97  0xFFFF8E98  cl_state_struct                      97 refs. CL monitoring state struct (15+ bytes). Base f
      92  0xFFFF3B06  diag_indexed_lookup_table            Diagnostic indexed lookup table. Accessed at FFFF3B06 +
      89  0xFFFF65C0  throttle_position                    89 refs. Throttle position (float). Read by AFL, timing
-     86  0xFFFF63F8  iat_current                          86 refs. Intake air temperature (float). Read by AFL, C
+     86  0xFFFF63F8  engine_load_current                  CORRECTED 2026-07-26: ENGINE LOAD (g/rev, float), NOT IAT. Real IAT is 0xFFFF69F0. See corrections.md item 9.
      77  0xFFFF4130  atm_pressure_baro                    77 refs. Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline.
      76  0xFFFF3836  io_ign_driver_ctrl                   InternalIO ignition driver control register (31 refs).
      69  0xFFFF6354  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float). Re
      69  0xFFFFADAC  diag_request_state                   69 refs. Diagnostic request/response state. Read by DTC
      60  0xFFFF85D7  fuel_system_state                    60 refs. Fuel system state byte. Read by AFC, AFL, idle
      56  0xFFFF4024  ATU_primary_ctrl                     ATU primary control register. 36 code refs — master inj
-     56  0xFFFF61CC  vehicle_speed                        56 refs. Vehicle speed (float). Read by timing, CL/OL, 
+     56  0xFFFF61CC  diag_monitor_status_bytes            CORRECTED 2026-07-26: BYTE array of diag monitor status. 26 int8 accesses, ZERO float. NOT speed.
      51  0xFFFF6254  maf_current                          51 refs. MAF sensor value (float, g/s). Read by AFL pip
      48  0xFFFF25CC  system_tick_counter                  48 refs. System tick/event counter.
      48  0xFFFF6364  ect_startup                          48 refs. ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Read by AFL, delay_manager_B, timing blend.
      48  0xFFFF6898  manifold_pressure                    48 refs. Manifold pressure (float). Read by frontO2, PS
      45  0xFFFF3480  cal_mirror_base                      45 refs. Calibration mirror base. Referenced by various
-     43  0xFFFF620C  airflow_maf_current                  Current MAF/airflow (float). Used by accel enrichment a
+     43  0xFFFF620C  manifold_pressure_map                CORRECTED 2026-07-26: MANIFOLD PRESSURE, not MAF airflow. Feeds axis 0xCC840 "Manifold Pressure".
      43  0xFFFF63C4  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
      41  0xFFFF366C  io_inj_driver_ctrl                   InternalIO injection driver control register (31 refs).
      39  0xFFFF8E46  fuel_mode_flags                      39 refs. Fuel mode flags register.
@@ -275,7 +303,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   afr_init_flag_D                           0xFFFF7BBB     0 refs  AFR deviation init flag D (byte). Set by
   afr_init_flag_E                           0xFFFF7BBC     0 refs  AFR deviation init flag E (byte). Set by
   aggregator_struct_base                    0xFFFF7828     0 refs  Major struct base for fuel aggregation (
-  airflow_maf_current                       0xFFFF620C    43 refs  Current MAF/airflow (float). Used by acc
+  manifold_pressure_map                     0xFFFF620C    43 refs  CORRECTED 2026-07-26: manifold pressure, not MAF.
   alt_blend_ratio                           0xFFFF7F1C     0 refs  Alternative blend ratio (task50).
   atm_blend_correction                      0xFFFF7F6C     0 refs  Atmospheric correction (task33).
   ect_startup                               0xFFFF6364    48 refs  ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Was mislabeled atm_pressure.
@@ -417,7 +445,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   egr_timeout_counter                       0xFFFF2BFC     0 refs  EGR timeout/period counter (u16). Read b
   egr_timeout_threshold                     0xFFFF9FB2     0 refs  EGR timeout threshold (u16). Read by egr
   egr_timer                                 0xFFFF9FA4     0 refs  EGR timer (u16). Compared against 400 by
-  engine_load_current                       0xFFFF65FC   135 refs  135 refs. Engine load in g/rev (float). Also load_current (task50 map switching).
+  vehicle_speed_kmh                         0xFFFF65FC   135 refs  CORRECTED 2026-07-26: vehicle speed km/h, NOT engine load.
   engine_mode_bits                          0xFFFF61F4     0 refs  Engine mode flag byte. Bit 3: early exit
   engine_running_flag                       0xFFFF65C5     0 refs  Byte: 1=engine running. Read by check_en
   engine_state_byte                         0xFFFF65BD    34 refs  34 refs. Engine state byte (cranking/run
@@ -484,7 +512,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   gbr_base_corr_init_ws                     0xFFFF7FD4     0 refs  GBR base for timing corrections init wor
   gbr_base_timing_ws                        0xFFFF7F10     0 refs  GBR base for task30 base timing workspac
   IAM_compensation_ws                       0xFFFF80C0     0 refs  IAM compensation workspace (float). Task
-  iat_current                               0xFFFF63F8    86 refs  86 refs. Intake air temperature (float).
+  engine_load_current                       0xFFFF63F8    86 refs  CORRECTED 2026-07-26: engine load g/rev, NOT IAT.
   ect_compensation                          0xFFFF63C4    43 refs  ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
   idle_control_GBR                          0xFFFF837E    20 refs  39 refs. Idle control GBR base (19 GBR u
   idle_sensor_ref                           0xFFFF83A5    21 refs  Idle control sensor comparison reference
@@ -681,7 +709,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   transient_enable_gate                     0xFFFF65F1     0 refs  Gate flag checked by transient_correctio
   transient_knock_inhibit                   0xFFFF726E     0 refs  Transient knock inhibit flag (byte). Rea
   fuel_system_ready                         0xFFFF726C    65 refs  Fuel system readiness flag (byte). Read by check_fuel_system_ready (0x2F8EA, 65 calls). When == 1, fuel pipeline is initialized. Also used to gate AFL and transient enrichment.
-  vehicle_speed                             0xFFFF61CC    56 refs  56 refs. Vehicle speed (float). Read by 
+  diag_monitor_status_bytes                 0xFFFF61CC    56 refs  CORRECTED 2026-07-26: diag monitor status bytes, NOT speed.
   vvt_error_feedback_A                      0xFFFF920C     0 refs  Intake VVT error feedback result A (floa
   vvt_error_feedback_B                      0xFFFF9210     0 refs  Intake VVT error feedback result B (floa
   vvt_error_feedback_C                      0xFFFF9220     0 refs  Intake VVT error feedback result C (floa
@@ -730,9 +758,9 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF5FFC    23  io_state_register                    23 refs. I/O state register.
   0xFFFF6155    36  adc_channel_status                   36 refs. ADC channel status/index (byte). GBR base
   0xFFFF61AC    17  adc_processed_alt                    ADC processed alternate channel
-  0xFFFF61CC    56  vehicle_speed                        56 refs. Vehicle speed (float). Read by timing, CL
+  0xFFFF61CC    56  diag_monitor_status_bytes            CORRECTED 2026-07-26: diag monitor status bytes, NOT speed.
   0xFFFF61FC    11  adc_processed_extra                  ADC processed extra channel (float). Near airflow_maf_current.
-  0xFFFF620C    43  airflow_maf_current                  Current MAF/airflow (float). Used by accel enrichm
+  0xFFFF620C    43  manifold_pressure_map                CORRECTED 2026-07-26: manifold pressure, not MAF.
   0xFFFF6228    22  maf_voltage                          22 refs. MAF sensor voltage (float). Read by timin
   0xFFFF6254    51  maf_current                          51 refs. MAF sensor value (float, g/s). Read by AF
   0xFFFF62DC    20  fuel_rate                            20 refs. Fuel injection rate (float). Read by timi
@@ -743,7 +771,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF63B0    16  adc_processed_temperature_B           ADC processed temperature B (float). ECT/IAT sensor region.
   0xFFFF63C4    43  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
   0xFFFF63CC    16  ram_ECT                              Coolant temperature / ECT (float)
-  0xFFFF63F8    86  iat_current                          86 refs. Intake air temperature (float). Read by A
+  0xFFFF63F8    86  engine_load_current                  CORRECTED 2026-07-26: engine load g/rev, NOT IAT.
   0xFFFF6430    19  adc_processed_secondary              ADC processed secondary sensor value
   0xFFFF64D8    29  throttle_raw                         29 refs. Throttle raw ADC or secondary throttle.
   0xFFFF653C    19  o2_sensor_voltage                    19 refs. O2 sensor voltage or lambda value.
@@ -753,7 +781,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF65BD    34  engine_state_byte                    34 refs. Engine state byte (cranking/running/etc).
   0xFFFF65BF    20  accel_state                          Acceleration state flag (task50 map switching). Was warmup_transition_flag_B.
   0xFFFF65C0    89  throttle_position                    89 refs. Throttle position (float). Read by AFL, t
-  0xFFFF65FC   135  engine_load_current                  135 refs. Engine load in g/rev (float). Also load_current (task50 map switching).
+  0xFFFF65FC   135  vehicle_speed_kmh                    CORRECTED 2026-07-26: vehicle speed km/h, NOT engine load.
   0xFFFF6624   301  rpm_current                          301 refs. Current RPM (float). Read by frontO2, AF
   0xFFFF67EC    99  atm_pressure_current                 99 refs. Atmospheric/barometric pressure (float). 
   0xFFFF6810    22  ol_condition_selector                OL condition selector byte (1-5). Selects ROM thre

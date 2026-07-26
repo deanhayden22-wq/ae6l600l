@@ -423,7 +423,7 @@ def decode_insn(code, pc, rom):
             if mid == 0x3: return f"ftrc   fr{n},FPUL", 2
             if mid == 0x4: return f"fneg   fr{n}", 2
             if mid == 0x5: return f"fabs   fr{n}", 2
-            if mid == 0x6: return f"fsqrt  fr{n}", 2
+            if mid == 0x6: return f".INVALID_SH2E  fr{n}", 2
             if mid == 0x8: return f"fldi0  fr{n}", 2
             if mid == 0x9: return f"fldi1  fr{n}", 2
             return f".word  0x{code:04X}  ; FPU special", 2

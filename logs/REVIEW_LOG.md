@@ -29,6 +29,43 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+## ingest 2026-07-26 (rev 20.19b) auto-rollup (2026-07-26 16:29)
+
+## VE proxy: 20.19b vs 20.19
+  cells with data — 20.19: 270, 20.19b: 124
+  overlap (≥30 samples in each): 77
+  cells with |Δ| ≥ 3%: 47
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19 → 20.19b):
+    1200 × -10.0    4.42 →   5.78 g/s  (+30.94%, n=2186/314)
+    1200 × -10.5    4.37 →   5.56 g/s  (+27.05%, n=159/54)
+    3300 × -11.0    8.74 →   9.73 g/s  (+11.22%, n=932/291)
+    3000 × -10.5   10.18 →  11.20 g/s  (+10.05%, n=651/321)
+    3700 ×  -7.5   32.39 →  34.98 g/s  (+8.01%, n=292/35)
+    2600 × -11.0    7.74 →   8.12 g/s  (+4.85%, n=1273/2270)
+    2200 ×  -8.0   17.40 →  18.14 g/s  (+4.23%, n=438/308)
+    2200 × -11.0    7.28 →   7.58 g/s  (+4.15%, n=388/408)
+    2200 ×  -5.0   28.46 →  29.63 g/s  (+4.09%, n=74/222)
+     800 ×  -8.0    5.45 →   5.67 g/s  (+3.96%, n=858/3628)
+
+  Top VE LOSSES:
+    1200 ×  -9.5    6.89 →   5.48 g/s  (-20.44%, n=3210/385)
+    1900 ×  -9.5   10.62 →   9.07 g/s  (-14.54%, n=368/89)
+     800 ×  -9.0    4.64 →   4.00 g/s  (-13.66%, n=666/13853)
+     800 × -10.0    4.01 →   3.64 g/s  (-9.11%, n=4415/297)
+    2200 × -10.5    8.65 →   7.91 g/s  (-8.63%, n=475/181)
+    1600 ×  -8.5   11.08 →  10.19 g/s  (-8.03%, n=354/349)
+    1600 ×  -6.5   14.99 →  13.91 g/s  (-7.16%, n=178/55)
+    1900 × -10.0    8.99 →   8.36 g/s  (-6.95%, n=245/62)
+    2600 ×  -0.0   52.28 →  48.68 g/s  (-6.89%, n=40/102)
+    2600 ×  -0.5   50.74 →  47.37 g/s  (-6.63%, n=89/117)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+              20.19: cells= 53  mean|c|= 1.21%  median|c|= 1.09%  in_tol= 67.9%  max= 3.0%
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+    verdict: LOSS — VE down + trim worse
+
+
 ## 2026-07-19 — log: logs/7-19 20.19/7-19 20.19.csv — rom: 20.19
 
 FIRST 20.19 log (flashed+driven). 234,494 samp / 156.3 min, warm-HOT highway (IAT med 86 / max 154, ECT max 205). Bin md5 8278a9b3 (drifted from 362bb112 in notes — rebuilt, ADDED an A(IAT) edit). Changeset vs 20.18a re-verified 273B/8 clusters: base timing all-4 (0.94 +0.35-0.70, 1.44 -0.35..-1.05, 1.20 ~flat) + KCA Cruise+NC (1.20 +0.70 @2200+, 1.44/1.67 +0.70 & 1.90 +0.35 @4000+) + Timing Comp A(IAT) idx5-15 thermal retard rolled back +1.41 UNIFORM 50-230F (~20.8) + checksum; AVCS carve/MAF/Target Boost byte-identical. Driven-bin confirmed via dip timing signature +2-3 vs 18a; method validated (reproduces 7-18 stored exactly).

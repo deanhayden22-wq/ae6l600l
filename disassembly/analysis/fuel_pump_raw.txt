@@ -41,7 +41,7 @@ CALIBRATION VALUES:
   04B99C: D281  mov.l  @(0x4BBA4),r2  ; =0x000080C6 [hw_port_write]
   04B99E: 422B  jmp    @r2
   04B9A0: 4F26  lds.l  @r15+,PR
-  04B9A2: 4F13  .word  0x4F13
+  04B9A2: 4F13  stc.l  gbr,@-r15
   04B9A4: D080  mov.l  @(0x4BBA8),r0  ; =0xFFFF8354 (RAM) [fuel_pump_state]
   04B9A6: 401E  ldc    r0,GBR
   04B9A8: 7FE8  add    #-24,r15
@@ -100,7 +100,7 @@ CALIBRATION VALUES:
   04BA12: D264  mov.l  @(0x4BBA4),r2  ; =0x000080C6 [hw_port_write]
   04BA14: 7F18  add    #24,r15
   04BA16: 422B  jmp    @r2
-  04BA18: 4F17  .word  0x4F17
+  04BA18: 4F17  ldc.l  @r15+,gbr
   04BA1A: 4F22  sts.l  PR,@-r15
   04BA1C: B166  bsr    0x4BCEC
   04BA1E: 0009  nop
@@ -510,7 +510,7 @@ CALIBRATION VALUES:
   04BBB2: 3333  cmp/ge r3,r3
   04BBB4: FFFF  .word  0xFFFF
   04BBB6: 8E98  .word  0x8E98
-  04BBB8: 0002  .word  0x0002
+  04BBB8: 0002  stc    sr,r0
   04BBBA: 81DC  mov.w  r0,@(24,r13)
   04BBBC: 0005  mov.w  r0,@(r0,r0)
   04BBBE: EA4E  mov    #78,r10
@@ -528,7 +528,7 @@ CALIBRATION VALUES:
   04BBD6: 8F24  bf/s   0x4BC22
   04BBD8: FFFF  .word  0xFFFF
   04BBDA: 85D7  mov.w  @(14,r13),r0
-  04BBDC: 0002  .word  0x0002
+  04BBDC: 0002  stc    sr,r0
   04BBDE: 2F92  mov.l  r9,@r15
   04BBE0: 000B  rts
   04BBE2: E53C  mov    #60,r5
@@ -705,7 +705,7 @@ CALIBRATION VALUES:
   047CFE: AA74  bra    0x471EA
   047D00: FFFF  .word  0xFFFF
   047D02: 8EDC  .word  0x8EDC
-  047D04: 0002  .word  0x0002
+  047D04: 0002  stc    sr,r0
   047D06: 271C  cmp/str r1,r7
   047D08: 0005  mov.w  r0,@(r0,r0)
   047D0A: AA9A  bra    0x47242
@@ -717,9 +717,9 @@ CALIBRATION VALUES:
   047D16: CA22  xor    #34,r0
   047D18: 0005  mov.w  r0,@(r0,r0)
   047D1A: B0A0  bsr    0x47E5E
-  047D1C: 0002  .word  0x0002
+  047D1C: 0002  stc    sr,r0
   047D1E: 2724  mov.b  r2,@-r7
-  047D20: 0002  .word  0x0002
+  047D20: 0002  stc    sr,r0
   047D22: 1F4A  mov.l  r4,@(40,r15)
   047D24: 0003  bsrf   r0
   047D26: E6B8  mov    #-72,r6
@@ -733,7 +733,7 @@ CALIBRATION VALUES:
   047D36: AEB8  bra    0x47AAA
   047D38: 0009  nop
   047D3A: 1368  mov.l  r6,@(32,r3)
-  047D3C: 0002  .word  0x0002
+  047D3C: 0002  stc    sr,r0
   047D3E: 8200  .word  0x8200
   047D40: D697  mov.l  @(0x47FA0),r6  ; =0x00006BC4
   047D42: 460B  jsr    @r6
@@ -1061,35 +1061,35 @@ CALIBRATION VALUES:
   047FC6: CB68  or     #104,r0
   047FC8: 0001  .word  0x0001
   047FCA: CF0C  or.b   #12,@(r0,GBR)
-  047FCC: 0002  .word  0x0002
+  047FCC: 0002  stc    sr,r0
   047FCE: 6104  mov.b  @r0+,r1
-  047FD0: 0002  .word  0x0002
+  047FD0: 0002  stc    sr,r0
   047FD2: 31C2  cmp/hs r12,r1
-  047FD4: 0002  .word  0x0002
+  047FD4: 0002  stc    sr,r0
   047FD6: 272C  cmp/str r2,r7
-  047FD8: 0002  .word  0x0002
+  047FD8: 0002  stc    sr,r0
   047FDA: 2F1C  cmp/str r1,r15
-  047FDC: 0002  .word  0x0002
+  047FDC: 0002  stc    sr,r0
   047FDE: 3270  cmp/eq r7,r2
   047FE0: 0001  .word  0x0001
   047FE2: D0E0  mov.l  @(0x48364),r0  ; =0x0009A0CB
-  047FE4: 0002  .word  0x0002
+  047FE4: 0002  stc    sr,r0
   047FE6: 262C  cmp/str r2,r6
-  047FE8: 0002  .word  0x0002
+  047FE8: 0002  stc    sr,r0
   047FEA: 260C  cmp/str r0,r6
   047FEC: 0001  .word  0x0001
   047FEE: D26A  mov.l  @(0x48198),r2  ; =0xD28C420B
-  047FF0: 0002  .word  0x0002
+  047FF0: 0002  stc    sr,r0
   047FF2: 121C  mov.l  r1,@(48,r2)
   047FF4: 0003  bsrf   r0
   047FF6: E6A4  mov    #-92,r6
   047FF8: 0003  bsrf   r0
   047FFA: E6E0  mov    #-32,r6
-  047FFC: 0002  .word  0x0002
+  047FFC: 0002  stc    sr,r0
   047FFE: 4CF8  .word  0x4CF8
   048000: 0001  .word  0x0001
   048002: F870  fadd fr7,fr8
-  048004: 0002  .word  0x0002
+  048004: 0002  stc    sr,r0
   048006: 2D2C  cmp/str r2,r13
   048008: 0001  .word  0x0001
   04800A: FA16  fmov.s @(r0,r1),fr10
@@ -1099,37 +1099,37 @@ CALIBRATION VALUES:
   048012: FD16  fmov.s @(r0,r1),fr13
   048014: 0001  .word  0x0001
   048016: FDF2  fmul fr15,fr13
-  048018: 0002  .word  0x0002
+  048018: 0002  stc    sr,r0
   04801A: 07D4  mov.b  r13,@(r0,r7)
-  04801C: 0002  .word  0x0002
+  04801C: 0002  stc    sr,r0
   04801E: 0678  .word  0x0678
-  048020: 0002  .word  0x0002
+  048020: 0002  stc    sr,r0
   048022: 0E6A  sts    FPSCR,r14
-  048024: 0002  .word  0x0002
+  048024: 0002  stc    sr,r0
   048026: 1D7C  mov.l  r7,@(48,r13)
-  048028: 0002  .word  0x0002
+  048028: 0002  stc    sr,r0
   04802A: 1E96  mov.l  r9,@(24,r14)
-  04802C: 0002  .word  0x0002
+  04802C: 0002  stc    sr,r0
   04802E: 4094  .word  0x4094
-  048030: 0002  .word  0x0002
+  048030: 0002  stc    sr,r0
   048032: 42C2  .word  0x42C2
-  048034: 0002  .word  0x0002
+  048034: 0002  stc    sr,r0
   048036: 2F50  mov.b  r5,@r15
-  048038: 0002  .word  0x0002
+  048038: 0002  stc    sr,r0
   04803A: 527A  mov.l  @(40,r7),r2
-  04803C: 0002  .word  0x0002
+  04803C: 0002  stc    sr,r0
   04803E: 5848  mov.l  @(32,r4),r8
-  048040: 0002  .word  0x0002
+  048040: 0002  stc    sr,r0
   048042: 5C24  mov.l  @(16,r2),r12
-  048044: 0002  .word  0x0002
+  048044: 0002  stc    sr,r0
   048046: 63FA  negc r15,r3
-  048048: 0002  .word  0x0002
+  048048: 0002  stc    sr,r0
   04804A: 6634  mov.b  @r3+,r6
-  04804C: 0002  .word  0x0002
+  04804C: 0002  stc    sr,r0
   04804E: 2688  tst r8,r6
-  048050: 0002  .word  0x0002
+  048050: 0002  stc    sr,r0
   048052: 269A  xor r9,r6
-  048054: 0002  .word  0x0002
+  048054: 0002  stc    sr,r0
   048056: 26A2  mov.l  r10,@r6
   048058: 0005  mov.w  r0,@(r0,r0)
   04805A: 88F0  cmp/eq #-16,r0
@@ -1161,17 +1161,17 @@ CALIBRATION VALUES:
   04808E: E902  mov    #2,r9
   048090: 0005  mov.w  r0,@(r0,r0)
   048092: CE6C  xor.b  #108,@(r0,GBR)
-  048094: 0002  .word  0x0002
+  048094: 0002  stc    sr,r0
   048096: FF74  fcmp/eq fr7,fr15
   048098: 0003  bsrf   r0
   04809A: 03C0  .word  0x03C0
-  04809C: 0002  .word  0x0002
+  04809C: 0002  stc    sr,r0
   04809E: EF08  mov    #8,r15
   0480A0: 0003  bsrf   r0
   0480A2: CD00  and.b  #0,@(r0,GBR)
-  0480A4: 0002  .word  0x0002
+  0480A4: 0002  stc    sr,r0
   0480A6: FA68  fmov.s @r6,fr10
-  0480A8: 0002  .word  0x0002
+  0480A8: 0002  stc    sr,r0
   0480AA: FB68  fmov.s @r6,fr11
   0480AC: 0003  bsrf   r0
   0480AE: 0430  .word  0x0430
@@ -1564,7 +1564,7 @@ CALIBRATION VALUES:
   0483B4: 0004  mov.b  r0,@(r0,r0)
   0483B6: 421E  ldc    r2,GBR
   0483B8: 0004  mov.b  r0,@(r0,r0)
-  0483BA: 427C  shad   r7,r2
+  0483BA: 427C  .word  0x427C
   0483BC: 0004  mov.b  r0,@(r0,r0)
   0483BE: 4300  shll  r3
   0483C0: 0004  mov.b  r0,@(r0,r0)
@@ -1655,7 +1655,7 @@ CALIBRATION VALUES:
   04846A: 02FA  .word  0x02FA
   04846C: 0004  mov.b  r0,@(r0,r0)
   04846E: B970  bsr    0x47752
-  048470: 0002  .word  0x0002
+  048470: 0002  stc    sr,r0
   048472: 7778  add    #120,r7
   048474: 0005  mov.w  r0,@(r0,r0)
   048476: 94F8  mov.w  @(0x4866A),r4  ; =0x420B (16907)
@@ -2034,7 +2034,7 @@ CALIBRATION VALUES:
   048760: 0008  clrt
   048762: 39F8  sub r15,r9
   048764: 0008  clrt
-  048766: 43AC  shad   r10,r3
+  048766: 43AC  .word  0x43AC
   048768: 0008  clrt
   04876A: 4A28  shll16  r10
   04876C: 0008  clrt
@@ -2043,7 +2043,7 @@ CALIBRATION VALUES:
   048772: FADC  fmov   fr13,fr10
   048774: 0007  mul.l  r0,r0
   048776: FAE4  fcmp/eq fr14,fr10
-  048778: 0002  .word  0x0002
+  048778: 0002  stc    sr,r0
   04877A: 9BB4  mov.w  @(0x488E6),r11  ; =0x420B (16907)
   04877C: 0007  mul.l  r0,r0
   04877E: FC80  fadd fr8,fr12
@@ -2077,15 +2077,15 @@ CALIBRATION VALUES:
   0487B6: E5BC  mov    #-68,r5
   0487B8: 0008  clrt
   0487BA: DA1C  mov.l  @(0x4882C),r10  ; =0x00047018
-  0487BC: 0002  .word  0x0002
+  0487BC: 0002  stc    sr,r0
   0487BE: 7C20  add    #32,r12
   0487C0: 0007  mul.l  r0,r0
   0487C2: F8C8  fmov.s @r12,fr8
-  0487C4: 0002  .word  0x0002
+  0487C4: 0002  stc    sr,r0
   0487C6: 9D68  mov.w  @(0x4889A),r13  ; =0xCF0C (53004)
-  0487C8: 0002  .word  0x0002
+  0487C8: 0002  stc    sr,r0
   0487CA: A428  bra    0x4901E
-  0487CC: 0002  .word  0x0002
+  0487CC: 0002  stc    sr,r0
   0487CE: BE78  bsr    0x484C2
   0487D0: 0008  clrt
   0487D2: F304  fcmp/eq fr0,fr3
@@ -2119,7 +2119,7 @@ CALIBRATION VALUES:
   04880A: 6534  mov.b  @r3+,r5
   04880C: 0007  mul.l  r0,r0
   04880E: 120C  mov.l  r0,@(48,r2)
-  048810: 0002  .word  0x0002
+  048810: 0002  stc    sr,r0
   048812: 820C  .word  0x820C
   048814: 0005  mov.w  r0,@(r0,r0)
   048816: C9B4  and    #180,r0
@@ -2152,7 +2152,7 @@ CALIBRATION VALUES:
   04884C: 0001  .word  0x0001
   04884E: 675C  extu.b r5,r7
   048850: 0001  .word  0x0001
-  048852: 42CC  shad   r12,r2
+  048852: 42CC  .word  0x42CC
   048854: 0001  .word  0x0001
   048856: 6BE4  mov.b  @r14+,r11
   048858: 0001  .word  0x0001
@@ -2163,19 +2163,19 @@ CALIBRATION VALUES:
   048862: 7D3C  add    #60,r13
   048864: 000B  rts
   048866: F604  fcmp/eq fr0,fr6
-  048868: 0002  .word  0x0002
+  048868: 0002  stc    sr,r0
   04886A: D718  mov.l  @(0x488CC),r7  ; =0x8BF8DE03
-  04886C: 0002  .word  0x0002
+  04886C: 0002  stc    sr,r0
   04886E: E1A2  mov    #-94,r1
-  048870: 0002  .word  0x0002
+  048870: 0002  stc    sr,r0
   048872: D45A  mov.l  @(0x489DC),r4  ; =0xD280420B
-  048874: 0002  .word  0x0002
+  048874: 0002  stc    sr,r0
   048876: C078  mov.b  r0,@(120,GBR)
   048878: 0005  mov.w  r0,@(r0,r0)
   04887A: 87FC  .word  0x87FC
-  04887C: 0002  .word  0x0002
+  04887C: 0002  stc    sr,r0
   04887E: B1DC  bsr    0x48C3A
-  048880: 0002  .word  0x0002
+  048880: 0002  stc    sr,r0
   048882: BDDC  bsr    0x4843E
   048884: 0005  mov.w  r0,@(r0,r0)
   048886: 6CB4  mov.b  @r11+,r12
@@ -2189,7 +2189,7 @@ CALIBRATION VALUES:
   048896: CB68  or     #104,r0
   048898: 0001  .word  0x0001
   04889A: CF0C  or.b   #12,@(r0,GBR)
-  04889C: 0002  .word  0x0002
+  04889C: 0002  stc    sr,r0
   04889E: 61A8  swap.b r10,r1
   0488A0: 0005  mov.w  r0,@(r0,r0)
   0488A2: CBC8  or     #200,r0
@@ -2531,45 +2531,45 @@ CALIBRATION VALUES:
   048B42: E9A0  mov    #-96,r9
   048B44: 0000  .word  0x0000
   048B46: 4BCA  .word  0x4BCA
-  048B48: 0002  .word  0x0002
+  048B48: 0002  stc    sr,r0
   048B4A: 1150  mov.l  r5,@(0,r1)
   048B4C: 0001  .word  0x0001
   048B4E: D1FC  mov.l  @(0x48F40),r1  ; =0x0007D15C
   048B50: 0001  .word  0x0001
   048B52: F896  fmov.s @(r0,r9),fr8
-  048B54: 0002  .word  0x0002
+  048B54: 0002  stc    sr,r0
   048B56: 0F32  .word  0x0F32
-  048B58: 0002  .word  0x0002
+  048B58: 0002  stc    sr,r0
   048B5A: 1E22  mov.l  r2,@(8,r14)
   048B5C: 0003  bsrf   r0
   048B5E: E654  mov    #84,r6
-  048B60: 0002  .word  0x0002
+  048B60: 0002  stc    sr,r0
   048B62: 30F4  div1 r15,r0
-  048B64: 0002  .word  0x0002
+  048B64: 0002  stc    sr,r0
   048B66: 42DE  .word  0x42DE
-  048B68: 0002  .word  0x0002
+  048B68: 0002  stc    sr,r0
   048B6A: 4CB0  .word  0x4CB0
-  048B6C: 0002  .word  0x0002
+  048B6C: 0002  stc    sr,r0
   048B6E: 524E  mov.l  @(56,r4),r2
-  048B70: 0002  .word  0x0002
+  048B70: 0002  stc    sr,r0
   048B72: 5866  mov.l  @(24,r6),r8
-  048B74: 0002  .word  0x0002
+  048B74: 0002  stc    sr,r0
   048B76: 5C2C  mov.l  @(48,r2),r12
-  048B78: 0002  .word  0x0002
-  048B7A: 4D7C  shad   r7,r13
+  048B78: 0002  stc    sr,r0
+  048B7A: 4D7C  .word  0x4D7C
   048B7C: 0001  .word  0x0001
   048B7E: FA78  fmov.s @r7,fr10
   048B80: 0001  .word  0x0001
   048B82: FE10  fadd fr1,fr14
-  048B84: 0002  .word  0x0002
+  048B84: 0002  stc    sr,r0
   048B86: 6754  mov.b  @r5+,r7
   048B88: 0004  mov.b  r0,@(r0,r0)
   048B8A: BFBC  bsr    0x48B06
   048B8C: 0004  mov.b  r0,@(r0,r0)
   048B8E: E8B8  mov    #-72,r8
-  048B90: 0002  .word  0x0002
+  048B90: 0002  stc    sr,r0
   048B92: EE78  mov    #120,r14
-  048B94: 0002  .word  0x0002
+  048B94: 0002  stc    sr,r0
   048B96: FCF0  fadd fr15,fr12
   048B98: 0003  bsrf   r0
   048B9A: 44BA  .word  0x44BA
@@ -3522,7 +3522,7 @@ CALIBRATION VALUES:
   028210: 2FD6  mov.l  r13,@-r15
   028212: 2FE6  mov.l  r14,@-r15
   028214: 4F22  sts.l  PR,@-r15
-  028216: 4F13  .word  0x4F13
+  028216: 4F13  stc.l  gbr,@-r15
   028218: D0BB  mov.l  @(0x28508),r0  ; =0xFFFF9704 (RAM)
   02821A: 401E  ldc    r0,GBR
   02821C: 7F9C  add    #-100,r15
@@ -3969,7 +3969,7 @@ CALIBRATION VALUES:
   05EBE0: 0005  mov.w  r0,@(r0,r0)
   05EBE2: D108  mov.l  @(0x5EC04),r1  ; =0xC500E50B (-2062.32)
   05EBE4: 4F22  sts.l  PR,@-r15
-  05EBE6: 4F13  .word  0x4F13
+  05EBE6: 4F13  stc.l  gbr,@-r15
   05EBE8: D09E  mov.l  @(0x5EE64),r0  ; =0xFFFF8F2A (RAM)
   05EBEA: 401E  ldc    r0,GBR
   05EBEC: 7FF8  add    #-8,r15
@@ -4157,7 +4157,7 @@ CALIBRATION VALUES:
   05EBE0: 0005  mov.w  r0,@(r0,r0)
   05EBE2: D108  mov.l  @(0x5EC04),r1  ; =0xC500E50B (-2062.32)
   05EBE4: 4F22  sts.l  PR,@-r15
-  05EBE6: 4F13  .word  0x4F13
+  05EBE6: 4F13  stc.l  gbr,@-r15
   05EBE8: D09E  mov.l  @(0x5EE64),r0  ; =0xFFFF8F2A (RAM)
   05EBEA: 401E  ldc    r0,GBR
   05EBEC: 7FF8  add    #-8,r15
@@ -4225,7 +4225,7 @@ CALIBRATION VALUES:
   05EC68: 420B  jsr    @r2
   05EC6A: 54F1  mov.l  @(4,r15),r4
   05EC6C: 7F08  add    #8,r15
-  05EC6E: 4F17  .word  0x4F17
+  05EC6E: 4F17  ldc.l  @r15+,gbr
   05EC70: 4F26  lds.l  @r15+,PR
   05EC72: 000B  rts
   05EC74: 0009  nop
@@ -4383,7 +4383,7 @@ CALIBRATION VALUES:
   0080FC: 0001  .word  0x0001
   0080FE: 0000  .word  0x0000
   008100: FFFF  .word  0xFFFF
-  008102: 41DC  shad   r13,r1
+  008102: 41DC  .word  0x41DC
   008104: 000B  rts
   008106: E81C  mov    #28,r8
   008108: 0000  .word  0x0000
@@ -4397,7 +4397,7 @@ CALIBRATION VALUES:
   008118: FFFF  .word  0xFFFF
   00811A: 4434  .word  0x4434
   00811C: FFFF  .word  0xFFFF
-  00811E: 443C  shad   r3,r4
+  00811E: 443C  .word  0x443C
   008120: 4780  .word  0x4780
   008122: 0000  .word  0x0000
   008124: D31C  mov.l  @(0x08198),r3  ; =0xFFFF4032 (RAM)

@@ -99,10 +99,10 @@ Calibration data:
     08E476: F928          fmov.s @R2,FR9             ; FR9 = ECT temperature (°C)
     08E478: D669          mov.l  @(0x8E620),R6       ; =0xFFFFA8B0 (threshold workspace)
     08E47A: E0F8          mov    #-8,R0              ; offset -8
-    08E47C: F697          fmov.s @(R0,R6),FR6        ; load threshold from workspace
+    08E47C: F697          fmov.s fr9,@(r0,r6)  ; load threshold from workspace
     08E47E: F966          fmov.s  @(R0,R6),FR9       ; ECT > threshold?
     08E480: E0FC          mov    #-4,R0              ; offset -4
-    08E482: F697          fmov.s @(R0,R6),FR6        ; load second threshold
+    08E482: F697          fmov.s fr9,@(r0,r6)  ; load second threshold
     08E484: D267          mov.l  @(0x8E624),R2       ; =0x000C545C (cal table)
     08E486: F828          fmov.s @R2,FR8             ; load cal value (86.1°C)
     08E488: 000B          rts
@@ -128,7 +128,7 @@ Calibration data:
     081A6A: 0009          nop
     081A6C: 620C          extu.b R0,R2
     081A6E: 2228          tst    R2,R2
-    081A70: 8B03          bf     +3                  ; if diag mode, skip
+    081A70: 8B03          bf     0x081A7A  ; if diag mode, skip
     081A72: B1CF          bsr    0x81E14             ; call interp_pipeline
     081A74: 0009          nop
     081A76: A21C          bra    0x81EB2             ; continue to next
@@ -159,7 +159,7 @@ Calibration data:
   Disassembly:
     082A9C: E6FF          mov    #-1,R6              ; R6 = 0xFF
     082A9E: D27F          mov.l  @(0x82C9C),R2       ; =0xFFFFA48A
-    082AA0: A00D          bra    +0x0D               ; branch into body
+    082AA0: A00D          bra    0x082ABE  ; branch into body
     082AA2: 2261          mov.w  R6,@R2              ; write 0xFF to FFFFA48A
     --- body continues at 082AA4 ---
     082AA4: 4F22          sts.l  PR,@-R15
@@ -168,7 +168,7 @@ Calibration data:
     082AAA: 401E          ldc    R0,GBR              ; set GBR = FFFFA494
     082AAC: E000          mov    #0,R0
     082AAE: B75E          bsr    0x8396E             ; call pack_workspace_sub_A
-    082AB0: C000          mov.b  R0,@(R0,GBR)        ; GBR[0] = 0
+    082AB0: C000          mov.b  r0,@(0,gbr)  ; GBR[0] = 0
     082AB2: E000          mov    #0,R0
     082AB4: C110          mov.w  R0,@(0x20,GBR)      ; GBR[0x20] = 0
     082AB6: C024          mov.b  R0,@(0x24,GBR)      ; GBR[0x24] = 0
@@ -206,18 +206,18 @@ Calibration data:
     0839FA: F828          fmov.s @R2,FR8             ; FR8 = float from sensor state
     0839FC: D583          mov.l  @(0x83C0C),R5       ; =0xFFFFA4D0 (stage3 workspace)
     0839FE: E014          mov    #0x14,R0
-    083A00: F587          fmov.s @(R0,R5),FR5        ; load float from workspace+0x14
-    083A02: C783          mova   @(pool),R0          ; literal pool ref
+    083A00: F587          fmov.s fr8,@(r0,r5)  ; load float from workspace+0x14
+    083A02: C783          mova   @(0x083C10),r0  ; literal pool ref
     083A04: F808          fmov.s @R0,FR8             ; FR8 += FR0
     083A06: E0F8          mov    #-8,R0
-    083A08: F587          fmov.s @(R0,R5),FR5        ; load from workspace-8
-    083A0A: C782          mova   @(pool),R0
+    083A08: F587          fmov.s fr8,@(r0,r5)  ; load from workspace-8
+    083A0A: C782          mova   @(0x083C14),r0
     083A0C: F808          fmov.s @R0,FR8
     083A0E: E0FC          mov    #-4,R0
-    083A10: F587          fmov.s @(R0,R5),FR5
+    083A10: F587          fmov.s fr8,@(r0,r5)
     083A12: E0FF          mov    #-1,R0
-    083A14: A00E          bra    +0x0E               ; branch to GBR init section
-    083A16: 8151          mov.w  R5,@(2,R1)
+    083A14: A00E          bra    0x083A34  ; branch to GBR init section
+    083A16: 8151          mov.w  r0,@(2,r5)
     --- GBR init section ---
     083A18: 4F22          sts.l  PR,@-R15
     083A1A: 4F13          stc.l  GBR,@-R15
@@ -225,7 +225,7 @@ Calibration data:
     083A1E: 401E          ldc    R0,GBR              ; GBR = FFFFA4D4
     083A20: E000          mov    #0,R0
     083A22: B480          bsr    0x84326             ; call pack_workspace_sub_B
-    083A24: C000          mov.b  R0,@(R0,GBR)
+    083A24: C000          mov.b  r0,@(0,gbr)
     083A26: E000          mov    #0,R0
     083A28: C10E          mov.w  R0,@(0x1C,GBR)
     083A2A: C024          mov.b  R0,@(0x24,GBR)
@@ -260,11 +260,11 @@ Calibration data:
   Entry: 0x0843AC    Size: ~18 bytes    Ends: 0x0843BC
 
   Disassembly:
-    0843AC: C76C          mova   @(pool),R0          ; literal pool ref
+    0843AC: C76C          mova   @(0x084560),r0  ; literal pool ref
     0843AE: F808          fmov.s @R0,FR8             ; accumulate float
     0843B0: D56C          mov.l  @(0x84564),R5       ; =0xFFFFA518 (stage4 workspace)
     0843B2: E0EC          mov    #-0x14,R0
-    0843B4: F587          fmov.s @(R0,R5),FR5        ; read workspace-0x14
+    0843B4: F587          fmov.s fr8,@(r0,r5)  ; read workspace-0x14
     0843B6: D66C          mov.l  @(0x84568),R6       ; =0xFFFF7C9D (fuel_state_byte)
     0843B8: 6060          mov.b  @R6,R0              ; read fuel state
     0843BA: 000B          rts

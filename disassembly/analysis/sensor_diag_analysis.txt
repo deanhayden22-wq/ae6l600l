@@ -94,7 +94,7 @@ SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- sensor_diag_dispatch_1_disabled
      |
      +-- sensor_conditional_calc (conditional sensor calc)
      |    +-- 0x022F92  timer/task state read
-     |    +-- 0xBE960  float_abs
+     |    +-- 0xBE960  float_max  (called as max(x, 0.0) -- clamp to non-negative)
      |    +-- 0xBEA40  float_clamp_range
      |
      +-- sensor_diag_eeprom_init (EEPROM initialization)
@@ -121,7 +121,12 @@ SECTION 1: SENSOR DIAGNOSTIC DISPATCHER 1 -- sensor_diag_dispatch_1_disabled
         if (timer_state == 1 || diag_flag != 0) {
             // Active computation path
             result = sensor_val - offset + correction1 + correction2;
-            result = float_abs(result);          // call 0xBE960
+            result = float_max(result, 0.0);     // call 0xBE960 (delay slot: fldi0 fr5)
+            // CORRECTED 2026-07-26: previously written as float_abs().
+            // 0xBE960 is a 2-arg MAX and every call site here loads FR5=0.0,
+            // so this clamps negatives to zero -- it does NOT take |x|.
+            // abs(-5)=5 but max(-5,0)=0; the distinction matters for any
+            // negative sensor residual.
             result = float_clamp_range(result,   // call 0xBEA40
                          cal_lower, cal_upper);  // bounds from 0x0C50B4
             *(float*)FFFF97B4 = result;          // workspace

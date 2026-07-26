@@ -284,7 +284,7 @@ def disasm(start, end):
             elif sub == 0xC: mnem = f"fmov   FR{fm_r},FR{fn_r}"
             elif sub == 0xD:
                 fops = {0:"fsts   FPUL,FR",1:"flds   FR,FPUL",2:"float  FPUL,FR",
-                        3:"ftrc   FR,FPUL",4:"fneg   FR",5:"fabs   FR",6:"fsqrt  FR",
+                        3:"ftrc   FR,FPUL",4:"fneg   FR",5:"fabs   FR",6:".INVALID_SH2E  FR",
                         8:"fldi0  FR",9:"fldi1  FR"}
                 if fm_r in fops:
                     mnem = f"{fops[fm_r]}{fn_r}"

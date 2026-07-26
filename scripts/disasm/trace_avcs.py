@@ -265,7 +265,7 @@ def disasm_one(addr):
                 0x0: f"fsts   FPUL,{fn}", 0x1: f"flds   {fn},FPUL",
                 0x2: f"float  FPUL,{fn}", 0x3: f"ftrc   {fn},FPUL",
                 0x4: f"fneg   {fn}", 0x5: f"fabs   {fn}",
-                0x6: f"fsqrt  {fn}", 0x8: f"fldi0  {fn}", 0x9: f"fldi1  {fn}",
+                0x6: f".INVALID_SH2E  {fn}", 0x8: f"fldi0  {fn}", 0x9: f"fldi1  {fn}",
             }
             mn = fpuD.get(m, f".word  0x{op:04X}")
         else:

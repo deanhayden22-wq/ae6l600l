@@ -241,7 +241,7 @@ def disasm(addr, n=120, stop_on_rts=True):
                 elif fm == 3: op = f'ftrc FR{fn_},FPUL'
                 elif fm == 4: op = f'fneg FR{fn_}'
                 elif fm == 5: op = f'fabs FR{fn_}'
-                elif fm == 6: op = f'fsqrt FR{fn_}'
+                elif fm == 6: op = f'.INVALID_SH2E FR{fn_}'
                 elif fm == 8: op = f'fldi0 FR{fn_}'
                 elif fm == 9: op = f'fldi1 FR{fn_}'
                 else: op = f'0xF{fn_:X}{fm:X}B'

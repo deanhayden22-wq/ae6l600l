@@ -1,4 +1,32 @@
 """
+DEPRECATED 2026-07-26 -- use scripts/verify_disasm_v2.py instead.
+
+This verifier could not detect the bug classes it existed to catch:
+
+  1. It skipped every line whose mnemonic started with '.' (see the filter in
+     the scan loop: `if mnem_s.startswith('.'): continue`). Any FPU or control
+     instruction a producing script had failed to decode and emitted as
+     ".word 0xNNNN" was therefore silently discarded rather than flagged.
+     141 real dropped instructions were hiding behind that one line.
+
+  2. Its own decoder folded LDS/STS with m=5 (FPUL) and m=6 (FPSCR) into the
+     PR case, so it reported `sts PR,Rn` for FPUL/FPSCR transfers and could not
+     detect that error even in principle.
+
+  3. It compared MNEMONICS ONLY. Every error actually found in this repo is in
+     the OPERANDS -- wrong displacement field width, wrong register field,
+     missing '& ~3' on PC-relative targets, inverted fmov.s direction. A
+     mnemonic-only comparison passes all of them.
+
+Its committed report (disassembly/verification_report.txt) reads
+"TOTAL ERRORS: 1 / TOTAL WARNINGS: 156" over 23,440 instructions, i.e. a clean
+bill of health. The operand-aware verifier finds 415 real errors over a
+comparable corpus.
+
+Kept for provenance only. Do not use it to validate anything.
+"""
+
+"""
 AE5L600L Disassembly Verification Script
 =========================================
 Scans all analysis files in disassembly/analysis/ and maps/ for verifiable
@@ -328,7 +356,7 @@ def decode_sh2(addr):
             if m == 3: return op, f"ftrc FR{n},FPUL"
             if m == 4: return op, f"fneg FR{n}"
             if m == 5: return op, f"fabs FR{n}"
-            if m == 6: return op, f"fsqrt FR{n}"
+            if m == 6: return op, f".INVALID_SH2E FR{n}"
             if m == 8: return op, f"fldi0 FR{n}"
             if m == 9: return op, f"fldi1 FR{n}"
             if m == 0xA: return op, f"fcnvsd FPUL,DR{n}"

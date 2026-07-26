@@ -60,8 +60,8 @@ KNOWN_FUNCS = {
     0x000BDE68: "float_max",
     0x000BDE78: "float_min",
     0x000BDE28: "float_clamp",
-    0x000BE960: "float_min",
-    0x000BE970: "rate_limit_interp",
+    0x000BE960: "float_max",
+    0x000BE970: "float_min",
     0x000BEA40: "float_lerp",
     0x000BE554: "uint16_add_sat",
     0x0000DF14: "rtos_task10_sensors",
@@ -286,7 +286,7 @@ def decode_insn(code, pc):
         if lo4 == 0xD:
             mid = (code >> 4) & 0xF
             fpu_s = {0:"fsts   FPUL,fr",1:"flds   fr",2:"float  FPUL,fr",3:"ftrc   fr",
-                     4:"fneg   fr",5:"fabs   fr",6:"fsqrt  fr",8:"fldi0  fr",9:"fldi1  fr"}
+                     4:"fneg   fr",5:"fabs   fr",6:".INVALID_SH2E  fr",8:"fldi0  fr",9:"fldi1  fr"}
             if mid in fpu_s:
                 s = fpu_s[mid]
                 if mid == 1: return f"flds   fr{n},FPUL", 2

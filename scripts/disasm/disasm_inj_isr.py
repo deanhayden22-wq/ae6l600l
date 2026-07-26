@@ -271,7 +271,7 @@ def disasm_func(start, max_bytes=0x300, gbr=0xFFFF7450, find_rts=1):
             elif sub == 0xB: mnem = f"fmov.s FR{fm},@-R{nr}"
             elif sub == 0xD:
                 fpd = {0:"fsts   FPUL,",1:"flds   ,FPUL",2:"float  FPUL,",
-                       3:"ftrc   ,FPUL",4:"fneg   ",5:"fabs   ",6:"fsqrt  ",
+                       3:"ftrc   ,FPUL",4:"fneg   ",5:"fabs   ",6:".INVALID_SH2E  ",
                        8:"fldi0  ",9:"fldi1  "}
                 if fm in fpd:
                     if fm == 1: mnem = f"flds   FR{fn},FPUL"

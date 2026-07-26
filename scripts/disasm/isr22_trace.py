@@ -39,16 +39,16 @@ KNOWN_LABELS = {
     0xFFFF76C8: "fuel_pw_final",
     0xFFFF76CC: "fuel_pw_cyl1",
     0xFFFF76D0: "fuel_pw_cyl2",
-    0xBE960: "float_min",
-    0xBE970: "rate_limit_interp",
+    0xBE960: "float_max",
+    0xBE970: "float_min",
 }
 
 KNOWN_SUBS = {
     0x3190: "injector_output",
     0x48732: "isr22_dead_time",
     0x82DE: "per_cyl_pulse_emit",
-    0xBE960: "float_min",
-    0xBE970: "rate_limit_interp",
+    0xBE960: "float_max",
+    0xBE970: "float_min",
     0x4760A: "pulse_lookup",
     0x30378: "injector_latency_user",
     0x3664: "mtu_write_gate",
@@ -297,7 +297,7 @@ def disasm_range(start, end, max_insn=300):
                 elif w == 0xFBFD: op = 'frchg'
                 elif w == 0xF3FD: op = 'fschg'
                 elif (w & 0x01FF) == 0x00FD:
-                    if (w >> 9) & 7 == 0: op = 'fsqrt FR%d' % n
+                    if (w >> 9) & 7 == 0: op = '.INVALID_SH2E FR%d' % n
                     else: op = 'F_0xFD_R%d_%X' % (n, (w>>9)&7)
                 else:
                     sub2 = (w >> 4) & 0xF
@@ -305,7 +305,7 @@ def disasm_range(start, end, max_insn=300):
                     elif sub2 == 0x9: op = 'fldi1 FR%d' % n
                     elif sub2 == 0xA: op = 'fneg FR%d' % n
                     elif sub2 == 0xB: op = 'fabs FR%d' % n
-                    elif sub2 == 0xC: op = 'fsqrt FR%d' % n
+                    elif sub2 == 0xC: op = '.INVALID_SH2E FR%d' % n
                     elif sub2 == 0xD:
                         # ftrc or float
                         if n == 0: op = 'ftrc FR%d,FPUL' % m
@@ -535,7 +535,7 @@ def disasm_segments(start, end, max_total=600):
                 elif sub2 == 9: op = 'fldi1 FR%d' % n
                 elif sub2 == 0xA: op = 'fneg FR%d' % n
                 elif sub2 == 0xB: op = 'fabs FR%d' % n
-                elif sub2 == 0xC: op = 'fsqrt FR%d' % n
+                elif sub2 == 0xC: op = '.INVALID_SH2E FR%d' % n
                 elif sub2 == 0xE: op = 'flds FR%d,FPUL' % m
                 elif m == 0: op = 'float FPUL,FR%d' % n
                 else: op = 'ftrc FR%d,FPUL' % n

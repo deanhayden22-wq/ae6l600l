@@ -132,20 +132,27 @@ Role:   Core tip-in enrichment gate. Applies gain (510x tip-in, 505x tip-out),
   03BB84: D25A  mov.l   @(0x168,PC),R2       ; =0xFFFF620C  airflow_maf_current (float)
   03BB86: FD28  fmov.s  @R2,FR13             ; FR13 = airflow_maf_current
 
-  ; --- state/condition queries (Renesas descriptor calling convention) ---
-  ; Each JSR reads args from words embedded after the call (via saved PR)
+  ; --- state/condition queries ---
+  ; CORRECTED 2026-07-26. The previous note here claimed "Each JSR reads args
+  ; from words embedded after the call (via saved PR)". That is WRONG. The words
+  ; after each JSR are its DELAY SLOTS, and they are ordinary stores.
+  ;
+  ; On SH the delay slot executes BEFORE control transfers, so at that point R0
+  ; still holds the PREVIOUS call's return value. The idiom here is therefore:
+  ; issue the next query and, in the same cycle, stash the previous query's
+  ; result into the local stack frame at @(4,R15), @(8,R15), @(12,R15).
   03BB88: D25A  mov.l   @(0x168,PC),R2       ; =0x0001CF16  timing_mode_selector
   03BB8A: 420B  jsr     @R2
-  03BB8C: 0009  nop
+  03BB8C: 0009  nop                          ; delay slot (nothing to save yet)
   03BB8E: D25A  mov.l   @(0x168,PC),R2       ; =0x00022CF4  check_engine_running
   03BB90: 420B  jsr     @R2
-  03BB92: 80F4  ; arg: workspace field +0x14 (mov.b R0,@(0x14,R0) descriptor)
+  03BB92: 80F4  mov.b  r0,@(4,r15)           ; delay slot: save timing_mode_selector result
   03BB94: D259  mov.l   @(0x164,PC),R2       ; =0x000297A0  condition_evaluator
   03BB96: 420B  jsr     @R2
-  03BB98: 80F8  ; arg: workspace field +0x18
+  03BB98: 80F8  mov.b  r0,@(8,r15)           ; delay slot: save check_engine_running result
   03BB9A: D559  mov.l   @(0x164,PC),R5       ; =0x000299BC  flkc_state_flag_reader_table+0x164
   03BB9C: 450B  jsr     @R5
-  03BB9E: 80FC  ; arg: workspace field +0x1C
+  03BB9E: 80FC  mov.b  r0,@(12,r15)          ; delay slot: save condition_evaluator result
 
   ; --- save last query result to local frame, read gain-set selector ---
   03BBA0: 6703  mov     R0,R7

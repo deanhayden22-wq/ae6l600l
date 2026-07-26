@@ -451,7 +451,7 @@ def disasm_range(start, end, gbr=0xFFFF7450):
                 elif fm == 0x3: mnem = f"ftrc   FR{fn},FPUL"
                 elif fm == 0x4: mnem = f"fneg   FR{fn}"
                 elif fm == 0x5: mnem = f"fabs   FR{fn}"
-                elif fm == 0x6: mnem = f"fsqrt  FR{fn}"
+                elif fm == 0x6: mnem = f".INVALID_SH2E  FR{fn}"
                 elif fm == 0x8: mnem = f"fldi0  FR{fn}"
                 elif fm == 0x9: mnem = f"fldi1  FR{fn}"
                 else: mnem = f".word  0x{op:04X}  ; FPU_xD"

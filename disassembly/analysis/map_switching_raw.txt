@@ -164,7 +164,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   040054: FFDB  fmov.s fr13,@-r15
   040056: FFEB  fmov.s fr14,@-r15
   040058: FFFB  fmov.s fr15,@-r15
-  04005A: 4F13  .word  0x4F13
+  04005A: 4F13  stc.l  gbr,@-r15
   04005C: D033  mov.l  @(0x4012C),r0  ; =0xFFFF7F0C (RAM) [timing_blend_gbr]
   04005E: 401E  ldc    r0,GBR
   040060: 7FF4  add    #-12,r15
@@ -691,7 +691,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   040472: DC14  mov.l  @(0x404C4),r12  ; =0x420B0009 (34.75)
   040474: 000B  rts
   040476: E830  mov    #48,r8
-  040478: 4F13  .word  0x4F13
+  040478: 4F13  stc.l  gbr,@-r15
   04047A: D079  mov.l  @(0x40660),r0  ; =0xFFFF7F8C (RAM)
   04047C: 401E  ldc    r0,GBR
   04047E: D679  mov.l  @(0x40664),r6  ; =0xFFFF65C0 (RAM) [throttle_position]
@@ -725,7 +725,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0404B6: 000B  rts
   0404B8: 4F17  ldc.l  @r15+,GBR
   0404BA: 4F22  sts.l  PR,@-r15
-  0404BC: 4F13  .word  0x4F13
+  0404BC: 4F13  stc.l  gbr,@-r15
   0404BE: D071  mov.l  @(0x40684),r0  ; =0xFFFF7F74 (RAM)
   0404C0: 401E  ldc    r0,GBR
   0404C2: D271  mov.l  @(0x40688),r2  ; =0x00022F92 (ROM)
@@ -791,7 +791,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   04053A: FFDB  fmov.s fr13,@-r15
   04053C: FFEB  fmov.s fr14,@-r15
   04053E: FFFB  fmov.s fr15,@-r15
-  040540: 4F13  .word  0x4F13
+  040540: 4F13  stc.l  gbr,@-r15
   040542: D050  mov.l  @(0x40684),r0  ; =0xFFFF7F74 (RAM)
   040544: 401E  ldc    r0,GBR
   040546: 7FB0  add    #-80,r15
@@ -1240,14 +1240,14 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 
   --- Subroutine calls ---
     0x03FFF6 -> flkc_flag_slot15 @ 0x02999C
-    0x040034 -> float_min @ 0x0BE960
+    0x040034 -> float_max @ 0x0BE960
     0x040076 -> check_engine_running @ 0x022CF4
     0x040176 -> table_desc_2d_typed @ 0x0BE8E4
     0x040182 -> table_desc_2d_typed @ 0x0BE8E4
     0x04018E -> table_desc_2d_typed @ 0x0BE8E4
     0x04019A -> jsr @r14 (unresolved)
-    0x0401AA -> float_min @ 0x0BE960
-    0x0401C6 -> float_min @ 0x0BE960
+    0x0401AA -> float_max @ 0x0BE960
+    0x0401C6 -> float_max @ 0x0BE960
     0x04023A -> float_lerp @ 0x0BEA40
     0x040262 -> float_deadband_check @ 0x0BE608
     0x04027C -> float_lerp @ 0x0BEA40
@@ -1279,7 +1279,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   040054: FFDB  fmov.s fr13,@-r15
   040056: FFEB  fmov.s fr14,@-r15
   040058: FFFB  fmov.s fr15,@-r15
-  04005A: 4F13  .word  0x4F13
+  04005A: 4F13  stc.l  gbr,@-r15
   04005C: D033  mov.l  @(0x4012C),r0  ; =0xFFFF7F0C (RAM) [timing_blend_gbr]
   04005E: 401E  ldc    r0,GBR
   040060: 7FF4  add    #-12,r15
@@ -1806,7 +1806,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   040472: DC14  mov.l  @(0x404C4),r12  ; =0x420B0009 (34.75)
   040474: 000B  rts
   040476: E830  mov    #48,r8
-  040478: 4F13  .word  0x4F13
+  040478: 4F13  stc.l  gbr,@-r15
   04047A: D079  mov.l  @(0x40660),r0  ; =0xFFFF7F8C (RAM)
   04047C: 401E  ldc    r0,GBR
   04047E: D679  mov.l  @(0x40664),r6  ; =0xFFFF65C0 (RAM) [throttle_position]
@@ -1840,7 +1840,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0404B6: 000B  rts
   0404B8: 4F17  ldc.l  @r15+,GBR
   0404BA: 4F22  sts.l  PR,@-r15
-  0404BC: 4F13  .word  0x4F13
+  0404BC: 4F13  stc.l  gbr,@-r15
   0404BE: D071  mov.l  @(0x40684),r0  ; =0xFFFF7F74 (RAM)
   0404C0: 401E  ldc    r0,GBR
   0404C2: D271  mov.l  @(0x40688),r2  ; =0x00022F92 (ROM)
@@ -1906,7 +1906,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   04053A: FFDB  fmov.s fr13,@-r15
   04053C: FFEB  fmov.s fr14,@-r15
   04053E: FFFB  fmov.s fr15,@-r15
-  040540: 4F13  .word  0x4F13
+  040540: 4F13  stc.l  gbr,@-r15
   040542: D050  mov.l  @(0x40684),r0  ; =0xFFFF7F74 (RAM)
   040544: 401E  ldc    r0,GBR
   040546: 7FB0  add    #-80,r15
@@ -2413,8 +2413,8 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
     0x040182 -> table_desc_2d_typed @ 0x0BE8E4
     0x04018E -> table_desc_2d_typed @ 0x0BE8E4
     0x04019A -> jsr @r14 (unresolved)
-    0x0401AA -> float_min @ 0x0BE960
-    0x0401C6 -> float_min @ 0x0BE960
+    0x0401AA -> float_max @ 0x0BE960
+    0x0401C6 -> float_max @ 0x0BE960
     0x04023A -> float_lerp @ 0x0BEA40
     0x040262 -> float_deadband_check @ 0x0BE608
     0x04027C -> float_lerp @ 0x0BEA40
@@ -2448,7 +2448,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   040924: 0009  nop
   040926: A3D5  bra    0x410D4
   040928: 4F26  lds.l  @r15+,PR
-  04092A: 4F13  .word  0x4F13
+  04092A: 4F13  stc.l  gbr,@-r15
   04092C: D093  mov.l  @(0x40B7C),r0  ; =0xFFFF7FD4 (RAM) [timing_ws_gbr]
   04092E: 401E  ldc    r0,GBR
   040930: D693  mov.l  @(0x40B80),r6  ; =0xFFFF65C0 (RAM) [throttle_position]
@@ -2484,7 +2484,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   04096C: 000B  rts
   04096E: 4F17  ldc.l  @r15+,GBR
   040970: 4F22  sts.l  PR,@-r15
-  040972: 4F13  .word  0x4F13
+  040972: 4F13  stc.l  gbr,@-r15
   040974: D086  mov.l  @(0x40B90),r0  ; =0xFFFF7FBC (RAM)
   040976: 401E  ldc    r0,GBR
   040978: D286  mov.l  @(0x40B94),r2  ; =0x00022F92 (ROM)
@@ -2690,7 +2690,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   040B08: FFDB  fmov.s fr13,@-r15
   040B0A: FFEB  fmov.s fr14,@-r15
   040B0C: FFFB  fmov.s fr15,@-r15
-  040B0E: 4F13  .word  0x4F13
+  040B0E: 4F13  stc.l  gbr,@-r15
   040B10: D02A  mov.l  @(0x40BBC),r0  ; =0xFFFF7FB0 (RAM)
   040B12: 401E  ldc    r0,GBR
   040B14: 7FDC  add    #-36,r15
@@ -3441,7 +3441,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0410E6: FFDB  fmov.s fr13,@-r15
   0410E8: FFEB  fmov.s fr14,@-r15
   0410EA: FFFB  fmov.s fr15,@-r15
-  0410EC: 4F13  .word  0x4F13
+  0410EC: 4F13  stc.l  gbr,@-r15
   0410EE: D08A  mov.l  @(0x41318),r0  ; =0xFFFF7FBC (RAM)
   0410F0: 401E  ldc    r0,GBR
   0410F2: 7FB8  add    #-72,r15
@@ -3605,7 +3605,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
     0x040F38 -> jsr @r1 (unresolved)
     0x040F46 -> jsr @r1 (unresolved)
     0x040FA4 -> float_lerp @ 0x0BEA40
-    0x040FAC -> float_min @ 0x0BE960
+    0x040FAC -> float_max @ 0x0BE960
     0x040FC4 -> jsr @r1 (unresolved)
     0x040FDC -> jsr @r1 (unresolved)
     0x04100A -> float_lerp @ 0x0BEA40
@@ -3625,7 +3625,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   03F378: FFDB  fmov.s fr13,@-r15
   03F37A: FFEB  fmov.s fr14,@-r15
   03F37C: FFFB  fmov.s fr15,@-r15
-  03F37E: 4F13  .word  0x4F13
+  03F37E: 4F13  stc.l  gbr,@-r15
   03F380: D061  mov.l  @(0x3F508),r0  ; =0xFFFF7E90 (RAM)
   03F382: 401E  ldc    r0,GBR
   03F384: 7FB0  add    #-80,r15
@@ -4529,7 +4529,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   03FA88: 000B  rts
   03FA8A: 69F6  mov.l  @r15+,r9
   03FA8C: 4F22  sts.l  PR,@-r15
-  03FA8E: 4F13  .word  0x4F13
+  03FA8E: 4F13  stc.l  gbr,@-r15
   03FA90: D03D  mov.l  @(0x3FB88),r0  ; =0xFFFF7EC0 (RAM)
   03FA92: 401E  ldc    r0,GBR
   03FA94: D23D  mov.l  @(0x3FB8C),r2  ; =0xFFFF6350 (RAM) [ect_current]
@@ -4566,7 +4566,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   03FAD2: 2FE6  mov.l  r14,@-r15
   03FAD4: 4F22  sts.l  PR,@-r15
   03FAD6: FFEB  fmov.s fr14,@-r15
-  03FAD8: 4F13  .word  0x4F13
+  03FAD8: 4F13  stc.l  gbr,@-r15
   03FADA: D02B  mov.l  @(0x3FB88),r0  ; =0xFFFF7EC0 (RAM)
   03FADC: 401E  ldc    r0,GBR
   03FADE: 7FF4  add    #-12,r15
@@ -4724,12 +4724,12 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 
   --- Subroutine calls ---
     0x03F3B8 -> FUN_05EB32 @ 0x05EB32
-    0x03F6B6 -> float_max @ 0x0BE970
-    0x03F6C0 -> float_max @ 0x0BE970
-    0x03F6CA -> float_max @ 0x0BE970
-    0x03F6D4 -> float_max @ 0x0BE970
-    0x03F6DE -> float_max @ 0x0BE970
-    0x03F702 -> float_min @ 0x0BE960
+    0x03F6B6 -> float_min @ 0x0BE970
+    0x03F6C0 -> float_min @ 0x0BE970
+    0x03F6CA -> float_min @ 0x0BE970
+    0x03F6D4 -> float_min @ 0x0BE970
+    0x03F6DE -> float_min @ 0x0BE970
+    0x03F702 -> float_max @ 0x0BE960
     0x03F7AC -> table_desc_1d_float @ 0x0BE830
     0x03F862 -> FUN_04059E @ 0x04059E
     0x03F8B4 -> jsr @r5 (unresolved)
@@ -4784,7 +4784,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   03F378: FFDB  fmov.s fr13,@-r15
   03F37A: FFEB  fmov.s fr14,@-r15
   03F37C: FFFB  fmov.s fr15,@-r15
-  03F37E: 4F13  .word  0x4F13
+  03F37E: 4F13  stc.l  gbr,@-r15
   03F380: D061  mov.l  @(0x3F508),r0  ; =0xFFFF7E90 (RAM)
   03F382: 401E  ldc    r0,GBR
   03F384: 7FB0  add    #-80,r15
@@ -5688,7 +5688,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   03FA88: 000B  rts
   03FA8A: 69F6  mov.l  @r15+,r9
   03FA8C: 4F22  sts.l  PR,@-r15
-  03FA8E: 4F13  .word  0x4F13
+  03FA8E: 4F13  stc.l  gbr,@-r15
   03FA90: D03D  mov.l  @(0x3FB88),r0  ; =0xFFFF7EC0 (RAM)
   03FA92: 401E  ldc    r0,GBR
   03FA94: D23D  mov.l  @(0x3FB8C),r2  ; =0xFFFF6350 (RAM) [ect_current]
@@ -5725,7 +5725,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   03FAD2: 2FE6  mov.l  r14,@-r15
   03FAD4: 4F22  sts.l  PR,@-r15
   03FAD6: FFEB  fmov.s fr14,@-r15
-  03FAD8: 4F13  .word  0x4F13
+  03FAD8: 4F13  stc.l  gbr,@-r15
   03FADA: D02B  mov.l  @(0x3FB88),r0  ; =0xFFFF7EC0 (RAM)
   03FADC: 401E  ldc    r0,GBR
   03FADE: 7FF4  add    #-12,r15
@@ -5889,12 +5889,12 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 
   --- Subroutine calls ---
     0x03F3B8 -> FUN_05EB32 @ 0x05EB32
-    0x03F6B6 -> float_max @ 0x0BE970
-    0x03F6C0 -> float_max @ 0x0BE970
-    0x03F6CA -> float_max @ 0x0BE970
-    0x03F6D4 -> float_max @ 0x0BE970
-    0x03F6DE -> float_max @ 0x0BE970
-    0x03F702 -> float_min @ 0x0BE960
+    0x03F6B6 -> float_min @ 0x0BE970
+    0x03F6C0 -> float_min @ 0x0BE970
+    0x03F6CA -> float_min @ 0x0BE970
+    0x03F6D4 -> float_min @ 0x0BE970
+    0x03F6DE -> float_min @ 0x0BE970
+    0x03F702 -> float_max @ 0x0BE960
     0x03F7AC -> table_desc_1d_float @ 0x0BE830
     0x03F862 -> FUN_04059E @ 0x04059E
     0x03F8B4 -> jsr @r5 (unresolved)

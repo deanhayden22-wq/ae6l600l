@@ -3,6 +3,22 @@ CL/OL TRANSITION & AFL PERSISTENCE — CONSOLIDATED ANALYSIS
 AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! CORRECTION 2026-07-26 -- BE960 / BE970 ARE SWAPPED THROUGHOUT THIS FILE   !!
+!!                                                                          !!
+!!   0xBE960 is float_MAX  (this file and ~24 others call it float_min)     !!
+!!   0xBE970 is float_MIN  (this file and ~24 others call it float_max)     !!
+!!                                                                          !!
+!! Verified from bytes: 0xFnm5 is FCMP/GT FRm,FRn with n=bits8-11,          !!
+!! m=bits4-7, setting T = (FRn > FRm). F455 is `fcmp/gt fr5,fr4`, so        !!
+!! 0xBE960 keeps the LARGER value. The 2026-04-07 "correction" reversed     !!
+!! the operand order and therefore went the wrong way.                      !!
+!!                                                                          !!
+!! Any "float_max provides a floor clamp" reading below is actually a       !!
+!! CEILING, and vice versa. See docs/corrections.md item 1.                 !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 CORRECTION NOTICE (2026-04-07)
 ------------------------------
 ROM-verified address identity corrections applied throughout this file.
@@ -525,7 +541,7 @@ SECTION 12: FFFF798C UPDATE ALGORITHM — CORRECTED (2026-04-07)
   FILTERED_UPDATE path (0x36250-0x36270) — RAMP UP:
     FFFF7990 = FR15 * FFFF79A0         // target × blend coefficient
     FR4 = FFFF798C + FFFF79E0          // current + ramp step (POSITIVE)
-    FFFF798C = max(FR4, FFFF7990)      // floor clamp via float_max (0xBE970)
+    FFFF798C = min(FR4, FFFF7990)      // ceiling clamp via float_min (0xBE970)
 
     FFFF79E0 is POSITIVE (u16 table at CE5A4 × 1/32768, via fadd at 0x36262).
     This RAMPS the accumulator UPWARD each cycle. The max() clamp prevents
@@ -838,8 +854,8 @@ ROM FUNCTION MAP
   0x000BE554  Saturating word add
   0x000BE830  Table interpolation (Pull3DFloat)
   0x000BE8E4  2D table interpolation (RPM×Load style)
-  0x000BE960  float_min — min(FR4, FR5). Opcode F455 = fcmp/gt FR4,FR5.
-  0x000BE970  float_max — max(FR4, FR5). Opcode F545 = fcmp/gt FR5,FR4.
+  0x000BE960  float_max — max(FR4, FR5). Opcode F455 = fcmp/gt FR5,FR4.
+  0x000BE970  float_min — min(FR4, FR5). Opcode F545 = fcmp/gt FR4,FR5.
   0x000BEA40  Blend/clamp
   0x000BEAB0  Table lookup (error scaling)
 

@@ -27911,8 +27911,8 @@
         <COMMENT ADDRESS="000be8e4" TYPE="end-of-line">2D table lookup utility.</COMMENT>
         <COMMENT ADDRESS="000be928" TYPE="end-of-line">2D descriptor, uint8 data, integer return. Calls axis_lookup_2d_typed + interp_2d_uint8</COMMENT>
         <COMMENT ADDRESS="000be944" TYPE="end-of-line">2D table lookup returning integer.</COMMENT>
-        <COMMENT ADDRESS="000be960" TYPE="end-of-line">Returns min(FR4, FR5) in FR0. fcmp/gt FR4,FR5.</COMMENT>
-        <COMMENT ADDRESS="000be970" TYPE="end-of-line">Returns max(FR4, FR5) in FR0. fcmp/gt FR5,FR4.</COMMENT>
+        <COMMENT ADDRESS="000be960" TYPE="end-of-line">Returns max(FR4, FR5) in FR0. fcmp/gt FR4,FR5.</COMMENT>
+        <COMMENT ADDRESS="000be970" TYPE="end-of-line">Returns min(FR4, FR5) in FR0. fcmp/gt FR5,FR4.</COMMENT>
         <COMMENT ADDRESS="000be980" TYPE="end-of-line">Extracts size from packed hi:~lo byte pair</COMMENT>
         <COMMENT ADDRESS="000be990" TYPE="end-of-line">Extracts size from packed hi:~lo word pair</COMMENT>
         <COMMENT ADDRESS="000be9a0" TYPE="end-of-line">Packs byte into hi:~lo complement format</COMMENT>
@@ -28086,15 +28086,15 @@
         <COMMENT ADDRESS="000cc224" TYPE="end-of-line">OL enrichment accumulator threshold offset = 20.0. post_condition_handler (0x36848): added to FFFF798C (enrichment blend) when computing whether to advance enrichment pipeline stage. Controls transition trigger point.</COMMENT>
         <COMMENT ADDRESS="000cc228" TYPE="end-of-line">OL hysteresis handler RPM gate threshold = 2000.0. clol_hysteresis_handler (0x36B0C): rpm_current (FFFF6624) must be &lt; 2000 for hysteresis sub. In practice always passes (RPM &lt;&lt; 2000 at hysteresis entry).</COMMENT>
         <COMMENT ADDRESS="000cc22c" TYPE="end-of-line">OL hysteresis handler speed gate threshold = 0.0. clol_hysteresis_handler (0x36B2C): FFFF65FC must be &lt;= 0.0. Stock=0.0 effectively disables this gate.</COMMENT>
-        <COMMENT ADDRESS="000cc230" TYPE="end-of-line">OL hysteresis sub rate limit = 0.004. clol_hysteresis_sub (0x36B8A): applied via float_min (0xBE960) to limit rate of change of enrichment working value at FFFF7A0C.</COMMENT>
+        <COMMENT ADDRESS="000cc230" TYPE="end-of-line">OL hysteresis sub rate limit = 0.004. clol_hysteresis_sub (0x36B8A): applied via float_max (0xBE960) to limit rate of change of enrichment working value at FFFF7A0C.</COMMENT>
         <COMMENT ADDRESS="000cc234" TYPE="end-of-line">OL delay manager B threshold A hi = 79.0. clol_delay_manager_B (0x36BF4): compared against FFFF6350. If FFFF6350 &lt; 79.0 AND (CC238 or FFFF6364 conditions), take fast path.</COMMENT>
         <COMMENT ADDRESS="000cc238" TYPE="end-of-line">OL delay manager B threshold A lo = 0.0. clol_delay_manager_B: secondary condition check against FFFF6364.</COMMENT>
         <COMMENT ADDRESS="000cc23c" TYPE="end-of-line">OL delay manager B threshold B hi = 70.0. clol_delay_manager_B: alternate path threshold vs FFFF6350.</COMMENT>
         <COMMENT ADDRESS="000cc240" TYPE="end-of-line">OL delay manager B threshold B lo = 0.0. clol_delay_manager_B: alternate path secondary vs FFFF6364.</COMMENT>
         <COMMENT ADDRESS="000cc244" TYPE="end-of-line">OL delay manager B enrichment target A = 0.3. clol_delay_manager_B: written to FFFF7A18 (enrichment delay step) on first condition path.</COMMENT>
         <COMMENT ADDRESS="000cc248" TYPE="end-of-line">OL delay manager B enrichment target B = 0.0. clol_delay_manager_B: written to FFFF7A18 on second condition path.</COMMENT>
-        <COMMENT ADDRESS="000cc254" TYPE="end-of-line">OL delay manager B rate limit A = 0.3. clol_delay_manager_B (0x36D5A): rate-limits FFFF7A1C-4 via float_min (0xBE960).</COMMENT>
-        <COMMENT ADDRESS="000cc258" TYPE="end-of-line">OL delay manager B rate limit B = 0.15. clol_delay_manager_B (0x36CE6): FFFF7A1C step-rate via float_max (0xBE970).</COMMENT>
+        <COMMENT ADDRESS="000cc254" TYPE="end-of-line">OL delay manager B rate limit A = 0.3. clol_delay_manager_B (0x36D5A): rate-limits FFFF7A1C-4 via float_max (0xBE960).</COMMENT>
+        <COMMENT ADDRESS="000cc258" TYPE="end-of-line">OL delay manager B rate limit B = 0.15. clol_delay_manager_B (0x36CE6): FFFF7A1C step-rate via float_min (0xBE970).</COMMENT>
         <COMMENT ADDRESS="000cc354" TYPE="end-of-line">WOT load threshold (float, 118.0 g/rev).</COMMENT>
         <COMMENT ADDRESS="000cc358" TYPE="end-of-line">WOT load hysteresis (float, 119.0 g/rev).</COMMENT>
         <COMMENT ADDRESS="000cc3b0" TYPE="end-of-line">LTFT step size (float, 0.001).</COMMENT>
@@ -33648,10 +33648,10 @@
         <SYMBOL ADDRESS="000be944" NAME="table_desc_2d_uint16_int" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="n" />
         <SYMBOL ADDRESS="000be944" NAME="table_lookup_2D_int" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="y" />
         <SYMBOL ADDRESS="000be960" NAME="float_max" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="n" />
-        <SYMBOL ADDRESS="000be960" NAME="float_min" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="y" />
+        <SYMBOL ADDRESS="000be960" NAME="float_max" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="y" />
         <SYMBOL ADDRESS="000be970" NAME="float_min" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="n" />
         <SYMBOL ADDRESS="000be970" NAME="rate_limit_interp" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="n" />
-        <SYMBOL ADDRESS="000be970" NAME="float_max" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="y" />
+        <SYMBOL ADDRESS="000be970" NAME="float_min" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="y" />
         <SYMBOL ADDRESS="000be980" NAME="uint8_unpack" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="y" />
         <SYMBOL ADDRESS="000be990" NAME="uint16_unpack" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="y" />
         <SYMBOL ADDRESS="000be9a0" NAME="uint8_pack" NAMESPACE="" TYPE="global" SOURCE_TYPE="USER_DEFINED" PRIMARY="y" />

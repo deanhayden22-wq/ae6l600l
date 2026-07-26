@@ -331,7 +331,7 @@ def disasm_one(pc):
             if m == 0x5:
                 return f"fabs   FR{n}", "", False
             if m == 0x6:
-                return f"fsqrt  FR{n}", "", False
+                return f".INVALID_SH2E  FR{n}", "", False
         if lo == 0x9:
             return f"fmov.s @R{m}+,FR{n}", "", False
         if lo == 0xB:

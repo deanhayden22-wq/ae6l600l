@@ -92,7 +92,7 @@ for i in range(18):
             elif fm == 3: s = "ftrc FR%d,FPUL" % fn
             elif fm == 4: s = "fneg FR%d" % fn
             elif fm == 5: s = "fabs FR%d" % fn
-            elif fm == 6: s = "fsqrt FR%d" % fn
+            elif fm == 6: s = ".INVALID_SH2E FR%d" % fn
             elif fm == 8: s = "fldi0 FR%d" % fn
             elif fm == 9: s = "fldi1 FR%d" % fn
             elif fm == 0xA: s = "lds R%d,FPUL" % fn

@@ -188,7 +188,7 @@ def disasm_one(addr):
     if (op & 0xF0FF) == 0xF03D: return f"ftrc FR{n},FPUL"
     if (op & 0xF0FF) == 0xF04D: return f"fneg FR{n}"
     if (op & 0xF0FF) == 0xF05D: return f"fabs FR{n}"
-    if (op & 0xF0FF) == 0xF06D: return f"fsqrt FR{n}"
+    if (op & 0xF0FF) == 0xF06D: return f".INVALID_SH2E FR{n}"
     if (op & 0xF0FF) == 0xF07D: return f"fsub FR{n},?"  # placeholder
     if (op & 0xF00F) == 0xF009: return f"fmov.s @(R0,R{m}),FR{n}"  # dup check
     if (op & 0xF00F) == 0xF00E: return f"fmac FR0,FR{m},FR{n}"

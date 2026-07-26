@@ -838,7 +838,7 @@ PART 2: FUNCTION DISASSEMBLY (SH-2 ISA)
   03F442: F028  fmov.s @R2,FR0                          
   03F444: C742  mova   @(0x03F550),R0                   
   03F446: F908  fmov.s @R0,FR9                          
-  03F448: FD9E  .word  0xFD9E  ; FPU                    
+  03F448: FD9E  fmac   fr0,fr9,fr13  ; FPU
   03F44A: D242  mov.l  @(0x03F554),R2                     ; =0x000D2A34 (cal) val=0
   03F44C: F928  fmov.s @R2,FR9                          
   03F44E: FD91  fsub   FR9,FR13                         
@@ -915,7 +915,7 @@ PART 2: FUNCTION DISASSEMBLY (SH-2 ISA)
   03F4DC: FFFF  .word  0xFFFF  ; FPU                    
   03F4DE: 7F08  add    #8,R15                             ; SP += 8
   03F4E0: 000D  mov.w  @(R0,R0),R0                      
-  03F4E2: 2ABC  .word  0x2ABC                           
+  03F4E2: 2ABC  cmp/str r11,r10
   03F4E4: 000B  rts                                     
   03F4E6: E960  mov    #96,R9                           
 
@@ -1688,7 +1688,7 @@ PART 2: FUNCTION DISASSEMBLY (SH-2 ISA)
   0459B0: F09D  fldi1  FR0                              
   0459B2: F0D1  fsub   FR13,FR0                         
   0459B4: F9F8  fmov.s @R15,FR9                         
-  0459B6: F89E  .word  0xF89E  ; FPU                    
+  0459B6: F89E  fmac   fr0,fr9,fr8  ; FPU
   0459B8: D656  mov.l  @(0x045B14),R6                     ; =0x000D299B (cal) val=3.21424e-39
   0459BA: 6260  mov.b  @R6,R2                           
   0459BC: 2228  tst    R2,R2                            
@@ -1709,7 +1709,7 @@ PART 2: FUNCTION DISASSEMBLY (SH-2 ISA)
   0459DA: F587  fmov.s FR8,@(R0,R5)                     
   0459DC: F058  fmov.s @R5,FR0                          
   0459DE: F856  fmov.s @(R0,R5),FR8                     
-  0459E0: F98E  .word  0xF98E  ; FPU                    
+  0459E0: F98E  fmac   fr0,fr8,fr9  ; FPU
   0459E2: E0EC  mov    #-20,R0                          
   0459E4: F597  fmov.s FR9,@(R0,R5)                     
   0459E6: 7F04  add    #4,R15                             ; SP += 4

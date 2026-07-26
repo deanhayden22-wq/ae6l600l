@@ -424,10 +424,10 @@ public class ImportAE5L600L extends GhidraScript {
             "fr4/fr5 with zero-division guard. If fr5==0: returns +/-max based on sign of fr4");
         count += labelComment(0x000BE800, "float_clamp_with_step",
             "Soft clamp from above. If fr4>fr5: 1, if fr4>fr5-fr6: 0, else: fr4");
-        count += labelComment(0x000BE960, "float_min",
-            "Returns min(fr4, fr5). fcmp/gt FR4,FR5 → picks smaller. Called by PI controller for I-term cap");
-        count += labelComment(0x000BE970, "float_max",
-            "Returns max(fr4, fr5). fcmp/gt FR5,FR4 → picks larger. Called by PI controller for I-term floor");
+        count += labelComment(0x000BE960, "float_max",
+            "Returns max(fr4, fr5). F455 = fcmp/gt FR5,FR4 (T = FR4>FR5) → keeps larger. Provides a FLOOR clamp. Called by PI controller for I-term floor");
+        count += labelComment(0x000BE970, "float_min",
+            "Returns min(fr4, fr5). F545 = fcmp/gt FR4,FR5 (T = FR5>FR4) → keeps smaller. Provides a CEILING clamp. Called by PI controller for I-term cap");
         count += labelComment(0x000BEA40, "float_lerp",
             "Linear interpolation with NaN guard. result = fr4 + (fr5-fr4)*(1-fr6), convergence check via fr7");
         count += labelComment(0x000BEAB0, "float_abs_diff",
@@ -1120,7 +1120,7 @@ public class ImportAE5L600L extends GhidraScript {
             "OL enrichment ramp rate 1D descriptor (16 bytes). Axis: RPM 0-8000 (9 points). "
             + "Values: step-floor u16 table at CE5A4, scale 1/32768. "
             + "Output FFFF79E0 ADDED to FFFF798C each cycle in FILTERED_UPDATE (0x36262: fadd). "
-            + "float_max (0xBE970) clamps result above floor target (FFFF7990). "
+            + "float_min (0xBE970) CAPS the result at the blended target (FFFF7990) — a ceiling, not a floor. "
             + "At 0-4000 RPM: 100/32768 = 0.003052/cycle. Higher = faster OL enrichment ramp.");
         count += labelComment(0x000CE580, "OL_Enrich_RampRate_Axis",
             "OL enrichment ramp rate RPM axis: 9 × f32: 0/1000/2000/3000/4000/5000/6000/7000/8000 RPM.");
@@ -1167,7 +1167,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "Stock=0.0 effectively disables this gate.");
         count += labelComment(0x000CC230, "OL_Hyst_RateLimit",
             "OL hysteresis sub rate limit = 0.004. "
-            + "clol_hysteresis_sub (0x36B8A): applied via float_min (0xBE960) "
+            + "clol_hysteresis_sub (0x36B8A): applied via float_max (0xBE960) "
             + "to limit rate of change of enrichment working value at FFFF7A0C.");
 
         // ── Path A: delay manager B (0x36BF4) calibrations ──
@@ -1199,10 +1199,10 @@ public class ImportAE5L600L extends GhidraScript {
             + "clol_delay_manager_B (0x36CD6): word@FFFF67EC vs 624 to gate enrichment ramp.");
         count += labelComment(0x000CC254, "OL_DelayB_RateLimit_A",
             "OL delay manager B rate limit A = 0.3. "
-            + "clol_delay_manager_B (0x36D5A): rate-limits FFFF7A1C-4 via float_min (0xBE960).");
+            + "clol_delay_manager_B (0x36D5A): rate-limits FFFF7A1C-4 via float_max (0xBE960).");
         count += labelComment(0x000CC258, "OL_DelayB_RateLimit_B",
             "OL delay manager B rate limit B = 0.15. "
-            + "clol_delay_manager_B (0x36CE6): FFFF7A1C step-rate via float_max (0xBE970).");
+            + "clol_delay_manager_B (0x36CE6): FFFF7A1C step-rate via float_min (0xBE970).");
 
         // Path B (FFFF7452) readiness thresholds — all identical stock vs modified
         count += labelComment(0x000CBBEF, "CL_Phase1_Counter_Threshold",
@@ -1365,7 +1365,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7BE2L, "cl_enable_final",
             "CL enable final check flag (byte). Last gate in cl_active_check.");
         // REMOVED: 0xFFFF6350 "ram_RPM" — wrong. This is ECT, not RPM. Correct: ect_current (line 2157)
-        // REMOVED: 0xFFFF63F8 "ram_MAF" — wrong. This is IAT, not MAF. Correct: iat_current (line 2166)
+        // SUPERSEDED 2026-07-26: 0xFFFF63F8 is neither MAF nor IAT -- it is ENGINE LOAD (g/rev).
+        // See docs/corrections.md item 9.
         count += labelComment(0xFFFF63CCL, "ram_ECT",
             "Coolant temperature / ECT (float)");
         // REMOVED: 0xFFFF6624 "ram_MAF_alt" — wrong. This is RPM, not MAF. Correct: rpm_current (line 2154)
@@ -1729,7 +1730,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "Compared against OL_DelayB_Thresh_A_Lo / OL_DelayB_Thresh_B_Lo (0.0). "
             + "Physical meaning TBD — consistently paired with FFFF6350 in delay manager B.");
         // REMOVED: 0xFFFF6624 "engine_rpm_or_maf" — wrong. Correct: rpm_current (line 2154)
-        // REMOVED: 0xFFFF65FC "vehicle_speed" — wrong. This is engine_load, not speed. Correct: engine_load_current (line 2160)
+        // SUPERSEDED 2026-07-26: this note was itself WRONG. 0xFFFF65FC IS vehicle speed (km/h);
+        // removing that label was a wrong-direction correction. See docs/corrections.md item 9.
         count += labelComment(0xFFFF6898L, "rpm_delta",
             "RPM change rate / delta (float). Read by ol_condition_checker (FR12). "
             + "Compared against OL_Condition_RPMDelta_Lo/Hi (CC1DC=691.9/CC1E0=699.9). "
@@ -2144,14 +2146,26 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF6350L, "ect_current",
             "205 refs. Coolant temperature (float). Read by PSE, AFC, AFL, timing, idle, diag. "
             + "Second most-referenced address.");
-        count += labelComment(0xFFFF65FCL, "engine_load_current",
-            "135 refs. Engine load (float, g/rev). Read by AFL, CL/OL transition, timing, fuel.");
+        count += labelComment(0xFFFF65FCL, "vehicle_speed_kmh",
+            "CORRECTED 2026-07-26. 134/135 float refs. VEHICLE SPEED in km/h -- NOT engine load. "
+            + "Was 'engine_load_current'; the label 'vehicle_speed' had been REMOVED in error (see the stale note above). "
+            + "Proof: (a) feeds 13 lookup axes spanning 0..300 while every definition-named load axis spans 0.2..8; "
+            + "(b) axis 0x0C0294 via descriptor 0x0AA760 reads 0,8,16..120 = km/h; "
+            + "(c) launch-control patch 0x0F1000 compares it to 8.0515 = 5 mph via LCSPEED(MPH) toexpr x*.621. "
+            + "Engine load is 0xFFFF63F8. See docs/corrections.md item 9.");
         count += labelComment(0xFFFF67ECL, "atm_pressure_current",
             "99 refs. Atmospheric/barometric pressure (float). Read by frontO2, PSE, AFL, timing.");
         count += labelComment(0xFFFF65C0L, "throttle_position",
             "89 refs. Throttle position (float). Read by AFL, timing tasks 34/38, boost, idle.");
-        count += labelComment(0xFFFF63F8L, "iat_current",
-            "86 refs. Intake air temperature (float). Read by AFL, CL/OL, timing.");
+        count += labelComment(0xFFFF63F8L, "engine_load_current",
+            "CORRECTED 2026-07-26. 86/86 float refs. ENGINE LOAD in g/rev -- NOT intake air temp. "
+            + "Was 'iat_current' (and 'ram_MAF' before that); both wrong. "
+            + "Proof: feeds 21/21 DEFINITION-NAMED lookup axes that are named 'Engine Load' "
+            + "(0xC1780/0xC1A00/0xC1C80/0xC1F00 Calculated Engine Torque A-D, 0xD16DC CL Fueling Target Comp B, "
+            + "0xD5374 Timing Comp Per Gear 1st); breakpoint span 0..3 g/rev; never once a temperature axis. "
+            + "Corroborated by 0xC0BCC 'Boost disable during fuel cut-Load threshold' = 1.7 g/rev compared "
+            + "against this value at 0x0141FC. Real IAT is 0xFFFF69F0 (float, -40..120 C). "
+            + "See docs/corrections.md item 9.");
         count += labelComment(0xFFFF6354L, "ect_raw_adc",
             "69 refs. ECT raw ADC value or secondary ECT (float). Read by PSE, AFL.");
         count += labelComment(0xFFFF6364L, "ect_startup",
@@ -2162,8 +2176,11 @@ public class ImportAE5L600L extends GhidraScript {
             "51 refs. MAF sensor value (float, g/s). Read by AFL pipeline.");
         count += labelComment(0xFFFF6228L, "maf_voltage",
             "22 refs. MAF sensor voltage (float). Read by timing, fuel.");
-        count += labelComment(0xFFFF61CCL, "vehicle_speed",
-            "56 refs. Vehicle speed (float). Read by timing, CL/OL, boost.");
+        count += labelComment(0xFFFF61CCL, "diag_monitor_status_bytes",
+            "CORRECTED 2026-07-26. NOT vehicle speed and NOT a float. Base of a BYTE array of diagnostic "
+            + "monitor/readiness status bitfields. Access census over all 56 pool refs: 26 int8 accesses, "
+            + "ZERO float accesses (compare 0xFFFF63F8 86/86 float, 0xFFFF6624 298/301 float). "
+            + "Written as bytes at 0x01BE02 etc. Vehicle speed is 0xFFFF65FC. See docs/corrections.md item 9.");
         count += labelComment(0xFFFF62DCL, "fuel_rate",
             "20 refs. Fuel injection rate (float). Read by timing, boost.");
         count += labelComment(0xFFFF6898L, "manifold_pressure",
@@ -5076,10 +5093,10 @@ public class ImportAE5L600L extends GhidraScript {
             "2D table lookup utility.");
         count += labelComment(0x000BE944, "table_lookup_2D_int",
             "2D table lookup returning integer.");
-        count += labelComment(0x000BE960, "float_min",
-            "Returns min(FR4, FR5) in FR0. fcmp/gt FR4,FR5.");
-        count += labelComment(0x000BE970, "float_max",
-            "Returns max(FR4, FR5) in FR0. fcmp/gt FR5,FR4.");
+        count += labelComment(0x000BE960, "float_max",
+            "Returns max(FR4, FR5) in FR0. F455 = fcmp/gt FR5,FR4. FLOOR clamp.");
+        count += labelComment(0x000BE970, "float_min",
+            "Returns min(FR4, FR5) in FR0. F545 = fcmp/gt FR4,FR5. CEILING clamp.");
         count += labelComment(0x000BEAB0, "table_lookup_err_scale",
             "Table lookup with error scaling.");
 
@@ -6340,8 +6357,11 @@ public class ImportAE5L600L extends GhidraScript {
             "ADC processed alternate channel");
         count += labelComment(0xFFFF61FCL, "adc_processed_extra",
             "ADC processed extra channel (float). Near airflow_maf_current.");
-        count += labelComment(0xFFFF620CL, "airflow_maf_current",
-            "Current MAF/airflow (float). Used by accel enrichment a");
+        count += labelComment(0xFFFF620CL, "manifold_pressure_map",
+            "CORRECTED 2026-07-26. 43/43 float refs. MANIFOLD PRESSURE, not MAF airflow. "
+            + "Feeds definition-named axis 0xCC840 'Cranking Fuel IPW Compensation (MAP) / Manifold Pressure'; "
+            + "span 0..1500. Corroborated by 0xC0BC8 'Boost disable during fuel cut-Boost(bar) threshold' "
+            + "= 1.68 bar absolute compared against this value at 0x0141F2. See docs/corrections.md item 9.");
         count += labelComment(0xFFFF63B0L, "adc_processed_temperature_B",
             "ADC processed temperature B (float). ECT/IAT sensor region.");
         count += labelComment(0xFFFF6430L, "adc_processed_secondary",

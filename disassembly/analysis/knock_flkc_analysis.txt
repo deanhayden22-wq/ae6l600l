@@ -34,7 +34,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ==============================================================================
   439FC: F48E  fmac   fr0,fr8,fr4                      
   439FE: D29C  mov.l  @(0x43C70),r2  ; =0x000BE56C (clamp_float)
-  43A00: 420B  jsr    @r0                              
+  43A00: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   43A02: F6EC  fmov   fr14,fr6                         
   43A04: 66E3  mov    r14,r6                           
   43A06: 7614  add    #20,r6                           
@@ -49,7 +49,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43A18: E0AC  mov    #-84,r0                          
   43A1A: F696  fmov.s @(r0,r9),fr6                     
   43A1C: E0E4  mov    #-28,r0                          
-  43A1E: 450B  jsr    @r0                                ; CALL @ 0xFFFFFFE4
+  43A1E: 450B  jsr    @r5  ; -> 0x0BEA40 (float_lerp)
   43A20: F596  fmov.s @(r0,r9),fr5                     
   43A22: E0E4  mov    #-28,r0                          
   43A24: F907  fmov.s fr0,@(r0,r9)                     
@@ -84,7 +84,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43A5E: F596  fmov.s @(r0,r9),fr5                     
   43A60: D584  mov.l  @(0x43C74),r5  ; =0x000BEA40     
   43A62: C785  mova   @(0x43C78),r0  ; =0x3D800000     
-  43A64: 450B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43A64: 450B  jsr    @r5  ; -> 0x0BEA40 (float_lerp)
   43A66: F608  fmov.s @r0,fr6                          
   43A68: E0E8  mov    #-24,r0                          
   43A6A: F907  fmov.s fr0,@(r0,r9)                     
@@ -351,7 +351,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43C74: 000B  rts                                     
   43C76: EA40  mov    #64,r10                          
   43C78: 3D80  cmp/eq  r8,r13                          
-  43C7A: 0000  ??       ; 0x0000                       
+  43C7A: 0000  .word  0x0000  ; 0x0000
   43C7C: 000D  mov.w  @(r0,r0),r0                      
   43C7E: 2D88  tst  r8,r13                             
   43C80: 000D  mov.w  @(r0,r0),r0                      
@@ -362,9 +362,9 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43C8A: 2D94  mov.b  r9,@-r13                         
   43C8C: 000D  mov.w  @(r0,r0),r0                      
   43C8E: 29DC  cmp/str  r13,r9                         
-  43C90: FFFF  ??fpu    ; 0xFFFF                       
+  43C90: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43C92: 81AC  mov.w  r0,@(24,r10)                     
-  43C94: FFFF  ??fpu    ; 0xFFFF                       
+  43C94: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43C96: 6624  mov.b  @r2+,r6                          
   43C98: 000D  mov.w  @(r0,r0),r0                      
   43C9A: 2989  and  r8,r9                              
@@ -374,20 +374,20 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43CA2: 2D54  mov.b  r5,@-r13                         
   43CA4: 000D  mov.w  @(r0,r0),r0                      
   43CA6: 298B  or  r8,r9                               
-  43CA8: FFFF  ??fpu    ; 0xFFFF                       
+  43CA8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43CAA: 818C  mov.w  r0,@(24,r8)                      
   43CAC: 000D  mov.w  @(r0,r0),r0                      
   43CAE: 298A  xor  r8,r9                              
-  43CB0: 4360  ??       ; 0x4360 (grp4)                
-  43CB2: 0000  ??       ; 0x0000                       
-  43CB4: FFFF  ??fpu    ; 0xFFFF                       
+  43CB0: 4360  .word  0x4360  ; 0x4360 (grp4)
+  43CB2: 0000  .word  0x0000  ; 0x0000
+  43CB4: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43CB6: 8DB0  bt/s   0x43C1A                          
-  43CB8: FFFF  ??fpu    ; 0xFFFF                       
+  43CB8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43CBA: 8DB4  bt/s   0x43C26                          
   43CBC: 000D  mov.w  @(r0,r0),r0                      
   43CBE: 2994  mov.b  r9,@-r9                          
   43CC0: 4320  shal   r3                               
-  43CC2: 0000  ??       ; 0x0000                       
+  43CC2: 0000  .word  0x0000  ; 0x0000
   43CC4: C789  mova   @(0x43EEC),r0  ; =0x43000000     
   43CC6: F908  fmov.s @r0,fr9                          
   43CC8: F985  fcmp/gt  fr8,fr9                        
@@ -519,18 +519,18 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43DC4: FF87  fmov.s fr8,@(r0,r15)                    
   43DC6: D459  mov.l  @(0x43F2C),r4  ; =0x000AE0F8     
   43DC8: DE59  mov.l  @(0x43F30),r14  ; =0x000BE830 (Pull3DFloat)
-  43DCA: 4E0B  jsr    @r0                                ; CALL @ 0x00004
+  43DCA: 4E0B  jsr    @r14  ; -> 0x0BE830 (table_desc_1d_float)
   43DCC: F4DC  fmov   fr13,fr4                         
   43DCE: DC59  mov.l  @(0x43F34),r12  ; =0xFFFF81D8 (knock_rpmgate)
   43DD0: E0E8  mov    #-24,r0                          
   43DD2: FC07  fmov.s fr0,@(r0,r12)                    
   43DD4: D458  mov.l  @(0x43F38),r4  ; =0x000AE00C     
-  43DD6: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43DD6: 4E0B  jsr    @r14  ; -> 0x0BE830 (table_desc_1d_float)
   43DD8: F4EC  fmov   fr14,fr4                         
   43DDA: E0F0  mov    #-16,r0                          
   43DDC: FC07  fmov.s fr0,@(r0,r12)                    
   43DDE: D457  mov.l  @(0x43F3C),r4  ; =0x000AE020     
-  43DE0: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFF0
+  43DE0: 4E0B  jsr    @r14  ; -> 0x0BE830 (table_desc_1d_float)
   43DE2: F4FC  fmov   fr15,fr4                         
   43DE4: E0F4  mov    #-12,r0                          
   43DE6: FC07  fmov.s fr0,@(r0,r12)                    
@@ -539,7 +539,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43DEC: F8C5  fcmp/gt  fr12,fr8                       
   43DEE: 891D  bt     0x43E2C                          
   43DF0: D454  mov.l  @(0x43F44),r4  ; =0x000AE10C     
-  43DF2: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43DF2: 4E0B  jsr    @r14  ; -> 0x0BE830 (table_desc_1d_float)
   43DF4: F4DC  fmov   fr13,fr4                         
   43DF6: E0EC  mov    #-20,r0                          
   43DF8: FC07  fmov.s fr0,@(r0,r12)                    
@@ -676,7 +676,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43C74: 000B  rts                                     
   43C76: EA40  mov    #64,r10                          
   43C78: 3D80  cmp/eq  r8,r13                          
-  43C7A: 0000  ??       ; 0x0000                       
+  43C7A: 0000  .word  0x0000  ; 0x0000
   43C7C: 000D  mov.w  @(r0,r0),r0                      
   43C7E: 2D88  tst  r8,r13                             
   43C80: 000D  mov.w  @(r0,r0),r0                      
@@ -687,9 +687,9 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43C8A: 2D94  mov.b  r9,@-r13                         
   43C8C: 000D  mov.w  @(r0,r0),r0                      
   43C8E: 29DC  cmp/str  r13,r9                         
-  43C90: FFFF  ??fpu    ; 0xFFFF                       
+  43C90: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43C92: 81AC  mov.w  r0,@(24,r10)                     
-  43C94: FFFF  ??fpu    ; 0xFFFF                       
+  43C94: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43C96: 6624  mov.b  @r2+,r6                          
   43C98: 000D  mov.w  @(r0,r0),r0                      
   43C9A: 2989  and  r8,r9                              
@@ -699,20 +699,20 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43CA2: 2D54  mov.b  r5,@-r13                         
   43CA4: 000D  mov.w  @(r0,r0),r0                      
   43CA6: 298B  or  r8,r9                               
-  43CA8: FFFF  ??fpu    ; 0xFFFF                       
+  43CA8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43CAA: 818C  mov.w  r0,@(24,r8)                      
   43CAC: 000D  mov.w  @(r0,r0),r0                      
   43CAE: 298A  xor  r8,r9                              
-  43CB0: 4360  ??       ; 0x4360 (grp4)                
-  43CB2: 0000  ??       ; 0x0000                       
-  43CB4: FFFF  ??fpu    ; 0xFFFF                       
+  43CB0: 4360  .word  0x4360  ; 0x4360 (grp4)
+  43CB2: 0000  .word  0x0000  ; 0x0000
+  43CB4: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43CB6: 8DB0  bt/s   0x43C1A                          
-  43CB8: FFFF  ??fpu    ; 0xFFFF                       
+  43CB8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43CBA: 8DB4  bt/s   0x43C26                          
   43CBC: 000D  mov.w  @(r0,r0),r0                      
   43CBE: 2994  mov.b  r9,@-r9                          
   43CC0: 4320  shal   r3                               
-  43CC2: 0000  ??       ; 0x0000                       
+  43CC2: 0000  .word  0x0000  ; 0x0000
   43CC4: C789  mova   @(0x43EEC),r0  ; =0x43000000     
   43CC6: F908  fmov.s @r0,fr9                          
   43CC8: F985  fcmp/gt  fr8,fr9                        
@@ -859,18 +859,18 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43DC4: FF87  fmov.s fr8,@(r0,r15)                    
   43DC6: D459  mov.l  @(0x43F2C),r4  ; =0x000AE0F8     
   43DC8: DE59  mov.l  @(0x43F30),r14  ; =0x000BE830 (Pull3DFloat)
-  43DCA: 4E0B  jsr    @r0                                ; CALL @ 0x00004
+  43DCA: 4E0B  jsr    @r14  ; -> 0x0BE830 (table_desc_1d_float)
   43DCC: F4DC  fmov   fr13,fr4                         
   43DCE: DC59  mov.l  @(0x43F34),r12  ; =0xFFFF81D8 (knock_rpmgate)
   43DD0: E0E8  mov    #-24,r0                          
   43DD2: FC07  fmov.s fr0,@(r0,r12)                    
   43DD4: D458  mov.l  @(0x43F38),r4  ; =0x000AE00C     
-  43DD6: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43DD6: 4E0B  jsr    @r14  ; -> 0x0BE830 (table_desc_1d_float)
   43DD8: F4EC  fmov   fr14,fr4                         
   43DDA: E0F0  mov    #-16,r0                          
   43DDC: FC07  fmov.s fr0,@(r0,r12)                    
   43DDE: D457  mov.l  @(0x43F3C),r4  ; =0x000AE020     
-  43DE0: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFF0
+  43DE0: 4E0B  jsr    @r14  ; -> 0x0BE830 (table_desc_1d_float)
   43DE2: F4FC  fmov   fr15,fr4                         
   43DE4: E0F4  mov    #-12,r0                          
   43DE6: FC07  fmov.s fr0,@(r0,r12)                    
@@ -879,7 +879,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43DEC: F8C5  fcmp/gt  fr12,fr8                       
   43DEE: 891D  bt     0x43E2C                          
   43DF0: D454  mov.l  @(0x43F44),r4  ; =0x000AE10C     
-  43DF2: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43DF2: 4E0B  jsr    @r14  ; -> 0x0BE830 (table_desc_1d_float)
   43DF4: F4DC  fmov   fr13,fr4                         
   43DF6: E0EC  mov    #-20,r0                          
   43DF8: FC07  fmov.s fr0,@(r0,r12)                    
@@ -887,13 +887,13 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43DFC: F4C2  fmul  fr12,fr4                          
   43DFE: D252  mov.l  @(0x43F48),r2  ; =0x000BE628     
   43E00: D652  mov.l  @(0x43F4C),r6  ; =0x000D2D80     
-  43E02: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFEC
+  43E02: 420B  jsr    @r2  ; -> 0x0BE628 (float_safe_div)
   43E04: F568  fmov.s @r6,fr5                          
   43E06: F40C  fmov   fr0,fr4                          
   43E08: D251  mov.l  @(0x43F50),r2  ; =0x000BE56C (clamp_float)
   43E0A: E0E8  mov    #-24,r0                          
   43E0C: F5C6  fmov.s @(r0,r12),fr5                    
-  43E0E: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43E0E: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   43E10: F69D  fldi1  fr6                              
   43E12: E0F0  mov    #-16,r0                          
   43E14: F8C6  fmov.s @(r0,r12),fr8                    
@@ -902,9 +902,9 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43E1A: F8C6  fmov.s @(r0,r12),fr8                    
   43E1C: F082  fmul  fr8,fr0                           
   43E1E: F40C  fmov   fr0,fr4                          
-  43E20: D24C  mov.l  @(0x43F54),r2  ; =0x000BE970 (max_float)
+  43E20: D24C  mov.l  @(0x43F54),r2  ; =0x000BE970 (min_float)
   43E22: D64D  mov.l  @(0x43F58),r6  ; =0x000D2D7C     
-  43E24: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43E24: 420B  jsr    @r2  ; -> 0x0BE970 (float_min)
   43E26: F568  fmov.s @r6,fr5                          
   43E28: A00C  bra    0x43E44                          
   43E2A: 0009  nop                                     
@@ -918,11 +918,11 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43E3A: F482  fmul  fr8,fr4                           
   43E3C: D244  mov.l  @(0x43F50),r2  ; =0x000BE56C (clamp_float)
   43E3E: F69D  fldi1  fr6                              
-  43E40: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43E40: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   43E42: F58D  fldi0  fr5                              
   43E44: FE0C  fmov   fr0,fr14                         
   43E46: D245  mov.l  @(0x43F5C),r2  ; =0x0000317C     
-  43E48: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF4
+  43E48: 420B  jsr    @r2  ; -> 0x00317C (interrupt_priority_set)
   43E4A: E410  mov    #16,r4                           
   43E4C: 6403  mov    r0,r4                            
   43E4E: F8F8  fmov.s @r15,fr8                         
@@ -934,21 +934,21 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43E5A: F9F6  fmov.s @(r0,r15),fr9                    
   43E5C: E0DC  mov    #-36,r0                          
   43E5E: D240  mov.l  @(0x43F60),r2  ; =0x00003190     
-  43E60: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFDC
+  43E60: 420B  jsr    @r2  ; -> 0x003190 (interrupt_restore)
   43E62: FB97  fmov.s fr9,@(r0,r11)                    
   43E64: D43F  mov.l  @(0x43F64),r4  ; =0x000AE26C     
-  43E66: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFDC
+  43E66: 4E0B  jsr    @r14
   43E68: F4DC  fmov   fr13,fr4                         
   43E6A: E0FC  mov    #-4,r0                           
   43E6C: FB07  fmov.s fr0,@(r0,r11)                    
   43E6E: D43E  mov.l  @(0x43F68),r4  ; =0x000AE278     
-  43E70: 4E0B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  43E70: 4E0B  jsr    @r14
   43E72: F4DC  fmov   fr13,fr4                         
   43E74: FB0A  fmov.s fr0,@r11                         
   43E76: D23D  mov.l  @(0x43F6C),r2  ; =0x0000A638     
   43E78: E0FC  mov    #-4,r0                           
   43E7A: F4B6  fmov.s @(r0,r11),fr4                    
-  43E7C: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  43E7C: 420B  jsr    @r2  ; -> 0x00A638
   43E7E: F5B8  fmov.s @r11,fr5                         
   43E80: C4B0  mov.b  @(176,GBR),r0                      ; @GBR+176 = 0xFFFF81AC (knock_status_81AC)
   43E82: E604  mov    #4,r6                            
@@ -968,7 +968,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43E9E: 8801  cmp/eq #1,r0                            
   43EA0: 8B03  bf     0x43EAA                          
   43EA2: D234  mov.l  @(0x43F74),r2  ; =0x000BE53C     
-  43EA4: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  43EA4: 420B  jsr    @r2  ; -> 0x0BE53C (uint8_add_sat)
   43EA6: E501  mov    #1,r5                            
   43EA8: 640C  extu.b  r0,r4                           
   43EAA: E6FF  mov    #-1,r6                           
@@ -1005,24 +1005,24 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43EE8: 000B  rts                                     
   43EEA: 6BF6  mov.l  @r15+,r11                        
   43EEC: 4300  shll   r3                               
-  43EEE: 0000  ??       ; 0x0000                       
-  43EF0: 42C0  ??       ; 0x42C0 (grp4)                
-  43EF2: 0000  ??       ; 0x0000                       
-  43EF4: 4280  ??       ; 0x4280 (grp4)                
-  43EF6: 0000  ??       ; 0x0000                       
-  43EF8: FFFF  ??fpu    ; 0xFFFF                       
+  43EEE: 0000  .word  0x0000  ; 0x0000
+  43EF0: 42C0  .word  0x42C0  ; 0x42C0 (grp4)
+  43EF2: 0000  .word  0x0000  ; 0x0000
+  43EF4: 4280  .word  0x4280  ; 0x4280 (grp4)
+  43EF6: 0000  .word  0x0000  ; 0x0000
+  43EF8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43EFA: 4309  shlr2  r3                               
-  43EFC: FFFF  ??fpu    ; 0xFFFF                       
-  43EFE: 430D  shld   r0,r3                
-  43F00: FFFF  ??fpu    ; 0xFFFF                       
+  43EFC: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  43EFE: 430D  .word  0x430D
+  43F00: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43F02: 80FC  mov.b  r0,@(12,r15)                     
-  43F04: FFFF  ??fpu    ; 0xFFFF                       
+  43F04: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43F06: 6624  mov.b  @r2+,r6                          
-  43F08: FFFF  ??fpu    ; 0xFFFF                       
+  43F08: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43F0A: 81F4  mov.w  r0,@(8,r15)                      
-  43F0C: FFFF  ??fpu    ; 0xFFFF                       
+  43F0C: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43F0E: 8128  mov.w  r0,@(16,r2)                      
-  43F10: FFFF  ??fpu    ; 0xFFFF                       
+  43F10: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43F12: 81F8  mov.w  r0,@(16,r15)                     
   43F14: 000D  mov.w  @(r0,r0),r0                      
   43F16: 2D60  mov.b  r6,@r13                            ; -> 0xFFFFFFE4
@@ -1040,7 +1040,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43F2E: E0F8  mov    #-8,r0                           
   43F30: 000B  rts                                     
   43F32: E830  mov    #48,r8                           
-  43F34: FFFF  ??fpu    ; 0xFFFF                       
+  43F34: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   43F36: 81D8  mov.w  r0,@(16,r13)                     
   43F38: 000A  sts    mach,r0                       
   43F3A: E00C  mov    #12,r0                           
@@ -1060,15 +1060,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43F56: E970  mov    #112,r9                          
   43F58: 000D  mov.w  @(r0,r0),r0                      
   43F5A: 2D7C  cmp/str  r7,r13                         
-  43F5C: 0000  ??       ; 0x0000                       
+  43F5C: 0000  .word  0x0000  ; 0x0000
   43F5E: 317C  add  r7,r1                              
-  43F60: 0000  ??       ; 0x0000                       
+  43F60: 0000  .word  0x0000  ; 0x0000
   43F62: 3190  cmp/eq  r9,r1                           
   43F64: 000A  sts    mach,r0                       
   43F66: E26C  mov    #108,r2                          
   43F68: 000A  sts    mach,r0                       
   43F6A: E278  mov    #120,r2                          
-  43F6C: 0000  ??       ; 0x0000                       
+  43F6C: 0000  .word  0x0000  ; 0x0000
   43F6E: A638  bra    0x44BE2                          
   43F70: 0006  mov.l  r0,@(r0,r0)                      
   43F72: 3E78  sub  r7,r14                             
@@ -1081,7 +1081,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43F80: D26E  mov.l  @(0x4413C),r2  ; =0xFFFF6624 (rpm_current)
   43F82: FE28  fmov.s @r2,fr14                         
   43F84: D26E  mov.l  @(0x44140),r2  ; =0x0000317C     
-  43F86: 420B  jsr    @r0                                ; CALL @ 0x00020
+  43F86: 420B  jsr    @r2  ; -> 0x00317C (interrupt_priority_set)
   43F88: E410  mov    #16,r4                           
   43F8A: 2F02  mov.l  r0,@r15                          
   43F8C: F4EC  fmov   fr14,fr4                         
@@ -1090,7 +1090,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43F92: F8E6  fmov.s @(r0,r14),fr8                    
   43F94: F481  fsub  fr8,fr4                           
   43F96: D26C  mov.l  @(0x44148),r2  ; =0x000BEAB0     
-  43F98: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF0
+  43F98: 420B  jsr    @r2  ; -> 0x0BEAB0 (float_abs_diff)
   43F9A: F58D  fldi0  fr5                              
   43F9C: E0E8  mov    #-24,r0                          
   43F9E: FE07  fmov.s fr0,@(r0,r14)                    
@@ -1098,7 +1098,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43FA2: F8E8  fmov.s @r14,fr8                         
   43FA4: F481  fsub  fr8,fr4                           
   43FA6: D268  mov.l  @(0x44148),r2  ; =0x000BEAB0     
-  43FA8: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFE8
+  43FA8: 420B  jsr    @r2  ; -> 0x0BEAB0 (float_abs_diff)
   43FAA: F58D  fldi0  fr5                              
   43FAC: E0EC  mov    #-20,r0                          
   43FAE: FE07  fmov.s fr0,@(r0,r14)                    
@@ -1138,7 +1138,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   43FF2: 401E  ldc    r0,GBR                             ; GBR <- 0xFFFF80FC
   43FF4: 7FFC  add    #-4,r15                          
   43FF6: D257  mov.l  @(0x44154),r2  ; =0x00022F92     
-  43FF8: 420B  jsr    @r0                                ; CALL @ 0xFFFF80FC
+  43FF8: 420B  jsr    @r2  ; -> 0x022F92 (check_cl_active)
   43FFA: 0009  nop                                     
   43FFC: 600C  extu.b  r0,r0                           
   43FFE: 8801  cmp/eq #1,r0                            
@@ -1146,7 +1146,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   44002: A08C  bra    0x4411E                          
   44004: 0009  nop                                     
   44006: D24E  mov.l  @(0x44140),r2  ; =0x0000317C     
-  44008: 420B  jsr    @r0                                ; CALL @ 0xFFFF80FC
+  44008: 420B  jsr    @r2  ; -> 0x00317C (interrupt_priority_set)
   4400A: E410  mov    #16,r4                           
   4400C: 2F02  mov.l  r0,@r15                          
   4400E: D252  mov.l  @(0x44158),r2  ; =0x000D2D4C     
@@ -1162,10 +1162,10 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   44022: E0CC  mov    #-52,r0                          
   44024: F466  fmov.s @(r0,r6),fr4                     
   44026: E0D0  mov    #-48,r0                          
-  44028: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFD0
+  44028: 420B  jsr    @r2  ; -> 0x00A638
   4402A: F566  fmov.s @(r0,r6),fr5                     
   4402C: D247  mov.l  @(0x4414C),r2  ; =0x00003190     
-  4402E: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFD0
+  4402E: 420B  jsr    @r2  ; -> 0x003190 (interrupt_restore)
   44030: 64F2  mov.l  @r15,r4                          
   44032: F98D  fldi0  fr9                              
   44034: DD49  mov.l  @(0x4415C),r13  ; =0xFFFF8158 (knock_struct_8158)
@@ -1217,20 +1217,20 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   443AA: D264  mov.l  @(0x4453C),r2  ; =0xFFFF6624 (rpm_current)
   443AC: FF28  fmov.s @r2,fr15                         
   443AE: D26C  mov.l  @(0x44560),r2  ; =0x0001CF22     
-  443B0: 420B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443B0: 420B  jsr    @r2  ; -> 0x01CF22
   443B2: 0009  nop                                     
   443B4: D26B  mov.l  @(0x44564),r2  ; =0x0002F8FE     
-  443B6: 420B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443B6: 420B  jsr    @r2  ; -> 0x02F8FE (check_transient_knock_inhibit)
   443B8: 2F00  mov.b  r0,@r15                          
   443BA: D26B  mov.l  @(0x44568),r2  ; =0x00029858     
-  443BC: 420B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443BC: 420B  jsr    @r2  ; -> 0x029858 (flkc_state_flag_reader_table)
   443BE: 80F4  mov.b  r0,@(4,r15)                      
   443C0: 80F8  mov.b  r0,@(8,r15)                      
   443C2: D66A  mov.l  @(0x4456C),r6  ; =0xFFFF81BA (knock_event_flag)
   443C4: 6B60  mov.b  @r6,r11                            ; @0xFFFF81BA (knock_event_flag)
   443C6: D66A  mov.l  @(0x44570),r6  ; =0xFFFF81BB (knock_flag_B)
   443C8: D26A  mov.l  @(0x44574),r2  ; =0x0002997C     
-  443CA: 420B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443CA: 420B  jsr    @r2  ; -> 0x02997C (diag_check_P0131)
   443CC: 6C60  mov.b  @r6,r12                            ; @0xFFFF81BB (knock_flag_B)
   443CE: 80FC  mov.b  r0,@(12,r15)                     
   443D0: D269  mov.l  @(0x44578),r2  ; =0xFFFF7F10     
@@ -1242,13 +1242,13 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   443DC: C43C  mov.b  @(60,GBR),r0                       ; @GBR+60 = 0xFFFF822C
   443DE: 6E03  mov    r0,r14                           
   443E0: D35A  mov.l  @(0x4454C),r3  ; =0x000456E0     
-  443E2: 430B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443E2: 430B  jsr    @r3  ; -> 0x0456E0
   443E4: F4EC  fmov   fr14,fr4                         
   443E6: D35A  mov.l  @(0x44550),r3  ; =0x0004578C     
-  443E8: 430B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443E8: 430B  jsr    @r3  ; -> 0x04578C
   443EA: F4FC  fmov   fr15,fr4                         
   443EC: D365  mov.l  @(0x44584),r3  ; =0x0004581A     
-  443EE: 430B  jsr    @r0                                ; CALL @ 0xFFFF81F0
+  443EE: 430B  jsr    @r3  ; -> 0x04581A
   443F0: 0009  nop                                     
   443F2: D665  mov.l  @(0x44588),r6  ; =0x000D2995     
   443F4: 6260  mov.b  @r6,r2                             ; @0x000D2995
@@ -1268,7 +1268,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   44410: F4CC  fmov   fr12,fr4                         
   44412: C75F  mova   @(0x44590),r0  ; =0x3B800000     
   44414: F608  fmov.s @r0,fr6                          
-  44416: 420B  jsr    @r0                                ; CALL @ 0x00000
+  44416: 420B  jsr    @r2  ; -> 0x0BE608 (float_deadband_check)
   44418: F59D  fldi1  fr5                              
   4441A: 620C  extu.b  r0,r2                           
   4441C: 60F0  mov.b  @r15,r0                          
@@ -1395,34 +1395,34 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4450E: D228  mov.l  @(0x445B0),r2  ; =0x000D2DDC     
   44510: F828  fmov.s @r2,fr8                          
   44512: D228  mov.l  @(0x445B4),r2  ; =0x000BE960     
-  44514: 420B  jsr    @r0                                ; CALL @ 0x00001
+  44514: 420B  jsr    @r2  ; -> 0x0BE960 (float_max)
   44516: F481  fsub  fr8,fr4                           
   44518: D610  mov.l  @(0x4455C),r6  ; =0xFFFF81F0     
   4451A: D227  mov.l  @(0x445B8),r2  ; =0x000469C6     
-  4451C: 420B  jsr    @r0                                ; CALL @ 0x00001
+  4451C: 420B  jsr    @r2  ; -> 0x0469C6
   4451E: F60A  fmov.s fr0,@r6                          
   44520: D226  mov.l  @(0x445BC),r2  ; =0x00045EEA (FLKC_commit_write)
-  44522: 420B  jsr    @r0                                ; CALL @ 0x00001
+  44522: 420B  jsr    @r2  ; -> 0x045EEA (knock_helper_leaf)
   44524: 0009  nop                                     
   44526: E000  mov    #0,r0                            
   44528: C047  mov.b  r0,@(71,GBR)                       ; @GBR+71 = 0xFFFF8237
   4452A: A150  bra    0x447CE                          
   4452C: EE01  mov    #1,r14                           
-  4452E: 0000  ??       ; 0x0000                       
-  44530: FFFF  ??fpu    ; 0xFFFF                       
-  44532: 8210  ??       ; 0x8210 (grp8)                
-  44534: FFFF  ??fpu    ; 0xFFFF                       
+  4452E: 0000  .word  0x0000  ; 0x0000
+  44530: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  44532: 8210  .word  0x8210  ; 0x8210 (grp8)
+  44534: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   44536: 6364  mov.b  @r6+,r3                          
-  44538: FFFF  ??fpu    ; 0xFFFF                       
+  44538: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   4453A: 63F8  swap.b  r15,r3                          
-  4453C: FFFF  ??fpu    ; 0xFFFF                       
+  4453C: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   4453E: 6624  mov.b  @r2+,r6                          
   44540: 0002  stc    sr,r0                       
   44542: 2F92  mov.l  r9,@r15                          
-  44544: FFFF  ??fpu    ; 0xFFFF                       
-  44546: 8224  ??       ; 0x8224 (grp8)                
-  44548: FFFF  ??fpu    ; 0xFFFF                       
-  4454A: 8235  ??       ; 0x8235 (grp8)                
+  44544: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  44546: 8224  .word  0x8224  ; 0x8224 (grp8)
+  44548: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  4454A: 8235  .word  0x8235  ; 0x8235 (grp8)
   4454C: 0004  mov.b  r0,@(r0,r0)                      
   4454E: 56E0  mov.l  @(0,r14),r6                        ; @0x00000001
   44550: 0004  mov.b  r0,@(r0,r0)                      
@@ -1431,25 +1431,25 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   44556: 57D2  mov.l  @(8,r13),r7                      
   44558: 0004  mov.b  r0,@(r0,r0)                      
   4455A: 57F4  mov.l  @(16,r15),r7                     
-  4455C: FFFF  ??fpu    ; 0xFFFF                       
+  4455C: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   4455E: 81F0  mov.w  r0,@(0,r15)                      
-  44560: 0001  ??       ; 0x0001                       
+  44560: 0001  .word  0x0001  ; 0x0001
   44562: CF22  or.b   #0x22,@(r0,GBR)                  
   44564: 0002  stc    sr,r0                       
   44566: F8FE  fmac   fr0,fr15,fr8                     
   44568: 0002  stc    sr,r0                       
   4456A: 9858  mov.w  @(0x4461E),r8  ; =0x420B         
-  4456C: FFFF  ??fpu    ; 0xFFFF                       
+  4456C: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   4456E: 81BA  mov.w  r0,@(20,r11)                     
-  44570: FFFF  ??fpu    ; 0xFFFF                       
+  44570: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   44572: 81BB  mov.w  r0,@(22,r11)                     
   44574: 0002  stc    sr,r0                       
   44576: 997C  mov.w  @(0x44672),r9  ; =0x0F54         
-  44578: FFFF  ??fpu    ; 0xFFFF                       
+  44578: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   4457A: 7F10  add    #16,r15                          
-  4457C: FFFF  ??fpu    ; 0xFFFF                       
+  4457C: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   4457E: 653C  extu.b  r3,r5                           
-  44580: FFFF  ??fpu    ; 0xFFFF                       
+  44580: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   44582: 7BE2  add    #-30,r11                         
   44584: 0004  mov.b  r0,@(r0,r0)                      
   44586: 581A  mov.l  @(40,r1),r8                      
@@ -1471,7 +1471,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45C0E: FFFB  fmov.s fr15,@-r15                       
   45C10: 7FF8  add    #-8,r15                          
   45C12: D267  mov.l  @(0x45DB0),r2  ; =0x00029858     
-  45C14: 420B  jsr    @r0                              
+  45C14: 420B  jsr    @r2  ; -> 0x029858 (flkc_state_flag_reader_table)
   45C16: 0009  nop                                     
   45C18: 2F00  mov.b  r0,@r15                          
   45C1A: D666  mov.l  @(0x45DB4),r6  ; =0xFFFF81BA (knock_event_flag)
@@ -1495,13 +1495,13 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45C3E: D263  mov.l  @(0x45DCC),r2  ; =0x000BE588     
   45C40: 644C  extu.b  r4,r4                           
   45C42: F58D  fldi0  fr5                              
-  45C44: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF8
+  45C44: 420B  jsr    @r2  ; -> 0x0BE588 (fmac_interp_uint8)
   45C46: F49D  fldi1  fr4                              
   45C48: FF0C  fmov   fr0,fr15                         
   45C4A: EB00  mov    #0,r11                           
   45C4C: D460  mov.l  @(0x45DD0),r4  ; =0x000AE134     
   45C4E: D261  mov.l  @(0x45DD4),r2  ; =0x000BE8AC     
-  45C50: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFF8
+  45C50: 420B  jsr    @r2  ; -> 0x0BE8AC (table_desc_1d_uint16)
   45C52: F4EC  fmov   fr14,fr4                         
   45C54: D14B  mov.l  @(0x45D84),r1  ; =0xFFFF8274 (FLKC_state_base)
   45C56: 8118  mov.w  r0,@(16,r1)                      
@@ -1550,8 +1550,8 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45CAC: F9F6  fmov.s @(r0,r15),fr9                    
   45CAE: FD90  fadd  fr9,fr13                          
   45CB0: F4DC  fmov   fr13,fr4                         
-  45CB2: D24A  mov.l  @(0x45DDC),r2  ; =0x000BE970 (max_float)
-  45CB4: 420B  jsr    @r0                                ; CALL @ 0x00004
+  45CB2: D24A  mov.l  @(0x45DDC),r2  ; =0x000BE970 (min_float)
+  45CB4: 420B  jsr    @r2  ; -> 0x0BE970 (float_min)
   45CB6: F59D  fldi1  fr5                              
   45CB8: FD0C  fmov   fr0,fr13                         
   45CBA: E001  mov    #1,r0                            
@@ -1561,7 +1561,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45CC2: D247  mov.l  @(0x45DE0),r2  ; =0x000BE554     
   45CC4: 6611  mov.w  @r1,r6                             ; @0xFFFF8274 (FLKC_state_base)
   45CC6: 646D  extu.w  r6,r4                           
-  45CC8: 420B  jsr    @r0                                ; CALL @ 0x00001
+  45CC8: 420B  jsr    @r2  ; -> 0x0BE554 (uint16_add_sat)
   45CCA: E501  mov    #1,r5                            
   45CCC: D12D  mov.l  @(0x45D84),r1  ; =0xFFFF8274 (FLKC_state_base)
   45CCE: A038  bra    0x45D42                          
@@ -1584,7 +1584,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45CF0: FD91  fsub  fr9,fr13                          
   45CF2: F4DC  fmov   fr13,fr4                         
   45CF4: D23B  mov.l  @(0x45DE4),r2  ; =0x000BE960     
-  45CF6: 420B  jsr    @r0                                ; CALL @ 0x00004
+  45CF6: 420B  jsr    @r2  ; -> 0x0BE960 (float_max)
   45CF8: F58D  fldi0  fr5                              
   45CFA: FD0C  fmov   fr0,fr13                         
   45CFC: E000  mov    #0,r0                            
@@ -1601,7 +1601,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45D12: 8B18  bf     0x45D46                          
   45D14: D434  mov.l  @(0x45DE8),r4  ; =0x000AE2CC     
   45D16: D235  mov.l  @(0x45DEC),r2  ; =0x000BE830 (Pull3DFloat)
-  45D18: 420B  jsr    @r0                                ; CALL @ 0x00001
+  45D18: 420B  jsr    @r2  ; -> 0x0BE830 (table_desc_1d_float)
   45D1A: F4FC  fmov   fr15,fr4                         
   45D1C: D119  mov.l  @(0x45D84),r1  ; =0xFFFF8274 (FLKC_state_base)
   45D1E: E00C  mov    #12,r0                           
@@ -1615,10 +1615,10 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45D2E: D230  mov.l  @(0x45DF0),r2  ; =0x000BE56C (clamp_float)
   45D30: F4DC  fmov   fr13,fr4                         
   45D32: F58D  fldi0  fr5                              
-  45D34: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  45D34: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   45D36: F69D  fldi1  fr6                              
   45D38: D22E  mov.l  @(0x45DF4),r2  ; =0x00046A42 (FLKC_output_write)
-  45D3A: 420B  jsr    @r0                                ; CALL @ 0xFFFFFFFC
+  45D3A: 420B  jsr    @r2  ; -> 0x046A42
   45D3C: FD0C  fmov   fr0,fr13                         
   45D3E: A002  bra    0x45D46                          
   45D40: 0009  nop                                     
@@ -1627,11 +1627,11 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45D46: D410  mov.l  @(0x45D88),r4  ; =0xFFFF323C (FLKC_work_bank2)
   45D48: D210  mov.l  @(0x45D8C),r2  ; =0x000BDBCC (write_float_ptr)
   45D4A: E004  mov    #4,r0                            
-  45D4C: 420B  jsr    @r0                                ; CALL @ 0x00004
+  45D4C: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   45D4E: F4F6  fmov.s @(r0,r15),fr4                    
   45D50: D410  mov.l  @(0x45D94),r4  ; =0xFFFF3234 (FLKC_work_bank1)
   45D52: D20E  mov.l  @(0x45D8C),r2  ; =0x000BDBCC (write_float_ptr)
-  45D54: 420B  jsr    @r0                                ; CALL @ 0x00004
+  45D54: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   45D56: F4DC  fmov   fr13,fr4                         
   45D58: 60B3  mov    r11,r0                           
   45D5A: 8801  cmp/eq #1,r0                            
@@ -1651,46 +1651,46 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45D76: 6CF6  mov.l  @r15+,r12                        
   45D78: 000B  rts                                     
   45D7A: 6BF6  mov.l  @r15+,r11                        
-  45D7C: FFFF  ??fpu    ; 0xFFFF                       
+  45D7C: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   45D7E: 3244  div1  r4,r2                             
-  45D80: FFFF  ??fpu    ; 0xFFFF                       
+  45D80: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   45D82: 85D7  mov.w  @(14,r13),r0                     
-  45D84: FFFF  ??fpu    ; 0xFFFF                       
-  45D86: 8274  ??       ; 0x8274 (grp8)                
-  45D88: FFFF  ??fpu    ; 0xFFFF                       
+  45D84: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  45D86: 8274  .word  0x8274  ; 0x8274 (grp8)
+  45D88: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   45D8A: 323C  add  r3,r2                              
   45D8C: 000B  rts                                     
   45D8E: DBCC  mov.l  @(0x460C0),r11  ; =0xFFEBEE00    
   45D90: 000D  mov.w  @(r0,r0),r0                      
   45D92: 2EE4  mov.b  r14,@-r14                        
-  45D94: FFFF  ??fpu    ; 0xFFFF                       
+  45D94: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   45D96: 3234  div1  r3,r2                             
   45D98: 000D  mov.w  @(r0,r0),r0                      
   45D9A: 2EE0  mov.b  r14,@r14                         
   45D9C: 0004  mov.b  r0,@(r0,r0)                      
   45D9E: 69CE  exts.b  r12,r9                          
-  45DA0: FFFF  ??fpu    ; 0xFFFF                       
-  45DA2: 822A  ??       ; 0x822A (grp8)                
+  45DA0: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  45DA2: 822A  .word  0x822A  ; 0x822A (grp8)
   45DA4: 000D  mov.w  @(r0,r0),r0                      
   45DA6: 29A5  mov.w  r10,@-r9                         
   45DA8: 000D  mov.w  @(r0,r0),r0                      
   45DAA: 29A6  mov.l  r10,@-r9                         
-  45DAC: FFFF  ??fpu    ; 0xFFFF                       
-  45DAE: 827D  ??       ; 0x827D (grp8)                
+  45DAC: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  45DAE: 827D  .word  0x827D  ; 0x827D (grp8)
   45DB0: 0002  stc    sr,r0                       
   45DB2: 9858  mov.w  @(0x45E66),r8  ; =0x6060         
-  45DB4: FFFF  ??fpu    ; 0xFFFF                       
+  45DB4: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   45DB6: 81BA  mov.w  r0,@(20,r11)                     
-  45DB8: FFFF  ??fpu    ; 0xFFFF                       
+  45DB8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   45DBA: 7D18  add    #24,r13                          
-  45DBC: FFFF  ??fpu    ; 0xFFFF                       
-  45DBE: 82A0  ??       ; 0x82A0 (grp8)                
-  45DC0: FFFF  ??fpu    ; 0xFFFF                       
+  45DBC: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  45DBE: 82A0  .word  0x82A0  ; 0x82A0 (grp8)
+  45DC0: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   45DC2: 6624  mov.b  @r2+,r6                          
-  45DC4: FFFF  ??fpu    ; 0xFFFF                       
-  45DC6: 8290  ??       ; 0x8290 (grp8)                
-  45DC8: FFFF  ??fpu    ; 0xFFFF                       
-  45DCA: 8298  ??       ; 0x8298 (grp8)                
+  45DC4: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  45DC6: 8290  .word  0x8290  ; 0x8290 (grp8)
+  45DC8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  45DCA: 8298  .word  0x8298  ; 0x8298 (grp8)
   45DCC: 000B  rts                                     
   45DCE: E588  mov    #-120,r5                         
   45DD0: 000A  sts    mach,r0                       
@@ -1698,7 +1698,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45DD4: 000B  rts                                     
   45DD6: E8AC  mov    #-84,r8                          
   45DD8: 3F00  cmp/eq  r0,r15                          
-  45DDA: 0000  ??       ; 0x0000                       
+  45DDA: 0000  .word  0x0000  ; 0x0000
   45DDC: 000B  rts                                     
   45DDE: E970  mov    #112,r9                          
   45DE0: 000B  rts                                     
@@ -1797,7 +1797,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45E9A: 7FFC  add    #-4,r15                          
   45E9C: D66D  mov.l  @(0x46054),r6  ; =0xFFFF65BD     
   45E9E: D26E  mov.l  @(0x46058),r2  ; =0x0002999C     
-  45EA0: 420B  jsr    @r0                                ; CALL @ 0x00001
+  45EA0: 420B  jsr    @r2  ; -> 0x02999C (flkc_state_flag_slot15)
   45EA2: 6E60  mov.b  @r6,r14                            ; @0xFFFF65BD
   45EA4: 620C  extu.b  r0,r2                           
   45EA6: 2F20  mov.b  r2,@r15                          
@@ -1815,12 +1815,12 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45EBE: D468  mov.l  @(0x46060),r4  ; =0xFFFF3234 (FLKC_work_bank1)
   45EC0: D668  mov.l  @(0x46064),r6  ; =0x000BDBCC (write_float_ptr)
   45EC2: D269  mov.l  @(0x46068),r2  ; =0x000D2EE0     
-  45EC4: 460B  jsr    @r0                                ; CALL @ 0x2999C
+  45EC4: 460B  jsr    @r6  ; -> 0x0BDBCC (desc_read_float_safe)
   45EC6: F428  fmov.s @r2,fr4                          
   45EC8: D468  mov.l  @(0x4606C),r4  ; =0xFFFF323C (FLKC_work_bank2)
   45ECA: D666  mov.l  @(0x46064),r6  ; =0x000BDBCC (write_float_ptr)
   45ECC: D268  mov.l  @(0x46070),r2  ; =0x000D2EE4     
-  45ECE: 460B  jsr    @r0                                ; CALL @ 0x2999C
+  45ECE: 460B  jsr    @r6  ; -> 0x0BDBCC (desc_read_float_safe)
   45ED0: F428  fmov.s @r2,fr4                          
   45ED2: D552  mov.l  @(0x4601C),r5  ; =0xFFFF3244 (FLKC_enable_byte)
   45ED4: 6050  mov.b  @r5,r0                             ; @0xFFFF3244 (FLKC_enable_byte)
@@ -1865,13 +1865,13 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45F22: C756  mova   @(0x4607C),r0  ; =0x3D800000     
   45F24: FF08  fmov.s @r0,fr15                         
   45F26: F6FC  fmov   fr15,fr6                         
-  45F28: 420B  jsr    @r0                                ; CALL @ 0x2999C
+  45F28: 420B  jsr    @r2  ; -> 0x0BE608 (float_deadband_check)
   45F2A: F58D  fldi0  fr5                              
   45F2C: 2F00  mov.b  r0,@r15                          
   45F2E: F4EC  fmov   fr14,fr4                         
   45F30: D251  mov.l  @(0x46078),r2  ; =0x000BE608 (Pull2DFloat)
   45F32: F6FC  fmov   fr15,fr6                         
-  45F34: 420B  jsr    @r0                                ; CALL @ 0x2999C
+  45F34: 420B  jsr    @r2  ; -> 0x0BE608 (float_deadband_check)
   45F36: F59D  fldi1  fr5                              
   45F38: 66F0  mov.b  @r15,r6                          
   45F3A: 2668  tst  r6,r6                              
@@ -1937,7 +1937,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45FB2: 62E0  mov.b  @r14,r2                            ; @0xFFFF8287
   45FB4: 642C  extu.b  r2,r4                           
   45FB6: D638  mov.l  @(0x46098),r6  ; =0x000BE800     
-  45FB8: 460B  jsr    @r0                                ; CALL @ 0xFFFFFFF8
+  45FB8: 460B  jsr    @r6  ; -> 0x0BE800 (float_clamp_with_step)
   45FBA: F558  fmov.s @r5,fr5                          
   45FBC: 8801  cmp/eq #1,r0                            
   45FBE: 0229  movt   r2                               
@@ -1964,7 +1964,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   45FE8: 640C  extu.b  r0,r4                           
   45FEA: F4FC  fmov   fr15,fr4                         
   45FEC: D62A  mov.l  @(0x46098),r6  ; =0x000BE800     
-  45FEE: 460B  jsr    @r0                                ; CALL @ 0x00000
+  45FEE: 460B  jsr    @r6  ; -> 0x0BE800 (float_clamp_with_step)
   45FF0: F558  fmov.s @r5,fr5                          
   45FF2: 8801  cmp/eq #1,r0                            
   45FF4: 0029  movt   r0                               
@@ -1991,7 +1991,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   463D0: D277  mov.l  @(0x465B0),r2  ; =0xFFFF3234 (FLKC_work_bank1)
   463D2: FE28  fmov.s @r2,fr14                         
   463D4: D27D  mov.l  @(0x465CC),r2  ; =0x00029858     
-  463D6: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  463D6: 420B  jsr    @r2  ; -> 0x029858 (flkc_state_flag_reader_table)
   463D8: 0009  nop                                     
   463DA: 660C  extu.b  r0,r6                           
   463DC: D57C  mov.l  @(0x465D0),r5  ; =0xFFFF7D18 (knock_suppress_flag)
@@ -2103,15 +2103,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   464B0: F828  fmov.s @r2,fr8                          
   464B2: F480  fadd  fr8,fr4                           
   464B4: F54C  fmov   fr4,fr5                          
-  464B6: D240  mov.l  @(0x465B8),r2  ; =0x000BE970 (max_float)
-  464B8: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464B6: D240  mov.l  @(0x465B8),r2  ; =0x000BE970 (min_float)
+  464B8: 420B  jsr    @r2  ; -> 0x0BE970 (float_min)
   464BA: F4CC  fmov   fr12,fr4                         
   464BC: F40C  fmov   fr0,fr4                          
   464BE: D24C  mov.l  @(0x465F0),r2  ; =0x000BE56C (clamp_float)
   464C0: D64C  mov.l  @(0x465F4),r6  ; =0x000D2F44     
   464C2: F668  fmov.s @r6,fr6                          
   464C4: D64C  mov.l  @(0x465F8),r6  ; =0x000D2F4C     
-  464C6: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464C6: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   464C8: F568  fmov.s @r6,fr5                          
   464CA: F50C  fmov   fr0,fr5                          
   464CC: FF0A  fmov.s fr0,@r15                         
@@ -2123,19 +2123,19 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   464D8: 3E2C  add  r2,r14                             
   464DA: D248  mov.l  @(0x465FC),r2  ; =0x000BDBCC (write_float_ptr)
   464DC: 64E3  mov    r14,r4                           
-  464DE: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464DE: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   464E0: F40C  fmov   fr0,fr4                          
   464E2: D247  mov.l  @(0x46600),r2  ; =0x000BE608 (Pull2DFloat)
   464E4: F4CC  fmov   fr12,fr4                         
   464E6: C736  mova   @(0x465C0),r0  ; =0x3EB40000     
   464E8: F608  fmov.s @r0,fr6                          
-  464EA: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464EA: 420B  jsr    @r2  ; -> 0x0BE608 (float_deadband_check)
   464EC: F5F8  fmov.s @r15,fr5                         
   464EE: 620C  extu.b  r0,r2                           
   464F0: 2228  tst  r2,r2                              
   464F2: 8B09  bf     0x46508                          
   464F4: D243  mov.l  @(0x46604),r2  ; =0x000BE9A0     
-  464F6: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  464F6: 420B  jsr    @r2  ; -> 0x0BE9A0 (uint8_pack)
   464F8: E401  mov    #1,r4                            
   464FA: 6603  mov    r0,r6                            
   464FC: D542  mov.l  @(0x46608),r5  ; =0xFFFF3360 (FLKC_percyl_result)
@@ -2145,7 +2145,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   46504: 4000  shll   r0                               
   46506: 0565  mov.w  r6,@(r0,r5)                      
   46508: D240  mov.l  @(0x4660C),r2  ; =0x00045EEA (FLKC_commit_write)
-  4650A: 420B  jsr    @r0                                ; CALL @ 0xFFFF8290
+  4650A: 420B  jsr    @r2  ; -> 0x045EEA (knock_helper_leaf)
   4650C: 0009  nop                                     
   4650E: E001  mov    #1,r0                            
   46510: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
@@ -2170,15 +2170,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   46536: F828  fmov.s @r2,fr8                          
   46538: F480  fadd  fr8,fr4                           
   4653A: F54C  fmov   fr4,fr5                          
-  4653C: D21E  mov.l  @(0x465B8),r2  ; =0x000BE970 (max_float)
-  4653E: 420B  jsr    @r0                                ; CALL @ 0x00000
+  4653C: D21E  mov.l  @(0x465B8),r2  ; =0x000BE970 (min_float)
+  4653E: 420B  jsr    @r2  ; -> 0x0BE970 (float_min)
   46540: F4CC  fmov   fr12,fr4                         
   46542: F40C  fmov   fr0,fr4                          
   46544: D22A  mov.l  @(0x465F0),r2  ; =0x000BE56C (clamp_float)
   46546: D62B  mov.l  @(0x465F4),r6  ; =0x000D2F44     
   46548: F668  fmov.s @r6,fr6                          
   4654A: D62B  mov.l  @(0x465F8),r6  ; =0x000D2F4C     
-  4654C: 420B  jsr    @r0                                ; CALL @ 0x00000
+  4654C: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   4654E: F568  fmov.s @r6,fr5                          
   46550: F50C  fmov   fr0,fr5                          
   46552: FF0A  fmov.s fr0,@r15                         
@@ -2190,19 +2190,19 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4655E: 3E2C  add  r2,r14                             
   46560: 64E3  mov    r14,r4                           
   46562: D226  mov.l  @(0x465FC),r2  ; =0x000BDBCC (write_float_ptr)
-  46564: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46564: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   46566: F40C  fmov   fr0,fr4                          
   46568: D225  mov.l  @(0x46600),r2  ; =0x000BE608 (Pull2DFloat)
   4656A: F4CC  fmov   fr12,fr4                         
   4656C: C714  mova   @(0x465C0),r0  ; =0x3EB40000     
   4656E: F608  fmov.s @r0,fr6                          
-  46570: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46570: 420B  jsr    @r2  ; -> 0x0BE608 (float_deadband_check)
   46572: F5F8  fmov.s @r15,fr5                         
   46574: 620C  extu.b  r0,r2                           
   46576: 2228  tst  r2,r2                              
   46578: 8B09  bf     0x4658E                          
   4657A: D222  mov.l  @(0x46604),r2  ; =0x000BE9A0     
-  4657C: 420B  jsr    @r0                                ; CALL @ 0x00000
+  4657C: 420B  jsr    @r2  ; -> 0x0BE9A0 (uint8_pack)
   4657E: E401  mov    #1,r4                            
   46580: 6603  mov    r0,r6                            
   46582: D521  mov.l  @(0x46608),r5  ; =0xFFFF3360 (FLKC_percyl_result)
@@ -2212,7 +2212,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4658A: 4000  shll   r0                               
   4658C: 0565  mov.w  r6,@(r0,r5)                      
   4658E: D21F  mov.l  @(0x4660C),r2  ; =0x00045EEA (FLKC_commit_write)
-  46590: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46590: 420B  jsr    @r2  ; -> 0x045EEA (knock_helper_leaf)
   46592: 0009  nop                                     
   46594: E001  mov    #1,r0                            
   46596: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
@@ -2223,37 +2223,37 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   465A0: C102  mov.w  r0,@(4,GBR)                      
   465A2: E001  mov    #1,r0                            
   465A4: D219  mov.l  @(0x4660C),r2  ; =0x00045EEA (FLKC_commit_write)
-  465A6: 420B  jsr    @r0                                ; CALL @ 0x00001
+  465A6: 420B  jsr    @r2  ; -> 0x045EEA (knock_helper_leaf)
   465A8: C00C  mov.b  r0,@(12,GBR)                       ; @GBR+12 = 0xFFFF829C (FLKC_mode_29C)
   465AA: E000  mov    #0,r0                            
   465AC: A0F5  bra    0x4679A                          
   465AE: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
-  465B0: FFFF  ??fpu    ; 0xFFFF                       
+  465B0: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   465B2: 3234  div1  r3,r2                             
-  465B4: FFFF  ??fpu    ; 0xFFFF                       
-  465B6: 8258  ??       ; 0x8258 (grp8)                
+  465B4: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  465B6: 8258  .word  0x8258  ; 0x8258 (grp8)
   465B8: 000B  rts                                     
   465BA: E970  mov    #112,r9                          
   465BC: 000B  rts                                     
   465BE: EA40  mov    #64,r10                          
   465C0: 3EB4  div1  r11,r14                           
-  465C2: 0000  ??       ; 0x0000                       
+  465C2: 0000  .word  0x0000  ; 0x0000
   465C4: 000D  mov.w  @(r0,r0),r0                      
   465C6: 2F3C  cmp/str  r3,r15                         
-  465C8: FFFF  ??fpu    ; 0xFFFF                       
-  465CA: 8290  ??       ; 0x8290 (grp8)                
+  465C8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  465CA: 8290  .word  0x8290  ; 0x8290 (grp8)
   465CC: 0002  stc    sr,r0                       
   465CE: 9858  mov.w  @(0x46682),r8  ; =0x600C         
-  465D0: FFFF  ??fpu    ; 0xFFFF                       
+  465D0: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   465D2: 7D18  add    #24,r13                          
-  465D4: FFFF  ??fpu    ; 0xFFFF                       
+  465D4: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   465D6: 81BA  mov.w  r0,@(20,r11)                     
-  465D8: FFFF  ??fpu    ; 0xFFFF                       
+  465D8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   465DA: 3244  div1  r4,r2                             
-  465DC: FFFF  ??fpu    ; 0xFFFF                       
+  465DC: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   465DE: 3248  sub  r4,r2                              
-  465E0: FFFF  ??fpu    ; 0xFFFF                       
-  465E2: 8233  ??       ; 0x8233 (grp8)                
+  465E0: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  465E2: 8233  .word  0x8233  ; 0x8233 (grp8)
   465E4: 000D  mov.w  @(r0,r0),r0                      
   465E6: 29EE  mulu.w  r14,r9                          
   465E8: 000D  mov.w  @(r0,r0),r0                      
@@ -2272,7 +2272,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   46602: E608  mov    #8,r6                            
   46604: 000B  rts                                     
   46606: E9A0  mov    #-96,r9                          
-  46608: FFFF  ??fpu    ; 0xFFFF                       
+  46608: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   4660A: 3360  cmp/eq  r6,r3                           
   4660C: 0004  mov.b  r0,@(r0,r0)                      
   4660E: 5EEA  mov.l  @(40,r14),r14                      ; @0xFFFF3270
@@ -2309,7 +2309,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4664C: D699  mov.l  @(0x468B4),r6  ; =0x000D2F44     
   4664E: F668  fmov.s @r6,fr6                          
   46650: D699  mov.l  @(0x468B8),r6  ; =0x000D2F4C     
-  46652: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46652: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   46654: F568  fmov.s @r6,fr5                          
   46656: F40C  fmov   fr0,fr4                          
   46658: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
@@ -2319,15 +2319,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   46660: 4200  shll   r2                               
   46662: 3E2C  add  r2,r14                             
   46664: D295  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
-  46666: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46666: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   46668: 64E3  mov    r14,r4                           
   4666A: D295  mov.l  @(0x468C0),r2  ; =0x00045EEA (FLKC_commit_write)
-  4666C: 420B  jsr    @r0                                ; CALL @ 0x00000
+  4666C: 420B  jsr    @r2  ; -> 0x045EEA (knock_helper_leaf)
   4666E: 0009  nop                                     
   46670: E001  mov    #1,r0                            
   46672: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
   46674: D293  mov.l  @(0x468C4),r2  ; =0x000BE9A0     
-  46676: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46676: 420B  jsr    @r2  ; -> 0x0BE9A0 (uint8_pack)
   46678: E400  mov    #0,r4                            
   4667A: 6603  mov    r0,r6                            
   4667C: D592  mov.l  @(0x468C8),r5  ; =0xFFFF3360 (FLKC_percyl_result)
@@ -2355,7 +2355,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   466A8: D683  mov.l  @(0x468B8),r6  ; =0x000D2F4C     
   466AA: 8F21  bf/s   0x466F0                          
   466AC: F568  fmov.s @r6,fr5                          
-  466AE: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466AE: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   466B0: 0009  nop                                     
   466B2: F40C  fmov   fr0,fr4                          
   466B4: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
@@ -2365,15 +2365,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   466BC: 4200  shll   r2                               
   466BE: 3E2C  add  r2,r14                             
   466C0: D27E  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
-  466C2: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466C2: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   466C4: 64E3  mov    r14,r4                           
   466C6: D27E  mov.l  @(0x468C0),r2  ; =0x00045EEA (FLKC_commit_write)
-  466C8: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466C8: 420B  jsr    @r2  ; -> 0x045EEA (knock_helper_leaf)
   466CA: 0009  nop                                     
   466CC: E001  mov    #1,r0                            
   466CE: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
   466D0: D27C  mov.l  @(0x468C4),r2  ; =0x000BE9A0     
-  466D2: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466D2: 420B  jsr    @r2  ; -> 0x0BE9A0 (uint8_pack)
   466D4: E400  mov    #0,r4                            
   466D6: 6603  mov    r0,r6                            
   466D8: D57B  mov.l  @(0x468C8),r5  ; =0xFFFF3360 (FLKC_percyl_result)
@@ -2388,7 +2388,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   466EA: D279  mov.l  @(0x468D0),r2  ; =0xFFFF8290 (FLKC_FG_GBR_base)
   466EC: A022  bra    0x46734                          
   466EE: F29A  fmov.s fr9,@r2                          
-  466F0: 420B  jsr    @r0                                ; CALL @ 0x00001
+  466F0: 420B  jsr    @r2  ; -> 0xFFFF8290 (flkc_fg_GBR_base)
   466F2: 0009  nop                                     
   466F4: F40C  fmov   fr0,fr4                          
   466F6: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
@@ -2398,15 +2398,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   466FE: 4200  shll   r2                               
   46700: 3E2C  add  r2,r14                             
   46702: D26E  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
-  46704: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46704: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   46706: 64E3  mov    r14,r4                           
   46708: D26D  mov.l  @(0x468C0),r2  ; =0x00045EEA (FLKC_commit_write)
-  4670A: 420B  jsr    @r0                                ; CALL @ 0x00001
+  4670A: 420B  jsr    @r2  ; -> 0x045EEA (knock_helper_leaf)
   4670C: 0009  nop                                     
   4670E: E001  mov    #1,r0                            
   46710: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
   46712: D26C  mov.l  @(0x468C4),r2  ; =0x000BE9A0     
-  46714: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46714: 420B  jsr    @r2  ; -> 0x0BE9A0 (uint8_pack)
   46716: E400  mov    #0,r4                            
   46718: 6603  mov    r0,r6                            
   4671A: D56B  mov.l  @(0x468C8),r5  ; =0xFFFF3360 (FLKC_percyl_result)
@@ -2432,7 +2432,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   46742: D65C  mov.l  @(0x468B4),r6  ; =0x000D2F44     
   46744: F668  fmov.s @r6,fr6                          
   46746: D65C  mov.l  @(0x468B8),r6  ; =0x000D2F4C     
-  46748: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46748: 420B  jsr    @r2  ; -> 0x0BE56C (float_clamp_range)
   4674A: F568  fmov.s @r6,fr5                          
   4674C: F40C  fmov   fr0,fr4                          
   4674E: C408  mov.b  @(8,GBR),r0                        ; @GBR+8 = 0xFFFF8298 (FLKC_cyl_idx)
@@ -2444,15 +2444,15 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4675A: 4200  shll   r2                               
   4675C: 3E2C  add  r2,r14                             
   4675E: D257  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
-  46760: 420B  jsr    @r0                                ; CALL @ 0x00044
+  46760: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   46762: 64E3  mov    r14,r4                           
   46764: D256  mov.l  @(0x468C0),r2  ; =0x00045EEA (FLKC_commit_write)
-  46766: 420B  jsr    @r0                                ; CALL @ 0x00044
+  46766: 420B  jsr    @r2  ; -> 0x045EEA (knock_helper_leaf)
   46768: 0009  nop                                     
   4676A: E001  mov    #1,r0                            
   4676C: C00D  mov.b  r0,@(13,GBR)                       ; @GBR+13 = 0xFFFF829D (FLKC_state_29D)
   4676E: D255  mov.l  @(0x468C4),r2  ; =0x000BE9A0     
-  46770: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46770: 420B  jsr    @r2  ; -> 0x0BE9A0 (uint8_pack)
   46772: E400  mov    #0,r4                            
   46774: 6603  mov    r0,r6                            
   46776: D554  mov.l  @(0x468C8),r5  ; =0xFFFF3360 (FLKC_percyl_result)
@@ -2525,7 +2525,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   467FC: FFEB  fmov.s fr14,@-r15                       
   467FE: 7FFC  add    #-4,r15                          
   46800: D23A  mov.l  @(0x468EC),r2  ; =0x0002999C     
-  46802: 420B  jsr    @r0                                ; CALL @ 0x00000
+  46802: 420B  jsr    @r2  ; -> 0x02999C (flkc_state_flag_slot15)
   46804: 0009  nop                                     
   46806: 660C  extu.b  r0,r6                           
   46808: 2F60  mov.b  r6,@r15                          
@@ -2550,7 +2550,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4682E: D432  mov.l  @(0x468F8),r4  ; =0xFFFF3248 (FLKC_percyl_arr)
   46830: 34DC  add  r13,r4                             
   46832: D222  mov.l  @(0x468BC),r2  ; =0x000BDBCC (write_float_ptr)
-  46834: 420B  jsr    @r0                                ; CALL @ 0x00001
+  46834: 420B  jsr    @r2  ; -> 0x0BDBCC (desc_read_float_safe)
   46836: F4EC  fmov   fr14,fr4                         
   46838: 7E01  add    #1,r14                           
   4683A: 7D08  add    #8,r13                           
@@ -2608,7 +2608,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   468A2: 8011  mov.b  r0,@(1,r1)                       
   468A4: 000D  mov.w  @(r0,r0),r0                      
   468A6: 2F40  mov.b  r4,@r15                          
-  468A8: FFFF  ??fpu    ; 0xFFFF                       
+  468A8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   468AA: 81BB  mov.w  r0,@(22,r11)                     
   468AC: 000D  mov.w  @(r0,r0),r0                      
   468AE: 2F64  mov.b  r6,@-r15                         
@@ -2624,40 +2624,40 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   468C2: 5EEA  mov.l  @(40,r14),r14                      ; @0x00000029
   468C4: 000B  rts                                     
   468C6: E9A0  mov    #-96,r9                          
-  468C8: FFFF  ??fpu    ; 0xFFFF                       
+  468C8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   468CA: 3360  cmp/eq  r6,r3                           
   468CC: 000D  mov.w  @(r0,r0),r0                      
   468CE: 2F68  tst  r6,r15                             
-  468D0: FFFF  ??fpu    ; 0xFFFF                       
-  468D2: 8290  ??       ; 0x8290 (grp8)                
+  468D0: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  468D2: 8290  .word  0x8290  ; 0x8290 (grp8)
   468D4: 000D  mov.w  @(r0,r0),r0                      
   468D6: 2F50  mov.b  r5,@r15                          
   468D8: 000D  mov.w  @(r0,r0),r0                      
   468DA: 2F60  mov.b  r6,@r15                          
   468DC: 000D  mov.w  @(r0,r0),r0                      
   468DE: 2F5C  cmp/str  r5,r15                         
-  468E0: FFFF  ??fpu    ; 0xFFFF                       
-  468E2: 829E  ??       ; 0x829E (grp8)                
-  468E4: FFFF  ??fpu    ; 0xFFFF                       
+  468E0: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  468E2: 829E  .word  0x829E  ; 0x829E (grp8)
+  468E4: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   468E6: 6624  mov.b  @r2+,r6                          
-  468E8: FFFF  ??fpu    ; 0xFFFF                       
+  468E8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   468EA: 63F8  swap.b  r15,r3                          
   468EC: 0002  stc    sr,r0                       
   468EE: 999C  mov.w  @(0x46A2A),r9  ; =0x32C3         
-  468F0: FFFF  ??fpu    ; 0xFFFF                       
+  468F0: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   468F2: 65BD  extu.w  r11,r5                          
-  468F4: FFFF  ??fpu    ; 0xFFFF                       
-  468F6: 82AB  ??       ; 0x82AB (grp8)                
-  468F8: FFFF  ??fpu    ; 0xFFFF                       
+  468F4: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  468F6: 82AB  .word  0x82AB  ; 0x82AB (grp8)
+  468F8: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   468FA: 3248  sub  r4,r2                              
-  468FC: FFFF  ??fpu    ; 0xFFFF                       
+  468FC: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   468FE: 81BA  mov.w  r0,@(20,r11)                     
-  46900: FFFF  ??fpu    ; 0xFFFF                       
-  46902: 8294  ??       ; 0x8294 (grp8)                
-  46904: FFFF  ??fpu    ; 0xFFFF                       
+  46900: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  46902: 8294  .word  0x8294  ; 0x8294 (grp8)
+  46904: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
   46906: 3244  div1  r4,r2                             
-  46908: FFFF  ??fpu    ; 0xFFFF                       
-  4690A: 8299  ??       ; 0x8299 (grp8)                
+  46908: FFFF  .word  0xFFFF (INVALID-SH2E)  ; 0xFFFF
+  4690A: 8299  .word  0x8299  ; 0x8299 (grp8)
   4690C: D575  mov.l  @(0x46AE4),r5  ; =0xFFFF3360 (FLKC_percyl_result)
   4690E: 8412  mov.b  @(2,r1),r0                       
   46910: 600C  extu.b  r0,r0                           
@@ -2675,7 +2675,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   46928: D470  mov.l  @(0x46AEC),r4  ; =0x000AE2D8     
   4692A: D271  mov.l  @(0x46AF0),r2  ; =0x000BE830 (Pull3DFloat)
   4692C: D671  mov.l  @(0x46AF4),r6  ; =0xFFFF3234 (FLKC_work_bank1)
-  4692E: 420B  jsr    @r0                                ; CALL @ 0x00004
+  4692E: 420B  jsr    @r2  ; -> 0x0BE830 (table_desc_1d_float)
   46930: F468  fmov.s @r6,fr4                          
   46932: D171  mov.l  @(0x46AF8),r1  ; =0xFFFF8299     
   46934: E00B  mov    #11,r0                           
@@ -2692,14 +2692,14 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   4694A: D26C  mov.l  @(0x46AFC),r2  ; =0x000BE53C     
   4694C: 8411  mov.b  @(1,r1),r0                       
   4694E: 640C  extu.b  r0,r4                           
-  46950: 420B  jsr    @r0                                ; CALL @ 0x0000B
+  46950: 420B  jsr    @r2  ; -> 0x0BE53C (uint8_add_sat)
   46952: E501  mov    #1,r5                            
   46954: D168  mov.l  @(0x46AF8),r1  ; =0xFFFF8299     
   46956: 8011  mov.b  r0,@(1,r1)                       
   46958: D268  mov.l  @(0x46AFC),r2  ; =0x000BE53C     
   4695A: 8412  mov.b  @(2,r1),r0                       
   4695C: 640C  extu.b  r0,r4                           
-  4695E: 420B  jsr    @r0                                ; CALL @ 0x0000B
+  4695E: 420B  jsr    @r2  ; -> 0x0BE53C (uint8_add_sat)
   46960: E501  mov    #1,r5                            
   46962: D165  mov.l  @(0x46AF8),r1  ; =0xFFFF8299     
   46964: 8012  mov.b  r0,@(2,r1)                       
@@ -2727,7 +2727,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   46990: D25E  mov.l  @(0x46B0C),r2  ; =0x000BE554     
   46992: E501  mov    #1,r5                            
   46994: 6611  mov.w  @r1,r6                             ; @0xFFFF8296
-  46996: 420B  jsr    @r0                                ; CALL @ 0x0000B
+  46996: 420B  jsr    @r2  ; -> 0x0BE554 (uint16_add_sat)
   46998: 646D  extu.w  r6,r4                           
   4699A: D15A  mov.l  @(0x46B04),r1  ; =0xFFFF8296     
   4699C: 2101  mov.w  r0,@r1                             ; -> 0xFFFF8296

@@ -304,7 +304,7 @@ Purpose: Per-cylinder-event FLKC update. Handles:
     Accumulate + clamp (0x45CAA):
       fr13 += fr9                  -> accumulate step into FLKC_work_bank1
       fr4 = fr13
-      call 0x000BE970 (max_float: fr4=value, fr5=fr12 target) -> fr0=max(fr4,fr5)
+      call 0x000BE970 (min_float: fr4=value, fr5=fr12 target) -> fr0=min(fr4,fr5)
       fr13 = fr0
       r11 = 1, set @(7,r1)=1, set @(5,r1)=1  -> mark recovery active
       jump to 0x45D04
@@ -448,7 +448,7 @@ HELPER FUNCTIONS
     if fr4 >= fr6: return fr6  (clamped to upper bound)
     else: return fr4
 
-  0x000BE970  max_float(fr4, fr5) -> fr0
+  0x000BE970  min_float(fr4, fr5) -> fr0
     return max(fr4, fr5)
 
   0x000BDBCC  write_float_ptr(r4=ptr, fr4=value) -> IIR write

@@ -5,8 +5,8 @@ AE5L600L (2013 Subaru WRX MT) -- Renesas SH7058 (SH-2)
 
 CORRECTION NOTICE (2026-04-08)
 ------------------------------
-All 5 clamping call sites in this file call 0xBE960 (float_min), NOT
-0xBE970 (float_max). Lines 24, 132, 139, 146, 383, 419 describe the
+All 5 clamping call sites in this file call 0xBE960 (float_max), NOT
+0xBE970 (float_min). Lines 24, 132, 139, 146, 383, 419 describe the
 behavior as "float_max(duty - rate, 0.0)" — this is WRONG.
 The actual operation is float_min (min of two values). The ramp-down
 mechanism works because FR5 holds a stored reference value, not 0.0.
@@ -123,10 +123,11 @@ SECTION 1: TASK 51 -- BOOST/WASTEGATE TARGET CALCULATION
           FR4 = FR0 * FR14 + FR4   (fmac: multiply-accumulate)
           where FR14 = ECT factor (0.7 or 2.0 from step 3)
 
-       f) Call 0xBE960 (float_min = min(FR4, FR5)):
+       f) Call 0xBE960 (float_max = max(FR4, FR5)):
           FR4 = correction, FR5 = boost error from R12-124
-          Result = min(correction, boost_error), stored to [FFFF8B50]
-          NOTE: Previously mislabelled "float_max". BE960 = min().
+          Result = max(correction, boost_error), stored to [FFFF8B50]
+          NOTE: BE960 = float_max = max(). Corrected 2026-07-26; the
+          2026-04 note claiming "BE960 = min()" was itself wrong.
 
        g) MAF left bank error:
           FR8 = maf_voltage_left - [FFFF8B50]
@@ -193,9 +194,10 @@ SECTION 2: INTERMEDIATE FUNCTION (0x0549D4-0x0549F8)
   1. Read ignition_switch_state -> FR8
   2. Shift previous filtered value: workspace[-4] -> workspace[-8]
   3. Store new raw value: FR8 -> workspace[-4]
-  4. Call float_min (0xBE960) = min(current, previous)
+  4. Call float_max (0xBE960) = max(current, previous)
   5. Store filtered result to [FFFF8B9C]
-  NOTE: Previously mislabelled "float_max". BE960 = min().
+  NOTE: BE960 = float_max = max(). Corrected 2026-07-26; the
+  2026-04 note claiming "BE960 = min()" was itself wrong.
 
 
 ================================================================================
@@ -285,7 +287,7 @@ SECTION 5: DESCRIPTOR SUMMARY
   0xAEFF0    1D     6       RPM 0-5000           10,10,20,30,40,50      WG duty RPM scaling factor
   0xAEFFC    1D     10      Error -800 to 0      10..0 (ramp down)      Boost error correction
   0xBE830    --     --      (function)           table_desc_1d_float    Descriptor lookup utility
-  0xBE960    --     --      (function)           float_min = min(FR4,FR5)
+  0xBE960    --     --      (function)           float_max = max(FR4,FR5)
   0xBE53C    --     --      (function)           uint8_add_sat          Counter increment utility
   0xBEA40    --     --      (function)           boost_feedback_lerp    Feedback interpolation
 

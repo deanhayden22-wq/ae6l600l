@@ -253,7 +253,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x6049C:  F895  fcmp/gt FR9,FR8                              
   0x6049E:  8907  bt     0x604B0                               
   0x604A0:  F966  fmov.s @(R0,R6),FR9                          
-  0x604A2:  F89D  .word  0xF89D                                
+  0x604A2:  F89D  fldi1  fr8
   0x604A4:  F985  fcmp/gt FR8,FR9                              
   0x604A6:  8903  bt     0x604B0                               
   0x604A8:  D226  mov.l  @(0x60544),R2                         ; =0x0000D118 (ROM) [clamp_filter]
@@ -717,7 +717,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66704:  FFFF  .word  0xFFFF                                
   0x66706:  67EC  extu.b R14,R7                                
   0x66708:  000C  mov.b  @(R0,R0),R0                           
-  0x6670A:  48DC  shad   R13,R8                                
+  0x6670A:  48DC  .word  0x48DC
   0x6670C:  000C  mov.b  @(R0,R0),R0                           
   0x6670E:  50DC  mov.l  @(48,R13),R0                          
   0x66710:  000C  mov.b  @(R0,R0),R0                           
@@ -1031,7 +1031,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66978:  FFFF  .word  0xFFFF                                
   0x6697A:  7449  add    #73,R4                                
   0x6697C:  FFFF  .word  0xFFFF                                
-  0x6697E:  43FC  shad   R15,R3                                
+  0x6697E:  43FC  .word  0x43FC
   0x66980:  FFFF  .word  0xFFFF                                
   0x66982:  9354  mov.w  @(0x66A2E),R3                         ; =0xF448 (62536)
   0x66984:  FFFF  .word  0xFFFF                                
@@ -1089,7 +1089,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x669EC:  FFFF  .word  0xFFFF                                
   0x669EE:  932C  mov.w  @(0x66A4A),R3                         ; =0x8B04 (35588)
   0x669F0:  000C  mov.b  @(R0,R0),R0                           
-  0x669F2:  478C  shad   R8,R7                                 
+  0x669F2:  478C  .word  0x478C
   0x669F4:  000B  rts                                          
   0x669F6:  E53C  mov    #60,R5                                
   0x669F8:  FFFF  .word  0xFFFF                                
@@ -1423,7 +1423,7 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66C7E:  C727  mova   @(0x66D1C),R0                         
   0x66C80:  F808  fmov.s @R0,FR8                               
   0x66C82:  FE8A  fmov.s FR8,@R14                              
-  0x66C84:  F89D  .word  0xF89D                                
+  0x66C84:  F89D  fldi1  fr8
   0x66C86:  F880  fadd   FR8,FR8                               
   0x66C88:  FD8A  fmov.s FR8,@R13                              
   0x66C8A:  FEF9  fmov.s @R15+,FR14                            
@@ -1433,14 +1433,14 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66C92:  6DF6  mov.l  @R15+,R13                             
   0x66C94:  000B  rts                                          
   0x66C96:  E5D8  mov    #-40,R5                               
-  0x66C98:  37FF  .word  0x37FF                                
+  0x66C98:  37FF  addv   r15,r7
   0x66C9A:  DA40  mov.l  @(0x66D9C),R10                        ; =0x420BE501 (34.9736)
   0x66C9C:  000C  mov.b  @(R0,R0),R0                           
   0x66C9E:  5100  mov.l  @(0,R0),R1                            
   0x66CA0:  FFFF  .word  0xFFFF                                
   0x66CA2:  9334  mov.w  @(0x66D0E),R3                         ; =0x9328 (37672)
   0x66CA4:  000C  mov.b  @(R0,R0),R0                           
-  0x66CA6:  478D  shld   R8,R7                                 
+  0x66CA6:  478D  .word  0x478D
   0x66CA8:  0009  nop                                          
   0x66CAA:  ED90  mov    #-112,R13                             
   0x66CAC:  000B  rts                                          
@@ -1747,14 +1747,14 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66EE8:  644D  extu.w R4,R4                                 
   0x66EEA:  F58D  fldi0  FR5                               
   0x66EEC:  410B  jsr    @R1                                   
-  0x66EEE:  F49D  .word  0xF49D                                
+  0x66EEE:  F49D  fldi1  fr4
   0x66EF0:  FE0C  fmov   FR0,FR14                              
   0x66EF2:  66F1  mov.w  @R15,R6                               
   0x66EF4:  646D  extu.w R6,R4                                 
   0x66EF6:  D123  mov.l  @(0x66F84),R1                         ; =0x000BE598 (ROM) [table_1d_lookup]
   0x66EF8:  F58D  fldi0  FR5                               
   0x66EFA:  410B  jsr    @R1                                   
-  0x66EFC:  F49D  .word  0xF49D                                
+  0x66EFC:  F49D  fldi1  fr4
   0x66EFE:  F50C  fmov   FR0,FR5                               
   0x66F00:  D621  mov.l  @(0x66F88),R6                         ; =0x000BE628 (ROM) [interp_readiness]
   0x66F02:  460B  jsr    @R6                                   
@@ -1777,14 +1777,14 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
   0x66F24:  640D  extu.w R0,R4                                 
   0x66F26:  F58D  fldi0  FR5                               
   0x66F28:  460B  jsr    @R6                                   
-  0x66F2A:  F49D  .word  0xF49D                                
+  0x66F2A:  F49D  fldi1  fr4
   0x66F2C:  FE0C  fmov   FR0,FR14                              
   0x66F2E:  85F4  mov.w  @(8,R15),R0                           
   0x66F30:  640D  extu.w R0,R4                                 
   0x66F32:  F58D  fldi0  FR5                               
   0x66F34:  D613  mov.l  @(0x66F84),R6                         ; =0x000BE598 (ROM) [table_1d_lookup]
   0x66F36:  460B  jsr    @R6                                   
-  0x66F38:  F49D  .word  0xF49D                                
+  0x66F38:  F49D  fldi1  fr4
   0x66F3A:  F50C  fmov   FR0,FR5                               
   0x66F3C:  D212  mov.l  @(0x66F88),R2                         ; =0x000BE628 (ROM) [interp_readiness]
   0x66F3E:  420B  jsr    @R2                                   

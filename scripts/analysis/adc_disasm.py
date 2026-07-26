@@ -293,7 +293,7 @@ def decode_insn(code, pc, rom):
         if (code & 0xF0FF) == 0xF09D: return f"fldi1  fr{n}", 2
         if (code & 0xF0FF) == 0xF00D: return f"fsts   FPUL,fr{n}", 2
         if (code & 0xF0FF) == 0xF01D: return f"flds   fr{n},FPUL", 2
-        if (code & 0xF0FF) == 0xF06D: return f"fsqrt  fr{n}", 2
+        if (code & 0xF0FF) == 0xF06D: return f".INVALID_SH2E  fr{n}", 2
         return f"??fpu    ; 0x{code:04X}", 2
 
     return f"??       ; 0x{code:04X}", 2

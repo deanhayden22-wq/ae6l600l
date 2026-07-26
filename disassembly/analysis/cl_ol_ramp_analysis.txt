@@ -8,9 +8,10 @@ CORRECTION NOTICE (2026-04-07)
 Original analysis incorrectly described FFFF79E0 as a NEGATIVE decay delta.
 The table lookup produces POSITIVE values (u16 × 1/32768), no fneg exists
 in the code path, and the FILTERED_UPDATE at 0x36262 uses fadd (not fsub).
-0xBE970 is float_max (not float_min as Ghidra import previously labelled).
-The mechanism is a RAMP-UP of the OL enrichment accumulator with a floor
-clamp, not a decay. All references to "decay" have been corrected to "ramp."
+0xBE970 is float_MIN (verified from bytes 2026-07-26; both the original
+Ghidra label and the 2026-04 "correction" got this wrong).
+The mechanism is a RAMP-UP of the OL enrichment accumulator with a CEILING
+cap at the blended target, not a decay and not a floor. All references to "decay" have been corrected to "ramp."
 
 WRITE SITE
 ----------
@@ -84,18 +85,21 @@ OUTPUT (value written to FFFF79E0)
 USAGE IN FILTERED_UPDATE (0x36250-0x36270)
 --------------------------------------------
 FFFF79E0 is POSITIVE and ADDED to FFFF798C each cycle via fadd (0x36262).
-The result is clamped from below by float_max (0xBE970) against the
-blended target floor (FFFF7990):
+The result is CAPPED FROM ABOVE by float_min (0xBE970) against the
+blended target (FFFF7990) — a ceiling, not a floor. Corrected 2026-07-26:
+0xBE970 is min(), so the accumulator ramps UP and is capped at the target:
 
   0x03625A: FR4 = [FFFF798C]           ; current accumulator
   0x036260: FR8 = [FFFF79E0]           ; ramp step (POSITIVE)
   0x036262: FR4 = FR4 + FR8            ; fadd — accumulator INCREASES
-  0x036268: jsr 0xBE970                ; float_max(FR4, FR5)
-  0x03626A: FR5 = [FFFF7990]           ; delay slot: floor = blended target
-  0x036270: [FFFF798C] = FR0           ; result = max(ramped, floor)
+  0x036268: jsr 0xBE970                ; float_min(FR4, FR5)
+  0x03626A: FR5 = [FFFF7990]           ; delay slot: ceiling = blended target
+  0x036270: [FFFF798C] = FR0           ; result = min(ramped, ceiling)
 
 This ramps FFFF798C upward during the FILTERED_UPDATE path of WRITE 4.
-The max() clamp ensures FFFF798C never drops below the blended target.
+The min() clamp ensures FFFF798C never rises ABOVE the blended target —
+i.e. the accumulator climbs toward the target and stops there. This is
+physically coherent: a ramp-up that converges on its target.
 
 NOTE: OL→CL transition (FFFF798C returning to zero) appears to happen
 via DIRECT_ASSIGN (0x362F8), which snaps FFFF798C to the new target
@@ -139,6 +143,9 @@ KEY ROM ADDRESSES FOR PATCHING
 
 FUNCTION CLARIFICATION (verified from ROM bytes)
 -------------------------------------------------
-  0xBE960: float_min — returns min(FR4, FR5). Opcode F455 = fcmp/gt FR4,FR5.
-  0xBE970: float_max — returns max(FR4, FR5). Opcode F545 = fcmp/gt FR5,FR4.
-  Previous Ghidra labels had these SWAPPED (BE960="float_max", BE970="float_min").
+  0xBE960: float_max — returns max(FR4, FR5). Opcode F455 = fcmp/gt FR5,FR4.
+  0xBE970: float_min — returns min(FR4, FR5). Opcode F545 = fcmp/gt FR4,FR5.
+  NOTE: the ORIGINAL Ghidra labels (BE960="float_max", BE970="float_min")
+  were CORRECT. The 2026-04-07 "fix" swapped them to the wrong values by
+  reversing the FCMP/GT operand order; restored 2026-07-26.
+  See docs/corrections.md item 1.

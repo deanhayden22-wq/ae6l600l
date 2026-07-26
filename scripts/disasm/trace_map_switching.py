@@ -382,7 +382,7 @@ def decode_insn(code, pc):
         if lo4 == 0xD:
             mid = (code >> 4) & 0xF
             fpu_s = {0:"fsts   FPUL,",1:"flds   ",2:"float  FPUL,",3:"ftrc   ",
-                     4:"fneg   ",5:"fabs   ",6:"fsqrt  ",8:"fldi0  ",9:"fldi1  "}
+                     4:"fneg   ",5:"fabs   ",6:".INVALID_SH2E  ",8:"fldi0  ",9:"fldi1  "}
             if mid in fpu_s:
                 if mid == 1: return f"flds   fr{n},FPUL", 2
                 if mid == 3: return f"ftrc   fr{n},FPUL", 2

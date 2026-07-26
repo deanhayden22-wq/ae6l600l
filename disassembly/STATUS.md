@@ -1,7 +1,14 @@
 # AE5L600L Disassembly Status
 
-**ROM:** 2013 USDM Impreza WRX MT (Denso SH7058, SH-2 CPU)
-**Last updated:** 2026-04-03 (all priority targets complete, format standardized)
+**ROM:** 2013 USDM Impreza WRX MT (Denso SH7058, **SH-2E** core — SH-2 integer ISA + single-precision FPU)
+**Ghidra language:** `SuperH:BE:32:SH-2A` (only FPU-capable SuperH language; plain SH-2 has none)
+**Last updated:** 2026-07-26 (architecture corrected, Ghidra re-imported with FPU support)
+
+> The figures in the table below were produced under the old FPU-blind SH-2 import
+> and **understate coverage**; the function counts in particular count fragments
+> truncated at FPU instructions. See `docs/architecture.md`. Post-re-import
+> numbers: 269,378 instructions / 539,226 bytes (51.4% of ROM) / 26,933 FPU
+> instructions decoded / 4,082 functions (769 named).
 
 ---
 

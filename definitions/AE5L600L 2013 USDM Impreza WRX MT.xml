@@ -1,3 +1,38 @@
+<!--
+  ================================================================================
+  NOTE FOR ANALYSIS SESSIONS (added 2026-07-26)
+
+  THIS FILE AND 32BITBASE.xml ARE PRIMARY GROUND TRUTH. READ BOTH.
+
+  This project file supplies ADDRESSES (716 tables with address=).
+  32BITBASE.xml supplies MEANING (2117 tables: category, <description>, axis
+  names, element counts, scalings). <include>32BITBASE</include> below binds a
+  table here to the base entry OF THE SAME NAME. Reading only one file gives you
+  half the picture.
+
+  READ toexpr, NOT JUST THE NAME. The RAW stored value is frequently not the
+  displayed value:
+    * LCSPEED(MPH) has toexpr="x*.621"  =>  raw is KM/H, display is MPH.
+      Raw 8.0515 displays as 5 mph.
+    * TWO TABLES CAN SHARE ONE ADDRESS with different scalings — e.g.
+      "LC disable speed(KMH)threshold" and "(MPH)" are both at f104c.
+      Two names does not mean two values.
+    * LoadGRev is declared max="5" g/rev, which alone rules out reading 8.05
+      as a load value.
+
+  WHY THIS WARNING EXISTS: these files were under-used, and ROM-byte
+  archaeology was done to answer questions the definitions already answered.
+  Worse, 0xFFFF65FC was labelled "engine_load_current" throughout the
+  disassembly when it is vehicle speed in km/h — consulting the scalings here
+  would have caught it. See docs/corrections.md item 8.
+
+  Engine load appears exactly ONCE as a threshold in the tinywrex patch set:
+  c0bcc, "Boost disable during fuel cut-Load threshold", scaling
+  EngineLoad(g/rev). Use it as the reference for what a load value looks like.
+
+  Correctness flags per area: docs/verification-status.md
+  ================================================================================
+-->
 <rom>
 	<romid>
 		<xmlid>AE5L600L</xmlid>

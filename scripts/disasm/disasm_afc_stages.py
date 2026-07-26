@@ -89,7 +89,7 @@ STAGES_HELPERS = [
     {"name": "per_cyl_helper_37E96", "addr": 0x37E96, "max_len": 512},
     {"name": "per_cyl_helper_37F62", "addr": 0x37F62, "max_len": 256},
     {"name": "per_cyl_helper_37F9A", "addr": 0x37F9A, "max_len": 512},
-    {"name": "float_util_BE960",     "addr": 0xBE960, "max_len": 256},
+    {"name": "float_max",            "addr": 0xBE960, "max_len": 256},
 ]
 
 # Known RAM labels
@@ -213,7 +213,7 @@ KNOWN_SUBS = {
     0x9E4A:  "injector_dead_time_store",
     0xBE830: "table_lookup_1D",
     0xBEA40: "clamp_blend",
-    0xBE970: "rate_limit_interp",
+    0xBE970: "float_min",
     0xBE56C: "float_clamp_apply",
     0xBEAB0: "table_lookup_err_scale",
     0xBDBCC: "cyl_injection_cb (per-cyl injection trigger)",
@@ -229,7 +229,7 @@ KNOWN_SUBS = {
     0xBE554: "float_util_554",
     0xBE598: "float_util_598",
     0x9A007: "sub_9A007",
-    0xBE960: "float_min",
+    0xBE960: "float_max",
     0x317C:  "raise_ipl",
     0x3190:  "injector_output_gate",
     0x3664:  "mtu_write_gate",

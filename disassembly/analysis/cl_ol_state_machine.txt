@@ -68,7 +68,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 ==============================================================================
   0x03580C:  2FE6    mov.l R14,@-R15
   0x03580E:  4F22    sts.l PR,@-R15
-  0x035810:  4F13    .word 0x4F13
+  0x035810:  4F13    stc.l  gbr,@-r15
   0x035812:  D076    mov.l @(0x0359EC),R0  ; =0xFFFF7954  (RAM 7954)
   0x035814:  401E    ldc R0,GBR  ; GBR = 0xFFFF7954
   0x035816:  C432    mov.b @(50,GBR),R0  ; <- RAM 0xFFFF7986
@@ -136,7 +136,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x035892:  420B    jsr @R2  ; -> 0x000BE53C
   0x035894:  E501    mov #1,R5
   0x035896:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF7986
-  0x035898:  4F17    .word 0x4F17
+  0x035898:  4F17    ldc.l  @r15+,gbr
   0x03589A:  4F26    lds.l @R15+,PR
   0x03589C:  A2E2    bra 0x035E64
   0x03589E:  6EF6    mov.l @R15+,R14
@@ -237,7 +237,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x03604C:  E0A4    mov #-92,R0
   0x03604E:  F687    fmov.s FR8,@(R0,R6)
   0x036050:  E000    mov #0,R0
-  0x036052:  8062    mov.b R0,@(98,R6)
+  0x036052:  8062    mov.b  r0,@(2,r6)
   0x036054:  4F26    lds.l @R15+,PR
   0x036056:  000B    rts
   0x036058:  0009    nop
@@ -270,7 +270,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036074:  FFDB    fmov.s FR13,@-R15
   0x036076:  FFEB    fmov.s FR14,@-R15
   0x036078:  FFFB    fmov.s FR15,@-R15
-  0x03607A:  4F13    .word 0x4F13
+  0x03607A:  4F13    stc.l  gbr,@-r15
   0x03607C:  D082    mov.l @(0x036288),R0  ; =0xFFFF798C  (RAM 798C)
   0x03607E:  401E    ldc R0,GBR  ; GBR = 0xFFFF798C
   0x036080:  7FD4    add #-44,R15
@@ -537,7 +537,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x03684C:  FFCB    fmov.s FR12,@-R15
   0x03684E:  FFEB    fmov.s FR14,@-R15
   0x036850:  FFFB    fmov.s FR15,@-R15
-  0x036852:  4F13    .word 0x4F13
+  0x036852:  4F13    stc.l  gbr,@-r15
   0x036854:  D06F    mov.l @(0x036A14),R0  ; =0xFFFF798C  (RAM 798C)
   0x036856:  401E    ldc R0,GBR  ; GBR = 0xFFFF798C
   0x036858:  7FFC    add #-4,R15
@@ -666,7 +666,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x03694E:  E0B0    mov #-80,R0
   0x036950:  FD07    fmov.s FR0,@(R0,R13)
   0x036952:  7F04    add #4,R15
-  0x036954:  4F17    .word 0x4F17
+  0x036954:  4F17    ldc.l  @r15+,gbr
   0x036956:  FFF9    fmov.s @R15+,FR15
   0x036958:  FEF9    fmov.s @R15+,FR14
   0x03695A:  FCF9    fmov.s @R15+,FR12
@@ -702,7 +702,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x03697C:  FFCB    fmov.s FR12,@-R15
   0x03697E:  FFEB    fmov.s FR14,@-R15
   0x036980:  FFFB    fmov.s FR15,@-R15
-  0x036982:  4F13    .word 0x4F13
+  0x036982:  4F13    stc.l  gbr,@-r15
   0x036984:  D03C    mov.l @(0x036A78),R0  ; =0xFFFF79CC  (RAM 79CC)
   0x036986:  401E    ldc R0,GBR  ; GBR = 0xFFFF79CC
   0x036988:  D223    mov.l @(0x036A18),R2  ; =0xFFFF6624  (RAM 6624)
@@ -766,7 +766,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x0369FC:  E201    mov #1,R2
   0x0369FE:  E200    mov #0,R2
   0x036A00:  6023    mov R2,R0
-  0x036A02:  4F17    .word 0x4F17
+  0x036A02:  4F17    ldc.l  @r15+,gbr
   0x036A04:  FFF9    fmov.s @R15+,FR15
   0x036A06:  FEF9    fmov.s @R15+,FR14
   0x036A08:  FCF9    fmov.s @R15+,FR12
@@ -793,35 +793,35 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036A32:  E608    mov #8,R6
   0x036A34:  3800    cmp/eq R0,R8
   0x036A36:  0000    .word 0x0000
-  0x036A38:  000A    .word 0x000A
+  0x036A38:  000A    sts    mach,r0
   0x036A3A:  D960    mov.l @(0x036BBC),R9  ; =0x00022CF4  (ROM @0x022CF4)
   0x036A3C:  000B    rts
   0x036A3E:  E8E4    mov #-28,R8
-  0x036A40:  000A    .word 0x000A
+  0x036A40:  000A    sts    mach,r0
   0x036A42:  C5F8    mov.w @(496,GBR),R0  ; <- RAM 0xFFFF7BBC
-  0x036A44:  000A    .word 0x000A
+  0x036A44:  000A    sts    mach,r0
   0x036A46:  D97C    mov.l @(0x036C38),R9  ; =0xA0040009
-  0x036A48:  000A    .word 0x000A
+  0x036A48:  000A    sts    mach,r0
   0x036A4A:  C60C    mov.l @(48,GBR),R0  ; <- RAM 0xFFFF79FC
   0x036A4C:  000B    rts
   0x036A4E:  E830    mov #48,R8
   0x036A50:  000C    mov.b @(R0,R0),R0
   0x036A52:  C224    mov.l R0,@(144,GBR)  ; -> RAM 0xFFFF7A5C
-  0x036A54:  000A    .word 0x000A
+  0x036A54:  000A    sts    mach,r0
   0x036A56:  D998    mov.l @(0x036CB8),R9  ; =0x89006271
   0x036A58:  000B    rts
   0x036A5A:  EAB0    mov #-80,R10
-  0x036A5C:  000A    .word 0x000A
+  0x036A5C:  000A    sts    mach,r0
   0x036A5E:  D9B4    mov.l @(0x036D30),R9  ; =0x420B2F00  (float: 34.795898)
   0x036A60:  000B    rts
   0x036A62:  EA40    mov #64,R10
   0x036A64:  3CBB    subv R11,R12
   0x036A66:  8000    mov.b R0,@(0,R0)
-  0x036A68:  000A    .word 0x000A
+  0x036A68:  000A    sts    mach,r0
   0x036A6A:  D9D0    mov.l @(0x036DAC),R9  ; =0xF828D228
   0x036A6C:  FFFF    fpu_0xFFFF
   0x036A6E:  6350    mov.b @R5,R3
-  0x036A70:  000A    .word 0x000A
+  0x036A70:  000A    sts    mach,r0
   0x036A72:  D0DC    mov.l @(0x036DE4),R0  ; =0x000CC234  (CAL @0x0CC234)
   0x036A74:  FFFF    fpu_0xFFFF
   0x036A76:  79A0    add #-96,R9
@@ -831,11 +831,11 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036A7E:  62DC    extu.b R13,R2
   0x036A80:  FFFF    fpu_0xFFFF
   0x036A82:  7348    add #72,R3
-  0x036A84:  000A    .word 0x000A
+  0x036A84:  000A    sts    mach,r0
   0x036A86:  C5BC    mov.w @(376,GBR),R0  ; <- RAM 0xFFFF7B44
   0x036A88:  FFFF    fpu_0xFFFF
   0x036A8A:  79FC    add #-4,R9
-  0x036A8C:  000A    .word 0x000A
+  0x036A8C:  000A    sts    mach,r0
   0x036A8E:  D0A4    mov.l @(0x036D20),R0  ; =0xD6386D61
   0x036A90:  000C    mov.b @(R0,R0),R0
   0x036A92:  C178    mov.w R0,@(240,GBR)  ; -> RAM 0xFFFF7ABC
@@ -849,13 +849,13 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
 ==============================================================================
   0x036A98:  E000    mov #0,R0
   0x036A9A:  D544    mov.l @(0x036BAC),R5  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036A9C:  8054    mov.b R0,@(84,R5)
-  0x036A9E:  8454    mov.b @(84,R5),R0
+  0x036A9C:  8054    mov.b  r0,@(4,r5)
+  0x036A9E:  8454    mov.b  @(4,r5),r0
   0x036AA0:  2500    mov.b R0,@R5
   0x036AA2:  D643    mov.l @(0x036BB0),R6  ; =0xFFFF65C0  (RAM 65C0)
   0x036AA4:  6060    mov.b @R6,R0
   0x036AA6:  000B    rts
-  0x036AA8:  8055    mov.b R0,@(85,R5)
+  0x036AA8:  8055    mov.b  r0,@(5,r5)
   0x036AAA:  A002    bra 0x036AB2
   0x036AAC:  0009    nop
   0x036AAE:  A04B    bra 0x036B48
@@ -887,27 +887,27 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036AD6:  3252    cmp/hs R5,R2
   0x036AD8:  8B08    bf 0x036AEC
   0x036ADA:  D134    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036ADC:  8415    mov.b @(21,R1),R0
+  0x036ADC:  8415    mov.b  @(5,r1),r0
   0x036ADE:  8801    cmp/eq #1,R0
   0x036AE0:  8B07    bf 0x036AF2
   0x036AE2:  2DD8    tst R13,R13
   0x036AE4:  8B05    bf 0x036AF2
   0x036AE6:  E001    mov #1,R0
   0x036AE8:  A003    bra 0x036AF2
-  0x036AEA:  8016    mov.b R0,@(22,R1)
+  0x036AEA:  8016    mov.b  r0,@(6,r1)
   0x036AEC:  E000    mov #0,R0
   0x036AEE:  D12F    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036AF0:  8016    mov.b R0,@(22,R1)
+  0x036AF0:  8016    mov.b  r0,@(6,r1)
   0x036AF2:  2DD8    tst R13,R13
   0x036AF4:  8F06    bf/s 0x036B04
   0x036AF6:  E000    mov #0,R0
   0x036AF8:  D233    mov.l @(0x036BC8),R2  ; =0x000BE554  (ROM @0x0BE554)
   0x036AFA:  E501    mov #1,R5
-  0x036AFC:  8511    mov.w @(34,R1),R0
+  0x036AFC:  8511    mov.w  @(2,r1),r0
   0x036AFE:  420B    jsr @R2  ; -> 0x000BE554
   0x036B00:  640D    extu.w R0,R4
   0x036B02:  D12A    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036B04:  8111    mov.w R0,@(34,R1)
+  0x036B04:  8111    mov.w  r0,@(2,r1)
   0x036B06:  66F0    mov.b @R15,R6
   0x036B08:  2668    tst R6,R6
   0x036B0A:  8B13    bf 0x036B34
@@ -917,10 +917,10 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036B12:  8B0F    bf 0x036B34
   0x036B14:  2DD8    tst R13,R13
   0x036B16:  8B0D    bf 0x036B34
-  0x036B18:  8416    mov.b @(22,R1),R0
+  0x036B18:  8416    mov.b  @(6,r1),r0
   0x036B1A:  8801    cmp/eq #1,R0
   0x036B1C:  8B0A    bf 0x036B34
-  0x036B1E:  8511    mov.w @(34,R1),R0
+  0x036B1E:  8511    mov.w  @(2,r1),r0
   0x036B20:  D52B    mov.l @(0x036BD0),R5  ; =0x000CBC68  (CAL @0x0CBC68)
   0x036B22:  6251    mov.w @R5,R2
   0x036B24:  3022    cmp/hs R2,R0
@@ -934,7 +934,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036B34:  E200    mov #0,R2
   0x036B36:  2120    mov.b R2,@R1
   0x036B38:  60D3    mov R13,R0
-  0x036B3A:  8015    mov.b R0,@(21,R1)
+  0x036B3A:  8015    mov.b  r0,@(5,r1)
   0x036B3C:  7F04    add #4,R15
   0x036B3E:  FFF9    fmov.s @R15+,FR15
   0x036B40:  FEF9    fmov.s @R15+,FR14
@@ -946,7 +946,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036B4C:  D222    mov.l @(0x036BD8),R2  ; =0xFFFF6350  (RAM 6350)
   0x036B4E:  F428    fmov.s @R2,FR4
   0x036B50:  DE16    mov.l @(0x036BAC),R14  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036B52:  84E4    mov.b @(228,R14),R0
+  0x036B52:  84E4    mov.b  @(4,r14),r0
   0x036B54:  2008    tst R0,R0
   0x036B56:  8B09    bf 0x036B6C
   0x036B58:  60E0    mov.b @R14,R0
@@ -987,7 +987,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036B9E:  E0FC    mov #-4,R0
   0x036BA0:  FE57    fmov.s FR5,@(R0,R14)
   0x036BA2:  60E0    mov.b @R14,R0
-  0x036BA4:  80E4    mov.b R0,@(228,R14)
+  0x036BA4:  80E4    mov.b  r0,@(4,r14)
   0x036BA6:  4F26    lds.l @R15+,PR
   0x036BA8:  000B    rts
   0x036BAA:  6EF6    mov.l @R15+,R14
@@ -1015,7 +1015,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036BD6:  C22C    mov.l R0,@(176,GBR)
   0x036BD8:  FFFF    fpu_0xFFFF
   0x036BDA:  6350    mov.b @R5,R3
-  0x036BDC:  000A    .word 0x000A
+  0x036BDC:  000A    sts    mach,r0
   0x036BDE:  C620    mov.l @(128,GBR),R0
   0x036BE0:  000B    rts
   0x036BE2:  E830    mov #48,R8
@@ -1038,7 +1038,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036B4C:  D222    mov.l @(0x036BD8),R2  ; =0xFFFF6350  (RAM 6350)
   0x036B4E:  F428    fmov.s @R2,FR4
   0x036B50:  DE16    mov.l @(0x036BAC),R14  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036B52:  84E4    mov.b @(228,R14),R0
+  0x036B52:  84E4    mov.b  @(4,r14),r0
   0x036B54:  2008    tst R0,R0
   0x036B56:  8B09    bf 0x036B6C
   0x036B58:  60E0    mov.b @R14,R0
@@ -1079,7 +1079,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036B9E:  E0FC    mov #-4,R0
   0x036BA0:  FE57    fmov.s FR5,@(R0,R14)
   0x036BA2:  60E0    mov.b @R14,R0
-  0x036BA4:  80E4    mov.b R0,@(228,R14)
+  0x036BA4:  80E4    mov.b  r0,@(4,r14)
   0x036BA6:  4F26    lds.l @R15+,PR
   0x036BA8:  000B    rts
   0x036BAA:  6EF6    mov.l @R15+,R14
@@ -1107,7 +1107,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036BD6:  C22C    mov.l R0,@(176,GBR)
   0x036BD8:  FFFF    fpu_0xFFFF
   0x036BDA:  6350    mov.b @R5,R3
-  0x036BDC:  000A    .word 0x000A
+  0x036BDC:  000A    sts    mach,r0
   0x036BDE:  C620    mov.l @(128,GBR),R0
   0x036BE0:  000B    rts
   0x036BE2:  E830    mov #48,R8
@@ -1190,10 +1190,10 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036C70:  0009    nop
   0x036C72:  D269    mov.l @(0x036E18),R2  ; =0x00021DAE  (ROM @0x021DAE)
   0x036C74:  420B    jsr @R2  ; -> 0x00021DAE
-  0x036C76:  80F4    mov.b R0,@(244,R15)
-  0x036C78:  84F4    mov.b @(244,R15),R0
+  0x036C76:  80F4    mov.b  r0,@(4,r15)
+  0x036C78:  84F4    mov.b  @(4,r15),r0
   0x036C7A:  8802    cmp/eq #2,R0
-  0x036C7C:  0D29    .word 0x0D29
+  0x036C7C:  0D29    movt   r13
   0x036C7E:  60E3    mov R14,R0
   0x036C80:  8801    cmp/eq #1,R0
   0x036C82:  8926    bt 0x036CD2
@@ -1290,13 +1290,13 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036D38:  0009    nop
   0x036D3A:  D242    mov.l @(0x036E44),R2  ; =0x00029818  (ROM @0x029818)
   0x036D3C:  420B    jsr @R2  ; -> 0x00029818
-  0x036D3E:  80F4    mov.b R0,@(244,R15)
+  0x036D3E:  80F4    mov.b  r0,@(4,r15)
   0x036D40:  66F0    mov.b @R15,R6
   0x036D42:  2668    tst R6,R6
-  0x036D44:  0429    .word 0x0429
-  0x036D46:  84F4    mov.b @(244,R15),R0
+  0x036D44:  0429    movt   r4
+  0x036D46:  84F4    mov.b  @(4,r15),r0
   0x036D48:  2008    tst R0,R0
-  0x036D4A:  0529    .word 0x0529
+  0x036D4A:  0529    movt   r5
   0x036D4C:  D63E    mov.l @(0x036E48),R6  ; =0xFFFF7C18  (RAM 7C18)
   0x036D4E:  6060    mov.b @R6,R0
   0x036D50:  8801    cmp/eq #1,R0
@@ -1412,7 +1412,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036E2C:  000C    mov.b @(R0,R0),R0
   0x036E2E:  BC6A    bsr 0x036706
   0x036E30:  FFFF    fpu_0xFFFF
-  0x036E32:  85D7    mov.w @(430,R13),R0
+  0x036E32:  85D7    mov.w  @(14,r13),r0
   0x036E34:  000C    mov.b @(R0,R0),R0
   0x036E36:  BC6E    bsr 0x036716
   0x036E38:  000C    mov.b @(R0,R0),R0
@@ -1420,9 +1420,9 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036E3C:  000B    rts
   0x036E3E:  E970    mov #112,R9
   0x036E40:  0002    stc SR,R0
-  0x036E42:  9808    mov.w @(0x036E54),R8  ; =0x000C (12)
+  0x036E42:  9808    mov.w  @(0x036E56),r8  ; =0x000C (12)
   0x036E44:  0002    stc SR,R0
-  0x036E46:  9818    mov.w @(0x036E78),R8  ; =0xD285 (53893)
+  0x036E46:  9818    mov.w  @(0x036E7A),r8  ; =0xD285 (53893)
   0x036E48:  FFFF    fpu_0xFFFF
   0x036E4A:  7C18    add #24,R12
   0x036E4C:  000C    mov.b @(R0,R0),R0
@@ -1466,7 +1466,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036E8A:  4F22    sts.l PR,@-R15
   0x036E8C:  FFEB    fmov.s FR14,@-R15
   0x036E8E:  FFFB    fmov.s FR15,@-R15
-  0x036E90:  4F13    .word 0x4F13
+  0x036E90:  4F13    stc.l  gbr,@-r15
   0x036E92:  D080    mov.l @(0x037094),R0  ; =0xFFFF7A20  (RAM 7A20)
   0x036E94:  401E    ldc R0,GBR  ; GBR = 0xFFFF7A20
   0x036E96:  7FF4    add #-12,R15
@@ -1490,7 +1490,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036EBA:  D27D    mov.l @(0x0370B0),R2  ; =0x00029AA0  (ROM @0x029AA0)
   0x036EBC:  420B    jsr @R2  ; -> 0x00029AA0
   0x036EBE:  2F00    mov.b R0,@R15
-  0x036EC0:  80F4    mov.b R0,@(244,R15)
+  0x036EC0:  80F4    mov.b  r0,@(4,r15)
   0x036EC2:  C408    mov.b @(8,GBR),R0  ; <- RAM 0xFFFF7A28
   0x036EC4:  D26F    mov.l @(0x037084),R2  ; =0x00022CF4  (ROM @0x022CF4)
   0x036EC6:  420B    jsr @R2  ; -> 0x00022CF4
@@ -1524,7 +1524,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036EFE:  C41C    mov.b @(28,GBR),R0  ; <- RAM 0xFFFF7A3C
   0x036F00:  8801    cmp/eq #1,R0
   0x036F02:  8902    bt 0x036F0A
-  0x036F04:  84F4    mov.b @(244,R15),R0
+  0x036F04:  84F4    mov.b  @(4,r15),r0
   0x036F06:  8802    cmp/eq #2,R0
   0x036F08:  8B27    bf 0x036F5A
   0x036F0A:  C41E    mov.b @(30,GBR),R0  ; <- RAM 0xFFFF7A3E
@@ -1574,7 +1574,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036F62:  E0E4    mov #-28,R0
   0x036F64:  F187    fmov.s FR8,@(R0,R1)
   0x036F66:  7F0C    add #12,R15
-  0x036F68:  4F17    .word 0x4F17
+  0x036F68:  4F17    ldc.l  @r15+,gbr
   0x036F6A:  FFF9    fmov.s @R15+,FR15
   0x036F6C:  FEF9    fmov.s @R15+,FR14
   0x036F6E:  4F26    lds.l @R15+,PR
@@ -1582,7 +1582,7 @@ PART 1: COMPLETE DISASSEMBLY OF ALL CL/OL STATE MACHINE FUNCTIONS
   0x036F72:  000B    rts
   0x036F74:  6DF6    mov.l @R15+,R13
   0x036F76:  4F22    sts.l PR,@-R15
-  0x036F78:  4F13    .word 0x4F13
+  0x036F78:  4F13    stc.l  gbr,@-r15
   0x036F7A:  D055    mov.l @(0x0370D0),R0  ; =0xFFFF7A24  (RAM 7A24)
   0x036F7C:  401E    ldc R0,GBR  ; GBR = 0xFFFF7A24
   0x036F7E:  7FF8    add #-8,R15
@@ -1616,7 +1616,7 @@ EXTENDED DISASSEMBLY: clol_transition_core — Full transition core
 ==============================================================================
   0x03580C:  2FE6    mov.l R14,@-R15
   0x03580E:  4F22    sts.l PR,@-R15
-  0x035810:  4F13    .word 0x4F13
+  0x035810:  4F13    stc.l  gbr,@-r15
   0x035812:  D076    mov.l @(0x0359EC),R0  ; =0xFFFF7954  (RAM 7954)
   0x035814:  401E    ldc R0,GBR  ; GBR = 0xFFFF7954
   0x035816:  C432    mov.b @(50,GBR),R0  ; <- RAM 0xFFFF7986
@@ -1684,7 +1684,7 @@ EXTENDED DISASSEMBLY: clol_transition_core — Full transition core
   0x035892:  420B    jsr @R2  ; -> 0x000BE53C
   0x035894:  E501    mov #1,R5
   0x035896:  C032    mov.b R0,@(50,GBR)  ; -> RAM 0xFFFF7986
-  0x035898:  4F17    .word 0x4F17
+  0x035898:  4F17    ldc.l  @r15+,gbr
   0x03589A:  4F26    lds.l @R15+,PR
   0x03589C:  A2E2    bra 0x035E64
   0x03589E:  6EF6    mov.l @R15+,R14
@@ -1794,7 +1794,7 @@ EXTENDED DISASSEMBLY: clol_transition_core — Full transition core
   0x03596E:  F828    fmov.s @R2,FR8
   0x035970:  F895    fcmp/gt FR9,FR8
   0x035972:  8B0F    bf 0x035994
-  0x035974:  8457    mov.b @(87,R5),R0
+  0x035974:  8457    mov.b  @(7,r5),r0
   0x035976:  2008    tst R0,R0
   0x035978:  8B0C    bf 0x035994
   0x03597A:  D240    mov.l @(0x035A7C),R2  ; =0x000CC12C  (CAL @0x0CC12C)
@@ -1963,7 +1963,7 @@ EXTENDED: Full flow from ol_enrichment_dispatch through end of condition checkin
   0x036074:  FFDB    fmov.s FR13,@-R15
   0x036076:  FFEB    fmov.s FR14,@-R15
   0x036078:  FFFB    fmov.s FR15,@-R15
-  0x03607A:  4F13    .word 0x4F13
+  0x03607A:  4F13    stc.l  gbr,@-r15
   0x03607C:  D082    mov.l @(0x036288),R0  ; =0xFFFF798C  (RAM 798C)
   0x03607E:  401E    ldc R0,GBR  ; GBR = 0xFFFF798C
   0x036080:  7FD4    add #-44,R15
@@ -2411,7 +2411,7 @@ EXTENDED: Full flow from ol_enrichment_dispatch through end of condition checkin
   0x036444:  FFDB    fmov.s FR13,@-R15
   0x036446:  FFEB    fmov.s FR14,@-R15
   0x036448:  FFFB    fmov.s FR15,@-R15
-  0x03644A:  4F13    .word 0x4F13
+  0x03644A:  4F13    stc.l  gbr,@-r15
   0x03644C:  D041    mov.l @(0x036554),R0  ; =0xFFFF79A4  (RAM 79A4)
   0x03644E:  401E    ldc R0,GBR  ; GBR = 0xFFFF79A4
   0x036450:  7FD4    add #-44,R15
@@ -2780,7 +2780,7 @@ EXTENDED: Full flow from ol_enrichment_dispatch through end of condition checkin
 ==============================================================================
   0x036830:  C023    mov.b R0,@(35,GBR)  ; -> RAM 0xFFFF79C7
   0x036832:  7F2C    add #44,R15
-  0x036834:  4F17    .word 0x4F17
+  0x036834:  4F17    ldc.l  @r15+,gbr
   0x036836:  FFF9    fmov.s @R15+,FR15
   0x036838:  FEF9    fmov.s @R15+,FR14
   0x03683A:  FDF9    fmov.s @R15+,FR13
@@ -2795,7 +2795,7 @@ EXTENDED: Full flow from ol_enrichment_dispatch through end of condition checkin
   0x03684C:  FFCB    fmov.s FR12,@-R15
   0x03684E:  FFEB    fmov.s FR14,@-R15
   0x036850:  FFFB    fmov.s FR15,@-R15
-  0x036852:  4F13    .word 0x4F13
+  0x036852:  4F13    stc.l  gbr,@-r15
   0x036854:  D06F    mov.l @(0x036A14),R0  ; =0xFFFF798C  (RAM 798C)
   0x036856:  401E    ldc R0,GBR  ; GBR = 0xFFFF798C
   0x036858:  7FFC    add #-4,R15
@@ -2924,7 +2924,7 @@ EXTENDED: Full flow from ol_enrichment_dispatch through end of condition checkin
   0x03694E:  E0B0    mov #-80,R0
   0x036950:  FD07    fmov.s FR0,@(R0,R13)
   0x036952:  7F04    add #4,R15
-  0x036954:  4F17    .word 0x4F17
+  0x036954:  4F17    ldc.l  @r15+,gbr
   0x036956:  FFF9    fmov.s @R15+,FR15
   0x036958:  FEF9    fmov.s @R15+,FR14
   0x03695A:  FCF9    fmov.s @R15+,FR12
@@ -2947,7 +2947,7 @@ EXTENDED: Full flow from ol_enrichment_dispatch through end of condition checkin
   0x03697C:  FFCB    fmov.s FR12,@-R15
   0x03697E:  FFEB    fmov.s FR14,@-R15
   0x036980:  FFFB    fmov.s FR15,@-R15
-  0x036982:  4F13    .word 0x4F13
+  0x036982:  4F13    stc.l  gbr,@-r15
   0x036984:  D03C    mov.l @(0x036A78),R0  ; =0xFFFF79CC  (RAM 79CC)
   0x036986:  401E    ldc R0,GBR  ; GBR = 0xFFFF79CC
   0x036988:  D223    mov.l @(0x036A18),R2  ; =0xFFFF6624  (RAM 6624)
@@ -3011,7 +3011,7 @@ EXTENDED: Full flow from ol_enrichment_dispatch through end of condition checkin
   0x0369FC:  E201    mov #1,R2
   0x0369FE:  E200    mov #0,R2
   0x036A00:  6023    mov R2,R0
-  0x036A02:  4F17    .word 0x4F17
+  0x036A02:  4F17    ldc.l  @r15+,gbr
   0x036A04:  FFF9    fmov.s @R15+,FR15
   0x036A06:  FEF9    fmov.s @R15+,FR14
   0x036A08:  FCF9    fmov.s @R15+,FR12
@@ -3229,7 +3229,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x03682E:  E000    mov #0,R0
   0x036830:  C023    mov.b R0,@(35,GBR)  ; -> RAM 0xFFFF79C7
   0x036832:  7F2C    add #44,R15
-  0x036834:  4F17    .word 0x4F17
+  0x036834:  4F17    ldc.l  @r15+,gbr
   0x036836:  FFF9    fmov.s @R15+,FR15
   0x036838:  FEF9    fmov.s @R15+,FR14
   0x03683A:  FDF9    fmov.s @R15+,FR13
@@ -3252,13 +3252,13 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
 ==============================================================================
   0x036A98:  E000    mov #0,R0
   0x036A9A:  D544    mov.l @(0x036BAC),R5  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036A9C:  8054    mov.b R0,@(84,R5)
-  0x036A9E:  8454    mov.b @(84,R5),R0
+  0x036A9C:  8054    mov.b  r0,@(4,r5)
+  0x036A9E:  8454    mov.b  @(4,r5),r0
   0x036AA0:  2500    mov.b R0,@R5
   0x036AA2:  D643    mov.l @(0x036BB0),R6  ; =0xFFFF65C0  (RAM 65C0)
   0x036AA4:  6060    mov.b @R6,R0
   0x036AA6:  000B    rts
-  0x036AA8:  8055    mov.b R0,@(85,R5)
+  0x036AA8:  8055    mov.b  r0,@(5,r5)
   0x036AAA:  A002    bra 0x036AB2
   0x036AAC:  0009    nop
   0x036AAE:  A04B    bra 0x036B48
@@ -3284,27 +3284,27 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036AD6:  3252    cmp/hs R5,R2
   0x036AD8:  8B08    bf 0x036AEC
   0x036ADA:  D134    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036ADC:  8415    mov.b @(21,R1),R0
+  0x036ADC:  8415    mov.b  @(5,r1),r0
   0x036ADE:  8801    cmp/eq #1,R0
   0x036AE0:  8B07    bf 0x036AF2
   0x036AE2:  2DD8    tst R13,R13
   0x036AE4:  8B05    bf 0x036AF2
   0x036AE6:  E001    mov #1,R0
   0x036AE8:  A003    bra 0x036AF2
-  0x036AEA:  8016    mov.b R0,@(22,R1)
+  0x036AEA:  8016    mov.b  r0,@(6,r1)
   0x036AEC:  E000    mov #0,R0
   0x036AEE:  D12F    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036AF0:  8016    mov.b R0,@(22,R1)
+  0x036AF0:  8016    mov.b  r0,@(6,r1)
   0x036AF2:  2DD8    tst R13,R13
   0x036AF4:  8F06    bf/s 0x036B04
   0x036AF6:  E000    mov #0,R0
   0x036AF8:  D233    mov.l @(0x036BC8),R2  ; =0x000BE554  (ROM @0x0BE554)
   0x036AFA:  E501    mov #1,R5
-  0x036AFC:  8511    mov.w @(34,R1),R0
+  0x036AFC:  8511    mov.w  @(2,r1),r0
   0x036AFE:  420B    jsr @R2  ; -> 0x000BE554
   0x036B00:  640D    extu.w R0,R4
   0x036B02:  D12A    mov.l @(0x036BAC),R1  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036B04:  8111    mov.w R0,@(34,R1)
+  0x036B04:  8111    mov.w  r0,@(2,r1)
   0x036B06:  66F0    mov.b @R15,R6
   0x036B08:  2668    tst R6,R6
   0x036B0A:  8B13    bf 0x036B34
@@ -3314,10 +3314,10 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036B12:  8B0F    bf 0x036B34
   0x036B14:  2DD8    tst R13,R13
   0x036B16:  8B0D    bf 0x036B34
-  0x036B18:  8416    mov.b @(22,R1),R0
+  0x036B18:  8416    mov.b  @(6,r1),r0
   0x036B1A:  8801    cmp/eq #1,R0
   0x036B1C:  8B0A    bf 0x036B34
-  0x036B1E:  8511    mov.w @(34,R1),R0
+  0x036B1E:  8511    mov.w  @(2,r1),r0
   0x036B20:  D52B    mov.l @(0x036BD0),R5  ; =0x000CBC68  (CAL @0x0CBC68)
   0x036B22:  6251    mov.w @R5,R2
   0x036B24:  3022    cmp/hs R2,R0
@@ -3331,7 +3331,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036B34:  E200    mov #0,R2
   0x036B36:  2120    mov.b R2,@R1
   0x036B38:  60D3    mov R13,R0
-  0x036B3A:  8015    mov.b R0,@(21,R1)
+  0x036B3A:  8015    mov.b  r0,@(5,r1)
   0x036B3C:  7F04    add #4,R15
   0x036B3E:  FFF9    fmov.s @R15+,FR15
   0x036B40:  FEF9    fmov.s @R15+,FR14
@@ -3343,7 +3343,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036B4C:  D222    mov.l @(0x036BD8),R2  ; =0xFFFF6350  (RAM 6350)
   0x036B4E:  F428    fmov.s @R2,FR4
   0x036B50:  DE16    mov.l @(0x036BAC),R14  ; =0xFFFF7A0C  (RAM 7A0C)
-  0x036B52:  84E4    mov.b @(228,R14),R0
+  0x036B52:  84E4    mov.b  @(4,r14),r0
   0x036B54:  2008    tst R0,R0
   0x036B56:  8B09    bf 0x036B6C
   0x036B58:  60E0    mov.b @R14,R0
@@ -3384,7 +3384,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036B9E:  E0FC    mov #-4,R0
   0x036BA0:  FE57    fmov.s FR5,@(R0,R14)
   0x036BA2:  60E0    mov.b @R14,R0
-  0x036BA4:  80E4    mov.b R0,@(228,R14)
+  0x036BA4:  80E4    mov.b  r0,@(4,r14)
   0x036BA6:  4F26    lds.l @R15+,PR
   0x036BA8:  000B    rts
   0x036BAA:  6EF6    mov.l @R15+,R14
@@ -3412,7 +3412,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036BD6:  C22C    mov.l R0,@(176,GBR)
   0x036BD8:  FFFF    fpu_0xFFFF
   0x036BDA:  6350    mov.b @R5,R3
-  0x036BDC:  000A    .word 0x000A
+  0x036BDC:  000A    sts    mach,r0
   0x036BDE:  C620    mov.l @(128,GBR),R0
   0x036BE0:  000B    rts
   0x036BE2:  E830    mov #48,R8
@@ -3499,10 +3499,10 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036C70:  0009    nop
   0x036C72:  D269    mov.l @(0x036E18),R2  ; =0x00021DAE  (ROM @0x021DAE)
   0x036C74:  420B    jsr @R2  ; -> 0x00021DAE
-  0x036C76:  80F4    mov.b R0,@(244,R15)
-  0x036C78:  84F4    mov.b @(244,R15),R0
+  0x036C76:  80F4    mov.b  r0,@(4,r15)
+  0x036C78:  84F4    mov.b  @(4,r15),r0
   0x036C7A:  8802    cmp/eq #2,R0
-  0x036C7C:  0D29    .word 0x0D29
+  0x036C7C:  0D29    movt   r13
   0x036C7E:  60E3    mov R14,R0
   0x036C80:  8801    cmp/eq #1,R0
   0x036C82:  8926    bt 0x036CD2
@@ -3599,13 +3599,13 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036D38:  0009    nop
   0x036D3A:  D242    mov.l @(0x036E44),R2  ; =0x00029818  (ROM @0x029818)
   0x036D3C:  420B    jsr @R2  ; -> 0x00029818
-  0x036D3E:  80F4    mov.b R0,@(244,R15)
+  0x036D3E:  80F4    mov.b  r0,@(4,r15)
   0x036D40:  66F0    mov.b @R15,R6
   0x036D42:  2668    tst R6,R6
-  0x036D44:  0429    .word 0x0429
-  0x036D46:  84F4    mov.b @(244,R15),R0
+  0x036D44:  0429    movt   r4
+  0x036D46:  84F4    mov.b  @(4,r15),r0
   0x036D48:  2008    tst R0,R0
-  0x036D4A:  0529    .word 0x0529
+  0x036D4A:  0529    movt   r5
   0x036D4C:  D63E    mov.l @(0x036E48),R6  ; =0xFFFF7C18  (RAM 7C18)
   0x036D4E:  6060    mov.b @R6,R0
   0x036D50:  8801    cmp/eq #1,R0
@@ -3721,7 +3721,7 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036E2C:  000C    mov.b @(R0,R0),R0
   0x036E2E:  BC6A    bsr 0x036706
   0x036E30:  FFFF    fpu_0xFFFF
-  0x036E32:  85D7    mov.w @(430,R13),R0
+  0x036E32:  85D7    mov.w  @(14,r13),r0
   0x036E34:  000C    mov.b @(R0,R0),R0
   0x036E36:  BC6E    bsr 0x036716
   0x036E38:  000C    mov.b @(R0,R0),R0
@@ -3729,9 +3729,9 @@ PART 5: CRITICAL CODE SECTIONS - Where CL/OL mode actually changes
   0x036E3C:  000B    rts
   0x036E3E:  E970    mov #112,R9
   0x036E40:  0002    stc SR,R0
-  0x036E42:  9808    mov.w @(0x036E54),R8  ; =0x000C (12)
+  0x036E42:  9808    mov.w  @(0x036E56),r8  ; =0x000C (12)
   0x036E44:  0002    stc SR,R0
-  0x036E46:  9818    mov.w @(0x036E78),R8  ; =0xD285 (53893)
+  0x036E46:  9818    mov.w  @(0x036E7A),r8  ; =0xD285 (53893)
   0x036E48:  FFFF    fpu_0xFFFF
   0x036E4A:  7C18    add #24,R12
   0x036E4C:  000C    mov.b @(R0,R0),R0

@@ -379,7 +379,7 @@ def disasm_one(addr):
             elif fm == 0x5:
                 mnemonic = "fabs   FR%d" % fn
             elif fm == 0x6:
-                mnemonic = "fsqrt  FR%d" % fn
+                mnemonic = ".INVALID_SH2E  FR%d" % fn
             elif fm == 0x8:
                 mnemonic = "fldi0  FR%d" % fn
             elif fm == 0x9:
@@ -464,7 +464,7 @@ def disasm_word(addr):
             if fm == 3: return "ftrc FR%d,FPUL" % fn
             if fm == 4: return "fneg FR%d" % fn
             if fm == 5: return "fabs FR%d" % fn
-            if fm == 6: return "fsqrt FR%d" % fn
+            if fm == 6: return ".INVALID_SH2E FR%d" % fn
             if fm == 8: return "fldi0 FR%d" % fn
             if fm == 9: return "fldi1 FR%d" % fn
             if fm == 0xA: return "lds R%d,FPUL" % fn

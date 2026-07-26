@@ -86,7 +86,7 @@ Workspace: FFFF4284 (base), stride 28 bytes per channel
 009A72: E008  mov    #8,R0
 009A74: D323  mov.l  @(0x009B04),R3       ; R3 = 0x0000317C (descriptor_dispatch)
 009A76: 4F22  sts.l  PR,@-R15
-009A78: 4F12  sts.l  FPSCR,@-R15
+009A78: 4F12  sts.l  macl,@-r15
 009A7A: 7FEC  add    #-20,R15             ; alloc 20 bytes on stack
 009A7C: 2F40  mov.b  R4,@R15              ; stack[0] = channel_index
 009A7E: FF47  fmov.s FR4,@(R0,R15)        ; stack[8] = new_value (float)
@@ -151,7 +151,7 @@ Workspace: FFFF4284 (base), stride 28 bytes per channel
 009AF4: 54F4  mov.l  @(16,R15),R4         ; descriptor result
 009AF6: 7F14  add    #20,R15              ; dealloc stack
 009AF8: D303  mov.l  @(0x009B08),R3       ; 0x00003190
-009AFA: 4F16  lds.l  @R15+,FPSCR
+009AFA: 4F16  lds.l  @r15+,macl
 009AFC: 432B  jmp    @R3                   ; tail call to 0x3190 (store result)
 009AFE: 4F26  lds.l  @R15+,PR
 
@@ -187,7 +187,7 @@ Uses workspace at FFFF4284 and library routines for allocation.
 00A480: 2F96  mov.l  R9,@-R15
 00A482: 2F86  mov.l  R8,@-R15
 00A484: 4F22  sts.l  PR,@-R15
-00A486: 4F12  sts.l  FPSCR,@-R15
+00A486: 4F12  sts.l  macl,@-r15
 00A488: D823  mov.l  @(0x00A518),R8       ; R8 = 0xFFFF4284 (workspace_base)
 00A48A: 7FFC  add    #-4,R15
 00A48C: D921  mov.l  @(0x00A514),R9       ; R9 = 0x000BE82C (workspace_free)
@@ -226,7 +226,7 @@ Uses workspace at FFFF4284 and library routines for allocation.
 ; --- LOOP END ---
 
 00A4CA: 7F04  add    #4,R15
-00A4CC: 4F16  lds.l  @R15+,FPSCR
+00A4CC: 4F16  lds.l  @r15+,macl
 00A4CE: 4F26  lds.l  @R15+,PR
 00A4D0: 68F6  mov.l  @R15+,R8
 00A4D2: 69F6  mov.l  @R15+,R9
@@ -259,7 +259,7 @@ Computes the new intake count for a channel from the channel table
 and current accumulator.
 
 00A55E: 634C  extu.b R4,R3               ; R3 = channel_index
-00A560: 4F12  sts.l  FPSCR,@-R15
+00A560: 4F12  sts.l  macl,@-r15
 00A562: E21C  mov    #28,R2               ; stride = 28
 00A564: 232E  mulu.w R2,R3               ; offset = index * 28
 00A566: 614C  extu.b R4,R1               ; R1 = index
@@ -277,7 +277,7 @@ and current accumulator.
 00A57E: 341C  add    R1,R4                ; R4 = accumulator + raw_count
 00A580: 6043  mov    R4,R0                ; return value
 00A582: 000B  rts
-00A584: 4F16  lds.l  @R15+,FPSCR
+00A584: 4F16  lds.l  @r15+,macl
 
 Literal pool:
   0x00A588: 0x00011A7C (intake_channel_table)

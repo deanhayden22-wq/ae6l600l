@@ -35,11 +35,53 @@ HARDWARE VECTOR TABLE (ROM 0x000-0x03FF)
   4-10   0x000010   0x000BFA      Default handler (infinite loop) — unused
   11     0x00002C   0x000BAC      NMI -> generic peripheral ISR
 
-  Vectors 64+ (peripheral IRQs): Most point to code/data following
-  the vector table, NOT to ISR handlers.  The SH7058 in this ECU does
-  NOT use per-vector hardware dispatch for peripherals.  All peripheral
-  interrupts route through the NMI/generic ISR path or through the
-  RTOS tick mechanism.
+  CORRECTION 2026-07-26 — the paragraph that used to sit here was WRONG.
+  It read: "Vectors 64+ ... Most point to code/data following the vector
+  table, NOT to ISR handlers. The SH7058 in this ECU does NOT use
+  per-vector hardware dispatch for peripherals."
+
+  That conclusion came from reading the peripheral vectors at VBR = 0.
+  VBR is NOT 0 on this ROM.  Startup relocates it:
+
+    00FA3E: D2A1  mov.l @(0x00FCC4),r2   ; = 0x000FFC50
+    00FA40: 422E  ldc   r2,vbr
+
+  So peripheral vector N resolves to 0x000FFC50 + 4N, and the table at
+  ROM 0x00-0x3FF is only the reset/exception block that hardware uses
+  BEFORE VBR is programmed.
+
+  The real table at 0x0FFC50 is fully populated — 236 entries, 234 of
+  which point into ROM, across 134 distinct handlers:
+
+    0x0000E852   default handler, 71 vectors   (mov.l @(0xE8C0),r4; bra 0xE774)
+    0x0000E8CE   second most common, 32 vectors
+    0x0000E858   1 vector   (mov.w @(0xE89E),r4; bsr 0xE794; bra self)
+    0x0000E862   1 vector
+    0x0000E86C   1 vector
+    0x0000E876   1 vector
+    ... 128 further distinct handlers
+
+  The single-use handlers follow a common shape: load a small ID into
+  R4, call a common reporter at 0xE794/0xE774, then spin (`bra self`).
+  That is a per-source fault/trap identifier — i.e. the hardware DOES
+  dispatch per vector.
+
+  For comparison, reading the same vectors at VBR = 0 yields:
+    vec[64] @0x000100 = 0x8B04D62B      <- instruction bytes, not a pointer
+    vec[65] @0x000104 = 0x94469142
+  which is what produced the original wrong conclusion.
+
+  IMPLICATION FOR PATCHING: to hook an interrupt, the table to modify is
+  at 0x0FFC50, not 0x0.
+
+  The free-space map is correct about this region and does NOT overlap
+  the table: the listed holes stop at 0x0FFAF8 and 0x0FFB00-0x0FFB80,
+  while the vector table starts at 0x0FFC50 and holds real data
+  (0x0FFC50 = 00 00 E8 52 ...).  But note how little margin there is —
+  the "PRIMARY PATCH AREA" (0x0FC004-0x0FFAF8) ends only 0x158 bytes
+  before the vector table.  Injected code placed at the top of that hole
+  that overruns its budget will silently clobber interrupt vectors.
+  Prefer the large hole at 0x0DAE8C-0x0F8900 for anything sizeable.
 
 
 RESET HANDLER (0x0C0C)

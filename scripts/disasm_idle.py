@@ -157,7 +157,7 @@ def decode(hw, addr):
     if (hw & 0xF0FF) == 0xF03D: return "ftrc    FR%d,FPUL" % n
     if (hw & 0xF0FF) == 0xF05D: return "fabs    FR%d" % n
     if (hw & 0xF0FF) == 0xF04D: return "fneg    FR%d" % n
-    if (hw & 0xF0FF) == 0xF06D: return "fsqrt   FR%d" % n
+    if (hw & 0xF0FF) == 0xF06D: return ".INVALID_SH2E   FR%d" % n
     if (hw & 0xF0FF) == 0xF01D: return "flds    FR%d,FPUL" % n
     if (hw & 0xF0FF) == 0xF00D: return "fsts    FPUL,FR%d" % n
     if (hw & 0xF00F) == 0xF006: return "fmov.s  @(R0,R%d),FR%d" % (m, n)

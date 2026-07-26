@@ -545,8 +545,8 @@ def main():
         if classify_addr(val) == "ROM":
             desc = ""
             if val == 0xBEAB0: desc = "table_lookup (error scaling)"
-            elif val == 0xBE970: desc = "clamp_float"
-            elif val == 0xBE960: desc = "clamp_float_neg (or variant)"
+            elif val == 0xBE970: desc = "float_min (2-arg min; gives a CEILING clamp)"
+            elif val == 0xBE960: desc = "float_max (2-arg max; gives a FLOOR clamp)"
             print(f"  0x{val:05X}  {desc}")
 
     # =====================================================
@@ -577,8 +577,8 @@ def main():
 //
 // Subroutines:
 //   0xBEAB0 = table_lookup (called with error in FR4, FR5=0)
-//   0xBE960 = clamp_neg (subtract + clamp, called for path 2)
-//   0xBE970 = clamp_pos (add + clamp, called for path 3)
+//   0xBE960 = float_max(FR4,FR5) -- FLOOR clamp  (path 2)
+//   0xBE970 = float_min(FR4,FR5) -- CEILING clamp (path 3)
 // ============================================================================
 
 function AFC_PI_Controller() {{
@@ -734,7 +734,7 @@ L_34332:
         R2 = &0xCC00C                  // I_gain cal
         FR8 = *(float*)R2             // FR8 = 1.0
         FR4 = FR4 - FR8              // FR4 = I-term - I_gain (decay toward zero)
-        R2 = 0xBE960                  // clamp_neg subroutine
+        R2 = 0xBE960                  // float_max -- FLOOR clamp
         FR5 = 0.0
         call R2                       // FR0 = clamp(FR4, 0, ...)
         R6 = &FFFF7864
@@ -749,7 +749,7 @@ L_34332:
         R2 = &0xCC00C                  // I_gain cal
         FR8 = *(float*)R2             // FR8 = 1.0
         FR4 = FR4 + FR8              // FR4 = I-term + I_gain (grow correction)
-        R2 = 0xBE970                  // clamp_pos subroutine
+        R2 = 0xBE970                  // float_min -- CEILING clamp
         FR5 = 0.0
         call R2                       // FR0 = clamp(FR4, limits...)
         R6 = &FFFF7864
@@ -825,11 +825,11 @@ EPILOGUE:  // (0x34390)
         |             GBR[98]=1, goto epilogue
         |
         +--[R0==2]--> Iterm -= I_gain(1.0)
-        |             call clamp_neg(BE960)
+        |             call float_max(BE960) [floor]
         |             write clamped -> struct[-76], goto epilogue
         |
         +--[R0==3]--> Iterm += I_gain(1.0)
-        |             call clamp_pos(BE970)
+        |             call float_min(BE970) [ceil]
         |             write clamped -> struct[-76], goto epilogue
         |
         +--[R0==4]--> write 0.0 -> struct[-76]

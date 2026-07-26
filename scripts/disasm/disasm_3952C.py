@@ -427,7 +427,7 @@ def disasm_one(addr):
             elif fm == 0x3: mnemonic = f"ftrc   {frn(fn)},FPUL"
             elif fm == 0x4: mnemonic = f"fneg   {frn(fn)}"
             elif fm == 0x5: mnemonic = f"fabs   {frn(fn)}"
-            elif fm == 0x6: mnemonic = f"fsqrt  {frn(fn)}"
+            elif fm == 0x6: mnemonic = f".INVALID_SH2E  {frn(fn)}"
             elif fm == 0x8: mnemonic = f"fldi0  {frn(fn)}"
             elif fm == 0x9: mnemonic = f"fldi1  {frn(fn)}"
             elif fm == 0xA:

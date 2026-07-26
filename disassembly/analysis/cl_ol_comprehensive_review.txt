@@ -1103,7 +1103,7 @@ WRITE 4 — ROM 0x36238-0x36306: THE ONLY ACTIVE PATH (corrected 2026-04-07)
   FILTERED_UPDATE (0x36250-0x36270) — RAMP UP:
     FFFF7990 = FR15 * [FFFF79A0]          ; target × blend coefficient
     FR4 = [FFFF798C] + [FFFF79E0]         ; current + ramp step (POSITIVE)
-    [FFFF798C] = max(FR4, [FFFF7990])     ; floor clamp via 0xBE970 (float_max)
+    [FFFF798C] = min(FR4, [FFFF7990])     ; ceiling clamp via 0xBE970 (float_min)
     Ramps accumulator UPWARD each cycle. FFFF79E0 is POSITIVE (u16 table
     at CE5A4 × 1/32768, added via fadd at 0x36262). The max() clamp
     prevents the accumulator from dropping below the blended target floor.

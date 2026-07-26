@@ -368,7 +368,7 @@ def disasm_one_str(addr):
             if fm == 0x3: return f"ftrc   FR{fn},FPUL"
             if fm == 0x4: return f"fneg   FR{fn}"
             if fm == 0x5: return f"fabs   FR{fn}"
-            if fm == 0x6: return f"fsqrt  FR{fn}"
+            if fm == 0x6: return f".INVALID_SH2E  FR{fn}"
             if fm == 0x8: return f"fldi0  FR{fn}"
             if fm == 0x9: return f"fldi1  FR{fn}"
             if fm == 0xA: return f"lds    R{n_reg},FPUL"

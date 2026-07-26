@@ -1,11 +1,49 @@
 ================================================================================
 SH7058 ECU ROM Disassembly
 ROM: 2013 USDM Subaru Impreza WRX MT  |  Part: AE5L600L
-MCU: Renesas SH7058  |  Arch: SH-2 Big-Endian  |  ROM Base: 0x00000000
-RAM: 0xFFFF8000-0xFFFFFFFF (32KB)  |  ROM Size: 1MB (0x100000)
+MCU: Renesas SH7058  |  Arch: SH-2E Big-Endian  |  ROM Base: 0x00000000
+RAM: 0xFFFF0000-0xFFFFBFFF (48KB on-chip)  |  ROM Size: 1MB (0x100000)
 ECU ID: 8A12587007  |  Flash Method: subarucan  |  Checksum: subarudbw
 ROM Variant: rev 20.2 "tiny wrex"  |  Ghidra: 12.0.2 SuperH:BE:32:SH-2
 Generated from RomRaider/EcuFlash definition files + Ghidra reverse engineering
+================================================================================
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! WARNING - THIS FILE'S GHIDRA CONTENT IS FPU-BLIND AND INCOMPLETE          !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+The Ghidra data below was produced with Language SuperH:BE:32:SH-2, which has
+NO FPU support at all (Ghidra's own sh-2.slaspec omits the `@define FPU`; only
+sh-2a.slaspec sets it, gating 36 FPU constructors in superh.sinc).
+
+The SH7058 is an SH-2E: SH-2 integer ISA PLUS a single-precision FPU. This ROM
+contains ~28,000 FPU instruction sites. Under SH-2, every one of them fails to
+decode -- and Ghidra does NOT flag it. Disassembly silently STOPS at the first
+float op, leaving no error and no bookmark. Consequences measured from the
+export:
+
+  * 994 of 3,042 code blocks (33%) terminate at the byte BEFORE an FPU word.
+    They look like complete short functions. They are truncated stubs.
+  * ~239 KB of code beginning with an FPU word was never disassembled, versus
+    ~172 KB decoded. More code is missing than present.
+  * fmac_interp_uint16 (0xBE598) and fmac_interp_uint8 (0xBE588) -- the two
+    core table-interpolation primitives, 176 call sites between them -- have
+    ZERO coverage. Every calibration lookup path dead-ends here.
+  * KNOCK_DETECTOR / FLKC_PATH_J / FLKC_PATHS_FG sit at 1-5% coverage. That is
+    why they appear below as raw hex dumps rather than disassembly.
+  * The "Total functions: 3,642 (+41% improvement)" statistic below counts
+    fragments created by FPU truncation. It overstates coverage; ignore it.
+
+DO NOT answer a question about ROM code from this file alone. A function that
+appears to end may simply have hit a float instruction. Verify against ROM
+bytes with an SH-2E-aware disassembler (scripts/sh2e_disasm.py) before drawing
+any conclusion about control flow, function length, or "this region is data".
+
+The hand-written analysis in disassembly/analysis/*.txt is NOT affected -- it
+was produced with the project's own FPU-aware Python disassembler.
+
+Fix in progress: re-import under SuperH:BE:32:SH-2A (a superset that decodes
+every SH-2E FPU encoding correctly). See docs/architecture.md.
 ================================================================================
 
 ; ═════════════════════════════════════════════════════════════════════════════
@@ -3135,8 +3173,8 @@ SECTION 10: FUNCTION CALL MAP
     0x0BE874  — LowPW_TableProcessor (named in Ghidra)
     0x0BE8AC  — Table processor variant
     0x0BE8E4  — Table processor variant (descriptor-based)
-    0x0BE960  — Table processor variant
-    0x0BE970  — Table processor variant
+    0x0BE960  — float_max: returns max(FR4, FR5) in FR0
+    0x0BE970  — float_min: returns min(FR4, FR5) in FR0
     0x0BEA40  — Table processor variant
     0x0BEAB0  — Table processor variant
     0x0BDBCC  — A/F Learning table interpolation/update

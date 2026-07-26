@@ -509,7 +509,7 @@ def disassemble_range(start, max_insns):
                 elif fm == 0x5:
                     mnemonic = "fabs   %s" % frn(fn)
                 elif fm == 0x6:
-                    mnemonic = "fsqrt  %s" % frn(fn)
+                    mnemonic = ".INVALID_SH2E  %s" % frn(fn)
                 elif fm == 0x8:
                     mnemonic = "fldi0  %s" % frn(fn)
                 elif fm == 0x9:

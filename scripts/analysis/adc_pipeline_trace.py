@@ -124,7 +124,7 @@ PIPELINE_FUNCTIONS = {
     0x000BEA6C: "iir_filter          - IIR low-pass filter (r4=new, r5=old, r6=coeff)",
     0x000BE830: "Pull3DFloat         - 3D table lookup (descriptor-based)",
     0x000BE608: "Pull2DFloat         - 2D table lookup (descriptor-based)",
-    0x000BE960: "adc_convert_indexed  - Per-cylinder ADC conversion",
+    0x000BE960: "float_max  - 2-arg float max (NOT an ADC routine)",
     0x000BE9C0: "sensor_post_process  - Secondary sensor processing",
     0x000BE82C: "sensor_init_convert  - Initial conversion (temp sensors)",
     0x000BE598: "float_lookup_1D      - 1D float interpolation",

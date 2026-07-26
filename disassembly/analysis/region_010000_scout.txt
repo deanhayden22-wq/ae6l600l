@@ -176,7 +176,7 @@ Calls from 0x10000-0x1FFFF to known library functions:
   struct_init2 (0xBE82C)     39     Struct/workspace teardown
   unpack_helper (0xBE980)    39     Byte unpack from RAM
   struct_init (0xBE81C)      38     Struct/workspace init
-  pack_helper (0xBE960)      23     Generic pack
+  float_max (0xBE960)        23     2-arg float max (NOT a pack helper)
   table_lookup (0xBE8E4)     20     Descriptor table lookup
   fmac_interp (0xBE598)      19     Fused multiply-accumulate interp
   float_safe_div (0xBE628)   12     Safe division
@@ -198,7 +198,7 @@ Top unknown ROM call targets (not yet named):
   0x003190:  32 refs   (low-level utility / scheduler)
   0x0BDCB6:  30 refs   (float/math library - needs identification)
   0x0BEA40:  25 refs   (pack/unpack library - needs identification)
-  0x0BE970:  24 refs   (pack/unpack library - needs identification)
+  0x0BE970:  24 refs   float_min -- 2-arg float min (identified 2026-07-26)
   0x022CF4:  22 refs   (engine control function)
 
 Descriptor table references (0x0AA000-0x0AFFFF):
@@ -435,7 +435,7 @@ Priority 1 (High value, lower effort):
      - 0x0BE53C (41 refs, interpolation)
      - 0x0BDCB6 (30 refs, float math)
      - 0x0BEA40 (25 refs, pack/unpack)
-     - 0x0BE970 (24 refs, pack/unpack)
+     - 0x0BE970 (24 refs, float_min)
   c. Correct rom_region_map for the misclassified code regions
      (0x10800, 0x1A300, others)
 
