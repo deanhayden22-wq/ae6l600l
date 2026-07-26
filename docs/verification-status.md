@@ -6,7 +6,7 @@
 python scripts/coverage_map.py
 ```
 
-Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-07-26 17:58.
+Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-07-26 19:21.
 
 Every flag below is recomputed from scratch on each run: the definition side from `scripts/defs.py` over both definition XMLs, the disassembly side re-derived from ROM bytes (literal-pool dereference back-trace, table descriptors decoded out of ROM, and a RAM→lookup-axis feed trace). No conclusion is read out of a derived file and trusted. Agreement across derived files is not evidence.
 
@@ -72,26 +72,26 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 
 ## 2. Coverage
 
-4721 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
+4724 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
 
 | Flag | Entities | Share |
 |---|---:|---:|
-| `CONFLICT` | 13 | 0.3% |
+| `CONFLICT` | 0 | 0.0% |
 | `BOUNDS-SUSPECT` | 53 | 1.1% |
-| `VERIFIED-BOTH` | 351 | 7.4% |
-| `VERIFIED-BYTES` | 291 | 6.2% |
+| `VERIFIED-BOTH` | 356 | 7.5% |
+| `VERIFIED-BYTES` | 293 | 6.2% |
 | `DEFS-ONLY` | 21 | 0.4% |
-| `DISASM-ONLY` | 904 | 19.1% |
-| `UNMAPPED` | 3088 | 65.4% |
+| `DISASM-ONLY` | 917 | 19.4% |
+| `UNMAPPED` | 3084 | 65.3% |
 
 ### By entity kind
 
 | Kind | `CONFLICT` | `BOUNDS-SUSPECT` | `VERIFIED-BOTH` | `VERIFIED-BYTES` | `DEFS-ONLY` | `DISASM-ONLY` | `UNMAPPED` |
 |---|---|---|---|---|---|---|---|
-| axis | 0 | 26 | 128 | 57 | 2 | 0 | 0 |
-| ram | 9 | 0 | 5 | 0 | 0 | 208 | 3088 |
-| rom-block | 0 | 0 | 0 | 0 | 0 | 696 | 0 |
-| table | 4 | 27 | 218 | 234 | 19 | 0 | 0 |
+| axis | 0 | 26 | 130 | 57 | 2 | 0 | 0 |
+| ram | 0 | 0 | 5 | 0 | 0 | 222 | 3084 |
+| rom-block | 0 | 0 | 0 | 0 | 0 | 695 | 0 |
+| table | 0 | 27 | 221 | 236 | 19 | 0 | 0 |
 
 `table` / `axis` are definition-backed. `rom-block` is a calibration block a ROM descriptor points at that no `<table>` covers. `ram` is a RAM variable — RAM is outside the ROM image, so no definition can ever cover it and the definition side contributes only indirectly, through the names of the axes a RAM variable is traced feeding.
 
@@ -113,8 +113,8 @@ Largest unmapped data blocks:
 | `0x01000`–`0x02C00` | float_data | 7,132 |
 | `0x9A700`–`0x9C200` | float_data | 6,760 |
 | `0x49A00`–`0x4B100` | float_data | 5,888 |
-| `0xC0B00`–`0xC3F00` | float_data | 4,929 |
-| `0xD5800`–`0xD7400` | float_data | 4,799 |
+| `0xC0B00`–`0xC3F00` | float_data | 4,927 |
+| `0xD5800`–`0xD7400` | float_data | 4,801 |
 | `0xD1D00`–`0xD4500` | float_data | 4,793 |
 | `0x03900`–`0x04A00` | float_data | 4,352 |
 | `0xD8300`–`0xDAB00` | float_data | 4,309 |
@@ -128,19 +128,19 @@ Largest unmapped data blocks:
 | Category | `CONFLICT` | `BOUNDS-SUSPECT` | `VERIFIED-BOTH` | `VERIFIED-BYTES` | `DEFS-ONLY` | `DISASM-ONLY` | `UNMAPPED` | total |
 |---|---|---|---|---|---|---|---|---|
 | Diagnostics / DTC | 0 | 0 | 0 | 152 | 0 | 0 | 0 | 152 |
-| Fueling - Base / Enrichment | 0 | 19 | 27 | 43 | 0 | 0 | 0 | 89 |
+| Fueling - Base / Enrichment | 0 | 19 | 30 | 43 | 0 | 0 | 0 | 92 |
 | Ignition Timing | 0 | 2 | 56 | 19 | 0 | 0 | 0 | 77 |
 | Boost Control | 0 | 0 | 43 | 8 | 4 | 0 | 0 | 55 |
 | Fueling - CL/OL Transition | 0 | 6 | 37 | 8 | 0 | 0 | 0 | 51 |
 | Map Switching - Cruise/Non-Cruise | 0 | 0 | 48 | 0 | 0 | 0 | 0 | 48 |
 | Torque Management / DBW | 0 | 2 | 2 | 27 | 10 | 0 | 0 | 41 |
-| Ignition Timing - Knock | 1 | 6 | 29 | 1 | 0 | 0 | 0 | 37 |
-| Fueling - Injector | 1 | 1 | 20 | 12 | 0 | 0 | 0 | 34 |
-| Idle Control | 1 | 8 | 5 | 8 | 0 | 0 | 0 | 22 |
+| Ignition Timing - Knock | 0 | 6 | 29 | 2 | 0 | 0 | 0 | 37 |
+| Fueling - Injector | 0 | 1 | 20 | 13 | 0 | 0 | 0 | 34 |
+| Idle Control | 0 | 8 | 6 | 8 | 0 | 0 | 0 | 22 |
 | Sensors / Calibration | 0 | 2 | 16 | 1 | 0 | 0 | 0 | 19 |
 | Vehicle Speed / Transmission | 0 | 0 | 15 | 0 | 0 | 0 | 0 | 15 |
 | Map Switching - Timing Blend | 0 | 0 | 14 | 0 | 0 | 0 | 0 | 14 |
-| tinywrex patches | 1 | 2 | 7 | 4 | 0 | 0 | 0 | 14 |
+| tinywrex patches | 0 | 2 | 8 | 4 | 0 | 0 | 0 | 14 |
 | AVCS / Cam Timing | 0 | 2 | 10 | 0 | 0 | 0 | 0 | 12 |
 | MAF / Airflow | 0 | 0 | 8 | 1 | 3 | 0 | 0 | 12 |
 | Fuel System | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 7 |
@@ -151,77 +151,9 @@ Largest unmapped data blocks:
 
 ## 4. `CONFLICT` — settle these from bytes
 
-Two independent sides make incompatible claims about the same address. Nothing downstream of these should be trusted until a human settles them from ROM bytes — and settles them in the right direction. **13 entities.**
+Two independent sides make incompatible claims about the same address. Nothing downstream of these should be trusted until a human settles them from ROM bytes — and settles them in the right direction. **0 entities.**
 
-- **`0xFFFF4254`** — afr_lambda_workspace  
-  _RAM variable_
-  - ram_reference.txt:174 calls this a float, but every one of the 9 code sites that dereference it uses int8 -- 0 float accesses. That contradicts the STORAGE WIDTH claim; it does not by itself disprove the name (the address could be the base of a byte-sized field in a struct whose float lives at an offset).
-  - **suspect side:** disassembly (ram_reference.txt) -- storage width claim unsupported by any code site
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int8 x9
-- **`0xFFFF61CC`** — diag_monitor_status_bytes  
-  _RAM variable_
-  - ram_reference.txt:57 calls this a float, but every one of the 26 code sites that dereference it uses int8 -- 0 float accesses. That contradicts the STORAGE WIDTH claim; it does not by itself disprove the name (the address could be the base of a byte-sized field in a struct whose float lives at an offset).
-  - **suspect side:** disassembly (ram_reference.txt) -- storage width claim unsupported by any code site
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int8 x26
-- **`0xFFFF6254`** — maf_current  
-  _RAM variable_
-  - ram_reference.txt:58 calls this a float, but every one of the 51 code sites that dereference it uses int8 -- 0 float accesses. That contradicts the STORAGE WIDTH claim; it does not by itself disprove the name (the address could be the base of a byte-sized field in a struct whose float lives at an offset).
-  - **suspect side:** disassembly (ram_reference.txt) -- storage width claim unsupported by any code site
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int8 x51
-- **`0xFFFF6364`** — ect_startup  
-  _RAM variable_
-  - traced as the axis input to 8 of 8 definition-named lookup axes, and those axes are intake_air_temp axes -- but ram_reference.txt:60 names it 'ect_startup', i.e. a coolant. The definition XMLs name the axis; the ROM code chooses what feeds it. Both sides here are re-derived from bytes.
-  - **suspect side:** disassembly (ram_reference.txt) -- the definition-named axis is the independent side
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x48
-  - evidence: D3 RAM -> table-lookup axis feed trace (re-derived) — 23 call sites into 23 descriptors; breakpoint span -40..120; definition-named axes: 0xC0E24 Target Boost Compensation (IAT)_ / Intake Temperature; 0xC0C54 Initial/Max Wastegate Duty Compensation (IAT) / Intake Temperature; 0xCC8A8 Cranking Fuel IPW Compensation (IAT) / Intake Temperature; 0xD3248 Timing Compensation A (IAT) / Intake Temperature
-- **`0xFFFF65C0`** — throttle_position  
-  _RAM variable_
-  - ram_reference.txt:49 calls this a float, but every one of the 89 code sites that dereference it uses int8 -- 0 float accesses. That contradicts the STORAGE WIDTH claim; it does not by itself disprove the name (the address could be the base of a byte-sized field in a struct whose float lives at an offset).
-  - **suspect side:** disassembly (ram_reference.txt) -- storage width claim unsupported by any code site
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int8 x89
-- **`0xFFFF67EC`** — atm_pressure_current  
-  _RAM variable_
-  - ram_reference.txt:46 calls this a float, but every one of the 99 code sites that dereference it uses int16 -- 0 float accesses. That contradicts the STORAGE WIDTH claim; it does not by itself disprove the name (the address could be the base of a byte-sized field in a struct whose float lives at an offset).
-  - **suspect side:** disassembly (ram_reference.txt) -- storage width claim unsupported by any code site
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int16 x99
-- **`0xFFFF6C48`** — battery_voltage  
-  _RAM variable_
-  - ram_reference.txt:71 calls this a float, but every one of the 34 code sites that dereference it uses int8 -- 0 float accesses. That contradicts the STORAGE WIDTH claim; it does not by itself disprove the name (the address could be the base of a byte-sized field in a struct whose float lives at an offset).
-  - **suspect side:** disassembly (ram_reference.txt) -- storage width claim unsupported by any code site
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int8 x34
-- **`0xFFFF8C98`** — timing_workspace_B  
-  _RAM variable_
-  - ram_reference.txt:176 calls this a float, but every one of the 5 code sites that dereference it uses int16 -- 0 float accesses. That contradicts the STORAGE WIDTH claim; it does not by itself disprove the name (the address could be the base of a byte-sized field in a struct whose float lives at an offset).
-  - **suspect side:** disassembly (ram_reference.txt) -- storage width claim unsupported by any code site
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int16 x5
-- **`0xFFFF8CFC`** — timing_workspace_extended  
-  _RAM variable_
-  - ram_reference.txt:198 calls this a float, but every one of the 5 code sites that dereference it uses int8 -- 0 float accesses. That contradicts the STORAGE WIDTH claim; it does not by itself disprove the name (the address could be the base of a byte-sized field in a struct whose float lives at an offset).
-  - **suspect side:** disassembly (ram_reference.txt) -- storage width claim unsupported by any code site
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int8 x5
-- **`0xC0BCC`** — Boost disable during fuel cut-Load threshold  
-  _tinywrex patches_
-  - ROM code dereferences 0xC0BCC as float; declared storagetype uint16 (EngineLoad(g/rev)) is never used. The definition shows 1.00 Engine Load (g/rev); read the way the code reads it (float) the same bytes are 1.7
-  - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
-  - evidence: D5 cal_crossref.txt:472 — Ghidra label cal_Boost_disable_during_fuel_cut_Load_threshold
-- **`0xD106C`** — Injector Latency_  
-  _Fueling - Injector_
-  - ROM descriptor @0xAD7E0 says 4 bytes/cell (typecode; spacing inconclusive); declared storagetype uint16 is 2
-  - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
-  - evidence: D2 ROM table descriptor @0xAD7E0 — 2D, 15 cells x 4 bytes (data pointer); spacing to the next known table boundary implies nothing bytes/cell
-- **`0xD3C2C`** — Rough Correction Learning Delay (Increasing)_  
-  _Ignition Timing - Knock_
-  - ROM descriptor @0xAE134 says 4 bytes/cell (typecode; spacing inconclusive); declared storagetype uint16 is 2
-  - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
-  - evidence: D2 ROM table descriptor @0xAE134 — 1D, 10 cells x 4 bytes (data pointer); spacing to the next known table boundary implies nothing bytes/cell
-  - evidence: D5 cal_crossref.txt:313 — Ghidra label cal_Rough_Correction_Learning_Delay_Increasing
-- **`0xD6214`** — Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter  
-  _Idle Control_
-  - ROM code dereferences 0xD6214 as int16; declared storagetype float (rawecuvalue) is never used. The definition shows 0.0 raw ecu value; read the way the code reads it (int16) the same bytes are 18
-  - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int16 x6
-  - evidence: D5 cal_crossref.txt:351 — Ghidra label cal_Idle_Airflow_Min_Target_Decel_Initial_Idle_Activation_Ma
+_None._
 
 ## 5. `BOUNDS-SUSPECT` — editor will clamp
 
@@ -383,7 +315,7 @@ Collapsed by address: a shared axis (the ECT axis at `0xCC624` serves 34 tables)
   - evidence: D5 cal_crossref.txt:298 — Ghidra label cal_Fine_Correction_Range_RPM
 - **`0xD39A8`** — Low Pulse Width Fuel Injector Compensation  
   _Fueling - Injector_
-  - descriptor typecode implies 4 byte(s)/cell but the spacing to the next table boundary implies 1, and the definition says 1 -- unresolved, NOT counted as a conflict
+  - descriptor @0xAE000 typecode implies 4 byte(s)/cell, but every routine that consumes it (0xBE874) hardcodes the cell width and never reads the typecode -- the field is dead, so it is NOT evidence against the declared uint8
   - 8 of 8 factory-ROM cells fall outside the declared min/max -10.16..14.84
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAE000 — 1D, 8 cells x 4 bytes (data pointer); spacing to the next known table boundary implies 1 bytes/cell
@@ -499,23 +431,22 @@ A `<table>` exists but has no usable storagetype or address, so it cannot be dec
 
 For these the descriptor's typecode field and the spacing to the next table boundary point at different cell widths, and the definition agrees with neither or with only one. Two weak signals disagreeing is not a conflict, so the flag ladder leaves these where the byte checks put them — but they are the best candidates for the next `0xC0BCC`-class find, so they are listed rather than buried.
 
-- **`0xD39A8`** — Low Pulse Width Fuel Injector Compensation (currently `BOUNDS-SUSPECT`)
-  - descriptor typecode implies 4 byte(s)/cell but the spacing to the next table boundary implies 1, and the definition says 1 -- unresolved, NOT counted as a conflict
-- **`0xCE640`** — CL to OL Transition Counter Step Value (MAF) (currently `VERIFIED-BYTES`)
-  - descriptor typecode implies 4 byte(s)/cell but the spacing to the next table boundary implies 2, and the definition says 2 -- unresolved, NOT counted as a conflict
-- **`0xD91E0`** — Ignition Dwell (currently `VERIFIED-BYTES`)
-  - descriptor typecode implies 4 byte(s)/cell but the spacing to the next table boundary implies 2, and the definition says 2 -- unresolved, NOT counted as a conflict
+_None._
 
 ## 7. `DISASM-ONLY` — RAM identities resting on one source
 
-208 RAM variables are named only in `ram_reference.txt`, with no independent corroboration from the feed trace. Three of this project's four wrong-direction corrections were exactly this shape: a plausible name in one derived file, copied everywhere, never re-derived. The top entries by reference count are listed; the full set is in the JSON.
+222 RAM variables are named only in `ram_reference.txt`, with no independent corroboration from the feed trace. Three of this project's four wrong-direction corrections were exactly this shape: a plausible name in one derived file, copied everywhere, never re-derived. The top entries by reference count are listed; the full set is in the JSON.
 
 | Address | Claimed name | Code access widths |
 |---|---|---|
 | `0xFFFF65FC` | vehicle_speed_kmh | float x134 |
+| `0xFFFF67EC` | dtc_maturation_counter_67EC | int16 x99 |
+| `0xFFFF65C0` | diag_precondition_flag_65C0 | int8 x89 |
 | `0xFFFF8E98` | cl_state_struct | int8 x83 |
-| `0xFFFF4130` | atm_pressure_baro | float x77 |
+| `0xFFFF4130` | battery_voltage | float x77 |
 | `0xFFFF85D7` | fuel_system_state | int8 x59 |
+| `0xFFFF6254` | flag_6254 | int8 x51 |
+| `0xFFFF6898` | atm_pressure_current | float x48 |
 | `0xFFFF620C` | manifold_pressure_map | float x43 |
 | `0xFFFF63C4` | ect_compensation | float x42 |
 | `0xFFFF8E46` | fuel_mode_flags | int8 x39 |
@@ -523,12 +454,14 @@ For these the descriptor's typecode field and the spacing to the next table boun
 | `0xFFFF895C` | injector_data | float x36 |
 | `0xFFFFAF3B` | comms_state_byte | int8 x35 |
 | `0xFFFF65BD` | engine_state_byte | int8 x34 |
+| `0xFFFF6C48` | diag_status_code_6C48 | int8 x34 |
 | `0xFFFF5BE3` | clutch_state | int8 x33 |
 | `0xFFFF6155` | adc_channel_status | float x1, int8 x31 |
 | `0xFFFF7C9D` | fuel_state_byte | int8 x32 |
 | `0xFFFF8EDC` | ol_dispatch_gate | int16 x2, int8 x29 |
 | `0xFFFF69F0` | iat_input_float | float x28 |
-| `0xFFFF64D8` | throttle_raw | float x27 |
+| `0xFFFF64D8` | accel_pedal_angle | float x27 |
+| `0xFFFF61CC` | diag_monitor_status_bytes | int8 x26 |
 | `0xFFFF43FC` | sensor_misc_state | float x25 |
 | `0xFFFF81F0` | knock_learning_value | float x25 |
 | `0xFFFF9094` | sched_task_GBR | float x24 |
@@ -536,14 +469,8 @@ For these the descriptor's typecode field and the spacing to the next table boun
 | `0xFFFF5FFC` | io_state_register | float x22 |
 | `0xFFFF682C` | adc_processed_misc | float x22 |
 | `0xFFFF4144` | ect_output_fmac | float x20 |
-| `0xFFFF6228` | maf_voltage | float x20 |
-| `0xFFFF65BF` | accel_state | int8 x20 |
-| `0xFFFF233C` | timer_config_block | int8 x19 |
-| `0xFFFF40C8` | cam_angle_sensor | float x18 |
-| `0xFFFF62DC` | fuel_rate | float x18 |
-| `0xFFFF77C8` | afc_output | float x18 |
 
-_… 178 more in the JSON._
+_… 192 more in the JSON._
 
 ## 8. How to use this before trusting an area
 

@@ -1055,14 +1055,14 @@ public class ImportAE5L600L extends GhidraScript {
             "OL condition checker neutral-state-5 RPM hi threshold = 4300.0 RPM.");
 
         // ── Path A: condition checker hysteresis flag thresholds (written to FFFF7A00–7A05) ──
-        // FR12=FFFF6898 (RPM delta) vs CC1DC/CC1E0 → writes FFFF7A05 (byte flag)
+        // FR12=FFFF6898 (ATM PRESSURE -- 'RPM delta' corrected 2026-07-26) vs CC1DC/CC1E0 → writes FFFF7A05 (byte flag)
         count += labelComment(0x000CC1DC, "OL_Condition_RPMDelta_Lo",
             "OL condition flag RPM-delta hysteresis lo = 691.9. "
             + "FFFF7A05 flag: set=1 when FFFF6898 < 691.9. Compared in ol_condition_checker (0x3643A).");
         count += labelComment(0x000CC1E0, "OL_Condition_RPMDelta_Hi",
             "OL condition flag RPM-delta hysteresis hi = 699.9. "
             + "FFFF7A05 cleared=0 when FFFF6898 > 699.9. Hysteresis pair with CC1DC.");
-        // FR13=FFFF62DC (throttle/load) vs CC1E4/CC1E8 → writes FFFF7A00; CC1EC/CC1F0 → FFFF7A01
+        // FR13=FFFF62DC (THROTTLE PLATE ANGLE -- settled 2026-07-26) vs CC1E4/CC1E8 → writes FFFF7A00; CC1EC/CC1F0 → FFFF7A01
         count += labelComment(0x000CC1E4, "OL_Condition_Load_A_Lo",
             "OL condition flag A (FFFF7A00) lo threshold = 90.0. "
             + "FFFF7A00 set=1 when FFFF62DC < 90.0. Hysteresis pair with CC1E8. ol_condition_checker.");
@@ -1216,7 +1216,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "(always true in practice). cl_master_readiness_eval speed check precondition.");
         count += labelComment(0x000CBE68, "CL_RPMDelta_Hyst_ON",
             "CL readiness RPM delta hysteresis ON threshold (float) = 570.0. "
-            + "FFFF7458 set=1 if (FFFF6898-FFFF620C) <= 570.");
+            + "FFFF7458 set=1 if (FFFF6898-FFFF620C) <= 570, i.e. baro minus MAP = manifold vacuum "
+            + "(FFFF6898 corrected to ATMOSPHERIC PRESSURE 2026-07-26).");
         count += labelComment(0x000CBE6C, "CL_RPMDelta_Hyst_OFF",
             "CL readiness RPM delta hysteresis OFF threshold (float) = 580.0. "
             + "FFFF7458 cleared=0 if delta > 580.");
@@ -1597,7 +1598,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Speed threshold 2 (word). Alternate speed threshold from 0xBE8AC. Used when "
             + "FFFF7829 speed selector == 1.");
         count += labelComment(0xFFFF7458L, "cl_rpm_delta_hyst",
-            "RPM delta hysteresis flag (byte). Set=1 if (FFFF6898-FFFF620C) <= 570 (CBE68). "
+            "Manifold-vacuum hysteresis flag (byte). Set=1 if (FFFF6898-FFFF620C) <= 570 (CBE68), "
+            + "i.e. baro minus MAP. CORRECTED 2026-07-26: FFFF6898 is ATMOSPHERIC PRESSURE, not an RPM delta. "
             + "Cleared=0 if delta > 580 (CBE6C). One of 3 throttle-condition flags for CL readiness.");
         count += labelComment(0xFFFF7459L, "cl_engine_flag_prev",
             "Previous value of FFFFA56B (engine running/cranking flag). Used for edge detection "
@@ -1705,7 +1707,9 @@ public class ImportAE5L600L extends GhidraScript {
             + "Speed within envelope for CL → set means speed OK for CL.");
         count += labelComment(0xFFFF7A05L, "ol_cond_flag_rpmDelta",
             "OL condition RPM-delta flag (byte). Written by ol_condition_checker. GBR+0x61. "
-            + "Set=1 when FFFF6898 (RPM delta) < OL_Condition_RPMDelta_Lo (CC1DC=691.9).");
+            + "Set=1 when FFFF6898 < CC1DC=691.9. CORRECTED 2026-07-26: FFFF6898 is ATMOSPHERIC PRESSURE "
+            + "(440..760 raw), so CC1DC/CC1E0 are a barometric/altitude hysteresis pair, not an RPM delta. "
+            + "The calibration label OL_Condition_RPMDelta_* is therefore misnamed.");
         count += labelComment(0xFFFF7A0CL, "ol_hyst_struct_base",
             "OL hysteresis working struct base (float). Used by clol_hysteresis_handler (0x36AB2) "
             + "and clol_delay_manager_B (0x36BF4) as base pointer. "
@@ -1721,21 +1725,37 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Path A sensor RAM variables (used in ol_condition_checker and clol_transition_core) ──
         // REMOVED: 0xFFFF6350 "engine_rpm" — wrong. This is ECT, not RPM. Correct: ect_current (line 2157)
-        count += labelComment(0xFFFF62DCL, "engine_load_metric",
-            "Engine load metric (float). Read by ol_condition_checker as FR13. "
-            + "Compared against OL_Condition_Load_A/B thresholds (90.0/91.0). "
-            + "Exact physical unit TBD — values of 90-91 suggest throttle degrees or normalized load.");
-        count += labelComment(0xFFFF6364L, "ect_startup",
-            "ECT at engine start / secondary ECT float. Read by clol_delay_manager_B (0x36BF4) as FR9. "
-            + "Compared against OL_DelayB_Thresh_A_Lo / OL_DelayB_Thresh_B_Lo (0.0). "
-            + "Physical meaning TBD — consistently paired with FFFF6350 in delay manager B.");
+        count += labelComment(0xFFFF62DCL, "throttle_plate_angle",
+            "CORRECTED 2026-07-26. THROTTLE PLATE OPENING ANGLE (float; defs toexpr x/.84 => %). "
+            + "Was 'engine_load_metric' here and 'fuel_rate' below; both wrong. "
+            + "Proof: 0x036096 fmov.s @r2,fr4 (r2=FFFF62DC, FR4 untouched on the path to the call) -> "
+            + "0x0360C4 jsr 0x0BE830, descriptor 0x0AC5D0, axis 0xCCD88 = definition-named "
+            + "'Minimum Primary Open Loop Enrichment (Throttle) / Throttle Plate Opening Angle' (10.93..89.06). "
+            + "This also explains the OL_Condition_Load_A/B thresholds of 90.0/91.0 read here: they sit just "
+            + "above that axis top, i.e. a wide-open-throttle gate. They are NOT load values (load axes span "
+            + "0.2..3). Accelerator pedal angle is 0xFFFF64D8. See docs/corrections.md item 13.");
+        count += labelComment(0xFFFF6364L, "iat_current",
+            "CORRECTED 2026-07-26. INTAKE AIR TEMPERATURE (float, degC raw; defs display (x*1.8)+32 degF). "
+            + "Was 'ect_startup'; wrong. Proof: 0x013A0C fmov.s @r2,fr15 -> 0x013A3A delay fmov fr15,fr4 -> "
+            + "descriptor 0x0AA974, axis 0xC0E24 = 'Target Boost Compensation (IAT)_ / Intake Temperature' "
+            + "(-20..40 C); independent second site 0x04042A -> descriptor 0x0ADC14, axis 0xD3248 = "
+            + "'Timing Compensation A (IAT) / Intake Temperature'. Zero coolant axes; the SAME block loads "
+            + "0xFFFF6350 separately for the (ECT) compensation, so the two are distinct quantities. "
+            + "See docs/corrections.md item 12.");
         // REMOVED: 0xFFFF6624 "engine_rpm_or_maf" — wrong. Correct: rpm_current (line 2154)
         // SUPERSEDED 2026-07-26: this note was itself WRONG. 0xFFFF65FC IS vehicle speed (km/h);
         // removing that label was a wrong-direction correction. See docs/corrections.md item 9.
-        count += labelComment(0xFFFF6898L, "rpm_delta",
-            "RPM change rate / delta (float). Read by ol_condition_checker (FR12). "
-            + "Compared against OL_Condition_RPMDelta_Lo/Hi (CC1DC=691.9/CC1E0=699.9). "
-            + "cl_master_readiness: FFFF7458 set when (FFFF6898 - FFFF620C) <= 570 (RPM delta hyst).");
+        count += labelComment(0xFFFF6898L, "atm_pressure_current",
+            "CORRECTED 2026-07-26. ATMOSPHERIC / BAROMETRIC PRESSURE (float, raw mmHg-class; 440..760 raw = "
+            + "8.5..14.7 psi absolute via psi1 toexpr x*.01933677). Was 'rpm_delta' here and 'manifold_pressure' "
+            + "below; both wrong. Proof: 0x013B02 mov.l @(0x013CCC),r2 (=FFFF6898); 0x013B04 fmov.s @r2,fr4 -> "
+            + "0x013B0E jsr 0x0BE8E4, descriptor 0x0AA99C, axis0 0xC0E94 = definition-named "
+            + "'Target Boost Compensation (Atm. Pressure)_ / Atmospheric Pressure' (440,580,670,720,740,760). "
+            + "Zero 'Manifold Pressure' axes. The OL_Condition thresholds CC1DC=691.9/CC1E0=699.9 read here are "
+            + "a barometric (altitude) hysteresis pair, not an RPM delta; and FFFF7458 set when "
+            + "(FFFF6898 - FFFF620C) <= 570 is baro minus MAP = MANIFOLD VACUUM, which is dimensionally coherent "
+            + "whereas 'RPM delta minus manifold pressure' is not. Manifold pressure is 0xFFFF620C. "
+            + "See docs/corrections.md item 11.");
 
         // ── AFL Application Working Variables ─────────────────────────────────
         count += labelComment(0xFFFF7AC0L, "afl_ramp_multiplier",
@@ -2153,10 +2173,21 @@ public class ImportAE5L600L extends GhidraScript {
             + "(b) axis 0x0C0294 via descriptor 0x0AA760 reads 0,8,16..120 = km/h; "
             + "(c) launch-control patch 0x0F1000 compares it to 8.0515 = 5 mph via LCSPEED(MPH) toexpr x*.621. "
             + "Engine load is 0xFFFF63F8. See docs/corrections.md item 9.");
-        count += labelComment(0xFFFF67ECL, "atm_pressure_current",
-            "99 refs. Atmospheric/barometric pressure (float). Read by frontO2, PSE, AFL, timing.");
-        count += labelComment(0xFFFF65C0L, "throttle_position",
-            "89 refs. Throttle position (float). Read by AFL, timing tasks 34/38, boost, idle.");
+        count += labelComment(0xFFFF67ECL, "dtc_maturation_counter_67EC",
+            "CORRECTED 2026-07-26. uint16 DTC MATURATION COUNTER at +4 in the 0xFFFF67E8 counter block. "
+            + "NOT atmospheric pressure and NOT a float. Access census over all 99 pool refs: 99 int16 "
+            + "(mov.w) accesses, ZERO FP accesses -- e.g. 0x01202A mov.l @(0x01210C),r6 ; 0x01202C mov.w @r6,r11, "
+            + "in a function that reads real floats through fmov.s from FFFF6624/FFFF6634 in the same breath. "
+            + "Reset to 0 at 0x023AA8; incremented through the saturating u16 helper 0x0BE554 at 0x023AB2; "
+            + "compared against the uint16 calibration at 0xC0212 (=306) at 0x01207E. Barometric pressure is "
+            + "the float at 0xFFFF6898. See docs/corrections.md item 15.");
+        count += labelComment(0xFFFF65C0L, "diag_precondition_flag_65C0",
+            "CORRECTED 2026-07-26. BYTE boolean in the 0xFFFF65B7-0xFFFF65C6 flag block. NOT throttle position "
+            + "and NOT a float. Census: 89 int8 accesses, ZERO FP accesses; every address in that block is "
+            + "byte-addressed, so there is no float field at an offset that could rescue the old claim. "
+            + "Read as cmp/eq #1 to gate DTC maturation counters (0x01573C/0x015748, 0x01F798, 0x023C7A). "
+            + "Accelerator pedal angle is 0xFFFF64D8; throttle plate angle is 0xFFFF62DC. Which monitor this "
+            + "flag gates is UNRESOLVED -- do not invent one. See docs/corrections.md item 16.");
         count += labelComment(0xFFFF63F8L, "engine_load_current",
             "CORRECTED 2026-07-26. 86/86 float refs. ENGINE LOAD in g/rev -- NOT intake air temp. "
             + "Was 'iat_current' (and 'ram_MAF' before that); both wrong. "
@@ -2168,12 +2199,22 @@ public class ImportAE5L600L extends GhidraScript {
             + "See docs/corrections.md item 9.");
         count += labelComment(0xFFFF6354L, "ect_raw_adc",
             "69 refs. ECT raw ADC value or secondary ECT (float). Read by PSE, AFL.");
-        count += labelComment(0xFFFF6364L, "ect_startup",
-            "48 refs. ECT at engine start (float). Read by AFL, knock window setup.");
+        count += labelComment(0xFFFF6364L, "iat_current",
+            "CORRECTED 2026-07-26. INTAKE AIR TEMPERATURE (float, degC). See the full proof on the earlier "
+            + "labelComment for this address and docs/corrections.md item 12.");
         count += labelComment(0xFFFF63C4L, "ect_compensation",
-            "43 refs. ECT compensation factor (float). Read by AFC, AFL, CL/OL.");
-        count += labelComment(0xFFFF6254L, "maf_current",
-            "51 refs. MAF sensor value (float, g/s). Read by AFL pipeline.");
+            "43 refs. UNRESOLVED as of 2026-07-26 -- the name is NOT supported. Its traced lookup axes split "
+            + "three ways: 'Intake Duty Correction A / Intake VVT Error' (0xCF9EC), 'Exhaust Duty Correction A / "
+            + "Exhaust VVT Error' (0xD11D0), and 'CL to OL Transition Counter Step Value (MAF) / Mass Airflow' "
+            + "(0xCE618). Nothing supports 'ECT compensation'. Needs control-flow-aware (not linear) tracing. "
+            + "See docs/corrections.md item 23.");
+        count += labelComment(0xFFFF6254L, "flag_6254",
+            "CORRECTED 2026-07-26. BYTE boolean at +4 in the 0xFFFF6250 block. NOT mass airflow and NOT a float. "
+            + "Census: 51 int8 accesses, ZERO FP accesses. Set to the literal 1 together with its siblings at "
+            + "+2/+3/+5/+9 in one run at 0x01DA9C-0x01DAA4; consumed as cmp/eq #1 (0x01D5A8, 0x025148). "
+            + "The real MAF/airflow RAM variable is UNIDENTIFIED: no axis in either definition XML is named "
+            + "MAF/mass air/airflow, so the axis-name method cannot locate it. Do not guess. "
+            + "See docs/corrections.md item 17.");
         count += labelComment(0xFFFF6228L, "maf_voltage",
             "22 refs. MAF sensor voltage (float). Read by timing, fuel.");
         count += labelComment(0xFFFF61CCL, "diag_monitor_status_bytes",
@@ -2181,28 +2222,94 @@ public class ImportAE5L600L extends GhidraScript {
             + "monitor/readiness status bitfields. Access census over all 56 pool refs: 26 int8 accesses, "
             + "ZERO float accesses (compare 0xFFFF63F8 86/86 float, 0xFFFF6624 298/301 float). "
             + "Written as bytes at 0x01BE02 etc. Vehicle speed is 0xFFFF65FC. See docs/corrections.md item 9.");
-        count += labelComment(0xFFFF62DCL, "fuel_rate",
-            "20 refs. Fuel injection rate (float). Read by timing, boost.");
-        count += labelComment(0xFFFF6898L, "manifold_pressure",
-            "48 refs. Manifold pressure (float). Read by frontO2, PSE, CL/OL, base timing.");
+        count += labelComment(0xFFFF62DCL, "throttle_plate_angle",
+            "CORRECTED 2026-07-26. THROTTLE PLATE OPENING ANGLE (float). See the full proof on the earlier "
+            + "labelComment for this address and docs/corrections.md item 13.");
+        count += labelComment(0xFFFF6898L, "atm_pressure_current",
+            "CORRECTED 2026-07-26. ATMOSPHERIC / BAROMETRIC PRESSURE (float). See the full proof on the earlier "
+            + "labelComment for this address and docs/corrections.md item 11.");
         count += labelComment(0xFFFF69F0L, "iat_input_float",
-            "32 refs. Intake air temperature (float, -40..120 C). Read by AFL, startup enrichment. GBR base (5 uses). Was 'boost_pressure' (misidentified).");
-        count += labelComment(0xFFFF6C48L, "battery_voltage",
-            "34 refs. Battery voltage (float). Read by injector latency, diag.");
+            "32 refs. NAME NO LONGER SETTLED as of 2026-07-26. This address feeds ZERO table-lookup axes, and "
+            + "its only two literal-pool stores are not sensor-like: 0x0273E0 fldi1 fr8 / 0x0273E6 fmov.s fr8,@r2 "
+            + "sets it to exactly 1.0, and 0x0275B4-0x0275C8 adds the calibration float at 0xC41F4 and clamps "
+            + "against 0xC41F8 -- a ramp-to-limit, not an ADC read. The IAT that every definition-named Intake "
+            + "Temperature axis actually reads is 0xFFFF6364. NOT renamed: the write path was not located, and "
+            + "this project has been burned four times by renames on partial evidence. "
+            + "See docs/corrections.md item 23.");
+        count += labelComment(0xFFFF6C48L, "diag_status_code_6C48",
+            "CORRECTED 2026-07-26. BYTE status/result code. NOT battery voltage and NOT a float. Census: "
+            + "34 int8 accesses (13 loads, 21 stores), ZERO FP accesses. Every stored constant is a "
+            + "nibble-doubled sentinel -- 0x00/0x33/0x55/0x77/0xAA/0xBB/0xDD/0xEE (e.g. 0x02C148 mov #-69,r2 ; "
+            + "0x02C14C mov.b r2,@r1 stores 0xBB). A voltage does not take eight discrete hand-written values. "
+            + "Real battery voltage is the float at 0xFFFF4130. See docs/corrections.md item 14.");
 
         // ── ADC / Sensor Raw + Status (0xFFFF61xx-0xFFFF65xx) ──────────────
         count += labelComment(0xFFFF6155L, "adc_channel_status",
             "36 refs. ADC channel status/index (byte). GBR base (4 uses).");
-        count += labelComment(0xFFFF64D8L, "throttle_raw",
-            "29 refs. Throttle raw ADC or secondary throttle.");
+        count += labelComment(0xFFFF64D8L, "accel_pedal_angle",
+            "CORRECTED 2026-07-26. ACCELERATOR PEDAL ANGLE (float, %, 0..100) -- DBW pedal position (APP), "
+            + "not a throttle-plate reading. Was 'throttle_raw'. Proof: 0x03609A fmov.s @r2,fr15 (r2=FFFF64D8) -> "
+            + "0x0360CE jsr 0x0BE830 with delay slot 0x0360D0 fmov fr15,fr4, descriptor 0x0AC5E4, axis 0xCCDA8 = "
+            + "definition-named 'Minimum Primary Open Loop Enrichment (Accelerator) / Accelerator Pedal Angle' "
+            + "(0,20,40,60,80,100). Decisive because the ADJACENT call at 0x0360C4 feeds the (Throttle) variant "
+            + "of the same table from 0xFFFF62DC: the ROM distinguishes pedal from plate in two consecutive "
+            + "instructions. Second site 0x02F9B8 -> axis 0xCC874 'Cranking Fuel IPW Compensation (Accelerator) / "
+            + "Accelerator Pedal Angle'. See docs/corrections.md item 13.");
         count += labelComment(0xFFFF65BDL, "engine_state_byte",
             "34 refs. Engine state byte (cranking/running/etc).");
         count += labelComment(0xFFFF653CL, "o2_sensor_voltage",
             "19 refs. O2 sensor voltage or lambda value.");
 
         // ── Sensor / Input Block (0xFFFF4xxx) ──────────────────────────────
-        count += labelComment(0xFFFF4130L, "atm_pressure_baro",
-            "Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline. Real battery voltage is at FFFF41E0.");
+        count += labelComment(0xFFFF4130L, "battery_voltage",
+            "CORRECTED 2026-07-26. BATTERY VOLTAGE (float, volts). Was 'atm_pressure_baro'; wrong, and the "
+            + "trailing claim that battery voltage lived at FFFF41E0 was wrong too. Two independent "
+            + "definition-named pairings, both through the 2D uint16 lookup 0x0BE944: "
+            + "(a) 0x00894A r3=FFFF4130 ; 0x00894E fmov.s @r3,fr5 ; 0x008954 jsr 0x0BE944 -> descriptor 0x0AF4B0, "
+            + "axis1 0xD91CC = 'Ignition Dwell / Battery Volts' (8,10,12,14,16 V) while FR4 (=FFFF4150) takes "
+            + "axis0 0xD918C 'Ignition Dwell / Engine Speed'; "
+            + "(b) 0x0303C6 r2=FFFF4130 ; 0x0303C8 fmov.s @r2,fr4 ; 0x0303D2 jsr 0x0BE944 -> descriptor 0x0AD7E0, "
+            + "axis0 0xD104C = 'Injector Latency_ / Battery Output' (6.5,9.0,11.5,14.0,16.5 V). "
+            + "EVERY one of the 8 axes this variable feeds spans 6..20; zero pressure-shaped axes. "
+            + "Injector dead-time as f(battery volts, MAP) and dwell as f(RPM, battery volts) are the textbook "
+            + "forms. Barometric pressure is 0xFFFF6898. See docs/corrections.md item 10.");
+
+        // ── Newly identified 2026-07-26 (RAM -> definition-named lookup axis) ──
+        // Each of these was previously unnamed.  Every one is settled by tracing the
+        // variable into a table-lookup call and reading the axis NAME out of the
+        // definition XMLs; the address: bytes -> mnemonic chain is quoted inline.
+        count += labelComment(0xFFFF5CA0L, "boost_error",
+            "IDENTIFIED 2026-07-26. BOOST ERROR (target - actual) -- the Turbo Dynamics input (float; "
+            + "psirelative toexpr x*.01933677, axes -240..+240 raw = -4.64..+4.64 psi). Reached as a struct "
+            + "field, not a pool literal: 0x013BA8 mov.l @(0x013D10),r5 (=FFFF5D18) ; 0x013BAE mov #-120,r0 "
+            + "(SIGN-EXTENDED -- reading this as +136 puts you at the wrong address) ; 0x013BB0 "
+            + "fmov.s @(r0,r5),fr14 => FFFF5D18-120 = FFFF5CA0. FR14 is not rewritten before 0x013C02 / "
+            + "0x013C32 / 0x013C7C, each of which has delay slot fmov fr14,fr4 -> axes 0xC0D04 "
+            + "'Turbo Dynamics Proportional / Boost Error', 0xC0D3C 'Turbo Dynamics Integral Negative / "
+            + "Boost Error', 0xC0D74 'Turbo Dynamics Integral Positive / Boost Error'. 3 of 3 named axes agree. "
+            + "See docs/corrections.md item 22.");
+        count += labelComment(0xFFFF62E4L, "throttle_angle_change",
+            "IDENTIFIED 2026-07-26. THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger value (float, %, "
+            + "axis 0..31.3). 0x03A9BC mov.l @(0x03AA70),r2 (=FFFF62E4) ; 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) "
+            + "; 0x03A9D0 jsr 0x0BE830 -> descriptor 0x0AD368, axis 0xCED08 = 'Throttle Tip-in Enrichment A / "
+            + "Throttle Angle Change'; the alternate branch reaches 0xCED74 'Throttle Tip-in Enrichment B / "
+            + "Throttle Angle Change', selected by the byte at 0xFFFF844F. Tuning-relevant. "
+            + "See docs/corrections.md item 22.");
+        count += labelComment(0xFFFF7324L, "last_calc_base_pulse_width",
+            "IDENTIFIED 2026-07-26. LAST CALCULATED BASE PULSE WIDTH (float; ms toexpr x*.001; axis "
+            + "1000..16000 = 1..16 ms). 0x038DCE mov.l @(0x038E14),r2 (=FFFF7324) ; 0x038DD0 fmov.s @r2,fr4 ; "
+            + "0x038DD8 jsr 0x0BE8E4 with delay fmov fr15,fr5 (FR15 = [FFFF6624] rpm) -> descriptor 0x0AD738, "
+            + "axis0 0xD0760 = 'Per Injector Pulse Width Compensation A / Last Calculated Base Pulse Width', "
+            + "axis1 0xD07A4 = '/ Engine Speed'. Repeated at 0x038DE6/0x038DF2/0x038DFE for compensations "
+            + "B/C/D: 4 of 4 named axes agree. See docs/corrections.md item 22.");
+        count += labelComment(0xFFFF7F4CL, "rpm_current_timing_copy",
+            "IDENTIFIED 2026-07-26. ENGINE SPEED (float, RPM) -- the copy read by the base-timing / "
+            + "knock-advance path. 0x040160 mov.l @(0x040354),r12 (=FFFF7F60) ; 0x040174 mov #-20,r0 ; "
+            + "0x040176 jsr 0x0BE8E4 ; delay 0x040178 fmov.s @(r0,r12),fr5 => FFFF7F60-20 = FFFF7F4C -> "
+            + "descriptor 0x0AE31C, axis1 0xD46CC = 'Base Timing Primary Cruise / Engine Speed'. Six further "
+            + "sites give six more Engine Speed axes (0xD488C Base Timing Primary Non-Cruise, 0xD4A4C/0xD4C0C "
+            + "Base Timing Reference Cruise/Non-Cruise, 0xD58BC/0xD5A7C Knock Correction Advance Max "
+            + "Cruise/Non-Cruise). See docs/corrections.md item 22.");
         count += labelComment(0xFFFF4024L, "sensor_group_base",
             "56 refs. Sensor processing group base. GBR base (1 use). Read by frontO2.");
         count += labelComment(0xFFFF43FCL, "sensor_misc_state",
@@ -2630,7 +2737,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "Lowers level back to 0 at E14A before final call (call_63 @ FBBA). "
             + "PRIMARY ROLE: ADC bulk read + all sensor conditioning. "
             + "ADC workspace GBR base = FFFF4024 (32 channels raw, 0x40 bytes). "
-            + "Produces: MAF(FFFF40B4), TPS(FFFF4108), Baro(FFFF4130), ECT(FFFF4144), "
+            + "Produces: MAF(FFFF40B4), TPS(FFFF4108), BatteryVolts(FFFF4130 -- was 'Baro', "
+            + "CORRECTED 2026-07-26), ECT(FFFF4144), "
             + "IAT(FFFF4128), Battery(FFFF41E0), MAP(FFFF43FC), cam_angle(FFFF40C8), "
             + "inj_dead_time(FFFF4280), knock signals(FFFF4309). "
             + "Also updates: AVCS/VVT solenoid output (0xF6EA I/O), ol_dispatch_gate (FFFF8EDC). "
@@ -2683,7 +2791,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "Written by Task 10 call_29 from raw FFFF4032 via ROM table 0xC4A74.");
         count += labelComment(0xFFFF4138L, "baro_correction_factor",
             "Atmospheric / Baro correction factor (float). Written by Task 10 calls 44 and 58. "
-            + "Derived from Baro ADC output (FFFF4130).");
+            + "Derived from the ADC output at FFFF4130, which is BATTERY VOLTAGE, not baro "
+            + "(CORRECTED 2026-07-26; baro is FFFF6898).");
         count += labelComment(0xFFFF41DCL, "maf_correction_factor",
             "MAF correction factor (float). Written by Task 10 calls 45 and 56. "
             + "Used to adjust MAF-based fuel calculation.");
@@ -3933,7 +4042,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0AC5A8L, "desc_1D_range_10_0_i16_6",
             "RR: Primary Open Loop Fueling Compensation (Timing Compensation)_");
         count += labelComment(0x0AC5D0L, "desc_1D_range_11_89_i16_6",
-            "Minimum Primary Open Loop Enrichment (Throttle). Axis=throttle_raw (FFFF64D8), "
+            "Minimum Primary Open Loop Enrichment (Throttle). NOTE the ROM feeds the (Throttle) variant "
+            + "from FFFF62DC (throttle plate angle) and the (Accelerator) variant from FFFF64D8 "
+            + "(accelerator pedal angle) in adjacent instructions at 0x0360C4/0x0360CE. "
+            + "'throttle_raw' for FFFF64D8 was corrected 2026-07-26. "
             + "range 10.93-89.06%. Input at ROM 0x0360BE. NOT MAF-indexed.");
         count += label(0x0AC760L, "desc_1D_range_300_650_i16_8");
         count += label(0x0ACE6CL, "desc_1D_range_0_0_u8_9");
@@ -4942,7 +5054,11 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Fuel Calculation & Output ──
         count += labelComment(0x000303C2L, "injector_dead_time_calc",
-            "Dead time table lookup. Inputs: FR4=[FFFF4130], FR5=[FFFF6210], "
+            "Dead time table lookup (descriptor 0x0AD7E0, via the 2D uint16 helper 0x0BE944). "
+            + "Inputs: FR4=[FFFF4130] = BATTERY VOLTAGE -> axis 0xD104C 'Injector Latency_ / Battery Output' "
+            + "(6.5..16.5 V); FR5=[FFFF6210] = MANIFOLD PRESSURE (relative) -> axis 0xD1060 "
+            + "'Injector Latency_ / Manifold Pressure' (-1000..1000 raw = -19.3..+19.3 psi rel). "
+            + "Both settled 2026-07-26; FFFF4130 was 'atm_pressure_baro'. "
             + "descriptor 0xAD7E0 (InjLat 5x3, VBatt axis 6.5-16.5V). "
             + "Calls 0xBE944 (2D interp), stores uint16 result to FFFF7350, "
             + "then calls 0x9E4A stub to write FFFF4280. Also calls 0xBE598 "
@@ -6315,8 +6431,13 @@ public class ImportAE5L600L extends GhidraScript {
         // --- sensor_data (17 labels) ---
         count += labelComment(0xFFFF4144L, "ect_output_fmac",
             "ECT output (degrees C, float). ADC pipeline ADDR29 -> FMAC call_08.");
-        count += labelComment(0xFFFF4254L, "afr_lambda_workspace",
-            "O2/AFR lambda workspace (float). Task10 call_48 output for lambda ratio calculation.");
+        count += labelComment(0xFFFF4254L, "flag_4254",
+            "CORRECTED 2026-07-26. BYTE boolean in the 0xFFFF4235-0xFFFF425F injection/O2 sequencing flag "
+            + "cluster. NOT a lambda value and NOT a float. Census: 9 int8 accesses (7 stores, 2 loads), "
+            + "ZERO FP accesses; the only values ever written are the literals 0 (0x0089EC, alongside zeroing "
+            + "0xFFFF4237 and 0xFFFF4252) and 1 (0x008D9A). No float access exists anywhere in that address "
+            + "run, so no struct offset can rescue the old claim. The specific meaning of the flag is "
+            + "UNRESOLVED -- deliberately not named after a quantity. See docs/corrections.md item 20.");
         count += labelComment(0xFFFF425FL, "injection_state_flag",
             "Injection channel enable/disable state flag (byte). Checked by injection_state_machine at 0x9106.");
         count += labelComment(0xFFFF447BL, "maf_timer_counter",
@@ -6428,12 +6549,23 @@ public class ImportAE5L600L extends GhidraScript {
             "Knock sensor state variable B. Knock/FLKC cluster.");
         count += labelComment(0xFFFF8A74L, "knock_flkc_state",
             "Knock/FLKC state variable");
-        count += labelComment(0xFFFF8C98L, "timing_workspace_B",
-            "Timing calculation workspace B (float). Adjacent to timing_workspace_A.");
+        count += labelComment(0xFFFF8C98L, "dtc_counter_struct_8C98",
+            "CORRECTED 2026-07-26. Base of a uint16 DIAGNOSTIC COUNTER STRUCT: +0 u16 counter, +2 u16 counter, "
+            + "+8 u8 verdict flag. NOT a float timing workspace. Census: 5 int16 (mov.w) accesses, ZERO FP. "
+            + "Both counters are driven through the saturating u16 helper 0x0BE554 (0x055F7A for +2, 0x055FA4 "
+            + "for +0) and reset to 0 at 0x055FB0; the +2 counter is compared against the uint16 calibration at "
+            + "0xD61C8 (0x055F8C) and the verdict written as a byte to +8 (0x055F96). The old 'float' claim "
+            + "rested only on adjacency to timing_workspace_A -- adjacency is not evidence. "
+            + "See docs/corrections.md item 18.");
         count += labelComment(0xFFFF8CE0L, "knock_timing_retard_base",
             "Knock timing retard workspace base (struct, 116 bytes). Per-cylinder knock state machine.");
-        count += labelComment(0xFFFF8CFCL, "timing_workspace_extended",
-            "Extended timing calculation workspace (float). Knock/timing intermediate result.");
+        count += labelComment(0xFFFF8CFCL, "knock_struct_flag_8CFC",
+            "CORRECTED 2026-07-26. BYTE boolean field at +0x1C in the 0xFFFF8CE0 knock/timing struct. NOT a "
+            + "float. Census: 5 int8 accesses, ZERO FP. This is the one address where the 'byte field inside a "
+            + "float struct' escape was genuinely available and it still fails: the struct DOES hold floats at "
+            + "+0x08/+0x0C/+0x10/+0x18, but not at this offset, and 0xFFFF8D04 beside it is int8 too. Set to 1 "
+            + "at 0x056CD0 after byte preconditions on 0xFFFF366C, the calibration byte at 0xD6177 and "
+            + "0xFFFF307C; read as cmp/eq #1 / tst. See docs/corrections.md item 19.");
         count += labelComment(0xFFFF8D04L, "ign_ext_counter_A",
             "Ignition extended workspace counter. Near timing_workspace_A.");
         count += labelComment(0xFFFF8D2CL, "ign_ext_workspace_B",
@@ -7113,8 +7245,14 @@ public class ImportAE5L600L extends GhidraScript {
             "GBR workspace base (1 use). Region: engine state.");
         count += labelComment(0xFFFF8550L, "gbr_eng_8550",
             "GBR workspace base (1 use). Region: engine state.");
-        count += labelComment(0xFFFF8558L, "gbr_eng_8558",
-            "GBR workspace base (1 use). Region: engine state.");
+        count += labelComment(0xFFFF8558L, "requested_torque",
+            "IDENTIFIED 2026-07-26. REQUESTED / CALCULATED ENGINE TORQUE -- the X-axis input that selects the "
+            + "Target Boost column (float, raw ecu value 0..350). Was 'gbr_eng_8558' (unnamed placeholder). "
+            + "Proof: 0x0139FE mov.l @(0x013AD4),r2 (=FFFF8558) ; 0x013A00 fmov.s @r2,fr4 ; 0x013A20 "
+            + "jsr 0x0BE8E4 -> descriptor 0x0AA9F0, axis0 0xC12D8 = 'Target Boost_ / Requested Torque' "
+            + "(0,100,170,200,240,280,310,320,330,340,350); FR5 on axis1 is 0xFFFF6624 rpm. This is the boost "
+            + "control entry point -- the same function then folds in the ECT, IAT and Atm. Pressure "
+            + "compensations. Directly tuning-relevant. float x6 + int32 x1. See docs/corrections.md item 22.");
         count += labelComment(0xFFFF8560L, "gbr_eng_8560",
             "GBR workspace base (1 use). Region: engine state.");
         count += labelComment(0xFFFF8564L, "gbr_eng_8564",

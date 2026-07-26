@@ -29,6 +29,52 @@ Total addresses: 858 | Named: 497 | Unnamed: 361 (low-ref infrastructure, exclud
   Full evidence: docs/corrections.md item 9
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! CORRECTIONS 2026-07-26 (SECOND PASS) -- 12 MORE IDENTITIES WERE WRONG    !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!!   FFFF4130 : was atm_pressure_baro   -> BATTERY VOLTAGE (float, volts)
+!!   FFFF6898 : was manifold_pressure   -> ATMOSPHERIC PRESSURE (float, 440..760)
+!!   FFFF6364 : was ect_startup         -> INTAKE AIR TEMPERATURE (float, degC)
+!!   FFFF62DC : was fuel_rate           -> THROTTLE PLATE OPENING ANGLE (float)
+!!   FFFF64D8 : was throttle_raw        -> ACCELERATOR PEDAL ANGLE (float, 0..100%)
+!!   FFFF67EC : was atm_pressure_current-> uint16 DTC MATURATION COUNTER (not float)
+!!   FFFF6C48 : was battery_voltage     -> BYTE diag status code (not float)
+!!   FFFF65C0 : was throttle_position   -> BYTE diag precondition flag (not float)
+!!   FFFF6254 : was maf_current         -> BYTE flag (not float, not airflow)
+!!   FFFF8C98 : was timing_workspace_B  -> uint16 DTC counter struct (not float)
+!!   FFFF8CFC : was timing_workspace_ex.-> BYTE flag in knock struct (not float)
+!!   FFFF4254 : was afr_lambda_workspace-> BYTE flag (not float, not lambda)
+
+  Same mechanical method as the first pass, extended to all EIGHT table-lookup
+  entry points (0x0BE830/874/88C/8AC/8C4 1D and 0x0BE8E4/928/944 2D) rather than
+  only the two float ones. Both proofs that 0xFFFF4130 is battery voltage run
+  through 0x0BE944, which the two-entry-point trace never followed.
+
+  DO NOT re-derive these from other derived files. Every claim above is cited to
+  address: bytes -> mnemonic in the per-address Description column below.
+
+  NOT renamed, deliberately -- evidence insufficient (see docs/corrections.md
+  item 23 for the exact evidence that would settle each):
+!!     FFFF69F0 iat_input_float   -- feeds ZERO lookup axes; its only stores set
+!!                                   it to 1.0 and ramp it to a clamp. The claim
+!!                                   on the FFFF63F8 line that "Real IAT is" this
+!!                                   address is NO LONGER SETTLED. FFFF6364 is
+!!                                   the IAT the cal tables actually read.
+!!     FFFF4150  1 site -> "Ignition Dwell / Engine Speed" (rpm-like, float x7)
+!!     FFFF63C0  1 site -> "MAF Compensation (IAT) / Mass Airflow" (computed addr)
+!!     FFFF40E0  1 site -> "Front Oxygen Sensor"; ATU_output_ctrl name unsupported
+!!     FFFFA198  36 rpm-shaped axes, none NAMED in the XMLs (envelope only)
+!!     FFFF6634  2 sites -> "Idle Speed Stability A / Engine Speed Delta"
+!!     FFFF89C8  1 site  -> "Idle Speed Stability A / Idle Speed Error"
+!!     FFFF63C4  ect_compensation -- 3-way axis split (VVT error / MAF / unnamed)
+!!     FFFF63CC  ram_ECT -- 1 named hit, the "Smoothed MAF" X axis 0xD9280 (g/s)
+!!     FFFF5FFC  io_state_register -- float x22 feeding 12 numeric axes; the
+!!                                   "I/O state register" name is refuted, replacement unknown
+
+  Full evidence: docs/corrections.md items 10-23
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 All addresses with >= 5 refs are named. Top 200 most-referenced: 100% coverage.
 Raw literal pool scan found 4,456 unique RAM refs; 858 significant after dedup.
 Sources: Ghidra import (373), Task10 analysis (61), manual (29), ram_map_raw (501), map_switching_analysis (20)
@@ -43,22 +89,22 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
     135  0xFFFF65FC  vehicle_speed_kmh                    CORRECTED 2026-07-26: VEHICLE SPEED (km/h, float), NOT engine load. See docs/corrections.md item 9.
     118  0xFFFF399E  dtc_maturation_timer                 118 refs. DTC maturation timer/counter. Read primarily 
     107  0xFFFFAD52  diag_session_state                   107 refs. Diagnostic session state. Read by diag/DTC fr
-     99  0xFFFF67EC  atm_pressure_current                 99 refs. Atmospheric/barometric pressure (float). Read 
+     99  0xFFFF67EC  dtc_maturation_counter_67EC          CORRECTED 2026-07-26: uint16 DTC MATURATION COUNTER at +4 in the 0xFFFF67E8 block, NOT atmospheric pressure and NOT an FP value. int16 x99, 0 FP accesses (every site mov.w). Reset to 0 at 0x023AA8, incremented via the saturating u16 helper 0x0BE554 at 0x023AB2, compared against the uint16 calibration at 0xC0212 (=306) at 0x01207E. Baro is the FP value at 0xFFFF6898. corrections.md item 15.
      97  0xFFFF8E98  cl_state_struct                      97 refs. CL monitoring state struct (15+ bytes). Base f
      92  0xFFFF3B06  diag_indexed_lookup_table            Diagnostic indexed lookup table. Accessed at FFFF3B06 +
-     89  0xFFFF65C0  throttle_position                    89 refs. Throttle position (float). Read by AFL, timing
-     86  0xFFFF63F8  engine_load_current                  CORRECTED 2026-07-26: ENGINE LOAD (g/rev, float), NOT IAT. Real IAT is 0xFFFF69F0. See corrections.md item 9.
-     77  0xFFFF4130  atm_pressure_baro                    77 refs. Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline.
+     89  0xFFFF65C0  diag_precondition_flag_65C0          CORRECTED 2026-07-26: BYTE boolean in the 0xFFFF65B7-0xFFFF65C6 flag block, NOT throttle position and NOT an FP value. int8 x89, 0 FP accesses. Read as cmp/eq #1 to gate DTC maturation counters (0x01573C/0x015748, 0x01F798, 0x023C7A). Pedal angle is 0xFFFF64D8, throttle plate angle 0xFFFF62DC. Which monitor it gates is UNRESOLVED -- do not invent one. corrections.md item 16.
+     86  0xFFFF63F8  engine_load_current                  CORRECTED 2026-07-26: ENGINE LOAD (g/rev, float), NOT IAT. IAT is 0xFFFF6364 (see item 12; the item-9 claim that IAT was 0xFFFF69F0 is RETRACTED). See corrections.md items 9 + 12.
+     77  0xFFFF4130  battery_voltage                      CORRECTED 2026-07-26: BATTERY VOLTAGE (float, volts), NOT atmospheric/baro. Feeds axis 0xD104C "Injector Latency_ / Battery Output" (6.5..16.5 V) as FR4 at 0x0303C8, and axis 0xD91CC "Ignition Dwell / Battery Volts" (8..16 V) as FR5 at 0x00894E. All 8 axes it feeds span 6..20. float x77, 0 int. corrections.md item 10.
      76  0xFFFF3836  io_ign_driver_ctrl                   InternalIO ignition driver control register (31 refs).
      69  0xFFFF6354  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float). Re
      69  0xFFFFADAC  diag_request_state                   69 refs. Diagnostic request/response state. Read by DTC
      60  0xFFFF85D7  fuel_system_state                    60 refs. Fuel system state byte. Read by AFC, AFL, idle
      56  0xFFFF4024  ATU_primary_ctrl                     ATU primary control register. 36 code refs — master inj
-     56  0xFFFF61CC  diag_monitor_status_bytes            CORRECTED 2026-07-26: BYTE array of diag monitor status. 26 int8 accesses, ZERO float. NOT speed.
-     51  0xFFFF6254  maf_current                          51 refs. MAF sensor value (float, g/s). Read by AFL pip
+     56  0xFFFF61CC  diag_monitor_status_bytes            CORRECTED 2026-07-26: BYTE array of diag monitor status. 26 int8 accesses, zero FP accesses. NOT speed. (Wording changed 2026-07-26: the old text said Z-E-R-O f-l-o-a-t and coverage_map.py's contradiction scan matched that word inside the correction itself, flagging a false CONFLICT. corrections.md item 21.)
+     51  0xFFFF6254  flag_6254                            CORRECTED 2026-07-26: BYTE boolean at +4 in the 0xFFFF6250 block, NOT mass airflow and NOT an FP value. int8 x51, 0 FP accesses. Set to 1 with its siblings +2/+3/+5/+9 in one run at 0x01DA9C-0x01DAA4; consumed as cmp/eq #1 (0x01D5A8, 0x025148). The real MAF variable is UNIDENTIFIED -- no axis in either XML is named MAF/airflow, so the axis-name method cannot locate it. corrections.md item 17.
      48  0xFFFF25CC  system_tick_counter                  48 refs. System tick/event counter.
-     48  0xFFFF6364  ect_startup                          48 refs. ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Read by AFL, delay_manager_B, timing blend.
-     48  0xFFFF6898  manifold_pressure                    48 refs. Manifold pressure (float). Read by frontO2, PS
+     48  0xFFFF6364  iat_current                          CORRECTED 2026-07-26: INTAKE AIR TEMPERATURE (float, degC raw; defs display (x*1.8)+32 degF), NOT ECT-at-start. 0x013A0C fmov.s @r2,fr15 -> 0x013A3A delay fmov fr15,fr4 -> desc 0x0AA974 axis 0xC0E24 "Target Boost Compensation (IAT)_ / Intake Temperature" (-20..40 C); second site 0x04042A -> desc 0x0ADC14 axis 0xD3248 "Timing Compensation A (IAT) / Intake Temperature". Zero coolant axes. float x48. corrections.md item 12.
+     48  0xFFFF6898  atm_pressure_current                 CORRECTED 2026-07-26: ATMOSPHERIC / BAROMETRIC PRESSURE (float, raw mmHg-class 440..760 = 8.5..14.7 psi abs), NOT manifold pressure and NOT rpm_delta. 0x013B02 mov.l @(0x013CCC),r2 ; 0x013B04 fmov.s @r2,fr4 -> desc 0x0AA99C axis0 0xC0E94 "Target Boost Compensation (Atm. Pressure)_ / Atmospheric Pressure". float x48. corrections.md item 11.
      45  0xFFFF3480  cal_mirror_base                      45 refs. Calibration mirror base. Referenced by various
      43  0xFFFF620C  manifold_pressure_map                CORRECTED 2026-07-26: MANIFOLD PRESSURE, not MAF airflow. Feeds axis 0xCC840 "Manifold Pressure".
      43  0xFFFF63C4  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
@@ -68,7 +114,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      36  0xFFFF6155  adc_channel_status                   36 refs. ADC channel status/index (byte). GBR base (4 u
      36  0xFFFFAF3B  comms_state_byte                     36 refs. Communications protocol state byte.
      34  0xFFFF65BD  engine_state_byte                    34 refs. Engine state byte (cranking/running/etc).
-     34  0xFFFF6C48  battery_voltage                      34 refs. Battery voltage (float). Read by injector late
+     34  0xFFFF6C48  diag_status_code_6C48                CORRECTED 2026-07-26: BYTE status/result code, NOT battery voltage and NOT an FP value. int8 x34, 0 FP accesses. Takes only nibble-doubled sentinels 00/33/55/77/AA/BB/DD/EE (e.g. 0x02C148 mov #-69,r2 ; 0x02C14C mov.b r2,@r1). Battery volts is the FP value at 0xFFFF4130. corrections.md item 14.
      33  0xFFFF5BE3  clutch_state                         33 refs. Clutch engagement state (task50 map switching). Was peripheral_status.
      33  0xFFFF8EDC  ol_dispatch_gate                     OL enrichment dispatch gate (byte). Checked by all 4 OL
      32  0xFFFF69F0  iat_input_float                      32 refs. Intake air temperature (float, -40..120 C). Read by AFL, startup enrichment. GBR base
@@ -77,7 +123,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      32  0xFFFFACE0  diag_output_buffer                   32 refs. Diagnostic output buffer pointer.
      30  0xFFFF81F0  knock_learning_value                 30 refs. Knock learning value (task50). Was knock_state_base.
      30  0xFFFF9094  sched_task_GBR                       36 refs. Scheduler task GBR base (6 GBR uses).
-     29  0xFFFF64D8  throttle_raw                         29 refs. Throttle raw ADC or secondary throttle.
+     29  0xFFFF64D8  accel_pedal_angle                    CORRECTED 2026-07-26: ACCELERATOR PEDAL ANGLE (float, %, 0..100) -- DBW pedal position (APP), not throttle plate. 0x03609A fmov.s @r2,fr15 -> 0x0360D0 delay fmov fr15,fr4 -> desc 0x0AC5E4 axis 0xCCDA8 "Minimum Primary Open Loop Enrichment (Accelerator) / Accelerator Pedal Angle". Fed in the same block, adjacent to the 0xFFFF62DC (Throttle) call. float x27. corrections.md item 13.
      26  0xFFFF87E4  timing_correction_A                  26 refs. Timing correction value A.
      25  0xFFFF3674  timer_counter_C                      25 refs. Timer/counter C.
      25  0xFFFF367C  timer_counter_B                      25 refs. Timer/counter B.
@@ -98,7 +144,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      21  0xFFFFAD50  diag_session_state_B                 Diagnostic session state variable B
      20  0xFFFF233C  timer_config_block                   Timer configuration block (16 bytes). Injection timing 
      20  0xFFFF4144  ect_output_fmac                      ECT output (degrees C, float). ADC pipeline ADDR29 -> FMAC call_08.
-     20  0xFFFF62DC  fuel_rate                            20 refs. Fuel injection rate (float). Read by timing, b
+     20  0xFFFF62DC  throttle_plate_angle                 CORRECTED 2026-07-26: THROTTLE PLATE OPENING ANGLE (float; defs toexpr x/.84 => %), NOT fuel rate and NOT engine load. 0x036096 fmov.s @r2,fr4 (FR4 untouched on the path to the call) -> 0x0360C4 jsr 0x0BE830, desc 0x0AC5D0 axis 0xCCD88 "Minimum Primary Open Loop Enrichment (Throttle) / Throttle Plate Opening Angle" (10.93..89.06). float x18. corrections.md item 13.
      20  0xFFFF65BF  accel_state                          Acceleration state flag (task50 map switching). Was warmup_transition_flag_B.
      20  0xFFFF7F08  ignition_timing_workspace            Ignition timing workspace variable (float). Multiple re
      20  0xFFFF837E  idle_control_GBR                     39 refs. Idle control GBR base (19 GBR uses). Primary G
@@ -171,9 +217,9 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      10  0xFFFF7864  fuel_enrichment_state                Fuel enrichment state (float). Near fuel_enrichment_B (0xFFFF7878).
      10  0xFFFF7D04  fuel_timing_state_B                  Fuel/timing state variable B. Fuel/timing region.                                  
       9  0xFFFF3444  dtc_idle_enable_cond                  DTC idle control enable condition flag (byte). Cal mirror for P0506-P050A diagnostic preconditions.
-      9  0xFFFF4254  afr_lambda_workspace                 O2/AFR lambda workspace (float). Task10 call_48 output for lambda ratio calculation.
+      9  0xFFFF4254  flag_4254                            CORRECTED 2026-07-26: BYTE boolean in the 0xFFFF4235-0xFFFF425F injection/O2 sequencing flag cluster, NOT a lambda value and NOT an FP value. int8 x9, 0 FP accesses; only ever written the literals 0 (0x0089EC) and 1 (0x008D9A). No FP access anywhere in that address run. Meaning of the flag is UNRESOLVED. corrections.md item 20.
       9  0xFFFF85DC  knock_fuel_interlock                  Knock/fuel interlock control byte. Between fuel_system_state and fuel_knock_state_var; gates knock-to-fuel feedback.
-      9  0xFFFF8C98  timing_workspace_B                   Timing calculation workspace B (float). Adjacent to timing_workspace_A.
+      9  0xFFFF8C98  dtc_counter_struct_8C98              CORRECTED 2026-07-26: base of a uint16 DIAGNOSTIC COUNTER STRUCT (+0 u16 counter, +2 u16 counter, +8 u8 verdict), NOT a timing FP workspace. int16 x5, 0 FP accesses. Both counters go through the saturating u16 helper 0x0BE554 (0x055F7A, 0x055FA4) and reset to 0 at 0x055FB0; +2 is compared against the uint16 calibration at 0xD61C8. The FP-width claim rested only on adjacency to timing_workspace_A. corrections.md item 18.
       9  0xFFFF8CE0  knock_timing_retard_base              Knock timing retard workspace base (struct, 116 bytes). Per-cylinder knock state machine.
       9  0xFFFF8EA8  sched_control_GBR                    14 refs. Scheduler control GBR base (5 GBR uses).
       9  0xFFFF8EDE  sensor_filter_workspace               O2 sensor rate-of-change filter workspace. CL entry validation via sub 0xC8E8.
@@ -195,7 +241,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
       7  0xFFFF69FC  ect_input_float                      ECT input value for fuel/ignition lookups (float). Startup enrichment / fueling pipeline.
       7  0xFFFF7878  fuel_enrichment_B                    Fuel enrichment term B (float). Summed with A+C.
       7  0xFFFF81F8  knock_thresh_config                  Knock threshold config workspace (GBR base). Task04/10.                                  
-      7  0xFFFF8CFC  timing_workspace_extended             Extended timing calculation workspace (float). Knock/timing intermediate result.
+      7  0xFFFF8CFC  knock_struct_flag_8CFC               CORRECTED 2026-07-26: BYTE boolean field at +0x1C in the 0xFFFF8CE0 knock/timing struct, NOT an FP workspace. int8 x5, 0 FP accesses. The struct does hold floats (+0x08/+0x0C/+0x10/+0x18) but not at this offset. Set to 1 at 0x056CD0 after byte preconditions; read as cmp/eq #1. corrections.md item 19.
       7  0xFFFF8F08  cl_readiness_A_input                 CL readiness A input (byte). Copied to FFFF744C. When n
       7  0xFFFF980C  sched_periodic_GBR                   7 refs. Scheduler periodic timer GBR base (4 GBR uses).
       7  0xFFFF9FBC  sched_timer_extended_C                Scheduler timer extension C (GBR base). Adjacent to sched_timer_base cluster.
@@ -240,8 +286,19 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
       5  0xFFFF5F99  sensor_burst_buf_5                   Sensor data burst buffer byte 5.
 
 
+NEWLY IDENTIFIED 2026-07-26 (below the top-200 ref count; same columns as above)
+--------------------------------------------------------------------------------------------------------------
+   Refs  Address     Name                                 Description
+  -----  ----------  -----------------------------------  -------------------------------------------------------
+      0  0xFFFF5CA0  boost_error                          NEW 2026-07-26: BOOST ERROR (target - actual), the Turbo Dynamics input (float; toexpr x*.01933677 => psi; axes -240..+240 raw = -4.64..+4.64 psi). Struct field, no pool literal: 0x013BA8 r5=0xFFFF5D18 ; 0x013BAE mov #-120,r0 (SIGN-EXTENDED) ; 0x013BB0 fmov.s @(r0,r5),fr14 => 0xFFFF5CA0. FR14 unmodified through 0x013C02/0x013C32/0x013C7C, each with delay fmov fr14,fr4 -> axes 0xC0D04/0xC0D3C/0xC0D74, 3 of 3 named "Boost Error". corrections.md item 22.
+      3  0xFFFF62E4  throttle_angle_change                NEW 2026-07-26: THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger (float, %, axis 0..31.3). 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) -> 0x03A9D0 jsr 0x0BE830, desc 0x0AD368 axis 0xCED08 "Throttle Tip-in Enrichment A / Throttle Angle Change". float x3. corrections.md item 22.
+      3  0xFFFF7324  last_calc_base_pulse_width           NEW 2026-07-26: LAST CALCULATED BASE PULSE WIDTH (float; defs toexpr x*.001 => ms; axis 1000..16000 = 1..16 ms). 0x038DD0 fmov.s @r2,fr4 -> 0x038DD8 jsr 0x0BE8E4, desc 0x0AD738 axis0 0xD0760 "Per Injector Pulse Width Compensation A / Last Calculated Base Pulse Width"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x3. corrections.md item 22.
+      1  0xFFFF7F4C  rpm_current_timing_copy              NEW 2026-07-26: ENGINE SPEED (float, RPM) -- the copy used by the base-timing / knock-advance path. 0x040160 r12=0xFFFF7F60 ; 0x040174 mov #-20,r0 ; 0x040178 fmov.s @(r0,r12),fr5 => 0xFFFF7F4C, desc 0x0AE31C axis1 0xD46CC "Base Timing Primary Cruise / Engine Speed". float x2. corrections.md item 22.
+      7  0xFFFF8558  requested_torque                     NEW 2026-07-26: REQUESTED / CALCULATED ENGINE TORQUE -- the X-axis input of the Target Boost table (float, raw ecu value 0..350). 0x013A00 fmov.s @r2,fr4 -> 0x013A20 jsr 0x0BE8E4, desc 0x0AA9F0 axis0 0xC12D8 "Target Boost_ / Requested Torque"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x6 + int32 x1. corrections.md item 22.
+
 FULL ALPHABETICAL INDEX (named addresses only)
 --------------------------------------------------------------------------------------------------------------
+  accel_pedal_angle                         0xFFFF64D8    29 refs  CORRECTED 2026-07-26: ACCELERATOR PEDAL ANGLE (float, %, 0..100) -- DBW pedal position (APP), not throttle plate. 0x03609A fmov.s @r2,fr15 -> 0x0360D0 delay fmov fr15,fr4 -> desc 0x0AC5E4 axis 0xCCDA8 "Minimum Primary Open Loop Enrichment (Accelerator) / Accelerator Pedal Angle". Fed in the same block, adjacent to the 0xFFFF62DC (Throttle) call. float x27. corrections.md item 13.
   accel_state                               0xFFFF65BF    20 refs  Acceleration state flag (task50 map switching). Was warmup_transition_flag_B.
   adc_channel_status                        0xFFFF6155    36 refs  36 refs. ADC channel status/index (byte)
   adc_conditioning_ws_A                     0xFFFF6134     6 refs  ADC conditioning workspace A (GBR base)
@@ -250,7 +307,6 @@ FULL ALPHABETICAL INDEX (named addresses only)
   adc_processed_misc                        0xFFFF682C    22 refs  ADC processed miscellaneous sensor value
   adc_processed_secondary                   0xFFFF6430    19 refs  ADC processed secondary sensor value
   adc_processed_temp                        0xFFFF6598     8 refs  ADC processed intermediate sensor value (float)
-  afr_lambda_workspace                      0xFFFF4254     9 refs  O2/AFR lambda workspace (float)
   afc_aggregator_output                     0xFFFF7904     0 refs  AFC final correction output (float).
   afc_axis_val_A                            0xFFFF78B0     0 refs  AFC additional axis value A (float). Inp
   afc_clamped_output                        0xFFFF7820     0 refs  AFC clamped output (float). Stage 8 outp
@@ -303,13 +359,10 @@ FULL ALPHABETICAL INDEX (named addresses only)
   afr_init_flag_D                           0xFFFF7BBB     0 refs  AFR deviation init flag D (byte). Set by
   afr_init_flag_E                           0xFFFF7BBC     0 refs  AFR deviation init flag E (byte). Set by
   aggregator_struct_base                    0xFFFF7828     0 refs  Major struct base for fuel aggregation (
-  manifold_pressure_map                     0xFFFF620C    43 refs  CORRECTED 2026-07-26: manifold pressure, not MAF.
   alt_blend_ratio                           0xFFFF7F1C     0 refs  Alternative blend ratio (task50).
   atm_blend_correction                      0xFFFF7F6C     0 refs  Atmospheric correction (task33).
-  ect_startup                               0xFFFF6364    48 refs  ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Was mislabeled atm_pressure.
-  atm_pressure_current                      0xFFFF67EC    99 refs  99 refs. Atmospheric/barometric pressure
+  atm_pressure_current                      0xFFFF6898    48 refs  CORRECTED 2026-07-26: ATMOSPHERIC / BAROMETRIC PRESSURE (float, raw mmHg-class 440..760 = 8.5..14.7 psi abs), NOT manifold pressure and NOT rpm_delta. 0x013B02 mov.l @(0x013CCC),r2 ; 0x013B04 fmov.s @r2,fr4 -> desc 0x0AA99C axis0 0xC0E94 "Target Boost Compensation (Atm. Pressure)_ / Atmospheric Pressure". float x48. corrections.md item 11.
   atu_counter_threshold                     0xFFFF4124     0 refs  ATU counter/threshold channel. Used by I
-  atu_timer_period                          0xFFFF447C     5 refs  ATU timer period/register (word)
   atu_interp_float_state                    0xFFFF8DA0     0 refs  Per-channel float state for crank-angle 
   atu_lower_threshold                       0xFFFF8DAC     0 refs  ATU lower threshold array (2×uint16). Co
   ATU_output_ctrl                           0xFFFF40E0     0 refs  ATU output control register. 5 refs — in
@@ -318,6 +371,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   atu_output_timing_chC                     0xFFFF44BC     0 refs  ATU output timing channel C. Written by 
   atu_output_timing_chD                     0xFFFF44C0     0 refs  ATU output timing channel D. Written by 
   ATU_primary_ctrl                          0xFFFF4024    56 refs  ATU primary control register. 36 code re
+  atu_timer_period                          0xFFFF447C     5 refs  ATU timer period/register (word)
   atu_upper_threshold                       0xFFFF8DA8     0 refs  ATU upper threshold array (2×uint16). Co
   baro_correction_factor                    0xFFFF4138     0 refs  Atmospheric / Baro correction factor (fl
   barometric_pressure                       0xFFFF63FC     0 refs  Barometric/atmospheric pressure (float).
@@ -325,7 +379,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   base_fuel_table_output                    0xFFFF7400     0 refs  Base fuel table output (float).
   base_timing_offset                        0xFFFF8000     0 refs  Base timing reference (task50). Was gbr_base_percond_ws.
   base_timing_output                        0xFFFF7F64     0 refs  Base timing output (float). Written by t
-  battery_voltage                           0xFFFF6C48    34 refs  34 refs. Battery voltage (float). Read b
+  battery_voltage                           0xFFFF4130    77 refs  CORRECTED 2026-07-26: BATTERY VOLTAGE (float, volts), NOT atmospheric/baro. Feeds axis 0xD104C "Injector Latency_ / Battery Output" (6.5..16.5 V) as FR4 at 0x0303C8, and axis 0xD91CC "Ignition Dwell / Battery Volts" (8..16 V) as FR5 at 0x00894E. All 8 axes it feeds span 6..20. float x77, 0 int. corrections.md item 10.
   batv_calibrated                           0xFFFF432C     0 refs  Battery Voltage calibrated float (output
   blend_correction_C                        0xFFFF7F74     0 refs  Third blend correction (task50).
   boost_correction_output                   0xFFFF8B80     0 refs  Feedback correction value (float). Outpu
@@ -335,24 +389,25 @@ FULL ALPHABETICAL INDEX (named addresses only)
   boost_desc_C_result                       0xFFFF8BB4     0 refs  Desc 0xAEFFC result: error correction fr
   boost_enable_flag                         0xFFFF8BD0     0 refs  Boost control enable byte (u8, 0/1). Set
   boost_error                               0xFFFF8B54     0 refs  Boost error: target - actual (float). Co
+  boost_error                               0xFFFF5CA0     0 refs  NEW 2026-07-26: BOOST ERROR (target - actual), the Turbo Dynamics input (float; toexpr x*.01933677 => psi; axes -240..+240 raw = -4.64..+4.64 psi). Struct field, no pool literal: 0x013BA8 r5=0xFFFF5D18 ; 0x013BAE mov #-120,r0 (SIGN-EXTENDED) ; 0x013BB0 fmov.s @(r0,r5),fr14 => 0xFFFF5CA0. FR14 unmodified through 0x013C02/0x013C32/0x013C7C, each with delay fmov fr14,fr4 -> axes 0xC0D04/0xC0D3C/0xC0D74, 3 of 3 named "Boost Error". corrections.md item 22.
   boost_error_filtered                      0xFFFF8B88     0 refs  Filtered boost error (float). IIR-filter
   boost_error_prev                          0xFFFF8BC0     0 refs  Previous boost error (float). History sh
   boost_feedback_trim                       0xFFFF8BC4     0 refs  Boost feedback trim workspace base (floa
   boost_gbr_base                            0xFFFF8B50     0 refs  Boost control GBR base. Current target v
   boost_ign_switch_filter_ws                0xFFFF8B9C     0 refs  Ignition switch EMA filter workspace (st
   boost_maf_error                           0xFFFF8B58     0 refs  MAF error: maf_left - target (float). In
-  iat_input_float                           0xFFFF69F0    32 refs  32 refs. Intake air temperature (float, -40..120 C). Read by
   boost_rpm_error_filtered                  0xFFFF8B84     0 refs  Filtered RPM error (float). IIR-filtered
   boost_rpm_filtered_prev                   0xFFFF8B7C     0 refs  Previous RPM filtered value (float). Use
   boost_wg_duty_final                       0xFFFF8B5C     0 refs  Final wastegate duty output (float). Aft
+  cal_descriptor_ptr_ws                     0xFFFF3C98     5 refs  Cal descriptor pointer workspace
   cal_mirror_base                           0xFFFF3480    45 refs  45 refs. Calibration mirror base. Refere
   cal_mirror_cache_A                        0xFFFF3654     5 refs  Calibration mirror workspace/cache A
-  cal_mirror_queue_index                    0xFFFF3438     7 refs  Cal mirror descriptor queue index
-  cal_mirror_state_base                     0xFFFF3C70     6 refs  Cal mirror state/control base
-  cal_mirror_state_flags                    0xFFFF341C     7 refs  Cal mirror state/control flags
   cal_mirror_cache_B                        0xFFFF3668     5 refs  Calibration mirror workspace/cache B
   cal_mirror_data                           0xFFFF34D8    22 refs  Calibration mirror data area
+  cal_mirror_queue_index                    0xFFFF3438     7 refs  Cal mirror descriptor queue index
   cal_mirror_state                          0xFFFF36C0    17 refs  Calibration mirror state variable
+  cal_mirror_state_base                     0xFFFF3C70     6 refs  Cal mirror state/control base
+  cal_mirror_state_flags                    0xFFFF341C     7 refs  Cal mirror state/control flags
   cal_mirror_sync_timer_A                   0xFFFF3C88     5 refs  Cal mirror sync timer A
   cal_mirror_timer                          0xFFFF365C    19 refs  Calibration mirror timer/counter
   cal_mirrors_cluster_base                  0xFFFF341A     5 refs  Cal mirrors region start
@@ -367,16 +422,15 @@ FULL ALPHABETICAL INDEX (named addresses only)
   cl_enable_final                           0xFFFF7BE2     0 refs  CL enable final check flag (byte). Last 
   cl_engine_flag_prev                       0xFFFF7459     0 refs  Previous value of FFFFA56B (engine runni
   cl_inhibit                                0xFFFF744B     0 refs  CL inhibit flag (byte). Copy of FFFF8E98
-  cl_rpm_hyst                               0xFFFF745D     0 refs  RPM (FFFF6624) hysteresis flag (byte). S
   cl_mode_state                             0xFFFF744E     0 refs  CL mode state (byte). 0/1/2 from func_02
-  cal_descriptor_ptr_ws                     0xFFFF3C98     5 refs  Cal descriptor pointer workspace
   cl_readiness_A                            0xFFFF744C     0 refs  CL readiness A (byte). Copy of FFFF8F08.
-  cl_readiness_state                        0xFFFF8EF8     6 refs  Closed-loop readiness state variable
   cl_readiness_A_input                      0xFFFF8F08     7 refs  CL readiness A input (byte). Copied to F
   cl_readiness_B                            0xFFFF744D     0 refs  CL readiness B (byte). From func_021D9A.
   cl_readiness_B_input                      0xFFFF8F24     0 refs  CL readiness B input (byte). Processed b
   cl_readiness_flags                        0xFFFF7452     0 refs  CL readiness flags.
+  cl_readiness_state                        0xFFFF8EF8     6 refs  Closed-loop readiness state variable
   cl_rpm_delta_hyst                         0xFFFF7458     0 refs  RPM delta hysteresis flag (byte). Set=1 
+  cl_rpm_hyst                               0xFFFF745D     0 refs  RPM (FFFF6624) hysteresis flag (byte). S
   cl_speed_coolant_readiness                0xFFFF7451     0 refs  Speed+coolant CL readiness flag (byte). 
   cl_speed_readiness                        0xFFFF7450     0 refs  Speed-based CL readiness flag (byte). GB
   cl_speed_table_hyst                       0xFFFF745E     0 refs  Speed table lookup hysteresis flag (byte
@@ -405,14 +459,16 @@ FULL ALPHABETICAL INDEX (named addresses only)
   desc_table_mirror                         0xFFFF2F84     6 refs  Descriptor table clone workspace (222B, GBR base)
   diag_counter_mps                          0xFFFFAB96     9 refs  Diagnostic counter/threshold (MPS-related)
   diag_indexed_lookup_table                 0xFFFF3B06    92 refs  Diagnostic indexed lookup table. Accesse
-  diag_mode_status                          0xFFFF36F0     0 refs  DWord: Diagnostic mode status. Read by d
   diag_maturation_counter                   0xFFFFA176     7 refs  Diagnostic maturation counter byte (GBR base)
   diag_maturation_threshold                 0xFFFFA6E8     8 refs  Diagnostic maturation threshold (word, GBR base)
+  diag_mode_status                          0xFFFF36F0     0 refs  DWord: Diagnostic mode status. Read by d
   diag_monitor_enable_flags                 0xFFFFAE09     0 refs  Diagnostic monitor enable flags array (7
   diag_monitor_GBR                          0xFFFFA160    15 refs  21 refs. Diagnostic monitor GBR base (6 
   diag_monitor_state                        0xFFFFA290    16 refs  Diagnostic monitor state area
+  diag_monitor_status_bytes                 0xFFFF61CC    56 refs  CORRECTED 2026-07-26: BYTE array of diag monitor status. 26 int8 accesses, zero FP accesses. NOT speed. (Wording changed 2026-07-26: the old text said Z-E-R-O f-l-o-a-t and coverage_map.py's contradiction scan matched that word inside the correction itself, flagging a false CONFLICT. corrections.md item 21.)
   diag_output_buffer                        0xFFFFACE0    32 refs  32 refs. Diagnostic output buffer pointe
   diag_precondition_flag                    0xFFFFAE08     0 refs  Master diagnostic precondition flag. Rea
+  diag_precondition_flag_65C0               0xFFFF65C0    89 refs  CORRECTED 2026-07-26: BYTE boolean in the 0xFFFF65B7-0xFFFF65C6 flag block, NOT throttle position and NOT an FP value. int8 x89, 0 FP accesses. Read as cmp/eq #1 to gate DTC maturation counters (0x01573C/0x015748, 0x01F798, 0x023C7A). Pedal angle is 0xFFFF64D8, throttle plate angle 0xFFFF62DC. Which monitor it gates is UNRESOLVED -- do not invent one. corrections.md item 16.
   diag_protocol_GBR                         0xFFFFAC6C    13 refs  13 refs. Diagnostic protocol GBR base (4
   diag_readiness_workspace                  0xFFFF9080     0 refs  Diagnostic readiness workspace (4 floats
   diag_request_state                        0xFFFFADAC    69 refs  69 refs. Diagnostic request/response sta
@@ -424,14 +480,21 @@ FULL ALPHABETICAL INDEX (named addresses only)
   diag_state_D_start                        0xFFFFA2A0     1 refs  Trip tracking region start. 104 bytes, 3
   diag_state_E_start                        0xFFFFAD14    14 refs  Active fault status region start. 62 byt
   diag_state_F_start                        0xFFFFAB76     2 refs  Healing counters region start. 79 bytes,
+  diag_status_code_6C48                     0xFFFF6C48    34 refs  CORRECTED 2026-07-26: BYTE status/result code, NOT battery voltage and NOT an FP value. int8 x34, 0 FP accesses. Takes only nibble-doubled sentinels 00/33/55/77/AA/BB/DD/EE (e.g. 0x02C148 mov #-69,r2 ; 0x02C14C mov.b r2,@r1). Battery volts is the FP value at 0xFFFF4130. corrections.md item 14.
   dt_lookup_input2                          0xFFFF6210     0 refs  Second input to dead time table lookup (
+  dtc_counter_struct_8C98                   0xFFFF8C98     9 refs  CORRECTED 2026-07-26: base of a uint16 DIAGNOSTIC COUNTER STRUCT (+0 u16 counter, +2 u16 counter, +8 u8 verdict), NOT a timing FP workspace. int16 x5, 0 FP accesses. Both counters go through the saturating u16 helper 0x0BE554 (0x055F7A, 0x055FA4) and reset to 0 at 0x055FB0; +2 is compared against the uint16 calibration at 0xD61C8. The FP-width claim rested only on adjacency to timing_workspace_A. corrections.md item 18.
   dtc_enable_flag                           0xFFFF36F4     0 refs  Byte: DTC processing enable. Read by dtc
   dtc_idle_enable_cond                      0xFFFF3444     9 refs  DTC idle control enable condition (byte)
   dtc_master_enable                         0xFFFFB71C     0 refs  Byte: DTC system master enable. Read by 
+  dtc_maturation_counter_67EC               0xFFFF67EC    99 refs  CORRECTED 2026-07-26: uint16 DTC MATURATION COUNTER at +4 in the 0xFFFF67E8 block, NOT atmospheric pressure and NOT an FP value. int16 x99, 0 FP accesses (every site mov.w). Reset to 0 at 0x023AA8, incremented via the saturating u16 helper 0x0BE554 at 0x023AB2, compared against the uint16 calibration at 0xC0212 (=306) at 0x01207E. Baro is the FP value at 0xFFFF6898. corrections.md item 15.
   dtc_maturation_timer                      0xFFFF399E   118 refs  118 refs. DTC maturation timer/counter. 
+  dtc_monitor_flag_array_base               0xFFFF9704     0 refs  Base of 45-byte DTC monitor status flag array (FFFF9704-FFFF9742). Each byte = 1 if DTC monitor is active/converged. Accessor dispatch table at 0x29858 (flkc_state_flag_reader_table) provides stub readers for offsets +0x0A through +0x33. FLKC/knock tasks read these as learning convergence state. See mystery_subs_analysis.txt.
+  dtc_monitor_flag_P0108                    0xFFFF970E     1 refs  DTC monitor active flag for P0108 (MAP high). Part of 45-byte DTC flag array FFFF9704-9742. Also: FLKC convergence slot 0 — read by flkc_state_flag_reader_table (0x29858); gates knock flag updates (task11) and timing corrections (task29). See mystery_subs_analysis.txt.
+  dtc_monitor_flag_P0134                    0xFFFF971B     0 refs  DTC monitor active flag for P0134 (front O2 no activity). Part of 45-byte DTC flag array FFFF9704-9742. Also: FLKC convergence slot 15 — read by flkc_state_flag_reader_table+0x144 (0x2999C); gates FLKC consolidation (task19), per-cyl FLKC propagation (task23), and EVAP test enable (task56). See mystery_subs_analysis.txt.
   dwell_output                              0xFFFF80AE     0 refs  Dwell time output (float). Task38.
-  ect_current                               0xFFFF6350   205 refs  205 refs. Coolant temperature (float). R
   ect_blend_correction                      0xFFFF7F68     0 refs  ECT blend correction (task33/50). Was ect_warmup_correction.
+  ect_compensation                          0xFFFF63C4    43 refs  ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
+  ect_current                               0xFFFF6350   205 refs  205 refs. Coolant temperature (float). R
   ect_desc_result                           0xFFFF7F2C     0 refs  ECT descriptor output (task33).
   ect_input_float                           0xFFFF69FC     7 refs  ECT input for fuel/ign lookups (float)
   ect_raw_adc                               0xFFFF6354    69 refs  69 refs. ECT raw ADC value or secondary
@@ -445,7 +508,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   egr_timeout_counter                       0xFFFF2BFC     0 refs  EGR timeout/period counter (u16). Read b
   egr_timeout_threshold                     0xFFFF9FB2     0 refs  EGR timeout threshold (u16). Read by egr
   egr_timer                                 0xFFFF9FA4     0 refs  EGR timer (u16). Compared against 400 by
-  vehicle_speed_kmh                         0xFFFF65FC   135 refs  CORRECTED 2026-07-26: vehicle speed km/h, NOT engine load.
+  engine_load_current                       0xFFFF63F8    86 refs  CORRECTED 2026-07-26: engine load g/rev, NOT IAT.
   engine_mode_bits                          0xFFFF61F4     0 refs  Engine mode flag byte. Bit 3: early exit
   engine_running_flag                       0xFFFF65C5     0 refs  Byte: 1=engine running. Read by check_en
   engine_state_byte                         0xFFFF65BD    34 refs  34 refs. Engine state byte (cranking/run
@@ -453,16 +516,18 @@ FULL ALPHABETICAL INDEX (named addresses only)
   engine_state_extended                     0xFFFF65A9    23 refs  Engine state extended byte. Read by task
   engine_status_flag                        0xFFFF7C68     0 refs  Engine status flag (byte). Gates AFL app
   evap_cal_cache                            0xFFFF236C     2 refs  EVAP calibration cache (5 floats + 6 u16
-  evap_workspace_base                       0xFFFF2368     5 refs  EVAP diagnostic workspace base
   evap_diag_state_GBR                       0xFFFF933C     0 refs  EVAP diagnostic state base (GBR). Used b
   evap_pressure_baseline                    0xFFFF318C     0 refs  EVAP pressure baseline value (float).
   evap_pressure_delta                       0xFFFF9314     0 refs  EVAP pressure delta (baseline - lower th
   evap_pressure_sum                         0xFFFF9318     0 refs  EVAP pressure sum (baseline + upper thre
+  evap_workspace_base                       0xFFFF2368     5 refs  EVAP diagnostic workspace base
   exhaust_avcs_workspace                    0xFFFF76F4     0 refs  Exhaust AVCS working data struct base (v
   exhaust_computed                          0xFFFF76F0     0 refs  Exhaust AVCS computed value (float, near
   exhaust_correction_A                      0xFFFF76E8     0 refs  Exhaust AVCS correction A (float). Works
   exhaust_correction_B                      0xFFFF76EC     0 refs  Exhaust AVCS correction B (float). Works
   final_timing_advance                      0xFFFF80F8     0 refs  Final combined timing advance (float). T
+  flag_4254                                 0xFFFF4254     9 refs  CORRECTED 2026-07-26: BYTE boolean in the 0xFFFF4235-0xFFFF425F injection/O2 sequencing flag cluster, NOT a lambda value and NOT an FP value. int8 x9, 0 FP accesses; only ever written the literals 0 (0x0089EC) and 1 (0x008D9A). No FP access anywhere in that address run. Meaning of the flag is UNRESOLVED. corrections.md item 20.
+  flag_6254                                 0xFFFF6254    51 refs  CORRECTED 2026-07-26: BYTE boolean at +4 in the 0xFFFF6250 block, NOT mass airflow and NOT an FP value. int8 x51, 0 FP accesses. Set to 1 with its siblings +2/+3/+5/+9 in one run at 0x01DA9C-0x01DAA4; consumed as cmp/eq #1 (0x01D5A8, 0x025148). The real MAF variable is UNIDENTIFIED -- no axis in either XML is named MAF/airflow, so the axis-name method cannot locate it. corrections.md item 17.
   FLKC_BASE_STEP                            0xFFFF323C     0 refs  Base correction step (float), = 0.5 stoc
   flkc_fg_active                            0xFFFF829C     0 refs  Active flag; cleared on knock entry
   flkc_fg_bank_route                        0xFFFF82A1     0 refs  Routes post-retard clamp fn call
@@ -498,13 +563,13 @@ FULL ALPHABETICAL INDEX (named addresses only)
   fuel_enrichment_A                         0xFFFF76D4     0 refs  Fuel enrichment term A (float). Summed w
   fuel_enrichment_B                         0xFFFF7878     7 refs  Fuel enrichment term B (float). Summed w
   fuel_enrichment_C                         0xFFFF7AE4     0 refs  Fuel enrichment term C (float). Summed w
-  injector_data                             0xFFFF895C    37 refs  Rate-limited sensor composite (float). Was fuel_ign_shared_state. See fueling_pipeline Section 15.
   fuel_ipw_state_B                          0xFFFF7AF4     0 refs  Final IPW correction output (float).
   fuel_mode_flags                           0xFFFF8E46    39 refs  39 refs. Fuel mode flags register.
   fuel_per_cyl_struct                       0xFFFF7344     0 refs  Per-cylinder fuel struct (8 x float fina
   fuel_pipeline_base                        0xFFFF77BC     0 refs  GBR base for fuel aggregator pipeline. S
-  fuel_rate                                 0xFFFF62DC    20 refs  20 refs. Fuel injection rate (float). Re
+  fuel_pump_workspace                       0xFFFF8366    18 refs  Fuel pump state machine workspace (14 bytes). Contains mode flags, transition/saturation counters. See fuel_pump_analysis.txt.
   fuel_state_byte                           0xFFFF7C9D    32 refs  32 refs. Fuel state byte/flag.
+  fuel_system_ready                         0xFFFF726C    65 refs  Fuel system readiness flag (byte). Read by check_fuel_system_ready (0x2F8EA, 65 calls). When == 1, fuel pipeline is initialized. Also used to gate AFL and transient enrichment.
   fuel_system_state                         0xFFFF85D7    60 refs  60 refs. Fuel system state byte. Read by
   fuel_timing_corr                          0xFFFF7E68    18 refs  Fuel timing correction variable
   fuel_timing_state                         0xFFFF71EA    22 refs  Fuel timing state variable
@@ -512,8 +577,8 @@ FULL ALPHABETICAL INDEX (named addresses only)
   gbr_base_corr_init_ws                     0xFFFF7FD4     0 refs  GBR base for timing corrections init wor
   gbr_base_timing_ws                        0xFFFF7F10     0 refs  GBR base for task30 base timing workspac
   IAM_compensation_ws                       0xFFFF80C0     0 refs  IAM compensation workspace (float). Task
-  engine_load_current                       0xFFFF63F8    86 refs  CORRECTED 2026-07-26: engine load g/rev, NOT IAT.
-  ect_compensation                          0xFFFF63C4    43 refs  ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
+  iat_current                               0xFFFF6364    48 refs  CORRECTED 2026-07-26: INTAKE AIR TEMPERATURE (float, degC raw; defs display (x*1.8)+32 degF), NOT ECT-at-start. 0x013A0C fmov.s @r2,fr15 -> 0x013A3A delay fmov fr15,fr4 -> desc 0x0AA974 axis 0xC0E24 "Target Boost Compensation (IAT)_ / Intake Temperature" (-20..40 C); second site 0x04042A -> desc 0x0ADC14 axis 0xD3248 "Timing Compensation A (IAT) / Intake Temperature". Zero coolant axes. float x48. corrections.md item 12.
+  iat_input_float                           0xFFFF69F0    32 refs  32 refs. Intake air temperature (float, -40..120 C). Read by
   idle_control_GBR                          0xFFFF837E    20 refs  39 refs. Idle control GBR base (19 GBR u
   idle_sensor_ref                           0xFFFF83A5    21 refs  Idle control sensor comparison reference
   idle_workspace_GBR                        0xFFFF83AC    19 refs  26 refs. Secondary idle GBR workspace (7
@@ -521,7 +586,6 @@ FULL ALPHABETICAL INDEX (named addresses only)
   ign_ext_counter_A                         0xFFFF8D04     6 refs  Ignition extended workspace counter
   ign_ext_workspace_B                       0xFFFF8D2C     6 refs  Ignition/knock extended workspace B (GBR base)
   ign_output_workspace                      0xFFFF8098     0 refs  Ignition output workspace (float). Task3
-  atm_pressure_baro                         0xFFFF4130    77 refs  Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline.
   ignition_system_state                     0xFFFF8910    16 refs  Ignition system state. Referenced in ign
   ignition_timing_workspace                 0xFFFF7F08    20 refs  Ignition timing workspace variable (floa
   inj_channel_enable                        0xFFFF3474     0 refs  Injection channel enable mask. 0xFF = al
@@ -533,6 +597,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   injdt_companion                           0xFFFF42F4     0 refs  Injector dead time companion output. Poi
   injdt_workspace                           0xFFFF4284     0 refs  Injector dead time calculation workspace
   injection_state_flag                      0xFFFF425F     8 refs  Injection channel enable/disable flag (byte)
+  injector_data                             0xFFFF895C    37 refs  Rate-limited sensor composite (float). Was fuel_ign_shared_state. See fueling_pipeline Section 15.
   injector_dead_time_applied                0xFFFF4280     0 refs  Applied injector dead time (uint32, zero
   injector_dead_time_ticks                  0xFFFF7350     0 refs  Injector dead time intermediate result (
   injector_trim_workspace                   0xFFFF7AB0     0 refs  Injector trim workspace (4 slots).
@@ -554,32 +619,29 @@ FULL ALPHABETICAL INDEX (named addresses only)
   knock_cylinder_count                      0xFFFF40AB     6 refs  Cylinder count dispatch byte for knock A
   knock_det_GBR_base                        0xFFFF80FC     0 refs  GBR base for knock_detector
   KNOCK_FLAG                                0xFFFF81BA     0 refs  1=knock detected, 0=no knock (per cycle)
-  knock_flkc_state                          0xFFFF8A74    20 refs  Knock/FLKC state variable
   knock_flkc_event_flag                     0xFFFF8570     6 refs  Knock/FLKC interrupt or event flag
+  knock_flkc_state                          0xFFFF8A74    20 refs  Knock/FLKC state variable
   knock_flkc_workspace                      0xFFFF8080    22 refs  Knock/FLKC workspace area
   knock_fuel_interlock                      0xFFFF85DC     9 refs  Knock/fuel interlock control byte
   knock_learning_value                      0xFFFF81F0    30 refs  Knock learning value (task50). Was knock_state_base.
-  knock_retard_accum                        0xFFFF8088     0 refs  Per-cylinder knock retard accumulator (task50).
   knock_level_accum                         0xFFFF8E38     6 refs  Knock intensity/level accumulator
-  knock_status_shadow                       0xFFFF3C90     5 refs  Knock status shadow/mirror from 0xFFFF81AC
-  knock_timing_retard_base                  0xFFFF8CE0     9 refs  Knock timing retard workspace base (struct)
+  knock_retard_accum                        0xFFFF8088     0 refs  Per-cylinder knock retard accumulator (task50).
   knock_state_var                           0xFFFF8318    17 refs  Knock state variable
-  fuel_pump_workspace                       0xFFFF8366    18 refs  Fuel pump state machine workspace (14 bytes). Contains mode flags, transition/saturation counters. See fuel_pump_analysis.txt.
+  knock_status_shadow                       0xFFFF3C90     5 refs  Knock status shadow/mirror from 0xFFFF81AC
+  knock_struct_flag_8CFC                    0xFFFF8CFC     7 refs  CORRECTED 2026-07-26: BYTE boolean field at +0x1C in the 0xFFFF8CE0 knock/timing struct, NOT an FP workspace. int8 x5, 0 FP accesses. The struct does hold floats (+0x08/+0x0C/+0x10/+0x18) but not at this offset. Set to 1 at 0x056CD0 after byte preconditions; read as cmp/eq #1. corrections.md item 19.
+  knock_timing_retard_base                  0xFFFF8CE0     9 refs  Knock timing retard workspace base (struct)
   knock_workspace_C                         0xFFFF8391    18 refs  Knock/FLKC workspace variable C
-  dtc_monitor_flag_P0134                    0xFFFF971B     0 refs  DTC monitor active flag for P0134 (front O2 no activity). Part of 45-byte DTC flag array FFFF9704-9742. Also: FLKC convergence slot 15 — read by flkc_state_flag_reader_table+0x144 (0x2999C); gates FLKC consolidation (task19), per-cyl FLKC propagation (task23), and EVAP test enable (task56). See mystery_subs_analysis.txt.
-  dtc_monitor_flag_P0108                    0xFFFF970E     1 refs  DTC monitor active flag for P0108 (MAP high). Part of 45-byte DTC flag array FFFF9704-9742. Also: FLKC convergence slot 0 — read by flkc_state_flag_reader_table (0x29858); gates knock flag updates (task11) and timing corrections (task29). See mystery_subs_analysis.txt.
-  dtc_monitor_flag_array_base               0xFFFF9704     0 refs  Base of 45-byte DTC monitor status flag array (FFFF9704-FFFF9742). Each byte = 1 if DTC monitor is active/converged. Accessor dispatch table at 0x29858 (flkc_state_flag_reader_table) provides stub readers for offsets +0x0A through +0x33. FLKC/knock tasks read these as learning convergence state. See mystery_subs_analysis.txt.
+  last_calc_base_pulse_width                0xFFFF7324     3 refs  NEW 2026-07-26: LAST CALCULATED BASE PULSE WIDTH (float; defs toexpr x*.001 => ms; axis 1000..16000 = 1..16 ms). 0x038DD0 fmov.s @r2,fr4 -> 0x038DD8 jsr 0x0BE8E4, desc 0x0AD738 axis0 0xD0760 "Per Injector Pulse Width Compensation A / Last Calculated Base Pulse Width"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x3. corrections.md item 22.
   load_timing_output                        0xFFFF80C8     0 refs  Load-dependent timing output (float). Ta
   ltft_workspace                            0xFFFF7B60     0 refs  LTFT learning workspace.
   maf_correction_factor                     0xFFFF41DC     0 refs  MAF correction factor (float). Written b
-  maf_current                               0xFFFF6254    51 refs  51 refs. MAF sensor value (float, g/s).
-  maf_timer_counter                         0xFFFF447B     8 refs  MAF/intake sensor timer counter (byte)
   maf_diag_extended                         0xFFFF96A8     0 refs  MAF diag extended state (2 bytes).
   maf_diag_state                            0xFFFF96A4     0 refs  MAF diag state: flag, enable, counter, i
   maf_hw_fault_A                            0xFFFF96AC     0 refs  MAF hardware fault state A (2 bytes).
   maf_hw_fault_B                            0xFFFF96AE     0 refs  MAF hardware fault state B (2 bytes).
+  maf_timer_counter                         0xFFFF447B     8 refs  MAF/intake sensor timer counter (byte)
   maf_voltage                               0xFFFF6228    22 refs  22 refs. MAF sensor voltage (float). Rea
-  manifold_pressure                         0xFFFF6898    48 refs  48 refs. Manifold pressure (float). Read
+  manifold_pressure_map                     0xFFFF620C    43 refs  CORRECTED 2026-07-26: manifold pressure, not MAF.
   monitoring_state                          0xFFFF41D0     0 refs  Monitoring state byte: 1=transitioning, 
   mps_current_readings                      0xFFFF44E8     0 refs  MPS current readings (2 bytes, channel A
   mps_diag_state                            0xFFFFABF4     0 refs  MPS (manifold pressure sensor) maturatio
@@ -594,7 +656,6 @@ FULL ALPHABETICAL INDEX (named addresses only)
   ol_cond_flag_rpmDelta                     0xFFFF7A05     0 refs  OL condition RPM-delta flag (byte). Writ
   ol_cond_flag_speed                        0xFFFF7A04     0 refs  OL condition speed flag (byte). Written 
   ol_condition_selector                     0xFFFF6810    22 refs  OL condition selector byte (1-5). Select
-  ol_ramp_step                              0xFFFF79E0     0 refs  OL enrichment ramp step (float, POSITIVE
   ol_delay_counter                          0xFFFF7A1C     0 refs  OL enrichment delay integration counter 
   ol_delay_counter_B                        0xFFFF79C4     0 refs  OL enrichment delay counter_B. Set by CB
   ol_delay_step                             0xFFFF7A18     0 refs  OL enrichment delay step value (float). 
@@ -606,6 +667,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   ol_enrichment_target                      0xFFFF7990     0 refs  OL enrichment accumulator target (float)
   ol_hyst_struct_base                       0xFFFF7A0C     0 refs  OL hysteresis working struct base (float
   ol_mode_state                             0xFFFF79C6     0 refs  OL mode state flag (byte). NEVER WRITTEN
+  ol_ramp_step                              0xFFFF79E0     0 refs  OL enrichment ramp step (float, POSITIVE
   overrun_counter                           0xFFFF7E8E     0 refs  Overrun scheduler tick counter (word).
   overrun_state                             0xFFFF7E8C     0 refs  Overrun state (byte). 0=normal, 1=fuel c
   per_cyl_base_corr                         0xFFFF81DC     0 refs  Per-cylinder base timing correction (task50).
@@ -619,7 +681,9 @@ FULL ALPHABETICAL INDEX (named addresses only)
   ram_coolant_alt                           0xFFFF68DC     0 refs  Coolant temperature alternate/computed (
   ram_ECT                                   0xFFFF63CC    16 refs  Coolant temperature / ECT (float)
   ram_IAM                                   0xFFFF3234     0 refs  Ignition Advance Multiplier current valu
+  requested_torque                          0xFFFF8558     7 refs  NEW 2026-07-26: REQUESTED / CALCULATED ENGINE TORQUE -- the X-axis input of the Target Boost table (float, raw ecu value 0..350). 0x013A00 fmov.s @r2,fr4 -> 0x013A20 jsr 0x0BE8E4, desc 0x0AA9F0 axis0 0xC12D8 "Target Boost_ / Requested Torque"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x6 + int32 x1. corrections.md item 22.
   rpm_current                               0xFFFF6624   301 refs  301 refs. Current RPM (float). Read by f
+  rpm_current_timing_copy                   0xFFFF7F4C     1 refs  NEW 2026-07-26: ENGINE SPEED (float, RPM) -- the copy used by the base-timing / knock-advance path. 0x040160 r12=0xFFFF7F60 ; 0x040174 mov #-20,r0 ; 0x040178 fmov.s @(r0,r12),fr5 => 0xFFFF7F4C, desc 0x0AE31C axis1 0xD46CC "Base Timing Primary Cruise / Engine Speed". float x2. corrections.md item 22.
   rpm_iat_blend_result                      0xFFFF7F70     0 refs  RPM x IAT table result (task33).
   rtos_scheduler_state                      0xFFFF1288     0 refs  RTOS scheduler state word. Read by task
   rtos_TCB_task0                            0xFFFF11C8     0 refs  Task Control Block for RTOS Task 0 (slow
@@ -656,8 +720,8 @@ FULL ALPHABETICAL INDEX (named addresses only)
   sensor_burst_buf_5                        0xFFFF5F99     5 refs  Sensor data burst buffer byte 5
   sensor_data_misc                          0xFFFF5E40    18 refs  Sensor data miscellaneous
   sensor_filter_workspace                   0xFFFF8EDE     9 refs  O2 sensor rate-of-change filter workspace
-  sensor_peripheral_status                  0xFFFF5C75     6 refs  Sensor peripheral status byte
   sensor_misc_state                         0xFFFF43FC    25 refs  25 refs. Misc sensor state.
+  sensor_peripheral_status                  0xFFFF5C75     6 refs  Sensor peripheral status byte
   sensor_struct_8998                        0xFFFF8998    11 refs  Sensor struct base (GBR at 0x52092).
   sensor_struct_start                       0xFFFF8920     0 refs  First field in sensor struct.
   SH7058_SCI_BRR                            0xFFFF12B4     0 refs  1 ref. Bit Rate Register (SCI). Baud rat
@@ -680,12 +744,12 @@ FULL ALPHABETICAL INDEX (named addresses only)
   system_state_timer_B                      0xFFFF2D40     5 refs  System state timer counter B
   system_tick_counter                       0xFFFF25CC    48 refs  48 refs. System tick/event counter.
   task50_gbr_base                           0xFFFF7E90    25 refs  GBR base for task50 timing blend. Was warmup_corr_cyl0.
-  throttle_position                         0xFFFF65C0    89 refs  89 refs. Throttle position (float). Read
-  throttle_raw                              0xFFFF64D8    29 refs  29 refs. Throttle raw ADC or secondary t
+  throttle_angle_change                     0xFFFF62E4     3 refs  NEW 2026-07-26: THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger (float, %, axis 0..31.3). 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) -> 0x03A9D0 jsr 0x0BE830, desc 0x0AD368 axis 0xCED08 "Throttle Tip-in Enrichment A / Throttle Angle Change". float x3. corrections.md item 22.
+  throttle_delta_pos                        0xFFFF7D68    19 refs  19 refs. Positive throttle rate of change (float). Used by accel enrichment.
+  throttle_plate_angle                      0xFFFF62DC    20 refs  CORRECTED 2026-07-26: THROTTLE PLATE OPENING ANGLE (float; defs toexpr x/.84 => %), NOT fuel rate and NOT engine load. 0x036096 fmov.s @r2,fr4 (FR4 untouched on the path to the call) -> 0x0360C4 jsr 0x0BE830, desc 0x0AC5D0 axis 0xCCD88 "Minimum Primary Open Loop Enrichment (Throttle) / Throttle Plate Opening Angle" (10.93..89.06). float x18. corrections.md item 13.
   timer_config_block                        0xFFFF233C    20 refs  Timer configuration block (16 bytes). In
   timer_counter_B                           0xFFFF367C    25 refs  25 refs. Timer/counter B.
   timer_counter_C                           0xFFFF3674    25 refs  25 refs. Timer/counter C.
-  throttle_delta_pos                        0xFFFF7D68    19 refs  19 refs. Positive throttle rate of change (float). Used by accel enrichment.
   timing_comp_lowpw_state                   0xFFFF80EC     0 refs  Low-PW ignition timing deactivation stat
   timing_corr_28                            0xFFFF8028     0 refs  Timing correction positive (task50).
   timing_corr_38                            0xFFFF8038     0 refs  Timing correction negative (task50).
@@ -699,8 +763,6 @@ FULL ALPHABETICAL INDEX (named addresses only)
   timing_correction_A                       0xFFFF87E4    26 refs  26 refs. Timing correction value A.
   timing_state_var                          0xFFFF798C    17 refs  17 refs. Timing state variable. Referenc
   timing_workspace_A                        0xFFFF8C9C    17 refs  17 refs. Timing workspace variable.
-  timing_workspace_B                        0xFFFF8C98     9 refs  Timing calculation workspace B (float)
-  timing_workspace_extended                 0xFFFF8CFC     7 refs  Extended timing workspace (float)
   torque_ratio                              0xFFFF62F8     0 refs  Requested torque ratio (task50 map switching).
   transient_accum_ptr                       0xFFFF7E4C     0 refs  Pointer/accumulator used by transient_co
   transient_correction_fr4                  0xFFFF7300     0 refs  Transient correction intermediate float 
@@ -708,8 +770,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   transient_correction_out                  0xFFFF72E8     0 refs  Transient correction output block (float
   transient_enable_gate                     0xFFFF65F1     0 refs  Gate flag checked by transient_correctio
   transient_knock_inhibit                   0xFFFF726E     0 refs  Transient knock inhibit flag (byte). Rea
-  fuel_system_ready                         0xFFFF726C    65 refs  Fuel system readiness flag (byte). Read by check_fuel_system_ready (0x2F8EA, 65 calls). When == 1, fuel pipeline is initialized. Also used to gate AFL and transient enrichment.
-  diag_monitor_status_bytes                 0xFFFF61CC    56 refs  CORRECTED 2026-07-26: diag monitor status bytes, NOT speed.
+  vehicle_speed_kmh                         0xFFFF65FC   135 refs  CORRECTED 2026-07-26: vehicle speed km/h, NOT engine load.
   vvt_error_feedback_A                      0xFFFF920C     0 refs  Intake VVT error feedback result A (floa
   vvt_error_feedback_B                      0xFFFF9210     0 refs  Intake VVT error feedback result B (floa
   vvt_error_feedback_C                      0xFFFF9220     0 refs  Intake VVT error feedback result C (floa
@@ -729,9 +790,9 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF20F4    17  system_config_timer_A                System config/timer variable A. System state cluster.
   0xFFFF233C    20  timer_config_block                   Timer configuration block (16 bytes). Injection ti
   0xFFFF25CC    48  system_tick_counter                  48 refs. System tick/event counter.
-  0xFFFF2AB4    17  system_state_descriptor               System state descriptor variable. Descriptor region.
+  0xFFFF2AB4    17  system_state_descriptor              System state descriptor variable. Descriptor region.
   0xFFFF3158    18  afl_diagnostic_flag                  AFL state / diagnostic flag. Checked by fueling pi
-  0xFFFF3420    15  cal_mirror_descriptor_ptr             Cal mirror descriptor pointer. Cal mirror region 0xFFFF341A-0xFFFF3612.
+  0xFFFF3420    15  cal_mirror_descriptor_ptr            Cal mirror descriptor pointer. Cal mirror region 0xFFFF341A-0xFFFF3612.
   0xFFFF3480    45  cal_mirror_base                      45 refs. Calibration mirror base. Referenced by va
   0xFFFF34D8    22  cal_mirror_data                      Calibration mirror data area
   0xFFFF365C    19  cal_mirror_timer                     Calibration mirror timer/counter
@@ -742,54 +803,57 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF3836    76  io_ign_driver_ctrl                   InternalIO ignition driver control register (31 re
   0xFFFF399E   118  dtc_maturation_timer                 118 refs. DTC maturation timer/counter. Read prima
   0xFFFF3B06    92  diag_indexed_lookup_table            Diagnostic indexed lookup table. Accessed at FFFF3
-  0xFFFF3C80    12  cal_mirror_timer_workspace            Cal mirror timer workspace. Cal mirror timer region.
+  0xFFFF3C80    12  cal_mirror_timer_workspace           Cal mirror timer workspace. Cal mirror timer region.
   0xFFFF4024    56  ATU_primary_ctrl                     ATU primary control register. 36 code refs — maste
   0xFFFF40C8    19  cam_angle_sensor                     Actual cam position from CMP/CKP (float, degrees).
-  0xFFFF4130    77  atm_pressure_baro                    Atmospheric pressure / baro ADC output (float). ADDR 4 in ADC pipeline.
+  0xFFFF4130    77  battery_voltage                      CORRECTED 2026-07-26: BATTERY VOLTAGE (float, volts), NOT atmospheric/baro. Feeds axis 0xD104C "Injector Latency_ / Battery Output" (6.5..16.5 V) as FR4 at 0x0303C8, and axis 0xD91CC "Ignition Dwell / Battery Volts" (8..16 V) as FR5 at 0x00894E. All 8 axes it feeds span 6..20. float x77, 0 int. corrections.md item 10.
   0xFFFF4144    20  ect_output_fmac                      ECT output (degrees C, float). ADC pipeline ADDR29 -> FMAC call_08.
   0xFFFF43FC    25  sensor_misc_state                    25 refs. Misc sensor state.
-  0xFFFF5BE2    14  engine_condition_flags                Engine condition flags byte. Read by task10, task30, task38.
+  0xFFFF5BE2    14  engine_condition_flags               Engine condition flags byte. Read by task10, task30, task38.
   0xFFFF5BE3    33  clutch_state                         33 refs. Clutch engagement state (task50 map switching). Was peripheral_status.
   0xFFFF5C98    15  peripheral_control_GBR               15 refs. Peripheral control GBR base (3 uses).
+  0xFFFF5CA0     0  boost_error                          NEW 2026-07-26: BOOST ERROR (target - actual), the Turbo Dynamics input (float; toexpr x*.01933677 => psi; axes -240..+240 raw = -4.64..+4.64 psi). Struct field, no pool literal: 0x013BA8 r5=0xFFFF5D18 ; 0x013BAE mov #-120,r0 (SIGN-EXTENDED) ; 0x013BB0 fmov.s @(r0,r5),fr14 => 0xFFFF5CA0. FR14 unmodified through 0x013C02/0x013C32/0x013C7C, each with delay fmov fr14,fr4 -> axes 0xC0D04/0xC0D3C/0xC0D74, 3 of 3 named "Boost Error". corrections.md item 22.
   0xFFFF5D14    22  ssm_output_workspace                 SSM diagnostic output workspace struct. Written by
   0xFFFF5DB5    11  cl_ol_gate_flag                      CL/OL gate flag byte. Referenced in cl_ol_state_machine and clol_gap_closure.
   0xFFFF5E40    18  sensor_data_misc                     Sensor data miscellaneous
-  0xFFFF5FC0    16  sensor_io_state_secondary             Sensor I/O state secondary. Near io_state_register (0xFFFF5FFC).
+  0xFFFF5FC0    16  sensor_io_state_secondary            Sensor I/O state secondary. Near io_state_register (0xFFFF5FFC).
   0xFFFF5FFC    23  io_state_register                    23 refs. I/O state register.
   0xFFFF6155    36  adc_channel_status                   36 refs. ADC channel status/index (byte). GBR base
   0xFFFF61AC    17  adc_processed_alt                    ADC processed alternate channel
-  0xFFFF61CC    56  diag_monitor_status_bytes            CORRECTED 2026-07-26: diag monitor status bytes, NOT speed.
+  0xFFFF61CC    56  diag_monitor_status_bytes            CORRECTED 2026-07-26: BYTE array of diag monitor status. 26 int8 accesses, zero FP accesses. NOT speed. (Wording changed 2026-07-26: the old text said Z-E-R-O f-l-o-a-t and coverage_map.py's contradiction scan matched that word inside the correction itself, flagging a false CONFLICT. corrections.md item 21.)
   0xFFFF61FC    11  adc_processed_extra                  ADC processed extra channel (float). Near airflow_maf_current.
   0xFFFF620C    43  manifold_pressure_map                CORRECTED 2026-07-26: manifold pressure, not MAF.
   0xFFFF6228    22  maf_voltage                          22 refs. MAF sensor voltage (float). Read by timin
-  0xFFFF6254    51  maf_current                          51 refs. MAF sensor value (float, g/s). Read by AF
-  0xFFFF62DC    20  fuel_rate                            20 refs. Fuel injection rate (float). Read by timi
+  0xFFFF6254    51  flag_6254                            CORRECTED 2026-07-26: BYTE boolean at +4 in the 0xFFFF6250 block, NOT mass airflow and NOT an FP value. int8 x51, 0 FP accesses. Set to 1 with its siblings +2/+3/+5/+9 in one run at 0x01DA9C-0x01DAA4; consumed as cmp/eq #1 (0x01D5A8, 0x025148). The real MAF variable is UNIDENTIFIED -- no axis in either XML is named MAF/airflow, so the axis-name method cannot locate it. corrections.md item 17.
+  0xFFFF62DC    20  throttle_plate_angle                 CORRECTED 2026-07-26: THROTTLE PLATE OPENING ANGLE (float; defs toexpr x/.84 => %), NOT fuel rate and NOT engine load. 0x036096 fmov.s @r2,fr4 (FR4 untouched on the path to the call) -> 0x0360C4 jsr 0x0BE830, desc 0x0AC5D0 axis 0xCCD88 "Minimum Primary Open Loop Enrichment (Throttle) / Throttle Plate Opening Angle" (10.93..89.06). float x18. corrections.md item 13.
+  0xFFFF62E4     3  throttle_angle_change                NEW 2026-07-26: THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger (float, %, axis 0..31.3). 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) -> 0x03A9D0 jsr 0x0BE830, desc 0x0AD368 axis 0xCED08 "Throttle Tip-in Enrichment A / Throttle Angle Change". float x3. corrections.md item 22.
   0xFFFF62F8     0  torque_ratio                         Requested torque ratio (task50 map switching).
   0xFFFF6350   205  ect_current                          205 refs. Coolant temperature (float). Read by PSE
   0xFFFF6354    69  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float
-  0xFFFF6364    48  ect_startup                          48 refs. ECT at engine start or secondary RPM (float). NOT atmospheric pressure. Was mislabeled atm_pressure.
-  0xFFFF63B0    16  adc_processed_temperature_B           ADC processed temperature B (float). ECT/IAT sensor region.
+  0xFFFF6364    48  iat_current                          CORRECTED 2026-07-26: INTAKE AIR TEMPERATURE (float, degC raw; defs display (x*1.8)+32 degF), NOT ECT-at-start. 0x013A0C fmov.s @r2,fr15 -> 0x013A3A delay fmov fr15,fr4 -> desc 0x0AA974 axis 0xC0E24 "Target Boost Compensation (IAT)_ / Intake Temperature" (-20..40 C); second site 0x04042A -> desc 0x0ADC14 axis 0xD3248 "Timing Compensation A (IAT) / Intake Temperature". Zero coolant axes. float x48. corrections.md item 12.
+  0xFFFF63B0    16  adc_processed_temperature_B          ADC processed temperature B (float). ECT/IAT sensor region.
   0xFFFF63C4    43  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
   0xFFFF63CC    16  ram_ECT                              Coolant temperature / ECT (float)
   0xFFFF63F8    86  engine_load_current                  CORRECTED 2026-07-26: engine load g/rev, NOT IAT.
   0xFFFF6430    19  adc_processed_secondary              ADC processed secondary sensor value
-  0xFFFF64D8    29  throttle_raw                         29 refs. Throttle raw ADC or secondary throttle.
+  0xFFFF64D8    29  accel_pedal_angle                    CORRECTED 2026-07-26: ACCELERATOR PEDAL ANGLE (float, %, 0..100) -- DBW pedal position (APP), not throttle plate. 0x03609A fmov.s @r2,fr15 -> 0x0360D0 delay fmov fr15,fr4 -> desc 0x0AC5E4 axis 0xCCDA8 "Minimum Primary Open Loop Enrichment (Accelerator) / Accelerator Pedal Angle". Fed in the same block, adjacent to the 0xFFFF62DC (Throttle) call. float x27. corrections.md item 13.
   0xFFFF653C    19  o2_sensor_voltage                    19 refs. O2 sensor voltage or lambda value.
   0xFFFF6540    12  o2_sensor_conditioned                Conditioned O2 sensor value (float). Rate-limited AFC PI error input.
   0xFFFF65A2    10  engine_state_var_A                   Engine state variable A. Near engine_state_extended.
   0xFFFF65A9    23  engine_state_extended                Engine state extended byte. Read by task58 extende
   0xFFFF65BD    34  engine_state_byte                    34 refs. Engine state byte (cranking/running/etc).
   0xFFFF65BF    20  accel_state                          Acceleration state flag (task50 map switching). Was warmup_transition_flag_B.
-  0xFFFF65C0    89  throttle_position                    89 refs. Throttle position (float). Read by AFL, t
+  0xFFFF65C0    89  diag_precondition_flag_65C0          CORRECTED 2026-07-26: BYTE boolean in the 0xFFFF65B7-0xFFFF65C6 flag block, NOT throttle position and NOT an FP value. int8 x89, 0 FP accesses. Read as cmp/eq #1 to gate DTC maturation counters (0x01573C/0x015748, 0x01F798, 0x023C7A). Pedal angle is 0xFFFF64D8, throttle plate angle 0xFFFF62DC. Which monitor it gates is UNRESOLVED -- do not invent one. corrections.md item 16.
   0xFFFF65FC   135  vehicle_speed_kmh                    CORRECTED 2026-07-26: vehicle speed km/h, NOT engine load.
   0xFFFF6624   301  rpm_current                          301 refs. Current RPM (float). Read by frontO2, AF
-  0xFFFF67EC    99  atm_pressure_current                 99 refs. Atmospheric/barometric pressure (float). 
+  0xFFFF67EC    99  dtc_maturation_counter_67EC          CORRECTED 2026-07-26: uint16 DTC MATURATION COUNTER at +4 in the 0xFFFF67E8 block, NOT atmospheric pressure and NOT an FP value. int16 x99, 0 FP accesses (every site mov.w). Reset to 0 at 0x023AA8, incremented via the saturating u16 helper 0x0BE554 at 0x023AB2, compared against the uint16 calibration at 0xC0212 (=306) at 0x01207E. Baro is the FP value at 0xFFFF6898. corrections.md item 15.
   0xFFFF6810    22  ol_condition_selector                OL condition selector byte (1-5). Selects ROM thre
   0xFFFF682C    22  adc_processed_misc                   ADC processed miscellaneous sensor value
-  0xFFFF6898    48  manifold_pressure                    48 refs. Manifold pressure (float). Read by frontO
+  0xFFFF6898    48  atm_pressure_current                 CORRECTED 2026-07-26: ATMOSPHERIC / BAROMETRIC PRESSURE (float, raw mmHg-class 440..760 = 8.5..14.7 psi abs), NOT manifold pressure and NOT rpm_delta. 0x013B02 mov.l @(0x013CCC),r2 ; 0x013B04 fmov.s @r2,fr4 -> desc 0x0AA99C axis0 0xC0E94 "Target Boost Compensation (Atm. Pressure)_ / Atmospheric Pressure". float x48. corrections.md item 11.
   0xFFFF69F0    32  iat_input_float                      32 refs. Intake air temperature (float, -40..120 C). Read by AFL, startup enrichment. GBR
-  0xFFFF6C48    34  battery_voltage                      34 refs. Battery voltage (float). Read by injector
+  0xFFFF6C48    34  diag_status_code_6C48                CORRECTED 2026-07-26: BYTE status/result code, NOT battery voltage and NOT an FP value. int8 x34, 0 FP accesses. Takes only nibble-doubled sentinels 00/33/55/77/AA/BB/DD/EE (e.g. 0x02C148 mov #-69,r2 ; 0x02C14C mov.b r2,@r1). Battery volts is the FP value at 0xFFFF4130. corrections.md item 14.
   0xFFFF71EA    22  fuel_timing_state                    Fuel timing state variable
+  0xFFFF7324     3  last_calc_base_pulse_width           NEW 2026-07-26: LAST CALCULATED BASE PULSE WIDTH (float; defs toexpr x*.001 => ms; axis 1000..16000 = 1..16 ms). 0x038DD0 fmov.s @r2,fr4 -> 0x038DD8 jsr 0x0BE8E4, desc 0x0AD738 axis0 0xD0760 "Per Injector Pulse Width Compensation A / Last Calculated Base Pulse Width"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x3. corrections.md item 22.
   0xFFFF77C8    19  afc_output                           19 refs. AFC output value. Referenced in fuel_corr
   0xFFFF7864    10  fuel_enrichment_state                Fuel enrichment state (float). Near fuel_enrichment_B (0xFFFF7878).
   0xFFFF798C    17  timing_state_var                     17 refs. Timing state variable. Referenced by task
@@ -803,6 +867,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF7F08    20  ignition_timing_workspace            Ignition timing workspace variable (float). Multip
   0xFFFF7F1C     0  alt_blend_ratio                      Alternative blend ratio (task50).
   0xFFFF7F2C     0  ect_desc_result                      ECT descriptor output (task33).
+  0xFFFF7F4C     1  rpm_current_timing_copy              NEW 2026-07-26: ENGINE SPEED (float, RPM) -- the copy used by the base-timing / knock-advance path. 0x040160 r12=0xFFFF7F60 ; 0x040174 mov #-20,r0 ; 0x040178 fmov.s @(r0,r12),fr5 => 0xFFFF7F4C, desc 0x0AE31C axis1 0xD46CC "Base Timing Primary Cruise / Engine Speed". float x2. corrections.md item 22.
   0xFFFF7F68     0  ect_blend_correction                 ECT blend correction (task33/50). Was ect_warmup_correction.
   0xFFFF7F6C     0  atm_blend_correction                 Atmospheric correction (task33).
   0xFFFF7F70     0  rpm_iat_blend_result                 RPM x IAT table result (task33).
@@ -826,42 +891,43 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF8260     0  knock_corr_advance                   Knock correction advance (task50).
   0xFFFF8318    17  knock_state_var                      Knock state variable
   0xFFFF8366    18  fuel_pump_workspace                  Fuel pump state machine (14-byte struct). Was knock_workspace_B (misidentified).
-  0xFFFF837B    13  idle_dispatch_workspace               Main idle dispatcher state (GBR base). 39 fields, 129 accesses.
+  0xFFFF837B    13  idle_dispatch_workspace              Main idle dispatcher state (GBR base). 39 fields, 129 accesses.
   0xFFFF837E    20  idle_control_GBR                     39 refs. Idle control GBR base (19 GBR uses). Prim
-  0xFFFF8387    13  knock_flkc_post_retard                Knock/FLKC post-retard state (GBR base). Adjacent to knock_workspace_B/C.
+  0xFFFF8387    13  knock_flkc_post_retard               Knock/FLKC post-retard state (GBR base). Adjacent to knock_workspace_B/C.
   0xFFFF8391    18  knock_workspace_C                    Knock/FLKC workspace variable C
   0xFFFF83A5    21  idle_sensor_ref                      Idle control sensor comparison reference (passed t
   0xFFFF83AA    17  idle_workspace_var                   Idle workspace variable (near idle GBR base)
   0xFFFF83AC    19  idle_workspace_GBR                   26 refs. Secondary idle GBR workspace (7 GBR uses)
+  0xFFFF8558     7  requested_torque                     NEW 2026-07-26: REQUESTED / CALCULATED ENGINE TORQUE -- the X-axis input of the Target Boost table (float, raw ecu value 0..350). 0x013A00 fmov.s @r2,fr4 -> 0x013A20 jsr 0x0BE8E4, desc 0x0AA9F0 axis0 0xC12D8 "Target Boost_ / Requested Torque"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x6 + int32 x1. corrections.md item 22.
   0xFFFF85D7    60  fuel_system_state                    60 refs. Fuel system state byte. Read by AFC, AFL,
-  0xFFFF85E4    11  fuel_knock_state_var                  Fuel/knock state variable. Near fuel_system_state (0xFFFF85D7).
+  0xFFFF85E4    11  fuel_knock_state_var                 Fuel/knock state variable. Near fuel_system_state (0xFFFF85D7).
   0xFFFF87E4    26  timing_correction_A                  26 refs. Timing correction value A.
   0xFFFF8910    16  ignition_system_state                Ignition system state. Referenced in ignition timi
   0xFFFF895C    37  injector_data                        Rate-limited sensor composite (float). Was fuel_ign_shared_state. See fueling_pipeline Section 15. 
   0xFFFF8998    11  sensor_struct_8998                   Sensor struct base (GBR at 0x52092).
-  0xFFFF89E8    14  knock_sensor_state_B                  Knock sensor state variable B. Knock/FLKC cluster.
+  0xFFFF89E8    14  knock_sensor_state_B                 Knock sensor state variable B. Knock/FLKC cluster.
   0xFFFF8A74    20  knock_flkc_state                     Knock/FLKC state variable
   0xFFFF8C9C    17  timing_workspace_A                   17 refs. Timing workspace variable.
   0xFFFF8E46    39  fuel_mode_flags                      39 refs. Fuel mode flags register.
   0xFFFF8E7E    17  afc_enable_flag_A                    PI output enable flag A (byte). Must == 1 for afc_
   0xFFFF8E98    97  cl_state_struct                      97 refs. CL monitoring state struct (15+ bytes). B
   0xFFFF8EDC    33  ol_dispatch_gate                     OL enrichment dispatch gate (byte). Checked by all
-  0xFFFF903C    13  sched_task_dispatch_state              Scheduler task dispatch state. Scheduler region.
+  0xFFFF903C    13  sched_task_dispatch_state            Scheduler task dispatch state. Scheduler region.
   0xFFFF9058    32  sched_state_A                        32 refs. Scheduler state variable A.
   0xFFFF9070    19  scheduler_state_B                    Scheduler state variable B
   0xFFFF9094    30  sched_task_GBR                       36 refs. Scheduler task GBR base (6 GBR uses).
-  0xFFFF90A8    12  timing_dispatch_state                 Timing dispatch state. Read by task01, task10, task32.
+  0xFFFF90A8    12  timing_dispatch_state                Timing dispatch state. Read by task01, task10, task32.
   0xFFFF922C    16  scheduler_counter                    Scheduler counter variable
   0xFFFF9FA8    17  sched_timer_B                        17 refs. Scheduler timer variable B.
   0xFFFF9FC6    22  sched_timer_base                     22 refs. Scheduler timer base. GBR base (3 uses).
-  0xFFFF9FE0    11  sched_timer_extended_A                Scheduler extended timer A. Scheduler timer cluster.
-  0xFFFF9FE4    12  sched_timer_extended_B                Scheduler extended timer B. Scheduler timer cluster.
+  0xFFFF9FE0    11  sched_timer_extended_A               Scheduler extended timer A. Scheduler timer cluster.
+  0xFFFF9FE4    12  sched_timer_extended_B               Scheduler extended timer B. Scheduler timer cluster.
   0xFFFFA160    15  diag_monitor_GBR                     21 refs. Diagnostic monitor GBR base (6 GBR uses).
-  0xFFFFA163    11  diag_monitor_state_byte               Diagnostic monitor state byte. Adjacent to diag_monitor_GBR (+3).
+  0xFFFFA163    11  diag_monitor_state_byte              Diagnostic monitor state byte. Adjacent to diag_monitor_GBR (+3).
   0xFFFFA198    13  egr_diag_state                       13 refs. EGR/emissions diagnostic state. GBR base 
-  0xFFFFA26C    11  diag_trip_tracking_flags              Diagnostic trip tracking flags. Trip tracking region.
+  0xFFFFA26C    11  diag_trip_tracking_flags             Diagnostic trip tracking flags. Trip tracking region.
   0xFFFFA290    16  diag_monitor_state                   Diagnostic monitor state area
-  0xFFFFA59D    15  diag_fault_enable_flags               Diagnostic fault enable/masking flags. Referenced by diag tasks.
+  0xFFFFA59D    15  diag_fault_enable_flags              Diagnostic fault enable/masking flags. Referenced by diag tasks.
   0xFFFFAC6C    13  diag_protocol_GBR                    13 refs. Diagnostic protocol GBR base (4 GBR uses)
   0xFFFFACE0    32  diag_output_buffer                   32 refs. Diagnostic output buffer pointer.
   0xFFFFAD14    14  diag_state_E_start                   Active fault status region start. 62 bytes, 268 re
@@ -874,5 +940,5 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFFAD52   107  diag_session_state                   107 refs. Diagnostic session state. Read by diag/D
   0xFFFFADAC    69  diag_request_state                   69 refs. Diagnostic request/response state. Read b
   0xFFFFAF3B    36  comms_state_byte                     36 refs. Communications protocol state byte.
-  0xFFFFAF73    13  diag_fault_history_byte               Diagnostic fault history byte. Part of diag_state_A (0xFFFFAF70-0xFFFFAFAB).
+  0xFFFFAF73    13  diag_fault_history_byte              Diagnostic fault history byte. Part of diag_state_A (0xFFFFAF70-0xFFFFAFAB).
   0xFFFFB6E1    18  stack_guard_byte                     Stack area guard byte / canary

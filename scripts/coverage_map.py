@@ -51,6 +51,7 @@ Writes (both regenerated from scratch, NEVER hand-edited):
 from __future__ import annotations
 
 import argparse
+import collections
 import datetime
 import json
 import os
@@ -87,6 +88,14 @@ RAM_LO, RAM_HI = 0xFFFF0000, 0xFFFFC000     # corrections.md #2
 CAL_LO, CAL_HI = 0x0C0000, 0x0E0000         # calibration data band
 DESC_LO, DESC_HI = 0x0A0000, 0x0BE000       # descriptor band
 LOOKUP_1D, LOOKUP_2D = 0x000BE830, 0x000BE8E4   # table_desc_1d/2d_float
+# The other six lookup entry points HARDCODE their cell width instead of
+# dispatching on the descriptor typecode, so their descriptors carry a dead
+# 0x0000 typecode.  Tracing only the two float ones made every integer-celled
+# table invisible -- which is why the Injector Latency battery-voltage feed
+# never showed up.  Trace all eight; suppress bytes/cell claims for the six.
+LOOKUP_WIDTH_HARDCODED = frozenset((0x000BE874, 0x000BE88C, 0x000BE8AC,
+                                    0x000BE8C4, 0x000BE928, 0x000BE944))
+LOOKUP_ALL = frozenset((LOOKUP_1D, LOOKUP_2D)) | LOOKUP_WIDTH_HARDCODED
 
 SCHEMA_VERSION = 1
 
@@ -348,7 +357,11 @@ def deref_widths(buf, lit, addr, back=0x400, fwd=14):
 # never the other way round.  780 descriptors survive, with 780 distinct data
 # pointers (no aliasing, no 1D/2D shadowing).
 
-_TYPECODE_WIDTH = {0x0000: 4, 0x0400: 1, 0x0800: 2}
+# Typecode -> bytes/cell.  The five-entry dispatch table at 0x0BE860 holds
+# 0xBEACC float, 0xBEB20 uint8, 0xBEB6C uint16, 0xBEAE4 SIGNED int8,
+# 0xBEB00 SIGNED int16 -- so the signed variants (0x0C00/0x1000) are real
+# typecodes and were being dropped.
+_TYPECODE_WIDTH = {0x0000: 4, 0x0400: 1, 0x0800: 2, 0x0C00: 1, 0x1000: 2}
 
 
 def _desc_at(buf, a):
@@ -457,7 +470,11 @@ def trace_axis_feeds(buf):
             slot = ((pc + 4) & ~3) + (w & 0xFF) * 4
             reg[n] = struct.unpack_from(">I", buf, slot)[0] if slot + 4 <= len(buf) else None
         elif hi == 0xE:                                 # mov #imm,Rn
-            reg[n] = w & 0xFF
+            # SH-2E SIGN-EXTENDS the 8-bit immediate.  Reading it unsigned put
+            # e.g. `mov #-120,r0` at +136, shifting every computed RAM address
+            # by exactly 256 -- self-consistently, so it looked correct.
+            _imm = w & 0xFF
+            reg[n] = _imm - 0x100 if _imm & 0x80 else _imm
         elif hi == 6 and lo == 3:                       # mov Rm,Rn
             reg[n] = reg[m]
         elif hi == 0xF and lo == 8:                     # fmov.s @Rm,FRn
@@ -468,6 +485,8 @@ def trace_axis_feeds(buf):
             fr[n] = None
         elif hi == 6 and lo in (0, 1, 2):               # integer load clobbers Rn
             reg[n] = None
+
+    desc_consumers = collections.defaultdict(set)
 
     pc = 0x400
     end = 0x0A0000
@@ -483,18 +502,19 @@ def trace_axis_feeds(buf):
             target = reg[(w >> 8) & 0xF]
             dslot = struct.unpack_from(">H", buf, pc + 2)[0]
             step(pc + 2, dslot)
-            if target in (LOOKUP_1D, LOOKUP_2D):
+            if target in LOOKUP_ALL:
                 desc = reg[4]
                 if desc is not None and DESC_LO <= desc < DESC_HI:
+                    desc_consumers[desc].add(target)
                     if fr[4] is not None and RAM_LO <= fr[4] < RAM_HI:
                         fr4[fr[4]][desc] += 1
-                    if target == LOOKUP_2D and fr[5] is not None and RAM_LO <= fr[5] < RAM_HI:
+                    if target != LOOKUP_1D and fr[5] is not None and RAM_LO <= fr[5] < RAM_HI:
                         fr5[fr[5]][desc] += 1
             pc += 4
             continue
         step(pc, w)
         pc += 2
-    return fr4, fr5
+    return fr4, fr5, desc_consumers
 
 
 # ---- region map (holes + data/code block classification) ------------------
@@ -683,7 +703,7 @@ def build(d, stock, rev, quiet=False):
         % (len(descs), sum(1 for x in descs if x["dim"] == "1D"),
            sum(1 for x in descs if x["dim"] == "2D")))
     say("  tracing RAM -> table-lookup axis feeds ...")
-    fr4, fr5 = trace_axis_feeds(stock)
+    fr4, fr5, desc_consumers = trace_axis_feeds(stock)
     say("    %d RAM variables reach a lookup axis at %d call sites"
         % (len(fr4) + len(fr5),
            sum(sum(c.values()) for c in fr4.values()) + sum(sum(c.values()) for c in fr5.values())))
@@ -876,7 +896,26 @@ def build(d, stock, rev, quiet=False):
                 # descriptor signals -- the typecode field and the spacing to the
                 # next table boundary -- point away from the declared width.  One
                 # signal alone is recorded as evidence, not as a conflict.
-                if (x is not None and x["width"] != width
+                # DEFECT (c) fix: six of the eight lookup routines HARDCODE the
+                # cell width and never read the descriptor's typecode field, so
+                # their descriptors carry a dead 0x0000 typecode -- which decodes
+                # as "4 bytes/cell, float".  Treating that as a width claim
+                # manufactured false conflicts against correct uint16 definitions
+                # (0xD106C Injector Latency_, 0xD3C2C Rough Correction Learning
+                # Delay).  If every routine that consumes this descriptor is one
+                # of the six, the typecode carries no information at all.
+                _consumers = desc_consumers.get(x["addr"]) if x is not None else None
+                _typecode_is_dead = bool(_consumers) and _consumers <= LOOKUP_WIDTH_HARDCODED
+                if _typecode_is_dead and x is not None and x["width"] != width:
+                    e["notes"].append(
+                        "descriptor @0x%05X typecode implies %d byte(s)/cell, but "
+                        "every routine that consumes it (%s) hardcodes the cell "
+                        "width and never reads the typecode -- the field is dead, "
+                        "so it is NOT evidence against the declared %s"
+                        % (x["addr"], x["width"],
+                           "/".join("0x%05X" % c for c in sorted(_consumers)),
+                           scaling.storagetype))
+                elif (x is not None and x["width"] != width
                         and x.get("implied_width") in (None, x["width"])):
                     contradiction = ("ROM descriptor @0x%05X says %d byte%s/cell "
                                      "(typecode%s); declared storagetype %s is %d"
@@ -1041,9 +1080,16 @@ def build(d, stock, rev, quiet=False):
             # mentions other quantities in passing, so it is only a fallback.
             claim_q = quantity_of(claim["name"].replace("_", " ")) or quantity_of(claim["desc"])
             # (a) declared float vs an access history with no float in it
+            #
+            # Match the word only inside the parenthesised TYPE SLOT -- "(float)",
+            # "(float, g/rev)" -- which is how every genuine claim in
+            # ram_reference.txt is written.  A bare \bfloat\b also matched the word
+            # inside CORRECTIVE prose ("NOT a float", "0 float accesses"), so every
+            # address we had just corrected re-flagged itself as a conflict against
+            # its own correction note.
             n_obs = sum(obs.values())
-            if (re.search(r"\bfloat\b", claim_text, re.I) and n_obs >= 5
-                    and "float" not in obs):
+            if (re.search(r"\(\s*(?:[^)]*,\s*)?float\b", claim_text, re.I)
+                    and n_obs >= 5 and "float" not in obs):
                 e["_contradiction"] = (
                     "ram_reference.txt:%d calls this a float, but every one of the "
                     "%d code sites that dereference it uses %s -- 0 float accesses. "
