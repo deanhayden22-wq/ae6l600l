@@ -40,6 +40,15 @@ FREG = re.compile(r'\bfr(\d+)\b', re.I)
 # normalize to "15" and "21" and register as a false mismatch. The bare-hex
 # alternative catches branch targets written without a prefix ("bsr 03735A").
 NUM = re.compile(r'(?<![\w])(0x[0-9A-Fa-f]+|[0-9A-Fa-f]{5,6}|\d+)(?![\w])', re.I)
+# Known, deliberate non-errors: (basename, line). Keep this SHORT and justify
+# every entry -- it is the one place a real bug could hide by being whitelisted.
+ACCEPTED = {
+    # A worked reasoning passage that computes the PC-relative target wrongly,
+    # notices, and corrects itself to 0x05ACF0 two lines down. Repairing the line
+    # would delete the reasoning trail, which is the valuable part.
+    ('clol_gap_closure.txt', 414),
+}
+
 # operands written as a symbol rather than an address ("bf skip", "@pool")
 SYMBOLIC = re.compile(r'@pool|\b(?:bra|bsr|bt|bf|bt/s|bf/s|jmp|jsr)\s+[a-z_][a-z0-9_]*\s*$', re.I)
 # trailing "[symbol_name]" annotations the analysis files append to branches
@@ -142,6 +151,8 @@ def main():
     ap.add_argument('paths', nargs='*')
     ap.add_argument('--rom', default='rom/ae5l600l.bin')
     ap.add_argument('--quiet', action='store_true')
+    ap.add_argument('--strict', action='store_true',
+                    help='count symbolic labels and accepted exceptions as failures')
     ap.add_argument('--max-show', type=int, default=40)
     args = ap.parse_args()
 
@@ -209,7 +220,30 @@ def main():
                 print(f"      truth: {truth[:100]}   [{cls}]")
             if len(findings) > args.max_show:
                 print(f"  ... +{len(findings)-args.max_show} more")
-    return 1 if findings else 0
+
+    # Exit code means "something REGRESSED", not "something was found".
+    #
+    # The corpus has a known, deliberate baseline of non-errors:
+    #   * SYMBOLIC  - a file writes `bf skip` or `@pool` instead of an address.
+    #                 Legitimate style, not a decode error.
+    #   * ACCEPTED  - a worked reasoning passage that states a wrong value, then
+    #                 catches itself and lands on the right one two lines later.
+    #                 The trail is worth more than the tidy line.
+    # Returning nonzero for those made the tool unusable in a `&&` chain and
+    # trained the reader to ignore its exit code. Use --strict for the old
+    # count-everything behaviour.
+    regressions = [f for f in findings
+                   if not f[6].startswith('SYMBOLIC')
+                   and (os.path.basename(f[0]), f[1]) not in ACCEPTED]
+    if args.strict:
+        regressions = findings
+    if regressions:
+        print(f"\nREGRESSION: {len(regressions)} finding(s) outside the accepted baseline")
+    else:
+        print(f"\nbaseline clean ({len(findings)} accepted non-error(s): "
+              f"{sum(1 for f in findings if f[6].startswith('SYMBOLIC'))} symbolic, "
+              f"{len(findings) - sum(1 for f in findings if f[6].startswith('SYMBOLIC'))} accepted)")
+    return 1 if regressions else 0
 
 
 if __name__ == '__main__':

@@ -36,6 +36,12 @@ These exist because confident-but-wrong answers have been produced here before.
    python scripts/verify_disasm_v2.py disassembly/analysis/<file>.txt
    ```
 
+   Both gates at once (Windows PowerShell 5.1 has no `&&`, so use the wrapper):
+
+   ```
+   .\scripts\check.ps1
+   ```
+
    Current baseline: **99.87% of 22,487 lines match; 0 known errors**
    (`disassembly/verification_report_v2.txt`). The 29 remaining mismatches are
    28 deliberate symbolic labels plus one self-correcting reasoning passage.
@@ -81,8 +87,16 @@ its status. Two worth carrying in your head:
   `FFFF63F8` = **engine load** (was `iat_current`), `FFFF65FC` = **vehicle speed
   km/h** (was `engine_load_current`), `FFFF620C` = **manifold pressure** (was
   `airflow_maf_current`), `FFFF61CC` = **diag status bytes** (was `vehicle_speed`).
-  Real IAT is `FFFF69F0`. Settled by tracing each RAM variable to the lookup axis
-  it feeds and reading the axis name out of the definition XMLs.
+  Settled by tracing each RAM variable to the lookup axis it feeds and reading
+  the axis name out of the definition XMLs.
+- **A further 17 RAM identities corrected** (items 10-26), including two straight
+  swaps: `FFFF4130` is **battery voltage** (was `atm_pressure_baro`) while
+  `FFFF6C48` — labelled `battery_voltage` — is a **byte status code**.
+  **IAT is `FFFF6364`** (was `ect_startup`); the earlier item-9 claim that IAT
+  was `FFFF69F0` is **RETRACTED** — `FFFF69F0` reaches zero named axes.
+  Several "sensors" are diagnostic plumbing read only as bytes: `FFFF67EC` is a
+  uint16 DTC counter, `FFFF65C0` a precondition flag. Real throttle is
+  `FFFF62DC` (plate) and `FFFF64D8` (**pedal**, not throttle_raw).
 
 ## Definitions are primary ground truth — and check the flag before trusting an area
 
@@ -134,9 +148,11 @@ block and every RAM variable carries exactly one flag in
 | `CONFLICT` | **Stop.** Two independent sides disagree. Settle it from ROM bytes, record it in `docs/corrections.md`, then continue. |
 | `DEFS-ONLY` / `DISASM-ONLY` / `UNMAPPED` | No cross-check exists. Say so in whatever you write (rule 6 above). |
 
-Current state: **350 VERIFIED-BOTH, 291 VERIFIED-BYTES, 15 CONFLICT, 53
-BOUNDS-SUSPECT, 21 DEFS-ONLY, 903 DISASM-ONLY, 3,088 UNMAPPED**, and **79.9% of
-data-classified ROM bytes are claimed by neither side.** Most of this ROM is not
+Current state (4,724 entities): **356 VERIFIED-BOTH, 293 VERIFIED-BYTES,
+0 CONFLICT, 53 BOUNDS-SUSPECT, 21 DEFS-ONLY, 917 DISASM-ONLY, 3,084 UNMAPPED**,
+and **79.9% of data-classified ROM bytes are claimed by neither side.**
+Zero CONFLICTs means nothing is *known* to disagree — not that the rest is right;
+only ~14% is verified at all. Most of this ROM is not
 verified. Treat an unflagged or `UNMAPPED` area as unknown, not as safe.
 
 ### Regenerate it — never hand-edit it
