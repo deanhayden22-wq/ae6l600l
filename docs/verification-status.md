@@ -6,7 +6,7 @@
 python scripts/coverage_map.py
 ```
 
-Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-07-26 19:21.
+Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-07-26 21:44.
 
 Every flag below is recomputed from scratch on each run: the definition side from `scripts/defs.py` over both definition XMLs, the disassembly side re-derived from ROM bytes (literal-pool dereference back-trace, table descriptors decoded out of ROM, and a RAM→lookup-axis feed trace). No conclusion is read out of a derived file and trusted. Agreement across derived files is not evidence.
 
@@ -72,26 +72,26 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 
 ## 2. Coverage
 
-4724 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
+4722 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
 
 | Flag | Entities | Share |
 |---|---:|---:|
-| `CONFLICT` | 0 | 0.0% |
+| `CONFLICT` | 2 | 0.0% |
 | `BOUNDS-SUSPECT` | 53 | 1.1% |
-| `VERIFIED-BOTH` | 356 | 7.5% |
+| `VERIFIED-BOTH` | 351 | 7.4% |
 | `VERIFIED-BYTES` | 293 | 6.2% |
 | `DEFS-ONLY` | 21 | 0.4% |
-| `DISASM-ONLY` | 917 | 19.4% |
+| `DISASM-ONLY` | 918 | 19.4% |
 | `UNMAPPED` | 3084 | 65.3% |
 
 ### By entity kind
 
 | Kind | `CONFLICT` | `BOUNDS-SUSPECT` | `VERIFIED-BOTH` | `VERIFIED-BYTES` | `DEFS-ONLY` | `DISASM-ONLY` | `UNMAPPED` |
 |---|---|---|---|---|---|---|---|
-| axis | 0 | 26 | 130 | 57 | 2 | 0 | 0 |
+| axis | 0 | 26 | 128 | 57 | 2 | 0 | 0 |
 | ram | 0 | 0 | 5 | 0 | 0 | 222 | 3084 |
-| rom-block | 0 | 0 | 0 | 0 | 0 | 695 | 0 |
-| table | 0 | 27 | 221 | 236 | 19 | 0 | 0 |
+| rom-block | 0 | 0 | 0 | 0 | 0 | 696 | 0 |
+| table | 2 | 27 | 218 | 236 | 19 | 0 | 0 |
 
 `table` / `axis` are definition-backed. `rom-block` is a calibration block a ROM descriptor points at that no `<table>` covers. `ram` is a RAM variable — RAM is outside the ROM image, so no definition can ever cover it and the definition side contributes only indirectly, through the names of the axes a RAM variable is traced feeding.
 
@@ -113,8 +113,8 @@ Largest unmapped data blocks:
 | `0x01000`–`0x02C00` | float_data | 7,132 |
 | `0x9A700`–`0x9C200` | float_data | 6,760 |
 | `0x49A00`–`0x4B100` | float_data | 5,888 |
-| `0xC0B00`–`0xC3F00` | float_data | 4,927 |
-| `0xD5800`–`0xD7400` | float_data | 4,801 |
+| `0xC0B00`–`0xC3F00` | float_data | 4,929 |
+| `0xD5800`–`0xD7400` | float_data | 4,799 |
 | `0xD1D00`–`0xD4500` | float_data | 4,793 |
 | `0x03900`–`0x04A00` | float_data | 4,352 |
 | `0xD8300`–`0xDAB00` | float_data | 4,309 |
@@ -128,7 +128,7 @@ Largest unmapped data blocks:
 | Category | `CONFLICT` | `BOUNDS-SUSPECT` | `VERIFIED-BOTH` | `VERIFIED-BYTES` | `DEFS-ONLY` | `DISASM-ONLY` | `UNMAPPED` | total |
 |---|---|---|---|---|---|---|---|---|
 | Diagnostics / DTC | 0 | 0 | 0 | 152 | 0 | 0 | 0 | 152 |
-| Fueling - Base / Enrichment | 0 | 19 | 30 | 43 | 0 | 0 | 0 | 92 |
+| Fueling - Base / Enrichment | 0 | 19 | 27 | 43 | 0 | 0 | 0 | 89 |
 | Ignition Timing | 0 | 2 | 56 | 19 | 0 | 0 | 0 | 77 |
 | Boost Control | 0 | 0 | 43 | 8 | 4 | 0 | 0 | 55 |
 | Fueling - CL/OL Transition | 0 | 6 | 37 | 8 | 0 | 0 | 0 | 51 |
@@ -136,11 +136,11 @@ Largest unmapped data blocks:
 | Torque Management / DBW | 0 | 2 | 2 | 27 | 10 | 0 | 0 | 41 |
 | Ignition Timing - Knock | 0 | 6 | 29 | 2 | 0 | 0 | 0 | 37 |
 | Fueling - Injector | 0 | 1 | 20 | 13 | 0 | 0 | 0 | 34 |
-| Idle Control | 0 | 8 | 6 | 8 | 0 | 0 | 0 | 22 |
+| Idle Control | 1 | 8 | 5 | 8 | 0 | 0 | 0 | 22 |
 | Sensors / Calibration | 0 | 2 | 16 | 1 | 0 | 0 | 0 | 19 |
 | Vehicle Speed / Transmission | 0 | 0 | 15 | 0 | 0 | 0 | 0 | 15 |
 | Map Switching - Timing Blend | 0 | 0 | 14 | 0 | 0 | 0 | 0 | 14 |
-| tinywrex patches | 0 | 2 | 8 | 4 | 0 | 0 | 0 | 14 |
+| tinywrex patches | 1 | 2 | 7 | 4 | 0 | 0 | 0 | 14 |
 | AVCS / Cam Timing | 0 | 2 | 10 | 0 | 0 | 0 | 0 | 12 |
 | MAF / Airflow | 0 | 0 | 8 | 1 | 3 | 0 | 0 | 12 |
 | Fuel System | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 7 |
@@ -151,9 +151,20 @@ Largest unmapped data blocks:
 
 ## 4. `CONFLICT` — settle these from bytes
 
-Two independent sides make incompatible claims about the same address. Nothing downstream of these should be trusted until a human settles them from ROM bytes — and settles them in the right direction. **0 entities.**
+Two independent sides make incompatible claims about the same address. Nothing downstream of these should be trusted until a human settles them from ROM bytes — and settles them in the right direction. **2 entities.**
 
-_None._
+- **`0xC0BCC`** — Boost disable during fuel cut-Load threshold  
+  _tinywrex patches_
+  - ROM code dereferences 0xC0BCC as float; declared storagetype uint16 (EngineLoad(g/rev)) is never used. The definition shows 1.00 Engine Load (g/rev); read the way the code reads it (float) the same bytes are 1.7
+  - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
+  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
+  - evidence: D5 cal_crossref.txt:472 — Ghidra label cal_Boost_disable_during_fuel_cut_Load_threshold
+- **`0xD6214`** — Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter  
+  _Idle Control_
+  - ROM code dereferences 0xD6214 as int16; declared storagetype float (rawecuvalue) is never used. The definition shows 0.0 raw ecu value; read the way the code reads it (int16) the same bytes are 18
+  - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
+  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int16 x6
+  - evidence: D5 cal_crossref.txt:351 — Ghidra label cal_Idle_Airflow_Min_Target_Decel_Initial_Idle_Activation_Ma
 
 ## 5. `BOUNDS-SUSPECT` — editor will clamp
 
