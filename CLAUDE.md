@@ -132,6 +132,23 @@ axis pointer → definition axis name → the RAM variable traced feeding it. Th
 method is what identified `0xFFFF63F8`, and it would have prevented corrections
 #6 and #8 from ever being applied backwards.
 
+### Do NOT edit the definition XMLs in the repo
+
+ECUFlash owns these files. Its definition directory is recorded in
+`HKCU:\Software\OpenECU\EcuFlash\files` → *metadata directory* (currently
+under `Program Files`), and it **rewrites the whole project XML on save**. A
+repo-side edit is therefore lost the next time ECUFlash saves, and the two
+copies diverge silently while each looks correct on its own — the same failure
+class as every correction in `docs/corrections.md`.
+
+- **Make definition changes in the ECUFlash UI**, then bring them back with
+  `.\scripts\sync_defs.ps1 -Pull`.
+- `.\scripts\sync_defs.ps1` on its own reports divergence and changes nothing.
+- Repo and ECUFlash have been out of sync since 2026-04-07; the repo carries
+  ~37 tables ECUFlash does not (post-transient knock window defs, the fuel-pump
+  duty split). A blind `-Pull` deletes them. Check before syncing either way.
+- Analysis tooling reads the **repo** copy via `scripts/defs.py`.
+
 ### Check the flag before building on an area
 
 Every addressed table, every addressed axis, every descriptor-backed calibration

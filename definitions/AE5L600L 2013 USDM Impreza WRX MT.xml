@@ -1,47 +1,3 @@
-<!--
-  ================================================================================
-  NOTE FOR ANALYSIS SESSIONS (added 2026-07-26)
-
-  THIS FILE AND 32BITBASE.xml ARE PRIMARY GROUND TRUTH. READ BOTH.
-
-  This project file supplies ADDRESSES (716 tables with address=).
-  32BITBASE.xml supplies MEANING (2117 tables: category, <description>, axis
-  names, element counts, scalings). <include>32BITBASE</include> below binds a
-  table here to the base entry OF THE SAME NAME. Reading only one file gives you
-  half the picture.
-
-  READ toexpr, NOT JUST THE NAME. The RAW stored value is frequently not the
-  displayed value:
-    * LCSPEED(MPH) has toexpr="x*.621"  =>  raw is KM/H, display is MPH.
-      Raw 8.0515 displays as 5 mph.
-    * TWO TABLES CAN SHARE ONE ADDRESS with different scalings — e.g.
-      "LC disable speed(KMH)threshold" and "(MPH)" are both at f104c.
-      Two names does not mean two values.
-    * LoadGRev is declared max="5" g/rev, which alone rules out reading 8.05
-      as a load value.
-
-  WHY THIS WARNING EXISTS: these files were under-used, and ROM-byte
-  archaeology was done to answer questions the definitions already answered.
-  Worse, 0xFFFF65FC was labelled "engine_load_current" throughout the
-  disassembly when it is vehicle speed in km/h — consulting the scalings here
-  would have caught it. See docs/corrections.md item 8.
-
-  Engine load appears exactly ONCE as a threshold in the tinywrex patch set:
-  c0bcc, "Boost disable during fuel cut-Load threshold". Use it as the reference
-  for what a load value looks like.
-
-  CORRECTED 2026-07-26: c0bcc used to declare scaling="EngineLoad(g/rev)", which
-  is a uint16 scaling (toexpr x*.00006103516). The ROM reads this address as a
-  FLOAT: 0x0141FA mov.l @(0x014268),r6 (=0x0C0BCC) ; 0x0141FC fmov.s @r6,fr8 ;
-  0x0141FE fcmp/gt fr15,fr8, where fr15 was loaded at 0x0141E4 from 0xFFFF63F8 =
-  engine load. Bytes 3F D9 99 99 = float 1.70 g/rev. Read the old declared way
-  it displayed 1.00 g/rev, which is why the error survived. Now scaling="g/rev"
-  (float, toexpr x), matching its two siblings c0bc8 and c0bd0 which were always
-  correctly declared float. See docs/corrections.md item 24.
-
-  Correctness flags per area: docs/verification-status.md
-  ================================================================================
--->
 <rom>
 	<romid>
 		<xmlid>AE5L600L</xmlid>
@@ -77,19 +33,10 @@
 	<scaling name="barpressureabsolute" units="bar absolute" toexpr="x*.001333224" frexpr="x/.001333224" format="%.3f" min="0.2" max="2.67" inc="0.01" storagetype="float" endian="big"/>
 	<scaling name="psipressureabsolute" units="psi absolute" toexpr="x*.01933677" frexpr="x/.01933677" format="%.3f" min="-8.01" max="9.94" inc="0.01" storagetype="float" endian="big"/>
 	<scaling name="Intake Duty Correction (uint8)" units="Correction" toexpr="x*0.2" frexpr="x/0.2" format="%.1f" min="0" max="51" inc="0.2" storagetype="uint8" endian="big"/>
-	<!-- Added 2026-07-26. uint16 counterpart of the base "rawecuvalue" scaling,
-	     which is float. Needed by d6214, whose six dereference sites are all
-	     mov.w. Do NOT retarget the base rawecuvalue scaling: 50 base tables use
-	     it and they are genuinely float. See docs/corrections.md item 25. -->
-	<scaling name="rawecuvalue(uint16)" units="raw ecu value" toexpr="x" frexpr="x" format="%.0f" min="0" max="65535" inc="1" storagetype="uint16" endian="big"/>
 
 	<table name="Boost disable during fuel cut-RPM threshold" category="tinywrex patches" address="c0bd0" type="1D" scaling="LCRPM"/>
 
-	<!-- CORRECTED 2026-07-26: was scaling="EngineLoad(g/rev)" (uint16). The ROM
-	     reads c0bcc with fmov.s at 0x0141FC and compares it to the float at
-	     0xFFFF63F8 (engine load). Bytes 3F D9 99 99 = 1.70 g/rev. See
-	     docs/corrections.md item 24. -->
-	<table name="Boost disable during fuel cut-Load threshold" category="tinywrex patches" address="c0bcc" type="1D" scaling="g/rev"/>
+	<table name="Boost disable during fuel cut-Load threshold" category="tinywrex patches" address="c0bcc" type="1D" scaling="EngineLoad(g/rev)"/>
 
 	<table name="Boost disable during fuel cut-Boost(bar) threshold" category="tinywrex patches" address="c0bc8" type="1D" scaling="barpressureabsolute"/>
 
@@ -1472,16 +1419,7 @@
 
 	<table name="Idle Airflow Min Target Decel Initial Idle Min Airflow A" category="Idle Control" address="d6484"/>
 
-	<!-- CORRECTED 2026-07-26: scaling overridden from the base "rawecuvalue"
-	     (float) to uint16. This address is never reached through a table
-	     descriptor, only through raw literals (pool slots 0x50998, 0x50C98,
-	     0x50DB8), and all six dereference sites are mov.w: 0x0507CA
-	     mov.l @(0x050998),r2 ; 0x0507CC mov.w @r2,r6 ; 0x0507CE cmp/hs r6,r0.
-	     Bytes 00 12 = uint16 18 counts. Read as float the same bytes give
-	     1.65e-39, a denormal the ECU never uses, and the 4 byte extent also
-	     swallowed the separate uint16 at d6216 (= 8), which is now an honest
-	     unmapped word needing its own table. See docs/corrections.md item 25. -->
-	<table name="Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter" category="Idle Control" address="d6214" scaling="rawecuvalue(uint16)"/>
+	<table name="Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter" category="Idle Control" address="d6214"/>
 
 	<table name="Idle Airflow Min Target Decel Ramping Adder Decreasing" category="Idle Control" address="d64a4"/>
 
@@ -2062,37 +2000,6 @@
 
 	<table name="Boost Feedback Filter Coefficient" category="Boost Control" address="d6748" type="1D" scaling="CoefficientFloat">
 		<description>IIR filter coefficient for boost feedback trim loop. Stock: 0.5.</description>
-	</table>
-
-	<!-- ============================================================
-	     NEW BINDINGS 2026-07-26, derived from ROM table descriptors.
-
-	     Front AF Sensor Smoothing Table. Descriptor at 0x0AF4C4, raw bytes
-	       00 04 00 04 | 00 0D 92 80 | 00 0D 92 90 | 00 0D 92 A0 | 00 00 00 00
-	     giving counts 4 x 4, axis1 d9280, axis2 d9290, data d92a0, typecode
-	     0x0000 = 4 byte float cells. Byte checks: axis1 reads 20 / 26 / 32 / 44
-	     (the base declares the X axis as "Smoothed MAF" in g/s); axis2 reads
-	     0.6 / 0.75 / 0.975 / 1.2 (base Y axis "Engine Load" in g/rev); the 16
-	     data cells read 0.05 .. 0.90, which through the base SmoothingFactor
-	     toexpr (x*(-100))+100 is 10% .. 95%, inside the range the base
-	     description warns about. Nothing else in this file claimed d92a0.
-
-	     This binding is VERIFIED AGAINST CODE, not geometry alone. The sole
-	     consumer of the descriptor is 0x058946 mov.l @(0x058A4C),r2 (=0xFFFF63CC)
-	     ; 0x058948 fmov.s @r2,fr4 ; 0x05894A mov.l @(0x058A50),r2 (=0xFFFF63F8)
-	     ; 0x05894C fmov.s @r2,fr5 ; 0x05894E mov.l @(0x058A54),r4 (=0x000AF4C4)
-	     ; 0x058950 mov.l @(0x058A58),r2 (=0x000BE8E4, the 2D float lookup) ;
-	     0x058952 jsr @r2. FR5 is 0xFFFF63F8, the settled ENGINE LOAD address, and
-	     it lands on axis2, exactly the axis the base names "Engine Load". The
-	     result is written back to 0xFFFF8DE0 at 0x058958.
-
-	     CAVEAT: the FR4 side comes from 0xFFFF63CC, whose own identity is
-	     UNRESOLVED (see docs/corrections.md item 23). That does not affect the
-	     binding, only the interpretation of the X axis.
-	     ============================================================ -->
-	<table name="Front AF Sensor Smoothing Table" category="Fueling - Base / Enrichment" address="d92a0">
-		<table name="Smoothed MAF" type="X Axis" address="d9280"/>
-		<table name="Engine Load" type="Y Axis" address="d9290"/>
 	</table>
 
 </rom>

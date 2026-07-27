@@ -950,7 +950,14 @@ is higher-leverage than any further tracer work.
 
 ---
 
-## 24. `0xC0BCC` was declared uint16 but the ROM reads it as a float — **FIXED 2026-07-26**
+## 24. `0xC0BCC` was declared uint16 but the ROM reads it as a float — **FINDING STANDS, EDIT REVERTED**
+
+> **Status 2026-07-26:** the XML edit was applied and then **reverted** at the
+> owner's request — ECUFlash round-trips these files, so repo-side edits are
+> lost on its next save and the two copies silently diverge. The *finding*
+> below is unaffected and verified from bytes; only the edit was rolled back.
+> `c0bcc` still displays 1.00 g/rev in ECUFlash where the true value is 1.70.
+> Deliberately left alone: not a table this project tunes.
 
 `definitions/AE5L600L 2013 USDM Impreza WRX MT.xml`, table
 "Boost disable during fuel cut-Load threshold", had
@@ -994,7 +1001,10 @@ identities at once: MAP → `0xFFFF620C`, load → `0xFFFF63F8`, RPM → `0xFFFF
 
 ---
 
-## 25. `0xD6214` was declared float but the ROM reads it as uint16 — **FIXED 2026-07-26**
+## 25. `0xD6214` was declared float but the ROM reads it as uint16 — **FINDING STANDS, EDIT REVERTED**
+
+> **Status 2026-07-26:** as item 24 — the XML edit was reverted; the
+> byte-level finding below is unaffected.
 
 Table "Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter"
 inherited `scaling="rawecuvalue"` from `32BITBASE.xml:5373`, which is **float**.
@@ -1029,7 +1039,11 @@ word needing its own table.
 
 ---
 
-## 26. New table binding: Front AF Sensor Smoothing Table at `0xD92A0` — **ADDED 2026-07-26**
+## 26. New table binding: Front AF Sensor Smoothing Table at `0xD92A0` — **PROPOSED, NOT IN THE XML**
+
+> **Status 2026-07-26:** the binding was added and then **reverted** with the
+> rest of the definition edits. The geometry evidence below stands; re-apply
+> it in ECUFlash's UI rather than the repo XML if it is wanted.
 
 `0xD92A0` was UNMAPPED. Descriptor `0x0AF4C4`, raw bytes:
 
