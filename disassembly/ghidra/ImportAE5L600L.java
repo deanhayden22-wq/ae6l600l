@@ -1352,8 +1352,22 @@ public class ImportAE5L600L extends GhidraScript {
             "Fuel correction parameter D (float). Read by fuel_correction_final.");
         count += labelComment(0xFFFF77DCL, "fuel_corr_cl_target_A",
             "CL target comp A output (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF63C4L, "ect_compensation",
-            "ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.");
+        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
+            "CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
+            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
+            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
+            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
+            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
+            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
+            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
+            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
+            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
+            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
+            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
+            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
+            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
+            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
+            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
 
         count += labelComment(0xFFFF316CL, "afl_table_base",
             "A/F Learning table base in RAM (4 ranges x 8 bytes = 32 bytes)");
@@ -1368,8 +1382,15 @@ public class ImportAE5L600L extends GhidraScript {
         // REMOVED: 0xFFFF6350 "ram_RPM" — wrong. This is ECT, not RPM. Correct: ect_current (line 2157)
         // SUPERSEDED 2026-07-26: 0xFFFF63F8 is neither MAF nor IAT -- it is ENGINE LOAD (g/rev).
         // See docs/corrections.md item 9.
-        count += labelComment(0xFFFF63CCL, "ram_ECT",
-            "Coolant temperature / ECT (float)");
+        count += labelComment(0xFFFF63CCL, "maf_smoothed_gps",
+            "CORRECTED 2026-07-27. SMOOTHED MASS AIRFLOW (float, g/s). The previous name asserted a temperature; that is refuted. Derived from "
+            + "bytes, not from an axis name: 0x020472 r14=0xFFFF63D8 ; 0x020476 mov #-20,r0 -> FR14 = "
+            + "*(0xFFFF63C4) (the MAF) ; 0x020482 fmov fr14,fr4 ; 0x02048C fr6 = cal 0xC3108 = 0.5 ; 0x020490 "
+            + "jsr 0x0BEA40 with delay slot 0x020492 fmov.s @(r0,r14),fr5 (r0=-12 => *(0xFFFF63CC)) ; 0x020496 "
+            + "fmov.s fr0,@(r0,r14) stores the result back. 0x0BEA40 is a first-order lag filter (fldi1/fsub for "
+            + "1-alpha, fmac, |delta| deadband against FR7, NaN reset), so 0xFFFF63CC = lag(MAF, alpha=0.5). This "
+            + "independently confirms the corrections.md item 26 binding of axis 0xD9280 \"Smoothed MAF\" "
+            + "(20/26/32/44 g/s). corrections.md item 30.");
         // REMOVED: 0xFFFF6624 "ram_MAF_alt" — wrong. This is RPM, not MAF. Correct: rpm_current (line 2154)
         count += labelComment(0xFFFF3234L, "ram_IAM",
             "Ignition Advance Multiplier current value (float). Also used by FLKC.");
@@ -2195,19 +2216,30 @@ public class ImportAE5L600L extends GhidraScript {
             + "(0xC1780/0xC1A00/0xC1C80/0xC1F00 Calculated Engine Torque A-D, 0xD16DC CL Fueling Target Comp B, "
             + "0xD5374 Timing Comp Per Gear 1st); breakpoint span 0..3 g/rev; never once a temperature axis. "
             + "Corroborated by 0xC0BCC 'Boost disable during fuel cut-Load threshold' = 1.7 g/rev compared "
-            + "against this value at 0x0141FC. Real IAT is 0xFFFF69F0 (float, -40..120 C). "
+            + "against this value at 0x0141FC. Real IAT is 0xFFFF6364 (corrections.md item 12); the earlier claim that "
+            + "IAT was 0xFFFF69F0 is RETRACTED -- 0xFFFF69F0 is a 0..1 ratio (corrections.md item 33). "
             + "See docs/corrections.md item 9.");
         count += labelComment(0xFFFF6354L, "ect_raw_adc",
             "69 refs. ECT raw ADC value or secondary ECT (float). Read by PSE, AFL.");
         count += labelComment(0xFFFF6364L, "iat_current",
             "CORRECTED 2026-07-26. INTAKE AIR TEMPERATURE (float, degC). See the full proof on the earlier "
             + "labelComment for this address and docs/corrections.md item 12.");
-        count += labelComment(0xFFFF63C4L, "ect_compensation",
-            "43 refs. UNRESOLVED as of 2026-07-26 -- the name is NOT supported. Its traced lookup axes split "
-            + "three ways: 'Intake Duty Correction A / Intake VVT Error' (0xCF9EC), 'Exhaust Duty Correction A / "
-            + "Exhaust VVT Error' (0xD11D0), and 'CL to OL Transition Counter Step Value (MAF) / Mass Airflow' "
-            + "(0xCE618). Nothing supports 'ECT compensation'. Needs control-flow-aware (not linear) tracing. "
-            + "See docs/corrections.md item 23.");
+        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
+            "CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
+            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
+            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
+            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
+            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
+            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
+            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
+            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
+            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
+            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
+            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
+            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
+            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
+            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
+            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
         count += labelComment(0xFFFF6254L, "flag_6254",
             "CORRECTED 2026-07-26. BYTE boolean at +4 in the 0xFFFF6250 block. NOT mass airflow and NOT a float. "
             + "Census: 51 int8 accesses, ZERO FP accesses. Set to the literal 1 together with its siblings at "
@@ -2216,7 +2248,14 @@ public class ImportAE5L600L extends GhidraScript {
             + "MAF/mass air/airflow, so the axis-name method cannot locate it. Do not guess. "
             + "See docs/corrections.md item 17.");
         count += labelComment(0xFFFF6228L, "maf_voltage",
-            "22 refs. MAF sensor voltage (float). Read by timing, fuel.");
+            "UNRESOLVED 2026-07-27 -- NAME REFUTED, replacement unknown, so deliberately NOT renamed. The real MAF "
+            + "voltage is 0xFFFF4042 (uint16 ADC counts) x 5/65536 and it is NEVER stored to RAM -- it lives only "
+            + "in FR4 across 0x004A44, immediately before the \"MAF Sensor Scaling\" lookup. 0xFFFF6228 has a "
+            + "different source and a different scale: it is its own GBR base (0x01D8FC mov.l @(0x01D9D8),r0 ; "
+            + "0x01D8FE ldc r0,gbr), and 0x01D94C mov.w @(30,gbr),r0 (the uint16 at 0xFFFF6246) ; 0x01D954 jsr "
+            + "0x0BE598 ; 0x01D956 fmov.s @r0,fr4 with *(0x01D990)=0.0305176 ; 0x01D95A fmov.s fr0,@r2 yields "
+            + "counts*0.0305176, not counts*5/65536. Second writer 0x01D6F0 / 0x01D6FA, same constant. It feeds "
+            + "ZERO lookup axes. corrections.md item 35.");
         count += labelComment(0xFFFF61CCL, "diag_monitor_status_bytes",
             "CORRECTED 2026-07-26. NOT vehicle speed and NOT a float. Base of a BYTE array of diagnostic "
             + "monitor/readiness status bitfields. Access census over all 56 pool refs: 26 int8 accesses, "
@@ -2228,14 +2267,15 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF6898L, "atm_pressure_current",
             "CORRECTED 2026-07-26. ATMOSPHERIC / BAROMETRIC PRESSURE (float). See the full proof on the earlier "
             + "labelComment for this address and docs/corrections.md item 11.");
-        count += labelComment(0xFFFF69F0L, "iat_input_float",
-            "32 refs. NAME NO LONGER SETTLED as of 2026-07-26. This address feeds ZERO table-lookup axes, and "
-            + "its only two literal-pool stores are not sensor-like: 0x0273E0 fldi1 fr8 / 0x0273E6 fmov.s fr8,@r2 "
-            + "sets it to exactly 1.0, and 0x0275B4-0x0275C8 adds the calibration float at 0xC41F4 and clamps "
-            + "against 0xC41F8 -- a ramp-to-limit, not an ADC read. The IAT that every definition-named Intake "
-            + "Temperature axis actually reads is 0xFFFF6364. NOT renamed: the write path was not located, and "
-            + "this project has been burned four times by renames on partial evidence. "
-            + "See docs/corrections.md item 23.");
+        count += labelComment(0xFFFF69F0L, "ratio_0to1_69F0",
+            "CORRECTED 2026-07-27. A 0..1 RATIO (float). Definitively NOT a temperature. 0x0272CE "
+            + "mov.l @(0x0274DC),r2 (=0x0BE56C) ; 0x0272D0 fldi1 fr6 ; 0x0272D2 fldi0 fr5 ; 0x0272D6 jsr @r2 with "
+            + "delay slot 0x0272D8 fmov.s @r6,fr4 (r6=0xFFFF69F0). 0x0BE56C is clamp(FR4, lo=FR5, hi=FR6), verified "
+            + "from bytes, so the value is clamped to [0.0, 1.0]; repeated at 0x0273BA. Its only store sets it to "
+            + "exactly 1.0 (0x0273E0 fldi1 fr8 ; 0x0273E6 fmov.s fr8,@r2). Full control-flow tracing finds 4 sites, "
+            + "all the SAME unnamed 0..1 axis 0xC4514, and ZERO temperature-named axes -- while 0xFFFF6364 reaches "
+            + "9. A value clamped to [0,1] cannot be a -40..120 C temperature, so the old name is refuted outright. "
+            + "WHICH ratio it is remains UNRESOLVED and is deliberately not guessed. corrections.md items 23 + 33.");
         count += labelComment(0xFFFF6C48L, "diag_status_code_6C48",
             "CORRECTED 2026-07-26. BYTE status/result code. NOT battery voltage and NOT a float. Census: "
             + "34 int8 accesses (13 loads, 21 stores), ZERO FP accesses. Every stored constant is a "
@@ -2372,8 +2412,15 @@ public class ImportAE5L600L extends GhidraScript {
             "13 refs. Diagnostic protocol GBR base (4 GBR uses).");
         count += labelComment(0xFFFFA160L, "diag_monitor_GBR",
             "21 refs. Diagnostic monitor GBR base (6 GBR uses).");
-        count += labelComment(0xFFFFA198L, "egr_diag_state",
-            "13 refs. EGR/emissions diagnostic state. GBR base (3 uses).");
+        count += labelComment(0xFFFFA198L, "rpm_snapshot_A198",
+            "CORRECTED 2026-07-27. ENGINE SPEED snapshot (float, RPM) at +0 of the 0xFFFFA198 struct. That struct "
+            + "is also loaded into GBR at 0x0758E8 and 0x075C54, which is where the old egr_diag_state name came "
+            + "from -- it described the STRUCT, not the float at offset 0. Assigned directly from the settled RPM "
+            + "variable at two independent sites: 0x075934 mov.l @(0x075A58),r2 (=0xFFFF6624) ; 0x075936 fmov.s "
+            + "@r2,fr8 ; 0x075938 mov.l @(0x075A48),r2 (=0xFFFFA198) ; 0x07593A fmov.s fr8,@r2 -- and identically "
+            + "at 0x075CA2 / 0x075CA6 / 0x075CA8. Corroborated by 53 lookup sites across 10 functions whose axes "
+            + "are all RPM-shaped (700..6700, 750..6700, 4000..6700, 3500..7000), zero dissent. corrections.md "
+            + "item 34.");
         count += labelComment(0xFFFFAF3BL, "comms_state_byte",
             "36 refs. Communications protocol state byte.");
         count += labelComment(0xFFFFAF60L, "comms_buffer_ptr",
@@ -2413,7 +2460,13 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF5C98L, "peripheral_control_GBR",
             "15 refs. Peripheral control GBR base (3 uses).");
         count += labelComment(0xFFFF5FFCL, "io_state_register",
-            "23 refs. I/O state register.");
+            "UNRESOLVED 2026-07-27 -- NAME REFUTED, replacement not derivable, so deliberately NOT renamed. It is "
+            + "a struct base loaded into GBR (0x018DDA mov.l @(0x019008),r0 ; 0x018DDC ldc r0,gbr) AND a float read "
+            + "26 times, feeding 15 numeric lookup axes spanning 0..250 across 5 functions. An I/O state register "
+            + "is not read as a float and used as a table index. All 15 axes (0xC2408 / C242C / C24AC / C24F8 / "
+            + "C2510 / C25A4 / C2614 / C2764 / C277C / C2794 / C27AC / C2CC8 / C2D24 / C2F88) are UNNAMED in both "
+            + "definition XMLs, so the axis-name method has nothing to vote with. What would settle it: name any "
+            + "one of those axes. corrections.md item 35.");
 
         // ── System State (0xFFFF2xxx) ──────────────────────────────────────
         count += labelComment(0xFFFF2004L, "system_init_flags",
@@ -3234,12 +3287,22 @@ public class ImportAE5L600L extends GhidraScript {
             + "Used in baro calc at 0xA5C8.");
 
         // MAF scaling — RAM variables
-        count += labelComment(0xFFFF4042L, "pMafSensorVoltage",
-            "Raw MAF sensor ADC value (uint16). ADDR15 channel. "
-            + "No IIR filter — direct pass-through to descriptor 0xAF45C.");
-        count += labelComment(0xFFFF40B4L, "maf_raw_gs",
-            "MAF descriptor output (float, g/s). From Pull3DFloat interp of "
-            + "54-point table. Only 2 direct consumers — feeds FFFF6254 and FFFF620C.");
+        count += labelComment(0xFFFF4042L, "maf_sensor_adc_counts",
+            "CONFIRMED 2026-07-27, renamed from pMafSensorVoltage because it holds COUNTS, not volts. Raw MAF "
+            + "sensor ADC value (uint16, 0..65535 = 0..5 V). 0x004A2E mov.l @(0x004A7C),r4 (=0xFFFF4042) ; 0x004A32 "
+            + "mov.w @r4,r4 ; 0x004A3A lds r4,fpul ; 0x004A3E float fpul,fr3 ; 0x004A44 fmul fr2,fr4 with FR2 = "
+            + "*(0x004A80) = 7.629394531e-05 = 5.0/65536, giving VOLTS in FR4 -- which is never stored to RAM. Also "
+            + "the source of SSM PID 0x1D via getter 0x05D454 (mov.w @(30,r6), r6=0xFFFF4024). Direct pass-through "
+            + "to descriptor 0xAF45C. corrections.md item 29.");
+        count += labelComment(0xFFFF40B4L, "maf_instantaneous_gps",
+            "CONFIRMED 2026-07-27. INSTANTANEOUS MASS AIRFLOW (float, g/s) -- the raw output of the MAF transfer "
+            + "function, before averaging and before the charge-temperature compensation. 0x004A42 jsr 0x0BE830 with r4 = 0x0AF45C = "
+            + "descriptor count 54 / axis 0xD8BC4 / data 0xD8C9C, exactly the definition \"MAF Sensor Scaling\" "
+            + "(54 g/s values) over axis \"MAF sensor\" (54 volts, 0.898..5.0); result stored 0x004A46 mov.l "
+            + "@(0x004A8C),r2 (=0xFFFF40B4) ; 0x004A4C fmov.s fr0,@r2. The old note that it feeds FFFF6254 and "
+            + "FFFF620C is WRONG -- 0xFFFF6254 is a byte flag (corrections.md item 17). It is copied to the MAF "
+            + "sample shift register at 0x0203E0 -> 0xFFFF63B4 -> 0xFFFF63B8 / 0xFFFF63BC -> 0xFFFF63C0 -> "
+            + "0xFFFF63C4. corrections.md item 29.");
         count += labelComment(0xFFFF4168L, "filtered_charge",
             "Filtered charge accumulator (float). Reference for intake channel "
             + "delta computation in rate-limited MAF processing (0x9A72).");
@@ -4420,8 +4483,17 @@ public class ImportAE5L600L extends GhidraScript {
             "ATU primary control register. 36 code refs — master injection/ignition angle timing.");
         count += labelComment(0xFFFF40C8L, "ATU_compare_reg",
             "ATU compare register. 17 code refs — injection/ignition window timing.");
-        count += labelComment(0xFFFF40E0L, "ATU_output_ctrl",
-            "ATU output control register. 5 refs — injection/ignition driver output control.");
+        count += labelComment(0xFFFF40E0L, "front_o2_sensor_ma",
+            "CORRECTED 2026-07-27. FRONT OXYGEN / AF SENSOR CURRENT (float, mA), NOT an ATU output control "
+            + "register. Proof 1: the entire function at 0x058902 does only this -- 0x058904 mov.l @(0x058A34),r2 "
+            + "(=0xFFFF40E0) ; 0x058906 fmov.s @r2,fr4 ; 0x058908 mov.l @(0x058A38),r4 (=0x0AF468) ; 0x05890C jsr "
+            + "0x0BE830, with no branch and no intervening call between that fmov.s and the jsr. Descriptor 0x0AF468 "
+            + "= count 13 / axis 0xD8D74 / data 0xD8DA8, exactly the definition \"Front Oxygen Sensor Scaling\" "
+            + "(13 elements) over axis \"Front Oxygen Sensor\" in mA, breakpoints -1.3..0.74. Proof 2: SSM "
+            + "getter-table entry 0x42 at 0x05D726 reads this same address with FR6=-16.0 and FR5=0.125, i.e. "
+            + "value = (raw-128)*0.125 in [-16, +15.875] -- a signed bipolar current in the same units and sign "
+            + "convention as the axis. A hardware output register is not read as a float and used as a table "
+            + "index. corrections.md item 31.");
 
         // -- InternalIO Ports (injection/ignition driver) --
         count += labelComment(0xFFFF3B06L, "io_inj_ign_port_ctrl",
@@ -4760,8 +4832,22 @@ public class ImportAE5L600L extends GhidraScript {
             "Monitoring state byte: 1=transitioning, 2=active. Read by task58 maturation.");
         count += labelComment(0xFFFF65A9L, "engine_state_extended",
             "Engine state extended byte. Read by task58 extended MAF diagnostics.");
-        count += labelComment(0xFFFF63C4L, "ect_compensation",
-            "ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.");
+        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
+            "CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
+            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
+            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
+            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
+            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
+            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
+            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
+            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
+            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
+            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
+            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
+            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
+            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
+            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
+            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
         count += labelComment(0xFFFF63FCL, "barometric_pressure",
             "Barometric/atmospheric pressure (float). Read by task56 EVAP.");
         count += labelComment(0xFFFF3B06L, "diag_indexed_lookup_table",
@@ -6987,10 +7073,28 @@ public class ImportAE5L600L extends GhidraScript {
             "GBR workspace base (1 use). Region: ADC sensors.");
         count += labelComment(0xFFFF6374L, "gbr_adc_6374",
             "GBR workspace base (2 uses). Region: ADC sensors.");
-        count += labelComment(0xFFFF63B4L, "gbr_adc_63B4",
-            "GBR workspace base (2 uses). Region: ADC sensors.");
-        count += labelComment(0xFFFF63B8L, "gbr_adc_63B8",
-            "GBR workspace base (1 use). Region: ADC sensors.");
+        count += labelComment(0xFFFF63B4L, "maf_sample_in",
+            "IDENTIFIED 2026-07-27. Head of the MAF sample shift register (float, g/s). Written from "
+            + "0xFFFF40B4 at 0x0203E0 mov.l @(0x0205E4),r2 (=0xFFFF40B4) ; 0x0203E2 fmov.s @r2,fr8 ; 0x0203E4 "
+            + "mov.l @(0x0205E8),r14 (=0xFFFF6424) ; 0x0203E6 mov #-112,r0 ; 0x0203E8 fmov.s fr8,@(r0,r14) "
+            + "=> 0xFFFF6424-112 = 0xFFFF63B4. corrections.md item 29.");
+        count += labelComment(0xFFFF63B8L, "maf_sample_prev",
+            "IDENTIFIED 2026-07-27. Previous MAF sample (float, g/s), slot 1 of the 2-entry shift register that "
+            + "feeds 0xFFFF63C0. Written 0x01FF04 fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-120; read back at "
+            + "0x01FF24. corrections.md item 29.");
+        count += labelComment(0xFFFF63BCL, "maf_sample_curr",
+            "IDENTIFIED 2026-07-27. Current MAF sample (float, g/s), slot 2 of the shift register feeding "
+            + "0xFFFF63C0. Written 0x01FF0C fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-116, sourced from "
+            + "0xFFFF6424 which is itself loaded from 0xFFFF63B4. corrections.md item 29.");
+        count += labelComment(0xFFFF63C0L, "maf_uncompensated_gps",
+            "IDENTIFIED 2026-07-27. MASS AIRFLOW, 2-sample average, BEFORE the charge-temperature compensation (float, g/s). "
+            + "0x01FF20 r1=0xFFFF6430 ; 0x01FF24 fmov.s @(r0,r1),fr8 (r0=-120 => 0xFFFF63B8) ; 0x01FF28 fmov.s "
+            + "@(r0,r1),fr9 (r0=-116 => 0xFFFF63BC) ; 0x01FF2A fadd fr9,fr8 ; 0x01FF30 fmul fr4,fr8 with FR4 = "
+            + "*(0x020090) = 0.5 ; 0x01FF34 fmov.s fr8,@(r0,r1) (r0=-112) => 0xFFFF63C0 = 0.5*(63B8+63BC). It is "
+            + "then fed straight back out as the axis-1 input: 0x01FF3A fmov.s @(r0,r1),fr5 ; 0x01FF3E jsr "
+            + "0x0BE8E4 with r4 = 0x0AAFE8 = counts 5x8, axis1 0xC3B90, whose definition name ends \"/ Mass "
+            + "Airflow\" (1.6..290 g/s). The computed-address form is why a literal-pool-only trace cannot see "
+            + "it. corrections.md items 28 + 29.");
 
         // --- ADC throttle/TPS ---
         count += labelComment(0xFFFF643CL, "gbr_adc_643C",
@@ -7245,6 +7349,38 @@ public class ImportAE5L600L extends GhidraScript {
             "GBR workspace base (1 use). Region: engine state.");
         count += labelComment(0xFFFF8550L, "gbr_eng_8550",
             "GBR workspace base (1 use). Region: engine state.");
+        count += labelComment(0xFFFF4150L, "rpm_from_tooth_period",
+            "IDENTIFIED 2026-07-27. ENGINE SPEED (float, RPM) computed from the crank tooth period -- the source "
+            + "the settled rpm_current is copied from. PRODUCER: 0x007B9E lds r2,fpul (r2 = accumulated period) ; "
+            + "0x007BA2 float fpul,fr3 ; 0x007BA4 fmov.s @r0,fr2 with *(0x007C04) = 1.2e8 ; 0x007BA6 fdiv fr3,fr2 "
+            + "(= 1.2e8 / period, i.e. a FREQUENCY by construction) ; 0x007BAA mov.l @(0x007C08),r3 (=0xFFFF4150) "
+            + "; 0x007BAC fmov.s fr2,@r3. DECISIVE CONSUMER: 0x0232B4 mov.l @(0x023508),r2 (=0xFFFF4150) ; "
+            + "0x0232B6 fmov.s @r2,fr8 ; 0x0232B8 mov.l @(0x02350C),r12 (=0xFFFF6648) ; 0x0232BA mov #-36,r0 ; "
+            + "0x0232BC fmov.s fr8,@(r0,r12) -- and 0xFFFF6648-36 = 0xFFFF6624, the SETTLED rpm_current, so RPM is "
+            + "a straight copy of this address. Third line of support: it is the FR4/axis0 input of descriptor "
+            + "0x0AF4B0 whose axis 0xD918C is \"Ignition Dwell / Engine Speed\" (500..8000), the same call whose "
+            + "FR5/axis1 is the settled battery voltage 0xFFFF4130. corrections.md item 32.");
+        count += labelComment(0xFFFF6634L, "engine_speed_delta",
+            "IDENTIFIED 2026-07-27. ENGINE SPEED DELTA (float, RPM), low-pass filtered. PRODUCER, hand-decoded "
+            + "with r12=0xFFFF6648 and r11=0xFFFF67AC: 0x023362 fmov.s @(r0,r12),fr8 (r0=-36 => 0xFFFF6624, the "
+            + "settled RPM) ; 0x023366 fmov.s @(r0,r11),fr9 (r0=16 => 0xFFFF67BC, the reference speed) ; 0x023368 "
+            + "fsub fr9,fr8 ; 0x02336C fmov.s @(r0,r12),fr9 (r0=-20 => 0xFFFF6634, previous) ; 0x02336E fadd "
+            + "fr9,fr8 ; 0x023374 fmul fr9,fr8 with *(0x023544)=0.5 ; 0x023378 fmov.s fr8,@(r0,r12), i.e. "
+            + "0xFFFF6634 = 0.5*((RPM - reference) + previous). Corroborated by 2 of 2 definition-named axes: "
+            + "0x051D7A fmov.s @r2,fr14 (r2=0xFFFF6634) ; 0x051DB4 fmov fr14,fr5 ; 0x051DB6 jsr 0x0BE8E4 reaching "
+            + "axis1 0xD7EC4 and 0xD8060, both \"Idle Speed Stability A/B / Engine Speed Delta\" (-50..50). "
+            + "corrections.md item 32.");
+        count += labelComment(0xFFFF89C8L, "idle_speed_error",
+            "IDENTIFIED 2026-07-27. IDLE SPEED ERROR (float, RPM). It is computed as a difference one instruction "
+            + "before it is used as the axis input: 0x051D88 mov.l @(0x051FFC),r1 (=0xFFFF89C8) ; 0x051D8C fmov.s "
+            + "@(r0,r1),fr8 (r0=-28 => 0xFFFF89AC) ; 0x051DA2 mov.l @(0x05200C),r6 (=0xFFFF895C) ; 0x051DA4 fmov.s "
+            + "@r6,fr9 ; 0x051DA6 fsub fr9,fr8 ; 0x051DAE fmov.s fr8,@r1 ; 0x051DB6 jsr 0x0BE8E4 with delay slot "
+            + "0x051DB8 fmov.s @r1,fr4 -- so FR4/axis0 is exactly the value just stored. The descriptor differs by "
+            + "path (0x0AF0C8 at 0x051DAA vs 0x0AF0AC at 0x051DB0, split by 0x051DAC bf/s) and BOTH axis0s are "
+            + "definition-named \"Idle Speed Error\" (0xD7E80 / 0xD801C, -150..600). NOTE: coverage_map "
+            + "quantity_of() mislabels \"Idle Speed Error\" as vehicle_speed through a bare word-boundary "
+            + "\"speed\" pattern -- the AXIS NAME is the evidence, not the quantity bucket. corrections.md "
+            + "item 32.");
         count += labelComment(0xFFFF8558L, "requested_torque",
             "IDENTIFIED 2026-07-26. REQUESTED / CALCULATED ENGINE TORQUE -- the X-axis input that selects the "
             + "Target Boost column (float, raw ecu value 0..350). Was 'gbr_eng_8558' (unnamed placeholder). "

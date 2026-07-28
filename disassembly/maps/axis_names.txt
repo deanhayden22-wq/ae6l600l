@@ -1,0 +1,973 @@
+# axis_names.txt -- repo-owned supplement naming ROM descriptor axes
+# ==================================================================
+# GENERATED FILE.  Regenerate with `python scripts/axis_names.py`; never hand-edit.
+# Derived from rom/ae5l600l.bin bytes (stock) on every run.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# The axis-name method that settled the core RAM identities (docs/corrections.md
+# item 9) reads an axis's NAME out of definitions/*.xml.  Those XMLs are owned by
+# ECUFlash, which rewrites them on save -- repo-side edits are lost and the two
+# copies silently diverge, which is why the definition edits in corrections items
+# 24, 25 and 26 were all reverted.  So naming this project derives from ROM bytes
+# is recorded HERE, in a file the repo owns, and never in the XMLs.
+#
+# THE GAP THIS CLOSES
+# -------------------
+# 780 descriptors decoded from ROM bytes reference 997 distinct axis
+# addresses.  The definition XMLs name only 160 of them.  Every unnamed axis is
+# a lost vote for the RAM->axis method, and roughly 60 traced RAM variables reach
+# ONLY unnamed axes, so for those the method has nothing to say.
+#
+# STATUS: EVIDENCE-RANKED, NOT AUTHORITATIVE
+# ------------------------------------------
+# Definition XML names ALWAYS outrank this file.  Consult it only for axis
+# addresses the XMLs do not name.  Read the confidence column before using a row:
+#
+#   high        Two independent sources agree: a RAM variable whose identity is
+#               SETTLED in docs/corrections.md is traced being passed as this
+#               axis's lookup input, AND the breakpoint envelope agrees with that
+#               quantity.  Reason from these, including about identity.
+#   medium      One source only -- either a settled feeder with an envelope that is
+#               merely compatible, or an envelope signature with no feeder at all.
+#               Usable as a hypothesis; do NOT settle a RAM identity from it.
+#   low         Weak/suggestive only.
+#   unresolved  No usable signal, or the feeder and the envelope CONTRADICT each
+#               other.  Deliberately left unnamed.  A wrong rename is worse than an
+#               honest gap.
+#
+# WHAT COUNTS AS A SETTLED FEEDER
+# -------------------------------
+# Only the RAM identities proved from ROM bytes in docs/corrections.md items 8-13
+# and 22.  Identities held back as medium in item 23 (0xFFFF4150, 0xFFFF6634,
+# 0xFFFF89C8, 0xFFFF63C0, 0xFFFF63C4, 0xFFFF63CC, 0xFFFF5FFC, 0xFFFFA198) never
+# promote a row above medium; they are reported in the evidence column so the
+# reverse inference (name the axis -> settle the RAM var) stays visible.
+#
+# KNOWN LIMITS
+# ------------
+#  * The D3 feed trace in scripts/coverage_map.py is a LINEAR sweep, not
+#    control-flow aware.  An FR tag can survive a basic-block boundary and be
+#    attributed to the wrong lookup.  That is why a feeder that contradicts the
+#    envelope demotes a row to `unresolved` instead of overriding the envelope.
+#  * Envelope bands were measured from the definition-NAMED axis population of this
+#    ROM, not assumed: rpm 55 axes -50..10000; load 29 axes 0.2..3; intake temp 11
+#    axes -40..120; coolant 4 axes -30..70; pressure 12 axes -1000..1000; throttle
+#    5 axes 0..100; airflow 3 axes 0.9..290; voltage 1 axis 8..16.
+#  * `temperature` means coolant-or-intake: the two are indistinguishable on
+#    envelope alone (both run -40..110 in this ROM) and are only separated by a
+#    settled feeder.  It is NOT a token scripts/coverage_map.py's quantity_of()
+#    emits; treat it as matching either.
+#  * Breakpoints are read as big-endian float32, which is what the descriptor
+#    acceptance rule in coverage_map.py already proves for every axis listed.
+#
+# HOW TO CONSUME THIS FILE
+# ------------------------
+# Records are the lines that start with `0x`, pipe-delimited, 10 fields:
+#
+#   1 axis_addr   hex, the descriptor axis pointer
+#   2 elements    breakpoint count (max, where descriptors share a prefix)
+#   3 min         first/min breakpoint value, raw
+#   4 max         last/max breakpoint value, raw
+#   5 name        PROPOSED axis name, in definition-XML vocabulary, or `-`
+#   6 quantity    token, aligned with coverage_map.quantity_of() output, or `-`
+#   7 confidence  high | medium | low | unresolved
+#   8 descriptors comma-separated `descriptor_addr:slot` (slot 0 = FR4 input)
+#   9 feeders     comma-separated RAM addresses traced feeding this axis
+#  10 evidence    prose; `;`-separated clauses
+#
+# Fields never contain `|`.  Parse with `line.split('|')` and strip.
+#
+# INTEGRATION POINT for scripts/coverage_map.py
+# ---------------------------------------------
+# In build(), the axis naming maps are assembled at the block beginning
+# `axis_names = defaultdict(set)` / `_axis_q_votes` (search for
+# `# ---- axis address -> definition-given name(s) ----`).  After that loop over
+# d.tables completes, merge this file for addresses NOT already present:
+#
+#     for r in read_axis_names():                  # confidence in ('high',)
+#         if r.addr not in axis_names:             # XML always wins
+#             axis_names[r.addr].add('(supplement) ' + r.name)
+#             axis_q.setdefault(r.addr, r.quantity)
+#
+# Gate on confidence == 'high' for the contradiction tests (b) and (c); `medium`
+# may be surfaced in evidence text but must not flag a CONFLICT on its own.
+# The AXIS_QUANTITY_ENVELOPE table built just below that block should be extended
+# from `high` rows only.
+#
+# ------------------------------------------------------------------------------
+# SUMMARY: 865 unnamed descriptor axes; 152 high, 205 medium, 0 low, 508 unresolved.
+# 160 of 997 axis addresses are named by the definition XMLs.
+#
+# axis_addr | elem | min | max | name | quantity | conf | descriptors | feeders | evidence
+
+# ==== HIGH (152) ========================================
+0xC0294 | 16 | 0 | 120 | Vehicle Speed | vehicle_speed | high | 0xAA760:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 2 call site(s); envelope 0..120 AGREES with vehicle_speed
+0xC03C0 | 5 | 8 | 16 | Battery Volts | voltage | high | 0xAA788:0 | 0xFFFF4130 | settled RAM feeder 0xFFFF4130 (Battery Volts, corrections item 10) is passed as this axis's lookup input at 1 call site(s); envelope 8..16 AGREES with voltage
+0xC0B34 | 6 | 1000 | 6000 | Engine Speed | rpm | high | 0xAA86C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..6000 AGREES with rpm
+0xC0DD4 | 5 | 1000 | 5000 | Engine Speed | rpm | high | 0xAA95C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..5000 AGREES with rpm
+0xC15A4 | 6 | 0 | 100 | Vehicle Speed | vehicle_speed | high | 0xAAA0C:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..100 AGREES with vehicle_speed
+0xC15C4 | 10 | 800 | 4400 | Engine Speed | rpm | high | 0xAAA20:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..4400 AGREES with rpm
+0xC15F8 | 15 | 800 | 6400 | Engine Speed | rpm | high | 0xAAA34:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..6400 AGREES with rpm
+0xC16D0 | 16 | 0 | 2 | Engine Load | load | high | 0xAAA4C:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 2 call site(s); envelope 0..2 AGREES with load
+0xC2180 | 3 | 0.4 | 1.6 | Engine Load | load | high | 0xAAAD4:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.4..1.6 AGREES with load
+0xC218C | 3 | 600 | 3600 | Engine Speed | rpm | high | 0xAAAD4:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 600..3600 AGREES with rpm
+0xC25DC | 5 | 100 | 760 | Manifold Pressure | pressure | high | 0xAABA4:0 | 0xFFFF620C | settled RAM feeder 0xFFFF620C (Manifold Pressure, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 100..760 AGREES with pressure
+0xC25FC | 4 | 460 | 760 | Atmospheric Pressure | pressure | high | 0xAABB8:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 460..760 AGREES with pressure
+0xC28D4 | 10 | 0 | 180 | Vehicle Speed | vehicle_speed | high | 0xAACAC:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..180 AGREES with vehicle_speed
+0xC2ADC | 5 | 200 | 800 | Manifold Pressure | pressure | high | 0xAACEC:0 | 0xFFFF620C | settled RAM feeder 0xFFFF620C (Manifold Pressure, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 200..800 AGREES with pressure
+0xC2AF0 | 5 | 1500 | 4000 | Engine Speed | rpm | high | 0xAACEC:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1500..4000 AGREES with rpm
+0xC2E98 | 7 | 800 | 7200 | Engine Speed | rpm | high | 0xAAD94:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..7200 AGREES with rpm
+0xC3698 | 8 | 4000 | 7500 | Engine Speed | rpm | high | 0xAAE64:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 4000..7500 AGREES with rpm
+0xC36C8 | 8 | 3200 | 6000 | Engine Speed | rpm | high | 0xAAE78:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 3200..6000 AGREES with rpm
+0xC3770 | 9 | 8.5 | 16.5 | Battery Volts | voltage | high | 0xAAECC:0 | 0xFFFF4130 | settled RAM feeder 0xFFFF4130 (Battery Volts, corrections item 10) is passed as this axis's lookup input at 1 call site(s); envelope 8.5..16.5 AGREES with voltage
+0xC37A8 | 16 | -40 | 110 | Intake Temperature | intake_air_temp | high | 0xAAEE0:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with intake_air_temp
+0xC38B8 | 4 | 0 | 100 | Vehicle Speed | vehicle_speed | high | 0xAAF1C:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..100 AGREES with vehicle_speed
+0xC3A14 | 15 | 800 | 6400 | Engine Speed | rpm | high | 0xAAF84:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..6400 AGREES with rpm
+0xC3ACC | 7 | 1000 | 7000 | Engine Speed | rpm | high | 0xAAFB8:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..7000 AGREES with rpm
+0xC3B04 | 7 | 1000 | 7000 | Engine Speed | rpm | high | 0xAAFC4:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..7000 AGREES with rpm
+0xC3DD8 | 15 | 800 | 6400 | Engine Speed | rpm | high | 0xAB03C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..6400 AGREES with rpm
+0xC3E14 | 31 | 10.58 | 83.9 | Throttle Plate Opening Angle | throttle | high | 0xAB03C:1 | 0xFFFF62DC | settled RAM feeder 0xFFFF62DC (Throttle Plate Opening Angle, corrections item 13) is passed as this axis's lookup input at 1 call site(s); envelope 10.58..83.9 AGREES with throttle
+0xC4064 | 9 | 800 | 4000 | Engine Speed | rpm | high | 0xAB058:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..4000 AGREES with rpm
+0xC4194 | 5 | -20 | 60 | Intake Temperature | intake_air_temp | high | 0xAB088:1 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -20..60 AGREES with intake_air_temp
+0xC4298 | 8 | 192 | 416 | Manifold Pressure | pressure | high | 0xAB140:0 | 0xFFFF620C | settled RAM feeder 0xFFFF620C (Manifold Pressure, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 192..416 AGREES with pressure
+0xC439C | 6 | 400 | 900 | Atmospheric Pressure | pressure | high | 0xAB1B8:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 400..900 AGREES with pressure
+0xC4444 | 10 | 200 | 1100 | Atmospheric Pressure | pressure | high | 0xAB230:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 200..1100 AGREES with pressure
+0xC4480 | 10 | 200 | 1100 | Atmospheric Pressure | pressure | high | 0xAB244:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 200..1100 AGREES with pressure
+0xC44BC | 10 | 200 | 1100 | Atmospheric Pressure | pressure | high | 0xAB258:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 200..1100 AGREES with pressure
+0xC5E9C | 7 | 500 | 800 | Atmospheric Pressure | pressure | high | 0xAB444:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 500..800 AGREES with pressure
+0xC604C | 10 | 800 | 4400 | Engine Speed | rpm | high | 0xAB558:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 2 call site(s); envelope 800..4400 AGREES with rpm
+0xC6208 | 11 | -40 | 60 | Coolant Temperature | coolant | high | 0xAB660:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..60 AGREES with coolant
+0xC62B8 | 11 | -40 | 60 | Coolant Temperature | coolant | high | 0xAB69C:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..60 AGREES with coolant
+0xC6420 | 4 | -30 | 60 | Intake Temperature | intake_air_temp | high | 0xAB76C:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -30..60 AGREES with intake_air_temp
+0xC69B0 | 10 | 750 | 5000 | Engine Speed | rpm | high | 0xAB880:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 750..5000 AGREES with rpm
+0xC6F50 | 13 | 700 | 6500 | Engine Speed | rpm | high | 0xAB97C:0 | 0xFFFF6624,0xFFFFA198 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 3 call site(s); envelope 700..6500 AGREES with rpm; fed by 0xFFFFA198 x1 -- UNRESOLVED (item 23): 36 hits, all RPM-shaped, zero named
+0xC6FB8 | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAB988:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xC7138 | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAB9AC:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xC7238 | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAB9C4:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xC7508 | 13 | 0 | 120 | Vehicle Speed | vehicle_speed | high | 0xABA54:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..120 AGREES with vehicle_speed
+0xC7968 | 4 | 0.1 | 1 | Engine Load | load | high | 0xABB68:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.1..1 AGREES with load
+0xC7A90 | 8 | 0 | 300 | Vehicle Speed | vehicle_speed | high | 0xABBBC:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..300 AGREES with vehicle_speed
+0xC7B0C | 10 | 0.2 | 2 | Engine Load | load | high | 0xABC1C:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2 AGREES with load
+0xC7E78 | 7 | 0.2 | 2.0819 | Engine Load | load | high | 0xABDF0:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2.082 AGREES with load
+0xC7F90 | 7 | 0.2 | 2.0819 | Engine Load | load | high | 0xABE0C:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2.082 AGREES with load
+0xC81C0 | 7 | 0.2 | 2.0819 | Engine Load | load | high | 0xABE44:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2.082 AGREES with load
+0xC82D8 | 7 | 0.2 | 2.0819 | Engine Load | load | high | 0xABE60:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2.082 AGREES with load
+0xC83F0 | 7 | 500 | 752 | Atmospheric Pressure | pressure | high | 0xABE7C:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 500..752 AGREES with pressure
+0xC8508 | 7 | 500 | 752 | Atmospheric Pressure | pressure | high | 0xABE98:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 500..752 AGREES with pressure
+0xC8620 | 3 | 1000 | 4000 | Engine Speed | rpm | high | 0xABEB4:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..4000 AGREES with rpm
+0xC862C | 2 | 0.2 | 1 | Engine Load | load | high | 0xABEB4:1 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..1 AGREES with load
+0xC8A54 | 11 | -40 | 60 | Coolant Temperature | coolant | high | 0xABF70:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..60 AGREES with coolant
+0xC8A9C | 5 | 100 | 560 | Atmospheric Pressure | pressure | high | 0xABF8C:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 100..560 AGREES with pressure
+0xC8ADC | 5 | 100 | 560 | Atmospheric Pressure | pressure | high | 0xABFA8:0 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 100..560 AGREES with pressure
+0xC8B3C | 8 | 0 | 56 | Vehicle Speed | vehicle_speed | high | 0xABFD8:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..56 AGREES with vehicle_speed
+0xCA0D8 | 18 | 0.2 | 2.0819 | Engine Load | load | high | 0xAC0DC:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2.082 AGREES with load
+0xCA548 | 18 | 0.2 | 2.0819 | Engine Load | load | high | 0xAC0F0:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2.082 AGREES with load
+0xCA7A4 | 18 | 0.2 | 2.0819 | Engine Load | load | high | 0xAC104:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2.082 AGREES with load
+0xCA7EC | 16 | 700 | 6700 | Engine Speed | rpm | high | 0xAC104:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 700..6700 AGREES with rpm
+0xCACB4 | 12 | 750 | 5000 | Engine Speed | rpm | high | 0xAC118:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 750..5000 AGREES with rpm
+0xCAD44 | 18 | 0.2 | 2.0819 | Engine Load | load | high | 0xAC12C:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..2.082 AGREES with load
+0xCAD8C | 14 | 700 | 6700 | Engine Speed | rpm | high | 0xAC12C:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 700..6700 AGREES with rpm
+0xCB5FC | 9 | 0 | 1.6 | Engine Load | load | high | 0xAC1B8:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..1.6 AGREES with load
+0xCB620 | 9 | 0 | 4500 | Engine Speed | rpm | high | 0xAC1B8:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..4500 AGREES with rpm
+0xCB788 | 6 | 0 | 0.75 | Engine Load | load | high | 0xAC1CC:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..0.75 AGREES with load
+0xCB7A0 | 8 | 0 | 2000 | Engine Speed | rpm | high | 0xAC1CC:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..2000 AGREES with rpm
+0xCBA90 | 2 | 500 | 5000 | Engine Speed | rpm | high | 0xAC208:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 500..5000 AGREES with rpm
+0xCC9CC | 4 | 1000 | 5000 | Engine Speed | rpm | high | 0xAC450:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..5000 AGREES with rpm
+0xCCA60 | 16 | 0 | 6000 | Engine Speed | rpm | high | 0xAC4AC:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..6000 AGREES with rpm
+0xCCC18 | 8 | 0 | 140 | Vehicle Speed | vehicle_speed | high | 0xAC544:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..140 AGREES with vehicle_speed
+0xCDEDC | 16 | 0 | 3 | Engine Load | load | high | 0xACE34:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..3 AGREES with load
+0xCE7B0 | 7 | 0.2 | 1.3 | Engine Load | load | high | 0xAD168:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..1.3 AGREES with load
+0xCE7DC | 7 | 0.2 | 1.3 | Engine Load | load | high | 0xAD17C:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..1.3 AGREES with load
+0xCE808 | 7 | 0.2 | 1.3 | Engine Load | load | high | 0xAD190:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..1.3 AGREES with load
+0xCE834 | 7 | 0.2 | 1.3 | Engine Load | load | high | 0xAD1A4:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..1.3 AGREES with load
+0xCE968 | 16 | -40 | 110 | Intake Temperature | intake_air_temp | high | 0xAD26C:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with intake_air_temp
+0xCEA08 | 16 | -40 | 110 | Intake Temperature | intake_air_temp | high | 0xAD2A8:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with intake_air_temp
+0xCEA68 | 16 | -40 | 110 | Intake Temperature | intake_air_temp | high | 0xAD2BC:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with intake_air_temp
+0xCEAC8 | 16 | -40 | 110 | Intake Temperature | intake_air_temp | high | 0xAD2D0:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with intake_air_temp
+0xCEEA0 | 8 | 1000 | 8000 | Engine Speed | rpm | high | 0xAD400:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..8000 AGREES with rpm
+0xCF000 | 2 | 500 | 6000 | Engine Speed | rpm | high | 0xAD458:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 500..6000 AGREES with rpm
+0xCF010 | 7 | 700 | 2500 | Engine Speed | rpm | high | 0xAD464:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 700..2500 AGREES with rpm
+0xCF388 | 16 | 0 | 1500 | Manifold Pressure | pressure | high | 0xAD4D0:0 | 0xFFFF620C | settled RAM feeder 0xFFFF620C (Manifold Pressure, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..1500 AGREES with pressure
+0xCF794 | 12 | -40 | 70 | Coolant Temperature | coolant | high | 0xAD5B0:1 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..70 AGREES with coolant
+0xCFB9C | 16 | 0 | 3 | Engine Load | load | high | 0xAD658:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..3 AGREES with load
+0xCFBDC | 10 | 0 | 7200 | Engine Speed | rpm | high | 0xAD658:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..7200 AGREES with rpm
+0xD12F0 | 9 | 650 | 3600 | Engine Speed | rpm | high | 0xAD864:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 650..3600 AGREES with rpm
+0xD1A14 | 11 | 0.2 | 1.6 | Engine Load | load | high | 0xAD928:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.2..1.6 AGREES with load
+0xD1A40 | 10 | 800 | 5000 | Engine Speed | rpm | high | 0xAD928:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..5000 AGREES with rpm
+0xD1BCC | 12 | 0.3 | 2.5 | Engine Load | load | high | 0xAD960:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.3..2.5 AGREES with load
+0xD1BFC | 15 | 800 | 6400 | Engine Speed | rpm | high | 0xAD960:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..6400 AGREES with rpm
+0xD1DA0 | 12 | 0.3 | 2.5 | Engine Load | load | high | 0xAD97C:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.3..2.5 AGREES with load
+0xD1DD0 | 15 | 800 | 6400 | Engine Speed | rpm | high | 0xAD97C:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..6400 AGREES with rpm
+0xD25A8 | 2 | 0.1 | 0.5 | Engine Load | load | high | 0xADA40:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.1..0.5 AGREES with load
+0xD25B0 | 2 | 1000 | 3000 | Engine Speed | rpm | high | 0xADA40:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..3000 AGREES with rpm
+0xD30B8 | 5 | 1600 | 3200 | Engine Speed | rpm | high | 0xADAC0:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1600..3200 AGREES with rpm
+0xD30D4 | 5 | 1600 | 3200 | Engine Speed | rpm | high | 0xADAD4:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1600..3200 AGREES with rpm
+0xD30F0 | 5 | 1600 | 3200 | Engine Speed | rpm | high | 0xADAE8:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1600..3200 AGREES with rpm
+0xD3900 | 16 | 0 | 6000 | Engine Speed | rpm | high | 0xADFD4:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..6000 AGREES with rpm
+0xD3B4C | 7 | 1000 | 7000 | Engine Speed | rpm | high | 0xAE0F8:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..7000 AGREES with rpm
+0xD3B78 | 7 | 1000 | 7000 | Engine Speed | rpm | high | 0xAE10C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..7000 AGREES with rpm
+0xD3BA4 | 16 | 0 | 7200 | Engine Speed | rpm | high | 0xAE120:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..7200 AGREES with rpm
+0xD3D60 | 6 | 1000 | 6000 | Engine Speed | rpm | high | 0xAE17C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..6000 AGREES with rpm
+0xD4008 | 18 | 800 | 7600 | Engine Speed | rpm | high | 0xAE26C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..7600 AGREES with rpm
+0xD4098 | 18 | 800 | 7600 | Engine Speed | rpm | high | 0xAE278:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..7600 AGREES with rpm
+0xD4330 | 10 | 800 | 8000 | Engine Speed | rpm | high | 0xAE290:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..8000 AGREES with rpm
+0xD5260 | 7 | 2000 | 6000 | Engine Speed | rpm | high | 0xAE514:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 2000..6000 AGREES with rpm
+0xD527C | 4 | 1 | 2.5 | Engine Load | load | high | 0xAE514:1 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 1..2.5 AGREES with load
+0xD52A8 | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAE530:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xD52E8 | 7 | -40 | 80 | Intake Temperature | intake_air_temp | high | 0xAE530:1 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -40..80 AGREES with intake_air_temp
+0xD56D4 | 2 | 600 | 700 | Atmospheric Pressure | pressure | high | 0xAE648:1 | 0xFFFF6898 | settled RAM feeder 0xFFFF6898 (Atmospheric Pressure, corrections item 11) is passed as this axis's lookup input at 1 call site(s); envelope 600..700 AGREES with pressure
+0xD56E4 | 15 | 0.27 | 2.56 | Engine Load | load | high | 0xAE664:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.27..2.56 AGREES with load
+0xD5720 | 18 | 800 | 7600 | Engine Speed | rpm | high | 0xAE664:1 | 0xFFFF7F4C | settled RAM feeder 0xFFFF7F4C (Engine Speed, corrections item 22) is passed as this axis's lookup input at 1 call site(s); envelope 800..7600 AGREES with rpm
+0xD5BF8 | 2 | 1 | 1.15 | Engine Load | load | high | 0xAE6B8:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 1..1.15 AGREES with load
+0xD5C00 | 2 | 3200 | 3600 | Engine Speed | rpm | high | 0xAE6B8:1 | 0xFFFF7F4C | settled RAM feeder 0xFFFF7F4C (Engine Speed, corrections item 22) is passed as this axis's lookup input at 1 call site(s); envelope 3200..3600 AGREES with rpm
+0xD6048 | 2 | 8 | 12 | Battery Volts | voltage | high | 0xAE774:0 | 0xFFFF4130 | settled RAM feeder 0xFFFF4130 (Battery Volts, corrections item 10) is passed as this axis's lookup input at 1 call site(s); envelope 8..12 AGREES with voltage
+0xD6848 | 10 | 10 | 200 | Vehicle Speed | vehicle_speed | high | 0xAE79C:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 10..200 AGREES with vehicle_speed
+0xD687C | 10 | 10 | 200 | Vehicle Speed | vehicle_speed | high | 0xAE7B0:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 10..200 AGREES with vehicle_speed
+0xD68B0 | 11 | 0 | 100 | Accelerator Pedal Angle | throttle | high | 0xAE7C4:0 | 0xFFFF64D8 | settled RAM feeder 0xFFFF64D8 (Accelerator Pedal Angle, corrections item 13) is passed as this axis's lookup input at 1 call site(s); envelope 0..100 AGREES with throttle
+0xD6A18 | 2 | -40 | 110 | Intake Temperature | intake_air_temp | high | 0xAE828:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with intake_air_temp
+0xD6B38 | 11 | 0 | 100 | Accelerator Pedal Angle | throttle | high | 0xAE8B4:0 | 0xFFFF64D8 | settled RAM feeder 0xFFFF64D8 (Accelerator Pedal Angle, corrections item 13) is passed as this axis's lookup input at 1 call site(s); envelope 0..100 AGREES with throttle
+0xD6EBC | 4 | 10 | 100 | Vehicle Speed | vehicle_speed | high | 0xAEAD0:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 10..100 AGREES with vehicle_speed
+0xD7790 | 8 | 0 | 50 | Vehicle Speed | vehicle_speed | high | 0xAEF3C:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) is passed as this axis's lookup input at 1 call site(s); envelope 0..50 AGREES with vehicle_speed
+0xD7800 | 8 | 0 | 7000 | Engine Speed | rpm | high | 0xAEF54:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..7000 AGREES with rpm
+0xD7840 | 8 | 800 | 5000 | Engine Speed | rpm | high | 0xAEF60:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..5000 AGREES with rpm
+0xD78A8 | 8 | 0 | 7000 | Engine Speed | rpm | high | 0xAEF78:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..7000 AGREES with rpm
+0xD78E8 | 8 | 800 | 5000 | Engine Speed | rpm | high | 0xAEF84:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..5000 AGREES with rpm
+0xD79E8 | 10 | 800 | 8000 | Engine Speed | rpm | high | 0xAEFB4:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..8000 AGREES with rpm
+0xD7AF8 | 6 | 0 | 5000 | Engine Speed | rpm | high | 0xAEFE4:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..5000 AGREES with rpm
+0xD7B28 | 6 | 0 | 5000 | Engine Speed | rpm | high | 0xAEFF0:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..5000 AGREES with rpm
+0xD7BA8 | 11 | -40 | 60 | Coolant Temperature | coolant | high | 0xAF008:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..60 AGREES with coolant
+0xD81B8 | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAF0E4:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xD82D0 | 16 | 800 | 6800 | Engine Speed | rpm | high | 0xAF100:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 800..6800 AGREES with rpm
+0xD8550 | 11 | -40 | 60 | Coolant Temperature | coolant | high | 0xAF11C:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..60 AGREES with coolant
+0xD8780 | 5 | 1200 | 4400 | Engine Speed | rpm | high | 0xAF3C0:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1200..4400 AGREES with rpm
+0xD8820 | 6 | 0 | 5000 | Engine Speed | rpm | high | 0xAF41C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 0..5000 AGREES with rpm
+0xD9290 | 4 | 0.6 | 1.2 | Engine Load | load | high | 0xAF4C4:1 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) is passed as this axis's lookup input at 1 call site(s); envelope 0.6..1.2 AGREES with load
+0xD9400 | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAF4F0:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xD9510 | 10 | 1000 | 5500 | Engine Speed | rpm | high | 0xAF51C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..5500 AGREES with rpm
+0xD954C | 10 | 1000 | 5500 | Engine Speed | rpm | high | 0xAF530:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 1 call site(s); envelope 1000..5500 AGREES with rpm
+0xD986C | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAF56C:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xD98CC | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAF580:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xD992C | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAF58C:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xD998C | 16 | -40 | 110 | Coolant Temperature | coolant | high | 0xAF5A0:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 1 call site(s); envelope -40..110 AGREES with coolant
+0xD99EC | 2 | -40 | 120 | Coolant Temperature | coolant | high | 0xAF5AC:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) is passed as this axis's lookup input at 2 call site(s); envelope -40..120 AGREES with coolant
+0xD99F8 | 11 | 6 | 16 | Battery Volts | voltage | high | 0xAF5B8:0 | 0xFFFF4130 | settled RAM feeder 0xFFFF4130 (Battery Volts, corrections item 10) is passed as this axis's lookup input at 1 call site(s); envelope 6..16 AGREES with voltage
+0xD9E34 | 4 | 10 | 16 | Battery Volts | voltage | high | 0xAF6BC:1 | 0xFFFF4130 | settled RAM feeder 0xFFFF4130 (Battery Volts, corrections item 10) is passed as this axis's lookup input at 1 call site(s); envelope 10..16 AGREES with voltage
+0xDA3C0 | 15 | 400 | 6000 | Engine Speed | rpm | high | 0xAF7E0:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) is passed as this axis's lookup input at 2 call site(s); envelope 400..6000 AGREES with rpm
+
+# ==== MEDIUM (205) ========================================
+0xC0118 | 15 | 800 | 6400 | Engine Speed | rpm | medium | 0xAF4D8:0 | - | envelope 800..6400, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC0190 | 15 | 800 | 6400 | Engine Speed | rpm | medium | 0xAF4E4:0 | - | envelope 800..6400, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC03FC | 8 | 0 | 3500 | Engine Speed | rpm | medium | 0xAA7B0:0 | - | envelope 0..3500, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC0444 | 12 | -40 | 20 | Temperature | temperature | medium | 0xAA7D8:0 | - | envelope -40..20 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC04BC | 12 | -40 | 20 | Temperature | temperature | medium | 0xAA80C:0 | 0xFFFF6368 | envelope -40..20 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6368 x1 (RAM identity not settled)
+0xC0524 | 18 | -30 | 55 | Temperature | temperature | medium | 0xAA834:0 | 0xFFFF6354 | envelope -30..55 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC056C | 17 | -30 | 50 | Temperature | temperature | medium | 0xAA834:1 | 0xFFFF6368 | envelope -30..50 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6368 x1 (RAM identity not settled)
+0xC0814 | 11 | -30 | 20 | Temperature | temperature | medium | 0xAA850:0 | 0xFFFF6354 | envelope -30..20 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC0DAC | 5 | 1000 | 5000 | Engine Speed | rpm | medium | 0xAA950:0 | - | envelope 1000..5000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC0DFC | 5 | 1000 | 5000 | Engine Speed | rpm | medium | 0xAA968:0 | - | envelope 1000..5000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC1670 | 12 | -50 | 100 | Temperature | temperature | medium | 0xAAA40:0 | 0xFFFF6638 | envelope -50..100 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6638 x1 (RAM identity not settled)
+0xC1750 | 6 | 0 | 5000 | Engine Speed | rpm | medium | 0xAAA58:0 | - | envelope 0..5000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC2450 | 15 | -100 | 100 | Temperature | temperature | medium | 0xAAB18:0 | 0xFFFF6060 | envelope -100..100 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6060 x1 (RAM identity not settled)
+0xC24E4 | 3 | 2000 | 6000 | Engine Speed | rpm | medium | 0xAAB40:0 | - | envelope 2000..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC360C | 16 | -40 | 110 | Temperature | temperature | medium | 0xAAE28:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC38F4 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAAF48:0 | 0xFFFF6354 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC3954 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAAF5C:0 | 0xFFFF6354 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC39B4 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAAF70:0 | 0xFFFF6354 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC3A7C | 10 | 300 | 6400 | Engine Speed | rpm | medium | 0xAAFAC:0 | - | envelope 300..6400, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC4150 | 2 | -40 | 110 | Temperature | temperature | medium | 0xAB074:1 | 0xFFFF6354 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC42C0 | 7 | 20 | 80 | Intake Temperature | intake_air_temp | medium | 0xAB154:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) at 1 site(s); envelope 20..80 is compatible but not distinctive
+0xC42E4 | 10 | 600 | 4200 | Engine Speed | rpm | medium | 0xAB168:0 | - | envelope 600..4200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC4378 | 6 | 500 | 750 | Engine Speed | rpm | medium | 0xAB1A4:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 500..750 is compatible but not distinctive
+0xC5840 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB2D8:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5888 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB2EC:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC58D0 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB300:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5918 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB314:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5960 | 13 | 0 | 6250 | Engine Speed | rpm | medium | 0xAB328:0 | - | envelope 0..6250, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5B2C | 13 | 700 | 6000 | Engine Speed | rpm | medium | 0xAB340:0 | - | envelope 700..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5B70 | 13 | 700 | 6000 | Engine Speed | rpm | medium | 0xAB354:0 | - | envelope 700..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5BB4 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB368:0 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5BFC | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB37C:0 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5C44 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB390:0 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5C8C | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB3A4:0 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5CD4 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB3B8:0 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5D1C | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB3CC:0 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5D64 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB3E0:0 | 0xFFFFA198 | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFFA198 x1 -- UNRESOLVED (item 23): 36 hits, all RPM-shaped, zero named
+0xC5DAC | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB3F4:0 | 0xFFFFA198 | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFFA198 x1 -- UNRESOLVED (item 23): 36 hits, all RPM-shaped, zero named
+0xC5DF4 | 14 | 650 | 6700 | Engine Speed | rpm | medium | 0xAB408:0 | - | envelope 650..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC5ECC | 6 | -30 | 20 | Temperature | temperature | medium | 0xAB464:0 | 0xFFFF682C | envelope -30..20 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF682C x1 (RAM identity not settled)
+0xC5EF0 | 6 | -30 | 20 | Temperature | temperature | medium | 0xAB470:0 | 0xFFFF682C | envelope -30..20 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF682C x1 (RAM identity not settled)
+0xC6028 | 2 | 700 | 1000 | Engine Speed | rpm | medium | 0xAB51C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 700..1000 is compatible but not distinctive
+0xC627C | 10 | -40 | 45 | Temperature | temperature | medium | 0xAB688:0 | 0xFFFF6354 | envelope -40..45 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC6450 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB784:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC64C0 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB790:0 | 0xFFFFA198 | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFFA198 x1 -- UNRESOLVED (item 23): 36 hits, all RPM-shaped, zero named
+0xC6530 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB79C:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC65A0 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB7A8:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6610 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB7B4:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6830 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB82C:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC68A0 | 7 | 4000 | 6700 | Engine Speed | rpm | medium | 0xAB838:0 | - | envelope 4000..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC68F8 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB85C:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6968 | 7 | 4000 | 6700 | Engine Speed | rpm | medium | 0xAB868:0 | - | envelope 4000..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6A00 | 7 | 4000 | 6700 | Engine Speed | rpm | medium | 0xAB88C:0 | - | envelope 4000..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6A48 | 10 | 750 | 5000 | Engine Speed | rpm | medium | 0xAB8A4:0 | - | envelope 750..5000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6A98 | 7 | 4000 | 6700 | Engine Speed | rpm | medium | 0xAB8B0:0 | - | envelope 4000..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6AE0 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB8C8:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6B60 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB8E0:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6BE0 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB8F8:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6C60 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB910:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6CD0 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB91C:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6D40 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB928:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6DC0 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB940:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6E30 | 7 | 4000 | 6700 | Engine Speed | rpm | medium | 0xAB94C:0 | - | envelope 4000..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC6E78 | 14 | 750 | 6700 | Engine Speed | rpm | medium | 0xAB964:0 | - | envelope 750..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC7038 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAB994:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC70B8 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAB9A0:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC71B8 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAB9B8:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC72B8 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAB9D0:0 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC7B34 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABC1C:1 | 0xFFFFA198 | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFFA198 x1 -- UNRESOLVED (item 23): 36 hits, all RPM-shaped, zero named
+0xC7D30 | 2 | 0.2 | 0.3107 | Engine Load | load | medium | 0xABD9C:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) at 1 site(s); envelope 0.2..0.3107 is compatible but not distinctive
+0xC7D60 | 7 | 0.2 | 2.0819 | Engine Load | load | medium | 0xABDD4:0 | - | breakpoints open 0.2, 0.3107, 0.4214 -- the canonical Subaru load run, verbatim on 29 definition-named 'Engine Load' axes in this ROM; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC7D7C | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABDD4:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC7E94 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABDF0:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC7FAC | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABE0C:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC80A8 | 7 | 0.2 | 2.0819 | Engine Load | load | medium | 0xABE28:0 | - | breakpoints open 0.2, 0.3107, 0.4214 -- the canonical Subaru load run, verbatim on 29 definition-named 'Engine Load' axes in this ROM; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC80C4 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABE28:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC81DC | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABE44:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC82F4 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABE60:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC840C | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABE7C:1 | 0xFFFFA198 | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFFA198 x1 -- UNRESOLVED (item 23): 36 hits, all RPM-shaped, zero named
+0xC8524 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xABE98:1 | 0xFFFFA198 | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFFA198 x1 -- UNRESOLVED (item 23): 36 hits, all RPM-shaped, zero named
+0xC86A4 | 7 | 0 | 6000 | Engine Speed | rpm | medium | 0xABEE4:1 | - | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC899C | 5 | 11.5 | 15.5 | Battery Volts | voltage | medium | 0xABF1C:1 | - | envelope 11.5..15.5 V; sensor voltages in this ROM start at 0, a floor above 5 V is the battery band; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC89CC | 5 | 11.5 | 15.5 | Battery Volts | voltage | medium | 0xABF38:1 | - | envelope 11.5..15.5 V; sensor voltages in this ROM start at 0, a floor above 5 V is the battery band; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC89F4 | 11 | -40 | 60 | Temperature | temperature | medium | 0xABF54:0 | - | envelope -40..60 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC8C50 | 24 | 0.2 | 2.7461 | Engine Load | load | medium | 0xAC014:0 | - | breakpoints open 0.2, 0.3107, 0.4214 -- the canonical Subaru load run, verbatim on 29 definition-named 'Engine Load' axes in this ROM; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC8CB0 | 13 | 700 | 6500 | Engine Speed | rpm | medium | 0xAC014:1 | - | envelope 700..6500, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC9224 | 24 | 0.2 | 2.7461 | Engine Load | load | medium | 0xAC064:0 | - | breakpoints open 0.2, 0.3107, 0.4214 -- the canonical Subaru load run, verbatim on 29 definition-named 'Engine Load' axes in this ROM; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC9284 | 13 | 700 | 6500 | Engine Speed | rpm | medium | 0xAC064:1 | - | envelope 700..6500, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC97B8 | 18 | 0.2 | 2.0819 | Engine Load | load | medium | 0xAC08C:0 | - | breakpoints open 0.2, 0.3107, 0.4214 -- the canonical Subaru load run, verbatim on 29 definition-named 'Engine Load' axes in this ROM; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC9800 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAC08C:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC9C48 | 18 | 0.2 | 2.0819 | Engine Load | load | medium | 0xAC0B4:0 | - | breakpoints open 0.2, 0.3107, 0.4214 -- the canonical Subaru load run, verbatim on 29 definition-named 'Engine Load' axes in this ROM; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xC9C90 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAC0B4:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCA120 | 14 | 700 | 6700 | Engine Speed | rpm | medium | 0xAC0DC:1 | - | envelope 700..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCA590 | 7 | 4000 | 6700 | Engine Speed | rpm | medium | 0xAC0F0:1 | - | envelope 4000..6700, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCACAC | 2 | 0.2 | 0.3107 | Engine Load | load | medium | 0xAC118:0 | 0xFFFF63F8 | settled RAM feeder 0xFFFF63F8 (Engine Load, corrections item 9) at 1 site(s); envelope 0.2..0.3107 is compatible but not distinctive
+0xCB1BC | 10 | 750 | 5000 | Engine Speed | rpm | medium | 0xAC140:1 | - | envelope 750..5000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCB3B0 | 3 | -30 | 25 | Temperature | temperature | medium | 0xAC17C:1 | - | envelope -30..25 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCB41C | 3 | -30 | 25 | Temperature | temperature | medium | 0xAC190:1 | 0xFFFF682C | envelope -30..25 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF682C x1 (RAM identity not settled)
+0xCB494 | 9 | 0 | 4500 | Engine Speed | rpm | medium | 0xAC1A4:1 | - | envelope 0..4500, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCBAB0 | 2 | 0 | 10000 | Engine Speed | rpm | medium | 0xAC21C:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 0..1e+04 is compatible but not distinctive
+0xCBAD0 | 2 | 0 | 10000 | Engine Speed | rpm | medium | 0xAC230:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 0..1e+04 is compatible but not distinctive
+0xCBAFC | 4 | 11 | 14 | Battery Volts | voltage | medium | 0xAC244:1 | - | envelope 11..14 V; sensor voltages in this ROM start at 0, a floor above 5 V is the battery band; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCBB70 | 4 | 11 | 14 | Battery Volts | voltage | medium | 0xAC258:1 | - | envelope 11..14 V; sensor voltages in this ROM start at 0, a floor above 5 V is the battery band; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCC750 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAC2B0:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCC934 | 10 | 3600 | 7200 | Engine Speed | rpm | medium | 0xAC3F4:0 | - | envelope 3600..7200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCC968 | 10 | 3600 | 7200 | Engine Speed | rpm | medium | 0xAC408:0 | - | envelope 3600..7200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCCA10 | 16 | 0 | 15 | Coolant Temperature | coolant | medium | 0xAC498:0 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) at 1 site(s); envelope 0..15 is compatible but not distinctive
+0xCCE18 | 16 | 0 | 6400 | Engine Speed | rpm | medium | 0xAC634:0 | - | envelope 0..6400, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCCFB8 | 3 | 500 | 1500 | Engine Speed | rpm | medium | 0xAC6FC:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 500..1500 is compatible but not distinctive
+0xCCFC8 | 7 | 800 | 3200 | Engine Speed | rpm | medium | 0xAC710:0 | - | envelope 800..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCCFEC | 7 | 800 | 3200 | Engine Speed | rpm | medium | 0xAC724:0 | - | envelope 800..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCD010 | 7 | 800 | 3200 | Engine Speed | rpm | medium | 0xAC738:0 | - | envelope 800..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCD034 | 7 | 800 | 3200 | Engine Speed | rpm | medium | 0xAC74C:0 | - | envelope 800..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCD788 | 16 | 0 | 6000 | Engine Speed | rpm | medium | 0xACBA4:0 | - | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCD7E8 | 16 | 0 | 6000 | Engine Speed | rpm | medium | 0xACBB8:0 | 0xFFFF7414 | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF7414 x1 (RAM identity not settled)
+0xCD888 | 16 | 0 | 6000 | Engine Speed | rpm | medium | 0xACBF4:0 | - | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCD8E8 | 16 | 0 | 6000 | Engine Speed | rpm | medium | 0xACC08:0 | - | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCD9C8 | 16 | 0 | 6000 | Engine Speed | rpm | medium | 0xACC6C:0 | - | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCDA28 | 16 | 0 | 6000 | Engine Speed | rpm | medium | 0xACC80:0 | - | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCDCC0 | 8 | 800 | 6400 | Engine Speed | rpm | medium | 0xACD34:0 | 0xFFFF7414 | envelope 800..6400, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF7414 x1 (RAM identity not settled)
+0xCE6EC | 16 | 0 | 6000 | Engine Speed | rpm | medium | 0xAD0F0:0 | - | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCE898 | 7 | 800 | 3200 | Engine Speed | rpm | medium | 0xAD208:0 | - | envelope 800..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCE8C4 | 7 | 800 | 3200 | Engine Speed | rpm | medium | 0xAD21C:0 | - | envelope 800..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCE8F0 | 7 | 800 | 3200 | Engine Speed | rpm | medium | 0xAD230:0 | - | envelope 800..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCE91C | 7 | 800 | 3200 | Engine Speed | rpm | medium | 0xAD244:0 | - | envelope 800..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCEB68 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAD30C:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCEBC8 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAD320:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCEC28 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAD334:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCEC88 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAD348:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCF3C8 | 2 | 800 | 1000 | Engine Speed | rpm | medium | 0xAD4D0:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 800..1000 is compatible but not distinctive
+0xCF430 | 9 | 800 | 4000 | Engine Speed | rpm | medium | 0xAD4EC:1 | - | envelope 800..4000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCF524 | 9 | 800 | 4000 | Engine Speed | rpm | medium | 0xAD508:1 | - | envelope 800..4000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xCF5D8 | 5 | 115 | 515 | Engine Speed | rpm | medium | 0xAD524:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 115..515 is compatible but not distinctive
+0xCF5EC | 7 | -30 | 0 | Coolant Temperature | coolant | medium | 0xAD524:1 | 0xFFFF6350 | settled RAM feeder 0xFFFF6350 (Coolant Temperature, corrections item 12 (side by side with 6364)) at 1 site(s); envelope -30..0 is compatible but not distinctive
+0xCFAD4 | 10 | -40 | 100 | Temperature | temperature | medium | 0xAD63C:1 | 0xFFFF6354 | envelope -40..100 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xD0060 | 18 | 800 | 7600 | Engine Speed | rpm | medium | 0xAD6AC:1 | - | envelope 800..7600, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD0E10 | 10 | -30 | 60 | Temperature | temperature | medium | 0xAD7A8:0 | 0xFFFF8E38 | envelope -30..60 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF8E38 x1 (RAM identity not settled)
+0xD15D8 | 10 | 800 | 5000 | Engine Speed | rpm | medium | 0xAD8D4:1 | - | envelope 800..5000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD18AC | 12 | 800 | 5000 | Engine Speed | rpm | medium | 0xAD90C:1 | - | envelope 800..5000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD1B44 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAD944:0 | 0xFFFF6354 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xD1FA4 | 13 | 800 | 6400 | Engine Speed | rpm | medium | 0xAD998:1 | - | envelope 800..6400, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD2140 | 13 | 800 | 6400 | Engine Speed | rpm | medium | 0xAD9B4:1 | - | envelope 800..6400, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD22DC | 13 | 800 | 6400 | Engine Speed | rpm | medium | 0xAD9D0:1 | - | envelope 800..6400, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD2470 | 7 | 400 | 6000 | Engine Speed | rpm | medium | 0xAD9EC:1 | - | envelope 400..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD2518 | 2 | 0 | 16 | Vehicle Speed | vehicle_speed | medium | 0xADA08:0 | 0xFFFF65FC | settled RAM feeder 0xFFFF65FC (Vehicle Speed, corrections item 8 / 9) at 1 site(s); envelope 0..16 is compatible but not distinctive
+0xD2520 | 2 | 400 | 1200 | Engine Speed | rpm | medium | 0xADA08:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 400..1200 is compatible but not distinctive
+0xD2600 | 6 | 0 | 4000 | Engine Speed | rpm | medium | 0xADA5C:1 | - | envelope 0..4000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD27D8 | 6 | 0 | 4000 | Engine Speed | rpm | medium | 0xADA70:1 | - | envelope 0..4000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD3070 | 8 | 400 | 3200 | Engine Speed | rpm | medium | 0xADA84:0 | - | envelope 400..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD32C0 | 2 | 800 | 1200 | Engine Speed | rpm | medium | 0xADC3C:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 800..1200 is compatible but not distinctive
+0xD33F0 | 7 | 500 | 3200 | Engine Speed | rpm | medium | 0xADDE0:0 | - | envelope 500..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD3414 | 7 | 500 | 3200 | Engine Speed | rpm | medium | 0xADDF4:0 | - | envelope 500..3200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD346C | 13 | 400 | 5200 | Engine Speed | rpm | medium | 0xADE30:0 | 0xFFFF8258 | envelope 400..5200, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF8258 x1 (RAM identity not settled)
+0xD38B0 | 16 | 0 | 6000 | Engine Speed | rpm | medium | 0xADFC0:0 | - | envelope 0..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD3D30 | 6 | 1000 | 6000 | Engine Speed | rpm | medium | 0xAE170:0 | 0xFFFF8024 | envelope 1000..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF8024 x1 (RAM identity not settled)
+0xD3FD0 | 7 | -40 | 40 | Temperature | temperature | medium | 0xAE260:0 | 0xFFFF6650 | envelope -40..40 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6650 x1 (RAM identity not settled)
+0xD4380 | 10 | 800 | 8000 | Engine Speed | rpm | medium | 0xAE29C:0 | - | envelope 800..8000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD43D0 | 10 | 800 | 8000 | Engine Speed | rpm | medium | 0xAE2A8:0 | - | envelope 800..8000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD4420 | 10 | 800 | 8000 | Engine Speed | rpm | medium | 0xAE2B4:0 | - | envelope 800..8000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD4470 | 10 | 800 | 8000 | Engine Speed | rpm | medium | 0xAE2C0:0 | - | envelope 800..8000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD4FD8 | 9 | -75 | 75 | Temperature | temperature | medium | 0xAE418:0 | - | envelope -75..75 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD5018 | 9 | -75 | 75 | Temperature | temperature | medium | 0xAE434:0 | - | envelope -75..75 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD5158 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAE4C0:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD51F8 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAE4F8:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD56C4 | 4 | 0 | 60 | Intake Temperature | intake_air_temp | medium | 0xAE648:0 | 0xFFFF6364 | settled RAM feeder 0xFFFF6364 (Intake Temperature, corrections item 12) at 1 site(s); envelope 0..60 is compatible but not distinctive
+0xD5C0C | 18 | 800 | 7600 | Engine Speed | rpm | medium | 0xAE6D4:0 | - | envelope 800..7600, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD5CEC | 18 | 800 | 7600 | Engine Speed | rpm | medium | 0xAE6E8:0 | - | envelope 800..7600, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD5DCC | 18 | 800 | 7600 | Engine Speed | rpm | medium | 0xAE6FC:0 | - | envelope 800..7600, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD5EAC | 18 | 800 | 7600 | Engine Speed | rpm | medium | 0xAE710:0 | - | envelope 800..7600, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD6AC8 | 6 | 6 | 16 | Battery Volts | voltage | medium | 0xAE874:0 | 0xFFFF6598 | envelope 6..16 V; sensor voltages in this ROM start at 0, a floor above 5 V is the battery band; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6598 x1 (RAM identity not settled)
+0xD75B8 | 12 | -100 | 100 | Temperature | temperature | medium | 0xAEE80:0 | 0xFFFF6634 | envelope -100..100 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6634 x1 -- medium (item 23): 'Idle Speed Stability A / Engine Speed Delta'
+0xD7600 | 12 | -100 | 100 | Temperature | temperature | medium | 0xAEE94:0 | - | envelope -100..100 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD76A8 | 7 | 100 | 1000 | Engine Speed | rpm | medium | 0xAEEE4:0 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 3 site(s); envelope 100..1000 is compatible but not distinctive
+0xD7C00 | 11 | -40 | 60 | Temperature | temperature | medium | 0xAF014:0 | - | envelope -40..60 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD7C78 | 6 | 0 | 2000 | Engine Speed | rpm | medium | 0xAF020:1 | - | envelope 0..2000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD7CE0 | 6 | 0 | 2000 | Engine Speed | rpm | medium | 0xAF03C:1 | - | envelope 0..2000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD7D48 | 6 | 0 | 2000 | Engine Speed | rpm | medium | 0xAF058:1 | - | envelope 0..2000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD7DB0 | 6 | 0 | 2000 | Engine Speed | rpm | medium | 0xAF074:1 | - | envelope 0..2000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD81F8 | 6 | -40 | 60 | Temperature | temperature | medium | 0xAF0E4:1 | 0xFFFF6354 | envelope -40..60 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xD8764 | 5 | 0 | 20 | Battery Volts | voltage | medium | 0xAF3AC:0 | 0xFFFF4130 | settled RAM feeder 0xFFFF4130 (Battery Volts, corrections item 10) at 1 site(s); envelope 0..20 is compatible but not distinctive
+0xD909C | 15 | 400 | 6000 | Engine Speed | rpm | medium | 0xAF498:0 | - | envelope 400..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD9114 | 15 | 400 | 6000 | Engine Speed | rpm | medium | 0xAF4A4:0 | - | envelope 400..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD9450 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF504:0 | 0xFFFF8E34 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF8E34 x1 (RAM identity not settled)
+0xD94B0 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF510:0 | 0xFFFF8E34 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF8E34 x1 (RAM identity not settled)
+0xD959C | 10 | -30 | 60 | Temperature | temperature | medium | 0xAF53C:0 | - | envelope -30..60 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD9A64 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF5CC:0 | 0xFFFF6354 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xD9BA4 | 16 | 300 | 6000 | Engine Speed | rpm | medium | 0xAF630:0 | - | envelope 300..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD9C04 | 16 | 300 | 6000 | Engine Speed | rpm | medium | 0xAF644:0 | - | envelope 300..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD9C64 | 16 | 300 | 6000 | Engine Speed | rpm | medium | 0xAF658:0 | - | envelope 300..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD9CC4 | 16 | 300 | 6000 | Engine Speed | rpm | medium | 0xAF66C:0 | - | envelope 300..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD9D24 | 16 | 300 | 6000 | Engine Speed | rpm | medium | 0xAF680:0 | - | envelope 300..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xD9D84 | 16 | 300 | 6000 | Engine Speed | rpm | medium | 0xAF694:0 | - | envelope 300..6000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xDA098 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF6D8:0 | - | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xDA0E8 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF6EC:0 | 0xFFFF912C | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF912C x1 (RAM identity not settled)
+0xDA138 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF700:0 | 0xFFFF912C | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF912C x1 (RAM identity not settled)
+0xDA188 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF714:0 | 0xFFFF912C | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF912C x1 (RAM identity not settled)
+0xDA200 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF764:0 | 0xFFFF912C | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF912C x1 (RAM identity not settled)
+0xDA250 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF778:0 | 0xFFFF912C | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF912C x2 (RAM identity not settled)
+0xDA300 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF7C0:0 | 0xFFFF8E38 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF8E38 x1 (RAM identity not settled)
+0xDA360 | 16 | -40 | 110 | Temperature | temperature | medium | 0xAF7CC:0 | 0xFFFF8E38 | envelope -40..110 deg C; matches the coolant/intake band, but ECT and IAT are indistinguishable on envelope alone; no settled RAM feeder -- envelope evidence only; fed by 0xFFFF8E38 x1 (RAM identity not settled)
+0xDA528 | 9 | 800 | 4000 | Engine Speed | rpm | medium | 0xAF830:1 | - | envelope 800..4000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xDA614 | 9 | 800 | 4000 | Engine Speed | rpm | medium | 0xAF84C:1 | - | envelope 800..4000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xDA700 | 9 | 800 | 4000 | Engine Speed | rpm | medium | 0xAF868:1 | - | envelope 800..4000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xDA7EC | 9 | 800 | 4000 | Engine Speed | rpm | medium | 0xAF884:1 | - | envelope 800..4000, monotonic, every breakpoint a multiple of 25; no other quantity in this ROM reaches 2000-9000 in that step pattern; no settled RAM feeder -- envelope evidence only; no RAM feeder reached this axis in the D3 trace
+0xDAE7C | 2 | 800 | 1200 | Engine Speed | rpm | medium | 0xAF910:1 | 0xFFFF6624 | settled RAM feeder 0xFFFF6624 (Engine Speed, corrections item 9 / 24) at 1 site(s); envelope 800..1200 is compatible but not distinctive
+
+# ==== UNRESOLVED (508) ========================================
+0xC02F4 | 16 | 0 | 120 | - | - | unresolved | 0xAA774:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC03DC | 5 | 20 | 4096 | - | - | unresolved | 0xAA79C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC042C | 4 | 0 | 10016 | - | - | unresolved | 0xAA7C4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC048C | 4 | 0 | 14016 | - | - | unresolved | 0xAA7E4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC04A4 | 4 | 0 | 14016 | - | - | unresolved | 0xAA7F8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC0504 | 5 | 0 | 50 | - | - | unresolved | 0xAA820:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC0840 | 29 | 0 | 1400 | - | - | unresolved | 0xAA850:1 | 0xFFFF63D0 | fed by 0xFFFF63D0 x1 (RAM identity not settled)
+0xC0B4C | 6 | 0.2 | 1.2 | - | - | unresolved | 0xAA86C:1 | 0xFFFF63E8 | fed by 0xFFFF63E8 x1 (RAM identity not settled)
+0xC2408 | 6 | 40 | 160 | - | - | unresolved | 0xAAAF0:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC242C | 6 | 40 | 160 | - | - | unresolved | 0xAAB04:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC24AC | 9 | 40 | 200 | - | - | unresolved | 0xAAB2C:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC24F8 | 4 | 40 | 160 | - | - | unresolved | 0xAAB54:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC2510 | 9 | 20 | 180 | - | - | unresolved | 0xAAB68:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC2548 | 15 | -1 | 1 | - | - | unresolved | 0xAAB7C:0 | 0xFFFF6060 | fed by 0xFFFF6060 x1 (RAM identity not settled)
+0xC25A4 | 9 | 40 | 200 | - | - | unresolved | 0xAAB90:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC2614 | 5 | 0 | 200 | - | - | unresolved | 0xAABCC:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC2634 | 6 | 1 | 6 | - | - | unresolved | 0xAABE0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2664 | 6 | 1 | 6 | - | - | unresolved | 0xAABEC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2694 | 6 | 1 | 6 | - | - | unresolved | 0xAABF8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC26C4 | 10 | 0 | 100 | - | - | unresolved | 0xAAC04:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2714 | 10 | 0 | 100 | - | - | unresolved | 0xAAC10:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2764 | 3 | 40 | 120 | - | - | unresolved | 0xAAC1C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC277C | 3 | 40 | 120 | - | - | unresolved | 0xAAC28:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2794 | 3 | 40 | 120 | - | - | unresolved | 0xAAC34:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC27AC | 3 | 40 | 120 | - | - | unresolved | 0xAAC40:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC27C4 | 3 | 40 | 80 | - | - | unresolved | 0xAAC4C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC27DC | 3 | 40 | 80 | - | - | unresolved | 0xAAC58:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC27F4 | 4 | 40 | 100 | - | - | unresolved | 0xAAC64:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2814 | 4 | 40 | 100 | - | - | unresolved | 0xAAC70:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2834 | 4 | 40 | 100 | - | - | unresolved | 0xAAC7C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2854 | 4 | 40 | 100 | - | - | unresolved | 0xAAC88:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2874 | 6 | -20 | 0.1 | - | - | unresolved | 0xAAC94:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC28A4 | 6 | -20 | 0 | - | - | unresolved | 0xAACA0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2924 | 10 | 0 | 180 | - | - | unresolved | 0xAACB8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2974 | 10 | 0 | 180 | - | - | unresolved | 0xAACC4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC29C4 | 11 | -1 | 1 | - | - | unresolved | 0xAACD0:0 | 0xFFFF6054 | fed by 0xFFFF6054 x1 (RAM identity not settled)
+0xC29F0 | 9 | -8 | 8 | - | - | unresolved | 0xAACD0:1 | 0xFFFF6060 | fed by 0xFFFF6060 x1 (RAM identity not settled)
+0xC2B38 | 11 | 37 | 250 | - | - | unresolved | 0xAAD08:0 | 0xFFFF61B0 | fed by 0xFFFF61B0 x1 (RAM identity not settled)
+0xC2B64 | 6 | 1 | 6 | - | - | unresolved | 0xAAD08:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC2C00 | 11 | 37 | 250 | - | - | unresolved | 0xAAD24:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2C2C | 6 | 1 | 6 | - | - | unresolved | 0xAAD24:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC2CC8 | 5 | 0 | 250 | - | - | unresolved | 0xAAD40:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC2CDC | 5 | -1 | 1 | - | - | unresolved | 0xAAD40:1 | 0xFFFF6054 | fed by 0xFFFF6054 x1 (RAM identity not settled)
+0xC2D24 | 5 | 40 | 200 | - | - | unresolved | 0xAAD5C:0 | 0xFFFF5FFC | fed by 0xFFFF5FFC x1 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC2D38 | 5 | -1 | 0.9 | - | - | unresolved | 0xAAD5C:1 | 0xFFFF6054 | fed by 0xFFFF6054 x1 (RAM identity not settled)
+0xC2D80 | 11 | -1 | 1 | - | - | unresolved | 0xAAD78:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2DAC | 9 | -5 | 2 | - | - | unresolved | 0xAAD78:1 | 0xFFFF6060 | fed by 0xFFFF6060 x1 (RAM identity not settled)
+0xC2EB4 | 11 | 0 | 100 | - | - | unresolved | 0xAAD94:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC2F7C | 3 | 4 | 50 | - | - | unresolved | 0xAADB0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2F88 | 3 | 40 | 120 | - | - | unresolved | 0xAADB0:1 | 0xFFFF5FFC | fed by 0xFFFF5FFC x2 -- UNRESOLVED (item 23): float x22, 12 unnamed axes, 'io_state_register' is wrong
+0xC2FA8 | 4 | 50 | 200 | - | - | unresolved | 0xAADCC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC2FB8 | 5 | -1 | 1 | - | - | unresolved | 0xAADCC:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC366C | 2 | 500 | 800 | - | - | unresolved | 0xAAE3C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC3808 | 8 | 410 | 760 | - | - | unresolved | 0xAAEF4:0 | 0xFFFF2200 | fed by 0xFFFF2200 x1 (RAM identity not settled)
+0xC3838 | 21 | 0 | 200 | - | - | unresolved | 0xAAF08:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC38D0 | 4 | 15 | 60 | - | - | unresolved | 0xAAF28:0 | 0xFFFF63C4 | fed by 0xFFFF63C4 x1 -- UNRESOLVED (item 23): three-way split, nothing supports 'ect_compensation'
+0xC38E8 | 2 | 3.44383e-41 | 3.67336e-41 | - | - | unresolved | 0xAAF3C:0 | 0xFFFF6598 | breakpoints are not plausible float32 (denormal/NaN) -- this 'axis' is probably not a float breakpoint array; region boundary suspect; fed by 0xFFFF6598 x1 (RAM identity not settled)
+0xC3A70 | 2 | 50 | 51 | - | - | unresolved | 0xAAF98:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC3B3C | 4 | 15 | 60 | - | - | unresolved | 0xAAFD0:0 | 0xFFFF63C4 | fed by 0xFFFF63C4 x1 -- UNRESOLVED (item 23): three-way split, nothing supports 'ect_compensation'
+0xC3B5C | 4 | 15 | 60 | - | - | unresolved | 0xAAFDC:0 | 0xFFFF63C4 | fed by 0xFFFF63C4 x1 -- UNRESOLVED (item 23): three-way split, nothing supports 'ect_compensation'
+0xC4088 | 7 | 0 | 25.3 | - | - | unresolved | 0xAB058:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC4124 | 11 | 0 | 500 | - | - | unresolved | 0xAB074:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC4184 | 4 | 520 | 760 | - | - | unresolved | 0xAB088:0 | 0xFFFF2200 | fed by 0xFFFF2200 x1 (RAM identity not settled)
+0xC4318 | 10 | 0 | 8.79 | - | - | unresolved | 0xAB17C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC434C | 7 | -0.1 | 0.01 | - | - | unresolved | 0xAB190:0 | 0xFFFF63FC | fed by 0xFFFF63FC x1 (RAM identity not settled)
+0xC43C0 | 2 | 0 | 0.25 | - | - | unresolved | 0xAB1CC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC43CC | 2 | 0 | 0.25 | - | - | unresolved | 0xAB1E0:0 | 0xFFFF7D68 | fed by 0xFFFF7D68 x1 (RAM identity not settled)
+0xC43D8 | 2 | 0 | 0.25 | - | - | unresolved | 0xAB1F4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC43E4 | 2 | 0 | 0.25 | - | - | unresolved | 0xAB208:0 | 0xFFFF7D68 | fed by 0xFFFF7D68 x1 (RAM identity not settled)
+0xC43F0 | 14 | 0 | 507.812 | - | - | unresolved | 0xAB21C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC44F8 | 7 | 0 | 468.75 | - | - | unresolved | 0xAB26C:0 | 0xFFFF6A18 | fed by 0xFFFF6A18 x3 (RAM identity not settled)
+0xC4514 | 5 | 0 | 1 | - | - | unresolved | 0xAB26C:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC4570 | 13 | 39.0625 | 507.812 | - | - | unresolved | 0xAB288:0 | 0xFFFF6A3C | fed by 0xFFFF6A3C x1 (RAM identity not settled)
+0xC45A4 | 13 | 0 | 0.804 | - | - | unresolved | 0xAB288:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC5814 | 4 | -20 | 20 | - | - | unresolved | 0xAB2A4:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC5828 | 2 | 700 | 1000 | - | - | unresolved | 0xAB2B0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5834 | 2 | 700 | 1000 | - | - | unresolved | 0xAB2C4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC59A4 | 78 | 0 | 77 | - | - | unresolved | 0xAB334:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5E4C | 16 | 0 | 15 | - | - | unresolved | 0xAB430:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5EC0 | 2 | 0 | 84 | - | - | unresolved | 0xAB458:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5F14 | 5 | 15 | 45 | - | - | unresolved | 0xAB484:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5F34 | 4 | 0.103 | 0.5 | - | - | unresolved | 0xAB498:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5F4C | 5 | 15 | 45 | - | - | unresolved | 0xAB4AC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5F6C | 6 | 0 | 1000 | - | - | unresolved | 0xAB4C0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5F90 | 2 | 0 | 100 | - | - | unresolved | 0xAB4D4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5F9C | 12 | 0 | 1600 | - | - | unresolved | 0xAB4E0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC5FE4 | 9 | 100 | 1000 | - | - | unresolved | 0xAB4F4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC601C | 2 | 700 | 1000 | - | - | unresolved | 0xAB508:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6034 | 2 | 700 | 1000 | - | - | unresolved | 0xAB530:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6040 | 2 | 700 | 1000 | - | - | unresolved | 0xAB544:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6088 | 7 | 0 | 14.0625 | - | - | unresolved | 0xAB56C:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xC60B4 | 7 | 0 | 14.0625 | - | - | unresolved | 0xAB580:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xC60E0 | 2 | 0 | 1 | - | - | unresolved | 0xAB594:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC60EC | 2 | 1 | 10 | - | - | unresolved | 0xAB5A8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC60F8 | 3 | 0 | 10000 | - | - | unresolved | 0xAB5BC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC610C | 3 | 0 | 10000 | - | - | unresolved | 0xAB5C8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6120 | 4 | -7 | 25 | - | - | unresolved | 0xAB5D4:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x2 (RAM identity not settled)
+0xC6138 | 4 | -7 | 27 | - | - | unresolved | 0xAB5E8:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC6150 | 4 | -7 | 25 | - | - | unresolved | 0xAB5FC:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC6168 | 4 | -7 | 25 | - | - | unresolved | 0xAB610:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xC6180 | 4 | -7 | 25 | - | - | unresolved | 0xAB624:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xC6198 | 9 | 0 | 80 | - | - | unresolved | 0xAB638:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC61D0 | 9 | 0 | 80 | - | - | unresolved | 0xAB64C:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC624C | 8 | 0 | 30 | - | - | unresolved | 0xAB674:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC62FC | 3 | 0 | 45 | - | - | unresolved | 0xAB6B0:0 | 0xFFFFACC0 | fed by 0xFFFFACC0 x1 (RAM identity not settled)
+0xC6310 | 3 | 0 | 100 | - | - | unresolved | 0xAB6C4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6328 | 2 | 150 | 200 | - | - | unresolved | 0xAB6D0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6338 | 2 | 0 | 100 | - | - | unresolved | 0xAB6DC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6348 | 2 | 800 | 4000 | - | - | unresolved | 0xAB6E8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6358 | 2 | 0 | 50 | - | - | unresolved | 0xAB6F4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6368 | 2 | 500 | 760 | - | - | unresolved | 0xAB700:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6378 | 2 | 0 | 4000 | - | - | unresolved | 0xAB70C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6388 | 2 | 0 | 4000 | - | - | unresolved | 0xAB718:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6398 | 2 | 1 | 6 | - | - | unresolved | 0xAB724:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC63A8 | 2 | 0 | 4000 | - | - | unresolved | 0xAB730:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC63B8 | 2 | 0 | 4000 | - | - | unresolved | 0xAB73C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC63C8 | 2 | 0 | 4000 | - | - | unresolved | 0xAB748:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC63D8 | 5 | -20 | 20 | - | - | unresolved | 0xAB754:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC6400 | 4 | -7 | 25 | - | - | unresolved | 0xAB760:0 | 0xFFFF682C | fed by 0xFFFF682C x1 (RAM identity not settled)
+0xC6440 | 2 | 700 | 6700 | - | - | unresolved | 0xAB778:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6680 | 2 | 700 | 6700 | - | - | unresolved | 0xAB7C0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6810 | 2 | 700 | 3000 | - | - | unresolved | 0xAB814:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6820 | 2 | 3500 | 6700 | - | - | unresolved | 0xAB820:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC68D8 | 2 | 700 | 3000 | - | - | unresolved | 0xAB844:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC68E8 | 2 | 3500 | 6700 | - | - | unresolved | 0xAB850:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC69A0 | 2 | 3500 | 6700 | - | - | unresolved | 0xAB874:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6A38 | 2 | 3500 | 6700 | - | - | unresolved | 0xAB898:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6AD0 | 2 | 700 | 3000 | - | - | unresolved | 0xAB8BC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6B50 | 2 | 700 | 3000 | - | - | unresolved | 0xAB8D4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6BD0 | 2 | 700 | 3000 | - | - | unresolved | 0xAB8EC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6C50 | 2 | 700 | 3000 | - | - | unresolved | 0xAB904:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6DB0 | 2 | 3500 | 7000 | - | - | unresolved | 0xAB934:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6E68 | 2 | 700 | 5000 | - | - | unresolved | 0xAB958:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC6EE8 | 13 | 0 | 12 | - | - | unresolved | 0xAB970:0 | 0xFFFF9A90 | fed by 0xFFFF9A90 x1 (RAM identity not settled)
+0xC7328 | 5 | 0 | 0.5 | - | - | unresolved | 0xAB9DC:0 | 0xFFFF798C | fed by 0xFFFF798C x1 (RAM identity not settled)
+0xC7350 | 2 | 0 | 4 | - | - | unresolved | 0xAB9E8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7360 | 8 | 0 | 285.72 | - | - | unresolved | 0xAB9F4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC73A0 | 7 | 0 | 0.6 | - | - | unresolved | 0xABA00:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC73D8 | 7 | 0 | 0.6 | - | - | unresolved | 0xABA0C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7410 | 3 | 0.8 | 1 | - | - | unresolved | 0xABA18:0 | 0xFFFF7BDC | fed by 0xFFFF7BDC x1 (RAM identity not settled)
+0xC7428 | 7 | 0 | 0.6 | - | - | unresolved | 0xABA24:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7460 | 4 | -7 | 25 | - | - | unresolved | 0xABA30:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xC7480 | 4 | -7 | 30 | - | - | unresolved | 0xABA3C:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xC74A0 | 13 | 0 | 120 | - | - | unresolved | 0xABA48:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7570 | 9 | -7 | 26 | - | - | unresolved | 0xABA60:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xC75B8 | 9 | -7 | 26 | - | - | unresolved | 0xABA6C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7600 | 4 | -7 | 25 | - | - | unresolved | 0xABA78:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xC7620 | 4 | -7 | 25 | - | - | unresolved | 0xABA84:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC7640 | 2 | 0 | 67107 | - | - | unresolved | 0xABA90:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7650 | 4 | -7 | 25 | - | - | unresolved | 0xABA9C:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xC7670 | 4 | -7 | 25 | - | - | unresolved | 0xABAA8:0 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xC7690 | 7 | -7 | 35 | - | - | unresolved | 0xABAB4:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC76C8 | 4 | -7 | 25 | - | - | unresolved | 0xABAC0:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC76E8 | 6 | -7 | 35 | - | - | unresolved | 0xABACC:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC7718 | 4 | -7 | 25 | - | - | unresolved | 0xABAD8:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC7738 | 6 | 70 | 120 | - | - | unresolved | 0xABAE4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7768 | 6 | 70 | 120 | - | - | unresolved | 0xABAF0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7798 | 6 | 500 | 1000 | - | - | unresolved | 0xABAFC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC77C8 | 6 | 500 | 1000 | - | - | unresolved | 0xABB08:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC77F8 | 7 | 520 | 760 | - | - | unresolved | 0xABB14:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7830 | 9 | -20 | 60 | - | - | unresolved | 0xABB20:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7878 | 5 | 0 | 20000 | - | - | unresolved | 0xABB2C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC78A0 | 7 | 520 | 760 | - | - | unresolved | 0xABB38:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC78D8 | 7 | 0 | 60 | - | - | unresolved | 0xABB44:0 | 0xFFFF6354 | fed by 0xFFFF6354 x1 (RAM identity not settled)
+0xC7910 | 2 | 0 | 60000 | - | - | unresolved | 0xABB50:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7920 | 9 | 520 | 840 | - | - | unresolved | 0xABB5C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7988 | 4 | 0 | 500 | - | - | unresolved | 0xABB74:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC79A8 | 4 | 525 | 750 | - | - | unresolved | 0xABB80:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC79C8 | 4 | 525 | 750 | - | - | unresolved | 0xABB8C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC79E8 | 13 | 0 | 1.2e+06 | - | - | unresolved | 0xABB98:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7A50 | 4 | 525 | 750 | - | - | unresolved | 0xABBA4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7A70 | 4 | 525 | 750 | - | - | unresolved | 0xABBB0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7AD0 | 2 | 0 | 50 | - | - | unresolved | 0xABBC8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7AD8 | 2 | 0 | 100 | - | - | unresolved | 0xABBC8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7AE4 | 2 | 0 | 50 | - | - | unresolved | 0xABBE4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7AEC | 2 | 0 | 100 | - | - | unresolved | 0xABBE4:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7AF8 | 2 | 0 | 50 | - | - | unresolved | 0xABC00:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7B00 | 2 | 0 | 100 | - | - | unresolved | 0xABC00:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7BF8 | 2 | 50 | 100 | - | - | unresolved | 0xABC30:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C00 | 2 | 0 | 4000 | - | - | unresolved | 0xABC30:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C10 | 2 | 50 | 100 | - | - | unresolved | 0xABC4C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C18 | 2 | 0 | 4000 | - | - | unresolved | 0xABC4C:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C28 | 2 | 50 | 100 | - | - | unresolved | 0xABC68:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C30 | 2 | 0 | 4000 | - | - | unresolved | 0xABC68:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C40 | 2 | 0 | 4000 | - | - | unresolved | 0xABC84:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C48 | 2 | 1 | 6 | - | - | unresolved | 0xABC84:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C58 | 2 | 0 | 4000 | - | - | unresolved | 0xABCA0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C60 | 2 | 1 | 6 | - | - | unresolved | 0xABCA0:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C70 | 2 | 0 | 1 | - | - | unresolved | 0xABCBC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C78 | 2 | 0 | 10000 | - | - | unresolved | 0xABCBC:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C88 | 2 | 0 | 100 | - | - | unresolved | 0xABCD8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7C90 | 2 | 2000 | 4000 | - | - | unresolved | 0xABCD8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7CA0 | 2 | 0 | 100 | - | - | unresolved | 0xABCF4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7CA8 | 2 | 2000 | 4000 | - | - | unresolved | 0xABCF4:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7CB8 | 2 | 0 | 1 | - | - | unresolved | 0xABD10:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7CC0 | 2 | 1000 | 3000 | - | - | unresolved | 0xABD10:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7CD0 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xABD2C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7CD8 | 2 | 700 | 1000 | - | - | unresolved | 0xABD2C:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7CE8 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xABD48:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7CF0 | 2 | 4000 | 4500 | - | - | unresolved | 0xABD48:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7D00 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xABD64:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7D08 | 2 | 2500 | 3000 | - | - | unresolved | 0xABD64:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7D18 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xABD80:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7D20 | 2 | 4000 | 4500 | - | - | unresolved | 0xABD80:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7D38 | 2 | 700 | 1000 | - | - | unresolved | 0xABD9C:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC7D48 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xABDB8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC7D50 | 2 | 4000 | 4500 | - | - | unresolved | 0xABDB8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC8640 | 4 | 10 | 40 | - | - | unresolved | 0xABED0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC8650 | 5 | 0 | 3001 | - | - | unresolved | 0xABED0:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC868C | 6 | 0 | 50 | - | - | unresolved | 0xABEE4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC8714 | 16 | 520 | 1120 | - | - | unresolved | 0xABF00:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC8754 | 16 | 520 | 1120 | - | - | unresolved | 0xABF00:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC8994 | 2 | 2 | 25 | - | - | unresolved | 0xABF1C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC89C4 | 2 | 2 | 25 | - | - | unresolved | 0xABF38:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC8A20 | 2 | 1 | 8 | - | - | unresolved | 0xABF54:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC8A80 | 1 | 8 | 8 | - | - | unresolved | 0xABF70:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC8AB0 | 3 | 10 | 54 | - | - | unresolved | 0xABF8C:1 | 0xFFFF637C | fed by 0xFFFF637C x1 (RAM identity not settled)
+0xC8AF0 | 3 | 0 | 20 | - | - | unresolved | 0xABFA8:1 | 0xFFFF637C | fed by 0xFFFF637C x1 (RAM identity not settled)
+0xC8B1C | 2 | 0 | 84 | - | - | unresolved | 0xABFC4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC8B24 | 2 | 800 | 4400 | - | - | unresolved | 0xABFC4:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC8B5C | 5 | -20 | 20 | - | - | unresolved | 0xABFD8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC8C10 | 2 | 0.2 | 1.7498 | - | - | unresolved | 0xABFEC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC8C18 | 2 | 700 | 3000 | - | - | unresolved | 0xABFEC:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC8C30 | 2 | 0.2 | 1.75 | - | - | unresolved | 0xAC000:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC8C38 | 2 | 3500 | 6700 | - | - | unresolved | 0xAC000:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC91C4 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xAC028:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC91CC | 2 | 4000 | 4500 | - | - | unresolved | 0xAC028:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC91E4 | 2 | 0.2 | 1.7498 | - | - | unresolved | 0xAC03C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC91EC | 2 | 700 | 3000 | - | - | unresolved | 0xAC03C:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC9204 | 2 | 0.2 | 1.75 | - | - | unresolved | 0xAC050:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC920C | 2 | 3500 | 6700 | - | - | unresolved | 0xAC050:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC9798 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xAC078:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC97A0 | 2 | 4000 | 4500 | - | - | unresolved | 0xAC078:1 | - | no RAM feeder reached this axis in the D3 trace
+0xC9C28 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xAC0A0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xC9C30 | 2 | 4000 | 4500 | - | - | unresolved | 0xAC0A0:1 | - | no RAM feeder reached this axis in the D3 trace
+0xCA0B8 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xAC0C8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCA0C0 | 2 | 4000 | 4500 | - | - | unresolved | 0xAC0C8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xCB1B4 | 2 | 0.2 | 0.3107 | - | - | unresolved | 0xAC140:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCB234 | 5 | 0 | 100 | - | - | unresolved | 0xAC154:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCB248 | 5 | 0 | 504 | - | - | unresolved | 0xAC154:1 | - | no RAM feeder reached this axis in the D3 trace
+0xCB2C0 | 10 | 0 | 700 | - | - | unresolved | 0xAC168:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCB2E8 | 4 | -10.1 | 20 | - | - | unresolved | 0xAC168:1 | 0xFFFF682C | fed by 0xFFFF682C x1 (RAM identity not settled)
+0xCB398 | 6 | 0 | 140 | - | - | unresolved | 0xAC17C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCB404 | 6 | 0 | 140 | - | - | unresolved | 0xAC190:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCB470 | 9 | 0 | 1.6 | - | - | unresolved | 0xAC1A4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCB880 | 5 | 40 | 70 | - | - | unresolved | 0xAC1E0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCB894 | 10 | -7 | 31 | - | - | unresolved | 0xAC1E0:1 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xCB984 | 5 | 40 | 70 | - | - | unresolved | 0xAC1F4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCB998 | 10 | -7 | 31 | - | - | unresolved | 0xAC1F4:1 | 0xFFFF30A0 | fed by 0xFFFF30A0 x1 (RAM identity not settled)
+0xCBA88 | 2 | 0 | 60 | - | - | unresolved | 0xAC208:0 | 0xFFFF63C4 | fed by 0xFFFF63C4 x1 -- UNRESOLVED (item 23): three-way split, nothing supports 'ect_compensation'
+0xCBAA8 | 2 | 0 | 60 | - | - | unresolved | 0xAC21C:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xCBAC8 | 2 | 0 | 60 | - | - | unresolved | 0xAC230:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xCBAE8 | 5 | 10 | 26 | - | - | unresolved | 0xAC244:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCBB5C | 5 | 10 | 26 | - | - | unresolved | 0xAC258:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCAB0 | 9 | 0 | 256 | - | - | unresolved | 0xAC4C0:0 | 0xFFFF7720 | fed by 0xFFFF7720 x4 (RAM identity not settled)
+0xCCAE0 | 9 | 0 | 256 | - | - | unresolved | 0xAC4D4:0 | 0xFFFF40C8,0xFFFF7720 | fed by 0xFFFF40C8 x2 (RAM identity not settled); fed by 0xFFFF7720 x1 (RAM identity not settled)
+0xCCB10 | 16 | 0 | 75 | - | - | unresolved | 0xAC4E8:0 | 0xFFFF62F8 | fed by 0xFFFF62F8 x1 (RAM identity not settled)
+0xCCB60 | 11 | 0 | 10000 | - | - | unresolved | 0xAC4FC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCB98 | 11 | 0 | 10000 | - | - | unresolved | 0xAC510:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCBD0 | 6 | 0 | 0.15625 | - | - | unresolved | 0xAC524:0 | 0xFFFF7874 | fed by 0xFFFF7874 x1 (RAM identity not settled)
+0xCCBF0 | 8 | 10 | 45 | - | - | unresolved | 0xAC530:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCC40 | 12 | 0 | 110000 | - | - | unresolved | 0xAC558:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCC7C | 9 | 0 | 40 | - | - | unresolved | 0xAC56C:0 | 0xFFFF7920 | fed by 0xFFFF7920 x1 (RAM identity not settled)
+0xCCCAC | 12 | 0 | 110000 | - | - | unresolved | 0xAC580:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCCE8 | 9 | 0 | 40 | - | - | unresolved | 0xAC594:0 | 0xFFFF7920 | fed by 0xFFFF7920 x1 (RAM identity not settled)
+0xCCDC8 | 6 | 0 | 12 | - | - | unresolved | 0xAC5F8:0 | - | no RAM feeder reached this axis in the D3 trace; BREAKPOINTS DIFFER between stock and 20.19c -- this axis is tuned
+0xCCDE8 | 6 | 0 | 12 | - | - | unresolved | 0xAC60C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCEA8 | 16 | 0 | 15 | - | - | unresolved | 0xAC698:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCEF8 | 16 | 0 | 15 | - | - | unresolved | 0xAC6AC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCCF58 | 16 | 0 | 15 | - | - | unresolved | 0xAC6D4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCD058 | 8 | 300 | 650 | - | - | unresolved | 0xAC760:0 | 0xFFFF7344 | fed by 0xFFFF7344 x1 (RAM identity not settled)
+0xCD090 | 7 | 0 | 300 | - | - | unresolved | 0xAC788:0 | 0xFFFF6574 | fed by 0xFFFF6574 x1 (RAM identity not settled)
+0xCD0B4 | 7 | 0 | 300 | - | - | unresolved | 0xAC79C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDA88 | 13 | -1.2 | 1.2 | - | - | unresolved | 0xACC94:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDAD8 | 13 | -1.2 | 1.2 | - | - | unresolved | 0xACCA8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDB28 | 11 | 1 | 16 | - | - | unresolved | 0xACCBC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDB6C | 11 | 1 | 16 | - | - | unresolved | 0xACCD0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDBB0 | 11 | 1 | 16 | - | - | unresolved | 0xACCE4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDBF4 | 11 | 1 | 16 | - | - | unresolved | 0xACCF8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDC38 | 11 | 1 | 16 | - | - | unresolved | 0xACD0C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDC7C | 11 | 1 | 16 | - | - | unresolved | 0xACD20:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDE50 | 10 | 0.08 | 1 | - | - | unresolved | 0xACE0C:0 | 0xFFFF7480 | fed by 0xFFFF7480 x1 (RAM identity not settled)
+0xCDE8C | 13 | 0.35 | 6 | - | - | unresolved | 0xACE20:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDF5C | 6 | 0 | 10485 | - | - | unresolved | 0xACE54:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDF80 | 6 | 0 | 20971.5 | - | - | unresolved | 0xACE60:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCDFA4 | 9 | 0 | 0.3 | - | - | unresolved | 0xACE6C:0 | 0xFFFF7A44 | fed by 0xFFFF7A44 x1 (RAM identity not settled)
+0xCDFFC | 16 | 0 | 300 | - | - | unresolved | 0xACE8C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE07C | 11 | 0.5 | 1.5 | - | - | unresolved | 0xACEB4:0 | 0xFFFF68DC | fed by 0xFFFF68DC x1 (RAM identity not settled)
+0xCE0E0 | 11 | 0.5 | 1.5 | - | - | unresolved | 0xACEDC:0 | 0xFFFF68DC | fed by 0xFFFF68DC x1 (RAM identity not settled)
+0xCE124 | 6 | 0 | 0.15625 | - | - | unresolved | 0xACEF0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE188 | 9 | 0 | 75 | - | - | unresolved | 0xACF14:0 | 0xFFFF63CC | fed by 0xFFFF63CC x2 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xCE1C0 | 5 | 10 | 50 | - | - | unresolved | 0xACF28:0 | 0xFFFF63CC | fed by 0xFFFF63CC x2 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xCE1E0 | 12 | 0 | 110000 | - | - | unresolved | 0xACF3C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE228 | 12 | 0 | 110000 | - | - | unresolved | 0xACF50:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE270 | 9 | 0 | 75 | - | - | unresolved | 0xACF64:0 | 0xFFFF63CC,0xFFFF7920 | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280; fed by 0xFFFF7920 x1 (RAM identity not settled)
+0xCE2A8 | 9 | 0 | 75 | - | - | unresolved | 0xACF78:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xCE2E0 | 12 | 0 | 110000 | - | - | unresolved | 0xACF8C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE328 | 12 | 0 | 110000 | - | - | unresolved | 0xACFA0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE370 | 5 | 10 | 50 | - | - | unresolved | 0xACFB4:0 | 0xFFFF7920 | fed by 0xFFFF7920 x1 (RAM identity not settled)
+0xCE390 | 5 | 10 | 50 | - | - | unresolved | 0xACFC8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE3B0 | 9 | 0 | 75 | - | - | unresolved | 0xACFDC:0 | 0xFFFF7920 | fed by 0xFFFF7920 x1 (RAM identity not settled)
+0xCE3E8 | 9 | 0 | 75 | - | - | unresolved | 0xACFF0:0 | 0xFFFF7920 | fed by 0xFFFF7920 x1 (RAM identity not settled)
+0xCE420 | 9 | 0 | 75 | - | - | unresolved | 0xAD004:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xCE458 | 9 | 0 | 75 | - | - | unresolved | 0xAD018:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE490 | 9 | 0 | 75 | - | - | unresolved | 0xAD02C:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xCE4C8 | 9 | 0 | 75 | - | - | unresolved | 0xAD040:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xCE520 | 8 | 0 | 70 | - | - | unresolved | 0xAD068:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE550 | 8 | 0 | 70 | - | - | unresolved | 0xAD07C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE654 | 10 | 1 | 10 | - | - | unresolved | 0xAD0C4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCE690 | 10 | 1 | 10 | - | - | unresolved | 0xAD0D0:0 | 0xFFFF63C4 | fed by 0xFFFF63C4 x1 -- UNRESOLVED (item 23): three-way split, nothing supports 'ect_compensation'
+0xCE74C | 7 | -0.1 | 0.01 | - | - | unresolved | 0xAD104:0 | 0xFFFF63FC | fed by 0xFFFF63FC x1 (RAM identity not settled)
+0xCEF10 | 9 | 0 | 8 | - | - | unresolved | 0xAD434:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCEF48 | 9 | 0 | 1.12104e-44 | - | - | unresolved | 0xAD440:0 | - | breakpoints are not plausible float32 (denormal/NaN) -- this 'axis' is probably not a float breakpoint array; region boundary suspect; no RAM feeder reached this axis in the D3 trace
+0xCEF80 | 16 | -700 | 800 | - | - | unresolved | 0xAD44C:0 | 0xFFFF6210 | fed by 0xFFFF6210 x1 (RAM identity not settled)
+0xCF088 | 16 | 0 | 15 | - | - | unresolved | 0xAD47C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF108 | 16 | 0 | 15 | - | - | unresolved | 0xAD488:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF188 | 16 | 0 | 15 | - | - | unresolved | 0xAD494:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF248 | 16 | 0 | 15 | - | - | unresolved | 0xAD4AC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF2C8 | 16 | 0 | 15 | - | - | unresolved | 0xAD4B8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF3F0 | 16 | 0.4 | 2.9 | - | - | unresolved | 0xAD4EC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF4E4 | 16 | 0.4 | 2.9 | - | - | unresolved | 0xAD508:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF62C | 5 | 115 | 515 | - | - | unresolved | 0xAD540:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF640 | 7 | -30 | 0 | - | - | unresolved | 0xAD540:1 | - | no RAM feeder reached this axis in the D3 trace
+0xCF728 | 5 | 504 | 760 | - | - | unresolved | 0xAD594:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF73C | 4 | -30 | 0 | - | - | unresolved | 0xAD594:1 | - | no RAM feeder reached this axis in the D3 trace
+0xCF760 | 13 | -600 | 600 | - | - | unresolved | 0xAD5B0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF860 | 5 | 504 | 760 | - | - | unresolved | 0xAD5CC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xCF874 | 4 | -30 | 0 | - | - | unresolved | 0xAD5CC:1 | - | no RAM feeder reached this axis in the D3 trace
+0xCFA94 | 16 | 0 | 500000 | - | - | unresolved | 0xAD63C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD0024 | 15 | 0.27 | 2.56 | - | - | unresolved | 0xAD6AC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD06F8 | 16 | 0 | 15 | - | - | unresolved | 0xAD71C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD0738 | 2 | 0 | 1 | - | - | unresolved | 0xAD71C:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD0E38 | 12 | 0 | 20000 | - | - | unresolved | 0xAD7A8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD0EE0 | 15 | 0 | 408 | - | - | unresolved | 0xAD7C4:0 | 0xFFFF5D5C | fed by 0xFFFF5D5C x1 (RAM identity not settled)
+0xD0F1C | 16 | 0 | 93.75 | - | - | unresolved | 0xAD7C4:1 | 0xFFFF5E64 | fed by 0xFFFF5E64 x1 (RAM identity not settled)
+0xD12D0 | 8 | 4 | 60 | - | - | unresolved | 0xAD864:0 | 0xFFFF63C4 | fed by 0xFFFF63C4 x1 -- UNRESOLVED (item 23): three-way split, nothing supports 'ect_compensation'
+0xD15AC | 11 | 0.2 | 1.6 | - | - | unresolved | 0xAD8D4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD1878 | 13 | 0.2 | 1.6 | - | - | unresolved | 0xAD90C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD1B84 | 2 | -10 | 0 | - | - | unresolved | 0xAD944:1 | 0xFFFF6368 | fed by 0xFFFF6368 x1 (RAM identity not settled)
+0xD1F74 | 12 | 0.15 | 2.5 | - | - | unresolved | 0xAD998:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD2110 | 12 | 0.15 | 2.5 | - | - | unresolved | 0xAD9B4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD22AC | 12 | 0.3 | 2.5 | - | - | unresolved | 0xAD9D0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD2448 | 10 | 48 | 192 | - | - | unresolved | 0xAD9EC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD25C0 | 16 | 0 | 3 | - | - | unresolved | 0xADA5C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD2798 | 16 | 0 | 3 | - | - | unresolved | 0xADA70:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD310C | 8 | 1 | 27 | - | - | unresolved | 0xADAFC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3134 | 16 | 0 | 1500 | - | - | unresolved | 0xADB10:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3184 | 5 | 515 | 795 | - | - | unresolved | 0xADB24:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3298 | 8 | 0 | 14 | - | - | unresolved | 0xADC28:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD32CC | 2 | 800 | 1200 | - | - | unresolved | 0xADC50:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD32D8 | 2 | 800 | 1200 | - | - | unresolved | 0xADC64:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD32E4 | 2 | 800 | 1200 | - | - | unresolved | 0xADC78:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD32F0 | 2 | 800 | 1200 | - | - | unresolved | 0xADC8C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD32FC | 2 | 800 | 1200 | - | - | unresolved | 0xADCA0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3308 | 2 | 800 | 1200 | - | - | unresolved | 0xADCB4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3314 | 2 | 800 | 1200 | - | - | unresolved | 0xADCC8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3320 | 2 | 800 | 1200 | - | - | unresolved | 0xADCDC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD332C | 2 | 800 | 1200 | - | - | unresolved | 0xADCF0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3338 | 2 | 800 | 1200 | - | - | unresolved | 0xADD04:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3344 | 2 | 800 | 1200 | - | - | unresolved | 0xADD18:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3350 | 2 | 800 | 1200 | - | - | unresolved | 0xADD2C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD335C | 2 | 800 | 1200 | - | - | unresolved | 0xADD40:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3368 | 2 | 800 | 1200 | - | - | unresolved | 0xADD54:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3374 | 2 | 800 | 1200 | - | - | unresolved | 0xADD68:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3380 | 2 | 800 | 1200 | - | - | unresolved | 0xADD7C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD33AC | 6 | 440 | 760 | - | - | unresolved | 0xADDB8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD33CC | 7 | 0 | 30 | - | - | unresolved | 0xADDCC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3448 | 7 | 0 | 100 | - | - | unresolved | 0xADE1C:0 | 0xFFFF5E64 | fed by 0xFFFF5E64 x1 (RAM identity not settled)
+0xD34B0 | 8 | 0 | 87.5 | - | - | unresolved | 0xADE44:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD34D8 | 8 | 0 | 87.5 | - | - | unresolved | 0xADE58:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3500 | 8 | 0 | 87.5 | - | - | unresolved | 0xADE6C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3528 | 8 | 0 | 87.5 | - | - | unresolved | 0xADE80:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3550 | 8 | 0 | 87.5 | - | - | unresolved | 0xADE94:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3578 | 8 | 0 | 87.5 | - | - | unresolved | 0xADEA8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD35A0 | 8 | 0 | 87.5 | - | - | unresolved | 0xADEBC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD35C8 | 8 | 0 | 87.5 | - | - | unresolved | 0xADED0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD35F0 | 8 | 0 | 87.5 | - | - | unresolved | 0xADEE4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3618 | 8 | 0 | 87.5 | - | - | unresolved | 0xADEF8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3640 | 8 | 0 | 87.5 | - | - | unresolved | 0xADF0C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3668 | 8 | 0 | 87.5 | - | - | unresolved | 0xADF20:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD36B0 | 21 | -20 | 20 | - | - | unresolved | 0xADF5C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD371C | 21 | -20 | 20 | - | - | unresolved | 0xADF70:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3788 | 21 | -20 | 20 | - | - | unresolved | 0xADF84:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD37F4 | 21 | -20 | 20 | - | - | unresolved | 0xADF98:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3950 | 5 | 1 | 5 | - | - | unresolved | 0xADFE8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD396C | 5 | 1 | 5 | - | - | unresolved | 0xADFF4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD39B0 | 6 | 0 | 1 | - | - | unresolved | 0xAE00C:0 | 0xFFFF81F4 | fed by 0xFFFF81F4 x1 (RAM identity not settled)
+0xD39D0 | 5 | -1 | 1 | - | - | unresolved | 0xAE020:0 | 0xFFFF81F8 | fed by 0xFFFF81F8 x1 (RAM identity not settled)
+0xD3CC0 | 9 | -20 | 20 | - | - | unresolved | 0xAE158:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3D08 | 5 | 0 | 0.2 | - | - | unresolved | 0xAE164:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3D90 | 4 | 0 | 3 | - | - | unresolved | 0xAE188:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3DB0 | 4 | 0 | 3 | - | - | unresolved | 0xAE194:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3DD0 | 4 | 0 | 3 | - | - | unresolved | 0xAE1A0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3DF0 | 4 | 0 | 3 | - | - | unresolved | 0xAE1AC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3E10 | 4 | 0 | 3 | - | - | unresolved | 0xAE1B8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3E30 | 4 | 0 | 3 | - | - | unresolved | 0xAE1C4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3E50 | 4 | 0 | 3 | - | - | unresolved | 0xAE1D0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3E70 | 4 | 0 | 3 | - | - | unresolved | 0xAE1DC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3E90 | 4 | 0 | 3 | - | - | unresolved | 0xAE1E8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3EB0 | 4 | 0 | 3 | - | - | unresolved | 0xAE1F4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3ED0 | 4 | 0 | 3 | - | - | unresolved | 0xAE200:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3EF0 | 4 | 0 | 3 | - | - | unresolved | 0xAE20C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3F10 | 4 | 0 | 3 | - | - | unresolved | 0xAE218:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3F30 | 4 | 0 | 3 | - | - | unresolved | 0xAE224:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3F50 | 4 | 0 | 3 | - | - | unresolved | 0xAE230:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3F70 | 4 | 0 | 3 | - | - | unresolved | 0xAE23C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3F90 | 4 | 0 | 3 | - | - | unresolved | 0xAE248:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD3FB0 | 4 | 0 | 3 | - | - | unresolved | 0xAE254:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD4128 | 65 | 0 | 3.5 | - | - | unresolved | 0xAE284:0 | 0xFFFF6624 | settled feeder 0xFFFF6624 (Engine Speed) CONTRADICTS envelope 0..3.5 -- most likely a stale FR-register tag carried across a basic block by the linear trace (corrections item 23); NOT named
+0xD44C0 | 35 | 0 | 34 | - | - | unresolved | 0xAE2CC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD45D8 | 8 | 0.0625 | 0.9375 | - | - | unresolved | 0xAE2D8:0 | 0xFFFF3234 | fed by 0xFFFF3234 x1 (RAM identity not settled)
+0xD4618 | 6 | 0.19 | 0.79 | - | - | unresolved | 0xAE2E4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD4630 | 3 | 400 | 800 | - | - | unresolved | 0xAE2E4:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD4650 | 6 | 0.19 | 0.79 | - | - | unresolved | 0xAE300:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD4668 | 3 | 400 | 600 | - | - | unresolved | 0xAE300:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD4E08 | 9 | -200 | 200 | - | - | unresolved | 0xAE3A8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD4E2C | 3 | 700 | 1500 | - | - | unresolved | 0xAE3A8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD4E54 | 9 | -200 | 200 | - | - | unresolved | 0xAE3C4:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD4E78 | 3 | 700 | 1500 | - | - | unresolved | 0xAE3C4:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD4EA0 | 9 | -200 | 200 | - | - | unresolved | 0xAE3E0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD4EC4 | 9 | -20 | 20 | - | - | unresolved | 0xAE3E0:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD4F3C | 9 | -200 | 200 | - | - | unresolved | 0xAE3FC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD4F60 | 9 | -20 | 20 | - | - | unresolved | 0xAE3FC:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD4FFC | 2 | 750 | 1000 | - | - | unresolved | 0xAE418:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD503C | 2 | 0 | 1000 | - | - | unresolved | 0xAE434:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD50F8 | 8 | 0 | 75 | - | - | unresolved | 0xAE488:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD5118 | 2 | 90 | 100 | - | - | unresolved | 0xAE488:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5198 | 2 | 0.6 | 0.61 | - | - | unresolved | 0xAE4C0:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD51C0 | 8 | 0 | 75 | - | - | unresolved | 0xAE4DC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD51E0 | 2 | 90 | 100 | - | - | unresolved | 0xAE4DC:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5238 | 2 | 0.6 | 0.61 | - | - | unresolved | 0xAE4F8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5C54 | 2 | 0.8 | 2.2 | - | - | unresolved | 0xAE6D4:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5D34 | 2 | 0.8 | 2.2 | - | - | unresolved | 0xAE6E8:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5E14 | 2 | 0.8 | 2.2 | - | - | unresolved | 0xAE6FC:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5EF4 | 2 | 0.8 | 2.2 | - | - | unresolved | 0xAE710:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5F8C | 2 | 800 | 7600 | - | - | unresolved | 0xAE724:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD5F94 | 2 | 0.8 | 2.2 | - | - | unresolved | 0xAE724:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5FAC | 2 | 800 | 7600 | - | - | unresolved | 0xAE738:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD5FB4 | 2 | 0.8 | 2.2 | - | - | unresolved | 0xAE738:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5FCC | 2 | 800 | 7600 | - | - | unresolved | 0xAE74C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD5FD4 | 2 | 0.8 | 2.2 | - | - | unresolved | 0xAE74C:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD5FEC | 2 | 800 | 7600 | - | - | unresolved | 0xAE760:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD5FF4 | 2 | 0.8 | 2.2 | - | - | unresolved | 0xAE760:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD6050 | 2 | -760 | 1000 | - | - | unresolved | 0xAE774:1 | 0xFFFF6210 | fed by 0xFFFF6210 x1 (RAM identity not settled)
+0xD6068 | 2 | 8 | 12 | - | - | unresolved | 0xAE788:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD6070 | 2 | -760 | 1000 | - | - | unresolved | 0xAE788:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD68E8 | 20 | 0 | 9961 | - | - | unresolved | 0xAE7D8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD694C | 20 | 0 | 9961 | - | - | unresolved | 0xAE7EC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD69B0 | 10 | 0 | 84 | - | - | unresolved | 0xAE800:0 | 0xFFFF62F8 | fed by 0xFFFF62F8 x1 (RAM identity not settled)
+0xD69E4 | 10 | 0 | 84 | - | - | unresolved | 0xAE814:0 | 0xFFFF62F8 | fed by 0xFFFF62F8 x1 (RAM identity not settled)
+0xD6A24 | 15 | -145.6 | 145.6 | - | - | unresolved | 0xAE83C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD6A80 | 4 | 4.62428e-44 | 2.77457e-43 | - | - | unresolved | 0xAE850:0 | - | breakpoints are not plausible float32 (denormal/NaN) -- this 'axis' is probably not a float breakpoint array; region boundary suspect; no RAM feeder reached this axis in the D3 trace
+0xD6A98 | 4 | 4.62428e-44 | 2.77457e-43 | - | - | unresolved | 0xAE85C:0 | - | breakpoints are not plausible float32 (denormal/NaN) -- this 'axis' is probably not a float breakpoint array; region boundary suspect; no RAM feeder reached this axis in the D3 trace
+0xD6AB0 | 4 | 0 | 2.76056e-43 | - | - | unresolved | 0xAE868:0 | - | breakpoints are not plausible float32 (denormal/NaN) -- this 'axis' is probably not a float breakpoint array; region boundary suspect; no RAM feeder reached this axis in the D3 trace
+0xD6AEC | 2 | 6 | 16 | - | - | unresolved | 0xAE880:0 | 0xFFFF6598 | fed by 0xFFFF6598 x1 (RAM identity not settled)
+0xD7094 | 7 | 0 | 60 | - | - | unresolved | 0xAEBFC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7120 | 6 | 400 | 1400 | - | - | unresolved | 0xAEC4C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7144 | 20 | 0 | 9961 | - | - | unresolved | 0xAEC60:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD71BC | 9 | -200 | 200 | - | - | unresolved | 0xAEC74:0 | 0xFFFF8A58 | fed by 0xFFFF8A58 x1 (RAM identity not settled)
+0xD7494 | 9 | 0 | 300 | - | - | unresolved | 0xAEE1C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD74CC | 9 | 0 | 300 | - | - | unresolved | 0xAEE30:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7504 | 10 | -100 | 350 | - | - | unresolved | 0xAEE44:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7540 | 10 | -60 | 0 | - | - | unresolved | 0xAEE58:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD757C | 10 | -60 | 0 | - | - | unresolved | 0xAEE6C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD76F4 | 2 | -100 | 0 | - | - | unresolved | 0xAEF04:0 | 0xFFFF6644 | fed by 0xFFFF6644 x1 (RAM identity not settled)
+0xD7700 | 6 | 0 | 101 | - | - | unresolved | 0xAEF18:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7730 | 6 | 0 | 30 | - | - | unresolved | 0xAEF24:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7760 | 6 | 0 | 100 | - | - | unresolved | 0xAEF30:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD77D0 | 6 | 0 | 200 | - | - | unresolved | 0xAEF48:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7880 | 5 | 15 | 80 | - | - | unresolved | 0xAEF6C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7928 | 5 | 15 | 80 | - | - | unresolved | 0xAEF90:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7950 | 9 | 0 | 1600 | - | - | unresolved | 0xAEF9C:0 | 0xFFFF89F0 | fed by 0xFFFF89F0 x1 (RAM identity not settled)
+0xD7998 | 10 | 0 | 1400 | - | - | unresolved | 0xAEFA8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7B58 | 10 | -800 | 0 | - | - | unresolved | 0xAEFFC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7C58 | 8 | 0 | 14 | - | - | unresolved | 0xAF020:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7CC0 | 8 | 0 | 14 | - | - | unresolved | 0xAF03C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7D28 | 8 | 0 | 21 | - | - | unresolved | 0xAF058:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD7D90 | 8 | 0 | 21 | - | - | unresolved | 0xAF074:0 | 0xFFFF8B10 | fed by 0xFFFF8B10 x1 (RAM identity not settled)
+0xD8310 | 16 | 0 | 333 | - | - | unresolved | 0xAF100:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD857C | 8 | -50 | 300 | - | - | unresolved | 0xAF11C:1 | - | no RAM feeder reached this axis in the D3 trace
+0xD8838 | 6 | 0 | 0.5 | - | - | unresolved | 0xAF41C:1 | 0xFFFF63E8 | fed by 0xFFFF63E8 x1 (RAM identity not settled)
+0xD8918 | 17 | 0.758 | 1.279 | - | - | unresolved | 0xAF438:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD89A0 | 18 | 0 | 6800 | - | - | unresolved | 0xAF444:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD8B44 | 16 | 0 | 7.5 | - | - | unresolved | 0xAF450:0 | 0xFFFF6390 | fed by 0xFFFF6390 x1 (RAM identity not settled)
+0xD9280 | 4 | 20 | 44 | - | - | unresolved | 0xAF4C4:0 | 0xFFFF63CC | fed by 0xFFFF63CC x1 -- UNRESOLVED (item 23): one hit, 'Smoothed MAF' X axis 0xD9280
+0xD95C4 | 11 | 0 | 10000 | - | - | unresolved | 0xAF53C:1 | 0xFFFF2254 | fed by 0xFFFF2254 x1 (RAM identity not settled)
+0xD96CC | 9 | -20 | 60 | - | - | unresolved | 0xAF550:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD96F0 | 11 | 0 | 20000 | - | - | unresolved | 0xAF550:1 | 0xFFFF2254 | fed by 0xFFFF2254 x1 (RAM identity not settled)
+0xD9B54 | 5 | 0 | 80 | - | - | unresolved | 0xAF5E0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD9B70 | 5 | 0 | 80 | - | - | unresolved | 0xAF5F4:0 | 0xFFFF90F0 | fed by 0xFFFF90F0 x1 (RAM identity not settled)
+0xD9B8C | 2 | 10 | 20 | - | - | unresolved | 0xAF608:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD9B98 | 2 | 80 | 95 | - | - | unresolved | 0xAF61C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD9DE4 | 11 | 0 | 200 | - | - | unresolved | 0xAF6A8:0 | - | no RAM feeder reached this axis in the D3 trace
+0xD9E28 | 3 | -20 | 100 | - | - | unresolved | 0xAF6BC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA1D8 | 2 | 0 | 50 | - | - | unresolved | 0xAF728:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA1E4 | 2 | 0 | 50 | - | - | unresolved | 0xAF73C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA41C | 13 | -0.3 | 0.3 | - | - | unresolved | 0xAF7F4:0 | 0xFFFF92FC | fed by 0xFFFF92FC x1 (RAM identity not settled)
+0xDA46C | 13 | -0.3 | 0.3 | - | - | unresolved | 0xAF808:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA4BC | 12 | 0 | 100 | - | - | unresolved | 0xAF81C:0 | 0xFFFF9310 | fed by 0xFFFF9310 x2 (RAM identity not settled)
+0xDA504 | 9 | -11.25 | 11.25 | - | - | unresolved | 0xAF830:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA5F0 | 9 | -11.25 | 11.25 | - | - | unresolved | 0xAF84C:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA6DC | 9 | -11.25 | 11.25 | - | - | unresolved | 0xAF868:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA7C8 | 9 | -11.25 | 11.25 | - | - | unresolved | 0xAF884:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA8B4 | 2 | 0 | 50 | - | - | unresolved | 0xAF8A0:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA8BC | 2 | 1000 | 5000 | - | - | unresolved | 0xAF8A0:1 | - | no RAM feeder reached this axis in the D3 trace
+0xDA8CC | 2 | 0 | 50 | - | - | unresolved | 0xAF8BC:0 | - | no RAM feeder reached this axis in the D3 trace
+0xDA8D4 | 2 | 1000 | 5000 | - | - | unresolved | 0xAF8BC:1 | - | no RAM feeder reached this axis in the D3 trace
+0xDAE74 | 2 | 0.25 | 0.4 | - | - | unresolved | 0xAF910:0 | - | no RAM feeder reached this axis in the D3 trace

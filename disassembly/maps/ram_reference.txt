@@ -54,23 +54,52 @@ Total addresses: 858 | Named: 497 | Unnamed: 361 (low-ref infrastructure, exclud
   DO NOT re-derive these from other derived files. Every claim above is cited to
   address: bytes -> mnemonic in the per-address Description column below.
 
-  NOT renamed, deliberately -- evidence insufficient (see docs/corrections.md
-  item 23 for the exact evidence that would settle each):
-!!     FFFF69F0 iat_input_float   -- feeds ZERO lookup axes; its only stores set
-!!                                   it to 1.0 and ramp it to a clamp. The claim
-!!                                   on the FFFF63F8 line that "Real IAT is" this
-!!                                   address is NO LONGER SETTLED. FFFF6364 is
-!!                                   the IAT the cal tables actually read.
-!!     FFFF4150  1 site -> "Ignition Dwell / Engine Speed" (rpm-like, float x7)
-!!     FFFF63C0  1 site -> "MAF Compensation (IAT) / Mass Airflow" (computed addr)
-!!     FFFF40E0  1 site -> "Front Oxygen Sensor"; ATU_output_ctrl name unsupported
-!!     FFFFA198  36 rpm-shaped axes, none NAMED in the XMLs (envelope only)
-!!     FFFF6634  2 sites -> "Idle Speed Stability A / Engine Speed Delta"
-!!     FFFF89C8  1 site  -> "Idle Speed Stability A / Idle Speed Error"
-!!     FFFF63C4  ect_compensation -- 3-way axis split (VVT error / MAF / unnamed)
-!!     FFFF63CC  ram_ECT -- 1 named hit, the "Smoothed MAF" X axis 0xD9280 (g/s)
-!!     FFFF5FFC  io_state_register -- float x22 feeding 12 numeric axes; the
-!!                                   "I/O state register" name is refuted, replacement unknown
+  SETTLED 2026-07-27 -- the MAF hunt closed, and 9 of the 11 deferred cases resolved.
+  Method note: two NEW instruments were used alongside the axis-name method, and both
+  are independent of the definition XMLs' axis labels:
+!!    (A) THE SSM GETTER TABLE at 0x06423C (848 entries, one function pointer per SSM
+!!        PID). Each getter is a leaf that loads ONE RAM address into FR4 and calls
+!!        0x0BE5A8 / 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)). The address a getter
+!!        reads IS the ECU's own copy of that logged quantity. Self-check: PID 0x0E/0x0F
+!!        -> 0xFFFF6624 (settled RPM, scale 0.25 = logcfg x/4); PID 0x29 -> 0xFFFF64D8
+!!        (settled pedal, 100/255); PID 0x0D/0x24 -> 0xFFFF620C (settled MAP); PID 0x1C
+!!        -> 0xFFFF4130 (settled battery voltage, 0.08 V/count). Four for four.
+!!    (B) THRESHOLD PAIRING against definition-NAMED calibration TABLES (not axes).
+!!  THE MAF ANSWER: 0xFFFF63C4 is mass airflow in g/s. Full pipeline, all from bytes:
+!!        0xFFFF4042  uint16 ADC counts  --x 5/65536-->  volts (never stored to RAM)
+!!        --'MAF Sensor Scaling' (desc 0x0AF45C, 54 pts, 0.898..5.0 V)-->  0xFFFF40B4 g/s
+!!        --> 0xFFFF63B4 -> 0xFFFF6424 -> shift reg 0xFFFF63B8 / 0xFFFF63BC
+!!        --0.5*(a+b)--> 0xFFFF63C0 --axis1 of 'MAF Compensation (IAT)'-->  comp factor
+!!        --x comp, min-clamped by 'MAF Limit (Maximum)' 0xC3100 (stock 300, 20.19c 475)-->
+!!        0xFFFF63C4  == SSM PID 0x13/0x14 == the logged MAF channel (2.40..296.24 g/s)
+!!        --lag(alpha 0.5, 0x0BEA40)--> 0xFFFF63CC  smoothed MAF
+!!  A DEFINITION-SIDE ERROR was found doing this, and it is the first time the axis-name
+!!  method's own input has been shown wrong: axes 0xCF9EC 'Intake VVT Error' and 0xD11D0
+!!  'Exhaust VVT Error' (both 4..80, from 32BITBASE.xml) are BOTH fed from 0xFFFF63C4,
+!!  by one FR14 loaded once at 0x031DD2 and never rewritten. One value cannot be both the
+!!  intake and the exhaust VVT error. Intake/Exhaust Duty Correction A are indexed by
+!!  [Mass Airflow g/s] x [Engine Speed], and their 650..3600 RPM sibling axis matches.
+!!  The definition XMLs are NOT edited here (ECUFlash owns them) -- see corrections.md 28.
+!!
+!!  CORRECTED 2026-07-27:
+!!    FFFF63C4 : was ect_compensation    -> MASS AIRFLOW g/s  (the MAF)
+!!    FFFF63CC : was ram_ECT             -> SMOOTHED MASS AIRFLOW g/s
+!!    FFFF40E0 : was ATU_output_ctrl     -> FRONT O2 / AF SENSOR CURRENT (mA)
+!!    FFFFA198 : was egr_diag_state      -> ENGINE SPEED snapshot (float RPM) at struct +0
+!!    FFFF69F0 : was iat_input_float     -> a 0..1 RATIO (clamped [0,1]); NOT IAT, and
+!!                                          WHICH ratio is still UNRESOLVED
+!!  NEWLY IDENTIFIED 2026-07-27 (added to the NEWLY IDENTIFIED block below):
+!!    FFFF4042 maf_sensor_adc_counts   FFFF40B4 maf_instantaneous_gps
+!!    FFFF63C0 maf_uncompensated_gps   FFFF63B8/FFFF63BC maf_sample_prev/curr
+!!    FFFF4150 rpm_from_tooth_period   FFFF6634 engine_speed_delta
+!!    FFFF89C8 idle_speed_error
+!!
+!!  STILL NOT RENAMED -- name refuted, replacement not derivable:
+!!    FFFF5FFC  io_state_register -- 26 float refs, 15 numeric axes 0..250, ALL UNNAMED
+!!    FFFF6228  maf_voltage -- refuted (real MAF voltage is 0xFFFF4042 x 5/65536 and is
+!!                             never stored); feeds ZERO axes; own writer uses x0.0305176
+!!    FFFF69F0  which 0..1 ratio it is
+!!  The binding limit is unchanged: the XMLs name only ~211 of ~780 descriptor axes.
 
   Full evidence: docs/corrections.md items 10-23
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -107,7 +136,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      48  0xFFFF6898  atm_pressure_current                 CORRECTED 2026-07-26: ATMOSPHERIC / BAROMETRIC PRESSURE (float, raw mmHg-class 440..760 = 8.5..14.7 psi abs), NOT manifold pressure and NOT rpm_delta. 0x013B02 mov.l @(0x013CCC),r2 ; 0x013B04 fmov.s @r2,fr4 -> desc 0x0AA99C axis0 0xC0E94 "Target Boost Compensation (Atm. Pressure)_ / Atmospheric Pressure". float x48. corrections.md item 11.
      45  0xFFFF3480  cal_mirror_base                      45 refs. Calibration mirror base. Referenced by various
      43  0xFFFF620C  manifold_pressure_map                CORRECTED 2026-07-26: MANIFOLD PRESSURE, not MAF airflow. Feeds axis 0xCC840 "Manifold Pressure".
-     43  0xFFFF63C4  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
+     43  0xFFFF63C4  mass_airflow_gps                     CORRECTED 2026-07-27: MASS AIRFLOW (float, g/s) -- THE MAF variable, not ect_compensation. Two independent non-axis proofs. (1) SSM: the stock getter table at 0x06423C entry 0x13/0x14 (Mass Airflow, logcfg x/100) is 0x05D3AC, which does 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; 0x05D3B8 jsr 0x0BE5D8 with fr6=0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)) => SSM raw = value*100 => value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l @(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched to 0x034D8E, compared against 0xCC074/78/7C = the definition-named table 'A/F Learning #1 Airflow Ranges' (scaling MassAirflow(g/s), 5.6/10/50). (3) PRODUCER: 0x01FF66 fmov.s fr0,@(r0,r1) with r1=0xFFFF6430 r0=-108 writes it as min(MAF*IATcomp, 'MAF Limit (Maximum)' 0xC3100=300 g/s) via 0x0BE970. (4) LOG: logs/7-26 20.19b MAF spans 2.40..296.24 g/s; widest axis 0..300. The 'Intake/Exhaust VVT Error' axis names at 0xCF9EC/0xD11D0 are DEFINITION-SIDE ERRORS -- 0x031DD2 loads FR14 from here once and feeds it unchanged to both. corrections.md item 28.
      41  0xFFFF366C  io_inj_driver_ctrl                   InternalIO injection driver control register (31 refs).
      39  0xFFFF8E46  fuel_mode_flags                      39 refs. Fuel mode flags register.
      37  0xFFFF895C  injector_data                        Rate-limited sensor composite (float). 28 pool refs. Was fuel_ign_shared_state. See fueling_pipeline Section 15.
@@ -117,7 +146,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      34  0xFFFF6C48  diag_status_code_6C48                CORRECTED 2026-07-26: BYTE status/result code, NOT battery voltage and NOT an FP value. int8 x34, 0 FP accesses. Takes only nibble-doubled sentinels 00/33/55/77/AA/BB/DD/EE (e.g. 0x02C148 mov #-69,r2 ; 0x02C14C mov.b r2,@r1). Battery volts is the FP value at 0xFFFF4130. corrections.md item 14.
      33  0xFFFF5BE3  clutch_state                         33 refs. Clutch engagement state (task50 map switching). Was peripheral_status.
      33  0xFFFF8EDC  ol_dispatch_gate                     OL enrichment dispatch gate (byte). Checked by all 4 OL
-     32  0xFFFF69F0  iat_input_float                      32 refs. Intake air temperature (float, -40..120 C). Read by AFL, startup enrichment. GBR base
+     32  0xFFFF69F0  ratio_0to1_69F0                      CORRECTED 2026-07-27: a 0..1 RATIO (float), definitively NOT a temperature. 0x0272CE mov.l @(0x0274DC),r2 (=0x0BE56C) ; 0x0272D0 fldi1 fr6 ; 0x0272D2 fldi0 fr5 ; 0x0272D6 jsr @r2 with delay 0x0272D8 fmov.s @r6,fr4 (r6=0xFFFF69F0) -- and 0x0BE56C is clamp(FR4, lo=FR5, hi=FR6), verified from bytes -- so the value is clamped to [0.0,1.0]. Repeated at 0x0273BA. Only store sets it to exactly 1.0 (0x0273E0 fldi1 fr8 ; 0x0273E6 fmov.s fr8,@r2). Feeds 4 sites, all the same unnamed 0..1 axis 0xC4514, and ZERO temperature-named axes while 0xFFFF6364 reaches 9. A value clamped to [0,1] cannot be a -40..120 C temperature. WHICH ratio is UNRESOLVED -- deliberately not guessed. corrections.md items 23 + 33.
      32  0xFFFF7C9D  fuel_state_byte                      32 refs. Fuel state byte/flag.
      32  0xFFFF9058  sched_state_A                        32 refs. Scheduler state variable A.
      32  0xFFFFACE0  diag_output_buffer                   32 refs. Diagnostic output buffer pointer.
@@ -130,11 +159,11 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      25  0xFFFF43FC  sensor_misc_state                    25 refs. Misc sensor state.
      25  0xFFFF7E90  task50_gbr_base                      GBR base for task50 timing blend. Was warmup_corr_cyl0.
      23  0xFFFF2004  system_init_flags                    23 refs. System initialization flags.
-     23  0xFFFF5FFC  io_state_register                    23 refs. I/O state register.
+     23  0xFFFF5FFC  io_state_register                    UNRESOLVED 2026-07-27: the io_state_register NAME is refuted and no replacement is derivable. It is a struct base loaded into GBR (0x018DDA mov.l @(0x019008),r0 ; 0x018DDC ldc r0,gbr) AND a float read 26 times, feeding 15 numeric lookup axes spanning 0..250 across 5 functions -- an I/O state register is not read as a float and used as a table index. ALL 15 axes (0xC2408/C242C/C24AC/C24F8/C2510/C25A4/C2614/C2764/C277C/C2794/C27AC/C2CC8/C2D24/C2F88) are UNNAMED in both definition XMLs, so the axis-name method has nothing to vote with. What would settle it: name any one of those axes. corrections.md item 35.
      23  0xFFFF65A9  engine_state_extended                Engine state extended byte. Read by task58 extended MAF
      22  0xFFFF34D8  cal_mirror_data                      Calibration mirror data area
      22  0xFFFF5D14  ssm_output_workspace                 SSM diagnostic output workspace struct. Written by ssm_
-     22  0xFFFF6228  maf_voltage                          22 refs. MAF sensor voltage (float). Read by timing, fu
+     22  0xFFFF6228  maf_voltage                          UNRESOLVED 2026-07-27: the maf_voltage NAME is refuted; replacement unknown. The real MAF voltage is 0xFFFF4042 (uint16 ADC counts) x 5/65536, and it is NEVER stored to RAM -- it exists only in FR4 across 0x004A44 before the 'MAF Sensor Scaling' lookup. 0xFFFF6228 is written from a DIFFERENT source with a DIFFERENT scale: it is its own GBR base (0x01D8FC mov.l @(0x01D9D8),r0 ; 0x01D8FE ldc r0,gbr), and 0x01D94C mov.w @(30,gbr),r0 (=> uint16 at 0xFFFF6246) ; 0x01D954 jsr 0x0BE598 ; 0x01D956 fmov.s @r0,fr4 with *(0x01D990) = 0.0305176 ; 0x01D95A fmov.s fr0,@r2 => value = counts * 0.0305176, not counts * 5/65536. Second writer 0x01D6F0/0x01D6FA, same constant. It feeds ZERO lookup axes, so the axis-name method cannot help. corrections.md item 35.
      22  0xFFFF6810  ol_condition_selector                OL condition selector byte (1-5). Selects ROM threshold
      22  0xFFFF682C  adc_processed_misc                   ADC processed miscellaneous sensor value
      22  0xFFFF71EA  fuel_timing_state                    Fuel timing state variable
@@ -176,7 +205,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      16  0xFFFF20D4  system_init_flags_B                  System initialization flags B. System state cluster.
      16  0xFFFF5FC0  sensor_io_state_secondary            Sensor I/O state secondary. Near io_state_register (0xFFFF5FFC).
      16  0xFFFF63B0  adc_processed_temperature_B          ADC processed temperature B (float). ECT/IAT sensor region.                                  
-     16  0xFFFF63CC  ram_ECT                              Coolant temperature / ECT (float)
+     16  0xFFFF63CC  maf_smoothed_gps                     CORRECTED 2026-07-27: SMOOTHED MASS AIRFLOW (float, g/s). The previous name asserted a temperature; that is refuted. Derived from bytes, not from an axis name: 0x020472 r14=0xFFFF63D8 ; 0x020476 mov #-20,r0 -> FR14 = *(0xFFFF63C4) (MAF) ; 0x020482 fmov fr14,fr4 ; 0x02048C fr6 = cal 0xC3108 = 0.5 ; 0x020490 jsr 0x0BEA40 with delay 0x020492 fmov.s @(r0,r14),fr5 (r0=-12 => *(0xFFFF63CC)) ; 0x020496 fmov.s fr0,@(r0,r14) stores back to 0xFFFF63CC. 0x0BEA40 is a first-order lag filter (fldi1/fsub alpha, fmac, |delta| deadband vs FR7, NaN reset). So 63CC = lag(MAF, alpha=0.5). Independently confirms the corrections.md item 26 binding of axis 0xD9280 'Smoothed MAF' (20/26/32/44 g/s). ram_ECT is refuted. corrections.md item 30.
      16  0xFFFF8910  ignition_system_state                Ignition system state. Referenced in ignition timing an
      16  0xFFFF922C  scheduler_counter                    Scheduler counter variable
      16  0xFFFFA290  diag_monitor_state                   Diagnostic monitor state area
@@ -193,7 +222,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      13  0xFFFF837B  idle_dispatch_workspace              Main idle dispatcher state (GBR base). 39 fields, 129 accesses.                                  
      13  0xFFFF8387  knock_flkc_workspace                 Knock/FLKC post-retard state (GBR base). Adjacent to knock_workspace_B/C.                                  
      13  0xFFFF903C  sched_task_dispatch_state             Scheduler task dispatch state. Scheduler region.                                  
-     13  0xFFFFA198  egr_diag_state                       13 refs. EGR/emissions diagnostic state. GBR base (3 us
+     13  0xFFFFA198  rpm_snapshot_A198                    CORRECTED 2026-07-27: ENGINE SPEED snapshot (float, RPM) at +0 of the 0xFFFFA198 struct (the struct is also loaded into GBR at 0x0758E8 / 0x075C54, which is where the old egr_diag_state name came from -- that describes the struct, not this float). Assigned directly from the settled RPM variable at TWO independent sites: 0x075934 mov.l @(0x075A58),r2 (=0xFFFF6624) ; 0x075936 fmov.s @r2,fr8 ; 0x075938 mov.l @(0x075A48),r2 (=0xFFFFA198) ; 0x07593A fmov.s fr8,@r2 -- and identically at 0x075CA2/0x075CA6/0x075CA8. Corroborated by 53 lookup sites in 10 functions whose axes are all RPM-shaped (700..6700, 750..6700, 4000..6700, 3500..7000), zero dissent. corrections.md item 34.
      13  0xFFFFAC6C  diag_protocol_GBR                    13 refs. Diagnostic protocol GBR base (4 GBR uses).
      13  0xFFFFAF73  diag_fault_history_byte               Diagnostic fault history byte. Part of diag_state_A (0xFFFFAF70-0xFFFFAFAB).                                  
      12  0xFFFF3C80  cal_mirror_timer_workspace            Cal mirror timer workspace. Cal mirror timer region.
@@ -296,6 +325,21 @@ NEWLY IDENTIFIED 2026-07-26 (below the top-200 ref count; same columns as above)
       1  0xFFFF7F4C  rpm_current_timing_copy              NEW 2026-07-26: ENGINE SPEED (float, RPM) -- the copy used by the base-timing / knock-advance path. 0x040160 r12=0xFFFF7F60 ; 0x040174 mov #-20,r0 ; 0x040178 fmov.s @(r0,r12),fr5 => 0xFFFF7F4C, desc 0x0AE31C axis1 0xD46CC "Base Timing Primary Cruise / Engine Speed". float x2. corrections.md item 22.
       7  0xFFFF8558  requested_torque                     NEW 2026-07-26: REQUESTED / CALCULATED ENGINE TORQUE -- the X-axis input of the Target Boost table (float, raw ecu value 0..350). 0x013A00 fmov.s @r2,fr4 -> 0x013A20 jsr 0x0BE8E4, desc 0x0AA9F0 axis0 0xC12D8 "Target Boost_ / Requested Torque"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x6 + int32 x1. corrections.md item 22.
 
+
+NEWLY IDENTIFIED 2026-07-27 (the MAF pipeline + the resolved deferred cases)
+--------------------------------------------------------------------------------------------------------------
+   Refs  Address     Name                                 Description
+  -----  ----------  -----------------------------------  -------------------------------------------------------
+      2  0xFFFF4042  maf_sensor_adc_counts                NEW 2026-07-27: MAF SENSOR RAW ADC COUNTS (uint16, 0..65535 = 0..5 V). Head of the airflow pipeline. 0x004A2E mov.l @(0x004A7C),r4 (=0xFFFF4042) ; 0x004A32 mov.w @r4,r4 ; 0x004A3A lds r4,fpul ; 0x004A3E float fpul,fr3 ; 0x004A44 fmul fr2,fr4 with FR2 = *(0x004A80) = 7.629394531e-05 = 5.0/65536 => VOLTS. Also the source of SSM PID 0x1D (MAF sensor voltage, logcfg x/50) via getter 0x05D454, which reads it as mov.w @(30,r6) off r6=0xFFFF4024. NOTE: the MAF VOLTAGE itself is never stored to RAM -- it lives only in FR4 across 0x004A44. corrections.md item 29.
+      2  0xFFFF40B4  maf_instantaneous_gps                NEW 2026-07-27: INSTANTANEOUS MASS AIRFLOW (float, g/s) -- the raw output of the MAF transfer function, before averaging and before the charge-temperature compensation. 0x004A42 jsr 0x0BE830 with r4 = 0x0AF45C = descriptor count 54 / axis 0xD8BC4 / data 0xD8C9C, which is exactly the definition 'MAF Sensor Scaling' (54 g/s values) over axis 'MAF sensor' (54 volts, 0.898..5.0); result stored 0x004A46 mov.l @(0x004A8C),r2 (=0xFFFF40B4) ; 0x004A4C fmov.s fr0,@r2. Copied on to the sample shift register at 0x0203E0 (-> 0xFFFF63B4). corrections.md item 29.
+      1  0xFFFF63C0  maf_uncompensated_gps                NEW 2026-07-27: MASS AIRFLOW, 2-sample average, BEFORE the charge-temperature compensation (float, g/s). 0x01FF20 r1=0xFFFF6430 ; 0x01FF24 fmov.s @(r0,r1),fr8 (r0=-120 => 0xFFFF63B8) ; 0x01FF28 fmov.s @(r0,r1),fr9 (r0=-116 => 0xFFFF63BC) ; 0x01FF2A fadd fr9,fr8 ; 0x01FF30 fmul fr4,fr8 with FR4 = *(0x020090) = 0.5 ; 0x01FF34 fmov.s fr8,@(r0,r1) (r0=-112) => *(0xFFFF63C0) = 0.5*(63B8+63BC). It is then fed straight back out as the axis-1 input: 0x01FF3A fmov.s @(r0,r1),fr5 ; 0x01FF3E jsr 0x0BE8E4 with r4 = 0x0AAFE8 = counts 5x8, axis1 0xC3B90, whose definition name ends '/ Mass Airflow' (1.6..290 g/s). The computed-address form is why a literal-pool trace cannot see it. corrections.md items 28 + 29.
+      2  0xFFFF63B8  maf_sample_prev                      NEW 2026-07-27: previous MAF sample (float, g/s), slot 1 of the 2-entry shift register feeding 0xFFFF63C0. Written 0x01FF04 fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-120. corrections.md item 29.
+      2  0xFFFF63BC  maf_sample_curr                      NEW 2026-07-27: current MAF sample (float, g/s), slot 2 of the shift register feeding 0xFFFF63C0. Written 0x01FF0C fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-116, sourced from 0xFFFF6424 which is loaded from 0xFFFF63B4. corrections.md item 29.
+      7  0xFFFF4150  rpm_from_tooth_period                NEW 2026-07-27: ENGINE SPEED (float, RPM) computed directly from the crank tooth period; this is the source the settled rpm_current is copied from. Producer: 0x007B9E lds r2,fpul ; 0x007BA2 float fpul,fr3 (r2 = accumulated period) ; 0x007BA4 fmov.s @r0,fr2 with *(0x007C04) = 1.2e8 ; 0x007BA6 fdiv fr3,fr2 (= 1.2e8 / period, i.e. a FREQUENCY) ; 0x007BAA mov.l @(0x007C08),r3 (=0xFFFF4150) ; 0x007BAC fmov.s fr2,@r3. Consumer, decisive: 0x0232B4 mov.l @(0x023508),r2 (=0xFFFF4150) ; 0x0232B6 fmov.s @r2,fr8 ; 0x0232B8 mov.l @(0x02350C),r12 (=0xFFFF6648) ; 0x0232BA mov #-36,r0 ; 0x0232BC fmov.s fr8,@(r0,r12) -- 0xFFFF6648-36 = 0xFFFF6624, the SETTLED rpm_current, is a straight copy of this address. Third line: it is the FR4/axis0 input of descriptor 0x0AF4B0 whose axis 0xD918C is 'Ignition Dwell / Engine Speed' (500..8000), the same call whose FR5/axis1 is the settled battery voltage 0xFFFF4130. corrections.md item 32.
+     18  0xFFFF6634  engine_speed_delta                   NEW 2026-07-27: ENGINE SPEED DELTA (float, RPM), low-pass filtered. Producer, hand-decoded: r12=0xFFFF6648 ; 0x023362 fmov.s @(r0,r12),fr8 (r0=-36 => 0xFFFF6624, the settled RPM) ; 0x023366 fmov.s @(r0,r11),fr9 (r11=0xFFFF67AC, r0=16 => 0xFFFF67BC, the reference speed) ; 0x023368 fsub fr9,fr8 (RPM - reference) ; 0x02336C fmov.s @(r0,r12),fr9 (r0=-20 => 0xFFFF6634, previous) ; 0x02336E fadd fr9,fr8 ; 0x023374 fmul fr9,fr8 with *(0x023544)=0.5 ; 0x023378 fmov.s fr8,@(r0,r12) => 0xFFFF6634 = 0.5*((RPM - ref) + previous). Corroborated by 2 of 2 definition-named axes: 0x051DB6 jsr 0x0BE8E4 with delay-preceding 0x051DB4 fmov fr14,fr5 (FR14 = *(0xFFFF6634) from 0x051D7A) reaching axis1 0xD7EC4 / 0xD8060, both 'Idle Speed Stability A/B / Engine Speed Delta' (-50..50). corrections.md item 32.
+      4  0xFFFF89C8  idle_speed_error                     NEW 2026-07-27: IDLE SPEED ERROR (float, RPM). Computed as a difference one instruction before it is used as the axis: 0x051D88 mov.l @(0x051FFC),r1 (=0xFFFF89C8) ; 0x051D8C fmov.s @(r0,r1),fr8 (r0=-28 => 0xFFFF89AC) ; 0x051DA2 mov.l @(0x05200C),r6 (=0xFFFF895C) ; 0x051DA4 fmov.s @r6,fr9 ; 0x051DA6 fsub fr9,fr8 ; 0x051DAE fmov.s fr8,@r1 (store to 0xFFFF89C8) ; 0x051DB6 jsr 0x0BE8E4 with delay slot 0x051DB8 fmov.s @r1,fr4 -- so FR4/axis0 is the value just stored. The descriptor differs by path (0x0AF0C8 at 0x051DAA vs 0x0AF0AC at 0x051DB0, split by 0x051DAC bf/s), and BOTH axis0s are definition-named 'Idle Speed Error' (0xD7E80 / 0xD801C, -150..600). 2 of 2 named axes agree. NOTE: coverage_map's quantity_of() mislabels 'Idle Speed Error' as vehicle_speed via a bare \bspeed\b pattern -- the AXIS NAME is the evidence, not the quantity bucket. corrections.md item 32.
+      5  0xFFFF40E0  front_o2_sensor_ma                   CORRECTED 2026-07-27: FRONT OXYGEN / AF SENSOR CURRENT (float, mA), NOT an ATU output control register. Duplicated here from the alphabetical index because that index's rows put the NAME first and are therefore invisible to coverage_map.parse_ram_reference(). Proof 1: the whole function 0x058902 does only this -- 0x058904 mov.l @(0x058A34),r2 (=0xFFFF40E0) ; 0x058906 fmov.s @r2,fr4 ; 0x058908 mov.l @(0x058A38),r4 (=0x0AF468) ; 0x05890C jsr 0x0BE830, with no branch and no call between that fmov.s and the jsr. Descriptor 0x0AF468 = count 13 / axis 0xD8D74 / data 0xD8DA8 = the definition 'Front Oxygen Sensor Scaling' (13 elements) over axis 'Front Oxygen Sensor' in mA (-1.3..0.74). Proof 2: SSM getter-table entry 0x42 at 0x05D726 reads this address with FR6=-16.0 and FR5=0.125, so the transported byte is (value+16)/0.125 and value = (raw-128)*0.125 in [-16,+15.875] -- a signed bipolar current in the same units as the axis. corrections.md item 31.
+
 FULL ALPHABETICAL INDEX (named addresses only)
 --------------------------------------------------------------------------------------------------------------
   accel_pedal_angle                         0xFFFF64D8    29 refs  CORRECTED 2026-07-26: ACCELERATOR PEDAL ANGLE (float, %, 0..100) -- DBW pedal position (APP), not throttle plate. 0x03609A fmov.s @r2,fr15 -> 0x0360D0 delay fmov fr15,fr4 -> desc 0x0AC5E4 axis 0xCCDA8 "Minimum Primary Open Loop Enrichment (Accelerator) / Accelerator Pedal Angle". Fed in the same block, adjacent to the 0xFFFF62DC (Throttle) call. float x27. corrections.md item 13.
@@ -365,7 +409,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   atu_counter_threshold                     0xFFFF4124     0 refs  ATU counter/threshold channel. Used by I
   atu_interp_float_state                    0xFFFF8DA0     0 refs  Per-channel float state for crank-angle 
   atu_lower_threshold                       0xFFFF8DAC     0 refs  ATU lower threshold array (2×uint16). Co
-  ATU_output_ctrl                           0xFFFF40E0     0 refs  ATU output control register. 5 refs — in
+  front_o2_sensor_ma                        0xFFFF40E0     0 refs  CORRECTED 2026-07-27: FRONT OXYGEN / AF SENSOR CURRENT (float, mA), NOT an ATU output control register. Two independent proofs. (1) The whole function 0x058902 exists to do exactly this: 0x058904 mov.l @(0x058A34),r2 (=0xFFFF40E0) ; 0x058906 fmov.s @r2,fr4 ; 0x058908 mov.l @(0x058A38),r4 (=0x0AF468) ; 0x05890C jsr 0x0BE830 -- no branch and no call between that fmov.s and the jsr. Descriptor 0x0AF468 = count 13, axis 0xD8D74, data 0xD8DA8, matching the definition 'Front Oxygen Sensor Scaling' (13 elements) with Y axis 'Front Oxygen Sensor' in mA, breakpoints -1.3..0.74. (2) SSM: getter-table entry 0x42 (0x05D726) reads this address with FR6=-16.0, FR5=0.125 => the SSM byte is (value+16)/0.125, i.e. value = (raw-128)*0.125 in [-16,+15.875] -- a signed bipolar current, same units and sign convention as the mA axis. A hardware output register is not read as a float and used as a table index. corrections.md item 31.
   atu_output_timing_chA                     0xFFFF4118     0 refs  ATU output timing channel A (float). Wri
   atu_output_timing_chB                     0xFFFF4120     0 refs  ATU output timing channel B. Written by 
   atu_output_timing_chC                     0xFFFF44BC     0 refs  ATU output timing channel C. Written by 
@@ -493,7 +537,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   dtc_monitor_flag_P0134                    0xFFFF971B     0 refs  DTC monitor active flag for P0134 (front O2 no activity). Part of 45-byte DTC flag array FFFF9704-9742. Also: FLKC convergence slot 15 — read by flkc_state_flag_reader_table+0x144 (0x2999C); gates FLKC consolidation (task19), per-cyl FLKC propagation (task23), and EVAP test enable (task56). See mystery_subs_analysis.txt.
   dwell_output                              0xFFFF80AE     0 refs  Dwell time output (float). Task38.
   ect_blend_correction                      0xFFFF7F68     0 refs  ECT blend correction (task33/50). Was ect_warmup_correction.
-  ect_compensation                          0xFFFF63C4    43 refs  ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
+  mass_airflow_gps                          0xFFFF63C4    43 refs  CORRECTED 2026-07-27: MASS AIRFLOW (float, g/s) -- THE MAF variable, not ect_compensation. Two independent non-axis proofs. (1) SSM: the stock getter table at 0x06423C entry 0x13/0x14 (Mass Airflow, logcfg x/100) is 0x05D3AC, which does 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; 0x05D3B8 jsr 0x0BE5D8 with fr6=0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)) => SSM raw = value*100 => value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l @(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched to 0x034D8E, compared against 0xCC074/78/7C = the definition-named table 'A/F Learning #1 Airflow Ranges' (scaling MassAirflow(g/s), 5.6/10/50). (3) PRODUCER: 0x01FF66 fmov.s fr0,@(r0,r1) with r1=0xFFFF6430 r0=-108 writes it as min(MAF*IATcomp, 'MAF Limit (Maximum)' 0xC3100=300 g/s) via 0x0BE970. (4) LOG: logs/7-26 20.19b MAF spans 2.40..296.24 g/s; widest axis 0..300. The 'Intake/Exhaust VVT Error' axis names at 0xCF9EC/0xD11D0 are DEFINITION-SIDE ERRORS -- 0x031DD2 loads FR14 from here once and feeds it unchanged to both. corrections.md item 28.
   ect_current                               0xFFFF6350   205 refs  205 refs. Coolant temperature (float). R
   ect_desc_result                           0xFFFF7F2C     0 refs  ECT descriptor output (task33).
   ect_input_float                           0xFFFF69FC     7 refs  ECT input for fuel/ign lookups (float)
@@ -501,7 +545,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   ect_timing_comp                           0xFFFF81EC     0 refs  ECT timing compensation (task50).
   egr_channel_selector                      0xFFFF2BFA     0 refs  EGR channel selector (u8) + timer (u16 a
   egr_completion_flag                       0xFFFFA17D     0 refs  EGR completion flag (bit 0). Set by egr_
-  egr_diag_state                            0xFFFFA198    13 refs  13 refs. EGR/emissions diagnostic state.
+  rpm_snapshot_A198                         0xFFFFA198    13 refs  CORRECTED 2026-07-27: ENGINE SPEED snapshot (float, RPM) at +0 of the 0xFFFFA198 struct (the struct is also loaded into GBR at 0x0758E8 / 0x075C54, which is where the old egr_diag_state name came from -- that describes the struct, not this float). Assigned directly from the settled RPM variable at TWO independent sites: 0x075934 mov.l @(0x075A58),r2 (=0xFFFF6624) ; 0x075936 fmov.s @r2,fr8 ; 0x075938 mov.l @(0x075A48),r2 (=0xFFFFA198) ; 0x07593A fmov.s fr8,@r2 -- and identically at 0x075CA2/0x075CA6/0x075CA8. Corroborated by 53 lookup sites in 10 functions whose axes are all RPM-shaped (700..6700, 750..6700, 4000..6700, 3500..7000), zero dissent. corrections.md item 34.
   egr_init_flag                             0xFFFF9FAE     0 refs  EGR initialization flag (u16). Set to 1 
   egr_maturation_counters                   0xFFFFA1FA     0 refs  EGR maturation counters A-D (4 bytes). I
   egr_state_b                               0xFFFFA224     0 refs  EGR state_b (6 consecutive floats). Copi
@@ -578,7 +622,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   gbr_base_timing_ws                        0xFFFF7F10     0 refs  GBR base for task30 base timing workspac
   IAM_compensation_ws                       0xFFFF80C0     0 refs  IAM compensation workspace (float). Task
   iat_current                               0xFFFF6364    48 refs  CORRECTED 2026-07-26: INTAKE AIR TEMPERATURE (float, degC raw; defs display (x*1.8)+32 degF), NOT ECT-at-start. 0x013A0C fmov.s @r2,fr15 -> 0x013A3A delay fmov fr15,fr4 -> desc 0x0AA974 axis 0xC0E24 "Target Boost Compensation (IAT)_ / Intake Temperature" (-20..40 C); second site 0x04042A -> desc 0x0ADC14 axis 0xD3248 "Timing Compensation A (IAT) / Intake Temperature". Zero coolant axes. float x48. corrections.md item 12.
-  iat_input_float                           0xFFFF69F0    32 refs  32 refs. Intake air temperature (float, -40..120 C). Read by
+  ratio_0to1_69F0                           0xFFFF69F0    32 refs  CORRECTED 2026-07-27: a 0..1 RATIO (float), definitively NOT a temperature. 0x0272CE mov.l @(0x0274DC),r2 (=0x0BE56C) ; 0x0272D0 fldi1 fr6 ; 0x0272D2 fldi0 fr5 ; 0x0272D6 jsr @r2 with delay 0x0272D8 fmov.s @r6,fr4 (r6=0xFFFF69F0) -- and 0x0BE56C is clamp(FR4, lo=FR5, hi=FR6), verified from bytes -- so the value is clamped to [0.0,1.0]. Repeated at 0x0273BA. Only store sets it to exactly 1.0 (0x0273E0 fldi1 fr8 ; 0x0273E6 fmov.s fr8,@r2). Feeds 4 sites, all the same unnamed 0..1 axis 0xC4514, and ZERO temperature-named axes while 0xFFFF6364 reaches 9. A value clamped to [0,1] cannot be a -40..120 C temperature. WHICH ratio is UNRESOLVED -- deliberately not guessed. corrections.md items 23 + 33.
   idle_control_GBR                          0xFFFF837E    20 refs  39 refs. Idle control GBR base (19 GBR u
   idle_sensor_ref                           0xFFFF83A5    21 refs  Idle control sensor comparison reference
   idle_workspace_GBR                        0xFFFF83AC    19 refs  26 refs. Secondary idle GBR workspace (7
@@ -609,7 +653,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   io_inj_driver_ctrl                        0xFFFF366C    41 refs  InternalIO injection driver control regi
   io_output_packed                          0xFFFF366E     5 refs  I/O output register packed status (word)
   io_peripheral_workspace                   0xFFFF5FC2     7 refs  I/O peripheral workspace (56B, GBR base)
-  io_state_register                         0xFFFF5FFC    23 refs  23 refs. I/O state register.
+  io_state_register                         0xFFFF5FFC    23 refs  UNRESOLVED 2026-07-27: the io_state_register NAME is refuted and no replacement is derivable. It is a struct base loaded into GBR (0x018DDA mov.l @(0x019008),r0 ; 0x018DDC ldc r0,gbr) AND a float read 26 times, feeding 15 numeric lookup axes spanning 0..250 across 5 functions -- an I/O state register is not read as a float and used as a table index. ALL 15 axes (0xC2408/C242C/C24AC/C24F8/C2510/C25A4/C2614/C2764/C277C/C2794/C27AC/C2CC8/C2D24/C2F88) are UNNAMED in both definition XMLs, so the axis-name method has nothing to vote with. What would settle it: name any one of those axes. corrections.md item 35.
   knock_active_flag                         0xFFFF6790     0 refs  Knock event active flag.
   knock_adc_group0                          0xFFFF4064     0 refs  Knock ADC Group 0 snapshot: ADDR0-ADDR11
   knock_adc_group1                          0xFFFF407C     0 refs  Knock ADC Group 1 snapshot: ADDR12-ADDR2
@@ -640,7 +684,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   maf_hw_fault_A                            0xFFFF96AC     0 refs  MAF hardware fault state A (2 bytes).
   maf_hw_fault_B                            0xFFFF96AE     0 refs  MAF hardware fault state B (2 bytes).
   maf_timer_counter                         0xFFFF447B     8 refs  MAF/intake sensor timer counter (byte)
-  maf_voltage                               0xFFFF6228    22 refs  22 refs. MAF sensor voltage (float). Rea
+  maf_voltage                               0xFFFF6228    22 refs  UNRESOLVED 2026-07-27: the maf_voltage NAME is refuted; replacement unknown. The real MAF voltage is 0xFFFF4042 (uint16 ADC counts) x 5/65536, and it is NEVER stored to RAM -- it exists only in FR4 across 0x004A44 before the 'MAF Sensor Scaling' lookup. 0xFFFF6228 is written from a DIFFERENT source with a DIFFERENT scale: it is its own GBR base (0x01D8FC mov.l @(0x01D9D8),r0 ; 0x01D8FE ldc r0,gbr), and 0x01D94C mov.w @(30,gbr),r0 (=> uint16 at 0xFFFF6246) ; 0x01D954 jsr 0x0BE598 ; 0x01D956 fmov.s @r0,fr4 with *(0x01D990) = 0.0305176 ; 0x01D95A fmov.s fr0,@r2 => value = counts * 0.0305176, not counts * 5/65536. Second writer 0x01D6F0/0x01D6FA, same constant. It feeds ZERO lookup axes, so the axis-name method cannot help. corrections.md item 35.
   manifold_pressure_map                     0xFFFF620C    43 refs  CORRECTED 2026-07-26: manifold pressure, not MAF.
   monitoring_state                          0xFFFF41D0     0 refs  Monitoring state byte: 1=transitioning, 
   mps_current_readings                      0xFFFF44E8     0 refs  MPS current readings (2 bytes, channel A
@@ -679,7 +723,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   pre_ratio                                 0xFFFF7F04     0 refs  Pre-computed blend ratio (task50).
   previous_timing_output                    0xFFFF7FBC    14 refs  Previous cycle timing output (task50). Was timing_final_advance.
   ram_coolant_alt                           0xFFFF68DC     0 refs  Coolant temperature alternate/computed (
-  ram_ECT                                   0xFFFF63CC    16 refs  Coolant temperature / ECT (float)
+  maf_smoothed_gps                          0xFFFF63CC    16 refs  CORRECTED 2026-07-27: SMOOTHED MASS AIRFLOW (float, g/s). The previous name asserted a temperature; that is refuted. Derived from bytes, not from an axis name: 0x020472 r14=0xFFFF63D8 ; 0x020476 mov #-20,r0 -> FR14 = *(0xFFFF63C4) (MAF) ; 0x020482 fmov fr14,fr4 ; 0x02048C fr6 = cal 0xC3108 = 0.5 ; 0x020490 jsr 0x0BEA40 with delay 0x020492 fmov.s @(r0,r14),fr5 (r0=-12 => *(0xFFFF63CC)) ; 0x020496 fmov.s fr0,@(r0,r14) stores back to 0xFFFF63CC. 0x0BEA40 is a first-order lag filter (fldi1/fsub alpha, fmac, |delta| deadband vs FR7, NaN reset). So 63CC = lag(MAF, alpha=0.5). Independently confirms the corrections.md item 26 binding of axis 0xD9280 'Smoothed MAF' (20/26/32/44 g/s). ram_ECT is refuted. corrections.md item 30.
   ram_IAM                                   0xFFFF3234     0 refs  Ignition Advance Multiplier current valu
   requested_torque                          0xFFFF8558     7 refs  NEW 2026-07-26: REQUESTED / CALCULATED ENGINE TORQUE -- the X-axis input of the Target Boost table (float, raw ecu value 0..350). 0x013A00 fmov.s @r2,fr4 -> 0x013A20 jsr 0x0BE8E4, desc 0x0AA9F0 axis0 0xC12D8 "Target Boost_ / Requested Torque"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x6 + int32 x1. corrections.md item 22.
   rpm_current                               0xFFFF6624   301 refs  301 refs. Current RPM (float). Read by f
@@ -817,13 +861,13 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF5DB5    11  cl_ol_gate_flag                      CL/OL gate flag byte. Referenced in cl_ol_state_machine and clol_gap_closure.
   0xFFFF5E40    18  sensor_data_misc                     Sensor data miscellaneous
   0xFFFF5FC0    16  sensor_io_state_secondary            Sensor I/O state secondary. Near io_state_register (0xFFFF5FFC).
-  0xFFFF5FFC    23  io_state_register                    23 refs. I/O state register.
+  0xFFFF5FFC    23  io_state_register                    UNRESOLVED 2026-07-27: the io_state_register NAME is refuted and no replacement is derivable. It is a struct base loaded into GBR (0x018DDA mov.l @(0x019008),r0 ; 0x018DDC ldc r0,gbr) AND a float read 26 times, feeding 15 numeric lookup axes spanning 0..250 across 5 functions -- an I/O state register is not read as a float and used as a table index. ALL 15 axes (0xC2408/C242C/C24AC/C24F8/C2510/C25A4/C2614/C2764/C277C/C2794/C27AC/C2CC8/C2D24/C2F88) are UNNAMED in both definition XMLs, so the axis-name method has nothing to vote with. What would settle it: name any one of those axes. corrections.md item 35.
   0xFFFF6155    36  adc_channel_status                   36 refs. ADC channel status/index (byte). GBR base
   0xFFFF61AC    17  adc_processed_alt                    ADC processed alternate channel
   0xFFFF61CC    56  diag_monitor_status_bytes            CORRECTED 2026-07-26: BYTE array of diag monitor status. 26 int8 accesses, zero FP accesses. NOT speed. (Wording changed 2026-07-26: the old text said Z-E-R-O f-l-o-a-t and coverage_map.py's contradiction scan matched that word inside the correction itself, flagging a false CONFLICT. corrections.md item 21.)
   0xFFFF61FC    11  adc_processed_extra                  ADC processed extra channel (float). Near airflow_maf_current.
   0xFFFF620C    43  manifold_pressure_map                CORRECTED 2026-07-26: manifold pressure, not MAF.
-  0xFFFF6228    22  maf_voltage                          22 refs. MAF sensor voltage (float). Read by timin
+  0xFFFF6228    22  maf_voltage                          UNRESOLVED 2026-07-27: the maf_voltage NAME is refuted; replacement unknown. The real MAF voltage is 0xFFFF4042 (uint16 ADC counts) x 5/65536, and it is NEVER stored to RAM -- it exists only in FR4 across 0x004A44 before the 'MAF Sensor Scaling' lookup. 0xFFFF6228 is written from a DIFFERENT source with a DIFFERENT scale: it is its own GBR base (0x01D8FC mov.l @(0x01D9D8),r0 ; 0x01D8FE ldc r0,gbr), and 0x01D94C mov.w @(30,gbr),r0 (=> uint16 at 0xFFFF6246) ; 0x01D954 jsr 0x0BE598 ; 0x01D956 fmov.s @r0,fr4 with *(0x01D990) = 0.0305176 ; 0x01D95A fmov.s fr0,@r2 => value = counts * 0.0305176, not counts * 5/65536. Second writer 0x01D6F0/0x01D6FA, same constant. It feeds ZERO lookup axes, so the axis-name method cannot help. corrections.md item 35.
   0xFFFF6254    51  flag_6254                            CORRECTED 2026-07-26: BYTE boolean at +4 in the 0xFFFF6250 block, NOT mass airflow and NOT an FP value. int8 x51, 0 FP accesses. Set to 1 with its siblings +2/+3/+5/+9 in one run at 0x01DA9C-0x01DAA4; consumed as cmp/eq #1 (0x01D5A8, 0x025148). The real MAF variable is UNIDENTIFIED -- no axis in either XML is named MAF/airflow, so the axis-name method cannot locate it. corrections.md item 17.
   0xFFFF62DC    20  throttle_plate_angle                 CORRECTED 2026-07-26: THROTTLE PLATE OPENING ANGLE (float; defs toexpr x/.84 => %), NOT fuel rate and NOT engine load. 0x036096 fmov.s @r2,fr4 (FR4 untouched on the path to the call) -> 0x0360C4 jsr 0x0BE830, desc 0x0AC5D0 axis 0xCCD88 "Minimum Primary Open Loop Enrichment (Throttle) / Throttle Plate Opening Angle" (10.93..89.06). float x18. corrections.md item 13.
   0xFFFF62E4     3  throttle_angle_change                NEW 2026-07-26: THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger (float, %, axis 0..31.3). 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) -> 0x03A9D0 jsr 0x0BE830, desc 0x0AD368 axis 0xCED08 "Throttle Tip-in Enrichment A / Throttle Angle Change". float x3. corrections.md item 22.
@@ -832,8 +876,8 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF6354    69  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float
   0xFFFF6364    48  iat_current                          CORRECTED 2026-07-26: INTAKE AIR TEMPERATURE (float, degC raw; defs display (x*1.8)+32 degF), NOT ECT-at-start. 0x013A0C fmov.s @r2,fr15 -> 0x013A3A delay fmov fr15,fr4 -> desc 0x0AA974 axis 0xC0E24 "Target Boost Compensation (IAT)_ / Intake Temperature" (-20..40 C); second site 0x04042A -> desc 0x0ADC14 axis 0xD3248 "Timing Compensation A (IAT) / Intake Temperature". Zero coolant axes. float x48. corrections.md item 12.
   0xFFFF63B0    16  adc_processed_temperature_B          ADC processed temperature B (float). ECT/IAT sensor region.
-  0xFFFF63C4    43  ect_compensation                     ECT compensation factor (float, 43 refs). Read by AFC, AFL, CL/OL.
-  0xFFFF63CC    16  ram_ECT                              Coolant temperature / ECT (float)
+  0xFFFF63C4    43  mass_airflow_gps                     CORRECTED 2026-07-27: MASS AIRFLOW (float, g/s) -- THE MAF variable, not ect_compensation. Two independent non-axis proofs. (1) SSM: the stock getter table at 0x06423C entry 0x13/0x14 (Mass Airflow, logcfg x/100) is 0x05D3AC, which does 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; 0x05D3B8 jsr 0x0BE5D8 with fr6=0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)) => SSM raw = value*100 => value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l @(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched to 0x034D8E, compared against 0xCC074/78/7C = the definition-named table 'A/F Learning #1 Airflow Ranges' (scaling MassAirflow(g/s), 5.6/10/50). (3) PRODUCER: 0x01FF66 fmov.s fr0,@(r0,r1) with r1=0xFFFF6430 r0=-108 writes it as min(MAF*IATcomp, 'MAF Limit (Maximum)' 0xC3100=300 g/s) via 0x0BE970. (4) LOG: logs/7-26 20.19b MAF spans 2.40..296.24 g/s; widest axis 0..300. The 'Intake/Exhaust VVT Error' axis names at 0xCF9EC/0xD11D0 are DEFINITION-SIDE ERRORS -- 0x031DD2 loads FR14 from here once and feeds it unchanged to both. corrections.md item 28.
+  0xFFFF63CC    16  maf_smoothed_gps                     CORRECTED 2026-07-27: SMOOTHED MASS AIRFLOW (float, g/s). The previous name asserted a temperature; that is refuted. Derived from bytes, not from an axis name: 0x020472 r14=0xFFFF63D8 ; 0x020476 mov #-20,r0 -> FR14 = *(0xFFFF63C4) (MAF) ; 0x020482 fmov fr14,fr4 ; 0x02048C fr6 = cal 0xC3108 = 0.5 ; 0x020490 jsr 0x0BEA40 with delay 0x020492 fmov.s @(r0,r14),fr5 (r0=-12 => *(0xFFFF63CC)) ; 0x020496 fmov.s fr0,@(r0,r14) stores back to 0xFFFF63CC. 0x0BEA40 is a first-order lag filter (fldi1/fsub alpha, fmac, |delta| deadband vs FR7, NaN reset). So 63CC = lag(MAF, alpha=0.5). Independently confirms the corrections.md item 26 binding of axis 0xD9280 'Smoothed MAF' (20/26/32/44 g/s). ram_ECT is refuted. corrections.md item 30.
   0xFFFF63F8    86  engine_load_current                  CORRECTED 2026-07-26: engine load g/rev, NOT IAT.
   0xFFFF6430    19  adc_processed_secondary              ADC processed secondary sensor value
   0xFFFF64D8    29  accel_pedal_angle                    CORRECTED 2026-07-26: ACCELERATOR PEDAL ANGLE (float, %, 0..100) -- DBW pedal position (APP), not throttle plate. 0x03609A fmov.s @r2,fr15 -> 0x0360D0 delay fmov fr15,fr4 -> desc 0x0AC5E4 axis 0xCCDA8 "Minimum Primary Open Loop Enrichment (Accelerator) / Accelerator Pedal Angle". Fed in the same block, adjacent to the 0xFFFF62DC (Throttle) call. float x27. corrections.md item 13.
@@ -850,7 +894,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF6810    22  ol_condition_selector                OL condition selector byte (1-5). Selects ROM thre
   0xFFFF682C    22  adc_processed_misc                   ADC processed miscellaneous sensor value
   0xFFFF6898    48  atm_pressure_current                 CORRECTED 2026-07-26: ATMOSPHERIC / BAROMETRIC PRESSURE (float, raw mmHg-class 440..760 = 8.5..14.7 psi abs), NOT manifold pressure and NOT rpm_delta. 0x013B02 mov.l @(0x013CCC),r2 ; 0x013B04 fmov.s @r2,fr4 -> desc 0x0AA99C axis0 0xC0E94 "Target Boost Compensation (Atm. Pressure)_ / Atmospheric Pressure". float x48. corrections.md item 11.
-  0xFFFF69F0    32  iat_input_float                      32 refs. Intake air temperature (float, -40..120 C). Read by AFL, startup enrichment. GBR
+  0xFFFF69F0    32  ratio_0to1_69F0                      CORRECTED 2026-07-27: a 0..1 RATIO (float), definitively NOT a temperature. 0x0272CE mov.l @(0x0274DC),r2 (=0x0BE56C) ; 0x0272D0 fldi1 fr6 ; 0x0272D2 fldi0 fr5 ; 0x0272D6 jsr @r2 with delay 0x0272D8 fmov.s @r6,fr4 (r6=0xFFFF69F0) -- and 0x0BE56C is clamp(FR4, lo=FR5, hi=FR6), verified from bytes -- so the value is clamped to [0.0,1.0]. Repeated at 0x0273BA. Only store sets it to exactly 1.0 (0x0273E0 fldi1 fr8 ; 0x0273E6 fmov.s fr8,@r2). Feeds 4 sites, all the same unnamed 0..1 axis 0xC4514, and ZERO temperature-named axes while 0xFFFF6364 reaches 9. A value clamped to [0,1] cannot be a -40..120 C temperature. WHICH ratio is UNRESOLVED -- deliberately not guessed. corrections.md items 23 + 33.
   0xFFFF6C48    34  diag_status_code_6C48                CORRECTED 2026-07-26: BYTE status/result code, NOT battery voltage and NOT an FP value. int8 x34, 0 FP accesses. Takes only nibble-doubled sentinels 00/33/55/77/AA/BB/DD/EE (e.g. 0x02C148 mov #-69,r2 ; 0x02C14C mov.b r2,@r1). Battery volts is the FP value at 0xFFFF4130. corrections.md item 14.
   0xFFFF71EA    22  fuel_timing_state                    Fuel timing state variable
   0xFFFF7324     3  last_calc_base_pulse_width           NEW 2026-07-26: LAST CALCULATED BASE PULSE WIDTH (float; defs toexpr x*.001 => ms; axis 1000..16000 = 1..16 ms). 0x038DD0 fmov.s @r2,fr4 -> 0x038DD8 jsr 0x0BE8E4, desc 0x0AD738 axis0 0xD0760 "Per Injector Pulse Width Compensation A / Last Calculated Base Pulse Width"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x3. corrections.md item 22.
@@ -924,7 +968,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF9FE4    12  sched_timer_extended_B               Scheduler extended timer B. Scheduler timer cluster.
   0xFFFFA160    15  diag_monitor_GBR                     21 refs. Diagnostic monitor GBR base (6 GBR uses).
   0xFFFFA163    11  diag_monitor_state_byte              Diagnostic monitor state byte. Adjacent to diag_monitor_GBR (+3).
-  0xFFFFA198    13  egr_diag_state                       13 refs. EGR/emissions diagnostic state. GBR base 
+  0xFFFFA198    13  rpm_snapshot_A198                    CORRECTED 2026-07-27: ENGINE SPEED snapshot (float, RPM) at +0 of the 0xFFFFA198 struct (the struct is also loaded into GBR at 0x0758E8 / 0x075C54, which is where the old egr_diag_state name came from -- that describes the struct, not this float). Assigned directly from the settled RPM variable at TWO independent sites: 0x075934 mov.l @(0x075A58),r2 (=0xFFFF6624) ; 0x075936 fmov.s @r2,fr8 ; 0x075938 mov.l @(0x075A48),r2 (=0xFFFFA198) ; 0x07593A fmov.s fr8,@r2 -- and identically at 0x075CA2/0x075CA6/0x075CA8. Corroborated by 53 lookup sites in 10 functions whose axes are all RPM-shaped (700..6700, 750..6700, 4000..6700, 3500..7000), zero dissent. corrections.md item 34.
   0xFFFFA26C    11  diag_trip_tracking_flags             Diagnostic trip tracking flags. Trip tracking region.
   0xFFFFA290    16  diag_monitor_state                   Diagnostic monitor state area
   0xFFFFA59D    15  diag_fault_enable_flags              Diagnostic fault enable/masking flags. Referenced by diag tasks.

@@ -6,7 +6,7 @@
 python scripts/coverage_map.py
 ```
 
-Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-07-26 21:44.
+Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-07-27 20:54.
 
 Every flag below is recomputed from scratch on each run: the definition side from `scripts/defs.py` over both definition XMLs, the disassembly side re-derived from ROM bytes (literal-pool dereference back-trace, table descriptors decoded out of ROM, and a RAM→lookup-axis feed trace). No conclusion is read out of a derived file and trusted. Agreement across derived files is not evidence.
 
@@ -72,7 +72,7 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 
 ## 2. Coverage
 
-4722 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
+4725 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
 
 | Flag | Entities | Share |
 |---|---:|---:|
@@ -81,15 +81,15 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 | `VERIFIED-BOTH` | 351 | 7.4% |
 | `VERIFIED-BYTES` | 293 | 6.2% |
 | `DEFS-ONLY` | 21 | 0.4% |
-| `DISASM-ONLY` | 918 | 19.4% |
-| `UNMAPPED` | 3084 | 65.3% |
+| `DISASM-ONLY` | 927 | 19.6% |
+| `UNMAPPED` | 3078 | 65.1% |
 
 ### By entity kind
 
 | Kind | `CONFLICT` | `BOUNDS-SUSPECT` | `VERIFIED-BOTH` | `VERIFIED-BYTES` | `DEFS-ONLY` | `DISASM-ONLY` | `UNMAPPED` |
 |---|---|---|---|---|---|---|---|
 | axis | 0 | 26 | 128 | 57 | 2 | 0 | 0 |
-| ram | 0 | 0 | 5 | 0 | 0 | 222 | 3084 |
+| ram | 0 | 0 | 5 | 0 | 0 | 231 | 3078 |
 | rom-block | 0 | 0 | 0 | 0 | 0 | 696 | 0 |
 | table | 2 | 27 | 218 | 236 | 19 | 0 | 0 |
 
@@ -446,7 +446,7 @@ _None._
 
 ## 7. `DISASM-ONLY` — RAM identities resting on one source
 
-222 RAM variables are named only in `ram_reference.txt`, with no independent corroboration from the feed trace. Three of this project's four wrong-direction corrections were exactly this shape: a plausible name in one derived file, copied everywhere, never re-derived. The top entries by reference count are listed; the full set is in the JSON.
+231 RAM variables are named only in `ram_reference.txt`, with no independent corroboration from the feed trace. Three of this project's four wrong-direction corrections were exactly this shape: a plausible name in one derived file, copied everywhere, never re-derived. The top entries by reference count are listed; the full set is in the JSON.
 
 | Address | Claimed name | Code access widths |
 |---|---|---|
@@ -459,7 +459,7 @@ _None._
 | `0xFFFF6254` | flag_6254 | int8 x51 |
 | `0xFFFF6898` | atm_pressure_current | float x48 |
 | `0xFFFF620C` | manifold_pressure_map | float x43 |
-| `0xFFFF63C4` | ect_compensation | float x42 |
+| `0xFFFF63C4` | mass_airflow_gps | float x42 |
 | `0xFFFF8E46` | fuel_mode_flags | int8 x39 |
 | `0xFFFF366C` | io_inj_driver_ctrl | int16 x3, int8 x33 |
 | `0xFFFF895C` | injector_data | float x36 |
@@ -470,7 +470,7 @@ _None._
 | `0xFFFF6155` | adc_channel_status | float x1, int8 x31 |
 | `0xFFFF7C9D` | fuel_state_byte | int8 x32 |
 | `0xFFFF8EDC` | ol_dispatch_gate | int16 x2, int8 x29 |
-| `0xFFFF69F0` | iat_input_float | float x28 |
+| `0xFFFF69F0` | ratio_0to1_69F0 | float x28 |
 | `0xFFFF64D8` | accel_pedal_angle | float x27 |
 | `0xFFFF61CC` | diag_monitor_status_bytes | int8 x26 |
 | `0xFFFF43FC` | sensor_misc_state | float x25 |
@@ -481,7 +481,7 @@ _None._
 | `0xFFFF682C` | adc_processed_misc | float x22 |
 | `0xFFFF4144` | ect_output_fmac | float x20 |
 
-_… 192 more in the JSON._
+_… 201 more in the JSON._
 
 ## 8. How to use this before trusting an area
 

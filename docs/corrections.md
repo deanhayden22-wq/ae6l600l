@@ -1112,3 +1112,432 @@ apply a fix it could not fully justify.
 
 Both now read `VERIFIED-BYTES` with an explicit note naming the consuming
 routine, so the reasoning is visible rather than silently suppressed.
+
+---
+
+# Third pass, 2026-07-27 — items 28 to 35: the MAF hunt, and the deferred cases
+
+Item 23 left eleven identities deferred and said the axis-name method had hit its
+binding limit (the XMLs name only ~211 of ~780 descriptor axes). Two **new
+instruments** broke that limit. Neither depends on a definition axis *name*, so
+both can be used to arbitrate when the axis names themselves are wrong — which,
+for the first time in this project, turned out to matter.
+
+### Instrument A — the SSM getter table at `0x06423C`
+
+`docs/ssm-read-patch.md` documents that the *stock* SSM handler bounds-checks the
+requested "address" against 848 and uses it as an **index into a function-pointer
+table at `0x06423C`**. Those 848 getters had never been read. Each is a tiny leaf:
+
+```
+05D3AC  sts.l pr,@-r15
+05D3AE  mov.l @(0x05D5B8),r2   ; = 0xFFFF63C4      <-- the RAM address
+05D3B0  fmov.s @r2,fr4         ; FR4 = value
+05D3B2  mov.l @(0x05D598),r2   ; = 0x000BE5D8
+05D3B4  fldi0 fr6              ; FR6 = offset = 0.0
+05D3B6  mova @(0x05D5BC),r0    ; -> 0.01
+05D3B8  jsr @r2
+05D3BA  fmov.s @r0,fr5         ; delay slot: FR5 = scale = 0.01
+```
+
+and `0x0BE5D8` / `0x0BE5A8` are both `clamp_u16(round((FR4 - FR6) / FR5))`,
+verified from bytes (`fsub fr6,fr4` / `fdiv fr5,fr4` / `fadd 0.5` / `ftrc` /
+clamp against `0x0000FFFF` and 0).
+
+**The address a getter reads is the ECU's own copy of that logged quantity, and
+the offset/scale pair is its unit conversion.** Four settled identities reproduce
+exactly, which is the self-check:
+
+| PID | getter | RAM | offset / scale | agrees with |
+|---|---|---|---|---|
+| `0x0E`/`0x0F` | `0x05D334` | `0xFFFF6624` | 0 / 0.25 | settled RPM; `logcfg` `x,4,/` |
+| `0x29` | `0x05D4F8` | `0xFFFF64D8` | 0 / 0.392157 | settled pedal (item 13); `logcfg` `x,100,*,255,/` |
+| `0x0D`, `0x24` | `0x05D31E`, `0x05D4BC` | `0xFFFF620C` | 0 / 7.5006 | settled MAP (item 9) |
+| `0x1C` | `0x05D43E` | `0xFFFF4130` | 0 / **0.08** | settled battery voltage (item 10) |
+
+Four for four, from an instrument that was not used to derive any of them.
+
+### Instrument B — threshold pairing against named calibration **tables**
+
+Item 9 used threshold pairing against *scalars*. Extending it to definition-named
+**tables** (`scripts/defs.py` supplies the name *and* the scaling) is much
+stronger, because the scaling states the units.
+
+---
+
+## 28. `0xFFFF63C4` is **MASS AIRFLOW (g/s)** — the MAF variable, found at last — **FIXED 2026-07-27**
+
+`ram_reference.txt` and `ImportAE5L600L.java` called it `ect_compensation`. Item
+23 listed it under "genuinely unresolved" with a three-way axis split.
+
+**Proof 1 — SSM.** Getter-table entry `0x13`/`0x14` is SSM *Mass Airflow*
+(`logs/logcfg.txt`: `paramname = MAF`, `paramid = 0x000013`, `databits = 16`,
+`scalingrpn = x,100,/`). Its getter `0x05D3AC` is quoted in full above: it reads
+`0xFFFF63C4` with offset 0 and scale 0.01, so the transported word is
+`value * 100` and `logcfg`'s `/100` returns **`value` in g/s unchanged**.
+
+**Proof 2 — threshold pairing.**
+
+```
+034D52: D245  mov.l @(0x034E68),r2   ; pool 034E68 = 0xFFFF63C4
+034D54: F828  fmov.s @r2,fr8         ; FR8 = mass airflow
+...                                    (FR8 not rewritten; only int ops + branches)
+034D76: D240  mov.l @(0x034E78),r2   ; = 0x000CC074
+034D78: F928  fmov.s @r2,fr9
+034D7A: F985  fcmp/gt fr8,fr9        ; T = (FR9 > FR8), i.e. MAF < threshold
+034D7E: D23F  mov.l @(0x034E7C),r2   ; = 0x000CC078
+034D8A: D23D  mov.l @(0x034E80),r2   ; = 0x000CC07C
+```
+
+`0xCC074` is the definition table **`A/F Learning #1 Airflow Ranges`**, scaling
+`MassAirflow(g/s)1`, values **5.6 / 10.0 / 50.0**. The block is a 4-bin airflow
+classifier gated by `0xCC070` = 1.6 and `0xCC080` = 80, result written to
+`0xFFFF787F` — already named `afl_airflow_range_idx` in the corpus.
+
+**Proof 3 — the producer.** See item 29: `0xFFFF63C4` is written as
+`min(MAF x IATcomp, MAF Limit (Maximum))`, and `MAF Limit (Maximum)` (`0xC3100`)
+is stock **300.0 g/s**.
+
+**Proof 4 — the logs.** `logs/7-26 20.19b/` MAF spans **2.40 … 296.24 g/s**; the
+widest axis `0xFFFF63C4` feeds is **0..300**.
+
+### The three-way split is resolved — and it was NOT a tracer artefact
+
+Item 23 offered two explanations and said control-flow-aware tracing would
+decide. It decided against both: the split survives, because **two of the three
+axis NAMES are wrong in `32BITBASE.xml`.**
+
+```
+031DD0: D25A  mov.l @(0x031F3C),r2   ; pool 031F3C = 0xFFFF63C4
+031DD2: FE28  fmov.s @r2,fr14        ; FR14 = mass airflow   (loaded ONCE)
+031DD4: D254  mov.l @(0x031F28),r2   ; = 0xFFFF6624 rpm
+031DD6: FF28  fmov.s @r2,fr15
+031E16: F4EC  fmov fr14,fr4  / 031E18: 4A0B jsr @r10 / 031E1A: F5FC fmov fr15,fr5
+031E36: F4EC  fmov fr14,fr4  / 031E38: 4A0B jsr @r10 / 031E3A: F5FC fmov fr15,fr5
+031E6A: F4EC  fmov fr14,fr4  / 031E6C: 4A0B jsr @r10 / 031E6E: F5FC fmov fr15,fr5
+```
+
+FR14 is written exactly once, at `0x031DD2`, and never again in the function;
+FR12–FR15 are callee-saved and were spilled at entry (`0x031DC4`–`0x031DCA`), so
+the three intervening `jsr`s cannot clobber it. The three descriptors decode as:
+
+| desc | counts | axis0 (fed by FR14) | definition name for axis0 | axis1 (fed by FR15 = RPM) |
+|---|---|---|---|---|
+| `0x0AD620` | 10 x 9 | `0xCF9EC` | `Intake Duty Correction A / **Intake VVT Error**` | `0xCFA14` Engine Speed 650…3600 |
+| `0x0AD848` | 10 x 9 | `0xD11D0` | `Exhaust Duty Correction A / **Exhaust VVT Error**` | `0xD11F8` Engine Speed 650…3600 |
+| `0x0AD864` | 8 x 9 | `0xD12D0` | (unnamed) | `0xD12F0` |
+
+**One value cannot be both the intake VVT error and the exhaust VVT error.** The
+descriptors match the project XML's own bindings exactly (data `0xCFA38` /
+`0xD121C`, axes `0xCF9EC` / `0xD11D0`), so the *tables* are bound correctly and
+only the axis **labels** are wrong. Both axes read `4, 6, 10, 15, 20, 25, 30, 40,
+60, 80` — impossible as cam phase error (authority is ~50 crank degrees; 60 and 80
+would be unreachable), and entirely ordinary as g/s across the 650…3600 RPM
+sibling axis. Intake/Exhaust Duty Correction A are **f(mass airflow, engine
+speed)**.
+
+This is the first case where the axis-name method's own input was shown wrong,
+and it is exactly why Instruments A and B matter: the axis-name vote here was 1
+for MAF and 2 against, and the *minority* was right.
+
+> **The definition XMLs were NOT edited.** ECUFlash owns them (items 24–26). The
+> observation is recorded here and in `ram_reference.txt` only.
+
+Renamed `mass_airflow_gps` in `ram_reference.txt` and `ImportAE5L600L.java` —
+**all three duplicate `labelComment` blocks** (`ect_compensation` appeared 3x;
+per item 1, a later stale block silently overwrites the corrected one in Ghidra).
+
+---
+
+## 29. The complete MAF pipeline — **ADDED 2026-07-27**
+
+Every step re-derived from `rom/ae5l600l.bin` bytes.
+
+```
+0xFFFF4042  uint16 ADC counts        <- SSM PID 0x1D source (getter 0x05D454)
+   |  004A32 mov.w @r4,r4 ; 004A3E float fpul,fr3 ; 004A44 fmul fr2,fr4
+   |  FR2 = *(0x004A80) = 7.629394531e-05 = 5.0/65536      => VOLTS (never stored)
+   v
+   |  004A42 jsr 0x0BE830 with r4 = 0x0AF45C
+   |    descriptor 0x0AF45C = count 54 / axis 0xD8BC4 / data 0xD8C9C
+   |    == definition "MAF Sensor Scaling" (54 g/s) over axis "MAF sensor"
+   |       (54 volts, 0.898 .. 5.000)   <-- element counts match exactly
+   v
+0xFFFF40B4  instantaneous g/s        004A46 mov.l @(0x004A8C),r2 ; 004A4C fmov.s fr0,@r2
+   |  0203E0 -> 0xFFFF63B4 -> 0xFFFF6424
+   v
+0xFFFF63B8 / 0xFFFF63BC   2-entry sample shift register (0x01FF00-0x01FF14)
+   |  01FF2A fadd fr9,fr8 ; 01FF30 fmul fr4,fr8 with *(0x020090) = 0.5
+   v
+0xFFFF63C0  = 0.5*(63B8+63BC)        01FF34 fmov.s fr8,@(r0,r1)  r1=0xFFFF6430 r0=-112
+   |  01FF3A fmov.s @(r0,r1),fr5 ; 01FF3E jsr 0x0BE8E4 with r4 = 0x0AAFE8
+   |    descriptor 0x0AAFE8 = counts 5 x 8 / axis0 0xC3B7C / axis1 0xC3B90 / data 0xC3BB0
+   |    axis1 0xC3B90 == "MAF Compensation (IAT) / Mass Airflow" (1.6 .. 290 g/s)
+   |    axis0 0xC3B7C == "... / Intake Temperature"    -> comp factor -> 0xFFFF63F0
+   |  01FF56 fmac fr0,fr8,fr14   (FR0 = 0xFFFF63C0, FR8 = comp factor)
+   |  01FF5E jsr 0x0BE970 (float_MIN, item 1) with FR5 = *(0x0C3100)
+   |    0xC3100 == "MAF Limit (Maximum)"   stock 300.0 g/s, 20.19c 475.0 g/s
+   v
+0xFFFF63C4  THE MAF (g/s)            01FF66 fmov.s fr0,@(r0,r1)  r0=-108
+   |  == SSM PID 0x13/0x14  == the logged MAF channel (2.40 .. 296.24 g/s)
+   |  020490 jsr 0x0BEA40 with FR4 = 63C4, FR5 = 63CC, FR6 = *(0x0C3108) = 0.5
+   v
+0xFFFF63CC  smoothed MAF (g/s)       020496 fmov.s fr0,@(r0,r14)  r14=0xFFFF63D8 r0=-12
+```
+
+**`0xFFFF4042` renamed** `pMafSensorVoltage` -> `maf_sensor_adc_counts` (it holds
+counts, not volts). **`0xFFFF40B4` renamed** `maf_raw_gs` -> `maf_instantaneous_gps`;
+its old note "feeds FFFF6254 and FFFF620C" was wrong — `0xFFFF6254` is a byte flag
+(item 17).
+
+**The MAF *voltage* is never stored to RAM.** It exists only in FR4 across
+`0x004A44`. Any file claiming a RAM address holds MAF volts is making a claim the
+ROM does not support — see item 35.
+
+---
+
+## 30. `0xFFFF63CC` is SMOOTHED MASS AIRFLOW, not ECT — **FIXED 2026-07-27**
+
+Was `ram_ECT`, "Coolant temperature / ECT (float)". Item 23 left it unresolved
+with one named hit that later evaporated when the item-26 XML edit was reverted.
+It does not need that label:
+
+```
+020472: DE68  mov.l @(0x020614),r14  ; = 0xFFFF63D8
+020474: E0EC  mov #-20,r0
+020476: FEE6  fmov.s @(r0,r14),fr14  ; FR14 = *(0xFFFF63C4)  = the MAF
+020482: F4EC  fmov fr14,fr4          ; FR4 = new sample
+020484: C766  mova @(0x020620),r0    ; -> 0.00457764
+020486: FF08  fmov.s @r0,fr15
+020488: F7FC  fmov fr15,fr7          ; FR7 = deadband epsilon
+02048A: D266  mov.l @(0x020624),r2   ; = 0x000C3108
+02048C: F628  fmov.s @r2,fr6         ; FR6 = alpha = 0.5
+02048E: E0F4  mov #-12,r0
+020490: 460B  jsr @r6                ; r6 = 0x000BEA40
+020492: F5E6  fmov.s @(r0,r14),fr5   ; delay slot: FR5 = *(0xFFFF63CC), previous
+020496: FE07  fmov.s fr0,@(r0,r14)   ; *(0xFFFF63CC) = result
+```
+
+`0x0BEA40` decoded from bytes is a **first-order lag filter**, not the
+`float_lerp`/`rate_limit_interp` its old labels suggest: NaN/Inf reset via the
+`0x7F800000` mask, then `fsub fr4,fr5` / `fldi1 fr0` / `fsub fr6,fr0` /
+`fmac fr0,fr5,fr6` giving `(1-alpha)*(old-new) + new`, then a
+`|new - result| < FR7` deadband that snaps to the new sample.
+
+So `0xFFFF63CC = lag(0xFFFF63C4, alpha 0.5)` — **smoothed mass airflow**. This
+independently confirms item 26's proposed binding of axis `0xD9280` as the
+`Smoothed MAF` X axis (20 / 26 / 32 / 44 g/s) of the Front AF Sensor Smoothing
+Table, from the *code* side rather than from the reverted XML label. Renamed
+`maf_smoothed_gps`.
+
+---
+
+## 31. `0xFFFF40E0` is FRONT OXYGEN / AF SENSOR CURRENT (mA) — **FIXED 2026-07-27**
+
+Was `ATU_output_ctrl`, "ATU output control register". Item 23 held it back at one
+site. It now has two independent lines, and the single site turns out to be an
+entire dedicated function:
+
+```
+058902: 4F22  sts.l pr,@-r15
+058904: D24B  mov.l @(0x058A34),r2   ; = 0xFFFF40E0
+058906: F428  fmov.s @r2,fr4         ; FR4 = value     (no branch, no call between)
+058908: D44B  mov.l @(0x058A38),r4   ; = 0x000AF468
+05890A: D24C  mov.l @(0x058A3C),r2   ; = 0x000BE830
+05890C: 420B  jsr @r2
+058910: D24B  mov.l @(0x058A40),r2   ; = 0xFFFF8DE4
+058916: F20A  fmov.s fr0,@r2         ; store the resulting AFR
+```
+
+Descriptor `0x0AF468` = count **13** / axis `0xD8D74` / data `0xD8DA8` — exactly
+the definition `Front Oxygen Sensor Scaling` (13 elements, `Air/FuelRatio`
+11.15 … 20.28) over axis `Front Oxygen Sensor` in **mA**, breakpoints
+-1.3 … +0.74.
+
+Second, independent: SSM getter-table entry `0x42` (`0x05D726`) reads the same
+address with **FR6 = -16.0, FR5 = 0.125**, so `value = (raw - 128) x 0.125` over
+`[-16, +15.875]` — a signed bipolar current in the same units and sign convention
+as the axis. A hardware output-control register is not read as a float and used
+as a table index. Renamed `front_o2_sensor_ma`.
+
+---
+
+## 32. Three idle / engine-speed identities settled — **FIXED 2026-07-27**
+
+### `0xFFFF4150` = ENGINE SPEED from the crank tooth period
+
+Item 23 held this at "single site". The **producer and the consumer** settle it
+without using any axis name:
+
+```
+007B9E: 425A  lds r2,fpul            ; r2 = accumulated tooth period
+007BA2: F32D  float fpul,fr3
+007BA4: F208  fmov.s @r0,fr2         ; *(0x007C04) = 1.2e8
+007BA6: F233  fdiv fr3,fr2           ; FR2 = 1.2e8 / period  -> a FREQUENCY
+007BAA: D317  mov.l @(0x007C08),r3   ; = 0xFFFF4150
+007BAC: F32A  fmov.s fr2,@r3
+```
+
+```
+0232B4: D294  mov.l @(0x023508),r2   ; = 0xFFFF4150
+0232B6: F828  fmov.s @r2,fr8
+0232B8: DC94  mov.l @(0x02350C),r12  ; = 0xFFFF6648
+0232BA: E0DC  mov #-36,r0
+0232BC: FC87  fmov.s fr8,@(r0,r12)   ; 0xFFFF6648-36 = 0xFFFF6624
+```
+
+**`0xFFFF6624` — the settled `rpm_current` — is a straight copy of this address.**
+Third line of support: it is the FR4/axis0 input of descriptor `0x0AF4B0`, axis
+`0xD918C` = `Ignition Dwell / Engine Speed` (500…8000), the same call whose
+FR5/axis1 is the settled battery voltage `0xFFFF4130` (item 10) — dwell as
+*f*(RPM, volts) is the textbook form. Named `rpm_from_tooth_period`.
+
+### `0xFFFF6634` = ENGINE SPEED DELTA (low-pass filtered)
+
+```
+r12 = 0xFFFF6648 ; r11 = 0xFFFF67AC
+023362: F8C6  fmov.s @(r0,r12),fr8   ; r0=-36 -> 0xFFFF6624, the settled RPM
+023366: F9B6  fmov.s @(r0,r11),fr9   ; r0=+16 -> 0xFFFF67BC, the reference speed
+023368: F891  fsub fr9,fr8           ; RPM - reference
+02336C: F9C6  fmov.s @(r0,r12),fr9   ; r0=-20 -> 0xFFFF6634, previous
+02336E: F890  fadd fr9,fr8
+023374: F892  fmul fr9,fr8           ; *(0x023544) = 0.5
+023378: FC87  fmov.s fr8,@(r0,r12)   ; 0xFFFF6634 = 0.5*((RPM-ref) + previous)
+```
+
+A low-pass-filtered difference against the settled RPM, and 2 of 2
+definition-named axes agree: `0xD7EC4` / `0xD8060`, both `Idle Speed Stability
+A/B / Engine Speed Delta` (-50…50), reached from `0x051D7A fmov.s @r2,fr14` /
+`0x051DB4 fmov fr14,fr5` / `0x051DB6 jsr 0x0BE8E4`. Named `engine_speed_delta`.
+
+### `0xFFFF89C8` = IDLE SPEED ERROR
+
+It is computed as a difference **one instruction before** it is used as the axis:
+
+```
+051D88: D19C  mov.l @(0x051FFC),r1   ; = 0xFFFF89C8
+051D8C: F816  fmov.s @(r0,r1),fr8    ; r0=-28 -> 0xFFFF89AC
+051DA2: D69A  mov.l @(0x05200C),r6   ; = 0xFFFF895C
+051DA4: F968  fmov.s @r6,fr9
+051DA6: F891  fsub fr9,fr8           ; a DIFFERENCE
+051DAA: D499  mov.l @(0x052010),r4   ; = 0x000AF0C8
+051DAC: 8F01  bf/s 0x051DB2
+051DAE: F18A  fmov.s fr8,@r1         ; delay slot: *(0xFFFF89C8) = the difference
+051DB0: D498  mov.l @(0x052014),r4   ; = 0x000AF0AC   (the other path)
+051DB4: F5EC  fmov fr14,fr5          ; FR5 = 0xFFFF6634 (engine speed delta)
+051DB6: 420B  jsr @r2                ; = 0x000BE8E4
+051DB8: F418  fmov.s @r1,fr4         ; delay slot: FR4 = the value just stored
+```
+
+Both path descriptors' axis0s are definition-named `Idle Speed Error`
+(`0xD7E80` / `0xD801C`, -150…600) — 2 of 2. Named `idle_speed_error`.
+
+> **Tool defect, recorded not fixed:** `coverage_map.quantity_of("Idle Speed
+> Error")` returns `vehicle_speed`, because the `vehicle_speed` pattern contains a
+> bare `\bspeed\b`. Same class as item 27(d). It would flag a *correct*
+> `idle_speed_error` name as CONFLICT via contradiction test (b). Not patched in
+> this commit, for the reason item 23 gave: do not change the instrument in the
+> commit that reports the measurement.
+
+---
+
+## 33. `0xFFFF69F0` is a 0..1 RATIO — the IAT claim is refuted outright — **FIXED 2026-07-27**
+
+Item 9 said "Real IAT is `0xFFFF69F0`"; item 23 **retracted** that but left the
+name in place because the write path had not been found. The name is now refuted
+positively, not merely unsupported:
+
+```
+0272CE: D283  mov.l @(0x0274DC),r2   ; = 0x000BE56C
+0272D0: F69D  fldi1 fr6              ; hi = 1.0
+0272D2: F58D  fldi0 fr5              ; lo = 0.0
+0272D4: D682  mov.l @(0x0274E0),r6   ; = 0xFFFF69F0
+0272D6: 420B  jsr @r2
+0272D8: F468  fmov.s @r6,fr4         ; delay slot: FR4 = *(0xFFFF69F0)
+```
+
+`0x0BE56C` is `clamp(FR4, lo=FR5, hi=FR6)`, verified from bytes
+(`F455 fcmp/gt fr5,fr4` -> `T = (FR4 > FR5)`, then `F645` -> `T = (FR6 > FR4)`).
+So the value is **clamped to [0.0, 1.0]**; repeated at `0x0273BA`. Its only store
+sets it to exactly 1.0 (`0273E0 fldi1 fr8` / `0273E6 fmov.s fr8,@r2`).
+
+A value clamped to [0,1] cannot be a -40…120 °C temperature. Full control-flow
+tracing finds 4 sites, all the *same* unnamed 0..1 axis `0xC4514`, and **zero**
+Intake Temperature axes — while `0xFFFF6364` (item 12) reaches 9.
+
+Renamed to the neutral `ratio_0to1_69F0`. **Which** ratio it is remains
+UNRESOLVED and is deliberately not guessed. Real IAT is `0xFFFF6364`; the stale
+"Real IAT is 0xFFFF69F0" cross-reference in the `0xFFFF63F8` comment block of
+`ImportAE5L600L.java` was corrected in the same pass.
+
+---
+
+## 34. `0xFFFFA198` is an ENGINE SPEED snapshot, not EGR diag state — **FIXED 2026-07-27**
+
+Item 23 had it at "36 rpm-shaped axes, none NAMED — envelope only", which by this
+project's own rule is not enough for a rename. It does not need an axis name:
+
+```
+075934: D248  mov.l @(0x075A58),r2   ; = 0xFFFF6624  (settled RPM)
+075936: F828  fmov.s @r2,fr8
+075938: D243  mov.l @(0x075A48),r2   ; = 0xFFFFA198
+07593A: F28A  fmov.s fr8,@r2         ; *(0xFFFFA198) = RPM
+```
+
+and identically at `0x075CA2` / `0x075CA6` / `0x075CA8`. Two independent straight
+assignments from the settled RPM variable, corroborated by 53 lookup sites across
+10 functions whose axes are all RPM-shaped (700…6700, 750…6700, 4000…6700,
+3500…7000) with zero dissent.
+
+The old `egr_diag_state` name came from `0xFFFFA198` *also* being loaded into GBR
+(`0x0758E8`, `0x075C54`) as a struct base. That describes the **struct**; the
+float at offset 0 is an RPM snapshot. Renamed `rpm_snapshot_A198`, with the
+struct role kept in the description so nothing is lost.
+
+---
+
+## 35. NOT corrected — `0xFFFF5FFC` and `0xFFFF6228`: names refuted, replacements unknown
+
+Both names are now positively refuted. Neither is renamed: a neutral name would
+discard information, and a physical one would be a guess.
+
+### `0xFFFF5FFC` `io_state_register`
+
+A struct base loaded into GBR (`0x018DDA mov.l @(0x019008),r0` / `0x018DDC ldc
+r0,gbr`) **and** a float read 26 times, feeding 15 numeric lookup axes spanning
+0..250 across 5 functions. An I/O state register is not read as a float and used
+as a table index. All 15 axes — `0xC2408`, `C242C`, `C24AC`, `C24F8`, `C2510`,
+`C25A4`, `C2614`, `C2764`, `C277C`, `C2794`, `C27AC`, `C2CC8`, `C2D24`, `C2F88` —
+are UNNAMED in both definition XMLs. *What would settle it:* name any one of them.
+
+### `0xFFFF6228` `maf_voltage`
+
+The real MAF voltage is `0xFFFF4042 x 5/65536` and is **never stored to RAM**
+(item 29). `0xFFFF6228` has a different source and a different scale — it is its
+own GBR base (`0x01D8FC` / `0x01D8FE ldc r0,gbr`), and:
+
+```
+01D94A: D210  mov.l @(0x01D98C),r2   ; = 0x000BE598  (u16 -> float: FR5 + FR4*x)
+01D94C: C50F  mov.w @(30,gbr),r0     ; the uint16 at 0xFFFF6246
+01D950: F58D  fldi0 fr5
+01D954: 420B  jsr @r2
+01D956: F408  fmov.s @r0,fr4         ; *(0x01D990) = 0.0305176
+01D95A: F20A  fmov.s fr0,@r2         ; *(0xFFFF6228) = counts * 0.0305176
+```
+
+Second writer `0x01D6F0` / `0x01D6FA`, same constant. `0.0305176` is not
+`5/65536`, so this is not a 0–5 V ADC conversion. It feeds **zero** lookup axes,
+so the axis-name method has nothing to say either. UNRESOLVED.
+
+### Still open from earlier passes, unchanged
+
+* Which 0..1 ratio `0xFFFF69F0` is (item 33).
+* Which monitor each settled byte flag belongs to (`0xFFFF4254`, `0xFFFF6254`,
+  `0xFFFF65C0`, `0xFFFF8CFC`, `0xFFFF6C48`), and which DTC `0xFFFF67EC` /
+  `0xFFFF8C98` mature.
+* The `coverage_map.quantity_of` `\bspeed\b` defect (item 32).
+* The binding limit itself: the XMLs still name only ~211 of ~780 descriptor
+  axes. Item 28 adds a caveat that was not there before — **a named axis can also
+  be wrong**, so a lone axis-name vote should be corroborated by an SSM getter, a
+  threshold pairing, a producer/consumer assignment, or a log range before it is
+  treated as settled.
