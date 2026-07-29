@@ -1921,9 +1921,16 @@ The decision calibration `0xD9AC0-0xD9E30` is byte-identical to stock.
   28800, 54400) are all divisible by 128 and match the raw-torque encoding of
   the per-gear torque cap (44800 = 350), which is suggestive, not proof.
   Writers are at `0xBC61C-0xBCA3E`.
-* **`0xFFFF90F0` is unidentified.** It carries a 45/50 hysteresis
-  (`0xD9B34`/`0xD9B38`) that is temperature-shaped. It is not called IAT
-  anywhere, and should not be.
+* ~~`0xFFFF90F0` is unidentified.~~ **RESOLVED same day.** The workspace
+  loader at the top of the parent function fills it: `060592 mov.l ...,r2 (=
+  0xFFFF63C4) ; 060594 fmov.s @r2,fr8 ; 060598 ... fmov.s fr8,@(r0,r6)` with
+  r6 = 0xFFFF9120 and r0 = -48. `0xFFFF63C4` is **mass airflow g/s** (item 28).
+  So the 45/50 pair at `0xD9B34`/`0xD9B38` is a **MAF gate: set below 45 g/s,
+  clear at 50 g/s** — not a temperature. The same loader settles the rest of
+  the workspace: `0xFFFF90E0` <- ECT, `0xFFFF90E4` <- IAT (`0xFFFF6364`),
+  `0xFFFF90E8` <- RPM, `0xFFFF90EC` <- vehicle speed. That confirms the
+  SET/CLEAR curve axis really is RPM, and makes the `[0xD9B2C] = 4.0` test a
+  "stopped" check on speed.
 * **Section 4.2's SI-DRIVE reading is unverified and probably wrong** — the bit
   tests at `0x040098`/`0x0400AC` select an engine-speed source, and neither
   branch writes `0xFFFF90A8`. This car has no SI-Drive input.

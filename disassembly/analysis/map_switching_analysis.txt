@@ -143,9 +143,21 @@ throttle response.
 
   The SET curve is ZERO from 3200 RPM up and the CLEAR curve is ZERO from
   3600 up. Cruise therefore CANNOT be entered above 3200 RPM at any torque,
-  and is force-cleared above 3600 RPM. Combined with the 250-count dwell
-  (reset by any transient) and the 375-count re-entry lockout, this is why
-  the Cruise tables see very little residency in normal driving.
+  and is force-cleared above 3600 RPM.
+
+  MEASURED 2026-07-28 against 213 min of 20.19/20.19b logs, applying only the
+  two gates that are loggable (RPM here, MAF in Section 1.6):
+
+    hard floor on NON-cruise time ............ 27.5%
+    upper bound on cruise-eligible time ...... 72.5%  (torque gate excluded)
+    highway (>=50 mph) above the RPM ceiling . 55.5%
+    city (5-50 mph) above the RPM ceiling ....  8.6%
+
+  So the RPM ceiling is decisive ON THE HIGHWAY and marginal in the city; it
+  does NOT make cruise globally rare. An earlier draft of this section said it
+  did — that was an overstatement written before the logs were checked. The
+  true residency is somewhere below 72.5% and cannot be pinned down here,
+  because [0xFFFF85E4] is not an SSM channel. Quote the bound, not a number.
 
   Raw table values (20800, 28800, 54400, ...) are divisible by 128 and match
   the raw-torque encoding family used by the per-gear torque cap (44800 =
@@ -157,11 +169,11 @@ throttle response.
 
     [0xFFFF90E0] >= [0xD9B30] (-40.0)      — a sensor floor, effectively always true
     [0xFFFF9116] == 1                      — the RPM/torque band above
-    [0xFFFF9117] == 1                      — hysteresis on [0xFFFF90F0]:
-                                             set below [0xD9B34]=45, clear at
-                                             [0xD9B38]=50. Temperature-shaped;
-                                             the identity of 0xFFFF90F0 is
-                                             UNVERIFIED — do not call it IAT.
+    [0xFFFF9117] == 1                      — MAF gate: set below 45 g/s
+                                             ([0xD9B34]), clear at 50 g/s
+                                             ([0xD9B38]). 0xFFFF90F0 is loaded
+                                             from 0xFFFF63C4 = MASS AIRFLOW
+                                             g/s at 0x060592-0x060598.
     [0xFFFF5E96] == 0
   Any failure jumps to 0x0610CE, which zeroes counter A and restarts the dwell.
 
@@ -789,8 +801,13 @@ SECTION 8: RAM ADDRESS REFERENCE
   FFFF85E4     float   torque_domain_value        —      compared against the
                                                          RPM curves; exact unit
                                                          UNVERIFIED
-  FFFF90F0     float   ???                        —      45/50 gate input;
-                                                         identity UNVERIFIED
+  FFFF90F0     float   maf_gps_copy               —      <- 0xFFFF63C4 MAF g/s
+                                                         (45/50 gate, 0x060592)
+  FFFF90E0     float   ect_copy                   —      <- 0xFFFF6350
+  FFFF90E4     float   iat_copy                   —      <- 0xFFFF6364
+  FFFF90E8     float   rpm_copy                   —      <- 0xFFFF6624; axis in
+                                                         to the SET/CLEAR curves
+  FFFF90EC     float   vehicle_speed_copy         —      <- 0xFFFF65FC
   FFFF7F68     float   ect_blend_correction       33,50  ECT blend correction
   FFFF7F6C     float   atm_blend_correction       33     Atmospheric correction
   FFFF7F70     float   rpm_iat_blend_result       33     RPM×IAT table result

@@ -10,9 +10,35 @@ any value.
 Added 2026-07-28 from ROM bytes — see [corrections.md](corrections.md) item 38
 and `disassembly/analysis/map_switching_analysis.txt` Section 1.
 
-**Cruise is rarely active on this car, and in 20.19c most of the pairs are
+**Cruise is unavailable on the highway, and in 20.19c most of the pairs are
 identical anyway.** Two separate reasons, both worth knowing before spending
 time on a Cruise table.
+
+Measured against 213 min of 20.19/20.19b logs (2026-07-28), using the two
+gates that are directly loggable — RPM and MAF g/s:
+
+| | |
+|---|---|
+| Hard floor on **non**-cruise time | **27.5%** |
+| Upper bound on cruise-eligible time | **72.5%** (torque gate not included) |
+| Highway (≥50 mph) time above the 3200 RPM ceiling | **55.5%** |
+| City (5–50 mph) time above the ceiling | 8.6% |
+
+The true figure sits below the upper bound by an unknown amount, because the
+third gate is a torque-domain value (`0xFFFF85E4`) that is **not a logged
+channel**. Do not quote a single number for cruise residency — quote the
+bound and say what is missing.
+
+Per-RPM-band, the torque ceiling the gate applies (descriptor units):
+
+| RPM band | % of drive time | ceiling | MAF gate pass rate |
+|---|---|---|---|
+| 0–1600 | 26.7% | 130 | 100% |
+| 1600–2400 | 7.6% | 110 | 99% |
+| 2400–2800 | 10.9% | 72 | 91% |
+| 2800–3200 | 22.5% | 28 | 71% |
+| 3200–3600 | 24.9% | **0 — impossible** | 33% |
+| 3600+ | 7.4% | **0 — impossible** | 21% |
 
 ### 1. The entry gate closes at 3200 RPM
 
@@ -26,8 +52,12 @@ hysteresis curves. Values in descriptor units (raw × 0.00625):
 
 The enter curve is zero from 3200 RPM up — cruise cannot be entered above 3200
 at *any* torque. The exit curve is zero from 3600 up — it is force-cleared
-there. City cruise (2400–3200) and highway cruise (2800–3600) sit on and above
-that ceiling.
+there. Highway cruise (2800–3600 RPM) sits on and above that ceiling; city
+cruise (2400–3200) is marginal, with a ceiling that falls from 90 to 0.
+
+The third gate is a MAF hysteresis on `0xFFFF63C4` (**mass airflow, g/s** —
+identified via the workspace loader at `0x060592`): set below **45 g/s**
+(`0xD9B34`), cleared at **50 g/s** (`0xD9B38`). That one IS loggable.
 
 On top of that: a **250-count dwell** (`0xD9AD8`) that any transient resets to
 zero, and a **375-count re-entry lockout** (`0xD9ADA`) after every dropout. The
