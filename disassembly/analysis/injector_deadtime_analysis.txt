@@ -63,7 +63,11 @@ SECTION 1: STAGE-BY-STAGE PIPELINE
       [6.5, 9.0, 11.5, 14.0, 16.5]  V
 
     Secondary axis (0xD1060, 3 float32):
-      [-1000.0, 0.0, 1000.0]
+      [-1000.0, 0.0, 1000.0]  raw
+      The definition XML scales this axis as `psirelative`, giving
+      [-19.34, 0.0, +19.34] psi manifold pressure — i.e. a fuel-pressure-delta
+      compensation axis.  All three rows carry identical data, so on this ROM
+      the compensation is not used.
 
     Data (0xD106C, 15 uint16, 5 columns × 3 rows, all rows identical):
       V=6.5:  12588 (0x312C)
@@ -74,13 +78,29 @@ SECTION 1: STAGE-BY-STAGE PIPELINE
       (rows for axis2 = -1000, 0, +1000 are all identical — dead time is
        independent of secondary axis; it varies only with VBatt)
 
-    Physical interpretation (÷16 → ATU ticks, assuming ~10 MHz ATU clock):
-      6.5V  →  787 ticks ≈ 78.7 μs
-      9.0V  →  428 ticks ≈ 42.8 μs
-      11.5V →  281 ticks ≈ 28.1 μs
-      14.0V →  201 ticks ≈ 20.1 μs
-      16.5V →  168 ticks ≈ 16.8 μs
+    Physical interpretation — 1 stored unit = 0.25 μs, i.e. value × 0.00025 ms:
+      6.5V  →  3.147  ms
+      9.0V  →  1.714  ms
+      11.5V →  1.125  ms
+      14.0V →  0.806  ms
+      16.5V →  0.673  ms
     (Monotonically decreasing: higher voltage → injector opens faster → less dead time)
+
+    CORRECTED 2026-07-28 (corrections.md item 37).  An earlier revision of this
+    file divided by 16 and assumed a ~10 MHz ATU clock, giving 78.7 μs @ 6.5 V
+    down to 20.1 μs @ 14 V.  Those figures are wrong by roughly 40x and are not
+    physically possible — no port injector has a 20 μs opening delay; a Subaru
+    top-feed injector is ~0.7–1.1 ms at 14 V, which is exactly what the ms
+    reading gives.  The ms reading is also what the definition XML declares
+    (scaling `Latency(ms)`, uint16, toexpr `x*.00025`), and `docs/corrections.md`
+    item 27(c) already settled this table as VERIFIED-BYTES on that basis.
+
+    The ">>4 at apply time" in Stage 6 is real and is NOT in conflict: the shift
+    is applied to (base_pulse_width + dead_time) as a pair, so the stored unit is
+    1/16 of an ATU tick and the tick is therefore 16 × 0.25 μs = 4 μs.  The
+    absolute ATU prescaler that produces a 4 μs tick has NOT been read out of the
+    ATU control registers — treat the 4 μs as derived from the scaling, not as an
+    independently verified clock rate.
 
   Execution path in 0x0303C2:
     0303C6: R2  = FFFF4130  → FR4 = [FFFF4130]   (axis input 1)

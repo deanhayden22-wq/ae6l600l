@@ -343,7 +343,14 @@ SECTION 9: CRUISE/NON-CRUISE MAP SWITCHING
 ================================================================================
 
 The ECU blends between cruise and non-cruise calibrations using a ratio
-stored at 0xFFFF7F60 (0.0 = full cruise, 1.0 = full non-cruise).
+stored at 0xFFFF90A8 (0.0 = full cruise, 1.0 = full non-cruise).
+
+CORRECTED 2026-07-28 (corrections.md item 38): this said 0xFFFF7F60, which is
+a timing workspace base, not the ratio. The ratio's sole write site is
+0x0611E0. The decision that drives it lives at 0x60ECC-0x6114E and is
+calibrated at 0xD9AC4-0xD9E26 — NOT at the 0xD29AC/0xD2A08 "Map Switching"
+constants, whose ECUFlash names are project-invented. See
+disassembly/analysis/map_switching_analysis.txt Section 1.
 
   Blending formula:
     result = cruise_value + (noncruise_value - cruise_value) × ratio
@@ -452,7 +459,8 @@ SECTION 12: KEY RAM ADDRESSES
   │ 0xFFFF7E8C   │ byte      │    - │ Overrun state (0=normal, 1=fuel cut) │
   │ 0xFFFF7E8E   │ word      │    - │ Overrun tick counter                 │
   │ 0xFFFF7F08   │ struct    │    - │ Map switching workspace               │
-  │ 0xFFFF7F60   │ float     │    - │ Cruise/non-cruise blend ratio        │
+  │ 0xFFFF7F60   │ uint16    │    - │ Timing-path counter (NOT the ratio)  │
+  │ 0xFFFF90A8   │ float     │    - │ Cruise/non-cruise blend ratio        │
   │ 0xFFFF82B4   │ word      │    - │ Alternate fuel cut gate              │
   │ 0xFFFF82B8   │ word      │    - │ Fuel cut bitmask (injector gating)   │
   │ 0xFFFF85D7   │ byte      │    - │ Engine status byte                   │
@@ -585,8 +593,9 @@ SECTION 14: COMPLETE TORQUE MANAGEMENT ARCHITECTURE DIAGRAM
          │
   ┌──────▼──────────────────────────────────────────────────────────┐
   │  CRUISE/NON-CRUISE MAP SWITCHING                                │
-  │  Blend ratio: FFFF7F60 (0.0=cruise, 1.0=non-cruise)           │
+  │  Blend ratio: FFFF90A8 (0.0=cruise, 1.0=non-cruise)           │
   │  Affects: timing, fueling, knock advance, AVCS, load comp     │
-  │  ~40 switching parameters at D29AC-D2ABC                        │
+  │  Decision: 0x60ECC..0x6114E, cal at D9AC4-D9E26                │
+  │  D29AC-D2ABC are NOT the switching parameters (item 38)        │
   │  Per-gear RPM thresholds: D2A74-D2A88                          │
   └─────────────────────────────────────────────────────────────────┘

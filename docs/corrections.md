@@ -1529,7 +1529,7 @@ Second writer `0x01D6F0` / `0x01D6FA`, same constant. `0.0305176` is not
 `5/65536`, so this is not a 0–5 V ADC conversion. It feeds **zero** lookup axes,
 so the axis-name method has nothing to say either. UNRESOLVED.
 
-### Still open from earlier passes, unchanged
+### Still open from earlier passes, unchanged (as of pass 3)
 
 * Which 0..1 ratio `0xFFFF69F0` is (item 33).
 * Which monitor each settled byte flag belongs to (`0xFFFF4254`, `0xFFFF6254`,
@@ -1541,3 +1541,389 @@ so the axis-name method has nothing to say either. UNRESOLVED.
   be wrong**, so a lone axis-name vote should be corroborated by an SSM getter, a
   threshold pairing, a producer/consumer assignment, or a log range before it is
   treated as settled.
+
+---
+
+# Fourth pass, 2026-07-28 — items 36 to 38: the injector-rescale sweep
+
+Prompted by an upcoming injector swap. The question asked was narrow — "which
+tables hold an injector pulse width" — and answering it from ROM bytes rather
+than from table names turned up three errors, one of which would have sent the
+rescale at a table that has nothing to do with fuelling.
+
+The working list this produced is `docs/injector-rescale.md`; the tool is
+`scripts/injector_rescale.py`.
+
+---
+
+## 36. `0xD39A8` "Low Pulse Width Fuel Injector Compensation" is NOT an injector table — its axis is RPM — **FIXED 2026-07-28**
+
+This is a `0xC0BCC`-class error: a real generic Subaru table name from
+`32BITBASE.xml`, bound by the project XML to an address that holds something
+else entirely on this ROM.
+
+**What the definitions claim.** `Fueling - Injector` category. Data `0xD39A8`,
+8 x uint8, scaling `InjectorPulseWidthCompensation` = `(x*.78125)-100`, so the
+factory contents (all raw `0x00`) display as **-100% on all eight cells**. Y
+axis `0xD3988`, 8 x float32, scaling `BasePulseWidth(ms)` = `x*.001`, so raw
+`700..4500` displays as **0.7 to 4.5 ms**. Two companion scalars,
+`0xD2D28` "maximum RPM" and `0xD2D2C` "maximum IPW" (`x*.001` -> 10.0 ms).
+
+Taken at face value that reads as: below 4.5 ms of pulse width, delete 100% of
+the fuel, with the gate wide open at 10 ms / 10000 RPM. The car runs, so
+something in that story is false.
+
+**What the ROM says.** Descriptor `0x0AE000` = `00080000 000D3988 000D39A8
+00060400` — 8 elements, axis `0xD3988`, data `0xD39A8`, typecode `0x0400`
+(1 byte/cell, per item 27b). It has **exactly one** literal reference in the
+1 MB image, at `0x043558`, in the pool of the function at `0x043470`. So there
+is one consumer and no other.
+
+That function loads its inputs once, at entry, and never reloads them:
+
+```
+043472 mov.l @(0x043530),r2 / 043474 fmov.s @r2,fr8   ; fr8 = [0xFFFF62F8] torque_ratio
+043476 mov.l @(0x043534),r2 / 043478 fmov.s @r2,fr9   ; fr9 = [0xFFFF65FC] vehicle speed
+04347A mov.l @(0x043538),r2 / 04347C fmov.s @r2,fr4   ; fr4 = [0xFFFF6624] ENGINE SPEED
+04347E mov.l @(0x04353C),r2 / 043480 fmov.s @r2,fr6   ; fr6 = [0xFFFF6350] ECT
+```
+
+and then calls the lookup with `fr4` still holding RPM:
+
+```
+0434C2 mov.l @(0x043558),r4   ; r4 = 0x000AE000  (the descriptor)
+0434C4 mov.l @(0x04355C),r2   ; r2 = 0x000BE874
+0434C6 jsr   @r2
+0434CE mov.b r0,@r5           ; result byte -> [0xFFFF80EC]
+```
+
+`0xBE874` takes its axis input in **FR4** — verified from its own bytes:
+
+```
+0BE876 mov.w @(0,r4),r0     ; element count  <- descriptor+0
+0BE878 mov.l @(4,r4),r1     ; axis pointer   <- descriptor+4
+0BE87A bsr   0x0BECA8       ; axis search
+0BE87C fmov  fr4,fr0        ; delay slot: THE SEARCH KEY IS FR4
+0BE880 mov.l @(8,r4),r1     ; data pointer   <- descriptor+8
+0BE88A extu.b r0,r0         ; returns a byte
+```
+
+`0xBECA8` in turn walks the axis array comparing each element against **FR0**
+(`0BECAC fmov.s @(r0,r1),fr1 / 0BECAE fcmp/gt fr0,fr1`) and returns the
+interpolated position `(fr0−fr1)/(fr2−fr1)`. So the key is FR0, which `0xBE874`
+sets from FR4 in the delay slot. And FR4 is written exactly once in `0x043470`
+— at `0x04347C` — and only read afterwards (`0x0434AE`, `0x0434B6`, both
+`fcmp/gt`). It still holds RPM at the call.
+
+`0xFFFF6624` is `rpm_current`: 301 references, the most-referenced float in the
+ROM, an SSM-logged channel (`scale 0.25 = logcfg x/4`), settled long before this
+item. The function also never touches `0xFFFF7324`
+(`last_calc_base_pulse_width`), which is the ROM's actual base-pulse-width
+variable and the feed a low-pulse-width compensation would necessarily use.
+
+Two derived files reached the same conclusion independently and were never
+reconciled with the XML: `descriptor_map.txt:545` records the axis range as
+`[700.0..4500.0]`, and `named_descriptors.txt:680` types the descriptor
+`1D_RPM_f32_8`.
+
+### One argument used here originally was wrong — withdrawn
+
+The first version of this item also argued that `700, 800, 900, 1400, 2000,
+2500, 3500, 4500` is implausible as milliseconds ("0.1 ms steps at the bottom,
+then a jump to 1.4"). **That is not a valid argument and it is withdrawn.**
+`0.7/0.8/0.9/1.4/2.0/2.5/3.5/4.5` ms is precisely the shape a low-pulse-width
+linearisation axis should have — fine resolution through the non-linear region,
+coarse above it. Nor do the raw magnitudes discriminate: this ROM stores a
+genuine millisecond axis as raw ×1000 (`0xD0760` holds `1000.0 … 16000.0` for
+1–16 ms), so raw `700` = `0.7` ms is exactly the right convention.
+
+The identity rests on the **feed**, and on the feed alone. Retaining a
+plausibility argument that does not survive checking would repeat the exact
+failure this project keeps hitting — see items 6, 8 and 12, all of which were
+"corrections" applied on reasoning that felt right.
+
+### The cheapest argument of all, needing no disassembly
+
+Read the definition at face value: eight cells at **−100%**, `maximum RPM` =
+10000, `maximum IPW` = 10.0 ms. Both gates always satisfied, so a 100% fuel cut
+below 4.5 ms of pulse width, at every RPM. The car idles. The definition is
+therefore not describing what this ECU does, whatever the correct reading turns
+out to be.
+
+**`0xD2D28` and `0xD2D2C` are both RPM bounds, and neither is an IPW.** Each has
+exactly one literal reference (`0x04354C`, `0x043550`), both in this same pool,
+and both are compared against `fr4`:
+
+```
+0434AA mov.l @(0x04354C),r2 / 0434AC fmov.s @r2,fr8   ; fr8 = [0xD2D28] = 10000.0
+0434AE fcmp/gt fr4,fr8        ; T = (fr8 > fr4) = (10000 > RPM)
+0434B0 bt  0x0434D0           ; -> exit.  continue requires RPM >= 0xD2D28
+0434B2 mov.l @(0x043550),r2 / 0434B4 fmov.s @r2,fr8   ; fr8 = [0xD2D2C] = 10000.0
+0434B6 fcmp/gt fr4,fr8        ; T = (10000 > RPM)
+0434B8 bf  0x0434D0           ; -> exit.  continue requires RPM <  0xD2D2C
+```
+
+(`fcmp/gt FRm,FRn` sets T when FRn > FRm; `0xF845` is n=8, m=4. Operand order
+was checked deliberately — reversing it is the mistake behind item 12.)
+
+They form the half-open window `[0xD2D28, 0xD2D2C)` on RPM. Both hold 10000.0,
+so the window is **empty** and the branch is unreachable. `0xD2D2C` displaying
+as "10.0 ms" is an artefact of the XML applying `x*.001` to the number 10000.
+
+**The rest of the function is map switching, not fuelling.** Its other gates are
+`0xD2A0C` (0.8798) and `0xD2A1C` (80.0) — the same two constants
+`map_switching_analysis.txt` names `MapSwitch_TorqueRatioThreshold` and
+`MapSwitch_IATThreshold` at `0x03F49A` / `0x03F4CE`. It reads
+`0xFFFF5BE3` (`clutch_state`, "task50 map switching" in `ram_reference.txt`) and
+writes its result to `0xFFFF80EC`, which `ram_reference.txt:797` already calls
+`timing_comp_lowpw_state` — *ignition* timing state, not fuel.
+
+There is a second, independent kill: at `0x0434A6` the code tests
+`fcmp/gt fr9,fr8` with `fr8 = [0xD2D24] = 0.0` and `fr9` = vehicle speed, then
+`bf` to the exit. That is "continue only if `0.0 > vehicle_speed`" — never true.
+The branch is dead twice over.
+
+**Status.** Corrected in `disassembly/maps/disassembly.txt` (the LOW PULSE WIDTH
+block and the two task summaries at Tasks 46/47) and in the do-not-touch list of
+`scripts/injector_rescale.py`.
+
+**The definition XML is NOT changed here.** ECUFlash owns those files and
+rewrites them on save (see CLAUDE.md); a repo-side edit would be lost and would
+diverge silently. The names `Low Pulse Width Fuel Injector Compensation`,
+`… maximum RPM` and `… maximum IPW` are still wrong in
+`definitions/AE5L600L 2013 USDM Impreza WRX MT.xml` and in `32BITBASE.xml`.
+Fixing them means editing in the ECUFlash UI and pulling with
+`.\scripts\sync_defs.ps1 -Pull` — and the repo is already ~37 tables ahead of
+ECUFlash, so that pull needs checking first.
+
+**Practical consequence.** Nothing to do for the injector swap, which is the
+point: the all-`-100%` table looks exactly like a broken calibration begging to
+be populated, and populating it would have written bytes into an ignition
+timing state path.
+
+---
+
+## 37. Injector dead time was stated in microseconds, off by ~40x — **FIXED 2026-07-28**
+
+`disassembly/analysis/injector_deadtime_analysis.txt` printed a "physical
+interpretation" of `0xD106C` that divided the stored values by 16 and assumed a
+~10 MHz ATU clock:
+
+    6.5V -> 787 ticks ~ 78.7 us   ...   14.0V -> 201 ticks ~ 20.1 us
+
+No port injector opens in 20 microseconds; a Subaru top-feed injector is roughly
+0.7–1.1 ms at 14 V. The definition XML declares `Latency(ms)`, uint16,
+`toexpr = x*.00025`, which gives **3.147 / 1.714 / 1.125 / 0.806 / 0.673 ms**
+across the 6.5…16.5 V axis — a textbook dead-time curve, and the same reading
+item 27(c) already used when it cleared this table of its false CONFLICT.
+
+The `>>4` in the apply path (`0x00A152`, `0x00A0D2`) is real and does not
+conflict: it shifts `(base_pulse_width + dead_time)` **as a pair**, so the stored
+unit is 1/16 ATU tick and the tick works out at 4 us. That 4 us is derived from
+the scaling, not read out of the ATU prescaler registers; the file now says so
+rather than asserting a clock rate.
+
+Also corrected in the same file: the secondary axis `0xD1060` `[-1000, 0, 1000]`
+is raw; the XML scales it `psirelative` to ±19.34 psi, i.e. a fuel-pressure-delta
+axis. All three rows are identical, so it is unused on this ROM.
+
+---
+
+## 38. Three CL/OL tables reported as "all zeros" were read as float32 — **FIXED 2026-07-28**
+
+`cl_ol_analysis.txt`, `cl_ol_state_machine.txt` and
+`cl_ol_comprehensive_review.txt` all stated that the delay-path thresholds were
+empty. They are not. Every one had been read as float32 at stride 4, with the
+element count inferred from that stride instead of taken from the definition:
+
+| Address | Claimed | Actual (stock == 20.19c) |
+|---|---|---|
+| `0xCCD78` | all zeros | 16 x **uint8**, `x*.581287202` -> 86.03% x13, then 0,0,0 |
+| `0xCE5F8` | 8 floats, all 0.0000 | 16 x **uint16**, `x*.004` -> 5.3, 5.3, 5.3, 5.7, 6.7, 6.6, 6.6, 6.5, 6.3, 5.6, 4.1, 3.6, 1.8, 0, 0, 0 ms |
+| `0xCE640` | `[0,0,0,0,0,1,2,3]` | 10 x **uint16**, identity -> all 1s |
+
+The mechanism is the same each time: `0xCE5F8`'s bytes are `05 2D 05 2D …`, and
+`0x052D052D` as a float32 is `8.1e-36` — a denormal that prints as `0.0000` at
+four decimal places. Nothing errored; the numbers just looked empty.
+
+`0xCE640`'s scaling is literally named
+`CLtoOLCounterIncrement(WARNING-value should NEVER be zero)`. Reporting zeros in
+a table whose own name forbids them should have been read as a decode failure on
+sight — that is the cheap tell this class of bug leaves behind.
+
+The downstream conclusion in those files ("moot with delay=0") survives, because
+`CL to OL Delay_` `0xCBC62` really is 0 in 20.19c (stock 750). But it rested on
+the wrong premise. `0xCE5F8` matters for a different reason: it is the **only
+absolute-pulse-width threshold in the whole CL/OL path**, so it belongs on the
+injector-rescale list even though it is currently inert — if the delay is ever
+re-enabled with unrescaled thresholds, the OL trigger moves.
+
+### Also swept, not a numbered item
+
+`map_switching_analysis.txt` labelled `0xFFFF65FC` `load_current` /
+"Engine load (g/rev)" in two places while reading it as a vehicle speed in four
+others. Item 9 settled it as vehicle speed; the two stale lines are corrected.
+~~Left OPEN and flagged in the file: `0xD2A14`/`0xD2A18` hold 550.0 and 1300.0,
+which are not km/h-shaped, so what those two actually gate is unresolved.~~
+**CLOSED 2026-07-28 by item 38:** both are compared against `fr12` = RPM
+(`0xFFFF6624`), not against speed. 550–1300 RPM is an idle band. The
+definition names "Map Switching Vehicle Speed Low/High Threshold" are wrong,
+and are project-invented rather than inherited from `32BITBASE.xml`.
+
+### Still open after this pass
+
+* Everything listed under pass 3 above.
+* The three definition-XML names in item 36 (`0xD39A8`, `0xD2D28`, `0xD2D2C`) —
+  correct in the repo's analysis layer, still wrong in the XMLs, and only
+  fixable through ECUFlash.
+* Whether `Per Injector Pulse Width Compensation A`–`D` are per-cylinder trims
+  or a shared linearisation curve. They differ from each other in 151–249 of 289
+  cells and sit at stock values, so they encode something real about the OEM
+  injector — which means they are wrong for a different injector regardless of
+  whether the ms axis is rescaled. See `docs/injector-rescale.md`.
+
+---
+
+## 38. The cruise/non-cruise blend ratio was the wrong address, and the whole subsystem was documented in the wrong place — **FIXED 2026-07-28**
+
+Asked to walk through the cruise→non-cruise logic, the committed answer would
+have been wrong in three structural ways at once. All three are corrected.
+
+### (a) The ratio is `0xFFFF90A8`, not `0xFFFF7F60`
+
+`map_switching_analysis.txt` (Sections 1, 2, 8), `torque_management_analysis.txt`
+(Section 9 and two diagrams) and `ram_reference.txt` all named `0xFFFF7F60` as
+the cruise/non-cruise blend ratio, with a sub-claim that "the actual blend ratio
+output is at `0xFFFF7F4C`".
+
+`0xFFFF7F4C` was already settled as ENGINE SPEED by item 22 — the file simply
+never got updated. And `0xFFFF7F60` is a **uint16 counter**, read with `mov.w`:
+
+```
+04008E: C52A  mov.w @(84,gbr),r0    ; GBR = 0xFFFF7F0C, +0x54 => 0xFFFF7F60
+040094: 3026  cmp/hi r2,r0          ; unsigned compare against [0xD29D4] = 88
+```
+
+The real ratio is `0xFFFF90A8`. It has **exactly one write site in the ROM**:
+
+```
+0611DE: D621  mov.l @(0x061264),r6  ; = 0xFFFF90A8
+0611E0: F60A  fmov.s fr0,@r6
+```
+
+and is consumed by task 32 as a linear interpolation weight:
+
+```
+0401D6: F9F8  fmov.s @r15,fr9       ; fr9 = ratio
+0401DC: F862  fmul fr6,fr8          ; fr8 = ratio * NonCruise
+0401DE: F09D  fldi1 fr0
+0401E0: F091  fsub fr9,fr0          ; fr0 = 1.0 - ratio
+0401E6: F89E  fmac fr0,fr9,fr8      ; fr8 += (1 - ratio) * Cruise
+```
+
+`ram_reference.txt` called `0xFFFF90A8` `timing_dispatch_state`, and
+`ignition_timing_analysis.txt` called it `timing_state`. Both renamed.
+
+### (b) The decision is not in tasks 50/32/31/33
+
+The subsystem was documented as four scheduler tasks in `0x3F368-0x410D4`. Only
+task 32 is involved, and only as the *consumer*. The decision is a four-function
+chain called back-to-back from one parent:
+
+```
+0605E6: B471  bsr 0x060ECC   ; evaluate condition, maintain dwell counter A
+0605EA: B57C  bsr 0x0610E6   ; arm  -> writes 0xFFFF90C4
+0605EE: B597  bsr 0x061120   ; re-entry lockout counter B
+0605F2: B5AC  bsr 0x06114E   ; ramp 0xFFFF90A8 by +/-0.008, clamp [0,1]
+```
+
+Its calibration lives at `0xD9AC4-0xD9E26`, an area with **no ECUFlash
+definitions at all**. The governing gate is a torque-domain value
+(`0xFFFF85E4`) against two RPM-indexed hysteresis curves (`0xD9BE4` SET /
+`0xD9C44` CLEAR, axes `0xD9BA4` / `0xD9C04`). In descriptor units:
+
+| RPM | 300 | 400–1600 | 2000 | 2400 | 2800 | 3200 | 3600+ |
+|---|---|---|---|---|---|---|---|
+| SET | 340 | 130 | 110 | 90 | 55 | **0** | 0 |
+| CLEAR | 350 | 180 | 160 | 140 | 105 | 70 | **0** |
+
+The SET curve is zero from 3200 RPM up, so cruise cannot be *entered* above
+3200 at any torque; the CLEAR curve is zero from 3600 up, so it is force-exited
+there. Plus a 250-count dwell (`0xD9AD8`) that any transient resets, and a
+375-count re-entry lockout (`0xD9ADA`). That is the mechanical reason the
+Cruise tables see little residency.
+
+### (c) The `Map Switching *` definitions are project-invented and misnamed
+
+Zero of the 48 `Map Switching *` table names occur in
+`definitions/32BITBASE.xml`. They exist only in the project XML, with
+AI-shaped descriptions ("Stock value: 2000 RPM"). None of them gates cruise.
+The block they describe (`0x03F49A-0x03F584`) is a **stationary/idle
+classifier**, and every comparison in the write-up was inverted:
+
+```
+03F49E: F8E5  fcmp/gt fr14,fr8  ; n=8,m=14 -> T = (0.8798 > torque_ratio)
+03F4A0: 8B70  bf 0x03F584       ; continue requires torque_ratio < 0.8798
+03F4A6: F8F5  fcmp/gt fr15,fr8  ; T = (2.0 > vehicle_speed)
+03F4AE: F8C5  fcmp/gt fr12,fr8  ; T = (550 > RPM)   -- RPM, not speed
+03F4B6: F8C5  fcmp/gt fr12,fr8  ; T = (1300 > RPM)
+03F4D2: F875  fcmp/gt fr7,fr8   ; T = (80 > ECT)    -- ECT, not IAT
+```
+
+Read correctly: warm engine, stopped, 550–1300 RPM, low torque, clutch out.
+Same operand-order failure as items 1 and 12 — `fcmp/gt FRm,FRn` sets
+`T = (FRn > FRm)`, and `0xFnm5` has n in bits 8–11.
+
+Section 3.3 was inverted the same way: it requires `[0xFFFF7F68] <= 0.0` and
+`RPM < 2000`, not `> 0.0` and `RPM > 2000`.
+
+### `0xFFFF90BE` is the cruise-request flag, not `ect_mode_flag`
+
+`fueling_pipeline_analysis.txt` and `startup_enrichment_analysis.txt` both
+named `0xFFFF90BE` `ect_mode_flag`. It has one writer — `0x0611BC`, in the
+cruise ramp — and 12 readers, all `mov.b` loads.
+
+Those two files are also what **confirmed the polarity**, independently and
+before this pass: `startup_enrichment` records `0xFFFF90BE = 0 → 0xCF6B0
+(Non-Cruise)` / `≠ 0 → 0xCF704 (Cruise)` for Cranking Fuel IPW Comp, and
+`fueling_pipeline` records `R6 == 0 → 0xD3206/0xD3216` (Timing Compensation
+Imm. **Non-Cruise** A/B) / `R6 != 0 → 0xD3226/0xD3236` (**Cruise** A/B). Both
+match the ramp direction derived from bytes at `0x0611C4-0x0611D4`. Renamed in
+both files; the table mappings there were already right.
+
+Worth carrying: these two consumers **hard-select** off the raw flag. They snap.
+Only the base-timing path uses the ramped `0xFFFF90A8` interpolation.
+
+### Consequence for the current tune
+
+In `20.19c` the Cruise and Non-Cruise sides have been flattened to identical
+for Base Timing Primary (0/306 cells differ; stock 121), Base Timing Reference
+(0/306; stock 121), Knock Correction Advance Max (0/306; stock 68), Intake Cam
+Advance (0/288; stock 96) and Target Throttle Plate (0/256; stock 162). For
+those the blend is a no-op regardless of the ratio. Still differing: CL Fueling
+Target Comp (18/48), Cranking Fuel IPW Comp (17/35), Min Primary Base
+Enrichment 1 (63/144) — all at stock values.
+
+The decision calibration `0xD9AC0-0xD9E30` is byte-identical to stock.
+
+### Not fixed here
+
+* **The definition XML is unchanged.** ECUFlash owns it (see CLAUDE.md). The 48
+  `Map Switching *` names remain wrong in
+  `definitions/AE5L600L 2013 USDM Impreza WRX MT.xml`, and `0xD9AD8`/`0xD9ADA`
+  and the rest of `0xD9AC4-0xD9E26` remain undefined. Fixing means editing in
+  the ECUFlash UI and pulling with `.\scripts\sync_defs.ps1 -Pull`, and the
+  repo is already ~37 tables ahead of ECUFlash.
+* **The scheduler rate of the `0x60562` parent is not established** — no literal
+  reference and no in-range branch to it was found. So the 250/375 dwell counts
+  and the 125-invocation ramp **cannot be stated in seconds**. Do not.
+* **`0xFFFF85E4`'s physical unit is unverified.** The raw table values (20800,
+  28800, 54400) are all divisible by 128 and match the raw-torque encoding of
+  the per-gear torque cap (44800 = 350), which is suggestive, not proof.
+  Writers are at `0xBC61C-0xBCA3E`.
+* **`0xFFFF90F0` is unidentified.** It carries a 45/50 hysteresis
+  (`0xD9B34`/`0xD9B38`) that is temperature-shaped. It is not called IAT
+  anywhere, and should not be.
+* **Section 4.2's SI-DRIVE reading is unverified and probably wrong** — the bit
+  tests at `0x040098`/`0x0400AC` select an engine-speed source, and neither
+  branch writes `0xFFFF90A8`. This car has no SI-Drive input.

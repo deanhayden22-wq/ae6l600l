@@ -938,7 +938,7 @@ SECTION 10: ECT WARMUP CORRECTION — func_403C4  (Table B[19])
   PSEUDOCODE
   ----------
   FR4  = ECT_float (FFFF6350)
-  R6   = byte @ FFFF90BE     ; ect_mode_flag
+  R6   = byte @ FFFF90BE     ; cruise_request_flag (0=Non-Cruise, 1=Cruise)
   R5   = byte @ FFFF6254     ; gear/operation mode byte
 
   if R6 == 0:
@@ -958,7 +958,14 @@ SECTION 10: ECT WARMUP CORRECTION — func_403C4  (Table B[19])
   ---
   FFFF6350  ect_current            (engine coolant temp, float)
   FFFF6254  gear/op mode byte     (1 = specific AT or mode condition)
-  FFFF90BE  ect_mode_flag         (byte, 0 or non-zero)
+  FFFF90BE  cruise_request_flag   (byte; 0 = Non-Cruise, 1 = Cruise)
+                                  RENAMED 2026-07-28, corrections item 38.
+                                  Sole writer 0x0611BC (cruise ramp).
+                                  Confirms out: R6==0 picks D3206/D3216 =
+                                  "Timing Compensation Imm. Non-Cruise A/B";
+                                  R6!=0 picks D3226/D3236 = "... Cruise A/B".
+                                  This is a HARD select off the raw flag,
+                                  not the ramped 0xFFFF90A8 blend.
   FFFF7F68  ect_blend_correction (float output; consumed by func @ 0x3F500)
 
   DESCRIPTORS

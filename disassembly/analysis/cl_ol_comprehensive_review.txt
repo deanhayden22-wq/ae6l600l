@@ -260,9 +260,14 @@ COMPLETE LOGIC FLOW (pseudocode):
 
       // ---- CHECKS 8-11: Delay-Based Transition ----
       // These use tables for gradual transition:
-      //   CAL[0xCCD78]: Throttle threshold with delay (all zeros in both ROMs)
-      //   CAL[0xCE5F8]: engine_load threshold with delay (all zeros in both ROMs)
-      //   CAL[0xCE640]: RPM-based counter step [0,0,0,0,0,1,2,3]
+      //   CAL[0xCCD78]: Throttle threshold with delay, 16 x uint8
+      //                 = 86.03% for 13 rows then 0,0,0   (stock == 20.19c)
+      //   CAL[0xCE5F8]: BASE PULSE WIDTH threshold with delay, 16 x uint16
+      //                 = 5.3..0.0 ms vs RPM             (stock == 20.19c)
+      //                 NOT engine load -- it is an absolute ms threshold
+      //   CAL[0xCE640]: MAF-based counter step, 10 x uint16 = all 1s
+      //   (all three corrected 2026-07-28; see corrections.md item 38 -- they
+      //    were read as float32 and reported as zeros)
       // In modified ROM with delay=0, these are moot
 
       // ---- NO CONDITION TRIGGERED ----

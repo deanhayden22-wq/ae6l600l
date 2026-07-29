@@ -5,6 +5,74 @@ tinywrex variant). Re-verify against
 `definitions/AE5L600L 2013 USDM Impreza WRX MT.xml` before relying on
 any value.
 
+## Before you tune a Cruise table: does it ever run?
+
+Added 2026-07-28 from ROM bytes — see [corrections.md](corrections.md) item 38
+and `disassembly/analysis/map_switching_analysis.txt` Section 1.
+
+**Cruise is rarely active on this car, and in 20.19c most of the pairs are
+identical anyway.** Two separate reasons, both worth knowing before spending
+time on a Cruise table.
+
+### 1. The entry gate closes at 3200 RPM
+
+A torque-domain value (`0xFFFF85E4`) is tested against two RPM-indexed
+hysteresis curves. Values in descriptor units (raw × 0.00625):
+
+| RPM | 300 | 400–1600 | 2000 | 2400 | 2800 | 3200 | 3600+ |
+|---|---|---|---|---|---|---|---|
+| **enter** cruise below | 340 | 130 | 110 | 90 | 55 | **0** | 0 |
+| **exit** cruise at/above | 350 | 180 | 160 | 140 | 105 | 70 | **0** |
+
+The enter curve is zero from 3200 RPM up — cruise cannot be entered above 3200
+at *any* torque. The exit curve is zero from 3600 up — it is force-cleared
+there. City cruise (2400–3200) and highway cruise (2800–3600) sit on and above
+that ceiling.
+
+On top of that: a **250-count dwell** (`0xD9AD8`) that any transient resets to
+zero, and a **375-count re-entry lockout** (`0xD9ADA`) after every dropout. The
+scheduler rate is not established, so these cannot be converted to seconds.
+
+Curve data: `0xD9BE4` (enter) / `0xD9C44` (exit), uint16 ×16; axes `0xD9BA4` /
+`0xD9C04`, float RPM ×16. **None of this has an ECUFlash definition** — it is
+raw-byte territory. It is byte-identical to stock in 20.19c.
+
+### 2. In 20.19c most pairs are already identical
+
+Cells differing between the Cruise and Non-Cruise side (via `scripts/defs.py`):
+
+| Pair | 20.19c | stock |
+|---|---|---|
+| Base Timing Primary | **0/306** | 121 |
+| Base Timing Reference (AVCS) | **0/306** | 121 |
+| Knock Correction Advance Max | **0/306** | 68 |
+| Intake Cam Advance (AVCS) | **0/288** | 96 |
+| Target Throttle Plate | **0/256** | 162 |
+| Engine Load Compensation | 0/154 | 0 |
+| Timing Compensation Imm. A / B | 0/16 each | 0 |
+| CL Fueling Target Comp (ECT) | 18/48 | 18 |
+| Cranking Fuel IPW Comp (RPM) | 17/35 | 17 |
+| Min Primary Base Enrichment 1 | 63/144 | 63 |
+
+Where the count is 0 the blend cannot change anything — editing only the Cruise
+copy of those is a no-op unless you also intend the Non-Cruise copy to diverge.
+Re-run the comparison after any new rev; these counts go stale silently.
+
+### Two different consumption modes
+
+- **Base timing** uses the ramped blend `0xFFFF90A8`
+  (`result = ratio × NonCruise + (1 − ratio) × Cruise`), so it crossfades.
+- **Cranking Fuel IPW Comp** and **Timing Compensation Imm. A/B** hard-select
+  off the raw flag `0xFFFF90BE` — they snap, no interpolation.
+
+### Do not use these names
+
+The 48 `Map Switching *` tables in the project XML (`0xD29AC`, `0xD2A08`–
+`0xD2ABC`) are project-invented — none appear in `32BITBASE.xml` — and **none
+of them gates cruise**. Known wrong: "Vehicle Speed Low/High Threshold"
+(`0xD2A14`/`0xD2A18`) are RPM bounds; "IAT Threshold" (`0xD2A1C`) is compared
+against ECT; "MAF/Load Threshold" (`0xD2A10`) is compared against vehicle speed.
+
 The project XML overrides base XML axis sizes for several of these.
 Values below are from the project XML, with scalings inherited from
 `definitions/32BITBASE.xml`. Confirmed by reading raw bytes from rev

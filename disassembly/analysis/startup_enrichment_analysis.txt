@@ -104,7 +104,14 @@ Gate:   FFFF65F1 == 0 AND FFFF726C == 1
 Inputs:
   FR15 = float@FFFF6624  (rpm_current)
   FR14 = float@FFFF6350  (ECT)
-  Mode:  0x22CF4 (engine_mode_check) + FFFF90BE (ect_mode_flag)
+  Mode:  0x22CF4 (engine_mode_check) + FFFF90BE (cruise_request_flag)
+         RENAMED 2026-07-28 (corrections item 38): 0xFFFF90BE has exactly
+         ONE writer in the ROM, 0x0611BC in the cruise ramp — it is the
+         cruise-request flag, not an ECT mode. The Cruise/Non-Cruise
+         column labels below were already right and are what confirmed
+         the polarity: 0 = Non-Cruise, 1 = Cruise.
+         NOTE this is a HARD table select off the raw flag, not the
+         ramped blend at 0xFFFF90A8 — it snaps, it does not interpolate.
 
 Descriptor selection (2D table, RPM × ECT):
 
@@ -380,7 +387,7 @@ Consumer:  0x3F374  (ect_warmup_consumer, 2050 bytes — per-cylinder timing)
 
 Mode selection — 2 flags select among 4 ECT curves:
 
-  Flag A:  FFFF90BE  (ect_mode_flag)
+  Flag A:  FFFF90BE  (cruise_request_flag; 0 = Non-Cruise, 1 = Cruise)
   Flag B:  FFFF6254  (maf_current)
 
   ┌──────────────┬────────────────────┬────────────────────┐
@@ -670,7 +677,8 @@ SECTION 12: COMPLETE RAM VARIABLE CATALOG
 
   ─── ECT Timing Correction Variables ─────────────────────────────────
 
-  FFFF90BE    ect_mode_flag           byte     timing curve selection
+  FFFF90BE    cruise_request_flag     byte     0=Non-Cruise 1=Cruise; sole
+                                               writer 0x0611BC. item 38.
   FFFF6350    ECT_float               float    coolant temp (timing input)
   FFFF7F68    ect_blend_correction   float    timing correction output
   FFFF7E94    warmup_corr_cyl1        float    per-cylinder timing adj

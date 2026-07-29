@@ -424,11 +424,15 @@ every SH-2E FPU encoding correctly). See docs/architecture.md.
 ;     Tasks 44/45 (0x4317A/0x431B0): RPM + MAF timing lookup pair.
 ;       Both ref same calibration (0xD2D10) and descriptors (0xADFC0).
 ;     Task 46 (0x43368): References MAF voltage (0xFFFF6650/6654), manifold
-;       pressure (0xFFFF6790), boost (0xFFFF6810). Calls low_pw_table_proc.
+;       pressure (0xFFFF6790), boost (0xFFFF6810). Calls the 1D uint8 lookup
+;       engine 0xBE874 (formerly mislabelled "low_pw_table_proc" -- it is a
+;       generic lookup, not injector-specific; corrections.md item 36).
 ;       Likely injector dead-time or manifold-pressure timing compensation.
 ;     Task 47 (0x43464): Map Switching integration — references Map Switch
 ;       Torque Ratio (0xD2A0C), IAT Threshold (0xD2A1C), plus Low PW
-;       Injector Comp thresholds (0xD2D20-0xD2D2C). Calls low_pw_table_proc.
+;       the RPM/torque-ratio gate constants (0xD2D20-0xD2D2C -- named "Low PW
+;       Injector Comp" in the XML but not injector-related, item 36).
+;       Calls the 1D uint8 lookup engine 0xBE874.
 ;     Task 48 (0x4359C): Final timing/injector output — reads throttle,
 ;       MAF, boost pressure (0xFFFF6812). 4 JSR calls + BSR to 0x436B6.
 ;
@@ -1196,20 +1200,53 @@ every SH-2E FPU encoding correctly). See docs/architecture.md.
 ; ═════════════════════════════════════════════════════════════════════════════
 ; Found via gate function (0x043470) literal pool and 0xAE000 descriptor analysis.
 ;
+; !! NOT AN INJECTOR FEATURE.  Corrected 2026-07-28 -- corrections.md item 36.
+; !! The definition name "Low Pulse Width Fuel Injector Compensation" is bound to
+; !! an address that is nothing of the kind on this ROM.  Everything below is
+; !! re-derived from ROM bytes.  Do NOT rescale any of it for an injector swap.
+;
 ; ─── Code Functions ────────────────────────────────
-;   0x043470:  LowPW_GateFunction    - Gate check: RPM < max and IPW < max
-;   0x0BE874:  LowPW_TableProcessor  - Table lookup engine called by gate function
-;   0x0BECA8:  LowPW_AxisLookup      - Axis lookup / interpolation helper
+;   0x043470:  MapSwitch/TimingState gate - NOT an IPW gate.  Reads
+;              torque_ratio (0xFFFF62F8), vehicle speed (0xFFFF65FC),
+;              RPM (0xFFFF6624), ECT (0xFFFF6350), clutch_state (0xFFFF5BE3);
+;              result byte -> 0xFFFF80EC (timing_comp_lowpw_state).
+;   0x0BE874:  1D uint8 table lookup engine.  Signature verified:
+;              0BE876 mov.w @(0,r4),r0   ; element count from descriptor+0
+;              0BE878 mov.l @(4,r4),r1   ; axis  ptr from descriptor+4
+;              0BE87A bsr  0x0BECA8      ; axis search, INPUT IS FR4
+;              0BE87C fmov fr4,fr0       ; (delay slot)
+;              0BE880 mov.l @(8,r4),r1   ; data  ptr from descriptor+8
+;              0BE88A extu.b r0,r0       ; returns a BYTE
+;   0x0BECA8:  Axis lookup / interpolation helper
 ;
 ; ─── Calibration Data ──────────────────────────────
-;   0xD2D20:  LowPW_GateThresh_FR8_Max  - Max FR8 gate threshold (float)
-;   0xD3988:  Y axis - Base Pulse Width (8 x float32): 0.7 to 4.5 ms
-;   0xD39A8:  Data - Low PW Fuel Injector Compensation (8 x uint8)
-;             Scaling: InjectorPulseWidthCompensation
-;   0xD2D28:  Low PW fuel injector comp maximum RPM (float)
-;             Currently = 10000 RPM (feature effectively disabled)
-;   0xD2D2C:  Low PW fuel injector comp maximum IPW (float)
-;             Currently = 10000 raw = 10.0 ms (feature effectively disabled)
+;   0xD2A0C:  torque-ratio lower gate (0.8798) - shared with map switching
+;   0xD2D20:  torque-ratio upper gate (100.0)
+;   0xD2D24:  gate compared against VEHICLE SPEED at 0x0434A6; = 0.0, and the
+;             test is (0.0 > speed), so it is never satisfied.  This alone makes
+;             the whole lookup branch dead on this ROM.
+;   0xD3988:  Axis - ENGINE SPEED (8 x float32): 700, 800, 900, 1400, 2000,
+;             2500, 3500, 4500 RPM.  The definition XML calls this
+;             "Injector Pulse Width" in ms; it is not.  At 0x0434C2 the caller
+;             has FR4 = [0xFFFF6624] = RPM, and 0xBE874 takes its axis input in
+;             FR4.  descriptor_map.txt and named_descriptors.txt independently
+;             classify 0x0AE000 as 1D_RPM_f32_8 with range [700.0..4500.0].
+;   0xD39A8:  Data - 8 x uint8, all zero in stock and in every 20.x rev.
+;             Result is stored to 0xFFFF80EC, a timing-state byte, not to any
+;             fuelling variable.
+;   0xD2D28:  LOWER bound of an RPM window (float, 10000.0).
+;             0434AE fcmp/gt fr4,fr8 / 0434B0 bt -> exit when (val > RPM),
+;             i.e. continue only if RPM >= val.
+;   0xD2D2C:  UPPER bound of the same RPM window (float, 10000.0).  The XML
+;             calls this "maximum IPW" and scales it x*.001 to show 10.0 ms.
+;             It is compared against FR4 = RPM at 0x0434B6, not against a pulse
+;             width.  Window is [10000, 10000) = empty.
+;   0xD2A1C:  ECT gate (80.0), compared against FR6 = [0xFFFF6350].
+;
+;   Only ONE literal reference exists anywhere in the 1 MB image for each of
+;   0xD2D20/24/28/2C (0x043544/48/4C/50, all in this one function's pool) and
+;   for descriptor 0x0AE000 (0x043558).  There is no second, injector-side
+;   consumer.
 
 ; ─────────────────────────────────────────────────────
 ; CALIBRATION TABLE DIRECTORY  (590+ tables)
@@ -2106,10 +2143,10 @@ every SH-2E FPU encoding correctly). See docs/architecture.md.
               ; Ignition Timing - Compensation  [2D]  (Ignition Advance Multiplier (IAM))
   000D2D20:  Low PW Fuel Injector Comp Gate Threshold (FR8 Max)
               ; ALPHA Low PW Injector Comp  [1D]  (float, gate threshold)
-  000D2D28:  Low PW Fuel Injector Comp Maximum RPM
-              ; ALPHA Low PW Injector Comp  [2D]  (Engine Speed (RPM))  currently 10000 = disabled
-  000D2D2C:  Low PW Fuel Injector Comp Maximum IPW
-              ; ALPHA Low PW Injector Comp  [2D]  (Base Pulse Width (ms))  currently 10.0 ms = disabled
+  000D2D28:  RPM window LOWER bound (XML: "Low PW Fuel Injector Comp Maximum RPM")
+              ; NOT injector-related -- corrections.md item 36  [2D]  (Engine Speed (RPM))  10000
+  000D2D2C:  RPM window UPPER bound (XML: "Low PW Fuel Injector Comp Maximum IPW")
+              ; NOT ms -- compared against RPM at 0x0434B6.  corrections.md item 36.  10000
   000D2D38:  Timing Compensation Per Gear Activation (RPM)
               ; Ignition Timing - Compensation  [2D]  (Engine Speed (RPM))
   000D2D40:  Timing Compensation Per Gear Activation (Load)
@@ -2188,10 +2225,10 @@ every SH-2E FPU encoding correctly). See docs/architecture.md.
               ;   [Y Axis]  (Degrees F)
   000D38A0:  Timing Compensation B (IAT)
               ; Ignition Timing - Compensation  [2D]  (Ignition Timing Correction (degrees))
-  000D3988:  Low PW Fuel Injector Comp - Base Pulse Width Axis (Y)
-              ; ALPHA Low PW Injector Comp  [axis]  (8 floats: 0.7-4.5 ms)
-  000D39A8:  Low Pulse Width Fuel Injector Compensation
-              ; ALPHA Low PW Injector Comp  [2D]  (8 x uint8, InjectorPulseWidthCompensation)
+  000D3988:  ENGINE SPEED axis (Y) -- XML calls it "Base Pulse Width"
+              ; NOT ms -- corrections.md item 36  [axis]  (8 floats: 700-4500 RPM)
+  000D39A8:  Timing-state byte table (XML: "Low Pulse Width Fuel Injector Compensation")
+              ; NOT injector-related -- corrections.md item 36  [2D]  (8 x uint8, all zero)
   000D3C04:  Engine Speed
               ;   [Y Axis]  (RPM)
   000D3C2C:  Rough Correction Learning Delay (Increasing)_

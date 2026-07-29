@@ -1400,6 +1400,16 @@ Source legend: B = 32BITBASE, R = AE5L600L (ROM-specific), M = MerpMod SD. `*` =
 
 ## Map Switching - Cruise/Non-Cruise  (48 tables)
 
+> **WARNING (2026-07-28, corrections.md item 38): every name in this section is
+> project-invented and none of these tables gates cruise/non-cruise.** Zero of
+> the 48 occur in `32BITBASE.xml`. The real cruise decision is calibrated at
+> `0xD9AC4`–`0xD9E26`, which has **no definitions at all**; the dwell thresholds
+> are `0xD9AD8` (250) and `0xD9ADA` (375). Names known to be wrong: "Vehicle
+> Speed Low/High Threshold" (`d2a14`/`d2a18`) are RPM bounds; "IAT Threshold"
+> (`d2a1c`) is compared against ECT; "MAF/Load Threshold" (`d2a10`) is compared
+> against vehicle speed. The block these describe is a stationary/idle
+> classifier. See `disassembly/analysis/map_switching_analysis.txt` Section 1.
+
 | Name | Addr | Type | Scaling | Src |
 |---|---|---|---|---|
 | Map Switch Ramping Adder A | `d2a60` | 1D | MapSwitchRatio | R |

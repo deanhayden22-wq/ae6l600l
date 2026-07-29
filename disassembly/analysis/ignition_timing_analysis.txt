@@ -514,9 +514,11 @@ SECTION 4: PHASE 3 -- FINAL TIMING & PER-CYLINDER
   final timing advance.
 
   Inputs:
-    FFFF63F8  iat_current
-    FFFF7F4C  timing_workspace
-    FFFF90A8  timing_state
+    FFFF63F8  engine_load        (corrections item 9; was "iat_current")
+    FFFF7F4C  rpm_current_timing_copy  (corrections item 22; ENGINE SPEED)
+    FFFF90A8  map_blend_ratio    (corrections item 38; cruise/non-cruise
+                                  blend weight, 0.0=Cruise 1.0=Non-Cruise.
+                                  Was "timing_state".)
     FFFF826C  knock_retard_value
     FFFF8214  knock_history
     FFFF8204  knock_flag_computed

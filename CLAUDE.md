@@ -97,6 +97,12 @@ its status. Two worth carrying in your head:
   Several "sensors" are diagnostic plumbing read only as bytes: `FFFF67EC` is a
   uint16 DTC counter, `FFFF65C0` a precondition flag. Real throttle is
   `FFFF62DC` (plate) and `FFFF64D8` (**pedal**, not throttle_raw).
+- **The cruise/non-cruise blend ratio is `0xFFFF90A8`, not `0xFFFF7F60`**
+  (item 38). The decision is the `0x60ECC`–`0x6114E` chain calibrated at
+  `0xD9AC4`–`0xD9E26`, **not** tasks 50/32/31/33 and **not** the `0xD29AC` /
+  `0xD2A08` constants. All 48 `Map Switching *` definition names are
+  project-invented (zero hits in `32BITBASE.xml`) and none of them gates
+  cruise — treat that whole category as unverified naming.
 
 ## Definitions are primary ground truth — and check the flag before trusting an area
 
@@ -165,12 +171,17 @@ block and every RAM variable carries exactly one flag in
 | `CONFLICT` | **Stop.** Two independent sides disagree. Settle it from ROM bytes, record it in `docs/corrections.md`, then continue. |
 | `DEFS-ONLY` / `DISASM-ONLY` / `UNMAPPED` | No cross-check exists. Say so in whatever you write (rule 6 above). |
 
-Current state (4,724 entities): **356 VERIFIED-BOTH, 293 VERIFIED-BYTES,
-0 CONFLICT, 53 BOUNDS-SUSPECT, 21 DEFS-ONLY, 917 DISASM-ONLY, 3,084 UNMAPPED**,
+Current state (4,725 entities): **351 VERIFIED-BOTH, 293 VERIFIED-BYTES,
+2 CONFLICT, 53 BOUNDS-SUSPECT, 21 DEFS-ONLY, 927 DISASM-ONLY, 3,078 UNMAPPED**,
 and **79.9% of data-classified ROM bytes are claimed by neither side.**
-Zero CONFLICTs means nothing is *known* to disagree — not that the rest is right;
-only ~14% is verified at all. Most of this ROM is not
+The 2 CONFLICTs are `0xC0BCC` and `0xD6214`, both storagetype disagreements
+(commit `b0f560f`). Only ~14% is verified at all. Most of this ROM is not
 verified. Treat an unflagged or `UNMAPPED` area as unknown, not as safe.
+
+> A flag of `VERIFIED-BOTH` covers the *definition vs. ROM-code* cross-check.
+> It does **not** mean the table's NAME is right. `0xD39A8` was a well-formed
+> entity whose name, axis units and data scaling were all wrong for this ROM —
+> caught only by decoding its single consumer. See `docs/corrections.md` item 36.
 
 ### Regenerate it — never hand-edit it
 

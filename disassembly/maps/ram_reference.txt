@@ -11,6 +11,17 @@ Total addresses: 858 | Named: 497 | Unnamed: 361 (low-ref infrastructure, exclud
 !!   FFFF620C : was airflow_maf_current -> MANIFOLD PRESSURE
 !!   FFFF61CC : was vehicle_speed       -> DIAG MONITOR STATUS BYTES (not a float)
 
+!! CORRECTION 2026-07-28 (corrections.md item 38)
+!!   FFFF90A8 : was timing_dispatch_state -> CRUISE/NON-CRUISE BLEND RATIO
+!!              (float, 0.0 = full Cruise, 1.0 = full Non-Cruise)
+!!   Sole write site in the ROM: 0x0611E0 `F60A fmov.s fr0,@r6`.
+!!   0xFFFF7F60 is NOT the ratio -- it is a uint16 timing-path counter.
+!!   Newly named in the same pass (decision chain 0x60ECC..0x6114E):
+!!     FFFF90BE cruise_request_flag   FFFF90C4 cruise_armed_flag
+!!     FFFF90B2 cruise_dwell_ctr_A    FFFF90B4 cruise_lockout_ctr_B
+!!     FFFF911A cruise_armed_prev     FFFF9116 cruise_rpm_torque_band
+!!     FFFF9117 cruise_temp_band
+
   Method that settled it (three independent derivations agreeing):
    1. Definition-named axes. A RAM variable is traced to the lookup axis it
       feeds; the definition XMLs NAME that axis. 0xFFFF63F8 feeds 21/21 axes
@@ -227,7 +238,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      13  0xFFFFAF73  diag_fault_history_byte               Diagnostic fault history byte. Part of diag_state_A (0xFFFFAF70-0xFFFFAFAB).                                  
      12  0xFFFF3C80  cal_mirror_timer_workspace            Cal mirror timer workspace. Cal mirror timer region.
      12  0xFFFF6540  o2_sensor_conditioned                Conditioned O2 sensor value (float). Rate-limited ±0.02/cycle. AFC PI error input.
-     12  0xFFFF90A8  timing_dispatch_state                Timing dispatch state. Read by task01, task10, task32. Called "timing_state" in ign analysis.
+     12  0xFFFF90A8  map_blend_ratio                      CORRECTED 2026-07-28 (corrections item 38): CRUISE/NON-CRUISE BLEND RATIO (float, 0.0=full Cruise 1.0=full Non-Cruise). Sole writer 0x0611E0 fmov.s fr0,@r6. Consumed by task32 lerp at 0x4001D6-0x4001EA. Was "timing_dispatch_state"/"timing_state".
      12  0xFFFF9FE4  sched_timer_extended_B               Scheduler extended timer B. Scheduler timer cluster.
      12  0xFFFFAD18  diag_active_fault_C                  Active fault status byte C. diag_state_E array offset +0x04.
      12  0xFFFFAD20  diag_active_fault_D                  Active fault status byte D. diag_state_E array offset +0x0C.
@@ -960,7 +971,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF9058    32  sched_state_A                        32 refs. Scheduler state variable A.
   0xFFFF9070    19  scheduler_state_B                    Scheduler state variable B
   0xFFFF9094    30  sched_task_GBR                       36 refs. Scheduler task GBR base (6 GBR uses).
-  0xFFFF90A8    12  timing_dispatch_state                Timing dispatch state. Read by task01, task10, task32.
+  0xFFFF90A8    12  map_blend_ratio                      Cruise/non-cruise blend ratio (float, 0.0=Cruise, 1.0=Non-Cruise). Sole writer 0x0611E0. corrections item 38.
   0xFFFF922C    16  scheduler_counter                    Scheduler counter variable
   0xFFFF9FA8    17  sched_timer_B                        17 refs. Scheduler timer variable B.
   0xFFFF9FC6    22  sched_timer_base                     22 refs. Scheduler timer base. GBR base (3 uses).

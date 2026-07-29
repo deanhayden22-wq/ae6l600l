@@ -3139,15 +3139,31 @@ PART 3: STOCK vs MODIFIED CALIBRATION VALUES (CL/OL related)
     [2] 0x0CCD80: Stock=-0.0000  Mod=-0.0000
     [3] 0x0CCD84: Stock=-0.0000  Mod=-0.0000
 
-  0x0CE5F8: CL to OL Transition with Delay (BPW) - 8 values
-    [0] 0x0CE5F8: Stock=0.0000  Mod=0.0000
-    [1] 0x0CE5FC: Stock=0.0000  Mod=0.0000
-    [2] 0x0CE600: Stock=0.0000  Mod=0.0000
-    [3] 0x0CE604: Stock=0.0000  Mod=0.0000
-    [4] 0x0CE608: Stock=0.0000  Mod=0.0000
-    [5] 0x0CE60C: Stock=0.0000  Mod=0.0000
-    [6] 0x0CE610: Stock=0.0000  Mod=0.0000
-    [7] 0x0CE614: Stock=0.0000  Mod=0.0000
+  0x0CE5F8: CL to OL Transition with Delay (BPW) - 16 values, uint16, x*.004 ms
+            indexed by the RPM axis at 0x0CE5B8 (0..6000 in 400 RPM steps)
+    [ 0]  0 RPM: Stock=5.300 ms  Mod=5.300 ms   (raw 1325)
+    [ 1]  400  : Stock=5.300     Mod=5.300      (raw 1325)
+    [ 2]  800  : Stock=5.300     Mod=5.300      (raw 1325)
+    [ 3] 1200  : Stock=5.700     Mod=5.700      (raw 1425)
+    [ 4] 1600  : Stock=6.700     Mod=6.700      (raw 1675)
+    [ 5] 2000  : Stock=6.600     Mod=6.600      (raw 1650)
+    [ 6] 2400  : Stock=6.600     Mod=6.600      (raw 1650)
+    [ 7] 2800  : Stock=6.500     Mod=6.500      (raw 1625)
+    [ 8] 3200  : Stock=6.300     Mod=6.300      (raw 1575)
+    [ 9] 3600  : Stock=5.600     Mod=5.600      (raw 1400)
+    [10] 4000  : Stock=4.100     Mod=4.100      (raw 1025)
+    [11] 4400  : Stock=3.600     Mod=3.600      (raw  900)
+    [12] 4800  : Stock=1.800     Mod=1.800      (raw  450)
+    [13] 5200  : Stock=0.000     Mod=0.000      (raw    0)
+    [14] 5600  : Stock=0.000     Mod=0.000      (raw    0)
+    [15] 6000  : Stock=0.000     Mod=0.000      (raw    0)
+
+    CORRECTED 2026-07-28 (corrections.md item 38).  This block previously listed
+    8 float32 values, all 0.0000, at stride 4.  Wrong on all three counts: the
+    table is 16 uint16 at stride 2.  The float32 misread turns the byte pairs
+    into denormals (0x052D052D -> 8.1e-36) that print as 0.0000.  These are the
+    ONLY absolute-pulse-width values in the CL/OL path, which makes them the
+    ones an injector swap would have to rescale -- see docs/injector-rescale.md.
 
   0x0CE640: CL to OL Transition Counter Step Value (MAF) - 8 values
     [0] 0x0CE640: Stock=0.0000  Mod=0.0000

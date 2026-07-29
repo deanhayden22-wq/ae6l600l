@@ -4,51 +4,236 @@ AE5L600L (2013 Subaru WRX MT) — Renesas SH7058 (SH-2)
 ================================================================================
 
 Subsystem: Cruise/Non-Cruise Map Switching + Timing Blend Interpolation
-Tasks: 31, 32, 33, 50
-Code range: 0x3F368 - 0x410D4
-Calibration range: 0xD29AC - 0xD2B1C
-Primary RAM: 0xFFFF7F60 (map_ratio workspace base), 0xFFFF7F0C (timing_blend_gbr)
-  NOTE: The actual blend ratio output is at 0xFFFF7F4C (offset -0x14 from base).
-Based on: map_switching_raw.txt disassembly trace
+Tasks: 31, 32, 33, 50 (application) + the 0x60ECC..0x6114E chain (decision)
+Code range: 0x3F368 - 0x410D4, plus 0x60ECC - 0x611EA
+Calibration range: 0xD29AC - 0xD2B1C (blend/timing), 0xD9AC4 - 0xD9E26 (decision)
+Primary RAM: 0xFFFF90A8 (BLEND RATIO), 0xFFFF7F0C (timing_blend_gbr)
+Based on: map_switching_raw.txt disassembly trace, re-derived from ROM bytes
+          2026-07-28 (see docs/corrections.md item 38)
+
+*** READ THIS BEFORE USING SECTIONS 3-8 ***
+This file's original framing was wrong in three structural ways, corrected
+2026-07-28. Sections 1 and 2 below are the re-derived truth. Sections 3-8
+describe task 50 / 31 / 33, which are ADJACENT timing code, NOT the
+cruise/non-cruise decision; individual inverted comparisons in them have been
+fixed in place and are marked. In particular:
+  * The blend ratio is 0xFFFF90A8, not 0xFFFF7F60.
+  * 0xFFFF7F4C is ENGINE SPEED (corrections item 22), not a ratio.
+  * The `Map Switching *` definitions at 0xD29AC / 0xD2A08-0xD2ABC are
+    project-invented names (zero occurrences in 32BITBASE.xml) and do NOT
+    gate cruise. The real thresholds are 0xD9AD8 / 0xD9ADA.
 
 
 ================================================================================
-SECTION 1: OVERVIEW
+SECTION 1: OVERVIEW — THE DECISION CHAIN (re-derived 2026-07-28)
 ================================================================================
 
-The cruise/non-cruise map switching system determines how the ECU blends
-between two parallel sets of calibration tables. A floating-point ratio
-stored at FFFF7F60 (0.0 = full cruise, 1.0 = full non-cruise) controls
-the blend. This ratio affects timing, fueling, knock limits, AVCS, and
+The cruise/non-cruise system blends between two parallel sets of calibration
+tables. A float at 0xFFFF90A8 is the blend weight: 0.0 = full Cruise,
+1.0 = full Non-Cruise. It affects timing, fueling, knock limits, AVCS and
 throttle response.
 
-Four scheduler tasks implement the system:
+1.1  Four functions, called back-to-back from one parent
+────────────────────────────────────────────────────────
 
-  Task 50 @ 0x3F368: Main evaluator - reads sensors, evaluates switching
-                     criteria, computes timing corrections per-cylinder
-  Task 32 @ 0x4004A: Blend ratio application - applies the ratio to
-                     descriptor table lookups
-  Task 31 @ 0x3FFD6: Blend ratio bounds checker - enforces floor/ceiling
-  Task 33 @ 0x40918: Timing workspace initializer - dispatches sub-functions
-                     for ECT-based descriptor selection
+  0605E6: B471  bsr 0x060ECC
+  0605EA: B57C  bsr 0x0610E6
+  0605EE: B597  bsr 0x061120
+  0605F2: B5AC  bsr 0x06114E
+
+  0x060ECC  evaluates the cruise CONDITION; maintains counter 0xFFFF90B2,
+            resetting it to 0 the instant any gate fails
+  0x0610E6  ARMS cruise: writes flag 0xFFFF90C4 once both dwell counters
+            have reached their ROM thresholds
+  0x061120  maintains counter 0xFFFF90B4 — the re-entry lockout, reset only
+            on the falling edge of 0xFFFF90C4
+  0x06114E  ramps the blend ratio 0xFFFF90A8 toward the requested end
+
+0xFFFF90A8 has exactly ONE write site in the ROM:
+
+  0611DE: D621  mov.l @(0x061264),r6
+  0611E0: F60A  fmov.s fr0,@r6
+
+1.2  Ramp direction and rate
+────────────────────────────
+
+  0611BE: C416  mov.b @(22,gbr),r0     ; GBR=0xFFFF90A8, +22 => 0xFFFF90BE
+  0611C0: 2008  tst r0,r0
+  0611C4: 8F04  bf/s 0x0611D0          ; flag != 0 -> SUBTRACT branch
+  0611C6: F468  fmov.s @r6,fr4         ; delay slot: fr4 = current ratio
+  0611CA: F928  fmov.s @r2,fr9         ; fr9 = [0xD9B40] = 0.008
+  0611CE: F490  fadd fr9,fr4           ; flag == 0: ratio += 0.008
+  0611D2: F828  fmov.s @r2,fr8         ; fr8 = [0xD9B44] = 0.008
+  0611D4: F481  fsub fr8,fr4           ; flag != 0: ratio -= 0.008
+  0611DA: 420B  jsr @r2                ; 0xBE56C = clamp(fr4, fr5=0.0, fr6=1.0)
+
+  So 0xFFFF90BE == 1 means "cruise requested" and drives the ratio DOWN
+  toward 0.0 (Cruise). 0xFFFF90BE == 0 drives it UP toward 1.0 (Non-Cruise).
+  Rate is +/-0.008 per invocation, symmetric — 125 invocations for a full
+  swing. The scheduler rate of the 0x60562 parent is NOT established, so
+  this cannot be converted to seconds. Do not state one.
+
+1.3  Cruise-request flag (0xFFFF90BE), written at 0x0611BC
+──────────────────────────────────────────────────────────
+
+  flag = 0 (force Non-Cruise) if either fault byte is non-zero:
+      0x029AA0 returns 2 when [0xFFFF972E] != 0
+      0x0297B0 returns 2 when [0xFFFF9705] != 0
+  otherwise a selector byte at 0xD9AC4 chooses the source:
+      == 1            -> flag = 1 unconditionally
+      == 3            -> flag = ([0xFFFF9113] == 1)
+      == 4            -> flag = ([0xFFFF9113] == 0)
+      < 1 or > 4      -> flag = ([0xFFFF90C4] == 1)     <-- THIS ROM
+
+  0xD9AC4 is 0 in stock and in every 20.x rev, so the selector always falls
+  through to the 0xFFFF90C4 branch.
+
+1.4  Arming (0x0610E6) — the two dwell counters
+───────────────────────────────────────────────
+
+  0610E8: 8541  mov.w @(2,r4),r0       ; r4 = 0xFFFF90B0, so counter A @ 0xFFFF90B2
+  0610EC: 6251  mov.w @r5,r2           ; r2 = [0xD9AD8] = 250
+  0610EE: 3022  cmp/hs r2,r0           ; T = (counterA >= 250)
+  0610F0: 8B0E  bf 0x061110            ; fail -> write 0
+  0610FA: F985  fcmp/gt fr8,fr9        ; T = ([0xD9B2C]=4.0 > [0xFFFF90EC])
+  0610FC: 8903  bt 0x061106            ; below 4.0 -> skip the 0xFFFF90B0 test
+  061102: 3262  cmp/hs r6,r2           ; T = ([0xFFFF90B0] >= 1)
+  061104: 8904  bt 0x061110            ; fail -> write 0
+  061106: 8542  mov.w @(4,r4),r0       ; counter B @ 0xFFFF90B4
+  06110A: 6251  mov.w @r5,r2           ; r2 = [0xD9ADA] = 375
+  06110C: 3022  cmp/hs r2,r0           ; T = (counterB >= 375)
+  06110E: 8903  bt 0x061118            ; pass -> write 1
+  061118: E201  mov #1,r2
+  06111C: 000B  rts
+  06111E: 2620  mov.b r2,@r6           ; r6 = 0xFFFF90C4
+
+  Counter B (0x061120) is reset ONLY on the 1->0 edge of 0xFFFF90C4, latched
+  through 0xFFFF911A. It is therefore a re-entry LOCKOUT: after cruise drops,
+  375 counts must elapse before it can arm again.
+
+1.5  The condition itself (0x060ECC) — why cruise is rare
+─────────────────────────────────────────────────────────
+
+  The governing test compares a torque-domain value [0xFFFF85E4] against two
+  RPM-indexed curves forming a hysteresis band:
+
+  060F56: F8D6  fmov.s @(r0,r13),fr8   ; r13=0xFFFF9120, -44 => 0xFFFF90F4 (SET curve)
+  060F58: F8E5  fcmp/gt fr14,fr8       ; T = (curve > [0xFFFF85E4])
+  060F5A: 8B02  bf 0x060F62
+  060F5C: E001  mov #1,r0
+  060F60: C064  mov.b r0,@(100,gbr)    ; GBR=0xFFFF90B2, +100 => 0xFFFF9116 = 1
+  060F64: F8D6  fmov.s @(r0,r13),fr8   ; -40 => 0xFFFF90F8 (CLEAR curve)
+  060F66: F8E5  fcmp/gt fr14,fr8       ; T = (curve > [0xFFFF85E4])
+  060F68: 8901  bt 0x060F6E            ; still below -> hold
+  060F6C: C064  mov.b r0,@(100,gbr)    ; else 0xFFFF9116 = 0
+
+  Curves come from 1D descriptors 0xAF630 (SET) and 0xAF644 (CLEAR), axis
+  0xD9BA4 / 0xD9C04 (float RPM x16), data 0xD9BE4 / 0xD9C44 (uint16 x16,
+  descriptor multiplier 0x3BCCCCCC = 0.00625, offset 0.0).
+
+  Selector [0xFFFF5DB5] (cl_ol_gate_flag) picks between three descriptor
+  sets — 0xAF630/0xAF644, 0xAF658/0xAF66C, 0xAF680/0xAF694 — but all three
+  are BYTE-IDENTICAL in stock and every 20.x rev, so the choice is inert.
+
+  Values in descriptor units (raw x 0.00625):
+
+    RPM     300   400..1600   2000   2400   2800   3200   3600+
+    SET     340      130       110     90     55      0      0
+    CLEAR   350      180       180    160    140    105     70 -> 0 at 3600
+
+  The SET curve is ZERO from 3200 RPM up and the CLEAR curve is ZERO from
+  3600 up. Cruise therefore CANNOT be entered above 3200 RPM at any torque,
+  and is force-cleared above 3600 RPM. Combined with the 250-count dwell
+  (reset by any transient) and the 375-count re-entry lockout, this is why
+  the Cruise tables see very little residency in normal driving.
+
+  Raw table values (20800, 28800, 54400, ...) are divisible by 128 and match
+  the raw-torque encoding family used by the per-gear torque cap (44800 =
+  350). That correspondence is SUGGESTIVE, not proven: the exact physical
+  unit of 0xFFFF85E4 is unverified. Its writers are at 0xBC61C-0xBCA3E.
+
+1.6  Other gates on the same condition (all must hold)
+──────────────────────────────────────────────────────
+
+    [0xFFFF90E0] >= [0xD9B30] (-40.0)      — a sensor floor, effectively always true
+    [0xFFFF9116] == 1                      — the RPM/torque band above
+    [0xFFFF9117] == 1                      — hysteresis on [0xFFFF90F0]:
+                                             set below [0xD9B34]=45, clear at
+                                             [0xD9B38]=50. Temperature-shaped;
+                                             the identity of 0xFFFF90F0 is
+                                             UNVERIFIED — do not call it IAT.
+    [0xFFFF5E96] == 0
+  Any failure jumps to 0x0610CE, which zeroes counter A and restarts the dwell.
+
+1.7  Application
+────────────────
+
+  Task 32 (0x4004A) reads the ratio and linearly interpolates:
+
+  0401D6: F9F8  fmov.s @r15,fr9        ; fr9 = ratio, saved from [0xFFFF90A8]
+  0401DA: F6C6  fmov.s @(r0,r12),fr6   ; -28 => Non-Cruise result
+  0401DC: F862  fmul fr6,fr8           ; fr8 = ratio * NonCruise
+  0401DE: F09D  fldi1 fr0
+  0401E0: F091  fsub fr9,fr0           ; fr0 = 1.0 - ratio
+  0401E4: F9C6  fmov.s @(r0,r12),fr9   ; -32 => Cruise result
+  0401E6: F89E  fmac fr0,fr9,fr8       ; fr8 += (1-ratio) * Cruise
+
+      result = ratio * NonCruise + (1 - ratio) * Cruise
+
+  Descriptor -> table bindings, read out of the descriptor bytes:
+    0xAE31C -> 0xD4714  Base Timing Primary Cruise
+    0xAE338 -> 0xD48D4  Base Timing Primary Non-Cruise
+    0xAE354 -> 0xD4A94  Base Timing Reference Cruise
+    0xAE370 -> 0xD4C54  Base Timing Reference Non-Cruise
+
+1.8  In rev 20.19c the blend is a no-op for most pairs
+──────────────────────────────────────────────────────
+
+  Cruise vs Non-Cruise cell differences (via scripts/defs.py, 2026-07-28):
+
+    Base Timing Primary              0/306 differ  (stock: 121)
+    Base Timing Reference (AVCS)     0/306         (stock: 121)
+    Knock Correction Advance Max     0/306         (stock:  68)
+    Intake Cam Advance (AVCS)        0/288         (stock:  96)
+    Target Throttle Plate            0/256         (stock: 162)
+    Engine Load Compensation         0/154         (stock:   0)
+    Timing Compensation Imm. A / B   0/16 each     (stock:   0)
+    CL Fueling Target Comp (ECT)    18/48          (stock:  18)
+    Cranking Fuel IPW Comp (RPM)    17/35          (stock:  17)
+    Min Primary Base Enrichment 1   63/144         (stock:  63)
+
+  The decision calibration itself (0xD9AC0-0xD9E30) is byte-identical to
+  stock in 20.19c — it has never been tuned.
+
+Four further functions implement the ADJACENT timing blend, and are what
+Sections 3-8 document:
+
+  Task 50 @ 0x3F368: per-cylinder timing summation
+  Task 32 @ 0x4004A: blend application (Section 1.7 above)
+  Task 31 @ 0x3FFD6: blend scratch bounds
+  Task 33 @ 0x40918: timing workspace init / ECT descriptor selection
 
 Execution order: 50 → 32 → 31 → 33 (within the ignition timing pipeline)
 
 
 ================================================================================
-SECTION 2: MAP RATIO (FFFF7F60) STRUCTURE
+SECTION 2: TIMING WORKSPACE (FFFF7F60) STRUCTURE
 ================================================================================
 
-The map ratio is not just a single float. FFFF7F60 is the base of a small
-workspace structure accessed via byte/word offsets from R1 or R12:
+CORRECTED 2026-07-28: this workspace is NOT the map ratio. The blend ratio is
+0xFFFF90A8 (Section 1). FFFF7F60 is the base of a timing-pipeline workspace
+accessed via byte/word offsets from R1 or R12:
 
   Offset  Type    Address      Purpose
   ──────  ──────  ───────────  ──────────────────────────────────
-  +0x00   uint16  FFFF7F60     Cruise switch counter (current)
-  +0x02   byte    FFFF7F62     Cruise mode active flag
+  +0x00   uint16  FFFF7F60     Timing-path counter (gated on 0xD29D4 in task32)
+  +0x02   byte    FFFF7F62     First-cycle init flag for the prev/current pair
   +0x03   byte    FFFF7F63     SI-Drive mode latch
-  -0x14   float   FFFF7F4C     Blend ratio output (actual 0.0-1.0)
-  -0x24   float   FFFF7F3C     Blend output scratch (task31 output)
+  -0x14   float   FFFF7F4C     ENGINE SPEED — the base-timing / knock-advance
+                               copy. Feeds axis 0xD46CC "Base Timing Primary
+                               Cruise / Engine Speed". See corrections item 22.
+                               (Was wrongly called "Blend ratio output".)
+  -0x24   float   FFFF7F3C     Blend correction scratch (task31 output)
   -0x08   float   FFFF7F58     Current blended timing
   -0x04   float   FFFF7F5C     Previous blended timing
   -0x40   float   FFFF7F20     Timing blend lookup input
@@ -72,7 +257,13 @@ decision engine.
 Inputs loaded at entry:
   fr12 = rpm_current       (FFFF6624)
   fr14 = torque_ratio      (FFFF62F8)
-  fr15 = load_current      (FFFF65FC)
+  fr15 = vehicle_speed     (FFFF65FC)  -- see corrections.md item 9; the old
+                                          "load_current" label here is stale.
+                                          Note this file's own threshold list
+                                          below already reads it as a speed.
+                                          OPEN: D2A14/D2A18 hold 550/1300,
+                                          which are not km/h-shaped, so what
+                                          those two gate is unresolved.
   fr8  = ect_current       (FFFF6350) → saved to stack
   r12  = flkc_mode_byte    (FFFF8F16)
   r11  = timing_state_A    (FFFF8F24)
@@ -110,38 +301,67 @@ Triggered when flkc_mode_byte (r12) == 1 (non-idle, non-FLKC):
     GBR = FFFF7E90 → offset -0x40+GBR = FFFF7F04 (approximation unclear)
     → loads fr15 = pre-existing blend ratio
 
-3.3  High-Load Switching Path (0x3F476 → 0x3F49A)
-──────────────────────────────────────────────────
+3.3  Low-RPM Path (0x3F470 → 0x3F49A)  — COMPARISONS CORRECTED 2026-07-28
+──────────────────────────────────────────────────────────────────────────
 
 Conditions (ALL must be true):
-  1. timing_state_A (r11) == 1
-  2. check_engine_running returned 1 (check_engine_running equivalent)
-  3. timing_state_B (r10) == 1
-  4. ECT-based blend correction (FFFF7F68) > 0.0
-  5. RPM > MapSwitch_EngineSpeedThreshold (D2A08 = 2000 RPM)
+  1. timing_state_A (r11, [0xFFFF8F24]) == 1
+  2. the 0x05EB32 helper returned 1
+  3. timing_state_B (r10, [0xFFFF85D7]) == 1
+  4. ECT-based blend correction [0xFFFF7F68] <= 0.0
+  5. RPM < 2000 (0xD2A08)
 
-If all conditions met → loads fr15 from FFFF7F1C (pre-blended ratio)
+  03F488: F855  fcmp/gt fr5,fr8   ; T = ([0xFFFF7F68] > 0.0)
+  03F48A: 8906  bt 0x03F49A       ; > 0 -> LEAVE.  continue requires <= 0.0
+  03F490: F8C5  fcmp/gt fr12,fr8  ; n=8,m=12: T = (fr8 > fr12) = (2000 > RPM)
+  03F492: 8B02  bf 0x03F49A       ; RPM >= 2000 -> LEAVE.  continue requires < 2000
 
-3.4  Standard Non-Cruise Evaluation (0x3F49A → 0x3F584)
-────────────────────────────────────────────────────────
+  Both were stated inverted before ("> 0.0", "RPM > threshold"). This is the
+  LOW-rpm path, not a high-load path.
 
-This is the main switching decision. ALL of the following must be true
-for the ECU to select non-cruise mode:
+If all conditions met → loads fr15 from FFFF7F1C
 
-  1. Torque ratio > 0.8798         (D2A0C: MapSwitch_TorqueRatioThreshold)
-  2. Load > 2.0 g/rev              (D2A10: MapSwitch_MAFLoadThreshold)
-  3. Vehicle speed < 550            (D2A14: MapSwitch_VehicleSpeedLow)
-     Note: this is a "less than" check — LOW speed = non-cruise
-  4. Vehicle speed < 1300           (D2A18: MapSwitch_VehicleSpeedHigh)
-  5. Counter A (GBR+0x71) > 0      (delay timer hasn't expired)
-  6. Counter B tst == 0             (no other inhibit)
-  7. IAT < 80°F                    (D2A1C: MapSwitch_IATThreshold)
-     Wait — the check is fcmp/gt fr7,fr8 where fr8=threshold, fr7=IAT
-     So: threshold > IAT → bt (skip) means: if IAT >= 80°F → skip to cruise
-     Correct interpretation: IAT must be BELOW threshold for non-cruise
+3.4  Stationary / Idle Classifier (0x3F49A → 0x3F584)  — REWRITTEN 2026-07-28
+──────────────────────────────────────────────────────────────────────────────
 
-If all pass → loads fr15 from D2A38 (MapSwitch_SIDriveThreshold = 4.0)
-as the blend target, and falls through to the timing computation.
+This is NOT the cruise/non-cruise decision (that is Section 1). Every
+comparison in the original version of this section was inverted. Re-derived
+from bytes; `fcmp/gt FRm,FRn` sets T = (FRn > FRm), and `0xFnm5` has n in
+bits 8-11, m in bits 4-7.
+
+Register bindings at entry: fr12 = [0xFFFF6624] RPM, fr14 = [0xFFFF62F8]
+torque ratio, fr15 = [0xFFFF65FC] vehicle speed, stack@0 = [0xFFFF6350] ECT,
+r5 = extu.b [0xFFFF5BE3] clutch_state.
+
+  03F49E: F8E5  fcmp/gt fr14,fr8  ; T = (0.8798 > torque_ratio)   [0xD2A0C]
+  03F4A0: 8B70  bf 0x03F584       ; continue requires torque_ratio <  0.8798
+  03F4A6: F8F5  fcmp/gt fr15,fr8  ; T = (2.0 > vehicle_speed)     [0xD2A10]
+  03F4A8: 8B6C  bf 0x03F584       ; continue requires speed       <  2.0
+  03F4AE: F8C5  fcmp/gt fr12,fr8  ; T = (550 > RPM)               [0xD2A14]
+  03F4B0: 8968  bt 0x03F584       ; continue requires RPM         >= 550
+  03F4B6: F8C5  fcmp/gt fr12,fr8  ; T = (1300 > RPM)              [0xD2A18]
+  03F4B8: 8B64  bf 0x03F584       ; continue requires RPM         <  1300
+  03F4C2: 4615  cmp/pl r6         ; continue requires counter A (GBR+0x71) > 0
+  03F4C8: 2558  tst r5,r5
+  03F4CA: 8B5B  bf 0x03F584       ; continue requires clutch_state == 0
+  03F4D2: F875  fcmp/gt fr7,fr8   ; T = (80 > ECT)                [0xD2A1C]
+  03F4D4: 8956  bt 0x03F584       ; continue requires ECT         >= 80
+
+Read together: warm engine, vehicle stopped, RPM in the idle band 550-1300,
+low torque request, clutch released. That is a STATIONARY/IDLE classifier.
+
+RESOLVED OPEN ITEM: 0xD2A14 (550.0) and 0xD2A18 (1300.0) were flagged in
+docs/corrections.md as "not km/h-shaped, what they gate is unresolved". They
+are compared against fr12 = RPM, not against speed. 550/1300 RPM is an idle
+band, and the shape is now explained. The definition XML names
+"Map Switching Vehicle Speed Low/High Threshold" are wrong (project-invented;
+see Section 7.3).
+
+Also wrong before: 0xD2A1C was read against IAT. The compared value is
+stack@0, loaded at 0x03F394 from [0xFFFF6350] = ECT.
+
+If all pass → loads fr15 from D2A38 (= 4.0) and falls through to the timing
+computation.
 
 3.5  Secondary Switching Path (0x3F584 → 0x3F5D6)
 ──────────────────────────────────────────────────
@@ -207,8 +427,12 @@ GBR = FFFF7F0C.
 4.1  Inputs
 ───────────
   fr12 = rpm_current (FFFF6624)
-  fr14 = iat_current (FFFF63F8)
-  fr15 = gear_current (FFFF679C) — as float
+  fr14 = ENGINE LOAD (FFFF63F8)   <-- CORRECTED 2026-07-28, was "iat_current".
+         corrections.md item 9 settled 0xFFFF63F8 as engine load. This is also
+         what makes the descriptor calls coherent: 0xAE31C..0xAE370 are
+         Load x RPM tables, and Section 4.4 passes fr4 = fr14 as axis 0 and
+         fr5 = [0xFFFF7F4C] (engine speed) as axis 1.
+  fr15 = FFFF679C — as float
   fr9  = initial value from check_engine_running → either
          TimBlend_RPMLimit (D2B14 = 6000) or TimBlend_MinRatio (D2B10 = 0.0)
   r13  = idle_mode_flag (FFFF7BE2)
@@ -224,25 +448,36 @@ GBR = FFFF7F0C.
   In I mode (bit 0 set), the switching logic is enabled.
   In S mode (neither), it falls through to the cruise-only path.
 
-4.3  Counter Gate (GBR+0x54)
-────────────────────────────
-  Reads the cruise switch counter (uint16 at GBR+0x54 = FFFF7F60).
-  Compares against MapSwitch_BlendAppCal (D29D4).
-  If counter > threshold → skips to ratio = 0.0 (cruise mode).
+4.3  Counter Gate (GBR+0x54)  — CORRECTED 2026-07-28
+────────────────────────────────────────────────────
+  Reads a uint16 at GBR+0x54 = FFFF7F60 and compares against [0xD29D4] = 88.
 
-4.4  Descriptor Lookups
-───────────────────────
-  Four 2D descriptors are evaluated via table_desc_2d_typed (0xBE8E4):
+  04008E: C52A  mov.w @(84,gbr),r0
+  040094: 3026  cmp/hi r2,r0        ; T = (counter > 88), unsigned
+  040096: 8963  bt 0x040160
 
-    Descriptor @ 0xAE31C (Base Timing Primary Cruise)       — fr4=fr14(IAT), fr5=ratio
-    Descriptor @ 0xAE354 (Base Timing Reference Cruise)     — fr4=fr14(IAT), fr5=ratio
-    Descriptor @ 0xAE338 (Base Timing Primary Non-Cruise)   — fr4=fr14(IAT), fr5=ratio
-    Descriptor @ 0xAE370 (Base Timing Reference Non-Cruise) — fr4=fr14(IAT), fr5=ratio
+  It does NOT "skip to ratio = 0.0". 0x040160 stores fr15 into 0xFFFF7F4C,
+  i.e. it selects which ENGINE SPEED value feeds the base-timing lookups —
+  [0xFFFF679C] on this path versus [0xFFFF804C] on the path at 0x0400B2.
+  The blend ratio (0xFFFF90A8) is untouched by this branch.
 
-  These are the same base timing Load×RPM descriptors used in the
-  ignition timing pipeline. Task 32 accesses them with IAT and the
-  map ratio as lookup inputs — the descriptor processor evaluates
-  the underlying 2D tables and applies the ratio as a blend weight.
+4.4  Descriptor Lookups  — AXIS INPUTS CORRECTED 2026-07-28
+───────────────────────────────────────────────────────────
+  Four 2D descriptors are evaluated via table_desc_2d_typed (0xBE8E4), each
+  with fr4 = [0xFFFF63F8] (ENGINE LOAD) and fr5 = [0xFFFF7F4C] (ENGINE SPEED):
+
+    Descriptor @ 0xAE31C -> table 0xD4714  Base Timing Primary Cruise
+    Descriptor @ 0xAE354 -> table 0xD4A94  Base Timing Reference Cruise
+    Descriptor @ 0xAE338 -> table 0xD48D4  Base Timing Primary Non-Cruise
+    Descriptor @ 0xAE370 -> table 0xD4C54  Base Timing Reference Non-Cruise
+
+  Table addresses read out of the descriptor bytes, e.g.
+  0xAE31C = 0011 0012 000D4688 000D46CC 000D4714 04000000 3EB40000 C1A00000
+  = 17 x 18, axis0 0xD4688 (load), axis1 0xD46CC (RPM), data 0xD4714.
+
+  The previous text said the inputs were "IAT and the map ratio". Both were
+  wrong: the ratio is not a lookup axis, it is applied afterwards as the
+  blend weight in Section 4.5.
 
   Results stored as:
     fr15 = cruise primary timing
@@ -267,12 +502,13 @@ GBR = FFFF7F0C.
 
 4.6  Smoothing & Ramping
 ─────────────────────────
-  The timing blend uses a "previous vs current" smoothing step:
+  The blend itself (0x4001D6-0x4001EA, quoted in Section 1.7) is:
 
-    blended = blend_correction_A * map_ratio + (1.0 - map_ratio) * blend_correction_B
+    result = ratio × NonCruise + (1.0 - ratio) × Cruise
 
-  This is the classic formula:
-    result = cruise + (noncruise - cruise) × ratio
+  where ratio = [0xFFFF90A8], loaded at task-32 entry (0x04006A) and saved to
+  stack@0. Equivalent to cruise + (noncruise - cruise) × ratio. The result is
+  stored to GBR-0x08 = 0xFFFF7F58, with the previous cycle at 0xFFFF7F5C.
 
   First-cycle initialization check:
     if GBR+0x56 (byte) == 0 → copy current to previous, set flag to 1
@@ -400,8 +636,17 @@ Task 33 is a dispatcher that calls three sub-functions:
 SECTION 7: CALIBRATION PARAMETER REFERENCE
 ================================================================================
 
-7.1  Map Switching Thresholds (float, 0xD2A08-D2ABC)
-─────────────────────────────────────────────────────
+7.1  Thresholds (float, 0xD2A08-D2ABC)
+───────────────────────────────────────
+
+  NAMING WARNING (2026-07-28): every `Map Switching *` name below and in
+  definitions/AE5L600L 2013 USDM Impreza WRX MT.xml is PROJECT-INVENTED —
+  zero of them occur in definitions/32BITBASE.xml. None of these constants
+  gates the cruise/non-cruise decision (Section 1). The "Purpose" column
+  here is retained for continuity but is UNVERIFIED except where a
+  comparison has been re-derived in Section 3. Known wrong already:
+  0xD2A14/0xD2A18 are RPM bounds, not vehicle speed; 0xD2A1C is compared
+  against ECT, not IAT; 0xD2A10 is compared against vehicle speed, not load.
 
   Address    Value        Name                          Purpose
   ─────────  ───────────  ────────────────────────────  ────────────────────────
@@ -456,13 +701,38 @@ SECTION 7: CALIBRATION PARAMETER REFERENCE
   D2B18      0.0          RatioFloor                    Ratio floor (hard min)
   D2B1C      1.0          RatioCeiling                  Ratio ceiling (hard max)
 
-7.3  Delay Counters (uint16, 0xD29AC-D29B2)
-───────────────────────────────────────────
+7.3  Delay Counters (uint16, 0xD29AC-D29B2)  — MISNAMED, CORRECTED 2026-07-28
+──────────────────────────────────────────────────────────────────────────────
 
-  D29AC      50           CruiseSwitchCounterA          Ticks before switch A
-  D29AE      38           CruiseSwitchMinDelayA         Minimum delay A
-  D29B0      100          CruiseSwitchCounterB          Ticks before switch B
-  D29B2      38           CruiseSwitchMinDelayB         Minimum delay B
+  D29AC      50           (defs call it CruiseSwitchCounterA)
+  D29AE      38           (defs call it CruiseSwitchMinDelayA)
+  D29B0      100          (defs call it CruiseSwitchCounterB)
+  D29B2      38           (defs call it CruiseSwitchMinDelayB)
+
+  These do NOT gate cruise/non-cruise. The real dwell thresholds for the
+  cruise decision are:
+
+    0xD9AD8   uint16  250   counter A target — steady-condition dwell
+    0xD9ADA   uint16  375   counter B target — re-entry lockout after dropout
+
+  Neither 0xD9AD8 nor 0xD9ADA has an ECUFlash definition. Nor do any of the
+  other decision-side calibrations:
+
+    0xD9AC4   uint8   0     source selector (0 => use 0xFFFF90C4)
+    0xD9B2C   float   4.0   gate on [0xFFFF90EC]
+    0xD9B30   float  -40.0  floor on [0xFFFF90E0]
+    0xD9B34   float   45.0  hysteresis SET  on [0xFFFF90F0]
+    0xD9B38   float   50.0  hysteresis CLEAR on [0xFFFF90F0]
+    0xD9B3C   float   1.0   hysteresis band width for the 0xAF6A8 path
+    0xD9B40   float   0.008 ratio ramp UP   (toward Non-Cruise)
+    0xD9B44   float   0.008 ratio ramp DOWN (toward Cruise)
+    0xD9BA4/0xD9BE4, 0xD9C04/0xD9C44   RPM x16 axis + uint16 data, SET/CLEAR
+    0xD9C64/0xD9CA4, 0xD9CC4/0xD9D04   duplicate set 2 (byte-identical)
+    0xD9D24/0xD9D64, 0xD9D84/0xD9DC4   duplicate set 3 (byte-identical)
+    0xD9DE4/0xD9E10                    11-pt table, all -40.0 (inert)
+
+  Adding definitions for these means editing in the ECUFlash UI and pulling
+  with .\scripts\sync_defs.ps1 -Pull — see CLAUDE.md; do not edit the repo XML.
 
 7.4  Undocumented Calibrations (found in task 50)
 ─────────────────────────────────────────────────
@@ -490,14 +760,37 @@ SECTION 8: RAM ADDRESS REFERENCE
   FFFF62F8     float   torque_ratio               50     Requested torque ratio
   FFFF6364     float   ect_startup                33     ECT at start / secondary RPM (NOT atmospheric pressure)
   FFFF65BF     byte    accel_state                50     Acceleration state flag
-  FFFF65FC     float   load_current               50     Engine load (g/rev)
+  FFFF65FC     float   vehicle_speed              50     Vehicle speed (km/h)
+                                                         -- corrections.md #9;
+                                                         was "load_current"
   FFFF7E90     -       task50_gbr_base            50     GBR base for task 50
   FFFF7F04     float   pre_ratio                  50     Pre-computed blend ratio
   FFFF7F0C     float   timing_blend_gbr           32     GBR base for task 32
   FFFF7F1C     float   alt_blend_ratio            50     Alternative blend ratio
   FFFF7F2C     float   ect_desc_result            33     ECT descriptor output
   FFFF7F3C     float   blend_output_scratch       31     Task 31 output
-  FFFF7F60     struct  map_ratio_workspace        32,50  Map ratio workspace base
+  FFFF7F60     struct  timing_ws_base             32,50  Timing workspace base
+                                                         (NOT the map ratio —
+                                                          corrected 2026-07-28)
+  FFFF7F4C     float   rpm_current_timing_copy    32     ENGINE SPEED for the
+                                                         base-timing lookups
+                                                         (corrections item 22)
+  FFFF90A8     float   map_blend_ratio            32     THE BLEND RATIO.
+                                                         0.0 = full Cruise,
+                                                         1.0 = full Non-Cruise.
+                                                         Sole writer 0x0611E0.
+  FFFF90BE     byte    cruise_request_flag        —      1 = ramp toward Cruise
+  FFFF90C4     byte    cruise_armed_flag          —      written by 0x0610E6
+  FFFF90B2     uint16  cruise_dwell_counter_A     —      target [0xD9AD8] = 250
+  FFFF90B4     uint16  cruise_lockout_counter_B   —      target [0xD9ADA] = 375
+  FFFF911A     byte    cruise_armed_prev_latch    —      previous 0xFFFF90C4
+  FFFF9116     byte    cruise_rpm_torque_band     —      RPM/torque hysteresis
+  FFFF9117     byte    cruise_temp_band           —      45/50 hysteresis
+  FFFF85E4     float   torque_domain_value        —      compared against the
+                                                         RPM curves; exact unit
+                                                         UNVERIFIED
+  FFFF90F0     float   ???                        —      45/50 gate input;
+                                                         identity UNVERIFIED
   FFFF7F68     float   ect_blend_correction       33,50  ECT blend correction
   FFFF7F6C     float   atm_blend_correction       33     Atmospheric correction
   FFFF7F70     float   rpm_iat_blend_result       33     RPM×IAT table result
@@ -570,38 +863,56 @@ SECTION 9: DESCRIPTOR REFERENCE
 SECTION 10: AFFECTED CALIBRATION PAIRS
 ================================================================================
 
-The map ratio blends between these cruise/non-cruise table pairs:
+The ratio at 0xFFFF90A8 blends between these cruise/non-cruise table pairs.
+All 11 address pairs re-checked against the definition XMLs via
+scripts/defs.py on 2026-07-28 and confirmed correct.
 
-  Subsystem                Cruise          Non-Cruise
-  ───────────────────────  ──────────────  ──────────────
-  Base Timing Primary      D4714           D48D4
-  Base Timing Reference    D4A94           D4C54
-  Knock Correction Max     D5904           D5AC4
-  CL Fueling Target        D13B0           D141C
-  Cranking IPW Comp        CF704           CF6B0
-  Engine Load Comp         C3C3C           C3D3C
-  AVCS Cam Advance         DA96C           DAC34
-  Timing ECT Comp A        D3226           D3206
-  Timing ECT Comp B        D3236           D3216
-  Target Throttle Plate    F9004           F9284
-  Min Base Enrichment 1    CF95C           CF8B8
+The last two columns are the number of CELLS whose display values differ
+between the two sides. Where the count is 0, the blend cannot change the
+result and the ratio is irrelevant for that subsystem.
+
+  Subsystem                Cruise    Non-Cruise   20.19c   stock
+  ───────────────────────  ────────  ──────────  ───────  ──────
+  Base Timing Primary      D4714     D48D4         0/306     121
+  Base Timing Reference    D4A94     D4C54         0/306     121
+  Knock Correction Max     D5904     D5AC4         0/306      68
+  CL Fueling Target        D13B0     D141C        18/48       18
+  Cranking IPW Comp        CF704     CF6B0        17/35       17
+  Engine Load Comp         C3C3C     C3D3C         0/154       0
+  AVCS Cam Advance         DA96C     DAC34         0/288      96
+  Timing ECT Comp A        D3226     D3206         0/16        0
+  Timing ECT Comp B        D3236     D3216         0/16        0
+  Target Throttle Plate    F9004     F9284         0/256     162
+  Min Base Enrichment 1    CF95C     CF8B8        63/144      63
+
+Reproduce with scripts/defs.py: load each pair, .read(rom) both, compare.
+Re-run after any new rev — these counts go stale silently.
 
 
 ================================================================================
 SECTION 11: SUMMARY OF FINDINGS
 ================================================================================
 
-1. The map switching system is more complex than initially documented in
-   torque_management_analysis.txt. Task 50 alone is ~1300 instructions with
-   multiple switching paths.
+0. CORRECTED 2026-07-28 — the cruise/non-cruise DECISION is not in tasks
+   50/32/31/33 at all. It is the 0x60ECC / 0x610E6 / 0x61120 / 0x6114E chain
+   documented in Section 1, calibrated at 0xD9AC4-0xD9E26, and the blend
+   ratio is 0xFFFF90A8. Tasks 50/31/33 are adjacent timing code. Task 32 is
+   the one genuine link: it APPLIES the ratio (Section 1.7 / 4.5).
 
-2. SI-DRIVE mode directly controls the switching behavior:
-   - S# mode (bit 1): Forces non-cruise (ratio = 1.0)
-   - I mode (bit 0): Enables switching logic
-   - S mode (default): Cruise-only
+1. Task 50 is ~1300 instructions with multiple paths, but they are timing
+   paths. Its 0xD2A08-0xD2A1C gates form a stationary/idle classifier
+   (Section 3.4), not a cruise selector, and every comparison in the
+   original write-up was inverted.
+
+2. The SI-DRIVE reading in Section 4.2 is UNVERIFIED and probably wrong: the
+   bit tests at 0x040098/0x0400AC select which engine-speed source feeds
+   0xFFFF7F4C, and neither branch writes 0xFFFF90A8. This car has no
+   SI-Drive input (see docs/ and project memory). Do not build on it.
 
 3. There is a secondary set of thresholds at D2A20-D2A3C that are NOT yet
-   in the ECUFlash definitions. These provide alternative switching criteria.
+   in the ECUFlash definitions. In 20.19c D2A20/D2A24/D2A28/D2A2C/D2A3C all
+   read 0.0, so that path is inert. They provide alternative criteria for the
+   Section 3.4 classifier, not for cruise switching.
 
 4. The byte at D2976 == 90 (0x5A) selects between a simple timing blend
    and a full per-cylinder timing summation that mirrors the ignition

@@ -57,7 +57,7 @@ Every named function in these subsystems is fully analyzed with disassembly, pse
 | Startup Enrichment | covered | startup_enrichment_analysis.txt |
 | Accel Enrichment | covered | accel_enrichment_analysis.txt |
 | Tau/Alpha | covered | tau_alpha_analysis.txt |
-| Map Switching | covered | map_switching_analysis.txt |
+| Map Switching | covered (major rewrite 2026-07-28) | map_switching_analysis.txt §1 |
 | Fuel Pump | covered | fuel_pump_analysis.txt |
 | Task Scheduler | 6 | task_scheduler_analysis.txt, task_call_graph.txt |
 | DTC Framework | covered | dtc_diagnostics_analysis.txt |
