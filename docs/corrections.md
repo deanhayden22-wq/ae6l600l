@@ -2641,3 +2641,118 @@ the `BOUNDS-SUSPECT` failure mode CLAUDE.md warns about.
 
 This closes the "repo and ECUFlash have been out of sync since 2026-04-07"
 item with a direction and a reason, rather than leaving it as a standing warning.
+
+---
+
+## 56. The knock detector DOES have a load input — four per-cylinder 2×2 RPM×LOAD tables, all zeroed — **SETTLES items 49 and 53, 2026-08-16**
+
+Items 49 and 53 each got half of this. This is the traced answer.
+
+The detector at `0x043798` performs **three** table lookups, not two. The third
+is the one that matters:
+
+```
+043860  D65D  mov.l @(0x0439D8),r6   ; r6 = 0x00063E68 (per-cylinder ptr table)
+043862  C4B0  mov.b @(176,gbr),r0    ; r0 = byte[0xFFFF81AC] = CYLINDER index
+043866  4008  shll2 r0
+043868  046E  mov.l @(r0,r6),r4      ; r4 = that cylinder's descriptor
+04386A  F4FC  fmov fr15,fr4          ; FR4 = RPM          (0xFFFF6624)
+04386C  D559  mov.l @(0x0439D4),r5   ; r5 = 0x000BE8E4 (2-D table_lookup)
+04386E  450B  jsr  @r5
+043870  F5EC  fmov fr14,fr5          ; FR5 = ENGINE LOAD  (0xFFFF63F8)
+043872  E0D8  mov #-40,r0
+043874  F907  fmov.s fr0,@(r0,r9)    ; result -> workspace
+```
+
+Pointer table at `0x00063E68`, exactly four entries (one per cylinder; the next
+two words are `0xFFFF81AD`/`0xFFFF81AF`, adjacent unrelated data):
+
+| cyl | descriptor | shape | Y = RPM | X = LOAD | data |
+|---|---|---|---|---|---|
+| 0 | `0x0AE724` | 2×2 float32 | 800, 7600 | 0.8, 2.2 | all 0.0 |
+| 1 | `0x0AE74C` | 2×2 float32 | 800, 7600 | 0.8, 2.2 | all 0.0 |
+| 2 | `0x0AE738` | 2×2 float32 | 800, 7600 | 0.8, 2.2 | all 0.0 |
+| 3 | `0x0AE760` | 2×2 float32 | 800, 7600 | 0.8, 2.2 | all 0.0 |
+
+Typecode is `0x00` (float32), so `table_lookup` skips scale/bias entirely — the
+apparent scale/bias fields in those records are meaningless and must not be quoted.
+
+**This reconciles the whole argument:**
+
+- The detection path **is** structurally indexed by RPM × engine load, per
+  cylinder. "No load input" is **false** as a claim about the code.
+- Those tables are **zero in every cell**, so the load term contributes nothing
+  as this ROM is calibrated. "No load input" is **true** as a claim about
+  observed behaviour.
+
+That is why the old note survived empirical checking for so long: right about
+the effect, wrong about the mechanism. Both earlier passes in this session were
+half-right — item 49 said the load claim was false, item 53 said it looked true
+again; neither had found this lookup.
+
+**It also makes the load term a latent lever.** Populating `0xAE724` / `0xAE738`
+/ `0xAE74C` / `0xAE760` would make knock detection load-sensitive. Recorded, not
+proposed.
+
+Corrected lookup count for the detector — **three**: `0xAE284` (1-D on knock
+signal `0xFFFF4304`, live, 0–304), `0xAE290` (1-D on RPM 800–8000, all zero),
+and the four per-cylinder 2×2 RPM × LOAD tables above (all zero).
+
+**Still open:** whether the 2×2 lookup is the threshold itself or a per-cylinder
+trim added to one. Its result lands at `[r9-40]` and is consumed by the
+arithmetic at `0x043888`–`0x0438B0`.
+
+---
+
+## 57. All three fuel dispatch tables are equally unreferenced — reframes item 46 — **SCOPED 2026-08-16**
+
+Item 46 left "table C's consumer is not located" as an open item. Checked
+exhaustively, then checked the same way against the two *known* tables:
+
+| table | address | literal refs anywhere, any alignment | `mova` into it |
+|---|---|---|---|
+| A | `0x0480B8` | **0** | 0 |
+| B | `0x04A0B8` | **0** | 0 |
+| C | `0x04ACB8` | **0** | 0 |
+
+**This was never a table-C anomaly.** No dispatch table in this ROM has a
+locatable reference, which means the existing analysis of tables A and B never
+established their consumer either. The access is presumably a base built by
+arithmetic (task id → table address) or a pointer initialised into RAM at
+startup.
+
+The open question is therefore not "what calls `func_3952C`" — item 46 answered
+that (table C slot 20) — but "what walks the dispatch tables at all". That is a
+scheduler question, not a fuel question. Correctly scoped, still open.
+
+---
+
+## 58. `0xAD7E0` is not a valid table; `0xCC51C`/`0xCC530` are not "gains" — **CHECKED 2026-08-16**
+
+The three addresses brief #2 flagged as the genuine unknowns, all sourced from
+`fueling_pipeline_analysis.txt` — the file that got `0xAD258` wrong four ways.
+
+**`0xAD7E0`** parses as 2-D 5×3 float32, Y = 6.5 / 9.0 / 11.5 / 14.0 / 16.5,
+X = −1000 / 0 / 1000, data at `0x0D106C`. The axes are plausible; the data is not
+a table:
+
+```
+[0.0, 0.0, 0.0]
+[0.0, 0.0, 0.0]
+[0.0, 0.0, 5.0]
+[7.0, 10.0, 1.29e+20]        <- garbage
+[1.73e+18, 131328.0, 0.0]    <- garbage
+```
+
+No calibration table contains 1.29e+20. **The descriptor is malformed or its
+data pointer is wrong. Treat `0xAD7E0` as NOT a valid table and do not cite it.**
+One literal reference, at `0x030410`.
+
+**`0xCC51C`** = `43 ff 00 00` = float **510.0** (literal ref `0x03BD0C`).
+**`0xCC530`** = `46 1c 40 00` = float **10000.0** (literal ref `0x03BD20`).
+
+Project notes label these "tip-in/out gains". 510 and 10000 are not gains — they
+are limits or counter thresholds, and the surrounding code at `0x03BC30`–`0x03BC64`
+is byte flag / state-machine work (`mov.b r0,@(1..7,r14)`, `cmp/hi`), not a
+multiplicative fuel path. **Values VERIFIED; the "gains" name is UNSUPPORTED.**
+Not renamed — there is no evidence for a replacement name yet.

@@ -379,3 +379,130 @@ RECOMMENDATION (not executed — writing to Program Files is Dean's call):
   2. Then `-Push` (repo -> ECUFlash), NOT `-Pull`. The repo is ahead by 37
      tables and the 3 ECUFlash-only entries are superseded.
   3. Re-run `.\scripts\sync_defs.ps1` to confirm convergence.
+
+
+================================================================================
+THIRD PASS — item 8c settles the load question; items 7 and 10
+Appended 2026-08-16, same session
+================================================================================
+
+ITEM 8c — THE KNOCK DETECTOR **DOES** HAVE A LOAD INPUT. FOUR PER-CYLINDER
+          2x2 RPM x LOAD TABLES. ALL ZEROED ON THIS CAL.
+--------------------------------------------------------------------------------
+This overturns the second-pass conclusion in this same file. I had said the
+detector "does exactly TWO lookups and neither is load-indexed". That was wrong
+because I only read a narrow window of the function. There is a THIRD lookup,
+and it is the one that matters.
+
+  043860  D65D  mov.l @(0x0439D8),r6   ; r6 = 0x00063E68 (pointer table)
+  043862  C4B0  mov.b @(176,gbr),r0    ; r0 = byte[0xFFFF81AC] = CYLINDER index
+  043864  600C  extu.b r0,r0
+  043866  4008  shll2 r0               ; x4
+  043868  046E  mov.l @(r0,r6),r4      ; r4 = per-cylinder DESCRIPTOR pointer
+  04386A  F4FC  fmov fr15,fr4          ; FR4 = RPM        (0xFFFF6624)
+  04386C  D559  mov.l @(0x0439D4),r5   ; r5 = 0x000BE8E4  (2-D table_lookup)
+  04386E  450B  jsr  @r5
+  043870  F5EC  fmov fr14,fr5          ; FR5 = ENGINE LOAD (0xFFFF63F8)
+  043872  E0D8  mov #-40,r0
+  043874  F907  fmov.s fr0,@(r0,r9)    ; result -> workspace
+
+Pointer table @ 0x00063E68, one descriptor per cylinder:
+
+  [0] 0x0AE724   [1] 0x0AE74C   [2] 0x0AE738   [3] 0x0AE760
+  (entries [4]/[5] of that region are 0xFFFF81AD / 0xFFFF81AF -- adjacent
+   unrelated data, so the table is exactly 4 entries = 4 cylinders)
+
+All four decode identically:
+  2x2, float32,  Y (rows) = RPM  800, 7600
+                 X (cols) = LOAD 0.8, 2.2
+  data = 0.0 in all four cells, in all four tables.
+
+Because the typecode is 0x00 (float32), scale/bias are not applied at all --
+`table_lookup` skips them for typecode 0 -- so the apparent scale/bias fields
+in those records are meaningless and must not be quoted.
+
+SO, FINALLY, AND THIS RECONCILES EVERYTHING:
+  * The detection path IS structurally indexed by RPM x ENGINE LOAD, per
+    cylinder. "No load input" is FALSE as a statement about the code.
+  * Those tables are calibrated to ZERO everywhere, so the load term
+    contributes nothing as this ROM is calibrated. "No load input" is TRUE as
+    a statement about observed behaviour.
+  That is why the old claim survived empirical checks for so long: it was right
+  about the effect and wrong about the mechanism. Both earlier readings in this
+  file were half-right; this is the traced answer.
+  It also means the load term is a LATENT lever -- populating 0xAE724/738/74C/
+  760 would make detection load-sensitive. NOT proposing that; recording it.
+
+  Still not established: whether this lookup is "the threshold" itself or a
+  per-cylinder trim added to one. The result lands in the workspace at
+  [r9-40] and is consumed by the arithmetic at 0x043888-0x0438B0.
+
+Corrected count of the detector's lookups: THREE, not two.
+  0xAE284  1-D on knock signal (0xFFFF4304)          -- live, 0..304
+  0xAE290  1-D on RPM (800..8000)                    -- ALL ZERO
+  0xAE724/738/74C/760  2-D RPM x LOAD, per cylinder  -- ALL ZERO
+
+
+ITEM 7 — REFRAMED AND CLOSED AS A CATEGORY, NOT SOLVED
+--------------------------------------------------------------------------------
+Table C (0x04ACB8) has no locatable reference. Checked exhaustively:
+  * literal 0x0004ACB8 anywhere in the ROM, any alignment : ZERO occurrences
+  * `mova @(disp,PC),r0` landing anywhere inside 0x4ACB8-0x4AE28 : ZERO
+
+Then the same checks on the two KNOWN fuel dispatch tables:
+  * literal 0x000480B8 (table A) : ZERO occurrences
+  * literal 0x0004A0B8 (table B) : ZERO occurrences
+  * mova into either table       : ZERO
+
+**All three dispatch tables are equally unreferenced.** So this was never a
+table-C anomaly -- it is how every dispatch table in this ROM is reached, and
+the existing analysis of tables A and B never established their consumer
+either. The access is presumably a base built by arithmetic (task id -> table
+address) or a pointer initialised into RAM at startup.
+
+That reframes the open question from "what calls func_3952C" (answered: table C
+slot 20) to "what walks the dispatch tables at all", which is a scheduler
+question, not a fuel question. Status: OPEN, but correctly scoped now.
+
+
+ITEM 10 — 0xAD7E0 IS NOT A VALID DESCRIPTOR; 0xCC51C / 0xCC530 ARE NOT "GAINS"
+--------------------------------------------------------------------------------
+All three came from fueling_pipeline_analysis.txt, the file that got 0xAD258
+wrong on four counts. Checked against the bytes:
+
+  0xAD7E0 -- parses as 2-D 5x3 float32, Y = 6.5/9.0/11.5/14.0/16.5,
+             X = -1000/0/1000, data at 0x0D106C. The AXES are plausible, but
+             the DATA is not a table:
+                 [0.0, 0.0, 0.0]
+                 [0.0, 0.0, 0.0]
+                 [0.0, 0.0, 5.0]
+                 [7.0, 10.0, 1.29e+20]      <- garbage
+                 [1.73e+18, 131328.0, 0.0]  <- garbage
+             Two cells are astronomically large floats and one is 131328.
+             A real calibration table does not contain 1.29e+20.
+             VERDICT: the descriptor is malformed or the data pointer is wrong.
+             Treat 0xAD7E0 as NOT a valid table. Do not cite it.
+             (One literal reference, at 0x030410.)
+
+  0xCC51C -- bytes 43 ff 00 00 = float **510.0**    (literal ref 0x03BD0C)
+  0xCC530 -- bytes 46 1c 40 00 = float **10000.0**  (literal ref 0x03BD20)
+             Project notes label these "tip-in/out gains". 510 and 10000 are
+             not gains; they are limits or counter thresholds. The surrounding
+             code at 0x03BC30-0x03BC64 is byte flag/state-machine work
+             (`mov.b r0,@(1..7,r14)`, `cmp/hi`), not a multiplicative fuel path.
+             VERDICT: the values are VERIFIED; the "gains" NAME is UNSUPPORTED.
+             Not renamed here -- no evidence for a replacement name.
+
+
+REMAINING AFTER THIS PASS
+--------------------------------------------------------------------------------
+  item 4b  0xFFFF77D8 / 0xFFFF77DC writers (arithmetic base -- needs emulation)
+  item 7   what walks the dispatch tables (scheduler-side, correctly scoped)
+  item 8d  is the per-cylinder 2x2 lookup the threshold itself or a trim on it
+  item 9b  what func_37B74 actually is (enrichC now positively excluded)
+  item 10b a supportable name for 0xCC51C / 0xCC530
+  item 11  D5 full RAM reconciliation sweep (GBR axis done)
+  item 12  re-derive the three *_analysis.txt prose files vs corrected widths
+
+NO ROM EDITS.
+================================================================================
