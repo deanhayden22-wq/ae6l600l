@@ -15,7 +15,11 @@ disassembly/maps/.
 STATE: disassembly/maps/descriptor_labels.txt now carries 1094 descriptors
 (corrections.md item 60). ImportAE5L600L.java still carries 860 desc_* labels
 covering the older 760-descriptor census. Those 860 are CORRECT but INCOMPLETE.
-Closing that gap needs a replace-in-place rewrite of this script, not a re-run.
+SUPERSEDED for the descriptor-label job by
+    scripts/mapping/sync_import_java_labels.py
+which is address-keyed, additive, idempotent, and never touches an existing
+entry. As of 2026-08-16 the java covers all 1094 descriptors. Use that; this
+script is kept only for its ISR-dispatch block, which has not been reworked.
 """
 import os
 import re

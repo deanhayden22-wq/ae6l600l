@@ -3443,3 +3443,71 @@ value claim, so there is nothing to fix.
 Item 12 is **done for the width-dependent claims**, which is what it was scoped
 to. These files contain much more prose than that, and the rest has not been
 re-derived — it was never in scope and is not implied by this entry.
+
+---
+
+## 68. Ghidra descriptor labels synced — 1094/1094, and a new idempotent tool — **FIXED 2026-08-16**
+
+Item 60 left a deliberate gap: `ImportAE5L600L.java` carried labels for the old
+760-descriptor census while `descriptor_labels.txt` had grown to 1094. The gap
+could not be closed by re-running `update_import_java.py`, which is insert-only
+(it appends a block before the final printf) and would have duplicated every
+label; its paths were wrong too.
+
+New tool: **`scripts/mapping/sync_import_java_labels.py`**.
+
+### Why address-keyed and additive rather than a rewrite
+
+The java is not machine-owned. Of its existing descriptor entries, **123 are
+hand-annotated `labelComment(...)` calls** carrying `"RR: <table name>"` prose
+and multi-line comments no generator can reproduce — e.g.
+
+```java
+count += labelComment(0x0AF0ACL, "desc_2D_range_150_600_xIAT_u16_17x9_AF0AC",
+    "RR: Idle Speed Stability A");
+```
+
+A block replace would have destroyed them. So the tool:
+
+- **leaves every address already present exactly as it is** — hand comments,
+  and the corrected type tokens from item 60, both survive untouched;
+- **adds only missing addresses**, into one delimited block it owns and
+  regenerates in place;
+- **never deletes.** Addresses in the java that are not in the descriptor list
+  are reported and left alone.
+
+### Result
+
+| | before | after |
+|---|---|---|
+| `desc_*` entries | 860 | 1178 |
+| distinct addresses | 795 | 1113 |
+| descriptors covered | 780 / 1094 | **1094 / 1094** |
+| duplicate addresses | 65 | 65 (unchanged) |
+| duplicate names | 0 | 0 |
+
+318 labels added. Idempotency verified by running `--apply` three times and
+comparing md5 — identical each time. (The first implementation was **not**
+idempotent: `strip_block` removed the managed block but left the blank line
+after it, so the file gained one blank line per run. Caught by the md5 check,
+fixed by swallowing the trailing newline.)
+
+### Left alone, deliberately — 19 `desc_*` labels that are not descriptors
+
+- **8 RAM workspaces** (`0xFFFF2398`, `0xFFFF24A8`, `0xFFFF2D88`, `0xFFFF2E48`,
+  `0xFFFF2EF4`, `0xFFFF2F84`, `0xFFFF30E4`, `0xFFFF34EC`) whose names merely
+  begin with `desc_`.
+- **3 code addresses** (`0x00DCE4`, `0x0BDBCC`, `0x0BDCB6`) — helper functions.
+- **8 ROM addresses** `0xAF238`–`0xAF318` that are **not descriptors**: their
+  `+4` field is `0x08000000`, not a ROM pointer. They were mislabelled before
+  this session and are flagged here rather than silently removed — deleting a
+  label is a human judgement call, not a sync script's.
+
+### Pre-existing issue, reported not fixed
+
+**65 addresses carry two different `desc_*` labels each** — a generated name and
+a hand-written semantic one, e.g. `0x0AC484` has both
+`desc_1D_ECT_u8_16_AC484` and `desc_avcs_run_time_corr`. This predates the sync
+(65 before, 65 after) and would give Ghidra two labels at one address. The hand
+names carry meaning and the generated ones carry the type, so which to keep is a
+judgement call. Listed for a human pass.
