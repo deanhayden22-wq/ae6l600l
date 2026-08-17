@@ -3263,3 +3263,96 @@ block are the three rev-limit resume values, 6650 → 6680.
 
 **"Tip-in/out gains: CC51C-CC530" is wrong** and should not be carried forward.
 The block is rev limiter + speed limiter + their boost/RPM guards.
+
+---
+
+## 66. ITEM 11 (D5) — the "446 conflicting RAM labels" is really 26 — **2026-08-16**
+
+Brief #2's D5 reported "446 RAM addresses carrying two or more distinct labels,
+390 of which differ on the first word", and correctly warned that most of it was
+prose noise from a crude regex. Doing the harvest properly:
+
+> **26 addresses carry genuinely conflicting label claims. All 26 touch a
+> priority subsystem.** 94% of the original figure was noise.
+
+New durable tool: **`scripts/mapping/reconcile_ram_labels.py`** — harvests
+address→label claims from every `disassembly/analysis/*.txt` and
+`disassembly/maps/*.txt`, groups them, and ranks by (distinct labels) ×
+(priority subsystem) × (registry flag). It **reports only**; adjudication is
+writer-based, because the majority label has been the wrong one before
+(`0xFFFF4130`, item 45).
+
+### The four noise classes it removes
+
+Each was a real defect in the naive approach, not just tuning:
+
+1. **Prose words.** `\b(FFFF….)\s{2,}(IDENT)\b` harvests "when", "mov", "loaded",
+   "does" as names. Fixed by requiring snake_case (`_` present, length ≥ 5) plus
+   a small allow-list for genuine single-word names (rpm, iat, ect, …).
+2. **Artifact filenames.** "… see `fueling_subfunctions_analysis`" was harvested
+   as a label for whatever address preceded it. Rejected by filestem match and by
+   `_analysis` / `_raw` / `_trace` / `_report` / `_review` / `_scout` suffix.
+3. **Newline spanning — the worst one.** `\s` matches newlines, so
+   `fuel_enrichment_A @ FFFF76D4` followed by `fuel_enrichment_B @ FFFF7878`
+   paired `FFFF76D4` with `fuel_enrichment_B` and manufactured a conflict in the
+   *fuel enrichment term naming* — the exact area where a real mispairing
+   existed (item 64). Fixed with `[ \t]` instead of `\s`.
+   **`fueling_pipeline_analysis.txt` is in fact self-consistent** on
+   A = `0xFFFF76D4`, B = `0xFFFF7878`, C = `0xFFFF7AE4`.
+4. **Type tokens** (`u8`, `f32`, `float32`) harvested as names.
+
+### Two resolved this pass, writer-based
+
+**`0xFFFF6254`** — claimed as `maf_current` (avcs, startup), `torque_related`
+(ignition), `gear` (fueling), `torque` (accel). All four are unsupported as
+stated. It is a **byte at offset +4 of a struct based at `0xFFFF6250`**, written
+once, at `0x01DBC2`:
+
+```
+01DBAC  cmp/hs r2,r5
+01DBB0  mov.b @r15,r1      / tst r1,r1   / bf 0x01DBC0
+01DBB6  mov.b @(4,r15),r0  / tst r0,r0   / bf 0x01DBC0
+01DBBE  mov #1,r0     <- all conditions met
+01DBC0  mov #0,r0     <- otherwise
+01DBC2  mov.b r0,@(4,r7)   ; r7 = 0xFFFF6250  ->  [0xFFFF6254]
+```
+
+It is written **0 or 1** from a three-condition test — a **boolean validity flag,
+not a sensor value**. That rules out `maf_current` (a value) as well as `gear`
+and `torque`. Its writer sits in the sensor/MAF region (`0x01Dxxx`, the same
+region that hosts the `maf_voltage` GBR base at `0x01D8FE`), so it is
+MAF/sensor-domain — consistent with CLAUDE.md already recording "51 int8 / 0
+float" accesses for it. **No replacement name is invented**; what is established
+is: byte flag, struct `0xFFFF6250`+4, sensor-domain, set by a 3-condition test.
+
+**`0xFFFF7D18`** — claimed as `knock_suppress_flag` (knock_flkc) and
+`fuel_system_state` (ignition_timing). **Both are right, from opposite ends.**
+Its single writer is `0x03C75C mov.b r0,@(7,gbr)` with GBR `0xFFFF7D11`, in the
+**fuel** region; its notable reader is the **FLKC learn routine** (`0x0463DE`).
+So it is a fuel-state byte that the knock path consumes as a suppression gate.
+`fuel_system_state` names its identity, `knock_suppress_flag` names its use —
+a naming collision, not a factual conflict.
+
+### Triage of the remaining 24
+
+| class | count | note |
+|---|---|---|
+| already settled earlier this session | 5 | `0xFFFF3248`, `0xFFFF8298` (item 41), `0xFFFF4130` (item 45), `0xFFFF6354` (item 40), `0xFFFF829E` (item 6) |
+| registry already `VERIFIED-BOTH` | 3 | `0xFFFF6350`, `0xFFFF63F8`, `0xFFFF6354` — the two labels are synonyms (`ect_current`/`ect_float`) |
+| synonym / wording only | ~9 | e.g. `0xFFFF4284` `workspace_base` vs `intake_workspace_base` (same file), `0xFFFF826C` `knock_retard_value` vs `..._accumulator` (same file), `0xFFFF726C` three spellings of the same transient flag |
+| genuinely open, materially different | ~7 | `0xFFFF64F5` boost flag vs engine-state byte; `0xFFFF3234` `flkc_work_bank1` vs `knock_learn_coarse`; `0xFFFF8258` `knock_metric` vs `flkc_retard`; `0xFFFF7F68`, `0xFFFF1288`, `0xFFFF8F24`, `0xFFFF895C` |
+
+### Brief #2's HUNCH, tested
+
+D5 suspected (~65%) that `boost_control_analysis.txt` and `avcs_analysis.txt`
+were over-represented among conflicts. **Not supported.** In the cleaned list the
+heaviest contributors are `ignition_timing_analysis.txt` (9 of 26) and
+`knock_flkc_analysis.txt` (5); `boost_control_analysis.txt` appears twice and
+`avcs_analysis.txt` once. The over-representation was an artifact of the noise
+those two files' formatting happened to trigger.
+
+### Status
+
+The sweep is **scoped and tooled, not finished**: ~7 addresses still need
+writer-based adjudication. That is a tractable list rather than the 446 it
+looked like. Re-run the tool after any label change.
