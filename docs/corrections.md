@@ -3511,3 +3511,62 @@ a hand-written semantic one, e.g. `0x0AC484` has both
 (65 before, 65 after) and would give Ghidra two labels at one address. The hand
 names carry meaning and the generated ones carry the type, so which to keep is a
 judgement call. Listed for a human pass.
+
+---
+
+## 69. The 61 duplicate Ghidra labels resolved — one label per address — **FIXED 2026-08-16**
+
+Item 68 reported, but did not fix, 61 addresses carrying two `desc_*` labels
+each. Ghidra applies every `label()` call, so those addresses ended up with two
+symbols and an arbitrary primary. Resolved with a new tool,
+**`scripts/mapping/dedupe_import_java_labels.py`**.
+
+They were never factual disagreements — nobody was wrong about what the table
+is. They were two naming passes colliding, and they fall into three groups:
+
+| group | count | shape | rule applied |
+|---|---|---|---|
+| A | 52 | generated + hand, e.g. `desc_1D_ECT_u8_16_AC484` + `desc_avcs_run_time_corr` | keep the **hand** name |
+| B | 4 | two hand names, `0xADBC4`–`0xADC00`: `desc_timing_ect_corr_N` vs `desc_ect_warmup_1D_modeNN` | keep the **mode-bit** name |
+| C | 5 | two hand names, `0xAE54C`–`0xAE5BC`: `desc_ign_timing_modeN` vs `desc_final_timing_X` | keep `desc_final_timing_*` |
+
+Group B keeps the mode-bit name because it encodes the throttle × engine-running
+selector state — the thing you would actually search for; the index name does not
+say which condition selects the table. Group C is arbitrary on information
+grounds, so the name that says what the table *is* wins over the one that says
+which slot it occupies.
+
+### Result
+
+```
+entries    1178 -> 1113        distinct addresses 1113 (unchanged)
+duplicate addresses 61 -> 0    duplicate names 0 -> 0
+descriptor coverage 1094/1094  (unchanged)
+braces balanced, paren delta unchanged
+```
+
+97 lines removed. Idempotent by construction — after a successful run no address
+has two labels, so a second run reports 0 and does nothing. Verified.
+
+### One decision reversed mid-implementation, deliberately
+
+The first draft folded the deleted generated name's geometry (`1D uint8 16pt`)
+into the surviving label's comment, so the type information would not be "lost".
+**That was the wrong call and it was dropped.**
+
+Geometry is already held authoritatively in `descriptor_map.txt` and
+`descriptor_labels.txt`, both regenerated from ROM bytes on every run. Copying it
+into a hand-frozen Java comment would create another copy that drifts the moment
+a descriptor changes — which is *exactly* the failure mode behind items 39, 43
+and 60 (one typecode map copy-pasted into five scripts, all five wrong; one
+off-by-one copy-pasted into three). Nothing is lost by omitting it: look the
+geometry up where it is derived.
+
+The rationale is recorded in the tool's source so a future pass does not
+"helpfully" add it back.
+
+### Note
+
+This is the only **destructive** edit in the whole descriptor sweep — everything
+else was additive or in-place correction. Backed by git; the pre-state is commit
+`8d7e02f`.
