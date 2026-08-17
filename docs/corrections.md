@@ -3356,3 +3356,90 @@ those two files' formatting happened to trigger.
 The sweep is **scoped and tooled, not finished**: ~7 addresses still need
 writer-based adjudication. That is a tractable list rather than the 446 it
 looked like. Re-run the tool after any label change.
+
+---
+
+## 67. ITEM 12 — the AVCS VVT-error tables are NOT zeroed, and `trace_map_switching.py`'s descriptor decoder was wrong in every field — **FIXED 2026-08-16**
+
+Item 12 was "re-derive the three `*_analysis.txt` prose files against the
+corrected widths". Two of the three carried conclusions that the width fix
+invalidates, and one generator turned out to be structurally broken.
+
+### A. `avcs_analysis.txt` — a live feedback surface was declared inert
+
+The four VVT-error feedback tables at `0xAF830` / `0xAF84C` / `0xAF868` /
+`0xAF884` were described as "9x9, zeroed" and "all zeroed in stock". Decoded at
+the correct width (**uint16**, not uint8; scale `0.0030517578125`, bias `-100.0`):
+
+```
+Y axis = VVT error  -11 -8 -6 -3  0  3  6  8 11   (degrees)
+X axis = RPM        800 1200 1600 2000 2400 2800 3200 3600 4000
+
+plane 0:  -7.00 -7.00 -5.47 -4.69  0.00  2.34  3.52  3.52  3.52
+plane 3:  -7.00 -7.00 -7.00 -4.69  0.00  2.34  4.69  4.69  4.69
+plane 8: -10.55 -7.00 -7.00 -4.69  0.00  3.52  4.69  4.69  4.69
+```
+
+Range **−10.55 .. +4.69**, monotonic in VVT error and **exactly 0.0 at error = 0**
+— the signature of a live feedback table, not a stub. It is **byte-identical in
+stock and 20.19c**, so this was never a tune artifact; the "zeroed" reading was
+simply a wrong-width decode.
+
+**This matters beyond bookkeeping:** an active AVCS error-feedback surface had
+been written off as inert, which removes it from consideration in any AVCS
+reasoning. Corrected at all six sites in the file.
+
+Also in the same file, `0xAD848` (Exhaust Duty Correction A) was documented as
+"uint16, scale=0.000061, **bias=-100**. All values cluster near -100 (effective
+zero correction)." Decoded: **bias is 0.0**, and the values are **0.09 .. 0.35** —
+they do not cluster near −100. The −100 was picked up from a neighbouring
+record's field. The file's *conclusion* ("NOT ACTIVE on EJ255 — no exhaust AVCS
+hardware") still stands, but on hardware grounds, not on the numeric argument it
+gave.
+
+Checked and found **correct**, no change: `0xAD620` (10x9 uint8, scale 0.2,
+values 5.0–22.0 duty %).
+
+### B. `trace_map_switching.py` — `decode_descriptor` was wrong in every field
+
+```python
+flags = r_u8(desc_addr)          # +0/+1 is a u16 COUNT, not flags
+dtype = r_u8(desc_addr + 1)      # +1 is the SIZE byte; typecode is +2 (1D) / +16 (2D)
+ycnt  = r_u8(desc_addr + 2)      # +2 is the TYPECODE
+is_2d = bool(flags & 0x01)       # 2-D is signalled by +3 != 0
+data_addr  = r_u32(desc_addr + 4)   # +4 is the AXIS pointer
+xaxis_addr = r_u32(desc_addr + 8)   # +8 is the DATA pointer
+scale_f    = r_f32(desc_addr + 16)  # +16 is the BIAS; scale is +12
+```
+
+Every descriptor line that file ever emitted was structurally wrong — which is
+why `0xADB4C` printed as `1D unk_10 0 scale=-20`. `unk_10` was the *count* (16)
+being read as a typecode, `0` was the typecode being read as a count, and `-20`
+was the *bias* labelled as the scale.
+
+**This also means my own earlier "fix" was cosmetic on top of a broken line.**
+In corrections item 60 I surgically rewrote the type tokens in that file rather
+than regenerating (to preserve hand-added instruction decodes). That put a
+correct-looking `uint8` onto a line whose other four fields were still garbage.
+Rewritten now from the canonical layout in `scripts/desc_types.py`; the five
+`desc_timing_blend_*` lines read correctly:
+
+```
+Descriptor @ 0x0ADB4C: 1D uint8 16  scale=0.351562 bias=-20.0000  [desc_timing_blend_0]
+```
+
+So the timing-blend tables are 16-point uint8, scale 0.3516, bias −20 — i.e.
+degrees over roughly −20 .. +69.7, on an ECT axis at `0x0D2F8C`.
+
+### C. `boost_control_analysis.txt` — nothing to correct
+
+Its only mention of an affected descriptor is a category count
+(`1 x 2D_RPMxBoost (0xAB058)`). Verified independently: `0xAB058` is 9x7 uint16,
+Y = RPM 800..4000, X = boost 0..25.3, values 0..100. The prose makes no width or
+value claim, so there is nothing to fix.
+
+### Status
+
+Item 12 is **done for the width-dependent claims**, which is what it was scoped
+to. These files contain much more prose than that, and the rest has not been
+re-derived — it was never in scope and is not implied by this entry.

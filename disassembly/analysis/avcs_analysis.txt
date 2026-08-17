@@ -164,8 +164,10 @@ SECTION 3: DUTY CORRECTION TABLE
   Exhaust Duty Correction A (VESTIGIAL -- EJ257 shared base)
   -----------------------------------------------------------------------
   Descriptor:   0xAD848
-  Data:         0xD121C (uint16, scale=0.000061, bias=-100)
-  All values cluster near -100 (effective zero correction).
+  Data:         0xD121C (uint16, scale=0.000061, bias=0.0)
+  *** CORRECTED 2026-08-16 (item 67): the bias is 0.0, NOT -100, and the
+      values are 0.09 .. 0.35 -- they do NOT "cluster near -100". The
+      -100 came from reading a neighbouring record's field. ***
   NOT ACTIVE on EJ255 -- no exhaust AVCS hardware.
 
 
@@ -174,6 +176,13 @@ SECTION 4: VVT ERROR FEEDBACK TABLES
 ================================================================================
 
   Four 9x9 VVT Error tables at 0xAF830, 0xAF84C, 0xAF868, 0xAF884.
+  *** CORRECTED 2026-08-16 (docs/corrections.md item 67): these are NOT
+      zeroed. They are uint16 (not uint8), scale 0.0030517578125, bias
+      -100.0, and they hold a populated correction surface spanning
+      -10.55 .. +4.69. Y axis = VVT error -11..+11 deg, X axis = RPM
+      800..4000. Values are monotonic in VVT error and exactly 0.0 at
+      error = 0 -- the signature of a live feedback table, not a stub.
+      The "zeroed" reading came from decoding them at the wrong width. ***
 
   Axes:
     Y-axis: Cam angle error -11.25 to +11.25 degrees (9 steps)
@@ -249,10 +258,10 @@ SECTION 7: KEY ROM / CALIBRATION ADDRESSES
   0x0AD6AC    desc      Intake Cam Advance alternate (15x18)
   0x0AD6C8    desc      Intake Cam Advance D (17x18)
   0x0AD6E4    desc      Intake Cam Advance E (17x18)
-  0x0AF830    desc      VVT Error feedback table 1 (9x9, zeroed)
-  0x0AF84C    desc      VVT Error feedback table 2 (9x9, zeroed)
-  0x0AF868    desc      VVT Error feedback table 3 (9x9, zeroed)
-  0x0AF884    desc      VVT Error feedback table 4 (9x9, zeroed)
+  0x0AF830    desc      VVT Error feedback table 1 (9x9 uint16, POPULATED -10.55..+4.69) [item 67]
+  0x0AF84C    desc      VVT Error feedback table 2 (9x9 uint16, POPULATED) [item 67]
+  0x0AF868    desc      VVT Error feedback table 3 (9x9 uint16, POPULATED) [item 67]
+  0x0AF884    desc      VVT Error feedback table 4 (9x9 uint16, POPULATED) [item 67]
   0x0CFA38    data      Intake Duty Correction data (90 u8)
   0x0CF9EC    axis      VVT Error axis (10 floats: 4-80 deg)
   0x0CFA14    axis      RPM axis (9 floats: 650-3600)
@@ -281,7 +290,9 @@ SECTION 8: SYSTEM FLOW SUMMARY
   8. OCV PWM is driven via ISR reading the duty RAM variables
      (hardware access via GBR-relative addressing, not direct I/O loads)
 
-  The VVT error feedback tables (9x9, all zeroed in stock) provide
+  The VVT error feedback tables (9x9 uint16, POPULATED -10.55..+4.69 in BOTH
+  stock and 20.19c -- byte-identical; the "all zeroed" reading was a wrong-width
+  decode, corrections.md item 67) provide
   optional RPM/error-dependent PID gain tuning -- unused in stock cal.
 
   NOTE: The exhaust AVCS path exists in code but is inactive on this

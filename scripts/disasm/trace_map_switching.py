@@ -572,30 +572,56 @@ from desc_types import TYPE_NAMES, TYPE_SIZES  # noqa: E402
 
 
 def decode_descriptor(desc_addr):
-    """Decode a descriptor header at the given ROM address."""
-    if desc_addr + 20 > ROM_LEN: return None
-    flags = r_u8(desc_addr)
-    dtype = r_u8(desc_addr + 1)
-    ycnt  = r_u8(desc_addr + 2)
-    xcnt  = r_u8(desc_addr + 3)
-    is_2d = bool(flags & 0x01)
-    data_addr = r_u32(desc_addr + 4)
-    xaxis_addr = r_u32(desc_addr + 8)
-    yaxis_addr = r_u32(desc_addr + 12) if is_2d else None
-    scale_f = r_f32(desc_addr + 16) if desc_addr + 20 <= ROM_LEN else 1.0
+    """Decode a descriptor header at the given ROM address.
+
+    REWRITTEN 2026-08-16 (corrections.md item 67). The previous version had the
+    record layout wrong in EVERY field: it took dtype from +1 (that is the size
+    byte), the row count from +2 (that is the typecode), treated +0 as a flags
+    byte with a 2-D bit (2-D is signalled by +3 != 0), took the data pointer
+    from +4 (that is the AXIS pointer), and printed the value at +16 as the
+    "scale" (for a 1-D record that is the BIAS; scale is at +12). Every
+    descriptor line this file emitted was therefore structurally wrong.
+
+    Canonical layout, from scripts/desc_types.py:
+      1D (20 B): +0 u16 count, +2 u8 typecode, +4 axis, +8 data,
+                 +12 f32 scale, +16 f32 bias
+      2D (28 B): +0 u16 rows, +1 u8 Y, +3 u8 X, +4 Yaxis, +8 Xaxis,
+                 +12 data, +16 u8 typecode, +20 f32 scale, +24 f32 bias
+    """
+    if desc_addr + 20 > ROM_LEN:
+        return None
+    two_d = r_u8(desc_addr + 3) != 0
+    if two_d and desc_addr + 28 > ROM_LEN:
+        return None
+    if two_d:
+        ycnt, xcnt = r_u8(desc_addr + 1), r_u8(desc_addr + 3)
+        dtype = r_u8(desc_addr + 16)
+        yaxis_addr, xaxis_addr = r_u32(desc_addr + 4), r_u32(desc_addr + 8)
+        data_addr = r_u32(desc_addr + 12)
+        scale_f, bias_f = r_f32(desc_addr + 20), r_f32(desc_addr + 24)
+    else:
+        ycnt, xcnt = r_u16(desc_addr), 0
+        dtype = r_u8(desc_addr + 2)
+        yaxis_addr, xaxis_addr = None, r_u32(desc_addr + 4)
+        data_addr = r_u32(desc_addr + 8)
+        scale_f, bias_f = r_f32(desc_addr + 12), r_f32(desc_addr + 16)
+    # typecode 0x00 is float32 -- table_lookup SKIPS scale/bias for it
+    if dtype == 0x00:
+        scale_f = bias_f = None
 
     return {
         'addr': desc_addr,
-        'flags': flags,
+        'flags': r_u8(desc_addr),
         'dtype': dtype,
         'dtype_name': TYPE_NAMES.get(dtype, f"unk_{dtype:02X}"),
         'ycnt': ycnt,
         'xcnt': xcnt,
-        'is_2d': is_2d,
+        'is_2d': two_d,
         'data_addr': data_addr,
         'xaxis_addr': xaxis_addr,
         'yaxis_addr': yaxis_addr,
         'scale': scale_f,
+        'bias': bias_f,
     }
 
 def dump_descriptor(desc_addr, label=""):
