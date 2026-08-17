@@ -32,6 +32,8 @@
 	<scaling name="Air/FuelRatio" units="Air/Fuel Ratio" toexpr="x*14.7" frexpr="x/14.7" format="%.2f" min="11.02" max="20.28" inc="0.06" storagetype="float" endian="big"/>
 	<scaling name="Airflow Overrun" units="Unknown" toexpr="x*.001525879" frexpr="x/.001525879" format="%.2f" min="0" max="40" inc="0.5" storagetype="uint16" endian="big"/>
 	<scaling name="AirflowAdder" units="Airflow Adder" toexpr="x*.001525879" frexpr="x/.001525879" format="%.2f" min="0" max="40" inc="0.5" storagetype="uint16" endian="big"/>
+	<scaling name="Alpha Hotstart 1" units="units" toexpr="x" frexpr="x" format="%.4f" min="0" max="255" inc="1" storagetype="float" endian="big"/>
+	<scaling name="Alpha Hotstart 2" units="units" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="AtmosphericPressure(psi)" units="Atmospheric Pressure (psi)" toexpr="x*.01933677" frexpr="x/.01933677" format="%.2f" min="13.38" max="13.53" inc="0.01" storagetype="float" endian="big"/>
 	<scaling name="AtmosphericPressure(psi)Multiplier" units="Atmospheric Pressure (psi) Multiplier" toexpr="x*.00078910749" frexpr="x/.00078910749" format="%.5f" min="0.05" max="0.08" inc="0.0004" storagetype="uint16" endian="big"/>
 	<scaling name="AtmosphericPressureMultiplierOffset" units="Atmospheric Pressure Multiplier Offset" toexpr="(x*.015625)-2" frexpr="(x+2)/.015625" format="%.4f" min="-0.14" max="0.25" inc="0.008" storagetype="uint8" endian="big"/>
@@ -58,7 +60,7 @@
 	<scaling name="ESTIMATEDFlowRate-GasOnly(cc/min)" units="ESTIMATED Flow Rate - Gas Only (cc/min)" toexpr="1804727/x" frexpr="1804727/x" format="%.2f" min="267.68" max="1000" inc="1" storagetype="float" endian="big"/>
 	<scaling name="ESTIMATEDFlowRate-GasOnly(cc/min)1" units="ESTIMATED Flow Rate - Gas Only (cc/min)" toexpr="2707090/x" frexpr="2707090/x" format="%.2f" min="231.65" max="1000" inc="1" storagetype="float" endian="big"/>
 	<scaling name="EngineLoad(g/rev)" units="Engine Load (g/rev)" toexpr="x*.00006103516" frexpr="x/.00006103516" format="%.2f" min="0.55" max="5" inc="0.01" storagetype="uint16" endian="big"/>
-	<scaling name="EngineLoad(g/rev)1" units="Engine Load (g/rev)" toexpr="x" frexpr="x" format="%.2f" min="0" max="5" inc="0.01" storagetype="float" endian="big"/>
+	<scaling name="EngineLoad(g/rev)1" units="Engine Load (g/rev)" toexpr="x" frexpr="x" format="%.2f" min="0" max="8" inc="0.01" storagetype="float" endian="big"/>
 	<scaling name="EngineLoadCompensation(%)" units="Engine Load Compensation (%)" toexpr="(x*.390625)-50" frexpr="(x+50)/.390625" format="%.1f" min="-28.9" max="21.1" inc="0.2" storagetype="uint8" endian="big"/>
 	<scaling name="EngineSpeed(RPM)" units="Engine Speed (RPM)" toexpr="x*.1953125" frexpr="x/.1953125" format="%.0f" min="0" max="12000" inc="50" storagetype="uint16" endian="big"/>
 	<scaling name="EngineSpeed(RPM)1" units="Engine Speed (RPM)" toexpr="x" frexpr="x" format="%.0f" min="0" max="2000" inc="50" storagetype="float" endian="big"/>
@@ -86,8 +88,6 @@
 	<scaling name="GDI Pressure Multiplier B" units="MPa?" toexpr="x*9.765625e-4" frexpr="x/9.765625e-4" format="%.3f" min="0" max="255" inc="0.06" storagetype="uint8" endian="big"/>
 	<scaling name="GDI Pressure Target" units="MPa?" toexpr="x*9.765625e-2" frexpr="x/9.765625e-2" format="%.1f" min="0" max="255" inc="0.06" storagetype="uint8" endian="big"/>
 	<scaling name="Gear" units="gear" toexpr="x" frexpr="x" format="%.0f" min="0" max="6" inc="1" storagetype="float" endian="big"/>
-	<scaling name="Alpha Hotstart 1" units="units" toexpr="x" frexpr="x" format="%.4f" min="0" max="255" inc="1" storagetype="float" endian="big"/>
-	<scaling name="Alpha Hotstart 2" units="units" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="Hotstart Counter uint16" units="Hotstart Counter Cycles" toexpr="x" frexpr="x" format="%5.0f" min="0" max="255" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="Hotstart Enrichment" units="Lambda Enrichment (Additive)" toexpr="x" frexpr="x" format="%.4f" min="0" max="255" inc="1" storagetype="float" endian="big"/>
 	<scaling name="Hz" units="Hz" toexpr="250000/x" frexpr="250000/x" format="%.2f" min="1" max="100" inc="0" storagetype="uint16" endian="big"/>
@@ -113,10 +113,12 @@
 	<scaling name="Knock2" units="units" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="Knock3" units="units" toexpr="x" frexpr="x" format="%.0f" min="0" max="255" inc="1" storagetype="uint8" endian="big"/>
 	<scaling name="Knock4" units="units" toexpr="x*0.000015258789" frexpr="x/0.000015258789" format="%.4f" min="0" max="255" inc="1" storagetype="uint16" endian="big"/>
+	<scaling name="KnockAccumBleed(raw)" units="raw (accumulator units/tick)" toexpr="x" frexpr="x" format="%.4f" min="0" max="2" inc="0.0005" storagetype="float" endian="big"/>
 	<scaling name="KnockCorrectionAdvanceAlternateMode" storagetype="bloblist">
 		<data name="disabled" value="FF"/>
 		<data name="enabled" value="00"/>
 	</scaling>
+	<scaling name="KnockWindowLength(count)" units="counter ticks" toexpr="x" frexpr="x" format="%.0f" min="0" max="65535" inc="1" storagetype="uint16" endian="big"/>
 	<scaling name="Lambda Additive" units="Air/Fuel Ratio Additive(Lambda)" toexpr="(x*0.00078125)-1" frexpr="(x+1)/0.00078125" format="%.4f" min="0" max="255" inc="0.06" storagetype="uint8" endian="big"/>
 	<scaling name="Latency(ms)" units="Latency (ms)" toexpr="x*.00025" frexpr="x/.00025" format="%.2f" min="0.3" max="6" inc="0.01" storagetype="uint16" endian="big"/>
 	<scaling name="ManifoldPressure(psirelativesealevel)" units="Manifold Pressure (psi relative sea level)" toexpr="(x-760)*.01933677" frexpr="(x/.01933677)+760" format="%.2f" min="4.64" max="23.98" inc="0.01" storagetype="float" endian="big"/>
@@ -220,8 +222,6 @@
 	<scaling name="clusterfueleffcomp" units="Estimated Fuel Efficiency Correction" toexpr="x" frexpr="x" format="%.3f" min="0" max="2" inc="0.1" storagetype="float" endian="big"/>
 	<scaling name="counterthreshold" units="counter threshold" toexpr="x" frexpr="x" format="%.0f" min="0" max="1250" inc="1" storagetype="uint8" endian="big"/>
 	<scaling name="counterthreshold1" units="counter threshold" toexpr="x" frexpr="x" format="%.0f" min="1" max="100" inc="1" storagetype="uint16" endian="big"/>
-	<scaling name="KnockWindowLength(count)" units="counter ticks" toexpr="x" frexpr="x" format="%.0f" min="0" max="65535" inc="1" storagetype="uint16" endian="big"/>
-	<scaling name="KnockAccumBleed(raw)" units="raw (accumulator units/tick)" toexpr="x" frexpr="x" format="%.4f" min="0" max="2" inc="0.0005" storagetype="float" endian="big"/>
 	<scaling name="cumulativethrottleanglechange" units="cumulative throttle angle change" toexpr="x" frexpr="x" format="%.2f" min="0" max="50" inc="0.1" storagetype="float" endian="big"/>
 	<scaling name="cumulativethrottleanglechange1" units="cumulative throttle angle change" toexpr="x*.001907349" frexpr="x/.001907349" format="%.2f" min="0" max="50" inc="0.1" storagetype="uint16" endian="big"/>
 	<scaling name="degreesofcorrection" units="degrees of correction" toexpr="x" frexpr="x" format="%.2f" min="-11.75" max="8" inc="0.1" storagetype="float" endian="big"/>
@@ -1362,12 +1362,6 @@
 			<data>(Above) - Clear CL Delay</data>
 		</table>
 	</table>
-
-	<!-- REMOVED: "CL to OL Enrichment Threshold (MAF)" was a duplicate of
-	     "Minimum Primary Open Loop Enrichment (Throttle)" (same ROM address).
-	     Axis is throttle plate opening % (10.93-89.06), not MAF g/s.
-	     Code input traced to FFFF64D8 (throttle_raw). Correct entry exists
-	     under "Fueling - Primary Open Loop" category above. -->
 
 	<table name="Injector Latency_" category="Fueling - Injectors" type="3D" level="2" scaling="Latency(ms)">
 		<description>Injector latency (dead-time)</description>
@@ -5204,7 +5198,6 @@
 		<description>This determines the minimum mass airflow that AF Learning values will be applied to.</description>
 	</table>
 
-
 	<table name="Tau Input A Falling Load Activation" category="Alpha Transient Fueling (Tau)" type="2D" scaling="Tau">
 		<description>This table determines the Tau A enrichment multiplier when engine load is decreasing.</description>
 		<table name="Coolant Temperature" type="Y Axis" elements="16" scaling="CoolantTemp(DegreesF)"/>
@@ -6149,8 +6142,6 @@
 	<table name="(P9578)" category="Diagnostic Trouble Codes" type="1D" scaling="PXXXX enable">
 		<description>(P9578). To disable this DTC, make sure the box above is unchecked. Off-road use only.</description>
 	</table>
-
-
 
 	<table name="Info Panel Fuel Consumption Correction" category="Fuel" type="2D" scaling="rawecuvalue">
 		<description>This is the correction applied to the fuel efficiency calculation to account for injector size change. Adjust this value by the same percentage as used for injector scaling. NewCorrection = CurrentCorrection * (NewInjectorScale / OldInjectorScale)</description>
