@@ -384,11 +384,17 @@ RESOLVED (ROM bytes win, per house rule):
                                              diag_tasks + 3162C WRONG
 
 STILL OPEN (named, not guessed):
-  * desc_func_xref.txt:279 lists 0xAD258 as "invalid". That row is wrong -
-    the consumer is 0x039598. Whatever heuristic marked it invalid probably
-    mis-scoped func_3952C because the function is reached by a `bra` stub and
-    has no direct caller. Worth checking how many other "invalid" rows are
-    branch-stub-reached functions; NOT audited this session.
+  * ~~desc_func_xref.txt:279 lists 0xAD258 as "invalid".~~ **CLOSED same day.**
+    Not a scoping problem at all: `is_valid_axis()` in desc_to_func_xref.py
+    counted monotonic PAIRS (max len-1) but thresholded against len*0.7, so a
+    perfectly monotonic axis returned False and EVERY 1-D descriptor was
+    marked invalid. 874 of 995 -> 2 after the fix. 0xAD258 now reads
+    `1D_vs_ECT`. See docs/corrections.md item 43.
+  * ~~func_3952C has no located caller.~~ **CLOSED same day.** There is a THIRD
+    dispatch table at 0x04ACB8 (93 entries); slot 20 (0x04AD08) holds
+    0x00039524, the stub whose `bra` lands on 0x03952C. The 0x39524/0x39528
+    pair are entries in two DIFFERENT tables, not an off-by-one.
+    See docs/corrections.md item 46. Table C's own consumer is still unlocated.
   * byte[FFFF782C] (R13) selects branch A vs branch B and I did not trace its
     writer beyond noting one store at 0x03408C (mov.b r2,@r5). Which branch the
     car actually runs is therefore UNVERIFIED. It does not change the verdict -
