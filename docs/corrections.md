@@ -3104,3 +3104,86 @@ inferred.
 - Item 57's framing ("all three dispatch tables are equally unreferenced …
   presumably a base built by arithmetic or a pointer initialised into RAM") is
   superseded: there is no base at all.
+
+---
+
+## 64. ITEM 9b RESOLVED — `func_37B74` is a bounded multiplicative fuel correction, and it IS on the fuel path — **2026-08-16**
+
+Item 47 left both candidate names unsupported. Tracing the function's output
+settles it.
+
+### What it computes
+
+```
+037C10  F49D  fldi1 fr4              ; fr4 = 1.0
+037C14  F0D6  fmov.s @(r0,r13),fr0   ; r0=-28 -> [0xFFFF7ABC]
+037C18  F8D6  fmov.s @(r0,r13),fr8   ; r0=-24 -> [0xFFFF7AC0]
+037C1A  F082  fmul fr8,fr0
+037C1E  F8D6  fmov.s @(r0,r13),fr8   ; r0=-20 -> [0xFFFF7AC4]
+037C20  F082  fmul fr8,fr0
+037C24  F8D6  fmov.s @(r0,r13),fr8   ; r0=-16 -> [0xFFFF7AC8]
+037C26  F48E  fmac fr0,fr8,fr4       ; fr4 = 1.0 + (A*B*C*D)
+037C28  D247  mov.l @(0x037D48),r2   ; 0x000BE56C = clamp
+037C2C  C748  mova @(0x037D4C),r0    ; upper = 1.5
+037C30  420B  jsr  @r2
+037C32  F508  fmov.s @r0,fr5         ; lower = 0.5
+037C38  FD07  fmov.s fr0,@(r0,r13)   ; r0=-36 -> [0xFFFF7AB4]  <-- OUTPUT
+```
+
+with `r13 = 0xFFFF7AD8`, so the output address is **`0xFFFF7AB4`**.
+
+**`output = clamp(1.0 + A·B·C·D, 0.5, 1.5)`** — and the bypass path writes
+**1.0** exactly:
+
+```
+037C3A  F49D  fldi1 fr4
+037C3E  FD47  fmov.s fr4,@(r0,r13)   ; r0=-36 -> [0xFFFF7AB4] = 1.0
+```
+
+A term whose neutral value is 1.0 and whose range is bounded ±50% is a
+**multiplicative correction**, not a compensation offset.
+
+### It is on the fuel path
+
+`0xFFFF7AB4` has exactly two readers, and both are decisive:
+
+| reader | enclosing function |
+|---|---|
+| `0x0301FC` | **`fuel_pw_calc`** (`0x0301E4`–`0x030674`) |
+| `0x0347D4` | **`afl_pipeline`** (`0x034488`–`0x037B74`) |
+
+`0x0301FC` sits 24 bytes into the fuel pulse-width calculator — it is one of the
+first things that routine reads. **That closes item 47's "is it on the fuel path
+at all" question: yes.**
+
+### Which name is right
+
+- **"Injector compensation (2D maps, RPM/load indexed)"**
+  (`fueling_pipeline_analysis.txt:61`) is **WRONG**. Its two comps are **1-D**
+  and indexed by **RPM** (`0xAC634`) and **ECT** (`0xAC648`) — not 2-D, not load.
+- **"AFL application"** is **SUPPORTED**: the output RAM `0xFFFF7AB4` is already
+  named `afl_multiplier_output` independently, and one of the two readers is the
+  AFL pipeline itself.
+- The **`enrichC` = `0xFFFF7AE4` half of that pairing stays wrong** (items 54,
+  61): `func_37B74` does not write `0xFFFF7AE4`; that address is written 16-bit
+  at `0x0365AA` from the OL fuel map selector.
+
+So the fuel model's third term is an **AFL multiplier at `0xFFFF7AB4`**, not
+`enrichC` at `0xFFFF7AE4`. Those were two different quantities merged under one
+label.
+
+### Gating
+
+Bypass (output forced to 1.0) if any of: three stack status bytes equal 2;
+`byte[0xFFFF7AD0] == 1`; `byte[0xFFFF7AD2] == 1`; or RPM ≥ `[0xCC2F0]`.
+**`0xCC2F0` = 10000.0**, which is above any reachable engine speed, so that last
+gate is a safety guard that never fires.
+
+### Not established
+
+Whether `A·B·C·D` is non-zero in practice. All four inputs
+(`0xFFFF7ABC`/`7AC0`/`7AC4`/`7AC8`) have real writers from live code
+(`0x037DBE`, `0x037EB0`, `0x037BCC`, `0x037BBC`), so the product is not
+structurally zero — but the two comps this function itself contributes
+(`0xAC634`, `0xAC648`) are flat zero on this calibration. Whether the whole
+term collapses to 1.0 needs the other two inputs traced. Recorded as open.
