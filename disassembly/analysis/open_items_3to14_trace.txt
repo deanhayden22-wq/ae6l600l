@@ -386,8 +386,13 @@ THIRD PASS — item 8c settles the load question; items 7 and 10
 Appended 2026-08-16, same session
 ================================================================================
 
-ITEM 8c — THE KNOCK DETECTOR **DOES** HAVE A LOAD INPUT. FOUR PER-CYLINDER
-          2x2 RPM x LOAD TABLES. ALL ZEROED ON THIS CAL.
+ITEM 8c — SUPERSEDED IN PART. See ITEM 8c-CORRECTED at the end of this file
+          (and docs/corrections.md item 59). The load input is real, but the
+          "ALL ZEROED" reading below was MY DECODE ERROR: I applied scale/bias
+          to typecode-0 (float32) records, which table_lookup skips. The tables
+          are POPULATED; it is the load AXIS that is degenerate.
+
+ITEM 8c (original, partly wrong) — THE KNOCK DETECTOR DOES HAVE A LOAD INPUT
 --------------------------------------------------------------------------------
 This overturns the second-pass conclusion in this same file. I had said the
 detector "does exactly TWO lookups and neither is load-indexed". That was wrong
@@ -505,4 +510,66 @@ REMAINING AFTER THIS PASS
   item 12  re-derive the three *_analysis.txt prose files vs corrected widths
 
 NO ROM EDITS.
+================================================================================
+
+
+================================================================================
+ITEM 8c-CORRECTED — the threshold tables are POPULATED; the LOAD AXIS is flat
+Appended 2026-08-16 after re-decoding. Supersedes ITEM 8c above and
+docs/corrections.md item 56. Full writeup: corrections.md item 59.
+================================================================================
+
+MY ERROR: I multiplied by the `scale`/`bias` fields of records whose typecode is
+0x00 (float32). `table_lookup` SKIPS scale/bias for typecode 0 --
+  0BE84A  2338  tst r3,r3
+  0BE84C  8D04  bt/s 0x0BE858     ; typecode 0 -> raw IS the value
+Those fields hold unrelated bytes, so raw 1000.0 * 1.8e-40 rounded to 0.0.
+Same class as the descriptor width bug: I trusted a field the code never reads.
+
+THE DETECTOR HAS FIVE LOOKUPS, TWO OF THEM 2-D RPM x LOAD PER CYLINDER:
+
+  1  0x0437BE  1-D 0xBE830  0xAE284                      in: knock signal
+                                                          data 0,0,32,51,...,304
+  2  0x043858  2-D 0xBE8E4  0xAE6D4/6E8/6FC/710          in: RPM x LOAD
+                            via ptr table 0x063E58        data 3.60 -> 3.45
+  3  0x04386E  2-D 0xBE8E4  0xAE724/738/74C/760          in: RPM x LOAD
+                            via ptr table 0x063E68        data 1000.0 everywhere
+  4  0x043920  1-D 0xBE830  0xAE29C/2A8/2B4/2C0          in: RPM
+                            via ptr table 0x063E48        data 16.0 everywhere
+  5  0x043944  1-D 0xBE830  0xAE290                      in: RPM
+                                                          data 8,10,10,10,10,10,
+                                                               12,13,10,10
+
+Item 56 found only lookup 3 of the two 2-D lookups, and mis-read its data.
+
+LOOKUP 2 IS THE THRESHOLD. 0xAE6D4 (cyl 0; other three structurally identical):
+  Y axis 0xD5C0C, 18 pts : 800 1200 1600 2000 2400 2800 3200 3600 4000
+                           4400 4800 5200 5600 6000 6400 6800 7200 7600
+  X axis 0xD5C54,  2 pts : 0.8, 2.2      <- LOAD
+  data   0xD5C5C, 36 f32 :
+     3.60 3.60 3.60 3.60 3.60 3.60 3.55 3.55 3.55 3.55 3.50 3.45 3.45 3.45
+     3.45 3.45 3.45 3.45      (then the identical 18 again)
+
+  VERIFIED byte-identical planes:
+     rom[0xD5C5C : +72] == rom[0xD5C5C+72 : +144]   ->  True
+  The 2-D helper takes the row count from `mov.w @(0,r4),r0` (=18) and the data
+  pointer from `mov.l @(12,r4),r1`, so the layout is TWO 18-VALUE LOAD PLANES,
+  not 18 rows of 2.
+
+FINAL ANSWER ON THE LOAD QUESTION:
+  * The threshold IS RPM x LOAD indexed, per cylinder, and IS populated:
+    3.60 at low RPM falling to 3.45 above 5200.
+  * The LOAD DIMENSION IS EXACTLY FLAT -- both planes identical, so load moves
+    the threshold by zero.
+  * "No load input" was right about the effect and wrong about the mechanism;
+    item 56's "zeroed" explanation was ALSO wrong. The tables are populated, the
+    load AXIS is degenerate.
+  * Latent lever: differentiating the two load planes would make detection
+    load-sensitive. Recorded, NOT proposed. Note the units are knock-signal
+    units (same 0..3.5 domain as 0xAE284's axis), not degrees.
+
+SCOPE OF THE ERROR: 0xAC634/0xAC648 (item 47) are typecode 0x04 where scaling
+IS applied, and their RAW bytes are all zero -- that conclusion stands.
+0xAD7E0 (item 58) was read raw both times -- stands. Only item 56's four 2x2
+tables and 0xAE290 were affected.
 ================================================================================

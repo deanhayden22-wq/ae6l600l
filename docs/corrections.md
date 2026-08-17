@@ -2756,3 +2756,68 @@ are limits or counter thresholds, and the surrounding code at `0x03BC30`–`0x03
 is byte flag / state-machine work (`mov.b r0,@(1..7,r14)`, `cmp/hi`), not a
 multiplicative fuel path. **Values VERIFIED; the "gains" name is UNSUPPORTED.**
 Not renamed — there is no evidence for a replacement name yet.
+
+---
+
+## 59. CORRECTION TO ITEM 56 — the knock threshold tables are NOT zeroed; they are populated, and the load dimension is exactly FLAT — **2026-08-16**
+
+Item 56 said the per-cylinder RPM × LOAD tables were "zero in every cell". **That
+was my decode error, not the ROM.** I multiplied by the `scale`/`bias` fields of
+records whose typecode is `0x00` (float32) — and `table_lookup` explicitly
+**skips** scale/bias for typecode 0 (`0x0BE84A tst r3,r3 / bt 0x0BE858`). Those
+fields hold unrelated bytes, so the product came out ~1e-37 and rounded to 0.0.
+Same class of error as the descriptor width bug: trusting a field the code
+doesn't read.
+
+### The detector's five lookups, decoded correctly
+
+| # | site | helper | descriptor(s) | input | data |
+|---|---|---|---|---|---|
+| 1 | `0x0437BE` | `0xBE830` 1-D | `0xAE284` | knock signal `0xFFFF4304`, clamped ≥0 | 0, 0, 32, 51, 64, 74 … 304 |
+| 2 | `0x043858` | `0xBE8E4` 2-D | per-cyl `0xAE6D4`/`6E8`/`6FC`/`710` via ptr table `0x063E58` | FR4 = RPM, FR5 = **LOAD** | **3.60 → 3.45** |
+| 3 | `0x04386E` | `0xBE8E4` 2-D | per-cyl `0xAE724`/`738`/`74C`/`760` via `0x063E68` | FR4 = RPM, FR5 = **LOAD** | **1000.0** everywhere |
+| 4 | `0x043920` | `0xBE830` 1-D | per-cyl `0xAE29C`/`2A8`/`2B4`/`2C0` via `0x063E48` | RPM | **16.0** everywhere |
+| 5 | `0x043944` | `0xBE830` 1-D | `0xAE290` | RPM | 8, 10, 10, 10, 10, 10, 12, 13, 10, 10 |
+
+There are **five** lookups and **two** of them are 2-D RPM × LOAD, per cylinder.
+Item 56 found only one of the two and mis-read its data.
+
+### Lookup 2 is the real threshold, and here are its numbers
+
+`0xAE6D4` (cylinder 0; the other three are structurally identical):
+18-point RPM axis `0xD5C0C` = 800, 1200 … 7600; 2-point load axis `0xD5C54` =
+**0.8, 2.2**; data at `0xD5C5C`, 36 float32.
+
+```
+RPM   800 1200 1600 2000 2400 2800 3200 3600 4000 4400 4800 5200 5600 6000 6400 6800 7200 7600
+val  3.60 3.60 3.60 3.60 3.60 3.60 3.55 3.55 3.55 3.55 3.50 3.45 3.45 3.45 3.45 3.45 3.45 3.45
+```
+
+**The two load planes are byte-identical** — verified directly:
+`rom[0xD5C5C:0xD5C5C+72] == rom[0xD5C5C+72:0xD5C5C+144]` is `True`. The 2-D
+helper reads the row count from `mov.w @(0,r4),r0` (= 18) and the data pointer
+from `mov.l @(12,r4),r1`, so the layout is two 18-value load planes, not 18
+rows of 2.
+
+### Final answer on the load question
+
+- The knock detection threshold **is** structurally RPM × engine load, per
+  cylinder, and it **is** populated: 3.60 at low RPM falling to 3.45 above 5200.
+- **The load dimension is exactly flat.** Both load planes are identical, so
+  changing load changes the threshold by nothing.
+- That is why "knock detection has no load input" survived every empirical
+  check: correct about the effect, wrong about the mechanism — and item 56's
+  "zeroed" explanation was also wrong. The tables are populated; it is the load
+  *axis* that is degenerate.
+- It remains a **latent lever**: differentiating the two load planes in
+  `0xAE6D4`/`6E8`/`6FC`/`710` would make detection load-sensitive. Recorded, not
+  proposed — and note the threshold is in knock-signal units (same 0–3.5 domain
+  as `0xAE284`'s axis), not degrees.
+
+### Scope of the decode error
+
+Checked every other table decoded this session for the same mistake:
+`0xAC634` / `0xAC648` (item 47, `0x37B74`'s comps) are typecode `0x04` (uint8),
+where scaling **is** applied — and their RAW bytes are all zero, so that
+conclusion stands. `0xAD7E0` (item 58) was read raw both times, so its garbage
+data stands. Only item 56's four 2×2 tables and `0xAE290` were affected.
