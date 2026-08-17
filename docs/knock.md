@@ -88,8 +88,11 @@ The Pull3DFloat descriptors used by the knock pipeline:
 
 | Descriptor | Used in | Purpose |
 |---|---|---|
-| 0x000AE284 | knock_detector | RPM/load-indexed knock threshold (main) |
-| 0x000AE290 | knock_detector | second knock signal table |
+| 0x000AE284 | knock_detector | **1-D curve on the KNOCK SIGNAL** (`0xFFFF4304`, clamped >=0), 65 pt float32, data 0..304. **NOT an RPM/load or RPM/IAT threshold** — corrected 2026-08-16, corrections.md items 49/59 |
+| 0x000AE290 | knock_detector | 1-D on RPM 800..8000, data 8,10,10,10,10,10,12,13,10,10 |
+| 0x0AE6D4/6E8/6FC/710 | knock_detector | **the threshold-shaped lookup**: per-cylinder 18 RPM x 2 LOAD, data 3.60 -> 3.45. The two load planes are BYTE-IDENTICAL, so the load axis is exactly flat (item 59) |
+| 0x0AE724/738/74C/760 | knock_detector | per-cylinder 2x2 RPM x LOAD, 1000.0 everywhere (ceiling) |
+| 0x0AE29C/2A8/2B4/2C0 | knock_detector | per-cylinder 1-D RPM, 16.0 everywhere |
 | 0x000AE0F8 | task12_knock_post | per-cycle retard amount lookup 1 |
 | 0x000AE00C | task12_knock_post | per-cycle retard amount lookup 2 |
 | 0x000AE020 | task12_knock_post | per-cycle retard amount lookup 3 |
@@ -148,9 +151,12 @@ Documented in `knock_flkc_report.txt`, kept here for context:
 
 - `rpm_current @ 0xFFFF6624` is RPM-scaled (RPM × 16/9). Source likely
   computed from crank timer ISR.
-- `iat_current @ 0xFFFF63F8` is the load-like variable used as the
-  Y-axis in 3D knock tables. Likely MAP or normalized load — needs
-  further tracing.
+- `0xFFFF63F8` is **ENGINE LOAD**, not IAT — settled in corrections.md item 9
+  and stated in CLAUDE.md; IAT is `0xFFFF6364`. The detector reads it at
+  `0x0437A0` into FR14 and uses it as the X axis of the per-cylinder
+  RPM x LOAD lookup at `0x043858`. So the detector DOES have a load input —
+  but that axis is calibrated exactly flat, which is why "knock detection has
+  no load input" held up empirically while being false about the code.
 - `knock_metric @ 0xFFFF8258` — cumulative knock signal used as the
   exponential weight in `flkc_paths_FG`. Computed elsewhere; not yet
   fully traced.

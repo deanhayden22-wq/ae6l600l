@@ -1,3 +1,25 @@
+> **SUPERSEDED 2026-08-16 — historical record only. Do not act on this file.**
+>
+> Every FIX and DIG item here is closed. Outcomes in `docs/corrections.md`
+> items 48-69. Live work is in **`docs/open-holes.md`**.
+>
+> Specifically wrong here, corrected later:
+> * **D1**: it INFERRED `0xFFFF4130` is baro and named tracing the writer as its
+>   weakest link. The weakest link broke — it is **battery voltage** (0..20 V
+>   full scale at `0x005A56`); `corrections.md` item 10 was right all along and
+>   `adc_pipeline_trace.txt` was the wrong artifact (item 45).
+> * **D5**: "446 addresses with 2+ labels" is really **26** — 94% was regex
+>   noise, including a `\s`-matches-newline bug that paired an address with the
+>   NEXT line's label (item 66).
+> * **D5's HUNCH** that `boost_control_analysis.txt` and `avcs_analysis.txt`
+>   dominate the conflicts is **not supported**; `ignition_timing_analysis.txt`
+>   leads with 9 of 26. The wholesale regeneration that hunch implied would have
+>   been harmful — regenerating those files LOSES hand-added instruction decodes
+>   the per-script decoders cannot reproduce (item 60).
+> * **FIX 1's premise** that the three `trace_*.py` scripts generate the
+>   `*_analysis.txt` files. They generate the `*_raw.txt` files; the analysis
+>   prose is hand-authored downstream.
+
 # Code-chase brief #2 — descriptor width bug cleanup + artifact reconciliation
 **2026-08-16, follow-up to `docs/code_chase_2026-08-16.md`**
 

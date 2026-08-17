@@ -1,3 +1,21 @@
+> **SUPERSEDED 2026-08-16 — historical record only. Do not act on this file.**
+>
+> Every task in this brief is closed. The outcomes, including where this brief
+> was WRONG, are in `docs/corrections.md` items 39-47 and the trace files it
+> names. Live work is in **`docs/open-holes.md`**.
+>
+> Specifically wrong here, corrected later:
+> * TASK 1's premise that `0xAD258` is a "WOT enrichment factor" — it is a 1-D
+>   uint16 table on a COOLANT axis, not on the IPW path, and clamped to
+>   `[0,0]` (item 42).
+> * TASK 2's INFERRED bilinear FLKC model — the grid is **bucketed** 7x5=35;
+>   write and read each touch exactly ONE cell, so the "mid-load event taxes the
+>   boost cells" mechanism does not exist (item 41).
+> * TASK 2's reading of the 8-14 traversal test — 59 of 64 FLKC changes were
+>   **in-cell learning**, not lookups of a pre-learned map (item 50).
+> * The 20-byte descriptor "stride" reading is off by one field; what it calls
+>   `pad` is the previous record's BIAS (item 39).
+
 # Code-chase brief — disassembly tasks, 2026-08-16
 
 **Repo:** `C:\Users\Dean\Documents\GitHub\ae6l600l`

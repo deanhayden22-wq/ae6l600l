@@ -71,6 +71,12 @@ These exist because confident-but-wrong answers have been produced here before.
    field, missing `& ~3` on PC-relative targets, inverted `fmov.s` direction.
    A mnemonic-only comparison passes all of them.
 
+### Open work
+
+**[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist — six scoped,
+unblocked items, each with what is known, what is not, and the concrete next
+move. Read it before picking up anything, and update it when you close one.
+
 ### Corrections history
 
 **[`docs/corrections.md`](docs/corrections.md)** records every verified error and
@@ -171,12 +177,22 @@ block and every RAM variable carries exactly one flag in
 | `CONFLICT` | **Stop.** Two independent sides disagree. Settle it from ROM bytes, record it in `docs/corrections.md`, then continue. |
 | `DEFS-ONLY` / `DISASM-ONLY` / `UNMAPPED` | No cross-check exists. Say so in whatever you write (rule 6 above). |
 
-Current state (4,725 entities): **351 VERIFIED-BOTH, 293 VERIFIED-BYTES,
-2 CONFLICT, 53 BOUNDS-SUSPECT, 21 DEFS-ONLY, 927 DISASM-ONLY, 3,078 UNMAPPED**,
-and **79.9% of data-classified ROM bytes are claimed by neither side.**
-The 2 CONFLICTs are `0xC0BCC` and `0xD6214`, both storagetype disagreements
-(commit `b0f560f`). Only ~14% is verified at all. Most of this ROM is not
-verified. Treat an unflagged or `UNMAPPED` area as unknown, not as safe.
+Current state, regenerated 2026-08-16 (4,691 entities): **336 VERIFIED-BOTH,
+290 VERIFIED-BYTES, 2 CONFLICT, 52 BOUNDS-SUSPECT, 6 DEFS-ONLY, 927
+DISASM-ONLY, 3,078 UNMAPPED**, and **79.9% of data-classified ROM bytes are
+claimed by neither side.** Only ~13% is verified at all. Most of this ROM is
+not verified. Treat an unflagged or `UNMAPPED` area as unknown, not as safe.
+
+> The totals moved on 2026-08-16 (was 4,725 / 351 / 293 / 53 / 21) because the
+> descriptor census itself changed — see the note below. Fewer VERIFIED-BOTH is
+> not a regression in knowledge; the corrected extents changed which definition
+> tables corroborate which descriptors.
+
+The 2 CONFLICTs are `0xC0BCC` and `0xD6214`, both **definition-XML storagetype**
+errors where the ROM code is right — settled from bytes in `docs/corrections.md`
+item 51. `0xC0BCC` reads **1.7** as a float while the editor displays 1.00, so
+any reasoning that used "boost disable during fuel cut = 1.00 load" used a wrong
+number. Fixing them means editing in the ECUFlash UI, not the repo copy.
 
 > A flag of `VERIFIED-BOTH` covers the *definition vs. ROM-code* cross-check.
 > It does **not** mean the table's NAME is right. `0xD39A8` was a well-formed
@@ -220,10 +236,58 @@ editing a definition XML, after a new tune rev, and after any correction.
 >
 > **As of 2026-08-16 `descriptor_map.txt`, `descriptor_labels.txt`,
 > `named_descriptors.txt`, `desc_func_xref.txt` and the `desc_*` labels in
-> `ImportAE5L600L.java` have all been regenerated or rewritten correctly**
-> (census: float32 149, uint8 215, uint16 396, int8 0, int16 0). Anything that
-> read a cell width or table extent out of those files **before** that date is
-> still suspect. They remain derived products — rule 1 above still applies.
+> `ImportAE5L600L.java` have all been regenerated or rewritten correctly.**
+> Anything that read a cell width or table extent out of those files **before**
+> that date is still suspect. They remain derived products — rule 1 still applies.
+>
+> **The census also changed: 760 → 1,094 descriptors** (1-D 851, 2-D 243;
+> float32 326, uint8 287, uint16 481). The old scanner missed a third of them
+> for three separate reasons, all fixed — see `docs/corrections.md` item 60.
+> `ImportAE5L600L.java` now labels all 1,094, one symbol per address.
+>
+> ### Two traps that have each cost this project a wrong conclusion
+>
+> **1. Typecode `0x00` (float32) has NO scale/bias.** `table_lookup` skips them
+> (`0BE84A tst r3,r3 / bt`), and the record's scale/bias fields hold unrelated
+> bytes — all 326 float32 descriptors have an implausible value sitting there.
+> Applying it silently collapses a table to ~0. That is how the AVCS VVT-error
+> feedback surface got recorded as "zeroed" when it is populated
+> (−10.55…+4.69, item 67), and how the knock threshold tables got called
+> "all zero" when they hold 3.45–3.60 (item 59).
+> **Use `desc_types.read_table()`; never hand-roll `raw * scale + bias`.**
+>
+> **2. `sh2e_disasm` prints displacements ALREADY IN BYTES** — `mov.l r0,@(d8*4,gbr)`,
+> `mov.w r0,@(d4*2,Rn)`. Multiplying by the operand size again puts `mov.w`
+> targets 2× and `mov.l` targets 4× too far (item 61).
+
+## Tools — check here before writing a new script
+
+Built 2026-08-16 because each replaced an ad-hoc pass that had already produced a
+wrong answer. Import them; do not re-derive.
+
+| tool | use it for |
+|---|---|
+| `scripts/desc_types.py` | **The** typecode map, plus `read_table()` / `scaling()` / `typecode()` / `is_2d()`. Single source of truth. Never re-declare the map — it was copy-pasted into five scripts and all five carried a guess. |
+| `scripts/mapping/find_writers.py` | Find every WRITE to a RAM address. Handles direct, displacement, indexed `@(r0,Rn)` and GBR-relative forms, and tracks `r0` through `add`/`extu`. |
+| `scripts/mapping/reconcile_ram_labels.py` | Harvest and rank conflicting RAM-address label claims across the artifacts. Reports; does not adjudicate. |
+| `scripts/mapping/sync_import_java_labels.py` | Sync descriptor labels into `ImportAE5L600L.java`. Address-keyed, additive, idempotent. **Use this, not `update_import_java.py`** (insert-only, would duplicate every label). |
+| `scripts/mapping/dedupe_import_java_labels.py` | Resolve addresses carrying two `desc_*` labels. |
+| `scripts/analysis/flkc_cell_trace.py` | Replicate the FLKC band selector over a log and classify FLKC steps as cell traversal vs in-cell learning. |
+
+### The method that actually settles things
+
+Three of the four identity errors fixed this session were settled the same way,
+after label-based reasoning had failed on all of them:
+
+1. **Find the WRITER, not the readers.** `0xFFFF6354`, `0xFFFF4130` and
+   `0xFFFF81BA` all had 100% reads in the literal pool. The writes were indexed
+   stores off a neighbouring base, or GBR-relative. A literal-pool scan settles
+   nothing on its own.
+2. **Read the clamp/limit constants before calling anything a live lever.**
+   `0xAD258` looked like a live fuel multiplier until its bound turned out to be
+   `0.0` on both branches.
+3. **Decode the consumer.** A claim that survives only because nobody decoded the
+   consuming function is not verified, however many artifacts repeat it.
 
 ## Table data vs. code
 
