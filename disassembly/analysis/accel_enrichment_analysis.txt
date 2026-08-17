@@ -159,6 +159,9 @@ CONDITION QUERIES
 GAIN SELECTION
   If frame[8] == 1: load gain set B (0xCC520 / 0xCC528)
   Otherwise:        load gain set A (0xCC51C / 0xCC524)
+  *** WRONG -- CORRECTED 2026-08-16, docs/corrections.md item 65. 0xCC51C is
+      "Speed Limiting Enable (Fuel Cut)" (alternate set) and 0xCC524 its
+      matching Disable. Not tip-in gains. See the banner at the CAL table. ***
   Both calibration sets are currently identical:
     FR15 = 510.0  (tip-in multiplier)
     FR14 = 505.0  (tip-out / decay multiplier)
@@ -196,7 +199,11 @@ void fuel_accel_enrich() {
     query_conditions();
 
     // gain selection
-    float tip_in_gain  = (frame[8]==1) ? CAL[0xCC520] : CAL[0xCC51C];  // 510.0
+    // *** THE PSEUDOCODE BELOW IS WRONG (item 65). This is the LIMITER block:
+    //     inputs are vehicle speed (0xFFFF65FC), RPM (0xFFFF6624) and MAP
+    //     (0xFFFF620C) -- NOT throttle. CAL[0xCC520]/[0xCC51C] are speed-limiter
+    //     CUT values and CAL[0xCC528]/[0xCC524] the matching RESUME values.
+    float speed_cut = (frame[8]==1) ? CAL[0xCC520] : CAL[0xCC51C];  // 510.0 km/h
     float tip_out_gain = (frame[8]==1) ? CAL[0xCC528] : CAL[0xCC524];  // 505.0
 
     Workspace* ws = 0xFFFF7CE0;
@@ -216,7 +223,7 @@ void fuel_accel_enrich() {
         }
 
         // check decay saturation
-        if (curr_tps > CAL[0xCC530]) {              // tps > 10000.0 (saturated)
+        if (rpm > CAL[0xCC530]) {                   // RPM > 10000 -- NEVER FIRES (item 65)
             if (curr_rpm > CAL[0xCC52C])             // RPM > 1260.0
                 goto deactivate;
             if (frame[4] == 1)
@@ -255,7 +262,7 @@ void fuel_accel_enrich() {
         }
 
     throttle_check:
-        if (curr_tps > CAL[0xCC530]) goto counter_decrement;  // tps > 10000
+        if (rpm > CAL[0xCC530]) goto counter_decrement;  // RPM > 10000, never fires (item 65)
         if (frame[4] != 0) goto counter_decrement;
 
         // ACTIVATE
@@ -296,12 +303,22 @@ alternate operating conditions (possibly closed-loop vs open-loop mode).
 
   CAL ADDRESS  NAME              VALUE   SET
   -----------  ----------------  ------  ---
-  0x000CC51C   tip_in_gain_A     510.0   A
+  0x000CC51C   SPEED LIMIT CUT   510.0   [CORRECTED 2026-08-16, item 65 --
+                                   was "tip_in_gain_A". Pairs with 0xCC524 =
+                                   505.0 resume. The XML defines the sibling
+                                   set 0xCC520/0xCC528 as "Speed Limiting
+                                   Enable/Disable (Fuel Cut)". Consumer is the
+                                   limiter routine 0x03BB6C, which compares
+                                   against float[0xFFFF65FC] = VEHICLE SPEED.]
   0x000CC520   tip_in_gain_B     510.0   B
   0x000CC524   tip_out_gain_A    505.0   A
   0x000CC528   tip_out_gain_B    505.0   B
   0x000CC52C   rpm_threshold     1260.0  (shared)
-  0x000CC530   decay_gain       10000.0  (shared, saturation sentinel)
+  0x000CC530   RPM CEILING GUARD 10000.0 [CORRECTED 2026-08-16, item 65 -- was
+                                   "decay_gain / TPS saturation sentinel". It is
+                                   compared against float[0xFFFF6624] = RPM at
+                                   0x03BBF2, and 10000 rpm is unreachable, so it
+                                   never fires. Not TPS, not a gain.]
 
 The gain values (510.0, 505.0) are multiplicative factors applied to the
 throttle delta float. The exact throttle delta units determine actual enrichment

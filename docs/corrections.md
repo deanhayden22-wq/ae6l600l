@@ -3187,3 +3187,79 @@ Whether `A·B·C·D` is non-zero in practice. All four inputs
 structurally zero — but the two comps this function itself contributes
 (`0xAC634`, `0xAC648`) are flat zero on this calibration. Whether the whole
 term collapses to 1.0 needs the other two inputs traced. Recorded as open.
+
+---
+
+## 65. ITEM 10b RESOLVED — `0xCC51C` is a speed-limiter cut, `0xCC530` an RPM guard. "Tip-in/out gains" was wrong — **2026-08-16**
+
+Item 58 verified the values (510.0 and 10000.0) but could not support the
+"tip-in/out gains" name and declined to invent one. The code trace plus the
+definition XML settle it.
+
+### The consuming routine is the LIMITER block
+
+Function `0x03BB6C`. Its three inputs, from literals `0x03BCE8`/`EC`/`F0`:
+
+```
+03BB7A  mov.l @(0x03BCE8),r2 ; fmov.s @r2,fr12   ; 0xFFFF65FC = VEHICLE SPEED
+03BB7E  mov.l @(0x03BCEC),r2 ; fmov.s @r2,fr9    ; 0xFFFF6624 = RPM  -> @r15
+03BB84  mov.l @(0x03BCF0),r2 ; fmov.s @r2,fr13   ; 0xFFFF620C = MANIFOLD PRESSURE
+```
+
+It then selects a cut/resume pair on a mode flag:
+
+```
+03BBA8  cmp/eq #1,r0
+03BBAA  bf 0x03BBB6
+03BBAC  mov.l @(0x03BD04),r2 ; fr15 = [0xCC520] = 510   ; mode A cut
+03BBB0  mov.l @(0x03BD08),r2 ; fr14 = [0xCC528] = 505   ; mode A resume
+03BBB6  mov.l @(0x03BD0C),r2 ; fr15 = [0xCC51C] = 510   ; mode B cut
+03BBBA  mov.l @(0x03BD10),r2 ; fr14 = [0xCC524] = 505   ; mode B resume
+03BBD4  fcmp/gt fr12,fr14                               ; compare vs VEHICLE SPEED
+```
+
+### The definition XML names the sibling pair
+
+`definitions/AE5L600L 2013 USDM Impreza WRX MT.xml`:
+
+```
+line 971:  <table name="Speed Limiting Enable (Fuel Cut)"  address="cc520">
+line 974:  <table name="Speed Limiting Disable (Fuel Cut)" address="cc528">
+```
+
+Mode A uses `0xCC520`/`0xCC528` — **defined**, and named exactly what the code
+trace independently shows. Mode B uses `0xCC51C`/`0xCC524` — **undefined**, and
+structurally identical.
+
+> **`0xCC51C` = Speed Limiting Enable (Fuel Cut), alternate set** (510)
+> **`0xCC524` = Speed Limiting Disable (Fuel Cut), alternate set** (505)
+
+This mirrors the rev limit, which has three parallel pairs in the same block —
+`0xCC500`/`504`, `0xCC508`/`50C`, `0xCC510`/`514`, all defined as
+"Rev Limit On/Off (1)(2)(3)".
+
+> **`0xCC530` = 10000.0, an RPM ceiling guard** in the same routine, compared
+> against `float[0xFFFF6624]` at `0x03BBF2`. Above any reachable engine speed,
+> so it never fires — the same never-fires guard pattern as `0xCC2F0` in
+> `func_37B74` (item 64).
+
+`0xCC52C` = 1260 is the manifold-pressure guard, compared against
+`float[0xFFFF620C]`; the same 1260 appears at `0xCC518`, defined as
+"Rev Limit Fuel Resume (Boost)".
+
+### Stock comparison — these are FACTORY values, not a tune change
+
+| addr | stock | 20.19c |
+|---|---|---|
+| `0xCC500` Rev Limit cut | 6700 | 6700 |
+| `0xCC504` Rev Limit resume | 6650 | **6680** |
+| `0xCC508`/`50C`, `0xCC510`/`514` | 6700 / 6650 | 6700 / **6680** |
+| `0xCC51C`–`0xCC528` speed limiter | 510 / 510 / 505 / 505 | unchanged |
+| `0xCC530` | 10000 | unchanged |
+
+510 km/h (~317 mph) is unreachable, i.e. **no speed limiter** — correct for a
+USDM car, and factory, not something the tune did. The only changes in this
+block are the three rev-limit resume values, 6650 → 6680.
+
+**"Tip-in/out gains: CC51C-CC530" is wrong** and should not be carried forward.
+The block is rev limiter + speed limiter + their boost/RPM guards.

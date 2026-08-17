@@ -6,7 +6,7 @@
 python scripts/coverage_map.py
 ```
 
-Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-08-17 16:53.
+Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-08-17 17:03.
 
 Every flag below is recomputed from scratch on each run: the definition side from `scripts/defs.py` over both definition XMLs, the disassembly side re-derived from ROM bytes (literal-pool dereference back-trace, table descriptors decoded out of ROM, and a RAM→lookup-axis feed trace). No conclusion is read out of a derived file and trusted. Agreement across derived files is not evidence.
 
@@ -72,17 +72,17 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 
 ## 2. Coverage
 
-4725 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
+4691 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
 
 | Flag | Entities | Share |
 |---|---:|---:|
 | `CONFLICT` | 2 | 0.0% |
-| `BOUNDS-SUSPECT` | 53 | 1.1% |
-| `VERIFIED-BOTH` | 351 | 7.4% |
-| `VERIFIED-BYTES` | 293 | 6.2% |
-| `DEFS-ONLY` | 21 | 0.4% |
-| `DISASM-ONLY` | 927 | 19.6% |
-| `UNMAPPED` | 3078 | 65.1% |
+| `BOUNDS-SUSPECT` | 52 | 1.1% |
+| `VERIFIED-BOTH` | 336 | 7.2% |
+| `VERIFIED-BYTES` | 290 | 6.2% |
+| `DEFS-ONLY` | 6 | 0.1% |
+| `DISASM-ONLY` | 927 | 19.8% |
+| `UNMAPPED` | 3078 | 65.6% |
 
 ### By entity kind
 
@@ -91,7 +91,7 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 | axis | 0 | 26 | 128 | 57 | 2 | 0 | 0 |
 | ram | 0 | 0 | 5 | 0 | 0 | 231 | 3078 |
 | rom-block | 0 | 0 | 0 | 0 | 0 | 696 | 0 |
-| table | 2 | 27 | 218 | 236 | 19 | 0 | 0 |
+| table | 2 | 26 | 203 | 233 | 4 | 0 | 0 |
 
 `table` / `axis` are definition-backed. `rom-block` is a calibration block a ROM descriptor points at that no `<table>` covers. `ram` is a RAM variable — RAM is outside the ROM image, so no definition can ever cover it and the definition side contributes only indirectly, through the names of the axes a RAM variable is traced feeding.
 
@@ -100,8 +100,8 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 Bytes the region map classifies as data (not code, not a 0xFF hole) and that no definition extent and no descriptor extent claims:
 
 - data bytes considered: **321,468**
-- unmapped: **256,736 (79.9%)**
-- of which 44,028 bytes lie inside the descriptor band `0x0A0000-0x0BE000` — those are descriptor STRUCTS and lookup-helper constants, not table cells, so they are unmapped by nature rather than by neglect. Excluding them, **212,708 of 277,440 calibration data bytes (76.7%) are claimed by nothing**.
+- unmapped: **256,794 (79.9%)**
+- of which 44,028 bytes lie inside the descriptor band `0x0A0000-0x0BE000` — those are descriptor STRUCTS and lookup-helper constants, not table cells, so they are unmapped by nature rather than by neglect. Excluding them, **212,766 of 277,440 calibration data bytes (76.7%) are claimed by nothing**.
 
 Largest unmapped data blocks:
 
@@ -114,8 +114,8 @@ Largest unmapped data blocks:
 | `0x9A700`–`0x9C200` | float_data | 6,760 |
 | `0x49A00`–`0x4B100` | float_data | 5,888 |
 | `0xC0B00`–`0xC3F00` | float_data | 4,929 |
-| `0xD5800`–`0xD7400` | float_data | 4,799 |
-| `0xD1D00`–`0xD4500` | float_data | 4,793 |
+| `0xD1D00`–`0xD4500` | float_data | 4,839 |
+| `0xD5800`–`0xD7400` | float_data | 4,803 |
 | `0x03900`–`0x04A00` | float_data | 4,352 |
 | `0xD8300`–`0xDAB00` | float_data | 4,309 |
 | `0xC8400`–`0xCC300` | float_data | 3,886 |
@@ -127,27 +127,46 @@ Largest unmapped data blocks:
 
 | Category | `CONFLICT` | `BOUNDS-SUSPECT` | `VERIFIED-BOTH` | `VERIFIED-BYTES` | `DEFS-ONLY` | `DISASM-ONLY` | `UNMAPPED` | total |
 |---|---|---|---|---|---|---|---|---|
-| Diagnostics / DTC | 0 | 0 | 0 | 152 | 0 | 0 | 0 | 152 |
-| Fueling - Base / Enrichment | 0 | 19 | 27 | 43 | 0 | 0 | 0 | 89 |
-| Ignition Timing | 0 | 2 | 56 | 19 | 0 | 0 | 0 | 77 |
-| Boost Control | 0 | 0 | 43 | 8 | 4 | 0 | 0 | 55 |
-| Fueling - CL/OL Transition | 0 | 6 | 37 | 8 | 0 | 0 | 0 | 51 |
-| Map Switching - Cruise/Non-Cruise | 0 | 0 | 48 | 0 | 0 | 0 | 0 | 48 |
-| Torque Management / DBW | 0 | 2 | 2 | 27 | 10 | 0 | 0 | 41 |
-| Ignition Timing - Knock | 0 | 6 | 29 | 2 | 0 | 0 | 0 | 37 |
-| Fueling - Injector | 0 | 1 | 20 | 13 | 0 | 0 | 0 | 34 |
-| Idle Control | 1 | 8 | 5 | 8 | 0 | 0 | 0 | 22 |
-| Sensors / Calibration | 0 | 2 | 16 | 1 | 0 | 0 | 0 | 19 |
-| Vehicle Speed / Transmission | 0 | 0 | 15 | 0 | 0 | 0 | 0 | 15 |
+| Diagnostic Trouble Codes | 0 | 0 | 0 | 152 | 0 | 0 | 0 | 152 |
+| Ignition Timing - Compensation | 0 | 2 | 39 | 8 | 0 | 0 | 0 | 49 |
+| Map Switching - Cruise/Non-Cruise | 0 | 0 | 41 | 0 | 0 | 0 | 0 | 41 |
+| Fueling - Tip-in Enrichment | 0 | 0 | 13 | 16 | 0 | 0 | 0 | 29 |
+| Ignition Timing - Advance | 0 | 0 | 19 | 10 | 0 | 0 | 0 | 29 |
+| Post Start Enrichment | 0 | 13 | 0 | 13 | 0 | 0 | 0 | 26 |
+| Fueling - Primary Open Loop | 0 | 0 | 23 | 2 | 0 | 0 | 0 | 25 |
+| Fueling - Cranking | 0 | 0 | 12 | 12 | 0 | 0 | 0 | 24 |
+| Ignition Timing - Knock Control | 0 | 6 | 15 | 2 | 0 | 0 | 0 | 23 |
+| Drive-by-Wire Throttle (DBW) | 0 | 0 | 0 | 20 | 0 | 0 | 0 | 20 |
+| Fueling - CL/OL Transition | 0 | 6 | 12 | 1 | 1 | 0 | 0 | 20 |
+| Boost Control - Turbo Dynamics | 0 | 0 | 15 | 3 | 0 | 0 | 0 | 18 |
+| Fueling - Closed Loop | 0 | 0 | 11 | 7 | 0 | 0 | 0 | 18 |
+| Fueling - Injectors | 0 | 0 | 15 | 1 | 0 | 0 | 0 | 16 |
+| Boost Control - Wastegate | 0 | 0 | 11 | 3 | 1 | 0 | 0 | 15 |
+| Mass Airflow / Engine Load | 0 | 0 | 14 | 1 | 0 | 0 | 0 | 15 |
 | Map Switching - Timing Blend | 0 | 0 | 14 | 0 | 0 | 0 | 0 | 14 |
 | tinywrex patches | 1 | 2 | 7 | 4 | 0 | 0 | 0 | 14 |
-| AVCS / Cam Timing | 0 | 2 | 10 | 0 | 0 | 0 | 0 | 12 |
-| MAF / Airflow | 0 | 0 | 8 | 1 | 3 | 0 | 0 | 12 |
-| Fuel System | 0 | 0 | 3 | 4 | 0 | 0 | 0 | 7 |
-| Fueling - AF Correction / Learning | 0 | 1 | 1 | 0 | 4 | 0 | 0 | 6 |
-| Fueling - Fuel Cut / Rev Limit | 0 | 2 | 2 | 2 | 0 | 0 | 0 | 6 |
-| Cooling | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 |
+| Alpha Drive-by-Wire Throttle (DBW) | 0 | 0 | 12 | 0 | 0 | 0 | 0 | 12 |
+| Boost Control - Target | 0 | 0 | 10 | 2 | 0 | 0 | 0 | 12 |
+| Alpha Transient Fueling (Tau) | 0 | 6 | 0 | 5 | 0 | 0 | 0 | 11 |
+| Alpha Idle Control | 1 | 2 | 5 | 0 | 0 | 0 | 0 | 8 |
+| Fueling - Warm-Up Enrichment | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 8 |
+| Idle Control | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 8 |
+| Fueling - AF Correction / Learning | 0 | 1 | 2 | 0 | 4 | 0 | 0 | 7 |
+| Miscellaneous - Limits | 0 | 1 | 3 | 3 | 0 | 0 | 0 | 7 |
+| Alpha Per Gear Requested Torque | 0 | 2 | 0 | 4 | 0 | 0 | 0 | 6 |
+| Alpha Variable Valve Timing (AVCS) | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 6 |
+| Boost Control - Limits | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 |
+| Idle control | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 6 |
+| Miscellaneous - Sensor Scalings | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 |
+| Miscellaneous - Thresholds | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 |
+| Variable Valve Timing (AVCS) | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 |
+| Alpha OverRun Fueling | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 5 |
+| Alpha Low PW Injector Comp | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 4 |
+| Alpha Ignition Dwell | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 3 |
+| Manifold Pressure Sensor | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 3 |
 | Alpha Engine Load Limit B Multiplier | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 |
+| Alpha Fuel Pump | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 |
+| Alpha Fueling - Injectors | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 1 |
 
 ## 4. `CONFLICT` — settle these from bytes
 
@@ -160,7 +179,7 @@ Two independent sides make incompatible claims about the same address. Nothing d
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
   - evidence: D5 cal_crossref.txt:472 — Ghidra label cal_Boost_disable_during_fuel_cut_Load_threshold
 - **`0xD6214`** — Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter  
-  _Idle Control_
+  _Alpha Idle Control_
   - ROM code dereferences 0xD6214 as int16; declared storagetype float (rawecuvalue) is never used. The definition shows 0.0 raw ecu value; read the way the code reads it (int16) the same bytes are 18
   - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int16 x6
@@ -168,58 +187,58 @@ Two independent sides make incompatible claims about the same address. Nothing d
 
 ## 5. `BOUNDS-SUSPECT` — editor will clamp
 
-The bytes are read correctly; the definition's declared min/max is contradicted by the factory ROM's own data. ECUFlash/RomRaider clamp on write, so these bounds can silently refuse a legitimate value. **53 entities.**
+The bytes are read correctly; the definition's declared min/max is contradicted by the factory ROM's own data. ECUFlash/RomRaider clamp on write, so these bounds can silently refuse a legitimate value. **52 entities.**
 
 Collapsed by address: a shared axis (the ECT axis at `0xCC624` serves 34 tables) would otherwise repeat once per consumer.
 
 - **`0xCC624`** — Table_Post_Start_Enrich_High_Speed_Decay_Initial_Start_1A / Coolant Temperature  (+16 more tables at this address)  
-  _Fueling - Base / Enrichment_
+  _Post Start Enrichment_
   - 14 of 16 factory-ROM cells fall outside the declared min/max 188.6..221.0
   - **suspect side:** definition XML (declared min/max)
 - **`0xCC664`** — Table_Post_Start_Enrich_Low_Speed_Decay_Delay_2 / Coolant Temperature  
-  _Fueling - Base / Enrichment_
+  _Post Start Enrichment_
   - 14 of 16 factory-ROM cells fall outside the declared min/max 188.6..221.0
   - **suspect side:** definition XML (declared min/max)
 - **`0xCCDCC`** — Tau Input A Rising Load Activation / Engine Load  
-  _Fueling - Base / Enrichment_
+  _Alpha Transient Fueling (Tau)_
   - 1 of 3 factory-ROM cells fall outside the declared min/max 0.0..5.0
   - **suspect side:** definition XML (declared min/max)
 - **`0xCFA14`** — Intake Duty Correction A / Engine Speed  
-  _AVCS / Cam Timing_
+  _Alpha Variable Valve Timing (AVCS)_
   - 3 of 9 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAD620 — 2D, 90 cells x 1 byte (axis pointer); spacing to the next known table boundary implies nothing bytes/cell
 - **`0xD11F8`** — Exhaust Duty Correction A / Engine Speed  
-  _AVCS / Cam Timing_
+  _Alpha Variable Valve Timing (AVCS)_
   - 3 of 9 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAD848 — 2D, 90 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell
 - **`0xD7E38`** — Idle Airflow Min Target Decel Adder (RPM x ECT) / Coolant Temp  
-  _Idle Control_
+  _Alpha Idle Control_
   - 2 of 2 factory-ROM cells fall outside the declared min/max 188.6..221.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAF090 — 2D, 32 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell
   - evidence: D5 cal_crossref.txt:362 — Ghidra label cal_Coolant_Temp
 - **`0xD7E80`** — Idle Speed Stability A / Idle Speed Error  
-  _Idle Control_
+  _Idle control_
   - 7 of 17 factory-ROM cells fall outside the declared min/max 0.0..10000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAF0AC — 2D, 153 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell
   - evidence: D5 cal_crossref.txt:364 — Ghidra label cal_Idle_Speed_Error
 - **`0xD7EC4`** — Idle Speed Stability A / Engine Speed Delta  
-  _Idle Control_
+  _Idle control_
   - 5 of 9 factory-ROM cells fall outside the declared min/max 0.0..10000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAF0AC — 2D, 153 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell
   - evidence: D5 cal_crossref.txt:365 — Ghidra label cal_Engine_Speed_Delta
 - **`0xD801C`** — Idle Speed Stability B / Idle Speed Error  
-  _Idle Control_
+  _Idle control_
   - 7 of 17 factory-ROM cells fall outside the declared min/max 0.0..10000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAF0C8 — 2D, 153 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell
   - evidence: D5 cal_crossref.txt:367 — Ghidra label cal_Idle_Speed_Error
 - **`0xD8060`** — Idle Speed Stability B / Engine Speed Delta  
-  _Idle Control_
+  _Idle control_
   - 5 of 9 factory-ROM cells fall outside the declared min/max 0.0..10000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAF0C8 — 2D, 153 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell
@@ -271,108 +290,103 @@ Collapsed by address: a shared axis (the ECT axis at `0xCC624` serves 34 tables)
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
 - **`0xCC498`** — Overrun Enrich RPM Delta Activation  
-  _Fueling - Fuel Cut / Rev Limit_
+  _Alpha OverRun Fueling_
   - 1 of 1 factory-ROM cells fall outside the declared min/max 0.0..420.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
 - **`0xCC500`** — Rev Limit (Fuel Cut)  
-  _Fueling - Fuel Cut / Rev Limit_
+  _Miscellaneous - Limits_
   - 2 of 2 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
 - **`0xD29DE`** — Feedback Correction Negative Advance Delay  
-  _Ignition Timing - Knock_
+  _Ignition Timing - Knock Control_
   - 1 of 1 factory-ROM cells fall outside the declared min/max 1.0..100.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int16 x1
   - evidence: D5 cal_crossref.txt:290 — Ghidra label cal_Feedback_Correction_Negative_Advance_Delay
 - **`0xD29EE`** — Fine Correction Advance Delay  
-  _Ignition Timing - Knock_
+  _Ignition Timing - Knock Control_
   - 1 of 1 factory-ROM cells fall outside the declared min/max 1.0..100.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int16 x1
   - evidence: D5 cal_crossref.txt:291 — Ghidra label cal_Fine_Correction_Advance_Delay
 - **`0xD2D38`** — Timing Compensation Per Gear Activation (RPM)  
-  _Ignition Timing_
+  _Ignition Timing - Compensation_
   - 2 of 2 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
 - **`0xD2D98`** — Timing Comp Maximum RPM (Per Cylinder)  
-  _Ignition Timing_
+  _Ignition Timing - Compensation_
   - 1 of 1 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
 - **`0xD2DAC`** — Feedback Correction Range (RPM)  
-  _Ignition Timing - Knock_
+  _Ignition Timing - Knock Control_
   - 2 of 4 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
   - evidence: D5 cal_crossref.txt:294 — Ghidra label cal_Feedback_Correction_Range_RPM
 - **`0xD2EBC`** — Rough Correction Range (RPM)  
-  _Ignition Timing - Knock_
+  _Ignition Timing - Knock Control_
   - 2 of 4 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
   - evidence: D5 cal_crossref.txt:296 — Ghidra label cal_Rough_Correction_Range_RPM
 - **`0xD2F0C`** — Fine Correction Rows (RPM)  
-  _Ignition Timing - Knock_
+  _Ignition Timing - Knock Control_
   - 6 of 6 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
 - **`0xD2F6C`** — Fine Correction Range (RPM)  
-  _Ignition Timing - Knock_
+  _Ignition Timing - Knock Control_
   - 2 of 4 factory-ROM cells fall outside the declared min/max 0.0..2000.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x2
   - evidence: D5 cal_crossref.txt:298 — Ghidra label cal_Fine_Correction_Range_RPM
 - **`0xD39A8`** — Low Pulse Width Fuel Injector Compensation  
-  _Fueling - Injector_
+  _Alpha Low PW Injector Comp_
   - descriptor @0xAE000 typecode implies 4 byte(s)/cell, but every routine that consumes it (0xBE874) hardcodes the cell width and never reads the typecode -- the field is dead, so it is NOT evidence against the declared uint8
   - 8 of 8 factory-ROM cells fall outside the declared min/max -10.16..14.84
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAE000 — 1D, 8 cells x 4 bytes (data pointer); spacing to the next known table boundary implies 1 bytes/cell
 - **`0xD64A4`** — Idle Airflow Min Target Decel Ramping Adder Decreasing  
-  _Idle Control_
+  _Alpha Idle Control_
   - 1 of 1 factory-ROM cells fall outside the declared min/max 0.0..255.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
   - evidence: D5 cal_crossref.txt:354 — Ghidra label cal_Idle_Airflow_Min_Target_Decel_Ramping_Adder_Decreasing
 - **`0xD7EE8`** — Idle Speed Stability A  
-  _Idle Control_
+  _Idle control_
   - 45 of 153 factory-ROM cells fall outside the declared min/max 0.0..255.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAF0AC — 2D, 153 cells x 2 bytes (data pointer); spacing to the next known table boundary implies nothing bytes/cell
   - evidence: D5 cal_crossref.txt:366 — Ghidra label cal_Idle_Speed_Stability_A
 - **`0xD8084`** — Idle Speed Stability B  
-  _Idle Control_
+  _Idle control_
   - 45 of 153 factory-ROM cells fall outside the declared min/max 0.0..255.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D2 ROM table descriptor @0xAF0C8 — 2D, 153 cells x 2 bytes (data pointer); spacing to the next known table boundary implies nothing bytes/cell
   - evidence: D5 cal_crossref.txt:369 — Ghidra label cal_Idle_Speed_Stability_B
 - **`0xD8AD8`** — Manifold Pressure Sensor Scaling_  
-  _Sensors / Calibration_
+  _Manifold Pressure Sensor_
   - 1 of 2 factory-ROM cells fall outside the declared min/max -8.01..9.94
   - **suspect side:** definition XML (declared min/max)
   - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
   - evidence: D5 cal_crossref.txt:372 — Ghidra label cal_Manifold_Pressure_Sensor_Scaling
-- **`0xD8ADC`** — Barometric Pressure Offset  
-  _Sensors / Calibration_
-  - 1 of 1 factory-ROM cells fall outside the declared min/max -100.0..15000.0
-  - **suspect side:** definition XML (declared min/max)
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
 - **`0xF9788`** — Requested Torque Limit A (Per Gear/Engine Speed)  
-  _Torque Management / DBW_
+  _Alpha Per Gear Requested Torque_
   - 96 of 96 factory-ROM cells fall outside the declared min/max 0.0..455.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D5 cal_crossref.txt:403 — Ghidra label cal_Requested_Torque_Limit_A_Per_Gear_Engine_Speed
 - **`0xF98A0`** — Requested Torque Limit B (Per Gear/Engine Speed)  
-  _Torque Management / DBW_
+  _Alpha Per Gear Requested Torque_
   - 96 of 96 factory-ROM cells fall outside the declared min/max 0.0..455.0
   - **suspect side:** definition XML (declared min/max)
   - evidence: D5 cal_crossref.txt:406 — Ghidra label cal_Requested_Torque_Limit_B_Per_Gear_Engine_Speed
 
 ## 6. `DEFS-ONLY` — definition too incomplete to check
 
-A `<table>` exists but has no usable storagetype or address, so it cannot be decoded here and cannot be opened in a tuning editor either. **21 entities.**
+A `<table>` exists but has no usable storagetype or address, so it cannot be decoded here and cannot be opened in a tuning editor either. **6 entities.**
 
 - **`None`** — AF 3 Correction Adder (Decrease) / None  
   _Fueling - AF Correction / Learning_
@@ -387,56 +401,11 @@ A `<table>` exists but has no usable storagetype or address, so it cannot be dec
   _Fueling - AF Correction / Learning_
   - definition unreadable: no address
 - **`0xC009E`** — Wastegate Duty Cycle Frequency  
-  _Boost Control_
+  _Boost Control - Wastegate_
   - definition unreadable: scaling '0.01' is not defined in any XML
-- **`0xCBE70`** — CL MAF Hysteresis ON  
-  _MAF / Airflow_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCBE74`** — CL MAF Hysteresis OFF  
-  _MAF / Airflow_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC020`** — CL MAF Enable Threshold  
-  _MAF / Airflow_
-  - definition unreadable: scaling 'ThresholdFloat' is not defined in any XML
-- **`0xCC570`** — Torque Request Minimum APP  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'ThresholdFloat' is not defined in any XML
-- **`0xCC574`** — Torque Request MAF Upper Gate  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC578`** — Torque Request MAF Maximum  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC588`** — MAF Hysteresis A ON (CL/OL)  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC58C`** — MAF Hysteresis A OFF (CL/OL)  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC590`** — MAF Hysteresis B ON (CL/OL)  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC594`** — MAF Hysteresis B OFF (CL/OL)  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC598`** — MAF Hysteresis C ON (CL/OL)  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC59C`** — MAF Hysteresis C OFF (CL/OL)  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xCC5A0`** — MAF Hysteresis D ON (CL/OL)  
-  _Torque Management / DBW_
-  - definition unreadable: scaling 'Airflow_gs' is not defined in any XML
-- **`0xD6720`** — Boost Control Enable Threshold  
-  _Boost Control_
-  - definition unreadable: scaling 'BoostThreshold' is not defined in any XML
-- **`0xD6724`** — Boost Control Disable Threshold  
-  _Boost Control_
-  - definition unreadable: scaling 'BoostThreshold' is not defined in any XML
-- **`0xD6748`** — Boost Feedback Filter Coefficient  
-  _Boost Control_
-  - definition unreadable: scaling 'CoefficientFloat' is not defined in any XML
+- **`0xCCDA0`** — CL to OL Enrichment Threshold (MAF)  
+  _Fueling - CL/OL Transition_
+  - definition unreadable: element count unresolved
 
 ## 6b. Watchlist — width disagreements deliberately NOT called conflicts
 
