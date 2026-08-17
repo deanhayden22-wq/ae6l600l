@@ -1,0 +1,620 @@
+001: type = adc
+   : name[type,8] value[adc,0,0.000000]
+002: paramname = wbo2
+   : name[paramname,16] value[wbo2,0,0.000000]
+003: paramid = 12
+   : name[paramid,17] value[12,12,12.000000]
+004: scalingrpn = x,0.001934,*,10.17,+
+   : name[scalingrpn,18] value[x,0.001934,*,10.17,+,0,0.000000]
+005: type = ssmcan
+   : name[type,8] value[ssmcan,0,0.000000]
+006: ;P58 - A/F Sensor #1(AFR)
+007: paramname = AFR
+   : name[paramname,16] value[AFR,0,0.000000]
+008: paramid = 0x000046
+   : name[paramid,17] value[0x000046,70,0.000000]
+009: scalingrpn = x,128,/,14.7,*
+   : name[scalingrpn,18] value[x,128,/,14.7,*,0,0.000000]
+010: ;E124 - Final Fueling Base (2-byte)*(estimated AFR)
+011: paramname = FFB
+   : name[paramname,16] value[FFB,0,0.000000]
+012: paramid = 0xFF6852
+   : name[paramid,17] value[0xFF6852,16738386,0.000000]
+013: databits = 16
+   : name[databits,22] value[16,16,16.000000]
+014: scalingrpn = 14.7,x,.0004882812,*,/
+   : name[scalingrpn,18] value[14.7,x,.0004882812,*,/,14,14.700000]
+015: ;P56 - A/F Sensor #1 Resistance(ohm)
+016: paramname = EGT
+   : name[paramname,16] value[EGT,0,0.000000]
+017: paramid = 0x000044
+   : name[paramid,17] value[0x000044,68,0.000000]
+018: scalingrpn = x
+   : name[scalingrpn,18] value[x,0,0.000000]
+019: ;P3 - A/F Correction #1(%)
+020: paramname = AFC
+   : name[paramname,16] value[AFC,0,0.000000]
+021: paramid = 0x000009
+   : name[paramid,17] value[0x000009,9,0.000000]
+022: scalingrpn = x,128,-,100,*,128,/
+   : name[scalingrpn,18] value[x,128,-,100,*,128,/,0,0.000000]
+023: ;P4 - A/F Learning #1(%)
+024: paramname = AFL
+   : name[paramname,16] value[AFL,0,0.000000]
+025: paramid = 0x00000A
+   : name[paramid,17] value[0x00000A,10,0.000000]
+026: scalingrpn = x,128,-,100,*,128,/
+   : name[scalingrpn,18] value[x,128,-,100,*,128,/,0,0.000000]
+027: ;P8 - Engine Speed(rpm)
+028: paramname = RPM
+   : name[paramname,16] value[RPM,0,0.000000]
+029: paramid = 0x00000E
+   : name[paramid,17] value[0x00000E,14,0.000000]
+030: databits = 16
+   : name[databits,22] value[16,16,16.000000]
+031: scalingrpn = x,4,/
+   : name[scalingrpn,18] value[x,4,/,0,0.000000]
+032: ;P9 - Vehicle Speed(mph)
+033: paramname = MPH
+   : name[paramname,16] value[MPH,0,0.000000]
+034: paramid = 0x000010
+   : name[paramid,17] value[0x000010,16,0.000000]
+035: scalingrpn = x,0.621371192,*
+   : name[scalingrpn,18] value[x,0.621371192,*,0,0.000000]
+036: ;P10 - Ignition Total Timing(degrees)
+037: paramname = Timing
+   : name[paramname,16] value[Timing,0,0.000000]
+038: paramid = 0x000011
+   : name[paramid,17] value[0x000011,17,0.000000]
+039: scalingrpn = x,128,-,2,/
+   : name[scalingrpn,18] value[x,128,-,2,/,0,0.000000]
+040: ;P11 - Intake Air Temperature(F)
+041: paramname = IAT
+   : name[paramname,16] value[IAT,0,0.000000]
+042: paramid = 0x000012
+   : name[paramid,17] value[0x000012,18,0.000000]
+043: scalingrpn = 32,9,x,40,-,*,5,/,+
+   : name[scalingrpn,18] value[32,9,x,40,-,*,5,/,+,32,32.000000]
+044: ;P12 - Mass Airflow(g/s)
+045: paramname = MAF
+   : name[paramname,16] value[MAF,0,0.000000]
+046: paramid = 0x000013
+   : name[paramid,17] value[0x000013,19,0.000000]
+047: databits = 16
+   : name[databits,22] value[16,16,16.000000]
+048: scalingrpn = x,100,/
+   : name[scalingrpn,18] value[x,100,/,0,0.000000]
+049: ;P18 - Mass Airflow Sensor Voltage(V)
+050: paramname = MAF(V)
+   : name[paramname,16] value[MAF(V),0,0.000000]
+051: paramid = 0x00001D
+   : name[paramid,17] value[0x00001D,29,0.000000]
+052: scalingrpn = x,50,/
+   : name[scalingrpn,18] value[x,50,/,0,0.000000]
+053: ;P30 – Accelerator Pedal Angle (%)
+054: paramname   = Accelerator
+   : name[paramname,16] value[Accelerator,0,0.000000]
+055: paramid     = 0x000029        
+   : name[paramid,17] value[0x000029,41,0.000000]
+056: scalingrpn  = x,100,*,255,/ 
+   : name[scalingrpn,18] value[x,100,*,255,/,0,0.000000]
+057: ;P13 - Throttle Opening Angle(%)
+058: paramname = Throttle
+   : name[paramname,16] value[Throttle,0,0.000000]
+059: paramid = 0x000015
+   : name[paramid,17] value[0x000015,21,0.000000]
+060: scalingrpn = x,100,*,255,/
+   : name[scalingrpn,18] value[x,100,*,255,/,0,0.000000]
+061: ;E56 - Requested Torque*(raw ecu value)
+062: paramname = RQTQ
+   : name[paramname,16] value[RQTQ,0,0.000000]
+063: paramid = 0xFF8558
+   : name[paramid,17] value[0xFF8558,16745816,0.000000]
+064: isfloat = 1
+   : name[isfloat,24] value[1,1,1.000000]
+065: scalingrpn = x
+   : name[scalingrpn,18] value[x,0,0.000000]
+066: ;P24 - Atmospheric Pressure(psi)
+067: paramname = ATM(psi)
+   : name[paramname,16] value[ATM(psi),0,0.000000]
+068: paramid = 0x000023
+   : name[paramid,17] value[0x000023,35,0.000000]
+069: scalingrpn = x,37,*,255,/
+   : name[scalingrpn,18] value[x,37,*,255,/,0,0.000000]
+070: sampinterval = 60
+   : name[sampinterval,26] value[60,60,60.000000]
+071: ;P7 - Manifold Absolute Pressure(PSI)
+072: paramname = MAP
+   : name[paramname,16] value[MAP,0,0.000000]
+073: paramid = 0x00000D
+   : name[paramid,17] value[0x00000D,13,0.000000]
+074: scalingrpn = x,0.145,*
+   : name[scalingrpn,18] value[x,0.145,*,0,0.000000]
+075: ;E120 - Target Boost Relative (4-byte)*(psi relative)
+076: paramname = Trgt_Boost
+   : name[paramname,16] value[Trgt_Boost,0,0.000000]
+077: paramid = 0xFF5CA4
+   : name[paramid,17] value[0xFF5CA4,16735396,0.000000]
+078: isfloat = 1
+   : name[isfloat,24] value[1,1,1.000000]
+079: scalingrpn = x,0.01933677,*
+   : name[scalingrpn,18] value[x,0.01933677,*,0,0.000000]
+080: ;P90 - IAM(multiplier)
+081: paramname = IAM
+   : name[paramname,16] value[IAM,0,0.000000]
+082: paramid = 0x0000F9
+   : name[paramid,17] value[0x0000F9,249,0.000000]
+083: scalingrpn = x,16,/
+   : name[scalingrpn,18] value[x,16,/,0,0.000000]
+084: sampinterval = 60
+   : name[sampinterval,26] value[60,60,60.000000]
+085: ;E33 - CL/OL Fueling*(status)
+086: paramname = CL/OL
+   : name[paramname,16] value[CL/OL,0,0.000000]
+087: paramid = 0xFFAF71
+   : name[paramid,17] value[0xFFAF71,16756593,0.000000]
+088: scalingrpn = x,6,+
+   : name[scalingrpn,18] value[x,6,+,0,0.000000]
+089: ;P91 - Fine Learning Knock Correction(degrees)
+090: paramname = FLKC
+   : name[paramname,16] value[FLKC,0,0.000000]
+091: paramid = 0x000199
+   : name[paramid,17] value[0x000199,409,0.000000]
+092: scalingrpn = x,0.25,*,32,-
+   : name[scalingrpn,18] value[x,0.25,*,32,-,0,0.000000]
+093: ;E39 - Feedback Knock Correction (4-byte)*(degrees)
+094: paramname = FBKC
+   : name[paramname,16] value[FBKC,0,0.000000]
+095: paramid = 0xFF81F0
+   : name[paramid,17] value[0xFF81F0,16744944,0.000000]
+096: isfloat = 1
+   : name[isfloat,24] value[1,1,1.000000]
+097: scalingrpn = x
+   : name[scalingrpn,18] value[x,0,0.000000]
+098: ;P49 - Intake VVT Advance Angle Left(degrees)
+099: paramname = avcs
+   : name[paramname,16] value[avcs,0,0.000000]
+100: paramid = 0x00003D
+   : name[paramid,17] value[0x00003D,61,0.000000]
+101: scalingrpn = x,50,-
+   : name[scalingrpn,18] value[x,50,-,0,0.000000]
+102: ;P36 - Primary Wastegate Duty Cycle(%)
+103: paramname = wgdc
+   : name[paramname,16] value[wgdc,0,0.000000]
+104: paramid = 0x000030
+   : name[paramid,17] value[0x000030,48,0.000000]
+105: scalingrpn = x,100,*,255,/
+   : name[scalingrpn,18] value[x,100,*,255,/,0,0.000000]
+106: ;E34 - Turbo Dynamics Integral (4-byte)*(absolute %)
+107: paramname = tdi
+   : name[paramname,16] value[tdi,0,0.000000]
+108: paramid = 0xFF5CB0
+   : name[paramid,17] value[0xFF5CB0,16735408,0.000000]
+109: isfloat = 1
+   : name[isfloat,24] value[1,1,1.000000]
+110: scalingrpn = x
+   : name[scalingrpn,18] value[x,0,0.000000]
+111: ;E37 - Turbo Dynamics Proportional (4-byte)*(absolute %)
+112: paramname = Tdp
+   : name[paramname,16] value[Tdp,0,0.000000]
+113: paramid = 0xFF5CAC
+   : name[paramid,17] value[0xFF5CAC,16735404,0.000000]
+114: isfloat = 1
+   : name[isfloat,24] value[1,1,1.000000]
+115: scalingrpn = x
+   : name[scalingrpn,18] value[x,0,0.000000]
+116: ;P21 - Fuel Injector #1 Pulse Width(ms)
+117: paramname = IPW
+   : name[paramname,16] value[IPW,0,0.000000]
+118: paramid = 0x000020
+   : name[paramid,17] value[0x000020,32,0.000000]
+119: scalingrpn = x,256,*,1000,/
+   : name[scalingrpn,18] value[x,256,*,1000,/,0,0.000000]
+120: ;E?? - Knock Event Flag (byte: 1=knock detected this cycle, 0=clean)
+121: paramname = KNOCK_FLAG
+   : name[paramname,16] value[KNOCK_FLAG,0,0.000000]
+122: paramid = 0xFF81BA
+   : name[paramid,17] value[0xFF81BA,16744890,0.000000]
+123: scalingrpn = x
+   : name[scalingrpn,18] value[x,0,0.000000]
+124: ;P2 - Coolant Temperature(F)
+125: paramname = ECT
+   : name[paramname,16] value[ECT,0,0.000000]
+126: paramid = 0x000008
+   : name[paramid,17] value[0x000008,8,0.000000]
+127: scalingrpn = 32,9,x,40,-,*,5,/,+
+   : name[scalingrpn,18] value[32,9,x,40,-,*,5,/,+,32,32.000000]
+128: sampinterval = 20
+   : name[sampinterval,26] value[20,20,20.000000]
+129: ;-------------------------TRIGGER-------------------------;
+130: ; Triggers allow us to start/stop and resume logging to   ;
+131: ; a file.  A default configuration has been setup for     ;
+132: ; you to start with.  This will start logging when the    ;
+133: ; engine starts (RPM > 0).                                ;
+134: ;                                                         ;
+135: ; A second configuration is also available.  It will log  ;
+136: ; when you press the defogger switch and will stop the    ;
+137: ; log when you turn the defogger off.  In order to use    ;
+138: ; that configuration, remove the ";" at the beginning of  ;
+139: ; the "Defogger Switch" lines and add a ";" to the others ;
+140: ;---------------------------------------------------------;
+141: ; Start log when RPM > 0
+142: conditionrpn = RPM,0,>	
+   : name[conditionrpn,48] value[RPM,0,>,0,0.000000]
+143: action = start
+   : name[action,49] value[start,0,0.000000]
+144: ; Stop log when RPM = 0
+145: conditionrpn = RPM,0,==
+   : name[conditionrpn,48] value[RPM,0,==,0,0.000000]
+146: action = stop
+   : name[action,49] value[stop,0,0.000000]
+
+--- log config dump ---
+
+firmware version is: 1.17.4877
+the following general options are set:
+  * interpolate missing samples
+  * zero sample count at start of each file
+
+channel type: adc
+
+param name: wbo2
+param id: 0x0000000C
+scaling: x,0.001934,*,10.170000,+
+
+channel type: ssmcan
+protocol id: 6
+baud: 500000
+
+param name: AFR
+param id: 0x00000046
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,128.000000,/,14.700000,*
+
+param name: FFB
+param id: 0x00FF6852
+read width: 2 bytes
+data width: 16 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: 14.700000,x,0.000488,*,/
+
+param name: EGT
+param id: 0x00000044
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x
+
+param name: AFC
+param id: 0x00000009
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,128.000000,-,100.000000,*,128.000000,/
+
+param name: AFL
+param id: 0x0000000A
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,128.000000,-,100.000000,*,128.000000,/
+
+param name: RPM
+param id: 0x0000000E
+read width: 2 bytes
+data width: 16 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,4.000000,/
+
+param name: MPH
+param id: 0x00000010
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,0.621371,*
+
+param name: Timing
+param id: 0x00000011
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,128.000000,-,2.000000,/
+
+param name: IAT
+param id: 0x00000012
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: 32.000000,9.000000,x,40.000000,-,*,5.000000,/,+
+
+param name: MAF
+param id: 0x00000013
+read width: 2 bytes
+data width: 16 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,100.000000,/
+
+param name: MAF(V)
+param id: 0x0000001D
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,50.000000,/
+
+param name: Accelerator
+param id: 0x00000029
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,100.000000,*,255.000000,/
+
+param name: Throttle
+param id: 0x00000015
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,100.000000,*,255.000000,/
+
+param name: RQTQ
+param id: 0x00FF8558
+read width: 4 bytes
+data width: 32 bits
+data offset: 0 bits
+float: 1
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x
+
+param name: ATM(psi)
+param id: 0x00000023
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+sample interval: 60
+sample phase: 0
+scaling: x,37.000000,*,255.000000,/
+
+param name: MAP
+param id: 0x0000000D
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,0.145000,*
+
+param name: Trgt_Boost
+param id: 0x00FF5CA4
+read width: 4 bytes
+data width: 32 bits
+data offset: 0 bits
+float: 1
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,0.019337,*
+
+param name: IAM
+param id: 0x000000F9
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+sample interval: 60
+sample phase: 1
+scaling: x,16.000000,/
+
+param name: CL/OL
+param id: 0x00FFAF71
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,6.000000,+
+
+param name: FLKC
+param id: 0x00000199
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,0.250000,*,32.000000,-
+
+param name: FBKC
+param id: 0x00FF81F0
+read width: 4 bytes
+data width: 32 bits
+data offset: 0 bits
+float: 1
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x
+
+param name: avcs
+param id: 0x0000003D
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,50.000000,-
+
+param name: wgdc
+param id: 0x00000030
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,100.000000,*,255.000000,/
+
+param name: tdi
+param id: 0x00FF5CB0
+read width: 4 bytes
+data width: 32 bits
+data offset: 0 bits
+float: 1
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x
+
+param name: Tdp
+param id: 0x00FF5CAC
+read width: 4 bytes
+data width: 32 bits
+data offset: 0 bits
+float: 1
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x
+
+param name: IPW
+param id: 0x00000020
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x,256.000000,*,1000.000000,/
+
+param name: KNOCK_FLAG
+param id: 0x00FF81BA
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+scaling: x
+
+param name: ECT
+param id: 0x00000008
+read width: 1 bytes
+data width: 8 bits
+data offset: 0 bits
+float: 0
+raw int: 0
+signed int: 0
+sign/magnitude int: 0
+mode: 0x01
+sample interval: 20
+sample phase: 0
+scaling: 32.000000,9.000000,x,40.000000,-,*,5.000000,/,+
+
+trigger action: start condition: RPM,0.000000,>
+trigger action: stop condition: RPM,0.000000,==
+
+--- storage info ---
+log channels: 2
+log parameters: 29
+log stringlist: 274 chars
+log floatlist: 24 floats
+worst case ssm request is 95 bytes long, response 62 bytes long and will be sent every 40000us (31957us is fastest possible)
+logging interval will be 40000us
