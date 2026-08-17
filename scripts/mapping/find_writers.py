@@ -62,8 +62,14 @@ STORE_IDX = re.compile(r"^(fmov\.s|mov\.[bwl])\s+(\S+),@\(r0,(r\d+)\)$")
 STORE_GBR = re.compile(r"^(mov\.[bwl])\s+r0,@\((\d+),gbr\)$")
 LOAD_ANY = re.compile(r"^(fmov\.s|mov\.[bwl])\s+@")
 MOVI_R0 = re.compile(r"^mov\s+#(-?\d+),r0$")
+ADDI_R0 = re.compile(r"^add\s+#(-?\d+),r0$")
+EXTU_R0 = re.compile(r"^extu\.([bw])\s+r0,r0$")
+# any other instruction whose destination is r0 invalidates our tracked value
+WRITES_R0 = re.compile(r",r0$")
 PCREL = re.compile(r"^mov\.l\s+@\(0x([0-9A-Fa-f]+)\),(r\d+)$")
 
+# NOTE: displacements printed by sh2e_disasm are ALREADY in bytes for every
+# form (@(d,Rn), @(d,gbr)). Never rescale them. Kept only for reference.
 SZ = {"b": 1, "w": 2, "l": 4}
 
 
@@ -118,18 +124,36 @@ def scan(rom, lo, hi, want_reads=False):
     hits = []
     r0 = None
     for pc, _w, t, _ds in disasm(rom, 0, len(rom)):
+        # --- track r0, which is the index register for every @(r0,Rn) store ---
+        # Real code walks a struct with `mov #-64,r0 / extu.b r0,r0 / add #4,r0
+        # ... `, so tracking only `mov #imm,r0` misses most indexed writes.
         m = MOVI_R0.match(t)
         if m:
             r0 = int(m.group(1))
             continue
+        m = ADDI_R0.match(t)
+        if m:
+            r0 = None if r0 is None else r0 + int(m.group(1))
+            continue
+        m = EXTU_R0.match(t)
+        if m:
+            r0 = None if r0 is None else (r0 & (0xFF if m.group(1) == "b" else 0xFFFF))
+            continue
 
         kind = tgt = detail = None
+        clobbers_r0 = bool(WRITES_R0.search(t)) and not t.startswith(("mov.b r0,", "mov.w r0,", "mov.l r0,"))
 
         m = STORE_GBR.match(t)
         if m:
             g = gbr_at(bases, pc)
             if g:
-                tgt = g[1] + int(m.group(2)) * SZ[m.group(1)[-1]]
+                # BUG FIX 2026-08-16: sh2e_disasm ALREADY prints the GBR
+                # displacement pre-scaled in BYTES --
+                #   mov.b r0,@({d8},gbr)  mov.w r0,@({d8*2},gbr)  mov.l r0,@({d8*4},gbr)
+                # Multiplying by the operand size again put every mov.w target
+                # 2x and every mov.l target 4x too far. Use the printed value
+                # as-is. corrections.md item 61.
+                tgt = g[1] + int(m.group(2))
                 kind, detail = "GBR", f"GBR={g[1]:08X} set @{g[0]:06X}"
         if tgt is None:
             m = STORE_IDX.match(t)
@@ -145,7 +169,10 @@ def scan(rom, lo, hi, want_reads=False):
             if m:
                 b = resolve_base(rom, pc, m.group(4))
                 if b:
-                    tgt = b[1] + int(m.group(3)) * SZ[m.group(1)[-1]]
+                    # Same pre-scaling as the GBR form: sh2e_disasm prints
+                    # mov.w r0,@({d4*2},Rn) and mov.l Rm,@({d4*4},Rn) already
+                    # in BYTES. Do not multiply again. corrections.md item 61.
+                    tgt = b[1] + int(m.group(3))
                     kind, detail = "DISP", f"base {b[1]:08X}@{b[0]:06X}"
         if tgt is None:
             m = STORE_DIRECT.match(t)
@@ -156,6 +183,9 @@ def scan(rom, lo, hi, want_reads=False):
 
         if tgt is not None and lo <= tgt < hi:
             hits.append((tgt, "WRITE", kind, pc, t, detail))
+
+        if clobbers_r0:
+            r0 = None
 
         if want_reads and LOAD_ANY.match(t):
             m2 = re.match(r"^(fmov\.s|mov\.[bwl])\s+@(r\d+)\+?,", t)

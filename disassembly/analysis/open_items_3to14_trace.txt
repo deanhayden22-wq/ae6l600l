@@ -573,3 +573,78 @@ IS applied, and their RAW bytes are all zero -- that conclusion stands.
 0xAD7E0 (item 58) was read raw both times -- stands. Only item 56's four 2x2
 tables and 0xAE290 were affected.
 ================================================================================
+
+
+================================================================================
+ITEM 4b — CLOSED (the question, not the writers).  Two tool bugs fixed en route.
+Appended 2026-08-16.  Full writeup: docs/corrections.md items 61 and 62.
+================================================================================
+
+TWO BUGS IN find_writers.py, FOUND WHILE WORKING THIS ITEM
+--------------------------------------------------------------------------------
+A. Displacements were scaled TWICE. sh2e_disasm already prints them in BYTES:
+       mov.w r0,@({d8*2},gbr)      mov.l r0,@({d8*4},gbr)
+       mov.l Rm,@({d4*4},Rn)       mov.w r0,@({d4*2},Rn)
+   The tool multiplied by the operand size again -> every mov.w target 2x and
+   every mov.l target 4x too far. Fixed in both the GBR and reg-disp branches.
+
+   IMPACT, MEASURED NOT ASSUMED. In the FFFF77D0-FFFF7990 sweep, 21 of 121 GBR
+   writes are mov.w/mov.l (previously mis-targeted); 100 are mov.b (always
+   correct). Every writer cited in items 48 and 52 is mov.b or INDEXED, so
+   those stand. FFFF798C GAINS a writer (0x035A6A mov.w r0,@(56,gbr),
+   GBR=FFFF7954), which reinforces item 48's dual-role finding.
+
+   ITEM 54 WAS WRONG AND IS CORRECTED: it cited 0x0367F2 mov.l r0,@(80,gbr)
+   as the writer of FFFF7AE4. That instruction actually targets
+   FFFF79A4 + 80 = FFFF79F4. The real writer is
+       FFFF7AE4  WRITE GBR  0365AA: mov.w r0,@(320,gbr)  ; GBR=FFFF79A4 @03644E
+   Item 54's CONCLUSION survives -- still in the OL fuel map selector, still
+   not func_37B74 -- but note the write is 16-BIT, which sits badly with the
+   fuel model treating enrichC as a float multiplier.
+
+B. r0 was only tracked through `mov #imm,r0`. Real code walks structs with
+   `mov #-64,r0 / extu.b r0,r0 / add #4,r0 ...`, so most indexed writes were
+   invisible. r0 is now tracked through add #imm and extu.{b,w}, and
+   invalidated when anything else writes it.
+
+THE WRITERS OF 0xFFFF77D8 / 0xFFFF77DC: STILL NOT FOUND
+--------------------------------------------------------------------------------
+After both fixes, all four addressing forms still return nothing. Stated
+plainly: the tool cannot resolve a base loaded from MEMORY or built by register
+ARITHMETIC, so absence is not proof. Do not record these as read-only.
+
+BUT THE QUESTION THEY GATE IS CLOSED
+--------------------------------------------------------------------------------
+These two feed branch A of func_3952C -- the branch that does NOT touch
+0xAD258 -- through subroutine 0x3961C:
+
+  039624  F540  fadd fr4,fr5        ; sum = [FFFF77DC] + [FFFF77D8]
+  039626  F89D  fldi1 fr8
+  039628  F580  fadd fr8,fr5        ; t = 1.0 + sum
+         BE608(t, 0.0, 1/8192)      ; t ~= 0 ?  -> output 0
+         BE628(1.0, t)              ; 1/t
+  039650  F080  fadd fr8,fr0        ; 1/t - 1        (fr8 = -1.0)
+  039656  D647  mov.l @(0x039774),r6 ; = 0x000CC3E8 = 0.03
+  03965A  420B  jsr @r2             ; BE56C = clamp(value, 0.0, 0.03)
+  03965E  FE0A  fmov.s fr0,@r14     ; [FFFF7BAC] = result
+
+The clamp FLOOR is 0.0, so the result exceeds zero only when 1/t - 1 > 0,
+i.e. t < 1.0, i.e.:
+
+    *** branch A is non-zero ONLY when [FFFF77DC] + [FFFF77D8] < 0,
+        and even then it is capped at 0.03 (3%). ***
+
+A one-sided, 3%-max enrichment that arms only on a NEGATIVE combined trim.
+
+THIS CLOSES THE CAVEAT LEFT OPEN IN ITEM 42. That item showed branch B is
+clamped to [0.0, 0.0] but flagged that "which branch the car actually runs is
+UNVERIFIED ... it does determine whether the 0.03 limit at 0xCC3E8 is live".
+Now: branch B is identically zero, and branch A is zero unless the trim sum
+goes negative. So func_3952C contributes nothing to 0xFFFF7BAC in the ordinary
+case regardless of branch, and 0xAD258 -- consulted only by branch B -- is
+inert either way.
+
+Correctly scoped remainder: WHAT writes 0xFFFF77D8/0xFFFF77DC, and whether
+their sum ever goes negative in practice. The second is a LOG question (this is
+the AFC/AFL trim pair region), not a disassembly one.
+================================================================================

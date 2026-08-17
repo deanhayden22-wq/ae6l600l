@@ -2919,3 +2919,95 @@ descriptors have no Ghidra label. `update_import_java.py` **must not be re-run**
 to fix it: it is insert-only (appends a block before the final printf), so a
 re-run duplicates every label, and its paths are wrong. A do-not-run banner was
 added to that script. Closing the gap needs a replace-in-place rewrite.
+
+---
+
+## 61. `find_writers.py` double-scaled displacements — item 54's citation was wrong — **FIXED 2026-08-16**
+
+Working item 4b exposed two bugs in the tool built for item 52.
+
+**Bug A — displacements were scaled twice.** `sh2e_disasm` already prints every
+displacement in **bytes**:
+
+```python
+0x1: f"mov.w r0,@({d8*2},gbr)"   0x2: f"mov.l r0,@({d8*4},gbr)"
+op 0x1: f"mov.l {F},@({d4*4},{R})"   0x1: f"mov.w r0,@({d4*2},{F})"
+```
+
+`find_writers.py` then multiplied by the operand size again, putting every
+`mov.w` target **2×** and every `mov.l` target **4×** too far. Fixed in both the
+GBR and the register-displacement branches.
+
+**Impact, checked rather than assumed.** In the `0xFFFF77D0`–`0xFFFF7990` sweep,
+21 of 121 GBR writes are `mov.w`/`mov.l` and so had wrong targets before; 100 are
+`mov.b` and were always correct. Every writer cited in **items 48 and 52** is
+`mov.b` or INDEXED — those claims stand unchanged. `0xFFFF798C` in fact gains a
+writer (`0x035A6A mov.w r0,@(56,gbr)`, GBR `0xFFFF7954`), reinforcing item 48's
+dual-role finding.
+
+**Item 54 is the one that was wrong.** It cited
+`0x0367F2 mov.l r0,@(80,gbr)` (GBR `0xFFFF79A4`) as the writer of `0xFFFF7AE4`.
+With the correct math that instruction targets `0xFFFF79A4 + 80 = 0xFFFF79F4`,
+not `0xFFFF7AE4`. The real writer is:
+
+```
+FFFF7AE4  WRITE GBR  0365AA: mov.w r0,@(320,gbr)   ; GBR=FFFF79A4 set @03644E
+```
+
+**Item 54's conclusion survives** — the writer is still in the OL fuel map
+selector region, still not `func_37B74`, so "enrichC = AFL application at
+`0x37B74`" remains positively excluded. Only the address and width were wrong.
+The width is worth noting on its own: `0xFFFF7AE4` is written **16-bit**, which
+sits badly with the fuel model treating `enrichC` as a float multiplier.
+
+**Bug B — `r0` was only tracked through `mov #imm,r0`.** Real code walks a struct
+with `mov #-64,r0 / extu.b r0,r0 / add #4,r0 / …`, so most indexed writes were
+invisible. `r0` is now tracked through `add #imm,r0` and `extu.{b,w} r0,r0`, and
+invalidated when any other instruction writes it.
+
+---
+
+## 62. Item 4b — `0xFFFF77D8` / `0xFFFF77DC` writers still not found, but the question they gate is now CLOSED — **2026-08-16**
+
+After fixing both tool bugs above, all four addressing forms still find **no
+writer** for either address. Stated plainly rather than concluded away: the tool
+cannot resolve a base register loaded from memory or built by register
+arithmetic, so absence here is not proof.
+
+**But the reason the item mattered is settled without them.** These two feed
+branch A of `func_3952C` (the branch that does NOT use `0xAD258`), via
+subroutine `0x3961C`:
+
+```
+039624  F540  fadd fr4,fr5     ; sum = [FFFF77DC] + [FFFF77D8]
+039626  F89D  fldi1 fr8
+039628  F580  fadd fr8,fr5     ; t = 1.0 + sum
+       BE608(t, 0.0, 1/8192)   ; t approximately zero?  -> output 0
+       BE628(1.0, t)           ; 1/t
+039650  F080  fadd fr8,fr0     ; fr0 = 1/t - 1     (fr8 = -1.0)
+039656  D647  mov.l @(0x039774),r6  ; = 0x000CC3E8 = 0.03
+03965A  420B  jsr @r2               ; BE56C = clamp(value, 0.0, 0.03)
+03965E  FE0A  fmov.s fr0,@r14       ; [FFFF7BAC] = result
+```
+
+The clamp floor is **0.0**, so the output exceeds zero only when
+`1/t - 1 > 0`, i.e. `t < 1.0`, i.e.:
+
+> **branch A produces a non-zero result only when
+> `[0xFFFF77DC] + [0xFFFF77D8] < 0`, and even then it is capped at 0.03.**
+
+It is a one-sided, 3%-max enrichment that arms only on a *negative* combined
+trim. Whatever writes those two addresses, the branch contributes nothing while
+their sum is ≥ 0.
+
+**This closes the caveat left open in item 42.** That item said branch B is
+clamped to `[0.0, 0.0]` but flagged that "which branch the car actually runs is
+UNVERIFIED … it does determine whether the 0.03 limit at `0xCC3E8` is live".
+Now: branch B is identically zero, and branch A is zero unless the trim sum goes
+negative. So `func_3952C` contributes nothing to `0xFFFF7BAC` in the ordinary
+case regardless of which branch runs, and `0xAD258` — which only branch B
+consults — is inert either way.
+
+Remaining, and correctly scoped: *what writes* `0xFFFF77D8`/`0xFFFF77DC`, and
+whether their sum ever goes negative in practice. The second is a log question
+(they are the AFC/AFL trim pair region), not a disassembly one.
