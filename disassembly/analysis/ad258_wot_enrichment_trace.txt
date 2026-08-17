@@ -1,0 +1,404 @@
+================================================================================
+0xAD258 IDENTITY + func_3952C ROLE + FFFF6354 IDENTITY
+Traced 2026-08-16 (session: code_chase_2026-08-16 TASK 1)
+Reference bin: rom/AE5L600L 20g rev 20.19c.bin
+               md5 92cae8275cd4f9b473a3a9e36efe6449  (VERIFIED this session)
+Method: descriptor bytes read direct from bin; table_lookup helper 0xBE830 and
+        its typecode dispatch table decoded with scripts/sh2e_disasm.py; RAM
+        identities settled by locating WRITERS (indexed @(r0,Rn) stores, not
+        just literal-pool loads) and reading the failsafe constant.
+================================================================================
+
+HEADLINE
+--------------------------------------------------------------------------------
+The premise in the brief is wrong on every axis, and the table is inert twice
+over:
+
+  * 0xAD258 is NOT a "WOT enrichment factor" and is NOT 2D RPM x load.
+    It is a 1-D, 16-point, uint16 table on a COOLANT TEMPERATURE axis.
+  * It is not on the injector-pulse-width path at all. It lives in the CL/OL
+    AFR-deviation diagnostic chain.
+  * Its data is flat 1.0 across all 16 points, so it is a pass-through, AND
+  * the branch it sits on is clamped to [0.0, 0.0] by two calibration
+    constants, so that branch's output is identically 0.0 regardless.
+
+Injector sizing gets nothing from this table. See PART 6 for where the ~0.8 AFR
+gap can and cannot be coming from.
+
+
+PART 1 - DESCRIPTOR RECORD LAYOUT (VERIFIED)
+--------------------------------------------------------------------------------
+Settled from the consumer, not from the artifact. table_lookup = 0xBE830, called
+with R4 = record base, FR4 = input:
+
+  0BE830  4F22  sts.l pr,@-r15
+  0BE832  8540  mov.w @(0,r4),r0      ; R0 = element count      (+0,  u16)
+  0BE834  5141  mov.l @(4,r4),r1      ; R1 = AXIS pointer       (+4,  u32)
+  0BE836  B237  bsr  0x0BECA8         ; axis search -> R0=index, FR0=fraction
+  0BE838  F04C  fmov fr4,fr0
+  0BE83A  6103  mov  r0,r1
+  0BE83C  8442  mov.b @(2,r4),r0      ; R0 = TYPECODE byte      (+2,  u8)
+  0BE83E  630C  extu.b r0,r3
+  0BE840  C707  mova @(0x0BE860),r0   ; typecode dispatch table
+  0BE842  023E  mov.l @(r0,r3),r2
+  0BE844  6013  mov  r1,r0
+  0BE846  420B  jsr  @r2
+  0BE848  5142  mov.l @(8,r4),r1      ; R1 = DATA pointer       (+8,  u32)
+  0BE84A  2338  tst  r3,r3
+  0BE84C  8D04  bt/s 0x0BE858         ; typecode 0 -> raw is already float
+  0BE84E  F12C  fmov fr2,fr1
+  0BE850  740C  add  #12,r4
+  0BE852  F049  fmov.s @r4+,fr0       ; FR0 = SCALE             (+12, f32)
+  0BE854  F148  fmov.s @r4,fr1        ; FR1 = BIAS              (+16, f32)
+  0BE856  F12E  fmac fr0,fr2,fr1      ; result = scale*raw + bias
+  0BE858  4F26  lds.l @r15+,pr
+  0BE85A  000B  rts
+  0BE85C  F01C  fmov fr1,fr0
+
+1-D record is therefore 20 bytes:
+    +0  u16  element count
+    +2  u8   typecode
+    +3  u8   (unused, 0x00 in every record inspected)
+    +4  u32  axis pointer      (float32 elements, always)
+    +8  u32  data pointer
+    +12 f32  scale
+    +16 f32  bias
+
+NOTE the brief's "[pad][count|flags][axis][data][scale]" reading is off by one
+field: the leading word it called "pad" at 0xAD254 is the BIAS of the PREVIOUS
+record. Proof: the record at 0xAD208 has 0xAD218 = 0xC0800000 = -4.0 in that
+slot. It is not padding, and it is not always zero.
+
+Typecode dispatch table @ 0x0BE860 (longs), and what each loader does:
+
+  idx  slot      handler   scaling of index      load        signedness
+  ---  --------  --------  --------------------  ----------  ----------
+   0   0x0BE860  0x0BEACC  shll2 r0  (x4)        fmov.s      float32
+   4   0x0BE864  0x0BEB20  add  r0,r1 (x1)       mov.b+extu  uint8
+   8   0x0BE868  0x0BEB6C  shll  r0  (x2)        mov.w+extu  uint16
+  12   0x0BE86C  0x0BEAE4  add  r0,r1 (x1)       mov.b, no extu   int8
+  16   0x0BE870  0x0BEB00  shll  r0  (x2)        mov.w, no extu   int16
+
+  => typecode 0x08 == uint16, 2 bytes per cell. VERIFIED from 0x0BEB6C:
+     0BEB6C F28D fldi0 fr2 / 0BEB6E 4000 shll r0 / 0BEB74 6015 mov.w @r1+,r0
+     0BEB76 600D extu.w r0,r0
+
+
+PART 2 - 0xAD258 DECODED (VERIFIED)
+--------------------------------------------------------------------------------
+Bytes at 0xAD258, 20 bytes:
+    0AD258  00 10 08 00      count=0x0010=16, typecode=0x08 (uint16), pad=0x00
+    0AD25C  00 0C C6 64      axis = 0x000CC664
+    0AD260  00 0C E9 46      data = 0x000CE946
+    0AD264  3A 00 00 00      scale = 0.00048828125 = 1/2048
+    0AD268  00 00 00 00      bias  = 0.0
+
+Axis @ 0x0CC664, 16 x big-endian float32:
+    -40 -30 -20 -10 0 10 20 30 40 50 60 70 80 90 100 110
+
+Data @ 0x0CE946, 16 x big-endian uint16 (typecode 0x08):
+    2048 x16   -> x 1/2048 + 0.0 -> 1.0000 at every one of the 16 points.
+
+Geometry cross-check that independently confirms 2 bytes/cell:
+    axis 0x0CC664 + 16*4 = 0x0CC6A4   (axis is f32, 4 B/cell)
+    data 0x0CE946 + 16*2 = 0x0CE966   next descriptor's axis begins 0x0CE968.
+    At 1 byte/cell the data block would end at 0x0CE956 and leave an
+    18-byte hole; at 2 B/cell it packs flush with 2 bytes of alignment.
+
+The 16 uint8 reading that descriptor_map.txt implies is [8,0,8,0,...] - the
+uint16 2048 read a byte at a time, exactly as the brief suspected.
+
+AXIS NAME FROM PRIMARY GROUND TRUTH: 0xCC664 is declared in
+definitions/AE5L600L 2013 USDM Impreza WRX MT.xml:423 and :1646 as
+    <table name="Coolant Temperature" address="cc664"/>
+and 32BITBASE gives "Coolant Temperature" axes elements="16". Both the project
+XML and the ROM bytes agree the 0xAD258 axis is coolant temperature.
+
+Units: the axis is Celsius, not Fahrenheit. -40..110 C is the standard Subaru
+ECT axis span; the base XML's DegreesF scaling is a DISPLAY toexpr ((x*1.8)+32)
+per CLAUDE.md, so the RAW axis this ROM compares against is C. Independent
+corroboration in PART 4: the sensor failsafe constant is 70.0, which is 70 C
+(158 F) - a normal limp-home coolant value, not 70 F.
+
+
+PART 3 - descriptor_map.txt WIDTH BUG: SCOPE (VERIFIED, SYSTEMATIC)
+--------------------------------------------------------------------------------
+Yes, it is a parser bug, and it is not confined to 0xAD258. Audited every row of
+disassembly/maps/descriptor_map.txt against the typecode byte read out of the
+19c bin (1-D typecode at record+2; 2-D typecode at record+16, per the 2-D
+helper 0x0BE8E4 which does `mov #16,r0 / add r4,r0 / mov.b @r0,r6`):
+
+  1-D rows: 621 parsed   129 correct   492 WRONG
+        331 rows labeled uint8  are actually uint16   (half the real width)
+        161 rows labeled int16  are actually uint8    (double, + wrong sign)
+        129 rows labeled float32 are correct
+
+  2-D rows: 139 parsed    20 correct   119 WRONG
+         65 rows labeled uint8  are actually uint16
+         54 rows labeled int16  are actually uint8
+         20 rows labeled float32 are correct
+
+  TOTAL:   760 rows      149 correct   611 WRONG  (80.4%)
+
+The Type column is not merely inverted 1-byte/2-byte as the CLAUDE.md note
+says; it is a shifted mapping. Observed: typecode 0x00 -> "float32" (right),
+0x08 -> "uint8" (should be uint16), 0x04 -> "int16" (should be uint8).
+Signedness is also wrong on all 215 "int16" rows - they are unsigned bytes.
+No row in the file is ever labeled uint16 or int8, though 396 of the 760
+descriptors are uint16 and none are int8.
+
+CONSEQUENCE: every cell width, and therefore every table EXTENT, taken from
+descriptor_map.txt is wrong for 611 of 760 descriptors. Anything that used that
+file to decide where a table ends, or to read cell values, is off. This file
+should be regenerated with the corrected typecode map before it is trusted
+again; it is a derived product and per CLAUDE.md rule 1 was never evidence.
+
+
+PART 4 - FFFF6354 IS COOLANT TEMPERATURE, NOT VEHICLE SPEED (VERIFIED)
+--------------------------------------------------------------------------------
+The three conflicting artifacts are resolved against the WRITER. All 69
+literal-pool sites that reference 0xFFFF6354 are READS - which is why previous
+passes could not settle it. The writes are indexed stores off a nearby base:
+
+  01F72C  D283  mov.l @(0x01F93C),r2   ; R2 = 0xFFFF6360   (base)
+  01F72E  E0F4  mov  #-12,r0
+  01F730  F2E7  fmov.s fr14,@(r0,r2)   ; [FFFF6354] = FR14   <-- WRITER
+  ...
+  01F742  D27E  mov.l @(0x01F93C),r2
+  01F744  E0F4  mov  #-12,r0
+  01F746  F247  fmov.s fr4,@(r0,r2)    ; [FFFF6354] = FR4    <-- WRITER (failsafe)
+
+The containing routine is 0x01F6E0. Its literals:
+  0x01F91C = 0xFFFF6350   (loaded into GBR - the block base)
+  0x01F938 = 0xFFFF4144   source sensor slot, FR14 = float[FFFF4144]
+  0x01F93C = 0xFFFF6360   store base
+  0x01F940 = 0x428C0000 = 70.0          <-- FAILSAFE SUBSTITUTE VALUE
+
+The routine reads ONE source float (FFFF4144, the linearised sensor in the
+0xFFFF41xx ADC block - same block as FFFF4130 battery voltage) and fans it out
+to four consumers with different validity gating:
+
+  [FFFF6350] = base-16    (0x01F7C2 good / 0x01F7CC failsafe)
+  [FFFF6354] = base-12    (0x01F730 good / 0x01F746 failsafe)
+  [FFFF6358] = base-8     (0x01F73C good / 0x01F74A failsafe)
+  [FFFF635C] = base-4     (0x01F754 good)
+
+On every failsafe path the value written is 70.0 (0x01F740 / 0x01F766 /
+0x01F782 / 0x01F7C6 all `mova @(0x01F940),r0 ; fmov.s @r0,fr4`).
+
+70.0 is the limp-home COOLANT temperature in Celsius. A vehicle-speed failsafe
+would be 0.0. Combined with:
+  - the -40..110 axis on the table it feeds,
+  - the definition XML naming 0xCC664 "Coolant Temperature",
+  - FFFF6350 (already accepted as ECT) being written by the SAME routine from
+    the SAME source float, four bytes away,
+this is conclusive.
+
+VERDICT: 0xFFFF6354 is a gated/distributed copy of COOLANT TEMPERATURE in
+degrees C. It is a sibling of FFFF6350, not a different quantity.
+
+ARTIFACT CORRECTIONS OWED:
+  * disassembly/analysis/diag_tasks_analysis.txt:123
+        "FFFF6354   float  Vehicle speed"                    -- WRONG
+  * disassembly/analysis/disasm_3162C_annotated.txt:254
+        "FFFF6354 - Input to speed computation"              -- WRONG
+    (This one is understandable: 0x3162C computes speed THRESHOLDS and does
+    read a temperature to gate them. The label leaked from the neighbouring
+    FFFF67EC speed compare in the same key-address list.)
+  * disassembly/maps/ram_reference.txt:139
+        "ect_raw_adc ... ECT raw ADC value"                  -- HALF WRONG
+    Right family, wrong stage. It is not raw ADC; the raw/linearised value is
+    upstream at FFFF4144. FFFF6354 is the scaled Celsius value after failsafe
+    substitution. Suggested name: ect_gated_c (or ect_copy_b).
+
+Corroboration that FFFF6354 is a live, widely-consumed sensor: the main IPW
+calculator at 0x03817C loads it directly -
+    038194  D279  mov.l @(0x03837C),r2   ; 0x03837C = 0xFFFF6354
+    038196  FC28  fmov.s @r2,fr12
+which is exactly what you expect of coolant temperature and not of a
+vehicle-speed copy.
+
+
+PART 5 - func_3952C: WHAT IT ACTUALLY COMPUTES (VERIFIED)
+--------------------------------------------------------------------------------
+Function starts at 0x3952C (not 0x39528 as fueling_pipeline_analysis.txt:60
+says; 0x39528 is `bra 0x039668`, a sibling dispatch stub). It is reached by
+`bra 0x03952C` at 0x039524 - a two-entry branch-stub pair at 0x039524/0x039528.
+There is no literal 0x0003952C anywhere in the ROM and no bsr in range, so the
+call comes through that stub table.
+
+Inputs (all loaded in the preamble 0x3953A-0x039554):
+    FR4  = float[FFFF77D8]   fuel_corr_param_B        (ram_reference.txt:610)
+    FR5  = float[FFFF77DC]   fuel_corr_cl_target_A    (ram_reference.txt:608)
+    R14  = byte [FFFF7448]   CL/OL MODE FLAG, 1=CL 0=OL (ram_reference.txt:501)
+    FR12 = float[FFFF798C]
+    FR9  = float[FFFF7800]   cl_afr_bound             (ram_reference.txt:471)
+    R13  = byte [FFFF782C]
+Outputs:
+    [FFFF7BAC]  afr_deviation_input   (ram_reference.txt:406)
+    [FFFF7BA8]  afr_deviation_metric  (ram_reference.txt:407)
+    [FFFF7BA4]
+    [FFFF7BC0]  scratch only - see below
+
+Helpers used (decoded):
+    0xBE608  approx_ne(FR4, FR5, FR6) -> R0 = 1 if |FR4-FR5| > FR6 else 0
+    0xBE628  safe_div(FR4, FR5)       -> FR4/FR5, returns 0 or +/-HUGE if FR5==0
+    0xBE56C  clamp(FR4, FR5, FR6)     -> returns FR4 clipped to [FR5, FR6];
+                                         out-of-range returns the violated bound
+    0xBE830  table_lookup             (PART 1)
+
+Two mutually exclusive branches on R13 = byte[FFFF782C]:
+
+BRANCH A - R13 == 0  (0x03955A -> subroutine 0x3961C, table NOT used)
+    t = 1.0 + float[FFFF77DC] + float[FFFF77D8]
+    if approx_ne(t, 0.0, 1/8192) == 0:  [FFFF7BAC] = 0.0
+    else:                               [FFFF7BAC] = clamp(1/t - 1, 0.0, LIMIT_A)
+    LIMIT_A = float[0x0CC3E8] = 0.03      <-- LIVE, non-zero
+    0xAD258 is never consulted on this branch.
+
+BRANCH B - R13 != 0  (0x039564-0x0395CC, table IS used)
+    if approx_ne(1.0 - FR9, 0.0, 1/8192) == 0:      ; i.e. FFFF7800 == 1.0
+        [FFFF7BAC] = 0.0 ; done
+    ratio = 1/(1 - float[FFFF7800]) - 1            ; 0x039586-0x039596
+    [FFFF7BC0] = table_lookup(0xAD258, float[FFFF6354])   ; 0x039598-0x0395A2
+    if byte[FFFF7448] == 1:            ; CLOSED LOOP
+        v = ratio                      ; table result IGNORED
+        LIMIT_B = float[0x0CC3EC]
+    else:                              ; OPEN LOOP
+        v = ratio * [FFFF7BC0]         ; 0x0395B8  fmul fr9,fr4  <-- the only
+        LIMIT_B = float[0x0CC3F0]      ;             use of the table
+    [FFFF7BAC] = clamp(v, 0.0, LIMIT_B)                   ; 0x0395C2-0x0395CC
+
+Tail, both branches (0x0395CE-0x03960A):
+    if [FFFF7BAC] > float[FFFF798C]:  [FFFF7BA8] = [FFFF7BAC]
+                                      [FFFF7BA4] = [FFFF7BAC]
+    else:                             [FFFF7BA8] = 0.0
+
+*** THE CALIBRATION CONSTANTS ***
+    0x0CC3E8 = 0.03    (branch A limit)  - LIVE
+    0x0CC3EC = 0.0     (branch B, CL)    - ZERO
+    0x0CC3F0 = 0.0     (branch B, OL)    - ZERO
+
+clamp(v, 0.0, 0.0) returns 0.0 for every possible v. Trace 0xBE56C:
+    if v <= 0.0 -> return FR5 = 0.0
+    else, `fcmp/gt fr4,fr6` tests 0.0 > v, which is false since v > 0
+          -> falls to 0x0BE57E `fmov fr6,fr7` -> return FR6 = 0.0
+So on BRANCH B the output is identically 0.0 whatever the ratio and whatever
+the table says. And since 0.0 > float[FFFF798C] is false for any non-negative
+FFFF798C, [FFFF7BA8] is then explicitly zeroed at 0x039604 as well.
+
+WHAT CONSUMES [FFFF7BC0]: nothing outside this function. It has exactly one
+literal-pool slot in the ROM (0x039754) and is read back at exactly one site,
+0x0395B6 `fmov.s @r6,fr9`, eight instructions after it is written. It is a
+scratch spill, not an interface.
+
+IS IT ON THE FUEL PATH? It is on the AFR-deviation / CL-OL diagnostic path, not
+on the injector pulse-width path.
+  * [FFFF7BA8] afr_deviation_metric is read at 0x024580, 0x030080, 0x0300B0,
+    0x031666, 0x0348B4.
+  * It does NOT feed enrichA. FFFF76D4 has 15 pool sites, all reads, none in
+    func_3952C and none fed by FFFF7BAx.
+  * The main IPW calculator at 0x03817C has no reference to the FFFF7B90-7BD0
+    block anywhere in its literal pool (0x038370-0x038420 scanned: zero hits).
+
+So fueling_pipeline_analysis.txt:60 and :426 are wrong on four separate counts:
+  (a) function entry is 0x3952C, not 0x39528;
+  (b) 0xAD258 is 1-D, not 2-D;
+  (c) its axis is coolant temperature, not RPM x load;
+  (d) its output is not "used by Main IPW calculator" - the IPW calculator
+      never reads it.
+
+
+PART 6 - THE VERDICT, AND WHERE THE ~0.8 AFR GAP IS NOT
+--------------------------------------------------------------------------------
+DELIVERABLE 4: Does 0xAD258 contribute anything to commanded fuel on this cal?
+
+NO - and for three independent reasons, any one of which is sufficient:
+  1. It is not on the commanded-fuel path at all. Its only consumer chain ends
+     at the AFR-deviation metric FFFF7BA8, which the IPW calculator does not
+     read.
+  2. Its data is flat 1.0 at all 16 coolant points, so even as a multiplier it
+     is the identity.
+  3. The single expression that uses it, `ratio * table_result` at 0x0395B8, is
+     immediately clamped to [0.0, 0.0] by 0x0CC3F0 = 0.0. The result is 0.0
+     whatever the inputs.
+
+To put it in the brief's own terms: it multiplies a deviation term that is
+itself forced to zero by calibration. The lever is closed. Populating the table
+would change nothing until 0x0CC3F0 (OL) and/or 0x0CC3EC (CL) are non-zero, and
+even then it would move a diagnostic metric, not commanded fuel.
+
+This also retires "0xAD258 was the last unextracted multiplier in the IPW
+stack" - it was never in that stack.
+
+DELIVERABLE 5: where the code points next.
+
+The ~0.8 AFR gap on an 11.0 command is ~7%. What is left, and what the code
+says about each:
+
+  * 1.05 baseline enrichment at 0x399EE -> FFFF7BDC. ~5% of the ~7%. Real, but
+    it does not close the gap on its own. NOT VERIFIED this session - I did not
+    decode 0x399EE; carrying the brief's figure forward as a claim, not a fact.
+  * Correction aggregator clamp [0.75, 1.25] at 0x33460. A clamp cannot create
+    a 7% offset; it can only fail to remove one. It is not a candidate for the
+    steady-state gap unless the aggregator is riding a rail, which the logs
+    would show directly. NOT VERIFIED this session.
+  * The remaining ~2% is not accounted for by any multiplier found so far.
+
+The code points AWAY from a missing command-side multiplier. Grounds:
+  (a) The one place a coolant-gain multiplier could have hidden - this table -
+      is proven inert.
+  (b) Both AFR-deviation limits being calibrated to exactly 0.0 says Subaru
+      deliberately disabled the OL AFR-deviation correction on this ROM
+      family, so there is no live closed-loop-style trim on the OL command to
+      hunt for.
+  (c) Delivered FFB below commanded map, with no live command-side term to
+      explain it, is the signature of a MODEL error, not a command error -
+      i.e. the ECU commands 11.0, computes the pulse width it believes gives
+      11.0, and the airmass estimate or the injector model is off by ~7%.
+
+INFERRED (weakest link stated): (c) rests on having enumerated the OL
+multiplier stack completely, and I have only positively closed ONE term
+(0xAD258) plus shown two others are structurally incapable of the sign/size
+needed. I have not independently re-derived the full stack from 0x38158.
+Confidence that the gap is MAF/injector-model rather than command-side: ~70%.
+
+CHEAPEST TEST THAT SETTLES IT: the injector swap already forces a full rescale.
+If the FFB-vs-map gap survives the rescale unchanged in PERCENT, it is airmass
+(MAF) side. If it moves with the rescale, it is injector-model side. Either way
+it costs nothing extra, because the rescale is happening regardless. Chasing
+it before the swap spends effort on a model that is about to be replaced.
+
+
+PART 7 - CONFLICTS RESOLVED AND STILL OPEN
+--------------------------------------------------------------------------------
+RESOLVED (ROM bytes win, per house rule):
+  0xAD258 shape       1-D, 16 elements       descriptor_map.txt was RIGHT
+  0xAD258 width       uint16                 descriptor_map.txt was WRONG
+                                             (systematic, 611/760 rows)
+  0xAD258 axis        coolant temperature C  descriptor_labels.txt was RIGHT
+                                             ("desc_1D_ECT_u8_16_AD258", right
+                                             on ECT, wrong on u8)
+  0xAD258 role        AFR-deviation gain     fueling_pipeline_analysis.txt WRONG
+  FFFF6354            coolant temperature C  ram_reference.txt half right;
+                                             diag_tasks + 3162C WRONG
+
+STILL OPEN (named, not guessed):
+  * desc_func_xref.txt:279 lists 0xAD258 as "invalid". That row is wrong -
+    the consumer is 0x039598. Whatever heuristic marked it invalid probably
+    mis-scoped func_3952C because the function is reached by a `bra` stub and
+    has no direct caller. Worth checking how many other "invalid" rows are
+    branch-stub-reached functions; NOT audited this session.
+  * byte[FFFF782C] (R13) selects branch A vs branch B and I did not trace its
+    writer beyond noting one store at 0x03408C (mov.b r2,@r5). Which branch the
+    car actually runs is therefore UNVERIFIED. It does not change the verdict -
+    branch B is zero-clamped, branch A never touches the table - but it does
+    determine whether the 0.03 limit at 0x0CC3E8 is live.
+  * float[FFFF7800] (cl_afr_bound) and float[FFFF77D8]/[FFFF77DC] have no
+    writer in any literal pool; all sites are reads. Same computed-addressing
+    situation as FFFF6354 had. Not chased - not needed for the verdict.
+  * float[FFFF798C] value/identity not resolved. Not needed: the tail zeroes
+    FFFF7BA8 for any FFFF798C >= 0, and propagates a 0.0 otherwise.
+
+NO ROM EDITS PROPOSED. This was an identification task.
+================================================================================

@@ -62,7 +62,13 @@ KNOWN_RAM = {
     0xFFFF323C: "FLKC_BASE_STEP",
     0xFFFF8290: "flkc_fg_GBR_base",
     0xFFFF8294: "flkc_fg_counter",
-    0xFFFF8298: "flkc_fg_cyl_index",
+    0xFFFF8298: "flkc_grid_cell_index",   # CORRECTED 2026-08-16: 0..34 = rpm_band*5+load_band, NOT a cylinder
+    0xFFFF82A8: "flkc_rpm_band",          # u8 0..6  (7 RPM bands from 6 boundaries @0xD2F0C)
+    0xFFFF82A9: "flkc_load_band",         # u8 0..4  (5 load bands from 4 boundaries @0xD2F28)
+    0xFFFF82AD: "flkc_gate_rpm_lo",
+    0xFFFF82AE: "flkc_gate_rpm_hi",
+    0xFFFF82AF: "flkc_gate_load_lo",
+    0xFFFF82B0: "flkc_gate_load_hi",
     0xFFFF829C: "flkc_fg_active",
     0xFFFF829D: "flkc_fg_retard_done",
     0xFFFF829E: "flkc_fg_enable",
@@ -72,7 +78,7 @@ KNOWN_RAM = {
     0xFFFF8258: "flkc_fg_limit_FR15",
     0xFFFF3234: "flkc_fg_ref_FR14",
     0xFFFF3244: "flkc_fg_R0_init",
-    0xFFFF3248: "flkc_fg_var_3248",
+    0xFFFF3248: "flkc_grid",              # CORRECTED 2026-08-16: 35 cells x 8 bytes, ends exactly at FFFF3360
     0xFFFF8233: "flkc_fg_flag_8233",
     0xFFFF7D18: "sched_status_R1",
     0xFFFF3360: "flkc_output_table",

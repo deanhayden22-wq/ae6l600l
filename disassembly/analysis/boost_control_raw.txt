@@ -206,7 +206,7 @@ Entry: 0x54852 (task51_boost_wg_calc)
   0549D0: 000B  rts
   0549D2: 6CF6  mov.l  @R15+,R12
   0549D4: 4F22  sts.l  PR,@-R15
-  0549D6: D231  mov.l  @(0x054A9C),R2  ; =0xFFFF4130 (ignition_switch_state)
+  0549D6: D231  mov.l  @(0x054A9C),R2  ; =0xFFFF4130 (battery_voltage)
   0549D8: F828  fmov.s @R2,FR8
   0549DA: D648  mov.l  @(0x054AFC),R6  ; =0xFFFF8B9C (RAM)
   0549DC: E0FC  mov    #-4,R0
@@ -271,7 +271,7 @@ Entry: 0x54852 (task51_boost_wg_calc)
   0x054982 -> pool 0x054AF4 = 0x000D6714 -> R2 (cal) val=1.0
   0x054986 -> pool 0x054AE4 = 0x000BE960 -> R2 (desc)
   0x0549A2 -> pool 0x054AF8 = 0x000BE53C -> R2 (desc)
-  0x0549D6 -> pool 0x054A9C = 0xFFFF4130 -> R2 (ignition_switch_state)
+  0x0549D6 -> pool 0x054A9C = 0xFFFF4130 -> R2 (battery_voltage)
   0x0549DA -> pool 0x054AFC = 0xFFFF8B9C -> R6 (RAM)
   0x0549E8 -> pool 0x054AE4 = 0x000BE960 -> R2 (desc)
   0x0549F2 -> pool 0x054AFC = 0xFFFF8B9C -> R6 (RAM)
@@ -489,15 +489,15 @@ PART 3: BOOST CONTROL DESCRIPTORS
   26 x 1D_Boost descriptors + 2 x 2D_Boostxrange + 1 x 2D_RPMxBoost
   (Decoding first few for cross-reference)
 
-  1D @ 0x0AA820: size=5, type=uint8, scale=0.003052, bias=0.00  axis=[0.0, 10.0, 20.0, 30.0...]
-  1D @ 0x0AB430: size=16, type=int16, scale=1.000000, bias=0.00  axis=[0.0, 1.0, 2.0, 3.0...]
-  1D @ 0x0AB674: size=8, type=uint8, scale=0.004578, bias=0.00  axis=[0.0, 2.0, 5.0, 10.0...]
-  1D @ 0x0AC2D0: size=16, type=int16, scale=0.000000, bias=0.00  axis=[0.0, 1.0, 2.0, 3.0...]
-  1D @ 0x0AC2E8: size=16, type=int16, scale=0.000000, bias=0.00  axis=[0.0, 1.0, 2.0, 3.0...]
-  1D @ 0x0AC300: size=16, type=int16, scale=0.000000, bias=0.00  axis=[0.0, 1.0, 2.0, 3.0...]
-  2D @ 0x0AF058: 8x6, type=int16, scale=0.007812, bias=0.00
-  2D @ 0x0AF074: 8x6, type=int16, scale=0.007812, bias=0.00
-  2D @ 0x0AB058: 9x7, type=uint8, scale=0.003052, bias=0.00
+  1D @ 0x0AA820: size=5, type=uint16, scale=0.003052, bias=0.00  axis=[0.0, 10.0, 20.0, 30.0...]
+  1D @ 0x0AB430: size=16, type=uint8, scale=1.000000, bias=0.00  axis=[0.0, 1.0, 2.0, 3.0...]
+  1D @ 0x0AB674: size=8, type=uint16, scale=0.004578, bias=0.00  axis=[0.0, 2.0, 5.0, 10.0...]
+  1D @ 0x0AC2D0: size=16, type=uint8, scale=0.000000, bias=0.00  axis=[0.0, 1.0, 2.0, 3.0...]
+  1D @ 0x0AC2E8: size=16, type=uint8, scale=0.000000, bias=0.00  axis=[0.0, 1.0, 2.0, 3.0...]
+  1D @ 0x0AC300: size=16, type=uint8, scale=0.000000, bias=0.00  axis=[0.0, 1.0, 2.0, 3.0...]
+  2D @ 0x0AF058: 8x6, type=uint8, scale=0.007812, bias=0.00
+  2D @ 0x0AF074: 8x6, type=uint8, scale=0.007812, bias=0.00
+  2D @ 0x0AB058: 9x7, type=uint16, scale=0.003052, bias=0.00
 
 ==============================================================================
 PART 4: BOOST CALIBRATION VALUES
@@ -786,7 +786,7 @@ PART 6: RAM AND I/O REFERENCE SUMMARY
 
 --- RAM addresses ---
 
-  0xFFFF4130  ignition_switch_state           refs: 0x0549D6
+  0xFFFF4130  battery_voltage                 refs: 0x0549D6   [item 45]
   0xFFFF64F5  boost_related_flag              refs: 0x054870
   0xFFFF65C0  throttle_position               refs: 0x054876
   0xFFFF65FC                                  refs: 0x05487A
@@ -864,7 +864,7 @@ PART 7: EXTENDED CONTEXT (PRE-TASK51 AND POST-TASK52)
   054822: 4F13  stc.l  GBR,@-R15
   054824: D09C  mov.l  @(0x054A98),R0  ; =0xFFFF8B90 (RAM)
   054826: 401E  ldc    R0,GBR
-  054828: D29C  mov.l  @(0x054A9C),R2  ; =0xFFFF4130 (ignition_switch_state)
+  054828: D29C  mov.l  @(0x054A9C),R2  ; =0xFFFF4130 (battery_voltage)
   05482A: F928  fmov.s @R2,FR9
   05482C: D29C  mov.l  @(0x054AA0),R2  ; =0xFFFF8BD0 (boost_wg_duty_output)
   05482E: E0C0  mov    #-64,R0

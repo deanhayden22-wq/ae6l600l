@@ -6,11 +6,21 @@ scalingrpn = x,0.001934,*,10.17,+
 
 type = ssmcan
 
+;P58 - A/F Sensor #1(AFR)
+paramname = AFR
+paramid = 0x000046
+scalingrpn = x,128,/,14.7,*
+
 ;E124 - Final Fueling Base (2-byte)*(estimated AFR)
 paramname = FFB
 paramid = 0xFF6852
 databits = 16
 scalingrpn = 14.7,x,.0004882812,*,/
+
+;P56 - A/F Sensor #1 Resistance(ohm)
+paramname = EGT
+paramid = 0x000044
+scalingrpn = x
 
 ;P3 - A/F Correction #1(%)
 paramname = AFC
@@ -21,7 +31,7 @@ scalingrpn = x,128,-,100,*,128,/
 paramname = AFL
 paramid = 0x00000A
 scalingrpn = x,128,-,100,*,128,/
-sampinterval = 5
+
 
 ;P8 - Engine Speed(rpm)
 paramname = RPM
@@ -33,7 +43,7 @@ scalingrpn = x,4,/
 paramname = MPH
 paramid = 0x000010
 scalingrpn = x,0.621371192,*
-sampinterval = 2
+
 
 ;P10 - Ignition Total Timing(degrees)
 paramname = Timing
@@ -44,13 +54,7 @@ scalingrpn = x,128,-,2,/
 paramname = IAT
 paramid = 0x000012
 scalingrpn = 32,9,x,40,-,*,5,/,+
-sampinterval = 20
 
-;P2 - Coolant Temperature(F)
-paramname = ECT
-paramid = 0x000008
-scalingrpn = 32,9,x,40,-,*,5,/,+
-sampinterval = 20
 
 ;P12 - Mass Airflow(g/s)
 paramname = MAF
@@ -106,7 +110,7 @@ sampinterval = 60
 paramname = CL/OL
 paramid = 0xFFAF71
 scalingrpn = x,6,+
-sampinterval = 60
+
 
 ;P91 - Fine Learning Knock Correction(degrees)
 paramname = FLKC
@@ -146,25 +150,17 @@ paramname = IPW
 paramid = 0x000020
 scalingrpn = x,256,*,1000,/
 
-;P63 - Roughness Monitor Cylinder 1 (misfire count)
-paramname = Misfire1
-paramid = 0x0000CE
+;E?? - Knock Event Flag (byte: 1=knock detected this cycle, 0=clean)
+paramname = KNOCK_FLAG
+paramid = 0xFF81BA
 scalingrpn = x
 
-;P64 - Roughness Monitor Cylinder 2 (misfire count)
-paramname = Misfire2
-paramid = 0x0000CF
-scalingrpn = x
+;P2 - Coolant Temperature(F)
+paramname = ECT
+paramid = 0x000008
+scalingrpn = 32,9,x,40,-,*,5,/,+
+sampinterval = 20
 
-;P69 - Roughness Monitor Cylinder 3 (misfire count)
-paramname = Misfire3
-paramid = 0x0000D8
-scalingrpn = x
-
-;P70 - Roughness Monitor Cylinder 4 (misfire count)
-paramname = Misfire4
-paramid = 0x0000D9
-scalingrpn = x
 
 ;-------------------------TRIGGER-------------------------;
 ; Triggers allow us to start/stop and resume logging to   ;

@@ -36,8 +36,40 @@ Total addresses: 858 | Named: 497 | Unnamed: 361 (low-ref infrastructure, exclud
   Those two are flagged CONFLICT in docs/verification-status.md; the NAME may
   still be right, but the "(float)" in their description is not supported.
 
+!! CORRECTIONS 2026-08-16 (corrections.md items 39-41)
+!!   FFFF6354 : was ect_raw_adc  -> COOLANT TEMPERATURE, degC, gated copy
+!!              Settled from the WRITER, not from readers. All 69 pooled refs
+!!              are reads; the writes are indexed stores off base FFFF6360:
+!!                0x01F730 `F2E7 fmov.s fr14,@(r0,r2)`  r0=-12, r2=FFFF6360
+!!                0x01F746 `F247 fmov.s fr4,@(r0,r2)`   (failsafe path)
+!!              Routine 0x01F6E0 fans ONE source float (FFFF4144, the
+!!              linearised sensor) out to FFFF6350/54/58/5C with a failsafe
+!!              constant of 70.0 at 0x01F940 -- 70 degC limp-home coolant.
+!!              A vehicle-speed failsafe would be 0.0. Corroborated by the
+!!              definition XML naming its consumer axis 0xCC664 "Coolant
+!!              Temperature", and by the -40..110 degC axis span.
+!!              NOTE: "raw ADC" was also wrong. The raw value is UPSTREAM at
+!!              FFFF4144; FFFF6354 is the scaled Celsius value post-failsafe.
+!!   FFFF3248 : was per_cylinder_knock_retard (float[4], by cylinder)
+!!              -> FLKC LEARNING GRID, 35 cells x 8 bytes. Nothing indexes it
+!!              by cylinder. Confirmed three ways: read 0x0462AE and write
+!!              0x0464D8 both use index*8; the reset loop at 0x046824 runs
+!!              `mov #35,r12` / `add #8,r13`; and FFFF3248 + 35*8 = FFFF3360,
+!!              exactly the base of the parallel u16 array.
+!!   FFFF8298 : was flkc_fg_cyl_index -> FLKC GRID CELL INDEX, 0..34
+!!              = rpm_band*5 + load_band, bounded by `mov #35,r5 / cmp/ge`
+!!              at 0x046288. Not a cylinder index (which would be 0..3).
+!!   Newly named in the same pass (selector 0x0461D2, GBR=FFFF8298):
+!!     FFFF82A8 flkc_rpm_band   (u8, 0..6)   FFFF82A9 flkc_load_band (u8, 0..4)
+!!     FFFF82AD flkc_gate_rpm_lo            FFFF82AE flkc_gate_rpm_hi
+!!     FFFF82AF flkc_gate_load_lo           FFFF82B0 flkc_gate_load_hi
+!!   The grid is BUCKETED, not interpolated -- axis values are band
+!!   boundaries, so 6 RPM + 4 load boundaries give 7x5 = 35 cells, and each
+!!   knock event writes EXACTLY ONE cell. Full trace:
+!!   disassembly/analysis/flkc_grid_interpolation_trace.txt
+
   Per-address verification flags: docs/verification-status.md
-  Full evidence: docs/corrections.md item 9
+  Full evidence: docs/corrections.md items 9, 39-41
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -136,7 +168,7 @@ TOP 200 MOST-REFERENCED RAM ADDRESSES
      86  0xFFFF63F8  engine_load_current                  CORRECTED 2026-07-26: ENGINE LOAD (g/rev, float), NOT IAT. IAT is 0xFFFF6364 (see item 12; the item-9 claim that IAT was 0xFFFF69F0 is RETRACTED). See corrections.md items 9 + 12.
      77  0xFFFF4130  battery_voltage                      CORRECTED 2026-07-26: BATTERY VOLTAGE (float, volts), NOT atmospheric/baro. Feeds axis 0xD104C "Injector Latency_ / Battery Output" (6.5..16.5 V) as FR4 at 0x0303C8, and axis 0xD91CC "Ignition Dwell / Battery Volts" (8..16 V) as FR5 at 0x00894E. All 8 axes it feeds span 6..20. float x77, 0 int. corrections.md item 10.
      76  0xFFFF3836  io_ign_driver_ctrl                   InternalIO ignition driver control register (31 refs).
-     69  0xFFFF6354  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float). Re
+     69  0xFFFF6354  ect_gated_c                          69 refs. COOLANT TEMP degC, gated copy (float). CORRECTE
      69  0xFFFFADAC  diag_request_state                   69 refs. Diagnostic request/response state. Read by DTC
      60  0xFFFF85D7  fuel_system_state                    60 refs. Fuel system state byte. Read by AFC, AFL, idle
      56  0xFFFF4024  ATU_primary_ctrl                     ATU primary control register. 36 code refs — master inj
@@ -552,7 +584,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   ect_current                               0xFFFF6350   205 refs  205 refs. Coolant temperature (float). R
   ect_desc_result                           0xFFFF7F2C     0 refs  ECT descriptor output (task33).
   ect_input_float                           0xFFFF69FC     7 refs  ECT input for fuel/ign lookups (float)
-  ect_raw_adc                               0xFFFF6354    69 refs  69 refs. ECT raw ADC value or secondary
+  ect_gated_c                               0xFFFF6354    69 refs  COOLANT TEMP degC gated copy. CORRECTED
   ect_timing_comp                           0xFFFF81EC     0 refs  ECT timing compensation (task50).
   egr_channel_selector                      0xFFFF2BFA     0 refs  EGR channel selector (u8) + timer (u16 a
   egr_completion_flag                       0xFFFFA17D     0 refs  EGR completion flag (bit 0). Set by egr_
@@ -587,7 +619,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   flkc_fg_active                            0xFFFF829C     0 refs  Active flag; cleared on knock entry
   flkc_fg_bank_route                        0xFFFF82A1     0 refs  Routes post-retard clamp fn call
   flkc_fg_counter                           0xFFFF8294     0 refs  Cycle counter, must be >= 90 for F/G pat
-  flkc_fg_cyl_index                         0xFFFF8298     0 refs  Current cylinder/bank index
+  flkc_grid_cell_index                      0xFFFF8298     0 refs  FLKC grid cell 0..34 = rpm_band*5+load_band
   flkc_fg_enable                            0xFFFF829E     0 refs  Must == 1 to enter main logic
   flkc_fg_exit_flag                         0xFFFF82A0     0 refs  Set to 1 at normal exit
   flkc_fg_flag_8233                         0xFFFF8233     0 refs  Byte flag checked during FP setup
@@ -727,7 +759,7 @@ FULL ALPHABETICAL INDEX (named addresses only)
   overrun_state                             0xFFFF7E8C     0 refs  Overrun state (byte). 0=normal, 1=fuel c
   per_cyl_base_corr                         0xFFFF81DC     0 refs  Per-cylinder base timing correction (task50).
   per_cyl_timing_corr                       0xFFFF81E8     0 refs  Per-cylinder timing corrections (float[4
-  per_cylinder_knock_retard                 0xFFFF3248     0 refs  Knock retard array (float[4]), indexed b
+  flkc_grid                                 0xFFFF3248     0 refs  FLKC learning grid, 35 cells x 8 bytes
   percyl_fuel_trim_output                   0xFFFF7C10     0 refs  Per-cylinder fuel trim output.
   percyl_timing_array                       0xFFFF41F0     0 refs  Per-cylinder timing array (8 bytes x 4 c
   peripheral_control_GBR                    0xFFFF5C98    15 refs  15 refs. Peripheral control GBR base (3
@@ -884,7 +916,7 @@ ADDRESS-SORTED COMPLETE LIST
   0xFFFF62E4     3  throttle_angle_change                NEW 2026-07-26: THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger (float, %, axis 0..31.3). 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) -> 0x03A9D0 jsr 0x0BE830, desc 0x0AD368 axis 0xCED08 "Throttle Tip-in Enrichment A / Throttle Angle Change". float x3. corrections.md item 22.
   0xFFFF62F8     0  torque_ratio                         Requested torque ratio (task50 map switching).
   0xFFFF6350   205  ect_current                          205 refs. Coolant temperature (float). Read by PSE
-  0xFFFF6354    69  ect_raw_adc                          69 refs. ECT raw ADC value or secondary ECT (float
+  0xFFFF6354    69  ect_gated_c                          COOLANT TEMP degC, gated copy. Writer 0x01F730/46.
   0xFFFF6364    48  iat_current                          CORRECTED 2026-07-26: INTAKE AIR TEMPERATURE (float, degC raw; defs display (x*1.8)+32 degF), NOT ECT-at-start. 0x013A0C fmov.s @r2,fr15 -> 0x013A3A delay fmov fr15,fr4 -> desc 0x0AA974 axis 0xC0E24 "Target Boost Compensation (IAT)_ / Intake Temperature" (-20..40 C); second site 0x04042A -> desc 0x0ADC14 axis 0xD3248 "Timing Compensation A (IAT) / Intake Temperature". Zero coolant axes. float x48. corrections.md item 12.
   0xFFFF63B0    16  adc_processed_temperature_B          ADC processed temperature B (float). ECT/IAT sensor region.
   0xFFFF63C4    43  mass_airflow_gps                     CORRECTED 2026-07-27: MASS AIRFLOW (float, g/s) -- THE MAF variable, not ect_compensation. Two independent non-axis proofs. (1) SSM: the stock getter table at 0x06423C entry 0x13/0x14 (Mass Airflow, logcfg x/100) is 0x05D3AC, which does 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; 0x05D3B8 jsr 0x0BE5D8 with fr6=0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)) => SSM raw = value*100 => value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l @(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched to 0x034D8E, compared against 0xCC074/78/7C = the definition-named table 'A/F Learning #1 Airflow Ranges' (scaling MassAirflow(g/s), 5.6/10/50). (3) PRODUCER: 0x01FF66 fmov.s fr0,@(r0,r1) with r1=0xFFFF6430 r0=-108 writes it as min(MAF*IATcomp, 'MAF Limit (Maximum)' 0xC3100=300 g/s) via 0x0BE970. (4) LOG: logs/7-26 20.19b MAF spans 2.40..296.24 g/s; widest axis 0..300. The 'Intake/Exhaust VVT Error' axis names at 0xCF9EC/0xD11D0 are DEFINITION-SIDE ERRORS -- 0x031DD2 loads FR14 from here once and feeds it unchanged to both. corrections.md item 28.

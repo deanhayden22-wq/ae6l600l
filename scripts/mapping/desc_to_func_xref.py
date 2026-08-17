@@ -11,7 +11,8 @@ import struct
 import sys
 from collections import defaultdict
 
-ROM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rom")
+# repo root is TWO levels up from scripts/mapping/ (fixed 2026-08-16)
+ROM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "rom")
 
 def load_rom():
     p = os.path.join(ROM_DIR, "ae5l600l.bin")
@@ -104,8 +105,17 @@ def is_valid_axis(rom, ptr, size):
     for v in vals:
         if v != v or abs(v) > 1e8:
             return False
-    increasing = sum(1 for i in range(len(vals)-1) if vals[i+1] >= vals[i])
-    return increasing >= len(vals) * 0.7
+    # BUG FIX 2026-08-16: `increasing` counts PAIRS, so its maximum is
+    # len(vals)-1, but the threshold was len(vals)*0.7. For the sampled
+    # window of 3 points that is 2 >= 2.1 -- False for a PERFECTLY monotonic
+    # axis. The function therefore returned False for every axis it was ever
+    # given, which marked 874 of 995 descriptor pointers "invalid".
+    # Compare against the pair count instead.
+    pairs = len(vals) - 1
+    if pairs <= 0:
+        return False
+    increasing = sum(1 for i in range(pairs) if vals[i+1] >= vals[i])
+    return increasing >= pairs * 0.7
 
 
 def classify_desc(rom, addr):
@@ -123,7 +133,9 @@ def classify_desc(rom, addr):
         axis_ptr = r_u32(rom, addr + 4)
         if not (0x1000 <= axis_ptr < rom_len):
             return "invalid"
-        if size < 2 or size > 64:
+        # 2026-08-16: guard raised 64 -> 256. Real descriptors exist at 65
+        # (0xAE284) and 78 (0xAB334) points; the old cap called them invalid.
+        if size < 2 or size > 256:
             return "invalid"
         if not is_valid_axis(rom, axis_ptr, min(size, 3)):
             return "invalid"

@@ -1,0 +1,362 @@
+================================================================================
+FLKC LEARNING GRID: STORE PATH, READ PATH, AND AXIS GEOMETRY
+Traced 2026-08-16 (session: code_chase_2026-08-16 TASK 2)
+Reference bin: rom/AE5L600L 20g rev 20.19c.bin
+               md5 92cae8275cd4f9b473a3a9e36efe6449  (VERIFIED this session)
+Compared against: rom/AE5L600L 20g rev 20.19d.bin
+               md5 ace1a5f86670ae120eda8925c162cf41  (VERIFIED this session)
+Method: axis pointers reached through the pointer-of-pointers lists at 0x63E88 /
+        0x63E98 (which is why a literal scan for 0xD2F0C/0xD2F28 finds nothing
+        in code); all four knock-module functions decoded with
+        scripts/sh2e_disasm.py; GBR bases resolved per function from their
+        `ldc R0,GBR` preambles.
+================================================================================
+
+HEADLINE
+--------------------------------------------------------------------------------
+The grid is NEITHER bilinear NOR nearest-cell. It is BUCKETED - piecewise
+constant, with hysteresis on downward transitions only.
+
+  * The axis values are BUCKET BOUNDARIES, not cell centres.
+  * 6 RPM boundaries -> 7 RPM bands. 4 load boundaries -> 5 load bands.
+  * The grid is therefore 7 x 5 = 35 cells, not 6 x 4 = 24.
+  * A knock event writes EXACTLY ONE cell. No weighting, no neighbours.
+  * A lookup reads EXACTLY ONE cell. No interpolation, at all.
+
+Consequence for 19d: the edit does do something real, but NOT the thing the
+brief's justification says it does. See PART 5. The weakest link the brief
+flagged - "I am assuming the write and the read are both bilinear" - was the
+right thing to doubt, and it does not hold.
+
+
+PART 1 - MODULE MAP (VERIFIED)
+--------------------------------------------------------------------------------
+Four functions, three GBR bases:
+
+  0x0461D2  cell selector          GBR = 0xFFFF8298
+  0x046296  FLKC readback / apply  (no GBR; uses pointers directly)
+  0x0463BA  FLKC learn / update    GBR = 0xFFFF8290
+  0x0467B4  enable-gate evaluator  GBR = 0xFFFF829E
+  0x046A4A  range comparator       (leaf, called by 0x0467B4)
+  0x0BE800  hysteresis comparator  (leaf helper)
+
+Calibration pointers, resolved:
+  0x046348 = 0x00063E98  -> list of 6 pointers: D2F0C D2F10 D2F14 D2F18 D2F1C D2F20
+  0x046350 = 0x00063E88  -> list of 4 pointers: D2F28 D2F2C D2F30 D2F34
+  0x04634C = 0x000D2F24  -> RPM  bucket hysteresis = 50.0 rpm
+  0x046354 = 0x000D2F38  -> LOAD bucket hysteresis = 0.02 load
+  0x04632C = 0xFFFF63F8  -> LOAD input  (engine load, per CLAUDE.md)
+  0x046330 = 0xFFFF6624  -> RPM input
+
+The axes are reached ONLY through those two pointer lists. Nothing in the ROM
+loads 0xD2F0C or 0xD2F28 as a literal, and no table descriptor points at them.
+That is why previous passes could not find the consumer.
+
+
+PART 2 - THE CELL SELECTOR (VERIFIED) - THIS IS THE WHOLE ANSWER
+--------------------------------------------------------------------------------
+Function 0x0461D2. RPM band loop first, load band loop second, then combine.
+
+RPM band loop (0x0461EA-0x046204), r1 = 6 = boundary count:
+  0461EA  D557  mov.l @(0x046348),r5   ; pointer list
+  0461EC  6043  mov  r4,r0
+  0461EE  025E  mov.l @(r0,r5),r2      ; r2 = &axis[i]
+  0461F0  F828  fmov.s @r2,fr8         ; fr8 = axis[i]
+  0461F2  F895  fcmp/gt fr9,fr8        ; T = (axis[i] > rpm)
+  0461F4  8B01  bf 0x0461FA            ; axis[i] <= rpm -> keep walking
+  0461F6  A006  bra 0x046206
+  0461F8  6563  mov  r6,r5             ; exit, band = i
+  0461FA  7601  add  #1,r6
+  0461FC  6563  mov  r6,r5
+  0461FE  7404  add  #4,r4
+  046200  626C  extu.b r6,r2
+  046202  3213  cmp/ge r1,r2           ; while band < 6
+  046204  8BF1  bf 0x0461EA
+
+  => band = number of boundaries <= input. Range 0..6. SEVEN bands.
+     band 0 is unbounded below; band 6 is unbounded above.
+
+LOAD band loop (0x046236-0x046250) is byte-identical in structure with r7 = 4.
+  => band = 0..4. FIVE bands.
+
+Downward hysteresis (0x046252-0x046272 for load; 0x046206-0x046226 for RPM):
+  046252  C411  mov.b @(17,gbr),r0     ; previous load band  [FFFF82A9]
+  046256  621C  extu.b r1,r2           ; new band
+  046258  3263  cmp/ge r6,r2           ; T = new >= prev
+  04625A  890B  bt 0x046274            ; rising or equal -> accept immediately
+  ...                                  ; falling -> require extra margin:
+  046266  F828  fmov.s @r2,fr8         ; fr8 = axis[new]
+  04626A  F928  fmov.s @r2,fr9         ; fr9 = hysteresis (D2F38 = 0.02)
+  04626C  F891  fsub fr9,fr8           ; fr8 = axis[new] - hyst
+  04626E  F865  fcmp/gt fr6,fr8        ; T = (axis[new]-hyst > load)
+  046270  8900  bt 0x046274            ; accept the lower band
+  046272  7101  add  #1,r1             ; otherwise stay one band higher
+  046274  C011  mov.b r0,@(17,gbr)
+
+  => Band boundaries are ASYMMETRIC: you enter a higher band the instant the
+     input crosses the boundary, but you only fall back once the input is
+     `hyst` below it (0.02 load, 50 rpm).
+
+Cell index (0x046278-0x046290):
+  046278  C410  mov.b @(16,gbr),r0     ; RPM band     [FFFF82A8]
+  04627C  6263  mov  r6,r2
+  04627E  4208  shll2 r2               ; x4
+  046280  326C  add  r6,r2             ; +1x  => r2 = rpm_band * 5
+  046282  C411  mov.b @(17,gbr),r0     ; LOAD band    [FFFF82A9]
+  046284  320C  add  r0,r2             ; + load_band
+  046288  E523  mov  #35,r5
+  04628A  3653  cmp/ge r5,r6
+  04628C  8901  bt 0x046292            ; index >= 35 -> discard, keep previous
+  046290  C000  mov.b r0,@(0,gbr)      ; [FFFF8298] = cell index
+
+  *** cell = rpm_band * 5 + load_band, bounded < 35.
+      Row stride 5 and ceiling 35 both independently confirm 7 x 5. ***
+
+
+PART 3 - THE STORE PATH (DELIVERABLE 1: ONE CELL, NO WEIGHTING)
+--------------------------------------------------------------------------------
+Function 0x0463BA, GBR = 0xFFFF8290, so `@(8,gbr)` == [0xFFFF8298] == the cell
+index computed in PART 2.
+
+  0464CE  C408  mov.b @(8,gbr),r0      ; cell index
+  0464D2  620C  extu.b r0,r2
+  0464D4  4208  shll2 r2               ; x4
+  0464D6  4200  shll  r2               ; x8   -> r2 = index * 8
+  0464D8  3E2C  add  r2,r14            ; r14 = FFFF3248 + index*8
+  0464DA  D248  mov.l @(0x0465FC),r2   ; 0x000BDBCC
+  0464DC  64E3  mov  r14,r4            ; r4 = &cell
+  0464DE  420B  jsr  @r2
+  0464E0  F40C  fmov fr0,fr4           ; fr4 = new value
+
+The identical sequence appears again at 0x046554-0x04655E for the second
+update branch. There is no second store, no adjacent-cell store, and no
+fractional weight anywhere in the function.
+
+A parallel per-cell u16 array is updated the same way, single-indexed:
+  0464FE  C408  mov.b @(8,gbr),r0
+  046504  4000  shll r0                ; x2
+  046506  0565  mov.w r6,@(r0,r5)      ; r5 = 0xFFFF3360
+
+ANSWER: ONE cell. Not two, not four. No weighting exists to describe.
+
+
+PART 4 - THE READ PATH (DELIVERABLE 2: ONE CELL, NO INTERPOLATION)
+--------------------------------------------------------------------------------
+Function 0x046296:
+  0462A2  D51C  mov.l @(0x046314),r5   ; r5  = 0xFFFF3248  (grid base)
+  0462A4  DC25  mov.l @(0x04633C),r12  ; r12 = 0xFFFF8298
+  0462A6  64C0  mov.b @r12,r4          ; r4  = cell index
+  0462A8  604C  extu.b r4,r0
+  0462AA  4008  shll2 r0               ; x4
+  0462AC  4000  shll  r0               ; x8
+  0462AE  F856  fmov.s @(r0,r5),fr8    ; fr8 = FLKC[cell]
+
+One fetch. No second fetch, no fraction, no fmac. The learn function does the
+same single-cell read at its head (0x0463F0-0x0463FA) for its read-modify-write.
+
+OUT-OF-GRID BEHAVIOUR: there is none, because out-of-grid is unreachable. The
+band index is produced by a bounded walk (0..6 / 0..4), so band 0 absorbs
+everything below the first boundary and the top band absorbs everything above
+the last. Functionally that is clamp-to-edge; structurally it is "the outermost
+band is unbounded". There is no zero-fill and no wrap.
+
+GRID GEOMETRY, confirmed three independent ways:
+  1. read/write stride is index*8 -> 8 bytes per cell
+  2. the reset loop at 0x046824-0x04683C:
+         046828  EC23  mov #35,r12         ; 35 iterations
+         04682E  D432  mov.l @(0x0468F8),r4
+         046830  34DC  add  r13,r4
+         04683A  7D08  add  #8,r13         ; stride 8
+     zeroes exactly 35 cells.
+  3. 0xFFFF3248 + 35*8 = 0xFFFF3360, which is exactly the base of the parallel
+     u16 array (literal 0x046608). The two arrays are flush.
+
+ARTIFACT CORRECTIONS OWED (both are the same mislabel class as the gear-byte
+"cylinder_index" error already on record):
+  * ram_reference.txt:730
+        "per_cylinder_knock_retard 0xFFFF3248 - Knock retard array (float[4]),
+         indexed by cylinder"                                  -- WRONG
+    It is the FLKC learning grid: 35 cells x 8 bytes. Nothing indexes it by
+    cylinder; the only index is rpm_band*5 + load_band.
+  * ram_reference.txt:590
+        "flkc_fg_cyl_index 0xFFFF8298 - Current cylinder/bank index" -- WRONG
+    It is the FLKC grid cell index, 0..34, explicitly bounded by
+    `mov #35,r5 / cmp/ge` at 0x046288.
+  * ram_reference.txt:591 "flkc_fg_enable 0xFFFF829E" is CORRECT (see PART 6).
+
+
+PART 5 - DELIVERABLE 3: DOES THE 19d RE-SPACING NARROW THE FOOTPRINT?
+--------------------------------------------------------------------------------
+19c vs 19d diff re-verified this session: exactly 15 bytes -
+  0x0D2F29-2B, 2D-2F, 30-33, 35  (11 bytes, the load axis)
+  0x0FFB88-8B                    (4 bytes, checksum)
+Nothing else moved. Confirms the brief.
+
+Enable window (PART 6): load in [1.25 .. 3.45], rpm in [1500 .. 6300].
+
+19c load boundaries 0.75 / 1.10 / 1.50 / 2.00 give five bands:
+    b0  (-inf, 0.75)   entirely below the gate   DEAD
+    b1  [0.75, 1.10)   entirely below the gate   DEAD
+    b2  [1.10, 1.50)   live only 1.25-1.50       0.25 wide
+    b3  [1.50, 2.00)   live                      0.50 wide
+    b4  [2.00,  inf)   live only 2.00-3.45       1.45 wide
+  -> 3 usable bands; the top one smears 1.45 load units into one cell.
+
+19d load boundaries 1.30 / 1.65 / 2.40 / 3.50 give:
+    b0  (-inf, 1.30)   live only 1.25-1.30       0.05 wide (inside hyst band)
+    b1  [1.30, 1.65)   live                      0.35 wide
+    b2  [1.65, 2.40)   live                      0.75 wide
+    b3  [2.40, 3.50)   live only 2.40-3.45       1.05 wide
+    b4  [3.50,  inf)   entirely above the gate   DEAD
+  -> 4 usable bands (one a sliver); worst band 1.05 instead of 1.45.
+
+ANSWER: YES, but for a different reason than the brief states, and by less.
+
+  * A load-1.5 event under 19c writes ONE cell, band b3 = [1.50, 2.00). Its
+    readback footprint is 0.50 load units.
+  * The same event under 19d writes ONE cell, band b1 = [1.30, 1.65). Footprint
+    0.35 load units.
+  * So the footprint narrows 0.50 -> 0.35. Real, but modest.
+
+THE BRIEF'S STATED MECHANISM IS WRONG. Quoting it: "under the old axis, a
+learned correction near load 1.5-1.8 writes into columns 3 (1.50) and 4 (2.00),
+and every readback from load 2.00 up to the range ceiling of 3.45 clamps to
+column 4 - so a mid-load event taxes the boost cells."
+
+  - It does not write into two columns. It writes one band.
+  - A load-1.5 event lands in b3 = [1.50, 2.00). Loads at or above 2.00 select
+    b4, a DIFFERENT cell, which that event never touched.
+  - Therefore a mid-load event CANNOT tax the boost cells. There is no bleed
+    mechanism in this code for it to use.
+
+COROLLARY, and this matters for the 8-14 reading: the observed FLKC readback
+spanning rpm 2500-5000 x load 1.25-3.0 cannot have come from one mid-load
+event. It requires corrections genuinely banked in several distinct cells -
+at minimum b2/b3/b4 across three or more rpm bands. The map really did have
+high-load corrections in it; they were not smeared there from load 1.5.
+
+WHAT 19d ACTUALLY BUYS (the honest justification):
+  1. It moves all four boundaries inside the enable window, so no band is
+     wasted below the gate. 19c wasted two of five.
+  2. It cuts the worst-case band width from 1.45 to 1.05 load units and gives
+     genuine resolution in 1.65-2.40, which 19c lumped into its top band.
+  3. It does NOT prevent cross-contamination between mid-load and boost cells,
+     because no such contamination exists.
+  4. NEW cost it introduces: band b4 (>= 3.50) is now entirely above the 3.45
+     upper gate, so 19d wastes one band at the top the way 19c wasted two at
+     the bottom. Net usable bands 3 -> 4, not 4 -> 4.
+
+SECOND COROLLARY - the traversal test in the brief may not say what it was
+read to say. The brief treated "33 step-downs of 0.25 in consecutive 40 ms
+samples" as proof of lookups across a pre-learned map. Under a piecewise-
+constant map, traversal produces jumps of whatever size separates two adjacent
+cells - arbitrary, not uniformly 0.25. A uniform 0.25 step is exactly the
+Fine Correction Advance Value (0xD2F48 = 0.25, VERIFIED). So the same data is
+at least equally consistent with active advance-relearning.
+INFERRED, weakest link: adjacent cells learned in 0.25 increments would also
+differ by multiples of 0.25, so the two hypotheses are not cleanly separable
+from step size alone.
+CHEAPEST DISCRIMINATOR: recompute rpm_band*5 + load_band from the logged rpm
+and load with the PART 2 rules (including the 50 rpm / 0.02 load downward
+hysteresis) and check whether the cell index actually changed across those 33
+samples. If the index held constant while FLKC stepped 0.25, it was learning,
+not traversal. This is computable from the existing 8-14 log with no new data.
+
+
+PART 6 - DELIVERABLE 4: THE TRAP. CELLS BELOW THE GATE ARE READABLE.
+--------------------------------------------------------------------------------
+The gate is built in 0x046A4A and consumed in 0x0467B4.
+
+0x046A4A produces four flags using hysteresis comparator 0x0BE800:
+  [FFFF82AD] rpm  >= lower band, D2F6C=1500 / D2F70=1600
+  [FFFF82AE] rpm  <= upper band, D2F74=6300 / D2F78=6400
+  [FFFF82AF] load >= lower band, D2F7C=1.25 / D2F80=1.30
+  [FFFF82B0] load <= upper band, D2F84=3.45 / D2F88=3.50
+
+0x0467B4 ANDs all four into one enable byte:
+  0467C2  C40F  mov.b @(15,gbr),r0   ; FFFF82AD
+  0467C8  C410  mov.b @(16,gbr),r0   ; FFFF82AE
+  0467CE  C411  mov.b @(17,gbr),r0   ; FFFF82AF
+  0467D8  C412  mov.b @(18,gbr),r0   ; FFFF82B0
+  0467E4  E001  mov  #1,r0           ; all four == 1
+  0467E8  C000  mov.b r0,@(0,gbr)    ; [FFFF829E] = FLKC enable
+Those four addresses are read NOWHERE else in the ROM (GBR-offset sweep of all
+three knock-module functions: only these four sites).
+
+[FFFF829E] is read at 0x024962 and 0x044B9C. It is NOT read anywhere on the
+readback path 0x046296-0x0462AE.
+
+ANSWER: writes are gated, reads are NOT.
+  * Below-gate cells cannot be WRITTEN - the enable byte gates entry to the
+    learn logic (ram_reference.txt:591 "Must == 1 to enter main logic", and
+    consistent with the two read sites both being upstream of learning).
+  * Below-gate cells CAN be READ. The band selector runs for every rpm/load
+    including load < 1.25, and the fetch at 0x0462AE is unconditional.
+
+Is that harmful at these calibrations? No, and here is why: the reset loop at
+0x046824 zeroes all 35 cells, and the gate prevents any write below 1.25, so
+19c's dead bands b0/b1 can only ever read back 0.0. The trap is structurally
+real but benign. The same is true of 19d's dead top band b4.
+
+So this does NOT mean the 19d change alters more than the resolution story
+suggests. The resolution story is the whole story - it is just a smaller story
+than the brief assumed.
+
+CAVEAT, stated: I confirmed the enable byte is read at 0x024962 / 0x044B9C but
+did NOT decode those two call sites to prove they abort learning rather than
+merely record state. The inference that writes are gated rests on
+ram_reference.txt:591 plus the absence of any other consumer. Confidence ~85%.
+If it matters, decoding 0x044B9C settles it in ten minutes.
+
+
+PART 7 - DELIVERABLE 5: THE RPM AXIS (NOTED, NO EDIT PROPOSED)
+--------------------------------------------------------------------------------
+Yes, it is real, and it is the same structural issue the load axis had.
+
+RPM boundaries 1600/2200/2800/3400/4000/4600 against a 1500-6300 enable window:
+    b0  (-inf, 1600)   live only 1500-1600     100 rpm  (inside the hyst band)
+    b1  [1600, 2200)                           600 rpm
+    b2  [2200, 2800)                           600 rpm
+    b3  [2800, 3400)                           600 rpm
+    b4  [3400, 4000)                           600 rpm
+    b5  [4000, 4600)                           600 rpm
+    b6  [4600,  inf)   live only 4600-6300    1700 rpm
+
+Band b6 lumps 4600-6300 into one cell - 2.8x the width of every band below it,
+and it covers the entire top-end region. Anything learned at 4700 applies
+identically at 6200.
+
+Per the brief: noted, not acted on. There is no top-end knock in the corpus to
+justify a change, and per memory there is zero log coverage above 5800 rpm
+under boost, so a re-space would be unverifiable.
+
+NO ROM EDITS PROPOSED.
+
+
+PART 8 - VALUES RE-VERIFIED THIS SESSION (19c bin)
+--------------------------------------------------------------------------------
+  Fine Correction Rows (RPM)     0xD2F0C  1600 2200 2800 3400 4000 4600
+  Fine Correction Columns (Load) 0xD2F28  0.75 1.10 1.50 2.00
+                        (19d)    0xD2F28  1.30 1.65 2.40 3.50
+  Fine Correction Range (RPM)    0xD2F6C  1500 1600 6300 6400
+  Fine Correction Range (Load)   0xD2F7C  1.25 1.30 3.45 3.50
+  Fine Correction Advance Limit  0xD2F44  8.0
+  Fine Correction Advance Value  0xD2F48  0.25
+  Fine Correction Retard Limit   0xD2F4C  -15.00
+  Fine Correction Retard Value   0xD2F50  1.01     <- stored POSITIVE in ROM
+  FLKC Advance Delay             0xD29EE  90 (u16)
+  RPM  band hysteresis           0xD2F24  50.0
+  LOAD band hysteresis           0xD2F38  0.02
+  LOAD band hysteresis (2nd)     0xD2F3C  0.02
+
+  NOTE on 0xD2F50: the brief lists it as -1.01. The stored float is +1.01; the
+  sign is applied by the consumer. Cosmetic, but worth not re-deriving.
+
+  Grid array   0xFFFF3248  35 cells x 8 bytes  -> ends 0xFFFF3360
+  Parallel u16 0xFFFF3360  35 cells x 2 bytes
+  Cell index   0xFFFF8298  (u8, 0..34)
+  RPM band     0xFFFF82A8  (u8, 0..6)
+  LOAD band    0xFFFF82A9  (u8, 0..4)
+  Enable       0xFFFF829E  (u8)
+  Gate flags   0xFFFF82AD..0xFFFF82B0
+================================================================================

@@ -1,6 +1,6 @@
 {
  "schema_version": 1,
- "generated": "2026-07-28 20:40",
+ "generated": "2026-08-16 21:32",
  "generator": "scripts/coverage_map.py",
  "warning": "GENERATED FILE -- regenerate, never hand-edit. python scripts/coverage_map.py",
  "inputs": {
@@ -12,7 +12,7 @@
    "rom/ae5l600l.bin",
    "rom/AE5L600L 20g rev 20.19b.bin"
   ],
-  "disassembly_corpus_files": 85
+  "disassembly_corpus_files": 87
  },
  "taxonomy": [
   {
@@ -1134,7 +1134,7 @@
    "evidence": [
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "3 file(s): disassembly/analysis/startup_enrichment_analysis.txt, disassembly/maps/descriptor_map.txt, disassembly/maps/disassembly.txt"
+     "detail": "6 file(s): disassembly/analysis/ad258_wot_enrichment_trace.txt, disassembly/analysis/fueling_pipeline_analysis.txt, disassembly/analysis/startup_enrichment_analysis.txt ..."
     }
    ],
    "notes": [
@@ -2086,7 +2086,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "6 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt ..."
+     "detail": "7 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/knock_flkc_analysis.txt ..."
     }
    ],
    "notes": [
@@ -2307,6 +2307,12 @@
     "max": 2000.0,
     "raw_is_display": true
    },
+   "evidence": [
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/analysis/flkc_grid_interpolation_trace.txt"
+    }
+   ],
    "notes": [
     "6 of 6 factory-ROM cells fall outside the declared min/max 0.0..2000.0"
    ],
@@ -2352,7 +2358,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+     "detail": "2 file(s): disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/maps/cal_crossref.txt"
     }
    ],
    "notes": [
@@ -8148,7 +8154,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/ram_reference.txt"
+     "detail": "3 file(s): disassembly/analysis/adc_pipeline_trace.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/ram_reference.txt"
     }
    ],
    "flag": "VERIFIED-BOTH",
@@ -8334,7 +8340,7 @@
    "declared": {
     "claimed_name": "ect_current",
     "claimed_desc": "205 refs. Coolant temperature (float). Read by PSE, AFC",
-    "source": "ram_reference.txt:128"
+    "source": "ram_reference.txt:160"
    },
    "evidence": [
     {
@@ -8347,20 +8353,20 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "22 file(s): disassembly/analysis/accel_enrichment_analysis.txt, disassembly/analysis/accel_enrichment_raw.txt, disassembly/analysis/avcs_raw.txt ..."
+     "detail": "23 file(s): disassembly/analysis/accel_enrichment_analysis.txt, disassembly/analysis/accel_enrichment_raw.txt, disassembly/analysis/ad258_wot_enrichment_trace.txt ..."
     }
    ],
    "flag": "VERIFIED-BOTH"
   },
   {
    "kind": "ram",
-   "name": "ect_raw_adc",
+   "name": "ect_gated_c",
    "category": "RAM variable",
    "address": "0xFFFF6354",
    "declared": {
-    "claimed_name": "ect_raw_adc",
-    "claimed_desc": "69 refs. ECT raw ADC value or secondary ECT (float). Re",
-    "source": "ram_reference.txt:139"
+    "claimed_name": "ect_gated_c",
+    "claimed_desc": "69 refs. COOLANT TEMP degC, gated copy (float). CORRECTE",
+    "source": "ram_reference.txt:171"
    },
    "evidence": [
     {
@@ -8373,7 +8379,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "9 file(s): disassembly/analysis/diag_tasks_raw.txt, disassembly/analysis/disasm_3162C_annotated.txt, disassembly/analysis/disasm_3952C_annotated.txt ..."
+     "detail": "10 file(s): disassembly/analysis/ad258_wot_enrichment_trace.txt, disassembly/analysis/diag_tasks_raw.txt, disassembly/analysis/disasm_3162C_annotated.txt ..."
     }
    ],
    "flag": "VERIFIED-BOTH"
@@ -8386,7 +8392,7 @@
    "declared": {
     "claimed_name": "iat_current",
     "claimed_desc": "CORRECTED 2026-07-26: INTAKE AIR TEMPERATURE (float, degC raw; defs display (x*1.8)+32 degF), NOT ECT-at-start. 0x013A0C fmov.s @r2,fr15 -> 0x013A3A delay fmov fr15,fr4 -> desc 0x0AA974 axis 0xC0E24 \"Target Boost Compensation (IAT)_ / Intake Temperature\" (-20..40 C); second site 0x04042A -> desc 0x0ADC14 axis 0xD3248 \"Timing Compensation A (IAT) / Intake Temperature\". Zero coolant axes. float x48. corrections.md item 12.",
-    "source": "ram_reference.txt:146"
+    "source": "ram_reference.txt:178"
    },
    "evidence": [
     {
@@ -8412,7 +8418,7 @@
    "declared": {
     "claimed_name": "engine_load_current",
     "claimed_desc": "CORRECTED 2026-07-26: ENGINE LOAD (g/rev, float), NOT IAT. IAT is 0xFFFF6364 (see item 12; the item-9 claim that IAT was 0xFFFF69F0 is RETRACTED). See corrections.md items 9 + 12.",
-    "source": "ram_reference.txt:136"
+    "source": "ram_reference.txt:168"
    },
    "evidence": [
     {
@@ -8425,7 +8431,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "14 file(s): disassembly/analysis/cl_ol_state_machine.txt, disassembly/analysis/ignition_timing_raw.txt, disassembly/analysis/knock_flkc_analysis.txt ..."
+     "detail": "15 file(s): disassembly/analysis/cl_ol_state_machine.txt, disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/ignition_timing_raw.txt ..."
     }
    ],
    "flag": "VERIFIED-BOTH"
@@ -8438,7 +8444,7 @@
    "declared": {
     "claimed_name": "rpm_current",
     "claimed_desc": "301 refs. Current RPM (float). Read by frontO2, AFL, CL",
-    "source": "ram_reference.txt:127"
+    "source": "ram_reference.txt:159"
    },
    "evidence": [
     {
@@ -8451,7 +8457,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "25 file(s): disassembly/analysis/accel_enrichment_analysis.txt, disassembly/analysis/accel_enrichment_raw.txt, disassembly/analysis/avcs_raw.txt ..."
+     "detail": "26 file(s): disassembly/analysis/accel_enrichment_analysis.txt, disassembly/analysis/accel_enrichment_raw.txt, disassembly/analysis/avcs_raw.txt ..."
     }
    ],
    "flag": "VERIFIED-BOTH"
@@ -15957,7 +15963,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "4 file(s): disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt, disassembly/maps/disassembly.txt ..."
+     "detail": "5 file(s): disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt ..."
     }
    ],
    "flag": "VERIFIED-BOTH",
@@ -15997,7 +16003,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "5 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt ..."
+     "detail": "6 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/knock_flkc_analysis.txt ..."
     }
    ],
    "flag": "VERIFIED-BOTH",
@@ -16037,7 +16043,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "5 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt ..."
+     "detail": "6 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/knock_flkc_analysis.txt ..."
     }
    ],
    "notes": [
@@ -16080,7 +16086,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "3 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/knock_flkc_analysis.txt, disassembly/maps/disassembly.txt"
+     "detail": "4 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/knock_flkc_analysis.txt ..."
     }
    ],
    "flag": "VERIFIED-BOTH",
@@ -16124,7 +16130,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+     "detail": "2 file(s): disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/maps/cal_crossref.txt"
     }
    ],
    "flag": "VERIFIED-BOTH",
@@ -18480,7 +18486,7 @@
    "evidence": [
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "3 file(s): disassembly/analysis/startup_enrichment_analysis.txt, disassembly/maps/descriptor_map.txt, disassembly/maps/disassembly.txt"
+     "detail": "6 file(s): disassembly/analysis/ad258_wot_enrichment_trace.txt, disassembly/analysis/fueling_pipeline_analysis.txt, disassembly/analysis/startup_enrichment_analysis.txt ..."
     }
    ],
    "flag": "VERIFIED-BYTES",
@@ -27962,6 +27968,12 @@
     "max": 5.0,
     "raw_is_display": true
    },
+   "evidence": [
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/analysis/flkc_grid_interpolation_trace.txt"
+    }
+   ],
    "flag": "VERIFIED-BYTES",
    "geometry": {
     "cells": 4,
@@ -29594,7 +29606,7 @@
    "declared": {
     "claimed_name": "system_init_flags",
     "claimed_desc": "23 refs. System initialization flags.",
-    "source": "ram_reference.txt:172"
+    "source": "ram_reference.txt:204"
    },
    "evidence": [
     {
@@ -29612,7 +29624,7 @@
    "declared": {
     "claimed_name": "system_state_cluster_base",
     "claimed_desc": "System state cluster base (0xFFFF20A0-0xFFFF227C, 88 addresses).",
-    "source": "ram_reference.txt:310"
+    "source": "ram_reference.txt:342"
    },
    "evidence": [
     {
@@ -29630,7 +29642,7 @@
    "declared": {
     "claimed_name": "system_init_counter_A",
     "claimed_desc": "System initialization counter/timer A. OL charge workspace cluster.",
-    "source": "ram_reference.txt:290"
+    "source": "ram_reference.txt:322"
    },
    "evidence": [
     {
@@ -29652,7 +29664,7 @@
    "declared": {
     "claimed_name": "system_init_counter_B",
     "claimed_desc": "System initialization counter/timer B. Before system_state_var_C.",
-    "source": "ram_reference.txt:291"
+    "source": "ram_reference.txt:323"
    },
    "evidence": [
     {
@@ -29674,7 +29686,7 @@
    "declared": {
     "claimed_name": "system_state_var_C",
     "claimed_desc": "System state variable C. System state cluster.",
-    "source": "ram_reference.txt:255"
+    "source": "ram_reference.txt:287"
    },
    "evidence": [
     {
@@ -29696,7 +29708,7 @@
    "declared": {
     "claimed_name": "system_state_var_D",
     "claimed_desc": "System state variable D. Paired with system_state_var_C (+4).",
-    "source": "ram_reference.txt:292"
+    "source": "ram_reference.txt:324"
    },
    "evidence": [
     {
@@ -29718,7 +29730,7 @@
    "declared": {
     "claimed_name": "system_state_flags_A",
     "claimed_desc": "System state flags A. System state cluster 0xFFFF20A0-0xFFFF227C.",
-    "source": "ram_reference.txt:223"
+    "source": "ram_reference.txt:255"
    },
    "evidence": [
     {
@@ -29740,7 +29752,7 @@
    "declared": {
     "claimed_name": "system_init_flags_B",
     "claimed_desc": "System initialization flags B. System state cluster.",
-    "source": "ram_reference.txt:216"
+    "source": "ram_reference.txt:248"
    },
    "evidence": [
     {
@@ -29762,7 +29774,7 @@
    "declared": {
     "claimed_name": "system_config_timer_A",
     "claimed_desc": "System config/timer variable A. System state cluster.",
-    "source": "ram_reference.txt:206"
+    "source": "ram_reference.txt:238"
    },
    "evidence": [
     {
@@ -29784,7 +29796,7 @@
    "declared": {
     "claimed_name": "timer_config_block",
     "claimed_desc": "Timer configuration block (16 bytes). Injection timing",
-    "source": "ram_reference.txt:185"
+    "source": "ram_reference.txt:217"
    },
    "evidence": [
     {
@@ -29806,7 +29818,7 @@
    "declared": {
     "claimed_name": "evap_workspace_base",
     "claimed_desc": "EVAP diagnostic workspace base (floats + counters).",
-    "source": "ram_reference.txt:311"
+    "source": "ram_reference.txt:343"
    },
    "evidence": [
     {
@@ -29828,7 +29840,7 @@
    "declared": {
     "claimed_name": "desc_partial_copy",
     "claimed_desc": "Descriptor partial copy workspace (62 bytes, GBR base). Temp buffer for cal descriptor processing.",
-    "source": "ram_reference.txt:267"
+    "source": "ram_reference.txt:299"
    },
    "evidence": [
     {
@@ -29846,7 +29858,7 @@
    "declared": {
     "claimed_name": "system_tick_counter",
     "claimed_desc": "48 refs. System tick/event counter.",
-    "source": "ram_reference.txt:145"
+    "source": "ram_reference.txt:177"
    },
    "evidence": [
     {
@@ -29864,7 +29876,7 @@
    "declared": {
     "claimed_name": "system_state_descriptor",
     "claimed_desc": "System state descriptor variable. Descriptor region.",
-    "source": "ram_reference.txt:207"
+    "source": "ram_reference.txt:239"
    },
    "evidence": [
     {
@@ -29886,7 +29898,7 @@
    "declared": {
     "claimed_name": "system_state_timer_A",
     "claimed_desc": "System state timer counter A. Extended system_state region.",
-    "source": "ram_reference.txt:312"
+    "source": "ram_reference.txt:344"
    },
    "evidence": [
     {
@@ -29908,7 +29920,7 @@
    "declared": {
     "claimed_name": "system_state_timer_B",
     "claimed_desc": "System state timer counter B. Adjacent to timer_A (+8).",
-    "source": "ram_reference.txt:313"
+    "source": "ram_reference.txt:345"
    },
    "evidence": [
     {
@@ -29930,7 +29942,7 @@
    "declared": {
     "claimed_name": "desc_region_workspace_B",
     "claimed_desc": "Descriptor region workspace B (GBR base). Descriptor queue/mirror operations.",
-    "source": "ram_reference.txt:274"
+    "source": "ram_reference.txt:306"
    },
    "evidence": [
     {
@@ -29948,7 +29960,7 @@
    "declared": {
     "claimed_name": "desc_table_mirror",
     "claimed_desc": "Descriptor table clone workspace (222 bytes, GBR base). ROM 0x88Exx processing.",
-    "source": "ram_reference.txt:293"
+    "source": "ram_reference.txt:325"
    },
    "evidence": [
     {
@@ -29966,7 +29978,7 @@
    "declared": {
     "claimed_name": "afl_diagnostic_flag",
     "claimed_desc": "AFL state / diagnostic flag. Checked by fueling pipelin",
-    "source": "ram_reference.txt:200"
+    "source": "ram_reference.txt:232"
    },
    "evidence": [
     {
@@ -29988,7 +30000,7 @@
    "declared": {
     "claimed_name": "cal_mirrors_cluster_base",
     "claimed_desc": "Cal mirrors region start (0xFFFF341A-0xFFFF3612, 152 addresses).",
-    "source": "ram_reference.txt:314"
+    "source": "ram_reference.txt:346"
    },
    "evidence": [
     {
@@ -30010,7 +30022,7 @@
    "declared": {
     "claimed_name": "cal_mirror_state_flags",
     "claimed_desc": "Cal mirror state/control flags. Adjacent to cal_mirror_descriptor_ptr.",
-    "source": "ram_reference.txt:275"
+    "source": "ram_reference.txt:307"
    },
    "evidence": [
     {
@@ -30032,7 +30044,7 @@
    "declared": {
     "claimed_name": "cal_mirror_descriptor_ptr",
     "claimed_desc": "Cal mirror descriptor pointer. Cal mirror region 0xFFFF341A-0xFFFF3612.",
-    "source": "ram_reference.txt:224"
+    "source": "ram_reference.txt:256"
    },
    "evidence": [
     {
@@ -30054,7 +30066,7 @@
    "declared": {
     "claimed_name": "cal_mirror_queue_index",
     "claimed_desc": "Cal mirror descriptor queue index. Cal mirror pipeline management.",
-    "source": "ram_reference.txt:276"
+    "source": "ram_reference.txt:308"
    },
    "evidence": [
     {
@@ -30076,7 +30088,7 @@
    "declared": {
     "claimed_name": "dtc_idle_enable_cond",
     "claimed_desc": "DTC idle control enable condition flag (byte). Cal mirror for P0506-P050A diagnostic preconditions.",
-    "source": "ram_reference.txt:259"
+    "source": "ram_reference.txt:291"
    },
    "evidence": [
     {
@@ -30098,7 +30110,7 @@
    "declared": {
     "claimed_name": "cal_mirror_base",
     "claimed_desc": "45 refs. Calibration mirror base. Referenced by various",
-    "source": "ram_reference.txt:148"
+    "source": "ram_reference.txt:180"
    },
    "evidence": [
     {
@@ -30120,7 +30132,7 @@
    "declared": {
     "claimed_name": "cal_mirror_data",
     "claimed_desc": "Calibration mirror data area",
-    "source": "ram_reference.txt:175"
+    "source": "ram_reference.txt:207"
    },
    "evidence": [
     {
@@ -30142,7 +30154,7 @@
    "declared": {
     "claimed_name": "cal_mirror_lookup",
     "claimed_desc": "Cal mirror lookup workspace (GBR base). 26 fields, 40 accesses.",
-    "source": "ram_reference.txt:277"
+    "source": "ram_reference.txt:309"
    },
    "evidence": [
     {
@@ -30164,7 +30176,7 @@
    "declared": {
     "claimed_name": "cal_mirror_cache_A",
     "claimed_desc": "Calibration mirror workspace/cache A. Cal mirrors region.",
-    "source": "ram_reference.txt:315"
+    "source": "ram_reference.txt:347"
    },
    "evidence": [
     {
@@ -30186,7 +30198,7 @@
    "declared": {
     "claimed_name": "cal_mirror_timer",
     "claimed_desc": "Calibration mirror timer/counter",
-    "source": "ram_reference.txt:192"
+    "source": "ram_reference.txt:224"
    },
    "evidence": [
     {
@@ -30208,7 +30220,7 @@
    "declared": {
     "claimed_name": "cal_mirror_cache_B",
     "claimed_desc": "Calibration mirror workspace/cache B. Cal mirrors region.",
-    "source": "ram_reference.txt:316"
+    "source": "ram_reference.txt:348"
    },
    "evidence": [
     {
@@ -30230,7 +30242,7 @@
    "declared": {
     "claimed_name": "io_inj_driver_ctrl",
     "claimed_desc": "InternalIO injection driver control register (31 refs).",
-    "source": "ram_reference.txt:151"
+    "source": "ram_reference.txt:183"
    },
    "evidence": [
     {
@@ -30252,7 +30264,7 @@
    "declared": {
     "claimed_name": "io_output_packed",
     "claimed_desc": "I/O output register packed status (word). Timing/output values.",
-    "source": "ram_reference.txt:317"
+    "source": "ram_reference.txt:349"
    },
    "evidence": [
     {
@@ -30274,7 +30286,7 @@
    "declared": {
     "claimed_name": "timer_counter_C",
     "claimed_desc": "25 refs. Timer/counter C.",
-    "source": "ram_reference.txt:168"
+    "source": "ram_reference.txt:200"
    },
    "evidence": [
     {
@@ -30296,7 +30308,7 @@
    "declared": {
     "claimed_name": "timer_counter_B",
     "claimed_desc": "25 refs. Timer/counter B.",
-    "source": "ram_reference.txt:169"
+    "source": "ram_reference.txt:201"
    },
    "evidence": [
     {
@@ -30318,7 +30330,7 @@
    "declared": {
     "claimed_name": "cal_output_buffer",
     "claimed_desc": "Cal output buffer (GBR base). 22 fields, single caller 0x5B16C.",
-    "source": "ram_reference.txt:278"
+    "source": "ram_reference.txt:310"
    },
    "evidence": [
     {
@@ -30340,7 +30352,7 @@
    "declared": {
     "claimed_name": "cal_mirror_state",
     "claimed_desc": "Calibration mirror state variable",
-    "source": "ram_reference.txt:208"
+    "source": "ram_reference.txt:240"
    },
    "evidence": [
     {
@@ -30362,7 +30374,7 @@
    "declared": {
     "claimed_name": "cal_descriptor_queue",
     "claimed_desc": "Cal descriptor queue workspace (GBR base). 39 fields, 129 accesses.",
-    "source": "ram_reference.txt:294"
+    "source": "ram_reference.txt:326"
    },
    "evidence": [
     {
@@ -30380,7 +30392,7 @@
    "declared": {
     "claimed_name": "io_ign_driver_ctrl",
     "claimed_desc": "InternalIO ignition driver control register (31 refs).",
-    "source": "ram_reference.txt:138"
+    "source": "ram_reference.txt:170"
    },
    "evidence": [
     {
@@ -30398,7 +30410,7 @@
    "declared": {
     "claimed_name": "dtc_maturation_timer",
     "claimed_desc": "118 refs. DTC maturation timer/counter. Read primarily",
-    "source": "ram_reference.txt:130"
+    "source": "ram_reference.txt:162"
    },
    "evidence": [
     {
@@ -30416,7 +30428,7 @@
    "declared": {
     "claimed_name": "diag_indexed_lookup_table",
     "claimed_desc": "Diagnostic indexed lookup table. Accessed at FFFF3B06 +",
-    "source": "ram_reference.txt:134"
+    "source": "ram_reference.txt:166"
    },
    "evidence": [
     {
@@ -30434,7 +30446,7 @@
    "declared": {
     "claimed_name": "cal_mirror_state_base",
     "claimed_desc": "Cal mirror state/control base. Precedes cal_mirror_timer_workspace.",
-    "source": "ram_reference.txt:295"
+    "source": "ram_reference.txt:327"
    },
    "evidence": [
     {
@@ -30456,7 +30468,7 @@
    "declared": {
     "claimed_name": "cal_mirror_timer_workspace",
     "claimed_desc": "Cal mirror timer workspace. Cal mirror timer region.",
-    "source": "ram_reference.txt:239"
+    "source": "ram_reference.txt:271"
    },
    "evidence": [
     {
@@ -30478,7 +30490,7 @@
    "declared": {
     "claimed_name": "cal_mirror_sync_timer_A",
     "claimed_desc": "Cal mirror sync timer A. Near cal_mirror_timer_workspace (+8).",
-    "source": "ram_reference.txt:318"
+    "source": "ram_reference.txt:350"
    },
    "evidence": [
     {
@@ -30496,7 +30508,7 @@
    "declared": {
     "claimed_name": "knock_status_shadow",
     "claimed_desc": "Knock status shadow/mirror (copy from 0xFFFF81AC). Knock detector.",
-    "source": "ram_reference.txt:319"
+    "source": "ram_reference.txt:351"
    },
    "evidence": [
     {
@@ -30514,7 +30526,7 @@
    "declared": {
     "claimed_name": "cal_descriptor_ptr_ws",
     "claimed_desc": "Calibration descriptor pointer workspace. Links to ROM tables.",
-    "source": "ram_reference.txt:320"
+    "source": "ram_reference.txt:352"
    },
    "evidence": [
     {
@@ -30536,7 +30548,7 @@
    "declared": {
     "claimed_name": "ATU_primary_ctrl",
     "claimed_desc": "ATU primary control register. 36 code refs \u2014 master inj",
-    "source": "ram_reference.txt:142"
+    "source": "ram_reference.txt:174"
    },
    "evidence": [
     {
@@ -30558,7 +30570,7 @@
    "declared": {
     "claimed_name": "maf_sensor_adc_counts",
     "claimed_desc": "NEW 2026-07-27: MAF SENSOR RAW ADC COUNTS (uint16, 0..65535 = 0..5 V). Head of the airflow pipeline. 0x004A2E mov.l @(0x004A7C),r4 (=0xFFFF4042) ; 0x004A32 mov.w @r4,r4 ; 0x004A3A lds r4,fpul ; 0x004A3E float fpul,fr3 ; 0x004A44 fmul fr2,fr4 with FR2 = *(0x004A80) = 7.629394531e-05 = 5.0/65536 => VOLTS. Also the source of SSM PID 0x1D (MAF sensor voltage, logcfg x/50) via getter 0x05D454, which reads it as mov.w @(30,r6) off r6=0xFFFF4024. NOTE: the MAF VOLTAGE itself is never stored to RAM -- it lives only in FR4 across 0x004A44. corrections.md item 29.",
-    "source": "ram_reference.txt:344"
+    "source": "ram_reference.txt:376"
    },
    "evidence": [
     {
@@ -30580,7 +30592,7 @@
    "declared": {
     "claimed_name": "knock_cylinder_count",
     "claimed_desc": "Cylinder count dispatch byte for knock ADC Group 1 read",
-    "source": "ram_reference.txt:296"
+    "source": "ram_reference.txt:328"
    },
    "evidence": [
     {
@@ -30602,7 +30614,7 @@
    "declared": {
     "claimed_name": "maf_instantaneous_gps",
     "claimed_desc": "NEW 2026-07-27: INSTANTANEOUS MASS AIRFLOW (float, g/s) -- the raw output of the MAF transfer function, before averaging and before the charge-temperature compensation. 0x004A42 jsr 0x0BE830 with r4 = 0x0AF45C = descriptor count 54 / axis 0xD8BC4 / data 0xD8C9C, which is exactly the definition 'MAF Sensor Scaling' (54 g/s values) over axis 'MAF sensor' (54 volts, 0.898..5.0); result stored 0x004A46 mov.l @(0x004A8C),r2 (=0xFFFF40B4) ; 0x004A4C fmov.s fr0,@r2. Copied on to the sample shift register at 0x0203E0 (-> 0xFFFF63B4). corrections.md item 29.",
-    "source": "ram_reference.txt:345"
+    "source": "ram_reference.txt:377"
    },
    "evidence": [
     {
@@ -30624,7 +30636,7 @@
    "declared": {
     "claimed_name": "cam_angle_sensor",
     "claimed_desc": "Actual cam position from CMP/CKP (float, degrees).",
-    "source": "ram_reference.txt:193"
+    "source": "ram_reference.txt:225"
    },
    "evidence": [
     {
@@ -30650,7 +30662,7 @@
    "declared": {
     "claimed_name": "front_o2_sensor_ma",
     "claimed_desc": "CORRECTED 2026-07-27: FRONT OXYGEN / AF SENSOR CURRENT (float, mA), NOT an ATU output control register. Duplicated here from the alphabetical index because that index's rows put the NAME first and are therefore invisible to coverage_map.parse_ram_reference(). Proof 1: the whole function 0x058902 does only this -- 0x058904 mov.l @(0x058A34),r2 (=0xFFFF40E0) ; 0x058906 fmov.s @r2,fr4 ; 0x058908 mov.l @(0x058A38),r4 (=0x0AF468) ; 0x05890C jsr 0x0BE830, with no branch and no call between that fmov.s and the jsr. Descriptor 0x0AF468 = count 13 / axis 0xD8D74 / data 0xD8DA8 = the definition 'Front Oxygen Sensor Scaling' (13 elements) over axis 'Front Oxygen Sensor' in mA (-1.3..0.74). Proof 2: SSM getter-table entry 0x42 at 0x05D726 reads this address with FR6=-16.0 and FR5=0.125, so the transported byte is (value+16)/0.125 and value = (raw-128)*0.125 in [-16,+15.875] -- a signed bipolar current in the same units as the axis. corrections.md item 31.",
-    "source": "ram_reference.txt:352"
+    "source": "ram_reference.txt:384"
    },
    "evidence": [
     {
@@ -30676,7 +30688,7 @@
    "declared": {
     "claimed_name": "battery_voltage",
     "claimed_desc": "CORRECTED 2026-07-26: BATTERY VOLTAGE (float, volts), NOT atmospheric/baro. Feeds axis 0xD104C \"Injector Latency_ / Battery Output\" (6.5..16.5 V) as FR4 at 0x0303C8, and axis 0xD91CC \"Ignition Dwell / Battery Volts\" (8..16 V) as FR5 at 0x00894E. All 8 axes it feeds span 6..20. float x77, 0 int. corrections.md item 10.",
-    "source": "ram_reference.txt:137"
+    "source": "ram_reference.txt:169"
    },
    "evidence": [
     {
@@ -30702,7 +30714,7 @@
    "declared": {
     "claimed_name": "ect_output_fmac",
     "claimed_desc": "ECT output (degrees C, float). ADC pipeline ADDR29 -> FMAC call_08.",
-    "source": "ram_reference.txt:186"
+    "source": "ram_reference.txt:218"
    },
    "evidence": [
     {
@@ -30711,7 +30723,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "4 file(s): disassembly/analysis/adc_pipeline_trace.txt, disassembly/analysis/percyl_injection_output_analysis.txt, disassembly/maps/ram_map_raw.txt ..."
+     "detail": "5 file(s): disassembly/analysis/ad258_wot_enrichment_trace.txt, disassembly/analysis/adc_pipeline_trace.txt, disassembly/analysis/percyl_injection_output_analysis.txt ..."
     }
    ],
    "flag": "DISASM-ONLY"
@@ -30724,7 +30736,7 @@
    "declared": {
     "claimed_name": "rpm_from_tooth_period",
     "claimed_desc": "NEW 2026-07-27: ENGINE SPEED (float, RPM) computed directly from the crank tooth period; this is the source the settled rpm_current is copied from. Producer: 0x007B9E lds r2,fpul ; 0x007BA2 float fpul,fr3 (r2 = accumulated period) ; 0x007BA4 fmov.s @r0,fr2 with *(0x007C04) = 1.2e8 ; 0x007BA6 fdiv fr3,fr2 (= 1.2e8 / period, i.e. a FREQUENCY) ; 0x007BAA mov.l @(0x007C08),r3 (=0xFFFF4150) ; 0x007BAC fmov.s fr2,@r3. Consumer, decisive: 0x0232B4 mov.l @(0x023508),r2 (=0xFFFF4150) ; 0x0232B6 fmov.s @r2,fr8 ; 0x0232B8 mov.l @(0x02350C),r12 (=0xFFFF6648) ; 0x0232BA mov #-36,r0 ; 0x0232BC fmov.s fr8,@(r0,r12) -- 0xFFFF6648-36 = 0xFFFF6624, the SETTLED rpm_current, is a straight copy of this address. Third line: it is the FR4/axis0 input of descriptor 0x0AF4B0 whose axis 0xD918C is 'Ignition Dwell / Engine Speed' (500..8000), the same call whose FR5/axis1 is the settled battery voltage 0xFFFF4130. corrections.md item 32.",
-    "source": "ram_reference.txt:349"
+    "source": "ram_reference.txt:381"
    },
    "evidence": [
     {
@@ -30750,7 +30762,7 @@
    "declared": {
     "claimed_name": "flag_4254",
     "claimed_desc": "CORRECTED 2026-07-26: BYTE boolean in the 0xFFFF4235-0xFFFF425F injection/O2 sequencing flag cluster, NOT a lambda value and NOT an FP value. int8 x9, 0 FP accesses; only ever written the literals 0 (0x0089EC) and 1 (0x008D9A). No FP access anywhere in that address run. Meaning of the flag is UNRESOLVED. corrections.md item 20.",
-    "source": "ram_reference.txt:260"
+    "source": "ram_reference.txt:292"
    },
    "evidence": [
     {
@@ -30772,7 +30784,7 @@
    "declared": {
     "claimed_name": "injection_state_flag",
     "claimed_desc": "Injection channel enable/disable state flag (byte). Checked by injection_state_machine at 0x9106.",
-    "source": "ram_reference.txt:268"
+    "source": "ram_reference.txt:300"
    },
    "evidence": [
     {
@@ -30794,7 +30806,7 @@
    "declared": {
     "claimed_name": "sensor_misc_state",
     "claimed_desc": "25 refs. Misc sensor state.",
-    "source": "ram_reference.txt:170"
+    "source": "ram_reference.txt:202"
    },
    "evidence": [
     {
@@ -30816,7 +30828,7 @@
    "declared": {
     "claimed_name": "maf_timer_counter",
     "claimed_desc": "MAF/intake sensor timer counter (byte). Task9 80ms prescaler reload via 0xCBAC.",
-    "source": "ram_reference.txt:269"
+    "source": "ram_reference.txt:301"
    },
    "evidence": [
     {
@@ -30838,7 +30850,7 @@
    "declared": {
     "claimed_name": "atu_timer_period",
     "claimed_desc": "ATU timer period/register (word). ATU hardware setup.",
-    "source": "ram_reference.txt:321"
+    "source": "ram_reference.txt:353"
    },
    "evidence": [
     {
@@ -30860,7 +30872,7 @@
    "declared": {
     "claimed_name": "engine_condition_flags",
     "claimed_desc": "Engine condition flags byte. Read by task10, task30, task38. Called \"condition_flags\" in ignition analysis.",
-    "source": "ram_reference.txt:228"
+    "source": "ram_reference.txt:260"
    },
    "evidence": [
     {
@@ -30882,7 +30894,7 @@
    "declared": {
     "claimed_name": "clutch_state",
     "claimed_desc": "33 refs. Clutch engagement state (task50 map switching). Was peripheral_status.",
-    "source": "ram_reference.txt:158"
+    "source": "ram_reference.txt:190"
    },
    "evidence": [
     {
@@ -30904,7 +30916,7 @@
    "declared": {
     "claimed_name": "sensor_peripheral_status",
     "claimed_desc": "Sensor peripheral status byte. Near peripheral_control_GBR.",
-    "source": "ram_reference.txt:297"
+    "source": "ram_reference.txt:329"
    },
    "evidence": [
     {
@@ -30926,7 +30938,7 @@
    "declared": {
     "claimed_name": "peripheral_control_GBR",
     "claimed_desc": "15 refs. Peripheral control GBR base (3 uses).",
-    "source": "ram_reference.txt:225"
+    "source": "ram_reference.txt:257"
    },
    "evidence": [
     {
@@ -30948,7 +30960,7 @@
    "declared": {
     "claimed_name": "boost_error",
     "claimed_desc": "NEW 2026-07-26: BOOST ERROR (target - actual), the Turbo Dynamics input (float; toexpr x*.01933677 => psi; axes -240..+240 raw = -4.64..+4.64 psi). Struct field, no pool literal: 0x013BA8 r5=0xFFFF5D18 ; 0x013BAE mov #-120,r0 (SIGN-EXTENDED) ; 0x013BB0 fmov.s @(r0,r5),fr14 => 0xFFFF5CA0. FR14 unmodified through 0x013C02/0x013C32/0x013C7C, each with delay fmov fr14,fr4 -> axes 0xC0D04/0xC0D3C/0xC0D74, 3 of 3 named \"Boost Error\". corrections.md item 22.",
-    "source": "ram_reference.txt:333"
+    "source": "ram_reference.txt:365"
    },
    "evidence": [
     {
@@ -30966,7 +30978,7 @@
    "declared": {
     "claimed_name": "ssm_output_workspace",
     "claimed_desc": "SSM diagnostic output workspace struct. Written by ssm_",
-    "source": "ram_reference.txt:176"
+    "source": "ram_reference.txt:208"
    },
    "evidence": [
     {
@@ -30984,7 +30996,7 @@
    "declared": {
     "claimed_name": "cl_ol_gate_flag",
     "claimed_desc": "CL/OL gate flag byte. Referenced in cl_ol_state_machine and clol_gap_closure.",
-    "source": "ram_reference.txt:247"
+    "source": "ram_reference.txt:279"
    },
    "evidence": [
     {
@@ -31006,7 +31018,7 @@
    "declared": {
     "claimed_name": "sensor_data_misc",
     "claimed_desc": "Sensor data miscellaneous",
-    "source": "ram_reference.txt:201"
+    "source": "ram_reference.txt:233"
    },
    "evidence": [
     {
@@ -31028,7 +31040,7 @@
    "declared": {
     "claimed_name": "sensor_burst_buf_0",
     "claimed_desc": "Sensor data burst buffer byte 0. Consecutive 6-byte buffer.",
-    "source": "ram_reference.txt:322"
+    "source": "ram_reference.txt:354"
    },
    "evidence": [
     {
@@ -31050,7 +31062,7 @@
    "declared": {
     "claimed_name": "sensor_burst_buf_1",
     "claimed_desc": "Sensor data burst buffer byte 1.",
-    "source": "ram_reference.txt:323"
+    "source": "ram_reference.txt:355"
    },
    "evidence": [
     {
@@ -31072,7 +31084,7 @@
    "declared": {
     "claimed_name": "sensor_burst_buf_3",
     "claimed_desc": "Sensor data burst buffer byte 3.",
-    "source": "ram_reference.txt:324"
+    "source": "ram_reference.txt:356"
    },
    "evidence": [
     {
@@ -31094,7 +31106,7 @@
    "declared": {
     "claimed_name": "sensor_burst_buf_4",
     "claimed_desc": "Sensor data burst buffer byte 4.",
-    "source": "ram_reference.txt:325"
+    "source": "ram_reference.txt:357"
    },
    "evidence": [
     {
@@ -31116,7 +31128,7 @@
    "declared": {
     "claimed_name": "sensor_burst_buf_5",
     "claimed_desc": "Sensor data burst buffer byte 5.",
-    "source": "ram_reference.txt:326"
+    "source": "ram_reference.txt:358"
    },
    "evidence": [
     {
@@ -31138,7 +31150,7 @@
    "declared": {
     "claimed_name": "sensor_io_state_secondary",
     "claimed_desc": "Sensor I/O state secondary. Near io_state_register (0xFFFF5FFC).",
-    "source": "ram_reference.txt:217"
+    "source": "ram_reference.txt:249"
    },
    "evidence": [
     {
@@ -31160,7 +31172,7 @@
    "declared": {
     "claimed_name": "io_peripheral_workspace",
     "claimed_desc": "I/O peripheral workspace (56 bytes, GBR base, 18 fields). Sensor I/O operations.",
-    "source": "ram_reference.txt:279"
+    "source": "ram_reference.txt:311"
    },
    "evidence": [
     {
@@ -31182,7 +31194,7 @@
    "declared": {
     "claimed_name": "io_state_register",
     "claimed_desc": "UNRESOLVED 2026-07-27: the io_state_register NAME is refuted and no replacement is derivable. It is a struct base loaded into GBR (0x018DDA mov.l @(0x019008),r0 ; 0x018DDC ldc r0,gbr) AND a float read 26 times, feeding 15 numeric lookup axes spanning 0..250 across 5 functions -- an I/O state register is not read as a float and used as a table index. ALL 15 axes (0xC2408/C242C/C24AC/C24F8/C2510/C25A4/C2614/C2764/C277C/C2794/C27AC/C2CC8/C2D24/C2F88) are UNNAMED in both definition XMLs, so the axis-name method has nothing to vote with. What would settle it: name any one of those axes. corrections.md item 35.",
-    "source": "ram_reference.txt:173"
+    "source": "ram_reference.txt:205"
    },
    "evidence": [
     {
@@ -31208,7 +31220,7 @@
    "declared": {
     "claimed_name": "adc_conditioning_ws_A",
     "claimed_desc": "ADC conditioning workspace A (GBR base). Near adc_channel_status.",
-    "source": "ram_reference.txt:298"
+    "source": "ram_reference.txt:330"
    },
    "evidence": [
     {
@@ -31230,7 +31242,7 @@
    "declared": {
     "claimed_name": "adc_conditioning_ws_B",
     "claimed_desc": "ADC conditioning workspace B (GBR base). Near adc_channel_status.",
-    "source": "ram_reference.txt:299"
+    "source": "ram_reference.txt:331"
    },
    "evidence": [
     {
@@ -31252,7 +31264,7 @@
    "declared": {
     "claimed_name": "adc_channel_status",
     "claimed_desc": "36 refs. ADC channel status/index (byte). GBR base (4 u",
-    "source": "ram_reference.txt:154"
+    "source": "ram_reference.txt:186"
    },
    "evidence": [
     {
@@ -31274,7 +31286,7 @@
    "declared": {
     "claimed_name": "adc_processed_alt",
     "claimed_desc": "ADC processed alternate channel",
-    "source": "ram_reference.txt:209"
+    "source": "ram_reference.txt:241"
    },
    "evidence": [
     {
@@ -31292,7 +31304,7 @@
    "declared": {
     "claimed_name": "diag_monitor_status_bytes",
     "claimed_desc": "CORRECTED 2026-07-26: BYTE array of diag monitor status. 26 int8 accesses, zero FP accesses. NOT speed. (Wording changed 2026-07-26: the old text said Z-E-R-O f-l-o-a-t and coverage_map.py's contradiction scan matched that word inside the correction itself, flagging a false CONFLICT. corrections.md item 21.)",
-    "source": "ram_reference.txt:143"
+    "source": "ram_reference.txt:175"
    },
    "evidence": [
     {
@@ -31314,7 +31326,7 @@
    "declared": {
     "claimed_name": "adc_processed_extra",
     "claimed_desc": "ADC processed extra channel (float). Near airflow_maf_current.",
-    "source": "ram_reference.txt:248"
+    "source": "ram_reference.txt:280"
    },
    "evidence": [
     {
@@ -31336,7 +31348,7 @@
    "declared": {
     "claimed_name": "manifold_pressure_map",
     "claimed_desc": "CORRECTED 2026-07-26: MANIFOLD PRESSURE, not MAF airflow. Feeds axis 0xCC840 \"Manifold Pressure\".",
-    "source": "ram_reference.txt:149"
+    "source": "ram_reference.txt:181"
    },
    "evidence": [
     {
@@ -31362,7 +31374,7 @@
    "declared": {
     "claimed_name": "maf_voltage",
     "claimed_desc": "UNRESOLVED 2026-07-27: the maf_voltage NAME is refuted; replacement unknown. The real MAF voltage is 0xFFFF4042 (uint16 ADC counts) x 5/65536, and it is NEVER stored to RAM -- it exists only in FR4 across 0x004A44 before the 'MAF Sensor Scaling' lookup. 0xFFFF6228 is written from a DIFFERENT source with a DIFFERENT scale: it is its own GBR base (0x01D8FC mov.l @(0x01D9D8),r0 ; 0x01D8FE ldc r0,gbr), and 0x01D94C mov.w @(30,gbr),r0 (=> uint16 at 0xFFFF6246) ; 0x01D954 jsr 0x0BE598 ; 0x01D956 fmov.s @r0,fr4 with *(0x01D990) = 0.0305176 ; 0x01D95A fmov.s fr0,@r2 => value = counts * 0.0305176, not counts * 5/65536. Second writer 0x01D6F0/0x01D6FA, same constant. It feeds ZERO lookup axes, so the axis-name method cannot help. corrections.md item 35.",
-    "source": "ram_reference.txt:177"
+    "source": "ram_reference.txt:209"
    },
    "evidence": [
     {
@@ -31384,7 +31396,7 @@
    "declared": {
     "claimed_name": "flag_6254",
     "claimed_desc": "CORRECTED 2026-07-26: BYTE boolean at +4 in the 0xFFFF6250 block, NOT mass airflow and NOT an FP value. int8 x51, 0 FP accesses. Set to 1 with its siblings +2/+3/+5/+9 in one run at 0x01DA9C-0x01DAA4; consumed as cmp/eq #1 (0x01D5A8, 0x025148). The real MAF variable is UNIDENTIFIED -- no axis in either XML is named MAF/airflow, so the axis-name method cannot locate it. corrections.md item 17.",
-    "source": "ram_reference.txt:144"
+    "source": "ram_reference.txt:176"
    },
    "evidence": [
     {
@@ -31406,7 +31418,7 @@
    "declared": {
     "claimed_name": "throttle_plate_angle",
     "claimed_desc": "CORRECTED 2026-07-26: THROTTLE PLATE OPENING ANGLE (float; defs toexpr x/.84 => %), NOT fuel rate and NOT engine load. 0x036096 fmov.s @r2,fr4 (FR4 untouched on the path to the call) -> 0x0360C4 jsr 0x0BE830, desc 0x0AC5D0 axis 0xCCD88 \"Minimum Primary Open Loop Enrichment (Throttle) / Throttle Plate Opening Angle\" (10.93..89.06). float x18. corrections.md item 13.",
-    "source": "ram_reference.txt:187"
+    "source": "ram_reference.txt:219"
    },
    "evidence": [
     {
@@ -31432,7 +31444,7 @@
    "declared": {
     "claimed_name": "throttle_angle_change",
     "claimed_desc": "NEW 2026-07-26: THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger (float, %, axis 0..31.3). 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) -> 0x03A9D0 jsr 0x0BE830, desc 0x0AD368 axis 0xCED08 \"Throttle Tip-in Enrichment A / Throttle Angle Change\". float x3. corrections.md item 22.",
-    "source": "ram_reference.txt:334"
+    "source": "ram_reference.txt:366"
    },
    "evidence": [
     {
@@ -31458,7 +31470,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "torque_ratio                         Requested torque ratio (task50 map switching).",
-    "source": "ram_reference.txt:885"
+    "source": "ram_reference.txt:917"
    },
    "evidence": [
     {
@@ -31484,7 +31496,7 @@
    "declared": {
     "claimed_name": "adc_processed_temperature_B",
     "claimed_desc": "ADC processed temperature B (float). ECT/IAT sensor region.",
-    "source": "ram_reference.txt:218"
+    "source": "ram_reference.txt:250"
    },
    "evidence": [
     {
@@ -31506,7 +31518,7 @@
    "declared": {
     "claimed_name": "maf_sample_prev",
     "claimed_desc": "NEW 2026-07-27: previous MAF sample (float, g/s), slot 1 of the 2-entry shift register feeding 0xFFFF63C0. Written 0x01FF04 fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-120. corrections.md item 29.",
-    "source": "ram_reference.txt:347"
+    "source": "ram_reference.txt:379"
    },
    "evidence": [
     {
@@ -31524,7 +31536,7 @@
    "declared": {
     "claimed_name": "maf_sample_curr",
     "claimed_desc": "NEW 2026-07-27: current MAF sample (float, g/s), slot 2 of the shift register feeding 0xFFFF63C0. Written 0x01FF0C fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-116, sourced from 0xFFFF6424 which is loaded from 0xFFFF63B4. corrections.md item 29.",
-    "source": "ram_reference.txt:348"
+    "source": "ram_reference.txt:380"
    },
    "evidence": [
     {
@@ -31542,7 +31554,7 @@
    "declared": {
     "claimed_name": "maf_uncompensated_gps",
     "claimed_desc": "NEW 2026-07-27: MASS AIRFLOW, 2-sample average, BEFORE the charge-temperature compensation (float, g/s). 0x01FF20 r1=0xFFFF6430 ; 0x01FF24 fmov.s @(r0,r1),fr8 (r0=-120 => 0xFFFF63B8) ; 0x01FF28 fmov.s @(r0,r1),fr9 (r0=-116 => 0xFFFF63BC) ; 0x01FF2A fadd fr9,fr8 ; 0x01FF30 fmul fr4,fr8 with FR4 = *(0x020090) = 0.5 ; 0x01FF34 fmov.s fr8,@(r0,r1) (r0=-112) => *(0xFFFF63C0) = 0.5*(63B8+63BC). It is then fed straight back out as the axis-1 input: 0x01FF3A fmov.s @(r0,r1),fr5 ; 0x01FF3E jsr 0x0BE8E4 with r4 = 0x0AAFE8 = counts 5x8, axis1 0xC3B90, whose definition name ends '/ Mass Airflow' (1.6..290 g/s). The computed-address form is why a literal-pool trace cannot see it. corrections.md items 28 + 29.",
-    "source": "ram_reference.txt:346"
+    "source": "ram_reference.txt:378"
    },
    "evidence": [
     {
@@ -31560,7 +31572,7 @@
    "declared": {
     "claimed_name": "mass_airflow_gps",
     "claimed_desc": "CORRECTED 2026-07-27: MASS AIRFLOW (float, g/s) -- THE MAF variable, not ect_compensation. Two independent non-axis proofs. (1) SSM: the stock getter table at 0x06423C entry 0x13/0x14 (Mass Airflow, logcfg x/100) is 0x05D3AC, which does 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; 0x05D3B8 jsr 0x0BE5D8 with fr6=0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)) => SSM raw = value*100 => value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l @(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched to 0x034D8E, compared against 0xCC074/78/7C = the definition-named table 'A/F Learning #1 Airflow Ranges' (scaling MassAirflow(g/s), 5.6/10/50). (3) PRODUCER: 0x01FF66 fmov.s fr0,@(r0,r1) with r1=0xFFFF6430 r0=-108 writes it as min(MAF*IATcomp, 'MAF Limit (Maximum)' 0xC3100=300 g/s) via 0x0BE970. (4) LOG: logs/7-26 20.19b MAF spans 2.40..296.24 g/s; widest axis 0..300. The 'Intake/Exhaust VVT Error' axis names at 0xCF9EC/0xD11D0 are DEFINITION-SIDE ERRORS -- 0x031DD2 loads FR14 from here once and feeds it unchanged to both. corrections.md item 28.",
-    "source": "ram_reference.txt:150"
+    "source": "ram_reference.txt:182"
    },
    "evidence": [
     {
@@ -31586,7 +31598,7 @@
    "declared": {
     "claimed_name": "maf_smoothed_gps",
     "claimed_desc": "CORRECTED 2026-07-27: SMOOTHED MASS AIRFLOW (float, g/s). The previous name asserted a temperature; that is refuted. Derived from bytes, not from an axis name: 0x020472 r14=0xFFFF63D8 ; 0x020476 mov #-20,r0 -> FR14 = *(0xFFFF63C4) (MAF) ; 0x020482 fmov fr14,fr4 ; 0x02048C fr6 = cal 0xC3108 = 0.5 ; 0x020490 jsr 0x0BEA40 with delay 0x020492 fmov.s @(r0,r14),fr5 (r0=-12 => *(0xFFFF63CC)) ; 0x020496 fmov.s fr0,@(r0,r14) stores back to 0xFFFF63CC. 0x0BEA40 is a first-order lag filter (fldi1/fsub alpha, fmac, |delta| deadband vs FR7, NaN reset). So 63CC = lag(MAF, alpha=0.5). Independently confirms the corrections.md item 26 binding of axis 0xD9280 'Smoothed MAF' (20/26/32/44 g/s). ram_ECT is refuted. corrections.md item 30.",
-    "source": "ram_reference.txt:219"
+    "source": "ram_reference.txt:251"
    },
    "evidence": [
     {
@@ -31612,7 +31624,7 @@
    "declared": {
     "claimed_name": "adc_processed_secondary",
     "claimed_desc": "ADC processed secondary sensor value",
-    "source": "ram_reference.txt:194"
+    "source": "ram_reference.txt:226"
    },
    "evidence": [
     {
@@ -31630,7 +31642,7 @@
    "declared": {
     "claimed_name": "accel_pedal_angle",
     "claimed_desc": "CORRECTED 2026-07-26: ACCELERATOR PEDAL ANGLE (float, %, 0..100) -- DBW pedal position (APP), not throttle plate. 0x03609A fmov.s @r2,fr15 -> 0x0360D0 delay fmov fr15,fr4 -> desc 0x0AC5E4 axis 0xCCDA8 \"Minimum Primary Open Loop Enrichment (Accelerator) / Accelerator Pedal Angle\". Fed in the same block, adjacent to the 0xFFFF62DC (Throttle) call. float x27. corrections.md item 13.",
-    "source": "ram_reference.txt:166"
+    "source": "ram_reference.txt:198"
    },
    "evidence": [
     {
@@ -31656,7 +31668,7 @@
    "declared": {
     "claimed_name": "o2_sensor_voltage",
     "claimed_desc": "19 refs. O2 sensor voltage or lambda value.",
-    "source": "ram_reference.txt:195"
+    "source": "ram_reference.txt:227"
    },
    "evidence": [
     {
@@ -31678,7 +31690,7 @@
    "declared": {
     "claimed_name": "o2_sensor_conditioned",
     "claimed_desc": "Conditioned O2 sensor value (float). Rate-limited \u00b10.02/cycle. AFC PI error input.",
-    "source": "ram_reference.txt:240"
+    "source": "ram_reference.txt:272"
    },
    "evidence": [
     {
@@ -31700,7 +31712,7 @@
    "declared": {
     "claimed_name": "adc_processed_temp",
     "claimed_desc": "ADC processed intermediate sensor value (float). Pipeline temp between raw ADC and engine state.",
-    "source": "ram_reference.txt:270"
+    "source": "ram_reference.txt:302"
    },
    "evidence": [
     {
@@ -31726,7 +31738,7 @@
    "declared": {
     "claimed_name": "engine_state_var_A",
     "claimed_desc": "Engine state variable A. Near engine_state_extended (0xFFFF65A9).",
-    "source": "ram_reference.txt:256"
+    "source": "ram_reference.txt:288"
    },
    "evidence": [
     {
@@ -31748,7 +31760,7 @@
    "declared": {
     "claimed_name": "engine_state_extended",
     "claimed_desc": "Engine state extended byte. Read by task58 extended MAF",
-    "source": "ram_reference.txt:174"
+    "source": "ram_reference.txt:206"
    },
    "evidence": [
     {
@@ -31770,7 +31782,7 @@
    "declared": {
     "claimed_name": "engine_state_ext_byte_B",
     "claimed_desc": "Engine state extended byte B. Adjacent to engine_state_extended (+2).",
-    "source": "ram_reference.txt:280"
+    "source": "ram_reference.txt:312"
    },
    "evidence": [
     {
@@ -31792,7 +31804,7 @@
    "declared": {
     "claimed_name": "engine_state_byte",
     "claimed_desc": "34 refs. Engine state byte (cranking/running/etc).",
-    "source": "ram_reference.txt:156"
+    "source": "ram_reference.txt:188"
    },
    "evidence": [
     {
@@ -31814,7 +31826,7 @@
    "declared": {
     "claimed_name": "accel_state",
     "claimed_desc": "Acceleration state flag (task50 map switching). Was warmup_transition_flag_B.",
-    "source": "ram_reference.txt:188"
+    "source": "ram_reference.txt:220"
    },
    "evidence": [
     {
@@ -31836,7 +31848,7 @@
    "declared": {
     "claimed_name": "diag_precondition_flag_65C0",
     "claimed_desc": "CORRECTED 2026-07-26: BYTE boolean in the 0xFFFF65B7-0xFFFF65C6 flag block, NOT throttle position and NOT an FP value. int8 x89, 0 FP accesses. Read as cmp/eq #1 to gate DTC maturation counters (0x01573C/0x015748, 0x01F798, 0x023C7A). Pedal angle is 0xFFFF64D8, throttle plate angle 0xFFFF62DC. Which monitor it gates is UNRESOLVED -- do not invent one. corrections.md item 16.",
-    "source": "ram_reference.txt:135"
+    "source": "ram_reference.txt:167"
    },
    "evidence": [
     {
@@ -31858,7 +31870,7 @@
    "declared": {
     "claimed_name": "vehicle_speed_kmh",
     "claimed_desc": "CORRECTED 2026-07-26: VEHICLE SPEED (km/h, float), NOT engine load. See docs/corrections.md item 9.",
-    "source": "ram_reference.txt:129"
+    "source": "ram_reference.txt:161"
    },
    "evidence": [
     {
@@ -31884,7 +31896,7 @@
    "declared": {
     "claimed_name": "engine_speed_delta",
     "claimed_desc": "NEW 2026-07-27: ENGINE SPEED DELTA (float, RPM), low-pass filtered. Producer, hand-decoded: r12=0xFFFF6648 ; 0x023362 fmov.s @(r0,r12),fr8 (r0=-36 => 0xFFFF6624, the settled RPM) ; 0x023366 fmov.s @(r0,r11),fr9 (r11=0xFFFF67AC, r0=16 => 0xFFFF67BC, the reference speed) ; 0x023368 fsub fr9,fr8 (RPM - reference) ; 0x02336C fmov.s @(r0,r12),fr9 (r0=-20 => 0xFFFF6634, previous) ; 0x02336E fadd fr9,fr8 ; 0x023374 fmul fr9,fr8 with *(0x023544)=0.5 ; 0x023378 fmov.s fr8,@(r0,r12) => 0xFFFF6634 = 0.5*((RPM - ref) + previous). Corroborated by 2 of 2 definition-named axes: 0x051DB6 jsr 0x0BE8E4 with delay-preceding 0x051DB4 fmov fr14,fr5 (FR14 = *(0xFFFF6634) from 0x051D7A) reaching axis1 0xD7EC4 / 0xD8060, both 'Idle Speed Stability A/B / Engine Speed Delta' (-50..50). corrections.md item 32.",
-    "source": "ram_reference.txt:350"
+    "source": "ram_reference.txt:382"
    },
    "evidence": [
     {
@@ -31910,7 +31922,7 @@
    "declared": {
     "claimed_name": "dtc_maturation_counter_67EC",
     "claimed_desc": "CORRECTED 2026-07-26: uint16 DTC MATURATION COUNTER at +4 in the 0xFFFF67E8 block, NOT atmospheric pressure and NOT an FP value. int16 x99, 0 FP accesses (every site mov.w). Reset to 0 at 0x023AA8, incremented via the saturating u16 helper 0x0BE554 at 0x023AB2, compared against the uint16 calibration at 0xC0212 (=306) at 0x01207E. Baro is the FP value at 0xFFFF6898. corrections.md item 15.",
-    "source": "ram_reference.txt:132"
+    "source": "ram_reference.txt:164"
    },
    "evidence": [
     {
@@ -31932,7 +31944,7 @@
    "declared": {
     "claimed_name": "ol_condition_selector",
     "claimed_desc": "OL condition selector byte (1-5). Selects ROM threshold",
-    "source": "ram_reference.txt:178"
+    "source": "ram_reference.txt:210"
    },
    "evidence": [
     {
@@ -31954,7 +31966,7 @@
    "declared": {
     "claimed_name": "adc_processed_misc",
     "claimed_desc": "ADC processed miscellaneous sensor value",
-    "source": "ram_reference.txt:179"
+    "source": "ram_reference.txt:211"
    },
    "evidence": [
     {
@@ -31980,7 +31992,7 @@
    "declared": {
     "claimed_name": "atm_pressure_current",
     "claimed_desc": "CORRECTED 2026-07-26: ATMOSPHERIC / BAROMETRIC PRESSURE (float, raw mmHg-class 440..760 = 8.5..14.7 psi abs), NOT manifold pressure and NOT rpm_delta. 0x013B02 mov.l @(0x013CCC),r2 ; 0x013B04 fmov.s @r2,fr4 -> desc 0x0AA99C axis0 0xC0E94 \"Target Boost Compensation (Atm. Pressure)_ / Atmospheric Pressure\". float x48. corrections.md item 11.",
-    "source": "ram_reference.txt:147"
+    "source": "ram_reference.txt:179"
    },
    "evidence": [
     {
@@ -32006,7 +32018,7 @@
    "declared": {
     "claimed_name": "ratio_0to1_69F0",
     "claimed_desc": "CORRECTED 2026-07-27: a 0..1 RATIO (float), definitively NOT a temperature. 0x0272CE mov.l @(0x0274DC),r2 (=0x0BE56C) ; 0x0272D0 fldi1 fr6 ; 0x0272D2 fldi0 fr5 ; 0x0272D6 jsr @r2 with delay 0x0272D8 fmov.s @r6,fr4 (r6=0xFFFF69F0) -- and 0x0BE56C is clamp(FR4, lo=FR5, hi=FR6), verified from bytes -- so the value is clamped to [0.0,1.0]. Repeated at 0x0273BA. Only store sets it to exactly 1.0 (0x0273E0 fldi1 fr8 ; 0x0273E6 fmov.s fr8,@r2). Feeds 4 sites, all the same unnamed 0..1 axis 0xC4514, and ZERO temperature-named axes while 0xFFFF6364 reaches 9. A value clamped to [0,1] cannot be a -40..120 C temperature. WHICH ratio is UNRESOLVED -- deliberately not guessed. corrections.md items 23 + 33.",
-    "source": "ram_reference.txt:160"
+    "source": "ram_reference.txt:192"
    },
    "evidence": [
     {
@@ -32028,7 +32040,7 @@
    "declared": {
     "claimed_name": "ect_input_float",
     "claimed_desc": "ECT input value for fuel/ignition lookups (float). Startup enrichment / fueling pipeline.",
-    "source": "ram_reference.txt:281"
+    "source": "ram_reference.txt:313"
    },
    "evidence": [
     {
@@ -32050,7 +32062,7 @@
    "declared": {
     "claimed_name": "diag_status_code_6C48",
     "claimed_desc": "CORRECTED 2026-07-26: BYTE status/result code, NOT battery voltage and NOT an FP value. int8 x34, 0 FP accesses. Takes only nibble-doubled sentinels 00/33/55/77/AA/BB/DD/EE (e.g. 0x02C148 mov #-69,r2 ; 0x02C14C mov.b r2,@r1). Battery volts is the FP value at 0xFFFF4130. corrections.md item 14.",
-    "source": "ram_reference.txt:157"
+    "source": "ram_reference.txt:189"
    },
    "evidence": [
     {
@@ -32072,7 +32084,7 @@
    "declared": {
     "claimed_name": "fuel_timing_state",
     "claimed_desc": "Fuel timing state variable",
-    "source": "ram_reference.txt:180"
+    "source": "ram_reference.txt:212"
    },
    "evidence": [
     {
@@ -32094,7 +32106,7 @@
    "declared": {
     "claimed_name": "last_calc_base_pulse_width",
     "claimed_desc": "NEW 2026-07-26: LAST CALCULATED BASE PULSE WIDTH (float; defs toexpr x*.001 => ms; axis 1000..16000 = 1..16 ms). 0x038DD0 fmov.s @r2,fr4 -> 0x038DD8 jsr 0x0BE8E4, desc 0x0AD738 axis0 0xD0760 \"Per Injector Pulse Width Compensation A / Last Calculated Base Pulse Width\"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x3. corrections.md item 22.",
-    "source": "ram_reference.txt:335"
+    "source": "ram_reference.txt:367"
    },
    "evidence": [
     {
@@ -32120,7 +32132,7 @@
    "declared": {
     "claimed_name": "afc_output",
     "claimed_desc": "19 refs. AFC output value. Referenced in fuel_correctio",
-    "source": "ram_reference.txt:196"
+    "source": "ram_reference.txt:228"
    },
    "evidence": [
     {
@@ -32142,7 +32154,7 @@
    "declared": {
     "claimed_name": "fuel_enrichment_state",
     "claimed_desc": "Fuel enrichment state (float). Near fuel_enrichment_B (0xFFFF7878).",
-    "source": "ram_reference.txt:257"
+    "source": "ram_reference.txt:289"
    },
    "evidence": [
     {
@@ -32160,7 +32172,7 @@
    "declared": {
     "claimed_name": "fuel_enrichment_B",
     "claimed_desc": "Fuel enrichment term B (float). Summed with A+C.",
-    "source": "ram_reference.txt:282"
+    "source": "ram_reference.txt:314"
    },
    "evidence": [
     {
@@ -32182,7 +32194,7 @@
    "declared": {
     "claimed_name": "timing_state_var",
     "claimed_desc": "17 refs. Timing state variable. Referenced by task35_ti",
-    "source": "ram_reference.txt:210"
+    "source": "ram_reference.txt:242"
    },
    "evidence": [
     {
@@ -32208,7 +32220,7 @@
    "declared": {
     "claimed_name": "transient_fuel_comp",
     "claimed_desc": "Transient fuel compensation value (float). AFC working value. Read by task35.",
-    "source": "ram_reference.txt:249"
+    "source": "ram_reference.txt:281"
    },
    "evidence": [
     {
@@ -32230,7 +32242,7 @@
    "declared": {
     "claimed_name": "fuel_state_byte",
     "claimed_desc": "32 refs. Fuel state byte/flag.",
-    "source": "ram_reference.txt:161"
+    "source": "ram_reference.txt:193"
    },
    "evidence": [
     {
@@ -32252,7 +32264,7 @@
    "declared": {
     "claimed_name": "fuel_timing_state_B",
     "claimed_desc": "Fuel/timing state variable B. Fuel/timing region.",
-    "source": "ram_reference.txt:258"
+    "source": "ram_reference.txt:290"
    },
    "evidence": [
     {
@@ -32274,7 +32286,7 @@
    "declared": {
     "claimed_name": "throttle_delta_pos",
     "claimed_desc": "19 refs. Positive throttle rate of change (float). Used by accel enrichment.",
-    "source": "ram_reference.txt:197"
+    "source": "ram_reference.txt:229"
    },
    "evidence": [
     {
@@ -32300,7 +32312,7 @@
    "declared": {
     "claimed_name": "fuel_timing_corr",
     "claimed_desc": "Fuel timing correction variable",
-    "source": "ram_reference.txt:202"
+    "source": "ram_reference.txt:234"
    },
    "evidence": [
     {
@@ -32322,7 +32334,7 @@
    "declared": {
     "claimed_name": "task50_gbr_base",
     "claimed_desc": "GBR base for task50 timing blend. Was warmup_corr_cyl0.",
-    "source": "ram_reference.txt:171"
+    "source": "ram_reference.txt:203"
    },
    "evidence": [
     {
@@ -32344,7 +32356,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "pre_ratio                            Pre-computed blend ratio (task50).",
-    "source": "ram_reference.txt:921"
+    "source": "ram_reference.txt:953"
    },
    "evidence": [
     {
@@ -32362,7 +32374,7 @@
    "declared": {
     "claimed_name": "ignition_timing_workspace",
     "claimed_desc": "Ignition timing workspace variable (float). Multiple re",
-    "source": "ram_reference.txt:189"
+    "source": "ram_reference.txt:221"
    },
    "evidence": [
     {
@@ -32380,7 +32392,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "alt_blend_ratio                      Alternative blend ratio (task50).",
-    "source": "ram_reference.txt:923"
+    "source": "ram_reference.txt:955"
    },
    "evidence": [
     {
@@ -32402,7 +32414,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "ect_desc_result                      ECT descriptor output (task33).",
-    "source": "ram_reference.txt:924"
+    "source": "ram_reference.txt:956"
    },
    "evidence": [
     {
@@ -32424,7 +32436,7 @@
    "declared": {
     "claimed_name": "rpm_current_timing_copy",
     "claimed_desc": "NEW 2026-07-26: ENGINE SPEED (float, RPM) -- the copy used by the base-timing / knock-advance path. 0x040160 r12=0xFFFF7F60 ; 0x040174 mov #-20,r0 ; 0x040178 fmov.s @(r0,r12),fr5 => 0xFFFF7F4C, desc 0x0AE31C axis1 0xD46CC \"Base Timing Primary Cruise / Engine Speed\". float x2. corrections.md item 22.",
-    "source": "ram_reference.txt:336"
+    "source": "ram_reference.txt:368"
    },
    "evidence": [
     {
@@ -32450,7 +32462,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "ect_blend_correction                 ECT blend correction (task33/50). Was ect_warmup_correction.",
-    "source": "ram_reference.txt:926"
+    "source": "ram_reference.txt:958"
    },
    "evidence": [
     {
@@ -32472,7 +32484,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "atm_blend_correction                 Atmospheric correction (task33).",
-    "source": "ram_reference.txt:927"
+    "source": "ram_reference.txt:959"
    },
    "evidence": [
     {
@@ -32498,7 +32510,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "rpm_iat_blend_result                 RPM x IAT table result (task33).",
-    "source": "ram_reference.txt:928"
+    "source": "ram_reference.txt:960"
    },
    "evidence": [
     {
@@ -32520,7 +32532,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "blend_correction_C                   Third blend correction (task50).",
-    "source": "ram_reference.txt:929"
+    "source": "ram_reference.txt:961"
    },
    "evidence": [
     {
@@ -32542,7 +32554,7 @@
    "declared": {
     "claimed_name": "previous_timing_output",
     "claimed_desc": "14 refs. Previous cycle timing output (task50). Was timing_final_advance.",
-    "source": "ram_reference.txt:229"
+    "source": "ram_reference.txt:261"
    },
    "evidence": [
     {
@@ -32564,7 +32576,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "base_timing_offset                   Base timing reference (task50). Was gbr_base_percond_ws.",
-    "source": "ram_reference.txt:931"
+    "source": "ram_reference.txt:963"
    },
    "evidence": [
     {
@@ -32586,7 +32598,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_28                       Timing correction positive (task50).",
-    "source": "ram_reference.txt:932"
+    "source": "ram_reference.txt:964"
    },
    "evidence": [
     {
@@ -32608,7 +32620,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_38                       Timing correction negative (task50).",
-    "source": "ram_reference.txt:933"
+    "source": "ram_reference.txt:965"
    },
    "evidence": [
     {
@@ -32630,7 +32642,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_3C                       Timing correction positive (task50).",
-    "source": "ram_reference.txt:934"
+    "source": "ram_reference.txt:966"
    },
    "evidence": [
     {
@@ -32652,7 +32664,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_5C                       Timing correction positive (task50).",
-    "source": "ram_reference.txt:935"
+    "source": "ram_reference.txt:967"
    },
    "evidence": [
     {
@@ -32674,7 +32686,7 @@
    "declared": {
     "claimed_name": "knock_flkc_workspace",
     "claimed_desc": "Knock/FLKC workspace area",
-    "source": "ram_reference.txt:181"
+    "source": "ram_reference.txt:213"
    },
    "evidence": [
     {
@@ -32692,7 +32704,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_84                       Timing correction negative (task50).",
-    "source": "ram_reference.txt:937"
+    "source": "ram_reference.txt:969"
    },
    "evidence": [
     {
@@ -32714,7 +32726,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "knock_retard_accum                   Per-cylinder knock retard accumulator (task50).",
-    "source": "ram_reference.txt:938"
+    "source": "ram_reference.txt:970"
    },
    "evidence": [
     {
@@ -32736,7 +32748,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_B4                       Timing correction positive (task50).",
-    "source": "ram_reference.txt:939"
+    "source": "ram_reference.txt:971"
    },
    "evidence": [
     {
@@ -32758,7 +32770,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_C4                       Timing correction positive (task50).",
-    "source": "ram_reference.txt:940"
+    "source": "ram_reference.txt:972"
    },
    "evidence": [
     {
@@ -32780,7 +32792,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_E8                       Timing correction negative (task50).",
-    "source": "ram_reference.txt:941"
+    "source": "ram_reference.txt:973"
    },
    "evidence": [
     {
@@ -32802,7 +32814,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "timing_corr_F0                       Timing correction positive (task50).",
-    "source": "ram_reference.txt:942"
+    "source": "ram_reference.txt:974"
    },
    "evidence": [
     {
@@ -32824,7 +32836,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "per_cyl_base_corr                    Per-cylinder base timing correction (task50).",
-    "source": "ram_reference.txt:943"
+    "source": "ram_reference.txt:975"
    },
    "evidence": [
     {
@@ -32846,7 +32858,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "ect_timing_comp                      ECT timing compensation (task50).",
-    "source": "ram_reference.txt:944"
+    "source": "ram_reference.txt:976"
    },
    "evidence": [
     {
@@ -32868,7 +32880,7 @@
    "declared": {
     "claimed_name": "knock_learning_value",
     "claimed_desc": "30 refs. Knock learning value (task50). Was knock_state_base.",
-    "source": "ram_reference.txt:164"
+    "source": "ram_reference.txt:196"
    },
    "evidence": [
     {
@@ -32890,7 +32902,7 @@
    "declared": {
     "claimed_name": "knock_thresh_config",
     "claimed_desc": "Knock threshold config workspace (GBR base). Task04/10.",
-    "source": "ram_reference.txt:283"
+    "source": "ram_reference.txt:315"
    },
    "evidence": [
     {
@@ -32916,7 +32928,7 @@
    "declared": {
     "claimed_name": "knock_window_state",
     "claimed_desc": "Knock window state workspace (GBR base). Task08.",
-    "source": "ram_reference.txt:300"
+    "source": "ram_reference.txt:332"
    },
    "evidence": [
     {
@@ -32938,7 +32950,7 @@
    "declared": {
     "claimed_name": "0",
     "claimed_desc": "knock_corr_advance                   Knock correction advance (task50).",
-    "source": "ram_reference.txt:946"
+    "source": "ram_reference.txt:978"
    },
    "evidence": [
     {
@@ -32960,7 +32972,7 @@
    "declared": {
     "claimed_name": "knock_state_var",
     "claimed_desc": "Knock state variable",
-    "source": "ram_reference.txt:211"
+    "source": "ram_reference.txt:243"
    },
    "evidence": [
     {
@@ -32982,7 +32994,7 @@
    "declared": {
     "claimed_name": "fuel_pump_workspace",
     "claimed_desc": "Fuel pump state machine (14-byte struct). Was knock_workspace_B (misidentified).",
-    "source": "ram_reference.txt:203"
+    "source": "ram_reference.txt:235"
    },
    "evidence": [
     {
@@ -33004,7 +33016,7 @@
    "declared": {
     "claimed_name": "idle_dispatch_workspace",
     "claimed_desc": "Main idle dispatcher state (GBR base). 39 fields, 129 accesses.",
-    "source": "ram_reference.txt:233"
+    "source": "ram_reference.txt:265"
    },
    "evidence": [
     {
@@ -33026,7 +33038,7 @@
    "declared": {
     "claimed_name": "idle_control_GBR",
     "claimed_desc": "39 refs. Idle control GBR base (19 GBR uses). Primary G",
-    "source": "ram_reference.txt:190"
+    "source": "ram_reference.txt:222"
    },
    "evidence": [
     {
@@ -33044,7 +33056,7 @@
    "declared": {
     "claimed_name": "knock_flkc_workspace",
     "claimed_desc": "Knock/FLKC post-retard state (GBR base). Adjacent to knock_workspace_B/C.",
-    "source": "ram_reference.txt:234"
+    "source": "ram_reference.txt:266"
    },
    "evidence": [
     {
@@ -33066,7 +33078,7 @@
    "declared": {
     "claimed_name": "knock_workspace_C",
     "claimed_desc": "Knock/FLKC workspace variable C",
-    "source": "ram_reference.txt:204"
+    "source": "ram_reference.txt:236"
    },
    "evidence": [
     {
@@ -33084,7 +33096,7 @@
    "declared": {
     "claimed_name": "idle_sensor_ref",
     "claimed_desc": "Idle control sensor comparison reference (passed to 0x4",
-    "source": "ram_reference.txt:183"
+    "source": "ram_reference.txt:215"
    },
    "evidence": [
     {
@@ -33106,7 +33118,7 @@
    "declared": {
     "claimed_name": "idle_workspace_var",
     "claimed_desc": "Idle workspace variable (near idle GBR base)",
-    "source": "ram_reference.txt:212"
+    "source": "ram_reference.txt:244"
    },
    "evidence": [
     {
@@ -33124,7 +33136,7 @@
    "declared": {
     "claimed_name": "idle_workspace_GBR",
     "claimed_desc": "26 refs. Secondary idle GBR workspace (7 GBR uses).",
-    "source": "ram_reference.txt:198"
+    "source": "ram_reference.txt:230"
    },
    "evidence": [
     {
@@ -33146,7 +33158,7 @@
    "declared": {
     "claimed_name": "requested_torque",
     "claimed_desc": "NEW 2026-07-26: REQUESTED / CALCULATED ENGINE TORQUE -- the X-axis input of the Target Boost table (float, raw ecu value 0..350). 0x013A00 fmov.s @r2,fr4 -> 0x013A20 jsr 0x0BE8E4, desc 0x0AA9F0 axis0 0xC12D8 \"Target Boost_ / Requested Torque\"; the FR5 half of that call comes from 0xFFFF6624 and lands on axis1. float x6 + int32 x1. corrections.md item 22.",
-    "source": "ram_reference.txt:337"
+    "source": "ram_reference.txt:369"
    },
    "evidence": [
     {
@@ -33172,7 +33184,7 @@
    "declared": {
     "claimed_name": "knock_flkc_event_flag",
     "claimed_desc": "Knock/FLKC interrupt or event flag. Knock processing region.",
-    "source": "ram_reference.txt:301"
+    "source": "ram_reference.txt:333"
    },
    "evidence": [
     {
@@ -33194,7 +33206,7 @@
    "declared": {
     "claimed_name": "fuel_system_state",
     "claimed_desc": "60 refs. Fuel system state byte. Read by AFC, AFL, idle",
-    "source": "ram_reference.txt:141"
+    "source": "ram_reference.txt:173"
    },
    "evidence": [
     {
@@ -33216,7 +33228,7 @@
    "declared": {
     "claimed_name": "knock_fuel_interlock",
     "claimed_desc": "Knock/fuel interlock control byte. Between fuel_system_state and fuel_knock_state_var; gates knock-to-fuel feedback.",
-    "source": "ram_reference.txt:261"
+    "source": "ram_reference.txt:293"
    },
    "evidence": [
     {
@@ -33238,7 +33250,7 @@
    "declared": {
     "claimed_name": "fuel_knock_state_var",
     "claimed_desc": "Fuel/knock state variable. Near fuel_system_state (0xFFFF85D7).",
-    "source": "ram_reference.txt:250"
+    "source": "ram_reference.txt:282"
    },
    "evidence": [
     {
@@ -33260,7 +33272,7 @@
    "declared": {
     "claimed_name": "timing_correction_A",
     "claimed_desc": "26 refs. Timing correction value A.",
-    "source": "ram_reference.txt:167"
+    "source": "ram_reference.txt:199"
    },
    "evidence": [
     {
@@ -33282,7 +33294,7 @@
    "declared": {
     "claimed_name": "ignition_system_state",
     "claimed_desc": "Ignition system state. Referenced in ignition timing an",
-    "source": "ram_reference.txt:220"
+    "source": "ram_reference.txt:252"
    },
    "evidence": [
     {
@@ -33304,7 +33316,7 @@
    "declared": {
     "claimed_name": "injector_data",
     "claimed_desc": "Rate-limited sensor composite (float). 28 pool refs. Was fuel_ign_shared_state. See fueling_pipeline Section 15.",
-    "source": "ram_reference.txt:153"
+    "source": "ram_reference.txt:185"
    },
    "evidence": [
     {
@@ -33326,7 +33338,7 @@
    "declared": {
     "claimed_name": "sensor_struct_8998",
     "claimed_desc": "Sensor struct base (GBR at 0x52092).",
-    "source": "ram_reference.txt:251"
+    "source": "ram_reference.txt:283"
    },
    "evidence": [
     {
@@ -33348,7 +33360,7 @@
    "declared": {
     "claimed_name": "idle_speed_error",
     "claimed_desc": "NEW 2026-07-27: IDLE SPEED ERROR (float, RPM). Computed as a difference one instruction before it is used as the axis: 0x051D88 mov.l @(0x051FFC),r1 (=0xFFFF89C8) ; 0x051D8C fmov.s @(r0,r1),fr8 (r0=-28 => 0xFFFF89AC) ; 0x051DA2 mov.l @(0x05200C),r6 (=0xFFFF895C) ; 0x051DA4 fmov.s @r6,fr9 ; 0x051DA6 fsub fr9,fr8 ; 0x051DAE fmov.s fr8,@r1 (store to 0xFFFF89C8) ; 0x051DB6 jsr 0x0BE8E4 with delay slot 0x051DB8 fmov.s @r1,fr4 -- so FR4/axis0 is the value just stored. The descriptor differs by path (0x0AF0C8 at 0x051DAA vs 0x0AF0AC at 0x051DB0, split by 0x051DAC bf/s), and BOTH axis0s are definition-named 'Idle Speed Error' (0xD7E80 / 0xD801C, -150..600). 2 of 2 named axes agree. NOTE: coverage_map's quantity_of() mislabels 'Idle Speed Error' as vehicle_speed via a bare \\bspeed\\b pattern -- the AXIS NAME is the evidence, not the quantity bucket. corrections.md item 32.",
-    "source": "ram_reference.txt:351"
+    "source": "ram_reference.txt:383"
    },
    "evidence": [
     {
@@ -33370,7 +33382,7 @@
    "declared": {
     "claimed_name": "knock_sensor_state_B",
     "claimed_desc": "Knock sensor state variable B. Knock/FLKC cluster.",
-    "source": "ram_reference.txt:230"
+    "source": "ram_reference.txt:262"
    },
    "evidence": [
     {
@@ -33392,7 +33404,7 @@
    "declared": {
     "claimed_name": "knock_flkc_state",
     "claimed_desc": "Knock/FLKC state variable",
-    "source": "ram_reference.txt:191"
+    "source": "ram_reference.txt:223"
    },
    "evidence": [
     {
@@ -33414,7 +33426,7 @@
    "declared": {
     "claimed_name": "dtc_counter_struct_8C98",
     "claimed_desc": "CORRECTED 2026-07-26: base of a uint16 DIAGNOSTIC COUNTER STRUCT (+0 u16 counter, +2 u16 counter, +8 u8 verdict), NOT a timing FP workspace. int16 x5, 0 FP accesses. Both counters go through the saturating u16 helper 0x0BE554 (0x055F7A, 0x055FA4) and reset to 0 at 0x055FB0; +2 is compared against the uint16 calibration at 0xD61C8. The FP-width claim rested only on adjacency to timing_workspace_A. corrections.md item 18.",
-    "source": "ram_reference.txt:262"
+    "source": "ram_reference.txt:294"
    },
    "evidence": [
     {
@@ -33436,7 +33448,7 @@
    "declared": {
     "claimed_name": "timing_workspace_A",
     "claimed_desc": "17 refs. Timing workspace variable.",
-    "source": "ram_reference.txt:213"
+    "source": "ram_reference.txt:245"
    },
    "evidence": [
     {
@@ -33458,7 +33470,7 @@
    "declared": {
     "claimed_name": "knock_timing_retard_base",
     "claimed_desc": "Knock timing retard workspace base (struct, 116 bytes). Per-cylinder knock state machine.",
-    "source": "ram_reference.txt:263"
+    "source": "ram_reference.txt:295"
    },
    "evidence": [
     {
@@ -33480,7 +33492,7 @@
    "declared": {
     "claimed_name": "knock_struct_flag_8CFC",
     "claimed_desc": "CORRECTED 2026-07-26: BYTE boolean field at +0x1C in the 0xFFFF8CE0 knock/timing struct, NOT an FP workspace. int8 x5, 0 FP accesses. The struct does hold floats (+0x08/+0x0C/+0x10/+0x18) but not at this offset. Set to 1 at 0x056CD0 after byte preconditions; read as cmp/eq #1. corrections.md item 19.",
-    "source": "ram_reference.txt:284"
+    "source": "ram_reference.txt:316"
    },
    "evidence": [
     {
@@ -33502,7 +33514,7 @@
    "declared": {
     "claimed_name": "ign_ext_counter_A",
     "claimed_desc": "Ignition extended workspace counter. Near timing_workspace_A.",
-    "source": "ram_reference.txt:302"
+    "source": "ram_reference.txt:334"
    },
    "evidence": [
     {
@@ -33524,7 +33536,7 @@
    "declared": {
     "claimed_name": "ign_ext_workspace_B",
     "claimed_desc": "Ignition/knock extended workspace B (GBR base). Timing calculation chain.",
-    "source": "ram_reference.txt:303"
+    "source": "ram_reference.txt:335"
    },
    "evidence": [
     {
@@ -33546,7 +33558,7 @@
    "declared": {
     "claimed_name": "knock_level_accum",
     "claimed_desc": "Knock intensity/level accumulator. Near fuel_mode_flags.",
-    "source": "ram_reference.txt:304"
+    "source": "ram_reference.txt:336"
    },
    "evidence": [
     {
@@ -33572,7 +33584,7 @@
    "declared": {
     "claimed_name": "fuel_mode_flags",
     "claimed_desc": "39 refs. Fuel mode flags register.",
-    "source": "ram_reference.txt:152"
+    "source": "ram_reference.txt:184"
    },
    "evidence": [
     {
@@ -33594,7 +33606,7 @@
    "declared": {
     "claimed_name": "afc_enable_flag_A",
     "claimed_desc": "PI output enable flag A (byte). Must == 1 for afc_pi_ou",
-    "source": "ram_reference.txt:214"
+    "source": "ram_reference.txt:246"
    },
    "evidence": [
     {
@@ -33616,7 +33628,7 @@
    "declared": {
     "claimed_name": "cl_state_struct",
     "claimed_desc": "97 refs. CL monitoring state struct (15+ bytes). Base f",
-    "source": "ram_reference.txt:133"
+    "source": "ram_reference.txt:165"
    },
    "evidence": [
     {
@@ -33638,7 +33650,7 @@
    "declared": {
     "claimed_name": "sched_control_GBR",
     "claimed_desc": "14 refs. Scheduler control GBR base (5 GBR uses).",
-    "source": "ram_reference.txt:264"
+    "source": "ram_reference.txt:296"
    },
    "evidence": [
     {
@@ -33660,7 +33672,7 @@
    "declared": {
     "claimed_name": "sched_control_secondary",
     "claimed_desc": "Secondary scheduler control (GBR base). Adjacent to sched_control_GBR.",
-    "source": "ram_reference.txt:305"
+    "source": "ram_reference.txt:337"
    },
    "evidence": [
     {
@@ -33682,7 +33694,7 @@
    "declared": {
     "claimed_name": "ol_dispatch_gate",
     "claimed_desc": "OL enrichment dispatch gate (byte). Checked by all 4 OL",
-    "source": "ram_reference.txt:159"
+    "source": "ram_reference.txt:191"
    },
    "evidence": [
     {
@@ -33704,7 +33716,7 @@
    "declared": {
     "claimed_name": "sensor_filter_workspace",
     "claimed_desc": "O2 sensor rate-of-change filter workspace. CL entry validation via sub 0xC8E8.",
-    "source": "ram_reference.txt:265"
+    "source": "ram_reference.txt:297"
    },
    "evidence": [
     {
@@ -33726,7 +33738,7 @@
    "declared": {
     "claimed_name": "cl_readiness_state",
     "claimed_desc": "Closed-loop readiness state variable. Near cl_readiness_A_input.",
-    "source": "ram_reference.txt:306"
+    "source": "ram_reference.txt:338"
    },
    "evidence": [
     {
@@ -33748,7 +33760,7 @@
    "declared": {
     "claimed_name": "cl_readiness_A_input",
     "claimed_desc": "CL readiness A input (byte). Copied to FFFF744C. When n",
-    "source": "ram_reference.txt:285"
+    "source": "ram_reference.txt:317"
    },
    "evidence": [
     {
@@ -33770,7 +33782,7 @@
    "declared": {
     "claimed_name": "sched_task_dispatch_state",
     "claimed_desc": "Scheduler task dispatch state. Scheduler region.",
-    "source": "ram_reference.txt:235"
+    "source": "ram_reference.txt:267"
    },
    "evidence": [
     {
@@ -33792,7 +33804,7 @@
    "declared": {
     "claimed_name": "sched_state_A",
     "claimed_desc": "32 refs. Scheduler state variable A.",
-    "source": "ram_reference.txt:162"
+    "source": "ram_reference.txt:194"
    },
    "evidence": [
     {
@@ -33814,7 +33826,7 @@
    "declared": {
     "claimed_name": "scheduler_state_B",
     "claimed_desc": "Scheduler state variable B",
-    "source": "ram_reference.txt:199"
+    "source": "ram_reference.txt:231"
    },
    "evidence": [
     {
@@ -33836,7 +33848,7 @@
    "declared": {
     "claimed_name": "sched_task_GBR",
     "claimed_desc": "36 refs. Scheduler task GBR base (6 GBR uses).",
-    "source": "ram_reference.txt:165"
+    "source": "ram_reference.txt:197"
    },
    "evidence": [
     {
@@ -33858,7 +33870,7 @@
    "declared": {
     "claimed_name": "map_blend_ratio",
     "claimed_desc": "CORRECTED 2026-07-28 (corrections item 38): CRUISE/NON-CRUISE BLEND RATIO (float, 0.0=full Cruise 1.0=full Non-Cruise). Sole writer 0x0611E0 fmov.s fr0,@r6. Consumed by task32 lerp at 0x4001D6-0x4001EA. Was \"timing_dispatch_state\"/\"timing_state\".",
-    "source": "ram_reference.txt:241"
+    "source": "ram_reference.txt:273"
    },
    "evidence": [
     {
@@ -33880,7 +33892,7 @@
    "declared": {
     "claimed_name": "sched_queue_base",
     "claimed_desc": "8 refs. Scheduler queue base. GBR base (3 uses).",
-    "source": "ram_reference.txt:271"
+    "source": "ram_reference.txt:303"
    },
    "evidence": [
     {
@@ -33902,7 +33914,7 @@
    "declared": {
     "claimed_name": "scheduler_counter",
     "claimed_desc": "Scheduler counter variable",
-    "source": "ram_reference.txt:221"
+    "source": "ram_reference.txt:253"
    },
    "evidence": [
     {
@@ -33920,7 +33932,7 @@
    "declared": {
     "claimed_name": "sched_event_counter",
     "claimed_desc": "Scheduler event/task counter (GBR base). Scheduler region.",
-    "source": "ram_reference.txt:307"
+    "source": "ram_reference.txt:339"
    },
    "evidence": [
     {
@@ -33942,7 +33954,7 @@
    "declared": {
     "claimed_name": "sched_periodic_GBR",
     "claimed_desc": "7 refs. Scheduler periodic timer GBR base (4 GBR uses).",
-    "source": "ram_reference.txt:286"
+    "source": "ram_reference.txt:318"
    },
    "evidence": [
     {
@@ -33964,7 +33976,7 @@
    "declared": {
     "claimed_name": "sched_timer_B",
     "claimed_desc": "17 refs. Scheduler timer variable B.",
-    "source": "ram_reference.txt:215"
+    "source": "ram_reference.txt:247"
    },
    "evidence": [
     {
@@ -33986,7 +33998,7 @@
    "declared": {
     "claimed_name": "sched_timer_extended_C",
     "claimed_desc": "Scheduler timer extension C (GBR base). Adjacent to sched_timer_base cluster.",
-    "source": "ram_reference.txt:287"
+    "source": "ram_reference.txt:319"
    },
    "evidence": [
     {
@@ -34008,7 +34020,7 @@
    "declared": {
     "claimed_name": "sched_timer_base",
     "claimed_desc": "22 refs. Scheduler timer base. GBR base (3 uses).",
-    "source": "ram_reference.txt:182"
+    "source": "ram_reference.txt:214"
    },
    "evidence": [
     {
@@ -34030,7 +34042,7 @@
    "declared": {
     "claimed_name": "sched_timer_state",
     "claimed_desc": "Scheduler timer state field (byte). RTOS task dispatch eligibility tracking.",
-    "source": "ram_reference.txt:272"
+    "source": "ram_reference.txt:304"
    },
    "evidence": [
     {
@@ -34052,7 +34064,7 @@
    "declared": {
     "claimed_name": "sched_timer_extended_A",
     "claimed_desc": "Scheduler extended timer A. Scheduler timer cluster.",
-    "source": "ram_reference.txt:252"
+    "source": "ram_reference.txt:284"
    },
    "evidence": [
     {
@@ -34070,7 +34082,7 @@
    "declared": {
     "claimed_name": "sched_timer_fractional",
     "claimed_desc": "Scheduler timer fractional field. Adjacent to sched_timer_extended_A (+2).",
-    "source": "ram_reference.txt:308"
+    "source": "ram_reference.txt:340"
    },
    "evidence": [
     {
@@ -34092,7 +34104,7 @@
    "declared": {
     "claimed_name": "sched_timer_extended_B",
     "claimed_desc": "Scheduler extended timer B. Scheduler timer cluster.",
-    "source": "ram_reference.txt:242"
+    "source": "ram_reference.txt:274"
    },
    "evidence": [
     {
@@ -34114,7 +34126,7 @@
    "declared": {
     "claimed_name": "diag_monitor_GBR",
     "claimed_desc": "21 refs. Diagnostic monitor GBR base (6 GBR uses).",
-    "source": "ram_reference.txt:226"
+    "source": "ram_reference.txt:258"
    },
    "evidence": [
     {
@@ -34136,7 +34148,7 @@
    "declared": {
     "claimed_name": "diag_monitor_state_byte",
     "claimed_desc": "Diagnostic monitor state byte. Adjacent to diag_monitor_GBR (+3).",
-    "source": "ram_reference.txt:253"
+    "source": "ram_reference.txt:285"
    },
    "evidence": [
     {
@@ -34158,7 +34170,7 @@
    "declared": {
     "claimed_name": "diag_maturation_counter",
     "claimed_desc": "Diagnostic maturation counter byte (GBR base). DTC trip tracking / qualification.",
-    "source": "ram_reference.txt:288"
+    "source": "ram_reference.txt:320"
    },
    "evidence": [
     {
@@ -34180,7 +34192,7 @@
    "declared": {
     "claimed_name": "rpm_snapshot_A198",
     "claimed_desc": "CORRECTED 2026-07-27: ENGINE SPEED snapshot (float, RPM) at +0 of the 0xFFFFA198 struct (the struct is also loaded into GBR at 0x0758E8 / 0x075C54, which is where the old egr_diag_state name came from -- that describes the struct, not this float). Assigned directly from the settled RPM variable at TWO independent sites: 0x075934 mov.l @(0x075A58),r2 (=0xFFFF6624) ; 0x075936 fmov.s @r2,fr8 ; 0x075938 mov.l @(0x075A48),r2 (=0xFFFFA198) ; 0x07593A fmov.s fr8,@r2 -- and identically at 0x075CA2/0x075CA6/0x075CA8. Corroborated by 53 lookup sites in 10 functions whose axes are all RPM-shaped (700..6700, 750..6700, 4000..6700, 3500..7000), zero dissent. corrections.md item 34.",
-    "source": "ram_reference.txt:236"
+    "source": "ram_reference.txt:268"
    },
    "evidence": [
     {
@@ -34206,7 +34218,7 @@
    "declared": {
     "claimed_name": "diag_trip_tracking_flags",
     "claimed_desc": "Diagnostic trip tracking flags. Trip tracking region.",
-    "source": "ram_reference.txt:254"
+    "source": "ram_reference.txt:286"
    },
    "evidence": [
     {
@@ -34228,7 +34240,7 @@
    "declared": {
     "claimed_name": "diag_monitor_state",
     "claimed_desc": "Diagnostic monitor state area",
-    "source": "ram_reference.txt:222"
+    "source": "ram_reference.txt:254"
    },
    "evidence": [
     {
@@ -34250,7 +34262,7 @@
    "declared": {
     "claimed_name": "diag_fault_enable_flags",
     "claimed_desc": "Diagnostic fault enable/masking flags. Referenced by diag tasks.",
-    "source": "ram_reference.txt:227"
+    "source": "ram_reference.txt:259"
    },
    "evidence": [
     {
@@ -34272,7 +34284,7 @@
    "declared": {
     "claimed_name": "diag_maturation_threshold",
     "claimed_desc": "Diagnostic maturation threshold (word, GBR base). DTC qualification gate between state_D and AB76 regions.",
-    "source": "ram_reference.txt:273"
+    "source": "ram_reference.txt:305"
    },
    "evidence": [
     {
@@ -34294,7 +34306,7 @@
    "declared": {
     "claimed_name": "diag_counter_mps",
     "claimed_desc": "Diagnostic counter/threshold byte (MPS-related). DTC maturation cluster.",
-    "source": "ram_reference.txt:266"
+    "source": "ram_reference.txt:298"
    },
    "evidence": [
     {
@@ -34316,7 +34328,7 @@
    "declared": {
     "claimed_name": "diag_protocol_GBR",
     "claimed_desc": "13 refs. Diagnostic protocol GBR base (4 GBR uses).",
-    "source": "ram_reference.txt:237"
+    "source": "ram_reference.txt:269"
    },
    "evidence": [
     {
@@ -34338,7 +34350,7 @@
    "declared": {
     "claimed_name": "diag_output_buffer",
     "claimed_desc": "32 refs. Diagnostic output buffer pointer.",
-    "source": "ram_reference.txt:163"
+    "source": "ram_reference.txt:195"
    },
    "evidence": [
     {
@@ -34360,7 +34372,7 @@
    "declared": {
     "claimed_name": "diag_state_E_start",
     "claimed_desc": "Active fault status region start. 62 bytes, 268 refs.",
-    "source": "ram_reference.txt:231"
+    "source": "ram_reference.txt:263"
    },
    "evidence": [
     {
@@ -34382,7 +34394,7 @@
    "declared": {
     "claimed_name": "diag_active_fault_C",
     "claimed_desc": "Active fault status byte C. diag_state_E array offset +0x04.",
-    "source": "ram_reference.txt:243"
+    "source": "ram_reference.txt:275"
    },
    "evidence": [
     {
@@ -34404,7 +34416,7 @@
    "declared": {
     "claimed_name": "diag_active_fault_B",
     "claimed_desc": "Active fault status byte B. Part of diag_state_E (0xFFFFAD14-0xFFFFAD52, 268 refs).",
-    "source": "ram_reference.txt:232"
+    "source": "ram_reference.txt:264"
    },
    "evidence": [
     {
@@ -34426,7 +34438,7 @@
    "declared": {
     "claimed_name": "diag_active_fault_D",
     "claimed_desc": "Active fault status byte D. diag_state_E array offset +0x0C.",
-    "source": "ram_reference.txt:244"
+    "source": "ram_reference.txt:276"
    },
    "evidence": [
     {
@@ -34448,7 +34460,7 @@
    "declared": {
     "claimed_name": "diag_active_fault_E",
     "claimed_desc": "Active fault status byte E. diag_state_E array offset +0x10.",
-    "source": "ram_reference.txt:245"
+    "source": "ram_reference.txt:277"
    },
    "evidence": [
     {
@@ -34470,7 +34482,7 @@
    "declared": {
     "claimed_name": "diag_active_fault_F",
     "claimed_desc": "Active fault status byte F. diag_state_E array offset +0x14.",
-    "source": "ram_reference.txt:246"
+    "source": "ram_reference.txt:278"
    },
    "evidence": [
     {
@@ -34492,7 +34504,7 @@
    "declared": {
     "claimed_name": "diag_session_state_B",
     "claimed_desc": "Diagnostic session state variable B",
-    "source": "ram_reference.txt:184"
+    "source": "ram_reference.txt:216"
    },
    "evidence": [
     {
@@ -34514,7 +34526,7 @@
    "declared": {
     "claimed_name": "diag_session_state",
     "claimed_desc": "107 refs. Diagnostic session state. Read by diag/DTC fr",
-    "source": "ram_reference.txt:131"
+    "source": "ram_reference.txt:163"
    },
    "evidence": [
     {
@@ -34532,7 +34544,7 @@
    "declared": {
     "claimed_name": "diag_request_state",
     "claimed_desc": "69 refs. Diagnostic request/response state. Read by DTC",
-    "source": "ram_reference.txt:140"
+    "source": "ram_reference.txt:172"
    },
    "evidence": [
     {
@@ -34550,7 +34562,7 @@
    "declared": {
     "claimed_name": "comms_state_byte",
     "claimed_desc": "36 refs. Communications protocol state byte.",
-    "source": "ram_reference.txt:155"
+    "source": "ram_reference.txt:187"
    },
    "evidence": [
     {
@@ -34572,7 +34584,7 @@
    "declared": {
     "claimed_name": "diag_fault_history_byte",
     "claimed_desc": "Diagnostic fault history byte. Part of diag_state_A (0xFFFFAF70-0xFFFFAFAB).",
-    "source": "ram_reference.txt:238"
+    "source": "ram_reference.txt:270"
    },
    "evidence": [
     {
@@ -34594,7 +34606,7 @@
    "declared": {
     "claimed_name": "stack_workspace_var",
     "claimed_desc": "Stack area workspace variable (long). Part of 28-byte stack canary cluster.",
-    "source": "ram_reference.txt:289"
+    "source": "ram_reference.txt:321"
    },
    "evidence": [
     {
@@ -34616,7 +34628,7 @@
    "declared": {
     "claimed_name": "stack_scratch_var",
     "claimed_desc": "Stack area scratch variable. Part of stack canary cluster.",
-    "source": "ram_reference.txt:309"
+    "source": "ram_reference.txt:341"
    },
    "evidence": [
     {
@@ -34638,7 +34650,7 @@
    "declared": {
     "claimed_name": "stack_guard_byte",
     "claimed_desc": "Stack area guard byte / canary",
-    "source": "ram_reference.txt:205"
+    "source": "ram_reference.txt:237"
    },
    "evidence": [
     {
@@ -47624,6 +47636,10 @@
     {
      "source": "D2 ROM table descriptor @0xAE284",
      "detail": "1D, 65 cells x 4 bytes, axis 0xD4128"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/named_descriptors.txt"
     }
    ],
    "notes": [
@@ -47648,7 +47664,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+     "detail": "1 file(s): disassembly/maps/descriptor_map.txt"
     }
    ],
    "notes": [
@@ -47670,6 +47686,10 @@
     {
      "source": "D2 ROM table descriptor @0xAE29C",
      "detail": "1D, 10 cells x 4 bytes, axis 0xD4380"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/named_descriptors.txt"
     }
    ],
    "notes": [
@@ -47694,7 +47714,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+     "detail": "1 file(s): disassembly/maps/descriptor_map.txt"
     }
    ],
    "notes": [
@@ -47716,6 +47736,10 @@
     {
      "source": "D2 ROM table descriptor @0xAE2B4",
      "detail": "1D, 10 cells x 4 bytes, axis 0xD4420"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/named_descriptors.txt"
     }
    ],
    "notes": [
@@ -47740,7 +47764,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+     "detail": "1 file(s): disassembly/maps/descriptor_map.txt"
     }
    ],
    "notes": [
@@ -47762,6 +47786,10 @@
     {
      "source": "D2 ROM table descriptor @0xAE2CC",
      "detail": "1D, 35 cells x 4 bytes, axis 0xD44C0"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/named_descriptors.txt"
     }
    ],
    "notes": [
@@ -47786,7 +47814,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+     "detail": "1 file(s): disassembly/maps/descriptor_map.txt"
     }
    ],
    "notes": [
@@ -74613,7 +74641,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "8 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt ..."
+     "detail": "9 file(s): disassembly/analysis/fbkc_path_trace.txt, disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/knock_flkc_analysis.txt ..."
     }
    ],
    "flag": "UNMAPPED"
@@ -74664,7 +74692,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "8 file(s): disassembly/analysis/ignition_timing_raw.txt, disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt ..."
+     "detail": "9 file(s): disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/ignition_timing_raw.txt, disassembly/analysis/knock_flkc_analysis.txt ..."
     }
    ],
    "flag": "UNMAPPED"
@@ -74732,7 +74760,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "7 file(s): disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt, disassembly/maps/disassembly.txt ..."
+     "detail": "8 file(s): disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/knock_flkc_analysis.txt, disassembly/analysis/knock_flkc_report.txt ..."
     }
    ],
    "flag": "UNMAPPED"
@@ -74834,7 +74862,7 @@
     },
     {
      "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/analysis/knock_flkc_analysis.txt"
+     "detail": "2 file(s): disassembly/analysis/flkc_grid_interpolation_trace.txt, disassembly/analysis/knock_flkc_analysis.txt"
     }
    ],
    "flag": "UNMAPPED"

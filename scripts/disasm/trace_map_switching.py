@@ -563,8 +563,13 @@ def dump_calibration_block():
 # Descriptor decode
 # ============================================================================
 
-TYPE_NAMES = {0x00:"float32", 0x02:"int8", 0x04:"int16", 0x08:"uint8", 0x0A:"uint16"}
-TYPE_SIZES = {0x00:4, 0x02:1, 0x04:2, 0x08:1, 0x0A:2}
+# Typecode map imported from the single source of truth (docs/corrections.md item 39).
+# Do NOT re-declare it here -- the old inline copy was a guess and mis-sized
+# 611 of 760 descriptors.
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from desc_types import TYPE_NAMES, TYPE_SIZES  # noqa: E402
+
 
 def decode_descriptor(desc_addr):
     """Decode a descriptor header at the given ROM address."""

@@ -1,0 +1,294 @@
+================================================================================
+DESCRIPTOR WIDTH CLEANUP + ARTIFACT RECONCILIATION
+Traced 2026-08-16 (session: code_chase_2026-08-16b)
+Reference bin: rom/AE5L600L 20g rev 20.19c.bin
+               md5 92cae8275cd4f9b473a3a9e36efe6449  (VERIFIED this session)
+Descriptor structure is rev-invariant; generators read rom/ae5l600l.bin (stock)
+as they always have. Both were checked to agree on every typecode cited here.
+================================================================================
+
+WHAT WAS DONE
+--------------------------------------------------------------------------------
+FIX 1, FIX 2, FIX 3 and DIG items D1, D3, D4 from
+docs/code_chase_2026-08-16b.md. D2 and D5 are NOT done -- see the end.
+
+
+FIX 1 - the typecode constant now lives in exactly one place (VERIFIED)
+--------------------------------------------------------------------------------
+New module: **scripts/desc_types.py**. It carries the decode evidence, the
+byte-form and word-form maps, and a `decode_cell()` helper. All five previous
+copies are gone; four scripts now import from it:
+
+  scripts/mapping/scan_descriptors.py     (corrected earlier, now imports)
+  scripts/mapping/name_descriptors.py
+  scripts/disasm/trace_avcs.py
+  scripts/disasm/trace_boost_control.py
+  scripts/disasm/trace_map_switching.py
+
+The `elif dtype == 0x02 / 0x0A` decode branches inside trace_avcs.py and
+trace_boost_control.py were also wrong and were rewritten to 0x0C / 0x10.
+
+Incidental bugs found and fixed while doing this -- each one meant the script
+could not run from the repo at all:
+
+  scan_descriptors.py     ROM_DIR   ..\rom          -> ..\..\rom
+  desc_to_func_xref.py    ROM_DIR   ..\rom          -> ..\..\rom
+  name_descriptors.py     ROM_DIR   ..\rom          -> ..\..\rom
+  gen_descriptor_labels.py DISASM_DIR ..\disassembly -> ..\..\disassembly
+
+Size guards of `2 <= size <= 64` in name_descriptors.py and desc_to_func_xref.py
+rejected two real descriptors (0xAE284 at 65 points, 0xAB334 at 78). Raised
+to 256.
+
+
+FIX 1 DIFF REPORT - what actually changed, and one thing that did NOT
+--------------------------------------------------------------------------------
+*** IMPORTANT CORRECTION TO THE BRIEF'S PREMISE ***
+The brief says the three trace_*.py scripts "generated avcs_analysis.txt,
+boost_control_analysis.txt and map_switching_analysis.txt". They do not. Each
+writes the corresponding **_raw.txt**; the *_analysis.txt files are hand-authored
+prose derived from them. So the regeneration touches the raw files only.
+
+And a wholesale regeneration would have been a NET LOSS. Diffing the freshly
+generated raw files against the committed ones:
+
+  avcs_raw.txt          27 dtype corrections  BUT  2 instructions downgraded
+                                                    (0x031E7E `425A lds r2,fpul`
+                                                     -> `.word 0x425A`)
+  map_switching_raw.txt  5 dtype corrections  BUT 18 instructions downgraded
+                                                    (0x04005A etc. `4F13
+                                                     stc.l gbr,@-r15` -> `.word`)
+  boost_control_raw.txt  9 dtype corrections, no regressions
+
+The committed raw files contain manual disassembly improvements the scripts
+cannot reproduce -- their built-in decoders do not know `lds Rm,FPUL` or
+`stc.l GBR,@-Rn`. This is exactly CLAUDE.md's warning that the per-script
+decoders in scripts/disasm/ are "usable, not authoritative".
+
+**Therefore the raw files were NOT overwritten.** They were reverted to HEAD and
+then patched surgically: only the type claim on each descriptor line was
+rewritten, with truth read from the ROM typecode byte per descriptor address
+(and, in avcs_raw.txt, from the `+0x10:` raw-bytes line already printed above
+each `Parsed as 2D` line). Result, line-for-line with zero collateral change:
+
+  avcs_raw.txt          27 changed / 27 lines touched
+  boost_control_raw.txt  9 changed /  9 lines touched
+  map_switching_raw.txt  5 changed /  5 lines touched
+
+TABLES WHOSE CLAIMED WIDTH CHANGED (the list of conclusions worth revisiting):
+
+  boost_control_raw.txt
+    0x0AA820  1D   uint8  -> uint16      0x0AB430  1D   int16 -> uint8
+    0x0AB674  1D   uint8  -> uint16      0x0AC2D0  1D   int16 -> uint8
+    0x0AC2E8  1D   int16  -> uint8       0x0AC300  1D   int16 -> uint8
+    0x0AF058  2D 8x6 int16 -> uint8      0x0AF074  2D 8x6 int16 -> uint8
+    0x0AB058  2D 9x7 uint8 -> uint16
+
+  avcs_raw.txt
+    27 lines, dominated by the 9x9 AVCS tables reading
+    `dtype=uint8` where the ROM typecode is 0x08 = uint16
+    (scale 0.0030517578125, bias -100.0 -- unchanged).
+
+  map_switching_raw.txt
+    0x0ADB4C / 0x0ADB60 / 0x0ADB74 / 0x0ADB88 / 0x0ADBB0
+    `unk_10` -> `int16`. Typecode 0x10 was simply unknown to the old map.
+    These are the only int16 descriptors found anywhere in this ROM, and they
+    are the hand-named desc_timing_blend_* set, which is why the 760-descriptor
+    census reports int16 = 0 (the census counts typed labels only).
+
+  named_descriptors.txt  regenerated in full (760 descriptors, unchanged count).
+    Category counts moved by one: RPM 79->78, Boost 26->27.
+
+NOT re-derived: the *_analysis.txt prose. Those files quote conclusions drawn
+from the raw files. The width corrections above are the input to re-checking
+them, and that re-check is NOT done here.
+
+
+FIX 2 - the Ghidra label chain (VERIFIED)
+--------------------------------------------------------------------------------
+disassembly/maps/descriptor_labels.txt : 610 of 760 typed labels rewritten from
+  the ROM typecode, 150 already correct, 15 hand-named labels carry no type
+  token and were left alone.
+
+disassembly/ghidra/ImportAE5L600L.java : 611 desc_* labels rewritten in two
+  passes (492 + 119). The second pass was needed because the file uses BOTH
+  `label(0x...L, "desc_...")` and `labelComment(0x...L, "desc_...")` and the
+  first regex only matched the former.
+
+  Labels are rewritten ONLY where the address appears in the regenerated
+  descriptor_map.txt. An earlier attempt read `rom[addr+2]` for every desc_*
+  label and produced garbage, because the java carries 860 desc_* labels
+  against 760 real descriptors -- 100 of them point at addresses that are not
+  descriptor records. That attempt was reverted, not shipped.
+
+  Final counts:  f32 148 | u8 215 | u16 396 | i8 0 | i16 0   (759 typed)
+  descriptor_map.txt says 149 / 215 / 396. The one-label gap is a single
+  float32 descriptor whose java label carries no type token. Accounted for,
+  not an error.
+
+disassembly/maps/desc_func_xref.txt : regenerated. See item 43 in
+  docs/corrections.md -- `invalid` fell from 874 to 2 once the `is_valid_axis`
+  off-by-one was fixed. 0xAD258 now reads `1D_vs_ECT`.
+
+
+FIX 3 - the two stale descriptions of the bug (DONE)
+--------------------------------------------------------------------------------
+CLAUDE.md: the "1-byte and 2-byte inverted" note is replaced with the decoded
+map, a pointer to scripts/desc_types.py, and an explicit as-of date recording
+that the artifacts have now been regenerated. The rule that they remain derived
+products is restated, not relaxed.
+
+scripts/coverage_map.py: the WARNING comment is rewritten. **The exclusion of
+descriptor_map.txt as evidence STANDS, deliberately.** Reason recorded in the
+file: coverage_map's acceptance rule (`axis + count*4 == data` exactly) is
+strictly stronger than the scanner's, and consuming the scanner's output here
+would make the two sides agree by construction and destroy the cross-check.
+Agreement between them is a real signal only because neither reads the other.
+
+
+D1 - 0xFFFF4130: THE BRIEF'S INFERENCE WAS WRONG. It is BATTERY VOLTAGE.
+--------------------------------------------------------------------------------
+The brief INFERRED baro, and correctly named its weakest link ("I have not
+traced the writer"). The weakest link broke.
+
+Writer, routine ending 0x005A5E:
+  005A40  C70C  mova @(0x005A74),r0    ; [0x5A74] = 0x47800000 = 65536.0
+  005A46  F32D  float fpul,fr3
+  005A48  F323  fdiv fr2,fr3           ; fr3 = filtered / 65536.0
+  005A4C  D30A  mov.l @(0x005A78),r3   ; [0x5A78] -> 0x0C0098, value 20.0
+  005A52  F312  fmul fr1,fr3           ; fr3 = (filtered/65536) * 20.0
+  005A56  F23A  fmov.s fr3,@r2         ; [0xFFFF4130] = fr3      <-- WRITER
+
+Full scale is **0..20**. That is volts. Barometric pressure would scale to
+~15 psi or ~101 kPa or ~1 bar, not 20.
+
+This independently confirms docs/corrections.md **item 10**, which had already
+settled 0xFFFF4130 = battery voltage by the strongest method available here:
+it feeds the definition-named axis 0xD91CC "Ignition Dwell / Battery Volts"
+with breakpoints 8, 10, 12, 14, 16 V.
+
+So the artifact that is wrong is **adc_pipeline_trace.txt**, not corrections.md.
+Its ADDR-4 pipeline STRUCTURE (raw 0xFFFF402C -> filt 0xFFFF4134 -> out
+0xFFFF4130) is correct and is corroborated by the writer above; only the sensor
+NAME attached to ADDR 4 was wrong.
+
+Knock-on: adc_pipeline_trace.txt also claimed ADDR 7 (out = 0xFFFF41E0) is
+battery voltage. It is not, and item 10 had already rejected that. Traced here:
+  008150  D215  mov.l @(0x0081A8),r2   ; -> 0x0C00B0 = 25.0
+  00815C  D313  mov.l @(0x0081AC),r3   ; -> 0x0C00B4 = -62.5
+  008160  F008  fmov.s @r0,fr0         ; inline float at 0x81B0 = 5/65536
+  008162  F23E  fmac fr0,fr3,fr2       ; fr2 = raw*25.0*(5/65536) + (-62.5)
+  008166  F12A  fmov.s fr2,@r1         ; [0xFFFF41E0] = fr2
+Range **-62.5 .. +62.5**, zero at mid-scale -- a bidirectional quantity. Neither
+volts nor baro. **Identity NOT established.** Left explicitly unnamed.
+
+Corrected: adc_pipeline_trace.txt (ADDR 4, ADDR 7, and the summary line that
+said battery voltage = 0xFFFF41E0), boost_control_analysis.txt and
+boost_control_raw.txt (`ignition_switch_state` -> `battery_voltage`, 5 sites).
+
+**ad258_wot_enrichment_trace.txt needs no correction on this point.** Its
+parenthetical "(same block as FFFF4130 battery voltage)" is right. The brief
+flagged it as a bad strand; it is not. The argument it supported was only
+"FFFF4144 lives in the 0xFFFF41xx ADC block", which holds either way, and the
+ECT conclusion never rested on it -- it rests on the 70.0 degC failsafe and the
+definition XML naming 0xCC664 "Coolant Temperature".
+
+
+D3 - the dispatch trampolines (VERIFIED), and func_3952C's caller (FOUND)
+--------------------------------------------------------------------------------
+Both tables decoded from the bin. Trampoline = the slot address is a `bra`.
+
+  table A @ 0x0480B8, 19 entries -- ONE trampoline:
+    A[13] 0x03756C -> 0x03757E
+  table B @ 0x04A0B8, 20 entries -- SIX trampolines:
+    B[ 5] 0x03160A -> 0x03161E      B[ 8] 0x039528 -> 0x039668
+    B[10] 0x036C3C -> 0x036C48      B[11] 0x037B68 -> 0x037B74
+    B[15] 0x03605E -> 0x03643A      B[17] 0x03A222 -> 0x03A230
+
+Matches the brief exactly. The entry addresses in fueling_pipeline_analysis.txt
+are right; the functions behind seven of them start elsewhere.
+
+**B[8] dispatches to 0x039668, and nothing in either table reaches func_3952C.**
+Confirms the brief's sharp case.
+
+**func_3952C's caller: FOUND.** There is a THIRD dispatch table, 93 contiguous
+code pointers at **0x04ACB8-0x04AE28**. Slot 20 (`0x04AD08`) holds
+**0x00039524** -- the stub whose `bra` lands on 0x03952C.
+
+  0x00039524 occurs exactly once in the whole ROM, at 0x04AD08.
+  0x00039528 occurs exactly once, at 0x04A0D8 = table B base + 4*8. (B[8].)
+  0x0003952C and 0x00039668 occur nowhere.
+
+So the 0x39524 / 0x39528 stub pair is not an off-by-one at all: the two stubs
+are entries in two DIFFERENT tables. Table B slot 8 reaches 0x39668 via 0x39528;
+table C slot 20 reaches func_3952C via 0x39524.
+
+OPEN: no 4-aligned literal anywhere points at 0x04ACB8 or 0x04ACB4, so the
+consumer of table C is not yet located. It is presumably reached with a
+non-zero displacement or a computed base. NOT chased.
+
+
+D4 - 0x37B74 (PARTIAL - both existing names are unsupported)
+--------------------------------------------------------------------------------
+0x037B68 is `A004` = `bra +4` -> 0x037B74. But it is one of THREE adjacent
+stubs, not a lone trampoline:
+    0x37B68  A004 -> 0x37B74
+    0x37B6C  A071 -> 0x37C52
+    0x37B70  A096 -> 0x37CA0
+and 0x37B70 is itself slot 29 of table C (0x04AD2C = 0x00037B70). So this is a
+stub group with three distinct entry points, and "0x37B68 and 0x37B74 are one
+function" is true only for that pair.
+
+func_37B74, VERIFIED from its preamble:
+    GBR = 0xFFFF7AB4                       (literal 0x037CEC)
+    r13 = 0xFFFF7AD8                       (literal 0x037D24)
+    fr8 = float[0xFFFF6624]  = RPM         -> stored at [r13-4] = 0xFFFF7AD4
+    fr8 = float[0xFFFF6350]  = ECT         -> stored at [r13]   = 0xFFFF7AD8
+    byte[0xFFFF726C] -> @(28,gbr) ; byte[0xFFFF7C68] -> @(30,gbr)
+    two table_lookup (0xBE830) calls on descriptors 0x0AC648 and 0x0AC634
+
+Both descriptors decoded from the bin:
+    0x0AC634  1D, 16, uint8, scale 1/128, bias 0
+              axis 0x0CCE18 = 0,800,1200,...,6400   (RPM)
+              data 0x0CCE58 = ALL ZERO
+    0x0AC648  1D, 16, uint8, scale 1/128, bias 0
+              axis 0x0CC624 = -40..110              (ECT)
+              data 0x0CCE68 = ALL ZERO
+
+So: the inputs are **RPM and ECT**, the tables are **1-D**, and both are
+**flat zero** on this calibration.
+
+fueling_pipeline_analysis.txt:61 calls B[11] "Injector compensation (2D maps,
+RPM/load indexed)". That is wrong on dimensionality (1-D, not 2-D) and on axis
+(ECT, not load). The competing "enrichC / AFL application" name is at least
+consistent with the workspace -- enrichC is 0xFFFF7AE4, which is r13+12 inside
+this function's 0xFFFF7AD8 workspace -- but I did **not** trace the write to
+0xFFFF7AE4, so I am not asserting it.
+
+**Neither existing name is supported by what was decoded. I am not inventing a
+third.** What is VERIFIED: 1-D, RPM- and ECT-indexed, both comps zero, workspace
+at 0xFFFF7AD8 under GBR 0xFFFF7AB4.
+
+The practical consequence for the fuel model is limited either way: with both
+tables identically zero, this term contributes nothing on this calibration,
+exactly like 0xAD258. Whether the multiplicative model's third term is
+mislabeled remains OPEN.
+
+
+NOT DONE
+--------------------------------------------------------------------------------
+D2 (0xFFFF798C scalar vs GBR base) -- not started.
+D5 (the 446-address RAM reconciliation sweep) -- not started.
+Re-derivation of the three *_analysis.txt prose files against the corrected
+widths -- not started; the width list above is the input to it.
+Table C's consumer -- not located.
+
+Verification gates after all edits above: `.\scripts\check.ps1` reports
+**both gates clean** -- disassembly baseline 29 accepted non-errors (28 symbolic
++ 1 accepted, unchanged), registry current after re-running coverage_map.py.
+Registry totals are unchanged: 351 VERIFIED-BOTH, 293 VERIFIED-BYTES,
+2 CONFLICT, 53 BOUNDS-SUSPECT, 21 DEFS-ONLY, 927 DISASM-ONLY, 3078 UNMAPPED.
+That is expected -- coverage_map never read the poisoned artifacts.
+
+NO ROM EDITS.
+================================================================================

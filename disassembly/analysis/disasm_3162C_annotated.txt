@@ -251,7 +251,11 @@ KEY RAM ADDRESSES
   FFFF61F4 - System status byte (bit 3 = cranking/starting flag?)
   FFFF620C - Comparison base value (loaded into FR12)
   FFFF6350 - Temperature value (checked > -15.0)
-  FFFF6354 - Input to speed computation
+  FFFF6354 - Coolant temperature degC (gated copy). [CORRECTED 2026-08-16: was
+             "Input to speed computation" -- wrong. This function computes speed
+             THRESHOLDS and gates them on a temperature, which is how the speed
+             label leaked in from the neighbouring FFFF67EC compare. See
+             docs/corrections.md item 40.]
   FFFF6624 - RPM/frequency value (loaded into FR15)
   FFFF6898 - RPM value (loaded into FR14, delta computed)
   FFFF653C - (loaded but overwritten by FFFF77DC)

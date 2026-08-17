@@ -342,9 +342,19 @@ def deref_widths(buf, lit, addr, back=0x400, fwd=14):
 # next descriptor pointer implies 1 byte/cell 83 times vs 2 bytes/cell 7 times;
 # for 0x0800 it implies 2 bytes/cell 232 times vs 4 bytes/cell 13 times.
 #
-# WARNING: disassembly/maps/descriptor_map.txt prints 0x0400 as "int16" and
-# 0x0800 as "uint8" -- its Type column has 1-byte and 2-byte INVERTED.  That
-# file is therefore never used as evidence here.
+# HISTORY: disassembly/maps/descriptor_map.txt used to print 0x0400 as "int16"
+# and 0x0800 as "uint8".  That was NOT a 1-byte/2-byte inversion as previously
+# noted here -- it was a shifted map that also lost signedness and dropped
+# typecodes 0x0C00/0x1000 entirely (docs/corrections.md item 39).  It was
+# regenerated correctly on 2026-08-16 and now agrees with _TYPECODE_WIDTH below.
+#
+# The exclusion nonetheless STANDS, deliberately: that file is still a derived
+# product, and this module's acceptance rule (below) is strictly stronger than
+# the scanner's -- it requires exact contiguous layout rather than a plausible
+# axis.  Keeping the two sides independent is the entire point of the
+# cross-check; consuming descriptor_map.txt here would make coverage_map agree
+# with the scanner by construction and destroy the corroboration.  Agreement
+# between them is now a real signal precisely because neither reads the other.
 #
 # ACCEPTANCE RULE (deliberately high precision, not high recall): a candidate is
 # accepted only when the Subaru contiguous layout holds exactly --

@@ -47,8 +47,13 @@ def r_f32(a): return struct.unpack_from(">f", rom, a)[0]
 def is_rom_ptr(v): return 0x1000 <= v < ROM_LEN
 def is_ram_ptr(v): return 0xFFFF0000 <= v <= 0xFFFFFFFF
 
-TYPE_NAMES = {0x00:"float32", 0x02:"int8", 0x04:"int16", 0x08:"uint8", 0x0A:"uint16"}
-TYPE_SIZES = {0x00:4, 0x02:1, 0x04:2, 0x08:1, 0x0A:2}
+# Typecode map imported from the single source of truth (docs/corrections.md item 39).
+# Do NOT re-declare it here -- the old inline copy was a guess and mis-sized
+# 611 of 760 descriptors.
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from desc_types import TYPE_NAMES, TYPE_SIZES  # noqa: E402
+
 
 KNOWN_RAM = {
     0xFFFF6624: "rpm_current",
@@ -476,11 +481,12 @@ def read_data(ptr, count, dtype, scale, bias):
     esz = TYPE_SIZES.get(dtype, 1)
     for i in range(count):
         a = ptr + i * esz
+        # typecodes corrected 2026-08-16 -- see scripts/desc_types.py
         if dtype == 0x00:    rv = r_f32(a)
-        elif dtype == 0x02:  rv = rom[a]; rv = rv - 256 if rv > 127 else rv
-        elif dtype == 0x04:  rv = r_s16(a)
-        elif dtype == 0x08:  rv = rom[a]
-        elif dtype == 0x0A:  rv = r_u16(a)
+        elif dtype == 0x04:  rv = rom[a]
+        elif dtype == 0x08:  rv = r_u16(a)
+        elif dtype == 0x0C:  rv = rom[a]; rv = rv - 256 if rv > 127 else rv
+        elif dtype == 0x10:  rv = r_s16(a)
         else:                rv = rom[a]
         raw.append(rv)
         phys.append(rv if dtype == 0x00 else rv * scale + bias)

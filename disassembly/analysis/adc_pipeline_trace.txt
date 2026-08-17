@@ -12,10 +12,18 @@ Bulk reader: 0x040DE | GBR base: 0xFFFF4024 | 32 channels
   ADDR 1  raw=0xFFFF4026  filt=    ---       out=    ---       [MED]        Knock Channel 1
   ADDR 2  raw=0xFFFF4028  filt=    ---       out=    ---       [MED]        Knock Channel 2
   ADDR 3  raw=0xFFFF402A  filt=    ---       out=    ---       [MED]        Knock Channel 3
-  ADDR 4  raw=0xFFFF402C  filt=0xFFFF4134  out=0xFFFF4130  [MED]        Atmospheric Pressure (Baro)
+  ADDR 4  raw=0xFFFF402C  filt=0xFFFF4134  out=0xFFFF4130  [MED]        BATTERY VOLTAGE  [CORRECTED 2026-08-16, corrections.md item 45]
+          The pipeline STRUCTURE here is right; only the sensor name was wrong. Writer 0x005A56
+          `fmov.s fr3,@r2` computes [FFFF4130] = filtered/65536.0 * 20.0 -> full scale 0..20,
+          which is volts, not pressure. Confirmed by corrections.md item 10: FFFF4130 feeds the
+          definition-named axis 0xD91CC 'Ignition Dwell / Battery Volts' (8,10,12,14,16 V).
   ADDR 5  raw=0xFFFF402E  filt=0xFFFF410C  out=0xFFFF4108  [MED]        TPS / Throttle Position A
   ADDR 6  raw=0xFFFF4030  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 6
-  ADDR 7  raw=0xFFFF4032  filt=0xFFFF41E4  out=0xFFFF41E0  [MED]        Battery Voltage
+  ADDR 7  raw=0xFFFF4032  filt=0xFFFF41E4  out=0xFFFF41E0  [MED]        UNIDENTIFIED  [CORRECTED 2026-08-16]
+          NOT battery voltage -- that is ADDR 4. Writer 0x008166 `fmov.s fr2,@r1` computes
+          [FFFF41E0] = raw * 25.0 * (5/65536) - 62.5, i.e. a BIDIRECTIONAL -62.5..+62.5 range
+          (zero at mid-scale). That is neither volts (0..20) nor baro. Identity NOT established;
+          do not name it without tracing the axis it feeds.
   ADDR 8  raw=0xFFFF4034  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 8
   ADDR 9  raw=0xFFFF4036  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 9
   ADDR10  raw=0xFFFF4038  filt=    ---       out=    ---       [LOW]        Knock/Sensor Ch 10
@@ -108,7 +116,7 @@ Bulk reader: 0x040DE | GBR base: 0xFFFF4024 | 32 channels
   |  pCoolantTemp      = 0xFFFF4144 (float, via ECT desc)                  |
   |  IAT               = 0xFFFF4128 (float, via IAT desc)                  |
   |  Fuel Temp          = 0xFFFF41F4 (float, via Fuel Temp desc)            |
-  |  Battery Voltage   = 0xFFFF41E0 (float, heavy filter)                  |
+  |  Battery Voltage   = 0xFFFF4130 (float)  [was 41E0 -- WRONG, item 45]  |
   |  Baro/Atm Pressure = 0xFFFF42FC (float, MAP Scaling desc)              |
   +-----------------------------------------------------------------------+
 

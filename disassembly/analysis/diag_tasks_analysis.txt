@@ -51,7 +51,7 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
       FFFF65FC  engine_load_current (float)
       FFFF895C  injector_data (float, was 'afl_learning_val' — see fueling_pipeline Section 15)
       FFFF7FBC  previous_timing_output (float)
-      FFFF6354  ect_raw_adc (float)
+      FFFF6354  ect_gated_c (float, degC)  [renamed 2026-08-16; raw is at FFFF4144]
 
     Call: 0x2F8EA -- unknown helper, result stored to stack
     Call: table_1d_lookup with FFFF4494 input
@@ -62,7 +62,7 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
        readiness = cal[0xD9A4C] = 1.0  (full readiness immediately)
 
     2. If atm_pressure_current < cal[0xD9A3C] (float, = 0 -- always passes):
-       readiness = 1D table lookup on ect_raw_adc via desc 0xAF5CC
+       readiness = 1D table lookup on ect_gated_c via desc 0xAF5CC
 
     3. If fuel_system_state NOT set:
        Branch to step 8 (fallback)
@@ -120,7 +120,10 @@ TASK 53: DIAGNOSTIC READINESS MONITOR @ 0x602DC
     FFFF65FC   float  Engine load current
     FFFF895C   float  Injector data (rate-limited composite; not AFL learning)
     FFFF7FBC   float  Previous timing output (previous cycle)
-    FFFF6354   float  Vehicle speed
+    FFFF6354   float  Coolant temperature degC (gated copy)  [CORRECTED 2026-08-16:
+                      was "Vehicle speed" -- wrong. Writer 0x01F730/0x01F746, failsafe
+                      70.0 degC at 0x01F940. This file already said ect_raw_adc at the
+                      Task-listing above; the two were inconsistent. corrections.md #40]
     FFFF9080   float  Readiness workspace [0]
     FFFF9084   float  Readiness value (current)
     FFFF9088   float  Readiness input (scaled tick)

@@ -7,7 +7,7 @@ Based on pattern analysis of known descriptors:
 1D Descriptor (20 bytes):
   +0x00: 0x00 (padding)
   +0x01: axis_size (uint8, number of axis breakpoints)
-  +0x02: data_type (uint8): 0x00=f32, 0x02=i8, 0x04=i16, 0x08=u8, 0x0A=u16
+  +0x02: data_type (uint8): 0x00=f32, 0x04=u8, 0x08=u16, 0x0C=i8, 0x10=i16
   +0x03: 0x00 (second dim = 0, marks this as 1D)
   +0x04: axis_ptr  (uint32, ROM addr → float32[axis_size])
   +0x08: data_ptr  (uint32, ROM addr → data[axis_size])
@@ -28,19 +28,31 @@ Based on pattern analysis of known descriptors:
 
 Discriminator: byte[3] == 0 → 1D, byte[3] != 0 → 2D
 
-Data types (from table_desc_1d_float jump table at 0xBE860):
-  0x00 = float32 (4 bytes)
-  0x02 = int8    (1 byte, sign-extended)
-  0x04 = int16   (2 bytes, sign-extended)
-  0x08 = uint8   (1 byte)
-  0x0A = uint16  (2 bytes)
+Data types -- DECODED from the loader jump table at 0xBE860, not guessed.
+Corrected 2026-08-16; the previous map (0x02=int8, 0x04=int16, 0x08=uint8,
+0x0A=uint16) was wrong and mis-sized 611 of 760 descriptors. See
+disassembly/analysis/ad258_wot_enrichment_trace.txt PART 1 and
+docs/corrections.md item 39.
+
+The typecode byte indexes a table of LONGS at 0xBE860 via
+`mova @(0x0BE860),r0 / mov.l @(r0,r3),r2`, so it is ALWAYS a multiple of 4.
+0x02 and 0x0A are structurally impossible.
+
+  typecode  handler   decode                                width
+  0x00      0xBEACC   shll2 (x4), fmov.s                    float32, 4 bytes
+  0x04      0xBEB20   add r0,r1 (x1), mov.b + extu.b        uint8,   1 byte
+  0x08      0xBEB6C   shll (x2),  mov.w + extu.w            uint16,  2 bytes
+  0x0C      0xBEAE4   add r0,r1 (x1), mov.b, no extu        int8,    1 byte
+  0x10      0xBEB00   shll (x2),  mov.w, no extu            int16,   2 bytes
 """
 import os
 import struct
 import sys
 from collections import defaultdict
 
-ROM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rom")
+# repo root is two levels up from scripts/mapping/ -- was "..", which resolved to
+# scripts/rom and does not exist (fixed 2026-08-16).
+ROM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "rom")
 
 def load_rom():
     p = os.path.join(ROM_DIR, "ae5l600l.bin")
@@ -59,11 +71,11 @@ def r_u32(rom, a): return struct.unpack_from(">I", rom, a)[0]
 def r_f32(rom, a): return struct.unpack_from(">f", rom, a)[0]
 
 TYPE_NAMES = {
-    0x00: "float32", 0x02: "int8", 0x04: "int16",
-    0x08: "uint8", 0x0A: "uint16"
+    0x00: "float32", 0x04: "uint8", 0x08: "uint16",
+    0x0C: "int8", 0x10: "int16"
 }
 TYPE_SIZES = {
-    0x00: 4, 0x02: 1, 0x04: 2, 0x08: 1, 0x0A: 2
+    0x00: 4, 0x04: 1, 0x08: 2, 0x0C: 1, 0x10: 2
 }
 
 def is_rom_ptr(val, rom_len):
@@ -215,16 +227,16 @@ def read_data_1d(rom, ptr, size, dtype):
         a = ptr + i * elem_size
         if dtype == 0x00:
             values.append(r_f32(rom, a))
-        elif dtype == 0x02:
+        elif dtype == 0x04:
+            values.append(rom[a])
+        elif dtype == 0x08:
+            values.append(r_u16(rom, a))
+        elif dtype == 0x0C:
             v = rom[a]
             values.append(v - 256 if v > 127 else v)
-        elif dtype == 0x04:
+        elif dtype == 0x10:
             v = r_u16(rom, a)
             values.append(v - 65536 if v > 32767 else v)
-        elif dtype == 0x08:
-            values.append(rom[a])
-        elif dtype == 0x0A:
-            values.append(r_u16(rom, a))
     return values
 
 

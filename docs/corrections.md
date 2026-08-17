@@ -1934,3 +1934,408 @@ The decision calibration `0xD9AC0-0xD9E30` is byte-identical to stock.
 * **Section 4.2's SI-DRIVE reading is unverified and probably wrong** — the bit
   tests at `0x040098`/`0x0400AC` select an engine-speed source, and neither
   branch writes `0xFFFF90A8`. This car has no SI-Drive input.
+
+---
+
+## 39. The descriptor typecode map was guessed, and it mis-sized 611 of 760 tables — **FIXED 2026-08-16**
+
+**Reference bin:** `rom/AE5L600L 20g rev 20.19c.bin`, md5 `92cae8275cd4f9b473a3a9e36efe6449`.
+
+`scripts/mapping/scan_descriptors.py` carried this map in its docstring and in
+`TYPE_NAMES`/`TYPE_SIZES`:
+
+```
+0x00 = float32   0x02 = int8   0x04 = int16   0x08 = uint8   0x0A = uint16
+```
+
+It was never decoded — it was inferred from the data. The real map comes out of
+the loader dispatch table at `0x0BE860`, which `table_lookup` (`0x0BE830`)
+indexes with the typecode byte via `mova @(0x0BE860),r0 / mov.l @(r0,r3),r2`.
+Because that is a table of **longs**, the typecode is always a multiple of 4 —
+`0x02` and `0x0A` are structurally impossible encodings.
+
+| typecode | handler | index scaling | load | truth |
+|---|---|---|---|---|
+| `0x00` | `0x0BEACC` | `shll2` (x4) | `fmov.s` | float32, 4 B |
+| `0x04` | `0x0BEB20` | `add r0,r1` (x1) | `mov.b` + `extu.b` | **uint8**, 1 B |
+| `0x08` | `0x0BEB6C` | `shll` (x2) | `mov.w` + `extu.w` | **uint16**, 2 B |
+| `0x0C` | `0x0BEAE4` | `add r0,r1` (x1) | `mov.b`, no extu | int8, 1 B |
+| `0x10` | `0x0BEB00` | `shll` (x2) | `mov.w`, no extu | int16, 2 B |
+
+**Scope of the damage.** Audited every row of `descriptor_map.txt` against the
+typecode byte in the bin (1-D at record+2, 2-D at record+16):
+
+* 1-D: 621 rows, **492 wrong** (331 "uint8" really uint16, 161 "int16" really uint8)
+* 2-D: 139 rows, **119 wrong** (65 "uint8" really uint16, 54 "int16" really uint8)
+* **Total 611 of 760 rows had the wrong cell width**, i.e. the wrong table extent.
+
+The file never once said `uint16`, though 396 of the 760 descriptors are uint16.
+It said `int16` 215 times; there are zero int16 descriptors in this ROM.
+
+This is NOT the "1-byte/2-byte inverted" note in CLAUDE.md — that note described
+the symptom and got the mechanism wrong. It is a shifted mapping.
+
+**Fixed:** typecode map corrected in `scripts/mapping/scan_descriptors.py`
+(names, sizes, `read_data_1d` branches, and both docstrings), and
+`disassembly/maps/descriptor_map.txt` regenerated. New totals — uint16 396,
+uint8 215, float32 149 — reproduce an independent hand audit exactly. Every
+other column (address, dim, count, scale, bias, pointers, axis range) is
+identical to the previous file, so only the type/width claim moved.
+
+`disassembly/maps/descriptor_labels.txt` inherited the same error in its label
+names (`..._u8_16_AD258`). 610 of its 760 typed labels were rewritten from the
+ROM typecode; 150 were already right; the 15 hand-named labels carry no type
+token and were left alone. Final tallies match `descriptor_map.txt` exactly.
+
+**Also fixed alongside:** `ROM_DIR` in `scan_descriptors.py` and
+`desc_to_func_xref.py`, and `DISASM_DIR` in `gen_descriptor_labels.py`, all
+resolved one level short (`scripts/rom`, `scripts/disassembly`). None of the
+three could run from the repo as committed.
+
+**Consequence to carry:** anything that read a cell width, a table extent, or a
+cell value out of `descriptor_map.txt` before this date is suspect for 80% of
+descriptors. The definition XMLs were never affected — they are independent.
+
+---
+
+## 40. `0xFFFF6354` is coolant temperature, not vehicle speed — **FIXED 2026-08-16**
+
+Three artifacts disagreed:
+
+| artifact | claim |
+|---|---|
+| `disassembly/maps/ram_reference.txt:139` | `ect_raw_adc` — ECT raw ADC value |
+| `disassembly/analysis/diag_tasks_analysis.txt:123` | **Vehicle speed** |
+| `disassembly/analysis/disasm_3162C_annotated.txt:254` | **Input to speed computation** |
+
+`diag_tasks_analysis.txt` contradicted *itself* — line 54 of the same file
+already said `ect_raw_adc`.
+
+**Settled from the writer.** All 69 literal-pool references to `0xFFFF6354` are
+**reads**, which is why earlier passes could not resolve it. The writes are
+indexed stores off a neighbouring base:
+
+```
+01F72C  D283  mov.l @(0x01F93C),r2    ; r2 = 0xFFFF6360
+01F72E  E0F4  mov  #-12,r0
+01F730  F2E7  fmov.s fr14,@(r0,r2)    ; [FFFF6354] = FR14      (good path)
+01F742  D27E  mov.l @(0x01F93C),r2
+01F744  E0F4  mov  #-12,r0
+01F746  F247  fmov.s fr4,@(r0,r2)     ; [FFFF6354] = FR4       (failsafe path)
+```
+
+Routine `0x01F6E0` reads ONE source float — `0xFFFF4144`, the linearised sensor
+in the same ADC block as `0xFFFF4130` battery voltage — and fans it out to
+`FFFF6350` / `FFFF6354` / `FFFF6358` / `FFFF635C` under four different validity
+gates. On every failsafe path it writes the constant at `0x01F940`:
+
+```
+0x01F940 = 0x428C0000 = 70.0
+```
+
+**70 is the limp-home coolant temperature in Celsius.** A vehicle-speed failsafe
+would be 0.0. `FFFF6350` — already accepted as ECT — is written by the same
+routine from the same source float, four bytes away.
+
+Corroborating, independently:
+* The one table it feeds, descriptor `0xAD258`, has a −40..110 axis at `0xCC664`,
+  which the project definition XML names **"Coolant Temperature"** (lines 423, 1646).
+* The main IPW calculator at `0x03817C` loads it directly
+  (`038194 mov.l @(0x03837C),r2 ; 038196 fmov.s @r2,fr12`, `0x03837C = 0xFFFF6354`) —
+  expected for coolant, not for a speed copy.
+
+**"raw ADC" was also wrong.** The raw value is upstream at `0xFFFF4144`;
+`0xFFFF6354` is the scaled Celsius value after failsafe substitution.
+Renamed `ect_raw_adc` -> **`ect_gated_c`** in `ram_reference.txt`,
+`ImportAE5L600L.java`, `diag_tasks_analysis.txt` and `disasm_3162C_annotated.txt`.
+
+The speed label most likely leaked in from the neighbouring `0xFFFF67EC` speed
+compare in the same key-address list in `disasm_3162C_annotated.txt`.
+
+---
+
+## 41. The FLKC grid is bucketed 7x5=35, not an interpolated 6x4 — **FIXED 2026-08-16**
+
+Two RAM identities were wrong, and the whole access model was wrong.
+
+**`0xFFFF3248` was `per_cylinder_knock_retard`, "float[4] indexed by cylinder".**
+It is the **FLKC learning grid: 35 cells x 8 bytes**. Nothing indexes it by
+cylinder. Three independent confirmations:
+1. read `0x0462AE` and write `0x0464D8` both use `index*8`;
+2. the reset loop at `0x046824` runs `mov #35,r12` / `add #8,r13`;
+3. `0xFFFF3248 + 35*8 = 0xFFFF3360`, exactly the base of the parallel u16 array.
+
+**`0xFFFF8298` was `flkc_fg_cyl_index`, "current cylinder/bank index".** It is
+the **grid cell index, 0..34**, computed as `rpm_band*5 + load_band` and bounded
+by `mov #35,r5 / cmp/ge` at `0x046288`. A cylinder index would be 0..3.
+Same mislabel class as the gear byte (`cylinder_index` at `0xFFFF6812`).
+
+**The access model.** The axis values at `0xD2F0C` (6 RPM) and `0xD2F28`
+(4 load) are **band BOUNDARIES, not cell centres**. The selector at `0x0461D2`
+walks each axis and returns `band = count of boundaries <= input`, giving
+**7 RPM bands and 5 load bands = 35 cells**. Downward transitions require extra
+margin (`0xD2F24` = 50 rpm, `0xD2F38` = 0.02 load); upward transitions are
+immediate. There is **no interpolation anywhere** — write is one cell, read is
+one cell. Out-of-grid is unreachable because the outermost band is unbounded.
+
+**Consequence:** a knock event at one load **cannot** bleed into cells at another
+load. Any claim that a mid-load event "taxes the boost cells" is false.
+
+Newly named in the same pass: `0xFFFF82A8` `flkc_rpm_band`, `0xFFFF82A9`
+`flkc_load_band`, `0xFFFF82AD..B0` the four range-gate flags. The gate
+(ANDed into `0xFFFF829E` at `0x0467E8`) gates **writes only** — the readback at
+`0x0462AE` is unconditional. Benign at current calibration because the reset
+loop zeroes all 35 cells.
+
+Full trace: `disassembly/analysis/flkc_grid_interpolation_trace.txt`.
+
+---
+
+## 42. `0xAD258` is not a WOT enrichment factor and is inert — **FIXED 2026-08-16**
+
+`disassembly/analysis/fueling_pipeline_analysis.txt:60` and `:426` said
+`0x39528  WOT enrichment factor (2D map 0xAD258)`, `(RPM x load)`, output
+"used by Main IPW calculator". Wrong on four counts:
+
+1. **Function entry is `0x3952C`**, not `0x39528` (`0x39528` is `bra 0x039668`,
+   a sibling dispatch stub). `func_3952C` is reached by `bra` from `0x039524`;
+   there is no literal `0x0003952C` in the ROM and no bsr in range.
+2. **The table is 1-D, 16 points, uint16**, scale 1/2048, bias 0.0 — not 2-D.
+3. **Its axis is coolant temperature** (`0xCC664`, −40..110 °C), not RPM x load.
+4. **It is not on the IPW path.** Its outputs are `FFFF7BAC`/`FFFF7BA8`
+   (AFR-deviation metric); `0xFFFF7BC0` is a scratch spill read once, eight
+   instructions later. The IPW calculator at `0x03817C` has **zero** references
+   to the `FFFF7B90-7BD0` block (literal pool `0x038370-0x038420` scanned).
+
+**And it is inert three times over**, any one sufficient: the data is flat 1.0
+at all 16 points; the branch that uses it is only reached when
+`byte[0xFFFF782C] != 0`; and that branch's result is clamped to `[0.0, 0.0]` by
+`0x0CC3EC` (CL) and `0x0CC3F0` (OL), **both of which are 0.0**. `clamp(v,0,0)`
+returns 0.0 for every v.
+
+The `0xFFFF7448` CL/OL mode flag selects which of the two zero limits is used —
+the OL branch is the only one that multiplies by the table at all (`0x0395B8
+fmul fr9,fr4`), and it is zeroed regardless.
+
+The sibling branch (`byte[0xFFFF782C] == 0`, subroutine `0x3961C`) never touches
+the table and uses a **live** limit of `0x0CC3E8 = 0.03`.
+
+**Consequence:** `0xAD258` was logged as "the last unextracted multiplier in the
+IPW stack". It was never in that stack. Closing it removes it as an injector-
+sizing lever. Full trace and the redirect for the FFB-below-map gap:
+`disassembly/analysis/ad258_wot_enrichment_trace.txt`.
+
+---
+
+## 43. `desc_func_xref.txt` marked 874 of 995 descriptors "invalid" because of an off-by-one — **FIXED 2026-08-16**
+
+`is_valid_axis()` in `scripts/mapping/desc_to_func_xref.py` counted monotonic
+**pairs** (maximum `len(vals)-1`) but compared against `len(vals) * 0.7`:
+
+```python
+increasing = sum(1 for i in range(len(vals)-1) if vals[i+1] >= vals[i])
+return increasing >= len(vals) * 0.7
+```
+
+The caller passes `min(size, 3)`, so `vals` has 3 elements, `increasing` maxes
+at 2, and the threshold is 2.1. **A perfectly monotonic axis returned False.**
+The function returned False for every axis it was ever given, so every 1-D
+descriptor was classified `invalid`; only 2-D descriptors (which skip the axis
+check) survived.
+
+Fixed to compare against the pair count. A second, unrelated guard rejected
+`size > 64`, which is wrong for two real descriptors — `0xAE284` (65 points) and
+`0xAB334` (78 points); raised to 256.
+
+**Result: `invalid` drops from 874 to 2**, and both survivors are genuine —
+`0xAF970` is float data (`bf800000` = −1.0, ...) that the pointer scan
+mis-picked. `0xAD258` now classifies correctly as `1D_vs_ECT`, which is what
+CLAUDE.md's rule-1 warning about derived products was pointing at.
+
+**Open, flagged not settled:** with the classifier fixed, `0xAE284` decodes as a
+**1-D, 65-point, float32** descriptor (axis `0xD4128` spanning 0..3.5, data
+`0xD422C` spanning 0..304), classified `1D_vs_Load` and sitting in `knock_area`.
+Project notes record `0xAE284` as an **RPM x IAT** knock-detection threshold.
+Those cannot both be right. Not resolved here — flagged for a dedicated pass.
+
+---
+
+## 44. `KNOCK_FLAG` (`0xFFFF81BA`) is the shared pre-gate knock trigger — **RESOLVED 2026-08-16**
+
+The repo's `logs/logcfg.txt` did not define `KNOCK_FLAG`, so the paramid behind
+log column 34 was unknown and the channel was barred from use. The live logger
+config was pulled off the SD card on 2026-08-16 and now matches the log:
+
+```
+paramname = KNOCK_FLAG
+paramid   = 0xFF81BA          -> RAM 0xFFFF81BA (byte)
+scalingrpn = x
+```
+
+**Writer.** Written at exactly two sites, both GBR-relative (which is why a
+pointer-based scan finds only reads), inside the knock detector whose prologue
+sets `GBR = 0xFFFF80FC` at `0x043798`:
+
+```
+043B5A  C0BE  mov.b r0,@(190,gbr)     ; 0xFFFF80FC + 190 = 0xFFFF81BA
+043B5E  C0BE  mov.b r0,@(190,gbr)
+```
+
+Cleared to 0 on either early-out; set to 1 when the detector's magnitude test
+passes and the cycle counter `r11` has reached the u16 threshold at
+`0x0D29DC` (= 250). The companion byte `0xFFFF81BB` (`@(191,gbr)`) sub-classifies
+the two set paths.
+
+**Consumers.** Thirteen read sites. Two matter:
+* `0x0443C4` — the FBKC path (`fbkc_path_trace.txt:21` calls it the primary
+  FBKC trigger).
+* `0x0463E2` — the FLKC learn routine loads it into `r7`; at `0x046460`
+  `tst r7,r7` routes zero to the advance path and non-zero to the retard path.
+
+**Verdict: it is a genuine knock-sensor-domain flag sitting UPSTREAM of both
+FBKC and FLKC** — the pre-gate signal the channel was hoped to be. It is usable,
+but as a witness of *detection*, not of *applied retard*, and with two caveats:
+
+1. It is a **per-ignition-event** flag. At ~2000 rpm a 4-cylinder fires roughly
+   every 15 ms while the logger samples at 25 Hz (40 ms), so the logged channel
+   is an aliased ~1-in-2.7 snapshot. Counts are lower bounds and absence proves
+   nothing.
+2. Detection does not imply correction. The 8-14 concentration at rpm ~1999 x
+   load ~0.44 sits **below the FLKC enable gate** (load 1.25, item 41), so FLKC
+   provably cannot act there — which explains flag-set samples with no FLKC
+   movement without needing any error in either channel.
+
+---
+
+## 45. `0xFFFF4130` — `adc_pipeline_trace.txt` and `boost_control_*` were wrong; item 10 was right — **FIXED 2026-08-16**
+
+Three artifacts disagreed with `docs/corrections.md` item 10:
+
+| artifact | claim |
+|---|---|
+| `disassembly/analysis/adc_pipeline_trace.txt:15` | ADDR 4 out = `0xFFFF4130` = **Atmospheric Pressure (Baro)** |
+| `disassembly/analysis/adc_pipeline_trace.txt:18` | ADDR 7 out = `0xFFFF41E0` = **Battery Voltage** |
+| `disassembly/analysis/boost_control_analysis.txt:190,330` | `ignition_switch_state`, "float, Ignition switch" |
+| `disassembly/analysis/boost_control_raw.txt:209,274,789,867` | `ignition_switch_state` |
+
+**Item 10 was right. `0xFFFF4130` is BATTERY VOLTAGE.** Settled again here from
+the writer and its scaling, independently of the axis-name argument item 10 used:
+
+```
+005A40  C70C  mova @(0x005A74),r0    ; [0x5A74] = 0x47800000 = 65536.0
+005A46  F32D  float fpul,fr3
+005A48  F323  fdiv fr2,fr3           ; fr3 = filtered / 65536.0
+005A4C  D30A  mov.l @(0x005A78),r3   ; [0x5A78] -> 0x0C0098, value 20.0
+005A52  F312  fmul fr1,fr3           ; fr3 = (filtered/65536) * 20.0
+005A56  F23A  fmov.s fr3,@r2         ; [0xFFFF4130] = fr3
+```
+
+Full scale is **0..20** — volts. Baro would scale to ~15 psi / ~101 kPa / ~1 bar.
+This agrees with item 10's finding that `0xFFFF4130` feeds the definition-named
+axis `0xD91CC` "Ignition Dwell / Battery Volts" (8, 10, 12, 14, 16 V).
+
+The ADC **pipeline structure** in `adc_pipeline_trace.txt` is correct and is
+corroborated by the writer (raw `0xFFFF402C` → filt `0xFFFF4134` → out
+`0xFFFF4130`). Only the sensor NAME attached to ADDR 4 was wrong.
+
+**`0xFFFF41E0` is not battery voltage either**, as item 10 already said. Traced:
+
+```
+008150  D215  mov.l @(0x0081A8),r2   ; -> 0x0C00B0 = 25.0
+00815C  D313  mov.l @(0x0081AC),r3   ; -> 0x0C00B4 = -62.5
+008160  F008  fmov.s @r0,fr0         ; inline float at 0x81B0 = 5/65536
+008162  F23E  fmac fr0,fr3,fr2       ; fr2 = raw*25.0*(5/65536) - 62.5
+008166  F12A  fmov.s fr2,@r1         ; [0xFFFF41E0] = fr2
+```
+
+Range **−62.5 .. +62.5**, zero at mid-scale — a bidirectional quantity, neither
+volts nor pressure. **Identity NOT established; left deliberately unnamed.**
+
+Corrected: `adc_pipeline_trace.txt` (ADDR 4, ADDR 7, and the summary line
+claiming battery voltage = `0xFFFF41E0`), `boost_control_analysis.txt` and
+`boost_control_raw.txt` (`ignition_switch_state` → `battery_voltage`, 5 sites).
+
+`ad258_wot_enrichment_trace.txt` needed no change — its parenthetical
+"(same block as FFFF4130 battery voltage)" is correct.
+
+---
+
+## 46. Seven fuel-dispatch slots are `bra` trampolines, and there is a THIRD dispatch table — **RESOLVED 2026-08-16**
+
+Decoded from the bin. A slot is a trampoline when the address it holds is a `bra`.
+
+```
+table A @ 0x0480B8 (19 entries) -- one trampoline
+  A[13] 0x03756C -> 0x03757E
+table B @ 0x04A0B8 (20 entries) -- six trampolines
+  B[ 5] 0x03160A -> 0x03161E     B[ 8] 0x039528 -> 0x039668
+  B[10] 0x036C3C -> 0x036C48     B[11] 0x037B68 -> 0x037B74
+  B[15] 0x03605E -> 0x03643A     B[17] 0x03A222 -> 0x03A230
+```
+
+The entry addresses in `fueling_pipeline_analysis.txt:50-72` all match the bin,
+so the tables are right — but any analysis that read forward from a stub address
+instead of the branch target analysed two instructions and then whatever
+followed.
+
+**`func_3952C`'s caller is found.** There is a third dispatch table: 93
+contiguous code pointers at **`0x04ACB8`–`0x04AE28`**. Slot 20 (`0x04AD08`)
+holds `0x00039524`, the stub whose `bra` lands on `0x03952C`.
+
+```
+0x00039524  occurs exactly once in the ROM, at 0x04AD08   (table C slot 20)
+0x00039528  occurs exactly once, at 0x04A0D8 = table B base + 4*8  (B[8])
+0x0003952C  occurs nowhere
+0x00039668  occurs nowhere
+```
+
+So the 4-byte-apart stub pair `0x39524`/`0x39528` is **not** an off-by-one — the
+two stubs belong to two different dispatch tables. Table B slot 8 reaches
+`0x39668`; table C slot 20 reaches `func_3952C`. This closes the "caller
+unlocated" item left open in `ad258_wot_enrichment_trace.txt`.
+
+**Still open:** no 4-aligned literal points at `0x04ACB8` or `0x04ACB4`, so
+table C's consumer is not located. Presumably reached with a non-zero
+displacement or a computed base.
+
+---
+
+## 47. `0x37B74` — both existing names are unsupported — **OPEN 2026-08-16**
+
+`0x037B68` is `A004` = `bra +4` → `0x037B74`, but it is one of **three adjacent
+stubs**, not a lone trampoline:
+
+```
+0x37B68  A004 -> 0x37B74
+0x37B6C  A071 -> 0x37C52
+0x37B70  A096 -> 0x37CA0     <- itself slot 29 of table C (0x04AD2C)
+```
+
+`func_37B74` preamble, VERIFIED:
+
+```
+GBR = 0xFFFF7AB4                    (literal 0x037CEC)
+r13 = 0xFFFF7AD8                    (literal 0x037D24)
+fr8 = float[0xFFFF6624]  = RPM      -> [r13-4] = 0xFFFF7AD4
+fr8 = float[0xFFFF6350]  = ECT      -> [r13]   = 0xFFFF7AD8
+two table_lookup (0xBE830) calls on descriptors 0x0AC648 and 0x0AC634
+```
+
+Both descriptors decoded:
+
+| desc | dim | count | type | axis | data |
+|---|---|---|---|---|---|
+| `0x0AC634` | 1D | 16 | uint8, 1/128 | `0x0CCE18` = 0,800,…,6400 (**RPM**) | `0x0CCE58` = **all zero** |
+| `0x0AC648` | 1D | 16 | uint8, 1/128 | `0x0CC624` = −40..110 (**ECT**) | `0x0CCE68` = **all zero** |
+
+`fueling_pipeline_analysis.txt:61` calls B[11] "Injector compensation (2D maps,
+RPM/load indexed)" — wrong on dimensionality (1-D) and on axis (ECT, not load).
+The competing "enrichC / AFL application" name is at least consistent with the
+workspace (`enrichC` = `0xFFFF7AE4` = r13+12), but the write to `0xFFFF7AE4` was
+**not** traced, so it is not asserted here.
+
+**Neither name is supported by what was decoded, and no third name is invented.**
+VERIFIED: 1-D, RPM- and ECT-indexed, both comps flat zero, workspace
+`0xFFFF7AD8` under GBR `0xFFFF7AB4`. Like `0xAD258`, this term contributes
+nothing on the current calibration. Whether the multiplicative fuel model's
+third term is mislabeled remains **OPEN**.

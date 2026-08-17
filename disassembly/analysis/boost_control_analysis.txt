@@ -187,11 +187,12 @@ SECTION 2: INTERMEDIATE FUNCTION (0x0549D4-0x0549F8)
   Reads ignition switch state and applies EMA filter.
 
   Inputs:
-    FFFF4130  ignition_switch_state
+    FFFF4130  battery_voltage   [CORRECTED 2026-08-16, corrections.md item 45 --
+              was 'ignition_switch_state', which is not a float quantity]
     FFFF8B9C  boost filter workspace (struct)
 
   Process:
-  1. Read ignition_switch_state -> FR8
+  1. Read battery_voltage (FFFF4130) -> FR8   [was 'ignition_switch_state', item 45]
   2. Shift previous filtered value: workspace[-4] -> workspace[-8]
   3. Store new raw value: FR8 -> workspace[-4]
   4. Call float_max (0xBE960) = max(current, previous)
@@ -327,7 +328,7 @@ SECTION 6: KEY RAM ADDRESSES (BOOST WORKSPACE)
   FFFF6624      --           rpm_current              float    Engine RPM
   FFFF6640      --           maf_voltage_left         float    MAF sensor left bank
   FFFF6644      --           maf_voltage_right        float    MAF sensor right bank
-  FFFF4130      --           ignition_switch_state    float    Ignition switch
+  FFFF4130      --           battery_voltage          float    Battery volts, 0..20 [item 45]
 
 
 ================================================================================

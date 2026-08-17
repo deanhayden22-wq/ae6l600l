@@ -29,6 +29,455 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+## ingest 2026-08-14 (rev 20.19c) auto-rollup (2026-08-16 17:21)
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 289
+  overlap (≥30 samples in each): 82
+  cells with |Δ| ≥ 3%: 38
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    1200 ×  -9.5    5.48 →   6.41 g/s  (+16.94%, n=385/11043)
+    3300 × -11.0    9.73 →  11.25 g/s  (+15.72%, n=291/1631)
+    3000 × -11.0    8.81 →  10.09 g/s  (+14.47%, n=969/700)
+    3700 × -11.0   11.01 →  12.07 g/s  (+9.58%, n=47/1525)
+     800 ×  -7.0    6.64 →   7.25 g/s  (+9.29%, n=238/388)
+    1600 × -10.5    6.40 →   6.95 g/s  (+8.61%, n=536/1457)
+    2600 × -11.0    8.12 →   8.82 g/s  (+8.61%, n=2270/439)
+    1600 × -10.0    6.84 →   7.34 g/s  (+7.28%, n=243/2766)
+    1900 × -10.5    7.35 →   7.82 g/s  (+6.51%, n=384/5788)
+    1600 ×  -6.5   13.91 →  14.79 g/s  (+6.29%, n=55/1638)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   4.78 g/s  (-14.01%, n=54/97)
+    2200 ×  -6.0   25.91 →  23.58 g/s  (-8.98%, n=58/4414)
+    2200 ×  -5.5   27.88 →  25.44 g/s  (-8.76%, n=149/3497)
+    2200 ×  -5.0   29.63 →  27.12 g/s  (-8.46%, n=222/3930)
+    2200 ×  -4.5   31.18 →  29.44 g/s  (-5.59%, n=128/2856)
+    2200 ×  -8.0   18.14 →  17.15 g/s  (-5.41%, n=308/6185)
+    2200 ×  -8.5   16.03 →  15.23 g/s  (-4.94%, n=178/8046)
+    3000 × -10.0   13.73 →  13.08 g/s  (-4.71%, n=135/1326)
+    2200 ×  -9.0   13.71 →  13.10 g/s  (-4.46%, n=66/5518)
+    1200 × -10.0    5.78 →   5.53 g/s  (-4.42%, n=314/1710)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 66  mean|c|= 1.17%  median|c|= 1.20%  in_tol= 83.3%  max= 3.5%
+    verdict: WIN — VE up + trim tighter
+
+
+## ingest 2026-08-08 (rev 20.19c) auto-rollup (2026-08-13 00:30)
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 272
+  overlap (≥30 samples in each): 82
+  cells with |Δ| ≥ 3%: 33
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    3300 × -11.0    9.73 →  11.24 g/s  (+15.53%, n=291/305)
+    3000 × -11.0    8.81 →  10.17 g/s  (+15.43%, n=969/163)
+    1200 ×  -9.5    5.48 →   6.05 g/s  (+10.41%, n=385/4268)
+    3700 × -11.0   11.01 →  12.11 g/s  (+9.94%, n=47/493)
+    1600 × -10.5    6.40 →   6.96 g/s  (+8.79%, n=536/806)
+    1600 × -10.0    6.84 →   7.36 g/s  (+7.61%, n=243/2066)
+    1900 × -10.5    7.35 →   7.85 g/s  (+6.85%, n=384/3627)
+    2200 × -10.5    7.91 →   8.44 g/s  (+6.81%, n=181/10629)
+    1600 ×  -6.5   13.91 →  14.84 g/s  (+6.62%, n=55/1416)
+    2600 × -11.0    8.12 →   8.61 g/s  (+6.09%, n=2270/175)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   4.82 g/s  (-13.16%, n=54/45)
+    2200 ×  -6.0   25.91 →  23.65 g/s  (-8.69%, n=58/2651)
+    2200 ×  -5.5   27.88 →  25.57 g/s  (-8.31%, n=149/2016)
+    2200 ×  -5.0   29.63 →  27.28 g/s  (-7.95%, n=222/2309)
+    3000 × -10.0   13.73 →  12.87 g/s  (-6.24%, n=135/773)
+    2200 ×  -8.0   18.14 →  17.09 g/s  (-5.74%, n=308/4307)
+    2200 ×  -8.5   16.03 →  15.18 g/s  (-5.26%, n=178/6018)
+    2200 ×  -4.5   31.18 →  29.70 g/s  (-4.75%, n=128/1890)
+    2600 ×  -5.0   33.46 →  31.89 g/s  (-4.68%, n=206/1564)
+    1200 × -10.0    5.78 →   5.51 g/s  (-4.66%, n=314/526)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 58  mean|c|= 1.28%  median|c|= 1.37%  in_tol= 77.6%  max= 4.9%
+    verdict: WIN — VE up + trim tighter
+
+
+
+## 2026-08-04 — log: logs/8-4 2 20.19c/8-4 2 20.19c.csv — rom: 20.19c  [HUMAN REVIEW]
+
+Second drive of 8-4 (evening, hot). Bin md5 `92cae827` re-verified from disk = unchanged
+from the anchor, same-rev drive, no re-diff. 72.7k samp / 48.5 min / 2 raw segments.
+Era-2 logger cadence (full 25 Hz CL/OL, AFL, MPH, IAT). Hottest short drive in the
+corpus by IAT median: 104 F med / 132.8 p95 / 147.2 max, ECT med 183 max 199.
+
+**HEADLINE — the FLKC map is carrying learned retard in the 19c boost/timing band.**
+This is the first log with real residency in 3900-4700 rpm x load 1.9-3.3 (10.5 s here
+vs 1.9 s on 8-2, 5 samples in the tight 4000-4400 x 2.9-3.3 cell). What it reads there:
+
+    FLKC by cell (min value seen, load bins 0.25 wide)
+    rpm\load   1.50   1.75   2.00   2.25   2.50   2.75   3.00
+      4000       .    -0.25  -0.75  -0.75  -0.75    .     -1.00
+      4200       .      .    -0.75  -0.75  -0.75  -0.75   -1.00
+      4400     -0.75  -0.75    .    -0.75  -0.75  -0.75   -1.00
+      4600       .      .      .      .    -0.75    .       .
+
+log_health counts 12 "decrements", but ALL 12 are cell TRAVERSAL, not learning:
+they step 0.25 between CONSECUTIVE 40 ms samples (rows 55778->55779, 59471->59472,
+67872->67873), and FBKC is 0.0 for the full 3 s before every one of them. The first
+read (row 23657) jumps 0 -> -1.00 in one sample as rpm crosses 4200 at load 3.14, then
+walks back to -0.75 and 0 as the cell moves — that is a map lookup, not a learn step.
+
+So the retard was learned BEFORE this drive and we have no log of the learning event:
+7-29, 8-2 and 8-4#1 all read flkc_min 0.0, but 8-2 only spent 1.9 s in the zone and
+8-4#1 never made boost at all (mrp max 5.9). The learning sits somewhere in unlogged
+driving since the 19c flash. **The zone overlaps 19c's own edits** — base timing
++0.35..+0.70 deg at 3700-4800 x load 1.9-2.83 (all four tables) and Target Boost
++2.0 psi at 3200-5600. Caveat before acting: logged load is PRE-comp and the timing
+table axis is corrected load, so the overlap is approximate, not cell-exact.
+
+**Boost — 19c's raised target is still untested.** No sustained WOT again. Longest
+Throttle>=95% run is 0.08 s (2 samples, mrp ~0 = snap-throttle blips, not pulls).
+All 9 boost events are part-throttle roll-ons at 33-55% throttle. Peak mrp 18.12 @
+4756 rpm, 48% throttle, load 3.31, wgdc 75 (not pegged), knock-free. Made-vs-asked by
+rpm bin (mrp - Trgt_Boost, median over mrp>7 samples): -9.3 at 3600, -7.0 at 3800,
+-6.2 at 4000, **-2.5 at 4200, -1.1 at 4400, -1.9 at 4600, -2.3 at 4800**. Under target
+everywhere, but at 40-50% throttle that measures the driver, not the tune. The +2 psi
+19c target ask (~20 psi at 3200-5600) has still never been chased.
+
+**Knock (backstop).** One FBKC onset, -1.4, 1.9 s, self-recovered, IAM 1.0 the whole
+drive. Row 29099: 2735 rpm x load 1.01, IAT 106, 5th gear (MPH/RPM ~12.1), throttle
+creeping 21->25%, mrp -2.0 (vacuum), at the CL->OL handoff (FFB steps 14.50 -> 13.48
+two samples before the retard). Timing 17.5 -> 15.5.
+**This is the second instance of the 8-2 class** — 8-2's lone event was 1779 rpm x
+load 1.01, IAT 127, low-speed tip-in, -2.8. Common factors: load ~1.0, hot IAT (>=105),
+light throttle, no boost. Different rpm, so it is not one cell; it is a light-load hot
+band. Consistent with the A(IAT) +1.41 global give-back leaving too much advance on
+the hot side at low load, and with FLKC being blind below load 1.25 (FBKC is sole
+protection there). Two trivial events is not yet a case for pulling the give-back back
+out, but it is now a pattern, not a one-off.
+Zones: ghost 0.66/min (=this event), cusp 0.77/min (same event, low end of the chronic
+0.4-5), rect 0.00 in 0.84 min residency.
+
+**Fueling — the light-load band has gone LEAN, and it tracks heat.** Repo matched-band
+trim -1.17 (vs 8-2 -0.78, 8-4#1 -0.78) — that summary hides the shape. Total trim
+(AFL+AFC) by MAF-V cell, CL / MPH>20 / pedal>0:
+
+    V      1.5    1.6    1.7    1.8    1.9    2.0    2.1    2.2    2.3    2.4
+    8-4#2 +5.47  +4.69  +3.91  +0.78   0.0    0.0  -1.56  -2.34  -1.56  -1.56
+    8-4#1   .    +1.56  +0.78   0.0   +0.78   0.0  -1.56  -3.13  -1.56  -1.56
+
+Independent confirmation from the MAF-correction channel (weighted by sample):
+V<=1.8 mean correction **+1.70%** on 8-4#2 vs **+0.87%** on 8-2 vs **-1.41%** on 8-4#1.
+Whole-log MAF corr is the corpus best (mean -0.31%, mean|corr| 0.92%, vs 8-2's
+-0.86/1.21) — the mid-band really is dialed; the error has moved to the ends.
+The 8-4#1 vs 8-4#2 flip is same rev, same day, ~10 h apart, cool vs hot — which
+*suggests* the light-load error is charge-temp driven rather than a MAF curve offset.
+HUNCH, ~55%: 8-4#1 was a cold start (ECT 64 F) with unsettled learning, so the pair is
+confounded and does not prove a temperature mechanism on its own. Needs a hot/cool pair
+that are both settled.
+Direction check: 19c cut MAF c13 (V1.395) by -3.0% to fix a 2-3% idle over-read. The
+low-V band now wants fuel ADDED. That cut has at minimum been fully spent.
+
+**Rest of the backstop is clean.** IDC peak 77.6%, 0 s over 85. MAF-V peak 4.04 (<4.8).
+AVCS p95 20, max 28, no post-reflash lockout. Tip-in 64 events, med lean 8.13,
+fbkc_follow 0 (vs 8-4#1's 2). Stutter 452 events. EGT min 27 ohms (hot, expected on
+this drive). DFCO ~292 s (7298 fuel-cut samples), no resume knock.
+
+**Verdict.**
+- IMPROVED: whole-log MAF correction (corpus best); rect zone clean; IDC headroom;
+  no knock under boost at 147 F peak IAT.
+- DECLINED: light-load (V<=1.8) fueling has gone lean and grown vs 8-2; FLKC retard
+  is present in the 4000-4600 boost band where 8-2 read zero (though thin 8-2 coverage
+  means "grown" is not provable — "first properly measured" is the honest phrasing).
+- NEXT: (1) a sustained held-WOT pull at heat, still the #1 open item and now doubly
+  overdue — it is the only test of the 19c boost raise AND the only way to catch the
+  FLKC zone learning live. (2) Decide whether the low-V MAF cut needs partial restore;
+  hold until a settled cool log confirms the tilt is not purely thermal. (3) Watch the
+  light-load hot FBKC class — two instances now.
+
+**Ingest note (2026-08-06):** running `log_review_ingest.py --map --all` over the device
+bridge is not viable — the bridge kills any command at 45 s and background/nohup does not
+survive (each call is a fresh sandbox), and the kill truncated `stutter_events.csv`
+mid-write. Restored that file from HEAD and re-ingested 7-29, 8-2, 8-4, 8-4#2 with
+per-log `--log` runs (idempotent, so this is lossless). **Use per-log ingest from the
+bridge, never `--all`.** metrics_dashboard.html is no longer hand-built: added
+`scripts/analysis/metrics_dashboard_data.py`, which regenerates the embedded `#data`
+payload from the trends store and splices it back into the HTML.
+
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 262
+  overlap (≥30 samples in each): 82
+  cells with |Δ| ≥ 3%: 31
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    3000 × -11.0    8.81 →  10.25 g/s  (+16.27%, n=969/85)
+    3300 × -11.0    9.73 →  11.29 g/s  (+16.07%, n=291/207)
+    3700 × -11.0   11.01 →  12.39 g/s  (+12.51%, n=47/274)
+    1200 ×  -9.5    5.48 →   6.08 g/s  (+10.99%, n=385/3803)
+    1600 × -10.5    6.40 →   6.94 g/s  (+8.55%, n=536/746)
+    2200 × -11.0    7.58 →   8.19 g/s  (+8.08%, n=408/120)
+    1600 × -10.0    6.84 →   7.36 g/s  (+7.62%, n=243/2040)
+    1900 × -10.5    7.35 →   7.89 g/s  (+7.37%, n=384/3334)
+    2200 × -10.5    7.91 →   8.46 g/s  (+7.02%, n=181/10094)
+    1600 ×  -6.5   13.91 →  14.84 g/s  (+6.62%, n=55/1416)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   5.02 g/s  (-9.59%, n=54/31)
+    2200 ×  -6.0   25.91 →  23.61 g/s  (-8.86%, n=58/2572)
+    2200 ×  -5.5   27.88 →  25.56 g/s  (-8.32%, n=149/1981)
+    2200 ×  -5.0   29.63 →  27.23 g/s  (-8.10%, n=222/2254)
+    3700 ×  -7.5   34.98 →  32.35 g/s  (-7.51%, n=35/73)
+    3000 × -10.0   13.73 →  12.82 g/s  (-6.64%, n=135/679)
+    2200 ×  -8.0   18.14 →  17.10 g/s  (-5.71%, n=308/4206)
+    2200 ×  -8.5   16.03 →  15.15 g/s  (-5.46%, n=178/5808)
+    2200 ×  -4.5   31.18 →  29.55 g/s  (-5.21%, n=128/1781)
+    2600 ×  -5.0   33.46 →  31.74 g/s  (-5.15%, n=206/1472)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 58  mean|c|= 1.23%  median|c|= 1.29%  in_tol= 77.6%  max= 4.8%
+    verdict: WIN — VE up + trim tighter
+
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 262
+  overlap (≥30 samples in each): 82
+  cells with |Δ| ≥ 3%: 31
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    3000 × -11.0    8.81 →  10.25 g/s  (+16.27%, n=969/85)
+    3300 × -11.0    9.73 →  11.29 g/s  (+16.07%, n=291/207)
+    3700 × -11.0   11.01 →  12.39 g/s  (+12.51%, n=47/274)
+    1200 ×  -9.5    5.48 →   6.08 g/s  (+10.99%, n=385/3803)
+    1600 × -10.5    6.40 →   6.94 g/s  (+8.55%, n=536/746)
+    2200 × -11.0    7.58 →   8.19 g/s  (+8.08%, n=408/120)
+    1600 × -10.0    6.84 →   7.36 g/s  (+7.62%, n=243/2040)
+    1900 × -10.5    7.35 →   7.89 g/s  (+7.37%, n=384/3334)
+    2200 × -10.5    7.91 →   8.46 g/s  (+7.02%, n=181/10094)
+    1600 ×  -6.5   13.91 →  14.84 g/s  (+6.62%, n=55/1416)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   5.02 g/s  (-9.59%, n=54/31)
+    2200 ×  -6.0   25.91 →  23.61 g/s  (-8.86%, n=58/2572)
+    2200 ×  -5.5   27.88 →  25.56 g/s  (-8.32%, n=149/1981)
+    2200 ×  -5.0   29.63 →  27.23 g/s  (-8.10%, n=222/2254)
+    3700 ×  -7.5   34.98 →  32.35 g/s  (-7.51%, n=35/73)
+    3000 × -10.0   13.73 →  12.82 g/s  (-6.64%, n=135/679)
+    2200 ×  -8.0   18.14 →  17.10 g/s  (-5.71%, n=308/4206)
+    2200 ×  -8.5   16.03 →  15.15 g/s  (-5.46%, n=178/5808)
+    2200 ×  -4.5   31.18 →  29.55 g/s  (-5.21%, n=128/1781)
+    2600 ×  -5.0   33.46 →  31.74 g/s  (-5.15%, n=206/1472)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 58  mean|c|= 1.23%  median|c|= 1.29%  in_tol= 77.6%  max= 4.8%
+    verdict: WIN — VE up + trim tighter
+
+
+## ingest 2026-08-04 (rev 20.19c) auto-rollup (2026-08-06 01:43)
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 262
+  overlap (≥30 samples in each): 82
+  cells with |Δ| ≥ 3%: 31
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    3000 × -11.0    8.81 →  10.25 g/s  (+16.27%, n=969/85)
+    3300 × -11.0    9.73 →  11.29 g/s  (+16.07%, n=291/207)
+    3700 × -11.0   11.01 →  12.39 g/s  (+12.51%, n=47/274)
+    1200 ×  -9.5    5.48 →   6.08 g/s  (+10.99%, n=385/3803)
+    1600 × -10.5    6.40 →   6.94 g/s  (+8.55%, n=536/746)
+    2200 × -11.0    7.58 →   8.19 g/s  (+8.08%, n=408/120)
+    1600 × -10.0    6.84 →   7.36 g/s  (+7.62%, n=243/2040)
+    1900 × -10.5    7.35 →   7.89 g/s  (+7.37%, n=384/3334)
+    2200 × -10.5    7.91 →   8.46 g/s  (+7.02%, n=181/10094)
+    1600 ×  -6.5   13.91 →  14.84 g/s  (+6.62%, n=55/1416)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   5.02 g/s  (-9.59%, n=54/31)
+    2200 ×  -6.0   25.91 →  23.61 g/s  (-8.86%, n=58/2572)
+    2200 ×  -5.5   27.88 →  25.56 g/s  (-8.32%, n=149/1981)
+    2200 ×  -5.0   29.63 →  27.23 g/s  (-8.10%, n=222/2254)
+    3700 ×  -7.5   34.98 →  32.35 g/s  (-7.51%, n=35/73)
+    3000 × -10.0   13.73 →  12.82 g/s  (-6.64%, n=135/679)
+    2200 ×  -8.0   18.14 →  17.10 g/s  (-5.71%, n=308/4206)
+    2200 ×  -8.5   16.03 →  15.15 g/s  (-5.46%, n=178/5808)
+    2200 ×  -4.5   31.18 →  29.55 g/s  (-5.21%, n=128/1781)
+    2600 ×  -5.0   33.46 →  31.74 g/s  (-5.15%, n=206/1472)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 58  mean|c|= 1.23%  median|c|= 1.29%  in_tol= 77.6%  max= 4.8%
+    verdict: WIN — VE up + trim tighter
+
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 252
+  overlap (≥30 samples in each): 81
+  cells with |Δ| ≥ 3%: 33
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    3300 × -11.0    9.73 →  11.25 g/s  (+15.73%, n=291/172)
+    3000 × -11.0    8.81 →  10.15 g/s  (+15.21%, n=969/76)
+    1200 ×  -9.5    5.48 →   6.05 g/s  (+10.37%, n=385/3508)
+    1600 × -10.5    6.40 →   6.94 g/s  (+8.52%, n=536/728)
+    2200 × -11.0    7.58 →   8.19 g/s  (+8.08%, n=408/120)
+    3700 × -11.0   11.01 →  11.86 g/s  (+7.69%, n=47/87)
+    1600 × -10.0    6.84 →   7.33 g/s  (+7.12%, n=243/1785)
+    1900 × -10.5    7.35 →   7.86 g/s  (+7.00%, n=384/2903)
+    2600 ×  -0.5   47.37 →  50.60 g/s  (+6.80%, n=117/55)
+    1600 ×  -6.5   13.91 →  14.82 g/s  (+6.53%, n=55/1139)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   5.02 g/s  (-9.68%, n=54/30)
+    3000 × -10.0   13.73 →  12.53 g/s  (-8.77%, n=135/472)
+    2200 ×  -6.0   25.91 →  23.67 g/s  (-8.63%, n=58/2062)
+    2200 ×  -5.5   27.88 →  25.68 g/s  (-7.91%, n=149/1789)
+    2200 ×  -5.0   29.63 →  27.35 g/s  (-7.68%, n=222/1909)
+    3700 ×  -7.5   34.98 →  32.59 g/s  (-6.85%, n=35/47)
+    2200 ×  -8.0   18.14 →  17.07 g/s  (-5.90%, n=308/3235)
+    2200 ×  -8.5   16.03 →  15.10 g/s  (-5.79%, n=178/4242)
+    2600 ×  -5.0   33.46 →  31.76 g/s  (-5.07%, n=206/990)
+    2200 ×  -4.5   31.18 →  29.60 g/s  (-5.06%, n=128/1480)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 58  mean|c|= 1.30%  median|c|= 1.33%  in_tol= 79.3%  max= 4.9%
+    verdict: WIN — VE up + trim tighter
+
+
+
+## 2026-08-04 — log: logs/8-4 20.19c/8-4 20.19c.csv — rom: 20.19c
+
+LOGGER-CONFIG log, not a rev change: bin md5 92cae827 verified unchanged from disk = same-rev drive, no re-diff. 64.9k samp / 43.3 min / 6 raw logs, cold start (ECT 64F) + suburban (peak thr 52%, peak mrp 5.9, no WOT). Purpose: first log with CL/OL at full 25 Hz — sampinterval decimation removed from CL/OL (60→1), AFL (5→1), MPH (2→1), IAT (20→1); ECT still 20, ATM/IAM still 60; base rate still 40 ms. Verified in-data (min change gaps 1 vs 8-2's 60/5/2/20). All CL/OL transition timing in pre-8-4 logs carries up to ±2.4 s slop; this log forward it's 40 ms.
+
+**CL/OL shift (the target):**
+- 171 OL episodes, med 1.6 s; **62% shorter than 2.4 s** — structurally invisible at the old cadence. Composition: 108 enrichment, 47 DFCO, 16 marginal flickers.
+- **Flag→OL is RPM-transit, not a timer:** flip lands at 1965–3188 rpm (p10–p90, med 2543) regardless of when FFB went rich (onset med 1847 rpm); corr(lag, onset rpm) = −0.33. Every sustained (>1.5 s) rich command that never flipped started ≤2360 rpm; every never-flip with onset >2500 rpm was a short transient (med 0.32 s, max 1.16 s) that ended before the flag could respond. Consistent with the lowered per-gear CC180 gate (cl_ol_master disasm). Nominal "flag lag" from rich-onset: med 2.24 s, but that's rpm-climb time.
+- **Flag→CL on exit is instant:** med 0.00 / p90 0.08 s after FFB returns ≥14.6 (165 re-entries). DFCO entry: flag flips med 0.4 s after IPW=0.
+- **NEW — boundary chatter:** ~14 one-to-five-sample 8↔10 flickers at 22–25% thr × load 0.75–1.05 × 2300–3330 rpm, with logged FFB 14.0–14.7 the whole time (leaner than the 13.82 cc170 trigger — flag flips without FFB ever crossing it; blend/rounding at the boundary). Cosmetic so far; only mechanism touched is AFC freeze/unfreeze churn. Watch.
+- **No lean cost at the shift:** 10/78 non-DFCO CL→OL shifts show wbo2>15.2 within 1 s (wb shifted 3), all ≤0.24 s, max 16.1, all at lift or tip-in edge. 7-18 "rich-not-lean handoff" conclusion holds at full rate.
+- AFL (now full-rate) changed on 124 OL sample-pairs — most likely airflow-range bin changes (AFL stored per cc074 ranges), NOT learning-in-OL; log alone can't separate. Flagged, not concluded.
+
+**Knock:** 1 event: 2.0 s, depth −1.4, 2944 rpm × load 1.25 (rect band), IAT 70 — post-DFCO-resume tip-in during a shift (APP +10, gear ratio moving) = known resume/shift class. Self-recovered, FLKC 0 whole log, IAM 1.0. Trivial.
+**WOT:** none. 19c boost-raise (+2 psi target) still untested; boost barely exercised.
+**MAF corr / fueling:** matched-band per-V-cell total trim med −1.56% (cells −0.78..−2.34, 1.8–2.5 V) vs 8-2's −0.78 = 1 LSB richer-learned on a cold-start city drive vs settled hot highway. Watch, not act.
+**IDC:** peak 53.3%. **MAF-V:** max 3.54. **AVCS:** p95 20, no lockout. **Cliffs/stutter/VE:** not swept (focused review; log too mild to move them).
+
+**Prior-flagged areas re-checked:**
+- Fueling settled (punch #1): holds within 1 LSB of 8-2 (above).
+- FLKC give-back zone: 0 FLKC, no regression.
+- A(IAT) hot-side: NOT exercised (IAT max 108F).
+- Rev-hang adder: not scored this log.
+
+**New issues:**
+- CL/OL boundary chatter zone (above) — cosmetic, watch for AFC churn effects.
+
+**Staged for next session:**
+- Held-WOT-at-heat pull remains THE open item (punch #2 + 19c boost/timing test + injector ceiling).
+- Filter note: CL=8 gating now excludes sub-2.4 s OL flickers it used to silently include; cruise/steady-state metrics unaffected (steady-state filter already killed transients), but don't cross-compare raw CL-residency percentages pre/post 8-4.
+
+## 2026-08-02 — log: logs/8-2 20.19c/8-2 20.19c.csv — rom: 20.19c  [HUMAN REVIEW]
+
+Big HOT drive: 279.7k samp / 186.5 min, 10 raw logs / 10 seams (double-dip CLEAN). Bin md5 92cae827 unchanged since 7-29 = same-rev drive, no re-diff. IAT med 98.6 / p95 138 / max 152.6F, ECT max 210 = hottest sustained drive in the corpus. CL 84% / OL 14% / warmup 2%.
+
+**Knock:** ONE ~3s FBKC event (74 samp, onset s194115) at 1779 rpm x load 1.01, IAT 127, slight vacuum (mrp -1.7), low-speed tip-in (AFC -8.6). Depth -2.8, self-recovered, no FLKC ratchet, IAM 1.0 whole drive. Zones: ghost 0 fires (4.5min res), cusp 0.41/min (2 onsets = this event, 4.9min res), rect 0 (2.4min res). Boost knock-free (0 FBKC in 50 hot-boost >120F samp).
+**A(IAT) attribution:** same low-rpm/light-load cell, cool<95F = 18deg timing / 0 knock vs hot>120F = 15.5deg / 37 samp. The +1.41deg 20.19 A(IAT) give-back is the hot-side cost surfacing at LOW rpm (not the WOT case we were watching). Mild; watch recurrence. ~70% attribution.
+**WOT:** 1 short Throttle>95 run (1.2s, no top-end). Boost hit at PART throttle: peak mrp 18.3 @ 4500rpm / 51% thr / load 3.30, UNDER target (18.8), wgdc 60 (not maxed), knock-free. Late spool = turbo char (target 16-20 thru 3000-4000, actual 5-12, catches ~4500). No overboost.
+**Fueling:** SETTLED (not relearn). Cruise matched trim ~0 (AFL & AFC med 0.0, n=205k; by-MAF-V within +-1.6%). log_health total_trim_matched -0.78 vs 7-26/7-29 relearn -2.34. The 19b/19c MAF+comp cuts have landed.
+**MAF corr:** mean -0.86% / mean|abs| 1.21% (87.6k samp) = tight.
+**IDC:** peak 85.3% (0.12s >85) = no ceiling pressure (no sustained WOT). **MAF-V:** max 4.08 (<<4.8). **AVCS:** p95 20, no lockout; cruise-band swing ~18% of 28-36mph inband, consistent w/ prior, not a new regression.
+
+**Prior-flagged areas re-checked:**
+- Fueling residual (punch #1): RESOLVED on this settled log = matched trim neutral.
+- 7-19 FLKC give-back zone 3200x0.90-1.35 (punch #4): CLOSED FAVORABLY = 2.8min residency, ZERO FLKC + ZERO FBKC. Give-back holds without knock cost on a hot drive.
+- A(IAT) rollback hot test (punch #2): PARTIAL = hot boost roll-ons clean; one shallow low-rpm hot-cruise event. WOT-at-heat still untested (no sustained pull).
+- Rev-hang adder (punch #3): exercised (multi-gear) but NOT conclusively scored = lift detector caught throttle-blip artifacts; needs dedicated shift-trough pass or seat read.
+- Injector ceiling / top-end: still uncovered (IDC 85 peak, 11.5s >4500rpm, 36s >1.5 load).
+
+**New issues:**
+- A(IAT) hot-side low-rpm knock signature (1500-2000 x 0.6-1.0, IAT>120): new, mild (-2.8, self-corrected). Lever if it grows = A(IAT) hot-side taper (already named lever).
+
+**Staged for next session:**
+- Top-end + WOT-at-heat coverage gap persists = need a sustained held-WOT pull at high IAT to close punch #2 + exercise injector ceiling + the undecoded 19c boost tables (0xC0D/0xC12/0xC14, 0xD4773) under real boost.
+- Decode the 19c boost tables before attributing any boost-table effect.
+
+## ingest 2026-07-29 (rev 20.19c) auto-rollup (2026-08-02 21:14)
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 247
+  overlap (≥30 samples in each): 79
+  cells with |Δ| ≥ 3%: 32
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    3300 × -11.0    9.73 →  11.25 g/s  (+15.73%, n=291/172)
+    3000 × -11.0    8.81 →  10.15 g/s  (+15.21%, n=969/76)
+    1200 ×  -9.5    5.48 →   6.13 g/s  (+11.91%, n=385/1615)
+    1600 × -10.5    6.40 →   6.97 g/s  (+8.94%, n=536/588)
+    3700 × -11.0   11.01 →  11.86 g/s  (+7.69%, n=47/87)
+    1600 × -10.0    6.84 →   7.34 g/s  (+7.34%, n=243/1420)
+    1900 × -10.5    7.35 →   7.88 g/s  (+7.30%, n=384/2516)
+    2600 ×  -0.5   47.37 →  50.66 g/s  (+6.94%, n=117/32)
+    1600 ×  -6.5   13.91 →  14.87 g/s  (+6.90%, n=55/415)
+    2200 × -11.0    7.58 →   8.04 g/s  (+6.12%, n=408/35)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   5.02 g/s  (-9.68%, n=54/30)
+    2200 ×  -6.0   25.91 →  23.63 g/s  (-8.80%, n=58/1830)
+    3000 × -10.0   13.73 →  12.52 g/s  (-8.79%, n=135/385)
+    2200 ×  -5.5   27.88 →  25.53 g/s  (-8.44%, n=149/1630)
+    2200 ×  -5.0   29.63 →  27.16 g/s  (-8.32%, n=222/1709)
+    2200 ×  -8.5   16.03 →  15.01 g/s  (-6.31%, n=178/3777)
+    2200 ×  -8.0   18.14 →  17.00 g/s  (-6.27%, n=308/2291)
+    2200 ×  -4.5   31.18 →  29.52 g/s  (-5.31%, n=128/1412)
+    2600 ×  -5.0   33.46 →  31.77 g/s  (-5.05%, n=206/881)
+    2200 ×  -9.5   12.04 →  11.43 g/s  (-5.01%, n=116/2703)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 57  mean|c|= 1.21%  median|c|= 1.15%  in_tol= 75.4%  max= 4.8%
+    verdict: MIXED — VE down but trim tighter (correcting prior over-scale?)
+
+
+## ingest 2026-08-02 (rev 20.19c) auto-rollup (2026-08-02 21:13)
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 247
+  overlap (≥30 samples in each): 79
+  cells with |Δ| ≥ 3%: 31
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    3300 × -11.0    9.73 →  11.25 g/s  (+15.73%, n=291/172)
+    3000 × -11.0    8.81 →  10.15 g/s  (+15.21%, n=969/76)
+    1200 ×  -9.5    5.48 →   6.18 g/s  (+12.69%, n=385/1479)
+    1600 × -10.5    6.40 →   6.99 g/s  (+9.28%, n=536/450)
+    3700 × -11.0   11.01 →  11.89 g/s  (+8.01%, n=47/64)
+    1600 × -10.0    6.84 →   7.35 g/s  (+7.46%, n=243/1261)
+    1900 × -10.5    7.35 →   7.88 g/s  (+7.32%, n=384/2454)
+    1600 ×  -6.5   13.91 →  14.89 g/s  (+7.04%, n=55/346)
+    2600 ×  -0.5   47.37 →  50.66 g/s  (+6.94%, n=117/32)
+    2200 × -11.0    7.58 →   8.04 g/s  (+6.12%, n=408/35)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   5.02 g/s  (-9.68%, n=54/30)
+    2200 ×  -6.0   25.91 →  23.54 g/s  (-9.13%, n=58/1687)
+    3000 × -10.0   13.73 →  12.52 g/s  (-8.79%, n=135/385)
+    2200 ×  -5.5   27.88 →  25.44 g/s  (-8.75%, n=149/1401)
+    2200 ×  -5.0   29.63 →  27.09 g/s  (-8.57%, n=222/1561)
+    2200 ×  -8.5   16.03 →  14.95 g/s  (-6.68%, n=178/3262)
+    2200 ×  -8.0   18.14 →  16.99 g/s  (-6.30%, n=308/1996)
+    2200 ×  -4.5   31.18 →  29.43 g/s  (-5.60%, n=128/1323)
+    2200 ×  -9.5   12.04 →  11.41 g/s  (-5.18%, n=116/2453)
+    2200 ×  -9.0   13.71 →  13.02 g/s  (-5.04%, n=66/3012)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 57  mean|c|= 1.19%  median|c|= 1.08%  in_tol= 75.4%  max= 5.1%
+    verdict: MIXED — VE down but trim tighter (correcting prior over-scale?)
+
+
 ## ingest 2026-07-26 (rev 20.19b) auto-rollup (2026-07-26 16:29)
 
 ## VE proxy: 20.19b vs 20.19
@@ -3435,3 +3884,61 @@ what happened — and stronger:** G1 barely improved *despite confirmed +2 ms fu
 delivery*, and the real non-DFCO lean held at 1.76 AFR. Both the cusp lean and the
 cusp knock are insensitive to ~3× tip-in BE-comp authority. **The cusp lean/knock
 is not a tip-in fuel deficit** (confirms `[[cusp-transient-knock-is-not-a-tip-in-fuel-deficit-likely-hardw
+## 2026-08-16 — rom: 20.19d — BUILT, NOT FLASHED, NOT DRIVEN (stub)
+
+No log exists for this rev. Stub entry only, so the rev is not invisible.
+
+**Changeset vs 19c: exactly 15 bytes.** Re-verified from the bins this session
+(19c md5 `92cae8275cd4f9b473a3a9e36efe6449`, 19d md5 `ace1a5f86670ae120eda8925c162cf41`):
+
+- `0x0D2F29–2B`, `0x0D2F2D–2F`, `0x0D2F30–33`, `0x0D2F35` — 11 bytes, the
+  **Fine Correction Columns (Load)** axis, `0.75 / 1.10 / 1.50 / 2.00`
+  → `1.30 / 1.65 / 2.40 / 3.50`
+- `0x0FFB88–8B` — checksum
+
+Nothing else moved. Boost, WGDC, turbo dynamics, all four base timing tables,
+KCA, MAF, load comp, AVCS, every FBKC/FLKC scalar and both knock windows are
+byte-identical to 19c.
+
+**⚠ THE STATED JUSTIFICATION FOR THIS REV DID NOT SURVIVE CODE REVIEW.**
+
+19d was built on the premise that the FLKC grid interpolates, so that a
+mid-load knock event near load 1.5 would bleed into the load-2.0+ columns and
+"tax the boost cells". The FLKC store and read paths were traced on 2026-08-16
+(`disassembly/analysis/flkc_grid_interpolation_trace.txt`, `docs/corrections.md`
+item 41) and that premise is **false**:
+
+- The grid is **bucketed**, not interpolated. Axis values are band
+  **boundaries**, so 6 RPM + 4 load boundaries give **7 × 5 = 35 cells**.
+- A knock event writes **exactly one cell** (`0x0464D8`, `index*8`), and a
+  lookup reads **exactly one cell** (`0x0462AE`, `index*8`). There is no
+  weighting and no interpolation anywhere.
+- Therefore a load-1.5 event under 19c writes only band `[1.50, 2.00)`. Loads
+  at or above 2.00 select a **different cell** it never touched. It cannot tax
+  the boost cells.
+
+**What 19d actually buys** (the honest, smaller case):
+
+| | 19c live load bands (gate 1.25–3.45) | 19d |
+|---|---|---|
+| dead below gate | b0 (<0.75), b1 (0.75–1.10) | — |
+| live | b2 1.25–1.50 (0.25), b3 1.50–2.00 (0.50), b4 2.00–3.45 (**1.45**) | b0 sliver 1.25–1.30, b1 1.30–1.65 (0.35), b2 1.65–2.40 (0.75), b3 2.40–3.45 (**1.05**) |
+| dead above gate | — | b4 (≥3.50) |
+| usable bands | **3** | **4** |
+
+Worst-case band narrows 1.45 → 1.05 load units, and 19d stops wasting two of
+five bands below the enable gate — but it introduces a new wasted band above it.
+The readback footprint of a load-1.5 event narrows 0.50 → 0.35, a real but
+modest improvement.
+
+**Also flagged:** the "33 step-downs of 0.25 in consecutive 40 ms samples =
+traversal of a pre-learned map" reading is not safe under a piecewise-constant
+map — traversal produces irregular jumps, and 0.25 is exactly the Fine
+Correction Advance Value (`0xD2F48`). Discriminator, computable from the
+existing 8-14 log with no new data: recompute `rpm_band*5 + load_band` (with the
+50 rpm / 0.02 load downward hysteresis) and check whether the cell index
+actually changed across those samples. If it held constant, it was relearning,
+not traversal.
+
+**Decision pending.** Whether 19d is still worth a flash is a tuning call, not a
+code call. Nothing here says it is harmful.

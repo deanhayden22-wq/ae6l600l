@@ -18,7 +18,8 @@ and went stale silently on every rev bump (see reference_log_review_sop memory).
 
 REV_ORDER = [
     "stock", "garn_base", "20.7", "20.8", "20.9", "20.10", "20.11", "20.12",
-    "20.13", "20.14", "20.15", "20.16", "20.17", "20.17a", "20.18", "20.18a", "20.19", "20.19b",
+    "20.13", "20.14", "20.15", "20.16", "20.17", "20.17a", "20.18", "20.18a", "20.19", "20.19b", "20.19c",
+    "20.19d",
 ]
 
 DEFAULT_BASELINE = "garn_base"

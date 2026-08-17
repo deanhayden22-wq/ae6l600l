@@ -24,7 +24,8 @@ import struct
 import sys
 from collections import defaultdict
 
-ROM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rom")
+# repo root is TWO levels up from scripts/mapping/ (fixed 2026-08-16)
+ROM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "rom")
 
 def load_rom():
     p = os.path.join(ROM_DIR, "ae5l600l.bin")
@@ -42,8 +43,13 @@ def r_u16(rom, a): return struct.unpack_from(">H", rom, a)[0]
 def r_u32(rom, a): return struct.unpack_from(">I", rom, a)[0]
 def r_f32(rom, a): return struct.unpack_from(">f", rom, a)[0]
 
-TYPE_NAMES = {0x00: "f32", 0x02: "i8", 0x04: "i16", 0x08: "u8", 0x0A: "u16"}
-TYPE_SIZES = {0x00: 4, 0x02: 1, 0x04: 2, 0x08: 1, 0x0A: 2}
+# Typecode map imported from the single source of truth (docs/corrections.md item 39).
+# Do NOT re-declare it here -- the old inline copy was a guess and mis-sized
+# 611 of 760 descriptors.
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..'))
+from desc_types import TYPE_SHORT as TYPE_NAMES, TYPE_SIZES  # noqa: E402
+
 
 
 def read_axis(rom, ptr, size):
@@ -182,7 +188,7 @@ def scan_descriptors(rom):
             # Try 1D
             if addr + 20 <= rom_len:
                 b0, size, dtype, b3 = rom[addr], rom[addr+1], rom[addr+2], rom[addr+3]
-                if b0 == 0 and b3 == 0 and 2 <= size <= 64 and dtype in TYPE_NAMES:
+                if b0 == 0 and b3 == 0 and 2 <= size <= 256 and dtype in TYPE_NAMES:  # cap 64->256 2026-08-16 (real descs at 65, 78)
                     aptr = r_u32(rom, addr+4)
                     dptr = r_u32(rom, addr+8)
                     if 0x1000 <= aptr < rom_len and 0x1000 <= dptr < rom_len:

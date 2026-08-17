@@ -196,10 +196,34 @@ treats `ram_reference.txt`, `descriptor_map.txt`, `cal_crossref.txt` and
 `analysis/*.txt` as **claims to be tested, never as evidence**. Re-run it after
 editing a definition XML, after a new tune rev, and after any correction.
 
-> Known-bad input, already accounted for: the `Type` column of
-> `disassembly/maps/descriptor_map.txt` has 1-byte and 2-byte **inverted**
-> (typecode `0x0400` is 1 byte/cell, `0x0800` is 2). Anything that read cell
-> widths or table extents out of that file is off by 2× in one direction.
+> **Descriptor typecodes — fixed 2026-08-16, see `docs/corrections.md` item 39.**
+> The single source of truth is now **`scripts/desc_types.py`**. Import it; never
+> re-declare the map (it had been copy-pasted into five scripts and all five
+> carried a guess).
+>
+> ```
+> 0x00 -> float32, 4 B    0x04 -> uint8,  1 B    0x08 -> uint16, 2 B
+> 0x0C -> int8,    1 B    0x10 -> int16,  2 B
+> ```
+>
+> Decoded from the dispatch table of longs at `0xBE860` (handlers `0xBEACC` /
+> `0xBEB20` / `0xBEB6C` / `0xBEAE4` / `0xBEB00`). Because it is indexed by the
+> raw byte into a table of longs, the typecode is **always a multiple of 4** —
+> `0x02` and `0x0A` are structurally impossible. Typecode lives at record `+2`
+> for 1-D and `+16` for 2-D.
+>
+> The earlier note here said the `Type` column was "1-byte and 2-byte
+> **inverted**". That was wrong in three ways: it is a *shifted* mapping, not an
+> inversion; signedness was also wrong on all 215 rows labelled `int16` (they
+> are unsigned bytes); and typecodes `0x0C`/`0x10` were dropped entirely.
+> **611 of 760 descriptors had the wrong cell width**, hence the wrong extent.
+>
+> **As of 2026-08-16 `descriptor_map.txt`, `descriptor_labels.txt`,
+> `named_descriptors.txt`, `desc_func_xref.txt` and the `desc_*` labels in
+> `ImportAE5L600L.java` have all been regenerated or rewritten correctly**
+> (census: float32 149, uint8 215, uint16 396, int8 0, int16 0). Anything that
+> read a cell width or table extent out of those files **before** that date is
+> still suspect. They remain derived products — rule 1 above still applies.
 
 ## Table data vs. code
 

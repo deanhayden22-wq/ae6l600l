@@ -57,7 +57,7 @@ SECTION 1: DISPATCH TABLE ENTRIES
   [ 5] 0x3160A  Major correction aggregator (RPM/MAF/lambda/enrichment)
   [ 6] 0x31528  FFFF7448 CL/OL mode flag writer (1=CL, 0=OL)
   [ 7] 0x3CD34  Warmup/cold-start enrichment (ECT/IAT indexed)
-  [ 8] 0x39528  WOT enrichment factor (2D map 0xAD258)
+  [ 8] 0x3952C  AFR-deviation metric, NOT fuel [CORRECTED 2026-08-16, item 39]
   [ 9] 0x30ACC  Base fuel map combiner (2D map + descriptors → FFFF73AC)
   [10] 0x36C3C  CL/OL state cleanup
   [11] 0x37B68  Injector compensation (2D maps, RPM/load indexed)
@@ -423,7 +423,16 @@ them via loaded pointers. The write paths are:
 3.6  WOT Enrichment Factor
      ─────────────────────────────────────────────────────────────────
      Computed by @ 0x39528 (Table B[8]):
-       - 2D map descriptor 0xAD258 (RPM × load)
+       - RETRACTED 2026-08-16. 0xAD258 is a 1-D, 16-point, uint16 table on a
+         COOLANT TEMPERATURE axis (0xCC664, named "Coolant Temperature" in the
+         project definition XML), not a 2D RPM x load map. Function entry is
+         0x3952C, not 0x39528 (0x39528 is `bra 0x039668`, a sibling stub).
+         It is NOT on the IPW path: its outputs are FFFF7BAC/7BA8 (AFR-deviation
+         metric), and the main IPW calculator at 0x3817C has zero references to
+         the FFFF7B90-7BD0 block. The table is flat 1.0 at all 16 points AND the
+         branch that uses it is clamped to [0.0, 0.0] by 0xCC3EC / 0xCC3F0, so it
+         contributes nothing to commanded fuel on this calibration.
+         Full trace: disassembly/analysis/ad258_wot_enrichment_trace.txt
        - Output used by Main IPW calculator
 
 3.7  Post-Start Enrichment
