@@ -58,6 +58,14 @@ SECTION 1: DISPATCH TABLE ENTRIES
   [ 6] 0x31528  FFFF7448 CL/OL mode flag writer (1=CL, 0=OL)
   [ 7] 0x3CD34  Warmup/cold-start enrichment (ECT/IAT indexed)
   [ 8] 0x3952C  AFR-deviation metric, NOT fuel [CORRECTED 2026-08-16, item 39]
+       NOTE 2026-08-16 (corrections.md item 63): the "dispatch table" framing
+       used throughout this section is WRONG. 0x480B8 / 0x4A0B8 are LITERAL
+       POOLS, not tables -- 99-100%% of their entries are loaded individually
+       by PC-relative mov.l, and there is no base pointer. The real pointer
+       runs start at 0x047F9C / 0x04A070, so the addresses assumed here are
+       slots 71 and 18, not slot 0. The entry ADDRESSES and their ORDER are
+       correct (order = call order in a hand-unrolled jsr sequence); only the
+       mechanism is fiction.
   [ 9] 0x30ACC  Base fuel map combiner (2D map + descriptors → FFFF73AC)
   [10] 0x36C3C  CL/OL state cleanup
   [11] 0x37B68  Injector compensation (2D maps, RPM/load indexed)

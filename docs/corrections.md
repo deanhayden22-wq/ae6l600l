@@ -3011,3 +3011,96 @@ consults — is inert either way.
 Remaining, and correctly scoped: *what writes* `0xFFFF77D8`/`0xFFFF77DC`, and
 whether their sum ever goes negative in practice. The second is a log question
 (they are the AFC/AFL trim pair region), not a disassembly one.
+
+---
+
+## 63. ITEM 7 RESOLVED — the "fuel dispatch tables" are LITERAL POOLS, and nothing walks them — **2026-08-16**
+
+Item 57 left this as "what walks the dispatch tables — a scheduler question".
+The answer is that **nothing does, because they are not tables.**
+
+### They are literal pools
+
+For each of the three regions, the fraction of entries individually loaded by a
+PC-relative `mov.l @(disp,PC),Rn` instruction:
+
+| region | entries | individually PC-relative loaded |
+|---|---|---|
+| "table A" `0x047F9C`–`0x048100` | 90 | **89 (99%)** |
+| "table B" `0x04A070`–`0x04A1D4` | 90 | **90 (100%)** |
+| "table C" `0x04ACB8`–`0x04AE28` | 93 | **93 (100%)** |
+
+There is no base pointer because none is needed — every entry is addressed
+individually from code within PC-relative range. That is exactly why item 57's
+exhaustive search found no literal and no `mova` for any of the three: it was
+looking for something that does not exist.
+
+**The analysis-assumed start addresses were also wrong.** `fueling_pipeline_analysis.txt`
+treats the tables as beginning at `0x0480B8` and `0x04A0B8`; the actual
+contiguous pointer runs begin at `0x047F9C` and `0x04A070`, so the assumed bases
+are slots 71 and 18 of their pools, not slot 0.
+
+### What the "slots" actually are
+
+Two of the three pools serve **hand-unrolled straight-line call sequences** —
+long runs of the identical three-instruction pattern:
+
+```
+04AA6C  D292  mov.l @(0x04ACB8),r2
+04AA6E  420B  jsr  @r2
+04AA70  1F41  mov.l r4,@(4,r15)      ; delay slot
+04AA72  D292  mov.l @(0x04ACBC),r2
+04AA74  420B  jsr  @r2
+04AA76  0009  nop
+                ... 92 consecutive calls ...
+```
+
+| pool | call sequence | count |
+|---|---|---|
+| C | `0x04AA6C`–`0x04AC8E` | 92 consecutive `jsr` |
+| B | `0x049E14`–`0x04A030` | 91 consecutive `jsr` |
+
+Pool A's consumers are scattered rather than one unrolled chain, but it is still
+a literal pool (89 of 90 entries individually loaded).
+
+The enclosing function for pool C begins at `0x04AA58` and is guarded:
+
+```
+04AA5C  D295  mov.l @(0x04ACB4),r2   ; 0x04ACB4 = 0xFFFF8EDC (sched_disable_flag)
+04AA5E  6620  mov.b @r2,r6
+04AA60  2668  tst r6,r6
+04AA62  8901  bt 0x04AA68
+04AA64  A1FD  bra 0x04AE62            ; disabled -> skip the whole sequence
+```
+
+So these ARE the scheduler task lists — but implemented as unrolled code, not as
+data walked by an interpreter. The "slot index" is a pool ordinal, which happens
+to equal call order, so the **ordering is meaningful** even though the
+"dispatch table" mechanism is fiction.
+
+### This also completes item 46
+
+Item 46 found that `0x04AD08` holds `0x00039524`, the stub whose `bra` reaches
+`func_3952C`, and called it "table C slot 20". The fact stands and now has a
+mechanism:
+
+```
+04AAE4  D288  mov.l @(0x04AD08),r2   ; r2 = 0x00039524
+04AAE6  420B  jsr  @r2               ; <-- THE CALLER OF func_3952C
+04AAE8  0009  nop
+```
+
+`func_3952C` is **call #20** of the 92-call sequence at `0x04AA6C`. For contrast,
+`0x039528` (which reaches `0x039668`) is **call #26** of pool B's sequence, from
+`0x049EB2`. The two stubs 4 bytes apart are reached from two different call
+sequences — as item 46 said, but now with the call sites named rather than
+inferred.
+
+### Corrections owed
+
+- `fueling_pipeline_analysis.txt`'s "dispatch table A/B" framing is wrong in
+  mechanism and wrong in base address. The entry addresses it lists are correct
+  and the ordering is meaningful; the "table" is a literal pool.
+- Item 57's framing ("all three dispatch tables are equally unreferenced …
+  presumably a base built by arithmetic or a pointer initialised into RAM") is
+  superseded: there is no base at all.
