@@ -146,8 +146,14 @@ def is_valid_axis(rom, ptr, size):
     for v in vals:
         if v != v or abs(v) > 1e8:
             return False
-    increasing = sum(1 for i in range(len(vals)-1) if vals[i+1] >= vals[i])
-    return increasing >= len(vals) * 0.7
+    # BUG FIX 2026-08-16 (corrections.md item 43/60): counts PAIRS (max len-1)
+    # but compared against len(vals). A 2-point axis gave 1 >= 1.4 = False, so
+    # every narrow-axis descriptor was silently excluded.
+    pairs = len(vals) - 1
+    if pairs <= 0:
+        return False
+    increasing = sum(1 for i in range(pairs) if vals[i+1] >= vals[i])
+    return increasing >= pairs * 0.7
 
 
 def scan_descriptors(rom):
@@ -182,7 +188,7 @@ def scan_descriptors(rom):
                                     'y_axis': y_axis, 'x_axis': x_axis,
                                     'data_ptr': dptr,
                                 })
-                                addr += 28
+                                addr += 4   # fixed stride, not record size (2026-08-16)
                                 continue
 
             # Try 1D
@@ -203,10 +209,10 @@ def scan_descriptors(rom):
                                     'scale': scale, 'bias': bias,
                                     'axis': axis, 'data_ptr': dptr,
                                 })
-                                addr += 20
+                                addr += 4   # fixed stride, not record size (2026-08-16)
                                 continue
 
-            addr += 2
+            addr += 4
 
     return descs
 

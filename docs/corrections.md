@@ -2821,3 +2821,101 @@ Checked every other table decoded this session for the same mistake:
 where scaling **is** applied — and their RAW bytes are all zero, so that
 conclusion stands. `0xAD7E0` (item 58) was read raw both times, so its garbage
 data stands. Only item 56's four 2×2 tables and `0xAE290` were affected.
+
+---
+
+## 60. The descriptor scanner under-reported by 30% — two more instances of the same off-by-one, plus a phase-locked walk — **FIXED 2026-08-16**
+
+Ran the typecode-0 sweep Dean asked for. It found no corrupted values in any
+committed artifact (see the sweep result at the end), but it did expose that
+`descriptor_map.txt` was **missing a third of the descriptors in the ROM**.
+
+### Bug A — the same `is_valid_axis` off-by-one, in two more files
+
+Item 43 fixed this in `desc_to_func_xref.py`. It was also present, verbatim, in
+`scan_descriptors.py` and `name_descriptors.py`:
+
+```python
+increasing = sum(1 for i in range(len(vals)-1) if vals[i+1] >= vals[i])
+return increasing >= len(vals) * 0.7
+```
+
+`increasing` counts **pairs**, so its maximum is `len(vals)-1`, but the
+threshold is `len(vals)`. **For a 2-point axis that is `1 >= 1.4` — False for a
+perfectly monotonic axis.** Every narrow-axis descriptor in the ROM was silently
+excluded, including all eight per-cylinder knock tables
+(`0xAE6D4`/`6E8`/`6FC`/`710` and `0xAE724`/`738`/`74C`/`760`) — the very tables
+item 59 had to decode by hand because they were not in the map.
+
+### Bug B — the walk was phase-locked
+
+```python
+d = try_parse_2d(rom, addr) or try_parse_1d(rom, addr)
+if d: addr += d["total_bytes"]     # 20 or 28
+else: addr += 2
+```
+
+Advancing by the **record size** means any descriptor starting inside the
+skipped span is never tested. Descriptors are interleaved at 12-byte offsets in
+places, so the walk locked onto one phase. Symptom: raising the size guard
+swapped `0xAE290`/`2A8`/`2C0`/`2D8` **out** and `0xAE284`/`29C`/`2B4`/`2CC`
+**in** — while the detector trace proves *both* sets are real. Fixed to a fixed
+4-byte stride (descriptors are 4-byte aligned; they hold u32 pointers).
+
+### Bug C — the `size > 64` guard, third instance
+
+Raised to 256 here too. `0xAE284` is 65 points and `0xAB334` is 78.
+
+### Result
+
+| | before | after |
+|---|---|---|
+| descriptors | 760 (1D 621 / 2D 139) | **1094** (1D 851 / 2D 243) |
+| float32 / uint8 / uint16 | 149 / 215 / 396 | 326 / 287 / 481 |
+| known-real descriptors missed | 12 of 16 | **0 of 16** |
+
+Validation, because a 44% jump demands it:
+- **1094 distinct data pointers, zero aliasing.** No two descriptors claim the
+  same data pointer — random false positives would collide.
+- **818 pass the strict contiguity rule** (`axis + count*4 == data`), against
+  the 780 that `coverage_map.py` accepts independently by that same rule. The
+  ~276 that don't are exactly the case coverage_map documents as its own blind
+  spot: descriptors that *share* an axis with a neighbour.
+- `scan_descriptors.py` and `name_descriptors.py` are independent
+  implementations and now agree on 1094.
+
+### Also fixed
+
+- `scan_descriptors.py` applied `raw * scale + bias` unconditionally in its
+  data-sample block, and printed the scale/bias columns for float32 rows. Both
+  are now guarded; float32 rows print `--`, so the typecode-0 trap cannot be
+  re-entered by reading the artifact.
+- `scan_descriptors.py` now imports `TYPE_NAMES`/`TYPE_SIZES` from
+  `scripts/desc_types.py` — the last duplicated copy of that map is gone.
+- `gen_descriptor_labels.py` read `disassembly/named_descriptors.txt` and wrote
+  `disassembly/descriptor_labels.txt`; both live under `disassembly/maps/`.
+  Fixed, and `descriptor_labels.txt` regenerated to 1094 labels
+  (f32 326 / u8 287 / u16 481 — matching the map exactly).
+- `scripts/desc_types.py` gained `read_table()`, `scaling()`, `typecode()` and
+  `is_2d()`. **Use `read_table()`; do not hand-roll `raw * scale + bias`.** It
+  returns `scale=None` for typecode 0 and decodes 2-D data as X planes of Y
+  values (verified on `0xAE6D4`, whose two 18-value load planes are
+  byte-identical).
+
+### Sweep result — no committed artifact was corrupted
+
+All 149 (now 326) float32 descriptors hold an implausible value in the scale
+field, so applying it always corrupts. Checked every `disassembly/analysis/*.txt`
+and `disassembly/maps/*.txt` that mentions a float32 descriptor: eleven files do,
+and **none of them print decoded values** — they are pool references, call sites
+and labels. The corruption was confined to my own session analysis (item 56),
+already corrected by item 59.
+
+### Known gap, deliberately not closed
+
+`ImportAE5L600L.java` still carries **860** `desc_*` labels covering the old
+760-descriptor census. Those labels are correct but incomplete — 334 new
+descriptors have no Ghidra label. `update_import_java.py` **must not be re-run**
+to fix it: it is insert-only (appends a block before the final printf), so a
+re-run duplicates every label, and its paths are wrong. A do-not-run banner was
+added to that script. Closing the gap needs a replace-in-place rewrite.

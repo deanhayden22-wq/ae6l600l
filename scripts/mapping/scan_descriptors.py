@@ -70,13 +70,9 @@ def r_u16(rom, a): return struct.unpack_from(">H", rom, a)[0]
 def r_u32(rom, a): return struct.unpack_from(">I", rom, a)[0]
 def r_f32(rom, a): return struct.unpack_from(">f", rom, a)[0]
 
-TYPE_NAMES = {
-    0x00: "float32", 0x04: "uint8", 0x08: "uint16",
-    0x0C: "int8", 0x10: "int16"
-}
-TYPE_SIZES = {
-    0x00: 4, 0x04: 1, 0x08: 2, 0x0C: 1, 0x10: 2
-}
+# Single source of truth -- do NOT re-declare (corrections.md item 39).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from desc_types import TYPE_NAMES, TYPE_SIZES  # noqa: E402
 
 def is_rom_ptr(val, rom_len):
     return 0x1000 <= val < rom_len
@@ -91,9 +87,18 @@ def is_valid_axis(rom, ptr, size):
         if v != v or abs(v) > 1e8:  # NaN or extreme
             return False
     # Check roughly monotonic (allow small deviations)
-    increasing = sum(1 for i in range(len(vals)-1) if vals[i+1] >= vals[i])
-    decreasing = sum(1 for i in range(len(vals)-1) if vals[i+1] <= vals[i])
-    return increasing >= len(vals) * 0.7 or decreasing >= len(vals) * 0.7
+    # BUG FIX 2026-08-16 (same off-by-one as desc_to_func_xref.py, corrections
+    # item 43): these count PAIRS, so the maximum is len(vals)-1, but the
+    # threshold compared against len(vals). For a 2-point axis that is
+    # 1 >= 1.4 -- False for a PERFECTLY monotonic axis, which silently excluded
+    # every narrow-axis descriptor in the ROM, including the per-cylinder knock
+    # threshold tables (0xAE6D4/6E8/6FC/710, 0xAE724/738/74C/760).
+    pairs = len(vals) - 1
+    if pairs <= 0:
+        return False
+    increasing = sum(1 for i in range(pairs) if vals[i+1] >= vals[i])
+    decreasing = sum(1 for i in range(pairs) if vals[i+1] <= vals[i])
+    return increasing >= pairs * 0.7 or decreasing >= pairs * 0.7
 
 def try_parse_1d(rom, addr):
     """Try to parse a 1D descriptor at addr. Returns dict or None."""
@@ -108,7 +113,8 @@ def try_parse_1d(rom, addr):
 
     if b0 != 0 or b3 != 0:
         return None
-    if size < 2 or size > 64:
+    # 64 rejected real descriptors (0xAE284 = 65 pts, 0xAB334 = 78). 2026-08-16.
+    if size < 2 or size > 256:
         return None
     if dtype not in TYPE_NAMES:
         return None
@@ -164,9 +170,9 @@ def try_parse_2d(rom, addr):
 
     if b0 != 0 or b2 != 0:
         return None
-    if rows < 2 or rows > 64:
+    if rows < 2 or rows > 256:
         return None
-    if cols < 2 or cols > 64:
+    if cols < 2 or cols > 256:
         return None
 
     y_axis_ptr = r_u32(rom, addr + 4)
@@ -260,20 +266,15 @@ def main():
         addr = start
         while addr < end:
             # Try 2D first (it's more specific)
-            d = try_parse_2d(rom, addr)
+            # 2026-08-16: advance by a FIXED 4 bytes, never by the record
+            # size. Descriptors are 4-byte aligned (they hold u32 pointers) and
+            # are interleaved at 12-byte offsets in places; skipping by
+            # total_bytes locked the walk onto one phase and silently dropped
+            # every record starting inside the skipped span.
+            d = try_parse_2d(rom, addr) or try_parse_1d(rom, addr)
             if d:
                 all_descs.append(d)
-                addr += d["total_bytes"]
-                continue
-
-            # Try 1D
-            d = try_parse_1d(rom, addr)
-            if d:
-                all_descs.append(d)
-                addr += d["total_bytes"]
-                continue
-
-            addr += 2  # Advance by 2 bytes (aligned)
+            addr += 4
 
     print(f"\n{'='*90}")
     print(f"DESCRIPTOR SCAN RESULTS: {len(all_descs)} descriptors found")
@@ -312,8 +313,13 @@ def main():
             x_axis = read_axis(rom, d["x_axis_ptr"], d["cols"])
             axis_range = f"Y[{y_axis[0]:.1f}..{y_axis[-1]:.1f}] X[{x_axis[0]:.1f}..{x_axis[-1]:.1f}]"
 
+        # typecode 0x00 = float32: table_lookup SKIPS scale/bias entirely
+        # (0x0BE84A tst r3,r3 / bt), so those fields are NOT a scale.
+        # Printed as "--" so they cannot be misread. corrections.md item 59.
+        sc_str = "--" if d["dtype"] == 0x00 else f"{d['scale']:.6f}"
+        bi_str = "--" if d["dtype"] == 0x00 else f"{d['bias']:.3f}"
         print(f"{i:>4} 0x{d['addr']:06X} {d['type']:>4} {size_str:>8} "
-              f"{d['dtype_name']:>8} {d['scale']:>12.6f} {d['bias']:>10.3f} "
+              f"{d['dtype_name']:>8} {sc_str:>12} {bi_str:>10} "
               f"{axis_str:>10} {data_str:>10}  {axis_range}")
 
     # Print data samples for first 20
@@ -323,10 +329,11 @@ def main():
     for i, d in enumerate(all_descs[:30]):
         if d["type"] == "1D":
             raw = read_data_1d(rom, d["data_ptr"], min(d["size"], 8), d["dtype"])
-            physical = [v * d["scale"] + d["bias"] for v in raw]
+            # float32 data is already physical -- corrections.md item 59
+            physical = raw if d["dtype"] == 0x00 else [v * d["scale"] + d["bias"] for v in raw]
             axis = read_axis(rom, d["axis_ptr"], min(d["size"], 8))
             print(f"\n  #{i} 0x{d['addr']:06X} 1D {d['dtype_name']} [{d['size']}] "
-                  f"scale={d['scale']:.6f} bias={d['bias']:.3f}")
+                  f"scale={'n/a (float32)' if d['dtype']==0x00 else format(d['scale'],'.6f')+' bias='+format(d['bias'],'.3f')}")
             print(f"    Axis: {[f'{v:.1f}' for v in axis]}")
             print(f"    Raw:  {raw}")
             print(f"    Phys: {[f'{v:.4f}' for v in physical]}")
@@ -334,12 +341,12 @@ def main():
             y_axis = read_axis(rom, d["y_axis_ptr"], min(d["rows"], 4))
             x_axis = read_axis(rom, d["x_axis_ptr"], min(d["cols"], 4))
             print(f"\n  #{i} 0x{d['addr']:06X} 2D {d['dtype_name']} [{d['rows']}x{d['cols']}] "
-                  f"scale={d['scale']:.6f} bias={d['bias']:.3f}")
+                  f"scale={'n/a (float32)' if d['dtype']==0x00 else format(d['scale'],'.6f')+' bias='+format(d['bias'],'.3f')}")
             print(f"    Y-Axis: {[f'{v:.1f}' for v in y_axis]}{'...' if d['rows'] > 4 else ''}")
             print(f"    X-Axis: {[f'{v:.1f}' for v in x_axis]}{'...' if d['cols'] > 4 else ''}")
             # First row
             first_row = read_data_1d(rom, d["data_ptr"], min(d["cols"], 6), d["dtype"])
-            phys_row = [v * d["scale"] + d["bias"] for v in first_row]
+            phys_row = first_row if d["dtype"] == 0x00 else [v * d["scale"] + d["bias"] for v in first_row]
             print(f"    Row 0:  {first_row} -> {[f'{v:.4f}' for v in phys_row]}")
 
 

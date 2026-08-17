@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 """
-Update ImportAE5L600L.java with:
-1. 760 calibration descriptor labels
-2. ISR dispatch table labels (54 entries)
-3. Generic ISR handler + dispatch infrastructure labels
+!! DO NOT RE-RUN AS-IS -- 2026-08-16 !!
 
-Inserts new label blocks before the final printf/count line.
+This script is INSERT-ONLY: it appends a label block before the final
+printf/count line. It was written for the original one-shot injection of 760
+descriptor labels. Running it again ADDS a second block rather than replacing
+the first, producing duplicate label() calls for every descriptor.
+
+Its paths are also wrong: DISASM_DIR resolves to scripts/disassembly and
+JAVA_FILE to disassembly/ImportAE5L600L.java; the real file is
+disassembly/ghidra/ImportAE5L600L.java and the labels live under
+disassembly/maps/.
+
+STATE: disassembly/maps/descriptor_labels.txt now carries 1094 descriptors
+(corrections.md item 60). ImportAE5L600L.java still carries 860 desc_* labels
+covering the older 760-descriptor census. Those 860 are CORRECT but INCOMPLETE.
+Closing that gap needs a replace-in-place rewrite of this script, not a re-run.
 """
 import os
 import re

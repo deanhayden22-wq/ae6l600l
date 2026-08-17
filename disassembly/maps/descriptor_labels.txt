@@ -4,21 +4,29 @@
         // Each descriptor struct points to axis data + calibration table
         // ============================================================
 
-        // --- 1D_AtmPressure (6 descriptors) ---
+        // --- 1D_AtmPressure (8 descriptors) ---
         count += label(0x0AABB8L, "desc_1D_AtmPressure_u16_4");
+        count += label(0x0AAE3CL, "desc_1D_AtmPressure_u16_2");
         count += label(0x0AAEF4L, "desc_1D_AtmPressure_u16_8");
         count += label(0x0AB1A4L, "desc_1D_AtmPressure_u16_6_AB1A4");
         count += label(0x0AB1B8L, "desc_1D_AtmPressure_u16_6_AB1B8");
         count += label(0x0AB444L, "desc_1D_AtmPressure_u8_7");
+        count += label(0x0AB700L, "desc_1D_AtmPressure_f32_2");
         count += label(0x0ADDB8L, "desc_1D_AtmPressure_u8_6");
 
-        // --- 1D_Boost (26 descriptors) ---
+        // --- 1D_Boost (42 descriptors) ---
         count += label(0x0AA820L, "desc_1D_Boost_u16_5");
         count += label(0x0AB430L, "desc_1D_Boost_u8_16_AB430");
         count += label(0x0AB674L, "desc_1D_Boost_u16_8");
+        count += label(0x0AB6B0L, "desc_1D_Boost_u16_3");
+        count += label(0x0AB6F4L, "desc_1D_Boost_f32_2");
+        count += label(0x0AC2A4L, "desc_1D_Boost_u8_16_AC2A4");
         count += label(0x0AC2D0L, "desc_1D_Boost_u8_16_AC2D0");
+        count += label(0x0AC2DCL, "desc_1D_Boost_u8_16_AC2DC");
         count += label(0x0AC2E8L, "desc_1D_Boost_u8_16_AC2E8");
+        count += label(0x0AC2F4L, "desc_1D_Boost_u8_16_AC2F4");
         count += label(0x0AC300L, "desc_1D_Boost_u8_16_AC300");
+        count += label(0x0AC30CL, "desc_1D_Boost_u8_16_AC30C");
         count += label(0x0AC318L, "desc_1D_Boost_u8_16_AC318");
         count += label(0x0AC498L, "desc_1D_Boost_u8_16_AC498");
         count += label(0x0AC56CL, "desc_1D_Boost_u8_9_AC56C");
@@ -32,20 +40,30 @@
         count += label(0x0ACCF8L, "desc_1D_Boost_u16_11_ACCF8");
         count += label(0x0ACD0CL, "desc_1D_Boost_u16_11_ACD0C");
         count += label(0x0ACD20L, "desc_1D_Boost_u16_11_ACD20");
-        count += label(0x0AD37CL, "desc_1D_Boost_u16_18");
+        count += label(0x0AD368L, "desc_1D_Boost_u16_18_AD368");
+        count += label(0x0AD37CL, "desc_1D_Boost_u16_18_AD37C");
         count += label(0x0AD47CL, "desc_1D_Boost_f32_16_AD47C");
+        count += label(0x0AD488L, "desc_1D_Boost_f32_16_AD488");
         count += label(0x0AD494L, "desc_1D_Boost_f32_16_AD494");
         count += label(0x0AD4ACL, "desc_1D_Boost_f32_16_AD4AC");
+        count += label(0x0AD4B8L, "desc_1D_Boost_f32_16_AD4B8");
         count += label(0x0ADAFCL, "desc_1D_Boost_u8_8");
         count += label(0x0ADDCCL, "desc_1D_Boost_u8_7");
+        count += label(0x0AE140L, "desc_1D_Boost_f32_16_AE140");
         count += label(0x0AE14CL, "desc_1D_Boost_f32_16_AE14C");
+        count += label(0x0AE2CCL, "desc_1D_Boost_f32_35");
+        count += label(0x0AEF24L, "desc_1D_Boost_f32_6");
+        count += label(0x0AEF3CL, "desc_1D_Boost_f32_8");
+        count += label(0x0AF3ACL, "desc_1D_Boost_u8_5");
+        count += label(0x0AF728L, "desc_1D_Boost_u8_2_AF728");
+        count += label(0x0AF73CL, "desc_1D_Boost_u8_2_AF73C");
 
         // --- 1D_Degrees (3 descriptors) ---
         count += label(0x0AAB18L, "desc_1D_Degrees_u16_15");
         count += label(0x0AEE80L, "desc_1D_Degrees_u16_12_AEE80");
         count += label(0x0AEE94L, "desc_1D_Degrees_u16_12_AEE94");
 
-        // --- 1D_ECT (258 descriptors) ---
+        // --- 1D_ECT (298 descriptors) ---
         count += label(0x0AA888L, "desc_1D_ECT_u8_16_AA888");
         count += label(0x0AA89CL, "desc_1D_ECT_u8_16_AA89C");
         count += label(0x0AA8B0L, "desc_1D_ECT_u8_16_AA8B0");
@@ -53,11 +71,14 @@
         count += label(0x0AA8D8L, "desc_1D_ECT_u8_16_AA8D8");
         count += label(0x0AA8ECL, "desc_1D_ECT_u8_16_AA8EC");
         count += label(0x0AA900L, "desc_1D_ECT_u8_16_AA900");
+        count += label(0x0AAA40L, "desc_1D_ECT_f32_12");
+        count += label(0x0AADE0L, "desc_1D_ECT_u8_16_AADE0");
         count += label(0x0AADECL, "desc_1D_ECT_u16_16_AADEC");
         count += label(0x0AAE00L, "desc_1D_ECT_u16_16_AAE00");
         count += label(0x0AAE28L, "desc_1D_ECT_u16_16_AAE28");
         count += label(0x0AAE50L, "desc_1D_ECT_u16_16_AAE50");
         count += label(0x0AAEA0L, "desc_1D_ECT_u16_16_AAEA0");
+        count += label(0x0AAEACL, "desc_1D_ECT_u16_16_AAEAC");
         count += label(0x0AAEC0L, "desc_1D_ECT_u16_16_AAEC0");
         count += label(0x0AAEE0L, "desc_1D_ECT_u16_16_AAEE0");
         count += label(0x0AAF48L, "desc_1D_ECT_u16_16_AAF48");
@@ -65,21 +86,33 @@
         count += label(0x0AAF70L, "desc_1D_ECT_u16_16_AAF70");
         count += label(0x0AB41CL, "desc_1D_ECT_u8_16_AB41C");
         count += label(0x0AB7CCL, "desc_1D_ECT_f32_16_AB7CC");
+        count += label(0x0AB7D8L, "desc_1D_ECT_f32_16_AB7D8");
         count += label(0x0AB7E4L, "desc_1D_ECT_f32_16_AB7E4");
+        count += label(0x0AB7F0L, "desc_1D_ECT_f32_16_AB7F0");
         count += label(0x0AB7FCL, "desc_1D_ECT_f32_16_AB7FC");
+        count += label(0x0AB808L, "desc_1D_ECT_f32_16_AB808");
+        count += label(0x0AB988L, "desc_1D_ECT_f32_16_AB988");
         count += label(0x0AB994L, "desc_1D_ECT_f32_16_AB994");
+        count += label(0x0AB9A0L, "desc_1D_ECT_f32_16_AB9A0");
         count += label(0x0AB9ACL, "desc_1D_ECT_f32_16_AB9AC");
+        count += label(0x0AB9B8L, "desc_1D_ECT_f32_16_AB9B8");
         count += label(0x0AB9C4L, "desc_1D_ECT_f32_16_AB9C4");
         count += label(0x0AC2B0L, "desc_1D_ECT_f32_16_AC2B0");
+        count += label(0x0AC2BCL, "desc_1D_ECT_u8_16_AC2BC");
+        count += label(0x0AC324L, "desc_1D_ECT_u8_16_AC324");
         count += label(0x0AC338L, "desc_1D_ECT_u8_16_AC338");
         count += label(0x0AC374L, "desc_1D_ECT_u8_5");
         count += label(0x0AC388L, "desc_1D_ECT_u8_16_AC388");
+        count += label(0x0AC394L, "desc_1D_ECT_u8_16_AC394");
         count += label(0x0AC3A0L, "desc_1D_ECT_u8_16_AC3A0");
+        count += label(0x0AC3ACL, "desc_1D_ECT_u8_16_AC3AC");
         count += label(0x0AC3B8L, "desc_1D_ECT_u8_16_AC3B8");
         count += label(0x0AC3CCL, "desc_1D_ECT_u8_16_AC3CC");
         count += label(0x0AC3E0L, "desc_1D_ECT_u8_16_AC3E0");
         count += label(0x0AC41CL, "desc_1D_ECT_u8_16_AC41C");
         count += label(0x0AC430L, "desc_1D_ECT_u8_16_AC430");
+        count += label(0x0AC43CL, "desc_1D_ECT_u8_16_AC43C");
+        count += label(0x0AC45CL, "desc_1D_ECT_u8_16_AC45C");
         count += label(0x0AC470L, "desc_1D_ECT_u8_16_AC470");
         count += label(0x0AC484L, "desc_1D_ECT_u8_16_AC484");
         count += label(0x0AC620L, "desc_1D_ECT_u8_16_AC620");
@@ -92,6 +125,7 @@
         count += label(0x0AC774L, "desc_1D_ECT_u8_16_AC774");
         count += label(0x0AC7D8L, "desc_1D_ECT_u8_16_AC7D8");
         count += label(0x0AC7ECL, "desc_1D_ECT_u8_16_AC7EC");
+        count += label(0x0AC7F8L, "desc_1D_ECT_u8_16_AC7F8");
         count += label(0x0AC804L, "desc_1D_ECT_u16_16_AC804");
         count += label(0x0AC818L, "desc_1D_ECT_u16_16_AC818");
         count += label(0x0AC82CL, "desc_1D_ECT_u16_16_AC82C");
@@ -102,6 +136,7 @@
         count += label(0x0AC890L, "desc_1D_ECT_u16_16_AC890");
         count += label(0x0AC8A4L, "desc_1D_ECT_u16_16_AC8A4");
         count += label(0x0AC8B8L, "desc_1D_ECT_u16_16_AC8B8");
+        count += label(0x0AC8C4L, "desc_1D_ECT_u16_16_AC8C4");
         count += label(0x0AC8D0L, "desc_1D_ECT_u16_16_AC8D0");
         count += label(0x0AC8E4L, "desc_1D_ECT_u16_16_AC8E4");
         count += label(0x0AC8F8L, "desc_1D_ECT_u16_16_AC8F8");
@@ -113,6 +148,7 @@
         count += label(0x0AC970L, "desc_1D_ECT_u16_16_AC970");
         count += label(0x0AC984L, "desc_1D_ECT_u16_16_AC984");
         count += label(0x0AC998L, "desc_1D_ECT_u16_16_AC998");
+        count += label(0x0AC9A4L, "desc_1D_ECT_u16_16_AC9A4");
         count += label(0x0AC9B8L, "desc_1D_ECT_u16_16_AC9B8");
         count += label(0x0AC9CCL, "desc_1D_ECT_u16_16_AC9CC");
         count += label(0x0AC9E0L, "desc_1D_ECT_u16_16_AC9E0");
@@ -123,6 +159,7 @@
         count += label(0x0ACA44L, "desc_1D_ECT_u16_16_ACA44");
         count += label(0x0ACA58L, "desc_1D_ECT_u16_16_ACA58");
         count += label(0x0ACA6CL, "desc_1D_ECT_u16_16_ACA6C");
+        count += label(0x0ACA78L, "desc_1D_ECT_u16_16_ACA78");
         count += label(0x0ACA8CL, "desc_1D_ECT_u16_16_ACA8C");
         count += label(0x0ACAA0L, "desc_1D_ECT_u16_16_ACAA0");
         count += label(0x0ACAB4L, "desc_1D_ECT_u16_16_ACAB4");
@@ -144,6 +181,7 @@
         count += label(0x0ACC44L, "desc_1D_ECT_u16_16_ACC44");
         count += label(0x0ACC58L, "desc_1D_ECT_u16_16_ACC58");
         count += label(0x0ACD48L, "desc_1D_ECT_u16_16_ACD48");
+        count += label(0x0ACD54L, "desc_1D_ECT_u16_16_ACD54");
         count += label(0x0ACD68L, "desc_1D_ECT_u16_16_ACD68");
         count += label(0x0ACD7CL, "desc_1D_ECT_u16_16_ACD7C");
         count += label(0x0ACD90L, "desc_1D_ECT_u16_16_ACD90");
@@ -152,11 +190,15 @@
         count += label(0x0ACDCCL, "desc_1D_ECT_u16_16_ACDCC");
         count += label(0x0ACDE0L, "desc_1D_ECT_u16_16_ACDE0");
         count += label(0x0ACDF4L, "desc_1D_ECT_u16_16_ACDF4");
+        count += label(0x0ACE00L, "desc_1D_ECT_u16_16_ACE00");
+        count += label(0x0ACE40L, "desc_1D_ECT_u16_16_ACE40");
         count += label(0x0ACE80L, "desc_1D_ECT_u16_16_ACE80");
         count += label(0x0ACEA0L, "desc_1D_ECT_u16_16_ACEA0");
         count += label(0x0ACEC8L, "desc_1D_ECT_u16_16_ACEC8");
+        count += label(0x0ACEFCL, "desc_1D_ECT_u16_16_ACEFC");
         count += label(0x0ACF08L, "desc_1D_ECT_u16_16_ACF08");
         count += label(0x0AD054L, "desc_1D_ECT_u16_16_AD054");
+        count += label(0x0AD0DCL, "desc_1D_ECT_u16_16_AD0DC");
         count += label(0x0AD118L, "desc_1D_ECT_u16_7_AD118");
         count += label(0x0AD12CL, "desc_1D_ECT_u16_7_AD12C");
         count += label(0x0AD140L, "desc_1D_ECT_u16_7_AD140");
@@ -165,7 +207,7 @@
         count += label(0x0AD1CCL, "desc_1D_ECT_u16_7_AD1CC");
         count += label(0x0AD1E0L, "desc_1D_ECT_u16_7_AD1E0");
         count += label(0x0AD1F4L, "desc_1D_ECT_u16_7_AD1F4");
-        count += label(0x0AD258L, "desc_1D_ECT_u16_16_AD258");   // CORRECTED 2026-08-16: u16 not u8 (typecode 0x08); see corrections.md item 39
+        count += label(0x0AD258L, "desc_1D_ECT_u16_16_AD258");
         count += label(0x0AD26CL, "desc_1D_ECT_u16_16_AD26C");
         count += label(0x0AD280L, "desc_1D_ECT_u16_16_AD280");
         count += label(0x0AD294L, "desc_1D_ECT_u16_16_AD294");
@@ -182,9 +224,13 @@
         count += label(0x0AD390L, "desc_1D_ECT_u16_16_AD390");
         count += label(0x0AD3A4L, "desc_1D_ECT_u16_16_AD3A4");
         count += label(0x0AD3B8L, "desc_1D_ECT_u16_16_AD3B8");
+        count += label(0x0AD3C4L, "desc_1D_ECT_u16_16_AD3C4");
         count += label(0x0AD3D8L, "desc_1D_ECT_u16_16_AD3D8");
         count += label(0x0AD3ECL, "desc_1D_ECT_u16_16_AD3EC");
+        count += label(0x0AD40CL, "desc_1D_ECT_u16_16_AD40C");
         count += label(0x0AD420L, "desc_1D_ECT_u16_16_AD420");
+        count += label(0x0AD470L, "desc_1D_ECT_f32_16_AD470");
+        count += label(0x0AD4A0L, "desc_1D_ECT_f32_16_AD4A0");
         count += label(0x0AD4C4L, "desc_1D_ECT_f32_16_AD4C4");
         count += label(0x0ADA98L, "desc_1D_ECT_u8_16_ADA98");
         count += label(0x0ADAACL, "desc_1D_ECT_u8_16_ADAAC");
@@ -206,14 +252,17 @@
         count += label(0x0ADF48L, "desc_1D_ECT_u8_16_ADF48");
         count += label(0x0ADFACL, "desc_1D_ECT_u8_16_ADFAC");
         count += label(0x0AE034L, "desc_1D_ECT_u16_16_AE034");
+        count += label(0x0AE040L, "desc_1D_ECT_u16_16_AE040");
         count += label(0x0AE054L, "desc_1D_ECT_u16_16_AE054");
         count += label(0x0AE068L, "desc_1D_ECT_u16_16_AE068");
         count += label(0x0AE07CL, "desc_1D_ECT_u16_16_AE07C");
         count += label(0x0AE090L, "desc_1D_ECT_u16_16_AE090");
         count += label(0x0AE0A4L, "desc_1D_ECT_u16_16_AE0A4");
+        count += label(0x0AE0B0L, "desc_1D_ECT_u16_16_AE0B0");
         count += label(0x0AE0C4L, "desc_1D_ECT_u16_16_AE0C4");
         count += label(0x0AE0D8L, "desc_1D_ECT_u16_16_AE0D8");
         count += label(0x0AE0ECL, "desc_1D_ECT_u16_16_AE0EC");
+        count += label(0x0AE828L, "desc_1D_ECT_u16_2");
         count += label(0x0AE88CL, "desc_1D_ECT_u16_16_AE88C");
         count += label(0x0AE8A0L, "desc_1D_ECT_u16_16_AE8A0");
         count += label(0x0AE8C8L, "desc_1D_ECT_u16_16_AE8C8");
@@ -265,6 +314,7 @@
         count += label(0x0AECC4L, "desc_1D_ECT_u16_16_AECC4");
         count += label(0x0AECD8L, "desc_1D_ECT_u16_16_AECD8");
         count += label(0x0AECECL, "desc_1D_ECT_u16_16_AECEC");
+        count += label(0x0AECF8L, "desc_1D_ECT_u16_16_AECF8");
         count += label(0x0AED0CL, "desc_1D_ECT_u16_16_AED0C");
         count += label(0x0AED20L, "desc_1D_ECT_u16_16_AED20");
         count += label(0x0AED34L, "desc_1D_ECT_u16_16_AED34");
@@ -275,6 +325,7 @@
         count += label(0x0AED98L, "desc_1D_ECT_u16_16_AED98");
         count += label(0x0AEDACL, "desc_1D_ECT_u16_16_AEDAC");
         count += label(0x0AEDC0L, "desc_1D_ECT_u16_16_AEDC0");
+        count += label(0x0AEDCCL, "desc_1D_ECT_u16_16_AEDCC");
         count += label(0x0AEDE0L, "desc_1D_ECT_u16_16_AEDE0");
         count += label(0x0AEDF4L, "desc_1D_ECT_u16_16_AEDF4");
         count += label(0x0AEE08L, "desc_1D_ECT_u16_16_AEE08");
@@ -283,15 +334,21 @@
         count += label(0x0AEED0L, "desc_1D_ECT_u16_16_AEED0");
         count += label(0x0AEEF8L, "desc_1D_ECT_u16_16_AEEF8");
         count += label(0x0AEFC0L, "desc_1D_ECT_f32_16_AEFC0");
+        count += label(0x0AEFCCL, "desc_1D_ECT_f32_16_AEFCC");
         count += label(0x0AEFD8L, "desc_1D_ECT_f32_16_AEFD8");
+        count += label(0x0AF130L, "desc_1D_ECT_u16_16_AF130");
         count += label(0x0AF3D4L, "desc_1D_ECT_u16_16_AF3D4");
+        count += label(0x0AF3E0L, "desc_1D_ECT_u16_16_AF3E0");
         count += label(0x0AF3F4L, "desc_1D_ECT_u16_16_AF3F4");
         count += label(0x0AF408L, "desc_1D_ECT_u16_16_AF408");
         count += label(0x0AF4F0L, "desc_1D_ECT_u8_16_AF4F0");
         count += label(0x0AF504L, "desc_1D_ECT_f32_16_AF504");
+        count += label(0x0AF510L, "desc_1D_ECT_f32_16_AF510");
         count += label(0x0AF56CL, "desc_1D_ECT_u16_16_AF56C");
         count += label(0x0AF580L, "desc_1D_ECT_f32_16_AF580");
+        count += label(0x0AF58CL, "desc_1D_ECT_u16_16_AF58C");
         count += label(0x0AF5A0L, "desc_1D_ECT_f32_16_AF5A0");
+        count += label(0x0AF5ACL, "desc_1D_ECT_f32_2");
         count += label(0x0AF5CCL, "desc_1D_ECT_u16_16_AF5CC");
         count += label(0x0AF6D8L, "desc_1D_ECT_u8_16_AF6D8");
         count += label(0x0AF6ECL, "desc_1D_ECT_u8_16_AF6EC");
@@ -303,28 +360,43 @@
         count += label(0x0AF78CL, "desc_1D_ECT_u16_16_AF78C");
         count += label(0x0AF7A0L, "desc_1D_ECT_u16_16_AF7A0");
         count += label(0x0AF7B4L, "desc_1D_ECT_u16_16_AF7B4");
+        count += label(0x0AF7C0L, "desc_1D_ECT_f32_16_AF7C0");
         count += label(0x0AF7CCL, "desc_1D_ECT_u16_16_AF7CC");
 
-        // --- 1D_IAT (5 descriptors) ---
+        // --- 1D_IAT (9 descriptors) ---
+        count += label(0x0AA974L, "desc_1D_IAT_f32_6");
         count += label(0x0AB660L, "desc_1D_IAT_u16_11_AB660");
         count += label(0x0AB688L, "desc_1D_IAT_u16_10");
         count += label(0x0AB69CL, "desc_1D_IAT_u16_11_AB69C");
         count += label(0x0AB76CL, "desc_1D_IAT_f32_4");
-        count += label(0x0AF008L, "desc_1D_IAT_f32_11");
+        count += label(0x0ABB20L, "desc_1D_IAT_f32_9");
+        count += label(0x0AE260L, "desc_1D_IAT_f32_7");
+        count += label(0x0AF008L, "desc_1D_IAT_f32_11_AF008");
+        count += label(0x0AF014L, "desc_1D_IAT_f32_11_AF014");
 
-        // --- 1D_IPW (12 descriptors) ---
+        // --- 1D_IPW (22 descriptors) ---
         count += label(0x0AABE0L, "desc_1D_IPW_f32_6_AABE0");
+        count += label(0x0AABECL, "desc_1D_IPW_f32_6_AABEC");
         count += label(0x0AABF8L, "desc_1D_IPW_f32_6_AABF8");
         count += label(0x0AB17CL, "desc_1D_IPW_u8_10");
+        count += label(0x0AB5A8L, "desc_1D_IPW_u16_2");
+        count += label(0x0AB724L, "desc_1D_IPW_f32_2_AB724");
+        count += label(0x0AB970L, "desc_1D_IPW_f32_13");
         count += label(0x0AC5F8L, "desc_1D_IPW_u8_6_AC5F8");
         count += label(0x0AC60CL, "desc_1D_IPW_u8_6_AC60C");
         count += label(0x0ACE20L, "desc_1D_IPW_u16_13");
         count += label(0x0AD0B8L, "desc_1D_IPW_f32_10_AD0B8");
+        count += label(0x0AD0C4L, "desc_1D_IPW_f32_10_AD0C4");
         count += label(0x0AD0D0L, "desc_1D_IPW_f32_10_AD0D0");
         count += label(0x0AD434L, "desc_1D_IPW_f32_9");
-        count += label(0x0ADFE8L, "desc_1D_IPW_f32_5");
+        count += label(0x0ADFE8L, "desc_1D_IPW_f32_5_ADFE8");
+        count += label(0x0ADFF4L, "desc_1D_IPW_f32_5_ADFF4");
+        count += label(0x0AF1C0L, "desc_1D_IPW_f32_2_AF1C0");
         count += label(0x0AF450L, "desc_1D_IPW_f32_16");
-        count += label(0x0AF480L, "desc_1D_IPW_f32_30");
+        count += label(0x0AF45CL, "desc_1D_IPW_f32_54");
+        count += label(0x0AF474L, "desc_1D_IPW_f32_28");
+        count += label(0x0AF480L, "desc_1D_IPW_f32_30_AF480");
+        count += label(0x0AF48CL, "desc_1D_IPW_f32_30_AF48C");
 
         // --- 1D_KnockIdx (4 descriptors) ---
         count += label(0x0AB56CL, "desc_1D_KnockIdx_u16_7_AB56C");
@@ -332,12 +404,17 @@
         count += label(0x0ADC28L, "desc_1D_KnockIdx_u8_8");
         count += label(0x0AF1CCL, "desc_1D_KnockIdx_f32_24");
 
-        // --- 1D_Load (24 descriptors) ---
+        // --- 1D_Load (40 descriptors) ---
         count += label(0x0AAA4CL, "desc_1D_Load_f32_16_AAA4C");
         count += label(0x0AB498L, "desc_1D_Load_u16_4");
+        count += label(0x0AB594L, "desc_1D_Load_u16_2");
         count += label(0x0AB9DCL, "desc_1D_Load_f32_5");
+        count += label(0x0AB9E8L, "desc_1D_Load_f32_2");
+        count += label(0x0ABA00L, "desc_1D_Load_f32_7_ABA00");
         count += label(0x0ABA0CL, "desc_1D_Load_f32_7_ABA0C");
+        count += label(0x0ABA18L, "desc_1D_Load_f32_3");
         count += label(0x0ABA24L, "desc_1D_Load_f32_7_ABA24");
+        count += label(0x0ABB68L, "desc_1D_Load_f32_4_ABB68");
         count += label(0x0ACE0CL, "desc_1D_Load_u16_10");
         count += label(0x0ACE34L, "desc_1D_Load_f32_16_ACE34");
         count += label(0x0ACEB4L, "desc_1D_Load_u16_11_ACEB4");
@@ -346,15 +423,26 @@
         count += label(0x0AD17CL, "desc_1D_Load_u16_7_AD17C");
         count += label(0x0AD190L, "desc_1D_Load_u16_7_AD190");
         count += label(0x0AD1A4L, "desc_1D_Load_u16_7_AD1A4");
+        count += label(0x0AE00CL, "desc_1D_Load_u8_6");
+        count += label(0x0AE188L, "desc_1D_Load_f32_4_AE188");
         count += label(0x0AE194L, "desc_1D_Load_f32_4_AE194");
+        count += label(0x0AE1A0L, "desc_1D_Load_f32_4_AE1A0");
         count += label(0x0AE1ACL, "desc_1D_Load_f32_4_AE1AC");
+        count += label(0x0AE1B8L, "desc_1D_Load_f32_4_AE1B8");
         count += label(0x0AE1C4L, "desc_1D_Load_f32_4_AE1C4");
+        count += label(0x0AE1D0L, "desc_1D_Load_f32_4_AE1D0");
         count += label(0x0AE1DCL, "desc_1D_Load_f32_4_AE1DC");
+        count += label(0x0AE1E8L, "desc_1D_Load_f32_4_AE1E8");
         count += label(0x0AE1F4L, "desc_1D_Load_f32_4_AE1F4");
+        count += label(0x0AE200L, "desc_1D_Load_f32_4_AE200");
         count += label(0x0AE20CL, "desc_1D_Load_f32_4_AE20C");
+        count += label(0x0AE218L, "desc_1D_Load_f32_4_AE218");
         count += label(0x0AE224L, "desc_1D_Load_f32_4_AE224");
+        count += label(0x0AE230L, "desc_1D_Load_f32_4_AE230");
         count += label(0x0AE23CL, "desc_1D_Load_f32_4_AE23C");
+        count += label(0x0AE248L, "desc_1D_Load_f32_4_AE248");
         count += label(0x0AE254L, "desc_1D_Load_f32_4_AE254");
+        count += label(0x0AE284L, "desc_1D_Load_f32_65");
         count += label(0x0AE2D8L, "desc_1D_Load_f32_8");
         count += label(0x0AF438L, "desc_1D_Load_f32_17");
 
@@ -362,29 +450,41 @@
         count += label(0x0AB21CL, "desc_1D_MAF_u16_14");
         count += label(0x0AC7C4L, "desc_1D_MAF_u8_9");
 
-        // --- 1D_Pressure (11 descriptors) ---
+        // --- 1D_Pressure (18 descriptors) ---
         count += label(0x0AAAF0L, "desc_1D_Pressure_u16_6_AAAF0");
         count += label(0x0AAB04L, "desc_1D_Pressure_u16_6_AAB04");
         count += label(0x0AAB2CL, "desc_1D_Pressure_u16_9_AAB2C");
         count += label(0x0AAB54L, "desc_1D_Pressure_u16_4_AAB54");
         count += label(0x0AAB68L, "desc_1D_Pressure_u16_9_AAB68");
         count += label(0x0AAB90L, "desc_1D_Pressure_u16_9_AAB90");
+        count += label(0x0AAC1CL, "desc_1D_Pressure_f32_3_AAC1C");
+        count += label(0x0AAC28L, "desc_1D_Pressure_f32_3_AAC28");
+        count += label(0x0AAC34L, "desc_1D_Pressure_f32_3_AAC34");
+        count += label(0x0AAC40L, "desc_1D_Pressure_f32_3_AAC40");
         count += label(0x0AAC64L, "desc_1D_Pressure_f32_4_AAC64");
+        count += label(0x0AAC70L, "desc_1D_Pressure_f32_4_AAC70");
         count += label(0x0AAC7CL, "desc_1D_Pressure_f32_4_AAC7C");
-        count += label(0x0ABAE4L, "desc_1D_Pressure_f32_6");
+        count += label(0x0AAC88L, "desc_1D_Pressure_f32_4_AAC88");
+        count += label(0x0ABAE4L, "desc_1D_Pressure_f32_6_ABAE4");
+        count += label(0x0ABAF0L, "desc_1D_Pressure_f32_6_ABAF0");
         count += label(0x0ABB74L, "desc_1D_Pressure_f32_4_ABB74");
         count += label(0x0AEAD0L, "desc_1D_Pressure_u16_4_AEAD0");
 
-        // --- 1D_RPM (107 descriptors) ---
+        // --- 1D_RPM (142 descriptors) ---
         count += label(0x0AA7C4L, "desc_1D_RPM_wide_u16_4_AA7C4");
+        count += label(0x0AA7E4L, "desc_1D_RPM_wide_u16_4_AA7E4");
         count += label(0x0AA7F8L, "desc_1D_RPM_wide_u16_4_AA7F8");
         count += label(0x0AA950L, "desc_1D_RPM_f32_5_AA950");
+        count += label(0x0AA95CL, "desc_1D_RPM_f32_5_AA95C");
         count += label(0x0AA968L, "desc_1D_RPM_f32_5_AA968");
         count += label(0x0AAA20L, "desc_1D_RPM_u8_10_AAA20");
         count += label(0x0AAA34L, "desc_1D_RPM_f32_15_AAA34");
+        count += label(0x0AAA58L, "desc_1D_RPM_wide_f32_6_AAA58");
+        count += label(0x0AAB40L, "desc_1D_RPM_mid_u16_3");
         count += label(0x0AAF84L, "desc_1D_RPM_u16_15_AAF84");
         count += label(0x0AAFACL, "desc_1D_RPM_f32_10_AAFAC");
-        count += label(0x0AAFC4L, "desc_1D_RPM_f32_7");
+        count += label(0x0AAFB8L, "desc_1D_RPM_f32_7_AAFB8");
+        count += label(0x0AAFC4L, "desc_1D_RPM_f32_7_AAFC4");
         count += label(0x0AB168L, "desc_1D_RPM_u8_10_AB168");
         count += label(0x0AB2D8L, "desc_1D_RPM_u8_14_AB2D8");
         count += label(0x0AB2ECL, "desc_1D_RPM_u8_14_AB2EC");
@@ -403,21 +503,37 @@
         count += label(0x0AB3F4L, "desc_1D_RPM_u8_14_AB3F4");
         count += label(0x0AB408L, "desc_1D_RPM_u8_14_AB408");
         count += label(0x0AB558L, "desc_1D_RPM_u16_10_AB558");
+        count += label(0x0AB5BCL, "desc_1D_RPM_wide_f32_3_AB5BC");
+        count += label(0x0AB5C8L, "desc_1D_RPM_wide_f32_3_AB5C8");
+        count += label(0x0AB6E8L, "desc_1D_RPM_f32_2_AB6E8");
+        count += label(0x0AB778L, "desc_1D_RPM_f32_2_AB778");
         count += label(0x0AB784L, "desc_1D_RPM_f32_14_AB784");
+        count += label(0x0AB790L, "desc_1D_RPM_f32_14_AB790");
         count += label(0x0AB79CL, "desc_1D_RPM_f32_14_AB79C");
+        count += label(0x0AB7A8L, "desc_1D_RPM_f32_14_AB7A8");
         count += label(0x0AB7B4L, "desc_1D_RPM_f32_14_AB7B4");
+        count += label(0x0AB7C0L, "desc_1D_RPM_f32_2_AB7C0");
+        count += label(0x0AB814L, "desc_1D_RPM_f32_2_AB814");
         count += label(0x0AB82CL, "desc_1D_RPM_f32_14_AB82C");
+        count += label(0x0AB844L, "desc_1D_RPM_f32_2_AB844");
         count += label(0x0AB85CL, "desc_1D_RPM_f32_14_AB85C");
         count += label(0x0AB880L, "desc_1D_RPM_f32_10_AB880");
         count += label(0x0AB8A4L, "desc_1D_RPM_f32_10_AB8A4");
+        count += label(0x0AB8BCL, "desc_1D_RPM_f32_2_AB8BC");
         count += label(0x0AB8C8L, "desc_1D_RPM_f32_14_AB8C8");
+        count += label(0x0AB8D4L, "desc_1D_RPM_f32_2_AB8D4");
         count += label(0x0AB8E0L, "desc_1D_RPM_f32_14_AB8E0");
+        count += label(0x0AB8ECL, "desc_1D_RPM_f32_2_AB8EC");
         count += label(0x0AB8F8L, "desc_1D_RPM_f32_14_AB8F8");
+        count += label(0x0AB904L, "desc_1D_RPM_f32_2_AB904");
         count += label(0x0AB910L, "desc_1D_RPM_f32_14_AB910");
+        count += label(0x0AB91CL, "desc_1D_RPM_f32_14_AB91C");
         count += label(0x0AB928L, "desc_1D_RPM_f32_14_AB928");
         count += label(0x0AB940L, "desc_1D_RPM_f32_14_AB940");
+        count += label(0x0AB958L, "desc_1D_RPM_f32_2_AB958");
         count += label(0x0AB964L, "desc_1D_RPM_f32_14_AB964");
         count += label(0x0AB97CL, "desc_1D_RPM_f32_13");
+        count += label(0x0AB9D0L, "desc_1D_RPM_f32_14_AB9D0");
         count += label(0x0AC450L, "desc_1D_RPM_f32_4");
         count += label(0x0AC4ACL, "desc_1D_RPM_wide_u8_16_AC4AC");
         count += label(0x0AC4FCL, "desc_1D_RPM_wide_u8_11_AC4FC");
@@ -445,6 +561,7 @@
         count += label(0x0AD230L, "desc_1D_RPM_u16_7_AD230");
         count += label(0x0AD244L, "desc_1D_RPM_u16_7_AD244");
         count += label(0x0AD400L, "desc_1D_RPM_f32_8_AD400");
+        count += label(0x0AD458L, "desc_1D_RPM_f32_2_AD458");
         count += label(0x0ADA84L, "desc_1D_RPM_u8_8");
         count += label(0x0ADDE0L, "desc_1D_RPM_u8_7_ADDE0");
         count += label(0x0ADDF4L, "desc_1D_RPM_u8_7_ADDF4");
@@ -452,28 +569,41 @@
         count += label(0x0ADFC0L, "desc_1D_RPM_wide_u8_16_ADFC0");
         count += label(0x0ADFD4L, "desc_1D_RPM_wide_u8_16_ADFD4");
         count += label(0x0AE000L, "desc_1D_RPM_f32_8_AE000");
+        count += label(0x0AE0F8L, "desc_1D_RPM_u16_7_AE0F8");
         count += label(0x0AE10CL, "desc_1D_RPM_u16_7_AE10C");
         count += label(0x0AE120L, "desc_1D_RPM_wide_u16_16_AE120");
         count += label(0x0AE134L, "desc_1D_RPM_f32_10_AE134");
-        count += label(0x0AE17CL, "desc_1D_RPM_f32_6");
-        count += label(0x0AE26CL, "desc_1D_RPM_f32_18");
+        count += label(0x0AE170L, "desc_1D_RPM_f32_6_AE170");
+        count += label(0x0AE17CL, "desc_1D_RPM_f32_6_AE17C");
+        count += label(0x0AE26CL, "desc_1D_RPM_f32_18_AE26C");
+        count += label(0x0AE278L, "desc_1D_RPM_f32_18_AE278");
         count += label(0x0AE290L, "desc_1D_RPM_f32_10_AE290");
+        count += label(0x0AE29CL, "desc_1D_RPM_f32_10_AE29C");
         count += label(0x0AE2A8L, "desc_1D_RPM_f32_10_AE2A8");
+        count += label(0x0AE2B4L, "desc_1D_RPM_f32_10_AE2B4");
         count += label(0x0AE2C0L, "desc_1D_RPM_f32_10_AE2C0");
         count += label(0x0AE7D8L, "desc_1D_RPM_wide_u8_20_AE7D8");
         count += label(0x0AE7ECL, "desc_1D_RPM_wide_u8_20_AE7EC");
         count += label(0x0AEC60L, "desc_1D_RPM_wide_u16_20");
+        count += label(0x0AEF54L, "desc_1D_RPM_wide_f32_8_AEF54");
         count += label(0x0AEF60L, "desc_1D_RPM_f32_8_AEF60");
-        count += label(0x0AEF78L, "desc_1D_RPM_wide_f32_8");
+        count += label(0x0AEF78L, "desc_1D_RPM_wide_f32_8_AEF78");
+        count += label(0x0AEF84L, "desc_1D_RPM_f32_8_AEF84");
+        count += label(0x0AEFB4L, "desc_1D_RPM_f32_10_AEFB4");
+        count += label(0x0AEFE4L, "desc_1D_RPM_wide_f32_6_AEFE4");
         count += label(0x0AEFF0L, "desc_1D_RPM_wide_f32_6_AEFF0");
         count += label(0x0AF144L, "desc_1D_RPM_u16_16_AF144");
         count += label(0x0AF158L, "desc_1D_RPM_u16_16_AF158");
         count += label(0x0AF16CL, "desc_1D_RPM_u16_16_AF16C");
         count += label(0x0AF180L, "desc_1D_RPM_u16_16_AF180");
         count += label(0x0AF1A8L, "desc_1D_RPM_f32_8_AF1A8");
+        count += label(0x0AF1B4L, "desc_1D_RPM_f32_8_AF1B4");
         count += label(0x0AF3C0L, "desc_1D_RPM_mid_u16_5");
+        count += label(0x0AF444L, "desc_1D_RPM_wide_f32_18");
         count += label(0x0AF498L, "desc_1D_RPM_f32_15_AF498");
+        count += label(0x0AF4A4L, "desc_1D_RPM_f32_15_AF4A4");
         count += label(0x0AF4D8L, "desc_1D_RPM_f32_15_AF4D8");
+        count += label(0x0AF4E4L, "desc_1D_RPM_f32_15_AF4E4");
         count += label(0x0AF51CL, "desc_1D_RPM_u16_10_AF51C");
         count += label(0x0AF530L, "desc_1D_RPM_f32_10_AF530");
         count += label(0x0AF630L, "desc_1D_RPM_u16_16_AF630");
@@ -491,21 +621,29 @@
         count += label(0x0AE020L, "desc_1D_SmallRatio_u8_5");
         count += label(0x0AF468L, "desc_1D_SmallRatio_f32_13");
 
-        // --- 1D_Throttle (41 descriptors) ---
+        // --- 1D_Throttle (49 descriptors) ---
         count += label(0x0AA760L, "desc_1D_Throttle_u16_16_AA760");
         count += label(0x0AA774L, "desc_1D_Throttle_u16_16_AA774");
         count += label(0x0AAA0CL, "desc_1D_Throttle_u8_6_AAA0C");
         count += label(0x0AABCCL, "desc_1D_Throttle_u16_5");
+        count += label(0x0AAC04L, "desc_1D_Throttle_f32_10_AAC04");
         count += label(0x0AAC10L, "desc_1D_Throttle_f32_10_AAC10");
         count += label(0x0AACACL, "desc_1D_Throttle_f32_10_AACAC");
+        count += label(0x0AACB8L, "desc_1D_Throttle_f32_10_AACB8");
         count += label(0x0AACC4L, "desc_1D_Throttle_f32_10_AACC4");
         count += label(0x0AAF08L, "desc_1D_Throttle_u16_21");
         count += label(0x0AAF1CL, "desc_1D_Throttle_f32_4");
         count += label(0x0AB11CL, "desc_1D_Throttle_f32_10_AB11C");
+        count += label(0x0AB128L, "desc_1D_Throttle_f32_2_AB128");
         count += label(0x0AB134L, "desc_1D_Throttle_f32_10_AB134");
+        count += label(0x0AB458L, "desc_1D_Throttle_f32_2_AB458");
+        count += label(0x0AB4D4L, "desc_1D_Throttle_f32_2_AB4D4");
         count += label(0x0AB638L, "desc_1D_Throttle_u16_9_AB638");
         count += label(0x0AB64CL, "desc_1D_Throttle_u16_9_AB64C");
-        count += label(0x0ABA54L, "desc_1D_Throttle_f32_13");
+        count += label(0x0AB6C4L, "desc_1D_Throttle_f32_3");
+        count += label(0x0AB6DCL, "desc_1D_Throttle_f32_2_AB6DC");
+        count += label(0x0ABA48L, "desc_1D_Throttle_f32_13_ABA48");
+        count += label(0x0ABA54L, "desc_1D_Throttle_f32_13_ABA54");
         count += label(0x0AC360L, "desc_1D_Throttle_u8_10_AC360");
         count += label(0x0AC544L, "desc_1D_Throttle_u8_8_AC544");
         count += label(0x0AC5E4L, "desc_1D_Throttle_u8_6_AC5E4");
@@ -534,9 +672,11 @@
         count += label(0x0AF6A8L, "desc_1D_Throttle_u16_11_AF6A8");
         count += label(0x0AF81CL, "desc_1D_Throttle_u16_12");
 
-        // --- 1D_TimingAdv (13 descriptors) ---
+        // --- 1D_TimingAdv (15 descriptors) ---
+        count += label(0x0AB334L, "desc_1D_TimingAdv_f32_78");
         count += label(0x0ABB44L, "desc_1D_TimingAdv_f32_7");
         count += label(0x0AC4E8L, "desc_1D_TimingAdv_u8_16");
+        count += label(0x0ACF14L, "desc_1D_TimingAdv_u16_9_ACF14");
         count += label(0x0ACF64L, "desc_1D_TimingAdv_u16_9_ACF64");
         count += label(0x0ACF78L, "desc_1D_TimingAdv_u16_9_ACF78");
         count += label(0x0ACFDCL, "desc_1D_TimingAdv_u16_9_ACFDC");
@@ -549,7 +689,7 @@
         count += label(0x0AD07CL, "desc_1D_TimingAdv_u16_8_AD07C");
         count += label(0x0AEBFCL, "desc_1D_TimingAdv_u16_7");
 
-        // --- 1D_VehSpd (11 descriptors) ---
+        // --- 1D_VehSpd (12 descriptors) ---
         count += label(0x0AA93CL, "desc_1D_VehSpd_u16_9_AA93C");
         count += label(0x0AB9F4L, "desc_1D_VehSpd_f32_8_AB9F4");
         count += label(0x0ABBBCL, "desc_1D_VehSpd_f32_8_ABBBC");
@@ -557,16 +697,20 @@
         count += label(0x0AC4D4L, "desc_1D_VehSpd_u8_9_AC4D4");
         count += label(0x0AC788L, "desc_1D_VehSpd_u8_7_AC788");
         count += label(0x0AC79CL, "desc_1D_VehSpd_u8_7_AC79C");
+        count += label(0x0ACE8CL, "desc_1D_VehSpd_u16_16");
         count += label(0x0AE79CL, "desc_1D_VehSpd_u8_10_AE79C");
         count += label(0x0AE7B0L, "desc_1D_VehSpd_u8_10_AE7B0");
         count += label(0x0AEE1CL, "desc_1D_VehSpd_u16_9_AEE1C");
         count += label(0x0AEE30L, "desc_1D_VehSpd_u16_9_AEE30");
 
-        // --- 1D_Voltage (2 descriptors) ---
+        // --- 1D_Voltage (5 descriptors) ---
         count += label(0x0AA788L, "desc_1D_Voltage_u8_5");
+        count += label(0x0AAECCL, "desc_1D_Voltage_u16_9");
+        count += label(0x0AE874L, "desc_1D_Voltage_f32_6");
+        count += label(0x0AE880L, "desc_1D_Voltage_f32_2");
         count += label(0x0AF5B8L, "desc_1D_Voltage_u16_11");
 
-        // --- 1D_range (91 descriptors) ---
+        // --- 1D_range (177 descriptors) ---
         count += label(0x0AA79CL, "desc_1D_range_20_4096_u16_5");
         count += label(0x0AA7B0L, "desc_1D_range_0_3500_u16_8");
         count += label(0x0AA7D8L, "desc_1D_range_40_20_f32_12");
@@ -574,53 +718,113 @@
         count += label(0x0AA914L, "desc_1D_range_160_160_u16_9");
         count += label(0x0AA928L, "desc_1D_range_240_0_u16_9");
         count += label(0x0AABA4L, "desc_1D_range_100_760_u16_5");
-        count += label(0x0AAC94L, "desc_1D_range_20_0_f32_6");
+        count += label(0x0AAC4CL, "desc_1D_range_40_80_f32_3_AAC4C");
+        count += label(0x0AAC58L, "desc_1D_range_40_80_f32_3_AAC58");
+        count += label(0x0AAC94L, "desc_1D_range_20_0_f32_6_AAC94");
+        count += label(0x0AACA0L, "desc_1D_range_20_0_f32_6_AACA0");
+        count += label(0x0AAE14L, "desc_1D_range_1000_10000_u16_2");
         count += label(0x0AAE64L, "desc_1D_range_4000_7500_u16_8");
         count += label(0x0AAE78L, "desc_1D_range_3200_6000_u16_8");
         count += label(0x0AAE8CL, "desc_1D_range_524_758_u16_4");
-        count += label(0x0AAFDCL, "desc_1D_range_15_60_f32_4");
+        count += label(0x0AAF28L, "desc_1D_range_15_60_u16_4");
+        count += label(0x0AAF3CL, "desc_1D_range_0_0_f32_2");
+        count += label(0x0AAF98L, "desc_1D_range_50_51_u16_2");
+        count += label(0x0AAFD0L, "desc_1D_range_15_60_f32_4_AAFD0");
+        count += label(0x0AAFDCL, "desc_1D_range_15_60_f32_4_AAFDC");
+        count += label(0x0AB0A4L, "desc_1D_range_5082_5631_u8_2_AB0A4");
+        count += label(0x0AB0B8L, "desc_1D_range_5082_5631_u8_2_AB0B8");
+        count += label(0x0AB0CCL, "desc_1D_range_228_230_u8_2_AB0CC");
+        count += label(0x0AB0E0L, "desc_1D_range_228_230_u8_2_AB0E0");
+        count += label(0x0AB0F4L, "desc_1D_range_228_230_u8_2_AB0F4");
+        count += label(0x0AB108L, "desc_1D_range_228_230_u8_2_AB108");
+        count += label(0x0AB140L, "desc_1D_range_192_416_u8_8");
         count += label(0x0AB154L, "desc_1D_range_20_80_u8_7");
         count += label(0x0AB190L, "desc_1D_range_0_0_u16_7_AB190");
+        count += label(0x0AB1CCL, "desc_1D_range_0_0_u16_2_AB1CC");
+        count += label(0x0AB1E0L, "desc_1D_range_0_0_u16_2_AB1E0");
+        count += label(0x0AB1F4L, "desc_1D_range_0_0_u16_2_AB1F4");
+        count += label(0x0AB208L, "desc_1D_range_0_0_u16_2_AB208");
         count += label(0x0AB230L, "desc_1D_range_200_1100_u16_10_AB230");
         count += label(0x0AB244L, "desc_1D_range_200_1100_u16_10_AB244");
         count += label(0x0AB258L, "desc_1D_range_200_1100_u16_10_AB258");
         count += label(0x0AB2A4L, "desc_1D_range_20_20_f32_4");
+        count += label(0x0AB2B0L, "desc_1D_range_700_1000_u8_2_AB2B0");
+        count += label(0x0AB2C4L, "desc_1D_range_700_1000_u8_2_AB2C4");
         count += label(0x0AB464L, "desc_1D_range_30_20_f32_6");
+        count += label(0x0AB470L, "desc_1D_range_30_20_u16_6");
         count += label(0x0AB484L, "desc_1D_range_15_45_u16_5_AB484");
         count += label(0x0AB4ACL, "desc_1D_range_15_45_u16_5_AB4AC");
         count += label(0x0AB4C0L, "desc_1D_range_0_1000_u16_6");
         count += label(0x0AB4E0L, "desc_1D_range_0_1600_u16_12");
         count += label(0x0AB4F4L, "desc_1D_range_100_1000_u16_9");
+        count += label(0x0AB508L, "desc_1D_range_700_1000_u16_2_AB508");
+        count += label(0x0AB51CL, "desc_1D_range_700_1000_u16_2_AB51C");
+        count += label(0x0AB530L, "desc_1D_range_700_1000_u16_2_AB530");
+        count += label(0x0AB544L, "desc_1D_range_700_1000_u16_2_AB544");
         count += label(0x0AB5D4L, "desc_1D_range_7_25_u16_4_AB5D4");
         count += label(0x0AB5E8L, "desc_1D_range_7_27_u16_4");
         count += label(0x0AB5FCL, "desc_1D_range_7_25_u16_4_AB5FC");
         count += label(0x0AB610L, "desc_1D_range_7_25_u16_4_AB610");
         count += label(0x0AB624L, "desc_1D_range_7_25_u16_4_AB624");
+        count += label(0x0AB6D0L, "desc_1D_range_150_200_f32_2");
+        count += label(0x0AB70CL, "desc_1D_range_0_4000_f32_2_AB70C");
+        count += label(0x0AB718L, "desc_1D_range_0_4000_f32_2_AB718");
+        count += label(0x0AB730L, "desc_1D_range_0_4000_f32_2_AB730");
+        count += label(0x0AB73CL, "desc_1D_range_0_4000_f32_2_AB73C");
+        count += label(0x0AB748L, "desc_1D_range_0_4000_f32_2_AB748");
         count += label(0x0AB754L, "desc_1D_range_20_20_f32_5");
+        count += label(0x0AB760L, "desc_1D_range_7_25_f32_4_AB760");
+        count += label(0x0AB820L, "desc_1D_range_3500_6700_f32_2_AB820");
+        count += label(0x0AB838L, "desc_1D_range_4000_6700_f32_7_AB838");
+        count += label(0x0AB850L, "desc_1D_range_3500_6700_f32_2_AB850");
+        count += label(0x0AB868L, "desc_1D_range_4000_6700_f32_7_AB868");
+        count += label(0x0AB874L, "desc_1D_range_3500_6700_f32_2_AB874");
+        count += label(0x0AB88CL, "desc_1D_range_4000_6700_f32_7_AB88C");
+        count += label(0x0AB898L, "desc_1D_range_3500_6700_f32_2_AB898");
+        count += label(0x0AB8B0L, "desc_1D_range_4000_6700_f32_7_AB8B0");
+        count += label(0x0AB934L, "desc_1D_range_3500_7000_f32_2");
+        count += label(0x0AB94CL, "desc_1D_range_4000_6700_f32_7_AB94C");
+        count += label(0x0ABA30L, "desc_1D_range_7_25_f32_4_ABA30");
         count += label(0x0ABA3CL, "desc_1D_range_7_30_f32_4");
-        count += label(0x0ABA6CL, "desc_1D_range_7_26_f32_9");
+        count += label(0x0ABA60L, "desc_1D_range_7_26_f32_9_ABA60");
+        count += label(0x0ABA6CL, "desc_1D_range_7_26_f32_9_ABA6C");
+        count += label(0x0ABA78L, "desc_1D_range_7_25_f32_4_ABA78");
         count += label(0x0ABA84L, "desc_1D_range_7_25_f32_4_ABA84");
+        count += label(0x0ABA90L, "desc_1D_range_0_67107_f32_2");
         count += label(0x0ABA9CL, "desc_1D_range_7_25_f32_4_ABA9C");
+        count += label(0x0ABAA8L, "desc_1D_range_7_25_f32_4_ABAA8");
         count += label(0x0ABAB4L, "desc_1D_range_7_35_f32_7");
+        count += label(0x0ABAC0L, "desc_1D_range_7_25_f32_4_ABAC0");
         count += label(0x0ABACCL, "desc_1D_range_7_35_f32_6");
-        count += label(0x0ABAFCL, "desc_1D_range_500_1000_f32_6");
-        count += label(0x0ABB14L, "desc_1D_range_520_760_f32_7");
+        count += label(0x0ABAD8L, "desc_1D_range_7_25_f32_4_ABAD8");
+        count += label(0x0ABAFCL, "desc_1D_range_500_1000_f32_6_ABAFC");
+        count += label(0x0ABB08L, "desc_1D_range_500_1000_f32_6_ABB08");
+        count += label(0x0ABB14L, "desc_1D_range_520_760_f32_7_ABB14");
         count += label(0x0ABB2CL, "desc_1D_range_0_20000_f32_5");
+        count += label(0x0ABB38L, "desc_1D_range_520_760_f32_7_ABB38");
+        count += label(0x0ABB50L, "desc_1D_range_0_60000_f32_2");
         count += label(0x0ABB5CL, "desc_1D_range_520_840_f32_9");
+        count += label(0x0ABB80L, "desc_1D_range_525_750_f32_4_ABB80");
         count += label(0x0ABB8CL, "desc_1D_range_525_750_f32_4_ABB8C");
+        count += label(0x0ABB98L, "desc_1D_range_0_1200000_f32_13");
         count += label(0x0ABBA4L, "desc_1D_range_525_750_f32_4_ABBA4");
-        count += label(0x0AC26CL, "desc_1D_range_8_24_f32_4");
+        count += label(0x0ABBB0L, "desc_1D_range_525_750_f32_4_ABBB0");
+        count += label(0x0AC26CL, "desc_1D_range_8_24_f32_4_AC26C");
+        count += label(0x0AC278L, "desc_1D_range_8_24_f32_4_AC278");
         count += label(0x0AC284L, "desc_1D_range_7_30_u16_5");
         count += label(0x0AC298L, "desc_1D_range_0_0_f32_24");
         count += label(0x0AC34CL, "desc_1D_range_184_760_u8_10");
         count += label(0x0AC3F4L, "desc_1D_range_3600_7200_u8_10_AC3F4");
         count += label(0x0AC408L, "desc_1D_range_3600_7200_u8_10_AC408");
         count += label(0x0AC524L, "desc_1D_range_0_0_f32_6_AC524");
+        count += label(0x0AC530L, "desc_1D_range_10_45_u8_8");
         count += label(0x0AC558L, "desc_1D_range_0_110000_u8_12_AC558");
         count += label(0x0AC580L, "desc_1D_range_0_110000_u8_12_AC580");
         count += label(0x0AC5A8L, "desc_1D_range_10_0_u8_6");
         count += label(0x0AC5D0L, "desc_1D_range_11_89_u8_6");
+        count += label(0x0AC6FCL, "desc_1D_range_500_1500_u8_3");
         count += label(0x0AC760L, "desc_1D_range_300_650_u8_8");
+        count += label(0x0ACE60L, "desc_1D_range_0_20972_f32_6");
         count += label(0x0ACE6CL, "desc_1D_range_0_0_u16_9");
         count += label(0x0ACEF0L, "desc_1D_range_0_0_f32_6_ACEF0");
         count += label(0x0ACF28L, "desc_1D_range_10_50_u16_5_ACF28");
@@ -631,6 +835,7 @@
         count += label(0x0ACFB4L, "desc_1D_range_10_50_u16_5_ACFB4");
         count += label(0x0ACFC8L, "desc_1D_range_10_50_u16_5_ACFC8");
         count += label(0x0AD104L, "desc_1D_range_0_0_u16_7_AD104");
+        count += label(0x0AD440L, "desc_1D_range_0_0_f32_9");
         count += label(0x0AD44CL, "desc_1D_range_700_800_f32_16");
         count += label(0x0AD464L, "desc_1D_range_700_2500_f32_7");
         count += label(0x0ADAC0L, "desc_1D_range_1600_3200_u8_5_ADAC0");
@@ -639,13 +844,32 @@
         count += label(0x0ADB10L, "desc_1D_range_0_1500_u8_16");
         count += label(0x0ADB24L, "desc_1D_range_515_795_u8_5");
         count += label(0x0ADB38L, "desc_1D_range_400_2000_u8_9");
+        count += label(0x0ADC3CL, "desc_1D_range_800_1200_u8_2_ADC3C");
+        count += label(0x0ADC50L, "desc_1D_range_800_1200_u8_2_ADC50");
+        count += label(0x0ADC64L, "desc_1D_range_800_1200_u8_2_ADC64");
+        count += label(0x0ADC78L, "desc_1D_range_800_1200_u8_2_ADC78");
+        count += label(0x0ADC8CL, "desc_1D_range_800_1200_u8_2_ADC8C");
+        count += label(0x0ADCA0L, "desc_1D_range_800_1200_u8_2_ADCA0");
+        count += label(0x0ADCB4L, "desc_1D_range_800_1200_u8_2_ADCB4");
+        count += label(0x0ADCC8L, "desc_1D_range_800_1200_u8_2_ADCC8");
+        count += label(0x0ADCDCL, "desc_1D_range_800_1200_u8_2_ADCDC");
+        count += label(0x0ADCF0L, "desc_1D_range_800_1200_u8_2_ADCF0");
+        count += label(0x0ADD04L, "desc_1D_range_800_1200_u8_2_ADD04");
+        count += label(0x0ADD18L, "desc_1D_range_800_1200_u8_2_ADD18");
+        count += label(0x0ADD2CL, "desc_1D_range_800_1200_u8_2_ADD2C");
+        count += label(0x0ADD40L, "desc_1D_range_800_1200_u8_2_ADD40");
+        count += label(0x0ADD54L, "desc_1D_range_800_1200_u8_2_ADD54");
+        count += label(0x0ADD68L, "desc_1D_range_800_1200_u8_2_ADD68");
+        count += label(0x0ADD7CL, "desc_1D_range_800_1200_u8_2_ADD7C");
         count += label(0x0ADF5CL, "desc_1D_range_20_20_u8_21_ADF5C");
         count += label(0x0ADF70L, "desc_1D_range_20_20_u8_21_ADF70");
         count += label(0x0ADF84L, "desc_1D_range_20_20_u8_21_ADF84");
         count += label(0x0ADF98L, "desc_1D_range_20_20_u8_21_ADF98");
+        count += label(0x0AE158L, "desc_1D_range_20_20_f32_9");
         count += label(0x0AE164L, "desc_1D_range_0_0_f32_5");
         count += label(0x0AE83CL, "desc_1D_range_146_146_u16_15");
         count += label(0x0AE850L, "desc_1D_range_0_0_f32_4_AE850");
+        count += label(0x0AE85CL, "desc_1D_range_0_0_f32_4_AE85C");
         count += label(0x0AE868L, "desc_1D_range_0_0_f32_4_AE868");
         count += label(0x0AEC4CL, "desc_1D_range_400_1400_u16_6");
         count += label(0x0AEC74L, "desc_1D_range_200_200_u16_9");
@@ -653,9 +877,15 @@
         count += label(0x0AEE58L, "desc_1D_range_60_0_u16_10_AEE58");
         count += label(0x0AEE6CL, "desc_1D_range_60_0_u16_10_AEE6C");
         count += label(0x0AEEE4L, "desc_1D_range_100_1000_u16_7");
-        count += label(0x0AEF90L, "desc_1D_range_15_80_f32_5");
+        count += label(0x0AEF04L, "desc_1D_range_100_0_u16_2");
+        count += label(0x0AEF6CL, "desc_1D_range_15_80_f32_5_AEF6C");
+        count += label(0x0AEF90L, "desc_1D_range_15_80_f32_5_AEF90");
+        count += label(0x0AEF9CL, "desc_1D_range_0_1600_f32_9");
         count += label(0x0AEFA8L, "desc_1D_range_0_1400_f32_10");
+        count += label(0x0AEFFCL, "desc_1D_range_800_0_f32_10");
         count += label(0x0AF194L, "desc_1D_range_504_760_u16_5");
+        count += label(0x0AF608L, "desc_1D_range_10_20_u8_2");
+        count += label(0x0AF61CL, "desc_1D_range_80_95_u8_2");
         count += label(0x0AF7F4L, "desc_1D_range_0_0_u16_13_AF7F4");
         count += label(0x0AF808L, "desc_1D_range_0_0_u16_13_AF808");
 
@@ -668,9 +898,37 @@
         // --- 2D_AtmPressurexrange (1 descriptors) ---
         count += label(0x0AA980L, "desc_2D_AtmPressurexrange_4000_7000_u8_6x4");
 
-        // --- 2D_Boostxrange (2 descriptors) ---
+        // --- 2D_BoostxLoad (1 descriptors) ---
+        count += label(0x0AD71CL, "desc_2D_BoostxLoad_u8_16x2");
+
+        // --- 2D_BoostxPressure (1 descriptors) ---
+        count += label(0x0AADB0L, "desc_2D_BoostxPressure_u16_3x3");
+
+        // --- 2D_BoostxRPM (3 descriptors) ---
+        count += label(0x0ABEE4L, "desc_2D_BoostxRPM_wide_u16_6x7");
+        count += label(0x0AF8A0L, "desc_2D_BoostxRPM_u16_2x2_AF8A0");
+        count += label(0x0AF8BCL, "desc_2D_BoostxRPM_u16_2x2_AF8BC");
+
+        // --- 2D_BoostxThrottle (3 descriptors) ---
+        count += label(0x0ABBC8L, "desc_2D_BoostxThrottle_u8_2x2_ABBC8");
+        count += label(0x0ABBE4L, "desc_2D_BoostxThrottle_u8_2x2_ABBE4");
+        count += label(0x0ABC00L, "desc_2D_BoostxThrottle_u8_2x2_ABC00");
+
+        // --- 2D_Boostxrange (5 descriptors) ---
+        count += label(0x0ABF1CL, "desc_2D_Boostxrange_12_16_u16_2x5_ABF1C");
+        count += label(0x0ABF38L, "desc_2D_Boostxrange_12_16_u16_2x5_ABF38");
+        count += label(0x0ADA08L, "desc_2D_Boostxrange_400_1200_u16_2x2");
         count += label(0x0AF058L, "desc_2D_Boostxrange_0_2000_u8_8x6_AF058");
         count += label(0x0AF074L, "desc_2D_Boostxrange_0_2000_u8_8x6_AF074");
+
+        // --- 2D_Degreesxrange (2 descriptors) ---
+        count += label(0x0AE418L, "desc_2D_Degreesxrange_750_1000_u8_9x2");
+        count += label(0x0AE434L, "desc_2D_Degreesxrange_0_1000_u8_9x2");
+
+        // --- 2D_ECTxCounter (3 descriptors) ---
+        count += label(0x0AD7F4L, "desc_2D_ECTxCounter_u16_16x3_AD7F4");
+        count += label(0x0AD810L, "desc_2D_ECTxCounter_u16_16x3_AD810");
+        count += label(0x0AD82CL, "desc_2D_ECTxCounter_u16_16x3_AD82C");
 
         // --- 2D_ECTxECT (1 descriptors) ---
         count += label(0x0AE530L, "desc_2D_ECTxECT_u8_16x7");
@@ -678,13 +936,34 @@
         // --- 2D_ECTxIAT (1 descriptors) ---
         count += label(0x0AF0E4L, "desc_2D_ECTxIAT_u16_16x6");
 
-        // --- 2D_ECTxLoad (3 descriptors) ---
+        // --- 2D_ECTxLoad (6 descriptors) ---
         count += label(0x0AD5E8L, "desc_2D_ECTxLoad_u8_16x8");
         count += label(0x0AD604L, "desc_2D_ECTxLoad_u8_16x9");
         count += label(0x0AE46CL, "desc_2D_ECTxLoad_u8_16x6");
+        count += label(0x0AE4A4L, "desc_2D_ECTxLoad_u8_16x2_AE4A4");
+        count += label(0x0AE4C0L, "desc_2D_ECTxLoad_u8_16x2_AE4C0");
+        count += label(0x0AE4F8L, "desc_2D_ECTxLoad_u8_16x2_AE4F8");
+
+        // --- 2D_ECTxVehSpd (1 descriptors) ---
+        count += label(0x0AAFE8L, "desc_2D_ECTxVehSpd_u8_5x8");
+
+        // --- 2D_ECTxVoltage (1 descriptors) ---
+        count += label(0x0AF6BCL, "desc_2D_ECTxVoltage_u16_3x4");
+
+        // --- 2D_ECTxrange (4 descriptors) ---
+        count += label(0x0AD880L, "desc_2D_ECTxrange_1_1_u16_16x3");
+        count += label(0x0AD89CL, "desc_2D_ECTxrange_1_2_u16_16x3");
+        count += label(0x0AD944L, "desc_2D_ECTxrange_10_0_u16_16x2");
+        count += label(0x0AE450L, "desc_2D_ECTxrange_1_2_u8_16x2");
 
         // --- 2D_IATxIAT (1 descriptors) ---
         count += label(0x0AA834L, "desc_2D_IATxIAT_u16_18x17");
+
+        // --- 2D_IATxIPW (1 descriptors) ---
+        count += label(0x0ABF54L, "desc_2D_IATxIPW_u16_11x2");
+
+        // --- 2D_IATxRPM (1 descriptors) ---
+        count += label(0x0AF53CL, "desc_2D_IATxRPM_wide_f32_10x11");
 
         // --- 2D_IATxrange (3 descriptors) ---
         count += label(0x0AD7A8L, "desc_2D_IATxrange_0_20000_u8_10x12");
@@ -695,19 +974,27 @@
         count += label(0x0AF020L, "desc_2D_KnockIdxxrange_0_2000_u8_8x6_AF020");
         count += label(0x0AF03CL, "desc_2D_KnockIdxxrange_0_2000_u8_8x6_AF03C");
 
-        // --- 2D_LoadxRPM (49 descriptors) ---
+        // --- 2D_LoadxAtmPressure (1 descriptors) ---
+        count += label(0x0AE2E4L, "desc_2D_LoadxAtmPressure_u8_6x3");
+
+        // --- 2D_LoadxRPM (61 descriptors) ---
         count += label(0x0AAA64L, "desc_2D_LoadxRPM_u16_16x16_AAA64");
         count += label(0x0AAA80L, "desc_2D_LoadxRPM_u16_16x16_AAA80");
         count += label(0x0AAA9CL, "desc_2D_LoadxRPM_u16_16x16_AAA9C");
         count += label(0x0AAAB8L, "desc_2D_LoadxRPM_u16_16x16_AAAB8");
+        count += label(0x0AAAD4L, "desc_2D_LoadxRPM_u16_3x3");
         count += label(0x0ABC1CL, "desc_2D_LoadxRPM_f32_10x14");
+        count += label(0x0ABCBCL, "desc_2D_LoadxRPM_wide_u16_2x2");
+        count += label(0x0ABD10L, "desc_2D_LoadxRPM_u16_2x2_ABD10");
         count += label(0x0ABDD4L, "desc_2D_LoadxRPM_u16_7x14_ABDD4");
         count += label(0x0ABDF0L, "desc_2D_LoadxRPM_u16_7x14_ABDF0");
         count += label(0x0ABE0CL, "desc_2D_LoadxRPM_u16_7x14_ABE0C");
         count += label(0x0ABE28L, "desc_2D_LoadxRPM_u16_7x14_ABE28");
         count += label(0x0ABE44L, "desc_2D_LoadxRPM_u16_7x14_ABE44");
         count += label(0x0ABE60L, "desc_2D_LoadxRPM_u16_7x14_ABE60");
+        count += label(0x0ABFECL, "desc_2D_LoadxRPM_f32_2x2_ABFEC");
         count += label(0x0AC014L, "desc_2D_LoadxRPM_f32_24x13_AC014");
+        count += label(0x0AC03CL, "desc_2D_LoadxRPM_f32_2x2_AC03C");
         count += label(0x0AC064L, "desc_2D_LoadxRPM_f32_24x13_AC064");
         count += label(0x0AC08CL, "desc_2D_LoadxRPM_f32_18x14_AC08C");
         count += label(0x0AC0B4L, "desc_2D_LoadxRPM_f32_18x14_AC0B4");
@@ -733,23 +1020,40 @@
         count += label(0x0AD998L, "desc_2D_LoadxRPM_u16_12x13_AD998");
         count += label(0x0AD9B4L, "desc_2D_LoadxRPM_u16_12x13_AD9B4");
         count += label(0x0AD9D0L, "desc_2D_LoadxRPM_u16_12x13_AD9D0");
+        count += label(0x0ADA40L, "desc_2D_LoadxRPM_u16_2x2_ADA40");
         count += label(0x0AE31CL, "desc_2D_LoadxRPM_u8_17x18_AE31C");
         count += label(0x0AE338L, "desc_2D_LoadxRPM_u8_17x18_AE338");
         count += label(0x0AE354L, "desc_2D_LoadxRPM_u8_17x18_AE354");
         count += label(0x0AE370L, "desc_2D_LoadxRPM_u8_17x18_AE370");
+        count += label(0x0AE54CL, "desc_2D_LoadxRPM_mid_u8_5x3_AE54C");
+        count += label(0x0AE568L, "desc_2D_LoadxRPM_mid_u8_5x3_AE568");
+        count += label(0x0AE584L, "desc_2D_LoadxRPM_mid_u8_5x3_AE584");
+        count += label(0x0AE5A0L, "desc_2D_LoadxRPM_mid_u8_5x3_AE5A0");
+        count += label(0x0AE5BCL, "desc_2D_LoadxRPM_mid_u8_5x3_AE5BC");
         count += label(0x0AE664L, "desc_2D_LoadxRPM_u8_15x18_AE664");
         count += label(0x0AE680L, "desc_2D_LoadxRPM_u8_17x18_AE680");
         count += label(0x0AE69CL, "desc_2D_LoadxRPM_u8_17x18_AE69C");
         count += label(0x0AF22CL, "desc_2D_LoadxRPM_u16_16x16_AF22C");
         count += label(0x0AF248L, "desc_2D_LoadxRPM_u16_16x16_AF248");
         count += label(0x0AF264L, "desc_2D_LoadxRPM_u16_16x16_AF264");
+        count += label(0x0AF280L, "desc_2D_LoadxRPM_mid_u16_3x3");
         count += label(0x0AF8D8L, "desc_2D_LoadxRPM_u16_18x16_AF8D8");
         count += label(0x0AF8F4L, "desc_2D_LoadxRPM_u16_18x16_AF8F4");
 
-        // --- 2D_Loadxrange (3 descriptors) ---
-        count += label(0x0AC1A4L, "desc_2D_Loadxrange_0_4500_f32_9x9");
+        // --- 2D_Loadxrange (10 descriptors) ---
+        count += label(0x0AC000L, "desc_2D_Loadxrange_3500_6700_f32_2x2_AC000");
+        count += label(0x0AC050L, "desc_2D_Loadxrange_3500_6700_f32_2x2_AC050");
+        count += label(0x0AC0F0L, "desc_2D_Loadxrange_4000_6700_f32_18x7");
+        count += label(0x0AC1A4L, "desc_2D_Loadxrange_0_4500_f32_9x9_AC1A4");
+        count += label(0x0AC1B8L, "desc_2D_Loadxrange_0_4500_f32_9x9_AC1B8");
         count += label(0x0AC1CCL, "desc_2D_Loadxrange_0_2000_f32_6x8");
-        count += label(0x0ADA5CL, "desc_2D_Loadxrange_0_4000_f32_16x6");
+        count += label(0x0ADA5CL, "desc_2D_Loadxrange_0_4000_f32_16x6_ADA5C");
+        count += label(0x0ADA70L, "desc_2D_Loadxrange_0_4000_f32_16x6_ADA70");
+        count += label(0x0AE300L, "desc_2D_Loadxrange_400_600_u8_6x3");
+        count += label(0x0AE6B8L, "desc_2D_Loadxrange_3200_3600_u8_2x2");
+
+        // --- 2D_PressurexECT (1 descriptors) ---
+        count += label(0x0AB074L, "desc_2D_PressurexECT_f32_11x2");
 
         // --- 2D_PressurexIPW (2 descriptors) ---
         count += label(0x0AAD08L, "desc_2D_PressurexIPW_u16_11x6_AAD08");
@@ -769,16 +1073,20 @@
         // --- 2D_PressurexThrottle (1 descriptors) ---
         count += label(0x0AD7C4L, "desc_2D_PressurexThrottle_u8_15x16");
 
-        // --- 2D_Pressurexrange (1 descriptors) ---
+        // --- 2D_Pressurexrange (4 descriptors) ---
+        count += label(0x0ABC30L, "desc_2D_Pressurexrange_0_4000_u16_2x2_ABC30");
+        count += label(0x0ABC4CL, "desc_2D_Pressurexrange_0_4000_u16_2x2_ABC4C");
+        count += label(0x0ABC68L, "desc_2D_Pressurexrange_0_4000_u16_2x2_ABC68");
         count += label(0x0AF37CL, "desc_2D_Pressurexrange_800_2000_u16_8x4");
 
-        // --- 2D_RPM (7 descriptors) ---
+        // --- 2D_RPM (8 descriptors) ---
         count += label(0x0AE38CL, "desc_2D_RPM_widexLoad_u8_8x8");
         count += label(0x0AE514L, "desc_2D_RPM_midxLoad_u8_7x4");
         count += label(0x0AE5D8L, "desc_2D_RPM_midxLoad_u8_14x5_AE5D8");
         count += label(0x0AE5F4L, "desc_2D_RPM_midxLoad_u8_14x5_AE5F4");
         count += label(0x0AE610L, "desc_2D_RPM_midxLoad_u8_14x5_AE610");
         count += label(0x0AE62CL, "desc_2D_RPM_midxLoad_u8_14x6");
+        count += label(0x0AF090L, "desc_2D_RPM_widexrange_50_60_u16_16x2");
         count += label(0x0AF41CL, "desc_2D_RPM_widexLoad_u16_6x6");
 
         // --- 2D_RPMxBoost (1 descriptors) ---
@@ -788,8 +1096,17 @@
         count += label(0x0AF29CL, "desc_2D_RPMxIPW_u16_16x6_AF29C");
         count += label(0x0AF2B8L, "desc_2D_RPMxIPW_u16_16x6_AF2B8");
 
-        // --- 2D_RPMxLoad (1 descriptors) ---
+        // --- 2D_RPMxLoad (10 descriptors) ---
         count += label(0x0AA86CL, "desc_2D_RPMxLoad_u16_6x6");
+        count += label(0x0ABEB4L, "desc_2D_RPMxLoad_u16_3x2");
+        count += label(0x0AE6D4L, "desc_2D_RPMxLoad_f32_18x2_AE6D4");
+        count += label(0x0AE6E8L, "desc_2D_RPMxLoad_f32_18x2_AE6E8");
+        count += label(0x0AE6FCL, "desc_2D_RPMxLoad_f32_18x2_AE6FC");
+        count += label(0x0AE710L, "desc_2D_RPMxLoad_f32_18x2_AE710");
+        count += label(0x0AE724L, "desc_2D_RPMxLoad_f32_2x2_AE724");
+        count += label(0x0AE738L, "desc_2D_RPMxLoad_f32_2x2_AE738");
+        count += label(0x0AE74CL, "desc_2D_RPMxLoad_f32_2x2_AE74C");
+        count += label(0x0AE760L, "desc_2D_RPMxLoad_f32_2x2_AE760");
 
         // --- 2D_RPMxPressure (1 descriptors) ---
         count += label(0x0AF100L, "desc_2D_RPMxPressure_u16_16x16");
@@ -803,28 +1120,50 @@
         // --- 2D_RPMxrange (1 descriptors) ---
         count += label(0x0AB03CL, "desc_2D_RPMxrange_11_84_u8_15x31");
 
+        // --- 2D_SmallRatioxVVTError (1 descriptors) ---
+        count += label(0x0AACD0L, "desc_2D_SmallRatioxVVTError_u16_11x9");
+
         // --- 2D_SmallRatioxrange (1 descriptors) ---
         count += label(0x0AAD78L, "desc_2D_SmallRatioxrange_5_2_u16_11x9");
 
         // --- 2D_ThrottlexMAF (1 descriptors) ---
         count += label(0x0AC154L, "desc_2D_ThrottlexMAF_f32_5x5");
 
-        // --- 2D_ThrottlexRPM (5 descriptors) ---
+        // --- 2D_ThrottlexRPM (11 descriptors) ---
+        count += label(0x0ABCD8L, "desc_2D_ThrottlexRPM_mid_u16_2x2_ABCD8");
+        count += label(0x0ABCF4L, "desc_2D_ThrottlexRPM_mid_u16_2x2_ABCF4");
+        count += label(0x0ABFC4L, "desc_2D_ThrottlexRPM_f32_2x2");
         count += label(0x0AD620L, "desc_2D_ThrottlexRPM_u8_10x9");
         count += label(0x0AD848L, "desc_2D_ThrottlexRPM_u16_10x9");
         count += label(0x0AF2D4L, "desc_2D_ThrottlexRPM_u16_15x17_AF2D4");
         count += label(0x0AF2F0L, "desc_2D_ThrottlexRPM_u16_15x17_AF2F0");
         count += label(0x0AF30CL, "desc_2D_ThrottlexRPM_u16_15x17_AF30C");
+        count += label(0x0AF328L, "desc_2D_ThrottlexRPM_u16_2x2_AF328");
+        count += label(0x0AF344L, "desc_2D_ThrottlexRPM_u16_2x2_AF344");
+        count += label(0x0AF360L, "desc_2D_ThrottlexRPM_u16_2x2_AF360");
 
-        // --- 2D_ThrottlexThrottle (2 descriptors) ---
+        // --- 2D_ThrottlexThrottle (3 descriptors) ---
+        count += label(0x0AF1D8L, "desc_2D_ThrottlexThrottle_u8_8x8_AF1D8");
         count += label(0x0AF1F4L, "desc_2D_ThrottlexThrottle_u8_8x8_AF1F4");
         count += label(0x0AF210L, "desc_2D_ThrottlexThrottle_u8_8x8_AF210");
 
-        // --- 2D_TimingAdvxRPM (1 descriptors) ---
+        // --- 2D_Throttlexrange (2 descriptors) ---
+        count += label(0x0AC17CL, "desc_2D_Throttlexrange_30_25_f32_6x3_AC17C");
+        count += label(0x0AC190L, "desc_2D_Throttlexrange_30_25_f32_6x3_AC190");
+
+        // --- 2D_TimingAdvxPressure (2 descriptors) ---
+        count += label(0x0AE488L, "desc_2D_TimingAdvxPressure_u8_8x2_AE488");
+        count += label(0x0AE4DCL, "desc_2D_TimingAdvxPressure_u8_8x2_AE4DC");
+
+        // --- 2D_TimingAdvxRPM (4 descriptors) ---
+        count += label(0x0AC208L, "desc_2D_TimingAdvxRPM_f32_2x2");
+        count += label(0x0AC21CL, "desc_2D_TimingAdvxRPM_wide_f32_2x2_AC21C");
+        count += label(0x0AC230L, "desc_2D_TimingAdvxRPM_wide_f32_2x2_AC230");
         count += label(0x0AF398L, "desc_2D_TimingAdvxRPM_f32_16x13");
 
-        // --- 2D_TimingAdvxrange (1 descriptors) ---
+        // --- 2D_TimingAdvxrange (2 descriptors) ---
         count += label(0x0ABFD8L, "desc_2D_TimingAdvxrange_20_20_f32_8x5");
+        count += label(0x0AE648L, "desc_2D_TimingAdvxrange_600_700_u8_4x2");
 
         // --- 2D_VVTErrorxRPM (4 descriptors) ---
         count += label(0x0AF830L, "desc_2D_VVTErrorxRPM_u16_9x9_AF830");
@@ -835,7 +1174,10 @@
         // --- 2D_VehSpdxSmallRatio (1 descriptors) ---
         count += label(0x0AAD40L, "desc_2D_VehSpdxSmallRatio_u16_5x5");
 
-        // --- 2D_range (29 descriptors) ---
+        // --- 2D_Voltagexrange (1 descriptors) ---
+        count += label(0x0AD7E0L, "desc_2D_Voltagexrange_1000_1000_f32_5x3");
+
+        // --- 2D_range (55 descriptors) ---
         count += label(0x0AA850L, "desc_2D_range_30_20_xrange_0_1400_u16_11x29");
         count += label(0x0AA9B8L, "desc_2D_range_120_350_xRPM_mid_u16_15x13_AA9B8");
         count += label(0x0AA9D4L, "desc_2D_range_120_350_xRPM_mid_u16_15x13_AA9D4");
@@ -844,10 +1186,30 @@
         count += label(0x0AB020L, "desc_2D_range_210_960_xRPM_u8_11x14_AB020");
         count += label(0x0AB088L, "desc_2D_range_520_760_xIAT_u16_4x5");
         count += label(0x0AB288L, "desc_2D_range_39_508_xLoad_u16_13x13");
+        count += label(0x0ABC84L, "desc_2D_range_0_4000_xIPW_u16_2x2_ABC84");
+        count += label(0x0ABCA0L, "desc_2D_range_0_4000_xIPW_u16_2x2_ABCA0");
+        count += label(0x0ABD2CL, "desc_2D_range_0_0_xrange_700_1000_u16_2x2_ABD2C");
+        count += label(0x0ABD48L, "desc_2D_range_0_0_xrange_4000_4500_u16_2x2_ABD48");
+        count += label(0x0ABD64L, "desc_2D_range_0_0_xrange_2500_3000_u16_2x2");
+        count += label(0x0ABD80L, "desc_2D_range_0_0_xrange_4000_4500_u16_2x2_ABD80");
+        count += label(0x0ABD9CL, "desc_2D_range_0_0_xrange_700_1000_u16_2x2_ABD9C");
+        count += label(0x0ABDB8L, "desc_2D_range_0_0_xrange_4000_4500_u16_2x2_ABDB8");
         count += label(0x0ABED0L, "desc_2D_range_10_40_xrange_0_3001_f32_4x5");
         count += label(0x0ABF00L, "desc_2D_range_520_1120_xrange_520_1120_u16_16x16");
-        count += label(0x0AC1F4L, "desc_2D_range_40_70_xrange_7_31_f32_5x10");
-        count += label(0x0AC244L, "desc_2D_range_10_26_xrange_11_14_f32_5x4");
+        count += label(0x0ABF8CL, "desc_2D_range_100_560_xrange_10_54_u16_5x3");
+        count += label(0x0ABFA8L, "desc_2D_range_100_560_xBoost_u16_5x3");
+        count += label(0x0AC028L, "desc_2D_range_0_0_xrange_4000_4500_f32_2x2_AC028");
+        count += label(0x0AC078L, "desc_2D_range_0_0_xrange_4000_4500_f32_2x2_AC078");
+        count += label(0x0AC0A0L, "desc_2D_range_0_0_xrange_4000_4500_f32_2x2_AC0A0");
+        count += label(0x0AC0C8L, "desc_2D_range_0_0_xrange_4000_4500_f32_2x2_AC0C8");
+        count += label(0x0AC118L, "desc_2D_range_0_0_xRPM_f32_2x12");
+        count += label(0x0AC140L, "desc_2D_range_0_0_xRPM_f32_2x10");
+        count += label(0x0AC168L, "desc_2D_range_0_700_xrange_10_20_f32_10x4");
+        count += label(0x0AC1E0L, "desc_2D_range_40_70_xrange_7_31_f32_5x10_AC1E0");
+        count += label(0x0AC1F4L, "desc_2D_range_40_70_xrange_7_31_f32_5x10_AC1F4");
+        count += label(0x0AC244L, "desc_2D_range_10_26_xrange_11_14_f32_5x4_AC244");
+        count += label(0x0AC258L, "desc_2D_range_10_26_xrange_11_14_f32_5x4_AC258");
+        count += label(0x0AD4D0L, "desc_2D_range_0_1500_xrange_800_1000_u8_16x2");
         count += label(0x0AD524L, "desc_2D_range_115_515_xrange_30_0_u8_5x7_AD524");
         count += label(0x0AD540L, "desc_2D_range_115_515_xrange_30_0_u8_5x7_AD540");
         count += label(0x0AD55CL, "desc_2D_range_115_515_xrange_30_0_u8_5x7_AD55C");
@@ -861,25 +1223,14 @@
         count += label(0x0AD770L, "desc_2D_range_1000_16000_xRPM_u8_17x17_AD770");
         count += label(0x0AD78CL, "desc_2D_range_1000_16000_xRPM_u8_17x17_AD78C");
         count += label(0x0AD864L, "desc_2D_range_4_60_xRPM_u16_8x9");
+        count += label(0x0AE3A8L, "desc_2D_range_200_200_xrange_700_1500_u8_9x3_AE3A8");
+        count += label(0x0AE3C4L, "desc_2D_range_200_200_xrange_700_1500_u8_9x3_AE3C4");
         count += label(0x0AE3E0L, "desc_2D_range_200_200_xrange_20_20_u8_9x9_AE3E0");
         count += label(0x0AE3FCL, "desc_2D_range_200_200_xrange_20_20_u8_9x9_AE3FC");
+        count += label(0x0AE774L, "desc_2D_range_8_12_xrange_760_1000_f32_2x2_AE774");
+        count += label(0x0AE788L, "desc_2D_range_8_12_xrange_760_1000_f32_2x2_AE788");
         count += label(0x0AF0ACL, "desc_2D_range_150_600_xIAT_u16_17x9_AF0AC");
         count += label(0x0AF0C8L, "desc_2D_range_150_600_xIAT_u16_17x9_AF0C8");
-
-        // --- Timing blend / map switching (15 descriptors) ---
-        count += label(0x0ADB4CL, "desc_timing_blend_0");       // 1D ECT-based timing blend (throttle=0, running)
-        count += label(0x0ADB60L, "desc_timing_blend_1");       // 1D ECT-based timing blend (throttle=0, cranking)
-        count += label(0x0ADB74L, "desc_timing_blend_2");       // 1D ECT-based timing blend (throttle=1, running)
-        count += label(0x0ADB88L, "desc_timing_blend_3");       // 1D ECT-based timing blend (throttle=1, cranking)
-        count += label(0x0ADBB0L, "desc_timing_blend_4");       // 1D ECT-based timing blend secondary
-        count += label(0x0ADBC4L, "desc_timing_ect_corr_0");    // 1D ECT correction (throttle=0, running)
-        count += label(0x0ADBD8L, "desc_timing_ect_corr_1");    // 1D ECT correction (throttle=0, cranking)
-        count += label(0x0ADBECL, "desc_timing_ect_corr_2");    // 1D ECT correction (throttle=1, running)
-        count += label(0x0ADC00L, "desc_timing_ect_corr_3");    // 1D ECT correction (throttle=1, cranking)
-        count += label(0x0ADC14L, "desc_timing_atm_comp");      // 1D atmospheric compensation for timing blend
-        count += label(0x0AE31CL, "desc_blend_app_0");          // 2D IAT×ratio timing blend output A
-        count += label(0x0AE338L, "desc_blend_app_1");          // 2D IAT×ratio timing blend output B
-        count += label(0x0AE354L, "desc_blend_app_2");          // 2D IAT×ratio timing blend output C
-        count += label(0x0AE370L, "desc_blend_app_3");          // 2D IAT×ratio timing blend output D
-        count += label(0x0AE38CL, "desc_blend_app_4");          // 2D RPM×? blend application lookup
+        count += label(0x0AF4C4L, "desc_2D_range_20_44_xLoad_f32_4x4");
+        count += label(0x0AF910L, "desc_2D_range_0_0_xrange_800_1200_u16_2x2");
 

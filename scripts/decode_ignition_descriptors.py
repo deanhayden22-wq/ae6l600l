@@ -132,8 +132,17 @@ def read_data(desc):
         for y in range(ycnt):
             row = []
             for x in range(xcnt):
-                raw = read_u8(dp + y * xcnt + x)
-                row.append(raw * scale)
+                # BUG FIX 2026-08-16 (corrections.md item 59): this branch
+                # hardcoded read_u8 and always applied scale. For a typecode-0
+                # (float32) 2-D descriptor that reads one byte of a float AND
+                # multiplies by a field that is not a scale. Prefer
+                # scripts/desc_types.read_table(); guarded here for safety.
+                if desc.get('interp_type', 0x04) == 0x00:
+                    raw = read_f32(dp + (y * xcnt + x) * 4)
+                    row.append(raw)
+                else:
+                    raw = read_u8(dp + y * xcnt + x)
+                    row.append(raw * scale)
             data.append(row)
         return {'x_axis': x_axis, 'y_axis': y_axis, 'data': data}
 

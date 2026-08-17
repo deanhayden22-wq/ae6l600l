@@ -12,8 +12,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # repo root is TWO levels up from scripts/mapping/ (fixed 2026-08-16)
 DISASM_DIR = os.path.join(SCRIPT_DIR, "..", "..", "disassembly")
 
-NAMED_DESC_FILE = os.path.join(DISASM_DIR, "named_descriptors.txt")
-OUTPUT_FILE = os.path.join(DISASM_DIR, "descriptor_labels.txt")
+NAMED_DESC_FILE = os.path.join(DISASM_DIR, "maps", "named_descriptors.txt")   # lives under maps/ (fixed 2026-08-16)
+OUTPUT_FILE = os.path.join(DISASM_DIR, "maps", "descriptor_labels.txt")      # lives under maps/ (fixed 2026-08-16)
 
 # Sanitize a name to be a valid Java/Ghidra identifier
 def sanitize(name):

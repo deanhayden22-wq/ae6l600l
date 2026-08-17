@@ -100,3 +100,93 @@ def decode_cell(rom, addr, dtype):
     if dtype == 0x10:
         return struct.unpack_from(">h", rom, addr)[0]
     raise ValueError(f"not a valid descriptor typecode: {dtype:#x}")
+
+
+# ---------------------------------------------------------------------------
+# READING VALUES -- use these, do not hand-roll `raw * scale + bias`.
+#
+# THE TRAP (cost this project a wrong conclusion on 2026-08-16, corrections
+# item 59): for typecode 0x00 the data IS already float32 and `table_lookup`
+# SKIPS scale/bias entirely --
+#     0BE84A  2338  tst r3,r3
+#     0BE84C  8D04  bt/s 0x0BE858     ; typecode 0 -> raw is the value
+# The scale/bias FIELDS still exist in the record but hold unrelated bytes.
+# Applying them silently corrupts the table: all 149 float32 descriptors in
+# this ROM have an implausible value sitting in that field, so the product
+# collapses to ~0 or explodes. Every value looks wrong in a plausible way.
+# ---------------------------------------------------------------------------
+
+# 1-D record: +0 u16 count, +2 u8 typecode, +4 axis, +8 data, +12 scale, +16 bias
+# 2-D record: +0 u16 rows,  +1 u8 Y, +3 u8 X, +4 Yaxis, +8 Xaxis, +12 data,
+#             +16 typecode, +20 scale, +24 bias
+_OFF = {
+    "1D": {"typecode": 2, "axis": 4, "data": 8, "scale": 12, "bias": 16},
+    "2D": {"typecode": 16, "yaxis": 4, "xaxis": 8, "data": 12, "scale": 20, "bias": 24},
+}
+
+
+def is_2d(rom, addr):
+    """Byte +3 is the second-dimension size; 0 means 1-D."""
+    return rom[addr + 3] != 0
+
+
+def typecode(rom, addr):
+    o = _OFF["2D" if is_2d(rom, addr) else "1D"]["typecode"]
+    return rom[addr + o]
+
+
+def scaling(rom, addr):
+    """(scale, bias) or (None, None) when the typecode makes them inapplicable.
+
+    Returns None for typecode 0x00 -- the fields are NOT a scale there.
+    """
+    import struct
+    tc = typecode(rom, addr)
+    if tc == 0x00:
+        return None, None
+    o = _OFF["2D" if is_2d(rom, addr) else "1D"]
+    return (struct.unpack_from(">f", rom, addr + o["scale"])[0],
+            struct.unpack_from(">f", rom, addr + o["bias"])[0])
+
+
+def read_table(rom, addr):
+    """Decode a descriptor into physical values. Handles the typecode-0 trap.
+
+    Returns dict: dim, typecode, type_name, axes, values (list, or list of
+    rows for 2-D), scale, bias. `values` are PHYSICAL -- scaled where the
+    typecode calls for it, raw float32 where it does not.
+
+    2-D layout note: the data is stored as X planes of Y values (verified on
+    0xAE6D4 -- the two 18-value load planes are byte-identical), so
+    values[x][y]. Do not assume row-major.
+    """
+    import struct
+    two = is_2d(rom, addr)
+    o = _OFF["2D" if two else "1D"]
+    tc = typecode(rom, addr)
+    if tc not in TYPE_SIZES:
+        raise ValueError(f"{addr:#x}: typecode {tc:#x} is not valid (must be a multiple of 4, 0x00-0x10)")
+    w = TYPE_SIZES[tc]
+    sc, bi = scaling(rom, addr)
+
+    def cell(a):
+        v = decode_cell(rom, a, tc)
+        return v if sc is None else v * sc + bi
+
+    dp = struct.unpack_from(">I", rom, addr + o["data"])[0]
+    if two:
+        ny, nx = rom[addr + 1], rom[addr + 3]
+        ya = struct.unpack_from(">I", rom, addr + o["yaxis"])[0]
+        xa = struct.unpack_from(">I", rom, addr + o["xaxis"])[0]
+        axes = {
+            "y": [struct.unpack_from(">f", rom, ya + 4 * i)[0] for i in range(ny)],
+            "x": [struct.unpack_from(">f", rom, xa + 4 * i)[0] for i in range(nx)],
+        }
+        vals = [[cell(dp + (p * ny + i) * w) for i in range(ny)] for p in range(nx)]
+    else:
+        n = struct.unpack_from(">H", rom, addr)[0]
+        ax = struct.unpack_from(">I", rom, addr + o["axis"])[0]
+        axes = {"x": [struct.unpack_from(">f", rom, ax + 4 * i)[0] for i in range(n)]}
+        vals = [cell(dp + i * w) for i in range(n)]
+    return {"dim": "2D" if two else "1D", "typecode": tc, "type_name": TYPE_NAMES[tc],
+            "axes": axes, "values": vals, "scale": sc, "bias": bi}
