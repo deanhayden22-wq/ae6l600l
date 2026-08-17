@@ -2339,3 +2339,181 @@ VERIFIED: 1-D, RPM- and ECT-indexed, both comps flat zero, workspace
 `0xFFFF7AD8` under GBR `0xFFFF7AB4`. Like `0xAD258`, this term contributes
 nothing on the current calibration. Whether the multiplicative fuel model's
 third term is mislabeled remains **OPEN**.
+
+---
+
+## 48. 88 addresses are both a GBR base and a named scalar — `ram_reference.txt` ref counts are contaminated — **DOCUMENTED 2026-08-16**
+
+Brief #2's D2 asked whether `0xFFFF798C` is a GBR workspace base or a scalar.
+**It is both, and so are 87 other addresses.**
+
+`cl_ol_analysis.txt:86` was **right**: `0xFFFF798C` is installed as a GBR base at
+`0x03607E` and `0x036856` — the exact two sites it names, and the only two of
+the ROM's 651 `ldc r0,gbr` sites that install that value. It is *also* written
+as a float (`0x03603E`, `0x03621E`, `0x036236`, `0x036270`, `0x036306`, all
+`fmov.s frX,@(r0,rN)` off base `0xFFFF79F0` with `r0 = -100`) and as a byte
+(`0x0354B2`, `mov.b r0,@(224,gbr)`, GBR `0xFFFF78AC`). Both artifacts were
+correct; they were describing different roles of the same address.
+
+Computed mechanically — 459 distinct GBR base values against 481 named scalars:
+
+- **88 addresses are both.** 36 are already named as a base/workspace/struct;
+  52 read as physical scalars.
+- **Dual-role is normal, not an error.** `0xFFFF6350 ect_current` (205 refs),
+  `0xFFFF6624 rpm_current` (301), `0xFFFF63C4 mass_airflow_gps` (43) and
+  `0xFFFF62DC throttle_plate_angle` (20) are all correctly named *and* GBR
+  bases. A struct base whose offset 0 is the value itself. Do not "fix" them.
+- **What is wrong is the `N refs` column** for those 88: it conflates GBR-base
+  loads with scalar accesses, so the count overstates the evidence behind the
+  NAME.
+
+Treat the low-ref, workspace-shaped ones as **unverified naming** — the name may
+have been invented to explain a base load: `0xFFFF798C timing_state_var`,
+`0xFFFF7954 ol_enrichment_factor_A`, `0xFFFF7F74 blend_correction_C`,
+`0xFFFF7AB4 afl_multiplier_output`, `0xFFFF8000 base_timing_offset`,
+`0xFFFF805C timing_corr_5C`, `0xFFFF7A20 o2_sensor2_output`,
+`0xFFFF7AF4 fuel_ipw_state_B`.
+
+Banner added to `ram_reference.txt`. Reproduce with
+`scripts/mapping/find_writers.py`.
+
+---
+
+## 49. `0xAE284` is a knock-signal transfer curve, not an RPM×IAT threshold — **FIXED 2026-08-16**
+
+Project notes recorded `0xAE284` as the knock detection threshold, **RPM × IAT**,
+with "no mrp/load input". Decoded from the bytes, all three parts are wrong.
+
+The descriptor is **1-D, 65 points, float32**: axis `0x0D4128` spanning
+0.0–3.5, data `0x0D422C` spanning 0.0–304.0. It read `invalid` in
+`desc_func_xref.txt` until item 43's off-by-one was fixed *and* the `size > 64`
+guard was raised — which is why it had never been decoded.
+
+Its one consumer is the knock detector at `0x043798` (GBR `0xFFFF80FC`, the same
+function that writes `KNOCK_FLAG`). The lookup input is neither RPM, load, nor IAT:
+
+```
+0437A8  D283  mov.l @(0x0439B8),r2   ; 0x0439B8 = 0xFFFF4304  (knock signal)
+0437AA  F828  fmov.s @r2,fr8
+0437AC  FC8D  fldi0 fr12
+0437AE  FC85  fcmp/gt fr8,fr12       ; clamp at zero
+0437B2  F8CC  fmov fr12,fr8
+0437B8  F987  fmov.s fr8,@(r0,r9)    ; [0xFFFF8134] = clamped signal
+0437BA  D481  mov.l @(0x0439C0),r4   ; r4 = 0x000AE284
+0437BC  DC81  mov.l @(0x0439C4),r12  ; r12 = 0x000BE830 (table_lookup)
+0437BE  4C0B  jsr  @r12
+0437C0  F496  fmov.s @(r0,r9),fr4    ; delay slot: fr4 = the clamped signal
+```
+
+So it maps **knock signal level (0–3.5) → 0–304**. A sensor transfer curve.
+
+The "no load input" claim is contradicted separately: the knock module contains
+2-D **RPM × LOAD** tables, decoded from the bytes —
+
+| desc | dim | Y axis (RPM) | X axis (LOAD) |
+|---|---|---|---|
+| `0x0AE5D8` | 14×5 uint8 | 1200,1600,2000,2400,2800,3200,3600,4000… | 0.5, 0.8, 1.4, 1.8, 2.2 |
+| `0x0AE5F4` | 14×5 uint8 | same | same |
+| `0x0AE610` | 14×5 uint8 | same | same |
+| `0x0AE62C` | 14×6 uint8 | same | 0.5, 0.8, 1.0, 1.3, 1.8, 2.3 |
+
+consumed at `0x0441C0`–`0x0441F0`. The detector itself also reads RPM
+(`0xFFFF6624` → FR15) and engine load (`0xFFFF63F8` → FR14) at `0x04379C`/`0x0437A0`.
+
+**Stated limit:** it is NOT established here that the 14×5 tables *are* the
+detection threshold. What is settled is narrower and sufficient to retire the
+old claim: `0xAE284` is not the threshold, is not 2-D, and is not RPM × IAT.
+Treat "knock detection has no load input" as **UNVERIFIED**, not inverted.
+
+---
+
+## 50. The 8-14 FLKC movement was in-drive LEARNING, not map traversal — **CORRECTED 2026-08-16**
+
+The prior reading of the 8-14 log was: "all 33 step-downs passed the traversal
+test (0.25 steps in consecutive 40 ms samples) = lookups of a pre-learned map,
+not in-drive learning." **That is backwards, and the method was invalid.**
+
+Step SIZE cannot discriminate under a bucketed map (item 41). 0.25 is exactly
+the Fine Correction Advance Value (`0xD2F48`), so an in-place ramp and a
+traversal look identical by step size. Only the **cell index** separates them.
+
+New tool `scripts/analysis/flkc_cell_trace.py` replicates the ECU band selector
+exactly — boundaries plus downward-only hysteresis (50 rpm `0xD2F24`, 0.02 load
+`0xD2F38`) — and computes `cell = rpm_band*5 + load_band` per sample.
+
+Result on `logs/8-14 weekend 20.19c` (221,829 samples):
+
+```
+FLKC changes total : 64
+  CELL TRAVERSAL   :  5   (index moved -- a different cell was read)
+  IN-CELL CHANGE   : 59   (index held -- the STORED VALUE moved = LEARNING)
+in-cell step sizes : {-1.00: 3, -0.25: 29, +0.25: 23, +0.50: 2, +1.00: 2}
+```
+
+**92% of FLKC movement was in-cell.** The textbook learn-then-recover cycle,
+in place — e.g. cell 18 ramping 0.00 → −0.25 → −0.50 → −0.75 → −1.00 over four
+consecutive samples at 2952–2998 rpm / 1.57–1.67 load, then cell 19 recovering
+−1.00 → 0.00 in four +0.25 steps.
+
+**The ECU was actively learning during the 8-14 drive.** Anything that treated
+that FLKC map as historical readback needs revisiting.
+
+Caveats: FLKC logs at 0.25 resolution (`x,0.25,*,32,-`), so sub-step movement is
+invisible and counts are lower bounds; the band index is reconstructed from the
+same 25 Hz rpm/load, so a fast excursion between samples could be misclassified
+— but 5 of 64 is far too low to flip the conclusion.
+
+---
+
+## 51. Both registry CONFLICTs settled on the ROM side — XML fix is ECUFlash-side — **ROM SIDE FIXED 2026-08-16**
+
+Both are definition-XML storagetype errors; the ROM code is right in both cases.
+Per CLAUDE.md the repo XMLs must not be hand-edited — ECUFlash owns them.
+
+**`0xC0BCC`** — "Boost disable during fuel cut-Load threshold" (tinywrex patches),
+XML line 39, `type="1D" scaling="EngineLoad(g/rev)"`.
+
+```
+bytes 3f d9 99 99
+  as float  = 1.7      <- how the ROM code reads it
+  as uint16 = 16345    <- what the XML implies; nonsense as a load
+```
+
+**The editor currently displays 1.00 for this table. The real threshold is
+1.7 g/rev.** Any reasoning that used "boost disable during fuel cut = 1.00 load"
+used a wrong number.
+
+**`0xD6214`** — "Idle Airflow Min Target Decel Initial Idle Activation Max Mode
+Counter" (Idle Control), XML line 1422.
+
+```
+bytes 00 12 00 08
+  as int16 = 18        <- how the ROM code reads it, and a sane counter
+  as float = 1.65e-39  <- what the XML declares; a denormal, garbage
+```
+
+**Fix, in the ECUFlash UI, then `.\scripts\sync_defs.ps1 -Pull`:**
+`c0bcc` → storagetype float; `d6214` → storagetype uint16/int16, scaling
+rawecuvalue. Run `.\scripts\sync_defs.ps1` first — repo and ECUFlash have been
+out of sync since 2026-04-07 and the repo carries ~37 tables ECUFlash does not,
+so a blind `-Pull` deletes them.
+
+---
+
+## 52. Writer traces for items 3–5 — **PARTIALLY FIXED 2026-08-16**
+
+New tool `scripts/mapping/find_writers.py` handles all four write forms (direct,
+displacement, indexed `@(r0,Rn)`, GBR-relative) and resolves base registers by
+backwards scan. Self-tested against `0xFFFF6354` and `0xFFFF81BA`; it reproduced
+every known writer **and found one additional writer for each**
+(`0x01F888` and `0x0440A4` respectively) that the hand method had missed.
+
+- **`0xFFFF782C`** (selects which branch of `func_3952C` runs): written at
+  `0x03408C` (`mov.b r2,@r5`) and `0x03445E` (`mov.b r0,@(12,gbr)`,
+  GBR `0xFFFF7820`). Both byte-sized. The write *conditions* are not decoded.
+- **`0xFFFF7800`**: written at `0x03407E` / `0x034088`, `fmov.s frX,@(r0,r5)`
+  off base `0xFFFF782C` with `r0 = -44`. Note the base is the item-3 flag
+  itself, so `0xFFFF782C` is both a byte flag and a struct base.
+- **`0xFFFF77D8` / `0xFFFF77DC`**: **no writer found.** Stated plainly — the
+  tool resolves bases loaded from a literal pool, so a base built by arithmetic
+  is invisible to it. Do NOT conclude these are read-only.

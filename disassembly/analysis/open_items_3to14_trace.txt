@@ -1,0 +1,269 @@
+================================================================================
+OPEN ITEMS 3-14 — WRITER TRACES, GBR AUDIT, FLKC LEARNING TEST, CONFLICTS
+Traced 2026-08-16 (session: clearing the unsettled list)
+Reference bin: rom/AE5L600L 20g rev 20.19c.bin
+               md5 92cae8275cd4f9b473a3a9e36efe6449  (VERIFIED this session)
+New tool:      scripts/mapping/find_writers.py   (self-tested, see below)
+New tool:      scripts/analysis/flkc_cell_trace.py
+================================================================================
+
+WHY A TOOL FIRST
+--------------------------------------------------------------------------------
+Items 3, 4, 5, 7, 8, 9 were all the SAME failure mode: a RAM address whose
+literal-pool references are 100% reads because the writes go through computed
+addressing. That had been re-derived ad-hoc several times and got two identities
+wrong for months. It is now `scripts/mapping/find_writers.py`, which handles all
+four write forms (direct, displacement, indexed @(r0,Rn), and GBR-relative) and
+resolves base registers by backwards scan.
+
+SELF-TEST, both against answers established independently earlier:
+  FFFF6354 -> found 0x01F730 and 0x01F746 (the two known writers) PLUS a third
+              at 0x01F888 that the earlier hand scan missed.
+  FFFF81BA -> found 0x043B5A and 0x043B5E (known) PLUS a third at 0x0440A4.
+The tool is strictly more thorough than the hand method it replaces.
+
+
+ITEM 3 — byte[0xFFFF782C]: WRITERS FOUND
+--------------------------------------------------------------------------------
+This byte selects which branch of func_3952C runs, and therefore whether the
+live 0.03 limit at 0xCC3E8 is reachable at all.
+
+  FFFF782C  WRITE DIRECT  03408C: mov.b r2,@r5           ; ptr set @034052
+  FFFF782C  WRITE GBR     03445E: mov.b r0,@(12,gbr)     ; GBR=FFFF7820 @0343D2
+
+Both writes are BYTE-sized, consistent with its use as a flag. It sits in the
+AFC/AFL region (0x034xxx), not the timing region. Identity of the CONDITION
+behind each write is NOT decoded here — only the writers are located.
+Status: writers found, semantics still open.
+
+
+ITEM 4 — 0xFFFF7800 WRITERS FOUND; 0xFFFF77D8 / 0xFFFF77DC STILL UNRESOLVED
+--------------------------------------------------------------------------------
+  FFFF7800  WRITE INDEXED 03407E: fmov.s fr8,@(r0,r5)    ; base FFFF782C@034052 -44
+  FFFF7800  WRITE INDEXED 034088: fmov.s fr6,@(r0,r5)    ; base FFFF782C@034052 -44
+
+Note the base is 0xFFFF782C — the same address that is itself the item-3 flag.
+So 0xFFFF782C is BOTH a byte flag and a struct base, and 0xFFFF7800 is that
+struct at offset -44. Same routine (0x034052) writes both.
+
+0xFFFF77D8 and 0xFFFF77DC: **NO writer found.** Stated plainly rather than
+concluded away — the tool resolves bases loaded from a literal pool, so a base
+built by arithmetic is invisible to it. Do NOT conclude these are read-only.
+Status: 7800 resolved, 77D8/77DC still open.
+
+
+ITEM 5 (= brief#2 D2) — 0xFFFF798C IS BOTH. cl_ol_analysis.txt WAS RIGHT.
+--------------------------------------------------------------------------------
+The two artifacts did not actually contradict each other; the address is
+genuinely dual-role.
+
+VERIFIED it IS a GBR workspace base — and at exactly the two sites
+`cl_ol_analysis.txt:86` names, which is a strong sign that file was derived
+from the bytes:
+    03607E  ldc r0,gbr   -> GBR = FFFF798C
+    036856  ldc r0,gbr   -> GBR = FFFF798C
+(651 `ldc r0,gbr` sites exist in the ROM; only these two install FFFF798C.)
+
+VERIFIED it is ALSO written as a float, from a different struct base:
+    03603E / 03621E / 036236 / 036270 / 036306
+        fmov.s frX,@(r0,rN)   ; base FFFF79F0, r0 = -100  -> FFFF798C
+and as a byte via yet another GBR:
+    0354B2  mov.b r0,@(224,gbr)  ; GBR=FFFF78AC -> FFFF798C
+
+That is normal structure, not a bug: a workspace base whose offset 0 is itself a
+real float. What IS wrong is `ram_reference.txt`'s "17 refs" — that count
+conflates GBR-base loads with scalar accesses, and the name `timing_state_var`
+may have been invented to explain a base load.
+
+
+ITEM 5b — THE GENERAL CASE: 88 ADDRESSES ARE DUAL-ROLE
+--------------------------------------------------------------------------------
+Brief #2's D2 asked how many other bases are double-listed as scalars. Answer,
+computed mechanically (459 distinct GBR base values vs 481 named scalars):
+
+  **88 addresses are BOTH a GBR workspace base AND a named scalar.**
+    36 of them are already named as a base/workspace/struct  -> no action
+    52 are named as a PHYSICAL SCALAR                        -> ref count is
+                                                                contaminated
+
+CRITICALLY, dual-role is NOT by itself an error, and most of the 52 are fine:
+  FFFF6350 ect_current        205 refs   GBR base @01F6F0  <- both, correct
+  FFFF6624 rpm_current        301 refs   GBR base @0238F4  <- both, correct
+  FFFF63C4 mass_airflow_gps    43 refs   GBR base @02042C  <- both, correct
+  FFFF62DC throttle_plate_angle 20 refs  GBR base @01F4F0  <- both, correct
+These are struct bases whose offset 0 is the sensor value. Do not "fix" them.
+
+The ones to treat as unverified naming are the low-ref, workspace-shaped ones
+whose name may have been invented to explain a base load, e.g.:
+  FFFF798C timing_state_var        FFFF7954 ol_enrichment_factor_A
+  FFFF7F74 blend_correction_C      FFFF7AB4 afl_multiplier_output
+  FFFF8000 base_timing_offset      FFFF805C timing_corr_5C
+Full list of all 88 is reproducible any time with find_writers.py + the
+gbr_bases() helper; a banner listing them was added to ram_reference.txt.
+
+
+ITEM 6 — THE FLKC GATE DOES BLOCK WRITES. VERIFIED (was ~85%).
+--------------------------------------------------------------------------------
+0xFFFF829E (flkc_fg_enable) has two readers. Both decoded:
+
+  0x044B9A-0x044BA4  — THE GATE:
+      044B9A  D673  mov.l @(0x044D68),r6    ; 0x044D68 = 0xFFFF829E  (verified)
+      044B9C  6260  mov.b @r6,r2
+      044B9E  2228  tst r2,r2                ; T = (enable == 0)
+      044BA0  8B01  bf 0x044BA6              ; enable != 0 -> continue
+      044BA2  A091  bra 0x044CC8             ; enable == 0 -> EARLY EXIT
+  So a zero enable branches past the learn path entirely.
+
+  0x024958-0x02497E — NOT a gate. A bulk snapshot that copies five status
+  bytes (0xFFFF829E among them) into a stack frame at @(84..100,r15). Benign;
+  diagnostic capture only.
+
+Confirms item 41: **writes are gated, reads are not.** Confidence 85% -> VERIFIED.
+
+
+ITEM 7 — TABLE C's CONSUMER: STILL NOT LOCATED
+--------------------------------------------------------------------------------
+The 93-entry dispatch table at 0x04ACB8-0x04AE28 (whose slot 20 holds 0x39524,
+func_3952C's caller) has no 4-aligned literal pointing at its base or at
+base-4. Not resolved. Status: still open.
+
+
+ITEM 8 — 0xAE284 IS NOT AN "RPM x IAT KNOCK THRESHOLD". IT IS A 1-D KNOCK-SIGNAL CURVE.
+--------------------------------------------------------------------------------
+Project notes recorded 0xAE284 as the knock detection threshold, RPM x IAT,
+"no mrp/load input". Decoded from the bytes, all three parts are wrong.
+
+The descriptor:
+  0AE284  1D, 65 points, float32, axis 0x0D4128 = 0.0 .. 3.5 (monotonic),
+          data 0x0D422C = 0.0 .. 304.0
+(It read `invalid` in desc_func_xref.txt until item 43's off-by-one was fixed,
+and until the size guard was raised past 64 — which is why nobody had decoded it.)
+
+Its ONE consumer is the knock detector at 0x043798 (GBR=FFFF80FC — the same
+function that writes KNOCK_FLAG). The input is NOT rpm, load or IAT:
+
+  0437A8  D283  mov.l @(0x0439B8),r2   ; 0x0439B8 = 0xFFFF4304
+  0437AA  F828  fmov.s @r2,fr8         ; fr8 = knock signal level
+  0437AC  FC8D  fldi0 fr12
+  0437AE  FC85  fcmp/gt fr8,fr12       ; clamp at zero
+  0437B0  8B00  bf 0x0437B4
+  0437B2  F8CC  fmov fr12,fr8
+  0437B4  D981  mov.l @(0x0439BC),r9   ; 0xFFFF8158
+  0437B8  F987  fmov.s fr8,@(r0,r9)    ; [0xFFFF8134] = clamped signal
+  0437BA  D481  mov.l @(0x0439C0),r4   ; r4 = 0x000AE284  (descriptor)
+  0437BC  DC81  mov.l @(0x0439C4),r12  ; r12 = 0x000BE830 (table_lookup)
+  0437BE  4C0B  jsr  @r12
+  0437C0  F496  fmov.s @(r0,r9),fr4    ; delay: fr4 = the clamped signal
+
+So 0xAE284 maps **knock signal level (0..3.5) -> 0..304**. A transfer curve on
+the sensor, not a threshold on RPM/IAT.
+
+AND the "no load input" claim is contradicted separately: the knock module DOES
+contain 2-D **RPM x LOAD** tables, decoded from the bytes —
+  0AE5D8  14x5 uint8   Y = 1200,1600,2000,2400,2800,3200,3600,4000...
+                       X = 0.5, 0.8, 1.4, 1.8, 2.2      <- LOAD
+  0AE5F4  14x5 uint8   same axes
+  0AE610  14x5 uint8   same axes
+  0AE62C  14x6 uint8   X = 0.5, 0.8, 1.0, 1.3, 1.8, 2.3 <- LOAD
+consumed at 0x0441C0-0x0441F0 (a different routine in knock_area, not the
+detector). The detector itself reads RPM (0xFFFF6624 -> FR15) and engine load
+(0xFFFF63F8 -> FR14) in its preamble at 0x04379C/0x0437A0.
+
+STATED LIMIT: I did NOT establish that the 14x5 tables ARE the detection
+threshold. What is settled is narrower and sufficient to retire the old claim:
+0xAE284 is not it, it is not 2-D, and it is not RPM x IAT. The blanket "knock
+detection has no load input" should be treated as UNVERIFIED, not inverted.
+
+
+ITEM 9 — 0x37B74: unchanged from the earlier pass, still OPEN
+--------------------------------------------------------------------------------
+No new work this session beyond what corrections.md item 47 records: 1-D,
+RPM- and ECT-indexed (descriptors 0x0AC634 / 0x0AC648), both comps flat ZERO,
+workspace 0xFFFF7AD8 under GBR 0xFFFF7AB4. The write to 0xFFFF7AE4 (enrichC)
+was not traced, so neither "injector compensation" nor "AFL application" is
+asserted. Status: open.
+
+
+ITEM 13 — THE FLKC TRAVERSAL TEST. THE ORIGINAL READING WAS BACKWARDS.
+--------------------------------------------------------------------------------
+New tool `scripts/analysis/flkc_cell_trace.py` replicates the ECU band selector
+exactly (boundaries + downward-only hysteresis, 50 rpm / 0.02 load) and computes
+cell = rpm_band*5 + load_band per sample, then classifies every FLKC change.
+
+Run against logs/8-14 weekend 20.19c (221,829 samples parsed):
+
+    FLKC changes total : 64
+      CELL TRAVERSAL   :  5   (index moved -- a different cell was read)
+      IN-CELL CHANGE   : 59   (index held -- the STORED VALUE moved = LEARNING)
+
+    in-cell step sizes: {-1.00: 3, -0.25: 29, +0.25: 23, +0.50: 2, +1.00: 2}
+
+The shape is the textbook learn-then-recover cycle, in place:
+      9564.92  3288 rpm  1.57 load  cell 18   0.00 -> -1.00
+      9701.68  2952 rpm  1.57 load  cell 18   0.00 -> -0.25
+      9701.84  2959      1.57       cell 18  -0.25 -> -0.50
+      9702.08  2976      1.67       cell 18  -0.50 -> -0.75
+      9702.12  2998      1.67       cell 18  -0.75 -> -1.00
+      9702.84  3068      2.27       cell 19  -1.00 -> -0.75   (then +0.25 x3
+      9703.28  3100      2.54       cell 19  -0.25 ->  0.00    back to zero)
+
+**92% of FLKC movement on 8-14 was in-cell.** The ECU was ACTIVELY LEARNING
+during that drive. The earlier conclusion — "all 33 step-downs passed the
+traversal test = lookups of a pre-learned map, not in-drive learning" — is
+wrong, and it was wrong because it used step SIZE (0.25) as the discriminator.
+Under a bucketed map that proves nothing: 0.25 is simply the Fine Correction
+Advance Value (0xD2F48), so an in-place ramp and a traversal look identical by
+step size. Only the cell index separates them.
+
+CAVEATS, stated:
+  * FLKC is logged at 0.25 resolution (scalingrpn x,0.25,*,32,-), so sub-step
+    movement is invisible and the counts are lower bounds.
+  * The band index is reconstructed from the same 25 Hz rpm/load samples, so a
+    fast in-and-out excursion between samples could be misclassified as in-cell.
+    5 traversals out of 64 is low enough that this cannot flip the conclusion.
+
+
+ITEM 14 — THE TWO REGISTRY CONFLICTS. ROM SIDE SETTLED; XML FIX IS ECUFLASH-SIDE.
+--------------------------------------------------------------------------------
+Both are definition-XML storagetype errors. The ROM code is right in both cases.
+Per CLAUDE.md the repo XMLs must NOT be hand-edited — ECUFlash owns them and
+rewrites the whole project file on save.
+
+  0xC0BCC  "Boost disable during fuel cut-Load threshold" (tinywrex patches)
+           bytes  3f d9 99 99
+           as float  = 1.7        <- how the ROM code reads it
+           as uint16 = 16345      <- what the XML declares; nonsense as a load
+           XML: definitions/AE5L600L 2013 USDM Impreza WRX MT.xml:39
+                type="1D" scaling="EngineLoad(g/rev)", no storagetype float
+           *** ACTIONABLE: the editor currently DISPLAYS 1.00 for this table.
+               The real threshold is 1.7 g/rev. Any reasoning that used "boost
+               disable during fuel cut = 1.00 load" used a wrong number. ***
+
+  0xD6214  "Idle Airflow Min Target Decel Initial Idle Activation Max Mode
+            Counter" (Idle Control)
+           bytes  00 12 00 08
+           as int16 = 18          <- how the ROM code reads it, and a sane count
+           as float = 1.65e-39    <- what the XML declares; a denormal, garbage
+           XML: definitions/AE5L600L 2013 USDM Impreza WRX MT.xml:1422
+
+  FIX (Dean, in the ECUFlash UI, then `.\scripts\sync_defs.ps1 -Pull`):
+    c0bcc  -> storagetype float
+    d6214  -> storagetype uint16 (or int16), scaling rawecuvalue
+  Check `.\scripts\sync_defs.ps1` first — repo and ECUFlash have been out of
+  sync since 2026-04-07 and the repo carries ~37 tables ECUFlash does not, so a
+  blind -Pull deletes them.
+
+
+STILL OPEN AFTER THIS SESSION
+--------------------------------------------------------------------------------
+  item 4b  0xFFFF77D8 / 0xFFFF77DC writers  (base built by arithmetic)
+  item 7   table C's consumer at 0x04ACB8
+  item 9   0x37B74 identity / the enrichC = AFL claim
+  item 10  0xAD7E0, 0xCC51C, 0xCC530 unverified
+  item 11  D5 full RAM reconciliation sweep (the GBR axis of it IS now done)
+  item 12  re-derive the three *_analysis.txt prose files vs corrected widths
+  item 14  the XML edits themselves — ECUFlash-side, not repo-side
+  item 8b  which knock table IS the detection threshold
+
+NO ROM EDITS.
+================================================================================

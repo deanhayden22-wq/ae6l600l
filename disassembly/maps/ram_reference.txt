@@ -68,6 +68,36 @@ Total addresses: 858 | Named: 497 | Unnamed: 361 (low-ref infrastructure, exclud
 !!   knock event writes EXACTLY ONE cell. Full trace:
 !!   disassembly/analysis/flkc_grid_interpolation_trace.txt
 
+!! DUAL-ROLE ADDRESSES 2026-08-16 (corrections.md item 48)
+!!   88 addresses in this file are BOTH a GBR workspace base AND a named
+!!   scalar. That is NORMAL structure in this ROM -- a struct base whose
+!!   offset 0 is itself a real value -- and is NOT by itself an error.
+!!   FFFF6350 ect_current (205 refs), FFFF6624 rpm_current (301),
+!!   FFFF63C4 mass_airflow_gps (43) and FFFF62DC throttle_plate_angle (20)
+!!   are all correctly named AND are GBR bases. Do not "fix" them.
+!!
+!!   WHAT IS WRONG is the "N refs" column for those 88: it conflates
+!!   GBR-base loads with scalar accesses, so the count overstates how much
+!!   evidence backs the NAME. 36 of the 88 are already named as a
+!!   base/workspace/struct; the other 52 read as physical scalars.
+!!
+!!   Treat the low-ref, workspace-shaped ones as UNVERIFIED NAMING -- the
+!!   name may have been invented to explain a base load:
+!!     FFFF798C timing_state_var        FFFF7954 ol_enrichment_factor_A
+!!     FFFF7F74 blend_correction_C      FFFF7AB4 afl_multiplier_output
+!!     FFFF8000 base_timing_offset      FFFF805C timing_corr_5C
+!!     FFFF7A20 o2_sensor2_output       FFFF7AF4 fuel_ipw_state_B
+!!
+!!   FFFF798C specifically: cl_ol_analysis.txt:86 was RIGHT that it is a GBR
+!!   base -- installed at 0x03607E and 0x036856, the exact two sites it names
+!!   (only 2 of the ROM's 651 `ldc r0,gbr` sites install it). It is ALSO
+!!   written as a float at 0x03603E/0x03621E/0x036236/0x036270/0x036306.
+!!   Both artifacts were right; they were describing different roles.
+!!
+!!   Regenerate the list any time:
+!!     scripts/mapping/find_writers.py  (gbr_bases helper) -- see
+!!     disassembly/analysis/open_items_3to14_trace.txt ITEM 5b
+
   Per-address verification flags: docs/verification-status.md
   Full evidence: docs/corrections.md items 9, 39-41
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
