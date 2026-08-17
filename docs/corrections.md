@@ -3570,3 +3570,144 @@ The rationale is recorded in the tool's source so a future pass does not
 This is the only **destructive** edit in the whole descriptor sweep — everything
 else was additive or in-place correction. Backed by git; the pre-state is commit
 `8d7e02f`.
+
+---
+
+## 70. Logged `AFC`/`AFL` are `0xFFFF76D4`/`0xFFFF7878`, NOT `0xFFFF77D8`/`0xFFFF77DC` — item 62's "log question" is unanswerable as posed — **CORRECTS ITEM 62, 2026-08-17**
+
+Reference bin for every byte claim below: `rom/AE5L600L 20g rev 20.19c.bin`,
+md5 `92cae8275cd4f9b473a3a9e36efe6449` (re-verified from disk this session).
+
+### What item 62 claimed
+
+Item 62 closed the `func_3952C` branch-A question and left two things open, the
+second with a parenthetical:
+
+> Remaining, and correctly scoped: *what writes* `0xFFFF77D8`/`0xFFFF77DC`, and
+> whether their sum ever goes negative in practice. The second is a log question
+> (they are the AFC/AFL trim pair region), not a disassembly one.
+
+**The parenthetical is wrong, and it is the load-bearing part** — it is what made
+the item look answerable from the existing 55-log corpus. It is not.
+
+### VERIFIED — the SSM getters
+
+`logs/logcfg.txt` declares `AFC paramid = 0x000009` and `AFL paramid = 0x00000A`.
+Those are **stock SSM parameter indices (P3/P4), not tagged RAM reads**, so they
+route through the getter-pointer table at `0x06423C` rather than through the
+read-address patch (`docs/ssm-read-patch.md`).
+
+```
+064260: 0005D2C0        ; getter table index 0x09  (AFC)
+064264: 0005D2DA        ; getter table index 0x0A  (AFL)
+
+05D2C0  4F22  sts.l pr,@-r15
+05D2C2  D2AE  mov.l @(0x05D57C),r2      ; [0x05D57C] = FFFF76D4
+05D2C4  F428  fmov.s @r2,fr4            ; <- AFC source
+
+05D2DA  4F22  sts.l pr,@-r15
+05D2DC  D2AA  mov.l @(0x05D588),r2      ; [0x05D588] = FFFF7878
+05D2DE  F428  fmov.s @r2,fr4            ; <- AFL source
+```
+
+**Logged `AFC` = `0xFFFF76D4`. Logged `AFL` = `0xFFFF7878`.**
+
+Two independent corroborations, both already in-repo and both previously
+un-cross-referenced:
+
+- `disassembly/analysis/cl_ol_master_analysis.txt:786` — "FFFF7878 float SSM AFL
+  display value (PID 0x0A reads this)"; `:830` — "0x0005D2DA SSM PID 0x0A getter
+  (reads FFFF7878)".
+- `disassembly/analysis/fueling_pipeline_analysis.txt:366-367` — `fuel_enrichment_A
+  @ FFFF76D4`, `fuel_enrichment_B @ FFFF7878`. So **the logged trims ARE enrichA
+  and enrichB**, the first two terms of the multiplicative fuel model.
+
+### Consequence
+
+`[0xFFFF77D8] + [0xFFFF77DC] < 0` **cannot be evaluated against any log we have.**
+Neither address appears in `logs/logcfg.txt` in any rev. Do not re-open this as a
+corpus query.
+
+### But the static route narrows it to ONE address
+
+`0xFFFF77DC`'s writer IS findable — not by `find_writers.py` (the destination is
+passed by pointer, so no literal store exists to match), but by reading the caller.
+
+```
+033342  B4BD  bsr 0x033CC0            ; r4 = 0x00063A44  (loaded at 0x033340)
+        063A44 -> FFFF77DC            ; pointer-to-destination
+
+033CC0  ...   mov r4,r13
+033CCC  D26E  mov.l @(0x033E88),r2    ; = FFFF6624  (RPM)  -> fr15
+033CD0  D26E  mov.l @(0x033E8C),r2    ; = FFFF63F8         -> fr14
+033CF2  D469  mov.l @(0x033E98),r4    ; = 0x000AD8D4   \
+033CF6  D469  mov.l @(0x033E9C),r4    ; = 0x000AD8B8    |  4-way selector on a
+033CFE  D468  mov.l @(0x033EA0),r4    ; = 0x000AD90C    |  byte arg + [FFFF984D]
+033D02  D468  mov.l @(0x033EA4),r4    ; = 0x000AD8F0   /
+033D04  D268  mov.l @(0x033EA8),r2    ; = 0x000BE8E4  (2-D interpolate)
+033D0C  62D2  mov.l @r13,r2           ; r2 = *(0x63A44) = FFFF77DC
+033D0E  F20A  fmov.s fr0,@r2          ; <- the write
+```
+
+So the routine at `0x33CC0` is a **selector over four tables**, not one. All four
+descriptor records read from bytes:
+
+| descriptor | shape | data | XML name |
+|---|---|---|---|
+| `0xAD8B8` | 11×10 | `0xD14D0` | **CL Fueling Target Compensation A (Load)** (`definitions/AE5L600L 2013 USDM Impreza WRX MT.xml:483`) |
+| `0xAD8D4` | 11×10 | `0xD1600` | *(not in the XML)* |
+| `0xAD8F0` | 13×12 | `0xD1740` | **CL Fueling Target Compensation B (Load)** (`…xml:488`) |
+| `0xAD90C` | 13×12 | `0xD18DC` | *(not in the XML)* |
+
+All four: typecode `0x08` = uint16, scale `1/65536`, offset `−0.5`, Y = load
+(0.200…1.600), X = RPM (800…5000).
+
+**Every cell of all four tables is negative.** Combined range **−0.00475 …
+−0.14999**; `0` cells `>= 0` out of 532. The `0xAD8D4` grid decodes to clean round
+calibration values (−0.008 / −0.009 / −0.010 / −0.0105 / −0.011 / −0.012 / −0.013 /
+−0.0135 / −0.014 / −0.015 / −0.016 / −0.017 / −0.020 / −0.030 / −0.050 / −0.075 /
+−0.100 / −0.125 / −0.150), deepening with load — the 1.6 row walks −0.050 → −0.150
+across RPM. Round values are themselves the confirmation that the scale/offset
+decode is right.
+
+### What this does to item 62's conclusion
+
+Item 62 stated the criterion correctly but framed it as an edge case:
+
+> branch A produces a non-zero result only when `[0xFFFF77DC] + [0xFFFF77D8] < 0`
+
+**Since `0xFFFF77DC` is unconditionally negative by at least 0.00475 and by up to
+0.15, that is the DEFAULT state, not the exception.** Branch A is suppressed only
+when `[0xFFFF77D8] >= +0.00475…+0.150` (cell-dependent). The reasonable prior is
+now that branch A is **live**, and that the `0.03` cap at `0xCC3E8` is a real
+term in the fuel stack — the opposite of the "contributes nothing in the ordinary
+case" reading item 62 landed on.
+
+**The whole question now reduces to the sign and magnitude of `0xFFFF77D8` alone.**
+`afc_pi_controller_trace.txt:191` places it at `R9+0xB0` — a struct-relative store
+that `find_writers.py` structurally cannot resolve (item 62 said as much), so the
+tool failing twice on it is expected, not evidence of absence.
+
+### Two traps recorded
+
+1. **`descriptor_map.txt:692` lists `0xD1600` as `0xAD8D4`'s X-axis pointer. It is
+   the DATA pointer.** The real X axis is `0xD15D8`. Decoding the table at the
+   descriptor address itself produces the item-60 phase-locked walk (values that
+   look table-shaped but shift one column every two rows). The descriptor record
+   layout read from bytes at `0xAD8D4` is unambiguous:
+   `000B 000A | 000D15AC | 000D15D8 | 000D1600 | 08000000 | 37800000 | BF000000`
+   = rows | cols | Y | X | **DATA** | typecode | scale | offset.
+2. **Definition gap:** `0xD1600` and `0xD18DC` are live, selector-reachable
+   siblings of the two named CL Fueling Target Comp tables and are **absent from
+   the XML**. Anyone editing Comp A/B in RomRaider is editing two of four
+   reachable tables. Candidates for the next definition sync (cf. item 55).
+
+### How to close the remainder
+
+`0xFFFF77D8` is directly loggable — the read-address patch supports arbitrary RAM
+reads and the `F4` tag selects a 4-byte read (`docs/ssm-read-patch.md`). Adding
+`paramid = 0xF477D8` (plus `0xF477DC` as the control, `0xF47BAC` for branch A's
+output, `0xF47AB4` for `func_37B74`'s product — item 64's open question) settles
+items 62 and 64 empirically in one drive. Costs +16 bytes on the SSM stream;
+watch the cadence, `8-4 20.19c` is already a cadence-era boundary in the corpus.
+

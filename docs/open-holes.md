@@ -1,4 +1,4 @@
-# Open holes — current as of 2026-08-16
+# Open holes — current as of 2026-08-17
 
 Live worklist. Everything here is **scoped, reproducible, and unblocked** — each
 entry says what is known, what is not, and the concrete next move.
@@ -77,20 +77,57 @@ multiplier — same shape as the `0xAD258` result.
 
 ---
 
-## 3. Does `[0xFFFF77D8] + [0xFFFF77DC]` ever go negative?
+## 3. What is `0xFFFF77D8`? (was: "does `[77D8]+[77DC]` go negative")
 
-`docs/corrections.md` item 62. **This is a log question, not a disassembly one.**
+`docs/corrections.md` items 62 and **70**. ⚠ **This entry was rewritten
+2026-08-17 — its previous framing was wrong.**
 
-Branch A of `func_3952C` computes
-`clamp(1/(1 + [77DC] + [77D8]) − 1, 0.0, 0.03)`. The clamp floor is 0.0, so the
-branch contributes **nothing unless that sum goes negative**, and is capped at 3%
-even then. These two sit in the AFC/AFL trim-pair region.
+**It is NOT a log question.** Item 62's parenthetical "these two sit in the
+AFC/AFL trim-pair region" is false. Verified from the 19c bin: `AFC`/`AFL` are
+stock SSM indices `0x09`/`0x0A`, so they route through the getter table at
+`0x06423C`, and those getters read
 
-Neither address has a locatable writer — `find_writers.py` covers four addressing
-forms and finds none, which means the base is built by arithmetic or loaded from
-memory. **Do not record them as read-only**; absence is not proof there.
+```
+064260 -> 05D2C0 :  05D2C2 D2AE mov.l @(0x05D57C),r2   [0x05D57C] = FFFF76D4   <- AFC
+064264 -> 05D2DA :  05D2DC D2AA mov.l @(0x05D588),r2   [0x05D588] = FFFF7878   <- AFL
+```
 
-The practical question is answerable from logged AFC/AFL rather than from code.
+`0xFFFF76D4` and `0xFFFF7878` — which are **enrichA and enrichB**
+(`fueling_pipeline_analysis.txt:366-367`), not `77D8`/`77DC`. Neither `77D8` nor
+`77DC` is in `logs/logcfg.txt` in any rev. **Do not re-open this as a corpus
+query.**
+
+**Half of it is already settled statically.** `0xFFFF77DC`'s writer is findable
+by reading the caller rather than by `find_writers.py` (the destination is passed
+by pointer, so there is no literal store to match):
+
+```
+033342  B4BD  bsr 0x033CC0      ; r4 = 0x00063A44 ;  *(0x63A44) = FFFF77DC
+033D0C  62D2  mov.l @r13,r2     ; r2 = FFFF77DC
+033D0E  F20A  fmov.s fr0,@r2    ; <- the write
+```
+
+`0x33CC0` is a **4-way selector** over `0xAD8B8` / `0xAD8D4` / `0xAD8F0` /
+`0xAD90C` — the CL Fueling Target Compensation family (A = `0xD14D0`,
+B = `0xD1740`; `0xD1600` and `0xD18DC` are live siblings **missing from the
+XML**). All four are uint16, scale `1/65536`, offset `−0.5`, load × RPM.
+**All 532 cells are negative**, range **−0.00475 … −0.14999**.
+
+⇒ Branch A of `func_3952C` arms **by default**, not as an edge case. It is
+suppressed only when `[0xFFFF77D8] >= +0.00475…+0.150`. Item 62's "contributes
+nothing in the ordinary case" is the wrong prior.
+
+**Next move — one of two:**
+
+1. **Log it.** The read-address patch takes arbitrary RAM with a width tag
+   (`docs/ssm-read-patch.md`); `F4` = 4-byte. Adding `0xF477D8` (+ `0xF477DC` as
+   control, `0xF47BAC` for branch A's output, `0xF47AB4` for hole #2) settles
+   this and hole #2 in one drive. +16 bytes on the SSM stream — watch cadence.
+2. **Trace it.** `afc_pi_controller_trace.txt:191` puts `0xFFFF77D8` at
+   `R9+0xB0`, a struct-relative store. `find_writers.py` cannot resolve that by
+   construction, so its two misses are expected — use
+   `scripts/mapping/map_gbr_structures.py` / `identify_gbr_workspaces.py` and
+   find what loads R9 in the AFC PI controller.
 
 ---
 
@@ -168,3 +205,7 @@ float). Repo XMLs must **not** be hand-edited — ECUFlash rewrites them on save
 * **`0xCC51C`/`0xCC530`** are a speed-limiter cut and an RPM guard, not tip-in
   gains.
 * **Descriptor census is 1,094**, not 760, and the Java labels all 1,094.
+* **Logged `AFC`/`AFL` are `0xFFFF76D4`/`0xFFFF7878`** (= enrichA/enrichB), NOT
+  `0xFFFF77D8`/`0xFFFF77DC` — item 70. Hole #3 was rewritten because of it.
+* **`0xFFFF77DC` is negative in all 532 cells** of the four CL Fueling Target
+  Comp tables it can be written from — item 70.
