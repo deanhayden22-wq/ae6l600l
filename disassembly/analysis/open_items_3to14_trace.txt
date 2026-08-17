@@ -267,3 +267,115 @@ STILL OPEN AFTER THIS SESSION
 
 NO ROM EDITS.
 ================================================================================
+
+
+================================================================================
+SECOND PASS — items 8b, 9, and the ECUFlash definition sync
+Appended 2026-08-16, same session
+================================================================================
+
+ITEM 8b — RESOLVED. Neither detector table is load-indexed, and the RPM x LOAD
+          tables belong to TIMING BLEND, not knock detection.
+--------------------------------------------------------------------------------
+The knock detector (0x043798, GBR=FFFF80FC) uses exactly TWO table lookups:
+
+  0xAE284  1D, 65pt, float32, axis 0.0-3.5, data 0.0-304.0
+           input = float[0xFFFF4304] clamped >=0   (the knock signal)
+           call site 0x0437BA-0x0437C0
+  0xAE290  1D, 10pt, float32, axis 800..8000 = RPM, data ALL ZERO on this cal
+           input = FR15 = RPM (0xFFFF6624)
+           call site 0x043942-0x043946
+
+Neither is IAT-indexed. Neither is load-indexed. `0xAE290` is additionally flat
+zero, so it contributes nothing as calibrated.
+
+The four 2-D RPM x LOAD tables are NOT part of detection. Traced end to end:
+  written by  0x0441C0-0x0441FE — four `jsr 0xBE8E4` (2-D lookup) calls with
+              FR4 = FR15 and FR5 = FR12, results stored to
+              0xFFFF81DC / 81E0 / 81E4 / 81E8  (base 0xFFFF81E8, r0 = -12/-8/-4/0)
+  axis inputs FR15 = RPM (0xFFFF6624), FR12 = ENGINE LOAD (0xFFFF63F8),
+              FR14 = ECT (0xFFFF6350)   [literals 0x044244 / 0x044248 / 0x04424C]
+  gated by    FR15 < [0xD2D98]=7000, FR12 vs [0xD2D9C]=0.0, FR14 vs [0xD2DA0]=60.0
+  READ BY     0x03F5F0, 0x03F680, 0x03F734 — all inside
+              **task50_timing_blend (0x03F368-0x03FCA2)**, not by the detector.
+
+CONCLUSION, stated carefully because it partly walks back the first pass:
+  * "Threshold = RPM x IAT @ 0xAE284" is WRONG — confirmed, unchanged.
+  * "The detector has no load input" — the detector DOES read engine load into
+    FR14 at 0x0437A0, so the literal statement is false. BUT neither of its two
+    lookup tables is load-indexed, and the RPM x LOAD tables turn out to belong
+    to timing blend. So the SPIRIT of the old claim (no load term in the
+    detection threshold) now looks MORE likely, not less.
+  * What FR14 (load) is used for inside the detector is NOT traced. Until it is,
+    neither "has a load term" nor "has no load term" is established.
+  Net: the address and the axes were wrong; the conclusion may well be right for
+  the wrong reason. Do not cite either version as settled.
+
+
+ITEM 9 — RESOLVED. 0x37B74 does NOT write enrichC.
+--------------------------------------------------------------------------------
+find_writers.py over 0xFFFF7AE4 (enrichC) returns exactly one writer:
+
+  FFFF7AE4  WRITE GBR  0367F2: mov.l r0,@(80,gbr)   ; GBR=FFFF79A4 set @03644E
+
+Two things follow:
+  1. The write is `mov.l` of an INTEGER register, not `fmov.s`. Whatever
+     0xFFFF7AE4 holds, it is not written as a float here.
+  2. The writer is at 0x0367F2, inside the function whose GBR is installed at
+     0x03644E — that is the OL fuel map selector reached via table B[15]
+     (0x03605E -> 0x03643A). It is NOT func_37B74.
+
+So the pairing "enrichC (0xFFFF7AE4, AFL application 0x37B74)" is wrong: those
+two halves describe different functions. `func_37B74`'s own outputs go to its
+0xFFFF7AD8 workspace ([r13-4] = 0xFFFF7AD4 and [r13] = 0xFFFF7AD8), not to
+0xFFFF7AE4.
+
+Still open: what func_37B74 IS. Both candidate names remain unsupported
+(corrections item 47) — but "AFL application writing enrichC" is now positively
+excluded, which is progress: it was the load-bearing half of the fuel model's
+third term.
+
+
+ECUFLASH DEFINITION SYNC — RAN `.\scripts\sync_defs.ps1` (report only)
+--------------------------------------------------------------------------------
+Result: both files DIVERGED, "ECUFLASH is newer" — but that is a 52-second mtime
+artifact (repo 7/26 9:23:08 PM vs ECUFlash 7/26 9:24:00 PM), not new content.
+
+  project XML   repo 104,949 bytes / 533 named tables
+                ECUFlash 64,712 bytes / 499 named tables
+  base XML      repo 585,548 bytes / 1235 tables
+                ECUFlash 585,194 bytes / 1235 tables
+
+PROJECT — the repo is AHEAD. 37 tables exist only in the repo (matching
+CLAUDE.md's "~37 tables"): the fuel-pump duty split, the CL/OL MAF hysteresis
+set, post-transient knock window/bleed defs, map-switching secondary gates,
+boost enable/disable thresholds, torque-request MAF gates.
+Only 3 tables exist only in ECUFlash, and all three look like superseded
+predecessors of repo work:
+    "Fuel Pump Duty"                          -> repo split into High/Low/Max
+    "CL to OL Enrichment Threshold (MAF)"     -> repo REMOVED it deliberately;
+        the repo's 32BITBASE carries a comment saying it duplicated
+        "Minimum Primary Open Loop Enrichment (Throttle)" at the same ROM
+        address, with a throttle axis (10.93-89.06), not MAF.
+    "AFL Ramp Rate (CL to OL Transition Speed)"
+  => a blind `-Pull` would delete 37 tables and resurrect 3 superseded ones.
+
+BASE — identical table membership (1235 both sides). The 354-byte delta is
+almost entirely reordering plus the removal comment above, EXCEPT for one real
+change, and on that one the REPO IS WRONG:
+
+    scaling EngineLoad(g/rev)1
+        ECUFlash:  max="8"
+        repo:      max="5"     <-- REGRESSION
+
+  `Engine Load Limit A (Maximum)` reads **8.00** in the 19c bin (via
+  scripts/defs.py). With max=5 ECUFlash would CLAMP that table — precisely the
+  BOUNDS-SUSPECT failure mode CLAUDE.md warns about ("never conclude a value is
+  out of spec because a tool clamped it").
+
+RECOMMENDATION (not executed — writing to Program Files is Dean's call):
+  1. Fix `EngineLoad(g/rev)1` max back to 8 FIRST. Otherwise a `-Push` writes
+     the clamp into ECUFlash.
+  2. Then `-Push` (repo -> ECUFlash), NOT `-Pull`. The repo is ahead by 37
+     tables and the 3 ECUFlash-only entries are superseded.
+  3. Re-run `.\scripts\sync_defs.ps1` to confirm convergence.

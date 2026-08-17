@@ -2517,3 +2517,127 @@ every known writer **and found one additional writer for each**
 - **`0xFFFF77D8` / `0xFFFF77DC`**: **no writer found.** Stated plainly — the
   tool resolves bases loaded from a literal pool, so a base built by arithmetic
   is invisible to it. Do NOT conclude these are read-only.
+
+---
+
+## 53. The knock detector's tables are knock-signal and RPM — the RPM×LOAD tables belong to timing blend — **REFINES item 49, 2026-08-16**
+
+Item 49 established that `0xAE284` is a 1-D knock-signal curve, not an RPM×IAT
+threshold, and noted that the knock module contains 2-D **RPM × LOAD** tables.
+Tracing those tables end to end changes the second half of that conclusion.
+
+**The detector (`0x043798`, GBR `0xFFFF80FC`) does exactly two lookups:**
+
+| desc | shape | input | data |
+|---|---|---|---|
+| `0xAE284` | 1-D, 65pt, float32, axis 0.0–3.5 | `float[0xFFFF4304]` clamped ≥0 (knock signal), call site `0x0437BA` | 0.0–304.0 |
+| `0xAE290` | 1-D, 10pt, float32, axis 800–8000 | FR15 = RPM (`0xFFFF6624`), call site `0x043942` | **all zero** |
+
+Neither is IAT-indexed. Neither is load-indexed. `0xAE290` is flat zero as
+calibrated, so it contributes nothing.
+
+**The four 2-D RPM × LOAD tables are not part of detection.** Traced:
+
+- Written at `0x0441C0`–`0x0441FE`: four `jsr 0xBE8E4` (2-D lookup) calls with
+  FR4 = FR15, FR5 = FR12, results stored to `0xFFFF81DC` / `81E0` / `81E4` /
+  `81E8` (base `0xFFFF81E8`, `r0` = −12/−8/−4/0).
+- Axis inputs, from literals `0x044244`/`0x044248`/`0x04424C`: FR15 = RPM
+  (`0xFFFF6624`), FR12 = **engine load** (`0xFFFF63F8`), FR14 = ECT
+  (`0xFFFF6350`). Gated on `[0xD2D98]` = 7000, `[0xD2D9C]` = 0.0,
+  `[0xD2DA0]` = 60.0.
+- **Read at `0x03F5F0`, `0x03F680`, `0x03F734` — all inside
+  `task50_timing_blend` (`0x03F368`–`0x03FCA2`)**, not by the knock detector.
+
+**Net, stated carefully because it partly walks back item 49:**
+
+- "Threshold = RPM × IAT @ `0xAE284`" — **wrong**, unchanged.
+- "The detector has no load input" — the detector *does* read engine load into
+  FR14 at `0x0437A0`, so the literal statement is false. **But** neither of its
+  two lookup tables is load-indexed, and the RPM×LOAD tables turn out to be
+  timing-blend inputs. So the *spirit* of the old claim — no load term in the
+  detection threshold — now looks **more** likely, not less.
+- What FR14 is used for inside the detector is **not traced**. Until it is,
+  neither "has a load term" nor "has no load term" is established.
+
+The address and the axes were wrong; the conclusion may well be right for the
+wrong reason. Do not cite either version as settled.
+
+---
+
+## 54. `0x37B74` does NOT write enrichC — **NARROWS item 47, 2026-08-16**
+
+`scripts/mapping/find_writers.py` over `0xFFFF7AE4` (enrichC) returns exactly
+one writer in the whole ROM:
+
+```
+FFFF7AE4  WRITE GBR  0367F2: mov.l r0,@(80,gbr)   ; GBR=FFFF79A4 set @03644E
+```
+
+Two consequences:
+
+1. The write is `mov.l` of an **integer** register, not `fmov.s`. Whatever
+   `0xFFFF7AE4` holds, it is not written as a float here.
+2. The writer sits in the function whose GBR is installed at `0x03644E` — the
+   **OL fuel map selector** reached via table B[15] (`0x03605E` → `0x03643A`).
+   It is **not** `func_37B74`.
+
+So the pairing "enrichC (`0xFFFF7AE4`, AFL application `0x37B74`)" is wrong:
+the two halves describe different functions. `func_37B74`'s own outputs go to
+its `0xFFFF7AD8` workspace (`[r13-4]` = `0xFFFF7AD4`, `[r13]` = `0xFFFF7AD8`).
+
+**"AFL application writing enrichC" is now positively excluded** — which is
+progress, because it was the load-bearing half of the multiplicative fuel
+model's third term. What `func_37B74` actually is remains open (item 47); both
+candidate names stay unsupported.
+
+---
+
+## 55. ECUFlash definition sync — the repo is ahead by 37 tables but has one bounds REGRESSION — **REPORTED 2026-08-16**
+
+Ran `.\scripts\sync_defs.ps1` (report-only; nothing was written). Both files
+show DIVERGED / "ECUFLASH is newer", but that is a **52-second mtime artifact**
+(repo 7/26 9:23:08 PM vs ECUFlash 7/26 9:24:00 PM), not newer content.
+
+| | repo | ECUFlash |
+|---|---|---|
+| project XML | 104,949 B / 533 named tables | 64,712 B / 499 |
+| base XML | 585,548 B / 1235 tables | 585,194 B / 1235 |
+
+**Project — the repo is AHEAD.** 37 tables exist only in the repo (matching
+CLAUDE.md's "~37 tables"): the fuel-pump duty split, the CL/OL MAF hysteresis
+set, post-transient knock window/bleed defs, map-switching secondary gates,
+boost enable/disable thresholds, torque-request MAF gates. Only 3 exist only in
+ECUFlash, and all three are superseded predecessors:
+
+- `Fuel Pump Duty` → repo split into High / Low / Max
+- `CL to OL Enrichment Threshold (MAF)` → repo **deliberately removed** it; the
+  repo's 32BITBASE carries a comment recording that it duplicated
+  `Minimum Primary Open Loop Enrichment (Throttle)` at the same ROM address,
+  with a throttle axis (10.93–89.06), not MAF
+- `AFL Ramp Rate (CL to OL Transition Speed)`
+
+A blind `-Pull` would delete 37 tables and resurrect 3 superseded ones.
+
+**Base — identical table membership (1235 both sides).** The 354-byte delta is
+almost all reordering plus that removal comment, with one real change, and on
+that one **the repo is WRONG**:
+
+```
+scaling EngineLoad(g/rev)1
+    ECUFlash:  max="8"
+    repo:      max="5"     <-- REGRESSION
+```
+
+`Engine Load Limit A (Maximum)` reads **8.00** in the 19c bin (via
+`scripts/defs.py`). With `max=5` ECUFlash would **clamp** that table — exactly
+the `BOUNDS-SUSPECT` failure mode CLAUDE.md warns about.
+
+**Recommended order (not executed — writing to Program Files is Dean's call):**
+
+1. Fix `EngineLoad(g/rev)1` `max` back to **8** first, or a `-Push` writes the
+   clamp into ECUFlash.
+2. Then `-Push` (repo → ECUFlash), **not** `-Pull`.
+3. Re-run `.\scripts\sync_defs.ps1` to confirm convergence.
+
+This closes the "repo and ECUFlash have been out of sync since 2026-04-07"
+item with a direction and a reason, rather than leaving it as a standing warning.
