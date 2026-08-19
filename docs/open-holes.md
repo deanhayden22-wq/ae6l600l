@@ -239,12 +239,13 @@ monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
 
 ### Next moves, in order
 
-0. **Decode `0x02F162` onward** and settle the eight coolant fractions
-   `0xAC840`/`890`/`854`/`8A4` and `0xAC818`/`868`/`82C`/`87C` — 1-D ×16
-   fractions 0.85–0.96, selected 2×2 on `byte[0xFFFF3158]` and `byte[gbr+101]`,
-   feeding `0xFFFF72D0` in the transient fuel region. Shape of a wall-wetting
-   term, which would bear on the cusp tip-in thread. Also identify `0xFFFF72D0`,
-   `0xFFFF72C8`, `0xFFFF3158`. **Highest tuning value found so far.**
+0. ~~Settle the eight coolant fractions~~ — **DONE, item 88.** They are the
+   decay rate of a staged accumulator bank in the transient workspace, and
+   **inert above 40 °C** (all eight are a flat 0.900 there). The wall-wetting
+   hypothesis is **retired**. What remains, if anyone wants it: the charge value
+   `[FFFF72DC]` and the four thresholds `[FFFF7328]`/`[732C]`/`[7330]`/`[7334]`
+   are RAM, so the staging is set at runtime — nobody has traced their writers,
+   or what consumes flags `0xFFFF726F`–`0xFFFF7272`.
 1. **Decode `0x03684A`** to its output store and either name the
    `0xAD960`/`97C`/`998`/`9B4`/`9D0` cluster or prove it inert. Highest tuning
    value found so far: RPM 800–6400 × load 0.30–2.50, populated, selected on

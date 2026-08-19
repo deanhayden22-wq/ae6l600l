@@ -1,0 +1,145 @@
+================================================================================
+THE EIGHT COOLANT FRACTIONS ARE A STAGED DECAY BANK -- and they are INERT above
+40 degC. Retires the wall-wetting hypothesis from item 87.
+Traced 2026-08-19. Closes open-holes #7 next-move 0.
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+================================================================================
+
+ANSWER
+--------------------------------------------------------------------------------
+The eight undefined coolant fractions found in slice 2 are the **decay rate** of
+a single multiplicative accumulator with four staged latch-off thresholds. The
+whole bank lives in the transient workspace, immediately adjacent to the
+transient-knock-inhibit flag.
+
+**They are not a wall-wetting lever at operating temperature.** Every one of the
+eight curves is a CONSTANT 0.900 from 40 degC upward. The coolant axis only does
+anything below ~40 degC. Item 87's shape argument is retired.
+
+THE MECHANISM -- function 0x02EFD2, GBR = 0xFFFF726C
+--------------------------------------------------------------------------------
+Reset / charge branch:
+
+  02F1E6: D26B  mov.l @(0x02F394),r2   ; [02F394] = FFFF72DC
+  02F1E8: F828  fmov.s @r2,fr8
+  02F1EA: DE61  mov.l @(0x02F370),r14   ; [02F370] = FFFF72D0
+  02F1EC: E0BC  mov #-68,r0
+  02F1EE: FE87  fmov.s fr8,@(r0,r14)
+  02F1F0: F8E6  fmov.s @(r0,r14),fr8
+  02F1F2: E0C0  mov #-64,r0
+  02F1F4: FE87  fmov.s fr8,@(r0,r14)
+  02F1F6: E201  mov #1,r2
+  02F1F8: 6023  mov r2,r0
+  02F1FA: C003  mov.b r0,@(3,gbr)
+  02F1FC: E0BC  mov #-68,r0
+  02F1FE: F8E6  fmov.s @(r0,r14),fr8
+  02F200: E0C4  mov #-60,r0
+  02F202: FE87  fmov.s fr8,@(r0,r14)
+  02F204: 6023  mov r2,r0
+  02F206: C004  mov.b r0,@(4,gbr)
+  02F208: E0BC  mov #-68,r0
+  02F20A: F8E6  fmov.s @(r0,r14),fr8
+  02F20C: E0C8  mov #-56,r0
+  02F20E: FE87  fmov.s fr8,@(r0,r14)
+  02F210: 6023  mov r2,r0
+  02F212: C005  mov.b r0,@(5,gbr)
+  02F214: E0BC  mov #-68,r0
+  02F216: F8E6  fmov.s @(r0,r14),fr8
+  02F218: E0CC  mov #-52,r0
+  02F21A: FE87  fmov.s fr8,@(r0,r14)
+  02F21C: 6023  mov r2,r0
+  02F21E: C006  mov.b r0,@(6,gbr)
+
+    [FFFF728C] = [FFFF72DC]              ; accumulator charged
+    [FFFF7290] = [FFFF7294] =
+    [FFFF7298] = [FFFF729C] = same       ; four outputs seeded
+    byte[gbr+3..6] = 1                   ; four "still active" flags set
+
+Decay branch -- the coolant fraction is the RATE:
+
+  02F162: E0A4  mov #-92,r0
+  02F164: FE07  fmov.s fr0,@(r0,r14)
+  02F166: E0BC  mov #-68,r0
+  02F168: F4E6  fmov.s @(r0,r14),fr4
+  02F16A: E0A4  mov #-92,r0
+  02F16C: F8E6  fmov.s @(r0,r14),fr8
+  02F16E: F482  fmul fr8,fr4
+  02F170: D283  mov.l @(0x02F380),r2   ; [02F380] = 000BE960
+  02F172: 420B    jsr @r2
+  02F174: F58D  fldi0 fr5
+  02F176: E0BC  mov #-68,r0
+  02F178: FE07  fmov.s fr0,@(r0,r14)
+
+    [FFFF7274] = f(coolant)                          ; the looked-up fraction
+    [FFFF728C] = max( [FFFF728C] * f(coolant), 0.0 ) ; helper 0x0BE960 = MAX
+
+then four INDEPENDENT staged comparisons, each against its own RAM threshold and
+each clearing its own flag as the accumulator falls below it:
+
+    [FFFF7290] = max(acc, [FFFF7328])   ; byte[gbr+3] -> 0 when acc < [FFFF7328]
+    [FFFF7294] = max(acc, [FFFF732C])   ; byte[gbr+4] -> 0 when acc < [FFFF732C]
+    [FFFF7298] = max(acc, [FFFF7330])   ; byte[gbr+5] -> 0 when acc < [FFFF7330]
+    [FFFF729C] = max(acc, [FFFF7334])   ; byte[gbr+6] -> 0 when acc < [FFFF7334]
+
+`0x0BE960` re-verified from bytes here: `fcmp/gt fr5,fr4 / bf/s` returning fr4 if
+fr4 > fr5 else fr5 -- i.e. MAX. (CLAUDE.md is right; this is the constant that
+was swapped project-wide in 2026-04 and fixed 2026-07-26.)
+
+WHERE IT SITS
+--------------------------------------------------------------------------------
+GBR = `0xFFFF726C`, so the four flags are `0xFFFF726F`, `0xFFFF7270`,
+`0xFFFF7271`, `0xFFFF7272`. `gbr+2` is **`0xFFFF726E`, the transient knock
+inhibit flag** whose writer (`0x02F550`) is already traced in
+`transient_knock_window_trace.txt`. This decay bank is in the same workspace
+block, two bytes away.
+
+`find_writers.py FFFF728C` returns exactly two writes, both inside this function
+(`0x02F178` decay, `0x02F1EE` charge). Nothing else touches the accumulator.
+
+THE CURVES -- and why they are inert where the car actually runs
+--------------------------------------------------------------------------------
+  degC      -40    -30    -20    -10      0     10     20     30     40     50     60     70     80     90    100    110
+  AC840   0.940  0.940  0.920  0.920  0.850  0.850  0.875  0.875  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900
+  AC890   0.900  0.900  0.900  0.900  0.900  0.900  0.875  0.875  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900
+  AC854   0.940  0.940  0.920  0.920  0.850  0.850  0.875  0.875  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900
+  AC8A4   0.900  0.900  0.900  0.900  0.900  0.900  0.875  0.875  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900
+  AC818   0.960  0.960  0.940  0.940  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900
+  AC868   0.960  0.960  0.940  0.940  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900
+  AC82C   0.960  0.960  0.940  0.940  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900
+  AC87C   0.960  0.960  0.940  0.940  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900  0.900
+
+Three things fall out:
+
+1. **Above 40 degC all eight are a flat 0.900.** Normal operating coolant is
+   80-100 degC. In that entire regime the coolant axis contributes nothing and
+   every one of the eight tables is the same constant.
+2. **Colder = SLOWER decay** (0.96/0.94 at -40..-30 degC vs 0.90 warm), so the
+   accumulator and its four flags persist longer when cold. That is the
+   signature of a cold-start hold, not a fuel-film term.
+3. **The 2x2 selection is nearly moot.** `0xAC840` == `0xAC854` byte for byte,
+   `0xAC890` == `0xAC8A4`, and all four of `0xAC818`/`868`/`82C`/`87C` are
+   identical. Only the first family differs between its two pairs, and only
+   below 40 degC.
+
+CONSEQUENCE FOR THE CUSP TIP-IN THREAD
+--------------------------------------------------------------------------------
+Item 87 flagged these as having the SHAPE of a wall-wetting / X-factor term,
+which would have borne on the conclusion that the cusp stab-lean is wall-wetting
+rather than deliverable fuel. **That is now ruled out for this path.** At the
+80-100 degC the car actually runs at, these tables are a constant and cannot
+explain any temperature-varying transient behaviour.
+
+They remain a genuine cold-start lever, and they are still undefined in every
+XML -- but they are not the thing.
+
+STILL OPEN
+--------------------------------------------------------------------------------
+* What the accumulator MEANS. `[FFFF72DC]` (the charge value) and the four
+  thresholds `[FFFF7328]`/`[732C]`/`[7330]`/`[7334]` are all RAM, so the staging
+  is set at runtime, not by calibration. Their writers are not traced here.
+* What consumes the four flags `0xFFFF726F`-`0xFFFF7272` and the four outputs
+  `0xFFFF7290`-`0xFFFF729C`.
+* `byte[0xFFFF3158]` (pair select), `byte[0xFFFF90C1]` (gate) and `gbr+101`
+  (`0xFFFF72D1`) remain unidentified -- they choose which curve is used, which
+  matters only below 40 degC.
+* No table is NAMED here.

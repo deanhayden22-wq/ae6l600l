@@ -95,8 +95,30 @@ public class ImportAE5L600L extends GhidraScript {
             + "(0xAC818/868/82C/87C). All eight are 1-D uint16 x16, values 0.85..0.96, and NONE "
             + "is defined in any XML. Transient fuel region -- shape of a wall-wetting term, but "
             + "NOT identified. corrections.md item 87.");
-        count += labelComment(0xFFFF72D0L, "fn_2F03C_workspace",
-            "r14 base after the coolant-fraction lookup at 0x02F062. UNIDENTIFIED (item 87).");
+        count += labelComment(0xFFFF72D0L, "coolant_decay_bank_base",
+            "r14 base for the staged decay bank in fn 0x02EFD2 (item 88).");
+
+        // -- item 88: the coolant fractions are a STAGED DECAY BANK, inert >40 degC ----
+        count += labelComment(0x0002EFD2, "fn_2EFD2_coolant_decay_bank",
+            "GBR = 0xFFFF726C (two bytes below the transient knock inhibit flag FFFF726E). "
+            + "Charge: [FFFF728C] = [FFFF72DC], four outputs seeded, gbr+3..6 = 1. "
+            + "Decay: [FFFF728C] = max([FFFF728C] * f(coolant), 0.0), then four staged "
+            + "comparisons that each clear one flag as the accumulator falls below its "
+            + "RAM threshold. ALL EIGHT coolant curves are a flat 0.900 above 40 degC, so "
+            + "the coolant axis is inert at operating temperature. corrections.md item 88.");
+        count += labelComment(0xFFFF728CL, "coolant_decay_accumulator",
+            "Multiplicative accumulator. Exactly two writers, both in fn 0x02EFD2: "
+            + "0x02F1EE charges it from [FFFF72DC], 0x02F178 decays it by f(coolant).");
+        count += labelComment(0xFFFF72DCL, "coolant_decay_charge_value",
+            "RAM. Value the accumulator is reset to at 0x02F1E6. Writer NOT traced.");
+        count += labelComment(0xFFFF726FL, "coolant_decay_flag_0",
+            "gbr+3. Set on charge, cleared when the accumulator falls below [FFFF7328].");
+        count += labelComment(0xFFFF7270L, "coolant_decay_flag_1",
+            "gbr+4. Cleared when the accumulator falls below [FFFF732C].");
+        count += labelComment(0xFFFF7271L, "coolant_decay_flag_2",
+            "gbr+5. Cleared when the accumulator falls below [FFFF7330].");
+        count += labelComment(0xFFFF7272L, "coolant_decay_flag_3",
+            "gbr+6. Cleared when the accumulator falls below [FFFF7334].");
         count += labelComment(0xFFFF3158L, "fn_2F03C_pair_select",
             "byte. Selects which PAIR of coolant fractions is used at 0x02F04E. UNIDENTIFIED.");
         count += labelComment(0xFFFF90C1L, "fn_2F03C_gate",

@@ -5207,3 +5207,70 @@ authority for a coolant term.
 ### Status
 
 Recorded. No ROM bytes changed, no XML edited, no table named.
+
+---
+
+## 88. The eight coolant fractions are a STAGED DECAY BANK — and inert above 40 °C. Retires item 87's wall-wetting hypothesis — **2026-08-19**
+
+Full trace: `disassembly/analysis/coolant_decay_bank_trace.txt` (41/41 lines
+verify). Closes open-holes #7 next-move 0.
+
+### What they are
+
+The decay **rate** of a single multiplicative accumulator with four staged
+latch-off thresholds, in function `0x02EFD2` (GBR `0xFFFF726C`):
+
+```
+charge:  [FFFF728C] = [FFFF72DC];  [FFFF7290/7294/7298/729C] = same
+         byte[gbr+3..6] = 1
+decay:   [FFFF7274] = f(coolant)
+         [FFFF728C] = max( [FFFF728C] * f(coolant), 0.0 )     ; 0x0BE960 = MAX
+         [FFFF7290] = max(acc, [FFFF7328])  ; gbr+3 -> 0 when acc < threshold
+         [FFFF7294] = max(acc, [FFFF732C])  ; gbr+4 -> 0
+         [FFFF7298] = max(acc, [FFFF7330])  ; gbr+5 -> 0
+         [FFFF729C] = max(acc, [FFFF7334])  ; gbr+6 -> 0
+```
+
+`find_writers.py FFFF728C` returns exactly two writes, both inside this
+function. `0x0BE960` re-verified from bytes as MAX.
+
+**GBR+2 is `0xFFFF726E`, the transient knock inhibit flag** (writer `0x02F550`,
+already traced). The bank sits two bytes away in the same workspace.
+
+### Why item 87's hypothesis is wrong
+
+```
+degC     -40    -30    -20    -10      0     10     20     30     40 .. 110
+AC840   0.940  0.940  0.920  0.920  0.850  0.850  0.875  0.875  0.900 (flat)
+AC818   0.960  0.960  0.940  0.940  0.900  0.900  0.900  0.900  0.900 (flat)
+```
+
+* **Above 40 °C all eight curves are a constant 0.900.** Normal coolant is
+  80–100 °C. In the entire regime the car runs in, the coolant axis contributes
+  nothing.
+* **Colder = slower decay**, so the accumulator and its flags persist longer when
+  cold — the signature of a cold-start hold, not a fuel-film term.
+* The 2×2 selection is nearly moot: `0xAC840` == `0xAC854` byte for byte,
+  `0xAC890` == `0xAC8A4`, and all four of `0xAC818`/`868`/`82C`/`87C` are
+  identical.
+
+⇒ Item 87 flagged these as having the shape of a wall-wetting / X-factor term,
+which would have borne on the cusp stab-lean conclusion. **Ruled out for this
+path.** At operating temperature they are a constant and cannot explain any
+temperature-varying transient behaviour. They remain a real cold-start lever and
+are still undefined in every XML — but they are not the thing.
+
+This is the "read the clamp constants before calling anything a live lever" rule
+(CLAUDE.md) catching a hypothesis one step after it was raised.
+
+### Still open
+
+`[FFFF72DC]` (charge value) and the four thresholds `[FFFF7328]`/`[732C]`/
+`[7330]`/`[7334]` are **RAM**, so the staging is set at runtime, not by
+calibration — their writers are not traced. Nor is what consumes the four flags
+`0xFFFF726F`–`0xFFFF7272` or the four outputs `0xFFFF7290`–`0xFFFF729C`.
+`byte[0xFFFF3158]`, `byte[0xFFFF90C1]` and `gbr+101` remain unidentified.
+
+### Status
+
+Recorded. No ROM bytes changed, no XML edited, no table named.
