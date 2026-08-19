@@ -5582,3 +5582,69 @@ None of `0xAB03C`, `0xAAF84`, `0x0C34F0`, `0x0C34F4`, `0x0C34F8` is in the XML.
 Not established: the 31-value axis units are inferred from `0xAAF84` sharing
 them, not read from a definition; `0xFFFF2240` and `fn_0x29AA0` are undecoded;
 nothing is named.
+
+## 95. The 930.0 trip feeds a DTC maturation counter, not enrichment — **CORRECTS ITEM 89, 2026-08-19**
+
+Full trace: `disassembly/analysis/thermal_trip_consumer_trace.txt` (28/28 lines
+verify).
+
+Item 89 inferred "an exhaust / catalyst temperature model driving **open-loop
+enrichment** for component protection" and named the consumer of
+`byte[0xFFFF79FC]` as the single test that would settle it. **Tested — the
+enrichment half is wrong.**
+
+### Every consumer, enumerated
+
+`byte[0xFFFF79FC]` is `gbr+88` with GBR `0xFFFF79A4`. Searching both access forms
+— direct literal and GBR-relative `mov.b @(88,gbr)`:
+
+```
+WRITE 0x036698, 0x0366AA     the 930.0 set/clear (item 89)
+READ  0x0366E4, 0x03676C     the only two reads
+literal at 0x036A88, loaded 0x03699C -- as a BASE POINTER ([r14-48], [r14-44]),
+                                        not a read of the flag
+```
+
+Both reads gate an increment of `word[gbr+76]` via helper `0x0BE554`, then test it
+against `word[0x0CBC5A]` = **200** and `word[0x0CBC64]` = **0** (always true, so
+that path exits immediately). Reaching either branches to `0x03682A` — the
+function's **exit**, which clears `word[gbr+32]` and `byte[gbr+35]` and returns.
+
+A flag gating a counter, the counter compared against a calibrated count, and a
+reset-and-return on reaching it, is **fault maturation**. Not a control path.
+
+And the model's two outputs:
+
+```
+0xFFFF79A4  -> 0x03644C (this monitor's own GBR setup) and 0x024564 (SSM getter)
+0xFFFF79A8  -> 0x0457F4 (the trip calibrated OFF at 10000.0) and 0x024568 (SSM)
+```
+
+**No fuel-path consumer anywhere in the image.**
+
+### What stands and what does not
+
+The model stands: load × RPM base × knock uplift, two cascaded lag filters with
+separate rise/fall coefficients, a 930.0 trip. Range, structure and limit are
+still consistent with an exhaust or catalyst temperature estimate.
+
+"Driving open-loop enrichment" does not. That came from the enclosing module's
+GBR being labelled `ol_enrichment_accum` — **a project guess** — plus the
+plausibility of the numbers. Neither is evidence, and the consumer enumeration
+contradicts it.
+
+Corrected: **a modelled temperature with a 930.0 over-temperature monitor whose
+only outputs are a maturation counter and two SSM-visible values.** No name
+asserted.
+
+> This is the third time this session that a plausible-sounding inference built
+> on a project-assigned label was wrong — after the wall-wetting reading (item
+> 88) and `0xAB03C` (item 94). The pattern is consistent: **structure decoded
+> from bytes has held every time; identity inferred from a label has not.**
+
+### Still open
+
+Whether the counter sets a specific DTC (`word[gbr+32]`/`byte[gbr+35]` are
+cleared on the exit path; the non-zero writer was not chased);
+`word[0xFFFF79F0]` is also loaded at `0x03603A` and `0x0360D2`; and
+`ol_enrichment_accum` on `0xFFFF798C` now has evidence against it in this context.

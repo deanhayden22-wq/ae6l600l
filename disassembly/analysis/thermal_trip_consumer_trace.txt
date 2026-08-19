@@ -1,0 +1,111 @@
+================================================================================
+THE 930.0 TRIP FLAG FEEDS A DTC MATURATION COUNTER, NOT ENRICHMENT
+Traced 2026-08-19. CORRECTS the inference in corrections item 89.
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+================================================================================
+
+ANSWER
+--------------------------------------------------------------------------------
+Item 89 traced a two-stage thermal-lag model tripping a flag at 930.0 and
+inferred "an exhaust / catalyst temperature model driving OPEN-LOOP ENRICHMENT
+for component protection", naming the consumer of byte[0xFFFF79FC] as the one
+test that would settle it.
+
+**Tested. The enrichment half is WRONG.** The flag feeds a maturation counter
+inside a monitor function. Nothing in the chain reaches a fuelling path.
+
+EVERY CONSUMER, ENUMERATED
+--------------------------------------------------------------------------------
+byte[0xFFFF79FC] is gbr+88 with GBR = 0xFFFF79A4. Searched both access forms --
+direct literal and GBR-relative `mov.b @(88,gbr)`:
+
+    WRITE 0x036698, 0x0366AA    (the 930.0 set/clear, item 89)
+    READ  0x0366E4, 0x03676C    <- the only two reads
+    literal 0xFFFF79FC at 0x036A88, loaded at 0x03699C -- but as a BASE POINTER
+      ([r14-48], [r14-44]), not a read of the flag byte
+
+And the two filtered outputs the model produces:
+
+    0xFFFF79A4  loaded at 0x03644C (this monitor's own GBR setup) and 0x024564
+    0xFFFF79A8  loaded at 0x0457F4 (the trip calibrated OFF at 10000.0) and 0x024568
+
+0x024564/0x024568 are the SSM getter pattern -- exposure for logging, not use.
+**There is no fuel-path consumer anywhere in the image.**
+
+WHAT THE READS DO
+--------------------------------------------------------------------------------
+  0366E4: C458  mov.b @(88,gbr),r0
+  0366E6: 8801  cmp/eq #1,r0
+  0366E8: 8F05  bf/s 0x0366F6
+  0366EA: E000  mov #0,r0
+  0366EC: D245  mov.l @(0x036804),r2   ; [036804] = 000BE554
+  0366EE: E501  mov #1,r5
+  0366F0: C526  mov.w @(76,gbr),r0
+  0366F2: 420B    jsr @r2
+  0366F4: 640D  extu.w r0,r4
+  0366F6: C126  mov.w r0,@(76,gbr)
+
+    if byte[FFFF79FC] == 1:
+        word[gbr+76] = counter_step( word[gbr+76], 1 )     ; helper 0x0BE554
+
+and again, with the counter then tested against a calibration:
+
+  03676C: C458  mov.b @(88,gbr),r0
+  03676E: 1F08  mov.l r0,@(32,r15)
+  036770: 600C  extu.b r0,r0
+  036772: 8801  cmp/eq #1,r0
+  036774: 8B07  bf 0x036786
+  036776: C526  mov.w @(76,gbr),r0
+  036778: 1F09  mov.l r0,@(36,r15)
+  03677A: 660D  extu.w r0,r6
+  03677C: D525  mov.l @(0x036814),r5   ; [036814] = 000CBC64
+  03677E: 6251  mov.w @r5,r2
+  036780: 652D  extu.w r2,r5
+  036782: 3653  cmp/ge r5,r6
+  036784: 8951  bt 0x03682A
+
+    if byte[FFFF79FC] == 1:
+        if word[gbr+76] >= word[0x0CBC64]:  -> 0x03682A
+    ...
+    if word[...] >= word[0x0CBC5A]:         -> 0x03682A
+
+    word[0x0CBC5A] = 200
+    word[0x0CBC64] = 0      <- always true, so that path exits immediately
+
+0x03682A is the function's EXIT: it clears word[gbr+32] and byte[gbr+35] and
+returns.
+
+  03682A: E000  mov #0,r0
+  03682C: C110  mov.w r0,@(32,gbr)
+  03682E: E000  mov #0,r0
+  036830: C023  mov.b r0,@(35,gbr)
+  036832: 7F2C  add #44,r15
+
+A flag gating an incrementing counter, the counter compared against a calibrated
+count, and a reset-and-return on reaching it, is the shape of a **fault
+maturation** routine. It is not a control path.
+
+WHAT THIS MEANS FOR ITEM 89
+--------------------------------------------------------------------------------
+The model itself stands: a load x RPM base quantity, a knock-derived uplift, two
+cascaded lag filters with separate rise/fall coefficients, a 930.0 trip. The
+range (390..1138), the thermal-lag structure and the 930 limit are all still
+consistent with an exhaust or catalyst temperature estimate.
+
+What does NOT stand is "driving open-loop enrichment". That came from the
+enclosing module's GBR being labelled `ol_enrichment_accum` -- a PROJECT GUESS --
+plus the physical plausibility of the numbers. Neither is evidence, and the
+consumer enumeration contradicts it.
+
+Corrected reading: **a modelled temperature with a 930.0 over-temperature
+monitor, whose only outputs are a maturation counter and two SSM-visible
+values.** Whether it is exhaust, catalyst or something else is still not
+established, and no name is asserted.
+
+STILL OPEN
+--------------------------------------------------------------------------------
+* Whether the maturation counter sets a specific DTC -- word[gbr+32] and
+  byte[gbr+35] are cleared on the exit path; the non-zero writer was not chased.
+* word[0xFFFF79F0] (the counter) is also loaded at 0x03603A and 0x0360D2.
+* The label `ol_enrichment_accum` on 0xFFFF798C now has evidence against it in
+  this context and should not be relied on.

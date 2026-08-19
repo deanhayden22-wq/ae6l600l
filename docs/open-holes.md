@@ -253,9 +253,10 @@ monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
 1. ~~Decode `0x03684A`~~ — **DONE, item 89.** The five tables are one model: a
    load × RPM base quantity × a knock-derived uplift, through **two cascaded lag
    filters** with separate rise/fall coefficients, tripping a flag at **930.0**.
-   Consistent with an exhaust/catalyst temperature model driving OL enrichment,
-   but **not named**. What would settle it: trace the consumer of
-   `byte[0xFFFF79FC]`. Also still open: `[0xFFFF7F48]` and `[0xFFFF7E90]`.
+   **Consumer traced (item 95): it drives a DTC maturation counter, NOT
+   enrichment.** A modelled temperature with a 930.0 over-temperature monitor;
+   no fuel-path consumer exists anywhere in the image. Still open:
+   `[0xFFFF7F48]` and `[0xFFFF7E90]`, and whether the counter sets a named DTC.
 2. **Triage out the diagnostic-monitor rows** (`0xABDD4`–`0xABE60`, `0xAC0DC`,
    `0xAC0F0`, `0xAC104`, `0xAC12C`). Symmetric ±3999 pairs on RPM × load —
    almost certainly OBD rationality bands, i.e. deliberately not levers.

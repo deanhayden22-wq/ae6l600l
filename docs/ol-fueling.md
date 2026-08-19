@@ -11,9 +11,10 @@ storage layout, see [cruise-tables.md](cruise-tables.md).
 >   `disassembly/analysis/thermal_lag_model_trace.txt`, item 89. Descriptors
 >   `0xAD960`/`97C`/`998`/`9B4`/`9D0` are not five maps but one model: a
 >   load × RPM base quantity × a knock-derived uplift, through two cascaded lag
->   filters with separate rise/fall coefficients. Consistent with an
->   exhaust/catalyst temperature model driving OL enrichment for component
->   protection — **not named**; tracing `byte[0xFFFF79FC]` would settle it.
+>   filters with separate rise/fall coefficients. **It does NOT drive enrichment**
+>   — item 95 enumerated every consumer of its 930.0 trip flag and they are a DTC
+>   maturation counter and two SSM-visible values. A modelled temperature with an
+>   over-temperature monitor; no fuel-path consumer exists. Not named.
 > * **`0xFFFF77D8` has no writer anywhere in the ROM** —
 >   `disassembly/analysis/ffff77d8_trace.txt`, item 83. It and `0xFFFF77DC` feed
 >   `[0xFFFF7BAC] = clamp(1/(1+A+B) − 1, 0, 0.03)`. With `77D8` stuck at 0 the
