@@ -84,12 +84,17 @@ def load_regions(path=REGION_MAP):
     Returns a sorted list of (start, end, type). Empty if the file is missing --
     the caller must then degrade to 'unknown', never to 'code'.
     """
+    # Only the 256-byte block classification. The same file also carries a
+    # coarse hand-written summary ("0x000C0C-0x0A0000 652276 bytes Main code
+    # region") whose ranges OVERLAP the blocks; matching those shadowed the
+    # fine-grained answer and reported the type as "Main".
+    TYPES = {"code", "float_data", "mixed_data", "uint8_data", "rom_hole"}
     out = []
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             for line in fh:
-                m = re.match(r"\s*0x([0-9A-Fa-f]+)-0x([0-9A-Fa-f]+)\s+\d+\s+bytes\s+(\w+)", line)
-                if m:
+                m = re.match(r"\s*0x([0-9A-Fa-f]+)-0x([0-9A-Fa-f]+)\s+\d+\s+bytes\s+(\w+)\s*$", line)
+                if m and m.group(3) in TYPES:
                     out.append((int(m.group(1), 16), int(m.group(2), 16), m.group(3)))
     except OSError:
         return []

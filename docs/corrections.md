@@ -4023,3 +4023,60 @@ them for anyone who wants that after reading them.
 suspect** and should be re-run. The tool has been in use since 2026-08-16.
 Re-running is cheap; the affected identities are the ones in
 `docs/corrections.md` items 62, 64, 66 and open-hole 1.
+
+### Addendum, same day — two more phantoms, and a region-map error the filter exposed
+
+Re-running open-hole 1 through the annotated tool found two more phantom
+writers, both verified from bytes:
+
+**`0xFFFF1288`, apparent writer `0x00336E`.** The bytes there are a literal
+pool holding the target address itself:
+
+```
+00336C: FFFF 12B0    = 0xFFFF12B0
+003370: FFFF 1288    = 0xFFFF1288     <-- the address being searched for
+```
+
+Read two bytes out of phase, `12B0` decodes as `mov.l r11,@(0,r2)` and `1288`
+as `mov.l r8,@(32,r2)`. The scanner found a "write" whose opcode bytes ARE the
+pointer it was looking for. `scripts/sh2e_disasm.py` self-flags it — the words
+either side print `.word 0xFFFF (INVALID-SH2E)`.
+
+**`0xFFFF7F68`, apparent writer `0x03C61A`.** A pointer table:
+
+```
+03C614: 0x000BE8C4     03C618: 0x000AC298     03C61C: 0x000BE88C
+```
+
+Three ROM addresses — two in the table-processor library, one in descriptor
+space. Decoded as code they yield `rts / mov #-60,r8 / sts mach,r0 /
+mov.l r0,@(608,gbr)`.
+
+**Both identities change as a result.** `0xFFFF7F68` does NOT have one writer
+in fuelling and one in ignition; the fuelling-side hit was the phantom. Its
+only real writer is `0403F8: fmov.s fr0,@r2`, in the ignition region and in the
+delay slot of an `rts`. That favours `blend_output` over `ect_blend_correction`
+— it does not settle it.
+
+### The region map got one wrong, in the direction that matters
+
+`0x002DB6` is classified `float_data` and is **real code**:
+
+```
+002DB0: mov.b @r5,r3 / cmp/ge r3,r14 / bf 0x002DBC
+002DB6: mov.b r7,@r5
+002DB8: mov.w @(4,r5),r0 / mov.w r0,@(6,r5)
+002DBC: mov.l @r15,r3 / ldc r3,sr      <- restores SR, ends a critical section
+```
+
+A guarded byte store inside an interrupt-masked section, updating a small
+struct at `r5`. This is the 6th such misclassification (STATUS.md records 5
+corrected). **It is the exact reason the filter annotates instead of dropping:**
+`--code-only` would have hidden the only real writer of `0xFFFF1288`.
+
+A parser bug found in the same pass: `rom_region_map.txt` carries a coarse
+hand-written summary whose ranges overlap the 256-byte blocks
+(`0x000C0C-0x0A0000 652276 bytes Main code region`). Matching those lines
+shadowed the fine-grained classification and reported the type as `Main`. The
+loader now accepts only the block types `code / float_data / mixed_data /
+uint8_data / rom_hole`, and parses 522 blocks.
