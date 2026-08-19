@@ -1400,7 +1400,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7904L, "fuel_corr_param_A",
             "Fuel correction parameter A (float). Read by fuel_correction_final.");
         count += labelComment(0xFFFF77D8L, "fuel_corr_param_B",
-            "Fuel correction parameter B (float). Read by fuel_correction_final.");
+            "NO WRITER ANYWHERE IN THE ROM (corrections.md item 83, four independent "
+            + "searches). Read at 0x032260, 0x03953A, 0x07D680 only. Pointer-table slot "
+            + "0x063A34 holds it but no code path reaches that slot. Term A of "
+            + "S = 1.0 + [FFFF77D8] + [FFFF77DC], consumed at 0x03961C; contributes 0.");
         count += labelComment(0xFFFF781CL, "fuel_corr_param_C",
             "Fuel correction parameter C (float). Read by fuel_correction_final.");
         count += labelComment(0xFFFF77E4L, "fuel_corr_param_D",
@@ -1878,7 +1881,30 @@ public class ImportAE5L600L extends GhidraScript {
             + "NEVER blocks cl_master_readiness_eval: threshold CBE78=0.11 > max clamp 0.03. "
             + "The WOT CL delay was caused by dead Path A thresholds, not this value.");
         count += labelComment(0xFFFF7BACL, "afr_deviation_input",
-            "Input value passed to afr_deviation_clamp (sub_3961C). Used in clamp computation.");
+            "NAME/ROLE CORRECTED 2026-08-19 (corrections.md item 83): this is the OUTPUT "
+            + "DESTINATION of 0x03961C, not an input. r4 = 0xFFFF7BAC is the write target: "
+            + "[FFFF7BAC] = clamp(1.0/S - 1.0, 0.0, [0x0CC3E8]=0.03) where "
+            + "S = 1.0 + [FFFF77D8] + [FFFF77DC]. Always a POSITIVE trim; the =0.0 path "
+            + "needs |S| <= 1.22e-4 and is unreachable. Saturates at +3% in 56/532 comp cells.");
+
+        // -- item 83: the 0xFFFF77D8 / 0xFFFF77DC consumer chain -----------------
+        count += labelComment(0x0003961C, "fuel_trim_from_target_comp",
+            "Branch A of func_3952C. fr4=[FFFF77D8], fr5=[FFFF77DC], r4=&output. "
+            + "S = 1.0 + fr4 + fr5; if |S| <= 1.22e-4 write 0.0 else "
+            + "write clamp(1.0/S - 1.0, 0.0, 0.03). Reached only when byte[FFFF782C] == 0 "
+            + "-- on the non-zero path fr4/fr5 are overwritten unused at 0x039566/0x039574.");
+        count += labelComment(0xFFFF782CL, "fuel_trim_path_select",
+            "byte. tst at 0x039556: ==0 routes func_3952C into 0x03961C (the "
+            + "[FFFF77D8]+[FFFF77DC] trim); !=0 discards both values. corrections.md item 83.");
+        count += labelComment(0x000BE608, "float_outside_band",
+            "returns 1 if fr4 is OUTSIDE fr5 +/- fr6, else 0. Divide-by-zero guard.");
+        count += labelComment(0x000BE628, "float_divide",
+            "fr0 = fr4 / fr5. Opens with fldi0 fr6 / fcmp/eq fr6,fr5 -- zero-denominator test.");
+        count += labelComment(0x000BE56C, "float_clamp3",
+            "fr0 = clamp(fr4, fr5, fr6). Verified from bytes 2026-08-19.");
+        count += labelComment(0x000CC3E8, "fuel_trim_cap",
+            "float 0.03. Upper clamp on the [FFFF77DC]-driven trim at 0x039656. "
+            + "No address= entry in the project XML.");
         count += labelComment(0xFFFF7BB0L, "afr_fault_flag",
             "AFR/sensor fault flag (byte). Checked by cl_master_readiness_eval condition 5: "
             + "must be 0 for CL. Also gated by func_39668 (afr_deviation_init).");

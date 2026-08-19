@@ -77,57 +77,35 @@ undefined calibrations that would do it — and warns why it is not a casual edi
 
 ---
 
-## 3. What is `0xFFFF77D8`? (was: "does `[77D8]+[77DC]` go negative")
+## 3. ~~What is `0xFFFF77D8`?~~ — **CLOSED 2026-08-19**
 
-`docs/corrections.md` items 62 and **70**. ⚠ **This entry was rewritten
-2026-08-17 — its previous framing was wrong.**
+**It has NO WRITER. It is the inert first term of a two-term fuel trim.**
+Settled statically — the drive in option 1 was not needed.
 
-**It is NOT a log question.** Item 62's parenthetical "these two sit in the
-AFC/AFL trim-pair region" is false. Verified from the 19c bin: `AFC`/`AFL` are
-stock SSM indices `0x09`/`0x0A`, so they route through the getter table at
-`0x06423C`, and those getters read
+Full trace: `disassembly/analysis/ffff77d8_trace.txt` (88/88 lines verify).
+Evidence: `docs/corrections.md` item 83.
 
 ```
-064260 -> 05D2C0 :  05D2C2 D2AE mov.l @(0x05D57C),r2   [0x05D57C] = FFFF76D4   <- AFC
-064264 -> 05D2DA :  05D2DC D2AA mov.l @(0x05D588),r2   [0x05D588] = FFFF7878   <- AFL
+S = 1.0 + [0xFFFF77D8] + [0xFFFF77DC]                  ; consumer 0x03961C
+if |S| <= 1.22e-4:  [0xFFFF7BAC] = 0.0
+else:               [0xFFFF7BAC] = clamp(1.0/S - 1.0, 0.0, 0.03)
 ```
 
-`0xFFFF76D4` and `0xFFFF7878` — which are **enrichA and enrichB**
-(`fueling_pipeline_analysis.txt:366-367`), not `77D8`/`77DC`. Neither `77D8` nor
-`77DC` is in `logs/logcfg.txt` in any rev. **Do not re-open this as a corpus
-query.**
+Four independent searches found no writer: `find_writers.py`; exhaustive literal
+enumeration (the value occurs at exactly four aligned offsets — three pools, all
+loaded by reads, plus one pointer-table slot no code path reaches); a store-base
+back-trace over `0x0`–`0xC0000`; and GBR-base enumeration over all 651
+`ldc rN,gbr` sites.
 
-**Half of it is already settled statically.** `0xFFFF77DC`'s writer is findable
-by reading the caller rather than by `find_writers.py` (the destination is passed
-by pointer, so there is no literal store to match):
+**Numerically:** `[0xFFFF77DC]` is negative in all 532 comp cells
+(−0.14999…−0.00475), so `S ∈ [0.85, 0.995]` and the output is always a positive
+enrichment, **saturating at the +3% cap in 56 of 532 cells (10.5%)**. The
+`= 0.0` path is unreachable.
 
-```
-033342  B4BD  bsr 0x033CC0      ; r4 = 0x00063A44 ;  *(0x63A44) = FFFF77DC
-033D0C  62D2  mov.l @r13,r2     ; r2 = FFFF77DC
-033D0E  F20A  fmov.s fr0,@r2    ; <- the write
-```
-
-`0x33CC0` is a **4-way selector** over `0xAD8B8` / `0xAD8D4` / `0xAD8F0` /
-`0xAD90C` — the CL Fueling Target Compensation family (A = `0xD14D0`,
-B = `0xD1740`; `0xD1600` and `0xD18DC` are live siblings **missing from the
-XML**). All four are uint16, scale `1/65536`, offset `−0.5`, load × RPM.
-**All 532 cells are negative**, range **−0.00475 … −0.14999**.
-
-⇒ Branch A of `func_3952C` arms **by default**, not as an edge case. It is
-suppressed only when `[0xFFFF77D8] >= +0.00475…+0.150`. Item 62's "contributes
-nothing in the ordinary case" is the wrong prior.
-
-**Next move — one of two:**
-
-1. **Log it.** The read-address patch takes arbitrary RAM with a width tag
-   (`docs/ssm-read-patch.md`); `F4` = 4-byte. Adding `0xF477D8` (+ `0xF477DC` as
-   control, `0xF47BAC` for branch A's output, `0xF47AB4` for hole #2) settles
-   this and hole #2 in one drive. +16 bytes on the SSM stream — watch cadence.
-2. **Trace it.** `afc_pi_controller_trace.txt:191` puts `0xFFFF77D8` at
-   `R9+0xB0`, a struct-relative store. `find_writers.py` cannot resolve that by
-   construction, so its two misses are expected — use
-   `scripts/mapping/map_gbr_structures.py` / `identify_gbr_workspaces.py` and
-   find what loads R9 in the AFC PI controller.
+**The old entry was wrong about the suppression test.** It is
+`|1 + [77D8] + [77DC]| <= 1.22e-4` — a divide-by-zero guard — not
+`[77D8] >= +0.00475…+0.150`. Those figures were the 77DC table magnitudes.
+The `map_gbr_structures.py` next move does not apply either.
 
 ---
 

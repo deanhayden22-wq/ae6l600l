@@ -4819,3 +4819,90 @@ K is a sigma multiplier, differentiating the planes is a well-defined lever:
 ### Status
 
 Recorded and verified. No ROM bytes changed, no XML edited.
+
+---
+
+## 83. `0xFFFF77D8` has NO writer, and the branch it feeds is a +3%-capped fuel trim — **CLOSES OPEN-HOLE 3, 2026-08-19**
+
+Settled statically, without the drive that option 1 of the hole called for. Full
+trace: `disassembly/analysis/ffff77d8_trace.txt` (88/88 instruction lines verify).
+
+### The writer question is answered: there isn't one
+
+Four independent methods, all negative:
+
+1. `find_writers.py FFFF77D8` → no writes.
+2. **Exhaustive literal enumeration.** The value `FFFF77D8` occurs at exactly
+   four aligned offsets in the image: `0x032450`, `0x03972C`, `0x07D788` (three
+   literal pools) and `0x063A34` (a pointer-table slot). Every PC-relative load
+   resolving to the three pools was enumerated — three instructions, **all
+   reads** (`0x032260`, `0x03953A`, `0x07D680`).
+3. **Store-base back-trace** over `0x000000`–`0x0C0000` for `fmov.s frM,@rN`,
+   `fmov.s frM,@-rN`, `mov.l rM,@rN`, resolving the base through literal loads,
+   `mov rM,rN`, `mov.l @rM,rN`, `mov.l @(disp,rM),rN` and accumulated
+   `add #imm,rN`: **zero** hits.
+4. **GBR enumeration.** All 651 `ldc rN,gbr` sites resolved to their bases; the
+   three that can reach `0xFFFF77D8` have no matching store inside their live
+   range (the apparent hits at `0x067900`+ are data-as-code, item 73's class).
+   SH-2E has no GBR-relative float store anyway, and all three reads are
+   `fmov.s`.
+
+**The pointer-table slot is unreachable.** `0xFFFF77DC`'s writer works by being
+handed `&0x063A44` (literal at `0x03342C`, `bsr 0x033CC0`, deref-and-store). No
+literal in the image holds `0x00063A34`, and the two helpers that receive a
+neighbouring slot index past it, not onto it:
+
+```
+0x033658  r11 = r5 = 0x63A2C ; mov.l @(4,r11),r2   -> 0x63A30 = FFFF77CC
+0x033D1C  r13 = r5 = 0x63A2C ; mov.l @(12,r13),r2  -> 0x63A38 = FFFF77E4
+```
+
+Each of the six helpers has exactly one caller (every `bsr` displacement in the
+image was scanned).
+
+### What the pair actually does
+
+Only `func_3952C` consumes them, and only when `byte[0xFFFF782C] == 0` — on the
+non-zero path `fr4`/`fr5` are overwritten at `0x039566`/`0x039574` without use.
+The live path calls `0x03961C`:
+
+```
+S = 1.0 + [0xFFFF77D8] + [0xFFFF77DC]
+if |S| <= 0.0001220703125:  [0xFFFF7BAC] = 0.0
+else:                       [0xFFFF7BAC] = clamp(1.0/S - 1.0, 0.0, 0.03)
+```
+
+Helpers verified from bytes: `0x0BE608(x,c,eps)` returns 1 when `x` is outside
+`c ± eps` (a divide-by-zero guard); `0x0BE628` is division (opens with a
+zero-denominator test); `0x0BE56C(x,lo,hi)` is `clamp`. Ceiling is float
+`[0x0CC3E8] = 0.03`.
+
+### Numerically
+
+`0xFFFF77DC` comes from the four CL Fueling Target Comp tables, re-read
+2026-08-19 with `desc_types.read_table`: 532 cells, all negative,
+**−0.14999 … −0.00475**. With `[77D8] = 0`, `S ∈ [0.85001, 0.99525]`, so
+`1/S − 1 ∈ [0.00477, 0.17646]` — always positive.
+
+* The `[0xFFFF7BAC] = 0.0` path is **unreachable** for any value these tables
+  can produce; it would need the sum near −1.0.
+* The trim **saturates at the +3% cap for 56 of 532 cells (10.5%)**. The rest
+  give a graded +0.48%…+3%.
+
+### Corrections to the previous open-holes entry
+
+* "suppressed only when `[0xFFFF77D8] >= +0.00475…+0.150`" — **wrong**. The test
+  is `|1 + [77D8] + [77DC]| <= 1.22e-4`. Those figures are the *magnitudes of the
+  77DC table data*, not a threshold on 77D8.
+* "Branch A arms by default" — right conclusion, wrong reason. It arms because
+  the guard is a divide-by-zero check that never trips.
+* The suggested `map_gbr_structures.py` next move does not apply: the
+  `afc_pi_controller_trace.txt:191` "R9+0xB0" reading is corroborated by no store
+  this trace can find.
+
+### Status
+
+Recorded and verified. No ROM bytes changed, no XML edited. Open: whether
+`0xFFFF77D8` is explicitly zeroed at reset (it lies in `FFFF4000..FFFFBF9F`, the
+fourth entry of the RAM region table at `0x011CCC`–`0x011CE8`, whose consumer was
+not decoded) or merely never written — either way it is constant per power cycle.

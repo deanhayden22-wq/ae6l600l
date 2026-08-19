@@ -1,0 +1,263 @@
+================================================================================
+0xFFFF77D8 -- identity, writer search, and the branch it feeds
+Traced 2026-08-19. CLOSES docs/open-holes.md item 3, statically (no drive).
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Method: exhaustive literal enumeration + PC-relative resolution + a wide
+        store-base back-trace + GBR-base enumeration. All four disagree with
+        the previous framing; see CORRECTIONS at the end.
+================================================================================
+
+ANSWER
+--------------------------------------------------------------------------------
+`0xFFFF77D8` is the FIRST TERM of a two-term fuel trim whose partner is
+`0xFFFF77DC`. It has **NO WRITER anywhere in the ROM**. The pair is consumed at
+`0x03961C` (reached only from `func_3952C`) as:
+
+    S = 1.0 + [0xFFFF77D8] + [0xFFFF77DC]
+    if |S - 0.0| <= 0.0001220703125:   [0xFFFF7BAC] = 0.0
+    else:                              [0xFFFF7BAC] = clamp(1.0/S - 1.0, 0.0, 0.03)
+
+The 0.03 ceiling is float `[0x0CC3E8]`. So the output is a **positive fuel trim
+capped at +3%**, and with `[0xFFFF77D8]` contributing nothing the trim is driven
+entirely by `[0xFFFF77DC]`.
+
+WRITER SEARCH -- four independent methods, all negative
+--------------------------------------------------------------------------------
+1. `scripts/mapping/find_writers.py FFFF77D8` -> "no writes found".
+
+2. Exhaustive literal enumeration. The 32-bit value `FFFF77D8` occurs at exactly
+   FOUR aligned offsets in the 1 MB image:
+
+       0x032450   literal pool  -> loaded at 0x032260, READ
+       0x03972C   literal pool  -> loaded at 0x03953A, READ
+       0x07D788   literal pool  -> loaded at 0x07D680, READ
+       0x063A34   pointer-table slot -- see (4)
+
+   Every PC-relative `mov.l @(disp,pc),rN` in the image resolving to any of the
+   three pool addresses was enumerated. There are exactly three, all reads.
+
+3. Store-base back-trace over 0x000000-0x0C0000 for `fmov.s frM,@rN`,
+   `fmov.s frM,@-rN` and `mov.l rM,@rN`, resolving rN through literal loads,
+   `mov rM,rN`, `mov.l @rM,rN`, `mov.l @(disp,rM),rN` and accumulated
+   `add #imm,rN`: ZERO stores resolve to `0xFFFF77D8`.
+
+4. GBR enumeration. All 651 `ldc rN,gbr` sites were resolved to their literal
+   bases. Three bases can reach `0xFFFF77D8` with a legal displacement
+   (`FFFF77BC`+7, `FFFF77C8`+4, `FFFF7710`+50). Every matching `mov.l r0,@(d,gbr)`
+   in the image lies far outside the function where that base is live -- these
+   are data decoded as code, the phantom class of corrections item 73. Note also
+   that all three READS are `fmov.s` (float); SH-2E has no GBR-relative float
+   store, so a GBR write would have to be an integer store of a float bit
+   pattern.
+
+THE POINTER-TABLE SLOT IS UNREACHABLE
+--------------------------------------------------------------------------------
+`0x063A34` sits in a table of RAM pointers:
+
+    063A2C  FFFF77C8      063A38  FFFF77E4      063A44  FFFF77DC
+    063A30  FFFF77CC      063A3C  FFFF782A      063A48  FFFF77E0
+    063A34  FFFF77D8  <-- 063A40  FFFF7864
+
+`0xFFFF77DC`'s writer works by being HANDED its slot address: `0x03342E` loads
+`0x00063A44` from a literal, `0x033342 bsr 0x033CC0` passes it in r4, and the
+helper dereferences and stores. That is the idiom, and it is why a literal-pool
+scan alone settles nothing (open-holes' own warning).
+
+But **no literal anywhere in the image holds `0x00063A34`**, `0x00063A30` or
+`0x00063A38`. The only slots ever passed are `0x639C4`, `0x63A04`, `0x63A10`,
+`0x63A2C`, `0x63A3C`, `0x63A44`, `0x63A48`. And the two helpers that receive a
+neighbouring slot index past `0x63A34`, not onto it:
+
+    0x033658  r11 = r5 = 0x63A2C ; mov.l @(4,r11),r2   -> 0x63A30 = FFFF77CC
+              r10 = r4 = 0x63A3C ; mov.l @(4,r10),r6   -> 0x63A40 = FFFF7864
+    0x033D1C  r13 = r5 = 0x63A2C ; mov.l @(12,r13),r2  -> 0x63A38 = FFFF77E4
+
+Each of the six helpers called from `0x03333C`-`0x033358` has exactly ONE caller
+(verified by scanning every `bsr` displacement in the image). So the slot holding
+`0xFFFF77D8` is reachable from no code path.
+
+`0xFFFF77D8` lies inside `FFFF4000..FFFFBF9F`, the fourth entry of the RAM region
+table at `0x011CCC`-`0x011CE8` (`FFFF0000-001F`, `0020-1FFF`, `2000-3FFF`,
+`4000-BF9F`). Whether that table drives a startup clear is NOT established here.
+
+THE THREE READS
+--------------------------------------------------------------------------------
+  03953A: D27C  mov.l @(0x03972C),r2   ; [03972C] = FFFF77D8
+  03953C: F428  fmov.s @r2,fr4
+  03953E: D27C  mov.l @(0x039730),r2   ; [039730] = FFFF77DC
+  039540: F528  fmov.s @r2,fr5
+  039542: D67C  mov.l @(0x039734),r6   ; [039734] = FFFF7448
+  039544: 6E60  mov.b @r6,r14
+
+`func_3952C` prologue -- fr4 = [77D8], fr5 = [77DC], and they survive to the call.
+
+  032260: D27B  mov.l @(0x032450),r2   ; [032450] = FFFF77D8
+  032262: F828  fmov.s @r2,fr8
+  032264: 7004  add #4,r0
+  032266: FF87  fmov.s fr8,@(r0,r15)
+
+  07D680: D241  mov.l @(0x07D788),r2   ; [07D788] = FFFF77D8
+  07D682: F828  fmov.s @r2,fr8
+  07D684: E020  mov #32,r0
+  07D686: FF87  fmov.s fr8,@(r0,r15)
+
+Both of the other two sites copy it into a stack frame alongside `FFFF7904`,
+`FFFF781C`, `FFFF77E4`, `FFFF77DC`, `FFFF7448` (0x032260) and `FFFF732C`,
+`FFFF7330`, `FFFF7334`, `FFFF733C`, `FFFF6624`, `FFFF6350`, `FFFF6364`,
+`FFFF63F8` (0x07D680) -- snapshot builders, not consumers.
+
+THE GATE -- 77D8/77DC ONLY MATTER WHEN byte[0xFFFF782C] == 0
+--------------------------------------------------------------------------------
+  039552: D27C  mov.l @(0x039744),r2   ; [039744] = FFFF782C
+  039554: 6D20  mov.b @r2,r13
+  039556: 2DD8  tst r13,r13
+  039558: 8B04  bf 0x039564
+  03955A: D47B  mov.l @(0x039748),r4   ; [039748] = FFFF7BAC
+  03955C: B05E    bsr 0x03961C
+  03955E: 0009  nop
+  039560: A035    bra 0x0395CE
+
+`tst r13,r13 / bf` sends the NON-zero case to `0x039564`, where fr4 and fr5 are
+immediately overwritten (`fmov fr7,fr4` at 0x039566, `fldi0 fr5` at 0x039574).
+So on that path both values are loaded and DISCARDED. Only the `r13 == 0` path
+carries them into `0x03961C`.
+
+BRANCH A -- the consumer
+--------------------------------------------------------------------------------
+  03961C: 2FE6  mov.l r14,@-r15
+  03961E: 4F22  sts.l pr,@-r15
+  039620: FFEB  fmov.s fr14,@-r15
+  039622: 6E43  mov r4,r14
+  039624: F540  fadd fr4,fr5
+  039626: F89D  fldi1 fr8
+  039628: F580  fadd fr8,fr5
+  03962A: FE5C  fmov fr5,fr14
+  03962C: D247  mov.l @(0x03974C),r2   ; [03974C] = 000BE608
+  03962E: F45C  fmov fr5,fr4
+  039630: C747  mova @(0x039750),r0
+  039632: F608  fmov.s @r0,fr6
+  039634: 420B    jsr @r2
+  039636: F58D  fldi0 fr5
+  039638: 620C  extu.b r0,r2
+  03963A: 2228  tst r2,r2
+  03963C: 8B02  bf 0x039644
+  03963E: F98D  fldi0 fr9
+  039640: A00E    bra 0x039660
+  039642: FE9A  fmov.s fr9,@r14
+  039644: D244  mov.l @(0x039758),r2   ; [039758] = 000BE628
+  039646: F49D  fldi1 fr4
+  039648: 420B    jsr @r2
+  03964A: F5EC  fmov fr14,fr5
+  03964C: F89D  fldi1 fr8
+  03964E: F84D  fneg fr8
+  039650: F080  fadd fr8,fr0
+  039652: D246  mov.l @(0x03976C),r2   ; [03976C] = 000BE56C
+  039654: F58D  fldi0 fr5
+  039656: D647  mov.l @(0x039774),r6   ; [039774] = 000CC3E8
+  039658: F668  fmov.s @r6,fr6
+  03965A: 420B    jsr @r2
+  03965C: F40C  fmov fr0,fr4
+  03965E: FE0A  fmov.s fr0,@r14
+  039660: FEF9  fmov.s @r15+,fr14
+  039662: 4F26  lds.l @r15+,pr
+  039664: 000B    rts
+  039666: 6EF6  mov.l @r15+,r14
+
+    r14 = r4 = 0xFFFF7BAC                    ; output destination
+    fr5 = [77D8] + [77DC]
+    fr5 = fr5 + 1.0                          ; S
+    r0  = guard(fr4=S, fr5=0.0, fr6=[0x039750] = 0.0001220703125)
+    if r0 == 0:  [0xFFFF7BAC] = 0.0          ; S is within +/-1.22e-4 of zero
+    else:        fr0 = 1.0 / S               ; helper 0x0BE628
+                 fr0 = fr0 - 1.0
+                 fr0 = clamp(fr0, 0.0, [0x0CC3E8] = 0.03)
+                 [0xFFFF7BAC] = fr0
+
+Helper semantics, both verified from bytes:
+
+  0BE608: F35C  fmov fr5,fr3
+  0BE60A: F361  fsub fr6,fr3
+  0BE60C: F345  fcmp/gt fr4,fr3
+  0BE60E: 8D07  bt/s 0x0BE620
+  0BE610: 0009  nop
+  0BE612: F35C  fmov fr5,fr3
+  0BE614: F360  fadd fr6,fr3
+  0BE616: F435  fcmp/gt fr3,fr4
+  0BE618: 8D02  bt/s 0x0BE620
+  0BE61A: 0009  nop
+  0BE61C: A001    bra 0x0BE622
+  0BE61E: E400  mov #0,r4
+  0BE620: E401  mov #1,r4
+  0BE622: 000B    rts
+  0BE624: 6043  mov r4,r0
+
+`0x0BE608(fr4=x, fr5=c, fr6=eps)` returns 1 when x is OUTSIDE `c +/- eps`, else 0.
+It is a divide-by-zero guard, nothing more.
+
+  0BE56C: F455  fcmp/gt fr5,fr4
+  0BE56E: 8D02  bt/s 0x0BE576
+  0BE570: 0009  nop
+  0BE572: A006    bra 0x0BE582
+  0BE574: F75C  fmov fr5,fr7
+  0BE576: F645  fcmp/gt fr4,fr6
+  0BE578: 8D02  bt/s 0x0BE580
+  0BE57A: 0009  nop
+  0BE57C: A001    bra 0x0BE582
+  0BE57E: F76C  fmov fr6,fr7
+  0BE580: F74C  fmov fr4,fr7
+  0BE582: 000B    rts
+  0BE584: F07C  fmov fr7,fr0
+
+`0x0BE56C(fr4=x, fr5=lo, fr6=hi)` returns `clamp(x, lo, hi)`.
+
+`0x0BE628` opens `fldi0 fr6 / fcmp/eq fr6,fr5 / bf/s` -- a zero-denominator test,
+confirming it is division `fr4 / fr5`.
+
+WHAT THIS MEANS NUMERICALLY
+--------------------------------------------------------------------------------
+`0xFFFF77DC` is written from the four CL Fueling Target Compensation tables via
+descriptors `0xAD8B8` / `0xAD8D4` / `0xAD8F0` / `0xAD90C` (corrections item 70).
+Re-read 2026-08-19 with `desc_types.read_table`:
+
+    0AD8B8  2D uint16  n=110  -0.14999 .. -0.00800
+    0AD8D4  2D uint16  n=110  -0.14999 .. -0.00800
+    0AD8F0  2D uint16  n=156  -0.14999 .. -0.00475
+    0AD90C  2D uint16  n=156  -0.14999 .. -0.00475
+    TOTAL   n=532            -0.14999 .. -0.00475   (all negative)
+
+With `[77D8] = 0`, `S = 1 + [77DC]` lies in `[0.85001, 0.99525]`, so
+`1/S - 1` lies in `[0.00477, 0.17646]` -- ALWAYS POSITIVE, never near the
+guard's zero band. Therefore:
+
+* The `[0xFFFF7BAC] = 0.0` path is UNREACHABLE for any value these tables can
+  produce. It would need `[77D8] + [77DC]` near -1.0.
+* The trim SATURATES at the +3% ceiling whenever `[77DC] <= -0.029126`.
+  That is **56 of 532 cells (10.5%)**. The other 89.5% give a graded
+  +0.48% .. +3% enrichment.
+
+CORRECTIONS to the previous open-holes entry
+--------------------------------------------------------------------------------
+* "It is suppressed only when `[0xFFFF77D8] >= +0.00475...+0.150`" -- WRONG.
+  The suppression test is `|1 + [77D8] + [77DC]| <= 1.22e-4`, i.e. the sum near
+  -1.0. The `0.00475..0.150` figures are the MAGNITUDES of the 77DC table data,
+  not a threshold on 77D8.
+* "Branch A of `func_3952C` arms by default, not as an edge case" -- right
+  conclusion, wrong reason. It arms because the guard is a divide-by-zero check
+  that essentially never trips, not because of a comparison against 77D8.
+* The suggested next move (`map_gbr_structures.py` / `identify_gbr_workspaces.py`
+  to find what loads R9 in the AFC PI controller) does not apply: the
+  `afc_pi_controller_trace.txt:191` "R9+0xB0" reading is not corroborated by any
+  store this trace can find, and R9-relative float stores in that region resolve
+  elsewhere.
+
+STILL OPEN
+--------------------------------------------------------------------------------
+* Whether `0xFFFF77D8` is explicitly zeroed at reset or merely never written.
+  The RAM region table at `0x011CCC` covers it, but the consumer of that table
+  was not decoded. Either way the read value is a constant for a given power
+  cycle, and every method above agrees nothing in the ROM changes it.
+* `0xFFFF7BAC`'s own consumers are not traced here.
+* None of `0x0CC3E8` (0.03), `0x0CC3EC` (0.0), `0x0CC3F0` (0.0), `0xAD8B8`,
+  `0xAD8D4`, `0xAD8F0`, `0xAD90C` has an `address=` entry in the project XML
+  (checked 2026-08-19). `0x0D1600` and `0x0D18DC` remain live siblings missing
+  from the XML, per item 70.
