@@ -89,26 +89,51 @@ because the first two slices happened to land in diagnostic-heavy regions.
 
 ## Phase 2 — rank, do not sweep — **SHORTLIST PRODUCED**
 
-Of the 472 live rows, **73 have a consumer touching a subsystem that actually
-gets tuned**. The other 399 are unassigned — their consumers touch RAM outside
-the signature list in the tool, which is a gap in the signatures, not proof the
-tables are uninteresting.
+The classifier uses **two independent signals**, both hints, never
+identifications, and the row records which one fired (`matched_by`):
+
+1. **RAM signature** — a workspace/GBR base or subsystem-specific variable near
+   the call site. Discriminating addresses only: `ect_current`, `rpm_current`,
+   `vehicle_speed_kmh` and `ect_gated_c` are the four commonest RAM references in
+   the corpus and classify nothing, so they are deliberately excluded.
+2. **Consumer code region** — which 4KB block the call site lives in. This turned
+   out to be the **stronger** signal. Only regions with a decoded anchor function
+   are listed, and each carries its anchor so the claim is auditable.
+
+Widening the signatures on 2026-08-19 (first pass → second pass):
+
+| | first | **widened** |
+|---|---|---|
+| unassigned (all rows) | 658 | **357** |
+| correctly caught as diagnostic | 109 | **204** |
+| live, non-diagnostic | 472 | **400** |
+| live rows still unassigned | 399 | **211** |
+
+The live count *fell* because 95 more tables were correctly recognised as
+diagnostics and dropped — a better result than a bigger list.
+
+### The live set, by hint
 
 ```
-transient fuel 19 | throttle/pedal 15 | boost/MAP 13 | CL/OL fuelling 11
-OL enrichment/thermal 7 | knock 4 | FLKC 2 | idle 2
+transient fuel 31 | ADC/IO 29 | AFC/AFL trim 22 | knock 18 | scheduler 16
+ignition timing 12 | evap 12 | base fuelling 10 | throttle/pedal 9 | FLKC 9
+CL/OL 8 | OL enrichment/thermal 6 | boost/MAP 5 | idle 2 | unassigned 211
 ```
 
-**947 → 73.** That is the list to work from; it is in
-`disassembly/maps/table_triage_live.json` (filter on a non-empty `subsystem`).
+**132 sit in a subsystem that actually gets tuned**; 57 are infrastructure
+(ADC/IO, scheduler, evap) and can wait; 211 remain unclassified — a gap in the
+signature list, not evidence the tables are uninteresting.
 
-Sanity check that the tool is finding the right things: it independently
-re-surfaced every cluster traced by hand — the `0xAC818`/`0xAC840` coolant decay
-rates (item 88), the `0xAD960` thermal-lag model (item 89), `0xAE284`/`0xAE290`
-in the knock detector (item 82), and `0xAD8D4`/`0xAD90C`, the CL Fuelling Target
-Comp siblings (items 70, 83).
+**947 → 132 worth reading.** Work from
+`disassembly/maps/table_triage_live.json`.
 
-### Biggest unexamined candidates on that shortlist
+Sanity check that the tool finds real things: it independently re-surfaced every
+cluster traced by hand — the `0xAC818`/`0xAC840` coolant decay rates (item 88),
+the `0xAD960` thermal-lag model (item 89), `0xAE284`/`0xAE290` in the knock
+detector (item 82), and `0xAD8D4`/`0xAD90C`, the CL Fuelling Target Comp
+siblings (items 70, 83).
+
+### Biggest unexamined candidates
 
 | descriptor | shape | range | hint |
 |---|---|---|---|
@@ -121,6 +146,14 @@ Comp siblings (items 70, 83).
 
 A 31×15 percentage surface indexed near manifold pressure is the single most
 interesting unexamined table in the ROM.
+
+### To widen further
+
+Add to `RAM_SIGNATURES` or `CODE_REGIONS` in the tool. The productive move is
+**code regions**, since it needs only one decoded anchor per region rather than a
+list of variables. The largest unclassified consumer regions are `0x0BB000`,
+`0x08E000`, `0x012000`, `0x019000`, `0x025000` and `0x055000` — one anchor
+function decoded in each would classify roughly 60 more tables.
 
 ## Phase 3 — deep-dive, one cluster at a time — **NEXT**
 

@@ -41,21 +41,76 @@ DEFAULT_ROM = os.path.join(REPO, 'rom', 'AE5L600L 20g rev 20.19c.bin')
 DESC_MAP = os.path.join(REPO, 'disassembly', 'maps', 'descriptor_map.txt')
 JAVA = os.path.join(REPO, 'disassembly', 'ghidra', 'ImportAE5L600L.java')
 
-# RAM signatures -> subsystem. Order matters; first match wins. These are HINTS
-# derived from RAM referenced near the call site, and several of those RAM labels
-# are themselves project guesses. Never name a table from this column.
-SUBSYSTEMS = [
+# ---------------------------------------------------------------------------
+# CLASSIFICATION -- two independent signals, both HINTS, never identifications.
+#
+# 1. RAM signature: a workspace/GBR base or subsystem-specific variable seen near
+#    the call site. Discriminating addresses only -- ect_current, rpm_current,
+#    vehicle_speed_kmh and ect_gated_c are the four most common RAM references in
+#    the whole corpus and classify nothing, so they are deliberately absent.
+# 2. Consumer code region: which 4KB block the call site lives in. This turned
+#    out to be the stronger signal. Only regions with a decoded anchor function
+#    are listed; the anchor is cited so the claim is auditable.
+#
+# Several of the RAM labels these match on are themselves project guesses. Never
+# name a table from this column -- see docs/analysis-plan.md.
+# ---------------------------------------------------------------------------
+
+RAM_SIGNATURES = [
     (('FFFFA160', 'FFFFA174', 'FFFFA290', 'FFFFA26C', 'FFFF8A84', 'FFFF8AC0',
-      'FFFF8A88', 'FFFF8A98', 'FFFF65C0'), 'diagnostic'),
+      'FFFF8A88', 'FFFF8A98', 'FFFF65C0', 'gbr_diag_A650', 'gbr_diag_A670',
+      'gbr_dtc_A8AC', 'diag_maturation_counter', 'diag_precondition_flag_65C0'),
+     'diagnostic'),
+    (('evap_pressure_baseline', 'evap_workspace_base', 'evap_cal_cache',
+      'egr_timer'), 'evap / emissions'),
+    (('sched_task_GBR', 'gbr_sched_90B0', 'gbr_sched_90B2', 'gbr_sched_984D',
+      'sched_timer_base', 'sched_event_count'), 'scheduler / task'),
+    (('adc_channel_status', 'gbr_adc_6078', 'gbr_adc_6A18', 'gbr_adc_6458',
+      'adc_processed_secondary', 'adc_processed_misc', 'io_state_register',
+      'gbr_io_5C3C', 'sensor_io_state_secondary'), 'ADC / I-O'),
     (('FFFF798C', 'FFFF79F8', 'FFFF79A4', 'FFFF79A8'), 'OL enrichment / thermal'),
-    (('FFFF3234', 'FFFF323C', 'FFFF3244', 'FFFF8286', 'FFFF3248'), 'FLKC'),
-    (('FFFF8158', 'FFFF8258', 'FFFF81AC', 'FFFF4304'), 'knock'),
-    (('FFFF7278', 'FFFF72A0', 'FFFF7288', 'FFFF726C', 'FFFF72D0'), 'transient fuel'),
-    (('FFFF77F0', 'FFFF77F4', 'FFFF782C', 'FFFF7448'), 'CL/OL fuelling'),
-    (('FFFF62DC', 'FFFF64D8'), 'throttle / pedal'),
-    (('FFFF7A20', 'FFFF7A24', 'FFFF7A2C'), 'idle'),
-    (('FFFF620C', 'FFFF5CB0', 'FFFF5CAC'), 'boost / MAP'),
+    (('FFFF3234', 'FFFF323C', 'FFFF3244', 'FFFF8286', 'FFFF3248',
+      'knock_flkc_workspace', 'flkc_grid'), 'FLKC'),
+    (('FFFF8158', 'FFFF8258', 'FFFF81AC', 'FFFF4304', 'knock_level_accum',
+      'knock_sensor_state_B', 'knock_det_GBR_base'), 'knock'),
+    (('ignition_system_state', 'final_ign_timing_output', 'fuel_timing_corr'),
+     'ignition timing'),
+    (('FFFF7278', 'FFFF72A0', 'FFFF7288', 'FFFF726C', 'FFFF72D0',
+      'coolant_decay_bank_base', 'transient_state_flag'), 'transient fuel'),
+    (('FFFF77F0', 'FFFF77F4', 'FFFF782C', 'FFFF7448', 'clol_mode_flag',
+      'cl_master_readiness', 'cl_strict_readiness'), 'CL/OL fuelling'),
+    (('afc_output', 'gbr_afl_7B8C', 'gbr_afc_7874', 'afc_enable_flag_A',
+      'afc_axis_val_A', 'correction_filter_base'), 'AFC / AFL trim'),
+    (('base_fuel_map_output', 'gbr_fuel_7278', 'gbr_fuel_73B0', 'gbr_fuel_77F4',
+      'gbr_fuel_7710', 'gbr_fuel_73E0', 'gbr_fuel_7354'), 'base fuelling'),
+    (('FFFF62DC', 'FFFF64D8', 'accel_pedal_angle'), 'throttle / pedal'),
+    (('FFFF7A20', 'FFFF7A24', 'FFFF7A2C', 'FFFF7A3C'), 'idle'),
+    (('FFFF620C', 'FFFF5CB0', 'FFFF5CAC', 'manifold_pressure_map'), 'boost / MAP'),
 ]
+
+# (lo, hi, name, anchor that establishes it)
+CODE_REGIONS = [
+    (0x02E000, 0x032000, 'transient fuel',    '0x02EFD2 coolant decay bank, item 88'),
+    (0x032000, 0x033000, 'base fuelling',     '0x0320AE fuel_correction_final'),
+    (0x033000, 0x035000, 'CL/OL fuelling',    '0x033304 cl_fuel_dispatcher; 0x03452A afl_learning_core'),
+    (0x035000, 0x036000, 'evap / emissions',  'evap_workspace_base at the call sites'),
+    (0x036000, 0x037000, 'OL enrichment / thermal', '0x03644E threshold bank, 0x03684A model, item 89'),
+    (0x039000, 0x03A000, 'AFC / AFL trim',    '0x03952C, item 83'),
+    (0x043000, 0x045000, 'knock',             '0x043750 knock_wrapper, 0x043782 knock_detector'),
+    (0x045000, 0x047000, 'FLKC',              '0x045BFE flkc_path_J, 0x0463BA flkc_paths_FG'),
+    (0x049000, 0x04B000, 'scheduler / task',  '0x04A94C sched_periodic_dispatch, item 84'),
+    (0x050000, 0x056000, 'diagnostic',        'gbr_sens_* / diag_precondition_flag_65C0, item 87'),
+    (0x077000, 0x079000, 'diagnostic',        'diag_monitor_GBR at the call sites'),
+    (0x08A000, 0x090000, 'diagnostic',        'gbr_diag_A650 / gbr_diag_A670'),
+    (0x0F8000, 0x0FB000, 'throttle / pedal',  'DBW pedal map 0x0F99E0, base RPM 0x0F8B54'),
+]
+
+
+def region_of(site):
+    for lo, hi, name, _ in CODE_REGIONS:
+        if lo <= site < hi:
+            return name
+    return ''
 
 
 def load_rom(path):
@@ -162,8 +217,14 @@ def triage(rom_path):
         for s in sites:
             for v in ram_near(rom, s):
                 seen[v] += 1
-        top = ['%08X' % v for v, _ in seen.most_common(8)]
-        sub = next((nm for keys, nm in SUBSYSTEMS if any(k in top for k in keys)), '')
+        labelled = [labels.get(v, '%08X' % v) for v, _ in seen.most_common(8)]
+        raw = ['%08X' % v for v, _ in seen.most_common(8)]
+        hay = set(labelled) | set(raw)
+        sub = next((nm for keys, nm in RAM_SIGNATURES if any(k in hay for k in keys)), '')
+        how = 'ram' if sub else ''
+        if not sub and sites:
+            sub = region_of(sites[0])
+            how = 'region' if sub else ''
 
         rows.append(dict(
             desc='0x%05X' % a, dim=tab['dim'], type=tab['type_name'],
@@ -176,7 +237,7 @@ def triage(rom_path):
             axis_names=[by_axis.get(x) for x in axes],
             sites=['0x%05X' % s for s in sites],
             ram=[labels.get(v, '%08X' % v) for v, _ in seen.most_common(4)],
-            subsystem=sub,
+            subsystem=sub, matched_by=how,
         ))
     return rows, named, artefact
 
@@ -204,6 +265,11 @@ def main():
     print('    flat (inert as shipped)         : %d' % flat)
     print('    axis identity known from a defn : %d' % withaxis)
     print('    with a direct call site         : %d' % withsite)
+    print()
+    print('  classified by RAM signature: %d, by code region: %d, unassigned: %d'
+          % (sum(1 for r in rows if r['matched_by'] == 'ram'),
+             sum(1 for r in rows if r['matched_by'] == 'region'),
+             sum(1 for r in rows if not r['subsystem'])))
     print()
     print('  by subsystem hint:')
     for k, v in collections.Counter(r['subsystem'] or '(unassigned)'
