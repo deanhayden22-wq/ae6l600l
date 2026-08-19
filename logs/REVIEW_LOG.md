@@ -3942,3 +3942,19 @@ not traversal.
 
 **Decision pending.** Whether 19d is still worth a flash is a tuning call, not a
 code call. Nothing here says it is harmful.
+
+## 2026-08-19 — GAP NOTICE: 20.18 through 20.19c were never written up here
+
+This file has per-drive entries through **6-5 (20.17a)** and then a 20.19d stub.
+The **fourteen logs from 7-12 to 8-14** — 20.18, 20.18a x5, 20.19, 20.19b and six
+on 20.19c — were ingested and analysed, but the analysis landed only in the
+`note` column of `logs/rom_rev_map.csv`, never here.
+
+Rather than back-fill fourteen entries from a summary, the record was assembled
+into `docs/tune-state.md` ("20.18 -> 20.19d - reconstructed 2026-08-19"), with the
+byte-level changeset for every rev boundary re-derived from the bins via
+`scripts/analysis/rom_diff.py`, and `docs/open-issues.md` re-scored against the
+20.19c evidence.
+
+**For anything in 7-12 .. 8-14, read those two files, not this one.**
+

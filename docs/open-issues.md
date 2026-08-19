@@ -1,6 +1,7 @@
 # Open issues — AE5L600L tuning
 
-Last updated 2026-06-05 — 20.17a driven 6-5 (`logs/6-5 20.17a/log0001.csv`, 32 min, thin cusp data): **the cusp lean/knock is NOT a tip-in fuel deficit** (G1 barely moved despite +2 ms more IPW; deep FBKC is overrun noise) → move to the load/timing/AVCS substrate. See "20.17a watch". Still **part-throttle only — 3rd log running with no real boost** (peak 13.77 psi), so the 20.17 top-end / 17-psi FLKC fix is STILL untested (WOT test pending). 20.15 tip-in fix was a real ~18% gain; tip-in is now ~3× lifted at the cusp via 20.17a BE-comp but the residual lean is wall-wetting, not fuel.
+Last updated **2026-08-19** (20.19c re-score; see the CURRENT STATE block below).
+The paragraph that follows is the 2026-06-05 header, kept for the trail: — 20.17a driven 6-5 (`logs/6-5 20.17a/log0001.csv`, 32 min, thin cusp data): **the cusp lean/knock is NOT a tip-in fuel deficit** (G1 barely moved despite +2 ms more IPW; deep FBKC is overrun noise) → move to the load/timing/AVCS substrate. See "20.17a watch". Still **part-throttle only — 3rd log running with no real boost** (peak 13.77 psi), so the 20.17 top-end / 17-psi FLKC fix is STILL untested (WOT test pending). 20.15 tip-in fix was a real ~18% gain; tip-in is now ~3× lifted at the cusp via 20.17a BE-comp but the residual lean is wall-wetting, not fuel.
 **On car for 6-5:** 20.17a *as-driven* = BE-comp lift + an accidental `0xCC4EC` decel-tier change (reverted post-drive). **On-disk `rom/AE5L600L 20g rev 20.17a.bin` is now BE-comp-only**, staged for the weekend long drive. (Underlying 20.17 base: target → ~17 to arm Turbo Dynamics + WGDC down + TD-negative up + per-gear 5th timing comp + OL richen; TD-arm confirmed 6-3, high-load knock fix still UNTESTED.)
 **Prior P0s (from 20.16, still open):** ghost-zone −11.8° knock (2200-3300 × 1.0-1.4) + injector IDC >100% at top end — see "20.16 watch". (6-3 in-zone IDC was fine at 54-62%, but that was part-throttle, ≤14.3 psi.)
 **MAF rescale:** CLOSED — Dean's 378k-sample offline check showed the current curve is converged in the cruise band. No changes needed.
@@ -14,7 +15,75 @@ diverge from this snapshot.
 
 ---
 
-## ACTIVE — shift/overrun knock mitigation (opened 6-7, investigation 6-7/6-8)
+## CURRENT STATE — 20.19c, re-scored 2026-08-19 against six 19c logs
+
+> This block was written 2026-08-19. Everything below it was last touched
+> **2026-06-05/07 and describes 20.17a** — seven revs and fourteen logs ago. The
+> older sections are kept as the verification trail; **read this block first, and
+> treat anything below as history unless it is repeated here.** Rev-by-rev detail
+> is in `tune-state.md` ("20.18 → 20.19d — reconstructed 2026-08-19").
+
+**On car:** 20.19c. **Built but never driven:** 20.19d (13 bytes of FLKC
+calibration at `0xD2F29`–`0xD2F36`; re-check its intent against
+`project_flkc_grid_is_bucketed` before flashing — the question it was built to
+answer has since been settled).
+
+### What is now SETTLED
+
+| thread | verdict |
+|---|---|
+| **AVCS carve (20.18a)** | **VALIDATED.** 23 boost events to 22.5 psi knock-free on 7-18; knock-neutral-to-better; no VE cost. Price: **+2–4 APP points** in the carved cells. |
+| **Fuelling / MAF cuts (19b + 19c)** | **LANDED.** 8-2: cruise matched trim ~0, AFL & AFC median 0.0 over n = 205k, by-MAF-V within ±1.6%. Not a relearn floor. |
+| **Boost raise (19c, +2 psi)** | **VALIDATED at moderate IAT.** 8-8 held-WOT: 21.9 @ 4800 vs ask 22.1, peak 22.32 vs 22.38, no overshoot, wgdc max 76 not pegged. |
+| **Timing give-back zone (3200 × 0.90–1.35)** | **HOLDS.** 8-2 provoked it 2.8 min with zero knock. |
+| **Tip-in fuel deficit** | Closed 6-7. Not revisited; nothing since contradicts it. |
+
+### What is OPEN, in priority order
+
+**1. Injector ceiling — blocking, and now measured three times.**
+IDC **114.9%** (7-12), **104.3%** (7-19), **106.4% @ 6315 rpm** (8-8). This caps
+top-end and is a *fuel* limit, not a knock limit. Nothing in the ROM fixes it —
+it needs the injector swap. **Everything top-end is gated behind this.**
+
+**2. NEW on 8-14 — deepest FBKC on 19c, and it is not a transient.**
+**−4.20 at 3151 rpm × load 1.49**, IAT 78.8, 80 mph, 34% throttle, on a **12 s
+progressive highway roll-on** — explicitly *not* a tip-in or resume transient, so
+the shift-knock filter does not explain it. The ECU then **learned FLKC
+−0.25…−1.00 into 2900–4300 × load 1.4–2.8** and reads it back on every later
+traversal (291 samples). This is a new band, lower than the old 3400–3800 one.
+**This is the most actionable open item that does not need new hardware.**
+
+**3. A(IAT) rollback hot-side cost — two confirmed instances, both trivial so far.**
+The 20.19 global +1.41 rollback shows up as low-rpm light-load knock when hot:
+−2.8 at 1779 × 1.00 / IAT 127 (8-2) and −1.4 at 2735 × 1.01 / IAT 106 (8-4 #2).
+Same cell reads 18° and knock-free below 95 °F, 15.5° and knocking above 120 °F.
+Self-recovering both times. **Watch, do not chase yet.**
+
+**4. High-IAT WOT still untested.** 8-8 validated the boost raise at IAT ~91.
+There is still **no held-WOT log at high IAT**, which is where the A(IAT)
+rollback and the boost raise interact. This is the single most valuable drive
+still missing.
+
+**5. Light-load lean tilt — unresolved and non-monotonic in IAT.**
+1.5–1.7 V cells run lean (+3 to +5.5%) while 2.1–2.4 V run rich (−1.5 to −3%).
+The charge-temp hunch **failed on 8-14**: lean returned at IAT 88–91 having
+receded at IAT 93 on 8-8. Mechanism unknown.
+
+### Downgraded from the 6-7 ACTIVE list
+
+- **Shift / overrun knock** — still present but **all trivial**. 8-8: 4 of 6 FBKC
+  within 2 s of a fuel-cut resume, every one −1.4. No longer worth a lever;
+  keep the `knock_shift_filter.py` classification step when scoring.
+- **Steady-state cusp knock (1600–3000 × 1.00–1.25)** — has not reappeared as a
+  cluster on 19c. What remains in that region is item 3 above, which is a
+  different mechanism (hot-side A(IAT), not substrate).
+- **20.16 P0-1 ghost zone** — not reproduced on any 17x/18x/19x log.
+- **FLKC −1.75 @ 3400–3800 high-load OL** — the original band read **clean** on
+  8-8 under real WOT. Superseded by item 2's new, lower band.
+
+---
+
+## ACTIVE (2026-06-07, SUPERSEDED by the block above) — shift/overrun knock mitigation (opened 6-7, investigation 6-7/6-8)
 
 **Symptom:** deep FBKC chains (−4 to −10.85°) triggered by shift/DFCO-resume
 rattle, not real knock. 6-7 first-instance data: 52% of SHIFT/MAYBE fires within
@@ -55,7 +124,7 @@ unverified (~8 ms family → 438 ≈ 3.5 s). Either sign is engine-safe to A/B.
    writer (event B), ctrB incrementer (tick unit), FFFF65C1 writer (the other
    inhibit's duration source).
 
-## ACTIVE — steady-state cusp knock: substrate work (opened 6-7)
+## ACTIVE (2026-06-07, SUPERSEDED by the block above) — steady-state cusp knock: substrate work (opened 6-7)
 
 **6-7 BIG log (502 min, fixed bin) settled the 20.17a test — see `tune-state.md`
 "20.17a verification drive (6-7 BIG)".** Outcomes:

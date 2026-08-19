@@ -752,6 +752,185 @@ fuel authority. Wall-wetting/sensor-lag, confirmed.
 `scripts/analysis/trends/zone_fire_rates.csv` (legacy FBKC<0 samp/min is
 inflated by retard-holding chains — use fires/min for cross-rev claims).
 
+
+---
+
+# 20.18 → 20.19d — reconstructed 2026-08-19
+
+> **Provenance.** This whole block was reconstructed on 2026-08-19, when
+> `tune-state.md` was found to stop at 20.17a (6-07) while the car had moved
+> through **seven revs and fourteen driven logs**. Every "what changed" line is
+> from `scripts/analysis/rom_diff.py` run against the actual bins; every drive
+> result is from the per-log `note` field in `logs/rom_rev_map.csv`, which was
+> being maintained while this file was not. Nothing here is new analysis — it is
+> the existing record, finally assembled. Where the two disagree, the binary diff
+> wins.
+>
+> `REVIEW_LOG.md` is *also* stale past 6-5 (it has only a 20.19d stub). The
+> per-log notes are the surviving record for this period.
+
+### 20.17a → 20.18 (flashed & driven 7-12) — load-comp substrate + MAF + boost
+
+Verified diff, **502 bytes / 38 runs**:
+
+| what | bytes |
+|---|---|
+| Engine Load Compensation **Cruise** (axes + data) `0xC3BD9` | 197 |
+| Engine Load Compensation **Non-Cruise** (axes + data) `0xC3CD9` | 197 |
+| MAF Sensor Scaling `0xD8C9D` | 107 |
+| Max Wastegate Duty `0xC0FB2` | 70 |
+| Boost Error axis `0xC0D15` | 15 |
+| Turbo Dynamics Proportional `0xC0D28` | 13 |
+| Initial Wastegate Duty `0xC11DE` | 12 |
+| Tau Input A Rising Load Activation `0xCD6E6` | 9 |
+| **Post-Transient Knock Window A/B Length `0xD29C4`** | 2 |
+
+This is the "load/timing/AVCS substrate" lever 6-7 pointed at after the tip-in
+fuel theory closed — plus the knock-window arm that `transient_knock_window_trace.txt`
+identified.
+
+**7-12 drive** (272.6 min, hot: IAT med 97 / max 149, with AC):
+- **IDC 114.9%** @ 6052 rpm / 18.7 psi, knock-free — injector ceiling again, worse
+  than the 100.5% seen later on 18a.
+- Rectangle fires **1.97 → 3.41/min** vs 6-21 — worse.
+- **FLKC 518 decrements**, floor −1.75, recovered.
+- 8 of 12 deep FBKC are the **DFCO-resume family**, not real knock.
+- AFL recovering −1.56 → 0, total cruise trim −2.34.
+
+### 20.18 → 20.18a (flashed & driven 7-15…7-18) — the AVCS carve, single variable
+
+Verified diff, **280 bytes / 25 runs** — and it is *only* AVCS:
+
+| what | bytes |
+|---|---|
+| AVCS Intake **Cruise** `0xDA97A` | 138 |
+| AVCS Intake **Non-Cruise** `0xDAC42` | 138 |
+
+A clean single-variable test. Five logs:
+
+- **7-15** (31.5 min, around town): no reflash lockout (p95 16–20°). Zero fires in
+  rect/ghost zones, FLKC 0. Knock-drop **not callable** on this exposure; steady
+  VE cost nil. Total CL trim −1.56.
+- **7-16** (18.1 min, cool IAT 77): 2 trivial −1.4 fires, 0 deep, FLKC 0. Pooled
+  carve rect **1 onset / 1.54 min vs 1.97–3.41 baseline** (P .19/.03).
+  **Pedal cost confirmed: carved cells +2–4 APP points at matched RPM × MAF**,
+  control cells flat.
+- **7-17** (98.7 min highway): backstop clean. One −4.2 deep **traced to 2nd-gear
+  tip-in on the AVCS 0→12° ramp** (lean tip-in + cam transit) — *not* carve knock.
+- **7-17 #2** (warm, IAT med 93 / max 138): 5 carve-rect fires all −1.4, zero deep,
+  including a **knock-free 17.8 psi / 4846 rpm pull** — first real 18a load.
+  IDC 85.0%.
+- **7-18** (162.9 min, 7 segments — de-duped first; log0001-04 were byte-identical
+  re-copies of 7-17 #2): **carve holds under load — 23 boost events to 22.5 psi,
+  all knock-free.** 28 onsets all −1.4, FLKC 0, IAM 1.0. IDC peak 100.5%.
+  **Answered the heat-vs-relaxation question: matched cruise trim ~0 at 79 °F vs
+  −1.56 at 77 °F on 7-16 = real AFL relaxation, not heat.**
+
+**Verdict: the AVCS carve is validated.** Knock-neutral to knock-better, no VE
+cost, at the price of 2–4 APP points in the carved cells.
+
+### 20.18a → 20.19 (flashed & driven 7-19) — timing give-back + A(IAT) rollback
+
+Verified diff, **273 bytes / 102 runs**:
+
+| what | bytes |
+|---|---|
+| Base Timing Primary Cruise `0xD4714` | 57 |
+| Base Timing Primary Non-Cruise `0xD491B` | 48 |
+| Base Timing Reference Cruise `0xD4ADB` | 48 |
+| Knock Adv Max Cruise `0xD594C` | 41 |
+| Base Timing Reference Non-Cruise `0xD4C9B` | 39 |
+| (undecoded, `0xD328D`–`0xD5BED`) | 52 |
+
+Per the 7-19 note: base timing on all four tables, KCA Adv Max Cruise + NC, and
+**Timing Comp A(IAT) idx 5–15 thermal retard rolled back +1.41 uniform 50–230 °F**
+(≈ the 20.8 curve). AVCS carve / MAF / Target Boost byte-identical — the carve was
+held fixed.
+
+**7-19 drive** (156.3 min, warm-hot highway, IAT med 86 / max 154, ECT max 205):
+- **Target dip give-back LANDED** — driven-bin confirmed by the dip timing
+  signature (+2–3° vs 18a).
+- **COST: first FLKC learning since the carve** — flkc_min −1.0, 39 decrements,
+  concentrated at **3200 rpm × load 0.90–1.35** = the give-back cells plus a
+  steepened 0.94→1.20 base cliff.
+- FBKC min −2.8 (lone event, 1600 × 1.12 on the boundary). IAM 1.0.
+- **The A(IAT) global rollback went UNTESTED at its real risk**: zero samples at
+  throttle > 90 & mrp > 8, IAT max 106 in boost, no top-end (RPM max 5742).
+- Backstop clean: matched total trim 0.0, AVCS cruise osc 0.19%, MAF-V 4.26.
+  IDC peak **104.3%** @ 4746 / load 3.68 — injector limiter again.
+
+### 20.19 → 20.19b (flashed & driven 7-26) — load comp + MAF re-cut
+
+Verified diff, **146 bytes / 19 runs**: Engine Load Compensation Cruise (71) and
+Non-Cruise (71), MAF Sensor Scaling (49), plus 16 undecoded bytes at `0xD7E70`.
+
+**7-26 drive** (57.2 min, around town + 10 boost events to 20.7 psi / 5493 rpm,
+knock-free, min FBKC −1.4): post-reflash relearn, so matched trim unsettled.
+**A(IAT) hot-WOT and the rev-hang lever remained undertested.**
+
+### 20.19b → 20.19c (flashed & driven 7-29 onward) — boost raise
+
+Verified diff, **243 bytes / 53 runs**:
+
+| what | bytes |
+|---|---|
+| Initial Wastegate Duty `0xC11FA` | 82 |
+| **Target Boost `0xC13D1`** | 39 |
+| Boost Error axis `0xC0D05` | 31 |
+| Base Timing Primary Cruise / NC, Reference Cruise / NC | 13 each |
+| MAF Sensor Scaling `0xD8CD1` | 10 |
+| Turbo Dynamics Proportional `0xC0D28` | 6 |
+| (undecoded, `0xD7E4C`–`0xD7E74`) | 30 |
+
+**Six logs on 20.19c — the best-covered rev in the project.**
+
+- **7-29** (25.9 min, MAF/comp focus): cruise CL trim ~0, not a relearn floor.
+  2.5–2.9 V rich is eff-OL / injector-confounded, not a cruise over-read.
+  Flagged at the time: **MAF c35 was raised the WRONG way**.
+- **8-2** (186.5 min, big hot drive, IAT med 99 / max 153, ECT max 210):
+  **SETTLED — cruise matched trim ~0** (AFL & AFC median 0.0, n = 205k) = the
+  19b/19c MAF + comp cuts landed. IAM 1.0 and **FLKC 0 the whole drive**. Knock =
+  **one** shallow −2.8 at 1779 rpm / load 1.0 / IAT 127, self-recovered — the
+  **A(IAT) rollback hot-side low-rpm cost** (same cell: cool < 95 °F = 18°, zero
+  knock; hot > 120 °F = 15.5°, 37 samples). **The 3200 × 0.90–1.35 give-back zone
+  was well provoked for 2.8 min with ZERO knock — the give-back holds.** Peak mp
+  18.3 @ 4500 at 51% throttle, under target, no overboost.
+- **8-4** (43.3 min, cold-start suburban, no boost): logger-config log, first full
+  25 Hz CL/OL/AFL/MPH/IAT — **the cadence-era boundary**. Backstop clean.
+  Closes nothing.
+- **8-4 #2** (48.5 min, evening hot, IAT med 104 / max 147): first real residency
+  in 3900–4700 × 1.9–3.3 — **reads back PRE-LEARNED FLKC retard −0.25…−1.00
+  across 4000–4600 × 2.0–3.2**. The 12 "decrements" are **cell traversal, not
+  learning** (0.25 steps in consecutive 40 ms samples, zero FBKC within 3 s); the
+  learning happened in unlogged driving after 8-2. Per-V trim tilt **worsened**:
+  1.5 V +5.47 / 1.6 V +4.69 lean vs 2.1–2.4 V −1.56…−2.34 rich.
+- **8-8** (25.3 min): **FIRST held-WOT log on 19c.** 4-pull run through gears —
+  **boost ON TARGET, 21.9 @ 4800 vs ask 22.1, peak mrp 22.32 vs 22.38, no
+  overshoot, wgdc max 76 not pegged. The 19c +2 psi target raise is VALIDATED at
+  moderate IAT** (high-IAT WOT still open). **IDC peak 106.4% @ 6315** — injector
+  ceiling. **FLKC 0 the entire log**, including 6.5 s in the zone 8-4 #2 read as
+  pre-learned — it took real WOT hits knock-free. Revved to 6626 knock-free.
+- **8-14 weekend** (147.9 min, 7 source logs; note the folder's log0001/2 were
+  SD re-copies of 8-8 and were removed before ingest): **deepest FBKC on 19c to
+  date, −4.20 at 3151 rpm × load 1.49, on a 12 s progressive highway roll-on —
+  NOT a tip-in or resume transient.** The ECU then **learned FLKC −0.25…−1.00
+  into 2900–4300 × 1.4–2.8** and reads it back on every later traversal (291
+  samples). Matched trim back to ~0.00; AFL relearned up to +1.56/+2.34 with AFC
+  offsetting. Light-load lean back at 1.6 V +3.12 **against the charge-temp
+  hunch** (8-8 was +0.78 at similar IAT).
+
+### 20.19c → 20.19d — BUILT, NOT FLASHED, NOT DRIVEN
+
+Verified diff, **15 bytes / 2 runs**: 13 bytes at **`0xD2F29`–`0xD2F36`** plus the
+checksum. That address block is the **FLKC calibration** (`0xD2F44`–`0xD2F50` hold
+the FLKC limits, advance and retard rates), so 20.19d is an FLKC-parameter change.
+
+**Status: built 2026-08-16, never driven.** `docs/code_chase_2026-08-16.md` records
+that its justification rested on the FLKC bilinear-vs-nearest-cell question —
+which was settled since: **the FLKC grid is BUCKETED 7×5, write and read each
+touch exactly one cell** (`project_flkc_grid_is_bucketed`). Re-check the intent
+against that finding before flashing.
+
 ## Baseline log
 
 `logs/4-25/4-25 full.csv` — 131,516 samples, ~33.8% pass cruise filter
