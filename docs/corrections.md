@@ -5037,3 +5037,84 @@ Repo-side applied and verified. `.\scripts\sync_defs.ps1 -Push` **still owed** �
 it writes into `Program Files` and needs an elevated shell. Restart ECUFlash
 after pushing so it reloads. Files were edited byte-safely; both keep LF endings
 (a first text-mode attempt rewrote all 7,709 lines to CRLF and was reverted).
+
+---
+
+## 86. The undefined-ROM programme, slice 1: 786 descriptors have no definition; the 41 RPM x load ones triaged — **NEW, 2026-08-19**
+
+`docs/open-holes.md` was empty after items 1-6 closed. This opens the successor
+programme. Full slice: `disassembly/analysis/unnamed_tables_rpm_load.txt`.
+
+### Sizing the gap — and a join that had been done wrong
+
+1,094 table descriptors decode cleanly from ROM bytes. Joining each descriptor's
+**data and axis pointers** against every address the definition XMLs claim:
+
+```
+descriptor data/axis IS defined in the XML :  308
+NO definition anywhere                     :  786   (775 plausible, 11 artefacts)
+```
+
+> **The join is on the POINTERS INSIDE the record, not the descriptor address.**
+> Definitions point at data (`0xD14D0`), never at descriptor records
+> (`0xAD8B8`). Joining on the descriptor's own address returns **zero** matches
+> and reads as "nothing is defined anywhere", which is wrong by construction.
+
+Axis breakpoints classify mechanically: **441 of 786 (56%)** get at least one
+axis physically identified (RPM ladder, ECT/IAT °C, load g/rev, MAF g/s) from a
+crude classifier. This is the "axis names are the most under-used asset" method
+in CLAUDE.md, run in reverse.
+
+### Slice 1 — the 41 on RPM x engine load
+
+| finding | count |
+|---|---|
+| FLAT (every cell identical, inert as shipped) | **14** |
+| consumer touches the diagnostic-monitor workspace | 11 |
+| consumer touches the OL enrichment workspace | 6 |
+| already identified — knock front-end, item 82 | 8 |
+| CL Fuelling Target Comp siblings, item 70 | 3 |
+| scanner artefact (`0xABC1C`, values to 1.7e22) | 1 |
+
+The eight `0xAE6D4`/`0xAE724`-family rows appearing here is itself a result: the
+knock front-end carries **no XML definition at all**, exactly as item 82 found.
+`0xAD8D4`/`0xAD90C` likewise confirm item 70's "live siblings missing from the
+XML".
+
+### The one cluster worth pursuing
+
+`0xAD960`/`0xAD97C`/`0xAD998`/`0xAD9B4`/`0xAD9D0` all hang off `0x03684A`, whose
+GBR is `0xFFFF798C`. Its lookup inputs are read straight from RAM:
+
+```
+03685A: D26F  mov.l @(0x036A18),r2   ; FFFF6624  RPM
+03685E: D26F  mov.l @(0x036A1C),r2   ; FFFF63F8  ENGINE LOAD
+036874: F860  fadd fr6,fr8           ; [FFFF7F48] + [FFFF8258]
+036876: F891  fsub fr9,fr8           ;          - [FFFF7E90]  -> FFFF79B4
+03688E: 8909  bt 0x0368A4            ; [FFFF798C] == 0 -> 0xAD97C, else 0xAD960
+```
+
+The selector is `0x0BE608` — the same outside-a-band helper decoded in item 83 —
+with `c = 0.0`, `eps = 3.0517578125e-05`, i.e. "is `[0xFFFF798C]` non-zero".
+
+All five are RPM 800–6400 × load 0.30–2.50 g/rev, properly scaled and populated
+(except `0xAD9D0`, flat 0.01). `0xFFFF798C` carries the project label
+`ol_enrichment_accum` and `0xFFFF8258` was settled in item 80 as a knock-workspace
+integrator — so the cluster is both fuel- and knock-adjacent, which is precisely
+why it is **not named here**. `0xFFFF7F48` and `0xFFFF7E90` are unidentified.
+**Structure established, meaning not.**
+
+### Cautions carried into the worklist
+
+* "Subsystem" in the slice file is a **hint** from RAM referenced near the call
+  site. Several of those RAM labels are themselves project guesses.
+* **FLAT ≠ a free lever.** `0xAD258` and `0xD2D48` are both flat and both feed
+  multipliers separately clamped to zero. Read the consumer first.
+* `0xAD6AC` and `0xAE664` are 18×15 RPM × load surfaces, **entirely zero**, whose
+  consumers touch the FLKC workspace (`0xFFFF3234` IAM, `0xFFFF323C`
+  FLKC_BASE_STEP). A dormant FLKC feature, worth understanding before anyone
+  populates it.
+
+### Status
+
+Recorded. No ROM bytes changed, no XML edited, **no table named**.

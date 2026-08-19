@@ -181,7 +181,7 @@ accessor prologue at `0x0000317C`; the full event-id map; the writer of
 
 ---
 
-## 6. ECUFlash definition sync — **repo side DONE 2026-08-19; one elevated command left**
+## 6. ~~ECUFlash definition sync~~ — **CLOSED 2026-08-19**
 
 All four definition fixes are applied to the repo XMLs and verified through
 `scripts/defs.py`. `docs/corrections.md` item 85.
@@ -194,16 +194,9 @@ All four definition fixes are applied to the repo XMLs and verified through
 | `d6214` | scaling → new `rawecuvalue(uint16)` | **18** (was a denormal) |
 | `cfa38` / `d121c` + 8 base variants | X/Y swapped, axis renamed `Mass Airflow` | **9 × 10**, monotone |
 
-**What is left — one command, and it needs an ELEVATED shell** (it writes into
-`Program Files`):
-
-```
-.\scripts\sync_defs.ps1 -Push
-```
-
-Then **restart ECUFlash** so it reloads. Preconditions already confirmed: both
-copies were SHA256-identical before the edit and ECUFlash was not running, so
-there is nothing to merge.
+**Pushed and confirmed 2026-08-19.** `.\scripts\sync_defs.ps1` now reports both
+files *in sync* at the corrected sizes (project 64,893 / base 585,222). Nothing
+outstanding.
 
 > The two blockers this entry used to carry are **both gone and were wrong**:
 > the "repo is 37 tables ahead, a blind `-Pull` deletes them" warning was stale
@@ -216,6 +209,49 @@ displays −82.5…−95.5. Dropping the `-100` yields 17.5…4.5, matching the 
 table's shape. Left alone deliberately — it is a data-interpretation change, not
 part of the authorised fix set. Its RPM axis is also exactly flat (every row
 byte-identical), same degenerate shape as the knock load planes.
+
+---
+
+## 7. The undefined-ROM programme (NEW — this is the live worklist now)
+
+Items 1-6 are all closed. `docs/corrections.md` item 86 opens the successor.
+
+**786 of 1,094 ROM-decoded table descriptors have no definition anywhere.** Each
+is a *proven* table — the code reads it through `table_lookup`, so geometry, cell
+type, scale/bias, axis breakpoints and data are all known. Only the **meaning**
+is missing. 775 look real; 11 are scanner artefacts.
+
+**Slice 1 (RPM × engine load, 41 tables) is DONE** —
+`disassembly/analysis/unnamed_tables_rpm_load.txt`. 14 flat, 11 diagnostic
+monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
+
+### Next moves, in order
+
+1. **Decode `0x03684A`** to its output store and either name the
+   `0xAD960`/`97C`/`998`/`9B4`/`9D0` cluster or prove it inert. Highest tuning
+   value found so far: RPM 800–6400 × load 0.30–2.50, populated, selected on
+   whether `[0xFFFF798C]` is non-zero, and it folds the knock integrator
+   `0xFFFF8258` in on the way. Also identify `0xFFFF7F48` / `0xFFFF7E90`.
+2. **Triage out the diagnostic-monitor rows** (`0xABDD4`–`0xABE60`, `0xAC0DC`,
+   `0xAC0F0`, `0xAC104`, `0xAC12C`). Symmetric ±3999 pairs on RPM × load —
+   almost certainly OBD rationality bands, i.e. deliberately not levers.
+   Confirming that removes 11 tables from the unknown pile cheaply.
+3. **`0xAD6AC` and `0xAE664`** — 18×15 RPM × load, entirely zero, consumers touch
+   the FLKC workspace. A dormant FLKC feature.
+4. **Remaining slices** of the 786: 157 with an ECT/IAT axis, 116 RPM × unknown,
+   29 load-only, 23 index-ramp (no units), 279 with no axis classified.
+
+### Rules for this programme
+
+* **Do not name a table from its subsystem hint.** The hint comes from RAM
+  referenced near the call site, and several of those RAM labels are themselves
+  project guesses. 48 invented `Map Switching *` names are already a cautionary
+  tale. Record what the consumer proves; leave it unnamed otherwise.
+* **FLAT ≠ a free lever.** `0xAD258` and `0xD2D48` are flat *and* feed
+  multipliers separately clamped to zero.
+* **Join on the pointers inside the descriptor record**, never on the descriptor
+  address — definitions point at data. Joining wrong returns zero matches and
+  reads as "nothing is defined".
 
 ---
 

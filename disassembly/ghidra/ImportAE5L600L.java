@@ -3,8 +3,15 @@
 //   1. Create new Ghidra project
 //   2. Import the raw ROM binary:
 //        File > Import File > select AE5L600L.bin
-//        Language: SuperH:BE:32:SH-2
+//        Language: SuperH:BE:32:SH-2A   <-- REQUIRED. Corrected 2026-08-19.
 //        Address: 0x00000000
+//
+//   SH-2A is the ONLY FPU-capable SuperH language in Ghidra 12, and ~10% of
+//   this ROM (~27,000 sites) is FPU. Plain SH-2 does not error on an FPU
+//   opcode -- it SILENTLY STOPS, which reads as "short function" or "this
+//   region is data". That failure mode has already cost this project real
+//   time; see CLAUDE.md and docs/architecture.md. This header said SH-2 for
+//   months while CLAUDE.md said SH-2A.
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.
@@ -65,6 +72,21 @@ public class ImportAE5L600L extends GhidraScript {
             + "NOT 59, and there is no task_table. Straight-line body, gated on "
             + "byte[0xFFFF8EDC] != 0 at 0x04A954, rts at 0x04A9F0. Task 1 = 0x043750 "
             + "(knock_wrapper), task 9 = 0x033304, tail jmp -> 0x00022F8A.");
+
+        // -- item 86: unnamed-table slice 1 (RPM x load) -------------------------
+        count += labelComment(0x0003684A, "fn_3684A_rpm_load_pair_select",
+            "GBR = 0xFFFF798C. Reads RPM [FFFF6624] -> fr12 and ENGINE LOAD [FFFF63F8] -> fr15 "
+            + "as the two lookup axes, folds [FFFF7F48]+[FFFF8258]-[FFFF7E90] into FFFF79B4, "
+            + "then selects desc 0xAD960 vs 0xAD97C on whether [FFFF798C] != 0 (helper "
+            + "0x0BE608, eps 3.0518e-05). Structure established, MEANING NOT -- do not name "
+            + "these tables from the ol_enrichment_accum label. corrections.md item 86.");
+        count += labelComment(0xFFFF79B4L, "fn_3684A_knock_mix",
+            "[FFFF7F48] + [FFFF8258] - [FFFF7E90], written at 0x03687A. FFFF8258 is the "
+            + "knock-workspace integrator (item 80). Unidentified.");
+        count += labelComment(0xFFFF7F48L, "fn_3684A_term_7F48",
+            "Float input to the 0x03684A mix. UNIDENTIFIED (item 86).");
+        count += labelComment(0xFFFF7E90L, "fn_3684A_term_7E90",
+            "Float subtrahend in the 0x03684A mix. UNIDENTIFIED (item 86).");
 
         // -- item 84: the RTOS event queue ---------------------------------------
         count += labelComment(0x00010B2A, "sched_event_queue_walk",

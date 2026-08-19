@@ -1,0 +1,160 @@
+================================================================================
+UNNAMED ROM TABLES, SLICE 1: every 2-D descriptor on RPM x ENGINE LOAD
+Traced 2026-08-19. First slice of the undefined-ROM programme.
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Method: descriptors decoded from ROM bytes via scripts/desc_types.py; axis
+        breakpoints classified physically; consumers found by resolving every
+        PC-relative mov.l in the image against every aligned occurrence of each
+        descriptor address; subsystem assigned from the RAM the consumer touches.
+================================================================================
+
+WHY THIS SLICE
+--------------------------------------------------------------------------------
+1,094 table descriptors decode cleanly from ROM bytes. Joining each descriptor's
+DATA and AXIS pointers against every address the definition XMLs claim:
+
+    descriptors whose data/axis IS defined in the XML :  308
+    descriptors with NO definition anywhere          :  786   (775 plausible,
+                                                               11 look like
+                                                               scanner artefacts)
+
+Of those 786, exactly 41 are 2-D on RPM x engine load -- the shape of every
+real engine map, and therefore the highest-value slice to take first.
+
+Join note: the definitions point at DATA, never at descriptor records. Joining on
+the descriptor's own address returns zero matches and looks like "nothing is
+defined". Join on the pointers inside the record.
+
+RESULT
+--------------------------------------------------------------------------------
+14 of the 41 are FLAT (every cell identical) -- inert as shipped.
+Subsystem split:
+
+    (unassigned)               18
+    DIAGNOSTIC MONITOR         11
+    OL enrichment workspace    6
+    CL fuelling target comp    3
+    fuel/transient GBR         2
+    FLKC workspace             1
+
+
+
+READ THIS BEFORE TREATING ANY ROW AS A LEVER
+--------------------------------------------------------------------------------
+* "Subsystem" is a HINT, derived from RAM addresses referenced near the call
+  site, and several of those RAM labels are themselves project guesses. It is
+  not an identification. No table below is NAMED here.
+* FLAT does not mean "safe to populate". `0xAD258` and `0xD2D48` are both flat
+  and both feed multipliers that are separately clamped to zero -- populating
+  them changes nothing. Read the consumer before acting.
+* `0xABC1C` decodes to values spanning -1.3e5 .. 1.7e22. It is almost certainly
+  a SCANNER ARTEFACT, not a table. 11 of the 786 look like this.
+* The eight `0xAE6D4`/`0xAE724`-family rows are ALREADY IDENTIFIED --
+  corrections item 82, the knock sigma multiplier and its threshold-B gain.
+  They appear here because they carry no XML definition, which is itself the
+  finding: the whole knock front-end is invisible to ECUFlash.
+* `0xAD8D4` and `0xAD90C` are the CL Fuelling Target Compensation siblings that
+  item 70 flagged as "live siblings missing from the XML". Confirmed here.
+
+THE ONE CLUSTER WORTH A CLOSER LOOK
+--------------------------------------------------------------------------------
+`0xAD960` / `0xAD97C` / `0xAD998` / `0xAD9B4` / `0xAD9D0` all hang off one
+function at `0x03684A`, whose GBR is `0xFFFF798C`. Its two lookup inputs are
+read straight from RAM at the top:
+
+  03685A: D26F  mov.l @(0x036A18),r2      ; [036A18] = FFFF6624   RPM
+  03685C: FC28  fmov.s @r2,fr12
+  03685E: D26F  mov.l @(0x036A1C),r2      ; [036A1C] = FFFF63F8   ENGINE LOAD
+  036860: FF28  fmov.s @r2,fr15
+
+It then folds the knock workspace in before the lookup:
+
+  036874: F860  fadd fr6,fr8              ; [FFFF7F48] + [FFFF8258]
+  036876: F891  fsub fr9,fr8              ; ... - [FFFF7E90]
+  03687A: FD87  fmov.s fr8,@(r0,r13)      ; -> FFFF79B4
+
+and picks between the two 15x12 surfaces on whether the GBR variable is non-zero:
+
+  03687C: D26C  mov.l @(0x036A30),r2      ; [036A30] = 000BE608   outside-band test
+  036886: 420B    jsr @r2
+  036888: F4D6  fmov.s @(r0,r13),fr4      ; r0 = -108  -> FFFF798C
+  03688E: 8909  bt 0x0368A4               ; in-band (== 0) -> 0xAD97C
+  036890: D469  mov.l @(0x036A38),r4      ; else        -> 0xAD960
+
+`0x0BE608` is the same outside-a-band-around-c helper decoded in item 83; here
+c = 0.0 and eps = `[0x036A34]` = 3.0517578125e-05 (2^-15), i.e. the test is
+simply "is `[0xFFFF798C]` non-zero".
+
+Geometry of the cluster (all RPM 800-6400 x load 0.30-2.50 g/rev):
+
+    0xAD960  uint16 15x12  scale 0.02288818  data  390.50 .. 866.25
+    0xAD97C  uint16 15x12  scale 0.02288818  data  390.50 .. 1138.00
+    0xAD998  uint16 13x12  scale 0.00390625  data    0.0195 .. 0.0742
+    0xAD9B4  uint16 13x12  scale 0.00390625  data    0.0117 .. 0.1094
+    0xAD9D0  uint16 13x12  scale 3.0518e-05  data    0.0100 flat
+
+`0xFFFF798C` carries the project label `ol_enrichment_accum` and `0xFFFF8258` was
+settled in item 80 as a knock-workspace integrator. Both are inputs here. That
+makes this cluster knock-adjacent AND fuel-adjacent, which is exactly why it
+should NOT be named from the label alone. `0xFFFF7F48` and `0xFFFF7E90` are
+unidentified. **Structure established; meaning NOT established.**
+
+FULL SLICE
+--------------------------------------------------------------------------------
+desc      type     shape   data              min         max  flat  subsystem                load site
+------------------------------------------------------------------------------------------------------------------------------------
+0xAA86C   uint16   6x6     0xC0B64       39.9994        75.0        (unassigned)             0x12A34
+0xAAAD4   uint16   3x3     0xC2198         200.0       500.0        (unassigned)             0x15B38
+0xABC1C   float32  14x10   0xC7B6C     -132072.0 1.6852366222828967e+22        DIAGNOSTIC MONITOR       0x783DC
+0xABDD4   uint16   14x7    0xC7DB4       16.9678   3999.0234        DIAGNOSTIC MONITOR       0x77F1C
+0xABDF0   uint16   14x7    0xC7ECC    -3999.0234    -26.9775        DIAGNOSTIC MONITOR       0x780C0
+0xABE0C   uint16   14x7    0xC7FE4       43.9453   3999.0234        DIAGNOSTIC MONITOR       0x780AC
+0xABE28   uint16   14x7    0xC80FC        7.3242   3999.0234        DIAGNOSTIC MONITOR       0x77F2A
+0xABE44   uint16   14x7    0xC8214    -3999.0234     -8.7891        DIAGNOSTIC MONITOR       0x7810C
+0xABE60   uint16   14x7    0xC832C       21.6064   3999.0234        DIAGNOSTIC MONITOR       0x780F8
+0xABFEC   float32  2x2     0xC8C20        4000.0      4000.0  FLAT  (unassigned)             (indirect)
+0xAC000   float32  2x2     0xC8C40        4000.0      4000.0  FLAT  (unassigned)             (indirect)
+0xAC014   float32  13x24   0xC8CE4       11.2444      104.19        (unassigned)             (indirect)
+0xAC03C   float32  2x2     0xC91F4       -4000.0     -4000.0  FLAT  (unassigned)             (indirect)
+0xAC050   float32  2x2     0xC9214       -4000.0     -4000.0  FLAT  (unassigned)             (indirect)
+0xAC064   float32  13x24   0xC92B8     -104.9648      -12.53        (unassigned)             (indirect)
+0xAC08C   float32  14x18   0xC9838           8.0      4000.0        (unassigned)             (indirect)
+0xAC0B4   float32  14x18   0xC9CC8           8.0      4000.0        (unassigned)             (indirect)
+0xAC0DC   float32  14x18   0xCA158           6.4      4000.0        DIAGNOSTIC MONITOR       0x781AE
+0xAC0F0   float32  7x18    0xCA5AC           6.4        40.8        DIAGNOSTIC MONITOR       0x781CE
+0xAC104   float32  16x18   0xCA82C           8.0      4000.0        DIAGNOSTIC MONITOR       0x7DB36
+0xAC12C   float32  14x18   0xCADC4           8.0      4000.0        DIAGNOSTIC MONITOR       0x7DB42
+0xAD4EC   uint8    9x16    0xCF454         180.0       180.0  FLAT  fuel/transient GBR       0x2F460
+0xAD508   uint8    9x16    0xCF548         180.0       180.0  FLAT  fuel/transient GBR       0x2F44A
+0xAD6AC   uint8    18x15   0xD00A8           0.0         0.0  FLAT  OL enrichment workspace  0x36106
+0xAD8D4   uint16   10x11   0xD1600         -0.15      -0.008        CL fuelling target comp  0x33CF2
+0xAD90C   uint16   12x13   0xD18DC         -0.15     -0.0047        CL fuelling target comp  0x33CFE
+0xAD928   uint16   10x11   0xD1A68           0.0         0.0  FLAT  CL fuelling target comp  0x34106
+0xAD960   uint16   15x12   0xD1C38      390.4953    866.2491        OL enrichment workspace  0x36890
+0xAD97C   uint16   15x12   0xD1E0C      390.4953   1138.0005        OL enrichment workspace  0x368A4
+0xAD998   uint16   13x12   0xD1FD8        0.0195      0.0742        OL enrichment workspace  0x36014,0x368DE
+0xAD9B4   uint16   13x12   0xD2174        0.0117      0.1094        OL enrichment workspace  0x36900
+0xAD9D0   uint16   13x12   0xD2310          0.01        0.01  FLAT  OL enrichment workspace  0x3692E
+0xAE664   uint8    18x15   0xD5768           0.0         0.0  FLAT  FLKC workspace           0x459A0
+0xAE6D4   float32  2x18    0xD5C5C          3.45         3.6        (unassigned)             (indirect)
+0xAE6E8   float32  2x18    0xD5D3C          3.45         3.6        (unassigned)             (indirect)
+0xAE6FC   float32  2x18    0xD5E1C          3.45         3.6        (unassigned)             (indirect)
+0xAE710   float32  2x18    0xD5EFC          3.45         3.6        (unassigned)             (indirect)
+0xAE724   float32  2x2     0xD5F9C        1000.0      1000.0  FLAT  (unassigned)             (indirect)
+0xAE738   float32  2x2     0xD5FBC        1000.0      1000.0  FLAT  (unassigned)             (indirect)
+0xAE74C   float32  2x2     0xD5FDC        1000.0      1000.0  FLAT  (unassigned)             (indirect)
+0xAE760   float32  2x2     0xD5FFC        1000.0      1000.0  FLAT  (unassigned)             (indirect)
+
+NEXT
+--------------------------------------------------------------------------------
+* Decode `0x03684A` to its output store and name the OL cluster, or prove it
+  inert. Highest tuning value in this slice.
+* The eight diagnostic-monitor rows (`0xABDD4`-`0xABE60`, `0xAC0DC`, `0xAC0F0`)
+  are symmetric +/-3999 pairs on RPM x load -- almost certainly OBD rationality
+  bands, i.e. deliberately NOT tuning levers. Confirm and triage them out.
+* `0xAD6AC` and `0xAE664` are 18x15 RPM x load surfaces, ENTIRELY ZERO, whose
+  consumers touch the FLKC workspace (`0xFFFF3234` IAM, `0xFFFF323C`
+  FLKC_BASE_STEP). A dormant FLKC feature is worth understanding before it is
+  ever populated.
+* Slices still untaken from the same 786: 157 with an ECT/IAT axis, 116 with an
+  RPM axis and one unknown, 29 load-only, 23 index-ramp (no units).
