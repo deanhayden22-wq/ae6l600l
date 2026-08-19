@@ -8298,6 +8298,27 @@ public class ImportAE5L600L extends GhidraScript {
             "4 bytes of 0x0000 alignment padding after the 0xBEDB8-0xBF600 ROM hole. "
             + "The function starts at 0x0BF604, not here. corrections.md item 78.");
 
+        // -- item 79: the tier ladder is decel-fuelcut dwell; 8024 is inert ---
+        count += labelComment(0x0003AE6CL, "overrun_fuelcut_classifier",
+            "Decel fuel-cut / overrun classifier. GBR 0xFFFF7C92. Holds BOTH the "
+            + "dwell ladder writing tier_state_7C9A (0x03AF04..5E) and the RPM ladder "
+            + "at 0x03AFF6 against Overrun_FuelCut_RPMThreshold (0xCC4EC=2250, "
+            + "0xCC4F0=3000). corrections.md item 79.");
+        count += labelComment(0xFFFF7CAAL, "overrun_dwell_counter",
+            "Saturating uint16. Incremented at 0x03B5EC while the overrun condition "
+            + "holds, reset to 0 at 0x03B5FC and 0x03B610. Banded by the three uint16 "
+            + "thresholds at 0xFFFF7C92/94/96 to give tier_state_7C9A 0-3. Tier 4 is "
+            + "NOT on this ladder -- it is a separate immediate entry at 0x03AF4A.");
+        count += label(0xFFFF7C92L, "overrun_dwell_threshold_1");
+        count += label(0xFFFF7C94L, "overrun_dwell_threshold_2");
+        count += label(0xFFFF7C96L, "overrun_dwell_threshold_3");
+        count += labelComment(0x000AE17CL, "desc_task37_stage3_mode1_ZERO",
+            "6 cells, all 0.0. Stage 3 mode 1 accumulates this into gbr_kflk_8024.");
+        count += labelComment(0x000AE170L, "desc_task37_stage3_mode2_ZERO",
+            "6 cells, all 0.0. Stage 3 mode 2 source.");
+        count += labelComment(0x000D2C28L, "cal_task37_stage3_mode3_ZERO",
+            "= 0.0. Stage 3 mode 3 writes this to gbr_kflk_8024 directly.");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }

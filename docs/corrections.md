@@ -4416,3 +4416,85 @@ boundary, not a data region.
 `SuperH:BE:32:SH-2A`. Any future impossible-instruction hit that is a lone
 `0x0000` is padding or a constant's low half, **not** a calibration block --
 the bytes-per-hit ratio separates the two cleanly, and did here.
+
+---
+
+## 79. `task37`'s trigger is the DECEL FUEL-CUT dwell tier, and its sibling channel is inert — **EXTENDS ITEM 74, 2026-08-18**
+
+Item 74 left two things open: what the `0xFFFF7C9A` tiers mean, and what drives
+the `gbr_kflk_8024` channel that `0xFFFF8028 = float_min(8020, 8024)` arbitrates
+against. Both are now settled from ROM bytes.
+
+### The tier state belongs to the decel fuel-cut classifier
+
+The five writes to `0xFFFF7C9A` (`0x03AF04/20/3A/4C/5E`) sit in the function
+starting at `0x03AE6C`, GBR `0xFFFF7C92` (`gbr_tim_7C92`). **The same function**
+holds the RPM ladder at `0x03AFF6`, whose thresholds resolve to:
+
+```
+03B074 -> 0x000CC4EC   Overrun_FuelCut_RPMThreshold   = 2250.0
+03B078 -> 0x000CC4F0                                  = 3000.0
+```
+
+That is exactly the 3-tier decel fuel-cut classifier already recorded at code
+`0x3AFF6`, at the 20.x value of 2250. So `0xFFFF7C9A` is a state code inside the
+**decel fuel-cut / overrun** subsystem, not an unrelated classifier.
+
+### What the tiers are: a DWELL ladder
+
+The `0x03AF04` ladder compares `@(24,gbr)` = `0xFFFF7CAA` against three uint16
+thresholds at `0xFFFF7C92/94/96`. `0xFFFF7CAA` is a **saturating uint16
+counter**:
+
+```
+03B5E4: mov.w @(62,gbr),r0     read  [0xFFFF7CAA]
+03B5E8: jsr @r2                saturating add, r5 = 1
+03B5EC: mov.w r0,@(62,gbr)     write back        <- INCREMENT while condition holds
+03B5FC: mov.w r0,@(62,gbr)     r0 = 0            <- RESET on exit path A
+03B610: mov.w r0,@(62,gbr)     r0 = 0            <- RESET on exit path B
+03B614: ldc.l @r15+,gbr                             function epilogue
+```
+
+So tiers **0-3 are DWELL**: how long the overrun condition has persisted, banded
+by three duration thresholds. **Tier 4 is NOT on that ladder** — it is a separate
+branch at `0x03AF4A` that also sets four companion flags at once, i.e. an
+immediate/exceptional entry rather than an accumulated one.
+
+**`timing_oneshot_retard` fires on the edge into tier 4**, so it is armed by the
+exceptional overrun entry, not by dwell.
+
+### The sibling channel is dead
+
+`gbr_kflk_8024` is written only by `FUN_00041a7e` — **task37's own stage 3**, not
+an independent subsystem. Stage 3 is a mode switch:
+
+```
+mode 1   8024 = float_min(8024 + table_lookup_1D(0x0AE17C), 0.0)
+mode 2   8024 = float_min(8024 + table_lookup_1D(0x0AE170), 0.0)
+mode 3   8024 = *[0x0D2C28]
+else     8024 = 0.0
+```
+
+Every source is zero on this calibration:
+
+| source | value |
+|---|---|
+| `desc 0x0AE17C` | 6 cells, all `0.00` |
+| `desc 0x0AE170` | 6 cells, all `0.00` |
+| `0x0D2C28` | `0.0` |
+
+Modes 1 and 2 accumulate zero and clamp at zero; mode 3 and the default write
+zero outright. **`gbr_kflk_8024` is identically `0.0`.**
+
+Since `0xFFFF8020` is itself always `<= 0` (it is retard, clamped by
+`float_min(x, 0.0)`), `float_min(8020, 0.0) == 8020`. **The arbitration is a
+no-op: `0xFFFF8028` equals `0xFFFF8020` exactly.**
+
+### Net effect on item 74
+
+`task37` has exactly ONE live retard path: stage 4's ECT table `0x0ADE08`,
+applied for one call on entry to overrun tier 4, recovering at `+0.7 deg`/call.
+Stage 3 contributes nothing. That also accounts for the `-24.96/-15.12` and
+`-20.04` tables in the descriptor array: they are NOT reached by stage 3 either,
+so they belong to `task33`/`task36`/`task41` or to nothing at all. **Still
+unattributed.**
