@@ -4970,3 +4970,70 @@ Recorded and verified. No ROM bytes changed, no XML edited. Open: what DRAINS th
 table (start from `0xFFFF2060`/`0xFFFF2064`); the guarded-RAM accessor prologue
 `jsr 0x0000317C ; r4 = 16` shared by `0x0BDA70`/`0x0BDAAC`/`0x0BDB6E`/`0x0BDB80`;
 the full event-id map (80, 84, 90, 92 seen); and the writer of `0xFFFF8EDC`.
+
+---
+
+## 85. Definition fixes applied: both registry CONFLICTs cleared, and the AVCS duty tables re-verified before the X/Y swap — **2026-08-19**
+
+Closes the repo half of open-hole 6 and the outstanding fixes from items 51 and
+71. **Registry CONFLICT count went 2 → 0** and VERIFIED-BOTH 360 → 363.
+
+### What changed
+
+| where | table / scaling | change |
+|---|---|---|
+| project | `c0bcc` Boost disable during fuel cut-Load threshold | scaling `EngineLoad(g/rev)` → **`EngineLoad(g/rev)1`** |
+| project | *(new)* `rawecuvalue(uint16)` | added |
+| project | `d6214` Idle Airflow … Max Mode Counter | scaling → **`rawecuvalue(uint16)`** |
+| project | `cfa38` / `d121c` axis children | renamed `* VVT Error` → **`Mass Airflow`**, reordered |
+| base | 8 × `{Intake,Exhaust} Duty Correction A-D` | **X/Y swapped**: `Mass Airflow` X/10/`MassAirflow(g/s)1`, `Engine Speed` Y/9 |
+
+Verified through `scripts/defs.py` after the edit: `c0bcc` now reads **1.70**
+(was displaying 1.00), `d6214` reads **18** (was the denormal 1.65e-39), and
+`Intake Duty Correction A` resolves as **9 rows × 10 cols**.
+
+`rawecuvalue` could **not** be changed in place — it is `storagetype="float"` and
+**50 base tables use it**. Hence the sibling scaling rather than a global edit.
+
+### The X/Y swap was re-derived from bytes, not taken from item 71
+
+Item 71 recorded the swap but explicitly left open "what ECUFlash actually
+renders". Rather than apply it blind, the data was read both ways:
+
+```
+Intake  cfa38 uint8 x0.2   stride 10 -> 9x10  monotone rows 9/9,  cols 10/10
+                           stride  9 -> 10x9  monotone rows 2/10, cols  0/9
+Exhaust d121c uint16       stride 10 -> 9x10  monotone rows 9/9,  cols 10/10
+                           stride  9 -> 10x9  monotone rows 2/10, cols  0/9
+```
+
+Stride 10 is the physical surface in both. The axis at `cf9ec`/`d11d0` is
+**4, 6, 10, 15, 20, 25, 30, 40, 60, 80** — a mass-airflow ladder, and the
+correction *decreases* along it, which is backwards for a position-error input
+and correct for an airflow feed-forward. The 9-element axis is
+650…3600 RPM. Geometry also checks arithmetically:
+`cf9ec + 10*4 = cfa14`, `cfa14 + 9*4 = cfa38`.
+
+> **Trap avoided.** A first pass read `cfa38` as uint16 and got garbage in both
+> orientations. The project XML **overrides** the base `Intake Duty Correction`
+> (uint16) with `Intake Duty Correction (uint8)`. Resolve inheritance before
+> judging a surface — this is exactly what `scripts/defs.py` exists for.
+
+### NEW, recorded not applied — the Exhaust table's scaling is wrong
+
+`d121c` inherits the base `Intake Duty Correction` = `(x*.003051758)-100`, which
+displays **−82.5 … −95.5**. Dropping the `-100` gives **17.5, 15.0, 10.0, 7.5,
+6.5, 6.0, 5.5, 5.0, 4.5, 4.5** — the same shape and magnitude as the Intake
+table's first row (11.6 … 5.0). The `-100` offset looks spurious.
+
+**Not changed.** It is a data-interpretation change outside the authorised fix
+set, and getting it wrong would mislead tuning. Also note **every RPM row of the
+exhaust table is byte-identical** — its RPM axis is exactly flat, the same
+degenerate shape as the knock load planes in item 82.
+
+### Status
+
+Repo-side applied and verified. `.\scripts\sync_defs.ps1 -Push` **still owed** —
+it writes into `Program Files` and needs an elevated shell. Restart ECUFlash
+after pushing so it reloads. Files were edited byte-safely; both keep LF endings
+(a first text-mode attempt rewrote all 7,709 lines to CRLF and was reverted).

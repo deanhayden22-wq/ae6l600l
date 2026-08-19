@@ -160,12 +160,18 @@ repo-side edit is therefore lost the next time ECUFlash saves, and the two
 copies diverge silently while each looks correct on its own — the same failure
 class as every correction in `docs/corrections.md`.
 
-- **Make definition changes in the ECUFlash UI**, then bring them back with
-  `.\scripts\sync_defs.ps1 -Pull`.
 - `.\scripts\sync_defs.ps1` on its own reports divergence and changes nothing.
-- Repo and ECUFlash have been out of sync since 2026-04-07; the repo carries
-  ~37 tables ECUFlash does not (post-transient knock window defs, the fuel-pump
-  duty split). A blind `-Pull` deletes them. Check before syncing either way.
+  **Run it first, every time.**
+- **The repo→editor path is verified** (2026-08-19, corrections item 85) and is
+  the right one for anything the UI cannot express, e.g. a `storagetype`. Only
+  when the report says *in sync* and **ECUFlash is not running**: edit the repo
+  XML, then `.\scripts\sync_defs.ps1 -Push` **from an elevated shell** (it writes
+  into `Program Files`), then restart ECUFlash so it reloads.
+- Edit the XMLs **byte-safely** — they are LF. A text-mode Python write on
+  Windows rewrites all 7,709 lines to CRLF and buries the real change.
+- The older "repo is ~37 tables ahead, a blind `-Pull` deletes them" warning was
+  **stale and is removed**; the copies were SHA256-identical on 2026-08-19.
+  Re-check with the report rather than trusting either claim.
 - Analysis tooling reads the **repo** copy via `scripts/defs.py`.
 
 ### Check the flag before building on an area

@@ -6,7 +6,7 @@
 python scripts/coverage_map.py
 ```
 
-Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-08-19 08:46.
+Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-08-19 08:58.
 
 Every flag below is recomputed from scratch on each run: the definition side from `scripts/defs.py` over both definition XMLs, the disassembly side re-derived from ROM bytes (literal-pool dereference back-trace, table descriptors decoded out of ROM, and a RAM→lookup-axis feed trace). No conclusion is read out of a derived file and trusted. Agreement across derived files is not evidence.
 
@@ -76,12 +76,12 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 
 | Flag | Entities | Share |
 |---|---:|---:|
-| `CONFLICT` | 2 | 0.0% |
+| `CONFLICT` | 0 | 0.0% |
 | `BOUNDS-SUSPECT` | 52 | 1.1% |
-| `VERIFIED-BOTH` | 360 | 7.6% |
+| `VERIFIED-BOTH` | 363 | 7.7% |
 | `VERIFIED-BYTES` | 266 | 5.6% |
 | `DEFS-ONLY` | 6 | 0.1% |
-| `DISASM-ONLY` | 956 | 20.3% |
+| `DISASM-ONLY` | 955 | 20.2% |
 | `UNMAPPED` | 3078 | 65.2% |
 
 ### By entity kind
@@ -89,9 +89,9 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 | Kind | `CONFLICT` | `BOUNDS-SUSPECT` | `VERIFIED-BOTH` | `VERIFIED-BYTES` | `DEFS-ONLY` | `DISASM-ONLY` | `UNMAPPED` |
 |---|---|---|---|---|---|---|---|
 | axis | 0 | 26 | 145 | 40 | 2 | 0 | 0 |
-| ram | 0 | 0 | 5 | 0 | 0 | 231 | 3078 |
+| ram | 0 | 0 | 6 | 0 | 0 | 230 | 3078 |
 | rom-block | 0 | 0 | 0 | 0 | 0 | 725 | 0 |
-| table | 2 | 26 | 210 | 226 | 4 | 0 | 0 |
+| table | 0 | 26 | 212 | 226 | 4 | 0 | 0 |
 
 `table` / `axis` are definition-backed. `rom-block` is a calibration block a ROM descriptor points at that no `<table>` covers. `ram` is a RAM variable — RAM is outside the ROM image, so no definition can ever cover it and the definition side contributes only indirectly, through the names of the axes a RAM variable is traced feeding.
 
@@ -113,9 +113,9 @@ Largest unmapped data blocks:
 | `0x01000`–`0x02C00` | float_data | 7,132 |
 | `0x9A700`–`0x9C200` | float_data | 6,760 |
 | `0x49A00`–`0x4B100` | float_data | 5,888 |
-| `0xC0B00`–`0xC3F00` | float_data | 4,929 |
+| `0xC0B00`–`0xC3F00` | float_data | 4,927 |
 | `0xD1D00`–`0xD4500` | float_data | 4,839 |
-| `0xD5800`–`0xD7400` | float_data | 4,803 |
+| `0xD5800`–`0xD7400` | float_data | 4,805 |
 | `0x03900`–`0x04A00` | float_data | 4,352 |
 | `0xD8300`–`0xDAB00` | float_data | 4,309 |
 | `0xC8400`–`0xCC300` | float_data | 3,886 |
@@ -144,11 +144,11 @@ Largest unmapped data blocks:
 | Boost Control - Wastegate | 0 | 0 | 11 | 3 | 1 | 0 | 0 | 15 |
 | Mass Airflow / Engine Load | 0 | 0 | 14 | 1 | 0 | 0 | 0 | 15 |
 | Map Switching - Timing Blend | 0 | 0 | 14 | 0 | 0 | 0 | 0 | 14 |
-| tinywrex patches | 1 | 2 | 7 | 4 | 0 | 0 | 0 | 14 |
+| tinywrex patches | 0 | 2 | 8 | 4 | 0 | 0 | 0 | 14 |
 | Alpha Drive-by-Wire Throttle (DBW) | 0 | 0 | 12 | 0 | 0 | 0 | 0 | 12 |
 | Boost Control - Target | 0 | 0 | 10 | 2 | 0 | 0 | 0 | 12 |
 | Alpha Transient Fueling (Tau) | 0 | 6 | 0 | 5 | 0 | 0 | 0 | 11 |
-| Alpha Idle Control | 1 | 2 | 5 | 0 | 0 | 0 | 0 | 8 |
+| Alpha Idle Control | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 8 |
 | Fueling - Warm-Up Enrichment | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 8 |
 | Idle Control | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 8 |
 | Fueling - AF Correction / Learning | 0 | 1 | 2 | 0 | 4 | 0 | 0 | 7 |
@@ -170,20 +170,9 @@ Largest unmapped data blocks:
 
 ## 4. `CONFLICT` — settle these from bytes
 
-Two independent sides make incompatible claims about the same address. Nothing downstream of these should be trusted until a human settles them from ROM bytes — and settles them in the right direction. **2 entities.**
+Two independent sides make incompatible claims about the same address. Nothing downstream of these should be trusted until a human settles them from ROM bytes — and settles them in the right direction. **0 entities.**
 
-- **`0xC0BCC`** — Boost disable during fuel cut-Load threshold  
-  _tinywrex patches_
-  - ROM code dereferences 0xC0BCC as float; declared storagetype uint16 (EngineLoad(g/rev)) is never used. The definition shows 1.00 Engine Load (g/rev); read the way the code reads it (float) the same bytes are 1.7
-  - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — float x1
-  - evidence: D5 cal_crossref.txt:472 — Ghidra label cal_Boost_disable_during_fuel_cut_Load_threshold
-- **`0xD6214`** — Idle Airflow Min Target Decel Initial Idle Activation Max Mode Counter  
-  _Alpha Idle Control_
-  - ROM code dereferences 0xD6214 as int16; declared storagetype float (rawecuvalue) is never used. The definition shows 0.0 raw ecu value; read the way the code reads it (int16) the same bytes are 18
-  - **suspect side:** definition XML (declared storagetype/geometry) -- the ROM's own code and descriptors are the independent side here
-  - evidence: D1 literal-pool dereference (re-derived from ROM bytes) — int16 x6
-  - evidence: D5 cal_crossref.txt:351 — Ghidra label cal_Idle_Airflow_Min_Target_Decel_Initial_Idle_Activation_Ma
+_None._
 
 ## 5. `BOUNDS-SUSPECT` — editor will clamp
 
@@ -417,7 +406,7 @@ _None._
 
 ## 7. `DISASM-ONLY` — RAM identities resting on one source
 
-231 RAM variables are named only in `ram_reference.txt`, with no independent corroboration from the feed trace. Three of this project's four wrong-direction corrections were exactly this shape: a plausible name in one derived file, copied everywhere, never re-derived. The top entries by reference count are listed; the full set is in the JSON.
+230 RAM variables are named only in `ram_reference.txt`, with no independent corroboration from the feed trace. Three of this project's four wrong-direction corrections were exactly this shape: a plausible name in one derived file, copied everywhere, never re-derived. The top entries by reference count are listed; the full set is in the JSON.
 
 | Address | Claimed name | Code access widths |
 |---|---|---|
@@ -430,7 +419,6 @@ _None._
 | `0xFFFF6254` | flag_6254 | int8 x51 |
 | `0xFFFF6898` | atm_pressure_current | float x48 |
 | `0xFFFF620C` | manifold_pressure_map | float x43 |
-| `0xFFFF63C4` | mass_airflow_gps | float x42 |
 | `0xFFFF8E46` | fuel_mode_flags | int8 x39 |
 | `0xFFFF366C` | io_inj_driver_ctrl | int16 x3, int8 x33 |
 | `0xFFFF895C` | injector_data | float x36 |
@@ -451,8 +439,9 @@ _None._
 | `0xFFFF5FFC` | io_state_register | float x22 |
 | `0xFFFF682C` | adc_processed_misc | float x22 |
 | `0xFFFF4144` | ect_output_fmac | float x20 |
+| `0xFFFF6228` | maf_voltage | float x20 |
 
-_… 201 more in the JSON._
+_… 200 more in the JSON._
 
 ## 8. How to use this before trusting an area
 

@@ -181,20 +181,41 @@ accessor prologue at `0x0000317C`; the full event-id map; the writer of
 
 ---
 
-## 6. ECUFlash definition sync (needs Dean, not a session)
+## 6. ECUFlash definition sync — **repo side DONE 2026-08-19; one elevated command left**
 
-`docs/corrections.md` item 55. `.\scripts\sync_defs.ps1` reports DIVERGED, but
-"ECUFlash is newer" is a 52-second mtime artifact, not new content.
+All four definition fixes are applied to the repo XMLs and verified through
+`scripts/defs.py`. `docs/corrections.md` item 85.
 
-* **The repo is AHEAD on the project XML by 37 tables.** The 3 ECUFlash-only
-  tables are superseded predecessors. **A blind `-Pull` deletes 37 tables.**
-* Dean has confirmed the `EngineLoad(g/rev)1` `max=8` in ECUFlash is what he
-  wants. The repo copy still reads `max="5"`, so **a `-Push` would write that
-  clamp into the editor** — fix the repo value to 8 first, or push selectively.
+**Registry CONFLICT count is now 0** (was 2); VERIFIED-BOTH 360 → 363.
 
-Also ECUFlash-side, from item 51: `c0bcc` needs `storagetype float`
-(reads 1.7, displays 1.00) and `d6214` needs `uint16`/`int16` (reads 18, declared
-float). Repo XMLs must **not** be hand-edited — ECUFlash rewrites them on save.
+| table | fix | now reads |
+|---|---|---|
+| `c0bcc` | scaling → `EngineLoad(g/rev)1` (float) | **1.70** (displayed 1.00) |
+| `d6214` | scaling → new `rawecuvalue(uint16)` | **18** (was a denormal) |
+| `cfa38` / `d121c` + 8 base variants | X/Y swapped, axis renamed `Mass Airflow` | **9 × 10**, monotone |
+
+**What is left — one command, and it needs an ELEVATED shell** (it writes into
+`Program Files`):
+
+```
+.\scripts\sync_defs.ps1 -Push
+```
+
+Then **restart ECUFlash** so it reloads. Preconditions already confirmed: both
+copies were SHA256-identical before the edit and ECUFlash was not running, so
+there is nothing to merge.
+
+> The two blockers this entry used to carry are **both gone and were wrong**:
+> the "repo is 37 tables ahead, a blind `-Pull` deletes them" warning was stale
+> (the copies were byte-identical), and "the repo copy still reads `max=5`" for
+> `EngineLoad(g/rev)1` confused it with `EngineLoad(g/rev)` — the `1` variant
+> already read `max="8"`.
+
+**Recorded, not applied** (item 85): `d121c` inherits `(x*.003051758)-100` and
+displays −82.5…−95.5. Dropping the `-100` yields 17.5…4.5, matching the Intake
+table's shape. Left alone deliberately — it is a data-interpretation change, not
+part of the authorised fix set. Its RPM axis is also exactly flat (every row
+byte-identical), same degenerate shape as the knock load planes.
 
 ---
 
