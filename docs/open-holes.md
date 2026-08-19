@@ -23,8 +23,8 @@ and these seven are the ones that are materially different rather than wording.
 
 | address | competing claims | registry flag |
 |---|---|---|
-| `0xFFFF64F5` | `boost_related_flag` (boost_control) vs `engine_state_byte` (ignition_timing) | UNMAPPED |
-| `0xFFFF3234` | `flkc_work_bank1` (knock_flkc) vs `knock_learn_coarse` (ignition_timing) | UNMAPPED |
+| ~~`0xFFFF64F5`~~ | **RESOLVED 2026-08-18 — item 76. Neither name. It is a DEBOUNCED CLOSED-PEDAL flag (`counter > 2`), overloaded to carry `fuel_system_state` when `adc_channel_status == 1`.** | |
+| `0xFFFF3234` | `flkc_work_bank1` vs `knock_learn_coarse` — **no writer even on a 0xFFFF3200-325F window scan**; neighbours at `0xFFFF3244` are written from `0x045xxx` (FLKC code). Needs a non-writer method. | UNMAPPED |
 | `0xFFFF8258` | `knock_metric` (knock_flkc) vs `flkc_retard` (ignition_timing) | UNMAPPED |
 | `0xFFFF7F68` | `ect_blend_correction` (fueling, startup) vs `blend_output` (ignition_timing) | DISASM-ONLY |
 | `0xFFFF1288` | `inj_gate_hook_ptr` (fueling) vs `scheduler_state` (task_scheduler) | unflagged |

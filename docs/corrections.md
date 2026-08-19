@@ -4173,3 +4173,98 @@ selected by index from here.**
 threshold it is compared against) are both unlabelled and unidentified. Until
 they are known, **whether this path ever fires on this calibration is unknown.**
 Do not assume it does; do not assume it does not.
+
+---
+
+## 75. Correctness-debt audit: NO phantom writers in the corpus — but three more region-map errors — **2026-08-18**
+
+Item 73 warned that any conclusion resting on a `find_writers.py` hit above
+`0x0A0000` was suspect, and named items 62, 64 and 66. Rather than re-run the
+tool item by item, every writer PC **already cited in prose** was screened
+against `rom_region_map.txt`.
+
+Result: **no citation in `docs/corrections.md` is a phantom.** Items 62, 64 and
+66 stand exactly as written.
+
+Only two citations landed in a block classified `float_data` — the strong
+signal. Both verified from bytes and both are real code:
+
+```
+item 33   0273E0: F89D  fldi1 fr8
+          0273E2: D23F  mov.l @(0x0274E0),r2
+          0273E4: 000B  rts
+          0273E6: F28A  fmov.s fr8,@r2        <- delay slot, tail-store of 1.0
+
+item 66   03C75A: E001  mov #1,r0
+          03C75C: C007  mov.b r0,@(7,gbr)     <- the cited write
+          03C764: 4F17  ldc.l @r15+,gbr       <- function epilogue
+          03C766: 4F26  lds.l @r15+,pr
+```
+
+The remaining flagged citations are all `region=unmapped`, which means only that
+no 256-byte block claims the address. Today established that is **not** evidence
+of data: `0x002DB6` is `float_data` and real, `0x0403F8` is `unmapped` and real.
+Treat `unmapped` as no information.
+
+### What the audit actually found
+
+**`rom_region_map.txt` misclassifies real code as `float_data` in at least
+three more places:** `0x002DB6` (item 73), `0x0273E6`, `0x03C75C`. STATUS.md
+records 5 previously corrected. That is 8 known, which is enough to say the map
+should be regenerated rather than patched — and enough to justify why
+`find_writers.py` annotates instead of filtering.
+
+The debt was in the map, not in the conclusions.
+
+---
+
+## 76. `0xFFFF64F5` is a DEBOUNCED CLOSED-PEDAL flag — both competing labels were wrong — **CLOSES 1 OF 7 IN OPEN-HOLE 1, 2026-08-18**
+
+Open-hole 1 listed `0xFFFF64F5` as `boost_related_flag` (boost_control) vs
+`engine_state_byte` (ignition_timing). Neither is right.
+
+`find_writers.py` gave four byte writes, three of them in one function with GBR
+based on `0xFFFF64D8` (accelerator pedal). Decompiling `FUN_000218F6`:
+
+```c
+if (0.0009999999 <= accel_pedal_angle) {
+    if (0.25199997 <= accel_pedal_angle)  [FFFF653B] = 0;   // released -> pressed
+} else {
+    [FFFF653B] = 1;                                          // pressed  -> released
+}
+uVar3 = 0;
+if ([FFFF653B] == 1) uVar3 = uint16_add_sat([FFFF64F0], 1);
+[FFFF64F0] = uVar3;
+
+if (adc_channel_status == 1)      [FFFF64F5] = fuel_system_state;
+else if ([FFFF653B] == 1)       { [FFFF64F5] = (2 < uVar3); mode = 1; }
+else                            { [FFFF64F5] = 0;           mode = 0; }
+[FFFF64F6] = mode;
+```
+
+So the chain is:
+
+| address | what it is |
+|---|---|
+| `0xFFFF653B` | raw pedal-released flag, **hysteretic**: set below `0.001`, cleared at/above `0.252` |
+| `0xFFFF64F0` | uint16 saturating counter, incremented while released, zeroed when pressed |
+| `0xFFFF64F5` | **`counter > 2`** — pedal released and *debounced* for 3 consecutive passes |
+| `0xFFFF64F6` | latched mode byte accompanying it |
+
+`0xFFFF64F5` is a debounced closed-pedal condition. It is not boost-related and
+it is not an engine state code.
+
+### The overload worth knowing
+
+When `adc_channel_status == 1`, `0xFFFF64F5` is **not** the debounced flag at
+all — it is assigned `fuel_system_state` verbatim. The slot carries two
+different quantities depending on ADC status. That is very likely how both
+original names arose: one camp read it in one mode, the other in the other.
+Same shape as `0xFFFF7D18` (item 66), where both names were right from opposite
+ends — except here neither name was right in either mode.
+
+### Status
+
+The hysteresis band (`0.001` / `0.252`) and the debounce depth (`> 2`) are
+**inline constants**, not calibrations, and carry no XML definition. They cannot
+be tuned without a code patch.

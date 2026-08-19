@@ -8276,6 +8276,19 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0xFFFF7AC4L, "afl_product_term_C");
         count += label(0xFFFF7AC8L, "afl_product_term_D");
 
+        // -- item 76: 0xFFFF64F5 is a debounced closed-pedal flag ------------
+        count += labelComment(0x000218F6L, "pedal_released_debounce",
+            "Hysteretic pedal-released flag (set <0.001, cleared >=0.252) -> "
+            + "saturating counter -> [FFFF64F5] = counter>2. corrections.md item 76.");
+        count += labelComment(0xFFFF653BL, "pedal_released_raw",
+            "Hysteretic. Set when accel_pedal_angle < 0.001, cleared at >= 0.252.");
+        count += label(0xFFFF64F0L, "pedal_released_counter");
+        count += labelComment(0xFFFF64F5L, "pedal_released_debounced",
+            "= (pedal_released_counter > 2). OVERLOADED: when adc_channel_status==1 "
+            + "this slot instead carries fuel_system_state verbatim. NOT a boost flag "
+            + "and NOT an engine state code -- both earlier names were wrong.");
+        count += label(0xFFFF64F6L, "pedal_released_mode_latch");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }
