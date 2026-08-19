@@ -5333,7 +5333,14 @@ Found while checking `0xFFFF798C`, which carries both `ol_enrichment_accum`
 (line 1855) and `timing_state_var` (line 2636).
 
 A scan of `labelComment(` calls finds **91 addresses with two or more different
-names**. Item 69 resolved 61 duplicates, but
+names**.
+
+> **The 91 is an undercount — the real figure is 118, and 112 of them pre-date
+> this session (item 91).** This scan keyed on the address *string*, so
+> `0x0000E774` and `0xE774` counted as different addresses. Item 91 re-counts by
+> parsed integer. Same derived-number failure this repo keeps hitting.
+
+Item 69 resolved 61 duplicates, but
 `scripts/mapping/dedupe_import_java_labels.py` handles **`desc_*` labels only** —
 the general ones were never in scope. Examples where the two names cannot both be
 right:
@@ -5372,3 +5379,64 @@ is exactly the work item 69 did for descriptors. Recorded as open-holes #8.
 ### Status
 
 Recorded. Two labels merged; 89 conflicts outstanding.
+
+---
+
+## 91. The `isr_handler_N` / `dtbl_isr_*` family: 106 labels built on a table that does not exist — **2026-08-19**
+
+### The decisive test
+
+`0x00E5EC`–`0x00E6C0` carried 52 `dtbl_isr_handler_N` labels ("Dispatch table[N]
+-> 0x…"), and the 51 addresses those slots point at carried matching
+`isr_handler_N` labels. Three checks, all negative:
+
+1. **Every one of the 51 is a value in that pool, and every `N` equals the pool
+   slot index exactly** — 51/51. The naming is purely positional.
+2. **Not one of the 51 appears in the `0x0`–`0x400` interrupt vector table**
+   (227 distinct entries). They are not ISR handlers.
+3. **Item 84 already proved the premise false**: `0x00E5EC`–`0x00E6C0` is the
+   shared *literal pool* of the `0x00E4xx` task stubs — 54 longs bounded by
+   `rts/nop` at `0x00E5E8` and code at `0x00E6C4`, with no literal anywhere
+   pointing at its base.
+
+### What was done
+
+| action | count |
+|---|---|
+| `isr_handler_N` dropped where a semantic label already existed | 23 |
+| `isr_handler_N` renamed → `stubpool_target_N` (was the sole label) | 28 |
+| `dtbl_isr_*` renamed → `stubpool_slot_N`, comment re-derived from ROM bytes | 52 |
+| short-form false-premise labels dropped (`0x00E5EC`, `0x00E628`, `0x04A94C`) | 3 |
+| **total retired** | **106** |
+
+The *pointer* facts were true and are preserved: each `stubpool_slot_N` comment
+now states its slot address and the long it holds, re-read from bytes rather than
+trusted.
+
+### Also resolved, from evidence already in the repo
+
+`0xFFFF3234` → `ram_IAM` (item 81, proven from the definition XML);
+`0xFFFF3248` → `flkc_grid`; `0xFFFF1288` → `rtos_scheduler_state` (item 80);
+`0x04A94C` → `sched_periodic_dispatch` (item 84 — 23 `jsr` + a tail `jmp`, and
+absent from the vector table, so not an ISR).
+
+### Honest accounting for this session
+
+**13 conflicts were introduced by me**, by adding a label without checking
+whether the address already had one. All 13 are merged. Two went against my
+expectation: the pre-existing `float_lerp` on `0x0BEA40` was already right, and
+my `fn_2F03C_pair_select` was a use-description competing with a real identity
+claim. Standing rule now: **keep the pre-existing name unless a byte-level trace
+positively contradicts it.**
+
+```
+conflicts at session start : 112
+introduced this session    : +13   (all merged)
+resolved this session      : -42
+conflicts now              :  83
+```
+
+### Status
+
+`javac` exit 0 against Ghidra 12.0.2. **83 conflicts remain**, all pre-existing.
+They are not one family — each needs its own evidence. See open-holes #8.

@@ -275,31 +275,58 @@ monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
 
 ---
 
-## 8. 89 Ghidra addresses still carry conflicting labels
+## 8. 83 Ghidra label conflicts remain (was 118)
 
-`docs/corrections.md` item 90. A scan of `labelComment(` calls found **91**
-addresses asserting two or more different names. Six were introduced 2026-08-19
-and are all merged, leaving **87**.
-
-Item 69 resolved 61 duplicates, but `scripts/mapping/dedupe_import_java_labels.py`
-handles **`desc_*` labels only** — the general ones were never in scope.
-
-Some pairs cannot both be right:
+`docs/corrections.md` items 90 and **91**.
 
 ```
-0x000299BC   diag_check_P0137               / float_store_to_ram
-0x000278D2   check_maf_valid                / dwell_calculator
-0x000281DC   check_diag_mode_active         / sensor_scale_helper
-0x00023E48   check_afl_ready                / fuel_desc_reader
-0x000297A0   diag_flag_reader_cluster_start / float_load_from_desc
+conflicts at session start : 112     (the "91" in item 90 was a string-key undercount)
+introduced 2026-08-19      : +13     (all merged)
+resolved 2026-08-19        : -42
+remaining                  :  83
 ```
 
-One family looks like a bulk pattern-scan that assigned diagnostic names across a
-range which a later, evidence-based pass renamed as generic helpers. Each needs
-deciding on evidence — the same work item 69 did for descriptors.
+**The big family is gone.** 106 labels rested on a "dispatch table" at
+`0x00E5EC`–`0x00E6C0` that item 84 proved is a **literal pool**: all 51
+`isr_handler_N` names were positional over pool slots (51/51 index match) and
+**none of the 51 is in the `0x0`–`0x400` vector table**. Renamed to
+`stubpool_slot_N` / `stubpool_target_N` with byte-derived comments.
 
-**Before adding any new label, check whether the address already has one.** That
-is how two of the 91 got there.
+### The 83 that remain
+
+They are **not one family** — each needs its own evidence. Three rough groups:
+
+1. **Synonym pairs** — same meaning, different words. Cheap: pick one, fold the
+   other's detail into the comment. e.g. `interrupt_priority_set` /
+   `irq_level_set`, `afc_target_calc` / `afc_target_computation`,
+   `fuel_overrun_cutoff` / `overrun_fuel_cutoff`, `table_desc_1d_float` /
+   `table_lookup_1D`.
+2. **Generated vs semantic** — a `desc_*` positional name against a hand-written
+   one, e.g. `AVCS_IntakeDutyCorr_Desc` / `desc_2D_ThrottlexRPM_u8_10x9`. The
+   `desc_*` side is machine-generated and its geometry is trustworthy; the
+   semantic side may not be (`0xD39A8` is the cautionary tale).
+3. **Genuinely contradictory** — these need decoding:
+   ```
+   0x000299BC  diag_check_P0137               / float_store_to_ram
+   0x000278D2  check_maf_valid                / dwell_calculator
+   0x000281DC  check_diag_mode_active         / sensor_scale_helper
+   0x00023E48  check_afl_ready                / fuel_desc_reader
+   0x000297A0  diag_flag_reader_cluster_start / float_load_from_desc
+   0xFFFF4024  ATU_primary_ctrl / knock_adc_working / sensor_group_base
+   0xFFFF3B06  diag_indexed_lookup_table / dtc_debounce_state / io_inj_ign_port_ctrl
+   ```
+   The `check_*` / `diag_*` side looks like a second bulk pattern-scan, the same
+   shape of error as the one just retired — worth testing as a family before
+   decoding them one by one.
+
+### Rules
+
+* **Check for an existing label before adding one.** 13 of the 118 got there that
+  way this session.
+* **Keep the pre-existing name unless a byte-level trace positively contradicts
+  it.** Twice this session the older name turned out to be right.
+* `scripts/mapping/dedupe_import_java_labels.py` handles **`desc_*` only** — it
+  will not see any of these.
 
 ---
 

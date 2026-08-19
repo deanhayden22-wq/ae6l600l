@@ -75,13 +75,9 @@ public class ImportAE5L600L extends GhidraScript {
             "Power-on reset entry point. Calls HW init, then main scheduler.");
 
         // Scheduler / Task table
-        count += labelComment(0x0000E628, "sched_table_main",
-            "NOT A TABLE (corrections.md item 84). 0x00E5EC-0x00E6C0 is the shared LITERAL "
-            + "POOL of the 0x00E4xx task-stub region -- 54 longs, all ROM code addresses, "
-            + "bounded by rts/nop at 0x00E5E8 and code at 0x00E6C4. This slot is loaded by "
-            + "mov.l @(0x00E628),r3 at 0x00E4AE. No literal points at the pool base.");
         count += labelComment(0x0004A94C, "sched_periodic_dispatch",
-            "COUNT CORRECTED 2026-08-19 (item 84): 23 jsr @r2 + one tail jmp @r2 = 24 tasks, "
+            "NOT AN ISR (item 84): absent from the 0x0-0x400 vector table, and its body is a straight-line run of 23 jsr plus one tail jmp gated on byte[0xFFFF8EDC]. "
+            +             "COUNT CORRECTED 2026-08-19 (item 84): 23 jsr @r2 + one tail jmp @r2 = 24 tasks, "
             + "NOT 59, and there is no task_table. Straight-line body, gated on "
             + "byte[0xFFFF8EDC] != 0 at 0x04A954, rts at 0x04A9F0. Task 1 = 0x043750 "
             + "(knock_wrapper), task 9 = 0x033304, tail jmp -> 0x00022F8A.");
@@ -97,6 +93,12 @@ public class ImportAE5L600L extends GhidraScript {
             + "NOT identified. corrections.md item 87.");
         count += labelComment(0xFFFF72D0L, "coolant_decay_bank_base",
             "r14 base for the staged decay bank in fn 0x02EFD2 (item 88).");
+
+        count += labelComment(0x0000E5EC, "stubpool_base",
+            "NOT A DISPATCH TABLE (item 84). 0x00E5EC-0x00E6C0 is the shared LITERAL POOL of the 0x00E4xx task stubs: 54 longs, all ROM code addresses, bounded by rts/nop at 0x00E5E8 and code at 0x00E6C4. No literal anywhere points at this base; slots are reached by mov.l @(disp,pc) from the stubs. Both former names asserted a table that does not exist.");
+
+        count += labelComment(0x0000E628, "stubpool_slot_15",
+            "Slot 15 of the literal pool at 0x00E5EC (item 84). Holds 0x0004A94C and is loaded by mov.l @(0x00E628),r3 at 0x00E4AE. Not a scheduler table.");
 
         // -- item 89: the 0xAD960 two-stage thermal-lag model ---------------------
         count += labelComment(0x0003644E, "fn_3644E_threshold_bank",
@@ -188,7 +190,8 @@ public class ImportAE5L600L extends GhidraScript {
             "5 entries x 12 bytes. +0 word event id, +4 long payload, +8 byte pending "
             + "counter (saturating at 255). Coalescing: a repeat id bumps the counter.");
         count += labelComment(0xFFFF20A0L, "sched_last_event_id",
-            "word. Last event id posted, written at 0x010C00 regardless of insert/drop.");
+            "SUPERSEDES \"system_state_cluster_base\" (item 84): word written at 0x010C00 with the last posted event id, on every post whether it inserts or drops. "
+            +             "word. Last event id posted, written at 0x010C00 regardless of insert/drop.");
         count += labelComment(0xFFFF20A4L, "sched_last_event_payload",
             "long. Payload of the last posted event, written at 0x010C08.");
         count += labelComment(0x0004AD40, "task_table",
@@ -507,7 +510,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "Since max=0.03 < CBE78 threshold 0.11, FFFF7BA8 NEVER blocks cl_master_readiness_eval. "
             + "See cl_ol_master_analysis.txt Section 5 (WOT delay root cause).");
         count += labelComment(0x0003961C, "afr_deviation_clamp",
-            "Helper for afr_deviation_calc. Clamps FFFF7BA8 to max 0.03 (CAL@CC3E8). "
+            "Item 83: computes clamp(1.0/S - 1.0, 0.0, [0x0CC3E8]=0.03) into [FFFF7BAC], where S = 1.0 + [FFFF77D8] + [FFFF77DC]. Reached only when byte[FFFF782C] == 0. "
+            +             "Helper for afr_deviation_calc. Clamps FFFF7BA8 to max 0.03 (CAL@CC3E8). "
             + "Calls 0xBE56C (float_clamp). Result written to FFFF7BAC area.");
         count += labelComment(0x00039668, "afr_deviation_init",
             "AFR deviation context initialization/setup. Runs on startup/reset. "
@@ -554,9 +558,11 @@ public class ImportAE5L600L extends GhidraScript {
 
         // Float utility functions
         count += labelComment(0x000BE608, "float_deadband_check",
-            "Returns 1 if |fr4-fr5| > fr6 (hysteresis/deadband comparison)");
+            "Verified from bytes 2026-08-19: returns 1 when fr4 is OUTSIDE fr5 +/- fr6, else 0. "
+            +             "Returns 1 if |fr4-fr5| > fr6 (hysteresis/deadband comparison)");
         count += labelComment(0x000BE628, "float_safe_div",
-            "fr4/fr5 with zero-division guard. If fr5==0: returns +/-max based on sign of fr4");
+            "Verified from bytes 2026-08-19: fr0 = fr4 / fr5, opening with a zero-denominator test. "
+            +             "fr4/fr5 with zero-division guard. If fr5==0: returns +/-max based on sign of fr4");
         count += labelComment(0x000BE800, "float_clamp_with_step",
             "Soft clamp from above. If fr4>fr5: 1, if fr4>fr5-fr6: 0, else: fr4");
         count += labelComment(0x000BE960, "float_max",
@@ -717,7 +723,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Upper threshold. clamp(baseline + K*1000.0*deviation, 50.0, 1000.0). "
             + "Ceiling float at 0x0D2D90. Compared at 0x043B52; sets KNOCK_BANK_FLAG only.");
         count += labelComment(0xFFFF81ACL, "knock_cylinder_index",
-            "GBR+176. Cylinder index copied from FFFF4308 at 0x04376A, gated < 4. "
+            "SUPERSEDES \"gbr_knock_81AC\" (item 82): GBR+176, cylinder index copied from FFFF4308 at 0x04376A and gated < 4. Indexes every per-cylinder descriptor in knock_detector. "
+            +             "GBR+176. Cylinder index copied from FFFF4308 at 0x04376A, gated < 4. "
             + "Indexes every per-cylinder descriptor and workspace array in knock_detector.");
         count += labelComment(0xFFFF81D9L, "fn_043d68_output",
             "Written by task [12], NOT the knock flag");
@@ -777,13 +784,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "corrections, task56 EVAP precondition passes.");
         count += labelComment(0xFFFF8258L, "flkc_fg_limit_FR15",
             "Loaded into FR15, compared vs 100.0");
-        count += labelComment(0xFFFF3234L, "flkc_fg_ref_FR14",
-            "Loaded into FR14 at entry");
         count += labelComment(0xFFFF3244L, "flkc_fg_R0_init",
             "Early R0 setup");
-        count += labelComment(0xFFFF3248L, "flkc_fg_var_3248",
-            "Read in setup. Also: per-cell FLKC correction float array [35 entries × 8 bytes]. "
-            + "Iterated by task23 (knock_cyl_track) and task08 (knock_window) with 35-entry loops.");
         count += labelComment(0xFFFF8233L, "flkc_fg_flag_8233",
             "Byte flag checked during FP setup");
         count += labelComment(0xFFFF7D18L, "sched_status_R1",
@@ -1434,7 +1436,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CBE98, "CL_Coolant_High_OFF",
             "Coolant CL readiness high flag OFF threshold (float) = 5.0.");
         count += labelComment(0x000CC3E8, "AFR_Deviation_Clamp_Max",
-            "AFR deviation clamp maximum (float) = 0.03. Used by afr_deviation_clamp (0x3961C) "
+            "Item 83: float 0.03, the upper clamp applied at 0x039656. No address= entry in the XML. "
+            +             "AFR deviation clamp maximum (float) = 0.03. Used by afr_deviation_clamp (0x3961C) "
             + "to limit FFFF7BA8. Since 0.03 < CL_AFRDeviation_Max (0.11), condition 4 in "
             + "cl_master_readiness_eval is NEVER the blocking factor for CL→OL transitions.");
         count += label(0x000CE640, "CLOL_CounterStep_MAF");
@@ -1584,7 +1587,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "(20/26/32/44 g/s). corrections.md item 30.");
         // REMOVED: 0xFFFF6624 "ram_MAF_alt" — wrong. This is RPM, not MAF. Correct: rpm_current (line 2154)
         count += labelComment(0xFFFF3234L, "ram_IAM",
-            "Ignition Advance Multiplier current value (float). Also used by FLKC.");
+            "SETTLED item 81: this is the IAM, proven from the definition XML -- cal 0x0D2CF4 (Timing Compensation B (IAT) IAM Activation, scaling IgnitionAdvanceMultiplier(IAM)) is compared against it at 0x042F74. \"flkc_fg_ref_FR14\" was wrong. "
+            +             "Ignition Advance Multiplier current value (float). Also used by FLKC.");
 
         // =====================================================================
         // PERIPHERAL INTERRUPT VECTOR TABLE (VBR = 0x000FFC50)
@@ -1625,8 +1629,6 @@ public class ImportAE5L600L extends GhidraScript {
             "ISR epilogue: restores all saved context, decrements nesting counter.");
 
         // ISR nesting context
-        count += labelComment(0xFFFF1288L, "ISR_NestingContext",
-            "ISR nesting context struct. +8=nesting counter, +16=saved SR.");
 
         // =====================================================================
         // ADC / SENSOR PIPELINE
@@ -2019,23 +2021,9 @@ public class ImportAE5L600L extends GhidraScript {
             + "needs |S| <= 1.22e-4 and is unreachable. Saturates at +3% in 56/532 comp cells.");
 
         // -- item 83: the 0xFFFF77D8 / 0xFFFF77DC consumer chain -----------------
-        count += labelComment(0x0003961C, "fuel_trim_from_target_comp",
-            "Branch A of func_3952C. fr4=[FFFF77D8], fr5=[FFFF77DC], r4=&output. "
-            + "S = 1.0 + fr4 + fr5; if |S| <= 1.22e-4 write 0.0 else "
-            + "write clamp(1.0/S - 1.0, 0.0, 0.03). Reached only when byte[FFFF782C] == 0 "
-            + "-- on the non-zero path fr4/fr5 are overwritten unused at 0x039566/0x039574.");
         count += labelComment(0xFFFF782CL, "fuel_trim_path_select",
             "byte. tst at 0x039556: ==0 routes func_3952C into 0x03961C (the "
             + "[FFFF77D8]+[FFFF77DC] trim); !=0 discards both values. corrections.md item 83.");
-        count += labelComment(0x000BE608, "float_outside_band",
-            "returns 1 if fr4 is OUTSIDE fr5 +/- fr6, else 0. Divide-by-zero guard.");
-        count += labelComment(0x000BE628, "float_divide",
-            "fr0 = fr4 / fr5. Opens with fldi0 fr6 / fcmp/eq fr6,fr5 -- zero-denominator test.");
-        count += labelComment(0x000BE56C, "float_clamp3",
-            "fr0 = clamp(fr4, fr5, fr6). Verified from bytes 2026-08-19.");
-        count += labelComment(0x000CC3E8, "fuel_trim_cap",
-            "float 0.03. Upper clamp on the [FFFF77DC]-driven trim at 0x039656. "
-            + "No address= entry in the project XML.");
         count += labelComment(0xFFFF7BB0L, "afr_fault_flag",
             "AFR/sensor fault flag (byte). Checked by cl_master_readiness_eval condition 5: "
             + "must be 0 for CL. Also gated by func_39668 (afr_deviation_init).");
@@ -2092,7 +2080,8 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Float Clamp/Range ──────────────────────────────────────────────
         count += labelComment(0x000BE56C, "float_clamp_range",
-            "218 calls. Clamps fr4 to [fr6, fr5]. If fr4>fr5: fr7=fr5; elif fr4<fr6: fr7=fr6; else fr7=fr4. "
+            "Verified from bytes 2026-08-19: fr0 = clamp(fr4, fr5, fr6). "
+            +             "218 calls. Clamps fr4 to [fr6, fr5]. If fr4>fr5: fr7=fr5; elif fr4<fr6: fr7=fr6; else fr7=fr4. "
             + "Returns clamped value in fr0. Core range-limiter for calibration outputs.");
 
         // ── Float Axis Interpolation (fraction calc) ───────────────────────
@@ -2796,114 +2785,200 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ISR dispatch table entry labels (table at 0x0E5EC, 54 entries)
         // Entry[N] address = 0x0E5EC + N*4 -> handler address
-        count += labelComment(0x00E5ECL, "dtbl_isr_handler_0", "Dispatch table[0] -> 0x010A46");
-        count += labelComment(0x010A46L, "isr_handler_0", "ISR dispatch table entry 0");
-        count += labelComment(0x00E5F0L, "dtbl_isr_handler_1", "Dispatch table[1] -> 0x00FC04");
-        count += labelComment(0x00FC04L, "isr_handler_1", "ISR dispatch table entry 1");
-        count += labelComment(0x00E5F4L, "dtbl_isr_handler_2", "Dispatch table[2] -> 0x005840");
-        count += labelComment(0x005840L, "isr_handler_2", "ISR dispatch table entry 2");
-        count += labelComment(0x00E5F8L, "dtbl_isr_handler_3", "Dispatch table[3] -> 0x00D658");
-        count += labelComment(0x00D658L, "isr_handler_3", "ISR dispatch table entry 3");
-        count += labelComment(0x00E5FCL, "dtbl_isr_handler_4", "Dispatch table[4] -> 0x00CBAC");
-        count += labelComment(0x00CBACL, "isr_handler_4", "ISR dispatch table entry 4");
-        count += labelComment(0x00E600L, "dtbl_isr_handler_5", "Dispatch table[5] -> 0x04907C");
-        count += labelComment(0x04907CL, "isr_handler_5", "ISR dispatch table entry 5");
-        count += labelComment(0x00E604L, "dtbl_isr_handler_6", "Dispatch table[6] -> 0x009A58");
-        count += labelComment(0x009A58L, "isr_handler_6", "ISR dispatch table entry 6");
-        count += labelComment(0x00E608L, "dtbl_isr_handler_7", "Dispatch table[7] -> 0x00D268");
-        count += labelComment(0x00D268L, "isr_handler_7", "ISR dispatch table entry 7");
-        count += labelComment(0x00E60CL, "dtbl_isr_handler_8", "Dispatch table[8] -> 0x00CBEE");
-        count += labelComment(0x00CBEEL, "isr_handler_8", "ISR dispatch table entry 8");
-        count += labelComment(0x00E610L, "dtbl_isr_handler_9", "Dispatch table[9] -> 0x0035A4");
-        count += labelComment(0x0035A4L, "isr_handler_9", "ISR dispatch table entry 9");
-        count += labelComment(0x00E614L, "dtbl_isr_handler_10", "Dispatch table[10] -> 0x00FE22");
-        count += labelComment(0x00FE22L, "isr_handler_10", "ISR dispatch table entry 10");
-        count += labelComment(0x00E618L, "dtbl_isr_handler_11", "Dispatch table[11] -> 0x00A878");
-        count += labelComment(0x00A878L, "isr_handler_11", "ISR dispatch table entry 11");
-        count += labelComment(0x00E61CL, "dtbl_isr_handler_12", "Dispatch table[12] -> 0x00D940");
-        count += labelComment(0x00D940L, "isr_handler_12", "ISR dispatch table entry 12");
-        count += labelComment(0x00E620L, "dtbl_isr_handler_13", "Dispatch table[13] -> 0x009A14");
-        count += labelComment(0x009A14L, "isr_handler_13", "ISR dispatch table entry 13");
-        count += labelComment(0x00E624L, "dtbl_isr_handler_14", "Dispatch table[14] -> 0x008528");
-        count += labelComment(0x008528L, "isr_handler_14", "ISR dispatch table entry 14");
-        count += labelComment(0x00E628L, "dtbl_isr_task_scheduler", "Dispatch table[15] -> 0x04A94C");
-        count += labelComment(0x04A94CL, "isr_task_scheduler", "ISR dispatch table entry 15");
-        count += labelComment(0x00E62CL, "dtbl_isr_handler_16", "Dispatch table[16] -> 0x04AA58");
-        count += labelComment(0x04AA58L, "isr_handler_16", "ISR dispatch table entry 16");
-        count += labelComment(0x00E630L, "dtbl_isr_handler_17", "Dispatch table[17] -> 0x009A34");
-        count += labelComment(0x009A34L, "isr_handler_17", "ISR dispatch table entry 17");
-        count += labelComment(0x00E634L, "dtbl_isr_handler_18", "Dispatch table[18] -> 0x0085AC");
-        count += labelComment(0x0085ACL, "isr_handler_18", "ISR dispatch table entry 18");
-        count += labelComment(0x00E638L, "dtbl_isr_handler_19", "Dispatch table[19] -> 0x00D3DC");
-        count += labelComment(0x00D3DCL, "isr_handler_19", "ISR dispatch table entry 19");
-        count += labelComment(0x00E63CL, "dtbl_isr_handler_20", "Dispatch table[20] -> 0x010D58");
-        count += labelComment(0x010D58L, "isr_handler_20", "ISR dispatch table entry 20");
-        count += labelComment(0x00E640L, "dtbl_isr_rcan0", "Dispatch table[21] -> 0x04793C");
+        count += labelComment(0x00E5F0, "stubpool_slot_1", "Literal pool slot 1 at 0x0E5F0 holds 0x00FC04. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E5F4, "stubpool_slot_2", "Literal pool slot 2 at 0x0E5F4 holds 0x005840. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E5F8, "stubpool_slot_3", "Literal pool slot 3 at 0x0E5F8 holds 0x00D658. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E5FC, "stubpool_slot_4", "Literal pool slot 4 at 0x0E5FC holds 0x00CBAC. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E600, "stubpool_slot_5", "Literal pool slot 5 at 0x0E600 holds 0x04907C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E604, "stubpool_slot_6", "Literal pool slot 6 at 0x0E604 holds 0x009A58. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E608, "stubpool_slot_7", "Literal pool slot 7 at 0x0E608 holds 0x00D268. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E60C, "stubpool_slot_8", "Literal pool slot 8 at 0x0E60C holds 0x00CBEE. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E610, "stubpool_slot_9", "Literal pool slot 9 at 0x0E610 holds 0x0035A4. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E614, "stubpool_slot_10", "Literal pool slot 10 at 0x0E614 holds 0x00FE22. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E618, "stubpool_slot_11", "Literal pool slot 11 at 0x0E618 holds 0x00A878. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E61C, "stubpool_slot_12", "Literal pool slot 12 at 0x0E61C holds 0x00D940. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E620, "stubpool_slot_13", "Literal pool slot 13 at 0x0E620 holds 0x009A14. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E624, "stubpool_slot_14", "Literal pool slot 14 at 0x0E624 holds 0x008528. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x008528, "stubpool_target_14",
+            "Slot 14 of the LITERAL POOL at 0x00E5EC (0x0E624), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_14\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E62C, "stubpool_slot_16", "Literal pool slot 16 at 0x0E62C holds 0x04AA58. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x04AA58, "stubpool_target_16",
+            "Slot 16 of the LITERAL POOL at 0x00E5EC (0x0E62C), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_16\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E630, "stubpool_slot_17", "Literal pool slot 17 at 0x0E630 holds 0x009A34. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E634, "stubpool_slot_18", "Literal pool slot 18 at 0x0E634 holds 0x0085AC. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E638, "stubpool_slot_19", "Literal pool slot 19 at 0x0E638 holds 0x00D3DC. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E63C, "stubpool_slot_20", "Literal pool slot 20 at 0x0E63C holds 0x010D58. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x010D58, "stubpool_target_20",
+            "Slot 20 of the LITERAL POOL at 0x00E5EC (0x0E63C), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_20\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E640, "stubpool_slot_21", "Literal pool slot 21 at 0x0E640 holds 0x04793C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x04793CL, "isr_rcan0", "ISR dispatch table entry 21");
-        count += labelComment(0x00E644L, "dtbl_isr_rcan1", "Dispatch table[22] -> 0x048732");
+        count += labelComment(0x00E644, "stubpool_slot_22", "Literal pool slot 22 at 0x0E644 holds 0x048732. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x048732L, "isr_rcan1", "ISR dispatch table entry 22");
-        count += labelComment(0x00E648L, "dtbl_isr_handler_23", "Dispatch table[23] -> 0x01076A");
-        count += labelComment(0x01076AL, "isr_handler_23", "ISR dispatch table entry 23");
-        count += labelComment(0x00E64CL, "dtbl_isr_handler_24", "Dispatch table[24] -> 0x004BCA");
-        count += labelComment(0x004BCAL, "isr_handler_24", "ISR dispatch table entry 24");
-        count += labelComment(0x00E650L, "dtbl_isr_handler_25", "Dispatch table[25] -> 0x010124");
-        count += labelComment(0x010124L, "isr_handler_25", "ISR dispatch table entry 25");
-        count += labelComment(0x00E654L, "dtbl_isr_handler_26", "Dispatch table[26] -> 0x047B66");
-        count += labelComment(0x047B66L, "isr_handler_26", "ISR dispatch table entry 26");
-        count += labelComment(0x00E658L, "dtbl_isr_handler_27", "Dispatch table[27] -> 0x049A7A");
-        count += labelComment(0x049A7AL, "isr_handler_27", "ISR dispatch table entry 27");
-        count += labelComment(0x00E65CL, "dtbl_isr_handler_28", "Dispatch table[28] -> 0x00C36C");
-        count += labelComment(0x00C36CL, "isr_handler_28", "ISR dispatch table entry 28");
-        count += labelComment(0x00E660L, "dtbl_isr_handler_29", "Dispatch table[29] -> 0x00A844");
-        count += labelComment(0x00A844L, "isr_handler_29", "ISR dispatch table entry 29");
-        count += labelComment(0x00E664L, "dtbl_isr_handler_30", "Dispatch table[30] -> 0x049BA4");
-        count += labelComment(0x049BA4L, "isr_handler_30", "ISR dispatch table entry 30");
-        count += labelComment(0x00E668L, "dtbl_isr_handler_31", "Dispatch table[31] -> 0x00C370");
-        count += labelComment(0x00C370L, "isr_handler_31", "ISR dispatch table entry 31");
-        count += labelComment(0x00E66CL, "dtbl_isr_handler_32", "Dispatch table[32] -> 0x005798");
-        count += labelComment(0x005798L, "isr_handler_32", "ISR dispatch table entry 32");
-        count += labelComment(0x00E670L, "dtbl_isr_handler_33", "Dispatch table[33] -> 0x049CF0");
-        count += labelComment(0x049CF0L, "isr_handler_33", "ISR dispatch table entry 33");
-        count += labelComment(0x00E674L, "dtbl_isr_handler_34", "Dispatch table[34] -> 0x00D4FC");
-        count += labelComment(0x00D4FCL, "isr_handler_34", "ISR dispatch table entry 34");
-        count += labelComment(0x00E678L, "dtbl_isr_handler_35", "Dispatch table[35] -> 0x00812C");
-        count += labelComment(0x00812CL, "isr_handler_35", "ISR dispatch table entry 35");
-        count += labelComment(0x00E67CL, "dtbl_isr_handler_36", "Dispatch table[36] -> 0x00ACFC");
-        count += labelComment(0x00ACFCL, "isr_handler_36", "ISR dispatch table entry 36");
-        count += labelComment(0x00E680L, "dtbl_isr_handler_37", "Dispatch table[37] -> 0x04A03E");
-        count += labelComment(0x04A03EL, "isr_handler_37", "ISR dispatch table entry 37");
-        count += labelComment(0x00E684L, "dtbl_isr_handler_38", "Dispatch table[38] -> 0x00658C");
-        count += labelComment(0x00658CL, "isr_handler_38", "ISR dispatch table entry 38");
-        count += labelComment(0x00E688L, "dtbl_isr_handler_39", "Dispatch table[39] -> 0x005980");
-        count += labelComment(0x005980L, "isr_handler_39", "ISR dispatch table entry 39");
-        count += labelComment(0x00E68CL, "dtbl_isr_handler_40", "Dispatch table[40] -> 0x0081C8");
-        count += labelComment(0x0081C8L, "isr_handler_40", "ISR dispatch table entry 40");
-        count += labelComment(0x00E690L, "dtbl_isr_handler_41", "Dispatch table[41] -> 0x04A420");
-        count += labelComment(0x04A420L, "isr_handler_41", "ISR dispatch table entry 41");
-        count += labelComment(0x00E694L, "dtbl_isr_handler_42", "Dispatch table[42] -> 0x04A674");
-        count += labelComment(0x04A674L, "isr_handler_42", "ISR dispatch table entry 42");
-        count += labelComment(0x00E698L, "dtbl_isr_handler_43", "Dispatch table[43] -> 0x04A6C6");
-        count += labelComment(0x04A6C6L, "isr_handler_43", "ISR dispatch table entry 43");
-        count += labelComment(0x00E69CL, "dtbl_isr_handler_44", "Dispatch table[44] -> 0x04A6FA");
-        count += labelComment(0x04A6FAL, "isr_handler_44", "ISR dispatch table entry 44");
-        count += labelComment(0x00E6A0L, "dtbl_isr_handler_45", "Dispatch table[45] -> 0x00D8D0");
-        count += labelComment(0x00D8D0L, "isr_handler_45", "ISR dispatch table entry 45");
-        count += labelComment(0x00E6A4L, "dtbl_isr_handler_46", "Dispatch table[46] -> 0x04AE7C");
-        count += labelComment(0x04AE7CL, "isr_handler_46", "ISR dispatch table entry 46");
-        count += labelComment(0x00E6A8L, "dtbl_isr_handler_47", "Dispatch table[47] -> 0x0099E4");
-        count += labelComment(0x0099E4L, "isr_handler_47", "ISR dispatch table entry 47");
-        count += labelComment(0x00E6ACL, "dtbl_isr_handler_48", "Dispatch table[48] -> 0x00D1F4");
-        count += labelComment(0x00D1F4L, "isr_handler_48", "ISR dispatch table entry 48");
-        count += labelComment(0x00E6B0L, "dtbl_isr_handler_49", "Dispatch table[49] -> 0x0084D8");
-        count += labelComment(0x0084D8L, "isr_handler_49", "ISR dispatch table entry 49");
-        count += labelComment(0x00E6B4L, "dtbl_isr_handler_50", "Dispatch table[50] -> 0x00A694");
-        count += labelComment(0x00A694L, "isr_handler_50", "ISR dispatch table entry 50");
-        count += labelComment(0x00E6B8L, "dtbl_isr_handler_51", "Dispatch table[51] -> 0x00BB32");
-        count += labelComment(0x00BB32L, "isr_handler_51", "ISR dispatch table entry 51");
-        count += labelComment(0x00E6BCL, "dtbl_isr_handler_52", "Dispatch table[52] -> 0x007D12");
-        count += labelComment(0x007D12L, "isr_handler_52", "ISR dispatch table entry 52");
-        count += labelComment(0x00E6C0L, "dtbl_isr_handler_53", "Dispatch table[53] -> 0x04AE82");
-        count += labelComment(0x04AE82L, "isr_handler_53", "ISR dispatch table entry 53");
+        count += labelComment(0x00E648, "stubpool_slot_23", "Literal pool slot 23 at 0x0E648 holds 0x01076A. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E64C, "stubpool_slot_24", "Literal pool slot 24 at 0x0E64C holds 0x004BCA. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E650, "stubpool_slot_25", "Literal pool slot 25 at 0x0E650 holds 0x010124. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x010124, "stubpool_target_25",
+            "Slot 25 of the LITERAL POOL at 0x00E5EC (0x0E650), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_25\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E654, "stubpool_slot_26", "Literal pool slot 26 at 0x0E654 holds 0x047B66. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E658, "stubpool_slot_27", "Literal pool slot 27 at 0x0E658 holds 0x049A7A. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x049A7A, "stubpool_target_27",
+            "Slot 27 of the LITERAL POOL at 0x00E5EC (0x0E658), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_27\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E65C, "stubpool_slot_28", "Literal pool slot 28 at 0x0E65C holds 0x00C36C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00C36C, "stubpool_target_28",
+            "Slot 28 of the LITERAL POOL at 0x00E5EC (0x0E65C), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_28\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E660, "stubpool_slot_29", "Literal pool slot 29 at 0x0E660 holds 0x00A844. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00A844, "stubpool_target_29",
+            "Slot 29 of the LITERAL POOL at 0x00E5EC (0x0E660), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_29\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E664, "stubpool_slot_30", "Literal pool slot 30 at 0x0E664 holds 0x049BA4. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x049BA4, "stubpool_target_30",
+            "Slot 30 of the LITERAL POOL at 0x00E5EC (0x0E664), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_30\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E668, "stubpool_slot_31", "Literal pool slot 31 at 0x0E668 holds 0x00C370. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00C370, "stubpool_target_31",
+            "Slot 31 of the LITERAL POOL at 0x00E5EC (0x0E668), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_31\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E66C, "stubpool_slot_32", "Literal pool slot 32 at 0x0E66C holds 0x005798. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E670, "stubpool_slot_33", "Literal pool slot 33 at 0x0E670 holds 0x049CF0. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E674, "stubpool_slot_34", "Literal pool slot 34 at 0x0E674 holds 0x00D4FC. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00D4FC, "stubpool_target_34",
+            "Slot 34 of the LITERAL POOL at 0x00E5EC (0x0E674), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_34\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E678, "stubpool_slot_35", "Literal pool slot 35 at 0x0E678 holds 0x00812C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00812C, "stubpool_target_35",
+            "Slot 35 of the LITERAL POOL at 0x00E5EC (0x0E678), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_35\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E67C, "stubpool_slot_36", "Literal pool slot 36 at 0x0E67C holds 0x00ACFC. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00ACFC, "stubpool_target_36",
+            "Slot 36 of the LITERAL POOL at 0x00E5EC (0x0E67C), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_36\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E680, "stubpool_slot_37", "Literal pool slot 37 at 0x0E680 holds 0x04A03E. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x04A03E, "stubpool_target_37",
+            "Slot 37 of the LITERAL POOL at 0x00E5EC (0x0E680), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_37\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E684, "stubpool_slot_38", "Literal pool slot 38 at 0x0E684 holds 0x00658C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00658C, "stubpool_target_38",
+            "Slot 38 of the LITERAL POOL at 0x00E5EC (0x0E684), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_38\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E688, "stubpool_slot_39", "Literal pool slot 39 at 0x0E688 holds 0x005980. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x005980, "stubpool_target_39",
+            "Slot 39 of the LITERAL POOL at 0x00E5EC (0x0E688), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_39\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E68C, "stubpool_slot_40", "Literal pool slot 40 at 0x0E68C holds 0x0081C8. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x0081C8, "stubpool_target_40",
+            "Slot 40 of the LITERAL POOL at 0x00E5EC (0x0E68C), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_40\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E690, "stubpool_slot_41", "Literal pool slot 41 at 0x0E690 holds 0x04A420. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x04A420, "stubpool_target_41",
+            "Slot 41 of the LITERAL POOL at 0x00E5EC (0x0E690), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_41\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E694, "stubpool_slot_42", "Literal pool slot 42 at 0x0E694 holds 0x04A674. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x04A674, "stubpool_target_42",
+            "Slot 42 of the LITERAL POOL at 0x00E5EC (0x0E694), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_42\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E698, "stubpool_slot_43", "Literal pool slot 43 at 0x0E698 holds 0x04A6C6. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x04A6C6, "stubpool_target_43",
+            "Slot 43 of the LITERAL POOL at 0x00E5EC (0x0E698), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_43\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E69C, "stubpool_slot_44", "Literal pool slot 44 at 0x0E69C holds 0x04A6FA. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x04A6FA, "stubpool_target_44",
+            "Slot 44 of the LITERAL POOL at 0x00E5EC (0x0E69C), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_44\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6A0, "stubpool_slot_45", "Literal pool slot 45 at 0x0E6A0 holds 0x00D8D0. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00D8D0, "stubpool_target_45",
+            "Slot 45 of the LITERAL POOL at 0x00E5EC (0x0E6A0), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_45\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6A4, "stubpool_slot_46", "Literal pool slot 46 at 0x0E6A4 holds 0x04AE7C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x04AE7C, "stubpool_target_46",
+            "Slot 46 of the LITERAL POOL at 0x00E5EC (0x0E6A4), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_46\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6A8, "stubpool_slot_47", "Literal pool slot 47 at 0x0E6A8 holds 0x0099E4. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x0099E4, "stubpool_target_47",
+            "Slot 47 of the LITERAL POOL at 0x00E5EC (0x0E6A8), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_47\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6AC, "stubpool_slot_48", "Literal pool slot 48 at 0x0E6AC holds 0x00D1F4. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00D1F4, "stubpool_target_48",
+            "Slot 48 of the LITERAL POOL at 0x00E5EC (0x0E6AC), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_48\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6B0, "stubpool_slot_49", "Literal pool slot 49 at 0x0E6B0 holds 0x0084D8. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x0084D8, "stubpool_target_49",
+            "Slot 49 of the LITERAL POOL at 0x00E5EC (0x0E6B0), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_49\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6B4, "stubpool_slot_50", "Literal pool slot 50 at 0x0E6B4 holds 0x00A694. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00A694, "stubpool_target_50",
+            "Slot 50 of the LITERAL POOL at 0x00E5EC (0x0E6B4), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_50\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6B8, "stubpool_slot_51", "Literal pool slot 51 at 0x0E6B8 holds 0x00BB32. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00BB32, "stubpool_target_51",
+            "Slot 51 of the LITERAL POOL at 0x00E5EC (0x0E6B8), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_51\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6BC, "stubpool_slot_52", "Literal pool slot 52 at 0x0E6BC holds 0x007D12. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x007D12, "stubpool_target_52",
+            "Slot 52 of the LITERAL POOL at 0x00E5EC (0x0E6BC), called from a 0x00E4xx task stub. "
+            + "RENAMED from \"isr_handler_52\", which was positional over a structure misread as an "
+            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
+            + "the 0x0-0x400 vector table. corrections.md item 91.");
+        count += labelComment(0x00E6C0, "stubpool_slot_53", "Literal pool slot 53 at 0x0E6C0 holds 0x04AE82. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
 
         // ============================================================
         // RTOS TASK SCHEDULER (master task table @ 0x3F80)
@@ -3191,7 +3266,8 @@ public class ImportAE5L600L extends GhidraScript {
             "Task Control Block for RTOS Task 12 (gate-only sub-task entry).");
 
         count += labelComment(0xFFFF1288L, "rtos_scheduler_state",
-            "RTOS scheduler state word. Read by task gate (0x10A46/rtos_task_gate) "
+            "SETTLED item 80: SR-masked priority raise plus the MTU0 array. The competing \"inj_gate_hook_ptr\" reading was also wrong. "
+            +             "RTOS scheduler state word. Read by task gate (0x10A46/rtos_task_gate) "
             + "and task epilogue (0x35A4/rtos_task_epilogue) to determine task run eligibility.");
 
         count += labelComment(0xFFFF8EDCL, "ol_dispatch_gate",
@@ -4981,8 +5057,6 @@ public class ImportAE5L600L extends GhidraScript {
         // -- Ignition Timing Map Descriptors (per-mode) --
 
         // -- ISR Dispatch Table --
-        count += labelComment(0x0000E5EC, "isr_dispatch_table",
-            "ISR dispatch table (54 entries x 4 bytes). Maps ISR index to handler address.");
 
         // -- Shared Fuel/Ignition State --
         count += labelComment(0xFFFF895CL, "injector_data",
@@ -5413,7 +5487,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF322CL, "FLKC_slow_learning_value",
             "Fine knock learn (FLKC slow) learning value (float).");
         count += labelComment(0xFFFF3248L, "flkc_grid",
-            "CORRECTED 2026-08-16 (corrections.md item 41). FLKC LEARNING GRID: 35 cells x 8 bytes "
+            "SETTLED (corrections item 41 / closed list): this is the FLKC grid, 7x5 bucketed. "
+            +             "CORRECTED 2026-08-16 (corrections.md item 41). FLKC LEARNING GRID: 35 cells x 8 bytes "
             + "(7 rpm bands x 5 load bands). NOT a per-cylinder float[4]. Read 0x0462AE and write "
             + "0x0464D8 both use index*8; the reset loop at 0x046824 runs `mov #35,r12` / `add #8,r13`; "
             + "and FFFF3248 + 35*8 = FFFF3360, exactly the base of the parallel u16 array. The grid is "
@@ -6882,8 +6957,6 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
 
         // --- system_state (16 labels) ---
-        count += labelComment(0xFFFF20A0L, "system_state_cluster_base",
-            "System state cluster base (0xFFFF20A0-0xFFFF227C, 88 addresses).");
         count += labelComment(0xFFFF20ACL, "system_init_counter_A",
             "System initialization counter/timer A. OL charge workspace cluster.");
         count += labelComment(0xFFFF20BCL, "system_init_counter_B",
@@ -7746,8 +7819,6 @@ public class ImportAE5L600L extends GhidraScript {
             "GBR workspace base (1 use). Region: knock_flkc.");
 
         // --- knock detection ---
-        count += labelComment(0xFFFF81ACL, "gbr_knock_81AC",
-            "GBR workspace base (1 use). Region: knock detection.");
 
         // --- FLKC state ---
         count += labelComment(0xFFFF8218L, "knock_det_workspace_ext",
