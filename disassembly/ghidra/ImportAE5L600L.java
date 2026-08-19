@@ -8216,6 +8216,66 @@ public class ImportAE5L600L extends GhidraScript {
             + "uint16_unpack (0xBE990), branch to DTC set/clear.");
 
 
+        // =====================================================================
+        // SESSION 2026-08-18 -- corrections.md items 72 and 74
+        // Findings that existed only in prose until now. Prose is not replayed
+        // into Ghidra; this file is. See scripts/check_label_sync.py.
+        // =====================================================================
+
+        // -- item 74: task37 one-shot timing retard ---------------------------
+        count += labelComment(0x00041BE4, "timing_oneshot_retard",
+            "task37 stage 4. Applies ECT retard (desc 0xADE08) for ONE call when "
+            + "[FFFF7C9A] hit 4 on the previous pass and [FFFF7C78] > rpm; then recovers "
+            + "toward 0 at +0.7 deg/call, clamped by float_min so it never advances. "
+            + "Output arbitrated most-retard-wins into FFFF8028. NOT FBKC, NOT FLKC.");
+        count += label(0x00041A02, "task37_stage1");
+        count += label(0x00041A48, "task37_stage2");
+        count += labelComment(0x00041A7E, "task37_stage3",
+            "Uses desc 0xAE170 / 0xAE17C, both all-zero on this calibration.");
+        count += labelComment(0x000ADE08, "desc_task37_ect_retard",
+            "1D uint8 x16 on ECT. [0,0,0,0,0,-8.09,-11.95,-16.17,...]. The ONLY "
+            + "descriptor FUN_00041be4 loads. Base of a 17-record contiguous array "
+            + "at stride 0x14; indexing NOT demonstrated -- do not assume it.");
+        count += labelComment(0x000D2C0C, "cal_task37_rpm_gate_INERT",
+            "Compared as rpm_current < this. Value is 0.0, so the gate can NEVER "
+            + "fire. No XML definition. corrections.md item 74.");
+        count += labelComment(0x000D2980, "cal_task37_counter_B_reload",
+            "Reload for FFFF8033 = 1: the retard applies for exactly ONE call.");
+        count += label(0x000D2981, "cal_task37_counter_A_reload");
+        count += labelComment(0x000D2982, "cal_task37_byte_gate",
+            "= 4. Compared against byte [FFFF5E94] when the engine is not running.");
+        count += labelComment(0xFFFF7C9AL, "tier_state_7C9A",
+            "5-state tier code written at 0x03AF04/20/3A/4C/5E. 0-3 from an "
+            + "ascending 3-threshold ladder on [FFFF7CAA]; 4 is a SEPARATE branch "
+            + "that also sets four companion flags. State 4 arms timing_oneshot_retard. "
+            + "Subsystem NOT identified -- adjacent to the decel fuel-cut tier code "
+            + "at 0x03AFF6, which is a lead, not a conclusion.");
+        count += labelComment(0xFFFF7C78L, "task37_rpm_threshold",
+            "float, written at 0x03AD06. Trigger requires this > rpm_current.");
+        count += labelComment(0xFFFF8028L, "kflk_retard_arbitrated",
+            "= float_min(FFFF8020, FFFF8024). Most-retard-wins across sibling "
+            + "timing channels.");
+        count += label(0xFFFF8032L, "task37_counter_A");
+        count += label(0xFFFF8033L, "task37_counter_B");
+        count += labelComment(0xFFFF8034L, "task37_prev_tier_latch",
+            "Latched previous value of FFFF7C9A -- makes the trigger edge-detected.");
+        count += labelComment(0xFFFF8036L, "task37_prev_precond_latch",
+            "Latched previous value of FFFF65C0.");
+        count += label(0xFFFF5E94L, "task37_gate_byte_5E94");
+
+        // -- item 72: func_37B74 fuel multiplier is dead ----------------------
+        count += labelComment(0x000CC32C, "cal_afl_ramp_up_rate_ZERO",
+            "AFL ramp-up rate = 0.0, so min(x+0,1) is a no-op and FFFF7AC0 is a "
+            + "STEP (1.0 or 0.0), not a ramp. No XML definition.");
+        count += labelComment(0x000CC330, "cal_afl_ramp_down_rate_ZERO",
+            "AFL ramp-down rate = 0.0. Same effect on the max(x-0,0) arm.");
+        count += labelComment(0x000D0740, "cal_afl_2d_correction_NEUTRAL",
+            "Data for desc 0xAD71C, 16x2 uint8. All 32 cells raw 0x80 = 0.0 after "
+            + "scale 0.00390625 / bias -0.5. Neutral-filled, NOT empty. This is why "
+            + "func_37B74's product is 0 and the fuel multiplier is a constant 1.0.");
+        count += label(0xFFFF7AC4L, "afl_product_term_C");
+        count += label(0xFFFF7AC8L, "afl_product_term_D");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }
