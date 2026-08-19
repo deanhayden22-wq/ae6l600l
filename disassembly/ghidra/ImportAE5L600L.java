@@ -8289,6 +8289,15 @@ public class ImportAE5L600L extends GhidraScript {
             + "and NOT an engine state code -- both earlier names were wrong.");
         count += label(0xFFFF64F6L, "pedal_released_mode_latch");
 
+        // -- item 78: the last two impossible-instruction sites ---------------
+        count += labelComment(0x0004BBE4L, "lit_pool_fuel_pump",
+            "24-byte literal pool, NOT code: FFFF8366 / irq_level_set / "
+            + "irq_level_restore / float 8.0 / cal_FuelPump_RunTimeGateA / ...GateB. "
+            + "Sits after the rts+delay slot at 0x4BBE2; code resumes at 0x4BBFC.");
+        count += labelComment(0x000BF600L, "align_pad_before_BF604",
+            "4 bytes of 0x0000 alignment padding after the 0xBEDB8-0xBF600 ROM hole. "
+            + "The function starts at 0x0BF604, not here. corrections.md item 78.");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }

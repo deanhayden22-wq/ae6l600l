@@ -4357,3 +4357,62 @@ had correct bytes but no independent corroboration, because the descriptor that
 corroborates them lives in the band coverage_map could not see. Per the flag
 table those go from *"contents only, never meaning"* to *"reason from it,
 including about identity"* -- and they are concentrated in the DBW region.
+
+---
+
+## 78. The last 2 of 765 impossible instructions: a literal pool and 4 bytes of alignment padding — **DIAGNOSED 2026-08-18**
+
+`ClearImpossibleSH2E.java` cleared 763 of 765 in bulk and correctly refused the
+last two, flagging both `REVIEW` at 510 and 154 bytes per hit against 5-9 for
+every data run. Both needed a human decision, and both turned out to be a
+different problem from the other 763.
+
+Both are the word `0x0000`, which matches the `MOVI20` encoding
+`0000nnnniiii0000`. Neither is a calibration block.
+
+### `0x04BBE4-0x04BBFB` — a literal pool, 24 bytes
+
+Sits after `04BBE0: rts / 04BBE2: mov #60,r5` (delay slot), with real code
+resuming at `04BBFC: mov #0,r0`. Every word resolves to a named entity:
+
+```
+04BBE4: 0xFFFF8366  fuel_pump_workspace
+04BBE8: 0x0000317C  irq_level_set
+04BBEC: 0x00003190  irq_level_restore
+04BBF0: 0x41000000  float 8.0
+04BBF4: 0x000D6018  cal_FuelPump_RunTimeGateA
+04BBF8: 0x000D601A  cal_FuelPump_RunTimeGateB
+```
+
+Six words, all meaningful, for the surrounding fuel-pump control code. **The
+"impossible instruction" at `0x04BBF2` is the low half of the float 8.0.**
+The enclosing function's body over-extends past its own `rts`.
+
+### `0x0BF600-0x0BF603` — alignment padding, 4 bytes
+
+`0x0BEDB8-0x0BF600` is an all-`0xFF` ROM hole. Then two `0x0000` words, then a
+genuine prologue:
+
+```
+0BF5F0..0BF600: ffffffffffffffffffffffffffffffff
+0BF600: 0000 / 0BF602: 0000
+0BF604: D225  mov.l @(0x0BF69C),r2
+0BF606: F828  fmov.s @r2,fr8
+```
+
+**The function starts at `0x0BF604`, not `0x0BF600`.** This is a wrong function
+boundary, not a data region.
+
+### Fix, in Ghidra
+
+* `0x04BBE4-0x04BBFB`: clear (`C`), define as 6 dwords (`T`). The function
+  should end after the delay slot at `0x04BBE3`.
+* `0x0BF600`: delete the function, clear the 4 bytes, create the function at
+  `0x0BF604` (`F`).
+
+### Worth keeping
+
+`0x0000` padding and `0x0000`-containing constants decode as `MOVI20` under
+`SuperH:BE:32:SH-2A`. Any future impossible-instruction hit that is a lone
+`0x0000` is padding or a constant's low half, **not** a calibration block --
+the bytes-per-hit ratio separates the two cleanly, and did here.
