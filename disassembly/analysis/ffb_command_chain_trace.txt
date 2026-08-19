@@ -1,0 +1,275 @@
+================================================================================
+FFB (Final Fueling Base) -- the complete command chain, every addend identified
+================================================================================
+Reference bin : rom/AE5L600L 20g rev 20.19c.bin
+                md5 92cae8275cd4f9b473a3a9e36efe6449
+Date          : 2026-08-17
+Method        : ROM bytes only. Decoder scripts/sh2e_disasm.py; writers via
+                scripts/mapping/find_writers.py (all four addressing forms);
+                descriptors decoded fresh, never read out of descriptor_map.txt.
+
+Tiers used below: VERIFIED (cited to address:bytes) / INFERRED (chain stated) /
+OPEN (not settled -- do not build on it).
+
+--------------------------------------------------------------------------------
+PART 0 -- THE UNITS. This is the whole answer to "why is FFB below the map".
+--------------------------------------------------------------------------------
+VERIFIED. Primary Open Loop Fueling uses scaling EstimatedAir/FuelRatio
+(32BITBASE.xml:67):
+
+    toexpr = 14.7/(1 + x*.0078125)
+
+The map does NOT store an AFR. It stores (phi - 1) * 128, an ENRICHMENT OVER
+STOICH, where phi = 14.7/AFR is the equivalence ratio.
+
+The logged FFB channel is the same quantity:
+
+    logs/logcfg.txt:14   paramid 0xFF6852, databits 16
+    scalingrpn = 14.7,x,.0004882812,*,/      ->  AFR = 14.7 / (raw/2048)
+
+So FFB and the OL map are the SAME quantity in the SAME units, and the map is
+ONE ADDEND in a sum. FFB reads below the map (in AFR) whenever any other term is
+positive. Nothing is lost, and no hidden multiplier is involved.
+
+Consequence worth carrying: the terms add in phi, and you read the result in
+AFR. The AFR gap is therefore NOT constant. The same +0.105 of enrichment is
+~0.8 AFR at an 11.0 command but only ~0.15 AFR at 14.7. A gap that looks
+dramatic at WOT can be an ordinary constant term.
+
+Worked example (the numbers from the 2026-08-16 brief):
+    map  11.0 AFR -> phi = 1.3364
+    FFB  10.2 AFR -> phi = 1.4412
+    delta phi = 0.1048  =  13.4 counts on the map's own 128-per-unit scale.
+
+--------------------------------------------------------------------------------
+PART 1 -- THE LOGGING PATH (how the number reaches the datalogger)
+--------------------------------------------------------------------------------
+VERIFIED.
+
+  1. FFB paramid 0xFF6852 -> RAM 0xFFFF6852.
+  2. 0xFFFF6852 has exactly ONE writer, GBR-relative (a literal-pool scan finds
+     zero, which is why this needed find_writers.py):
+
+        0244FC: C10B  mov.w r0,@(22,gbr)      ; GBR = 0xFFFF683C set @0243C8
+                                              ; 0xFFFF683C + 22 = 0xFFFF6852
+
+  3. It sits in the SSM packing block. The source and scale are the three
+     instructions before it:
+
+        0244EE: D277  mov.l @(0x0246CC),r2    ; r2  = 0xFFFF730C   <- SOURCE
+        0244F0: F428  fmov.s @r2,fr4
+        0244F2: F6DC  fmov fr13,fr6           ; fr6 = 0.0  (bias, fldi0 @0243D0)
+        0244F4: C776  mova @(0x0246D0),r0
+        0244F6: FF08  fmov.s @r0,fr15         ; fr15 = 0.000488281 = 1/2048
+        0244F8: 4D0B  jsr @r13                ; r13 = 0x000BE5D8
+        0244FA: F5FC  fmov fr15,fr5           ; fr5 = scale
+
+  4. The packer 0x0BE5D8 is round-then-clamp:
+
+        0BE5DA  fsub fr6,fr4        ; v - bias
+        0BE5DE  fdiv fr5,fr4        ; / scale
+        0BE5E0..E6  fadd 0.5 ; ftrc ; clamp to [0, 0xFFFF]
+                              (0.5 at 0x0BE600, 0xFFFF at 0x0BE604)
+
+     => stored word = round(phi * 2048), which the logcfg expression inverts.
+
+  ** 0xFFFF730C IS THE COMMANDED EQUIVALENCE RATIO phi. **
+
+  Note: 0xFFFF730C is the COMMON (pre-per-cylinder) command. The four
+  per-cylinder values are stored separately at -48/-44/-40/-36 off 0xFFFF7340
+  (0x030128 onward) and are NOT in FFB.
+
+--------------------------------------------------------------------------------
+PART 2 -- WHERE 0xFFFF730C COMES FROM
+--------------------------------------------------------------------------------
+VERIFIED. One writer, indexed:
+
+    03011C: FD07  fmov.s fr0,@(r0,r13)   ; r13 = 0xFFFF7340, r0 = -52
+                                         ; 0xFFFF7340 - 52 = 0xFFFF730C
+
+fr0 is the output of the clamp helper 0x0BE56C called at 0x030116 with
+fr5 = 0.0 (lo) and fr6 = 32.0 (hi):
+
+    030110  mova @(0x0301E0),r0 / fmov.s @r0,fr14   ; 32.0
+    030116  jsr @r14 (=0x0BE56C) / 030118 fldi0 fr5
+
+and its input fr4 is set at 0x0300BE-0x0300C4:
+
+    0300BE: F4EC  fmov fr14,fr4          ; fr4 = the accumulated sum
+    0300C0: DD28  mov.l @(0x030164),r13  ; r13 = 0xFFFF7340
+    0300C2: F8D8  fmov.s @r13,fr8
+    0300C4: F482  fmul fr8,fr4           ; fr4 = sum * [0xFFFF7340]
+
+    FFB_phi = clamp( SUM * [0xFFFF7340], 0.0, 32.0 )
+
+[0xFFFF7340] is 1.0 in normal running -- VERIFIED at its three writers:
+    02FF74 fldi1 fr8 / 02FF7A fmov.s fr8,@r2        -> 1.0
+    02FFD4 fldi1 fr5 / 02FFD8 fmov.s fr5,@r2        -> 1.0
+    02FFCE/02FFD2                                   -> clamp(1 + byte/100, hi 1.2)
+The 1.2 path is reached ONLY when byte[0xFFFF8F24]==1 AND byte[0xFFFF8F08]!=0
+(02FFA4-02FFB2). Treat it as a special mode, not a normal-driving term.
+
+--------------------------------------------------------------------------------
+PART 3 -- THE SUM, TERM BY TERM  (function 0x02FFE0-0x03012E)
+--------------------------------------------------------------------------------
+VERIFIED structure. There are TWO structurally different summations, selected by
+a ROM CAL BYTE:
+
+    030070  mov.b @r6,r0   ; r6 = 0x0CBBD2
+    030072  cmp/eq #90,r0
+    030074  bf/s 0x030096
+
+    ROM byte [0x0CBBD2] = 0x00 on this cal  ->  NOT-EQUAL branch is LIVE.
+    The ==90 branch (0x030078-0x030094) is DEAD on this calibration.
+
+LIVE FORMULA (branch 0x030096, assembled from 0x03003A-0x0300BC):
+
+    base    = 1.0 + [73B4] + [7A08] + [7A14] + [7AF4] + [7B8C]
+    floor   = MIN( [73A4] + [7BE4], 0.65 ) + [7354] + [7374]
+    mapterm = MIN( [798C] + [7A20], 0.52 )
+    phi     = base + MAX( mapterm, floor ) - [7A44] + [7BCC] + [7BA8]
+
+  (all addresses 0xFFFFxxxx; helpers VERIFIED from bytes this session:
+   0x0BE960 = MAX -- 0BE960 fcmp/gt fr5,fr4 -> returns fr4 if fr4>fr5
+   0x0BE970 = MIN -- 0BE970 fcmp/gt fr4,fr5 -> returns fr4 if fr5>fr4
+   This confirms CLAUDE.md and corrects a reversed one-line note in the
+   project memory index.)
+
+The MAX(mapterm, floor) is the classic "minimum enrichment" structure: whichever
+of the OL map path and the minimum-enrichment path is RICHER wins.
+
+--------------------------------------------------------------------------------
+PART 4 -- WHAT EACH TERM IS, AND WHAT CALIBRATES IT
+--------------------------------------------------------------------------------
+Writers found with find_writers.py over 0xFFFF7300-0xFFFF7C00 (one pass).
+
+[0xFFFF798C]  THE OL FUELLING MAP RESULT.                          VERIFIED
+    Written by the OL blend module, base r12 = 0xFFFF79F0 (@0360D2), r0 = -100:
+        03621E / 036236  fmov.s fr8,@(r0,r12)
+    Mode-selected at 036210-036236 (byte==1 -> direct copy; ==2 -> fmac blend).
+    The module loads, in one function, the descriptors for:
+        0xAD674 -> Primary Open Loop Fueling (KCA Alternate Mode)   0xCFD30
+        0xAD690 -> Primary Open Loop Fueling (Failsafe)(KCA Alt)    0xCFEF0
+        0xAD6C8 -> Primary Open Loop Fueling (KCA Additive B Low)   0xD0244
+        0xAD6E4 -> Primary Open Loop Fueling (KCA Additive B High)  0xD0404
+        0xAD700 -> Primary Open Loop Fueling (Failsafe)             0xD05C4
+        0xAC5A8 -> Primary OL Fueling Compensation (Timing Comp)    0xCCD30
+    TUNABLE: yes -- these are the named OL tables.
+
+[0xFFFF7A20]  adds to the map term INSIDE the 0.52 clamp.           VERIFIED addr
+    Writers 036E7C (base 0xFFFF7A38-24), 036F64 (base 0xFFFF7A3C-28).
+    Module constants: 0xCC274=102, 0xCC278=105, 0xCC27C=12000, 0xCC280=12800,
+                      0xCC284=0.1, 0xCC288=0.1, 0xCC28C=0.2, 0xCC290=0.2
+    102/105 and 12000/12800 read as ECT and RPM guard pairs.  INFERRED.
+    TUNABLE: constants only, none currently carry XML definitions.
+
+[0xFFFF73A4] + [0xFFFF7BE4]  THE MINIMUM-ENRICHMENT FLOOR.          VERIFIED
+    73A4 writer 030B30 (base 0xFFFF73AC-8). Its module reads:
+        0xAD5E8 -> Min Primary Base Enrichment 1 Non-Cruise   0xCF8B8
+        0xAD604 -> Min Primary Base Enrichment 1 Cruise       0xCF95C
+        0xAC3E0 -> (undefined)                                0xCC921
+    7BE4 writer 039E38 (direct). No cal refs in window.
+    TUNABLE: yes -- the two Min Primary Base Enrichment tables.
+
+[0xFFFF7354]  floor adder.                                          VERIFIED addr
+    Writer 03059A (base 0xFFFF7370-28). Module reads descriptors
+        0xAC3CC -> (undefined) 0xCC911 ;  0xAD5B0 -> (undefined) 0xCF7C4
+    Constants 0xCBE10=119, 0xCBE14=10000.
+[0xFFFF7374]  floor adder.                                          VERIFIED addr
+    Writer 030AAC (base 0xFFFF73A0-44). Descriptor 0xAD5CC -> (undefined) 0xCF884
+
+[0xFFFF7A08]  ECT-DRIVEN ENRICHMENT THAT DECAYS TO ZERO.            VERIFIED
+    Writers 036B6A / 036B9A / 036BA0 (base 0xFFFF7A0C-4).
+        036B4C  r2 = 0xFFFF6350 (ECT) -> fr4
+        036B5E  r4 = descriptor 0x0AC620  (data 0xCCE06, NO definition)
+        036B62  jsr 0x0BE830  (table_lookup)
+        036B8A  subtract cal [0x0CC230] = 0.004 per pass
+        036B90  jsr 0x0BE960 (MAX) with 0.0 -> floored at zero
+    So: seeded from an ECT table, then decayed 0.004 per pass to 0.
+    This is a post-start enrichment. TUNABLE: 0xCCE06 (needs a definition) and
+    the 0.004 decay step at 0xCC230.
+
+[0xFFFF7A14]                                                        VERIFIED addr
+    Writers 036C36 (base 0xFFFF7A18-4), 036CFA/036D04 (base 0xFFFF7A1C-8).
+    Constants 0xCC238=0, 0xCC23C=70, 0xCC240=0, 0xCC244=0.3, 0xCC248=0,
+              0xCC258=0.15
+
+[0xFFFF7AF4]                                                        OPEN
+    Only TWO writes resolve, and the one in the fuel path (0x0388A0) is inside a
+    BLOCK RESET: 038876 fldi0 fr9 then stores 0.0 to -52,-48,-40,-36,-28,-32,-76
+    off 0xFFFF7B40. So the write found is a CLEAR, not a computation.
+    Where its live value is produced is NOT established.
+
+[0xFFFF7B8C]  TRANSIENT / TIP-IN FAMILY.                            VERIFIED addr
+    Writer 0391D0 (base 0xFFFF7BA0-20), and it is a SUM of two neighbours:
+        0391C4  fmov.s @(r0=-16,r10),fr8   ; [0xFFFF7B90]
+        0391CA  fmov.s @(r0=-12,r10),fr9   ; [0xFFFF7B94]
+        0391CC  fadd fr9,fr8
+        0391D0  fmov.s fr8,@(r0=-20,r10)   ; -> [0xFFFF7B8C]
+    Module descriptors 0xAD208 (data 0xCE8B4) and 0xAD21C (data 0xCE8E0), both
+    UNDEFINED in the XMLs. Constant 0xCC3DC = 80.
+    This is the strongest candidate for the acceleration-dependent term.
+    Confirming which of 7B90/7B94 moves on a throttle step is the next step.
+
+[0xFFFF7BCC]  GATED ENRICHMENT, three cal thresholds.               VERIFIED
+    Writers 03992E / 039936 / 03993E / 03996A (base 0xFFFF7BD0-4).
+    Gate chain at 0398F8-039920, all three must pass or the term is set to 0.0:
+        input [0xFFFF7A20] through helper at 0398FA
+        0xCC40C = 0     require value >= 0
+        0xCC404 = 0.25  require fr15 <  0.25
+        0xCC408 = 1.0   require fr13 >= 1.0
+    TUNABLE: the three thresholds are plain floats with no XML definition.
+
+[0xFFFF7BA8]  ADDED UNCONDITIONALLY in the live branch.             VERIFIED
+    Writers 0395FA / 03960A (base 0xFFFF7BC0-24).
+    Module constants 0xCC3EC = 0.0 and 0xCC3F0 = 0.0  -- BOTH ZERO.
+    Flagged: a zero-pair gate is exactly the 0xAD258 signature (corrections
+    item 42). Whether this term is inert on this cal is NOT yet settled.
+
+[0xFFFF73B4]  first addend of base.                                 OPEN
+    THREE literal-pool references (0x0246D4, 0x0301A4, 0x032EEC) and ALL THREE
+    ARE READS. find_writers reports ZERO stores in any of the four addressing
+    forms. It is also SSM-packed to slot 0xFFFF6854 with the same 1/2048 scale
+    as FFB (02450A), i.e. it is a phi-domain quantity someone intended to log.
+    If RAM is zero-initialised and nothing writes it, it contributes 0.0 --
+    but that is INFERRED, not shown. Do not assume either way.
+
+[0xFFFF7A44]  SUBTRACTED in the live branch.                        OPEN
+    Zero writers found. Same caveat as 0xFFFF73B4. A subtractive term that is
+    never written would be inert; unproven.
+
+[0xFFFF7A78..84] and [0xFFFF7B44..50]  PER-CYLINDER, NOT IN FFB.    VERIFIED
+    Two 4-float arrays copied to the stack at 030000-03002E and added ONLY to
+    the four per-cylinder outputs (0300C6-03010C). FFB excludes them.
+    7A78 array writer: 037596-0375A2 (base 0xFFFF7AB0, -56/-52/-48/-44).
+
+--------------------------------------------------------------------------------
+PART 5 -- THE RICH CLAMPS (the two most consequential numbers here)
+--------------------------------------------------------------------------------
+VERIFIED values, INFERRED interpretation:
+
+    0x0CBE04 = 0.52   caps the OL-map path      -> phi 1.52 -> 9.67 AFR
+    0x0CBE00 = 0.65   caps the floor path       -> phi 1.65 -> 8.91 AFR
+
+Both are hard MIN clamps applied BEFORE the MAX, so they bound how rich each
+path can ask for on its own. Neither has an XML definition.
+
+--------------------------------------------------------------------------------
+PART 6 -- WHAT THIS CLOSES
+--------------------------------------------------------------------------------
+The 2026-08-16 brief framed "FFB ~0.8 AFR below the OL map at WOT" as evidence
+of a missing MULTIPLIER in the IPW stack, and item 42 removed 0xAD258 as that
+lever without replacing the frame. The frame itself was wrong: the command is a
+SUM in phi-space, not a product in AFR-space, and the map is one addend of about
+a dozen. The gap needs no unexplained multiplier.
+
+--------------------------------------------------------------------------------
+OPEN, in priority order
+--------------------------------------------------------------------------------
+1. Which of [0xFFFF7B90] / [0xFFFF7B94] moves on a throttle step (the accel term).
+2. Whether [0xFFFF7BA8] is inert -- its two module constants are both 0.0.
+3. The writers of [0xFFFF73B4] and [0xFFFF7A44]. Zero stores resolve; either
+   they are memset-only (inert) or written by a form find_writers cannot see.
+4. Definitions for 0xCE8B4, 0xCE8E0, 0xCCE06, 0xCC911, 0xCF7C4, 0xCF884, 0xCC921
+   and the scalars 0xCBE00, 0xCBE04, 0xCC404/408/40C, 0xCC230.
+================================================================================
