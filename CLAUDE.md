@@ -79,7 +79,30 @@ These exist because confident-but-wrong answers have been produced here before.
 6. **State your evidence.** Cite `file:line` for derived claims and
    `address: bytes -> mnemonic` for binary claims. If you did not verify it,
    say so rather than presenting it as established.
-7. **Check operands, not just mnemonics.** The known errors in this repo are
+7. **A LABEL IS NOT EVIDENCE. Check its tag before building on it.**
+   Every Ghidra label's comment now opens with its evidence class, stamped by
+   `scripts/mapping/label_provenance.py`:
+
+   | tag | meaning | what you may do |
+   |---|---|---|
+   | `[TRACED]` | the address appears in a verifier-checked file under `disassembly/analysis/` — bytes decoded and machine-checked | reason from it, but see below |
+   | `[CITED]` | mentioned in `corrections.md`, no byte-level check | treat as a lead |
+   | `[UNVERIFIED]` | **the name is the only artefact** | a hypothesis. Never a premise. |
+
+   **781 of 2,476 labels (32%) are `[UNVERIFIED]`.** In the listing they look
+   exactly like the other 68%.
+
+   Even `[TRACED]` means the *address was decoded*, not that the *name is right*
+   — the same distinction as `VERIFIED-BOTH` on the table side.
+
+   > **Three for three.** Every time this project has inferred an identity from a
+   > project-assigned label, it has been wrong: the wall-wetting reading from
+   > `transient_state_flag` proximity (item 88); `0xAB03C` from
+   > `manifold_pressure_map` proximity (item 94); the enrichment reading from
+   > `ol_enrichment_accum` (item 95). Every time it has decoded structure from
+   > bytes, that has held. **Decode the consumer. Do not reason from the name.**
+
+8. **Check operands, not just mnemonics.** The known errors in this repo are
    almost all operand-level: wrong displacement field width, wrong register
    field, missing `& ~3` on PC-relative targets, inverted `fmov.s` direction.
    A mnemonic-only comparison passes all of them.
@@ -324,6 +347,7 @@ wrong answer. Import them; do not re-derive.
 | tool | use it for |
 |---|---|
 | `scripts/desc_types.py` | **The** typecode map, plus `read_table()` / `scaling()` / `typecode()` / `is_2d()`. Single source of truth. Never re-declare the map — it was copy-pasted into five scripts and all five carried a guess. |
+| `scripts/mapping/label_provenance.py` | Classify every Ghidra label `[TRACED]` / `[CITED]` / `[UNVERIFIED]` and stamp the class into its comment. Idempotent — re-run after new analysis and classes upgrade automatically. **Run it after any labelling work.** |
 | `scripts/mapping/table_triage.py` | Triage every ROM descriptor no definition names: geometry, cell type, scale, data range, flat?, axis names where an axis is shared with a defined table, consumers, RAM context, subsystem hint. `--live` drops flat and diagnostic. **947 unnamed → 73 worth looking at.** Built 2026-08-19; see `docs/analysis-plan.md`. |
 | `scripts/mapping/find_writers.py` | Find every WRITE to a RAM address. Handles direct, displacement, indexed `@(r0,Rn)` and GBR-relative forms, and tracks `r0` through `add`/`extu`. |
 | `scripts/mapping/reconcile_ram_labels.py` | Harvest and rank conflicting RAM-address label claims across the artifacts. Reports; does not adjudicate. |
