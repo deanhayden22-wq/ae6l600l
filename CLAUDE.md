@@ -102,6 +102,25 @@ picking up anything, and update it when you close one.
 > "consumer" it named never touched the value. Before chasing a frame slot,
 > check whether the base register is loaded from a literal pool — item 82.
 
+### Ghidra labels are ADDITIVE — deleting a call does not unlabel anything
+
+`ImportAE5L600L.java` labels with `createLabel(addr, name, true)`, which **adds**
+a label and makes it primary. It never removes one, and Ghidra allows several
+labels per address. Removing a `labelComment` call stops the name being
+re-applied; it does **not** remove it from a program already imported. The stale
+name survives as a secondary symbol, still searchable and still in the Symbol
+Tree.
+
+**After any label retirement, run `disassembly/ghidra/RetireStaleLabels.java`
+first, then re-run the import.** The current copy removes the 129 names retired
+by corrections items 91–93. It is idempotent and touches only those exact
+(address, name) pairs.
+
+> **Editing the import script: match on the PARSED address, not the literal
+> text.** The same address appears as `0xAD090`, `0x0AD090L`, `0x000AD090` and
+> `0x00E5ECL`. Text-keyed regex edits have silently missed labels four times
+> (item 93).
+
 ### Corrections history
 
 **[`docs/corrections.md`](docs/corrections.md)** records every verified error and
