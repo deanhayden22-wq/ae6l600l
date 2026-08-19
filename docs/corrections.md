@@ -4640,3 +4640,81 @@ Two of the five ended with **both** competing names wrong, matching `0xFFFF6254`
 and `0xFFFF64F5`. Per the standing rule, no replacement name is invented for
 those beyond what the code establishes: a debounced flag, and a clamped
 difference.
+
+---
+
+## 81. `0xFFFF3234` is the IAM — settled from the DEFINITION XML — **CLOSES OPEN-HOLE 1, 2026-08-18**
+
+The last of the seven. `find_writers.py` found nothing at this address, nor
+anywhere in a 96-byte window, so the base is computed and no writer-based method
+could reach it. It was settled from the read side instead.
+
+### The neighbourhood already said knock-learning
+
+`0xFFFF3234` appears as a literal-pool word at **14 sites**, and its neighbours
+are all named:
+
+```
+0xFFFF322C  FLKC_slow_learning_value   (-8)
+0xFFFF3234  ram_IAM                    ( 0)   <- 14 pool sites
+0xFFFF323C  FLKC_BASE_STEP             (+8)
+0xFFFF3244  flkc_fg_R0_init           (+16)
+0xFFFF3248  flkc_grid                 (+20)
+```
+
+It is read as a **float** (`fmov.s @r2,fr8`), at `0x042F50`, immediately beside
+`FLKC_slow_learning_value` at `0x042F54`.
+
+### The proof is in the definition XML, not the labels
+
+At `0x042F70` the same function gates on it:
+
+```
+042F4C  r2 = [0x043070] = 0xFFFF6364   fr4 = *r2     IAT
+042F50  r2 = [0x043074] = 0xFFFF3234   fr8 = *r2     <- the address in question
+042F70  r2 = [0x04308C] = 0x000D2CF4   fr6 = *r2     a CALIBRATION
+042F74  fcmp/gt fr8,fr6
+042F76  bt 0x043014                                   bail if cal > [0xFFFF3234]
+```
+
+`0x000D2CF4` is a **defined table** in the project XML:
+
+* name **`Timing Compensation B (IAT) IAM Activation`**
+* category `Ignition Timing - Compensation`
+* scaling **`IgnitionAdvanceMultiplier(IAM)`**, units "Ignition Advance
+  Multiplier (IAM)", min `-1.0`, max `1.0`
+* value **0.6000** in both stock and 20.19d
+* description: *"When the ignition advance multiplier (IAM) is greater than this
+  threshold, the 'Timing Compensation B (IAT)' will potentially be active ...
+  When the IAM is less than or equal to this threshold, this timing compensation
+  will be set to zero."*
+
+The definition says the threshold is compared against IAM. The ROM code compares
+it against `0xFFFF3234`, in a function that also loads IAT. **`0xFFFF3234` is
+the IAM.** This is the definition-XML method CLAUDE.md recommends -- calibration
+name to RAM variable, mechanically -- and it is `VERIFIED-BOTH` class evidence:
+definition side and code side, independently.
+
+### Adjudication
+
+| claim | verdict |
+|---|---|
+| `flkc_work_bank1` (knock_flkc) | **WRONG.** FLKC's own values are the neighbours at `322C`/`323C`/`3244`/`3248`. This is not FLKC workspace. |
+| `knock_learn_coarse` (ignition_timing) | **RIGHT in substance.** IAM is exactly the coarse global knock-learning term, as distinct from FLKC's fine per-cell learning. |
+| `ram_IAM` (already in `ImportAE5L600L.java`) | **CORRECT**, and now verified rather than asserted. |
+
+### Still open about it
+
+**The writer is still unfound.** IAM is learned, so something must write it, but
+it is not reachable by any of the four addressing forms `find_writers.py`
+handles. That is a limitation of the tool, not evidence the value is constant.
+
+### Open-hole 1 is CLOSED
+
+All seven addresses adjudicated (items 76, 80, 81). Final tally: **two names
+right, one right in substance, and four of seven where BOTH competing labels
+were wrong** (`0xFFFF6254`, `0xFFFF64F5`, `0xFFFF8F24`, `0xFFFF895C`).
+
+That last number is the durable lesson. Where a majority of disputed addresses
+have no correct name on either side, agreement between artifacts was never
+evidence -- it meant two files had copied one guess.

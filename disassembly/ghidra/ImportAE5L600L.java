@@ -8343,6 +8343,18 @@ public class ImportAE5L600L extends GhidraScript {
             + "0xFFFF7878 per item 70. No identity claimed.");
         count += label(0x000D6280L, "cal_clamp_ceiling_1000");
 
+        // -- item 81: 0xFFFF3234 is the IAM, proven from the definition XML ---
+        count += labelComment(0xFFFF3234L, "ram_IAM",
+            "Ignition Advance Multiplier, float. VERIFIED: at 0x042F74 it is compared "
+            + "against cal 0x0D2CF4, whose XML definition is 'Timing Compensation B "
+            + "(IAT) IAM Activation' with scaling IgnitionAdvanceMultiplier(IAM), value "
+            + "0.60. Definition side and code side agree. 'flkc_work_bank1' is WRONG; "
+            + "'knock_learn_coarse' is right in substance. Writer still unfound -- the "
+            + "base is computed. corrections.md item 81.");
+        count += labelComment(0x000D2CF4L, "cal_TimingCompB_IAT_IAM_Activation",
+            "= 0.60. Timing Compensation B (IAT) is zeroed when IAM <= this. The "
+            + "comparison at 0x042F74 is what identifies 0xFFFF3234 as the IAM.");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }

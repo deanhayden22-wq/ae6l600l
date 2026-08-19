@@ -15,7 +15,11 @@ answer.
 
 ---
 
-## 1. Seven RAM addresses with genuinely conflicting labels
+## 1. ~~Seven RAM addresses with genuinely conflicting labels~~ — **CLOSED 2026-08-18**
+
+**All seven adjudicated** (corrections items 76, 80, 81). Four of the seven had
+**both** competing names wrong. Numbering kept so existing "hole #N" references
+stay valid.
 
 `docs/corrections.md` item 66. `scripts/mapping/reconcile_ram_labels.py`
 harvested and ranked every address→label claim; 26 conflicts survive filtering,
@@ -24,7 +28,7 @@ and these seven are the ones that are materially different rather than wording.
 | address | competing claims | registry flag |
 |---|---|---|
 | ~~`0xFFFF64F5`~~ | **RESOLVED 2026-08-18 — item 76. Neither name. It is a DEBOUNCED CLOSED-PEDAL flag (`counter > 2`), overloaded to carry `fuel_system_state` when `adc_channel_status == 1`.** | |
-| `0xFFFF3234` | `flkc_work_bank1` vs `knock_learn_coarse` — **no writer even on a 0xFFFF3200-325F window scan**; neighbours at `0xFFFF3244` are written from `0x045xxx` (FLKC code). Needs a non-writer method. | UNMAPPED |
+| ~~`0xFFFF3234`~~ | **RESOLVED — item 81. It is the IAM.** Proven from the definition XML: cal `0x0D2CF4` (`Timing Compensation B (IAT) IAM Activation`, scaling `IgnitionAdvanceMultiplier(IAM)`, 0.60) is compared against it at `0x042F74`. `flkc_work_bank1` WRONG; `knock_learn_coarse` right in substance. | |
 | ~~`0xFFFF8258`~~ | **RESOLVED — item 80. A knock-workspace product INTEGRATOR; `knock_metric` in kind, `flkc_retard` unsupported (produces no degrees).** | |
 | ~~`0xFFFF7F68`~~ | **RESOLVED — item 80. ECT warm-up blend, 4 modes on `ect_current`. Identity vs use — both names describe it from opposite ends.** | |
 | ~~`0xFFFF1288`~~ | **RESOLVED — item 80. `rtos_scheduler_state`: SR-masked priority raise + MTU0 array. `inj_gate_hook_ptr` WRONG.** | |
