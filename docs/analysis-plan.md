@@ -45,10 +45,9 @@ decoding deeply** — the triage is cheap and the deep dives are not.
 
 ---
 
-## Phase 0 — build the tool (do this first)
+## Phase 0 — build the tool — **DONE 2026-08-19**
 
-Today's triage was rebuilt three times in scratchpad. Make it a repo tool:
-`scripts/mapping/table_triage.py`, emitting one row per unnamed descriptor:
+`scripts/mapping/table_triage.py`. One row per unnamed descriptor:
 
 ```
 address | dim | cell type | shape | scale/bias | data min/max | FLAT?
@@ -67,21 +66,63 @@ carried over or the output is wrong:
   ground truth from the XML and beats any breakpoint heuristic — a naive
   classifier calls the 4–80 g/s mass-airflow ladder a temperature axis.
 
-## Phase 1 — triage all 947
+## Phase 1 — triage all 947 — **DONE 2026-08-19**
 
-Run the tool once. Expected from the two slices: ~380 flat, ~240 diagnostic,
-leaving **~330 live and non-diagnostic**. Publish the table; do not decode
-anything yet.
+```
+python scripts/mapping/table_triage.py --json disassembly/maps/table_triage.json
+python scripts/mapping/table_triage.py --live --json disassembly/maps/table_triage_live.json
+```
 
-## Phase 2 — rank, do not sweep
+| | predicted | **actual** |
+|---|---|---|
+| named by a definition | — | 147 |
+| scanner artefacts | ~11 | **14** |
+| unnamed, triaged | 947 | **936** |
+| flat (inert as shipped) | ~380 | **383** (41%) |
+| diagnostic | ~240 | **109** |
+| **live and non-diagnostic** | ~330 | **472** |
+| axis identity free from a shared axis | 158 | **158** |
+| with a direct call site | — | 828 |
 
-Keep only tables whose consumer touches RAM belonging to something actually
-tuned: fuel, knock, boost/wastegate, AVCS, timing. Drop everything whose
-consumer sits in the diagnostic workspaces (`0xFFFFA1xx`, `0xFFFF8Axx`,
-`gbr_sens_*`, `diag_precondition_flag_65C0`) — that was 48 of 198 in the two
-slices and none of it is a lever.
+The flat prediction was almost exact; the diagnostic share was overestimated
+because the first two slices happened to land in diagnostic-heavy regions.
 
-## Phase 3 — deep-dive, one cluster at a time
+## Phase 2 — rank, do not sweep — **SHORTLIST PRODUCED**
+
+Of the 472 live rows, **73 have a consumer touching a subsystem that actually
+gets tuned**. The other 399 are unassigned — their consumers touch RAM outside
+the signature list in the tool, which is a gap in the signatures, not proof the
+tables are uninteresting.
+
+```
+transient fuel 19 | throttle/pedal 15 | boost/MAP 13 | CL/OL fuelling 11
+OL enrichment/thermal 7 | knock 4 | FLKC 2 | idle 2
+```
+
+**947 → 73.** That is the list to work from; it is in
+`disassembly/maps/table_triage_live.json` (filter on a non-empty `subsystem`).
+
+Sanity check that the tool is finding the right things: it independently
+re-surfaced every cluster traced by hand — the `0xAC818`/`0xAC840` coolant decay
+rates (item 88), the `0xAD960` thermal-lag model (item 89), `0xAE284`/`0xAE290`
+in the knock detector (item 82), and `0xAD8D4`/`0xAD90C`, the CL Fuelling Target
+Comp siblings (items 70, 83).
+
+### Biggest unexamined candidates on that shortlist
+
+| descriptor | shape | range | hint |
+|---|---|---|---|
+| `0xAB03C` | 2-D uint8 31×15 | 0 … 100 | boost/MAP, consumer touches `manifold_pressure_map` |
+| `0xAA850` | 2-D uint16 29×11 | 0 … 1045 | throttle/pedal |
+| `0xAB288` | 2-D uint16 13×13 | 0.053 … 1.0 | boost/MAP |
+| `0xAAD08` / `0xAAD24` | 2-D uint16 6×11 | 7 … 261 / 1.4 … 331 | boost/MAP |
+| `0xAD054` | 1-D uint16 ×16 | 0 … 29000 | CL/OL, consumer reads `clol_mode_flag` |
+| `0xAE0D8` | 1-D uint16 ×16 | 0 … 70000 | throttle/pedal |
+
+A 31×15 percentage surface indexed near manifold pressure is the single most
+interesting unexamined table in the ROM.
+
+## Phase 3 — deep-dive, one cluster at a time — **NEXT**
 
 Only now decode consumers. The sequence that worked on both clusters today:
 

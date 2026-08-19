@@ -37,8 +37,10 @@ boundary error, not a discovery. Do not build an explanation on top of it.
 
 These exist because confident-but-wrong answers have been produced here before.
 
-1. **Verify against ROM bytes.** `disassembly/maps/disassembly.txt`, the Ghidra
-   export XML, and the `analysis/*.txt` files are all *derived products*. Decode
+1. **Verify against ROM bytes.** The Ghidra export XML and the `analysis/*.txt`
+   files are *derived products*. `disassembly/maps/disassembly.txt` is **not a
+   disassembly at all** despite its name — it is a Ghidra statistics summary
+   from a 2026-03-08 FPU-blind export, with zero instruction lines in it. Decode
    the actual bytes with `scripts/sh2e_disasm.py` before making a claim about
    control flow, function boundaries, or semantics. To check a whole file:
 
@@ -322,6 +324,7 @@ wrong answer. Import them; do not re-derive.
 | tool | use it for |
 |---|---|
 | `scripts/desc_types.py` | **The** typecode map, plus `read_table()` / `scaling()` / `typecode()` / `is_2d()`. Single source of truth. Never re-declare the map — it was copy-pasted into five scripts and all five carried a guess. |
+| `scripts/mapping/table_triage.py` | Triage every ROM descriptor no definition names: geometry, cell type, scale, data range, flat?, axis names where an axis is shared with a defined table, consumers, RAM context, subsystem hint. `--live` drops flat and diagnostic. **947 unnamed → 73 worth looking at.** Built 2026-08-19; see `docs/analysis-plan.md`. |
 | `scripts/mapping/find_writers.py` | Find every WRITE to a RAM address. Handles direct, displacement, indexed `@(r0,Rn)` and GBR-relative forms, and tracks `r0` through `add`/`extu`. |
 | `scripts/mapping/reconcile_ram_labels.py` | Harvest and rank conflicting RAM-address label claims across the artifacts. Reports; does not adjudicate. |
 | `scripts/mapping/sync_import_java_labels.py` | Sync descriptor labels into `ImportAE5L600L.java`. Address-keyed, additive, idempotent. **Use this, not `update_import_java.py`** (insert-only, would duplicate every label). |
