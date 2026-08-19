@@ -5440,3 +5440,65 @@ conflicts now              :  83
 
 `javac` exit 0 against Ghidra 12.0.2. **83 conflicts remain**, all pre-existing.
 They are not one family — each needs its own evidence. See open-holes #8.
+
+---
+
+## 92. The auto-generated flag-reader labels were RIGHT; the hand-written "helper" names were wrong — **2026-08-19**
+
+Item 91 left 83 conflicts and predicted that the `check_*` / `diag_*` family —
+headed in the file as *"FLAG READER LABELS (auto-generated from ROM byte pattern
+scan)"* — was "the same shape of error as the one just retired" and should be
+tested as a family first.
+
+**That prediction was backwards.** Decoding the functions settles it the other
+way: the auto-generated names describe what the code does; the hand-written
+"Miscellaneous High-Call-Count / Sensor Reading Helpers" names do not.
+
+All five contested functions are six-instruction **byte flag readers**:
+
+```
+0297A0: D65C  mov.l @(0x029914),r6   ; FFFF9704
+0297A2: 6260  mov.b @r6,r2
+0297A4: 2228  tst r2,r2
+0297A6: 8F01  bf/s 0x0297AC
+0297A8: E002    mov #2,r0
+0297AA: E000  mov #0,r0
+0297AC: 000B  rts
+```
+
+| address | reads | retired name | why it is wrong |
+|---|---|---|---|
+| `0x0297A0` | `byte[FFFF9704]` | `float_load_from_desc` | no float, no descriptor |
+| `0x0299BC` | `byte[FFFF971C]` | `float_store_to_ram` | it is a READ, and no float |
+| `0x0281DC` | `byte[FFFF96A8]` | `sensor_scale_helper` | no scaling, no float |
+| `0x0278D2` | `byte[FFFF6A29]` | `dwell_calculator` | five-instruction bit test |
+| `0x023E48` | `byte[FFFF67FC]` | `fuel_desc_reader` | no descriptor |
+
+Tell-tale that should have been caught earlier: **both blocks quoted the same
+call counts** for the same addresses (14 for `0x0299BC`, etc.). They were always
+describing the same functions.
+
+`0x02999C` was a true synonym pair — `flkc_flag_slot15` and
+`flkc_state_flag_slot15` both correctly describe `byte[FFFF971B]` → 2/0. Merged,
+alias recorded.
+
+`0x000E5EC`'s last claimant, `isr_dispatch_table` ("Interrupt dispatch table: 54
+function pointers"), is retired — it used a third address-literal form
+(`0x000E5ECL`) and survived item 91's sweep. **Zero labels now assert a dispatch
+table.**
+
+### Lesson
+
+"Auto-generated" is not a synonym for "unreliable". The pattern scan was derived
+from the actual byte pattern and was accurate; the hand-written names were
+plausible-sounding guesses. Judge the label by whether the bytes support it, not
+by how it was produced — the `isr_handler_N` family was wrong because its
+*premise* was disproved, not because it was generated.
+
+```
+conflicts: 83 (item 91) -> 76
+```
+
+### Status
+
+`javac` exit 0. 2,595 labels. **76 conflicts remain.**

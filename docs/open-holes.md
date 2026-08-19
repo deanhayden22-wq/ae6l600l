@@ -275,15 +275,15 @@ monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
 
 ---
 
-## 8. 83 Ghidra label conflicts remain (was 118)
+## 8. 76 Ghidra label conflicts remain (was 118)
 
 `docs/corrections.md` items 90 and **91**.
 
 ```
 conflicts at session start : 112     (the "91" in item 90 was a string-key undercount)
 introduced 2026-08-19      : +13     (all merged)
-resolved 2026-08-19        : -42
-remaining                  :  83
+resolved 2026-08-19        : -49
+remaining                  :  76
 ```
 
 **The big family is gone.** 106 labels rested on a "dispatch table" at
@@ -315,9 +315,12 @@ They are **not one family** — each needs its own evidence. Three rough groups:
    0xFFFF4024  ATU_primary_ctrl / knock_adc_working / sensor_group_base
    0xFFFF3B06  diag_indexed_lookup_table / dtc_debounce_state / io_inj_ign_port_ctrl
    ```
-   The `check_*` / `diag_*` side looks like a second bulk pattern-scan, the same
-   shape of error as the one just retired — worth testing as a family before
-   decoding them one by one.
+   ~~The `check_*` / `diag_*` side looks like a second bulk pattern-scan~~ —
+   **tested and the prediction was BACKWARDS (item 92).** The auto-generated
+   flag-reader names were accurate; the hand-written "helper" names
+   (`float_load_from_desc`, `float_store_to_ram`, `sensor_scale_helper`,
+   `dwell_calculator`, `fuel_desc_reader`) were wrong. All five retired.
+   **Judge a label by whether the bytes support it, not by how it was produced.**
 
 ### Rules
 

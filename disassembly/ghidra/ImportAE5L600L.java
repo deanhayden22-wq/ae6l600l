@@ -95,7 +95,8 @@ public class ImportAE5L600L extends GhidraScript {
             "r14 base for the staged decay bank in fn 0x02EFD2 (item 88).");
 
         count += labelComment(0x0000E5EC, "stubpool_base",
-            "NOT A DISPATCH TABLE (item 84). 0x00E5EC-0x00E6C0 is the shared LITERAL POOL of the 0x00E4xx task stubs: 54 longs, all ROM code addresses, bounded by rts/nop at 0x00E5E8 and code at 0x00E6C4. No literal anywhere points at this base; slots are reached by mov.l @(disp,pc) from the stubs. Both former names asserted a table that does not exist.");
+            "Supersedes the remaining \"isr_dispatch_table\" label (item 84/91). "
+            +             "NOT A DISPATCH TABLE (item 84). 0x00E5EC-0x00E6C0 is the shared LITERAL POOL of the 0x00E4xx task stubs: 54 longs, all ROM code addresses, bounded by rts/nop at 0x00E5E8 and code at 0x00E6C4. No literal anywhere points at this base; slots are reached by mov.l @(disp,pc) from the stubs. Both former names asserted a table that does not exist.");
 
         count += labelComment(0x0000E628, "stubpool_slot_15",
             "Slot 15 of the literal pool at 0x00E5EC (item 84). Holds 0x0004A94C and is loaded by mov.l @(0x00E628),r3 at 0x00E4AE. Not a scheduler table.");
@@ -2226,12 +2227,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0004E0B8, "gbr_task_dispatcher",
             "40 calls. Sets GBR=0xFFFF83AB, allocates 64-byte workspace, copies r4-r7 args. "
             + "Writes multiple GBR-offset bytes from inputs. GBR-relative task setup.");
-        count += labelComment(0x000297A0, "float_load_from_desc",
-            "18 calls. Loads float from descriptor address. Small utility for descriptor access.");
         count += labelComment(0x000297B0, "float_load_from_desc_B",
             "16 calls. Variant of float_load_from_desc.");
-        count += labelComment(0x000299BC, "float_store_to_ram",
-            "14 calls. Stores float to RAM address from descriptor result.");
 
         // ── FLKC Learning State Flag Dispatch Table ────────────────────────
         count += labelComment(0x00029858, "flkc_state_flag_reader_table",
@@ -2241,19 +2238,16 @@ public class ImportAE5L600L extends GhidraScript {
             + "Covers FFFF970E-FFFF9737 (41 bytes). Dead slots return R0=0 unconditionally. "
             + "Called by task11 (knock_flag), task18, task25, task29 (timing_percyl) at offset +0.");
         count += labelComment(0x0002999C, "flkc_state_flag_slot15",
-            "Offset +0x144 in flkc_state_flag_reader_table (0x29858). Reads FFFF971B "
+            "Both former names agreed; verified 2026-08-19: reads byte[FFFF971B], returns 2 if non-zero else 0. Alias: flkc_flag_slot15. "
+            +             "Offset +0x144 in flkc_state_flag_reader_table (0x29858). Reads FFFF971B "
             + "(FLKC learning convergence flag, slot 15). Returns R0=2 if converged, R0=0 if not. "
             + "Called by task19 (flkc_post), task23 (knock_cyl_track), task56 (EVAP precondition).");
 
         // ── Sensor Reading Helpers ─────────────────────────────────────────
         count += labelComment(0x00045EEA, "knock_helper_leaf",
             "13 calls. Leaf function in knock processing pipeline. Short helper called by multiple knock tasks.");
-        count += labelComment(0x00023E48, "fuel_desc_reader",
-            "15 calls. Reads fuel-related descriptor. Called from PSE and fuel correction code (0x304F4-0x30C66).");
         count += labelComment(0x0001CF16, "engine_state_helper",
             "10 calls. Engine state utility. Called from AFL/timing/boost contexts.");
-        count += labelComment(0x000281DC, "sensor_scale_helper",
-            "15 calls. Sensor scaling/conversion utility. Called from AFL, fuel, and O2 processing.");
         count += labelComment(0x00021D9A, "cl_readiness_check",
             "12 calls. CL readiness evaluation. Called from CL/OL transition, fuel, and AFL code. "
             + "Referenced by clol_cond analysis.");
@@ -2780,11 +2774,11 @@ public class ImportAE5L600L extends GhidraScript {
             "Reads INTEVT/priority register to identify interrupt source, returns index");
         count += labelComment(0x000D78L, "isr_int_acknowledge",
             "Interrupt acknowledge/clear function");
-        count += labelComment(0x000E5ECL, "isr_dispatch_table",
-            "Interrupt dispatch table: 54 function pointers (4 bytes each)");
-
-        // ISR dispatch table entry labels (table at 0x0E5EC, 54 entries)
-        // Entry[N] address = 0x0E5EC + N*4 -> handler address
+        // 0x000E5EC previously carried "isr_dispatch_table" ("Interrupt dispatch table:
+        // 54 function pointers"). RETIRED -- item 84 proved this range is the shared
+        // LITERAL POOL of the 0x00E4xx task stubs, and none of the 51 addresses it holds
+        // appears in the 0x0-0x400 interrupt vector table. See corrections item 91.
+        // Slot labels below: entry N is at 0x0E5EC + N*4.
         count += labelComment(0x00E5F0, "stubpool_slot_1", "Literal pool slot 1 at 0x0E5F0 holds 0x00FC04. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00E5F4, "stubpool_slot_2", "Literal pool slot 2 at 0x0E5F4 holds 0x005840. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00E5F8, "stubpool_slot_3", "Literal pool slot 3 at 0x0E5F8 holds 0x00D658. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
@@ -5454,8 +5448,6 @@ public class ImportAE5L600L extends GhidraScript {
             "Task34 throttle timing calc subroutine.");
         count += labelComment(0x00044296, "task29_timing_percyl",
             "Task 29: secondary per-cylinder timing computation.");
-        count += labelComment(0x000278D2, "dwell_calculator",
-            "Computes coil dwell time from RPM and battery voltage.");
         count += labelComment(0x00046296, "task27_knock_timing",
             "Task 27: knock timing retard per-cylinder.");
 
@@ -7301,19 +7293,22 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00022CEAL, "check_accel_pedal_idle",
             "Flag reader: returns 1 if FFFF65B1 == 1 (accel pedal at idle). 15 callers.");
         count += labelComment(0x00023E48L, "check_afl_ready",
-            "Flag reader: returns 1 if FFFF67FC == 1 (A/F learning ready). 15 callers.");
+            "DECODED (item 92): reads byte[FFFF67FC], compares == 1, movt. No descriptor. Supersedes \"fuel_desc_reader\". "
+            +             "Flag reader: returns 1 if FFFF67FC == 1 (A/F learning ready). 15 callers.");
         count += labelComment(0x000281DCL, "check_diag_mode_active",
-            "Flag reader: returns 1 if FFFF96A8 set (diagnostic mode active). 15 callers.");
+            "DECODED (item 92): reads byte[FFFF96A8], compares == 1. No scaling, no float. Supersedes \"sensor_scale_helper\". "
+            +             "Flag reader: returns 1 if FFFF96A8 set (diagnostic mode active). 15 callers.");
         count += labelComment(0x000299BCL, "diag_check_P0137",
-            "DTC flag reader: returns 2 if FFFF971C nonzero (P0137 rear O2 low). 14 callers.");
+            "DECODED (item 92): reads byte[FFFF971C], returns 2 if non-zero else 0. It is a READ, not a store, and there is no float. Supersedes \"float_store_to_ram\". "
+            +             "DTC flag reader: returns 2 if FFFF971C nonzero (P0137 rear O2 low). 14 callers.");
         count += labelComment(0x00021D9AL, "check_sensor_valid",
             "Sensor validity check: reads FFFF6552. Called from CL/OL transition. 12 callers.");
-        count += labelComment(0x0002999CL, "flkc_flag_slot15",
-            "FLKC learning convergence: reads FFFF971B. Gates task19/task23 FLKC. 10 callers.");
         count += labelComment(0x000278D2L, "check_maf_valid",
-            "MAF validity check: reads FFFF6A29. 7 callers.");
+            "DECODED (item 92): reads byte[FFFF6A29], tests bit 7, returns the inverted flag in five instructions. Nothing dwell-related. Supersedes \"dwell_calculator\". "
+            +             "MAF validity check: reads FFFF6A29. 7 callers.");
         count += labelComment(0x000297A0L, "diag_flag_reader_cluster_start",
-            "Start of 45 sequential DTC flag readers (16B each). FFFF9704-FFFF9742. "
+            "DECODED 2026-08-19 (item 92): reads byte[FFFF9704], returns 2 if non-zero else 0. Six instructions, no float and no descriptor. Supersedes \"float_load_from_desc\". "
+            +             "Start of 45 sequential DTC flag readers (16B each). FFFF9704-FFFF9742. "
             + "Each returns 2 if DTC flag nonzero, 0 if clear.");
         count += labelComment(0x0002D718L, "fuel_correction_eeprom_loader",
             "Per-cylinder/per-bank fuel correction loader from EEPROM. "
