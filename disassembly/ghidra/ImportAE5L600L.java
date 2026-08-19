@@ -12,6 +12,19 @@
 //   region is data". That failure mode has already cost this project real
 //   time; see CLAUDE.md and docs/architecture.md. This header said SH-2 for
 //   months while CLAUDE.md said SH-2A.
+//
+//   NAME COLLISION -- read this before hunting for a language that does not
+//   exist. SH-2E is the CPU CORE (the SH7058, and scripts/sh2e_disasm.py).
+//   SH-2A is the GHIDRA LANGUAGE. There is NO SH-2E language in Ghidra.
+//   Verified against Ghidra 12.0.2: SuperH ships exactly three ids --
+//   SuperH:BE:32:SH-1, :SH-2, :SH-2A -- and only sh-2a.slaspec sets
+//   `@define FPU "1"`, which is what superh.sinc gates the FPU block on.
+//   The id has a HYPHEN: filtering the import dialog for "sh2a" matches
+//   nothing; use "superh" or "sh-2a" and read the Variant column.
+//
+//   SH-2A is a SUPERSET of SH-2E, so Ghidra will decode instructions this chip
+//   cannot execute (MOVI20, MOVU, 32-bit forms). Seeing one means you are
+//   decoding DATA as code -- a region-boundary error, not a discovery.
 //   3. Run this script: Script Manager > Run (or press the green play button)
 //
 // This script applies all labels and comments from disassembly.txt analysis.

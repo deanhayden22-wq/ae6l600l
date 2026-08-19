@@ -11,6 +11,16 @@ failure mode has already cost this project real time, so:
 
 - **Ghidra language: `SuperH:BE:32:SH-2A`** (the only FPU-capable SuperH language
   in Ghidra 12). Never `SH-2` — it has zero FPU support.
+- **`SH-2E` is the CORE. `SH-2A` is the GHIDRA LANGUAGE. There is no `SH-2E`
+  language in Ghidra** — this doc says "SH-2E" everywhere and the collision has
+  already sent someone looking for a language that does not exist. Verified
+  against Ghidra 12.0.2: SuperH ships exactly three ids (`SH-1`, `SH-2`,
+  `SH-2A`) and only `sh-2a.slaspec` sets `@define FPU "1"`, which is what
+  `superh.sinc` gates the FPU block on. The id has a **hyphen** — filtering the
+  import dialog for `sh2a` matches nothing; use `superh` or `sh-2a`.
+- SH-2A is a **superset** of SH-2E, so Ghidra decodes instructions this chip
+  cannot execute. That is the deliberate trade for having an FPU at all, and it
+  is why the "instructions the SH7058 cannot execute" list below matters.
 - **Canonical decoder: `scripts/sh2e_disasm.py`.** The ~27 older per-script
   decoders in `scripts/disasm/` are independent copies; usable, not authoritative.
 - Full detail and evidence: **[`docs/architecture.md`](docs/architecture.md)**.
