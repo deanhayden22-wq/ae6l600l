@@ -56,11 +56,42 @@ public class ImportAE5L600L extends GhidraScript {
 
         // Scheduler / Task table
         count += labelComment(0x0000E628, "sched_table_main",
-            "Scheduler table, entry -> sched_periodic_dispatch @ 0x04A94C");
+            "NOT A TABLE (corrections.md item 84). 0x00E5EC-0x00E6C0 is the shared LITERAL "
+            + "POOL of the 0x00E4xx task-stub region -- 54 longs, all ROM code addresses, "
+            + "bounded by rts/nop at 0x00E5E8 and code at 0x00E6C4. This slot is loaded by "
+            + "mov.l @(0x00E628),r3 at 0x00E4AE. No literal points at the pool base.");
         count += labelComment(0x0004A94C, "sched_periodic_dispatch",
-            "Per-tick dispatcher, calls 59 tasks from task_table @ 0x04AD40");
+            "COUNT CORRECTED 2026-08-19 (item 84): 23 jsr @r2 + one tail jmp @r2 = 24 tasks, "
+            + "NOT 59, and there is no task_table. Straight-line body, gated on "
+            + "byte[0xFFFF8EDC] != 0 at 0x04A954, rts at 0x04A9F0. Task 1 = 0x043750 "
+            + "(knock_wrapper), task 9 = 0x033304, tail jmp -> 0x00022F8A.");
+
+        // -- item 84: the RTOS event queue ---------------------------------------
+        count += labelComment(0x00010B2A, "sched_event_queue_walk",
+            "THE WALKER. Linear scan of the 5-slot event table at 0xFFFF2064 (stride 12) "
+            + "with count byte at 0xFFFF2060. On id match, bumps entry+8 (saturates at 255). "
+            + "On miss with count < 5, appends. On miss with count >= 5, SILENTLY DROPS -- "
+            + "cmp/ge #5 at 0x010BCC, no error path. corrections.md item 84.");
+        count += labelComment(0x00010800, "sched_event_post",
+            "Packs (r4 = event id, r5 = payload), enters critical section via 0x0BE81C, "
+            + "calls the walker 0x010B2A, leaves via 0x0BE82C.");
+        count += labelComment(0x0000E774, "sched_isr_common_entry",
+            "Every ISR stub in the 0x00E9xx family bra's here with r4 = its event id "
+            + "(80, 84, 90, 92 seen). Raises SR to IMASK=15 (or #240) before posting.");
+        count += labelComment(0xFFFF2060L, "sched_event_count",
+            "byte. Number of occupied slots in the event table at 0xFFFF2064. HARD MAX 5.");
+        count += labelComment(0xFFFF2064L, "sched_event_table",
+            "5 entries x 12 bytes. +0 word event id, +4 long payload, +8 byte pending "
+            + "counter (saturating at 255). Coalescing: a repeat id bumps the counter.");
+        count += labelComment(0xFFFF20A0L, "sched_last_event_id",
+            "word. Last event id posted, written at 0x010C00 regardless of insert/drop.");
+        count += labelComment(0xFFFF20A4L, "sched_last_event_payload",
+            "long. Payload of the last posted event, written at 0x010C08.");
         count += labelComment(0x0004AD40, "task_table",
-            "59-entry periodic task pointer table. Terminator = 0xFFFF8322");
+            "MISNAMED (corrections.md item 84). This is a LITERAL POOL, not a table. "
+            + "Longs: 0x00042A32, 0x0003EA0C, 0x0003EA5A, 0x00044188, 0x00045970, "
+            + "0x00045098, 0x00045670 -- the jsr targets of the straight-line run that "
+            + "precedes it. Same shape item 63 established for the 'fuel dispatch tables'.");
 
         // PSE code
         count += labelComment(0x00030674, "PSE_code_entry",

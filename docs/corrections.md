@@ -4906,3 +4906,67 @@ Recorded and verified. No ROM bytes changed, no XML edited. Open: whether
 `0xFFFF77D8` is explicitly zeroed at reset (it lies in `FFFF4000..FFFFBF9F`, the
 fourth entry of the RAM region table at `0x011CCC`–`0x011CE8`, whose consumer was
 not decoded) or merely never written — either way it is constant per power cycle.
+
+---
+
+## 84. The scheduler DOES have a walker — a 5-slot coalescing event queue that silently drops overflow — **CLOSES OPEN-HOLE 5, 2026-08-19**
+
+Item 63 was right that nothing walks the unrolled call runs. What it left open —
+"what calls the enclosing functions" — resolves to a real RTOS post/dispatch
+path. Full trace: `disassembly/analysis/scheduler_event_queue_trace.txt`
+(162/162 instruction lines verify).
+
+### The chain
+
+```
+ISR stub (0x00E970 family, r4 = event id)
+  -> 0x00E774     raise SR to IMASK=15 (stc sr / and / or #240 / ldc)
+  -> 0x00010800   pack (id, payload), enter critical section
+  -> 0x00010B2A   THE WALKER
+  -> later, task stubs at 0x00E4xx call 0x04A94C / 0x04AA58 / 0x049A7A /
+     0x049BA4 / 0x049CF0 — each a straight-line jsr run
+```
+
+### The event table
+
+```
+count   byte  @ 0xFFFF2060
+entries       @ 0xFFFF2064, STRIDE 12   (add #12,r13/r12/r14 at 0x010BB8-0x010BC2)
+  +0  word  event id
+  +4  long  payload
+  +8  byte  pending counter, saturates at 255 (ceiling 0x00FF @ 0x010B92)
+last posted id      -> word @ 0xFFFF20A0
+last posted payload -> long @ 0xFFFF20A4
+```
+
+Two behaviours worth carrying:
+
+* **Coalescing.** A repeat of a queued id bumps that slot's counter instead of
+  taking a second slot. The counter is the multiplicity.
+* **Silent drop.** `mov #5,r2 / cmp/ge r2,r9 / bt/s` at `0x010BCC` skips the
+  insert when the count has reached **5**. A new event id arriving on a full
+  queue is discarded — no error path, no overflow flag, no else branch.
+
+### Two Java labels were wrong
+
+* `0x04A94C` was labelled "calls 59 tasks from task_table @ 0x04AD40". It makes
+  exactly **23 `jsr @r2` calls plus one tail `jmp @r2`** between its
+  `byte[0xFFFF8EDC]` gate and its `rts` at `0x04A9F0`. First task is
+  `0x043750` (knock_wrapper); ninth is `0x033304`.
+* `0x04AD40` was labelled `task_table`. It is a **literal pool** — the longs are
+  `0x00042A32`, `0x0003EA0C`, `0x0003EA5A`, `0x00044188`, `0x00045970`,
+  `0x00045098`, `0x00045670`, the jsr targets of the run that precedes it.
+  Exactly the shape item 63 described; the label predates that finding.
+
+Likewise `0x00E5EC`–`0x00E6C0` (54 longs, all ROM code addresses, bounded by
+`rts/nop` at `0x00E5E8` and code at `0x00E6C4`) is the **shared literal pool** of
+the `0x00E4xx` stub region, not a dispatch table. No literal in the image points
+at its base; the individual entries are reached by `mov.l @(disp,pc)` from the
+stubs (`0x00E4AE`, `0x00E4C8`, `0x00E52E`, `0x00E542`, `0x00E556`).
+
+### Status
+
+Recorded and verified. No ROM bytes changed, no XML edited. Open: what DRAINS the
+table (start from `0xFFFF2060`/`0xFFFF2064`); the guarded-RAM accessor prologue
+`jsr 0x0000317C ; r4 = 16` shared by `0x0BDA70`/`0x0BDAAC`/`0x0BDB6E`/`0x0BDB80`;
+the full event-id map (80, 84, 90, 92 seen); and the writer of `0xFFFF8EDC`.

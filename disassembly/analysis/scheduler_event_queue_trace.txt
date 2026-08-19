@@ -1,0 +1,337 @@
+================================================================================
+THE SCHEDULER: what actually walks what
+Traced 2026-08-19. CLOSES docs/open-holes.md item 5.
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Method: top-down from the ISR stubs. scripts/sh2e_disasm.py throughout;
+        every literal resolved from its own pool.
+================================================================================
+
+ANSWER
+--------------------------------------------------------------------------------
+Item 63 established that the "fuel dispatch tables" are literal pools and that
+NOTHING walks the unrolled call runs. That still holds. What was left open --
+"what calls the enclosing functions" -- has an answer, and there IS a walker,
+just not where the original question looked:
+
+    ISR stub (0x00E970 family)
+      -> 0x00E774          raise SR to IMASK=15, pass r4 = event id
+      -> 0x00010800        wrap the (id, payload) pair
+      -> 0x00010B2A        <-- THE WALKER: linear scan of a 5-slot event table
+      -> ... later ...
+         task stubs at 0x00E4xx  -> 0x04A94C / 0x04AA58 / 0x049A7A /
+                                    0x049BA4 / 0x049CF0 / ...
+         each a straight-line run of `mov.l @(lit,pc),r2 / jsr @r2`
+
+THE EVENT TABLE -- 5 slots, 12-byte stride, coalescing, silent drop
+--------------------------------------------------------------------------------
+    count  : byte  @ 0xFFFF2060
+    entries: array @ 0xFFFF2064, STRIDE 12
+
+    entry +0  word  event id
+    entry +4  long  payload (the r5 passed in)
+    entry +8  byte  pending counter, SATURATES at 255
+
+    last posted id      -> word @ 0xFFFF20A0
+    last posted payload -> long @ 0xFFFF20A4
+
+Algorithm of 0x010B2A, read straight off the bytes below:
+
+    n = count[FFFF2060]
+    for i in 0 .. n-1:
+        if entry[i].id == target:
+            if entry[i].pending < 255: entry[i].pending += 1
+            found = 1; break
+    if not found and n < 5:
+        entry[n].id      = target
+        entry[n].payload = r5
+        entry[n].pending = 1
+        count[FFFF2060]  = n + 1
+    [FFFF20A0] = target ; [FFFF20A4] = payload
+
+Two consequences that are worth carrying:
+
+* **Coalescing.** A repeat of an already-queued id does NOT take a second slot;
+  it bumps that slot's counter. The counter is what tells the consumer how many
+  times the event fired.
+* **Silent drop.** A NEW event id arriving while count >= 5 is discarded. There
+  is no error path, no overflow flag, no else branch -- control simply falls to
+  the tail at 0x010BFC.
+
+BLOCK 1 -- ISR stubs converge on 0x00E774 with r4 = event id
+--------------------------------------------------------------------------------
+  00E970: 9239  mov.w @(0x00E9E6),r2
+  00E972: E31F  mov #31,r3
+  00E974: 2231  mov.w r3,@r2
+  00E976: AEFD    bra 0x00E774
+  00E978: E450  mov #80,r4
+  00E97A: 9434  mov.w @(0x00E9E6),r4
+  00E97C: 6341  mov.w @r4,r3
+  00E97E: 922D  mov.w @(0x00E9DC),r2
+  00E980: 2421  mov.w r2,@r4
+  00E982: AEF7    bra 0x00E774
+  00E984: E454  mov #84,r4
+
+Each stub writes a priority word to the register whose address is at 0x00E9E6,
+then `bra 0x00E774` with r4 set to its own event id (80, 84, 90, 92, ...).
+
+BLOCK 2 -- the common entry raises the interrupt mask
+--------------------------------------------------------------------------------
+  00E774: 4F22  sts.l pr,@-r15
+  00E776: 0002  stc sr,r0
+  00E778: 938C  mov.w @(0x00E894),r3
+  00E77A: 2F46  mov.l r4,@-r15
+  00E77C: 2039  and r3,r0
+  00E77E: CBF0  or #240,r0
+  00E780: 400E  ldc r0,sr
+  00E782: 6543  mov r4,r5
+  00E784: D349  mov.l @(0x00E8AC),r3   ; [00E8AC] = 00010800
+  00E786: 9486  mov.w @(0x00E896),r4
+  00E788: 430B    jsr @r3
+  00E78A: 0009  nop
+  00E78C: D248  mov.l @(0x00E8B0),r2   ; [00E8B0] = 0000FBA4
+  00E78E: 7F04  add #4,r15
+  00E790: 422B    jmp @r2
+  00E792: 4F26  lds.l @r15+,pr
+
+`stc sr,r0 / and r3,r0 / or #240,r0 / ldc r0,sr` sets IMASK = 15, i.e. blocks
+all maskable interrupts for the duration of the post. r5 carries the event id
+through; r4 is reloaded from word[0x00E896].
+
+BLOCK 3 -- 0x00010800 packs the pair and calls the walker
+--------------------------------------------------------------------------------
+  010800: 4F22  sts.l pr,@-r15
+  010802: 6043  mov r4,r0
+  010804: D317  mov.l @(0x010864),r3   ; [010864] = 000BE81C
+  010806: 7FF4  add #-12,r15
+  010808: 81F2  mov.w r0,@(4,r15)
+  01080A: 1F52  mov.l r5,@(8,r15)
+  01080C: 9512  mov.w @(0x010834),r5
+  01080E: 430B    jsr @r3
+  010810: 64F3  mov r15,r4
+  010812: 55F2  mov.l @(8,r15),r5
+  010814: 85F2  mov.w @(4,r15),r0
+  010816: B188    bsr 0x010B2A
+  010818: 6403  mov r0,r4
+  01081A: D313  mov.l @(0x010868),r3   ; [010868] = 000BE82C
+  01081C: 430B    jsr @r3
+  01081E: 64F2  mov.l @r15,r4
+
+    word[r15+4] = r4 (id) ; long[r15+8] = r5 (payload)
+    jsr 0x0BE81C          ; enter critical section
+    bsr 0x010B2A          ; <-- the walker
+    jsr 0x0BE82C          ; leave critical section
+
+BLOCK 4 -- the walk itself
+--------------------------------------------------------------------------------
+  010B46: D418  mov.l @(0x010BA8),r4   ; [010BA8] = FFFF2060
+  010B48: 430B    jsr @r3
+  010B4A: 6503  mov r0,r5
+  010B4C: D418  mov.l @(0x010BB0),r4   ; [010BB0] = FFFF2064
+  010B4E: 6803  mov r0,r8
+  010B50: EA00  mov #0,r10
+  010B52: 6D43  mov r4,r13
+  010B54: 6C43  mov r4,r12
+  010B56: 6E43  mov r4,r14
+  010B58: 698C  extu.b r8,r9
+  010B5A: 4915  cmp/pl r9
+  010B5C: 8F32  bf/s 0x010BC4
+  010B5E: EB01  mov #1,r11
+  010B60: D314  mov.l @(0x010BB4),r3   ; [010BB4] = 000BDAAC
+  010B62: E500  mov #0,r5
+  010B64: 430B    jsr @r3
+  010B66: 64E3  mov r14,r4
+  010B68: 62F1  mov.w @r15,r2
+  010B6A: 600D  extu.w r0,r0
+  010B6C: 622D  extu.w r2,r2
+  010B6E: 3020  cmp/eq r2,r0
+  010B70: 8F22  bf/s 0x010BB8
+  010B72: 0009  nop
+  010B74: 84C8  mov.b @(8,r12),r0
+  010B76: 600C  extu.b r0,r0
+  010B78: 930B  mov.w @(0x010B92),r3
+  010B7A: 3033  cmp/ge r3,r0
+  010B7C: 8D03  bt/s 0x010B86
+  010B7E: 0009  nop
+  010B80: 84D8  mov.b @(8,r13),r0
+  010B82: 7001  add #1,r0
+  010B84: 80D8  mov.b r0,@(8,r13)
+  010B86: 60B3  mov r11,r0
+  010B88: A01C    bra 0x010BC4
+  010B8A: 80F8  mov.b r0,@(8,r15)
+
+    r8 = r9 = count via 0x0BDA70(r4 = 0xFFFF2060)
+    r12 = r13 = r14 = 0xFFFF2064          ; three cursors over the same array
+    loop while r9 > 0:
+        r0 = id at cursor via 0x0BDAAC(r4 = r14)   ; helper does mov.w @r14,r2
+        compare against word[r15] (the target)
+        on match: byte[r12+8] vs 0x00FF ; if below, byte[r13+8] += 1
+                  byte[r15+8] = 1  (found) and leave the loop
+
+The 0x00FF at 0x010B92 is the saturation ceiling. `cmp/ge r3,r0` with r0 = the
+counter and r3 = 255 skips the increment once it is pegged.
+
+BLOCK 5 -- cursor advance proves the 12-byte stride
+--------------------------------------------------------------------------------
+  010BB8: 7A01  add #1,r10
+  010BBA: 7D0C  add #12,r13
+  010BBC: 7C0C  add #12,r12
+  010BBE: 3A93  cmp/ge r9,r10
+  010BC0: 8FCE  bf/s 0x010B60
+  010BC2: 7E0C  add #12,r14
+  010BC4: 84F8  mov.b @(8,r15),r0
+  010BC6: 2008  tst r0,r0
+  010BC8: 8F18  bf/s 0x010BFC
+  010BCA: 0009  nop
+  010BCC: E205  mov #5,r2
+  010BCE: 3923  cmp/ge r2,r9
+  010BD0: 8D14  bt/s 0x010BFC
+  010BD2: 0009  nop
+  010BD4: 65F1  mov.w @r15,r5
+  010BD6: 6E8C  extu.b r8,r14
+  010BD8: D124  mov.l @(0x010C6C),r1   ; [010C6C] = FFFF2064
+  010BDA: 63E3  mov r14,r3
+  010BDC: 4E00  shll r14
+  010BDE: 3E3C  add r3,r14
+  010BE0: D323  mov.l @(0x010C70),r3   ; [010C70] = 000BDB80
+  010BE2: 4E08  shll2 r14
+  010BE4: 3E1C  add r1,r14
+  010BE6: 430B    jsr @r3
+  010BE8: 64E3  mov r14,r4
+  010BEA: 60B3  mov r11,r0
+  010BEC: D421  mov.l @(0x010C74),r4   ; [010C74] = FFFF2060
+  010BEE: 7801  add #1,r8
+  010BF0: D321  mov.l @(0x010C78),r3   ; [010C78] = 000BDB6E
+  010BF2: 52F1  mov.l @(4,r15),r2
+  010BF4: 1E21  mov.l r2,@(4,r14)
+  010BF6: 80E8  mov.b r0,@(8,r14)
+  010BF8: 430B    jsr @r3
+  010BFA: 6583  mov r8,r5
+
+    r10 += 1 ; r13 += 12 ; r12 += 12 ; r14 += 12 ; loop while r10 < r9
+
+BLOCK 6 -- the insert path, and the 5-entry ceiling
+--------------------------------------------------------------------------------
+  010BCC: E205  mov #5,r2
+  010BCE: 3923  cmp/ge r2,r9
+  010BD0: 8D14  bt/s 0x010BFC
+  010BD2: 0009  nop
+  010BD4: 65F1  mov.w @r15,r5
+  010BD6: 6E8C  extu.b r8,r14
+  010BD8: D124  mov.l @(0x010C6C),r1   ; [010C6C] = FFFF2064
+  010BDA: 63E3  mov r14,r3
+  010BDC: 4E00  shll r14
+  010BDE: 3E3C  add r3,r14
+  010BE0: D323  mov.l @(0x010C70),r3   ; [010C70] = 000BDB80
+  010BE2: 4E08  shll2 r14
+  010BE4: 3E1C  add r1,r14
+  010BE6: 430B    jsr @r3
+  010BE8: 64E3  mov r14,r4
+  010BEA: 60B3  mov r11,r0
+  010BEC: D421  mov.l @(0x010C74),r4   ; [010C74] = FFFF2060
+  010BEE: 7801  add #1,r8
+  010BF0: D321  mov.l @(0x010C78),r3   ; [010C78] = 000BDB6E
+  010BF2: 52F1  mov.l @(4,r15),r2
+  010BF4: 1E21  mov.l r2,@(4,r14)
+  010BF6: 80E8  mov.b r0,@(8,r14)
+  010BF8: 430B    jsr @r3
+  010BFA: 6583  mov r8,r5
+
+    if found:      skip to 0x010BFC
+    if count >= 5: skip to 0x010BFC          <-- `mov #5,r2 / cmp/ge r2,r9 / bt/s`
+    else:
+        r14 = 0xFFFF2064 + count*12          ; shll/add/shll2 builds the *12
+        0x0BDB80(r4 = r14, r5 = id)          ; store id word
+        long[r14+4] = payload
+        byte[r14+8] = 1
+        0x0BDB6E(r4 = 0xFFFF2060, r5 = count+1)
+
+`cmp/ge r2,r9` sets T when r9 (the count) >= r2 (5). The `bt/s` therefore takes
+the SKIP on a full queue -- the new event is dropped.
+
+BLOCK 7 -- tail: record the last posted event
+--------------------------------------------------------------------------------
+  010BFC: D41F  mov.l @(0x010C7C),r4   ; [010C7C] = FFFF20A0
+  010BFE: D31C  mov.l @(0x010C70),r3   ; [010C70] = 000BDB80
+  010C00: 430B    jsr @r3
+  010C02: 65F1  mov.w @r15,r5
+  010C04: 52F1  mov.l @(4,r15),r2
+  010C06: D31E  mov.l @(0x010C80),r3   ; [010C80] = FFFF20A4
+  010C08: 2322  mov.l r2,@r3
+  010C0A: 7F0C  add #12,r15
+
+THE TASK BODIES ARE STRAIGHT-LINE, AND THE OLD LABELS ARE WRONG
+--------------------------------------------------------------------------------
+  04A94C: 4F22  sts.l pr,@-r15
+  04A94E: 7FFC  add #-4,r15
+  04A950: D228  mov.l @(0x04A9F4),r2   ; [04A9F4] = FFFF8EDC
+  04A952: 6520  mov.b @r2,r5
+  04A954: 2558  tst r5,r5
+  04A956: 8B49  bf 0x04A9EC
+  04A958: 644C  extu.b r4,r4
+  04A95A: D227  mov.l @(0x04A9F8),r2   ; [04A9F8] = 00043750
+  04A95C: 420B    jsr @r2
+  04A95E: 2F42  mov.l r4,@r15
+
+  04A9E4: D21B  mov.l @(0x04AA54),r2   ; [04AA54] = 00022F8A
+  04A9E6: 7F04  add #4,r15
+  04A9E8: 422B    jmp @r2
+  04A9EA: 4F26  lds.l @r15+,pr
+  04A9EC: 7F04  add #4,r15
+  04A9EE: 4F26  lds.l @r15+,pr
+  04A9F0: 000B    rts
+  04A9F2: 0009  nop
+
+`0x04A94C` is gated on `byte[0xFFFF8EDC] != 0` (skip everything) and ends at the
+`rts` at 0x04A9F0. Its literal pool begins at 0x04A9F4 -- the first long there is
+0xFFFF8EDC itself. Between the gate and the end it makes exactly **23 `jsr @r2`
+calls plus one tail `jmp @r2`**, in this fixed order:
+
+     1  043750   (knock_wrapper)      13  031A6A
+     2  022DB0                        14  039820
+     3  023286                        15  03C392
+     4  02EF3C                        16  03E8DC
+     5  02FA84                        17  0758C4
+     6  02FC5C                        18  03D552
+     7  02FD42                        19  03D68C
+     8  02F974                        20  03D856
+     9  033304                        21  03D648
+    10  032B10                        22  046C68
+    11  031D1E                        23  0471E8
+    12  03297A                        24  022F8A  (tail jmp)
+
+Two labels in `ImportAE5L600L.java` were wrong and are corrected in the same
+commit as this file:
+
+* `0x04A94C "sched_periodic_dispatch -- calls 59 tasks from task_table @ 0x04AD40"`
+  -- it calls **24**, not 59, and there is no table.
+* `0x04AD40 "task_table"` -- it is a LITERAL POOL. The longs there are
+  0x00042A32, 0x0003EA0C, 0x0003EA5A, 0x00044188, 0x00045970, 0x00045098,
+  0x00045670 -- the jsr targets of the straight-line run that precedes it,
+  exactly the shape item 63 described.
+
+Callers of the task bodies, resolved from their pools (all in the 0x00E4xx stub
+region, all sharing the pool at 0x00E5EC-0x00E6C0):
+
+    00E4AE  mov.l @(0x00E628),r3  ->  0004A94C
+    00E4C8  mov.l @(0x00E62C),r3  ->  0004AA58
+    00E52E  mov.l @(0x00E658),r3  ->  00049A7A
+    00E542  mov.l @(0x00E664),r3  ->  00049BA4
+    00E556  mov.l @(0x00E670),r2  ->  00049CF0
+
+`0x00E5EC-0x00E6C0` is 54 longs, every one a ROM code address, bounded by an
+`rts/nop` at 0x00E5E8 and code resuming at 0x00E6C4. It is the shared literal
+pool of that stub region -- NOT a dispatch table. No literal anywhere in the
+image points at its base.
+
+STILL OPEN
+--------------------------------------------------------------------------------
+* What DRAINS the event table -- the consumer that reads the pending counters
+  and runs the corresponding task stub -- is not traced here. `0xFFFF2060` /
+  `0xFFFF2064` are the addresses to start from.
+* The accessor helpers `0x0BDA70` / `0x0BDAAC` / `0x0BDB6E` / `0x0BDB80` all open
+  with `jsr 0x0000317C ; r4 = 16`. That common prologue is not decoded; it looks
+  like a guarded-RAM access layer, but that is an inference, not a finding.
+* Event ids seen in the ISR stubs decoded here: 80, 84, 90, 92. The full id map
+  was not enumerated.
+* `byte[0xFFFF8EDC]` (`sched_disable_flag`) has its readers here; its WRITER was
+  not chased.

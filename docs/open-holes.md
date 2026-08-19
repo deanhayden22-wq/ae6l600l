@@ -153,17 +153,31 @@ to ECUFlash.
 
 ---
 
-## 5. What walks the scheduler task lists? (low priority)
+## 5. ~~What walks the scheduler task lists?~~ — **CLOSED 2026-08-19**
 
-`docs/corrections.md` items 57, 63. Resolved in the important sense: the "fuel
-dispatch tables" are **literal pools**, not tables, and the "slots" are entries
-in hand-unrolled `mov.l @(lit,PC),r2 / jsr @r2` call sequences — 92 consecutive
-calls at `0x04AA6C`, 91 at `0x049E14`, gated on `byte[0xFFFF8EDC]`
-(`sched_disable_flag`).
+**There IS a walker — just not over the call runs.** `0x00010B2A` linearly scans
+a **5-slot event table** at `0xFFFF2064` (stride 12, count byte `0xFFFF2060`).
 
-Nothing "walks" them, so the original question dissolved. What remains is only
-what calls the enclosing functions, which is a scheduler question and does not
-block any fuel or knock work.
+Full trace: `disassembly/analysis/scheduler_event_queue_trace.txt` (162/162
+lines verify). Evidence: `docs/corrections.md` item 84.
+
+```
+ISR stub -> 0x00E774 (IMASK=15) -> 0x00010800 -> 0x00010B2A  [walker]
+entry +0 word id | +4 long payload | +8 byte pending count, saturates at 255
+```
+
+* **Coalescing:** a repeat of a queued id bumps its counter, not a new slot.
+* **Silent drop:** `cmp/ge #5` at `0x010BCC` discards a NEW id once 5 slots are
+  used. No error path.
+
+Item 63's finding stands: the task bodies are straight-line `jsr` runs, nothing
+walks them. But **two Java labels were wrong** and are now fixed — `0x04A94C`
+makes **24** calls (23 `jsr` + tail `jmp`), not 59, and `0x04AD40` is a literal
+pool, not a `task_table`.
+
+**Still open** (not blocking anything): what DRAINS the table; the guarded-RAM
+accessor prologue at `0x0000317C`; the full event-id map; the writer of
+`byte[0xFFFF8EDC]`.
 
 ---
 

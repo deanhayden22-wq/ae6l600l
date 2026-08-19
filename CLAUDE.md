@@ -73,9 +73,9 @@ These exist because confident-but-wrong answers have been produced here before.
 
 ### Open work
 
-**[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist — two
-scoped items (items 1 and 2 closed 2026-08-18, items 3 and 4 closed 2026-08-19),
-each with what is known, what is not, and the concrete next move. Read it before
+**[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist — **one
+remaining item, #6, and it needs Dean in the ECUFlash UI, not a session.**
+Items 1 and 2 closed 2026-08-18; items 3, 4 and 5 closed 2026-08-19. Read it before
 picking up anything, and update it when you close one.
 
 > **Item 4's stated next move was wrong for a year-old reason worth carrying:**
