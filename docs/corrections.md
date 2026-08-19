@@ -5502,3 +5502,43 @@ conflicts: 83 (item 91) -> 76
 ### Status
 
 `javac` exit 0. 2,595 labels. **76 conflicts remain.**
+
+## 93. The four `desc_*` vs semantic conflicts resolved — item 85's axis fix settles two of them — **2026-08-19**
+
+| address | verdict |
+|---|---|
+| `0x0AD090` | **Both wrong.** Data `0x0CE5A4` is named **"AFL Ramp Rate (CL to OL Transition Speed)"** in the project XML. `OL_Enrich_RampRate_Desc` is a misnomer — AFL is the long-term trim, not OL enrichment. `desc_1D_RPM_wide_u16_9` had the geometry right (1-D uint16 ×9 on Engine Speed `0x0CE580`, 0–8000). Renamed **`AFL_RampRate_Desc`**. |
+| `0x0AD620` | **Semantic wins.** Data `0x0CFA38` = "Intake Duty Correction A". `desc_2D_ThrottlexRPM_u8_10x9` had geometry right but **axes wrong** — Mass Airflow × Engine Speed, not throttle × RPM. |
+| `0x0AD848` | **Semantic wins.** Same, `0x0D121C` = "Exhaust Duty Correction A". Cell type differs from its intake sibling: exhaust uint16, intake uint8. |
+| `0x0AD928` | **Neither verified.** Data `0x0D1A68` is claimed by no XML and both axes are unnamed. The two names agreed in substance (AFC integral / PI blend) so they are merged, but the identity is **not** established. What *is* established: all 110 cells are 0.0 — inert as shipped — and the consumer at `0x034106` sits in the CL fuelling path near `byte[FFFF782C]`. |
+
+**Two of the four are settled by this session's own item 85**, which proved from
+the data stride that those axes are Mass Airflow × Engine Speed and fixed it in
+the XML. The `ThrottlexRPM` naming predates that.
+
+### A tooling lesson that has now cost four failed edits
+
+Address literals in `ImportAE5L600L.java` appear in **at least four forms** for
+the same address:
+
+```
+0xAD090        0x0AD090L        0x000AD090        0x00E5ECL
+```
+
+Regex edits keyed on the literal text silently miss labels — that is why item 91
+left `isr_dispatch_table` behind and why three drops failed here. **Any script
+that edits this file must match on the PARSED address, not the text.** The
+conflict counter was fixed this way in item 91; the editors were not.
+
+### Attempted and NOT settled
+
+`0xFFFF5DB5` (`cl_ol_gate_flag` | `si_drive_mode`) was chased and left open.
+It is read as a byte at 11 sites; `find_writers` returns a single hit that the
+tool itself annotates as a likely phantom in a data region. The nearby switch
+compares (`cmp/eq #1..#5` at `0x03649A` and `0x04F718`) are on a **different
+register**, so they do not establish the byte's cardinality. Neither a binary
+gate nor a 3-state SI-Drive mode is supported by what was decoded.
+
+```
+conflicts: 76 -> 72
+```

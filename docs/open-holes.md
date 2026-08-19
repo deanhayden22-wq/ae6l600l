@@ -275,16 +275,21 @@ monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
 
 ---
 
-## 8. 76 Ghidra label conflicts remain (was 118)
+## 8. 72 Ghidra label conflicts remain (was 118)
 
 `docs/corrections.md` items 90 and **91**.
 
 ```
 conflicts at session start : 112     (the "91" in item 90 was a string-key undercount)
 introduced 2026-08-19      : +13     (all merged)
-resolved 2026-08-19        : -49
-remaining                  :  76
+resolved 2026-08-19        : -53
+remaining                  :  72
 ```
+
+> **Editing this file: match on the PARSED address, not the literal text.**
+> The same address appears as `0xAD090`, `0x0AD090L`, `0x000AD090` and
+> `0x00E5ECL`. Text-keyed regex edits have silently missed labels four times
+> (item 93).
 
 **The big family is gone.** 106 labels rested on a "dispatch table" at
 `0x00E5EC`–`0x00E6C0` that item 84 proved is a **literal pool**: all 51
@@ -301,10 +306,11 @@ They are **not one family** — each needs its own evidence. Three rough groups:
    `irq_level_set`, `afc_target_calc` / `afc_target_computation`,
    `fuel_overrun_cutoff` / `overrun_fuel_cutoff`, `table_desc_1d_float` /
    `table_lookup_1D`.
-2. **Generated vs semantic** — a `desc_*` positional name against a hand-written
-   one, e.g. `AVCS_IntakeDutyCorr_Desc` / `desc_2D_ThrottlexRPM_u8_10x9`. The
-   `desc_*` side is machine-generated and its geometry is trustworthy; the
-   semantic side may not be (`0xD39A8` is the cautionary tale).
+2. ~~**Generated vs semantic**~~ — **DONE (item 93), all 4 resolved.** The
+   `desc_*` geometry was trustworthy every time; its **axis** claims were not
+   (`ThrottlexRPM` where item 85 proved Mass Airflow × Engine Speed). One,
+   `0x0AD928`, is merged but its identity remains unverified — its data is all
+   zero, so it is inert either way.
 3. **Genuinely contradictory** — these need decoding:
    ```
    0x000299BC  diag_check_P0137               / float_store_to_ram

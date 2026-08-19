@@ -101,6 +101,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0000E628, "stubpool_slot_15",
             "Slot 15 of the literal pool at 0x00E5EC (item 84). Holds 0x0004A94C and is loaded by mov.l @(0x00E628),r3 at 0x00E4AE. Not a scheduler table.");
 
+        count += labelComment(0x000AD090, "AFL_RampRate_Desc",
+            "RENAMED 2026-08-19 (item 93). Descriptor for data 0x0CE5A4, which the project XML names \"AFL Ramp Rate (CL to OL Transition Speed)\". 1-D uint16 x9 on the Engine Speed axis 0x0CE580 (0..8000 RPM). \"OL_Enrich_RampRate_Desc\" was a misnomer -- this is the AFL (long-term trim) ramp rate, not an OL enrichment rate. The geometry in \"desc_1D_RPM_wide_u16_9\" was correct.");
+
         // -- item 89: the 0xAD960 two-stage thermal-lag model ---------------------
         count += labelComment(0x0003644E, "fn_3644E_threshold_bank",
             "GBR = 0xFFFF79A4 (the stage-1 filtered value IS this GBR base). Bank of "
@@ -889,14 +892,16 @@ public class ImportAE5L600L extends GhidraScript {
         // AVCS DUTY CORRECTION
         // =====================================================================
         count += labelComment(0x000AD620, "AVCS_IntakeDutyCorr_Desc",
-            "28-byte descriptor: bias=0, dims=10x9, Y=0xCF9EC, X=0xCFA14, data=0xCFA38, uint8, scale=0.2");
+            "Descriptor for data 0x0CFA38 = \"Intake Duty Correction A\" (project XML). 2-D uint8, 9 rows x 10 cols. The retired \"desc_2D_ThrottlexRPM_u8_10x9\" had the geometry right but the AXES WRONG: they are Mass Airflow (0x0CF9EC, 4..80 g/s) x Engine Speed (0x0CFA14, 650..3600), not throttle x RPM -- settled and fixed in the XML by item 85. "
+            +             "28-byte descriptor: bias=0, dims=10x9, Y=0xCF9EC, X=0xCFA14, data=0xCFA38, uint8, scale=0.2");
         count += label(0x000CF9EC, "AVCS_Intake_VVTError_Axis");
         count += label(0x000CFA14, "AVCS_Intake_RPM_Axis");
         count += labelComment(0x000CFA38, "AVCS_IntakeDutyCorrA",
             "90 uint8, 10x9, physical = raw * 0.2 degrees");
 
         count += labelComment(0x000AD848, "AVCS_ExhaustDutyCorr_Desc",
-            "28-byte descriptor: bias=0, dims=10x9, Y=0xD11D0, X=0xD11F8, data=0xD121C, uint16, scale=0.000061");
+            "Descriptor for data 0x0D121C = \"Exhaust Duty Correction A\" (project XML). 2-D uint16. Retired \"desc_2D_ThrottlexRPM_u16_10x9\" -- axes are Mass Airflow (0x0D11D0) x Engine Speed (0x0D11F8), not throttle x RPM (item 85). Note the cell type differs from the intake sibling: exhaust is uint16, intake is uint8. "
+            +             "28-byte descriptor: bias=0, dims=10x9, Y=0xD11D0, X=0xD11F8, data=0xD121C, uint16, scale=0.000061");
         count += label(0x000D11D0, "AVCS_Exhaust_VVTError_Axis");
         count += label(0x000D11F8, "AVCS_Exhaust_RPM_Axis");
         count += labelComment(0x000D121C, "AVCS_ExhaustDutyCorrA",
@@ -1307,12 +1312,6 @@ public class ImportAE5L600L extends GhidraScript {
         // ── Path A: WRITE4 / enrichment decay filter ──
         // FUN_0003606C (ol_enrichment_dispatch) at 0x36204 calls 1D lookup using AD090 descriptor,
         // result written to FFFF79E0 each cycle (the enrichment decay rate per task cycle).
-        count += labelComment(0x000AD090, "OL_Enrich_RampRate_Desc",
-            "OL enrichment ramp rate 1D descriptor (16 bytes). Axis: RPM 0-8000 (9 points). "
-            + "Values: step-floor u16 table at CE5A4, scale 1/32768. "
-            + "Output FFFF79E0 ADDED to FFFF798C each cycle in FILTERED_UPDATE (0x36262: fadd). "
-            + "float_min (0xBE970) CAPS the result at the blended target (FFFF7990) — a ceiling, not a floor. "
-            + "At 0-4000 RPM: 100/32768 = 0.003052/cycle. Higher = faster OL enrichment ramp.");
         count += labelComment(0x000CE580, "OL_Enrich_RampRate_Axis",
             "OL enrichment ramp rate RPM axis: 9 × f32: 0/1000/2000/3000/4000/5000/6000/7000/8000 RPM.");
         count += labelComment(0x000CE5A4, "OL_Enrich_RampRate_Table",
@@ -1466,7 +1465,8 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000AC4FC, "AFC_PNorm_Desc",
             "AFC P normalizer descriptor (1D by airflow). Scales combined P gains.");
         count += labelComment(0x000AD928, "AFC_IComp_2D_Desc",
-            "AFC I-component descriptor (2D: engine load x MAF). Used by afc_pi_output integral chain.");
+            "IDENTITY UNVERIFIED (item 93). Descriptor for data 0x0D1A68, which NO definition XML claims; both axes (0x0D1A14 RPM 800.., 0x0D1A40 0.2..1.0) are unnamed. The two former names agreed in substance (AFC integral / PI blend) but neither is corroborated. What IS established: all 110 cells are 0.0, so it is inert as shipped, and its consumer at 0x034106 sits in the CL fuelling path near byte[FFFF782C]. Alias: desc_afc_pi_blend_2D. "
+            +             "AFC I-component descriptor (2D: engine load x MAF). Used by afc_pi_output integral chain.");
         count += labelComment(0x000ACEC8, "AFC_IGain_A_Desc",
             "AFC I-gain A descriptor (1D by RPM). Used by afc_pi_output integral chain.");
         count += labelComment(0x000ACEDC, "AFC_IGain_B_Desc",
@@ -4164,8 +4164,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0ACC80L, "desc_1D_RPM_wide_u16_16_ACC80");
         count += label(0x0ACD34L, "desc_1D_RPM_u16_8");
         count += label(0x0ACE54L, "desc_1D_RPM_wide_f32_6_ACE54");
-        count += labelComment(0x0AD090L, "desc_1D_RPM_wide_u16_9",
-            "RR: OL Enrichment Ramp Rate (CL to OL Transition Speed). WAS: AFL Decay Rate.");
         count += labelComment(0x0AD0A4L, "desc_1D_RPM_wide_u16_16_AD0A4",
             "RR: CL to OL Transition with Delay (Base Pulse Width)");
         count += label(0x0AD0F0L, "desc_1D_RPM_wide_u16_16_AD0F0");
@@ -4548,10 +4546,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AC154L, "desc_2D_ThrottlexMAF_f32_5x5");
 
         // --- 2D_ThrottlexRPM (5 descriptors) ---
-        count += labelComment(0x0AD620L, "desc_2D_ThrottlexRPM_u8_10x9",
-            "RR: Intake Duty Correction A");
-        count += labelComment(0x0AD848L, "desc_2D_ThrottlexRPM_u16_10x9",
-            "RR: Exhaust Duty Correction A");
         count += labelComment(0x0AF2D4L, "desc_2D_ThrottlexRPM_u16_15x17_AF2D4",
             "RR: Requested Torque (Accelerator Pedal) SI-DRIVE Sport");
         count += labelComment(0x0AF2F0L, "desc_2D_ThrottlexRPM_u16_15x17_AF2F0",
@@ -5928,8 +5922,6 @@ public class ImportAE5L600L extends GhidraScript {
             "AFC target 2D descriptor (RPM x load).");
         count += labelComment(0x000AC4E8, "desc_afc_cl_decision_1D",
             "AFC CL decision 1D descriptor.");
-        count += labelComment(0x000AD928, "desc_afc_pi_blend_2D",
-            "AFC PI blend 2D descriptor (11x10).");
         count += labelComment(0x000AD7E0L, "desc_injector_latency",
             "InjectorLatency 2D descriptor (16-byte format). "
             + "+00: 0x00050003 (dims 5x3), +04: 0x000D104C (VBatt axis ptr), "
