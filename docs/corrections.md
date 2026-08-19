@@ -5542,3 +5542,43 @@ gate nor a 3-state SI-Drive mode is supported by what was decoded.
 ```
 conflicts: 76 -> 72
 ```
+
+## 94. `0xAB03C` is a MAP-sensor rationality monitor input, not a boost lever — and the GBR signal beat the RAM signal — **2026-08-19**
+
+Full trace: `disassembly/analysis/map_rationality_monitor_trace.txt` (54/54
+lines verify). First Phase-3 target from the table triage.
+
+`0xAB03C` is 2-D uint8, **31 throttle-angle rows × 15 RPM columns**, values
+0–100. It supplies the **expected manifold pressure** term of an OBD-II
+MAP-sensor rationality monitor:
+
+```
+residual = [FFFF2240] − ( [FFFF620C] + table2D(0xAB03C, RPM, throttle) )
+                          ^ actual MAP
+
+run only if ECT > −30.0, 1000 < RPM < 6500, throttle > table1D(0xAAF84, RPM),
+and a precondition byte is clear
+```
+
+A coolant floor, an RPM window, a minimum throttle and a precondition byte is
+the signature of a rationality monitor, not a control path. `0xAAF84` (1-D ×15,
+13.64→57.30) is the throttle threshold, and its units matching `0xAB03C`'s
+31-value row axis is what identifies that axis as throttle angle.
+
+### The part worth keeping
+
+I called this "the single most interesting unexamined table in the ROM" because
+its consumer touches `manifold_pressure_map`, so the triage's **RAM signature**
+classified it *boost / MAP*. The **GBR-base signal** classified it *ADC / I-O*.
+
+**The GBR signal was right and the RAM signal was wrong.** The RAM near a call
+site can be an incidental read; the enclosing function's GBR is the workspace the
+code actually belongs to. That is why `matched_by` is recorded per row — when the
+two signals disagree, prefer the GBR one, and treat a RAM-derived hint as the
+weaker evidence.
+
+None of `0xAB03C`, `0xAAF84`, `0x0C34F0`, `0x0C34F4`, `0x0C34F8` is in the XML.
+
+Not established: the 31-value axis units are inferred from `0xAAF84` sharing
+them, not read from a definition; `0xFFFF2240` and `fn_0x29AA0` are undecoded;
+nothing is named.

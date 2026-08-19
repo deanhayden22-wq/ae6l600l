@@ -92,12 +92,17 @@ because the first two slices happened to land in diagnostic-heavy regions.
 The classifier uses **two independent signals**, both hints, never
 identifications, and the row records which one fired (`matched_by`):
 
-1. **RAM signature** — a workspace/GBR base or subsystem-specific variable near
-   the call site. Discriminating addresses only: `ect_current`, `rpm_current`,
+1. **GBR base of the enclosing function** — strongest of the three. Nearly every
+   function sets GBR from a literal, and the repo already labels those bases with
+   a subsystem prefix (`gbr_adc_`, `gbr_io_`, `gbr_diag_`, `gbr_tim_`,
+   `gbr_fuel_`, `gbr_afc_`, `gbr_sched_`), so mapping the prefix is mechanical.
+   **When this disagrees with the RAM signature, prefer it** — item 94 is the
+   worked example, where the RAM said boost/MAP and the GBR said ADC/IO and the
+   GBR was right.
+2. **RAM signature** — a workspace base or subsystem variable near the call site. Discriminating addresses only: `ect_current`, `rpm_current`,
    `vehicle_speed_kmh` and `ect_gated_c` are the four commonest RAM references in
    the corpus and classify nothing, so they are deliberately excluded.
-2. **Consumer code region** — which 4KB block the call site lives in. This turned
-   out to be the **stronger** signal. Only regions with a decoded anchor function
+3. **Consumer code region** — which 4KB block the call site lives in. Only regions with a decoded anchor function
    are listed, and each carries its anchor so the claim is auditable.
 
 Widening the signatures on 2026-08-19 (first pass → second pass):
@@ -135,17 +140,18 @@ siblings (items 70, 83).
 
 ### Biggest unexamined candidates
 
-| descriptor | shape | range | hint |
+| descriptor | shape | range | status |
 |---|---|---|---|
-| `0xAB03C` | 2-D uint8 31×15 | 0 … 100 | boost/MAP, consumer touches `manifold_pressure_map` |
-| `0xAA850` | 2-D uint16 29×11 | 0 … 1045 | throttle/pedal |
-| `0xAB288` | 2-D uint16 13×13 | 0.053 … 1.0 | boost/MAP |
-| `0xAAD08` / `0xAAD24` | 2-D uint16 6×11 | 7 … 261 / 1.4 … 331 | boost/MAP |
-| `0xAD054` | 1-D uint16 ×16 | 0 … 29000 | CL/OL, consumer reads `clol_mode_flag` |
-| `0xAE0D8` | 1-D uint16 ×16 | 0 … 70000 | throttle/pedal |
+| `0xAB03C` | 2-D uint8 31×15 | 0 … 100 | **DONE, item 94 — MAP rationality monitor, a diagnostic. Not a lever.** |
+| `0xAA850` | 2-D uint16 29×11 | 0 … 1045 | GBR `gbr_io_5C24` → ADC/IO |
+| `0xAB288` | 2-D uint16 13×13 | 0.053 … 1.0 | GBR `ratio_0to1_69F0` |
+| `0xAAD08` / `0xAAD24` | 2-D uint16 6×11 | 7 … 261 / 1.4 … 331 | GBR `FFFF6118` → ADC/IO |
+| `0xAD054` | 1-D uint16 ×16 | 0 … 29000 | GBR `FFFF787E` → AFC/AFL trim |
 
-A 31×15 percentage surface indexed near manifold pressure is the single most
-interesting unexamined table in the ROM.
+> **`0xAB03C` is the cautionary tale for this whole programme.** It was the
+> largest and most promising-looking unexamined table, its consumer touched
+> `manifold_pressure_map`, and it turned out to be an OBD rationality monitor.
+> Size and an evocative neighbour are not evidence.
 
 ### To widen further
 

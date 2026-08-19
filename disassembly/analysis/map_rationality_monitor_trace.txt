@@ -1,0 +1,157 @@
+================================================================================
+0xAB03C IS A MAP-SENSOR RATIONALITY MONITOR INPUT, NOT A BOOST LEVER
+Traced 2026-08-19. First Phase-3 target from the table triage.
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+================================================================================
+
+ANSWER
+--------------------------------------------------------------------------------
+`0xAB03C` is a 2-D uint8 surface, **31 throttle-angle rows x 15 RPM columns**,
+scale 0.39215684, values 0..100. It is the **expected manifold pressure** term of
+an OBD-II MAP-sensor rationality monitor. It is a DIAGNOSTIC. It is not a lever.
+
+It was flagged as "the single most interesting unexamined table in the ROM"
+because its consumer touches `manifold_pressure_map` and the triage's RAM
+signature therefore called it boost/MAP. **The GBR-base signal called it
+ADC / I-O, and the GBR signal was right.** Recorded because the disagreement is
+the useful part -- see docs/analysis-plan.md.
+
+THE CHAIN -- fn 0x024EE8, GBR = 0xFFFF68A4
+--------------------------------------------------------------------------------
+  024EE8: 4F22  sts.l pr,@-r15
+  024EEA: FFEB  fmov.s fr14,@-r15
+  024EEC: FFFB  fmov.s fr15,@-r15
+  024EEE: 4F13  stc.l gbr,@-r15
+  024EF0: D03B  mov.l @(0x024FE0),r0   ; [024FE0] = FFFF68A4
+  024EF2: 401E  ldc r0,gbr
+  024EF4: 7FF4  add #-12,r15
+  024EF6: D24A  mov.l @(0x025020),r2   ; [025020] = FFFF6624
+  024EF8: FE28  fmov.s @r2,fr14
+  024EFA: D24A  mov.l @(0x025024),r2   ; [025024] = FFFF62DC
+  024EFC: FF28  fmov.s @r2,fr15
+  024EFE: D24A  mov.l @(0x025028),r2   ; [025028] = 00029AA0
+  024F00: 420B    jsr @r2
+  024F02: 0009  nop
+  024F04: 2F00  mov.b r0,@r15
+  024F06: D449  mov.l @(0x02502C),r4   ; [02502C] = 000AB03C
+  024F08: D649  mov.l @(0x025030),r6   ; [025030] = 000BE8E4
+  024F0A: F4EC  fmov fr14,fr4
+  024F0C: 460B    jsr @r6
+  024F0E: F5FC  fmov fr15,fr5
+  024F10: D548  mov.l @(0x025034),r5   ; [025034] = FFFF68C0
+  024F12: E0E4  mov #-28,r0
+  024F14: F507  fmov.s fr0,@(r0,r5)
+  024F16: D448  mov.l @(0x025038),r4   ; [025038] = 000AAF84
+  024F18: D637  mov.l @(0x024FF8),r6   ; [024FF8] = 000BE830
+
+    fr14 = [FFFF6624]                 ; RPM
+    fr15 = [FFFF62DC]                 ; THROTTLE PLATE ANGLE
+    byte[r15] = fn_0x29AA0(RPM, throttle)
+    [FFFF68A4] = table2D(0xAB03C, RPM, throttle)     ; helper 0x0BE8E4
+    [FFFF68AC] = table1D(0xAAF84, RPM)               ; helper 0x0BE830
+
+then the comparison and its enable gate:
+
+  024F24: D227  mov.l @(0x024FC4),r2   ; [024FC4] = FFFF2240
+  024F26: F928  fmov.s @r2,fr9
+  024F28: D230  mov.l @(0x024FEC),r2   ; [024FEC] = FFFF620C
+  024F2A: F828  fmov.s @r2,fr8
+  024F2C: E0E4  mov #-28,r0
+  024F2E: F656  fmov.s @(r0,r5),fr6
+  024F30: F860  fadd fr6,fr8
+  024F32: F981  fsub fr8,fr9
+  024F34: D241  mov.l @(0x02503C),r2   ; [02503C] = FFFF6350
+  024F36: F628  fmov.s @r2,fr6
+  024F38: D241  mov.l @(0x025040),r2   ; [025040] = 000C34F0
+  024F3A: F828  fmov.s @r2,fr8
+  024F3C: F685  fcmp/gt fr8,fr6
+  024F3E: 8B23  bf 0x024F88
+  024F40: D240  mov.l @(0x025044),r2   ; [025044] = 000C34F4
+  024F42: F828  fmov.s @r2,fr8
+  024F44: FE85  fcmp/gt fr8,fr14
+  024F46: 8B1F  bf 0x024F88
+  024F48: D23F  mov.l @(0x025048),r2   ; [025048] = 000C34F8
+  024F4A: F828  fmov.s @r2,fr8
+  024F4C: F8E5  fcmp/gt fr14,fr8
+  024F4E: 8B1B  bf 0x024F88
+  024F50: E0EC  mov #-20,r0
+  024F52: F856  fmov.s @(r0,r5),fr8
+  024F54: FF85  fcmp/gt fr8,fr15
+  024F56: 8B17  bf 0x024F88
+  024F58: 62F0  mov.b @r15,r2
+  024F5A: 2228  tst r2,r2
+  024F5C: 8B14  bf 0x024F88
+
+    residual = [FFFF2240] - ( [FFFF620C] + [FFFF68A4] )
+                             ^ actual MAP   ^ modelled contribution
+
+    run the monitor only if ALL of:
+        [FFFF6350] (ECT)  >  -30.0     [0x0C34F0]
+        RPM               > 1000.0     [0x0C34F4]
+        RPM               < 6500.0     [0x0C34F8]
+        throttle          > [FFFF68AC] (the 0xAAF84 RPM-indexed threshold)
+        byte[r15]        == 0
+
+Enable conditions of exactly that shape -- a coolant floor, an RPM window, a
+minimum throttle and a precondition byte -- are the signature of an OBD-II
+rationality monitor, not of a control path.
+
+THE SURFACE (rows = throttle angle, cols = RPM)
+--------------------------------------------------------------------------------
+          800  1200  1600  2000  2400  2800  3200  3600  4000  4400  4800  5200  5600  6000  6400
+  10.58 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  13.90  50.2 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  14.53  49.4 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  17.11  47.8  68.2 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  18.58  46.7  50.2  85.1 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  18.66  46.7  49.8  83.9 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  20.14  45.5  48.6  69.0  86.7 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  21.98  44.3  47.5  50.2  70.2  89.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  22.60  43.9  47.1  49.4  64.7  85.5 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  24.23  42.7  45.5  48.2  50.2  76.1  91.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  24.78  42.4  45.1  47.8  49.4  72.9  87.8 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  28.67  39.6  42.4  44.7  46.3  50.2  65.9  78.8 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  29.17  39.2  42.0  44.3  45.9  49.4  63.1  76.1 100.0 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  31.47  37.3  40.0  42.4  43.9  47.5  50.2  63.1  87.5 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  33.66  36.1  38.4  40.4  41.2  45.9  48.2  51.4  75.7 100.0 100.0 100.0 100.0 100.0 100.0 100.0
+  33.89  35.7  38.4  40.4  42.0  45.5  47.8  50.2  74.5  98.8 100.0 100.0 100.0 100.0 100.0 100.0
+  36.87  33.7  36.1  38.0  39.2  43.1  45.5  47.5  58.4  83.9 100.0 100.0 100.0 100.0 100.0 100.0
+  37.94  32.9  35.3  37.3  38.4  42.0  44.3  46.7  52.5  78.4  94.5 100.0 100.0 100.0 100.0 100.0
+  38.41  32.5  34.9  36.9  38.0  41.6  43.9  46.3  50.2  76.1  92.2  98.0 100.0 100.0 100.0 100.0
+  41.61  30.2  32.5  34.1  35.3  38.8  41.2  43.5  47.1  60.0  76.1  83.1 100.0 100.0 100.0 100.0
+  43.35  29.0  31.0  32.5  34.1  37.6  39.6  42.0  45.5  51.0  67.5  75.3  93.7 100.0 100.0 100.0
+  43.56  28.6  31.0  32.5  33.7  37.3  39.6  41.6  45.5  50.2  66.3  74.5  92.9  99.2 100.0 100.0
+  43.96  28.6  30.6  32.2  33.3  36.9  39.2  41.2  45.1  49.8  64.3  72.5  91.4  98.0 100.0 100.0
+  46.78  26.7  28.2  29.8  31.0  34.5  36.9  38.8  42.7  47.1  50.2  60.0  80.8  89.0  91.0 100.0
+  47.33  26.3  27.8  29.4  30.6  34.1  36.5  38.4  42.4  46.7  49.4  57.3  78.8  87.5  89.4 100.0
+  48.95  25.1  26.7  28.2  29.4  32.5  34.9  36.9  40.8  45.5  48.2  50.2  72.9  82.4  84.3  93.3
+  55.14  20.4  22.0  23.1  23.9  27.5  29.8  31.8  35.3  40.0  43.1  45.5  50.2  62.7  64.7  67.5
+  59.22  17.6  18.8  20.0  20.8  23.9  26.3  28.2  31.8  36.5  40.0  42.7  47.8  50.2  51.4  50.2
+  59.29  17.6  18.8  20.0  20.8  23.9  26.3  28.2  31.8  36.5  40.0  42.7  47.8  49.8  51.4  50.2
+  59.71  17.3  18.4  19.6  20.4  23.5  25.9  27.8  31.4  36.1  39.6  42.4  47.5  49.8  50.2  48.2
+  83.90   0.0   0.0   0.0   0.0   3.1   5.1   7.1  10.2  14.9  20.0  25.1  34.9  36.9  40.0  45.1
+
+100% at small throttle across all RPM; falling as the throttle opens; falling
+hardest at low RPM. At the 83.90 row it is 0% from 800-2000 RPM and recovers to
+45% by 6400. That is the expected *throttling* term -- how much the plate is
+still restricting flow -- which is what a speed-density estimate of manifold
+pressure needs.
+
+THE SIBLING
+--------------------------------------------------------------------------------
+`0xAAF84`, 1-D uint16 x15 on the same RPM axis, data 13.64 -> 57.30. It is the
+minimum-throttle enable threshold, and its units match `0xAB03C`'s 31-value row
+axis (10.58 .. 83.90) -- which is what confirms that axis is throttle angle.
+
+NOT IN THE XML
+--------------------------------------------------------------------------------
+None of `0xAB03C`, `0xAAF84`, `0x0C34F0`, `0x0C34F4`, `0x0C34F8` has an
+`address=` entry in the project XML.
+
+WHAT THIS DOES NOT ESTABLISH
+--------------------------------------------------------------------------------
+* The units of the 31-value axis are inferred from the `0xAAF84` threshold
+  sharing them, not read from a definition.
+* `0xFFFF2240` and `fn_0x29AA0` are not decoded here.
+* Nothing is NAMED. The reading above is what the code does; the label is not
+  asserted.

@@ -106,6 +106,44 @@ CODE_REGIONS = [
 ]
 
 
+# 3. The enclosing function's GBR base. STRONGEST of the three: nearly every
+#    function sets GBR from a literal, and the repo already labels those bases
+#    with a subsystem prefix convention. Mapping the prefix is mechanical and
+#    uses the existing naming rather than a fresh guess.
+GBR_PREFIXES = [
+    ('gbr_diag_', 'diagnostic'), ('gbr_dtc_', 'diagnostic'),
+    ('gbr_sens_', 'diagnostic'), ('diag_', 'diagnostic'),
+    ('gbr_adc_', 'ADC / I-O'), ('gbr_io_', 'ADC / I-O'),
+    ('gbr_tim_', 'ignition timing'), ('ignition_ext_workspace', 'ignition timing'),
+    ('gbr_fuel_', 'base fuelling'),
+    ('gbr_afc_', 'AFC / AFL trim'), ('gbr_afl_', 'AFC / AFL trim'),
+    ('gbr_sched_', 'scheduler / task'), ('sched_', 'scheduler / task'),
+    ('knock_det_GBR', 'knock'), ('knock_', 'knock'),
+    ('flkc_', 'FLKC'),
+    ('evap_', 'evap / emissions'),
+    ('coolant_decay_bank', 'transient fuel'),
+    ('gbr_eng_', 'engine control'),
+]
+
+
+def gbr_of(rom, site, limit=0x900):
+    """Nearest preceding `ldc rN,gbr` and the literal it was loaded from."""
+    a = site
+    while a > max(0, site - limit):
+        w = struct.unpack_from('>H', rom, a)[0]
+        if (w & 0xF0FF) == 0x401E:
+            n = (w >> 8) & 0xF
+            for b in range(a - 2, max(0, a - 40), -2):
+                v = struct.unpack_from('>H', rom, b)[0]
+                if (v >> 12) == 0xD and ((v >> 8) & 0xF) == n:
+                    t = (b & ~3) + 4 + ((v & 0xFF) * 4)
+                    if t + 4 <= len(rom):
+                        return struct.unpack_from('>I', rom, t)[0]
+            return None
+        a -= 2
+    return None
+
+
 def region_of(site):
     for lo, hi, name, _ in CODE_REGIONS:
         if lo <= site < hi:
@@ -220,8 +258,16 @@ def triage(rom_path):
         labelled = [labels.get(v, '%08X' % v) for v, _ in seen.most_common(8)]
         raw = ['%08X' % v for v, _ in seen.most_common(8)]
         hay = set(labelled) | set(raw)
-        sub = next((nm for keys, nm in RAM_SIGNATURES if any(k in hay for k in keys)), '')
-        how = 'ram' if sub else ''
+        sub, how, gbr = '', '', None
+        if sites:
+            gbr = gbr_of(rom, sites[0])
+            if gbr is not None:
+                nm = labels.get(gbr, '')
+                sub = next((v for pfx, v in GBR_PREFIXES if nm.startswith(pfx)), '')
+                how = 'gbr' if sub else ''
+        if not sub:
+            sub = next((nm for keys, nm in RAM_SIGNATURES if any(k in hay for k in keys)), '')
+            how = 'ram' if sub else ''
         if not sub and sites:
             sub = region_of(sites[0])
             how = 'region' if sub else ''
@@ -238,6 +284,7 @@ def triage(rom_path):
             sites=['0x%05X' % s for s in sites],
             ram=[labels.get(v, '%08X' % v) for v, _ in seen.most_common(4)],
             subsystem=sub, matched_by=how,
+            gbr=('%08X' % gbr) if gbr else None,
         ))
     return rows, named, artefact
 
@@ -266,8 +313,10 @@ def main():
     print('    axis identity known from a defn : %d' % withaxis)
     print('    with a direct call site         : %d' % withsite)
     print()
-    print('  classified by RAM signature: %d, by code region: %d, unassigned: %d'
-          % (sum(1 for r in rows if r['matched_by'] == 'ram'),
+    print('  classified by GBR base: %d, RAM signature: %d, code region: %d, '
+          'unassigned: %d'
+          % (sum(1 for r in rows if r['matched_by'] == 'gbr'),
+             sum(1 for r in rows if r['matched_by'] == 'ram'),
              sum(1 for r in rows if r['matched_by'] == 'region'),
              sum(1 for r in rows if not r['subsystem'])))
     print()
