@@ -28,6 +28,26 @@ For forms 1-3 the base register is resolved by scanning backwards for the
 For form 4 the GBR base is resolved from the enclosing function's
 `mov.l @(disp,PC),r0 ; ldc r0,gbr` preamble.
 
+PHANTOM WRITERS -- read this before trusting a hit
+--------------------------------------------------
+This scanner decodes the WHOLE 1 MB as if it were code. Calibration data
+decoded as SH-2E produces plausible-looking stores. A descending float axis
+at 0x0D7E7C reads as a tidy run of `mov.l r0,@(disp,gbr)`:
+
+  0D7E84: C2FA  mov.l r0,@(1000,gbr)     really 0xC2FA0000 = -125.0
+  0D7E88: C2C8  mov.l r0,@(800,gbr)      really 0xC2C80000 = -100.0
+  0D7E8C: C296  mov.l r0,@(600,gbr)      really 0xC2960000 =  -75.0
+
+Both were reported as writers of 0xFFFF895C. Neither is code -- the main code
+region ends long before 0x0D0000. See docs/corrections.md item 73.
+
+Every hit is therefore annotated with the region type rom_region_map.txt gives
+its PC, and anything outside `code` is marked. Hits are ANNOTATED, NEVER
+DROPPED: that map is itself a derived product and has misclassified real code
+as float_data before (STATUS.md, 5 corrected entries), so a silent filter would
+hide exactly the writers this tool exists to find. Pass --code-only to suppress
+them anyway once you have read them.
+
 Usage
 -----
     python scripts/mapping/find_writers.py FFFF6354
@@ -55,6 +75,41 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 from sh2e_disasm import disasm  # noqa: E402
 
 DEFAULT_ROM = os.path.join(REPO, "rom", "AE5L600L 20g rev 20.19c.bin")
+REGION_MAP = os.path.join(REPO, "disassembly", "maps", "rom_region_map.txt")
+
+
+def load_regions(path=REGION_MAP):
+    """256-byte block classification from rom_region_map.txt.
+
+    Returns a sorted list of (start, end, type). Empty if the file is missing --
+    the caller must then degrade to 'unknown', never to 'code'.
+    """
+    out = []
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = re.match(r"\s*0x([0-9A-Fa-f]+)-0x([0-9A-Fa-f]+)\s+\d+\s+bytes\s+(\w+)", line)
+                if m:
+                    out.append((int(m.group(1), 16), int(m.group(2), 16), m.group(3)))
+    except OSError:
+        return []
+    out.sort()
+    return out
+
+
+def region_of(regions, pc):
+    """Region type holding `pc`, or 'unmapped' if no block claims it."""
+    lo, hi = 0, len(regions)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        s, e, t = regions[mid]
+        if pc < s:
+            hi = mid
+        elif pc >= e:
+            lo = mid + 1
+        else:
+            return t
+    return "unmapped"
 
 STORE_DIRECT = re.compile(r"^(fmov\.s|mov\.[bwl])\s+(\S+),@(r\d+)\+?$")
 STORE_DISP = re.compile(r"^(mov\.[bwl])\s+(\S+),@\((\d+),(r\d+)\)$")
@@ -214,10 +269,31 @@ def main():
         print("  no writes found -- if the address is clearly written, the base is")
         print("  built by arithmetic and this tool cannot see it. Say so; do not")
         print("  conclude the address is read-only.")
+    regions = load_regions()
+    if not regions:
+        print("  NOTE: rom_region_map.txt unreadable -- no region annotation.\n")
+    code_only = "--code-only" in sys.argv
+    suspect = 0
     for tgt, rw, kind, pc, t, detail in sorted(hits):
-        print(f"  {tgt:08X}  {rw:5s} {kind:8s} {pc:06X}: {t:34s} ; {detail}")
+        reg = region_of(regions, pc) if regions else "unknown"
+        if reg not in ("code", "unknown"):
+            suspect += 1
+            if code_only:
+                continue
+            mark = f"  <-- IN {reg.upper()}, LIKELY NOT A REAL WRITER"
+        else:
+            mark = ""
+        print(f"  {tgt:08X}  {rw:5s} {kind:8s} {pc:06X}: {t:34s} ; {detail}{mark}")
     w = sum(1 for h in hits if h[1] == "WRITE")
     print(f"\n  {w} write(s), {len(hits) - w} read(s) shown")
+    if suspect:
+        print(f"\n  {suspect} hit(s) fall in blocks rom_region_map.txt classifies as")
+        print("  DATA, not code. Decoding data as SH-2E yields plausible-looking")
+        print("  stores -- a float axis reads as `mov.l r0,@(disp,gbr)`. Verify any")
+        print("  such hit with sh2e_disasm before believing it. Re-run with")
+        print("  --code-only to hide them.")
+        print("  The region map is itself a derived product and has misclassified")
+        print("  code as float_data before, so hits are ANNOTATED, never dropped.")
 
 
 if __name__ == "__main__":

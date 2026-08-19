@@ -3960,3 +3960,66 @@ from a function nothing had previously decoded.
 Recorded here. No XML edited, no ROM byte changed. `docs/verification-status.md`
 is unaffected — none of `0x0D0740`, `0x0CC32C`, `0x0CC330` is a defined entity,
 so `coverage_map.py` never flagged them and still will not.
+
+---
+
+## 73. `find_writers.py` reported PHANTOM WRITERS in calibration space — it decoded the whole 1 MB as code — **FIXED 2026-08-18**
+
+`scripts/mapping/find_writers.py` is the tool CLAUDE.md points at for settling
+RAM identities, and three of the four identity fixes on 2026-08-16 came from it.
+It had no region filter: it ran the SH-2E decoder over all 1,048,576 bytes and
+reported every apparent store, including ones inside calibration tables.
+
+Found while working open-hole 1. `find_writers.py FFFF895C` returned three
+writers, two of them at `0x0D7E84` and `0x0D8020`. Decoded in context:
+
+```
+0D7E80: C316  trapa #22
+0D7E82: 0000  .word 0x0000
+0D7E84: C2FA  mov.l r0,@(1000,gbr)
+0D7E86: 0000  .word 0x0000
+0D7E88: C2C8  mov.l r0,@(800,gbr)
+0D7E8C: C296  mov.l r0,@(600,gbr)
+0D7E90: C248  mov.l r0,@(288,gbr)
+```
+
+Read as 32-bit floats instead — which is what they are:
+
+```
+C3160000  C2FA0000  C2C80000  C2960000  C2480000
+  -150.0    -125.0    -100.0     -75.0     -50.0
+```
+
+A descending float axis. `rom_region_map.txt` puts the main code region at
+`0x000C0C-0x0A0000`; `0x0D7E84` is ~220 KB past its end, and the block is
+classified `float_data`. `0xFFFF895C` has exactly **one** real writer,
+`05189C: fmov.s fr0,@(r0,r14)`.
+
+### Why this is the same failure class as everything else here
+
+The regular `C2xx 0000` stride of a float table decodes as a regular stride of
+`mov.l r0,@(disp,gbr)`. It does not look like garbage. It looks like a
+purpose-built initialiser writing a series of related offsets off one base —
+which is exactly the shape a real RAM-structure writer has. Nothing flags it.
+
+### The fix — annotate, never drop
+
+`find_writers.py` now classifies each hit's PC against
+`disassembly/maps/rom_region_map.txt` and marks anything outside `code`:
+
+```
+FFFF895C  WRITE GBR  0D7E84: mov.l r0,@(1000,gbr)  <-- IN FLOAT_DATA, LIKELY NOT A REAL WRITER
+```
+
+Hits are **annotated, never filtered out**. The region map is itself a derived
+product and has misclassified real code as `float_data` before (STATUS.md
+records 5 such entries corrected), so a silent filter would hide precisely the
+computed-addressing writers this tool exists to find. `--code-only` suppresses
+them for anyone who wants that after reading them.
+
+### What else needs rechecking
+
+**Any conclusion resting on a `find_writers.py` hit above `0x0A0000` is
+suspect** and should be re-run. The tool has been in use since 2026-08-16.
+Re-running is cheap; the affected identities are the ones in
+`docs/corrections.md` items 62, 64, 66 and open-hole 1.
