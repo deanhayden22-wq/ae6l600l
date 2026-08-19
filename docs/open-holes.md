@@ -25,11 +25,11 @@ and these seven are the ones that are materially different rather than wording.
 |---|---|---|
 | ~~`0xFFFF64F5`~~ | **RESOLVED 2026-08-18 — item 76. Neither name. It is a DEBOUNCED CLOSED-PEDAL flag (`counter > 2`), overloaded to carry `fuel_system_state` when `adc_channel_status == 1`.** | |
 | `0xFFFF3234` | `flkc_work_bank1` vs `knock_learn_coarse` — **no writer even on a 0xFFFF3200-325F window scan**; neighbours at `0xFFFF3244` are written from `0x045xxx` (FLKC code). Needs a non-writer method. | UNMAPPED |
-| `0xFFFF8258` | `knock_metric` (knock_flkc) vs `flkc_retard` (ignition_timing) | UNMAPPED |
-| `0xFFFF7F68` | `ect_blend_correction` (fueling, startup) vs `blend_output` (ignition_timing) | DISASM-ONLY |
-| `0xFFFF1288` | `inj_gate_hook_ptr` (fueling) vs `scheduler_state` (task_scheduler) | unflagged |
-| `0xFFFF8F24` | `blend_state_b` (ignition_timing) vs `global_cl_enable` (startup_enrichment) | UNMAPPED |
-| `0xFFFF895C` | `injector_data` (diag_tasks) vs `afl_value` (ignition_timing) | DISASM-ONLY |
+| ~~`0xFFFF8258`~~ | **RESOLVED — item 80. A knock-workspace product INTEGRATOR; `knock_metric` in kind, `flkc_retard` unsupported (produces no degrees).** | |
+| ~~`0xFFFF7F68`~~ | **RESOLVED — item 80. ECT warm-up blend, 4 modes on `ect_current`. Identity vs use — both names describe it from opposite ends.** | |
+| ~~`0xFFFF1288`~~ | **RESOLVED — item 80. `rtos_scheduler_state`: SR-masked priority raise + MTU0 array. `inj_gate_hook_ptr` WRONG.** | |
+| ~~`0xFFFF8F24`~~ | **RESOLVED — item 80. Debounced flag on status byte == 90, 6-count timeout. BOTH names unsupported.** | |
+| ~~`0xFFFF895C`~~ | **RESOLVED — item 80. A clamped difference with a 1000.0 ceiling. BOTH names unsupported.** | |
 
 **How to settle each** (this exact method resolved `0xFFFF6254` and
 `0xFFFF7D18`, and corrected `0xFFFF4130`, `0xFFFF6354`, `0xFFFF3248`,

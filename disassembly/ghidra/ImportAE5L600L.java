@@ -8319,6 +8319,30 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000D2C28L, "cal_task37_stage3_mode3_ZERO",
             "= 0.0. Stage 3 mode 3 writes this to gbr_kflk_8024 directly.");
 
+        // -- item 80: five open-hole-1 adjudications --------------------------
+        count += labelComment(0xFFFF7F68L, "ect_warmup_blend_out",
+            "table_lookup_1D(ect_current) over one of four desc_ect_warmup_1D_mode** "
+            + "(0xADBC4/ADBD8/ADBEC/ADC00) selected by [0xFFFF90BE] and flag_6254. "
+            + "Written at 0x0403F8. 'blend_output' named the same thing from the "
+            + "consumer side -- identity vs use, not a conflict. Item 80.");
+        count += label(0xFFFF90BEL, "ect_warmup_mode_flag_A");
+        count += labelComment(0xFFFF8258L, "knock_metric_accum",
+            "Accumulator: += [0xFFFF826C] * ([8214]*[8204]*knock_thresh_calc*"
+            + "knock_det_workspace_ext), at 0x0459E4. Integrates knock-detector terms; "
+            + "produces NO degrees, so the competing 'flkc_retard' name is unsupported. "
+            + "Whether it is later converted to retard is NOT established.");
+        count += label(0xFFFF826CL, "knock_metric_gain");
+        count += labelComment(0xFFFF8F24L, "status90_debounced_flag",
+            "Set 1 when byte [0xFFFF8F12] == 90; cleared after 6 consecutive non-90 "
+            + "samples. Written at 0x05E9C6. NEITHER 'blend_state_b' NOR "
+            + "'global_cl_enable' is supported by the code; 0xFFFF8F12 is unidentified.");
+        count += label(0xFFFF8F1CL, "status90_debounce_counter");
+        count += labelComment(0xFFFF895CL, "clamped_diff_895C",
+            "= float_max(fr0 - [r14-48] - [r14-28], float_min(x, 1000.0)) at 0x05189C. "
+            + "NEITHER 'injector_data' NOR 'afl_value' is supported -- and logged AFL is "
+            + "0xFFFF7878 per item 70. No identity claimed.");
+        count += label(0x000D6280L, "cal_clamp_ceiling_1000");
+
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }

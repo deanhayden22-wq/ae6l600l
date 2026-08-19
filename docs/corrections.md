@@ -4528,3 +4528,115 @@ from `extu.w r0,r6` at `0x03AECA` off a value spilled at `0x03AEC8`, which was
 not traced further back. So the gate STRUCTURE is settled and reachability is
 settled, but the operating condition -- when in real driving this fires -- is
 NOT. Do not claim it fires during any particular manoeuvre without tracing `r6`.
+
+---
+
+## 80. Open-hole 1: five more RAM conflicts adjudicated from writers — two names right, two pairs BOTH wrong — **2026-08-18**
+
+Continues item 76. Each address had exactly one verified real writer; each writer
+was decoded and its literals resolved.
+
+### `0xFFFF7F68` — ECT warm-up blend. `ect_blend_correction` is right.
+
+Writer `0x0403F8`, in the delay slot of an `rts`. The function is a 2x2 selector:
+
+```
+0403C6  fr4  = *[0xFFFF6350]          ect_current
+0403CA  r6   =  [0xFFFF90BE]          flag A
+0403CE  r5   =  [0xFFFF6254]          flag B  (flag_6254)
+        r4 = one of four descriptors by (A,B):
+             0x0ADBC4 mode00   0x0ADBD8 mode01
+             0x0ADBEC mode10   0x0ADC00 mode11
+0403EC  jsr 0x0BE830 = table_lookup_1D
+0403F8  fmov.s fr0,@r2               -> 0xFFFF7F68
+```
+
+All four descriptors are named `desc_ect_warmup_1D_mode**`, 16 cells, live
+(`8.09, 8.09, 8.09, 8.09, 7.03, ...`). The input is `ect_current`, which is
+`VERIFIED-BOTH`. So this is an ECT warm-up correction blended across four modes.
+`ect_blend_correction` names the identity; `blend_output` names the same thing
+from the consumer side. **Not a conflict -- identity vs use, like `0xFFFF7D18`.**
+
+### `0xFFFF1288` — `rtos_scheduler_state`. `inj_gate_hook_ptr` is WRONG.
+
+Writer `0x002DB6`, inside an SR-masked critical section:
+
+```
+002DA4  r3 = 0xFFFF1230 (SH7058_TIER_MTU0) + index*2 ; store [r5+4]
+002DB0  r3 = byte [r5]                     r5 = 0xFFFF1288
+002DB2  cmp/ge r3,r14                      raise-to-higher-priority test
+002DB6  mov.b r7,@r5
+002DBA  [r5+6] = [r5+4]                    save previous
+002DBE  ldc r3,sr                          end critical section
+```
+
+A byte priority compared and conditionally raised, a previous-value save, and an
+`SH7058_TIER_MTU0` timer array indexed alongside -- all under interrupt mask, in
+the RTOS region. The long written to `[r5+8]` (`0x1000` at `0x002D20`) is the
+pointer-shaped field that probably produced the `inj_gate_hook_ptr` name. The
+address already carried `rtos_scheduler_state` in the Java; the code confirms it.
+
+### `0xFFFF8258` — a knock-workspace product INTEGRATOR. `knock_metric` in kind.
+
+Writer `0x0459E4` (base `0xFFFF826C`, `r0 = -20`):
+
+```
+0459C0  fr9 = fr8                                     previous value
+        fr8 = [0xFFFF8214] * [0xFFFF8204]
+                           * [0xFFFF821C] knock_thresh_calc
+                           * [0xFFFF8218] knock_det_workspace_ext
+0459E0  fmac fr0,fr8,fr9    fr9 += [0xFFFF826C] * product
+0459E4  fmov.s fr9,@(r0,r5)                           -> 0xFFFF8258
+```
+
+An accumulator over a product of four knock-detector workspace terms, with a
+gain. That is a metric being integrated, not a timing quantity. `knock_metric`
+describes what it IS. **`flkc_retard` is not supported here** -- nothing in this
+function produces degrees. Whether the accumulated value is later converted to
+retard is NOT established.
+
+### `0xFFFF8F24` — a debounced status flag. BOTH names unsupported.
+
+Writer `0x05E9C6` (`mov.b r0,@(8,r1)`, `r1 = 0xFFFF8F1C`):
+
+```
+05E9AC  r0 = byte [0xFFFF8F12]
+05E9B0  cmp/eq #90,r0    ->  [0xFFFF8F24] = 1
+        else  r2 = byte [0xFFFF8F1C]
+05E9C0  cmp/hs #6,r2     ->  [0xFFFF8F24] = 0
+        else             ->  uint8_add_sat path (increment the counter)
+05E9CC  [0xFFFF8F1C] = 0                    reset on either decision
+```
+
+`0xFFFF8F24` is set when a status byte equals **90**, cleared after **6**
+consecutive non-90 samples, with `0xFFFF8F1C` as the debounce counter. Same shape
+as `0xFFFF64F5` (item 76). **Neither `blend_state_b` nor `global_cl_enable` is
+supported by the code.** `0xFFFF8F12` is unlabelled and unidentified, so what
+"status 90" means is open.
+
+### `0xFFFF895C` — a clamped difference. BOTH names unsupported.
+
+Writer `0x05189C` (base `0xFFFF8964`, `r0 = -8`):
+
+```
+051878  fr0 = fr0 - [r14-48] - [r14-28]  ; fr14 = fr0
+05188E  jsr float_min(fr4, *[0x0D6280] = 1000.0)
+051896  jsr float_max(fr14, that)
+05189C  -> 0xFFFF895C , and the same value to 0xFFFF8964
+```
+
+A difference of two subtractions, floored by `max` against a value ceilinged at
+**1000.0**. **Neither `injector_data` nor `afl_value` is supported.** `afl_value`
+is additionally doubtful because item 70 established the logged AFL channel is
+`0xFFFF7878`.
+
+### Status of open-hole 1
+
+Six of seven addressed (item 76 plus these five). Only `0xFFFF3234` remains, and
+it has **no writer even on a 96-byte window scan** -- it needs a method that does
+not start from writes.
+
+Two of the five ended with **both** competing names wrong, matching `0xFFFF6254`
+and `0xFFFF64F5`. Per the standing rule, no replacement name is invented for
+those beyond what the code establishes: a debounced flag, and a clamped
+difference.
