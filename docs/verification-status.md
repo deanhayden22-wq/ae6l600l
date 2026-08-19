@@ -6,7 +6,7 @@
 python scripts/coverage_map.py
 ```
 
-Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-08-17 20:47.
+Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-08-18 21:28.
 
 Every flag below is recomputed from scratch on each run: the definition side from `scripts/defs.py` over both definition XMLs, the disassembly side re-derived from ROM bytes (literal-pool dereference back-trace, table descriptors decoded out of ROM, and a RAM→lookup-axis feed trace). No conclusion is read out of a derived file and trusted. Agreement across derived files is not evidence.
 
@@ -72,26 +72,26 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 
 ## 2. Coverage
 
-4691 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
+4720 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
 
 | Flag | Entities | Share |
 |---|---:|---:|
 | `CONFLICT` | 2 | 0.0% |
 | `BOUNDS-SUSPECT` | 52 | 1.1% |
-| `VERIFIED-BOTH` | 336 | 7.2% |
-| `VERIFIED-BYTES` | 290 | 6.2% |
+| `VERIFIED-BOTH` | 360 | 7.6% |
+| `VERIFIED-BYTES` | 266 | 5.6% |
 | `DEFS-ONLY` | 6 | 0.1% |
-| `DISASM-ONLY` | 927 | 19.8% |
-| `UNMAPPED` | 3078 | 65.6% |
+| `DISASM-ONLY` | 956 | 20.3% |
+| `UNMAPPED` | 3078 | 65.2% |
 
 ### By entity kind
 
 | Kind | `CONFLICT` | `BOUNDS-SUSPECT` | `VERIFIED-BOTH` | `VERIFIED-BYTES` | `DEFS-ONLY` | `DISASM-ONLY` | `UNMAPPED` |
 |---|---|---|---|---|---|---|---|
-| axis | 0 | 26 | 128 | 57 | 2 | 0 | 0 |
+| axis | 0 | 26 | 145 | 40 | 2 | 0 | 0 |
 | ram | 0 | 0 | 5 | 0 | 0 | 231 | 3078 |
-| rom-block | 0 | 0 | 0 | 0 | 0 | 696 | 0 |
-| table | 2 | 26 | 203 | 233 | 4 | 0 | 0 |
+| rom-block | 0 | 0 | 0 | 0 | 0 | 725 | 0 |
+| table | 2 | 26 | 210 | 226 | 4 | 0 | 0 |
 
 `table` / `axis` are definition-backed. `rom-block` is a calibration block a ROM descriptor points at that no `<table>` covers. `ram` is a RAM variable — RAM is outside the ROM image, so no definition can ever cover it and the definition side contributes only indirectly, through the names of the axes a RAM variable is traced feeding.
 
@@ -100,8 +100,8 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 Bytes the region map classifies as data (not code, not a 0xFF hole) and that no definition extent and no descriptor extent claims:
 
 - data bytes considered: **321,468**
-- unmapped: **256,794 (79.9%)**
-- of which 44,028 bytes lie inside the descriptor band `0x0A0000-0x0BE000` — those are descriptor STRUCTS and lookup-helper constants, not table cells, so they are unmapped by nature rather than by neglect. Excluding them, **212,766 of 277,440 calibration data bytes (76.7%) are claimed by nothing**.
+- unmapped: **255,192 (79.4%)**
+- of which 44,028 bytes lie inside the descriptor band `0x0A0000-0x0BE000` — those are descriptor STRUCTS and lookup-helper constants, not table cells, so they are unmapped by nature rather than by neglect. Excluding them, **211,164 of 277,440 calibration data bytes (76.1%) are claimed by nothing**.
 
 Largest unmapped data blocks:
 
@@ -136,7 +136,7 @@ Largest unmapped data blocks:
 | Fueling - Primary Open Loop | 0 | 0 | 23 | 2 | 0 | 0 | 0 | 25 |
 | Fueling - Cranking | 0 | 0 | 12 | 12 | 0 | 0 | 0 | 24 |
 | Ignition Timing - Knock Control | 0 | 6 | 15 | 2 | 0 | 0 | 0 | 23 |
-| Drive-by-Wire Throttle (DBW) | 0 | 0 | 0 | 20 | 0 | 0 | 0 | 20 |
+| Drive-by-Wire Throttle (DBW) | 0 | 0 | 20 | 0 | 0 | 0 | 0 | 20 |
 | Fueling - CL/OL Transition | 0 | 6 | 12 | 1 | 1 | 0 | 0 | 20 |
 | Boost Control - Turbo Dynamics | 0 | 0 | 15 | 3 | 0 | 0 | 0 | 18 |
 | Fueling - Closed Loop | 0 | 0 | 11 | 7 | 0 | 0 | 0 | 18 |
@@ -153,7 +153,7 @@ Largest unmapped data blocks:
 | Idle Control | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 8 |
 | Fueling - AF Correction / Learning | 0 | 1 | 2 | 0 | 4 | 0 | 0 | 7 |
 | Miscellaneous - Limits | 0 | 1 | 3 | 3 | 0 | 0 | 0 | 7 |
-| Alpha Per Gear Requested Torque | 0 | 2 | 0 | 4 | 0 | 0 | 0 | 6 |
+| Alpha Per Gear Requested Torque | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 6 |
 | Alpha Variable Valve Timing (AVCS) | 0 | 2 | 4 | 0 | 0 | 0 | 0 | 6 |
 | Boost Control - Limits | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 |
 | Idle control | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 6 |
@@ -377,11 +377,13 @@ Collapsed by address: a shared axis (the ECT axis at `0xCC624` serves 34 tables)
   _Alpha Per Gear Requested Torque_
   - 96 of 96 factory-ROM cells fall outside the declared min/max 0.0..455.0
   - **suspect side:** definition XML (declared min/max)
+  - evidence: D2 ROM table descriptor @0xAF29C — 2D, 96 cells x 2 bytes (data pointer); spacing to the next known table boundary implies 2 bytes/cell
   - evidence: D5 cal_crossref.txt:403 — Ghidra label cal_Requested_Torque_Limit_A_Per_Gear_Engine_Speed
 - **`0xF98A0`** — Requested Torque Limit B (Per Gear/Engine Speed)  
   _Alpha Per Gear Requested Torque_
   - 96 of 96 factory-ROM cells fall outside the declared min/max 0.0..455.0
   - **suspect side:** definition XML (declared min/max)
+  - evidence: D2 ROM table descriptor @0xAF2B8 — 2D, 96 cells x 2 bytes (data pointer); spacing to the next known table boundary implies 2 bytes/cell
   - evidence: D5 cal_crossref.txt:406 — Ghidra label cal_Requested_Torque_Limit_B_Per_Gear_Engine_Speed
 
 ## 6. `DEFS-ONLY` — definition too incomplete to check

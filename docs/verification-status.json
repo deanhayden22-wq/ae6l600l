@@ -1,6 +1,6 @@
 {
  "schema_version": 1,
- "generated": "2026-08-17 20:47",
+ "generated": "2026-08-18 21:28",
  "generator": "scripts/coverage_map.py",
  "warning": "GENERATED FILE -- regenerate, never hand-edit. python scripts/coverage_map.py",
  "inputs": {
@@ -59,35 +59,35 @@
   }
  ],
  "totals": {
-  "entities": 4691,
+  "entities": 4720,
   "by_flag": {
    "CONFLICT": 2,
    "BOUNDS-SUSPECT": 52,
-   "VERIFIED-BOTH": 336,
-   "VERIFIED-BYTES": 290,
+   "VERIFIED-BOTH": 360,
+   "VERIFIED-BYTES": 266,
    "DEFS-ONLY": 6,
-   "DISASM-ONLY": 927,
+   "DISASM-ONLY": 956,
    "UNMAPPED": 3078
   },
   "by_kind_flag": {
    "axis/BOUNDS-SUSPECT": 26,
    "axis/DEFS-ONLY": 2,
-   "axis/VERIFIED-BOTH": 128,
-   "axis/VERIFIED-BYTES": 57,
+   "axis/VERIFIED-BOTH": 145,
+   "axis/VERIFIED-BYTES": 40,
    "ram/DISASM-ONLY": 231,
    "ram/UNMAPPED": 3078,
    "ram/VERIFIED-BOTH": 5,
-   "rom-block/DISASM-ONLY": 696,
+   "rom-block/DISASM-ONLY": 725,
    "table/BOUNDS-SUSPECT": 26,
    "table/CONFLICT": 2,
    "table/DEFS-ONLY": 4,
-   "table/VERIFIED-BOTH": 203,
-   "table/VERIFIED-BYTES": 233
+   "table/VERIFIED-BOTH": 210,
+   "table/VERIFIED-BYTES": 226
   },
-  "descriptors_decoded": 780,
+  "descriptors_decoded": 818,
   "rom_data_bytes_considered": 321468,
-  "rom_data_bytes_unmapped": 256794,
-  "rom_data_bytes_unmapped_pct": 79.9,
+  "rom_data_bytes_unmapped": 255192,
+  "rom_data_bytes_unmapped_pct": 79.4,
   "rom_unmapped_bytes_in_descriptor_band": 44028
  },
  "by_category": {
@@ -123,7 +123,7 @@
   },
   "Alpha Per Gear Requested Torque": {
    "BOUNDS-SUSPECT": 2,
-   "VERIFIED-BYTES": 4
+   "VERIFIED-BOTH": 4
   },
   "Alpha Transient Fueling (Tau)": {
    "VERIFIED-BYTES": 5,
@@ -153,7 +153,7 @@
    "VERIFIED-BYTES": 152
   },
   "Drive-by-Wire Throttle (DBW)": {
-   "VERIFIED-BYTES": 20
+   "VERIFIED-BOTH": 20
   },
   "Fueling - AF Correction / Learning": {
    "DEFS-ONLY": 4,
@@ -2696,6 +2696,10 @@
    },
    "evidence": [
     {
+     "source": "D2 ROM table descriptor @0xAF29C",
+     "detail": "2D, 96 cells x 2 bytes (data pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
      "source": "D5 cal_crossref.txt:403",
      "detail": "Ghidra label cal_Requested_Torque_Limit_A_Per_Gear_Engine_Speed"
     },
@@ -2739,6 +2743,10 @@
     "raw_is_display": false
    },
    "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2B8",
+     "detail": "2D, 96 cells x 2 bytes (data pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
     {
      "source": "D5 cal_crossref.txt:406",
      "detail": "Ghidra label cal_Requested_Torque_Limit_B_Per_Gear_Engine_Speed"
@@ -8340,6 +8348,754 @@
     "cells": 16,
     "bytes_per_cell": 4,
     "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque Base (RPM) / Engine Speed",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF8B14",
+   "defs_source": "project XML line 946",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF144",
+     "detail": "1D, 16 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:390",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Target Throttle Plate Position Cruise (Requested Torque Ratio) / 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF8F84",
+   "defs_source": "project XML line 950",
+   "declared": {
+    "scaling": "ratio",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "ratio",
+    "min": 0.0,
+    "max": 1.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF22C",
+     "detail": "2D, 256 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:392",
+     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Target Throttle Plate Position Cruise (Requested Torque Ratio) / Engine Speed",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF8FC4",
+   "defs_source": "project XML line 950",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF22C",
+     "detail": "2D, 256 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:393",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Target Throttle Plate Position Non-Cruise (Requested Torque Ratio) / 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9204",
+   "defs_source": "project XML line 955",
+   "declared": {
+    "scaling": "ratio",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "ratio",
+    "min": 0.0,
+    "max": 1.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF248",
+     "detail": "2D, 256 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:395",
+     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Target Throttle Plate Position Non-Cruise (Requested Torque Ratio) / Engine Speed",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9244",
+   "defs_source": "project XML line 955",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF248",
+     "detail": "2D, 256 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:396",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Target Throttle Plate Position Maximum (Requested Torque Ratio) / 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9484",
+   "defs_source": "project XML line 960",
+   "declared": {
+    "scaling": "ratio",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "ratio",
+    "min": 0.0,
+    "max": 1.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF264",
+     "detail": "2D, 256 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:398",
+     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Target Throttle Plate Position Maximum (Requested Torque Ratio) / Engine Speed",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF94C4",
+   "defs_source": "project XML line 960",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF264",
+     "detail": "2D, 256 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:399",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque Limit A (Per Gear/Engine Speed) / Engine Speed",
+   "category": "Alpha Per Gear Requested Torque",
+   "address": "0xF9730",
+   "defs_source": "project XML line 1378",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF29C",
+     "detail": "2D, 96 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:401",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque Limit A (Per Gear/Engine Speed) / Gear",
+   "category": "Alpha Per Gear Requested Torque",
+   "address": "0xF9770",
+   "defs_source": "project XML line 1378",
+   "declared": {
+    "scaling": "Gear",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "gear",
+    "min": 0.0,
+    "max": 6.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF29C",
+     "detail": "2D, 96 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:402",
+     "detail": "Ghidra label cal_Gear"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 6,
+    "bytes_per_cell": 4,
+    "byte_length": 24
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque Limit B (Per Gear/Engine Speed) / Engine Speed",
+   "category": "Alpha Per Gear Requested Torque",
+   "address": "0xF9848",
+   "defs_source": "project XML line 1383",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2B8",
+     "detail": "2D, 96 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:404",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 4,
+    "byte_length": 64
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque Limit B (Per Gear/Engine Speed) / Gear",
+   "category": "Alpha Per Gear Requested Torque",
+   "address": "0xF9888",
+   "defs_source": "project XML line 1383",
+   "declared": {
+    "scaling": "Gear",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "gear",
+    "min": 0.0,
+    "max": 6.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2B8",
+     "detail": "2D, 96 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:405",
+     "detail": "Ghidra label cal_Gear"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 6,
+    "bytes_per_cell": 4,
+    "byte_length": 24
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport / Accelerator Pedal Angle",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9960",
+   "defs_source": "project XML line 931",
+   "declared": {
+    "scaling": "%",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "%",
+    "min": 0.0,
+    "max": 105.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2D4",
+     "detail": "2D, 255 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:407",
+     "detail": "Ghidra label cal_Accelerator_Pedal_Angle"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 15,
+    "bytes_per_cell": 4,
+    "byte_length": 60
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport / Engine Speed",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF999C",
+   "defs_source": "project XML line 931",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2D4",
+     "detail": "2D, 255 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:408",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 17,
+    "bytes_per_cell": 4,
+    "byte_length": 68
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp / Accelerator Pedal Angle",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9BE0",
+   "defs_source": "project XML line 936",
+   "declared": {
+    "scaling": "%",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "%",
+    "min": 0.0,
+    "max": 105.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2F0",
+     "detail": "2D, 255 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:410",
+     "detail": "Ghidra label cal_Accelerator_Pedal_Angle"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 15,
+    "bytes_per_cell": 4,
+    "byte_length": 60
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp / Engine Speed",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9C1C",
+   "defs_source": "project XML line 936",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2F0",
+     "detail": "2D, 255 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:411",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 17,
+    "bytes_per_cell": 4,
+    "byte_length": 68
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent / Accelerator Pedal Angle",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9E60",
+   "defs_source": "project XML line 941",
+   "declared": {
+    "scaling": "%",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "%",
+    "min": 0.0,
+    "max": 105.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF30C",
+     "detail": "2D, 255 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:413",
+     "detail": "Ghidra label cal_Accelerator_Pedal_Angle"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 15,
+    "bytes_per_cell": 4,
+    "byte_length": 60
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "axis",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent / Engine Speed",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9E9C",
+   "defs_source": "project XML line 941",
+   "declared": {
+    "scaling": "RPM",
+    "storagetype": "float",
+    "toexpr": "x",
+    "units": "RPM",
+    "min": 0.0,
+    "max": 10000.0,
+    "raw_is_display": true
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF30C",
+     "detail": "2D, 255 cells x 2 bytes (axis pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:414",
+     "detail": "Ghidra label cal_Engine_Speed"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 17,
+    "bytes_per_cell": 4,
+    "byte_length": 68
    },
    "bytes_ok": {
     "stock": true,
@@ -17091,6 +17847,314 @@
    }
   },
   {
+   "kind": "table",
+   "name": "Requested Torque Base (RPM)",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF8B54",
+   "defs_source": "project XML line 946",
+   "declared": {
+    "scaling": "RequestedTorque(rawecuvalue)",
+    "storagetype": "uint16",
+    "toexpr": "x*.0078125",
+    "units": "Requested Torque (raw ecu value)",
+    "min": 0.0,
+    "max": 455.0,
+    "raw_is_display": false
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF144",
+     "detail": "1D, 16 cells x 2 bytes (data pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:391",
+     "detail": "Ghidra label cal_Requested_Torque_Base_RPM"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 2,
+    "byte_length": 32
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "table",
+   "name": "Target Throttle Plate Position Cruise (Requested Torque Ratio)",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9004",
+   "defs_source": "project XML line 950",
+   "declared": {
+    "scaling": "TargetThrottlePlateOpeningAngle(%)",
+    "storagetype": "uint16",
+    "toexpr": "x*.002270655357",
+    "units": "Target Throttle Plate Opening Angle (%)",
+    "min": 0.0,
+    "max": 102.4,
+    "raw_is_display": false
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF22C",
+     "detail": "2D, 256 cells x 2 bytes (data pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:394",
+     "detail": "Ghidra label cal_Target_Throttle_Plate_Position_Cruise_Requested_Torque_R"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 256,
+    "bytes_per_cell": 2,
+    "byte_length": 512
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "table",
+   "name": "Target Throttle Plate Position Non-Cruise (Requested Torque Ratio)",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9284",
+   "defs_source": "project XML line 955",
+   "declared": {
+    "scaling": "TargetThrottlePlateOpeningAngle(%)",
+    "storagetype": "uint16",
+    "toexpr": "x*.002270655357",
+    "units": "Target Throttle Plate Opening Angle (%)",
+    "min": 0.0,
+    "max": 102.4,
+    "raw_is_display": false
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF248",
+     "detail": "2D, 256 cells x 2 bytes (data pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:397",
+     "detail": "Ghidra label cal_Target_Throttle_Plate_Position_Non_Cruise_Requested_Torq"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 256,
+    "bytes_per_cell": 2,
+    "byte_length": 512
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "table",
+   "name": "Target Throttle Plate Position Maximum (Requested Torque Ratio)",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9504",
+   "defs_source": "project XML line 960",
+   "declared": {
+    "scaling": "TargetThrottlePlateOpeningAngle(%)",
+    "storagetype": "uint16",
+    "toexpr": "x*.002270655357",
+    "units": "Target Throttle Plate Opening Angle (%)",
+    "min": 0.0,
+    "max": 102.4,
+    "raw_is_display": false
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF264",
+     "detail": "2D, 256 cells x 2 bytes (data pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:400",
+     "detail": "Ghidra label cal_Target_Throttle_Plate_Position_Maximum_Requested_Torque"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 256,
+    "bytes_per_cell": 2,
+    "byte_length": 512
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "table",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF99E0",
+   "defs_source": "project XML line 931",
+   "declared": {
+    "scaling": "RequestedTorque(rawecuvalue)",
+    "storagetype": "uint16",
+    "toexpr": "x*.0078125",
+    "units": "Requested Torque (raw ecu value)",
+    "min": 0.0,
+    "max": 455.0,
+    "raw_is_display": false
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2D4",
+     "detail": "2D, 255 cells x 2 bytes (data pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:409",
+     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Sport"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 255,
+    "bytes_per_cell": 2,
+    "byte_length": 510
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "table",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9C60",
+   "defs_source": "project XML line 936",
+   "declared": {
+    "scaling": "RequestedTorque(rawecuvalue)",
+    "storagetype": "uint16",
+    "toexpr": "x*.0078125",
+    "units": "Requested Torque (raw ecu value)",
+    "min": 0.0,
+    "max": 455.0,
+    "raw_is_display": false
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF2F0",
+     "detail": "2D, 255 cells x 2 bytes (data pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:412",
+     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Sport_Sharp"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 255,
+    "bytes_per_cell": 2,
+    "byte_length": 510
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
+   "kind": "table",
+   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent",
+   "category": "Drive-by-Wire Throttle (DBW)",
+   "address": "0xF9EE0",
+   "defs_source": "project XML line 941",
+   "declared": {
+    "scaling": "RequestedTorque(rawecuvalue)",
+    "storagetype": "uint16",
+    "toexpr": "x*.0078125",
+    "units": "Requested Torque (raw ecu value)",
+    "min": 0.0,
+    "max": 455.0,
+    "raw_is_display": false
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF30C",
+     "detail": "2D, 255 cells x 2 bytes (data pointer); spacing to the next known table boundary implies nothing bytes/cell"
+    },
+    {
+     "source": "D5 cal_crossref.txt:415",
+     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Intelligent"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "5 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
+    }
+   ],
+   "flag": "VERIFIED-BOTH",
+   "geometry": {
+    "cells": 255,
+    "bytes_per_cell": 2,
+    "byte_length": 510
+   },
+   "bytes_ok": {
+    "stock": true,
+    "rev": true
+   },
+   "out_of_declared_range": {
+    "stock": 0,
+    "rev": 0
+   }
+  },
+  {
    "kind": "axis",
    "name": "Initial/Max Wastegate Duty Compensation (ECT) / Coolant Temperature",
    "category": "Boost Control - Wastegate",
@@ -18596,686 +19660,6 @@
     "cells": 16,
     "bytes_per_cell": 4,
     "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque Base (RPM) / Engine Speed",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF8B14",
-   "defs_source": "project XML line 946",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:390",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Target Throttle Plate Position Cruise (Requested Torque Ratio) / 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF8F84",
-   "defs_source": "project XML line 950",
-   "declared": {
-    "scaling": "ratio",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "ratio",
-    "min": 0.0,
-    "max": 1.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:392",
-     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Target Throttle Plate Position Cruise (Requested Torque Ratio) / Engine Speed",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF8FC4",
-   "defs_source": "project XML line 950",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:393",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Target Throttle Plate Position Non-Cruise (Requested Torque Ratio) / 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9204",
-   "defs_source": "project XML line 955",
-   "declared": {
-    "scaling": "ratio",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "ratio",
-    "min": 0.0,
-    "max": 1.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:395",
-     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Target Throttle Plate Position Non-Cruise (Requested Torque Ratio) / Engine Speed",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9244",
-   "defs_source": "project XML line 955",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:396",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Target Throttle Plate Position Maximum (Requested Torque Ratio) / 'Requested Torque (Accelerator Pedal)' to 'Requested Torque Base (RPM)'",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9484",
-   "defs_source": "project XML line 960",
-   "declared": {
-    "scaling": "ratio",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "ratio",
-    "min": 0.0,
-    "max": 1.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:398",
-     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_to_Requested_Torque_B"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Target Throttle Plate Position Maximum (Requested Torque Ratio) / Engine Speed",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF94C4",
-   "defs_source": "project XML line 960",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:399",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque Limit A (Per Gear/Engine Speed) / Engine Speed",
-   "category": "Alpha Per Gear Requested Torque",
-   "address": "0xF9730",
-   "defs_source": "project XML line 1378",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:401",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque Limit A (Per Gear/Engine Speed) / Gear",
-   "category": "Alpha Per Gear Requested Torque",
-   "address": "0xF9770",
-   "defs_source": "project XML line 1378",
-   "declared": {
-    "scaling": "Gear",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "gear",
-    "min": 0.0,
-    "max": 6.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:402",
-     "detail": "Ghidra label cal_Gear"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 6,
-    "bytes_per_cell": 4,
-    "byte_length": 24
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque Limit B (Per Gear/Engine Speed) / Engine Speed",
-   "category": "Alpha Per Gear Requested Torque",
-   "address": "0xF9848",
-   "defs_source": "project XML line 1383",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:404",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 4,
-    "byte_length": 64
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque Limit B (Per Gear/Engine Speed) / Gear",
-   "category": "Alpha Per Gear Requested Torque",
-   "address": "0xF9888",
-   "defs_source": "project XML line 1383",
-   "declared": {
-    "scaling": "Gear",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "gear",
-    "min": 0.0,
-    "max": 6.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:405",
-     "detail": "Ghidra label cal_Gear"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 6,
-    "bytes_per_cell": 4,
-    "byte_length": 24
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport / Accelerator Pedal Angle",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9960",
-   "defs_source": "project XML line 931",
-   "declared": {
-    "scaling": "%",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "%",
-    "min": 0.0,
-    "max": 105.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:407",
-     "detail": "Ghidra label cal_Accelerator_Pedal_Angle"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 15,
-    "bytes_per_cell": 4,
-    "byte_length": 60
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport / Engine Speed",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF999C",
-   "defs_source": "project XML line 931",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:408",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 17,
-    "bytes_per_cell": 4,
-    "byte_length": 68
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp / Accelerator Pedal Angle",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9BE0",
-   "defs_source": "project XML line 936",
-   "declared": {
-    "scaling": "%",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "%",
-    "min": 0.0,
-    "max": 105.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:410",
-     "detail": "Ghidra label cal_Accelerator_Pedal_Angle"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 15,
-    "bytes_per_cell": 4,
-    "byte_length": 60
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp / Engine Speed",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9C1C",
-   "defs_source": "project XML line 936",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:411",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 17,
-    "bytes_per_cell": 4,
-    "byte_length": 68
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent / Accelerator Pedal Angle",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9E60",
-   "defs_source": "project XML line 941",
-   "declared": {
-    "scaling": "%",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "%",
-    "min": 0.0,
-    "max": 105.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:413",
-     "detail": "Ghidra label cal_Accelerator_Pedal_Angle"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "2 file(s): disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 15,
-    "bytes_per_cell": 4,
-    "byte_length": 60
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "axis",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent / Engine Speed",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9E9C",
-   "defs_source": "project XML line 941",
-   "declared": {
-    "scaling": "RPM",
-    "storagetype": "float",
-    "toexpr": "x",
-    "units": "RPM",
-    "min": 0.0,
-    "max": 10000.0,
-    "raw_is_display": true
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:414",
-     "detail": "Ghidra label cal_Engine_Speed"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "1 file(s): disassembly/maps/cal_crossref.txt"
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 17,
-    "bytes_per_cell": 4,
-    "byte_length": 68
    },
    "bytes_ok": {
     "stock": true,
@@ -28091,6 +28475,10 @@
    },
    "evidence": [
     {
+     "source": "D2 ROM table descriptor @0xAB0CC",
+     "detail": "1D, 2 cells x 1 byte (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
      "source": "D5 cal_crossref.txt:387",
      "detail": "Ghidra label cal_Speed_Limiting_A_Throttle_SI_DRIVE_Sport_Sport_Sharp"
     },
@@ -28130,6 +28518,10 @@
     "raw_is_display": false
    },
    "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB0E0",
+     "detail": "1D, 2 cells x 1 byte (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
     {
      "source": "D5 cal_crossref.txt:388",
      "detail": "Ghidra label cal_Speed_Limiting_Throttle_SI_DRIVE_Intelligent"
@@ -28171,6 +28563,10 @@
    },
    "evidence": [
     {
+     "source": "D2 ROM table descriptor @0xAB0F4",
+     "detail": "1D, 2 cells x 1 byte (axis pointer); spacing to the next known table boundary implies 2 bytes/cell"
+    },
+    {
      "source": "D5 cal_crossref.txt:389",
      "detail": "Ghidra label cal_Speed_Limiting_B_Throttle_SI_DRIVE_Sport_Sport_Sharp"
     },
@@ -28184,286 +28580,6 @@
     "cells": 2,
     "bytes_per_cell": 4,
     "byte_length": 8
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "table",
-   "name": "Requested Torque Base (RPM)",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF8B54",
-   "defs_source": "project XML line 946",
-   "declared": {
-    "scaling": "RequestedTorque(rawecuvalue)",
-    "storagetype": "uint16",
-    "toexpr": "x*.0078125",
-    "units": "Requested Torque (raw ecu value)",
-    "min": 0.0,
-    "max": 455.0,
-    "raw_is_display": false
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:391",
-     "detail": "Ghidra label cal_Requested_Torque_Base_RPM"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 16,
-    "bytes_per_cell": 2,
-    "byte_length": 32
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "table",
-   "name": "Target Throttle Plate Position Cruise (Requested Torque Ratio)",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9004",
-   "defs_source": "project XML line 950",
-   "declared": {
-    "scaling": "TargetThrottlePlateOpeningAngle(%)",
-    "storagetype": "uint16",
-    "toexpr": "x*.002270655357",
-    "units": "Target Throttle Plate Opening Angle (%)",
-    "min": 0.0,
-    "max": 102.4,
-    "raw_is_display": false
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:394",
-     "detail": "Ghidra label cal_Target_Throttle_Plate_Position_Cruise_Requested_Torque_R"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 256,
-    "bytes_per_cell": 2,
-    "byte_length": 512
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "table",
-   "name": "Target Throttle Plate Position Non-Cruise (Requested Torque Ratio)",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9284",
-   "defs_source": "project XML line 955",
-   "declared": {
-    "scaling": "TargetThrottlePlateOpeningAngle(%)",
-    "storagetype": "uint16",
-    "toexpr": "x*.002270655357",
-    "units": "Target Throttle Plate Opening Angle (%)",
-    "min": 0.0,
-    "max": 102.4,
-    "raw_is_display": false
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:397",
-     "detail": "Ghidra label cal_Target_Throttle_Plate_Position_Non_Cruise_Requested_Torq"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 256,
-    "bytes_per_cell": 2,
-    "byte_length": 512
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "table",
-   "name": "Target Throttle Plate Position Maximum (Requested Torque Ratio)",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9504",
-   "defs_source": "project XML line 960",
-   "declared": {
-    "scaling": "TargetThrottlePlateOpeningAngle(%)",
-    "storagetype": "uint16",
-    "toexpr": "x*.002270655357",
-    "units": "Target Throttle Plate Opening Angle (%)",
-    "min": 0.0,
-    "max": 102.4,
-    "raw_is_display": false
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:400",
-     "detail": "Ghidra label cal_Target_Throttle_Plate_Position_Maximum_Requested_Torque"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 256,
-    "bytes_per_cell": 2,
-    "byte_length": 512
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "table",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF99E0",
-   "defs_source": "project XML line 931",
-   "declared": {
-    "scaling": "RequestedTorque(rawecuvalue)",
-    "storagetype": "uint16",
-    "toexpr": "x*.0078125",
-    "units": "Requested Torque (raw ecu value)",
-    "min": 0.0,
-    "max": 455.0,
-    "raw_is_display": false
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:409",
-     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Sport"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 255,
-    "bytes_per_cell": 2,
-    "byte_length": 510
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "table",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Sport Sharp",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9C60",
-   "defs_source": "project XML line 936",
-   "declared": {
-    "scaling": "RequestedTorque(rawecuvalue)",
-    "storagetype": "uint16",
-    "toexpr": "x*.0078125",
-    "units": "Requested Torque (raw ecu value)",
-    "min": 0.0,
-    "max": 455.0,
-    "raw_is_display": false
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:412",
-     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Sport_Sharp"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "4 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 255,
-    "bytes_per_cell": 2,
-    "byte_length": 510
-   },
-   "bytes_ok": {
-    "stock": true,
-    "rev": true
-   },
-   "out_of_declared_range": {
-    "stock": 0,
-    "rev": 0
-   }
-  },
-  {
-   "kind": "table",
-   "name": "Requested Torque (Accelerator Pedal) SI-DRIVE Intelligent",
-   "category": "Drive-by-Wire Throttle (DBW)",
-   "address": "0xF9EE0",
-   "defs_source": "project XML line 941",
-   "declared": {
-    "scaling": "RequestedTorque(rawecuvalue)",
-    "storagetype": "uint16",
-    "toexpr": "x*.0078125",
-    "units": "Requested Torque (raw ecu value)",
-    "min": 0.0,
-    "max": 455.0,
-    "raw_is_display": false
-   },
-   "evidence": [
-    {
-     "source": "D5 cal_crossref.txt:415",
-     "detail": "Ghidra label cal_Requested_Torque_Accelerator_Pedal_SI_DRIVE_Intelligent"
-    },
-    {
-     "source": "D6 disassembly corpus mentions",
-     "detail": "5 file(s): disassembly/analysis/torque_management_analysis.txt, disassembly/maps/cal_crossref.txt, disassembly/maps/descriptor_map.txt ..."
-    }
-   ],
-   "flag": "VERIFIED-BYTES",
-   "geometry": {
-    "cells": 255,
-    "bytes_per_cell": 2,
-    "byte_length": 510
    },
    "bytes_ok": {
     "stock": true,
@@ -51077,6 +51193,731 @@
    "flag": "DISASM-ONLY"
   },
   {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8938 (desc 0xAB0A4)",
+   "category": "(no definition)",
+   "address": "0xF8938",
+   "geometry": {
+    "cells": 2,
+    "bytes_per_cell": 1,
+    "byte_length": 2
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB0A4",
+     "detail": "1D, 2 cells x 1 byte, axis 0xF8930"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8944 (desc 0xAB0B8)",
+   "category": "(no definition)",
+   "address": "0xF8944",
+   "geometry": {
+    "cells": 2,
+    "bytes_per_cell": 1,
+    "byte_length": 2
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB0B8",
+     "detail": "1D, 2 cells x 1 byte, axis 0xF893C"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8950 (desc 0xAB0CC)",
+   "category": "(no definition)",
+   "address": "0xF8950",
+   "geometry": {
+    "cells": 2,
+    "bytes_per_cell": 1,
+    "byte_length": 2
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB0CC",
+     "detail": "1D, 2 cells x 1 byte, axis 0xF8948"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF895C (desc 0xAB0E0)",
+   "category": "(no definition)",
+   "address": "0xF895C",
+   "geometry": {
+    "cells": 2,
+    "bytes_per_cell": 1,
+    "byte_length": 2
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB0E0",
+     "detail": "1D, 2 cells x 1 byte, axis 0xF8954"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8968 (desc 0xAB0F4)",
+   "category": "(no definition)",
+   "address": "0xF8968",
+   "geometry": {
+    "cells": 2,
+    "bytes_per_cell": 1,
+    "byte_length": 2
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB0F4",
+     "detail": "1D, 2 cells x 1 byte, axis 0xF8960"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8974 (desc 0xAB108)",
+   "category": "(no definition)",
+   "address": "0xF8974",
+   "geometry": {
+    "cells": 2,
+    "bytes_per_cell": 1,
+    "byte_length": 2
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB108",
+     "detail": "1D, 2 cells x 1 byte, axis 0xF896C"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF89A0 (desc 0xAB11C)",
+   "category": "(no definition)",
+   "address": "0xF89A0",
+   "geometry": {
+    "cells": 10,
+    "bytes_per_cell": 4,
+    "byte_length": 40
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB11C",
+     "detail": "1D, 10 cells x 4 bytes, axis 0xF8978"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF89D0 (desc 0xAB128)",
+   "category": "(no definition)",
+   "address": "0xF89D0",
+   "geometry": {
+    "cells": 2,
+    "bytes_per_cell": 4,
+    "byte_length": 8
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB128",
+     "detail": "1D, 2 cells x 4 bytes, axis 0xF89C8"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8A00 (desc 0xAB134)",
+   "category": "(no definition)",
+   "address": "0xF8A00",
+   "geometry": {
+    "cells": 10,
+    "bytes_per_cell": 4,
+    "byte_length": 40
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAB134",
+     "detail": "1D, 10 cells x 4 bytes, axis 0xF89D8"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8A44 (desc 0xAC26C)",
+   "category": "(no definition)",
+   "address": "0xF8A44",
+   "geometry": {
+    "cells": 4,
+    "bytes_per_cell": 4,
+    "byte_length": 16
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAC26C",
+     "detail": "1D, 4 cells x 4 bytes, axis 0xF8A34"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8A5C (desc 0xAC278)",
+   "category": "(no definition)",
+   "address": "0xF8A5C",
+   "geometry": {
+    "cells": 4,
+    "bytes_per_cell": 4,
+    "byte_length": 16
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAC278",
+     "detail": "1D, 4 cells x 4 bytes, axis 0xF8A4C"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8A78 (desc 0xAC284)",
+   "category": "(no definition)",
+   "address": "0xF8A78",
+   "geometry": {
+    "cells": 5,
+    "bytes_per_cell": 2,
+    "byte_length": 10
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAC284",
+     "detail": "1D, 5 cells x 2 bytes, axis 0xF8A64"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8BB4 (desc 0xAF158)",
+   "category": "(no definition)",
+   "address": "0xF8BB4",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 2,
+    "byte_length": 32
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF158",
+     "detail": "1D, 16 cells x 2 bytes, axis 0xF8B74"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8C14 (desc 0xAF16C)",
+   "category": "(no definition)",
+   "address": "0xF8C14",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 2,
+    "byte_length": 32
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF16C",
+     "detail": "1D, 16 cells x 2 bytes, axis 0xF8BD4"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8C74 (desc 0xAF180)",
+   "category": "(no definition)",
+   "address": "0xF8C74",
+   "geometry": {
+    "cells": 16,
+    "bytes_per_cell": 2,
+    "byte_length": 32
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF180",
+     "detail": "1D, 16 cells x 2 bytes, axis 0xF8C34"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8CA8 (desc 0xAF194)",
+   "category": "(no definition)",
+   "address": "0xF8CA8",
+   "geometry": {
+    "cells": 5,
+    "bytes_per_cell": 2,
+    "byte_length": 10
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF194",
+     "detail": "1D, 5 cells x 2 bytes, axis 0xF8C94"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8CD4 (desc 0xAF1A8)",
+   "category": "(no definition)",
+   "address": "0xF8CD4",
+   "geometry": {
+    "cells": 8,
+    "bytes_per_cell": 4,
+    "byte_length": 32
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF1A8",
+     "detail": "1D, 8 cells x 4 bytes, axis 0xF8CB4"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8D14 (desc 0xAF1B4)",
+   "category": "(no definition)",
+   "address": "0xF8D14",
+   "geometry": {
+    "cells": 8,
+    "bytes_per_cell": 4,
+    "byte_length": 32
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF1B4",
+     "detail": "1D, 8 cells x 4 bytes, axis 0xF8CF4"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8D3C (desc 0xAF1C0)",
+   "category": "(no definition)",
+   "address": "0xF8D3C",
+   "geometry": {
+    "cells": 2,
+    "bytes_per_cell": 4,
+    "byte_length": 8
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF1C0",
+     "detail": "1D, 2 cells x 4 bytes, axis 0xF8D34"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8DA4 (desc 0xAF1CC)",
+   "category": "(no definition)",
+   "address": "0xF8DA4",
+   "geometry": {
+    "cells": 24,
+    "bytes_per_cell": 4,
+    "byte_length": 96
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF1CC",
+     "detail": "1D, 24 cells x 4 bytes, axis 0xF8D44"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8E44 (desc 0xAF1D8)",
+   "category": "(no definition)",
+   "address": "0xF8E44",
+   "geometry": {
+    "cells": 64,
+    "bytes_per_cell": 1,
+    "byte_length": 64
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF1D8",
+     "detail": "2D, 64 cells x 1 byte, axis 0xF8E04, 0xF8E24"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8EC4 (desc 0xAF1F4)",
+   "category": "(no definition)",
+   "address": "0xF8EC4",
+   "geometry": {
+    "cells": 64,
+    "bytes_per_cell": 1,
+    "byte_length": 64
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF1F4",
+     "detail": "2D, 64 cells x 1 byte, axis 0xF8E84, 0xF8EA4"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF8F44 (desc 0xAF210)",
+   "category": "(no definition)",
+   "address": "0xF8F44",
+   "geometry": {
+    "cells": 64,
+    "bytes_per_cell": 1,
+    "byte_length": 64
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF210",
+     "detail": "2D, 64 cells x 1 byte, axis 0xF8F04, 0xF8F24"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xF971C (desc 0xAF280)",
+   "category": "(no definition)",
+   "address": "0xF971C",
+   "geometry": {
+    "cells": 9,
+    "bytes_per_cell": 2,
+    "byte_length": 18
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF280",
+     "detail": "2D, 9 cells x 2 bytes, axis 0xF9704, 0xF9710"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xFA0F0 (desc 0xAF328)",
+   "category": "(no definition)",
+   "address": "0xFA0F0",
+   "geometry": {
+    "cells": 4,
+    "bytes_per_cell": 2,
+    "byte_length": 8
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF328",
+     "detail": "2D, 4 cells x 2 bytes, axis 0xFA0E0, 0xFA0E8"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xFA108 (desc 0xAF344)",
+   "category": "(no definition)",
+   "address": "0xFA108",
+   "geometry": {
+    "cells": 4,
+    "bytes_per_cell": 2,
+    "byte_length": 8
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF344",
+     "detail": "2D, 4 cells x 2 bytes, axis 0xFA0F8, 0xFA100"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xFA120 (desc 0xAF360)",
+   "category": "(no definition)",
+   "address": "0xFA120",
+   "geometry": {
+    "cells": 4,
+    "bytes_per_cell": 2,
+    "byte_length": 8
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF360",
+     "detail": "2D, 4 cells x 2 bytes, axis 0xFA110, 0xFA118"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xFA158 (desc 0xAF37C)",
+   "category": "(no definition)",
+   "address": "0xFA158",
+   "geometry": {
+    "cells": 32,
+    "bytes_per_cell": 2,
+    "byte_length": 64
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF37C",
+     "detail": "2D, 32 cells x 2 bytes, axis 0xFA128, 0xFA148"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
+   "kind": "rom-block",
+   "name": "descriptor data @0xFA20C (desc 0xAF398)",
+   "category": "(no definition)",
+   "address": "0xFA20C",
+   "geometry": {
+    "cells": 208,
+    "bytes_per_cell": 4,
+    "byte_length": 832
+   },
+   "evidence": [
+    {
+     "source": "D2 ROM table descriptor @0xAF398",
+     "detail": "2D, 208 cells x 4 bytes, axis 0xFA198, 0xFA1D8"
+    },
+    {
+     "source": "D6 disassembly corpus mentions",
+     "detail": "2 file(s): disassembly/maps/descriptor_map.txt, disassembly/maps/named_descriptors.txt"
+    }
+   ],
+   "notes": [
+    "no <table> in either definition XML covers these bytes"
+   ],
+   "flag": "DISASM-ONLY"
+  },
+  {
    "kind": "ram",
    "name": "(unnamed)",
    "category": "RAM variable",
@@ -66398,7 +67239,7 @@
     },
     {
      "source": "D3 RAM -> table-lookup axis feed trace (re-derived)",
-     "detail": "1 call sites into 1 descriptors; definition-named axes: none of the axes are named in the definition XMLs"
+     "detail": "1 call sites into 1 descriptors; breakpoint span 800..2000; definition-named axes: none of the axes are named in the definition XMLs"
     },
     {
      "source": "D6 disassembly corpus mentions",

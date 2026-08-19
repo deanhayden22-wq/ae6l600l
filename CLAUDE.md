@@ -177,9 +177,9 @@ block and every RAM variable carries exactly one flag in
 | `CONFLICT` | **Stop.** Two independent sides disagree. Settle it from ROM bytes, record it in `docs/corrections.md`, then continue. |
 | `DEFS-ONLY` / `DISASM-ONLY` / `UNMAPPED` | No cross-check exists. Say so in whatever you write (rule 6 above). |
 
-Current state, regenerated 2026-08-16 (4,691 entities): **336 VERIFIED-BOTH,
-290 VERIFIED-BYTES, 2 CONFLICT, 52 BOUNDS-SUSPECT, 6 DEFS-ONLY, 927
-DISASM-ONLY, 3,078 UNMAPPED**, and **79.9% of data-classified ROM bytes are
+Current state, regenerated 2026-08-18 (4,720 entities): **360 VERIFIED-BOTH,
+266 VERIFIED-BYTES, 2 CONFLICT, 52 BOUNDS-SUSPECT, 6 DEFS-ONLY, 956
+DISASM-ONLY, 3,078 UNMAPPED**, and **79.4% of data-classified ROM bytes are
 claimed by neither side.** Only ~13% is verified at all. Most of this ROM is
 not verified. Treat an unflagged or `UNMAPPED` area as unknown, not as safe.
 

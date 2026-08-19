@@ -85,6 +85,45 @@ sh-2a.slaspec:    @define SH_VERSION "2A"
 The 36 FPU constructors in `superh.sinc` sit behind `@if defined(FPU)`. Plain
 SH-2 therefore has **zero** FPU support.
 
+### Ghidra ships no SH-2E language — but one builds in three lines
+
+`SuperH:BE:32:SH-2A` is a **proxy**, not a match. It is a superset: it also
+decodes `MOVI20`/`MOVI20S`/`MOVU`, `FSQRT`/`FSCHG`/`FCNVDS`/`FCNVSD` and the
+SH-2A 32-bit fixed-length forms, none of which an SH-2E can execute. That is
+why data decoded as code produces plausible-looking instructions instead of
+failing loudly, and why `ClearImpossibleSH2E.java` exists to find them after
+the fact.
+
+The two gates in `superh.sinc` are **independent** — `@if defined(FPU)` for the
+float ops, `@if SH_VERSION == "2A"` for the 32-bit forms (`MOVU` at line 487,
+`MOVI20` at 511, inside the 393-826 block). So an exact SH-2E language is:
+
+```
+sh-2e.slaspec:    @define SH_VERSION "2"
+                  @define FPU "1"
+                  @include "superh.sinc"
+```
+
+**Verified 2026-08-18:** this compiles clean with `support/sleigh.bat` against
+the Ghidra 12.0.2 tree (`4 languages successfully compiled`), producing a
+`sh-2e.sla` of 15,996 bytes — between `sh-2.sla` (13,051) and `sh-2a.sla`
+(28,508), exactly as the constructor counts predict.
+
+One residue: `FSQRT` (line 2174), `FSCHG` (2168), `FCNVDS` (2022), `FCNVSD`
+(2028) and the two 32-bit `FMOV.S @(disp12,…)` forms (2108, 2143) live INSIDE
+the `defined(FPU)` block, so the plain build still accepts six instructions the
+SH7058 cannot execute. Fencing those six behind `@ifndef STRICT_SH2E` also
+compiles (`sh-2e-strict.sla`, 15,475 bytes) and gives what `sh2e_disasm.py`
+already gives: **data-as-code self-flags as an undefined instruction instead of
+a plausible mnemonic**, automatically, with no post-audit pass.
+
+Neither variant has been tested against ROM bytes inside Ghidra, and adding a
+language means editing the `Ghidra/Processors/SuperH` tree under `Program
+Files` (or packaging a module extension) plus an entry in `superh.ldefs`. Until
+someone does that and diffs a full decode against `scripts/sh2e_disasm.py`,
+**`SuperH:BE:32:SH-2A` remains the language to use** — it is proven here and
+the strict variant is not.
+
 ### What went wrong with the original import
 
 The original DB was built as `SuperH:BE:32:SH-2`. Under that language an FPU

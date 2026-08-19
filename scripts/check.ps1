@@ -13,6 +13,11 @@
        and .json are stale relative to the definitions, the ROM and the
        disassembly corpus. Regenerate with: python scripts/coverage_map.py
 
+    3. check_label_sync.py -- REPORT ONLY, never fails the run. Lists addresses
+       that docs/corrections.md discusses but ImportAE5L600L.java never labels,
+       so findings do not stay stranded in prose. Many addresses are cited in
+       passing and deserve no label; this exists so the choice is deliberate.
+
     Windows PowerShell 5.1 has no '&&' operator, which is why this exists.
 #>
 param([switch]$Strict)
@@ -41,6 +46,9 @@ try {
         Write-Host "    python scripts/coverage_map.py"
         exit $registry
     }
+
+    Write-Host "`n== prose -> Ghidra label sync (report only) ==" -ForegroundColor Cyan
+    python scripts/check_label_sync.py | Select-Object -Last 3
 
     Write-Host "`nBoth gates clean." -ForegroundColor Green
     exit 0

@@ -85,7 +85,25 @@ OUT_JSON = os.path.join(REPO, "docs", "verification-status.json")
 
 ROM_SIZE = defs.ROM_SIZE
 RAM_LO, RAM_HI = 0xFFFF0000, 0xFFFFC000     # corrections.md #2
-CAL_LO, CAL_HI = 0x0C0000, 0x0E0000         # calibration data band
+CAL_LO, CAL_HI = 0x0C0000, 0x0E0000         # main calibration data band
+
+# There is a SECOND calibration band above the big ROM hole.  rom_region_map.txt
+# classifies 0x0F8900-0x0FA500 as float_data / mixed_data, and 38 descriptors
+# point their axis or data there -- including the DBW pedal->throttle tables
+# (0x0F8B54 base RPM, 0x0F9004 / 0x0F9284 / 0x0F9504 throttle-by-ratio,
+# 0x0F99E0 pedal map).  They are FACTORY tables, byte-identical in stock
+# ae5l600l.bin, not patch additions.
+#
+# A single 0x0C0000-0x0E0000 window silently excluded all of them, so every
+# descriptor in the DBW region was invisible to this registry.  Same blind spot
+# CLAUDE.md warns about for rev diffs: anything living past the ROM hole is
+# missed by a filter that assumes one contiguous band.
+CAL_BANDS = ((0x0C0000, 0x0E0000), (0x0F8900, 0x0FA600))
+
+
+def _in_cal(a):
+    """True if `a` lies in any calibration band."""
+    return any(lo <= a < hi for lo, hi in CAL_BANDS)
 DESC_LO, DESC_HI = 0x0A0000, 0x0BE000       # descriptor band
 LOOKUP_1D, LOOKUP_2D = 0x000BE830, 0x000BE8E4   # table_desc_1d/2d_float
 # The other six lookup entry points HARDCODE their cell width instead of
@@ -381,15 +399,15 @@ def _desc_at(buf, a):
     c1, tc = struct.unpack_from(">HH", buf, a)
     ax, dp = struct.unpack_from(">II", buf, a + 4)
     if (1 <= c1 <= 512 and tc in _TYPECODE_WIDTH
-            and CAL_LO <= ax < CAL_HI and CAL_LO <= dp < CAL_HI and ax + c1 * 4 == dp):
+            and _in_cal(ax) and _in_cal(dp) and ax + c1 * 4 == dp):
         return dict(addr=a, dim="1D", count=c1, width=_TYPECODE_WIDTH[tc],
                     data=dp, axes=[ax], counts=[c1])
     c2 = struct.unpack_from(">H", buf, a + 2)[0]
     a1, a2, dp2, tc2 = struct.unpack_from(">IIII", buf, a + 4)
     tch = tc2 >> 16
     if (1 <= c1 <= 512 and 1 <= c2 <= 512 and tc2 & 0xFFFF == 0 and tch in _TYPECODE_WIDTH
-            and CAL_LO <= a1 < CAL_HI and a1 + c1 * 4 == a2 and a2 + c2 * 4 == dp2
-            and dp2 < CAL_HI):
+            and _in_cal(a1) and a1 + c1 * 4 == a2 and a2 + c2 * 4 == dp2
+            and _in_cal(dp2)):
         return dict(addr=a, dim="2D", count=c1 * c2, width=_TYPECODE_WIDTH[tch],
                     data=dp2, axes=[a1, a2], counts=[c1, c2])
     return None
@@ -410,14 +428,14 @@ def _desc_loose_at(buf, a):
     c1, tc = struct.unpack_from(">HH", buf, a)
     ax, dp = struct.unpack_from(">II", buf, a + 4)
     if (1 <= c1 <= 512 and tc in _TYPECODE_WIDTH
-            and CAL_LO <= ax < CAL_HI and CAL_LO <= dp < CAL_HI):
+            and _in_cal(ax) and _in_cal(dp)):
         return dict(addr=a, dim="1D", count=c1, width=_TYPECODE_WIDTH[tc],
                     data=dp, axes=[ax], counts=[c1], loose=True)
     c2 = struct.unpack_from(">H", buf, a + 2)[0]
     a1, a2, dp2, tc2 = struct.unpack_from(">IIII", buf, a + 4)
     tch = tc2 >> 16
     if (1 <= c1 <= 512 and 1 <= c2 <= 512 and tc2 & 0xFFFF == 0 and tch in _TYPECODE_WIDTH
-            and CAL_LO <= a1 < CAL_HI and CAL_LO <= a2 < CAL_HI and CAL_LO <= dp2 < CAL_HI):
+            and _in_cal(a1) and _in_cal(a2) and _in_cal(dp2)):
         return dict(addr=a, dim="2D", count=c1 * c2, width=_TYPECODE_WIDTH[tch],
                     data=dp2, axes=[a1, a2], counts=[c1, c2], loose=True)
     return None

@@ -4268,3 +4268,92 @@ ends — except here neither name was right in either mode.
 The hysteresis band (`0.001` / `0.252`) and the debounce depth (`> 2`) are
 **inline constants**, not calibrations, and carry no XML definition. They cannot
 be tuned without a code patch.
+
+---
+
+## 77. `coverage_map.py` could not see the SECOND calibration band — 38 descriptors, including the whole DBW region — **FIXED 2026-08-18**
+
+Chasing an apparent census mismatch (`coverage_map.py` reported 780 descriptors,
+`descriptor_map.txt` reports 1094). **The 780 was not a stale scanner** — item 60
+already records that coverage_map applies a deliberately stricter acceptance rule
+(exact contiguous layout) and that ~276 shared-axis descriptors are its
+documented blind spot. Loosening it would have destroyed the corroboration the
+cross-check exists to provide.
+
+But item 60 also predicted **818** rows would pass strict contiguity, against the
+780 coverage_map accepted. That 38-row gap was real, and it had exactly one
+cause.
+
+### One cause, no residue
+
+Of the 585 1-D rows in `descriptor_map.txt` that satisfy `axis + count*4 ==
+data`, coverage_map rejected 22 — every one of them because the **axis pointer
+fell outside `CAL_LO..CAL_HI = 0x0C0000..0x0E0000`**. `585 - 22 = 563`, which is
+exactly what it accepted. Nothing unexplained.
+
+They point into `0x0F89xx`:
+
+```
+0x0AB0A4  axis=0x0F8930  data=0x0F8938
+0x0F8930: 459ED000 45AFF800 801A0000  =  5082.0, 5631.0, -0.0
+```
+
+Clean RPM breakpoints, and **byte-identical in stock `ae5l600l.bin`** — factory
+tables, not patch additions.
+
+### There are TWO calibration bands, not one
+
+`rom_region_map.txt` has said so all along:
+
+```
+0x0DAF00-0x0F8900   121344 bytes  rom_hole
+0x0F8900-0x0F9700     3584 bytes  float_data
+0x0F9700-0x0F9900      512 bytes  mixed_data
+0x0F9900-0x0FA500     3072 bytes  float_data
+```
+
+A second calibration region sits **above the big ROM hole**, and 38 descriptors
+point their axis or data into it. It contains the DBW pedal->throttle tables the
+project actively works on: `0x0F8B54` base RPM, `0x0F9004`/`0x0F9284`/`0x0F9504`
+throttle-by-ratio, `0x0F99E0` pedal map.
+
+A single window assumed one contiguous band and silently excluded the lot. This
+is the same blind spot CLAUDE.md already warns about for rev diffs -- *"do not
+filter to code-classified regions only; injected code lives in rom_hole space by
+definition"* -- reappearing in a different filter.
+
+### Fix
+
+`CAL_LO/CAL_HI` replaced by `CAL_BANDS` plus an `_in_cal()` helper, applied at
+all five acceptance tests:
+
+```python
+CAL_BANDS = ((0x0C0000, 0x0E0000), (0x0F8900, 0x0FA600))
+```
+
+The acceptance RULE is unchanged -- still exact contiguity, still ~40 bits of
+coincidence, still high-precision-not-high-recall. Only the address window moved.
+
+### Result, and why it is trustworthy
+
+```
+780 descriptors (563 1D, 217 2D)  ->  818 (584 1D, 234 2D)
+```
+
+**818 is exactly the number item 60 predicted** from a completely separate
+implementation. Two scanners that do not read each other now agree.
+
+| flag | before | after |
+|---|---|---|
+| entities | 4,691 | 4,720 |
+| VERIFIED-BOTH | 336 | **360** |
+| VERIFIED-BYTES | 290 | **266** |
+| DISASM-ONLY | 927 | 956 |
+| CONFLICT | 2 | 2 |
+| UNMAPPED bytes | 79.9% | 79.4% |
+
+The 24 that moved VERIFIED-BYTES -> VERIFIED-BOTH are definitions that always
+had correct bytes but no independent corroboration, because the descriptor that
+corroborates them lives in the band coverage_map could not see. Per the flag
+table those go from *"contents only, never meaning"* to *"reason from it,
+including about identity"* -- and they are concentrated in the DBW region.
