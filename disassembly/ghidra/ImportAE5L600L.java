@@ -98,6 +98,35 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF72D0L, "coolant_decay_bank_base",
             "r14 base for the staged decay bank in fn 0x02EFD2 (item 88).");
 
+        // -- item 89: the 0xAD960 two-stage thermal-lag model ---------------------
+        count += labelComment(0x0003644E, "fn_3644E_threshold_bank",
+            "GBR = 0xFFFF79A4 (the stage-1 filtered value IS this GBR base). Bank of "
+            + "threshold comparators over it. The live one: limit = 930.0 "
+            + "(0x0CC210/0x0CC214), hysteresis [0x0CC218] = 0.0, sets/clears "
+            + "byte[FFFF79FC]. corrections.md item 89.");
+        count += labelComment(0xFFFF79ACL, "thermal_model_target",
+            "table2D(load,RPM) * table1D(0xAC60C, knock_mix). The unfiltered target.");
+        count += labelComment(0xFFFF79A4L, "thermal_model_stage1",
+            "Merges the earlier \"ol_condition_checker_GBR\" -- BOTH are true: it is the GBR "
+            + "base of fn 0x03644E AND the stage-1 lag output (item 89). "
+            + "lag(target, self, alpha(load,RPM), snap 0.02288818) via helper 0x0BEA40. "
+            + "Compared against 930.0 at 0x036690.");
+        count += labelComment(0xFFFF79A8L, "thermal_model_stage2",
+            "Stage-2 lag output, coefficient flat 0.0100 (desc 0xAD9D0). Compared at "
+            + "0x0457F4 against [0x0CC220]/[0x0CC21C] -- BOTH 10000.0, so that trip "
+            + "(byte FFFF8253) can never fire. Calibrated off.");
+        count += labelComment(0xFFFF79FCL, "thermal_model_trip_flag",
+            "gbr+88 of fn 0x03644E. Set when stage-1 >= 930.0. CONSUMER NOT TRACED -- "
+            + "tracing it is what would identify this whole model (item 89).");
+        count += labelComment(0x000BEA40, "float_lag_filter",
+            "The earlier \"float_lerp\" was right in substance -- this IS a lerp between "
+            + "current and target, used as a first-order lag. "
+            + "fr0 = target + (1-alpha)*(current-target); snaps to target when the residual "
+            + "is below fr7. Args fr4=target fr5=current fr6=alpha fr7=snap.");
+        count += labelComment(0x000BEAB0, "float_abs_diff",
+            "fr0 = |fr4 - fr5|. Three instructions: fsub fr5,fr4 / fabs fr4 / rts. "
+            + "SUPERSEDES \"table_lookup_err_scale\", which the bytes do not support (item 90).");
+
         // -- item 88: the coolant fractions are a STAGED DECAY BANK, inert >40 degC ----
         count += labelComment(0x0002EFD2, "fn_2EFD2_coolant_decay_bank",
             "GBR = 0xFFFF726C (two bytes below the transient knock inhibit flag FFFF726E). "
@@ -119,8 +148,6 @@ public class ImportAE5L600L extends GhidraScript {
             "gbr+5. Cleared when the accumulator falls below [FFFF7330].");
         count += labelComment(0xFFFF7272L, "coolant_decay_flag_3",
             "gbr+6. Cleared when the accumulator falls below [FFFF7334].");
-        count += labelComment(0xFFFF3158L, "fn_2F03C_pair_select",
-            "byte. Selects which PAIR of coolant fractions is used at 0x02F04E. UNIDENTIFIED.");
         count += labelComment(0xFFFF90C1L, "fn_2F03C_gate",
             "byte. Non-zero routes 0x02F03C away from the coolant-fraction path entirely.");
 
@@ -147,10 +174,14 @@ public class ImportAE5L600L extends GhidraScript {
             + "cmp/ge #5 at 0x010BCC, no error path. corrections.md item 84.");
         count += labelComment(0x00010800, "sched_event_post",
             "Packs (r4 = event id, r5 = payload), enters critical section via 0x0BE81C, "
-            + "calls the walker 0x010B2A, leaves via 0x0BE82C.");
+            + "calls the walker 0x010B2A, leaves via 0x0BE82C. Same thing the earlier "
+            + "\"event_notify\" label described; merged (item 90).");
+        // 0x0000E774 also carried "ADC_StateMachine" from an earlier pass; item 84's
+        // trace does not support that reading. Merged here -- see corrections item 90.
         count += labelComment(0x0000E774, "sched_isr_common_entry",
             "Every ISR stub in the 0x00E9xx family bra's here with r4 = its event id "
-            + "(80, 84, 90, 92 seen). Raises SR to IMASK=15 (or #240) before posting.");
+            + "(80, 84, 90, 92 seen). Raises SR to IMASK=15 (or #240) before posting. "
+            + "SUPERSEDES the earlier \"ADC_StateMachine\" label (item 90).");
         count += labelComment(0xFFFF2060L, "sched_event_count",
             "byte. Number of occupied slots in the event table at 0xFFFF2064. HARD MAX 5.");
         count += labelComment(0xFFFF2064L, "sched_event_table",
@@ -532,8 +563,6 @@ public class ImportAE5L600L extends GhidraScript {
             "Returns max(fr4, fr5). F455 = fcmp/gt FR5,FR4 (T = FR4>FR5) → keeps larger. Provides a FLOOR clamp. Called by PI controller for I-term floor");
         count += labelComment(0x000BE970, "float_min",
             "Returns min(fr4, fr5). F545 = fcmp/gt FR4,FR5 (T = FR5>FR4) → keeps smaller. Provides a CEILING clamp. Called by PI controller for I-term cap");
-        count += labelComment(0x000BEA40, "float_lerp",
-            "Linear interpolation with NaN guard. result = fr4 + (fr5-fr4)*(1-fr6), convergence check via fr7");
         count += labelComment(0x000BEAB0, "float_abs_diff",
             "Returns |fr4 - fr5|. Called by PI controller for error magnitude");
 
@@ -1608,8 +1637,6 @@ public class ImportAE5L600L extends GhidraScript {
             "ADI0 actual handler: clears ADF flag, advances ADC state machine.");
         count += labelComment(0x0000F320, "ADI0_Handler2",
             "ADI0 second handler: calls ADC_DataCopy(0x7110), Sensor_Scaling(0x7D26), ADC_Notify(0xBB6C).");
-        count += labelComment(0x0000E774, "ADC_StateMachine",
-            "ADC conversion state machine dispatcher. Called from ISR and bulk read paths.");
         count += labelComment(0x0000E852, "ISR_SharedHalt",
             "Shared ISR handler for unused/error interrupts. Halts with infinite loop after logging error code.");
         count += labelComment(0x00007110, "ADC_DataCopy",
@@ -2186,9 +2213,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "Used for state change detection with notification.");
         count += labelComment(0x0000B99C, "ram_word_update_B",
             "22 calls. Variant of ram_word_update with different event routing.");
-        count += labelComment(0x00010800, "event_notify",
-            "15 calls. Event notification dispatcher. Called by ram_word_update "
-            + "when state changes are detected.");
 
         // ── DTC Table Iterator ─────────────────────────────────────────────
         count += labelComment(0x0009CFEE, "dtc_scan_loop",
@@ -5720,8 +5744,6 @@ public class ImportAE5L600L extends GhidraScript {
             "Returns max(FR4, FR5) in FR0. F455 = fcmp/gt FR5,FR4. FLOOR clamp.");
         count += labelComment(0x000BE970, "float_min",
             "Returns min(FR4, FR5) in FR0. F545 = fcmp/gt FR4,FR5. CEILING clamp.");
-        count += labelComment(0x000BEAB0, "table_lookup_err_scale",
-            "Table lookup with error scaling.");
 
         // ── Fueling Pipeline RAM (Key Working Addresses) ──
         count += labelComment(0xFFFF7448L, "clol_mode_flag",
@@ -6895,6 +6917,8 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- cal_mirrors (20 labels) ---
         count += labelComment(0xFFFF3158L, "afl_diagnostic_flag",
+            "ALSO read at 0x02F04E to pick which PAIR of coolant decay-rate curves is used "
+            + "(item 88). That is a use, not a second identity. ".replace("~","") +
             "AFL state / diagnostic flag. Checked by fueling pipelin");
         count += labelComment(0xFFFF341AL, "cal_mirrors_cluster_base",
             "Cal mirrors region start (0xFFFF341A-0xFFFF3612, 152 addresses).");
@@ -7642,8 +7666,6 @@ public class ImportAE5L600L extends GhidraScript {
             "GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF7950L, "gbr_afc_7950",
             "GBR workspace base (1 use). Region: AFC/AFL state.");
-        count += labelComment(0xFFFF79A4L, "ol_condition_checker_GBR",
-            "FUN_0003643A OL condition checker");
         count += labelComment(0xFFFF79C0L, "gbr_afc_79C0",
             "GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF79CCL, "gbr_afc_79CC",

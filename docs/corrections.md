@@ -5274,3 +5274,101 @@ calibration — their writers are not traced. Nor is what consumes the four flag
 ### Status
 
 Recorded. No ROM bytes changed, no XML edited, no table named.
+
+---
+
+## 89. The `0xAD960` cluster is a two-stage thermal-lag model with a 930.0 trip — **CLOSES open-holes #7 next-move 1, 2026-08-19**
+
+Full trace: `disassembly/analysis/thermal_lag_model_trace.txt` (72/72 lines
+verify).
+
+The five unnamed RPM × load tables from slice 1 are not five maps. They are one
+model:
+
+```
+target  = table2D(load,RPM)          ; 0xAD960 (390..866) or 0xAD97C (390..1138)
+        x table1D(0xAC60C, knock_mix); 1.0000 .. 1.0469
+hysteresis band 20.0 (0x0CC224) picks the filter coefficient:
+        rising  -> 0xAD998      falling -> 0xAD9B4      (0.0117 .. 0.1094)
+stage 1 [FFFF79A4] = lag(target,     [FFFF79A4], alpha(load,RPM), snap 0.02288818)
+stage 2 [FFFF79A8] = lag([FFFF79A4], [FFFF79A8], 0.0100,          snap 0.02288818)
+trip    [FFFF79A4] >= 930.0 (0x0CC210/0x0CC214) -> byte[FFFF79FC] = 1
+```
+
+`knock_mix` = `[FFFF7F48] + [FFFF8258] − [FFFF7E90]`, where `0xFFFF8258` is the
+knock-workspace integrator from item 80 — so ignition retard raises the modelled
+quantity by up to **+4.7%**.
+
+Helpers verified from bytes: `0x0BEA40` is a first-order lag with a snap-to-target
+deadband, `0x0BEAB0` is `|a−b|`, `0x0BE608` is the outside-a-band test from item
+83. The snap threshold `0.02288818` is exactly one LSB of `0xAD960`'s scale.
+
+**A second trip is calibrated off.** `0x0457F4` compares the stage-2 output
+against `[0x0CC220]`/`[0x0CC21C]`, both **10000.0**, against a quantity whose base
+map maxes at 1138. `byte[0xFFFF8253]` can never be set.
+
+**Both stages are exposed for logging** via the SSM getter at `0x024564`, but
+neither appears in `logs/logcfg.txt` in any rev.
+
+### What it is — inference, not a name
+
+Every property fits an **exhaust-gas / catalyst temperature model driving
+open-loop enrichment for component protection**: a 390–1138 quantity on a
+load × RPM base map, two-stage thermal lag with separate heating and cooling
+constants, raised by ignition retard, tripping at 930.0 — a textbook
+catalyst/turbine limit — in a module whose GBR is labelled `ol_enrichment_accum`.
+
+**No name is asserted.** Settling it means tracing what consumes
+`byte[0xFFFF79FC]`. Note also that `[0xFFFF79F8]`, labelled `ol_enrich_func_ptr`,
+is **not a function pointer** — it holds a table descriptor address.
+
+None of `0xAD960`, `0xAD97C`, `0xAD998`, `0xAD9B4`, `0xAD9D0`, `0xAC60C`,
+`0x0CC20C`–`0x0CC228` has an `address=` entry in the project XML.
+
+---
+
+## 90. 91 Ghidra addresses carry CONFLICTING labels — item 69's sweep only covered `desc_*` — **NEW, 2026-08-19**
+
+Found while checking `0xFFFF798C`, which carries both `ol_enrichment_accum`
+(line 1855) and `timing_state_var` (line 2636).
+
+A scan of `labelComment(` calls finds **91 addresses with two or more different
+names**. Item 69 resolved 61 duplicates, but
+`scripts/mapping/dedupe_import_java_labels.py` handles **`desc_*` labels only** —
+the general ones were never in scope. Examples where the two names cannot both be
+right:
+
+```
+0x000299BC   diag_check_P0137          / float_store_to_ram
+0x000278D2   check_maf_valid           / dwell_calculator
+0x000281DC   check_diag_mode_active    / sensor_scale_helper
+0x00023E48   check_afl_ready           / fuel_desc_reader
+0x000297A0   diag_flag_reader_cluster_start / float_load_from_desc
+```
+
+One family looks like a **bulk pattern-scan** that assigned diagnostic names
+across a range which a later, evidence-based pass renamed as generic helpers.
+Whichever is right, the file currently asserts both.
+
+**Six of them are mine, added across this session without checking whether the
+address already had a label** — the exact mistake this item documents:
+
+| address | existing | mine | resolution |
+|---|---|---|---|
+| `0x0000E774` | `ADC_StateMachine` | `sched_isr_common_entry` | item 84's trace supersedes |
+| `0x00010800` | `event_notify` | `sched_event_post` | same thing, merged |
+| `0xFFFF79A4` | `ol_condition_checker_GBR` | `thermal_model_stage1` | **both true**, merged |
+| `0x0BEA40` | `float_lerp` | `float_lag_filter` | **the old name was right**; it is a lerp used as a lag |
+| `0x0BEAB0` | `table_lookup_err_scale` | `float_abs_diff` | 3 instructions, `fsub/fabs/rts` — old name unsupported |
+| `0xFFFF3158` | `afl_diagnostic_flag` | `fn_2F03C_pair_select` | mine described a *use*, not an identity; folded into the existing comment |
+
+Two of those six went the other way from what I expected: `float_lerp` was
+already correct, and my `fn_2F03C_pair_select` was a use-description masquerading
+as an identity. All six are merged to one label per address.
+
+**The other 87 are NOT resolved here** — each needs deciding on evidence, which
+is exactly the work item 69 did for descriptors. Recorded as open-holes #8.
+
+### Status
+
+Recorded. Two labels merged; 89 conflicts outstanding.

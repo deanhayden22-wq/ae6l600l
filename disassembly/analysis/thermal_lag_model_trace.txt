@@ -1,0 +1,188 @@
+================================================================================
+THE 0xAD960 CLUSTER IS A TWO-STAGE THERMAL-LAG MODEL WITH A 930 PROTECTION TRIP
+Traced 2026-08-19. Closes open-holes #7 next-move 1.
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+================================================================================
+
+ANSWER
+--------------------------------------------------------------------------------
+The five unnamed RPM x load tables from slice 1 are not five maps. They are the
+pieces of ONE model: a load x RPM base quantity, multiplied by a knock-derived
+uplift, then pushed through TWO cascaded first-order lag filters whose
+coefficients differ for rising vs falling, with the filtered output compared
+against a **930.0** trip point.
+
+    0xAD960 / 0xAD97C   the base quantity, 390..866 / 390..1138
+    0xAC60C             knock-derived uplift, 1.0000 .. 1.0469
+    0xAD998 / 0xAD9B4   RISING / FALLING filter coefficient, 0.0117 .. 0.1094
+    0xAD9D0             second-stage coefficient, flat 0.0100
+
+None of the five, nor 0xAC60C, nor any constant below, has an `address=` entry in
+the project XML.
+
+THE CHAIN
+--------------------------------------------------------------------------------
+**1. Build the target** -- fn 0x03684A, GBR = 0xFFFF798C, r13 = 0xFFFF79F8.
+Inputs are RPM [FFFF6624] -> fr12 and engine load [FFFF63F8] -> fr15. The 2-D
+table is picked on whether [FFFF798C] is non-zero (helper 0x0BE608, the
+outside-a-band test from item 83, eps 3.05e-05):
+
+  0368B0: E0DC  mov #-36,r0
+  0368B2: FD07  fmov.s fr0,@(r0,r13)
+  0368B4: D464  mov.l @(0x036A48),r4   ; [036A48] = 000AC60C
+  0368B6: D665  mov.l @(0x036A4C),r6   ; [036A4C] = 000BE830
+  0368B8: E0BC  mov #-68,r0
+  0368BA: 460B    jsr @r6
+  0368BC: F4D6  fmov.s @(r0,r13),fr4
+  0368BE: E0E0  mov #-32,r0
+  0368C0: FD07  fmov.s fr0,@(r0,r13)
+  0368C2: E0DC  mov #-36,r0
+  0368C4: F8D6  fmov.s @(r0,r13),fr8
+  0368C6: E0E0  mov #-32,r0
+  0368C8: F9D6  fmov.s @(r0,r13),fr9
+  0368CA: F892  fmul fr9,fr8
+  0368CC: E0B4  mov #-76,r0
+  0368CE: FD87  fmov.s fr8,@(r0,r13)
+
+    [FFFF79D4] = table2D(load, RPM)            ; 0xAD960 or 0xAD97C
+    [FFFF79D8] = table1D(0xAC60C, knock_mix)   ; knock_mix = [FFFF79B4]
+    [FFFF79AC] = [FFFF79D4] * [FFFF79D8]       ; the TARGET
+
+`knock_mix` was built at the top of the same function as
+`[FFFF7F48] + [FFFF8258] - [FFFF7E90]`, where 0xFFFF8258 is the knock-workspace
+integrator settled in item 80. 0xAC60C's axis runs 0..12 and its data 1.0000 to
+1.0469 -- so the knock workspace can raise the target by up to **+4.7%**.
+
+**2. Rise / fall hysteresis picks the filter coefficient.** Band = float
+[0x0CC224] = **20.0**; 0x0BEAB0 is `|fr4 - fr5|`, verified from bytes:
+
+  0368D0: F8EC  fmov fr14,fr8
+  0368D2: D25F  mov.l @(0x036A50),r2   ; [036A50] = 000CC224
+  0368D4: F928  fmov.s @r2,fr9
+  0368D6: F890  fadd fr9,fr8
+  0368D8: F9D6  fmov.s @(r0,r13),fr9
+  0368DA: F985  fcmp/gt fr8,fr9
+  0368DC: 8B02  bf 0x0368E4
+  0368DE: D05D  mov.l @(0x036A54),r0   ; [036A54] = 000AD998
+  0368E0: A010    bra 0x036904
+  0368E2: C21B  mov.l r0,@(108,gbr)
+
+    target > previous + 20.0   -> coefficient table = 0xAD998   (RISING)
+    previous - 20.0 > target   -> coefficient table = 0xAD9B4   (FALLING)
+    otherwise                  -> keep whatever was selected last
+
+The selection is stored in **[0xFFFF79F8]** -- which the repo labels
+`ol_enrich_func_ptr`. It is not a function pointer; it holds a table DESCRIPTOR
+address, read back at 0x03690A.
+
+**3. Two cascaded lag filters.** Helper 0x0BEA40, verified from bytes:
+
+  0BEA40: F51D  flds fr5,fpul
+  0BEA42: D409  mov.l @(0x0BEA68),r4   ; [0BEA68] = 7F800000
+  0BEA44: 005A  sts fpul,r0
+  0BEA46: 2049  and r4,r0
+  0BEA48: 3040  cmp/eq r4,r0
+  0BEA4A: 8D0A  bt/s 0x0BEA62
+  0BEA4C: F541  fsub fr4,fr5
+  0BEA4E: F09D  fldi1 fr0
+  0BEA50: F061  fsub fr6,fr0
+  0BEA52: F64C  fmov fr4,fr6
+  0BEA54: F65E  fmac fr0,fr5,fr6
+  0BEA56: F54C  fmov fr4,fr5
+  0BEA58: F561  fsub fr6,fr5
+  0BEA5A: F55D  fabs fr5
+  0BEA5C: F755  fcmp/gt fr5,fr7
+  0BEA5E: 8F01  bf/s 0x0BEA64
+  0BEA60: 0009  nop
+  0BEA62: F64C  fmov fr4,fr6
+  0BEA64: 000B    rts
+  0BEA66: F06C  fmov fr6,fr0
+
+    fr0 = 1 - alpha ; result = target + (1-alpha)*(current - target)
+    if |target - result| < fr7:  snap to target
+
+    stage 1: [FFFF79A4] = lag(target,      [FFFF79A4], alpha(load,RPM), 0.02288818)
+    stage 2: [FFFF79A8] = lag([FFFF79A4],  [FFFF79A8], 0.0100,          0.02288818)
+
+The snap threshold 0.02288818 is exactly one LSB of 0xAD960's scale -- the filter
+snaps once it is within one quantum of target rather than crawling asymptotically.
+
+**4. The trip.** fn 0x03644E, GBR = 0xFFFF79A4 (the stage-1 output IS this
+function's GBR base). It runs a bank of threshold comparators; this is the one
+that matters:
+
+  036678: D25B  mov.l @(0x0367E8),r2   ; [0367E8] = 000CC20C
+  03667A: F828  fmov.s @r2,fr8
+  03667C: F8E5  fcmp/gt fr14,fr8
+  03667E: 8B02  bf 0x036686
+  036680: D25A  mov.l @(0x0367EC),r2   ; [0367EC] = 000CC210
+  036682: A002    bra 0x03668A
+  036684: F828  fmov.s @r2,fr8
+  036686: D25A  mov.l @(0x0367F0),r2   ; [0367F0] = 000CC214
+  036688: F828  fmov.s @r2,fr8
+  03668A: D65A  mov.l @(0x0367F4),r6   ; [0367F4] = FFFF7A04
+  03668C: E0A0  mov #-96,r0
+  03668E: F966  fmov.s @(r0,r6),fr9
+  036690: F895  fcmp/gt fr9,fr8
+  036692: 8902  bt 0x03669A
+  036694: E001  mov #1,r0
+  036696: A009    bra 0x0366AC
+  036698: C058  mov.b r0,@(88,gbr)
+  03669A: D257  mov.l @(0x0367F8),r2   ; [0367F8] = 000CC218
+  03669C: F928  fmov.s @r2,fr9
+  03669E: F891  fsub fr9,fr8
+  0366A0: E0A0  mov #-96,r0
+  0366A2: F966  fmov.s @(r0,r6),fr9
+  0366A4: F895  fcmp/gt fr9,fr8
+  0366A6: 8B01  bf 0x0366AC
+  0366A8: E000  mov #0,r0
+  0366AA: C058  mov.b r0,@(88,gbr)
+
+    limit = ([0x0CC20C] > x) ? [0x0CC210] : [0x0CC214]     ; both = 930.0
+    if [FFFF79A4] >= limit:                byte[FFFF79FC] = 1
+    if [FFFF79A4] <  limit - [0x0CC218]:   byte[FFFF79FC] = 0   ; hysteresis = 0.0
+
+**5. A second trip that is DISABLED.** fn 0x0457F4 compares the STAGE-2 output
+against [0x0CC220] and [0x0CC21C] and sets byte[FFFF8253]. Both constants are
+**10000.0**, against a quantity whose own base map maxes at 1138. That flag can
+never be set. Calibrated off.
+
+**6. Both stages are exposed for logging.** 0x024564 reads [FFFF79A4] and
+[FFFF79A8], converts each through a shared getter and stores 16-bit results into
+a GBR block alongside FFFF7BA8 and FFFF7D68 -- the SSM getter pattern. Neither
+appears in `logs/logcfg.txt` in any rev, so they are available but not logged.
+
+THE TABLES
+--------------------------------------------------------------------------------
+  0xAD960 / 0xAD97C  uint16 15x12, scale 0.02288818, RPM 800-6400 x load 0.30-2.50
+     0xAD960 range 390.50 .. 866.25      0xAD97C range 390.50 .. 1138.00
+  0xAC60C  uint8 1-D x6, axis [0.0, 2.0, 4.0, 8.0, 10.0, 12.0]
+     data [1.0, 1.0, 1.0, 1.0234, 1.0312, 1.0469]
+
+WHAT THIS IS -- stated as inference, not as a name
+--------------------------------------------------------------------------------
+Every property lines up with an **exhaust-gas / catalyst temperature model
+driving open-loop enrichment for component protection**:
+
+* the modelled quantity spans 390..1138 on a load x RPM base map;
+* it is pushed through a two-stage thermal lag with SEPARATE heating and cooling
+  time constants -- the standard way to model exhaust and catalyst mass;
+* ignition retard raises it, via the knock-workspace uplift, by up to 4.7%;
+* it trips a flag at **930.0**, a textbook catalyst/turbine protection limit;
+* the enclosing module's GBR is 0xFFFF798C, which the repo labels
+  `ol_enrichment_accum`.
+
+**No name is asserted.** Nothing in the ROM or the XMLs states units, and the
+repo's own label on 0xFFFF798C is a project guess -- and a CONFLICTING one: the
+Ghidra script carries BOTH `ol_enrichment_accum` (line 1855) and
+`timing_state_var` (line 2636) for that address. Settling the identity means
+tracing what consumes byte[0xFFFF79FC].
+
+STILL OPEN
+--------------------------------------------------------------------------------
+* What consumes byte[0xFFFF79FC], the 930.0 trip flag. That is the one test that
+  would convert this from a strong inference into an identification.
+* [0xFFFF7F48] and [0xFFFF7E90], the other two terms of `knock_mix`.
+* The duplicate label on 0xFFFF798C.
+* fn 0x03644E contains further comparator pairs (0x0CC1E4/0x0CC1E8 at gbr+93,
+  and more) that were not decoded here.

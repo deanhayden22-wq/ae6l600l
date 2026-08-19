@@ -246,11 +246,12 @@ monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
    `[FFFF72DC]` and the four thresholds `[FFFF7328]`/`[732C]`/`[7330]`/`[7334]`
    are RAM, so the staging is set at runtime — nobody has traced their writers,
    or what consumes flags `0xFFFF726F`–`0xFFFF7272`.
-1. **Decode `0x03684A`** to its output store and either name the
-   `0xAD960`/`97C`/`998`/`9B4`/`9D0` cluster or prove it inert. Highest tuning
-   value found so far: RPM 800–6400 × load 0.30–2.50, populated, selected on
-   whether `[0xFFFF798C]` is non-zero, and it folds the knock integrator
-   `0xFFFF8258` in on the way. Also identify `0xFFFF7F48` / `0xFFFF7E90`.
+1. ~~Decode `0x03684A`~~ — **DONE, item 89.** The five tables are one model: a
+   load × RPM base quantity × a knock-derived uplift, through **two cascaded lag
+   filters** with separate rise/fall coefficients, tripping a flag at **930.0**.
+   Consistent with an exhaust/catalyst temperature model driving OL enrichment,
+   but **not named**. What would settle it: trace the consumer of
+   `byte[0xFFFF79FC]`. Also still open: `[0xFFFF7F48]` and `[0xFFFF7E90]`.
 2. **Triage out the diagnostic-monitor rows** (`0xABDD4`–`0xABE60`, `0xAC0DC`,
    `0xAC0F0`, `0xAC104`, `0xAC12C`). Symmetric ±3999 pairs on RPM × load —
    almost certainly OBD rationality bands, i.e. deliberately not levers.
@@ -271,6 +272,34 @@ monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
 * **Join on the pointers inside the descriptor record**, never on the descriptor
   address — definitions point at data. Joining wrong returns zero matches and
   reads as "nothing is defined".
+
+---
+
+## 8. 89 Ghidra addresses still carry conflicting labels
+
+`docs/corrections.md` item 90. A scan of `labelComment(` calls found **91**
+addresses asserting two or more different names. Six were introduced 2026-08-19
+and are all merged, leaving **87**.
+
+Item 69 resolved 61 duplicates, but `scripts/mapping/dedupe_import_java_labels.py`
+handles **`desc_*` labels only** — the general ones were never in scope.
+
+Some pairs cannot both be right:
+
+```
+0x000299BC   diag_check_P0137               / float_store_to_ram
+0x000278D2   check_maf_valid                / dwell_calculator
+0x000281DC   check_diag_mode_active         / sensor_scale_helper
+0x00023E48   check_afl_ready                / fuel_desc_reader
+0x000297A0   diag_flag_reader_cluster_start / float_load_from_desc
+```
+
+One family looks like a bulk pattern-scan that assigned diagnostic names across a
+range which a later, evidence-based pass renamed as generic helpers. Each needs
+deciding on evidence — the same work item 69 did for descriptors.
+
+**Before adding any new label, check whether the address already has one.** That
+is how two of the 91 got there.
 
 ---
 
