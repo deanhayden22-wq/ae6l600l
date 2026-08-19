@@ -86,6 +86,22 @@ public class ImportAE5L600L extends GhidraScript {
             + "byte[0xFFFF8EDC] != 0 at 0x04A954, rts at 0x04A9F0. Task 1 = 0x043750 "
             + "(knock_wrapper), task 9 = 0x033304, tail jmp -> 0x00022F8A.");
 
+        // -- item 87: unnamed-table slice 2 (coolant axis) -----------------------
+        count += labelComment(0x0002F03C, "fn_2F03C_coolant_fraction_select",
+            "2x2 selector over four UNDEFINED coolant-indexed fractions. fr4 = [FFFF6354] "
+            + "(coolant); gated on byte[FFFF90C1] == 0; then byte[FFFF3158] picks the pair and "
+            + "byte[gbr+101] == 1 picks within it: 0xAC840/0xAC890 or 0xAC854/0xAC8A4. Result "
+            + "lands in the FFFF72D0 workspace. Second identical family at 0x02F126-0x02F158 "
+            + "(0xAC818/868/82C/87C). All eight are 1-D uint16 x16, values 0.85..0.96, and NONE "
+            + "is defined in any XML. Transient fuel region -- shape of a wall-wetting term, but "
+            + "NOT identified. corrections.md item 87.");
+        count += labelComment(0xFFFF72D0L, "fn_2F03C_workspace",
+            "r14 base after the coolant-fraction lookup at 0x02F062. UNIDENTIFIED (item 87).");
+        count += labelComment(0xFFFF3158L, "fn_2F03C_pair_select",
+            "byte. Selects which PAIR of coolant fractions is used at 0x02F04E. UNIDENTIFIED.");
+        count += labelComment(0xFFFF90C1L, "fn_2F03C_gate",
+            "byte. Non-zero routes 0x02F03C away from the coolant-fraction path entirely.");
+
         // -- item 86: unnamed-table slice 1 (RPM x load) -------------------------
         count += labelComment(0x0003684A, "fn_3684A_rpm_load_pair_select",
             "GBR = 0xFFFF798C. Reads RPM [FFFF6624] -> fr12 and ENGINE LOAD [FFFF63F8] -> fr15 "

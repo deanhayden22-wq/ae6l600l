@@ -216,17 +216,35 @@ byte-identical), same degenerate shape as the knock load planes.
 
 Items 1-6 are all closed. `docs/corrections.md` item 86 opens the successor.
 
-**786 of 1,094 ROM-decoded table descriptors have no definition anywhere.** Each
+**947 of 1,094 ROM-decoded table descriptors have no definition anywhere.** Each
 is a *proven* table — the code reads it through `table_lookup`, so geometry, cell
 type, scale/bias, axis breakpoints and data are all known. Only the **meaning**
-is missing. 775 look real; 11 are scanner artefacts.
+is missing.
 
-**Slice 1 (RPM × engine load, 41 tables) is DONE** —
+> The count was **786** until 2026-08-19; item 87 corrects it. A table is
+> unnamed iff its **DATA** pointer is unclaimed. Item 86 also excluded tables
+> whose *axis* pointer was claimed, which is wrong — and the discarded signal is
+> the most useful one in the whole programme: **158 unnamed tables share an axis
+> array with a NAMED table, so their axis identity is free.**
+
+**Slice 1 (RPM × engine load, 41) DONE** —
 `disassembly/analysis/unnamed_tables_rpm_load.txt`. 14 flat, 11 diagnostic
 monitor, 8 already-identified knock tables, 3 CL-fuelling siblings, 1 artefact.
 
+**Slice 2 (coolant axis, 157) DONE** —
+`disassembly/analysis/unnamed_tables_coolant_axis.txt`. **66 flat (42%)**;
+37 populated are OBD diagnostics in `0x50000`-`0x55000`; 25 populated are in the
+`0x2F000`-`0x31000` fuel region. Four coolant axis arrays, all the identical
+16-point −40…110 °C ladder.
+
 ### Next moves, in order
 
+0. **Decode `0x02F162` onward** and settle the eight coolant fractions
+   `0xAC840`/`890`/`854`/`8A4` and `0xAC818`/`868`/`82C`/`87C` — 1-D ×16
+   fractions 0.85–0.96, selected 2×2 on `byte[0xFFFF3158]` and `byte[gbr+101]`,
+   feeding `0xFFFF72D0` in the transient fuel region. Shape of a wall-wetting
+   term, which would bear on the cusp tip-in thread. Also identify `0xFFFF72D0`,
+   `0xFFFF72C8`, `0xFFFF3158`. **Highest tuning value found so far.**
 1. **Decode `0x03684A`** to its output store and either name the
    `0xAD960`/`97C`/`998`/`9B4`/`9D0` cluster or prove it inert. Highest tuning
    value found so far: RPM 800–6400 × load 0.30–2.50, populated, selected on

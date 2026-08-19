@@ -1,0 +1,268 @@
+================================================================================
+UNNAMED ROM TABLES, SLICE 2: everything indexed by the COOLANT TEMPERATURE axis
+Traced 2026-08-19. Second slice of the undefined-ROM programme (open-holes #7).
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Method: descriptors decoded from ROM bytes; a table is "unnamed" iff its DATA
+        pointer is unclaimed by any definition; membership of this slice is by
+        AXIS-POINTER IDENTITY with a defined "Coolant Temperature" axis -- not
+        by a heuristic on breakpoint values.
+================================================================================
+
+FIRST: SLICE 1'S JOIN WAS WRONG, AND THIS CORRECTS IT
+--------------------------------------------------------------------------------
+Item 86 counted a descriptor as "defined" if its data OR an axis pointer was
+claimed by the XML. That is wrong -- sharing an axis with a named table says
+nothing about whether THIS table is named. The correct test is the DATA pointer
+alone.
+
+    join on data OR axis (item 86, WRONG) :  308 named /  786 unnamed
+    join on DATA pointer only (correct)   :  147 named /  947 unnamed
+
+Slice 1's 41-row RPM x load table is unaffected in content -- everything in it
+was unnamed under either rule -- but its framing numbers are superseded.
+
+The discarded signal is the valuable one: **158 unnamed tables share an axis
+array with a named table, and 157 of those share the "Coolant Temperature"
+axis.** That is this slice, and its axis identity is ground truth from the
+definition XML rather than a guess from breakpoint values.
+
+THE AXIS
+--------------------------------------------------------------------------------
+Four distinct coolant axis arrays are in use, and all four hold the IDENTICAL
+ladder -- 16 points, -40 to +110 degC in 10 deg steps (-40 to +230 degF):
+
+    0xD67C8  used by 67      0xCC664  used by 24
+    0xCC624  used by 57      0xD2F8C  used by  9
+
+Raw is Celsius; CoolantTemp(DegreesF) displays (x*1.8)+32. Four copies of one
+ladder, one per consuming subsystem.
+
+RESULT
+--------------------------------------------------------------------------------
+    157 unnamed tables on the coolant axis
+     66 are FLAT (every cell identical) -- inert as shipped
+     91 are populated
+    139 have at least one direct call site
+
+By consumer region:
+
+    (indirect)    16   axis arrays 0xD67C8
+    0x2F000       11   axis arrays 0xCC624,0xCC664
+    0x30000        9   axis arrays 0xCC624,0xCC664
+    0x31000        5   axis arrays 0xCC664
+    0x34000        1   axis arrays 0xCC664
+    0x36000        1   axis arrays 0xCC624
+    0x3C000        1   axis arrays 0xCC624
+    0x3E000        1   axis arrays 0xD2F8C
+    0x41000        3   axis arrays 0xD2F8C
+    0x42000        2   axis arrays 0xD2F8C
+    0x4F000        1   axis arrays 0xD67C8
+    0x50000        8   axis arrays 0xD67C8
+    0x51000        8   axis arrays 0xD67C8
+    0x53000       19   axis arrays 0xD67C8
+    0x55000        2   axis arrays 0xD67C8
+    0x63000        2   axis arrays 0xD67C8
+    0x9F000        1   axis arrays 0xD67C8
+
+Cell types: 116 are 1-D uint16 x16, 29 uint8 x16, 6 float32 x16, 6 are 2-D.
+
+WHAT THE BIG CLUSTERS ARE
+--------------------------------------------------------------------------------
+* **0x50000-0x55000 (37 populated, axis 0xD67C8) -- OBD DIAGNOSTICS, not levers.**
+  The call sites touch `gbr_sens_8A84`, `gbr_sens_8AC0`,
+  `diag_precondition_flag_65C0` and the `FFFF8Axx` block. Payloads are
+  rationality-shaped: ratio thresholds clustered at 0.96-0.99, a 250-400 band, a
+  0-180 ramp. Triage these out.
+* **0x2F000-0x31000 (25 populated, axes 0xCC624/0xCC664) -- the FUEL region.**
+  This is where the tuning-relevant material is; see below.
+* **0x41000-0x42000 (5, axis 0xD2F8C)** and 16 reached indirectly via pointer
+  tables (axis 0xD67C8) -- not examined here.
+
+THE FIND: EIGHT UNDEFINED COOLANT FRACTIONS IN THE TRANSIENT FUEL PATH
+--------------------------------------------------------------------------------
+Two 2x2 families, all eight 1-D uint16 x16 on the coolant axis, all of them
+FRACTIONS just below unity, none defined in any XML:
+
+    0xAC840  0.8500 .. 0.9400        0xAC818  0.9000 .. 0.9600
+    0xAC890  0.8750 .. 0.9000        0xAC868  0.9000 .. 0.9600
+    0xAC854  0.8500 .. 0.9400        0xAC82C  0.9000 .. 0.9600
+    0xAC8A4  0.8750 .. 0.9000        0xAC87C  0.9000 .. 0.9600
+
+The first family's selector, decoded:
+
+  02F03C: D230  mov.l @(0x02F100),r2   ; [02F100] = FFFF6354
+  02F03E: F428  fmov.s @r2,fr4
+  02F040: D617  mov.l @(0x02F0A0),r6   ; [02F0A0] = FFFF3158
+  02F042: 6660  mov.b @r6,r6
+  02F044: D22F  mov.l @(0x02F104),r2   ; [02F104] = FFFF90C1
+  02F046: 6520  mov.b @r2,r5
+  02F048: 2558  tst r5,r5
+  02F04A: 8B65  bf 0x02F118
+  02F04C: 2668  tst r6,r6
+  02F04E: 8F12  bf/s 0x02F076
+  02F050: C465  mov.b @(101,gbr),r0
+  02F052: 1F03  mov.l r0,@(12,r15)
+  02F054: 600C  extu.b r0,r0
+  02F056: 8801  cmp/eq #1,r0
+  02F058: 8B06  bf 0x02F068
+  02F05A: D42B  mov.l @(0x02F108),r4   ; [02F108] = 000AC840
+  02F05C: D21D  mov.l @(0x02F0D4),r2   ; [02F0D4] = 000BE830
+  02F05E: 420B    jsr @r2
+  02F060: 0009  nop
+  02F062: DE23  mov.l @(0x02F0F0),r14   ; [02F0F0] = FFFF72D0
+  02F064: A07D    bra 0x02F162
+  02F066: 0009  nop
+  02F068: D428  mov.l @(0x02F10C),r4   ; [02F10C] = 000AC890
+  02F06A: D21A  mov.l @(0x02F0D4),r2   ; [02F0D4] = 000BE830
+  02F06C: 420B    jsr @r2
+  02F06E: 0009  nop
+  02F070: DE1F  mov.l @(0x02F0F0),r14   ; [02F0F0] = FFFF72D0
+
+    fr4 = [FFFF6354]                       ; coolant temperature
+    if byte[FFFF90C1] != 0      -> unrelated branch at 0x02F118
+    if byte[FFFF3158] == 0:
+         byte[gbr+101] == 1 ? table(0xAC840) : table(0xAC890)
+    else:
+         byte[gbr+101] == 1 ? table(0xAC854) : table(0xAC8A4)
+    r14 = FFFF72D0 ; continue at 0x02F162
+
+`0x0BE830` is the 1-D lookup helper. The second family at 0x2F126-0x2F158 has
+the same 2x2 shape and lands in the same workspace.
+
+**Why this matters and what is NOT established.** The region touches
+`transient_state_flag` and `FFFF7328`/`732C`/`7330`/`7334`, and `0x02F550`
+nearby is the known transient-knock-inhibit writer. A coolant-indexed fraction
+a little under 1.0, selected 2x2, feeding a transient workspace, has the SHAPE of
+a wall-wetting / X-factor term -- which would bear directly on the cusp
+tip-in work, where the stab-lean was concluded to be wall-wetting rather than
+deliverable fuel.
+
+That is a SHAPE ARGUMENT, not an identification. `0xFFFF72D0`, `0xFFFF72C8`,
+`0xFFFF3158` and `gbr+101` are all unidentified. **Nothing here is named.**
+Settling it means decoding 0x02F162 onward to the output store.
+
+OTHER POPULATED FUEL-REGION TABLES WORTH A LOOK
+--------------------------------------------------------------------------------
+    0xACD7C / 0xACD90  1.25-2.20 and 0.00-2.75, call sites 0x30B72/0x30B80,
+                       touching `base_fuel_map_output` -- coolant-indexed terms
+                       sitting directly on the base fuel map output.
+    0xACDA4 / 0xACDB8  same ranges at 0x3119E/0x311A6 (the sibling path).
+    0xAD7F4 / 0xAD810 / 0xAD82C   1.00-12.11, three copies, 0x30D78/0x30E2C/
+                       0x30E30, touching `ect_current` and `transient_state_flag`.
+                       A 12x span is a big authority for a coolant term.
+    0xACB54 / 0xACB68  0.25/0.30-3.40 at 0x30D3C/0x30D32, `gbr_fuel_73B0`.
+
+FULL SLICE -- POPULATED
+--------------------------------------------------------------------------------
+desc      type     axis               min          max  site      RAM at the call site
+------------------------------------------------------------------------------------------------------------------------
+0xAC840   uint16   0xCC664           0.85         0.94  0x2F05A   FFFF72D0,transient_state_flag,FFFF72C8
+0xAC890   uint16   0xCC664          0.875          0.9  0x2F068   FFFF72D0,FFFF72C8,rpm_current
+0xAC854   uint16   0xCC664           0.85         0.94  0x2F07E   FFFF72D0,FFFF7328,FFFF72C8
+0xAC8A4   uint16   0xCC664          0.875          0.9  0x2F08C   FFFF72D0,FFFF7328,FFFF72C8
+0xAC818   uint16   0xCC664            0.9         0.96  0x2F126   FFFF72D0,FFFF7330,FFFF7334
+0xAC868   uint16   0xCC664            0.9         0.96  0x2F134   FFFF72D0,ect_gated_c,afl_diagnostic_flag
+0xAC82C   uint16   0xCC664            0.9         0.96  0x2F14A   FFFF72D0,FFFF7328,FFFF732C
+0xAC87C   uint16   0xCC664            0.9         0.96  0x2F158   FFFF72D0,FFFF7328,FFFF732C
+0xAC8B8   uint16   0xCC624            0.0          0.0  0x2F7A2   FFFF315E,transient_state_flag,engine_state_byte
+0xAC388   uint8    0xCC624            0.0          0.0  0x2FBD0   FFFF72F8,ect_current,FFFF72A1
+0xAC394   uint8    0xCC624            0.0          0.0  0x2FBD4   FFFF72F8,ect_current,FFFF72A1
+0xAC3AC   uint8    0xCC624            0.0          0.0  0x305CC   FFFF7370,gbr_fuel_7354,rpm_current
+0xAC3A0   uint8    0xCC624            0.0          0.0  0x30618   FFFF7370,afl_diagnostic_flag,fuel_state_byte
+0xACD7C   uint16   0xCC664           1.25       2.2002  0x30B72   base_fuel_map_output,FFFF7442,ect_current
+0xACD90   uint16   0xCC664            0.0         2.75  0x30B80   base_fuel_map_output,FFFF7442,ect_current
+0xACB68   uint16   0xCC624           0.25       3.3999  0x30D32   gbr_fuel_73B0,FFFF7414,dtc_maturation_counter_67EC
+0xACB54   uint16   0xCC624         0.2998       3.3999  0x30D3C   gbr_fuel_73B0,FFFF7414,dtc_maturation_counter_67EC
+0xAD82C   uint16   0xCC624            1.0      12.1094  0x30D78   FFFF844F,transient_state_flag
+0xAD810   uint16   0xCC624            1.0      12.1094  0x30E2C   ect_current,FFFF844F,FFFF641C
+0xAD7F4   uint16   0xCC624            1.0      12.1094  0x30E30   ect_current,FFFF844F,FFFF641C
+0xACDA4   uint16   0xCC664           1.25       2.2002  0x3119E   FFFF7444,gbr_fuel_73E0,ect_gated_c
+0xACDB8   uint16   0xCC664            0.0         2.75  0x311A6   FFFF7444,gbr_fuel_73E0,ect_gated_c
+0xAC430   uint8    0xCC664            0.0          0.0  0x31240   gbr_fuel_73B0,FFFF7414,FFFF7444
+0xACDF4   uint16   0xCC664            0.0          0.0  0x31610   cl_inhibit,cl_master_readiness,cl_inhibit_sensor_flag
+0xACE00   uint16   0xCC664            0.0          0.0  0x31878   ol_enrichment_accum,o2_sensor2_output,sched_status_R1
+0xAD054   uint16   0xCC664            0.0      29000.0  0x34ECE   ect_gated_c,clol_mode_flag,cl_strict_readiness
+0xAC620   uint8    0xCC624            0.0       0.3008  0x36B5E   ol_hyst_struct_base,ol_delay_step,diag_precondition_flag_65C0
+0xAD420   uint16   0xCC624         1300.0       2300.0  0x3C864   FFFF7D2C,gbr_tim_7D28,FFFF7D12
+0xADAAC   uint8    0xD2F8C          -20.0      20.0781  0x3EE90   FFFF7ED0,gbr_tim_7EEC,rpm_current
+0xAE46C   uint8    0xD2F8C            0.0      20.0391  0x41716   FFFF801C,flkc_fg_limit_FR15,FFFF81EC
+0xAE450   uint8    0xD2F8C            0.0       4.9219  0x4171A   FFFF801C,flkc_fg_limit_FR15,FFFF81EC
+0xADE08   uint8    0xD2F8C       -24.9609          0.0  0x41C9E   task37_prev_tier_latch,FFFF3204,gbr_kflk_8020
+0xADF34   uint8    0xD2F8C         0.2969          1.0  0x429E0   FFFF8084,ect_current,ign_output_workspace
+0xADF48   uint8    0xD2F8C         0.2969          1.0  0x429E6   FFFF8084,ect_current,ign_output_workspace
+0xAE8A0   uint16   0xD67C8        17.9993      35.0006  0x4FDA4   FFFF85D0,FFFF87C8,FFFF87CC
+0xAEA30   uint16   0xD67C8         2.9999      14.5004  0x5012E   timing_correction_A,FFFF8A9D,FFFF886C
+0xAEA44   uint16   0xD67C8         2.9999      14.5004  0x50130   timing_correction_A,FFFF8A9D,FFFF886C
+0xAEA58   uint16   0xD67C8         2.9007      13.0005  0x50170   timing_correction_A,FFFF8A9D,ect_current
+0xAEA6C   uint16   0xD67C8         2.9007      13.0005  0x50180   timing_correction_A,FFFF8A9D,ect_current
+0xAE9CC   uint16   0xD67C8         2.6398      16.9998  0x5019C   timing_correction_A,FFFF8A9D,ect_current
+0xAE9E0   uint16   0xD67C8         2.6398      16.9998  0x501AC   timing_correction_A,FFFF8A9D,FFFF886C
+0xAEA08   uint16   0xD67C8         2.4994      13.0005  0x501C8   timing_correction_A,FFFF8A9D,FFFF886C
+0xAEA1C   uint16   0xD67C8         2.4994      13.0005  0x501D8   timing_correction_A,FFFF8A9D,FFFF886C
+0xAEB34   uint16   0xD67C8          700.0       1700.0  0x510CA   FFFF8994
+0xAEB5C   uint16   0xD67C8          700.0       1700.0  0x510EC   FFFF8994
+0xAEB84   uint16   0xD67C8          700.0       1350.0  0x51124   FFFF8994
+0xAEB98   uint16   0xD67C8          700.0       1350.0  0x51130   FFFF8994
+0xAEBAC   uint16   0xD67C8          700.0       1700.0  0x51152   FFFF8994
+0xAEBC0   uint16   0xD67C8          700.0       1700.0  0x5115E   FFFF8994
+0xAEAF8   uint16   0xD67C8         0.1999       0.3006  0x5117E   FFFF8994
+0xAEB0C   uint16   0xD67C8         2.4994       3.9993  0x51188   FFFF8994
+0xAEFC0   float32  0xD67C8            0.0        180.0  0x53706   FFFF8A88,diag_precondition_flag_65C0,gbr_sens_8A84
+0xAEFCC   float32  0xD67C8          250.0        400.0  0x5373A   gbr_sens_8A84,diag_precondition_flag_65C0,FFFF5E5C
+0xAECB0   uint16   0xD67C8         0.5493       7.4997  0x537E4   FFFF8ABC
+0xAECD8   uint16   0xD67C8         0.0046       0.0076  0x537EE   FFFF8ABC
+0xAECEC   uint16   0xD67C8            0.0          0.0  0x53814   FFFF5E92
+0xAEFD8   float32  0xD67C8            0.0          0.3  0x53846   FFFF8A98,FFFF5E92,diag_precondition_flag_65C0
+0xAECC4   uint16   0xD67C8         1.4999      10.0006  0x538D0   FFFF8A98,FFFF5E92,diag_precondition_flag_65C0
+0xAECF8   uint16   0xD67C8            0.0       0.5005  0x53A8C   FFFF8AE0,gbr_sens_8AC0,fuel_mode_flags
+0xAED20   uint16   0xD67C8            0.0       2.4002  0x53C6A   FFFF8AEC,ect_current,FFFF8AF4
+0xAED34   uint16   0xD67C8           0.96         0.99  0x53CB4   FFFF8AEC,ect_current,FFFF90BE
+0xAED5C   uint16   0xD67C8         2.4994       8.0002  0x53D1A   FFFF8AEC,ect_current,FFFF8AF4
+0xAED48   uint16   0xD67C8         2.4994      19.9997  0x53D24   FFFF8AEC,ect_current,FFFF8AF4
+0xAED98   uint16   0xD67C8         2.4994       8.0002  0x53D2C   FFFF8AEC,ect_current,FFFF8AF4
+0xAED84   uint16   0xD67C8         1.7502       7.4997  0x53D32   ect_current,FFFF8AF4,FFFF8AEC
+0xAED70   uint16   0xD67C8         1.7502      11.9995  0x53D3C   ect_current,FFFF8AF4,FFFF90BE
+0xAEDAC   uint16   0xD67C8         1.7502       7.4997  0x53D46   ect_current,FFFF8AF4,FFFF90BE
+0xAEDE0   uint16   0xD67C8           0.97         0.99  0x53DEE   FFFF8AF4,ect_current,FFFF90BE
+0xAEDCC   uint16   0xD67C8           0.99        0.992  0x53DF2   FFFF8AF4,ect_current,FFFF90BE
+0xAEE08   uint16   0xD67C8           0.98         0.99  0x53E66   FFFF8AF4,ect_current,ect_gated_c
+0xAEED0   uint16   0xD67C8         2.1194       6.1996  0x55830   FFFF8C4C,FFFF69E4,gbr_tim_8C20
+0xAEEF8   uint16   0xD67C8            0.0          0.0  0x55E92   FFFF8C8C,FFFF8CA8,engine_state_extended
+0xAE8C8   uint16   0xD67C8         2.6398      16.9998  0x63E3E   
+0xAEA94   uint16   0xD67C8         2.9007      13.0005  0x63E42   
+0xAEBE8   uint16   0xD67C8          700.0       1500.0  0x9F180   comms_state_byte,cl_inhibit_sensor_flag,ect_current
+0xAE8DC   uint16   0xD67C8         2.6398      13.0005  (indirect) 
+0xAE8F0   uint16   0xD67C8         2.6001      11.9003  (indirect) 
+0xAE904   uint16   0xD67C8         2.9999      19.0002  (indirect) 
+0xAE918   uint16   0xD67C8         2.9999      19.0002  (indirect) 
+0xAE92C   uint16   0xD67C8         2.9999      14.5004  (indirect) 
+0xAE940   uint16   0xD67C8         2.4994      13.0005  (indirect) 
+0xAE954   uint16   0xD67C8         2.4994      13.0005  (indirect) 
+0xAE968   uint16   0xD67C8         2.4994      11.9003  (indirect) 
+0xAE97C   uint16   0xD67C8         2.9007      13.9999  (indirect) 
+0xAE990   uint16   0xD67C8         2.9007      13.9999  (indirect) 
+0xAE9A4   uint16   0xD67C8         2.9007      13.0005  (indirect) 
+0xAE9B8   uint16   0xD67C8         2.6398      16.9998  (indirect) 
+0xAE9F4   uint16   0xD67C8         2.4994      13.0005  (indirect) 
+0xAEA80   uint16   0xD67C8         2.4994      11.9003  (indirect) 
+0xAEAA8   uint16   0xD67C8         2.6001      11.9003  (indirect) 
+0xAEABC   uint16   0xD67C8         2.9999      14.5004  (indirect) 
+
+FLAT / inert (66):
+   0xAC2BC(0) 0xAC324(0) 0xAC3B8(0.8984) 0xAC3CC(1) 0xAC3E0(0) 0xAC41C(1) 0xAC43C(1) 0xAC45C(1) 0xAC470(1) 
+   0xAC484(1) 0xAC648(0) 0xAC65C(0) 0xAC670(0) 0xAC684(0) 0xAC6C0(0) 0xAC6E8(0) 0xAC774(1) 0xAC804(500) 
+   0xAC8C4(0) 0xAC9B8(0) 0xAC9CC(0) 0xAC9F4(0) 0xACA1C(0) 0xACA30(0) 0xACA58(0) 0xACA8C(0) 0xACAB4(0) 
+   0xACAC8(0) 0xACADC(0) 0xACB04(0) 0xACB18(0) 0xACB2C(0) 0xACC1C(1) 0xACC30(1) 0xACC44(1) 0xACC58(1) 
+   0xACD48(0) 0xACD54(0.005) 0xACD68(0.045) 0xACDCC(0.605) 0xACDE0(1.21) 0xACE40(0.7) 0xACE80(0) 0xACEA0(0.2) 
+   0xACEC8(0) 0xACEFC(0) 0xACF08(0) 0xAD258(1) 0xAD35C(0) 0xAD3B8(0) 0xAD470(0) 0xAD4A0(0) 0xAD4C4(0) 
+   0xADA98(-20) 0xADB9C(16.9141) 0xAE4A4(0) 0xAE88C(0) 0xAEAE4(0.1007) 0xAEC38(1000) 0xAEC88(1.1002) 
+   0xAEC9C(1.1002) 0xAED0C(0) 0xAEDF4(0.99) 0xAEEA8(1000) 0xAEEBC(50) 0xAF130(0) 
+
+CAUTIONS
+--------------------------------------------------------------------------------
+* No table in this file is NAMED. Consumer RAM labels are themselves partly
+  project guesses.
+* FLAT is not permission to populate. `0xAD258` and `0xD2D48` are flat AND feed
+  multipliers separately clamped to zero.
+* 66 of 157 being inert is itself a result: most of the coolant-indexed surface
+  in this ROM is switched off as shipped.

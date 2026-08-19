@@ -5118,3 +5118,92 @@ why it is **not named here**. `0xFFFF7F48` and `0xFFFF7E90` are unidentified.
 ### Status
 
 Recorded. No ROM bytes changed, no XML edited, **no table named**.
+
+---
+
+## 87. Item 86's join was wrong (147/947, not 308/786) — and slice 2: 157 unnamed COOLANT-indexed tables — **CORRECTS ITEM 86, 2026-08-19**
+
+Full slice: `disassembly/analysis/unnamed_tables_coolant_axis.txt` (27/27
+instruction lines verify).
+
+### The correction
+
+Item 86 counted a descriptor as "defined" if its **data OR an axis** pointer was
+claimed. Sharing an axis with a named table says nothing about whether *that*
+table is named. The correct test is the **data pointer alone**:
+
+```
+join on data OR axis (item 86, WRONG) :  308 named /  786 unnamed
+join on DATA pointer only (correct)   :  147 named /  947 unnamed
+```
+
+Slice 1's 41-row RPM × load content is unaffected — every row was unnamed under
+either rule — but item 86's framing numbers are superseded. **947, not 786.**
+
+The signal item 86 was throwing away is the useful one: **158 unnamed tables
+share an axis array with a named table, 157 of them the "Coolant Temperature"
+axis.** That is ground-truth axis identity from the XML, not a breakpoint guess —
+and it is a far better slice criterion than the heuristic classifier, which would
+have mislabelled the 4–80 g/s mass-airflow ladder as a temperature axis.
+
+### The coolant axis
+
+Four distinct arrays, all holding the **identical** 16-point ladder, −40…+110 °C
+in 10° steps (−40…+230 °F): `0xD67C8` (67 users), `0xCC624` (57), `0xCC664` (24),
+`0xD2F8C` (9). One ladder, four copies, one per consuming subsystem.
+
+### Result
+
+**157 unnamed coolant-indexed tables. 66 are FLAT** — inert as shipped. That is
+42%: most of the coolant-indexed surface in this ROM is switched off.
+
+* `0x50000`–`0x55000` (37 populated) — **OBD diagnostics, not levers.** Call
+  sites touch `gbr_sens_8A84`, `gbr_sens_8AC0`, `diag_precondition_flag_65C0`;
+  payloads are rationality-shaped (0.96–0.99 ratio bands, a 250–400 band, a
+  0–180 ramp).
+* `0x2F000`–`0x31000` (25 populated) — the **fuel region**, where the
+  tuning-relevant material is.
+
+### The find: eight undefined coolant fractions in the transient fuel path
+
+Two 2×2 families, all 1-D uint16 ×16 on the coolant axis, all fractions just
+under unity, **none defined in any XML**:
+
+```
+0xAC840  0.8500..0.9400     0xAC818  0.9000..0.9600
+0xAC890  0.8750..0.9000     0xAC868  0.9000..0.9600
+0xAC854  0.8500..0.9400     0xAC82C  0.9000..0.9600
+0xAC8A4  0.8750..0.9000     0xAC87C  0.9000..0.9600
+```
+
+```
+02F03C: D230  mov.l @(0x02F100),r2   ; FFFF6354  coolant
+02F040: D617  mov.l @(0x02F0A0),r6   ; FFFF3158
+02F044: D22F  mov.l @(0x02F104),r2   ; FFFF90C1
+02F04A: 8B65  bf 0x02F118            ; [FFFF90C1] != 0 -> elsewhere
+02F04E: 8F12  bf/s 0x02F076          ; [FFFF3158] != 0 -> second pair
+02F050: C465    mov.b @(101,gbr),r0
+02F058: 8B06  bf 0x02F068            ; gbr+101 == 1 ? 0xAC840 : 0xAC890
+```
+
+then `r14 = 0xFFFF72D0`. The second family at `0x2F126`–`0x2F158` is the same
+shape into the same workspace.
+
+**Shape argument only, and it is flagged as such in the slice file.** The region
+touches `transient_state_flag` and `FFFF7328`/`732C`/`7330`/`7334`, and
+`0x02F550` nearby is the known transient-knock-inhibit writer. A coolant-indexed
+fraction slightly under 1.0, selected 2×2, feeding a transient workspace has the
+shape of a wall-wetting / X-factor term — which would bear directly on the cusp
+tip-in conclusion that the stab-lean is wall-wetting rather than deliverable
+fuel. `0xFFFF72D0`, `0xFFFF72C8`, `0xFFFF3158` and `gbr+101` are all
+unidentified. **Nothing is named.** Settling it means decoding `0x02F162` onward.
+
+### Also worth a look (populated, fuel region, undefined)
+
+`0xACD7C`/`0xACD90` (1.25–2.20, 0–2.75) and `0xACDA4`/`0xACDB8` sit on
+`base_fuel_map_output`. `0xAD7F4`/`0xAD810`/`0xAD82C` span **1.00–12.11** — a 12×
+authority for a coolant term.
+
+### Status
+
+Recorded. No ROM bytes changed, no XML edited, no table named.

@@ -84,11 +84,16 @@ These exist because confident-but-wrong answers have been produced here before.
 ### Open work
 
 **[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist. Items 1-6
-all closed (2026-08-18/19). **Item 7 is the successor programme: 786 of 1,094
+all closed (2026-08-18/19). **Item 7 is the successor programme: 947 of 1,094
 ROM-decoded table descriptors have no definition anywhere.** Each is a proven
 table — geometry, type, scale, axes and data all known from bytes; only the
-meaning is missing. Slice 1 (the 41 on RPM × load) is done; see corrections
-item 86. Read it before
+meaning is missing. Slices 1 (41 on RPM × load) and 2 (157 on the coolant axis)
+are done; see corrections items 86 and **87**, which corrects 86's join.
+
+> **Join on the DATA pointer only.** Definitions point at data, never at
+> descriptor records. Counting a table as named because its *axis* is claimed
+> undercounts by 161 — and throws away the best signal in the programme: 158
+> unnamed tables share an axis with a named one, so their axis identity is free. Read it before
 picking up anything, and update it when you close one.
 
 > **Item 4's stated next move was wrong for a year-old reason worth carrying:**
