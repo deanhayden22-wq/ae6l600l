@@ -52,9 +52,10 @@ These exist because confident-but-wrong answers have been produced here before.
    .\scripts\check.ps1
    ```
 
-   Current baseline: **99.87% of 22,487 lines match; 0 known errors**
-   (`disassembly/verification_report_v2.txt`). The 29 remaining mismatches are
-   28 deliberate symbolic labels plus one self-correcting reasoning passage.
+   Current baseline: **99.87% of 23,165 lines match; 0 known errors**
+   (`disassembly/verification_report_v2.txt`, 2026-08-19). The 29 remaining
+   mismatches are 28 deliberate symbolic labels plus one self-correcting
+   reasoning passage — that count has not moved as the corpus grew.
    Keep it that way — re-run the verifier after editing any analysis file.
    Do **not** use `scripts/verify_disassembly.py` — it is deprecated and was
    structurally blind to every bug class actually present here.
@@ -82,6 +83,10 @@ These exist because confident-but-wrong answers have been produced here before.
    A mnemonic-only comparison passes all of them.
 
 ### Open work
+
+**[`docs/analysis-plan.md`](docs/analysis-plan.md)** is the game plan — measured
+hit rates, the triage-before-decode sequence, and the standing rules that each
+cost something to learn. Read it before starting a new line of analysis.
 
 **[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist. Items 1-6
 all closed (2026-08-18/19). **Item 7 is the successor programme: 947 of 1,094
@@ -227,22 +232,21 @@ block and every RAM variable carries exactly one flag in
 | `CONFLICT` | **Stop.** Two independent sides disagree. Settle it from ROM bytes, record it in `docs/corrections.md`, then continue. |
 | `DEFS-ONLY` / `DISASM-ONLY` / `UNMAPPED` | No cross-check exists. Say so in whatever you write (rule 6 above). |
 
-Current state, regenerated 2026-08-18 (4,720 entities): **360 VERIFIED-BOTH,
-266 VERIFIED-BYTES, 2 CONFLICT, 52 BOUNDS-SUSPECT, 6 DEFS-ONLY, 956
+Current state, regenerated 2026-08-19 (4,720 entities): **363 VERIFIED-BOTH,
+266 VERIFIED-BYTES, 0 CONFLICT, 52 BOUNDS-SUSPECT, 6 DEFS-ONLY, 955
 DISASM-ONLY, 3,078 UNMAPPED**, and **79.4% of data-classified ROM bytes are
 claimed by neither side.** Only ~13% is verified at all. Most of this ROM is
 not verified. Treat an unflagged or `UNMAPPED` area as unknown, not as safe.
 
-> The totals moved on 2026-08-16 (was 4,725 / 351 / 293 / 53 / 21) because the
-> descriptor census itself changed — see the note below. Fewer VERIFIED-BOTH is
-> not a regression in knowledge; the corrected extents changed which definition
-> tables corroborate which descriptors.
+**Both CONFLICTs are now 0** — `0xC0BCC` and `0xD6214` were definition-XML
+storagetype errors where the ROM code was right, fixed in the XMLs and pushed to
+ECUFlash on 2026-08-19 (`docs/corrections.md` item 85). `0xC0BCC` now reads
+**1.70**, not the 1.00 the editor used to display, so any older reasoning that
+used "boost disable during fuel cut = 1.00 load" used a wrong number.
 
-The 2 CONFLICTs are `0xC0BCC` and `0xD6214`, both **definition-XML storagetype**
-errors where the ROM code is right — settled from bytes in `docs/corrections.md`
-item 51. `0xC0BCC` reads **1.7** as a float while the editor displays 1.00, so
-any reasoning that used "boost disable during fuel cut = 1.00 load" used a wrong
-number. Fixing them means editing in the ECUFlash UI, not the repo copy.
+> The 3,078 `UNMAPPED` entities are **all RAM addresses**, not tables. Do not
+> quote that figure as the table gap — for tables the number is 947 of 1,094
+> descriptors (item 87).
 
 > A flag of `VERIFIED-BOTH` covers the *definition vs. ROM-code* cross-check.
 > It does **not** mean the table's NAME is right. `0xD39A8` was a well-formed
@@ -338,6 +342,40 @@ after label-based reasoning had failed on all of them:
    `0.0` on both branches.
 3. **Decode the consumer.** A claim that survives only because nobody decoded the
    consuming function is not verified, however many artifacts repeat it.
+
+## How much of this ROM is actually known (measured 2026-08-19)
+
+Quote these rather than re-deriving them, and do not confuse the layers.
+
+```
+image        1,048,576 bytes
+  code         444,928   42.4%      <- Ghidra decodes essentially all of it, given SH-2A
+  float_data   395,776   37.7%
+  rom_hole     194,560   18.6%      (0xFF, empty)
+  mixed/uint8   13,312    1.2%
+```
+
+| layer | figure |
+|---|---|
+| code **decoded** in Ghidra | ~100% of 444,928 bytes — automatic, means nothing on its own |
+| code **traced and byte-verified** by this project | 18,099 distinct instruction addresses = **36,198 bytes = 8.1% of code, 3.5% of the image** |
+| labelled addresses | 1,560 ROM + 915 RAM |
+| table descriptors decoded from bytes | 1,094 |
+| …**named** by a definition | **147** |
+| …**unnamed** | **947** (open-holes #7) |
+| data bytes claimed by neither defs nor disassembly | **255,192 of 321,468 = 79.4%** |
+| entities `VERIFIED-BOTH` | 363 of 4,720 = 7.7% |
+
+**Fully disassembled, barely analysed.** The verified 8% is concentrated in the
+subsystems that get tuned — knock, fuelling, CL/OL, the scheduler — which is the
+right concentration, but most of this ROM has never been read by anyone here.
+
+> ⚠ **`disassembly/maps/disassembly.txt` is NOT a coverage listing.** It is the
+> old **FPU-blind** Ghidra export, it carries its own warning banner, and it
+> describes **rev 20.2**, not the current rev. Its header records that 994 of
+> 3,042 code blocks terminate at the byte before an FPU word. Never cite it as
+> evidence of what is or is not decoded; decode the bytes with
+> `scripts/sh2e_disasm.py` instead.
 
 ## Table data vs. code
 

@@ -86,12 +86,29 @@ In log column terms (see [logs.md](logs.md)):
 
 The Pull3DFloat descriptors used by the knock pipeline:
 
+> **The detection threshold is RAM, not a table** — `docs/corrections.md` item
+> 82, full trace `disassembly/analysis/knock_threshold_trace.txt`:
+>
+> ```
+> threshold_A = clamp( baseline + K * deviation,          50.0,  359.0 )  -> 0xFFFF8154
+> threshold_B = clamp( baseline + K * 1000.0 * deviation, 50.0, 1000.0 )  -> 0xFFFF8158
+> ```
+>
+> `K` is `0xAE6D4` and is **dimensionless** — it multiplies a tracked deviation,
+> so it is a sigma count, not knock-signal units. `baseline` (`0xFFFF8148`) and
+> `deviation` (`0xFFFF8150`) are per-cylinder tracked statistics. **Lower K =
+> more sensitive detection.** `r9` in the detector is the literal `0xFFFF8158`,
+> not a stack frame — reading it as one is what kept this open for a year.
+>
+> **None of the twelve knock-detection calibrations has an `address=` entry in
+> the project XML.** The whole detection front-end is invisible to ECUFlash.
+
 | Descriptor | Used in | Purpose |
 |---|---|---|
 | 0x000AE284 | knock_detector | **1-D curve on the KNOCK SIGNAL** (`0xFFFF4304`, clamped >=0), 65 pt float32, data 0..304. **NOT an RPM/load or RPM/IAT threshold** — corrected 2026-08-16, corrections.md items 49/59 |
 | 0x000AE290 | knock_detector | 1-D on RPM 800..8000, data 8,10,10,10,10,10,12,13,10,10 |
-| 0x0AE6D4/6E8/6FC/710 | knock_detector | **the threshold-shaped lookup**: per-cylinder 18 RPM x 2 LOAD, data 3.60 -> 3.45. The two load planes are BYTE-IDENTICAL, so the load axis is exactly flat (item 59) |
-| 0x0AE724/738/74C/760 | knock_detector | per-cylinder 2x2 RPM x LOAD, 1000.0 everywhere (ceiling) |
+| 0x0AE6D4/6E8/6FC/710 | knock_detector | **the SIGMA MULTIPLIER `K`** — dimensionless, per-cylinder 18 RPM x 2 LOAD, data 3.60 -> 3.45. **NOT the threshold** (corrected 2026-08-19, item 82). The two load planes are BYTE-IDENTICAL, so the load axis is exactly flat |
+| 0x0AE724/738/74C/760 | knock_detector | per-cylinder 2x2 RPM x LOAD, 1000.0 everywhere. Multiplies `K` for **threshold B only** |
 | 0x0AE29C/2A8/2B4/2C0 | knock_detector | per-cylinder 1-D RPM, 16.0 everywhere |
 | 0x000AE0F8 | task12_knock_post | per-cycle retard amount lookup 1 |
 | 0x000AE00C | task12_knock_post | per-cycle retard amount lookup 2 |

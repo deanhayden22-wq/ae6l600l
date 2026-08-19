@@ -5,6 +5,21 @@ storage layout, see [cruise-tables.md](cruise-tables.md).
 
 ## The five tables
 
+> **Added 2026-08-19 — two undefined mechanisms in this area.**
+>
+> * **A two-stage thermal-lag model with a 930.0 trip** —
+>   `disassembly/analysis/thermal_lag_model_trace.txt`, item 89. Descriptors
+>   `0xAD960`/`97C`/`998`/`9B4`/`9D0` are not five maps but one model: a
+>   load × RPM base quantity × a knock-derived uplift, through two cascaded lag
+>   filters with separate rise/fall coefficients. Consistent with an
+>   exhaust/catalyst temperature model driving OL enrichment for component
+>   protection — **not named**; tracing `byte[0xFFFF79FC]` would settle it.
+> * **`0xFFFF77D8` has no writer anywhere in the ROM** —
+>   `disassembly/analysis/ffff77d8_trace.txt`, item 83. It and `0xFFFF77DC` feed
+>   `[0xFFFF7BAC] = clamp(1/(1+A+B) − 1, 0, 0.03)`. With `77D8` stuck at 0 the
+>   trim is driven entirely by the CL Fueling Target Comp tables and **saturates
+>   at the +3% cap in 56 of 532 cells** — editing those cells does nothing.
+
 In the project XML category "Fueling - CL/OL Transition":
 
 | Table | Address |

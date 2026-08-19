@@ -21,6 +21,11 @@ before making a decision.
 
 **Workflow**
 
+- [analysis-plan.md](analysis-plan.md) — the ROM-analysis game plan.
+  Where coverage actually stands, the measured hit rate from the first two
+  triage slices, the triage-before-decode sequence, and the standing rules.
+  **Read before starting a new line of analysis.**
+- [open-holes.md](open-holes.md) — the live worklist.
 - [workflow.md](workflow.md) — the drive→log→ingest→diff→propose→flash
   iteration loop. Read this before running any analysis script.
 

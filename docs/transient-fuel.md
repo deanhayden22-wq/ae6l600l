@@ -5,6 +5,16 @@ Captured 2026-05-04. Full disassembly in
 `disassembly/analysis/tau_alpha_analysis.txt` (437 lines). This page is
 the navigation layer + tuning-relevant summary.
 
+> **Added 2026-08-19 — a staged decay bank in this workspace, and it is INERT at
+> operating temperature.** `disassembly/analysis/coolant_decay_bank_trace.txt`,
+> corrections item 88. Function `0x02EFD2` (GBR `0xFFFF726C`, two bytes below the
+> transient-knock-inhibit flag `0xFFFF726E`) decays an accumulator by a
+> coolant-indexed rate with four staged latch-off thresholds. **All eight rate
+> curves are a flat 0.900 above 40 °C**, so the coolant axis does nothing in the
+> 80–100 °C regime the car runs in. It was briefly suspected of being a
+> wall-wetting / X-factor term bearing on the cusp stab-lean — **that is
+> retired**. None of the eight is defined in any XML.
+
 ## What's transient fueling for
 
 Two physical effects need transient correction:

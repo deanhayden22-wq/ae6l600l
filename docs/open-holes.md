@@ -7,6 +7,10 @@ Reference bin for every address below: `rom/AE5L600L 20g rev 20.19c.bin`,
 md5 `92cae8275cd4f9b473a3a9e36efe6449`. **Verify the md5 first** — Dean rebuilds
 bins in place and a filename-matched changeset has lied before.
 
+**Method and priorities: [`analysis-plan.md`](analysis-plan.md).** It carries the
+measured hit rates (≈40% of unnamed tables are flat, ≈25% diagnostic), the
+triage-before-decode sequence, and the standing rules.
+
 House rules still apply: ROM bytes outrank every artifact; cite `file:line` for
 derived claims and `address: bytes -> mnemonic` for binary ones; say plainly when
 something is unverified. Read the **Tools** section of `CLAUDE.md` before writing
