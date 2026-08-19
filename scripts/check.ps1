@@ -13,7 +13,14 @@
        and .json are stale relative to the definitions, the ROM and the
        disassembly corpus. Regenerate with: python scripts/coverage_map.py
 
-    3. check_label_sync.py -- REPORT ONLY, never fails the run. Lists addresses
+    3. doc_coherence.py -- REPORT ONLY. Flags any doc that mentions an address a
+       corrections.md item re-settled AFTER that doc was last committed. This is
+       the answer to "there is always a stale file we overlooked": saying it
+       does not catch them, this does. A flag is a question, not a verdict --
+       check the file, and if it is already right, touch it in the same commit
+       as the correction so the dates align.
+
+    4. check_label_sync.py -- REPORT ONLY, never fails the run. Lists addresses
        that docs/corrections.md discusses but ImportAE5L600L.java never labels,
        so findings do not stay stranded in prose. Many addresses are cited in
        passing and deserve no label; this exists so the choice is deliberate.
@@ -46,6 +53,9 @@ try {
         Write-Host "    python scripts/coverage_map.py"
         exit $registry
     }
+
+    Write-Host "`n== doc coherence (report only) ==" -ForegroundColor Cyan
+    python scripts/doc_coherence.py | Select-Object -Last 40
 
     Write-Host "`n== prose -> Ghidra label sync (report only) ==" -ForegroundColor Cyan
     python scripts/check_label_sync.py | Select-Object -Last 3

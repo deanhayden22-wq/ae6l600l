@@ -347,6 +347,7 @@ wrong answer. Import them; do not re-derive.
 | tool | use it for |
 |---|---|
 | `scripts/desc_types.py` | **The** typecode map, plus `read_table()` / `scaling()` / `typecode()` / `is_2d()`. Single source of truth. Never re-declare the map — it was copy-pasted into five scripts and all five carried a guess. |
+| `scripts/doc_coherence.py` | **The stale-file check.** Flags any doc that mentions an address a `corrections.md` item re-settled AFTER that doc was last committed. Runs inside `check.ps1`. Its first real run found `docs/open-issues.md` still asserting the RPM×IAT knock threshold that item 49 retracted in June. |
 | `scripts/mapping/label_provenance.py` | Classify every Ghidra label `[TRACED]` / `[CITED]` / `[UNVERIFIED]` and stamp the class into its comment. Idempotent — re-run after new analysis and classes upgrade automatically. **Run it after any labelling work.** |
 | `scripts/mapping/table_triage.py` | Triage every ROM descriptor no definition names: geometry, cell type, scale, data range, flat?, axis names where an axis is shared with a defined table, consumers, RAM context, subsystem hint. `--live` drops flat and diagnostic. **947 unnamed → 73 worth looking at.** Built 2026-08-19; see `docs/analysis-plan.md`. |
 | `scripts/mapping/find_writers.py` | Find every WRITE to a RAM address. Handles direct, displacement, indexed `@(r0,Rn)` and GBR-relative forms, and tracks `r0` through `add`/`extu`. |

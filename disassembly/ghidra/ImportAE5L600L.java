@@ -104,6 +104,28 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000AD090, "AFL_RampRate_Desc",
             "[TRACED] RENAMED 2026-08-19 (item 93). Descriptor for data 0x0CE5A4, which the project XML names \"AFL Ramp Rate (CL to OL Transition Speed)\". 1-D uint16 x9 on the Engine Speed axis 0x0CE580 (0..8000 RPM). \"OL_Enrich_RampRate_Desc\" was a misnomer -- this is the AFL (long-term trim) ramp rate, not an OL enrichment rate. The geometry in \"desc_1D_RPM_wide_u16_9\" was correct.");
 
+        // -- items 94/95: MAP rationality monitor, and the thermal trip's consumer ---
+        count += labelComment(0x00024EE8, "fn_24EE8_map_rationality_monitor",
+            "[TRACED] GBR = 0xFFFF68A4. Builds an expected manifold pressure from RPM [FFFF6624] x "
+            + "THROTTLE [FFFF62DC] via desc 0xAB03C plus an RPM term via desc 0xAAF84, and "
+            + "compares it against actual MAP [FFFF620C]. Enable gate: ECT > -30.0 [0x0C34F0], "
+            + "1000 [0x0C34F4] < RPM < 6500 [0x0C34F8], throttle above the 0xAAF84 threshold, "
+            + "precondition byte clear. OBD-II rationality monitor -- DIAGNOSTIC, not a "
+            + "control path. corrections.md item 94.");
+        count += labelComment(0x000AB03C, "desc_map_expected_pressure",
+            "[TRACED] 2-D uint8, 31 THROTTLE-ANGLE rows x 15 RPM cols, 0..100, scale 0.39215684. The "
+            + "expected-manifold-pressure term of the monitor at 0x024EE8. NOT a boost lever: "
+            + "the triage's RAM signature called it boost/MAP and was WRONG, the GBR signal "
+            + "called it ADC/IO and was right (item 94). Not in any XML.");
+        count += labelComment(0x000AAF84, "desc_map_monitor_throttle_gate",
+            "[TRACED] 1-D uint16 x15 on RPM 800..6400, data 13.64..57.30. Minimum-throttle enable "
+            + "threshold for 0x024EE8. Its units match desc 0xAB03C's 31-value row axis, which "
+            + "is what identifies that axis as throttle angle. Not in any XML.");
+        count += labelComment(0xFFFF79F0L, "thermal_trip_maturation_counter",
+            "[TRACED] word[gbr+76] of fn 0x03644E. Incremented via 0x0BE554 while byte[FFFF79FC] == 1, "
+            + "tested against word[0x0CBC5A] = 200 and word[0x0CBC64] = 0. Fault maturation "
+            + "(item 95). Also loaded at 0x03603A and 0x0360D2 -- not chased.");
+
         // -- item 89: the 0xAD960 two-stage thermal-lag model ---------------------
         count += labelComment(0x0003644E, "fn_3644E_threshold_bank",
             "[TRACED] GBR = 0xFFFF79A4 (the stage-1 filtered value IS this GBR base). Bank of "
@@ -122,8 +144,11 @@ public class ImportAE5L600L extends GhidraScript {
             + "0x0457F4 against [0x0CC220]/[0x0CC21C] -- BOTH 10000.0, so that trip "
             + "(byte FFFF8253) can never fire. Calibrated off.");
         count += labelComment(0xFFFF79FCL, "thermal_model_trip_flag",
-            "[TRACED] gbr+88 of fn 0x03644E. Set when stage-1 >= 930.0. CONSUMER NOT TRACED -- "
-            + "tracing it is what would identify this whole model (item 89).");
+            "[TRACED] gbr+88 of fn 0x03644E. Set when stage-1 >= 930.0. CONSUMER TRACED "
+            + "(item 95): read at 0x0366E4 and 0x03676C ONLY, both gating an increment of "
+            + "word[gbr+76] via 0x0BE554, tested against word[0x0CBC5A]=200 and "
+            + "word[0x0CBC64]=0. It feeds a DTC MATURATION COUNTER, not enrichment. No "
+            + "fuel-path consumer exists anywhere in the image.");
         count += labelComment(0x000BEA40, "float_lag_filter",
             "[TRACED] The earlier \"float_lerp\" was right in substance -- this IS a lerp between "
             + "current and target, used as a first-order lag. "
