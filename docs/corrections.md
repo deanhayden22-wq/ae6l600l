@@ -3711,3 +3711,252 @@ output, `0xF47AB4` for `func_37B74`'s product — item 64's open question) settl
 items 62 and 64 empirically in one drive. Costs +16 bytes on the SSM stream;
 watch the cadence, `8-4 20.19c` is already a cadence-era boundary in the corpus.
 
+
+---
+
+## 71. `Intake`/`Exhaust Duty Correction A` declare X and Y backwards — the data is read with the wrong stride — **EXTENDS ITEM 28, 2026-08-17**
+
+Reference bin for every byte claim below: `rom/ae5l600l.bin`, md5
+`a8ea39d447f977e270e27ee670243c88`. Both tables are **byte-identical to stock in
+all 19 bins in `rom/`**, so nothing has been mis-edited through the bad view.
+
+### What item 28 established, and the part it did not reach
+
+Item 28 proved from code that descriptor `0x0AD620` takes axis0 (`0xCF9EC`) from
+FR14 = `0xFFFF63C4` = **mass airflow g/s**, and axis1 (`0xCFA14`) from FR15 =
+RPM — so the axis *name* "Intake VVT Error" is wrong. It then concluded:
+
+> The descriptors match the project XML's own bindings exactly (data `0xCFA38` /
+> `0xD121C`, axes `0xCF9EC` / `0xD11D0`), so the *tables* are bound correctly and
+> only the axis **labels** are wrong.
+
+The bindings are indeed right. But "only the labels" is incomplete: the axis
+**roles** are also wrong. `32BITBASE.xml:5042` types `Engine Speed` (9 elements)
+as the **X Axis** and the 10-element axis as the **Y Axis**. X is the fast
+(contiguous) axis, so anything honouring that declaration strides the 90 data
+bytes by **9** when the ROM lays them out by **10**.
+
+### VERIFIED — three independent lines, none reading a derived file
+
+**1. The descriptor convention.** Across every 3-D table where a ROM descriptor
+and both addressed axes exist, the `+4` pointer (with the `+1` count) is the
+definition's **X** axis in **61 of 63** tables, and no table fails to match a
+pointer. The two exceptions are exactly these:
+
+```
+desc 0x0AD620  00 0A 00 09 | 000CF9EC | 000CFA14 | 000CFA38
+                  ^ +1 = 10   ^ +4 = the 10-point axis   ^ data
+desc 0x0AD848  00 0A 00 09 | 000D11D0 | 000D11F8 | 000D121C
+```
+
+The `+4` pointer is the 10-point airflow axis, not the 9-point RPM axis.
+
+**2. Contiguous layout.** `0xCF9EC` (10 floats) + 40 = `0xCFA14` (9 floats)
++ 36 = `0xCFA38` (data). The fast axis is laid down first — the same rule that
+holds for the 57 other 3-D tables whose axes are contiguous.
+
+**3. The data.** Read stride-10, the *exhaust* table is **9 identical rows** — a
+pure function of airflow, flat in RPM. Read stride-9, it becomes a staircase
+that shifts one cell per row. The intake table's row roughness is **5.56**
+stride-10 vs **10.59** stride-9.
+
+### It is not a display-orientation choice
+
+A cosmetic X/Y swap would make the declared view the **transpose** of the ROM
+view. It does not: stride-9 and stride-10 agree on **2 of 90 cells**. Only the
+first cell survives. This is a different byte-to-cell mapping, not a rotated one.
+
+### The correct reading — f(mass airflow, engine speed)
+
+Display values (`Intake Duty Correction (uint8)`, `x*0.2`), 9 RPM rows x 10 g/s
+columns:
+
+```
+ RPM \ MAF g/s    4     6    10    15    20    25    30    40    60    80
+      650      11.6  10.0   6.6   6.0   5.6   5.0   5.0   5.0   5.0   5.0
+      800      12.4  10.8   7.0   6.2   5.8   5.6   5.4   5.4   5.4   5.4
+     1000      13.6  11.2   8.2   6.8   6.0   5.6   5.4   5.4   5.4   5.4
+     1200      14.6  12.2   8.8   7.2   6.4   5.8   5.4   5.4   5.4   5.4
+     1600      16.0  15.4  11.2   9.2   7.8   6.8   6.6   6.2   6.0   5.8
+     2000      18.0  16.0  12.6  10.4   9.0   8.0   7.2   6.6   6.4   6.2
+     2400      19.0  17.0  14.0  11.2  10.2   9.2   8.0   7.2   6.8   6.4
+     3000      20.0  18.0  15.6  13.4  12.4  11.0  10.0   8.8   8.0   7.6
+     3600      22.0  21.0  19.8  15.2  14.2  13.0  12.6  11.6  10.0  10.0
+```
+
+Monotone in both directions — more duty as revs rise, less as airflow rises.
+Under the declared stride-9 view the maxima instead walk one cell right per row
+(11.6, 12.4, 13.6, 14.6, 16.0, 18.0, 19.0, 20.0, 22.0), which is the signature
+of a wrong stride, not a calibration surface.
+
+### The fix — in the ECUFlash UI, not the repo
+
+The X/Y typing is inherited from `32BITBASE.xml`, so it also affects the
+unmapped `B`/`C`/`D` variants of both families. For each of the two addressed
+tables, the 10-element axis must become the **X Axis** and the 9-element
+`Engine Speed` axis the **Y Axis**:
+
+```xml
+<table name="Intake Duty Correction A" address="cfa38" scaling="Intake Duty Correction (uint8)">
+    <table name="Mass Airflow"  type="X Axis" address="cf9ec" elements="10" scaling="MassAirflow(g/s)1"/>
+    <table name="Engine Speed"  type="Y Axis" address="cfa14" elements="9"/>
+</table>
+
+<table name="Exhaust Duty Correction A" address="d121c">
+    <table name="Mass Airflow"  type="X Axis" address="d11d0" elements="10" scaling="MassAirflow(g/s)1"/>
+    <table name="Engine Speed"  type="Y Axis" address="d11f8" elements="9"/>
+</table>
+```
+
+`MassAirflow(g/s)1` is the correct existing scaling (`32BITBASE.xml:129`:
+float, `toexpr="x"`, units `Mass Airflow (g/s)`) -- do **not** invent a new
+scaling name, and do **not** use `MassAirflow(g/s)` (line 128), which is uint16
+with `x*.004577637`. The axis currently carries `VVT Error`, also `toexpr="x"`
+on a float, so the displayed breakpoints do not change -- only the name, the
+units and the role do.
+
+The axis rename is item 28's outstanding fix, folded in here because it is the
+same edit. Per items 24-26 the repo XMLs are **not** edited: make the change in
+ECUFlash and bring it back with `.\scripts\sync_defs.ps1 -Pull`.
+
+> **`sync_defs.ps1` now reports both XMLs SHA256-identical to the ECUFlash copies
+> under `C:\Program Files (x86)\OpenECU\EcuFlash\rommetadata\subaru`.** CLAUDE.md
+> still warns that the repo is ~37 tables ahead of ECUFlash and that a blind
+> `-Pull` would delete them; that warning is **stale as of 2026-08-17** and the
+> pull path is clear. Re-check before relying on it.
+
+### Open
+
+**What ECUFlash actually renders is not established here.** All three lines of
+evidence above are about ROM bytes and the XML text; none of them observes
+ECUFlash's own axis-role resolution. If the table shows column headers
+`650 … 3600`, ECUFlash strides by 9 and the displayed surface is scrambled; if
+it shows `4 … 80`, ECUFlash reads it correctly and the defect is confined to
+`scripts/defs.py` and anything downstream of it. Settle it by looking at the
+column headers before assuming which tool needs fixing.
+
+### Status
+
+Recorded here only. No XML edited, no data changed. `docs/verification-status.md`
+is unaffected — `coverage_map.py` checks geometry and width, not axis role, so
+neither table was ever flagged.
+
+---
+
+## 72. `func_37B74`'s fuel multiplier is DEAD — `A` reads a neutral-filled table and both AFL ramp rates are `0.0` — **CLOSES OPEN-HOLE 2, 2026-08-18**
+
+Open-hole 2 asked whether the product term in
+
+```
+[0xFFFF7AB4] = clamp(1.0 + A*B*C*D, 0.5, 1.5)      bypass writes exactly 1.0
+A = [0xFFFF7ABC]  B = [0xFFFF7AC0]  C = [0xFFFF7AC4]  D = [0xFFFF7AC8]
+```
+
+can ever go non-zero. Its output is read by `fuel_pw_calc` at `0x0301FC` and by
+the AFL pipeline at `0x0347D4`, so a non-zero product would be a live
+multiplicative fuel term. **It is zero. The multiplier is a constant 1.0.**
+
+Settled by decompiling the two writers in Ghidra (SH-2A re-import, 2026-08-18)
+and then verifying every constant against ROM bytes in
+`rom/AE5L600L 20g rev 20.19d.bin`.
+
+### A (`0xFFFF7ABC`) is a table read, and the table is neutral everywhere
+
+`FUN_00037d74` — the function holding the two indexed writes at `0x037DBE` /
+`0x037DC6` — does not compute `A`. It looks it up:
+
+```c
+if (afl_transient_copy == 0 && afl_engine_status_copy == 0
+    && afl_counter_1 > 1 && afl_counter_2 > 1) {
+    afl_2d_correction = table_lookup_2D(&desc_2D_BoostxLoad_u8_16x2);   // 0xAD71C
+} else {
+    afl_2d_correction = 0.0;
+}
+```
+
+Descriptor `0xAD71C` decoded with `scripts/desc_types.py` (never hand-rolled —
+see the float32 trap in CLAUDE.md): 2-D, typecode `0x04` = uint8, 16 x 2,
+scale `0.00390625`, bias `-0.5`, data at `0x0D0740`.
+
+```
+0x0D0740: 8080 8080 8080 8080 8080 8080 8080 8080
+          8080 8080 8080 8080 8080 8080 8080 8080
+```
+
+All 32 cells are raw `0x80`. `0x80 * 0.00390625 - 0.5 = 0.0`. The table is
+**deliberately neutral-filled, not empty** — raw zero would display `-0.5`.
+
+So `A` is identically `0.0` on both branches, therefore `A*B*C*D = 0`,
+therefore `[0xFFFF7AB4] = clamp(1.0, 0.5, 1.5) = 1.0` for every operating point.
+Same shape as the `0xAD258` result (item 40): live code, dead calibration.
+
+### B (`0xFFFF7AC0`) is a STEP, not a ramp — both rates are zeroed calibrations
+
+`FUN_00037e70` holds all four writers of `B` (`0x037EB0`, `0x037EC6`,
+`0x037EEE`, `0x037EF4`). The decompiler renders its two ramp arms as
+`afl_ramp_multiplier + 0.0` and `afl_ramp_multiplier - 0.0`. Those are literal
+pool loads, resolved from bytes:
+
+```
+037EB6: D22E  mov.l @(0x037F70),r2   ->  0x000CC32C   ramp-UP rate
+037EDE: D226  mov.l @(0x037F78),r2   ->  0x000CC330   ramp-DOWN rate
+
+0xCC32C: 00000000 = 0.0
+0xCC330: 00000000 = 0.0
+```
+
+`min(x + 0.0, 1.0)` and `max(x - 0.0, 0.0)` are both no-ops. `B` therefore only
+ever takes the values written directly:
+
+```
+037EAA: F59D  fldi1 fr5   ...  037EB0: F65A  fmov.s fr5,@r6    ->  1.0
+037EF0: F58D  fldi0 fr5   ...  037EF4: F65A  fmov.s fr5,@r6    ->  0.0
+```
+
+`B` in `{0.0, 1.0}`. It **can** be non-zero — `A` is what kills the product.
+Note this for any future work: even with `A` populated, `B` snaps rather than
+ramps until `0xCC32C`/`0xCC330` are set.
+
+### Three latent levers, none defined in either XML
+
+`defs.covering()` returns NONE for all of them.
+
+| what | address | current value |
+|---|---|---|
+| AFL 2-D correction data | `0x0D0740` | 32 x `0x80` -> `0.0` |
+| AFL ramp-up rate | `0x000CC32C` | `0.0` |
+| AFL ramp-down rate | `0x000CC330` | `0.0` |
+
+Same pattern as the per-gear timing comp (`0xD5454` gated by `0xD2D48` = 0.0):
+live code, zeroed calibration, no definition. Not a lever until defined and
+populated — and populating `0x0D0740` alone would revive a fuel multiplier on
+the IPW path, so it is not a casual edit.
+
+### Naming caution — `desc_2D_BoostxLoad_u8_16x2` is not supported by the ROM
+
+The descriptor's own axis arrays are placeholder index ramps:
+
+```
+y-axis @0x0D06F8 (16 floats): 0,1,2,3,...,15
+x-axis @0x0D0738 ( 2 floats): 0,1
+```
+
+No physical units, no breakpoints. "Boost x Load" is a project guess, exactly
+the `0xD39A8` failure mode of item 36. Whatever selects this surface, it is not
+established here. **Do not reason from the name.**
+
+### Incidental: `0xBE960`/`0xBE970` re-confirmed from an undecoded path
+
+```
+037F74 -> 0x000BE970   called with ceiling 1.0  (fldi1)  => float_MIN
+037F7C -> 0x000BE960   called with floor   0.0  (fldi0)  => float_MAX
+```
+
+Independent re-confirmation of the identity that was backwards across ~25 files,
+from a function nothing had previously decoded.
+
+### Status
+
+Recorded here. No XML edited, no ROM byte changed. `docs/verification-status.md`
+is unaffected — none of `0x0D0740`, `0x0CC32C`, `0x0CC330` is a defined entity,
+so `coverage_map.py` never flagged them and still will not.

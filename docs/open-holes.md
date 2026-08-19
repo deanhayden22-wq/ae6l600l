@@ -1,4 +1,4 @@
-# Open holes — current as of 2026-08-17
+# Open holes — current as of 2026-08-18
 
 Live worklist. Everything here is **scoped, reproducible, and unblocked** — each
 entry says what is known, what is not, and the concrete next move.
@@ -52,28 +52,24 @@ Re-run `reconcile_ram_labels.py` after any label change.
 
 ---
 
-## 2. Does `func_37B74`'s product term ever go non-zero?
+## 2. ~~Does `func_37B74`'s product term ever go non-zero?~~ — **CLOSED 2026-08-18**
 
-`docs/corrections.md` item 64. The function computes
+**No. The term is identically zero and the multiplier is a constant 1.0.**
+Full evidence in `docs/corrections.md` item 72.
 
-```
-[0xFFFF7AB4] = clamp(1.0 + A*B*C*D, 0.5, 1.5)      bypass writes exactly 1.0
-A = [0xFFFF7ABC]  B = [0xFFFF7AC0]  C = [0xFFFF7AC4]  D = [0xFFFF7AC8]
-```
+`A` (`0xFFFF7ABC`) is not computed — `FUN_00037d74` reads it from descriptor
+`0xAD71C`, whose 16x2 uint8 data at `0x0D0740` is 32 bytes of raw `0x80`, i.e.
+`0.0` in every cell after `scale 0.00390625 / bias -0.5`. So `A*B*C*D = 0` and
+`[0xFFFF7AB4] = clamp(1.0, 0.5, 1.5)`. `fuel_pw_calc` at `0x0301FC` reads a dead
+multiplier. Same shape as `0xAD258`.
 
-and its output is read by **`fuel_pw_calc`** at `0x0301FC` (24 bytes into the
-pulse-width calculator) and by the AFL pipeline at `0x0347D4`. So it is a live
-multiplicative fuel term — **if the product is non-zero.**
+`B` (`0xFFFF7AC0`) *can* be non-zero — it is a step function taking only `1.0`
+(`fldi1` @ `0x037EAA`) or `0.0` (`fldi0` @ `0x037EF0`), because both ramp rates
+(`0xCC32C`, `0xCC330`) are `0.0`.
 
-Known: all four inputs have real writers (`0x037DBE`, `0x037EB0`, `0x037BCC`,
-`0x037BBC`), so the product is not structurally zero. But the two comps this
-function itself contributes — `0xAC634` (RPM axis) and `0xAC648` (ECT axis) —
-are **flat zero** on this calibration.
-
-**Next move:** trace `0x037DBE` and `0x037EB0` (the writers of A and B, which
-this function does not compute itself) and decide whether either can be non-zero.
-If they cannot, the whole term collapses to 1.0 and the fuel model loses a
-multiplier — same shape as the `0xAD258` result.
+Numbering kept so existing "hole #N" references stay valid. Do not re-litigate;
+if you want to *revive* the term, corrections item 72 lists the three zeroed,
+undefined calibrations that would do it — and warns why it is not a casual edit.
 
 ---
 
@@ -209,3 +205,10 @@ float). Repo XMLs must **not** be hand-edited — ECUFlash rewrites them on save
   `0xFFFF77D8`/`0xFFFF77DC` — item 70. Hole #3 was rewritten because of it.
 * **`0xFFFF77DC` is negative in all 532 cells** of the four CL Fueling Target
   Comp tables it can be written from — item 70.
+* **`func_37B74`'s fuel multiplier is dead** — `A` reads descriptor
+  `0xAD71C`, neutral-filled `0x80` in all 32 cells, so the product is 0 and
+  `[0xFFFF7AB4]` is a constant 1.0. Both AFL ramp rates (`0xCC32C`,
+  `0xCC330`) are 0.0, so `0xFFFF7AC0` is a step, not a ramp — item 72.
+* **`desc_2D_BoostxLoad_u8_16x2` is a project guess.** Its axes are index
+  ramps `0..15` and `0..1` with no units. `0xD39A8`-class; do not reason
+  from that name.

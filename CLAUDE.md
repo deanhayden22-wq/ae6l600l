@@ -73,9 +73,9 @@ These exist because confident-but-wrong answers have been produced here before.
 
 ### Open work
 
-**[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist — six scoped,
-unblocked items, each with what is known, what is not, and the concrete next
-move. Read it before picking up anything, and update it when you close one.
+**[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist — five scoped,
+unblocked items (item 2 closed 2026-08-18), each with what is known, what is not,
+and the concrete next move. Read it before picking up anything, and update it when you close one.
 
 ### Corrections history
 
