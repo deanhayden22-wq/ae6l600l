@@ -4080,3 +4080,96 @@ hand-written summary whose ranges overlap the 256-byte blocks
 shadowed the fine-grained classification and reported the type as `Main`. The
 loader now accepts only the block types `code / float_data / mixed_data /
 uint8_data / rom_hole`, and parses 522 blocks.
+
+---
+
+## 74. `task37_timing_multiaxis` identified — a ONE-SHOT timing retard feeding the knock workspace, with three neutered gates — **NEW, 2026-08-18**
+
+Found while sweeping descriptors that no definition XML covers (the "option B"
+sweep). `task37_timing_multiaxis` at `0x000419BA` had **19 descriptors and zero
+definitions**. It is a dispatcher:
+
+```c
+void task37_timing_multiaxis(void) {
+    FUN_00041a02(); FUN_00041a48(); FUN_00041a7e(); FUN_00041be4();
+}
+```
+
+`FUN_00041be4` is the one that matters. Decompiled in Ghidra (SH-2A re-import,
+2026-08-18) with every literal resolved against ROM bytes.
+
+### The mechanism
+
+```
+GBR = 0xFFFF8020  (knock / FLKC workspace)
+
+inputs   fr12 = engine_speed_delta [0xFFFF6634]   fr13 = ect_current [0xFFFF6350]
+         fr15 = rpm_current [0xFFFF6624]          fr14 = [0xFFFF7C78]   (unlabelled)
+         r13  = byte [0xFFFF5E94]                 r11  = byte [0xFFFF7C9A] (unlabelled)
+         r14  = flag_6254 [0xFFFF6254]            r12  = [0xFFFF65C0]
+         jsr  0x00022CF4 = check_engine_running
+
+trigger  [0xFFFF8034] == 4  AND  [0xFFFF7C78] > rpm_current
+         -> 8032 = 0, 8033 = 1
+         8034 latches the PREVIOUS pass's value of 0xFFFF7C9A, so this is
+         EDGE detection: it fires on the pass AFTER 7C9A becomes 4.
+         8036 likewise latches the previous [0xFFFF65C0].
+
+apply    8033 != 0  ->  [0xFFFF8020] = table_lookup_1D(desc @0x0ADE08)
+                        ECT axis, uint8, 16 cells:
+                        [0, 0, 0, 0, 0, -8.09, -11.95, -16.17, ...]
+
+recover  8033 == 0  ->  [0xFFFF8020] = float_min([0xFFFF8020] + 0.7, 0.0)
+                        +0.7 deg per call, clamped at 0 -- never advances
+
+abort    (!running && [0xFFFF5E94] < 4) || flag_6254 == 0
+         || engine_speed_delta < -20.0 || rpm_current < 0.0
+         ->  [0xFFFF8020] = 0, both counters = 0
+
+output   [0xFFFF8028] = float_min([0xFFFF8020], [0xFFFF8024])
+```
+
+### Why this is worth knowing
+
+**It is a retard source of up to -16.17 deg that is neither FBKC nor FLKC**, and
+it writes into the knock GBR workspace. If it fires it moves total timing while
+appearing in no knock channel. Anything reading a log and attributing all
+retard to the knock channels would misread it.
+
+The `float_min([8020], [8024])` output also shows this is one of SEVERAL such
+channels arbitrated most-retard-wins. `FUN_00041be4` touches **only** `0x0ADE08`;
+the `-24.96/-15.12` and `-20.04` tables in the same descriptor array belong to
+sibling paths (`task33_timing_ws_init`, `task36_timing_percond`,
+`task41_ign_calc_b`), not to this one.
+
+### Three parts of it are neutered
+
+| element | address | value | effect |
+|---|---|---|---|
+| RPM abort threshold | `0x0D2C0C` | `0.0` | `rpm_current < 0.0` can never be true. Gate is dead. |
+| recovery multiplier | in-path | `* 1.0` | exact no-op on the `(8036==0 && [65C0]==1)` branch |
+| apply-window reload | `0x0D2980/81` | `8032=0, 8033=1` | the ECT table applies for exactly ONE call |
+
+Same shape as item 72 and the per-gear timing comp: live code, zeroed
+calibration. The only live gate is `engine_speed_delta < -20.0` at `0x0D2C08`,
+which abandons the retard during a hard speed drop.
+
+**None of `0x0D2C08`, `0x0D2C0C`, `0x0D2980`, `0x0D2981`, `0x0D2982` has an XML
+definition** (`defs.covering()` returns NONE for all five).
+
+### Descriptor array layout
+
+The 17 records from `0x0ADE08` are contiguous at the 1-D record stride of
+`0x14`: `ADE08, ADE1C, ADE30, ADE44 ... ADF48`. Only `0x0ADE08` is loaded by
+literal anywhere in `0x419BA-0x41D40`; `0x0AE170`/`0x0AE17C` (both all-zero) are
+used by `FUN_00041a7e`. Contiguity makes an indexed array plausible but the code
+does NOT demonstrate indexing -- at `0x41C9E` the base is passed straight to
+`table_desc_1d_float` as a plain single lookup. **Do not assume the other 16 are
+selected by index from here.**
+
+### Open
+
+`0xFFFF7C9A` (the trigger byte -- what makes it 4?) and `0xFFFF7C78` (the RPM
+threshold it is compared against) are both unlabelled and unidentified. Until
+they are known, **whether this path ever fires on this calibration is unknown.**
+Do not assume it does; do not assume it does not.
