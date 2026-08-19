@@ -4718,3 +4718,104 @@ were wrong** (`0xFFFF6254`, `0xFFFF64F5`, `0xFFFF8F24`, `0xFFFF895C`).
 That last number is the durable lesson. Where a majority of disputed addresses
 have no correct name on either side, agreement between artifacts was never
 evidence -- it meant two files had copied one guess.
+
+---
+
+## 82. The knock detection threshold: lookup 2 is a SIGMA MULTIPLIER, and `r9` was never a stack frame — **CLOSES OPEN-HOLE 4, 2026-08-19**
+
+Open-hole 4 asked whether `0xAE6D4`/`6E8`/`6FC`/`710` is "the threshold itself or
+a per-cylinder trim on one". It is neither. Full trace with verified
+disassembly: `disassembly/analysis/knock_threshold_trace.txt` (195/195 lines
+agree against ROM bytes; the code is byte-identical in stock and 20.19c).
+
+### The mistake that kept this open
+
+The old entry read `[r9-40]` as a stack slot and pointed at `0x043888`–`0x0438B0`
+as the consumer. Both follow from treating `r9` as a frame pointer. It is not:
+
+```
+0437B4: D981  mov.l @(0x0439BC),r9      ; [0439BC] = FFFF8158
+043798: 401E  ldc r0,gbr                ; [0439A8] = FFFF80FC
+```
+
+`r9` is a **fixed RAM workspace base**, `r14` is the same value, and
+`mov.b @(176,gbr),r0` is the cylinder index at `0xFFFF81AC`. Once that is fixed,
+every slot is a real address and the consumer is findable mechanically.
+
+Lookup 2 stores to `[r9-44]` = **`0xFFFF812C`** (`04385E: F907`), lookup 3 to
+`[r9-40]` = `0xFFFF8130` (`043874: F907`). `[r9-44]` is read exactly twice, at
+`0x043ABE` and `0x043AEA` — 560 bytes past where the entry said to look.
+
+### What it actually computes
+
+```
+043AB8: E0F0  mov #-16,r0
+043ABA: F896  fmov.s @(r0,r9),fr8       ; baseline   [r9-16] = FFFF8148
+043ABC: E0D4  mov #-44,r0
+043ABE: F096  fmov.s @(r0,r9),fr0       ; K          [r9-44] = FFFF812C
+043AC0: E0F8  mov #-8,r0
+043AC2: F996  fmov.s @(r0,r9),fr9       ; deviation  [r9-8]  = FFFF8150
+043AC4: F89E  fmac fr0,fr9,fr8          ; baseline + K*deviation
+```
+
+then clamped to `[float 0x0D2D88 = 50.0, float 0x0D2D8C = 359.0]` and stored to
+`[r9-4]` = `0xFFFF8154`. A second copy at `0x043AE0`–`0x043B08` multiplies
+lookup 3 in and clamps to `[50.0, float 0x0D2D90 = 1000.0]`, stored to `[r9+0]`
+= `0xFFFF8158`.
+
+So **K is dimensionless** — it multiplies a deviation. The old "units are
+knock-signal units (the same 0–3.5 domain as `0xAE284`'s axis)" is wrong; the
+3.45–3.60 resemblance to that axis is coincidence. The signal domain is the
+50–359 one the clamps sit in.
+
+`0x043888`–`0x0438B0`, which the entry named as the consumer, is the **deviation
+estimator**: `[r9-20] = min(1.0, min(abs(signal - baseline) * [r9-92],
+abs([r9-24])))`. That value then drives the baseline tracking at
+`0x0438C0`–`0x0438FC`, which is what establishes `[r9-16]` as a tracked mean.
+
+### The decision, and a delay-slot trap
+
+```
+043B3C: F895  fcmp/gt fr9,fr8           ; T if threshold_A > signal
+043B3E: 890D  bt 0x043B5C               ; -> no knock
+043B48: 3253  cmp/ge r5,r2              ; word[FFFF67EC] >= word[0x0D29DC] (250)
+043B4A: 8B07  bf 0x043B5C               ; -> no knock
+043B52: F895  fcmp/gt fr9,fr8           ; T if threshold_B > signal
+043B54: 8D03  bt/s 0x043B5E
+043B56: E001    mov #1,r0               ; DELAY SLOT - runs on BOTH paths
+043B58: A003  bra 0x043B62
+043B5A: C0BE    mov.b r0,@(190,gbr)     ; DELAY SLOT - stores 1
+043B5C: E000  mov #0,r0
+043B5E: C0BE  mov.b r0,@(190,gbr)
+043B60: E000  mov #0,r0
+043B62: C0BF  mov.b r0,@(191,gbr)
+```
+
+Both arms of the `bt/s` write **1** to `GBR+190` = `0xFFFF81BA` = `KNOCK_FLAG`.
+The comparison only selects whether `GBR+191` = `0xFFFF81BB` gets 0 or 1.
+Reading that `fcmp` as gating `KNOCK_FLAG` would be wrong.
+
+⇒ **`0xFFFF81BB`'s existing label `KNOCK_BANK_FLAG` is unsupported.** This
+function is per-cylinder (index from `0xFFFF4308`, gated `< 4`), not per-bank,
+and `81BB` is set by an *upper-threshold* comparison. Recorded, not renamed.
+
+### Calibration inventory — all of it invisible to ECUFlash
+
+`0xAE6D4/6E8/6FC/710`, `0xAE724/738/74C/760`, `0xAE284`, `0xAE290`,
+`0xAE29C/2A8/2B4/2C0`, `0x0D2D84` (8.0), `0x0D2D88` (50.0), `0x0D2D8C` (359.0),
+`0x0D2D90` (1000.0), `0x0D2D94` (2.0), `0x0D29DC` (uint16 250), `0x0D298B`
+(byte 255). Checked 2026-08-19: **zero** of these carry an `address=` entry in
+`definitions/AE5L600L 2013 USDM Impreza WRX MT.xml`.
+
+### Consequence for the load-plane lever
+
+The two 18-value load planes of lookup 2 are byte-identical (re-confirmed via
+`desc_types.read_table` on `0xAE6D4` and `0xAE6E8`), so the load axis is exactly
+flat and "knock detection has no load input" is right about the effect. Because
+K is a sigma multiplier, differentiating the planes is a well-defined lever:
+**lower K = more sensitive detection**, higher K = less. Breakpoints 0.80 and
+2.20 g/rev, RPM 800–7600 in 400 steps.
+
+### Status
+
+Recorded and verified. No ROM bytes changed, no XML edited.

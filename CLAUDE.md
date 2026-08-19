@@ -73,9 +73,16 @@ These exist because confident-but-wrong answers have been produced here before.
 
 ### Open work
 
-**[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist — four scoped,
-unblocked items (items 1 and 2 both closed 2026-08-18), each with what is known,
-what is not, and the concrete next move. Read it before picking up anything, and update it when you close one.
+**[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist — three
+scoped items (items 1 and 2 closed 2026-08-18, item 4 closed 2026-08-19), each
+with what is known, what is not, and the concrete next move. Read it before
+picking up anything, and update it when you close one.
+
+> **Item 4's stated next move was wrong for a year-old reason worth carrying:**
+> it read `r9` in the knock detector as a stack frame. `r9` is the literal
+> `0xFFFF8158` (pool `0x0439BC`), so every `[r9-NN]` is a RAM address, and the
+> "consumer" it named never touched the value. Before chasing a frame slot,
+> check whether the base register is loaded from a literal pool — item 82.
 
 ### Corrections history
 

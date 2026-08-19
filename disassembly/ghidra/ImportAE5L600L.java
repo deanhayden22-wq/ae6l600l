@@ -547,7 +547,45 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF81BAL, "KNOCK_FLAG",
             "1=knock detected, 0=no knock (per cycle)");
         count += labelComment(0xFFFF81BBL, "KNOCK_BANK_FLAG",
-            "Bank selector: 1=bank1, 0=bank0");
+            "NAME UNSUPPORTED (corrections.md item 82). Not a bank selector -- knock_detector "
+            + "is PER-CYLINDER (index at FFFF81AC, gated <4). Written 1 at 0x043B62 only when "
+            + "the signal also clears THRESHOLD B [FFFF8158]; 0 otherwise. Gross/over-range knock.");
+
+        // -- item 82: knock detector workspace, base r9 = 0xFFFF8158 -----------
+        // r9 is NOT a stack frame -- it is the literal at pool 0x0439BC.
+        // threshold_A = clamp(baseline + K*deviation,        50.0,  359.0)
+        // threshold_B = clamp(baseline + K*1000.0*deviation, 50.0, 1000.0)
+        count += labelComment(0xFFFF812CL, "knock_sigma_mult",
+            "K: lookup 2 result (desc AE6D4/AE6FC/AE6E8/AE710, firing order). "
+            + "DIMENSIONLESS sigma multiplier, 3.45-3.60. Stored 0x04385E, read 0x043ABE/0x043AEA.");
+        count += labelComment(0xFFFF8130L, "knock_threshB_gain",
+            "Lookup 3 result (desc AE724/AE74C/AE738/AE760). 1000.0 in every cell. "
+            + "Multiplies K for threshold B only. Stored 0x043874, read 0x043AE6.");
+        count += labelComment(0xFFFF8134L, "knock_signal_raw",
+            "Raw knock signal from FFFF4304, clamped >= 0. Input to lookup 1 (desc AE284).");
+        count += labelComment(0xFFFF8138L, "knock_signal_proc",
+            "PROCESSED knock signal -- the quantity compared against both thresholds. "
+            + "= max(0, table(AE284,raw) - 32*byte[FFFF81D0+cyl] + byte[FFFF81B6+cyl]).");
+        count += labelComment(0xFFFF8140L, "knock_dev_incr_ceiling",
+            "Ceiling on the deviation increment. Preloaded 40.0 at 0x04382C when the "
+            + "state-change test fires and byte[0x0D298B] != 0.");
+        count += labelComment(0xFFFF8144L, "knock_dev_increment",
+            "min(1.0, min(abs(signal-baseline)*[FFFF80FC], abs([FFFF8140]))). "
+            + "Computed 0x043888-0x0438B0 -- the DEVIATION ESTIMATOR.");
+        count += labelComment(0xFFFF8148L, "knock_baseline",
+            "Per-cylinder tracked mean, mirrored to workspace[FFFF817C + cyl*4]. "
+            + "Tracked +/- knock_dev_increment at 0x0438C0-0x0438FC.");
+        count += labelComment(0xFFFF8150L, "knock_deviation",
+            "Per-cylinder tracked spread = max(0, devstat[cyl] - [FFFF814C]). Stored 0x043AB6.");
+        count += labelComment(0xFFFF8154L, "knock_threshold_A",
+            "THE detection threshold. clamp(baseline + K*deviation, 50.0, 359.0). "
+            + "Clamps are floats at 0x0D2D88 / 0x0D2D8C. Compared at 0x043B3C.");
+        count += labelComment(0xFFFF8158L, "knock_threshold_B",
+            "Upper threshold. clamp(baseline + K*1000.0*deviation, 50.0, 1000.0). "
+            + "Ceiling float at 0x0D2D90. Compared at 0x043B52; sets KNOCK_BANK_FLAG only.");
+        count += labelComment(0xFFFF81ACL, "knock_cylinder_index",
+            "GBR+176. Cylinder index copied from FFFF4308 at 0x04376A, gated < 4. "
+            + "Indexes every per-cylinder descriptor and workspace array in knock_detector.");
         count += labelComment(0xFFFF81D9L, "fn_043d68_output",
             "Written by task [12], NOT the knock flag");
         count += labelComment(0xFFFF323CL, "FLKC_BASE_STEP",

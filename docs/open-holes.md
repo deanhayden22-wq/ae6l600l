@@ -1,4 +1,4 @@
-# Open holes — current as of 2026-08-18
+# Open holes — current as of 2026-08-19
 
 Live worklist. Everything here is **scoped, reproducible, and unblocked** — each
 entry says what is known, what is not, and the concrete next move.
@@ -131,30 +131,47 @@ nothing in the ordinary case" is the wrong prior.
 
 ---
 
-## 4. Which knock table is the detection threshold?
+## 4. ~~Which knock table is the detection threshold?~~ — **CLOSED 2026-08-19**
 
-`docs/corrections.md` items 56, 59. The detector at `0x043798` does **five**
-lookups:
+**Neither of the two options in the old question. Lookup 2 is the SIGMA
+MULTIPLIER — a dimensionless gain on a tracked deviation statistic.**
 
-| site | descriptor | input | data |
-|---|---|---|---|
-| `0x0437BE` | `0xAE284` | knock signal `0xFFFF4304`, clamped ≥0 | 0,0,32,51,…,304 |
-| `0x043858` | per-cyl `0xAE6D4`/`6E8`/`6FC`/`710` | RPM × **LOAD** | **3.60 → 3.45** |
-| `0x04386E` | per-cyl `0xAE724`/`738`/`74C`/`760` | RPM × **LOAD** | 1000.0 everywhere |
-| `0x043920` | per-cyl `0xAE29C`/`2A8`/`2B4`/`2C0` | RPM | 16.0 everywhere |
-| `0x043944` | `0xAE290` | RPM | 8,10,10,10,10,10,12,13,10,10 |
+Full trace: `disassembly/analysis/knock_threshold_trace.txt` (195/195 instruction
+lines verify). Evidence summary in `docs/corrections.md` item 82.
 
-Lookup 2 is the threshold-shaped one. Its **load axis is exactly flat** — the two
-18-value load planes are byte-identical — which is why "knock detection has no
-load input" held up empirically for years while being false about the code.
+```
+threshold_A = clamp( baseline + K * deviation,          50.0,  359.0 )  -> 0xFFFF8154
+threshold_B = clamp( baseline + K * 1000.0 * deviation, 50.0, 1000.0 )  -> 0xFFFF8158
 
-**Open:** whether lookup 2 is the threshold itself or a per-cylinder trim on one.
-Its result lands at `[r9-40]` and is consumed by the arithmetic at
-`0x043888`–`0x0438B0`. Decoding that stretch settles it.
+K         = lookup 2 (0xAE6D4/6FC/6E8/710), 18 RPM x 2 LOAD, 3.45..3.60
+baseline  = per-cylinder tracked mean    [r9-16] = 0xFFFF8148
+deviation = per-cylinder tracked spread  [r9-8]  = 0xFFFF8150
+```
 
-**Latent lever, recorded not proposed:** differentiating those two load planes
-would make detection load-sensitive. Units are knock-signal units (the same
-0–3.5 domain as `0xAE284`'s axis), **not degrees**.
+Decision at `0x043B34`: `signal < threshold_A` → no knock; else `0xFFFF67EC` must
+have reached 250 (`word[0x0D29DC]`); else `KNOCK_FLAG` (`0xFFFF81BA`) = 1, and
+`0xFFFF81BB` = 1 additionally when the signal also clears threshold_B.
+
+**The old entry was wrong on three points** — kept here because each was the kind
+of error that survives by nobody re-decoding:
+
+* `r9` is **not a stack frame**. It is the literal `0xFFFF8158` (pool `0x0439BC`),
+  so every `[r9-NN]` is a nameable RAM address.
+* Lookup 2 stores to **`[r9-44]` = `0xFFFF812C`**, not `[r9-40]` (that is lookup
+  3). It is first read at **`0x043ABE`**.
+* `0x043888`–`0x0438B0` never touches it — that block is the **deviation
+  estimator**, reading `[r9-32]`/`[r9-92]`/`[r9-24]` and writing `[r9-20]`.
+* Units are **dimensionless** (a sigma count), not "knock-signal units".
+
+**Latent lever, still recorded not proposed:** the two 18-value load planes are
+byte-identical, so the load axis is exactly flat. Because K is a sigma
+multiplier, differentiating them is well-defined — **lower K = more sensitive**.
+Load breakpoints 0.80 / 2.20 g/rev; RPM 800–7600 in 400 steps.
+
+**Also established:** none of the twelve knock-detection calibrations (the five
+lookup families plus `0x0D2D84`–`0x0D2D94`, `0x0D29DC`, `0x0D298B`) has an
+`address=` entry in the project XML. The whole detection front-end is invisible
+to ECUFlash.
 
 ---
 

@@ -1,0 +1,395 @@
+================================================================================
+KNOCK DETECTION THRESHOLD -- full trace of func 0x043782
+Traced 2026-08-19. CLOSES docs/open-holes.md item 4.
+ROM: rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Method: scripts/sh2e_disasm.py over 0x043782-0x043B62; r9 and GBR resolved from
+        the function's own literal pool at 0x0439A0-0x0439E4; descriptor
+        contents via scripts/desc_types.py read_table().
+================================================================================
+
+ANSWER TO OPEN-HOLE 4
+--------------------------------------------------------------------------------
+Lookup 2 (0xAE6D4 / 0xAE6FC / 0xAE6E8 / 0xAE710) is NEITHER "the threshold" NOR
+"a per-cylinder trim on one". It is the SIGMA MULTIPLIER: the dimensionless gain
+applied to a tracked per-cylinder deviation statistic.
+
+    threshold_A = clamp( baseline + K * deviation,          50.0,  359.0 )
+    threshold_B = clamp( baseline + K * 1000.0 * deviation, 50.0, 1000.0 )
+
+    K         = lookup 2, 18 RPM x 2 LOAD, float32, 3.45..3.60, DIMENSIONLESS
+    1000.0    = lookup 3 (0xAE724 family), 1000.0 in every cell
+    baseline  = per-cylinder tracked mean      -> [r9-16] = 0xFFFF8148
+    deviation = per-cylinder tracked spread    -> [r9-8]  = 0xFFFF8150
+    50 / 359 / 1000 = float consts 0x0D2D88 / 0x0D2D8C / 0x0D2D90
+
+    threshold_A -> 0xFFFF8154        threshold_B -> 0xFFFF8158
+
+THREE FACTUAL CORRECTIONS to the previous open-holes entry
+--------------------------------------------------------------------------------
+1. "Its result lands at [r9-40]" -- NO. Lookup 2 stores to [r9-44] = 0xFFFF812C.
+   [r9-40] = 0xFFFF8130 is LOOKUP 3's result.
+
+2. "consumed by the arithmetic at 0x043888-0x0438B0" -- NO. That block never
+   reads [r9-44]. It reads [r9-32], [r9-92], [r9-24] and writes [r9-20]; it is
+   the DEVIATION ESTIMATOR (block C). Lookup 2's result is first read at
+   0x043ABE, some 560 bytes later.
+
+3. "Units are knock-signal units ... not degrees" -- NO. K is DIMENSIONLESS. It
+   multiplies a deviation, so it is a sigma count. The knock-signal domain in
+   this function runs to several hundred, not 0..3.5; the clamps at 50.0 and
+   359.0 sit in that domain, K does not.
+
+KEY REGISTER BINDINGS -- why the old reading went wrong
+--------------------------------------------------------------------------------
+r9 IS NOT A STACK FRAME. It is a fixed RAM workspace base:
+
+    0439BC literal = FFFF8158   ->  r9  = 0xFFFF8158  (loaded 0x0437B4)
+                                    r14 = 0xFFFF8158  (loaded 0x04387A, same lit)
+    0439A8 literal = FFFF80FC   ->  GBR = 0xFFFF80FC  (set   0x043798)
+
+So every "[r9-NN]" is a nameable RAM address, and mov.b @(176,gbr),r0 is the
+CYLINDER INDEX at 0xFFFF81AC (copied from 0xFFFF4308 at 0x04376A, gated < 4).
+
+    [r9-92] = FFFF80FC  deviation-estimator gain (== GBR+0)
+    [r9-88] = FFFF8100  filter coefficient
+    [r9-84] = FFFF8104  filter coefficient
+    [r9-44] = FFFF812C  LOOKUP 2 result  (K, the sigma multiplier)
+    [r9-40] = FFFF8130  LOOKUP 3 result  (1000.0 everywhere)
+    [r9-36] = FFFF8134  raw knock signal, clamped >= 0
+    [r9-32] = FFFF8138  PROCESSED knock signal (the quantity compared)
+    [r9-28] = FFFF813C  baseline step
+    [r9-24] = FFFF8140  deviation-increment ceiling
+    [r9-20] = FFFF8144  deviation increment
+    [r9-16] = FFFF8148  baseline (mirrored to workspace[r14+36+cyl*4])
+    [r9-12] = FFFF814C  spread offset
+    [r9-8]  = FFFF8150  deviation
+    [r9-4]  = FFFF8154  THRESHOLD A
+    [r9+0]  = FFFF8158  THRESHOLD B
+
+Per-cylinder workspace arrays (r14 = 0xFFFF8158, indexed cyl*4):
+    r14+4  = FFFF815C..  lookup 4 result
+    r14+20 = FFFF816C..  deviation statistic (filtered)
+    r14+36 = FFFF817C..  baseline statistic  (tracked)
+    r14+52 = FFFF818C..  detector output
+    r14+68 = FFFF819C..  baseline step accumulator
+
+The descriptor pointer tables are in FIRING ORDER, not address order:
+    0x063E58 -> AE6D4, AE6FC, AE6E8, AE710   (lookup 2, cyl 1-3-2-4)
+    0x063E68 -> AE724, AE74C, AE738, AE760   (lookup 3)
+    0x063E48 -> AE29C, AE2A8, AE2B4, AE2C0   (lookup 4)
+
+BLOCK A -- entry, GBR/r9 setup, inputs
+--------------------------------------------------------------------------------
+Entered by bsr from 0x043774, itself gated on (r4 & 0xFF) in {0,6,12,18} and on
+byte[0xFFFF4308] < 4.
+
+  043782: 2F96  mov.l r9,@-r15
+  043784: 2FB6  mov.l r11,@-r15
+  043786: 2FC6  mov.l r12,@-r15
+  043788: 2FD6  mov.l r13,@-r15
+  04378A: 2FE6  mov.l r14,@-r15
+  04378C: 4F22  sts.l pr,@-r15
+  04378E: FFCB  fmov.s fr12,@-r15
+  043790: FFEB  fmov.s fr14,@-r15
+  043792: FFFB  fmov.s fr15,@-r15
+  043794: 4F13  stc.l gbr,@-r15
+  043796: D084  mov.l @(0x0439A8),r0
+  043798: 401E  ldc r0,gbr
+  04379A: 7FF8  add #-8,r15
+  04379C: D283  mov.l @(0x0439AC),r2
+  04379E: FF28  fmov.s @r2,fr15
+  0437A0: D283  mov.l @(0x0439B0),r2
+  0437A2: FE28  fmov.s @r2,fr14
+  0437A4: D683  mov.l @(0x0439B4),r6
+  0437A6: 6B61  mov.w @r6,r11
+  0437A8: D283  mov.l @(0x0439B8),r2
+  0437AA: F828  fmov.s @r2,fr8
+  0437AC: FC8D  fldi0 fr12
+  0437AE: FC85  fcmp/gt fr8,fr12
+  0437B0: 8B00  bf 0x0437B4
+  0437B2: F8CC  fmov fr12,fr8
+  0437B4: D981  mov.l @(0x0439BC),r9
+  0437B6: E0DC  mov #-36,r0
+  0437B8: F987  fmov.s fr8,@(r0,r9)
+  0437BA: D481  mov.l @(0x0439C0),r4
+  0437BC: DC81  mov.l @(0x0439C4),r12
+
+Inputs read: 0xFFFF6624 (RPM) -> fr15, 0xFFFF63F8 (engine load) -> fr14,
+0xFFFF67EC (uint16) -> r11, 0xFFFF4304 (raw knock signal) -> fr8, clamped >= 0.
+
+BLOCK B -- lookup 1 linearizes the signal; result -> [r9-32]
+--------------------------------------------------------------------------------
+  0437BA: D481  mov.l @(0x0439C0),r4
+  0437BC: DC81  mov.l @(0x0439C4),r12
+  0437BE: 4C0B    jsr @r12
+  0437C0: F496  fmov.s @(r0,r9),fr4
+  0437C2: DD79  mov.l @(0x0439A8),r13
+  0437C4: 62D3  mov r13,r2
+  0437C6: 727F  add #127,r2
+  0437C8: 7255  add #85,r2
+  0437CA: C4B0  mov.b @(176,gbr),r0
+  0437CC: 600C  extu.b r0,r0
+  0437CE: 062C  mov.b @(r0,r2),r6
+  0437D0: 626C  extu.b r6,r2
+  0437D2: 4208  shll2 r2
+  0437D4: 4208  shll2 r2
+  0437D6: 4200  shll r2
+  0437D8: 425A  lds r2,fpul
+  0437DA: F82D  float fpul,fr8
+  0437DC: F081  fsub fr8,fr0
+  0437DE: 65D3  mov r13,r5
+  0437E0: 757F  add #127,r5
+  0437E2: 753B  add #59,r5
+  0437E4: C4B0  mov.b @(176,gbr),r0
+  0437E6: 600C  extu.b r0,r0
+  0437E8: 065C  mov.b @(r0,r5),r6
+  0437EA: 626C  extu.b r6,r2
+  0437EC: 425A  lds r2,fpul
+  0437EE: F82D  float fpul,fr8
+  0437F0: F080  fadd fr8,fr0
+  0437F2: FC05  fcmp/gt fr0,fr12
+  0437F4: 8B00  bf 0x0437F8
+  0437F6: F0CC  fmov fr12,fr0
+  0437F8: E0E0  mov #-32,r0
+  0437FA: F907  fmov.s fr0,@(r0,r9)
+
+    [r9-32] = max( 0, table_1d(0xAE284, rawknock)
+                      - 32 * byte[0xFFFF81D0 + cyl]
+                      +      byte[0xFFFF81B6 + cyl] )
+
+The table_lookup helper is 0x0BE830 (held in r12). 0xAE284's data runs 0..304.
+
+BLOCK C -- the deviation ESTIMATOR (what 0x043888 actually does)
+--------------------------------------------------------------------------------
+  043888: F981  fsub fr8,fr9
+  04388A: FC95  fcmp/gt fr9,fr12
+  04388C: 8B00  bf 0x043890
+  04388E: F94D  fneg fr9
+  043890: E0A4  mov #-92,r0
+  043892: F896  fmov.s @(r0,r9),fr8
+  043894: F982  fmul fr8,fr9
+  043896: E0E8  mov #-24,r0
+  043898: F896  fmov.s @(r0,r9),fr8
+  04389A: FC85  fcmp/gt fr8,fr12
+  04389C: 8B00  bf 0x0438A0
+  04389E: F84D  fneg fr8
+  0438A0: F985  fcmp/gt fr8,fr9
+  0438A2: 8B00  bf 0x0438A6
+  0438A4: F98C  fmov fr8,fr9
+  0438A6: F89D  fldi1 fr8
+  0438A8: F895  fcmp/gt fr9,fr8
+  0438AA: 8B00  bf 0x0438AE
+  0438AC: F98C  fmov fr8,fr9
+  0438AE: E0EC  mov #-20,r0
+  0438B0: F997  fmov.s fr9,@(r0,r9)
+
+    [r9-20] = min( 1.0,
+                   min( abs([r9-32] - baseline[cyl]) * [r9-92], abs([r9-24]) ) )
+
+fr12 is 0.0 throughout (fldi0 at 0x0437AC), so both fcmp/fneg pairs are abs().
+
+BLOCK D -- baseline tracking, +/- the deviation increment
+--------------------------------------------------------------------------------
+  0438C0: 66E3  mov r14,r6
+  0438C2: 7624  add #36,r6
+  0438C4: C4B0  mov.b @(176,gbr),r0
+  0438C6: 600C  extu.b r0,r0
+  0438C8: 4008  shll2 r0
+  0438CA: F866  fmov.s @(r0,r6),fr8
+  0438CC: E0E0  mov #-32,r0
+  0438CE: F996  fmov.s @(r0,r9),fr9
+  0438D0: F985  fcmp/gt fr8,fr9
+  0438D2: 8B05  bf 0x0438E0
+  0438D4: E0EC  mov #-20,r0
+  0438D6: F996  fmov.s @(r0,r9),fr9
+  0438D8: F8F8  fmov.s @r15,fr8
+  0438DA: F890  fadd fr9,fr8
+  0438DC: A00F    bra 0x0438FE
+  0438DE: FF8A  fmov.s fr8,@r15
+  0438E0: 66E3  mov r14,r6
+  0438E2: 7624  add #36,r6
+  0438E4: C4B0  mov.b @(176,gbr),r0
+  0438E6: 600C  extu.b r0,r0
+  0438E8: 4008  shll2 r0
+  0438EA: F866  fmov.s @(r0,r6),fr8
+  0438EC: E0E0  mov #-32,r0
+  0438EE: F996  fmov.s @(r0,r9),fr9
+  0438F0: F895  fcmp/gt fr9,fr8
+  0438F2: 8B04  bf 0x0438FE
+  0438F4: E0EC  mov #-20,r0
+  0438F6: F996  fmov.s @(r0,r9),fr9
+  0438F8: F8F8  fmov.s @r15,fr8
+  0438FA: F891  fsub fr9,fr8
+  0438FC: FF8A  fmov.s fr8,@r15
+
+    if signal > baseline[cyl]:  acc += [r9-20]
+    if signal < baseline[cyl]:  acc -= [r9-20]
+
+This is what makes workspace[r14+36+cyl] a TRACKED MEAN rather than a constant,
+and it is why [r9-16] can be called a baseline with confidence.
+
+BLOCK E -- deviation extracted; result -> [r9-8]
+--------------------------------------------------------------------------------
+  043A9A: 66E3  mov r14,r6
+  043A9C: 7614  add #20,r6
+  043A9E: C4B0  mov.b @(176,gbr),r0
+  043AA0: 600C  extu.b r0,r0
+  043AA2: 4008  shll2 r0
+  043AA4: F866  fmov.s @(r0,r6),fr8
+  043AA6: E0F4  mov #-12,r0
+  043AA8: F996  fmov.s @(r0,r9),fr9
+  043AAA: F891  fsub fr9,fr8
+  043AAC: FC85  fcmp/gt fr8,fr12
+  043AAE: 8F01  bf/s 0x043AB4
+  043AB0: F98C  fmov fr8,fr9
+  043AB2: F9CC  fmov fr12,fr9
+  043AB4: E0F8  mov #-8,r0
+  043AB6: F997  fmov.s fr9,@(r0,r9)
+
+    [r9-8] = max( 0, devstat[cyl] - [r9-12] )
+
+BLOCK F -- THRESHOLD A  (where lookup 2 is finally consumed)
+--------------------------------------------------------------------------------
+  043AB8: E0F0  mov #-16,r0
+  043ABA: F896  fmov.s @(r0,r9),fr8
+  043ABC: E0D4  mov #-44,r0
+  043ABE: F096  fmov.s @(r0,r9),fr0
+  043AC0: E0F8  mov #-8,r0
+  043AC2: F996  fmov.s @(r0,r9),fr9
+  043AC4: F89E  fmac fr0,fr9,fr8
+  043AC6: D66D  mov.l @(0x043C7C),r6
+  043AC8: F968  fmov.s @r6,fr9
+  043ACA: F985  fcmp/gt fr8,fr9
+  043ACC: 8B01  bf 0x043AD2
+  043ACE: A005    bra 0x043ADC
+  043AD0: F868  fmov.s @r6,fr8
+  043AD2: D26B  mov.l @(0x043C80),r2
+  043AD4: F928  fmov.s @r2,fr9
+  043AD6: F895  fcmp/gt fr9,fr8
+  043AD8: 8B00  bf 0x043ADC
+  043ADA: F828  fmov.s @r2,fr8
+  043ADC: E0FC  mov #-4,r0
+  043ADE: F987  fmov.s fr8,@(r0,r9)
+
+    tA = [r9-16] + [r9-44] * [r9-8]           ; fmac: baseline + K * deviation
+    if 50.0 > tA:    tA = 50.0                ; float [0x0D2D88]
+    elif tA > 359.0: tA = 359.0               ; float [0x0D2D8C]
+    [r9-4] = tA
+
+BLOCK G -- THRESHOLD B  (same, with lookup 3 multiplied in)
+--------------------------------------------------------------------------------
+  043AE0: E0F0  mov #-16,r0
+  043AE2: F896  fmov.s @(r0,r9),fr8
+  043AE4: E0D8  mov #-40,r0
+  043AE6: F096  fmov.s @(r0,r9),fr0
+  043AE8: E0D4  mov #-44,r0
+  043AEA: F996  fmov.s @(r0,r9),fr9
+  043AEC: F092  fmul fr9,fr0
+  043AEE: E0F8  mov #-8,r0
+  043AF0: F996  fmov.s @(r0,r9),fr9
+  043AF2: F89E  fmac fr0,fr9,fr8
+  043AF4: F968  fmov.s @r6,fr9
+  043AF6: F985  fcmp/gt fr8,fr9
+  043AF8: 8B01  bf 0x043AFE
+  043AFA: A005    bra 0x043B08
+  043AFC: F868  fmov.s @r6,fr8
+  043AFE: D261  mov.l @(0x043C84),r2
+  043B00: F928  fmov.s @r2,fr9
+  043B02: F895  fcmp/gt fr9,fr8
+  043B04: 8B00  bf 0x043B08
+  043B06: F828  fmov.s @r2,fr8
+  043B08: F98A  fmov.s fr8,@r9
+
+    tB = [r9-16] + ([r9-44] * [r9-40]) * [r9-8]  ; baseline + K*1000 * deviation
+    if 50.0 > tB:     tB = 50.0                  ; float [0x0D2D88]
+    elif tB > 1000.0: tB = 1000.0                ; float [0x0D2D90]
+    [r9+0] = tB
+
+Because lookup 3 is 1000.0 in every cell, tB >= tA always, and tB saturates at
+its 1000.0 ceiling for any deviation above roughly 0.27. tB is therefore only
+reachable when the tracked spread is very small -- a spike against a quiet
+baseline.
+
+BLOCK H -- the decision; writes KNOCK_FLAG and KNOCK_BANK_FLAG
+--------------------------------------------------------------------------------
+  043B34: E0E0  mov #-32,r0
+  043B36: F996  fmov.s @(r0,r9),fr9
+  043B38: E0FC  mov #-4,r0
+  043B3A: F896  fmov.s @(r0,r9),fr8
+  043B3C: F895  fcmp/gt fr9,fr8
+  043B3E: 890D  bt 0x043B5C
+  043B40: D652  mov.l @(0x043C8C),r6
+  043B42: 6261  mov.w @r6,r2
+  043B44: 652D  extu.w r2,r5
+  043B46: 62BD  extu.w r11,r2
+  043B48: 3253  cmp/ge r5,r2
+  043B4A: 8B07  bf 0x043B5C
+  043B4C: E0E0  mov #-32,r0
+  043B4E: F996  fmov.s @(r0,r9),fr9
+  043B50: F898  fmov.s @r9,fr8
+  043B52: F895  fcmp/gt fr9,fr8
+  043B54: 8D03  bt/s 0x043B5E
+  043B56: E001  mov #1,r0
+  043B58: A003    bra 0x043B62
+  043B5A: C0BE  mov.b r0,@(190,gbr)
+  043B5C: E000  mov #0,r0
+  043B5E: C0BE  mov.b r0,@(190,gbr)
+  043B60: E000  mov #0,r0
+  043B62: C0BF  mov.b r0,@(191,gbr)
+
+    if threshold_A > signal:                    -> 81BA = 0, 81BB = 0
+    elif word[0xFFFF67EC] < word[0x0D29DC]:     -> 81BA = 0, 81BB = 0   (250)
+    elif threshold_B > signal:                  -> 81BA = 1, 81BB = 0
+    else:                                       -> 81BA = 1, 81BB = 1
+
+    GBR+190 = 0xFFFF81BA = KNOCK_FLAG      (logged; logcfg paramid 0xFF81BA)
+    GBR+191 = 0xFFFF81BB = "KNOCK_BANK_FLAG"
+
+CAUTION on the bt/s at 0x043B54: its delay slot mov #1,r0 executes on BOTH
+paths, and the not-taken path stores r0 in the delay slot of the bra at
+0x043B58. Both paths therefore write 1 to 0x81BA; the fcmp only selects whether
+0x81BB gets 0 (via 0x043B60) or 1 (via 0x043B62).
+
+  -> The existing label "KNOCK_BANK_FLAG" is UNSUPPORTED. This function is
+     per-cylinder, not per-bank, and 0x81BB is set by an UPPER-THRESHOLD
+     comparison. "gross / over-range knock" describes it; "bank" does not.
+     Recorded, not renamed -- do not invent a replacement name.
+
+CALIBRATION INVENTORY -- none of it is in the definition XML
+--------------------------------------------------------------------------------
+    0xAE6D4/6E8/6FC/710  K, sigma multiplier      2D 18x2 float32  3.45-3.60
+    0xAE724/738/74C/760  threshold-B gain         2D 18x2 float32  1000.0
+    0xAE284              signal linearization     1D float32       0..304
+    0xAE290              (lookup 5)               1D float32       8..13
+    0xAE29C/2A8/2B4/2C0  (lookup 4)               1D float32       16.0
+    0x0D2D84  float 8.0        offset added before lookup 5
+    0x0D2D88  float 50.0       threshold floor (BOTH thresholds)
+    0x0D2D8C  float 359.0      threshold A ceiling
+    0x0D2D90  float 1000.0     threshold B ceiling
+    0x0D2D94  float 2.0        post-decision gain
+    0x0D29DC  uint16 250       detection-enable count on 0xFFFF67EC
+    0x0D298B  byte 255         gate on the [r9-24] preload at 0x043818
+
+Checked 2026-08-19: ZERO of these carry an address= entry in
+definitions/AE5L600L 2013 USDM Impreza WRX MT.xml. The entire knock detection
+front-end is undefined in ECUFlash.
+
+STILL OPEN
+--------------------------------------------------------------------------------
+* 0xFFFF80FC / 0xFFFF8100 / 0xFFFF8104 (the estimator gain and the two filter
+  coefficients) are RAM, written elsewhere. Not traced here.
+* 0xFFFF67EC is labelled a uint16 DTC counter elsewhere in this repo. Here it
+  gates knock detection on >= 250. Consistent with a maturity counter, but its
+  identity is NOT re-verified by this trace.
+* Helpers 0x0BE56C and 0x0BEA40 (the two filter calls) are not decoded here.
+  The baseline/deviation reading rests on block D's tracking arithmetic, which
+  is explicit, not on those helpers.
+
+THE LEVER (recorded, not proposed)
+--------------------------------------------------------------------------------
+The two 18-value load planes of lookup 2 are byte-identical (confirmed via
+desc_types.read_table on 0xAE6D4 and 0xAE6E8), which is why "knock detection has
+no load input" held up empirically while being false about the code. Because K
+is a sigma multiplier, differentiating the planes is well-defined: LOWERING K in
+a load band makes detection MORE sensitive there, raising it LESS. The load axis
+breakpoints are 0.80 and 2.20 g/rev; RPM runs 800..7600 in 400 steps.
