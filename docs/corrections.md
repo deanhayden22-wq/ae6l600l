@@ -4498,3 +4498,33 @@ Stage 3 contributes nothing. That also accounts for the `-24.96/-15.12` and
 `-20.04` tables in the descriptor array: they are NOT reached by stage 3 either,
 so they belong to `task33`/`task36`/`task41` or to nothing at all. **Still
 unattributed.**
+
+### Addendum, same day — tier 4 is REACHABLE, and not calibration-gated
+
+Three branches reach the tier-4 entry at `0x03AF4A`, all from one chain:
+
+```
+03AED2: cmp/gt r4,r6      r4 = [0x0CBC90] uint16 = 625      require r6 > 625
+03AED4: bf 0x03AEF2                                          else -> dwell ladder
+03AED8: cmp/eq #1,r0      r0 = byte [0xFFFF65D0]             require == 1
+03AEE0: cmp/ge r5,r6                                         require r6 >= r5
+03AEE6: tst r13,r13       r13 = [0xFFFF8E46] fuel_mode_flags
+03AEE8: bt 0x03AF4A                                          -> TIER 4 if flags == 0
+03AEEC: mov.w @r6,r2      r2 = [0x0CBC92] uint16 = 0
+03AEEE: tst r2,r2
+03AEF0: bt 0x03AF4A                                          -> TIER 4, ALWAYS
+```
+
+**`0x0CBC92` is `0` in both stock and 20.19d**, so `tst r2,r2` sets T and the
+second branch is taken unconditionally once control reaches `0x03AEEA`. Tier 4
+is therefore **not** disabled by calibration, and `timing_oneshot_retard` is a
+live path rather than dead code.
+
+Neither `0x0CBC90` nor `0x0CBC92` has an XML definition, and `0xFFFF65D0` is
+unlabelled.
+
+**Not established:** what `r6` and `r5` actually are at `0x03AED2`. `r6` comes
+from `extu.w r0,r6` at `0x03AECA` off a value spilled at `0x03AEC8`, which was
+not traced further back. So the gate STRUCTURE is settled and reachability is
+settled, but the operating condition -- when in real driving this fires -- is
+NOT. Do not claim it fires during any particular manoeuvre without tracing `r6`.
