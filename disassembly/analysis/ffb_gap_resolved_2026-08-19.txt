@@ -1,0 +1,607 @@
+================================================================================
+FFB BELOW THE OL MAP -- RESOLVED. The term is the transient enrichment, and it
+is hard-clamped at +0.09998 phi.
+================================================================================
+Reference bin : rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+                (md5 re-computed this session, matches)
+Logs          : all 20.19c logs -- 7-29, 8-2, 8-4, 8-4 2, 8-8, 8-14 weekend
+Date          : 2026-08-19
+Supersedes    : the OPEN list in ffb_gap_quantified_2026-08-19.txt sections 4 and 6.
+Builds on     : ffb_command_chain_trace.txt (2026-08-17), whose STRUCTURE is
+                re-derived from bytes here and confirmed correct.
+
+Tiers: VERIFIED (cited to address:bytes) / INFERRED (chain + weakest link named)
+
+--------------------------------------------------------------------------------
+0. THE ANSWER
+--------------------------------------------------------------------------------
+    map term  0.3359375  (11.0035 AFR)
+  + [7B8C]    0.0999756  <- the transient/accel term AT ITS CLAMP
+  ----------------------
+    phi       1.4359131   ->  14.7 / 1.4359131  =  10.237 AFR
+
+** "FFB 10.2 against an 11.0 map" IS the transient enrichment term pinned at its
+   upper clamp. The clamp is ROM table 0x0CE784, a flat +0.09998, read through
+   descriptor 0x0AD12C. Nothing else is needed to produce the number. **
+
+And the premise needs one correction before anything else (section 1): at
+SETTLED WOT this ROM commands 11.0 exactly. The 10.2 is transient-only.
+
+--------------------------------------------------------------------------------
+1. THE PREMISE IS WRONG AS STATED -- settled WOT IS 11.0
+--------------------------------------------------------------------------------
+VERIFIED from the log. The earlier brief filtered "CL/OL==10, load>=2.90,
+RPM>=3300" and reported a MEDIAN residual of +0.053, framing it as a standing
+offset. Every sample in that filter comes from a short WOT pull, so the filter
+selects transients almost exclusively. Splitting it by whether load is actually
+settled:
+
+    flat map region, injectors flowing (IPW>0.5), 8-8 log
+      load rolling-std < 0.06 (settled)   n= 40  median res +0.0232  max +0.0981
+      load rolling-std >= 0.06 (ramping)  n=107  median res +0.0693  max +0.1182
+
+and inside a single pull the term decays to zero while the throttle stays at 100%:
+
+    burst t=118.0, throttle 100% throughout, flat map region
+      t+0.48  RPM 5039  load 3.07  FFB 11.23   res -0.0273
+      t+0.96  RPM 5369  load 3.28  FFB 11.01   res -0.0005
+      t+1.20  RPM 5559  load 3.19  FFB 10.87   res +0.0166
+
+** FFB 11.01 against a map of 11.0035. The command IS the map once the transient
+   has decayed. There is no standing offset to explain. **
+
+--------------------------------------------------------------------------------
+2. THE MECHANISM, FROM BYTES
+--------------------------------------------------------------------------------
+2a. The live branch of the sum, re-decoded (function 0x02FFE0, live branch at
+    0x030096 because ROM cal byte [0x0CBBD2] = 0x00 != 90):
+
+  030096: FCD0  fadd fr13,fr12
+  030098: F4CC  fmov fr12,fr4
+  03009A: D647  mov.l @(0x0301B8),r6
+  03009C: D24F  mov.l @(0x0301DC),r2
+  03009E: 460B  jsr @r6
+  0300A0: F528  fmov.s @r2,fr5
+  0300A2: F40C  fmov fr0,fr4
+  0300A4: D249  mov.l @(0x0301CC),r2
+  0300A6: 420B  jsr @r2
+  0300A8: F5FC  fmov fr15,fr5
+  0300BA: FE91  fsub fr9,fr14
+  0300BC: FE80  fadd fr8,fr14
+
+    r6 = 0x000BE970 (MIN), r2 = 0x000CBE04 (0.52), then r2 = 0x000BE960 (MAX)
+    with fr5 = fr15 = the floor. So:
+        mapterm = MIN([798C] + [7A20], 0.52)
+        phi     = base - [7A44] + MAX(mapterm, floor) + [7BCC] + [7BA8]
+
+    This confirms ffb_command_chain_trace.txt Part 3 exactly. One thing that
+    trace understated and the later brief then dropped: [7A20] is INSIDE the
+    map term, so it is a residual contributor, not part of the map.
+
+2b. The transient term [0xFFFF7B8C]. Single producer, function 0x038EA0-0x039286,
+    base r10 = 0xFFFF7BA0 (literal at 0x039104):
+
+  03917E: F48E  fmac fr0,fr8,fr4
+  039180: D2A8  mov.l @(0x039424),r2
+  039182: E068  mov #104,r0
+  039184: F5F6  fmov.s @(r0,r15),fr5
+  039186: E06C  mov #108,r0
+  039188: 420B  jsr @r2
+  03918A: F6F6  fmov.s @(r0,r15),fr6
+  03918C: E0F0  mov #-16,r0
+  03918E: FA07  fmov.s fr0,@(r0,r10)
+  0391B4: E070  mov #112,r0
+  0391B6: F5F6  fmov.s @(r0,r15),fr5
+  0391B8: E074  mov #116,r0
+  0391BA: D29A  mov.l @(0x039424),r2
+  0391BC: 420B  jsr @r2
+  0391BE: F6F6  fmov.s @(r0,r15),fr6
+  0391C0: E0F4  mov #-12,r0
+  0391C2: FA07  fmov.s fr0,@(r0,r10)
+  0391C4: E0F0  mov #-16,r0
+  0391C6: F8A6  fmov.s @(r0,r10),fr8
+  0391C8: E0F4  mov #-12,r0
+  0391CA: F9A6  fmov.s @(r0,r10),fr9
+  0391CC: F890  fadd fr9,fr8
+  0391CE: E0EC  mov #-20,r0
+  0391D0: FA87  fmov.s fr8,@(r0,r10)
+
+    r2 = 0x000BE56C is the CLAMP helper. [sp+104]/[sp+108] are the lo/hi for
+    [0xFFFF7B90]; [sp+112]/[sp+116] the lo/hi for [0xFFFF7B94]; the final store
+    at 0x0391D0 is [7B8C] = [7B90] + [7B94].
+
+2c. The clamp helper is clamp(fr4, lo=fr5, hi=fr6). VERIFIED:
+
+  0BE56C: F455  fcmp/gt fr5,fr4
+  0BE56E: 8D02  bt/s 0x0BE576
+  0BE572: A006  bra 0x0BE582
+  0BE574: F75C  fmov fr5,fr7
+  0BE576: F645  fcmp/gt fr4,fr6
+  0BE578: 8D02  bt/s 0x0BE580
+  0BE57C: A001  bra 0x0BE582
+  0BE57E: F76C  fmov fr6,fr7
+  0BE580: F74C  fmov fr4,fr7
+  0BE584: F07C  fmov fr7,fr0
+
+2d. THE FOUR CLAMP TABLES. All four are 1-D, n=7, typecode 0x08 (uint16),
+    scale 1/8192, offset -4.0, on the ECT axis 0x0CC6E4 (-40..80 degC), and all
+    four are FLAT -- so the bound is a constant, not a curve:
+
+      desc      data      raw     value      role
+      0x0AD118  0x0CE776  7C CD   -0.09998   [7B90] lower bound
+      0x0AD12C  0x0CE784  83 33   +0.09998   [7B90] UPPER bound   <-- THE ANSWER
+      0x0AD140  0x0CE792  7C CD   -0.09998   [7B94] lower bound
+      0x0AD154  0x0CE7A0  80 00    0.00000   [7B94] upper bound
+
+    32768/8192 - 4 = 0.0 exactly; 33587/8192 - 4 = +0.099976.
+
+** [7B94] can only SUBTRACT (its upper bound is exactly zero). [7B90] is the only
+   term that can add. Therefore [7B8C] is bounded to [-0.19995, +0.09998], and the
+   MAXIMUM POSSIBLE transient enrichment on this cal is +0.09998 phi. **
+
+2e. The gate-fail exit calls the block reset at 0x0392C4, which zeroes the whole
+    group -- so the term is genuinely 0 when the module is not active:
+
+  0392D0: F98D  fldi0 fr9
+  0392D2: D260  mov.l @(0x039454),r2
+  0392D4: E0F8  mov #-8,r0
+  0392D6: F297  fmov.s fr9,@(r0,r2)
+
+    r2 = 0xFFFF7B9C, so this store clears [0xFFFF7B94]; the next three clear
+    [7B90], [7B8C] and [7B98]. The module tail (0x0391E8-0x039282) writes
+    0xFFFF7B7C/7B80/7B84/7B88, which are exactly the four values read back at the
+    top of the next pass. It is a recursive filter -- a wall-wetting style
+    transient model -- which is why the term decays smoothly to zero under held
+    throttle (section 1).
+
+--------------------------------------------------------------------------------
+3. THE MEASUREMENT AGREES WITH THE CLAMP
+--------------------------------------------------------------------------------
+Residual re-computed with FULL bilinear interpolation of the OL map (the earlier
+brief used the flat-region shortcut only), DFCO rows excluded (see 5g), across
+every 20.19c log:
+
+    log                     n_flat    median      p95      max   over clamp
+    7-29 / 8-2                  14   +0.0689  +0.0830  +0.0830        0
+    8-4 2                       89   +0.0205  +0.0766  +0.0806        0
+    8-8                        147   +0.0532  +0.1082  +0.1182        9
+    8-14 weekend                21   +0.0713  +0.1338  +0.1338        8
+    ---------------------------------------------------------------------
+    ALL                        271   +0.0459  +0.1065  +0.1187      17  (6.3%)
+
+** 93.7% of all flat-region open-loop samples fall at or below the +0.09998
+   ceiling that section 2d derives from ROM bytes, with no free parameters. **
+
+--------------------------------------------------------------------------------
+4. ADDENDS CLOSED THIS SESSION (all were OPEN or "not settled" before)
+--------------------------------------------------------------------------------
+[0xFFFF7BA8]  = 0.0 IDENTICALLY.  Upgraded from "flagged, not settled".  VERIFIED
+    Its clamp is clamp(x, 0.0, 0.0) -- BOTH bounds are zero constants:
+
+  0395BE: D26A  mov.l @(0x039768),r2
+  0395C0: F628  fmov.s @r2,fr6
+  0395C2: D26A  mov.l @(0x03976C),r2
+  0395C4: 420B  jsr @r2
+  0395C6: F58D  fldi0 fr5
+
+    r2 = 0x000CC3F0 = 0.0 is the hi bound, fldi0 supplies lo = 0.0, and
+    r2 = 0x000BE56C is the clamp. Both downstream stores (0x0395FA, 0x03960A)
+    therefore write 0.0. This is the 0xAD258 zero-pair signature of corrections
+    item 42, and here it is PROVEN inert rather than suspected.
+
+[0xFFFF7BCC]  = 0.0 AT WOT.                                             VERIFIED
+    Its first gate (0x0398E0-0x0398EE) requires [0xFFFF798C] -- the OL MAP RESULT
+    itself -- to test as approximately zero through helper 0x0BE608. At WOT the
+    map result is 0.3359, so the gate fails and 0x03993E stores 0.0. This term
+    only ever acts where the OL map is commanding stoich.
+
+[0xFFFF7A14]  = an ECT/IAT hysteresis latch of {0.0, 0.15, 0.3}.        VERIFIED
+    Setter 0x036BF4: ECT >= [0x0CC234]=79 and IAT >= 0  -> [7A18] = 0.3
+                     70 <= ECT < 79 and IAT >= 0        -> [7A18] = 0.0
+                     ECT < 70                           -> hold
+    then [7A14] = [7A18] (0x036C36) or MIN([7A18], 0.15) (0x036CFA).
+    NOTE: 0.3 phi would put WOT at ~9.0 AFR, which is never observed, so the 79
+    degC branch is NOT live in the fuelling path as decoded. 0x036BF4 has no
+    direct caller -- it is reached only through the pointer table at 0x0480E0.
+    INFERRED (weakest link: that dispatch entry was not traced): [7A14] = 0.0.
+
+[0xFFFF7A20]  = 0.0 normally; latches 0.1 (ECT<102) / 0.2 (ECT>=105).   VERIFIED
+    Producer 0x036E86-0x036F74, GBR = 0xFFFF7A20, latch at 0xFFFF7A38:
+
+  036F3A: F916  fmov.s @(r0,r1),fr9
+  036F3C: D262  mov.l @(0x0370C8),r2
+  036F3E: F828  fmov.s @r2,fr8
+  036F40: F895  fcmp/gt fr9,fr8
+  036F42: 8905  bt 0x036F50
+  036F50: E0FC  mov #-4,r0
+  036F52: F1E7  fmov.s fr14,@(r0,r1)
+  036F5A: D151  mov.l @(0x0370A0),r1
+  036F5C: E0FC  mov #-4,r0
+  036F5E: F1E7  fmov.s fr14,@(r0,r1)
+  036F60: F88D  fldi0 fr8
+  036F62: E0E4  mov #-28,r0
+  036F64: F187  fmov.s fr8,@(r0,r1)
+
+    r2 = 0x000CC274 = 102, so the compare at 0x036F40 is (102 > ECT) and the
+    branch stores the 0.1 latch value ([0x0CC284]) into 0xFFFF7A38. The 102/105
+    degC pair is over-temperature hysteresis. Reaching the latch at all requires
+    uint16[0xFFFF67EC] >= 1250 ([0x0CBC70]) plus three byte flags and the
+    0x022CF4 selector == 1. Normally the gate fails, 0x036F64 stores 0.0, and
+    the term is inert. This is the ONLY remaining candidate for section 6.
+
+[0xFFFF7BE4]  the write at 0x039E38 is a RESET (fldi0 then store), not a
+    computation -- same trap as [0xFFFF7AF4] at 0x0388A0.               VERIFIED
+
+Also eliminated, re-verified from bytes this session:
+  * Primary OL Fueling Compensation (Timing Comp) 0x0AC5A8 -> 0x0CCD30: six
+    zero bytes. Dead.  (agrees with the earlier brief)
+  * Min Primary Base Enrichment 1 Non-Cruise 0x0AD5E8 and Cruise 0x0AD604: every
+    ECT column >= 70 degC is zero in EVERY load row -- checked exhaustively, not
+    by sampling the last row.  (agrees)
+  * Primary Open Loop Fueling Compensation (ECT) @0x0CE6CC -- a NAMED definition
+    the earlier brief never checked. Reads 0.0% at every ECT column from 140 degF
+    up. Neutral at operating temperature.  (new)
+  * Failsafe map 0x0D05C4 / 0x0CFEF0 is a FLAT 0x46 = 0.546875 phi = 9.50 AFR.
+    Not our value, so failsafe is not selected.  (new)
+
+--------------------------------------------------------------------------------
+5. MATH CHECK ON ffb_gap_quantified_2026-08-19.txt
+--------------------------------------------------------------------------------
+CORRECT, re-verified independently:
+  * 11.0/10.2 = 1.0784, i.e. +7.8% fuel not +10%.
+  * phi(11.0)=1.33636, phi(10.2)=1.44118, delta 0.10482 = 13.4 counts. Right --
+    and that delta IS the +0.09998 clamp; the brief computed the answer in its
+    own section 0 and did not recognise it.
+  * Descriptor 0x0AD6C8: bytes, 17x18, axes, typecode 0x04, scale 0.0078125 --
+    all match. Flat 0x2B plateau above load 2.90 and RPM 3300 confirmed.
+  * The five OL-map md5s, including B Low == B High == KCA Alt.
+  * Injector Flow Scaling 0x0CBE0C = 4916.0 -> 550.6692 cc/min.
+  * Per Injector PW Comp: mean of A-D is 0.00% for PW columns 1000-6000 us and
+    -4.88% for 8000 us and up, at 4400-5200 rpm. Verified cell by cell.
+  * Clamps 0x0CBE00 = 0.65 and 0x0CBE04 = 0.52.
+
+WRONG or misleading:
+  a) "Row 15 (6000 rpm)" of the OL map. Row 15 is 6300 rpm; 6000 rpm is row 14.
+     The quoted byte string is row 15's. Conclusion unaffected (both rows are
+     0x2B across the plateau).
+  b) Section 3's framing. The +0.053 median is a median over TRANSIENTS, because
+     the filter selects them; it is not a standing offset. Settled WOT is 11.0.
+     This is the substantive error -- it turned a decaying transient into a
+     permanent gap and sent the investigation after the wrong kind of term.
+  c) Section 4's HUNCH that 0x0CE8B4 "is doing most of the work". 0x0CE8B4 is
+     read at 0x0391D2, AFTER [7B8C] is already stored, into [sp+120]; it is a
+     state-update input, not the clamp. The real bound is 0x0CE784. The two hold
+     the identical bytes 83 33, which is why it looked right.
+  d) Per Injector PW Comp geometry: the tables are 17 x 17, not 17 x 16, and the
+     cited offset "+204" is row 12 COLUMN 0 (0x82 in table A), not the top PW
+     column. The values actually quoted (7A/78/7A/7B) are at +220. Right cell,
+     wrong offset arithmetic, right conclusion.
+  e) "Rescaling that axis by k=0.55 pulls a 21 ms pulse to ~11.5 ms equivalent --
+     still off the top of a stock axis." The axis top is 16000 us = 16 ms, so
+     11.5 ms is ON the axis, not off it. The practical conclusion survives anyway
+     because 8000-16000 us is a flat ~-4.9% plateau, so the applied compensation
+     is unchanged -- but for a different reason than the one given.
+  f) "VERIFIED by fit" (section 5's sign convention applied_PW = base_PW *
+     (1 - comp/100)) is not this project's VERIFIED tier, which requires bytes.
+     It is a well-supported INFERENCE. The consuming code was not decoded.
+  g) Section 4's Pearson scan did not exclude DFCO. 6,701 of 12,271 OL rows in
+     the 8-8 log are decel fuel cut (IPW = 0.00, IDC = 0, throttle ~9.6%), and
+     they carry a sharp artificial residual mode at +0.160 with map term 0.
+     Any correlation computed over CL/OL==10 without an IPW>0 filter is
+     contaminated by them.
+
+--------------------------------------------------------------------------------
+6. WHAT IS STILL OPEN -- one term, 6.3% of samples
+--------------------------------------------------------------------------------
+17 of 271 flat-region samples sit above the +0.09998 ceiling, to a maximum of
++0.1338. That excess is real, not measurement error:
+
+  * NOT sample skew. Shifting FFB by -4..+4 samples against load/RPM leaves the
+    maximum at +0.1182 in the 8-8 log at every shift.
+  * NOT the load proxy. In the flat region the map term is at the table MAXIMUM
+    (0x2B), so any error in load can only LOWER the true map term and therefore
+    RAISE the true residual. The measured residual is a lower bound.
+
+So a second addend contributes at least +0.034 phi on those samples. By
+elimination (section 4) the only live candidate left is [0xFFFF7A20] latching
+0.1 behind its gate chain, which would make residual = 0.1 + [7B8C] and bound
+the total at +0.2 -- consistent with every sample observed.
+
+THE ONE TEST, if it is ever worth it: log 0xF47A20 and 0xF47B8C via the SSM read
+patch. That is two channels, not the seven the earlier brief proposed; the other
+five are now closed from bytes. Prove the 4-byte 0xF4 tag first on 0xF4730C (its
+value must equal 14.7/FFB row for row), since no channel in the current
+logcfg.txt uses that tag.
+
+Judgement: low priority. The mechanism is settled, the bound is settled, and the
+open part changes the answer by at most ~0.3 AFR on 6% of transient samples.
+
+--------------------------------------------------------------------------------
+7. WHAT THIS MEANS FOR THE TUNE
+--------------------------------------------------------------------------------
+1. There is no missing multiplier and no fuelling defect. The command is a sum in
+   phi, the map is one addend, and the extra fuel is a deliberate transient
+   enrichment that decays to zero under held throttle.
+2. The lever exists and is NOT currently reachable from ECUFlash. All 18 tables
+   this module reads (0x0CE776-0x0CE8E0, plus 0x0CCFE4/0x0CD008/0x0CD02C/
+   0x0CD050) are UNNAMED -- part of open-holes #7. The single most useful one is
+   0x0CE784, the +0.09998 upper clamp: it alone sets how rich a tip-in may go.
+3. This is a DIFFERENT module from the Tip-in Enrichment already mapped in docs
+   (base A/B 0x0CED50/0x0CEDBC, RPM comp 0x0CD118, BE comp 0x0CD14C). Do not
+   conflate them. This one acts in the phi domain on the OL command; that one
+   acts on injector pulse width.
+4. Relevance to cusp transient knock: this module adds up to +0.100 phi (about
+   +7.5% fuel) precisely during load ramps, and [7B94] can REMOVE up to -0.100.
+   Anything investigating transient AFR excursions in 1600-3000 x load 1.0-1.25
+   should account for it before blaming wall-wetting or the BE comp.
+================================================================================
+
+================================================================================
+ADDENDUM -- 2026-08-19, second pass. Two soft spots closed BY OBSERVATION, and
+the measurement problem solved without a ROM patch.
+================================================================================
+
+8. [0xFFFF7A14] IS INERT -- settled empirically, replacing a bad inference
+--------------------------------------------------------------------------------
+Section 4 argued [7A14] = 0.0 because 0.3 phi "is never observed". That is
+reasoning backwards from the conclusion -- the exact failure mode this project
+keeps repeating. Both halves of that argument were also wrong on the facts:
+
+  * "0x036BF4 has no direct caller" -- WRONG. It is called at 0x047F68:
+
+  047F68: D25D  mov.l @(0x0480E0),r2
+  047F6A: 420B  jsr @r2
+
+    The run at 0x047FA0-0x048104 is a LITERAL POOL, not a dispatch table (no
+    literal and no mova anywhere in the ROM points into it). The code before it
+    is a straight-line task body of mov.l/jsr/nop triples -- exactly the trap
+    recorded in the scheduler-queue note. The decreasing disp pattern
+    (D262,D261,D261,D260,...) is the signature: PC advances 6 bytes per triple
+    while the pool advances 4, so disp drops by 1 every other triple.
+
+  * The seeding condition really is ECT >= [0x0CC234] = 79 degC, and 0xFFFF6350
+    really is degrees CELSIUS -- confirmed mechanically, not assumed: it feeds
+    descriptor 0x0AC620 whose axis 0x0CC624 is -40..110 in 10-degree steps.
+
+What was actually missing is a THIRD writer group, function 0x036D14, which
+DECAYS the accumulator:
+
+  036D5A: D23C  mov.l @(0x036E4C),r2
+  036D5C: F828  fmov.s @r2,fr8
+  036D5E: F481  fsub fr8,fr4
+  036D60: D23B  mov.l @(0x036E50),r2
+  036D62: 420B  jsr @r2
+  036D64: F58D  fldi0 fr5
+  036D6C: F707  fmov.s fr0,@(r0,r7)
+
+    r2 = 0x000CC254 = 0.3 and r2 = 0x000BE960 = MAX, so this is
+    [7A18] = MAX([7A18] - 0.3, 0.0) -- it subtracts exactly the seed. The other
+    two paths (0x036DBA, 0x036DCE) decay by [0x0CC250] = 0.01 per pass toward
+    [0x0CC24C] = 0.2 or toward 0.0. Same architecture as [7A08].
+
+THE OBSERVATIONAL TEST. ECT sweeps through 79 degC (174.2 degF) in every warmup,
+so if the seed ever survived, the residual must STEP by +0.3 there. Over all
+20.19c logs, 78,949 open-loop rows with fuel flowing:
+
+    ECT degF     ECT degC      n     median residual
+    170.0-174.2   77-79      972        +0.0463
+    174.2-178.0   79-81    16695        +0.0290
+  and at low load (map term < 0.02), where +0.3 would be unmissable:
+    170.0-174.2              417        +0.0552   (median FFB 13.89)
+    174.2-178.0             5861        +0.1602   (median FFB 12.67)
+
+** No step. [7A14] is inert -- now VERIFIED by observation rather than inferred
+   from the absence of its effect. **
+
+9. THE MAX(mapterm, floor) STRUCTURE IS CONFIRMED FROM THE DATA
+--------------------------------------------------------------------------------
+Independent confirmation of the decoded formula, from a direction that has
+nothing to do with the transient term. At low load with fuel flowing and the map
+term at ~0, the residual sits pinned at +0.1602 (FFB 12.67) across every ECT bin
+from 150 to 206 degF. At WOT the map term is 0.3359 and the residual goes to ~0.
+
+That is exactly what MAX(mapterm, floor) predicts: the FLOOR (0.160) wins at low
+load, the MAP (0.336) wins at WOT, and the crossover is automatic. The formula
+predicts a two-regime behaviour that the data shows.
+
+CAUTION for anyone reusing that 0.160: it is NOT a single constant. Subtracting
+it from low-load residuals to recover [7B8C] fails -- the resulting distribution
+is bimodal (a second mode near residual +0.01), so there are at least two floor
+regimes. The low-load window does NOT cleanly isolate the transient term.
+
+10. THE MEASUREMENT PROBLEM IS SOLVED -- NO ROM PATCH NEEDED
+--------------------------------------------------------------------------------
+Every residual figure in this file and its predecessor is computed against a
+load PROXY (MAF*60/RPM) fed through a bilinear map interpolation. That proxy is
+the largest remaining source of doubt.
+
+It can be removed entirely. The SSM packing block at 0x0243C8-0x0245A4 already
+packs the OL MAP RESULT itself into a logging slot:
+
+  024554: D268  mov.l @(0x0246F8),r2
+  024556: F428  fmov.s @r2,fr4
+  024558: F6DC  fmov fr13,fr6
+  02455A: C768  mova @(0x0246FC),r0
+  02455C: FF08  fmov.s @r0,fr15
+  02455E: 4D0B  jsr @r13
+  024560: F5FC  fmov fr15,fr5
+  024562: C112  mov.w r0,@(36,gbr)
+
+    r2 = 0xFFFF798C (the map result), fr13 = 0.0 (bias, fldi0 at 0x0243D0),
+    [0x0246FC] = 3.05176e-05 = 1/32768 (scale), GBR = 0xFFFF683C so gbr+36 is
+    slot 0xFFFF6860. Packer 0x0BE5D8 computes
+        word = clamp(round((value - bias)/scale), 0, 0xFFFF).
+
+Three FFB-sum quantities are therefore loggable TODAY with the ordinary 0xFF
+2-byte tag already used by every channel in logcfg.txt -- the unexercised 0xF4
+4-byte path is NOT required:
+
+  slot        source        scale / bias        scalingrpn
+  0xFF6860    [0xFFFF798C]  1/32768, 0          x,0.0000305176,*
+  0xFF6854    [0xFFFF73B4]  1/2048,  -16        x,0.0004882812,*,16,-
+  0xFF6866    [0xFFFF7BA8]  1/32768, 0          x,0.0000305176,*
+
+With 0xFF6860 logged the residual becomes EXACT:
+
+    residual = 14.7/FFB - 1 - [798C]_logged
+
+no load proxy, no interpolation, no ECU-load uncertainty -- and it directly
+measures the sum of every remaining addend.
+
+VALIDATION, in priority order:
+  1. 0xFF6860 must read 0.3359 in the flat WOT region. That is a sharp, falsifiable
+     prediction of the slot mapping AND the scale together.
+  2. 0xFF6866 ([7BA8]) should read 0.000, per section 4. Weaker evidence than it
+     looks: the packer clamps at 0, so any negative value also reads 0. A NONZERO
+     reading falsifies the section-4 decode; a zero reading is only consistent
+     with it.
+
+Caveat to weigh before wiring it in: each added SSM channel costs sample rate.
+Three channels is a real cost against the current logging rate.
+
+** This is the answer to "how do we stop guessing". Every previous wrong answer
+   in this thread -- the IPW multiplier, 0xAD258, 0x0CE8B4 -- was an ATTRIBUTION
+   inferred from a MAGNITUDE. The map term has been directly loggable the whole
+   time. **
+
+11. READY-TO-PASTE LOGGING RECIPE (not applied -- logcfg.txt deliberately untouched)
+--------------------------------------------------------------------------------
+Derived in section 10. Uses the ordinary 0xFF 2-byte tag, identical in form to
+the FFB channel already in logs/logcfg.txt. No ROM patch. Each channel costs
+sample rate, so add only what a given question needs.
+
+THE ONE THAT MATTERS. Removes the load proxy from every open-loop analysis in
+this project, not just the FFB question:
+
+    ;[798C] Primary OL Fueling map result -- enrichment over stoich (phi-1)
+    paramname = OLmap
+    paramid = 0xFF6860
+    databits = 16
+    scalingrpn = x,.0000305176,*
+
+    ; ...or the same channel expressed as the AFR the map is asking for:
+    ; scalingrpn = 14.7,1,x,.0000305176,*,+,/
+
+OPTIONAL -- settles whether [73B4], which has NO writer anywhere in the ROM,
+actually contributes (bias -16 lets it read negative):
+
+    ;[73B4] FFB base addend
+    paramname = FFB_73B4
+    paramid = 0xFF6854
+    databits = 16
+    scalingrpn = x,.0004882812,*,16,-
+
+OPTIONAL, WEAK -- section 4 proves [7BA8] is identically 0.0. A NONZERO reading
+falsifies that decode; a zero reading is only consistent with it, because the
+packer clamps negatives to 0 as well:
+
+    ;[7BA8] FFB addend -- expected identically 0.000
+    paramname = FFB_7BA8
+    paramid = 0xFF6866
+    databits = 16
+    scalingrpn = x,.0000305176,*
+
+HOW TO READ THE RESULT
+
+  1. FIRST, validate before concluding anything. In the flat WOT region
+     (settled, high load, RPM >= 3300) OLmap must read 0.3359. That single
+     number confirms the slot mapping (GBR 0xFFFF683C + 36) and the 1/32768
+     scale together. If it reads anything else, STOP -- the packing decode in
+     section 10 is wrong and nothing downstream of it is safe.
+
+  2. Then the residual is exact, with no proxy and no interpolation:
+
+         residual = 14.7/FFB - 1 - OLmap
+
+  3. Predictions this makes, all falsifiable:
+       * settled WOT           -> residual ~ 0
+       * hard load ramps       -> residual rises to but NOT past +0.09998
+         (section 2d clamp). Samples above it require a second addend.
+       * low load, fuel flowing-> residual jumps to the floor value, because
+         MAX(mapterm, floor) switches regime (section 9). Expect ~+0.160 in one
+         regime and ~+0.01 in another -- the bimodality is real, not noise.
+
+  4. Filter IPW > 0.5 first. 6,701 of 12,271 CL/OL==10 rows in the 8-8 log are
+     DFCO with the injectors off and carry a meaningless +0.160 residual
+     (section 5g).
+================================================================================
+
+12. CORRECTION TO SECTIONS 10-11 -- what the logging recipe does NOT do
+--------------------------------------------------------------------------------
+Sections 10-11 were written as though logging 0xFF6860 would close the open
+question of section 6. IT WILL NOT, and the claim is withdrawn.
+
+  * 0xFF6860 measures [798C], the OL map result. The residual it enables,
+        residual = 14.7/FFB - 1 - [798C]
+    is still the SUM of every remaining addend:
+        [73B4] + [7A08] + [7A14] + [7AF4] + [7B8C] - [7A44] + [7BCC] + [7BA8]
+    plus the [7A20] contribution inside the map term and the multiplicative
+    [7340]. It removes MEASUREMENT error. It does not do ATTRIBUTION.
+
+  * Of the three packed channels, [7BA8] is already proven 0.0 (section 4), so
+    it adds nothing but a self-test, and a weak one (the packer clamps negatives
+    to 0, so a zero reading is consistent with several possibilities).
+
+  * The terms that WOULD attribute -- [7B8C], [7A20], [7340] -- are NOT in the
+    SSM packing block at 0x0243C8-0x0245A4. Reading them requires the 0xF4
+    4-byte tag and therefore the SSM read patch, which sections 10-11 claimed
+    was unnecessary.
+
+WHAT SECTIONS 10-11 ARE STILL GOOD FOR, unchanged: logging 0xFF6860 retires the
+MAF*60/RPM load proxy for EVERY open-loop analysis in this project. That is a
+real and separate win. It is just not the answer to section 6.
+
+THE ACTUAL ROUTE TO SECTION 6, from bytes only:
+
+  [0xFFFF7340] is the last CONTINUOUS candidate, and it is multiplicative:
+        phi = clamp( SUM * [0xFFFF7340], 0.0, 32.0 )     (0x0300BE-0x030118)
+  Its producer is 0x02FFA2:
+
+  02FFA4: D673  mov.l @(0x030174),r6
+  02FFA6: 6660  mov.b @r6,r6
+  02FFA8: D273  mov.l @(0x030178),r2
+  02FFAA: 6020  mov.b @r2,r0
+  02FFAC: 8801  cmp/eq #1,r0
+  02FFAE: 8B11  bf 0x02FFD4
+  02FFB0: 2668  tst r6,r6
+  02FFB2: 890F  bt 0x02FFD4
+  02FFC0: F59D  fldi1 fr5
+  02FFC2: F050  fadd fr5,fr0
+  02FFC6: D26F  mov.l @(0x030184),r2
+  02FFCA: 420B  jsr @r2
+  02FFCC: F608  fmov.s @r0,fr6
+  02FFCE: D265  mov.l @(0x030164),r2
+  02FFD2: F20A  fmov.s fr0,@r2
+  02FFD4: F59D  fldi1 fr5
+  02FFD6: D263  mov.l @(0x030164),r2
+  02FFD8: F25A  fmov.s fr5,@r2
+
+    r6 = byte[0xFFFF8F08], r2 = 0xFFFF8F24, r2 = 0x000BE56C (CLAMP),
+    [0x030188] = 1.2 (hi), r2 = 0xFFFF7340. So:
+
+        byte[0x8F24] != 1  OR  byte[0x8F08] == 0   ->  [7340] = 1.0
+        otherwise  [7340] = clamp(1 + byte[0x8F08]/100, 1.0, 1.2)
+
+    i.e. [7340] is 1.0 or a value in [1.01, 1.20] in DISCRETE 1% steps.
+
+  PRE-REGISTERED TEST, so this cannot become another magnitude match:
+    A multiplicative k inflates EVERY sample, not just transients. At settled WOT
+    the other terms are ~0, so residual would be (1+map)*(k-1) = 1.336*(k-1),
+    i.e. >= +0.0134 for k=1.01. Settled WOT samples in the 8-8 log include
+    residuals of -0.0273, -0.0005 and +0.0166. Those REQUIRE k = 1.0.
+    Therefore [7340] can only explain section 6 if it SWITCHES between 1.0 and
+    >1.0 within a pull, which must show up as a DISCRETE jump of >= 0.0134 phi
+    between adjacent 40 ms samples. The observed excess is smooth
+    (0.098 -> 0.118 -> 0.098 -> 0.042 across four samples).
+    ** On present evidence that test FAILS and [7340] is NOT the explanation. **
+
+  NOTE on the labels: 0xFFFF8F24 carries the project label "cl_global_enable"
+  and 0xFFFF8F08 "cl_readiness_A_input". Per CLAUDE.md rule 7 these are names,
+  not evidence, and 0xFFFF8F24 carries TWO conflicting project labels
+  ("cl_global_enable" and "cl_readiness_B_input"). Settle from the writers.
+
+STATUS OF SECTION 6 AFTER THIS: still open, and now with its last continuous
+candidate provisionally failing a pre-registered test. The honest position is
+that the +0.13 to +0.24 AFR excess on ~6% of transient samples is NOT explained,
+and that no candidate should be reported for it until its writer is traced to
+cal constants and sensors.

@@ -1,0 +1,274 @@
+================================================================================
+WHY FFB SITS BELOW THE OL MAP -- quantified, and the IPW chain run backwards
+================================================================================
+Reference bin : rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Log           : logs/8-8 20.19c/8-8 20.19c.csv  (37,878 rows, 12,271 in CL/OL==10)
+Date          : 2026-08-19
+Builds on     : disassembly/analysis/ffb_command_chain_trace.txt (2026-08-17), which
+                established the STRUCTURE. This file supplies the NUMBERS, kills
+                three candidate terms outright, and closes the IPW loop.
+
+Tiers: VERIFIED (cited) / INFERRED (chain + weakest link) / HUNCH (confidence + test)
+
+--------------------------------------------------------------------------------
+0. THE ARITHMETIC, CORRECTED
+--------------------------------------------------------------------------------
+VERIFIED. 11.0 AFR -> 10.2 AFR is **+7.8% fuel**, not +10%.
+    11.0/10.2 = 1.0784
+In the ROM's own units it is a phi delta:
+    phi(11.0) = 14.7/11.0 = 1.33636
+    phi(10.2) = 14.7/10.2 = 1.44118
+    delta      = 0.10482 phi = 13.4 counts on the map's 128-per-unit scale.
+
+--------------------------------------------------------------------------------
+1. THE MAP TERM IS UNAMBIGUOUS -- three ways it could have been wrong, all closed
+--------------------------------------------------------------------------------
+VERIFIED, all from the 19c bin.
+
+(a) Descriptor 0xAD6C8 decodes as 17 x 18, axes 0xD01B8 / 0xD01FC, data 0xD0244,
+    typecode 0x04 (uint8), scale 0x3C000000 = 0.0078125, offset 0.
+        0AD6C8: 00 11 00 12 00 0D 01 B8 00 0D 01 FC 00 0D 02 44 04 00 00 00
+                3C 00 00 00 00 00 00 00
+    Load axis: 0.27 0.57 0.73 1.00 1.17 1.36 1.51 1.64 1.78 1.95 2.12 2.28 2.44
+               2.60 2.90 3.22 3.70
+    RPM  axis: 800 1200 1600 1900 2200 2600 3000 3300 3700 4000 4400 4800 5200
+               5500 6000 6300 6600 7000
+    Row 15 (6000 rpm): 09 0F 18 1D 20 22 25 25 26 26 27 27 28 29 2B 2B 2B
+    col 14 (load 2.90) = 0x2B = 43 -> 43 * 0.0078125 = 0.3359375 -> 11.0035 AFR.
+    ** Above load 2.90 and RPM 3300 the map is a FLAT 0.3359375. No interpolation
+       ambiguity exists in that region. **
+
+(b) The three OL maps Dean keeps mirrored are still byte-identical on 19c:
+        B Low  0xD0244  md5 6693a7a770fae62f832503d69ee3c86d
+        B High 0xD0404  md5 6693a7a770fae62f832503d69ee3c86d
+        KCA Alt 0xCFD30 md5 6693a7a770fae62f832503d69ee3c86d
+        Failsafe 0xD05C4 / FS Alt 0xCFEF0  md5 71545ca6e0338eb833cea4b7ec18324f
+    So the KCA-B blend (high*m + low*(1-m)) cannot move the map term. Whatever the
+    multiplier does, the result is 0.3359375.
+
+(c) "Primary OL Fueling Compensation (Timing Comp)", descriptor 0xAC5A8:
+        0AC5A8: 00 06 04 00 00 0C CD 18 00 0C CD 30 3C 00 00 00 00 00 00 00
+        1-D, 6 points, uint8, axis 0xCCD18 = -10,-8,-6,-4,-2,0 degrees,
+        data 0xCCD30 = 00 00 00 00 00 00  -> ALL ZERO.
+    ** DEAD. It is not the source of the offset. **
+
+--------------------------------------------------------------------------------
+2. THE MINIMUM-ENRICHMENT FLOOR PATH IS INERT AT OPERATING TEMPERATURE
+--------------------------------------------------------------------------------
+The live sum is  phi = base + MAX(mapterm, floor) - [7A44] + [7BCC] + [7BA8]
+with floor = MIN([73A4] + [7BE4], 0.65) + [7354] + [7374]
+(ffb_command_chain_trace.txt Part 3; clamps 0xCBE00 = 0.65, 0xCBE04 = 0.52 --
+ re-read this session: 0CBE00: 3F 26 66 66 3F 05 1E B8 -> 0.650, 0.520).
+
+Every calibration the floor modules read is neutral once warm. VERIFIED:
+
+  0xAD5E8 -> Min Primary Base Enrichment 1 Non-Cruise @0xCF8B8
+      16 (ECT) x 8 (load), uint8, scale 0x3B800000 = 0.00390625.
+      ECT axis 0xCC624 = float -40..110 degC in 10 deg steps.
+      Load row 1.80 (last): A6 9C 93 83 6E 52 33 1A 0D 0A 05 00 00 00 00 00
+      ** Columns 11-15 (70/80/90/100/110 degC) are ZERO in EVERY load row. **
+
+  0xAD604 -> Min Primary Base Enrichment 1 Cruise @0xCF95C
+      16 x 9. Last row: A1 8A 73 45 6E 40 2E 1A 0D 0A 05 00 00 00 00 00
+      ** Same: zero at and above 70 degC in every row. **
+
+  0xAC3CC -> 0xCC911 (feeds the [0xFFFF7354] module)
+      1-D, 16 pts on the same ECT axis, scale 0x3C000000 = 0.0078125.
+      Bytes: 80 x16 -> a FLAT 1.0000. A neutral gain.
+
+  0xAC3E0 -> 0xCC921 (feeds the [0xFFFF73A4] module)
+      1-D, 16 pts, scale 0x3B800000. Bytes: 00 x16 -> ALL ZERO.
+
+  0xAD5B0 -> 0xCF7C4 (feeds [0xFFFF7354]) 13 x 12, scale 0x3C800000 = 0.015625.
+      Row 0: 40 x13 -> 0.015625*64 = 1.0000. Every one of the 156 cells is 0x40.
+      ** FLAT 1.0 everywhere. ** Axes: X = -600..+600 (step 100), Y = -40..70 degC.
+
+  0xAD5CC -> 0xCF884 (feeds [0xFFFF7374]) 5 x 4, scale 0.0078125.
+      X axis 0xCF860 = 504, 568, 600, 650, 760  (reads as mmHg -- barometric).
+      Y axis 0xCF874 = -30, -10, -3, 0.
+      Rows 0 and 3 are a flat 1.0; rows 1-2 rise to 1.8125 only at 504 mmHg.
+      ** At sea level (760) it is 1.0 in all four rows. Neutral here. **
+
+INFERRED (weakest link: the module arithmetic around 0x03059A / 0x030AAC / 0x030B30
+was not re-decoded this session): with every table in the floor path either zero or
+a flat 1.0 at 90 degC and 760 mmHg, the floor cannot beat the map term, so
+MAX(mapterm, floor) = mapterm. The gap does NOT come from minimum enrichment.
+
+--------------------------------------------------------------------------------
+3. THE GAP, MEASURED IN THE FLAT-MAP REGION (this is the load-bearing result)
+--------------------------------------------------------------------------------
+Filter: CL/OL == 10, load >= 2.90, RPM >= 3300  -> map term is exactly 0.3359375
+with zero interpolation ambiguity. 147 rows in the 8-8 log.
+
+    residual_phi = 14.7/FFB - 1.3359375
+
+    min      -0.0273
+    p05      -0.0117
+    median   +0.0532
+    p95      +0.1108
+    max      +0.1182       <- FFB 10.11 AFR against an 11.00 command
+
+** The gap is real, it is up to +0.118 phi (+8.8% fuel), and its MEDIAN in this
+   region is +0.053 phi (~ +4.0% fuel, FFB ~10.58 against 11.00). **
+
+It is also a LOWER BOUND. `load` in the combined logs is DERIVED, not logged --
+`combine_logs.py:246  df["load"] = num["MAF"] * 60 / rpm_safe`. Because the map is
+flat at its RICHEST above load 2.90, any error in that proxy can only make the true
+map term leaner, hence the true residual larger.
+
+Time-series shape (pull at 115.3-117.6 s, 100% throttle throughout, ECT 167 F):
+    t=116.0  RPM 4062  load 2.49  FFB 10.98  res +0.069
+    t=116.4  RPM 4423  load 3.12  FFB 10.13  res +0.116
+    t=116.6  RPM 4687  load 3.42  FFB 10.12  res +0.117
+    t=117.0  RPM 5164  load 3.28  FFB 10.67  res +0.042
+    t=117.5  RPM 5765  load 3.14  FFB 10.98  res +0.003
+** Same cell, same throttle, same gear pull: the gap rises to +0.118 and decays to
+   zero inside 1.5 s. It is not a static offset. **
+
+--------------------------------------------------------------------------------
+4. WHAT IT IS *NOT* -- the transient hypothesis fails its own test
+--------------------------------------------------------------------------------
+The obvious read of section 3 is tip-in / accel enrichment ([0xFFFF7B8C], which
+ffb_command_chain_trace.txt showed is [7B90] + [7B94]). Tested and it does not hold
+up on the instantaneous-rate form:
+
+    residual vs dMAF/dt, flat region:
+        -100..-50   n= 5  med +0.0708
+         -50..  +0  n=18  med +0.0625
+          +0.. +50  n=49  med +0.0347
+         +50..+100  n=19  med +0.0747
+        +100..+150  n=12  med +0.0688
+        +150..+200  n=23  med +0.0708
+        +200..+250  n= 8  med +0.0823
+    -> no monotone relationship.
+
+Full Pearson scan over every logged channel (OL, load >= 1.0, ECT > 170 F,
+n = 1919). NOTHING dominates:
+    Timing  -0.267 | dRPM +0.232 | dMAF +0.202 | Throttle +0.191 | ECT -0.161
+    avcs    -0.148 | RPM   -0.135| wgdc +0.121 | load +0.112 | MPH +0.092
+    ol_s    +0.091 | IAT   -0.086| MAF +0.026 | IDC -0.026 | IPW -0.014 | MAP -0.003
+
+INFERRED, weakest link named: `load` is a MAF-derived instantaneous proxy while the
+ECU's own load is filtered, so a genuine ramp-rate dependence would be partly
+smeared by the proxy. The scan rules out a strong single-channel driver; it does
+not rule out the transient family outright.
+
+Worth carrying: descriptor 0xAD208 (20-byte 1-D form) decodes to a FLAT 0.100:
+    0AD208: 00 07 08 00 00 0C E8 98 00 0C E8 B4 39 00 00 00 C0 80 00 00
+    n=7, uint16, axis 0xCE898 = 800..3200 RPM, data 0xCE8B4, scale 1/8192, off -4.0
+    0CE8B4: 83 33 x7 -> 33587/8192 - 4 = 0.09998 at every RPM point.
+    Sibling 0xAD21C -> 0xCE8E0 = 20 00 x7 -> a flat 1.0000.
+HUNCH (55%): a term capped near 0.100 is doing most of the work, and 0xCE8B4 is it.
+What triggers it: 0.100 sits right inside the observed 0..0.118 band and the table
+is flat, which matches a gap that appears at full amplitude rather than scaling.
+Cheapest test: section 6.
+
+--------------------------------------------------------------------------------
+5. THE IPW CHAIN RUN BACKWARDS -- it closes to +/-1%, so FFB IS the real command
+--------------------------------------------------------------------------------
+This was the "or maybe lets see how the ipw is determined and run it backwards"
+half of the question. Result: the loop closes, which makes the section-3 gap real
+fuel rather than a display artifact.
+
+Model:  air per cylinder per cycle = load/2 grams
+        fuel per cylinder          = K * (IPW_ms - deadtime) * percyl_multiplier
+        AFR_ipw                    = air / fuel
+
+VERIFIED constant: Injector Flow Scaling @0xCBE0C = 45 99 A0 00 = float 4916.0
+    ECUFlash display = 2707090 / 4916 = 550.669 cc/min  (stock, unchanged in 19c)
+    -> K = 550.669 * 0.745 / 60000 = 0.006837 g/ms
+
+Independent check on the whole model: fitting K and deadtime by OLS from 15,998
+steady closed-loop rows (CL/OL==8, ECT>170 F, load/RPM/IPW flat over +/-3 samples)
+with no ROM input at all gives
+    fuel_per_cyl_g = 0.006661 * (IPW_ms - 0.7359)   ->  536.5 cc/min
+** 536.5 vs the ROM's own 550.669 is 2.6%. The logged IPW channel, the derived
+   load channel and the ROM injector constant are mutually consistent. **
+
+Fitting deadtime alone against the wideband gives 0.720 ms, and AFR_ipw vs wbo2 on
+those steady CL rows is mean +0.36% (sd 7.07%, n=7958).
+
+Now OL. With NO per-cylinder term the reconstruction drifts LEAN with load:
+    IDC  0-20  n=870  AFR_ipw vs FFB  median -2.17%
+    IDC 20-40  n=766                  median +0.51%
+    IDC 40-60  n=186                  median +5.55%
+    IDC 60-80  n= 65                  median +5.36%
+    IDC 80-100 n= 32                  median +4.27%
+
+The break sits at IDC ~30, i.e. IPW ~7-8 ms at those RPM. That is exactly where the
+Per Injector Pulse Width Compensation tables step. VERIFIED, decoded fresh:
+    A 0xD07E8 / B 0xD0994 / C 0xD0B40 / D 0xD0CEC, each 17 x 16 uint8,
+    scaling (x*0.78125)-100, X = Last Calculated Base PW 1000..16000 (us),
+    Y = Engine Speed 700..5600.
+    Row 12 (4400 rpm), top PW column:
+        A 0xD07E8+204 -> 0x7A = 122 -> -4.6875 %
+        B 0xD0994+204 -> 0x78 = 120 -> -6.2500 %
+        C 0xD0B40+204 -> 0x7A = 122 -> -4.6875 %
+        D 0xD0CEC+204 -> 0x7B = 123 -> -3.9062 %
+        mean = -4.8828 %
+    At 4400-5600 rpm the mean of A-D is 0.00% for PW columns 1000-6000 us and
+    -4.88% for columns 8000 us and up. Our WOT IPW is 20-23 ms, i.e. past the top
+    of the axis, so it clamps to the -4.88% column.
+
+Testing the two possible sign conventions -- refit deadtime under each, then look
+at the OL reconstruction error:
+
+    convention                             deadtime   IDC 20-40  40-60  60-80  80-100
+    no comp at all                          0.720 ms   +0.51%   +5.55% +5.36%  +4.27%
+    PW * (1 + c/100)   (c=-4.88 -> less)    0.749 ms   +1.47%  +11.15% +10.97% +9.28%
+    PW * (1 - c/100)   (c=-4.88 -> MORE)    0.685 ms   -0.69%   +0.50%  +0.25%  +0.94%
+
+** VERIFIED by fit: applied_PW = base_PW * (1 - comp/100). A negative table entry
+   LENGTHENS the pulse. Under that convention the IPW chain reconstructs FFB to
+   within +/-1% at every duty band from 20% to 100%. **
+
+Consequences:
+  * FFB is not a display quantity. The low-10s command is really being injected,
+    and the logged IPW channel is the COMMON value -- the per-injector tables add
+    ~4.9% more fuel at WOT that never appears in the IPW column.
+  * The wideband agrees: wbo2 tracks FFB within +/-0.5 AFR across every IDC band,
+    while un-compensated AFR_ipw is 0.5-0.6 AFR lean of both.
+  * This directly touches the injector-swap worksheet. docs/injector-rescale.md
+    calls the Per Injector PW Comp axis question "-3% to +6% of load-dependent,
+    per-channel error". Measured here it is a clean 0 -> -4.88% step, i.e. +4.9%
+    fuel, and today the WOT operating point is CLAMPED off the top of the axis.
+    Rescaling that axis by k=0.55 pulls a 21 ms pulse to ~11.5 ms equivalent --
+    still off the top of a stock axis, so the clamp survives the swap. Confirm
+    before flashing new injectors.
+
+--------------------------------------------------------------------------------
+6. WHAT IS STILL OPEN, AND THE ONE MOVE THAT SETTLES IT
+--------------------------------------------------------------------------------
+Eliminated this session: the OL map term (sec 1), Timing Comp (sec 1c), the whole
+minimum-enrichment floor path (sec 2), and any IPW/injector-model artifact (sec 5).
+
+Still standing, from ffb_command_chain_trace.txt Part 3:
+    base extras : [73B4] [7A08] [7A14] [7AF4] [7B8C]
+    tail        : - [7A44] + [7BCC] + [7BA8]
+[7A08] is ECT-seeded and decays to zero, so it is out at 167-178 F. That leaves six
+addends and no way to separate them from the logged channels -- which is exactly
+why section 4's correlation scan came back flat.
+
+THE MOVE: log the addends directly. No ROM change is needed. The SSM read-addresses
+patch at 0x09A3C2-0x09A473 (docs/ssm-read-patch.md) already supports 4-byte tagged
+RAM reads -- tag 0xF4, precedent `0xF465FC` -> 4 bytes at 0xFFFF65FC. So add to
+logs/logcfg.txt:
+
+    0xF4730C   the FFB source itself (phi, float) -- validates the whole decode
+    0xF4798C   the OL map result -- confirms sec 1 on the car
+    0xF47B8C   transient / tip-in sum
+    0xF47BCC   gated enrichment
+    0xF47A14   unnamed base addend
+    0xF47AF4   unnamed base addend (no live writer found)
+    0xF473B4   unnamed base addend (no writer found; also SSM-packed at 0xFFFF6854)
+
+One WOT pull with those seven channels decomposes the sum arithmetically and the
+question is finished. Caveat before wiring it: every extended channel currently in
+logcfg.txt uses the 0xFF tag, none uses 0xF4 or 0xF2, so the 4-byte path is
+UNEXERCISED on this setup. Prove it on 0xF4730C first -- its value must equal
+14.7/FFB row for row. If that matches, the other six are trustworthy.
+
+Also still open and worth a line: `load` is derived (MAF*60/RPM), not the ECU's own
+figure. docs/ssm-read-patch.md names 0xFFFF65FC as engine load. Logging 0xF465FC
+alongside would remove the proxy from every OL analysis in this project, not just
+this one.
