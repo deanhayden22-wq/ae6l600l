@@ -294,5 +294,285 @@
    "That other ECT-indexed tables in this ROM also use \u00b0C."
   ],
   "reason": "The central claim is that these two tables use a 16-bin coolant axis from \u221240 to 110 in \u00b0C, not \u00b0F. The blind answer independently describes both tables as 16-point curves over coolant temperature \u221240..110C. The specific table values and the bin-index details are not covered, but nothing in the blind answer contradicts the claim."
+ },
+ "mem-project_knock_flag_channel": {
+  "grade": "agree",
+  "supported": [
+   "KNOCK_FLAG is the byte at RAM 0xFFFF81BA (GBR+190).",
+   "It is written at two GBR-relative sites, 0x043B5A and 0x043B5E, with GBR = 0xFFFF80FC loaded at 0x043798.",
+   "It is set when the magnitude test passes (signal >= threshold 1) AND the counter reaches the u16 threshold at 0xD29DC (=250).",
+   "Companion byte 0xFFFF81BB sub-classifies the event (blind: heavy-knock flag set when signal >= threshold 2).",
+   "0x0463E2 is a consumer in the FLKC / fine-correction routine, and tst r7,r7 at 0x046460 sends zero to the advance path and non-zero to the retard path.",
+   "It is a detection-domain flag computed from the knock signal and thresholds, not a record of applied retard."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "0x0443C4 as the primary FBKC trigger: the blind answer marks it unknown (function not shown).",
+   "That the flag sits upstream of FBKC specifically: no FBKC consumer is identified in the blind answer.",
+   "That it is a per-ignition-event flag. The blind answer describes per-cylinder detection but does not state how often it updates.",
+   "The FLKC enable gate at load 1.25."
+  ],
+  "reason": "The blind answer independently confirms the address, both write sites, the GBR base and where it is set, the 250-count gate, the sub-classifying companion byte, and the FLKC consumer with its advance/retard branch. Nothing is contradicted. The FBKC-consumer statement (0x0443C4) and the load gate are not covered, but most of the main code statements are supported."
+ },
+ "doc-ssm-read-patch-00": {
+  "grade": "partly_agree",
+  "supported": [
+   "The code at 0x09A3C2 onward, in the function around 0x09A3B0, is a diagnostic read-addresses request handler. The blind answer describes a service handler with service code 0xA8 that parses 3-byte address tokens and copies memory bytes into a response buffer, which matches what an SSM read-addresses handler does.",
+   "0x09A3C2 is code inside the function that begins around 0x09A3B0. The blind answer places it in the decode portion of the handler, right after the prologue."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "That 0x09A3C2\u20130x09A473 (178 bytes) is a patched region that differs from the stock ROM.",
+   "That the patch is present in revs 20.8\u201320.19b and absent from ae5l600l.bin, 2013 STI, 2014_wrx, AE5L700V and rev 25 e garn.",
+   "That it is the only code difference between the stock ROM and the flashed ROMs.",
+   "The exact end boundary of 0x09A473."
+  ],
+  "reason": "The blind answer independently identifies the code as a service-0xA8 read-addresses handler, which fits the claim's description. One small difference: the blind answer puts the function entry at 0x09A3BA and treats 0x09A3B0 as part of its register-save prologue. That is close enough to 'the function at 0x09A3B0' not to count as a contradiction. The central assertion is that this region is a patch absent from the stock and comparison ROMs. That needs cross-ROM comparison, which the blind answer does not address."
+ },
+ "doc-architecture-02": {
+  "grade": "partly_agree",
+  "supported": [
+   "0xFFFFBFA0 is used as an initial stack-pointer value: the blind answer says the literal is loaded into r15 at reset-vector-like entries (0x40, 0x4C) as the stack top."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "About 27,900 FPU instruction sites in code regions",
+   "Zero SH-2A-only encodings; the 4 candidates are float constants in literal pools",
+   "No FSQRT, FSCHG, FRCHG or double-precision instructions, so the FPU is SH-2E",
+   "ROM size of 1,048,576 bytes identifies an SH7058",
+   "The reset SP value is stored specifically at vector address 0x00000004 and sits just under the top of 48 KB on-chip RAM",
+   "0xFFFFBFFC is the highest RAM literal in ROM and the last aligned word of on-chip RAM (the blind answer describes it only as a 0x5AA5A55A magic flag cell)",
+   "Peripheral literals 0xFFFFF602\u20130xFFFFF666 are the SH7058 ATU-II timer block",
+   "Tuned rev 20.19b is architecturally identical, with FPU sites at the same addresses"
+  ],
+  "reason": "The only overlap is 0xFFFFBFA0 serving as the initial stack pointer, which the blind answer confirms. Its extra roles for 0xFFFFBFA0 and 0xFFFFBFFC (buffer-pointer cell, magic flag) do not conflict with the claim's placement statements. The claim's central points are not addressed: the CPU/FPU identification, the ROM size, the RAM top boundary and the peripheral map."
+ },
+ "mem-feedback_dont_attribute_from_magnitude": {
+  "grade": "agree",
+  "supported": [
+   "0xCE8B4 is a flat table of about 0.100: the blind answer says every value is 0.099976.",
+   "A decay function exists at 0x036D14 as a separate writer routine: the blind answer describes it as the entry of a decay routine that decrements a float, floored at 0 or at a calibration value.",
+   "0x0243C8-0x0245A4 is a packing block that stores many internal RAM floats into 0xFFFF683C+disp slots: the blind answer says GBR=0xFFFF683C is loaded at 0x0243C8 and float signals are quantized into uint16/uint8 slots up to 0x0245A4.",
+   "0xAD258 is not the lever: the blind answer independently says its ECT factor is all 1.0 and has no effect. This is consistent with the claim but not the same detail."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "The clamp constants associated with 0xAD258 are both 0.0. The blind answer says the clamp limits *0xCC3EC and *0xCC3F0 are not shown.",
+   "0xCE8B4 is read after the store it was blamed for. The blind answer gives no ordering relative to that store.",
+   "[7B8C] has a +0.09998 clamp bound.",
+   "The 0x036D14 decay function writes [7A14]. The blind answer says it decays 0xFFFF7A18 and does not mention 7A14; this is a possible address discrepancy, but not a definite conflict.",
+   "A 79 \u00b0C ECT threshold gates [7A14].",
+   "The packed slots are readable via the 0xFF 2-byte SSM tag, and the OL map result is among them.",
+   "The run of ROM addresses is a literal pool, not a dispatch table."
+  ],
+  "reason": "The main code statements are supported: the flat 0.1 table at 0xCE8B4, the decay routine at 0x036D14, and the packing block at 0x0243C8-0x0245A4 into 0xFFFF683C. Nothing is directly contradicted. The 7A14 vs 7A18 difference is noted as unresolved rather than as a clear conflict."
+ },
+ "doc-architecture-06": {
+  "grade": "agree",
+  "supported": [
+   "0x09A3C2\u20130x09A473 contain real instructions. The blind answer places them in an SSM-style 0xA8 read-memory handler.",
+   "Injected code exists at 0x0F1000\u20130x0F1057 in erased flash (0xFFFF padding). The blind answer ends it with a float constant at 0x0F1054\u20130x0F1057.",
+   "The injected code is reached via literal-pool words at 0x03B79C and 0x03B7A8, both holding 0x000F1000.",
+   "The injected code returns into the rev-limit path at 0x03B6B2.",
+   "The injection touches the rev limiter (both deadband arms of the fuel-cut routine are hooked)."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "That the 0x09A3C2\u20130x09A473 bytes differ between stock and tuned (the blind answer saw one ROM only).",
+   "The original stock values of the literals (0x000CC500/0x000CC50C) before redirection.",
+   "The ROM hole spans 0x0DAE8C\u20130x0F8900, so the injected code classifies as rom_hole. The blind answer only notes that 0x0DAE8C holds 0xFFFF.",
+   "The byte-difference counts (12,084 total, 178 code, two float literal-pool bytes).",
+   "That all other code is byte-identical between stock and tuned. The blind answer flags 0x0F8900 = 8000.0 as possibly another patch constant, but only as an inference."
+  ],
+  "reason": "The blind answer independently confirms the injected code at 0x0F1000, the two literal redirects at 0x03B79C and 0x03B7A8, the return to 0x03B6B2, and that 0x09A3C2\u20130x09A473 are instructions. Nothing in it is contradicted. The diff and history statements cannot be tested from one ROM."
+ },
+ "mem-project_cruise_noncruise_mechanism": {
+  "grade": "partly_agree",
+  "supported": [
+   "0xFFFF90A8 is a float value clamped to [0,1] and written by the store at 0x0611E0",
+   "It ramps: a calibrated step is added or subtracted each pass (0xD9B40/0xD9B44), then clamped",
+   "The decision chain runs back-to-back from scheduler call sites 0x605E6\u20130x605F2: 0x60ECC condition \u2192 0x610E6 \u2192 0x61120 counter/lockout \u2192 0x6114E ramp",
+   "Calibration lives in the 0xD9AC4\u20130xD9E26 region",
+   "Table 0xD9BE4 is zero from 3200 RPM up and table 0xD9C44 is zero from 3600 RPM up",
+   "0xD9AD8 = 250 and 0xD9ADA = 375 are count limits used by the chain",
+   "0xFFFF63C4 is the MAF input"
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "That 0xFFFF90A8 is specifically the Cruise/Non-Cruise blend ratio (0 = Cruise, 1 = Non-Cruise). The blind reader frames it as a monitor/diagnostic debounce accumulator and says its consumer is not shown.",
+   "Application by task 32 as a ratio crossfade between the Non-Cruise and Cruise maps",
+   "Ramp step magnitude of \u00b10.008 per tick",
+   "Entry versus exit roles of the two curves, and that they are RPM/torque curves",
+   "MAF hysteresis thresholds of 45/50 g/s",
+   "Specific roles for the counts: 250-count dwell reset by transients and 375-count re-entry lockout",
+   "0xFFFF85E4 as a torque-domain gate. The blind answer loosely calls it an airflow quantity but says what it measures is not shown.",
+   "0xFFFF90BE as a raw cruise flag used to hard-select Cranking IPW Comp and Timing Compensation A/B",
+   "Which map pairs differ in 20.19c, the absence of ECUFlash definitions, and that the Map Switching names are invented",
+   "No TGV control in the ROM"
+  ],
+  "reason": "The blind answer independently confirms the code structure: the clamped [0,1] ramp at 0xFFFF90A8 with its writer at 0x0611E0, the four-routine chain and its call sites, the zero-above-3200/3600 RPM curves, the 250/375 limits, and MAF at 0xFFFF63C4. It does not establish the central identification of this mechanism as cruise/non-cruise map blending, or how the result is consumed. It hedges on what the threshold quantity at 0xFFFF85E4 and the table units mean, so nothing is contradicted outright."
+ },
+ "doc-rev-limit-patch-05": {
+  "grade": "disagree",
+  "supported": [
+   "All three pairs hold the same values (6700 cut / 6680 resume).",
+   "Pair 1 (0xCC500/0xCC504) is live: the blind answer has 0xCC500 loaded in the 0x0F1000 trampoline and 0xCC504 loaded at 0x03B6B6, with the primary hysteresis state written to @(1,r5).",
+   "Pair 3 (0xCC510/0xCC514) is live as a second hysteresis stage at 0x03B6D6/0x03B6E6 and sets @(2,r5).",
+   "r5 = 0xFFFF7CB8, so the two stages write independent bytes at 0xFFFF7CB9 and 0xFFFF7CBA.",
+   "The patch returns to 0x03B6B2, which loads 0xCC504 as the resume value.",
+   "At 0x0F1030 the patch loads r2 with 0xCC500.",
+   "The patch at 0x0F1000 adds an RPM offset to fr15.",
+   "0xCC50C has no direct reference."
+  ],
+  "contradicted": [
+   "Claim says both entries now jump to 0x0F1000, pair 2 is dead, and editing 0xCC508 does nothing; blind answer says only the false-condition branch goes through the trampoline, and 'Rev Limit On (2)' 0x0CC508 is 'Loaded into fr6 at 0x03B6BE as the ON threshold on the branch taken when the deadband condition is true', so pair 2 is live on one branch."
+  ],
+  "not_addressed": [
+   "That fr15 is still modified when stage 2 runs at 0x03B6D6, so pair 3 is also shifted by the offset.",
+   "That the offset is +2700 and is tied to launch control.",
+   "That path B's delay slot sets r2 = 0xCC508 before the patch overwrites it."
+  ],
+  "reason": "The blind answer agrees on pairs 1 and 3, the flag bytes, and the patch return point. It contradicts the central claim that pair 2 is dead: it reads 0xCC508 as being loaded at 0x03B6BE on the branch that does not go through the trampoline."
+ },
+ "mem-project_ffb_transient_clamp": {
+  "grade": "agree",
+  "supported": [
+   "[FFFF7B8C] = [7B90] + [7B94], produced by the routine spanning 0x038EA0-0x039286, with r10 base 0xFFFF7BA0.",
+   "[7B90] is clamped to [-0.09998, +0.09998] by flat tables whose data sit at 0xCE776 (lower) and 0xCE784 (upper).",
+   "[7B94] is clamped to [-0.09998, 0.0] by flat tables at 0xCE792 (lower) and 0xCE7A0 (upper), so it can only subtract.",
+   "Maximum transient enrichment from this term is +0.09998.",
+   "The fuel command is an additive sum that includes the OL map result [798C] and [7B8C] (0x02FFE4 adds both).",
+   "The tip-in enrichment module (0xCED50/0xCEDBC base, 0xCD118 RPM comp, 0xCD14C boost-error comp) is a separate path from the 7B8C transient module.",
+   "Setter 0x036BF4 is called from 0x047F68."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "The tip-in module acts on injector pulse width while this module acts in the phi domain (the blind answer only shows tip-in output going to 7C3C/7C40).",
+   "All 18 tables read by the module are unnamed.",
+   "[FFFF7BA8] is identically 0.0 via clamp(x,0,0); the blind answer says its writer is not shown.",
+   "[FFFF7BCC] is 0 at WOT because its gate needs the OL map result to be about 0.",
+   "[FFFF7A20] is an over-temp latch at 102/105 degC and normally 0; the blind answer only hunches at a tip-in fraction.",
+   "SSM packing slots 0xFF6860/0xFF6854/0xFF6866 map to [798C]/[73B4]/[7BA8] with the stated scales.",
+   "A third writer group at 0x036D14 decays the [7A14] accumulator by exactly the seed, and [7A14] is inert.",
+   "A MAX(mapterm, floor) structure with the floor around 0.160; the blind answer shows only a max(798C,7BA8) path selected by 0xCBBD2==90."
+  ],
+  "reason": "The central code claims all match the blind answer: the sum structure, the producer range, the r10 base, the four clamp tables with their bounds, the +0.1 cap and separation from the tip-in module. Nothing is contradicted. The secondary claims (7BA8, 7BCC, 7A20, SSM slots, 0x036D14) are left unaddressed."
+ },
+ "doc-ssm-read-patch-02": {
+  "grade": "disagree",
+  "supported": [
+   "Table at 0x06423C is a function-pointer table indexed by value<<2 (shll2), fetched via mov.l @(r0,r5),r6 and called via jsr @r6",
+   "0x09A4E4 is the literal-pool slot holding the table base 0x06423C",
+   "The request value is used as a table index, not an address",
+   "Getter returns one byte stored into output buffer",
+   "0x09A4DA holds the bound constant checked via cmp/hs r8,r1"
+  ],
+  "contradicted": [
+   "claim says 0x09A4DA bound is 848 (reject if index >= 848); blind answer says 0x09A4DA = 0x0350 = 848 \u2014 actually 0x0350 = 848 decimal, so these agree"
+  ],
+  "not_addressed": [
+   "Only Subaru-provided getters can be read on stock ROM (interpretive conclusion)"
+  ],
+  "reason": "0x0350 hex equals 848 decimal, so the bound value matches and is not a contradiction. The core mechanism \u2014 index-based dispatch through a function-pointer table at 0x06423C, scaled by 4, bounds-checked at 0x09A4DA, with base pointer at 0x09A4E4, returning one byte \u2014 is independently confirmed by the blind answer. No testable statement is actually contradicted.\n\nCorrecting: since 0x0350=848 the grade should reflect agreement.\n\nAll central testable statements are supported and none genuinely contradicted."
+ },
+ "doc-architecture-05": {
+  "grade": "agree",
+  "supported": [
+   "0xBE598 (fmac_interp_uint16) and 0xBE588 (fmac_interp_uint8) are table-lookup/interpolation primitives. The blind answer independently identifies both as shared uint16/uint8-indexed interpolation/lookup helpers called via jsr.",
+   "These helpers sit on calibration lookup paths. The blind answer describes callers converting raw counts to engineering values through them.",
+   "The ROM's code uses SH-2E FPU instructions throughout, which is the premise for needing an FPU-capable language. The blind answer reports fmov.s, fldi0, fldi1 and an fr4/fr5/fr0 float calling convention in the code."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "The two interp helpers have 176 call sites between them.",
+   "0x2B8C is a generic ISR prologue with 118 callers that performs an FPU context save. The blind answer only says it is reached through a dispatch/trampoline table at 0x2080-0x20C8 and that its internals are not shown, which is consistent with the claim but does not confirm it.",
+   "KNOCK_DETECTOR, FLKC_PATH_J and FLKC_PATHS_FG contain FPU code.",
+   "No genuine SH7058 code contains MOVI20, MOVU, FSQRT or SH-2A 32-bit forms.",
+   "The SH-2E FPU encodings decode identically under SH-2A."
+  ],
+  "reason": "Most of the claim concerns Ghidra language configuration and import history, which the blind answer cannot test. On the code itself, the blind answer agrees that 0xBE588 and 0xBE598 are uint8/uint16 interpolation helpers. It also shows heavy FPU instruction use, which supports the claim's premise. Its description of 0x2B8C as a routine reached through a handler trampoline chain fits the claim's 'generic ISR prologue' without confirming it. Nothing is contradicted."
+ },
+ "doc-transient-fuel-03": {
+  "grade": "disagree",
+  "supported": [
+   "The routine at 0x3BB6C is a state machine using a workspace at 0xFFFF7CE0 with an active/not-active state.",
+   "It has two counters (active and inactive), with thresholds at 0xCBC0B (active, 3) and 0xCBC0C (inactive, 3).",
+   "Values: 0xCC51C/0xCC520 = 510, 0xCC524/0xCC528 = 505, 0xCC52C = 1260, 0xCC530 = 10000.",
+   "There are two calibration sets (A/B), currently identical, so the set selection changes nothing."
+  ],
+  "contradicted": [
+   "Claim says 0x3BB6C is tip-in (acceleration) fuel enrichment; blind answer says it is a speed-limit fuel-cut state machine with staged cut output flags.",
+   "Claim says 0xCC51C/0xCC520 (510) are tip-in gains; blind answer says they are speed enable thresholds (activate when speed >= 510).",
+   "Claim says 0xCC524/0xCC528 (505) are tip-out/decay gains; blind answer says they are speed disable thresholds.",
+   "Claim says 0xCC530 (10000) is a decay saturation sentinel; blind answer says it is an RPM threshold: activation needs rpm >= 10000, and one release path fires when rpm < 10000.",
+   "Claim says 0xCC52C (1260) is an RPM gate, so enrichment can't deactivate below 1260 RPM; blind answer says 1260 is compared with an unknown signal fr13 = 0xFFFF620C, not rpm (rpm is 0xFFFF6624), and fr13 < 1260 is a condition for release, not a block on it.",
+   "Claim says magnitude = gain \u00d7 throttle delta (from throttle_delta_calc); blind answer has no multiplication. The 510/505 values are only compared against speed as thresholds.",
+   "Claim says the B set is likely for closed-loop vs open-loop; blind answer says the set is chosen by whether helper 0x22CF4 returns 1, and what that helper computes is unknown."
+  ],
+  "not_addressed": [
+   "Whether a throttle_delta_calc routine exists and produces a normalized 0.0\u20131.0 delta."
+  ],
+  "reason": "Both agree on the 0xFFFF7CE0 state machine, the two counters with thresholds of 3, and the identical A/B sets. They conflict on what the function is: the claim calls it tip-in enrichment, the blind answer a speed-limit fuel cut. They also conflict on the role of every gain/threshold constant and on how 1260 and 10000 are used."
+ },
+ "doc-rev-limit-patch-03": {
+  "grade": "disagree",
+  "supported": [
+   "0xFFFF65FC is the vehicle speed signal in km/h (blind: 'central float32 signal (vehicle speed km/h)', marked inferred).",
+   "0x0CC500 holds the cut/rev-limit RPM value of 6700 (blind: 'Rev Limit On' constant, 6700 rpm as float32).",
+   "0x0F104C is the LC disable speed threshold in km/h.",
+   "0x0F1050 is the LC RPM delta, 2700.0.",
+   "0x0F1054 is the FFS RPM delta, 0.0, so the FFS offset is currently null.",
+   "0x0F1048 holds 0.0."
+  ],
+  "contradicted": [
+   "Claim says 0x0F1038 holds the literal pointer 0xFFFF65FC, which the injected code uses to read vehicle speed; blind answer says 0x0F1038 is 'Calibration data, 0xFFFF pattern; appears unset/placeholder', i.e. a 'disabled/unused calibration slot'.",
+   "Claim says 0x0F103C holds the pointer 0xFFFF65D0 to the state flag byte read by the code; blind answer says 0x0F103C 'appears unset/placeholder', consistent with a disabled/unused slot.",
+   "Claim says 0x0F1000\u20130x0F1036 is executable injected code, for example 0x0F101E fcmp/gt, 0x0F1024 mova and 0x0F102C fmov.s; blind answer says 0x0F101E, 0x0F1024, 0x0F102A and 0x0F102C are 'Calibration data' and that the 0x0F10xx block is 'calibration constants/tables'."
+  ],
+  "not_addressed": [
+   "The branch logic: when the flag equals 1 and speed is below 5 mph, add 2700; when the flag is not 1 and speed is not above 5 mph, add 2700; otherwise add 0.",
+   "fadd fr8,fr15 adds the delta to the RPM value in FR15.",
+   "0x0F1040 holds return address 0x0003B6B2, and the code jumps back into the stock path there. The blind answer shows only a uint16 value of 3 and calls 0x03B6B2 undecoded code.",
+   "0x0F1044 holds the pointer 0x000CC500, and FR8 is loaded with 6700 in the delay slot. The blind answer shows only a uint16 value of 12.",
+   "0xFFFF65D0 is a state flag byte compared with 1. The blind answer says its role is unknown.",
+   "8.0515 km/h equals 5 mph."
+  ],
+  "reason": "The blind answer agrees on the identities of the data constants: vehicle speed RAM, 6700 rev limit, the 2700 LC delta, the 0 FFS delta and the LC speed threshold. However, it reads the 0x0F10xx block as calibration data rather than injected code. It also calls the pointer literals at 0x0F1038 and 0x0F103C unset or unused placeholders. Both readings directly conflict with the claim's central statement that this is executable code using those literals as pointers."
+ },
+ "doc-knock-07": {
+  "grade": "disagree",
+  "supported": [
+   "0xC0BFC is the 'Boost Control Disable (IAM)' threshold, compared against an IAM-type value to drive a boost-control disable decision",
+   "0xC0BF8 is the 'Boost Control Disable (Fine Correction)' threshold; a fine correction more negative than it leads toward disabling boost control",
+   "Boost control reads IAM and fine knock correction and disables or backs off when they go bad"
+  ],
+  "contradicted": [
+   "claim says BoostControlDisable_IAM (0xC0BFC) = 0.2; blind answer says the float at 0x0C0BFC is 0.5",
+   "claim says BoostControlDisable_FineCorrection (0xC0BF8) = \u22121.0; blind answer says the float at 0x0C0BF8 is -2.0"
+  ],
+  "not_addressed": [
+   "That the disable actually backs off the wastegate / cuts boost (the blind answer says where the disable flags are consumed is not shown)",
+   "The blind answer adds detail the claim omits: a delay counter with a calibrated delay at 0x0C0BAD, and a second IAM bound at 0x0C0C00. These do not conflict with the claim."
+  ],
+  "reason": "Both sides give the two addresses the same roles. However, the blind answer reads different calibration values at both addresses: 0.5 versus the claimed 0.2, and -2.0 versus the claimed -1.0. These cannot both be true for the same ROM."
+ },
+ "doc-transient-fuel-02": {
+  "grade": "agree",
+  "supported": [
+   "0x37186 is the top-level orchestrator/dispatcher for this feature",
+   "0x37186 calls the sub-steps 0x37492, 0x3735A, 0x3740C, 0x37450, 0x3726A and 0x371E6, in that order",
+   "0x371E6 is the final call and produces the combined output result",
+   "0x3BB6C is not called from 0x37186; both are invoked separately as periodic tasks from the scheduler dispatcher at 0x049CF0"
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "0x37492 is a tip-in ramp state machine (the blind answer describes threshold compares, saturating counters and selection of a config float, but gives no tip-in meaning)",
+   "0x3735A and 0x3740C are wall-film handlers for rising and falling load (the blind answer says the two listings are one function split by the heuristic)",
+   "0x37450 is the DFCO / overrun fuel-cut logic",
+   "0x3726A is transient condition gating",
+   "0x371E6 combines all the corrections into the final enrichment",
+   "Internal structure of 0x3BB6C: condition queries, gain A/B selection, ACTIVE/NOT-ACTIVE state machine, tail call to enrich_apply (the blind answer says its body is not in the pack)"
+  ],
+  "reason": "The blind answer independently confirms the core call structure. 0x37186 calls the same six sub-steps in the same order, and 0x3BB6C is a separate task called by the scheduler dispatcher rather than by 0x37186. It contradicts nothing. The functional labels for each sub-step and the internals of 0x3BB6C are not addressed. The blind answer's note that 0x3735A and 0x3740C are one function split by the heuristic is a structural remark, not a contradiction of the rising and falling labels."
  }
 }
