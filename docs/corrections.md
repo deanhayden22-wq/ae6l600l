@@ -5653,8 +5653,11 @@ cleared on the exit path; the non-zero writer was not chased);
 
 ## 96. Blind audit of function labels: seven label comments describe code that is not at the labelled address — **2026-10-11**
 
-**Status: recorded. Labels NOT yet changed** — renames are being held until the
-full function-label audit returns, so Ghidra is re-imported once.
+**Status: labels changed 2026-10-11** in `ImportAE5L600L.java`; old names added to
+`RetireStaleLabels.java` (21 across items 96 and 97). Each row below was re-decoded
+from rev 20.19c bytes before the rename. Ghidra re-imported 2026-10-11 in one
+program of the project ("removed 21 of 150", "Applied 3756"); the project holds
+four programs and labels are per program.
 
 ### How these were found
 
@@ -5729,7 +5732,8 @@ at `0xFFFFF738`; find what reads `0xFFFF81F8` and `0xFFFF8210`.
 
 ## 97. Blind audit, all remaining function-entry labels: twelve more descriptions wrong, one dispute the label won — **2026-10-11**
 
-**Status: recorded. Labels NOT yet changed** (same hold as item 96).
+**Status: labels changed 2026-10-11** (see item 96's status). `0x0431B0` and
+`0x050DE2` kept their names and had only the comment rewritten.
 
 Continuation of item 96 over the other 123 `[TRACED]` labels that sit on a
 function entry. Report: `docs/exploration/blind_audit/report.md`. 117 graded:

@@ -1,4 +1,5 @@
-// Removes the label names retired on 2026-08-19 by corrections items 91, 92 and 93.
+// Removes the label names retired on 2026-08-19 by corrections items 91, 92 and 93,
+// and on 2026-10-11 by items 96 and 97.
 //
 // WHY THIS EXISTS
 // ImportAE5L600L.java labels with createLabel(addr, name, true), which ADDS a
@@ -8,12 +9,15 @@
 // applied to -- the stale name stays as a secondary symbol, still searchable and
 // still shown in the Symbol Tree.
 //
-// The 129 names below were retired because the evidence contradicts them:
+// The first 129 names below were retired because the evidence contradicts them:
 //   * 105 asserted an ISR dispatch table at 0x00E5EC-0x00E6C0 that does not
 //     exist -- item 84 proved it is the literal pool of the 0x00E4xx task stubs,
 //     and none of the 51 addresses it holds is in the 0x0-0x400 vector table.
 //   *   5 put float/descriptor names on six-instruction byte flag readers.
 //   *  the rest were duplicates or superseded identities.
+//
+// A further 21 names (19 on code, 2 on RAM) were retired by items 96 and 97: each
+// described a larger or different body than the code at the labelled address.
 //
 // Safe to run more than once: a name that is already gone just reports 0.
 // It removes ONLY these exact (address, name) pairs -- your own labels, and the
@@ -176,7 +180,30 @@ public class RetireStaleLabels extends GhidraScript {
         n += drop(0xFFFF3248L, "flkc_fg_var_3248");
         n += drop(0xFFFF79A4L, "ol_condition_checker_GBR");
         n += drop(0xFFFF81ACL, "gbr_knock_81AC");
-        println("RetireStaleLabels: removed " + n + " of 129 stale label(s).");
+        // Retired 2026-10-11 by corrections items 96 and 97 (blind audit of
+        // function labels): the description did not match the code at the address.
+        n += drop(0x00000F4CL, "isr_dispatch_manager");
+        n += drop(0x0000300EL, "injector_ic_trigger");
+        n += drop(0x00009B2CL, "dt_float_correction");
+        n += drop(0x0000A660L, "task10_knock_signal_read");
+        n += drop(0x0000D118L, "clamp_filter");
+        n += drop(0x0000DD52L, "rtos_task1_fast_minimal");
+        n += drop(0x0000DE92L, "rtos_task4_minimal");
+        n += drop(0x00011848L, "descriptor_interpolation");
+        n += drop(0x00011880L, "atu_timer_capture_read");
+        n += drop(0x00032958L, "fuel_correction_filter_init");
+        n += drop(0x000343CEL, "afc_output_clamp");
+        n += drop(0x00037ABAL, "injector_trim_application");
+        n += drop(0x00037F00L, "afl_multiplier_computation");
+        n += drop(0x00044DB0L, "task09_knock_det");
+        n += drop(0x00045098L, "task02_knock_window");
+        n += drop(0x000627D8L, "vvt_error_feedback");
+        n += drop(0x00066C40L, "evap_test_sequence");
+        n += drop(0x00066C40L, "task56_evap_test_sequence");
+        n += drop(0x00071D14L, "sensor_float_clamp_b");
+        n += drop(0xFFFF31A4L, "afl_interp_secondary");
+        n += drop(0xFFFF31ACL, "afl_interp_primary");
+        println("RetireStaleLabels: removed " + n + " of 150 stale label(s).");
         println("Now re-run ImportAE5L600L to apply the current names.");
     }
 }

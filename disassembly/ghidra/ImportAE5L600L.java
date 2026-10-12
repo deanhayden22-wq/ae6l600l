@@ -260,8 +260,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00045970, "task01_knock_timing_fb",
             "[TRACED] Task [1] Post-knock timing adjustment. Knock corr state RAM 0x8204-821C");
         // Knock Window Setup
-        count += labelComment(0x00045098, "task02_knock_window",
-            "[TRACED] Task [2] Knock window setup. KNOCK_FLAG+MAF, sets GBR, cal 0xD29E4/D2E60/D2E64");
+        count += labelComment(0x00045098, "iat_running_min_update",
+            "[TRACED] Running minimum of intake air temp: [0xFFFF8210] = float_min(0xBE970)([0xFFFF8210], IAT "
+            + "0xFFFF6364). Seven instructions, rts at 0x0450AA. No KNOCK_FLAG, MAF, GBR or calibration read. "
+            + "One of the jsr targets in the task straight-line run (item 84). Was task02_knock_window; that "
+            + "description belonged to the function starting 0x0450AE. corrections.md item 96.");
         count += labelComment(0x00045670, "task03_knock_thresh",
             "[TRACED] Task [3] Knock threshold config. Feedback Corr Min Load (0xD2DA4), sets GBR");
         count += labelComment(0x000455E6, "task04_knock_thresh",
@@ -272,14 +275,16 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00045354, "task06_knock_det",
             "[UNVERIFIED] Task [6] Knock detection. KNOCK_FLAG+MAF, sets GBR");
         count += labelComment(0x000450AE, "task07_knock_det",
-            "[UNVERIFIED] Task [7] Knock detection. KNOCK_FLAG+MAF, sets GBR");
+            "[CITED] Task [7] Knock detection. KNOCK_FLAG+MAF, sets GBR");
         count += labelComment(0x00044E04, "task08_knock_window",
             "[TRACED] Task [8] Knock window setup. Gates on check_transient_knock_inhibit (0x2F8FE). "
             + "Loads RPM/IAM/FFFF6898. Iterates 35 flkc_fg_var entries vs KnockWindow_FLKC_Cell_Threshold "
             + "(0xD2E34) with uint8_add_sat. Iterates 6 knock history slots vs 0xD2E3C/40/44/48. "
             + "GBR=FFFF8210. Cal 0xD2E1C/20/2C/34/3C/40/44/48, threshold 0xD299C.");
-        count += labelComment(0x00044DB0, "task09_knock_det",
-            "[UNVERIFIED] Task [9] Knock detection. KNOCK_FLAG+IAM+RPM, sets GBR");
+        count += labelComment(0x00044DB0, "load_lag_filter_and_delta",
+            "[CITED] Lag-filters engine load (0xFFFF63F8) through 0xBEA40 with coefficient [0xD2E18]=0.03125 "
+            + "into 0xFFFF81F4, then stores load minus filtered load to 0xFFFF81F8. rts at 0x044DDC. KNOCK_FLAG "
+            + "is first read at 0x044DE0, the NEXT function. Was task09_knock_det. corrections.md item 96.");
         count += labelComment(0x000448F4, "task10_knock_config",
             "[TRACED] Task [10] Knock config dispatcher. RPM+MAF+sched, multi-RAM refs");
         // Tasks 11/12 already labeled above
@@ -294,7 +299,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00045BBC, "task16_flkc_pre",
             "[TRACED] Task [16] FLKC pre-process. KNOCK_FLAG+FLKC_BASE_STEP+IAM+MAF");
         count += labelComment(0x00045B44, "task17_flkc_pre",
-            "[UNVERIFIED] Task [17] FLKC pre-process. FLKC_BASE_STEP+IAM, Advance Multiplier");
+            "[CITED] Task [17] FLKC pre-process. FLKC_BASE_STEP+IAM, Advance Multiplier");
         // Tasks 18/25 already labeled above (flkc_path_J, flkc_paths_FG)
         count += labelComment(0x00045E96, "task19_flkc_post",
             "[TRACED] Task [19] FLKC post-process. Calls flkc_state_flag_slot15 (0x2999C, FFFF971B) to check "
@@ -359,7 +364,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0004317A, "task44_timing_lu_a",
             "[TRACED] Task [44] Timing lookup A. RPM+MAF, cal 0xD2D10");
         count += labelComment(0x000431B0, "task45_timing_lu_b",
-            "[TRACED] Task [45] Timing lookup B. RPM+MAF, cal 0xD2D10");
+            "[TRACED] Task [45]. Inputs are RPM (0xFFFF6624), ECT (0xFFFF6350) and IAT (0xFFFF6364) -- no MAF "
+            + "or load literal. Adds cal [0xD2D10] to [0xFFFF80C4] on the first branch. Looks up 0xADFC0 and "
+            + "0xAE530 (item 97). Body past the first instructions NOT read; the name is kept only until it is "
+            + "decoded. corrections.md item 97.");
         count += labelComment(0x00043368, "task46_inj_mps_timing",
             "[TRACED] Task [46] Injector/MPS timing comp. MAF V+MPS+boost, calls low_pw_table_proc");
         count += labelComment(0x00043464, "task47_mapswitch_lowpw",
@@ -397,7 +405,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "load, AFL learning against cal thresholds. First failing condition sets readiness level.");
         count += labelComment(0x0006048E, "diag_readiness_output_filter",
             "[TRACED] Readiness output filter. Copies prev to current, clamps against bounds, "
-            + "calls clamp_filter(0xD118). Final output at FFFF908C.");
+            + "calls atomic_store_float_pair(0xD118). Final output at FFFF908C.");
 
         // Idle
         count += labelComment(0x0004BC20, "task54_idle_control",
@@ -416,11 +424,8 @@ public class ImportAE5L600L extends GhidraScript {
         // Diagnostics -- Task 56: EVAP Purge
         count += labelComment(0x00066580, "task56_evap_purge",
             "[TRACED] Task [56] EVAP purge diagnostic. check_diag_state dispatch: "
-            + "active(1/2)->evap_test_sequence(0x66C40), disabled(0)->sub_66D20/66DEC/66EBC. "
+            + "active(1/2)->signal_minmax_tracker_66C40(0x66C40), disabled(0)->sub_66D20/66DEC/66EBC. "
             + "Workspace at FFFF236C (5 floats + 6 u16s). GBR=FFFF933C.");
-        count += labelComment(0x00066C40, "evap_test_sequence",
-            "[TRACED] EVAP leak test sequence. Multi-stage: seal system, apply vacuum, "
-            + "monitor pressure decay. DTCs: P0456 (very small leak), P0458/P0459 (purge circuit).");
         count += labelComment(0x000662D0, "evap_workspace_init_trampoline",
             "[TRACED] Trampoline: bra 0x665C0. Redirect to primary evap_workspace_init.");
         count += labelComment(0x000665C0, "evap_workspace_init",
@@ -572,8 +577,11 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] AFC PI controller - THE SHORT-TERM CORRECTION. Computes error (fsub), looks up gain (0xBEAB0), clamps to limits. ROM 0xCC000-0xCC00C. Output: 0xFFFF7864.");
         count += labelComment(0x0003439E, "afc_enable_gate",
             "[TRACED] AFC enable/disable gate. Calls 0x2BE2C/0x2BE38. Reads ROM 0xCC010.");
-        count += labelComment(0x000343CE, "afc_output_clamp",
-            "[TRACED] AFC output clamp. Upper=200% (0xCC014), Lower=190% (0xCC018). Reads/writes 0xFFFF7820.");
+        count += labelComment(0x000343CE, "pedal_hysteresis_flag_343CE",
+            "[TRACED] Entry sets GBR=0xFFFF7820 and loads accelerator pedal (0xFFFF64D8). byte[gbr+82] is SET "
+            + "when pedal >= [0xCC014]=200.0 and CLEARED when pedal < [0xCC018]=190.0 (0x0343E6-0x0343FA). "
+            + "Hysteresis on an input, not a clamp on an output; at 200/190 the flag cannot set on a 0-100 "
+            + "pedal. Body continues past 0x0343FC, not read. Was afc_output_clamp. corrections.md item 97.");
         count += labelComment(0x000320AE, "fuel_correction_final",
             "[TRACED] Final fuel correction accumulator. Combines AFC (0xFFFF77C8L) + LTFT + enrichments into IPW multiplier.");
 
@@ -1744,12 +1752,18 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] AFL airflow update (Dispatch B entry).");
 
         // AFL Application (KEY: no CL/OL gate!)
-        count += labelComment(0x00037ABA, "injector_trim_application",
-            "[TRACED] Injector trim application. Uses A/F learning tables.");
+        count += labelComment(0x00037ABA, "iat_ect_filter_and_blend",
+            "[TRACED] GBR=0xFFFF7AB4. Reads IAT (0xFFFF6364) and ECT (0xFFFF6350). If IAT < [0xCC308]=200 and "
+            + "ECT >= [0xCC30C]=-200, each goes through float_lag_filter 0xBEA40 (coefficients [0xCC304], "
+            + "[0xCC310], both 0.0), else raw. Stores IAT to 0xFFFF31A4 and ECT to 0xFFFF31AC, calls 0x37F00, "
+            + "then writes 1.0 to 0xFFFF7AB4. No A/F learning table is read. Was injector_trim_application. "
+            + "corrections.md item 97.");
         count += labelComment(0x00037B74, "afl_application",
             "[TRACED] AFL APPLICATION. Writes FFFF7AB4 multiplier. WARNING: Does NOT check FFFF7448 CL/OL mode. Does NOT check airflow max. Only gates: FFFF726C (transient), FFFF7C68 (status). AFL persists into OL.");
-        count += labelComment(0x00037F00, "afl_multiplier_computation",
-            "[TRACED] AFL multiplier computation subroutine. Reads FFFF31AC (primary) and FFFF31A4 (secondary) with weights CC2F4/CC2FC.");
+        count += labelComment(0x00037F00, "iat_ect_weighted_blend",
+            "[TRACED] ([0xFFFF31AC] ECT x [0xCC2FC] + [0xFFFF31A4] IAT x [0xCC2F4]) passed with [0xCC300] to "
+            + "0xBE628, result to 0xFFFF7AB8. All three constants are 0.0 on rev 20.19c. A temperature blend, "
+            + "not an AFL multiplier. Was afl_multiplier_computation. corrections.md item 97.");
 
         // Fuel Pulse Width (consumes AFL)
         count += labelComment(0x000301E4, "fuel_pulse_width_calc",
@@ -1770,10 +1784,12 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] AFL Range 2 learning value (float). Normal driving: 23.0-40.0 g/s.");
         count += labelComment(0xFFFF3184L, "afl_range3_value",
             "[TRACED] AFL Range 3 learning value (float). Heavy load: 40.0-80.0 g/s (partially OL).");
-        count += labelComment(0xFFFF31A4L, "afl_interp_secondary",
-            "[TRACED] AFL secondary interpolated output (float).");
-        count += labelComment(0xFFFF31ACL, "afl_interp_primary",
-            "[TRACED] AFL primary interpolated output (float).");
+        count += labelComment(0xFFFF31A4L, "iat_filtered_31A4",
+            "[TRACED] Lag-filtered (or raw) intake air temp, float. Written by 0x037ABA, read by 0x037F00. "
+            + "Was afl_interp_secondary. corrections.md item 97.");
+        count += labelComment(0xFFFF31ACL, "ect_filtered_31AC",
+            "[TRACED] Lag-filtered (or raw) coolant temp, float. Written by 0x037ABA, read by 0x037F00. Was "
+            + "afl_interp_primary. corrections.md item 97.");
         count += labelComment(0xFFFF726CL, "transient_state_flag",
             "[TRACED] Transient state flag (byte). Gates AFL application — when set, forces FFFF7AB4=1.0.");
         count += labelComment(0xFFFF726EL, "transient_knock_inhibit",
@@ -2762,7 +2778,7 @@ public class ImportAE5L600L extends GhidraScript {
         // SH7058 INTERRUPT ARCHITECTURE
         // All peripheral IRQs share one generic ISR entry at 0x0BAC
         // 0x0BAC: saves R0-R7,PR,MACH,MACL; calls 0x0F4C; restores; RTE
-        // 0x0F4C: reads interrupt ID; dispatches via table at 0x0E5EC
+        // 0x0F4C: calls 0x0EE4, doubles its arg if non-zero, tail-jumps 0x0D78 (no table; items 84, 97)
         // 0x0EE4: interrupt ID resolver (reads INTEVT/priority register)
         // 0x0D78: interrupt acknowledge/clear
         // 0x0BFA: exception trap (illegal instr/addr error = infinite loop)
@@ -2793,8 +2809,9 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Generic ISR RTE (return from interrupt) after register restore");
         count += labelComment(0x000BFAL, "exc_trap_infinite_loop",
             "[UNVERIFIED] Exception trap: illegal instruction / address error (infinite loop)");
-        count += labelComment(0x000F4CL, "isr_dispatch_manager",
-            "[TRACED] ISR sub-dispatch: identifies interrupt source, calls handler from isr_dispatch_table");
+        count += labelComment(0x000F4CL, "isr_ack_wrapper_F4C",
+            "[TRACED] Calls 0xEE4; if the result is non-zero doubles its argument (0x000F60 shll r4); tail- "
+            + "jumps to 0xD78. No table access in this body. Was isr_dispatch_manager. corrections.md item 97.");
         count += labelComment(0x000EE4L, "isr_intevt_resolver",
             "[TRACED] Reads INTEVT/priority register to identify interrupt source, returns index");
         count += labelComment(0x000D78L, "isr_int_acknowledge",
@@ -3025,9 +3042,12 @@ public class ImportAE5L600L extends GhidraScript {
             + "Does NOT call gate function -- runs unconditionally.");
 
         // Task 1 -- fast minimal (10 ms)
-        count += labelComment(0x0000DD52L, "rtos_task1_fast_minimal",
-            "[TRACED] RTOS Task 1: fast minimal (10 ms, pri 4). TCB=FFFF11D0. "
-            + "Body: JSR epilogue (0x35A4), RTS. Heartbeat / scheduler tick counter.");
+        count += labelComment(0x0000DD52L, "rtos_task1_dispatch_loop",
+            "[TRACED] RTOS task 1 body (address stored at 0x003F9C). Calls 0x10A46 with r4=1, then loops "
+            + "0x00DD6E-0x00DD9A: critical section (0xBE81C/0xBE82C), 0xF97C(0, object 0xFFFF4520), and on a "
+            + "zero return calls through the pointer stored in that object; repeats while byte[0xFFFF4572] is "
+            + "non-zero; only then jsr 0x35A4. Not minimal. Was rtos_task1_fast_minimal. corrections.md item "
+            + "96.");
 
         // Task 2 -- secondary dispatch (20 ms)
         count += labelComment(0x0000DDACL, "rtos_task2_secondary_dispatch",
@@ -3043,9 +3063,10 @@ public class ImportAE5L600L extends GhidraScript {
             + "Parallel to Task 2, allows independent phase offset for same sub-table.");
 
         // Task 4 -- minimal (20 ms)
-        count += labelComment(0x0000DE92L, "rtos_task4_minimal",
-            "[TRACED] RTOS Task 4: minimal task (20 ms, pri 1). TCB=FFFF11E8. "
-            + "Body: epilogue (0x35A4), RTS. Lowest-priority placeholder.");
+        count += labelComment(0x0000DE92L, "rtos_task4_dispatch_loop",
+            "[TRACED] RTOS task 4 body (address stored at 0x003FCC). Same loop as 0x00DD52 on object "
+            + "0xFFFF455C and flag byte[0xFFFF457B]; 0x10A46 argument 4, 0xF97C argument 3. Not a placeholder. "
+            + "Was rtos_task4_minimal. corrections.md item 96.");
 
         // Task 5 -- fuel sub-group A (20 ms)
         count += labelComment(0x0000E486L, "rtos_task5_fuel_subA",
@@ -3130,10 +3151,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Task 10 call_52: CL/OL gate update. Reads/writes FFFF8EDC (ol_dispatch_gate) "
             + "and FFFF8323 (OL/CL state flag). Called from sensor task to update gate "
             + "based on current sensor readings. Also accesses FFFF36BE.");
-        count += labelComment(0x0000A660L, "task10_knock_signal_read",
-            "[TRACED] Task 10 call_32: Knock signal per-cylinder read. Accesses FFFF4309 (knock byte), "
-            + "FFFF430D (knock byte 2), FFFF4311 (MAP/pressure threshold). "
-            + "Reads processed knock ADC values into per-cylinder knock state bytes.");
+        count += labelComment(0x0000A660L, "init_byte_arrays_4309_430D",
+            "[TRACED] Initialiser. bsr 0x00A694, then fills four bytes at 0xFFFF430D with 7 and four at "
+            + "0xFFFF4309 with 1 (0x00A676-0x00A680), and zeroes 0xFFFF4311. Reads no signal. Was "
+            + "task10_knock_signal_read. corrections.md item 97.");
         count += labelComment(0x0000BADCL, "task10_egr_state_update",
             "[TRACED] Task 10 call_34: EGR state update. Accesses FFFF4330 (egr_state_a struct). "
             + "Updates EGR state floats and status bytes from sensor data.");
@@ -3554,7 +3575,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "and 0xA4E0 (process_channel). Allocs 224-byte workspace per iteration.");
         count += labelComment(0x0000A4E0L, "maf_process_channel",
             "[TRACED] Per-channel intake processing. Clamps count to 0xFFFF, computes "
-            + "remainder, calls descriptor interpolation (0x11848) and stores "
+            + "remainder, calls atomic_store_u16_twice (0x11848) and stores "
             + "accumulator result to FFFF4294[ch].");
         count += labelComment(0x0000A55EL, "maf_get_channel_count",
             "[TRACED] Reads raw crank-synced MAF count from intake channel table (0x11A7C) "
@@ -3577,9 +3598,10 @@ public class ImportAE5L600L extends GhidraScript {
             + "raw_ptr (crank-synced counter), out_ptr, mask. "
             + "Ch0: F640/F444/0x10000, Ch1: F642/F446/0x20000, "
             + "Ch2: F644/F448/0x40000, Ch3: F646/F44A/0x80000.");
-        count += labelComment(0x00011848L, "descriptor_interpolation",
-            "[TRACED] Descriptor-based 1D interpolation. Allocs 224-byte workspace, "
-            + "calls 0xBE81C/0xBE82C. Used by MAF and other sensor channels.");
+        count += labelComment(0x00011848L, "atomic_store_u16_twice",
+            "[TRACED] Stores a 16-bit value (r5) to the caller-supplied address (r4) twice (0x01185E, "
+            + "0x011864) inside a critical section (0xBE81C/0xBE82C). 0xE0 is the interrupt mask, not a "
+            + "workspace size. No interpolation. Was descriptor_interpolation. corrections.md item 97.");
 
         // MAF scaling — descriptor
         count += labelComment(0x000AF45CL, "desc_MAF_Sensor",
@@ -5165,9 +5187,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Standard duty output path when engine_state == 1.");
         count += labelComment(0x00031EAE, "avcs_control__final_output",
             "[TRACED] Final AVCS duty computation and store to output RAM.");
-        count += labelComment(0x000627D8, "vvt_error_feedback",
-            "[TRACED] VVT error feedback PID function. Reads 4 descriptor tables (9x9, zeroed in stock). "
-            + "Writes FFFF920C-FFFF9228.");
+        count += labelComment(0x000627D8, "vvt_error_lookup_AF830",
+            "[TRACED] Thirteen instructions: one lookup of descriptor 0xAF830 via 0xBE8E4, result stored to "
+            + "0xFFFF91FC and returned multiplied by [0xFFFF9210]. The old PID description belongs to a larger "
+            + "module. Was vvt_error_feedback. corrections.md item 97.");
 
         // ── AVCS RAM ──
         count += labelComment(0xFFFF40C8L, "cam_angle_sensor",
@@ -5298,10 +5321,14 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] EVAP sub when diagnostics disabled (path B).");
         count += labelComment(0x00066EBC, "task56_evap_sub_disabled_C",
             "[TRACED] EVAP sub when diagnostics disabled (path C).");
-        count += labelComment(0x00066C40, "task56_evap_test_sequence",
-            "[TRACED] EVAP active test sequence (state 1 or 2).");
-        count += labelComment(0x0000D118, "clamp_filter",
-            "[TRACED] Clamp/filter function. Called by task53 readiness.");
+        count += labelComment(0x00066C40, "signal_minmax_tracker_66C40",
+            "[TRACED] While 0x21D9A returns 2: float_max (0xBE960) of [0xFFFF653C] into 0xFFFF9324 and "
+            + "float_min (0xBE970) into 0xFFFF9328. A running max/min of one signal; nothing EVAP-specific in "
+            + "the body. Was task56_evap_test_sequence / evap_test_sequence. corrections.md item 97.");
+        count += labelComment(0x0000D118, "atomic_store_float_pair",
+            "[TRACED] Calls 0x317C(16), stores fr4 to 0xFFFF4498 and fr5 to 0xFFFF449C, tail-jumps to 0x3190. "
+            + "An interrupt-masked store of a float pair; no clamp, no filter. Was clamp_filter. corrections.md "
+            + "item 97.");
 
         // ── DTC Diagnostic RAM Regions ──
         count += labelComment(0xFFFFAD14L, "diag_state_E_start",
@@ -5646,8 +5673,9 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] 29-element gear-dependent correction array.");
         count += labelComment(0x00031C9C, "fuel_percyl_array_init",
             "[TRACED] Zeros 3x42 floats per-cylinder init.");
-        count += labelComment(0x00032958, "fuel_correction_filter_init",
-            "[TRACED] Zeros 3 floats at FFFF770C correction filter.");
+        count += labelComment(0x00032958, "correction_filter_reset_to_1",
+            "[TRACED] When 0x22F92 returns 1, sets the three floats at 0xFFFF7704, 0xFFFF7708 and 0xFFFF770C "
+            + "to 1.0 (fldi1), not 0. Was fuel_correction_filter_init. corrections.md item 97.");
         count += labelComment(0x00031A4C, "fuel_trim_init_B",
             "[TRACED] Writes FFFF7464, checks cal IDs.");
         count += labelComment(0x0003160A, "major_correction_aggregator",
@@ -5760,11 +5788,11 @@ public class ImportAE5L600L extends GhidraScript {
             + "R4=ATU_TCNT+3; R0=@(20,cyl_struct)-R4; "
             + "BF/S if window expired; MOV.W R0,@(20,R7) writes ATU OCR; "
             + "BSR 0xA4E0; JSR 0xBE82C. Final per-cylinder pulse width write.");
-        count += labelComment(0x00009B2CL, "dt_float_correction",
-            "[UNVERIFIED] Dead time float correction. Reads FFFF4280, FFFF42F4, FFFF4158, FFFF4168. "
-            + "R1=[FFFF4280]+[FFFF42F4]+@(8,stack); converts to float index; "
-            + "3-branch interpolation from float tables at 0x9C14-0x9C28. "
-            + "Produces corrected dead time float for runtime compensation.");
+        count += labelComment(0x00009B2CL, "crank_angle_calc_9B2C",
+            "[CITED] ([0xFFFF4280]+[0xFFFF42F4]+arg) x 180.0 / [0xFFFF4158]; then (arg fr4 - [0xFFFF4168]) "
+            + "is wrapped by +720/-720 against -60 and 660 (constants at 0x9C14-0x9C28 are 180, -60, 720, 660, "
+            + "-720, not tables). Arithmetic on a 720-degree cycle, NOT an injector dead-time correction. "
+            + "Purpose unverified. Was dt_float_correction. corrections.md item 96.");
         count += labelComment(0x00009ED6L, "dt_accumulate_float",
             "[TRACED] Dead time float accumulate. R0=[FFFF4280]; R2+=R0 (add DT to R2); "
             + "FP multiply/divide chain; writes ATU float output; "
@@ -5777,12 +5805,14 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Interrupt level restore / gate. TST R4,R4; BF 0x31A4; "
             + "reads FFFF1288 ptr; checks status flag; if gate open: JMP 0x3664, LDC R4,SR. "
             + "Tail-call target from dead time compute chain; restores interrupt mask.");
-        count += labelComment(0x0000300E, "injector_ic_trigger",
-            "[UNVERIFIED] Sets bit15 on external injector IC at 0xF00F00.");
+        count += labelComment(0x0000300E, "call_3F2C_with_flag_bit15",
+            "[CITED] ORs 0x00008000 into the long at RAM 0xFFFF1290, calls through the pointer stored at "
+            + "0x3F2C, then ANDs it back out with 0xFFFF7FFF. Does not load 0xF00F00. Was injector_ic_trigger. "
+            + "corrections.md item 96.");
         count += labelComment(0x000035FC, "inj_channel_timer_setup",
             "[UNVERIFIED] RAM-resident injection channel timer setup.");
         count += labelComment(0x00002FEC, "inj_final_hw_write",
-            "[UNVERIFIED] Final hardware write to injector IC + XRAM.");
+            "[CITED] Final hardware write to injector IC + XRAM.");
 
         // ── Sensor Composite ──
         count += labelComment(0x000517A0, "sensor_composite_calc",
@@ -5804,7 +5834,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00050A5A, "etb_safety_interlock",
             "[TRACED] ETB safety interlock. 566B, 8 cals. Checks engine state + DTC flags.");
         count += labelComment(0x00050DE2, "etb_target_compute_main",
-            "[TRACED] ETB main throttle target computation. 626B (largest). ECT + atm + throttle.");
+            "[TRACED] A sequencer: eight bsr calls (0x518BE, 0x50E0C, 0x51400, 0x5149A, 0x51558, 0x518FC, "
+            + "0x513BA, 0x516B0) and a tail bra to 0x0517A0. No RAM access at the label; the old size and "
+            + "inputs described its callees. corrections.md item 97.");
         count += label(0x00051B06, "etb_rpm_correction");
         count += label(0x00052644, "etb_pedal_interpret");
         count += labelComment(0x00052BCE, "etb_torque_map",
@@ -5904,7 +5936,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF42F4L, "injdt_companion",
             "[TRACED] Injector dead time companion output. Pointer stored into ATU cyl struct "
             + "by call_37@0x9860 init path (0x9926: [R14]=FFFF42F4). "
-            + "Also added to FFFF4280 in float correction at 0x9B2C.");
+            + "Also added to FFFF4280 in crank_angle_calc_9B2C (0x9B2C).");
         count += labelComment(0xFFFF6210L, "dt_lookup_input2",
             "[TRACED] Second input to dead time table lookup (func 0x0303C2, FR5). "
             + "InjLat secondary axis is [-1000,0,1000]; all table rows identical "
@@ -6373,15 +6405,15 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000C0D04, "cal_Boost_Error",
             "[TRACED] RomRaider: Boost Error");
         count += labelComment(0x000C0D28, "cal_Turbo_Dynamics_Proportional",
-            "[UNVERIFIED] RomRaider: Turbo Dynamics Proportional");
+            "[CITED] RomRaider: Turbo Dynamics Proportional");
         count += labelComment(0x000C0D3C, "cal_Boost_Error",
             "[TRACED] RomRaider: Boost Error");
         count += labelComment(0x000C0D60, "cal_Turbo_Dynamics_Integral_Negative",
-            "[UNVERIFIED] RomRaider: Turbo Dynamics Integral Negative");
+            "[CITED] RomRaider: Turbo Dynamics Integral Negative");
         count += labelComment(0x000C0D74, "cal_Boost_Error",
             "[TRACED] RomRaider: Boost Error");
         count += labelComment(0x000C0D98, "cal_Turbo_Dynamics_Integral_Positive",
-            "[UNVERIFIED] RomRaider: Turbo Dynamics Integral Positive");
+            "[CITED] RomRaider: Turbo Dynamics Integral Positive");
         count += labelComment(0x000C0E24, "cal_Intake_Temperature",
             "[CITED] RomRaider: Intake Temperature");
         count += labelComment(0x000C0E3C, "cal_Target_Boost_Compensation_IAT",
@@ -6479,7 +6511,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CC8BC, "cal_Cranking_Fuel_IPW_Compensation_IAT",
             "[TRACED] RomRaider: Cranking Fuel IPW Compensation (IAT)");
         count += labelComment(0x000CCD18, "cal_Timing_Compensation_MRP_Timing_Compensation_IAT",
-            "[UNVERIFIED] RomRaider: 'Timing Compensation (MRP)' + 'Timing Compensation (IAT)'");
+            "[TRACED] RomRaider: 'Timing Compensation (MRP)' + 'Timing Compensation (IAT)'");
         count += labelComment(0x000CCD30, "cal_Primary_Open_Loop_Fueling_Compensation_Timing_Compensati",
             "[TRACED] RomRaider: Primary Open Loop Fueling Compensation (Timing Compensation)_");
         count += labelComment(0x000CCD38, "cal_Engine_Speed",
@@ -6499,7 +6531,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CE618, "cal_Mass_Airflow",
             "[CITED] RomRaider: Mass Airflow");
         count += labelComment(0x000CE6CC, "cal_Primary_Open_Loop_Fueling_Compensation_ECT",
-            "[UNVERIFIED] RomRaider: Primary Open Loop Fueling Compensation (ECT)");
+            "[TRACED] RomRaider: Primary Open Loop Fueling Compensation (ECT)");
         count += labelComment(0x000CED74, "cal_Throttle_Angle_Change",
             "[CITED] RomRaider: Throttle Angle Change");
         count += labelComment(0x000CF680, "cal_Engine_Speed",
@@ -7770,7 +7802,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7AF8L, "gbr_afl_7AF8",
             "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
         count += labelComment(0xFFFF7B7CL, "gbr_afl_7B7C",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: AFL/fuel trim.");
+            "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
         count += labelComment(0xFFFF7B8CL, "gbr_afl_7B8C",
             "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
 
@@ -8322,8 +8354,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] FPU-heavy sensor computation sub (called from dispatcher 1 body).");
         count += labelComment(0x00071D08L, "sensor_float_clamp_a",
             "[TRACED] Float clamp A (called from dispatcher 1 body).");
-        count += labelComment(0x00071D14L, "sensor_float_clamp_b",
-            "[TRACED] Float clamp B (called from dispatcher 1 body).");
+        count += labelComment(0x00071D14L, "deadband_debounce_71D14",
+            "[TRACED] 0xBE608 deadband check of [0xFFFF69F0] against 0; result byte to 0xFFFF97CB. When set, "
+            + "0xBE53C saturating-increments the counter at 0xFFFF97C9; otherwise it is zeroed. Body continues "
+            + "from 0x071D42, not read. Not a clamp. Was sensor_float_clamp_b. corrections.md item 97.");
         count += labelComment(0x00071D92L, "sensor_float_interpolation",
             "[TRACED] Float interpolation sub (called from dispatcher 1 body).");
         count += labelComment(0x00071F48L, "sensor_dtc_monitor_pair_1",
@@ -8413,9 +8447,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00016558L, "battery_voltage_state_eval",
             "[TRACED] 4 callers. Compares battery voltage (FFFF4130) against 9.0V/9.5V "
             + "hysteresis thresholds (cal 0xC152C/C1530); sets low-voltage flag FFFF5E45.");
-        count += labelComment(0x00011880L, "atu_timer_capture_read",
-            "[TRACED] 4 callers. Reads ATU timer counter at FFFFF738 with overflow-bit handling; "
-            + "struct_init/struct_init2 sandwich.");
+        count += labelComment(0x00011880L, "io_F738_toggle_bit15",
+            "[TRACED] A write, not a read: inside a critical section, toggles bit 15 of the word at "
+            + "0xFFFFF738 and keeps bits 0-14 (0x011890-0x01189C). Which peripheral register that is has NOT "
+            + "been checked. Was atu_timer_capture_read. corrections.md item 96.");
         count += labelComment(0x00014278L, "bit_test_nz",
             "[TRACED] Returns 1 if (R4 & R5) != 0. Part of trio: bit_test/bit_extract/byte_pair_merge "
             + "at 0x14278/82/8C.");

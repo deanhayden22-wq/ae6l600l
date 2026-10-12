@@ -142,9 +142,14 @@ name survives as a secondary symbol, still searchable and still in the Symbol
 Tree.
 
 **After any label retirement, run `disassembly/ghidra/RetireStaleLabels.java`
-first, then re-run the import.** The current copy removes the 129 names retired
-by corrections items 91–93. It is idempotent and touches only those exact
+first, then re-run the import.** The current copy removes the 150 names retired
+by corrections items 91–93 (129) and 96–97 (21). It is idempotent and touches only those exact
 (address, name) pairs.
+
+> **Ghidra runs the copies in `~/ghidra_scripts`, not the repo's.** Copy both scripts
+> there, then touch them: PowerShell `cp` keeps the old modified time and Ghidra will
+> silently run its stale compiled class. Trust the printed counts ("removed N of 150",
+> "Applied 3756"), not "Finished!" -- and labels are per program, four in the project.
 
 > **Editing the import script: match on the PARSED address, not the literal
 > text.** The same address appears as `0xAD090`, `0x0AD090L`, `0x000AD090` and
