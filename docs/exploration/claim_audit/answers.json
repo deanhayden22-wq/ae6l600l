@@ -4356,12 +4356,159 @@
     "0x005B18-0x005B40: uint16 [0x0C009E] \u00d7 [0xFFFF4138] (int32_fixmul) \u2192 0xFFFF4408; raw value \u2192 0xFFFF4404; followed by timer register writes."
    ],
    "not_shown": "- What 0xFFFF8558 physically is (0\u2013360 axis).\n- Values of 0x0C0C04, 0x0C0C08, 0x0C0C10, 0x0C0BAC, 0x0C0BB8/BBC/BC0/BC4, 0x0CC534 and 0x0CBC0D.\n- Contents of unnamed tables 0xAA89C, 0xAA950, 0xAA968 and 0xAA95C.\n- Who writes the additive terms 0xFFFF5CAC / 0xFFFF5CB0, i.e. the boost-error feedback.\n- Meaning of the inhibit helpers' return codes.\n- How 0xFFFF5C98 reaches the solenoid output.\n- Which timer channel is involved, and the physical units of the 10000 frequency value.\n- The consumer of fuel-cut flag 0xFFFF7CE8.\n- What fn 0x1CF16 and byte 0xFFFF6810 represent; the 1st-gear meaning rests on the definition name only."
+  },
+  "doc-boost-control-07": {
+   "mechanism": "Both addresses are single cells inside the two base wastegate-duty maps, not separate scalars. 0x0C0FE0 is 0x88 bytes (element 68) into \"Max Wastegate Duty_\" at 0x0C0F58. 0x0C11D8 is 0x88 bytes (element 68) into \"Initial Wastegate Duty_\" at 0x0C1150. Read as uint16 with a 1/256 scale, they give 20302/256 = 79.305 and 18037/256 = 70.457. Those are exactly the listed cells at RPM 3200 and the ninth breakpoint (240) of the 0\u2013360 axis. The code never addresses the cells directly. Function 0x013D66 passes the descriptors 0xAA9B8 and 0xAA9D4 to table_lookup_2D (0xBE8E4). The inputs are fr5 = rpm_current (0xFFFF6624) and fr4 = RAM 0xFFFF8558, an unnamed load or boost-type variable on the 0\u2013360 axis. Results: the Initial lookup is stored at 0xFFFF5CB8 (5D14-92) and the Max lookup at 0xFFFF5CC8 (5D14-76). Compensation tables are also looked up: Atm-pressure 2D from 0xFFFF6898 and rpm, stored at -72; IAT 1D at -68; unnamed IAT-indexed 0xAA89C at -64; ECT 1D at -60. Max-duty limit = Max \u00d7 Atm \u00d7 IAT \u00d7 ECT, clamped by float_clamp_range to [0, 80.0] (literal 0x42A00000), stored at 0xFFFF5CC4 (-80). Initial duty = Initial \u00d7 Atm \u00d7 IAT \u00d7 ECT + [5D14-104] + [5D14-100]. The fmac adds -104, then fadd adds -100; these are two additive terms, probably feedback or learning, and they are zeroed under some conditions. The sum is clamped to [0, max-limit at -80] and stored at -56 (0xFFFF5CDC). Depending on flags, -56 is copied to the duty variable at -96 (0xFFFF5CB4). Alternatively, a 1D rpm table chosen by state (0xAA950/0xAA968/0xAA95C) feeds a path at -52: \u00d7 Atm \u00d7 AA89C \u00d7 ECT, then min against -56, optionally + 0xC0BC4 and min again. GBR flag byte 113 latches which path is active. Afterwards a step or rate stage (0xC0BBC, 0xC0BB8, 0xC0BC0, float_max/float_min) moves the target at -88 toward -96. The result is written to -124, which equals 0xFFFF5C98, the GBR base; it is probably the final commanded wastegate duty. A deadband check of -96 against -88 clears GBR flag 108.",
+   "addresses": [
+    {
+     "address": "0x0C0F58",
+     "role": "Base of \"Max Wastegate Duty_\" map (descriptor 0xAA9B8). Looked up with rpm and 0xFFFF8558, multiplied by the Atm/IAT/ECT compensations, clamped to [0, 80] and used as the ceiling for the duty command at 0xFFFF5CC4.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C0FE0",
+     "role": "One cell of the Max Wastegate Duty map: element 68, RPM 3200, axis value 240. uint16 20302 \u00d7 1/256 = 79.305 %. Reached only through table interpolation.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x0C1150",
+     "role": "Base of \"Initial Wastegate Duty_\" map (descriptor 0xAA9D4). Looked up with rpm and 0xFFFF8558 and stored at 0xFFFF5CB8. It is the feed-forward base of the duty command: \u00d7 comps + adders, clamped to [0, max].",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C11D8",
+     "role": "One cell of the Initial Wastegate Duty map: element 68, RPM 3200, axis value 240. uint16 18037 \u00d7 1/256 = 70.457 %.",
+     "evidence_class": "inferred"
+    }
+   ],
+   "inert_or_gated": "The max-duty product is clamped to 0..80.0 (literal 0x42A00000 at 0x014004). Max-map cells of 85\u201390 % can therefore only take effect if the compensations pull the product below 80; the 87.5/90 cells at 1600\u20132000 rpm, top of the axis, are capped at 80 when the compensations are 1. The RPM 6400 row and the RPM 1600/axis-0 cell are 0 in both maps, so duty there is 0. Initial duty is clamped to [0, max-limit]. Several status flags send execution to 0x01400C: r10 from 0xFFFF85D7 == 1, helper results ==1 or ==2, GBR bytes 111 or 112 == 1. That path zeroes 0xFFFF5CB4, 5CAC and 5CB0, forcing the duty to 0 and clearing the additive terms. If byte 0xC0BAC == 0, only the plain initial-duty path runs (flags 16/20); its value is not shown.",
+   "evidence": [
+    "013DF6 loads descriptor 0xAA9D4 (Initial WGDC) and calls table_lookup_2D with fr5 = rpm_current, fr4 = [0xFFFF8558]. The result is stored to 0xFFFF5D14-92.",
+    "013E3C loads descriptor 0xAA9B8 (Max WGDC) with the same inputs. The result is stored at 5D14-76.",
+    "013E84\u2013013EA8: [-76]\u00d7[-72]\u00d7[-68]\u00d7[-60] goes to float_clamp_range(lo = 0, hi = 80.0) and is stored at -80.",
+    "014046\u2013014074: [-104] + ([-92]\u00d7[-72]\u00d7[-68])\u00d7[-60] + [-100] goes to float_clamp_range(0, [-80]) and is stored at -56.",
+    "0x0C0FE0 - 0x0C0F58 = 0x88 = element 68 = row RPM 3200, column 8 (240). 20302/256 = 79.305 matches the listed cell.",
+    "0x0C11D8 - 0x0C1150 = 0x88. 18037/256 = 70.457 matches the Initial map cell at RPM 3200, axis 240.",
+    "014182\u201301418C: min(-96, -88) is stored at 5D14-124 = 0xFFFF5C98, the GBR base."
+   ],
+   "not_shown": "The identity of the 0\u2013360 axis variable 0xFFFF8558 is not shown; it may be boost target, load or a similar quantity. The table_lookup_2D argument-to-axis mapping and the descriptor storage type and scale are not shown; the uint16/256 reading is inferred from the matching values. Not shown: what writes the adders at 5D14-104 and -100; the values of 0xC0BAC, 0xC0BB8, 0xC0BBC, 0xC0BC0 and 0xC0BC4; the meaning of the helper-function flags. Also not shown is where 0xFFFF5C98 and 0xFFFF5CB4 go downstream (the solenoid output driver)."
+  },
+  "doc-boost-control-01": {
+   "mechanism": "Two distinct mechanisms appear. (1) 0x0C009E is the 'Wastegate Duty Cycle Frequency' calibration word (uint16 = 10000). Two functions (0x005B14, 0x005BF8) read it with mov.w @r3 and program it into a hardware timer/PWM peripheral block at 0xFFFF4404 (a 16-bit timer control structure): the value is written to the timer period register, and in 0x005B14 it is also fed through int32_fixmul before being stored as a compare/duty value. These set up the wastegate solenoid PWM frequency. (2) 0x054852/0x054858 is a periodic boost/wastegate control routine (dispatched from the big init/scheduler table at 0x04AC6A alongside 0x0549FA at 0x04AC70). It sets GBR to 0xFFFF8B50 and uses GBR-relative byte/float accesses to a RAM state block based there. 0xFFFF8B50 itself holds a float that is read, updated (fsub against table_lookup_1D results and float_max clamps), and written back repeatedly \u2014 it is the running/filtered boost-error or integrator term for the controller. 0x0549FA is a companion routine applying a float_lag_filter (reads rpm_current, filters state in the 0xFFFF8BC4 block), and 0x054A5A zeroes that filter state block when a mode check returns 1 (reset path).",
+   "addresses": [
+    {
+     "address": "0x0C009E",
+     "role": "uint16 calibration constant (10000) = wastegate PWM frequency; loaded and written into timer period register at 0xFFFF4404 and, in 0x005B14, passed through int32_fixmul to form a compare value",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF8B50",
+     "role": "GBR base and float working variable of the boost/wastegate controller; read, differenced against lookup/max results, and stored back each pass (controller integrator/error state)",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x054852",
+     "role": "entry of the boost/wastegate control routine (prologue saving r12-r14), falls into 0x054858 body; invoked from scheduler table at 0x04AC6A",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0549FA",
+     "role": "companion lag-filter routine (filters rpm/boost state in 0xFFFF8BC4 block); invoked from scheduler table at 0x04AC70",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x054A5A",
+     "role": "reset routine: when mode helper at 0x22F92 returns 1, zeroes (fldi0) the filter/controller state block at 0xFFFF8BC4",
+     "evidence_class": "observed"
+    }
+   ],
+   "inert_or_gated": "In 0x054858 the whole table_lookup/fmac boost-correction path is gated: it is skipped (bra to 0x054990) when the enable byte at GBR+128 is zero (set from rpm thresholds 0xD6720/0xD6724), or taken to the fixed-value branches 0x054978/0x05495E when r13 or r14 (state bytes at 0xFFFF65C0/0xFFFF64F5) equal 1. The uint8_add_sat counter path at 0x0549A2 only runs when r13, r14 and GBR+128 are all set. 0x054A5A's zeroing block runs only when helper 0x22F92 returns exactly 1. No zero-multiplier or dead calibration constant proven inert in this cal.",
+   "evidence": [
+    "0x005C06/0x005B18/0x005B38 load 0x0C009E as mov.w and store into 0xFFFF4404 structure (period at @r4, compare at @(4,r4)), with critical_section_enter/exit wrapping \u2014 timer/PWM programming",
+    "0x005B20 passes the 0x0C009E value through int32_fixmul before storing as the 12(r15)->@(4,r4) compare value",
+    "0x054864/0x0548BC/0x054906/0x05492C/0x05495E/0x054978 all reference 0xFFFF8B50: it is set as GBR, and separately fmov.s read/written as a float that is subtracted from fr13/table values and clamped via float_max (0xBE960)",
+    "0x054852 begins with register-save prologue and continues into 0x054858; both 0x054852 and 0x0549FA are called via the dispatch table at 0x04AC6A/0x04AC70",
+    "0x0549FA calls float_lag_filter (0xBEA40) using rpm_current (0xFFFF6624) and state block 0xFFFF8BC4",
+    "0x054A5A tests helper 0x22F92==1 then writes fldi0 zeros across offsets of the 0xFFFF8BC4 block (reset)",
+    "GBR+128 enable byte set/cleared from fcmp against RPM thresholds at 0xD6720/0xD6724 in 0x054858"
+   ],
+   "not_shown": "The scaling/units applied to 0x0C009E inside int32_fixmul and the actual peripheral meaning of 0xFFFF4404 fields (whether it is the wastegate GPT/PWM channel) are not confirmed by the pack. The full layout and physical meaning of the 0xFFFF8B50/0xFFFF8BC4/0xFFFF8BD0 RAM blocks, the contents of the 1D tables at 0xAEFE4/0xAEFF0/0xAEFFC, and the constants at 0xD670C-0xD6724 are not decoded. Whether this controller output ultimately drives the same PWM programmed from 0x0C009E is not shown."
+  },
+  "mem-feedback_ect_axis_celsius": {
+   "mechanism": "This function computes a 'Tau Input A' fuel-film / wall-wetting activation factor. It reads ect_current (coolant temp, 0xFFFF6350) into fr15 and rpm_current (0xFFFF6624) as inputs, and determines a load-direction state (rising vs falling, encoded 1 or 2 in the byte at (8,r15) / [8]). Based on that state it selects one of several 1D activation tables indexed by coolant temperature and looks them up via table_lookup_1D (0xBE830) with fr4=ect_current. The two addresses of interest are the descriptors for the rising-load (0x000ACB40 -> table data at 0x0CD6E6) and falling-load (0x000ACB7C -> table data at 0x0CD746) activation curves, each a 16-point curve over coolant temperature -40..110C. The chosen curve result is stored to a scratch frame slot (offset -92 from r8) and later combined by a chain of fmul/fmac operations with other looked-up factors (2D tables keyed on temp and another input, plus further 1D curves) to produce a final activation multiplier, which is clamped with float_max (0xBE960) against 0.0 and written to scratch slot -96 from r8. Various gated bytes at gbr offsets (148,149,150) and a RPM threshold comparison (0xCBC26/0xCBC2A/0xCBC2C) decide whether the full calculation runs or the output is forced to 0.0.",
+   "addresses": [
+    {
+     "address": "0x0CD6E6",
+     "role": "Table data for 'Tau Input A Rising Load Activation': 16 float values over coolant-temp breakpoints -40..110C; selected (descriptor 0xACB40) when load is rising and the mode byte at 0xFFFF844F != 1, looked up with ect_current to give a rising-load activation factor stored at frame slot -92(r8).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CD746",
+     "role": "Table data for 'Tau Input A Falling Load Activation': 16 floats over same coolant-temp axis; selected (descriptor 0xACB7C) when load is falling (state!=2) and mode byte at 0xFFFF844F != 1, looked up with ect_current to give a falling-load activation factor stored at slot -92(r8).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF6350",
+     "role": "ect_current (coolant temp), loaded into fr15 and used as fr4 X-axis input to all these 1D/2D table lookups.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF6624",
+     "role": "rpm_current, loaded into fr8 early; part of the engine-state inputs.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x000ACB40",
+     "role": "Descriptor pointer for the rising-load activation table, loaded into r4 then passed to table_lookup_1D.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x000ACB7C",
+     "role": "Descriptor pointer for the falling-load activation table, loaded into r4 then passed to table_lookup_1D.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x000ACB90",
+     "role": "Descriptor for 'Tau Input A Falling Load Activation A', alternate falling-load table selected when state==2.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x000ACB54",
+     "role": "Descriptor for a rising-load activation table variant selected when mode byte at 0xFFFF844F == 1 and state==1.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x000CBC2A",
+     "role": "16-bit RPM/count threshold compared (via (84,gbr)) against r11 (0xFFFF67EC) to gate whether the activation path runs; alternate value when activation flag at gbr+150 set.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x000CBC2C",
+     "role": "Alternate 16-bit threshold used when gbr+150 activation flag is set.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x000CBC26",
+     "role": "16-bit threshold compared against r14 to decide whether final result is floored to 0.0 via float_max.",
+     "evidence_class": "inferred"
+    }
+   ],
+   "inert_or_gated": "Output is forced to 0.0 (fldi0 fr8 stored at -96(r8)) if the count in r11 (0xFFFF67EC) < threshold (0xCBC2A/0xCBC2C), or if byte @r15==1, so the whole table result can be gated off. The activation flag at gbr+150 is set to 1 unless r13 (0xFFFF6254) and r12 (0xFFFF65C0) are both nonzero AND fr14 > table[-60] AND fr0 < table[-40]; when flag set the alternate threshold path is taken. Exact calibration values of 0xCBC26/2A/2C bytes not shown, so cannot state which branch is live.",
+   "evidence": [
+    "030C5A/030C5C load ect_current (0xFFFF6350) into fr15; 030C5E/030C60 load rpm_current (0xFFFF6624) into fr8",
+    "030D40 >> loads 0x000ACB40 (rising-load descriptor) into r4; 030D42 jsr table_lookup_1D (r9=0xBE830) with fr4=fr15",
+    "030D54 >> loads 0x000ACB7C (falling-load descriptor) into r4; 030D56 jsr table_lookup_1D",
+    "030D22-030D2C check table[-40] vs 0 to branch between rising/falling table selection",
+    "030D2E/030D4E cmp/eq #2 select state-2 (A/falling variant) tables; 030D38 tests 0xFFFF844F mode byte",
+    "table data at 0x0CD6E6 and 0x0CD746 are 16-float curves on coolant-temp axis -40..110C per [DEFINITION]",
+    "030E92-030EC6 chain of fmul/fmac combines slots -32,-76,-88,-36,-80,-92,-28,-72,-84,-20 into final fr4",
+    "030ED4 float_max (0xBE960) with fr5=0.0 clamps final result to >=0 before storing at -96(r8)",
+    "030CF2-030D10 gate: (84,gbr) threshold from 0xCBC2A/0xCBC2C compared with r11; branch to 030EE2 forces 0.0 output"
+   ],
+   "not_shown": "The absolute scaling/units of the stored activation factor, the actual runtime values of the gating bytes at 0xCBC26/2A/2C and the mode byte 0xFFFF844F in this calibration, how the final slot -96(r8) result feeds the fuel model downstream, and the contents/axes of the referenced 2D tables (0xAD82C, 0xAD810/0xAD7F4) and the other 1D correction curves. Whether rising vs falling branch is actually reached depends on load-direction computation not present in this listing."
   }
  },
  "failed": {
-  "doc-boost-control-07": "stopped: refusal (cyber)",
-  "doc-boost-control-01": "stopped: refusal (cyber)",
-  "mem-feedback_ect_axis_celsius": "stopped: refusal (cyber)",
   "mem-project_knock_flag_channel": "stopped: refusal (cyber)",
   "doc-ssm-read-patch-00": "stopped: refusal (cyber)",
   "doc-architecture-02": "stopped: refusal (cyber)",

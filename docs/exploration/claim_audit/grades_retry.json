@@ -242,5 +242,57 @@
    "That the shared axis is specifically RQTQ and is affected by pedal-map changes (blind calls 0xFFFF8558 a load/torque-request input with the exact quantity not shown)"
   ],
   "reason": "Every table address and role in the claim matches the blind reading, and the shared load/torque axis is consistent with RQTQ. The 1.93 Hz figure and the exact RQTQ identity are not confirmed, but nothing in the blind answer contradicts them."
+ },
+ "doc-boost-control-07": {
+  "grade": "disagree",
+  "supported": [
+   "0xC0FE0 belongs to the Max Wastegate Duty table, which the blind answer also associates with 0xC0F58.",
+   "0xC11D8 belongs to the Initial Wastegate Duty table, which the blind answer also associates with 0xC1150.",
+   "Both addresses are table contents rather than standalone scalars or code-referenced variables."
+  ],
+  "contradicted": [
+   "Claim says 0xC0F58 is the table header and 0xC0FE0 is where the Max Wastegate Duty table data is. Blind answer says 0xC0F58 is the base of the map itself. It says 0xC0FE0 is an interior cell 0x88 bytes in (element 68, RPM 3200, axis 240, value 79.305%), not the start of the data.",
+   "Claim says 0xC1150 is the table header and 0xC11D8 is where the Initial Wastegate Duty data is. Blind answer says 0xC1150 is the map base. It says 0xC11D8 is element 68 inside the map (RPM 3200, axis 240, value 70.457%)."
+  ],
+  "not_addressed": [
+   "That these tables changed between 20.9 and 20.10. This is a byte-diff and history statement, not testable from the code."
+  ],
+  "reason": "Both sides agree on which tables the two addresses belong to. They disagree on layout. The claim treats 0xC0F58 and 0xC1150 as headers, with 0xC0FE0 and 0xC11D8 as the table data. The blind answer treats 0xC0F58 and 0xC1150 as the map bases and the other two as mid-table cells, and backs this with cell values that match. Both layouts cannot be true at once."
+ },
+ "doc-boost-control-01": {
+  "grade": "agree",
+  "supported": [
+   "Two periodic scheduler-dispatched routines (0x054852 and 0x0549FA, both in the scheduler table) plus a separate reset routine",
+   "0x054852 is the boost/wastegate control or calculation routine and uses 1D table lookups; the blind answer names three 1D tables (0xAEFE4/0xAEFF0/0xAEFFC)",
+   "0x0549FA is a companion filter routine (float_lag_filter, i.e. exponential/IIR-style) reading RPM and filtering rpm/boost state",
+   "0x054A5A zeroes the feedback/filter state block when a mode/state check returns 1",
+   "0xC009E is the wastegate duty cycle frequency calibration and is programmed into a timer/PWM peripheral",
+   "GBR workspace base for boost is 0xFFFF8B50"
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "The specific inputs of task 51 (throttle, MAF, load, ECT) and that its output is the target wastegate duty",
+   "That the three 1D descriptors are RPM-indexed and that there is a MAF-error correction",
+   "That the IIR loop operates on both boost error and RPM error specifically",
+   "The stock frequency value of ~1.93 Hz (the blind answer gives raw value 10000 and says the units are unconfirmed)"
+  ],
+  "reason": "The blind answer independently confirms the claim's structure: the two scheduler tasks at the stated addresses, the lag-filter feedback routine, the reset that zeroes state on a mode check, the role of 0xC009E as wastegate PWM frequency, and the GBR base 0xFFFF8B50. Details such as the exact task-51 inputs, the MAF correction and the Hz scaling are not covered, but none is contradicted."
+ },
+ "mem-feedback_ect_axis_celsius": {
+  "grade": "agree",
+  "supported": [
+   "0xCD6E6 is the rising-load tau/activation table and 0xCD746 is the falling-load table.",
+   "Both tables are indexed by coolant temperature (ECT).",
+   "The ECT axis has 16 breakpoints spanning \u221240 to 110 in \u00b0C (the blind answer gives 'coolant-temp breakpoints -40..110C')."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "That the breakpoints are in exact 10\u00b0C steps (consistent with 16 points over \u221240..110, but not stated).",
+   "That the 80\u2013110\u00b0C warm span maps to bins 13\u201316 (indexes 12\u201315).",
+   "That at 90\u00b0C the lookup interpolates on the warm-end plateau rather than clamping.",
+   "The specific plateau values (e.g. 0.40/0.30/0.25) on the warm bins of the rising table.",
+   "That other ECT-indexed tables in this ROM also use \u00b0C."
+  ],
+  "reason": "The central claim is that these two tables use a 16-bin coolant axis from \u221240 to 110 in \u00b0C, not \u00b0F. The blind answer independently describes both tables as 16-point curves over coolant temperature \u221240..110C. The specific table values and the bin-index details are not covered, but nothing in the blind answer contradicts the claim."
  }
 }
