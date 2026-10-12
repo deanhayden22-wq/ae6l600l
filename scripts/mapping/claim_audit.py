@@ -58,6 +58,21 @@ SKIP_DOCS = {'corrections.md', 'verification-status.md', 'open-holes.md', 'analy
              'logs.md', 'workflow.md'}
 MAX_ADDRS = 24
 MAX_FUNCS = 8
+
+# Code injected into the ROM hole above the calibration area, as (start, pool,
+# end): instructions are start..pool, their literal pool is pool..end. describe()
+# used to call everything >= 0xA0000 "calibration data", so the blind reader was
+# shown the launch-control patch as data and disputed a correct doc section
+# (corrections item 100). See docs/rev-limit-patch.md.
+INJECTED_CODE = ((0x0F1000, 0x0F1038, 0x0F1058),)
+
+
+def injected(rom, v):
+    """(start, pool, end) if v lies in injected code that this ROM actually has."""
+    for s, p, e in INJECTED_CODE:
+        if s <= v < e and rom[s:s + 2] != b'\xff\xff':
+            return s, p, e
+    return None
 MAX_CHARS = 80000
 
 SYSTEM = """You are helping reverse-engineer a 2013 Subaru WRX engine computer ROM \
@@ -210,6 +225,16 @@ class Rom:
         name = ('  name: %s [%s]' % self.labels[v]) if v in self.labels else ''
         if v >= 0xFFFF0000:
             return 'RAM. %d direct literal reference(s).%s' % (len(self.sites(v)), name)
+        inj = injected(rom, v)
+        if inj:
+            s, p, e = inj
+            if v < p:
+                return 'code injected into a ROM hole, in the listing 0x%06X-0x%06X.%s' % (s, p, name)
+            f = struct.unpack_from('>f', rom, v & ~3)[0]
+            return ('literal pool of the injected code at 0x%06X (listing 0x%06X-0x%06X). '
+                    'As a long: 0x%08X. As float32: %s.%s' % (
+                        s, s, p, struct.unpack_from('>I', rom, v & ~3)[0],
+                        B.fmt(f) if abs(f) < 1e7 and f == f else 'not a plausible float', name))
         if v in self.desc or v in self.data_to_desc:
             d = v if v in self.desc else self.data_to_desc[v]
             kind = 'table descriptor' if v in self.desc else 'table data (descriptor 0x%05X)' % d
@@ -233,6 +258,9 @@ class Rom:
                 refs += self.sites(self.data_to_desc[v])
             if 0x400 <= v < 0xA0000 and not v & 1:
                 refs.append(v + 2 if B._is_push(B._word(self.rom, v)) else v)
+            inj = injected(self.rom, v)
+            if inj:
+                funcs[(inj[0], inj[1])].add(v)
             for s in refs[:40]:
                 st, en, _ = B.function_bounds(self.rom, s)
                 funcs[(st, en)].add(v)

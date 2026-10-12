@@ -188,9 +188,14 @@ operating-point distribution stabilizes), then review the WG strategy.
 
 Two boost-related tables changed in 20.10 with origin not established:
 
-- **Max Wastegate Duty** (0xC0FE0) — note: this address is the table
-  data; the table header is at 0xC0F58.
-- **Initial Wastegate Duty** (0xC11D8) — table header at 0xC1150.
+- **Max Wastegate Duty** — definition address `0xC0F58`, which is where
+  the table **data starts**. `0xC0FE0` is a cell 0x88 bytes into it.
+- **Initial Wastegate Duty** — definition address `0xC1150`, again the
+  start of the data. `0xC11D8` is a cell 0x88 bytes into it.
+
+Corrected 2026-10-11 (corrections item 100): this used to call `0xC0F58`
+and `0xC1150` "table headers" and the other two addresses "the table
+data". Definitions point at data, never at a header.
 
 These changes were detected via byte-diff of the 20.9 → 20.10 ROMs but
 weren't documented in working notes. If they need re-derivation,

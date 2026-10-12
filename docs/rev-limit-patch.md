@@ -26,7 +26,7 @@ at `0x03B778`:
 |---|---|---|
 | `FR15` | `0xFFFF6624` | **rpm_current** |
 | `FR14` | `0xFFFF65FC` | **vehicle speed (km/h)** — repo labels this `engine_load_current`, which is wrong; see `corrections.md` item 8 |
-| `FR12` | `0xFFFF620C` | airflow_maf_current |
+| `FR12` | `0xFFFF620C` | **manifold pressure** — the old label `airflow_maf_current` is wrong; see `corrections.md` item 9 |
 
 Stock then selects one of two cut/resume pairs based on a condition result:
 

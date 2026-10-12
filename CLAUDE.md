@@ -422,7 +422,7 @@ choice of rev is nearly irrelevant.
    extended datalogging possible. See [`docs/ssm-read-patch.md`](docs/ssm-read-patch.md).
 2. **`0x0F1000`–`0x0F1057` (88 bytes)** — launch control / 2-step. Injected into
    the big ROM hole, reached by literal redirects at `0x03B79C`/`0x03B7A8`. When
-   engine load is below ~8.05 it adds **2700 RPM** to the value the rev limiter
+   vehicle speed (`0xFFFF65FC`) is below ~8.05 km/h (5 mph) it adds **2700 RPM** to the value the rev limiter
    compares, so the limiter trips at an actual **4000 RPM** instead of 6700.
    Side effect: the second rev-limit pair (`0xCC508`/`0xCC50C`) is now
    **unreachable** — edit `0xCC500` (cut) and `0xCC504` (resume).

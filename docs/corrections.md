@@ -5972,4 +5972,93 @@ and `0x045D50`.
 What `0x054852` is; what reads `0xFFFF8B5C`; the code at `0x013AB0`–`0x013D18`
 that really reads the boost-disable and TD constants; the `0x73600` commit
 function; `0xD2F50`'s arithmetic; the consumer of `[0xFFFF8290]`.
+---
 
+## 100. Claim-audit retry: `0x3BB6C` is the speed limiter, not tip-in enrichment; five more doc sections wrong — **2026-10-11**
+
+**Status: docs fixed (`transient-fuel.md`, `boost-control.md`,
+`rev-limit-patch.md`, `CLAUDE.md`). `claim_audit.py` fixed. Labels NOT changed.**
+
+The `claim_audit.py retry` run graded the 28 claims the API had declined
+(report: `docs/exploration/claim_audit/report.md`). Doc-section disputes rose
+from 6 to 15. The ones below were decoded by hand from rev 20.19c.
+
+### `0x3BB6C` (`fuel_accel_enrich`) is the speed limiter
+
+`transient-fuel.md` described `0x3BB6C` as tip-in enrichment with "gains" of
+510 / 505 times a throttle delta, and offered those constants as levers for
+the post-DFCO knock issue. From bytes:
+
+```
+03BB7A mov.l @(0x03BCE8),r2 ; fmov.s @r2,fr12   ; fr12 = [0xFFFF65FC] vehicle speed
+03BB84 mov.l @(0x03BCF0),r2 ; fmov.s @r2,fr13   ; fr13 = [0xFFFF620C] manifold pressure
+03BBAC mov.l @(0x03BD04),r2 ; fmov.s @r2,fr15   ; fr15 = [0xCC520] = 510
+03BBB0 mov.l @(0x03BD08),r2 ; fmov.s @r2,fr14   ; fr14 = [0xCC528] = 505
+03BBD4 fcmp/gt fr12,fr14                        ; T = 505 > speed   (active state)
+03BC50 fcmp/gt fr12,fr15                        ; T = 510 > speed   (inactive state)
+03BBE0 [0xCC52C] = 1260 ; 03BBE4 fcmp/gt fr13,fr8   ; 1260 > manifold pressure
+03BC66 [0xCC530] = 10000 ; 03BC6A fcmp/gt fr8,fr9 ; bt -> stay inactive while 10000 > RPM
+```
+
+- The definition XML names `0xCC520` **Speed Limiting Enable (Fuel Cut)** and
+  `0xCC528` **Speed Limiting Disable (Fuel Cut)** (scaling `x*.621`, so 510 and
+  505 km/h display as 317 and 314 mph). Both are `VERIFIED-BOTH`. `0xCC51C` /
+  `0xCC524` are the alternate pair, chosen when `0x22CF4` does not return 1.
+- **No `fmul`, `fmac`, `fadd`, `fsub` or `fdiv` exists in `0x03BB6C`–`0x03BCCA`.**
+  Nothing is multiplied by a gain.
+- `0xCC52C` (1260) is compared with `[0xFFFF620C]`, manifold pressure (item 9),
+  not RPM. `0xCC530` (10000) is compared with RPM, and activation needs
+  RPM ≥ 10000, so the limiter cannot switch on by this path on this calibration.
+- Each of the eight constants (`0xCC51C`–`0xCC530`, `0xCBC0B`, `0xCBC0C`) has
+  exactly one literal reference in the image, all in this function's pool
+  (`0x03BD04`–`0x03BD28`). The function's address is stored at `0x04A0B0`.
+
+Consequence: the doc's three "levers" for the post-DFCO issue are not levers.
+
+### `0x3735A` and `0x3740C` are not the tau table handlers
+
+- `0x3735A` (16 instructions): `float_lag_filter` (`0xBEA40`) with input
+  `[0xFFFF7A60]`, previous value `[0xFFFF7A54]`, `fr6` = `[0xFFFF7A58]`, `fr7` =
+  the literal 0.004578 at `0x0373E8`; result stored to `0xFFFF7A54`. No table.
+- `0x3740C`: adds `[0xFFFF7A54]` to `[0xFFFF3194]`; resets the sum to 0 when
+  `byte[0xFFFFAF3B]` == 1, the previous copy `byte[0xFFFF7A74]` == 0 and
+  `[0xFFFF8EAC]` ≥ `[0xCC2B0]` = 720.0. No table.
+- "Tau Input A Rising Load Activation" (data `0xCD6E6`) is reached through
+  descriptor `0xACB40`, whose only literal is at `0x030E08`, loaded at
+  `0x030D40`. The record is 1-D, 16 points, uint16, scale 1/2048, axis
+  `0xCC624` (Coolant Temperature). The doc's "3 load × 16 ECT" does not match.
+
+### Smaller ones
+
+- `boost-control.md` "Recently changed in 20.10" called `0xC0F58` and `0xC1150`
+  "table headers". They are the definition addresses of Max / Initial Wastegate
+  Duty, i.e. where the data starts.
+- `rev-limit-patch.md` "The host function" labelled `0xFFFF620C` (loaded into
+  `fr12` at `0x03B67E`–`0x03B680`) `airflow_maf_current`. It is manifold
+  pressure (item 9).
+- `CLAUDE.md` said the launch-control patch acts "when engine load is below
+  ~8.05". `0F1000`–`0F1002` load `[0xFFFF65FC]`, vehicle speed, and `0x0F104C`
+  holds 8.0515 (km/h = 5 mph). A leftover of the pre-item-8 label. Fixed.
+- `knock.md` "Boost-control coupling" was disputed for quoting 0.2 and −1.0 for
+  `0xC0BFC` / `0xC0BF8`. Already fixed with item 99's rewrite; no change.
+
+### Upheld: `rev-limit-patch.md` "The injected code"
+
+The blind reader called `0x0F1000`–`0x0F103C` unset data. It is code:
+`0F1000: D00D -> mov.l @(0x0F1038),r0` (= `0xFFFF65FC`), ending
+`0F1034: 402B -> jmp @r0`, with its pool at `0x0F1038`–`0x0F1057`. **The doc is
+right and the dispute came from a tool defect:** `Rom.describe()` in
+`claim_audit.py` labelled every address ≥ `0xA0000` "calibration data", so the
+evidence pack presented the injected code as data. Fixed with an explicit
+injected-code range; the claim has **not** been re-sent.
+
+### Not checked
+
+Whether rev-limit pair 2 is dead; what `0x1CF16`, `0x22CF4`, `0x297A0`,
+`0x299BC` compute; whether anything else writes `[0xFFFF7CE0]`; the tail target
+`0x3D2FC`; what `0xFFFF7A60` and `0xFFFF8EAC` hold; the function at `0x030Dxx`
+that really applies the tau tables (it loads seven descriptors,
+`0xACB40`–`0xACBB8`, at `0x030D32`–`0x030D5E`); the doc's three tau "load rows"; the one
+remaining new dispute, in `ssm-read-patch.md` (claim `doc-ssm-read-patch-02`). The labels
+`fuel_accel_enrich`, `tau_rising_handler` and `tau_falling_handler` are
+candidates for the next rename pass.
