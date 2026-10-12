@@ -1,0 +1,1336 @@
+{
+ "answers": {
+  "tab-AAA80": {
+   "proposed_name": "Engine torque estimate from load and RPM, variant C of four (blend weight (1-f_A)*f_B)",
+   "what_it_does": "One of four load-by-RPM maps looked up back-to-back with identical inputs. The function blends the four results bilinearly using two 0..1 factors read from RAM, and stores the blended result to 0xFFFF5D58 and 0xFFFF5D5C. This map's raw value goes to 0xFFFF5E00 and enters the blend with weight (1-[FFFF90A8])*[FFFF3234].",
+   "axis_meanings": [
+    "Y (0.2..2.5): engine load in g/rev. The call passes engine_load_current [FFFF63F8] in fr4.",
+    "X (800..6800): engine speed in rpm. The call passes rpm_current [FFFF6624] in fr5."
+   ],
+   "output_units": "Unknown from code. The magnitude and shape suggest Nm of engine torque (hunch).",
+   "evidence_class": "inferred",
+   "evidence": [
+    "014EFE/014F00: fr15 is loaded from 0xFFFF63F8 (engine_load_current). 014F02/014F04: fr14 is loaded from 0xFFFF6624 (rpm_current).",
+    "014F28-014F2E: descriptor 0xAAA80 is passed to table_lookup_2D at 0xBE8E4 with fr4=fr15 (load) and fr5=fr14 (rpm). The same inputs are used for the sibling tables 0xAAA64, 0xAAA9C and 0xAAAB8 at 014F0E, 014F1E and 014F34.",
+    "014F30/014F32: the result is stored to r13-12 = 0xFFFF5E00. Siblings: AAA64 goes to 0xFFFF5E08, AAA9C to 0xFFFF5E0C, AAAB8 to 0xFFFF5E04.",
+    "014F40-014F56: fr0 = 1 - f1, where f1 is fr12 from 0xFFFF90A8. Then fr8 = f1*[5E08] + (1-f1)*[5E00] (this table), stored to 0xFFFF5D50.",
+    "014F58-014F62: f1*[5E0C] + (1-f1)*[5E04] is stored to 0xFFFF5D54.",
+    "014F64-014F7C: f2*[5D50] + (1-f2)*[5D54], where f2 is fr13 from 0xFFFF3234, is stored to 0xFFFF5D58 and copied to 0xFFFF5D5C. This is a bilinear blend of the four maps.",
+    "Data: exactly 0 at 0.2 g/rev. Rises roughly linearly at about 145 per g/rev. Capped at 350/360 at high load. Falls at high RPM for a given load. That is consistent with net torque (indicated minus friction rising with rpm), but magnitude alone is not proof."
+   ],
+   "weakest_link": "The identity 'torque' rests only on the shape and magnitude of the data. The code shows a blended load/rpm-to-quantity map but does not consume the blended result here, and the meaning of the blend factors at FFFF90A8 and FFFF3234 is not visible.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search for readers of 0xFFFF5D5C and 0xFFFF5D58 to see whether the blended value feeds torque-request, DBW or torque-limit logic, or is compared with a torque or pedal target. Search for writers of 0xFFFF90A8 and 0xFFFF3234 to learn what selects among the four maps, and whether they ever leave the weight (1-f1)*f2 at zero."
+  },
+  "fn-37156": {
+   "proposed_name": "seed_float_states_from_FFFF69F4_and_set_flags",
+   "mechanism": "It saves PR and calls the subroutine at 0x00022F92, keeping the return value in r2. It loads a float from RAM 0xFFFF69F4 and stores it to 0xFFFF7A60 (r4=0xFFFF7A74, disp -20). It then reads 0xFFFF7A60 back and copies it to 0xFFFF7A54 (disp -32) and to 0xFFFF7A64 (disp -16). It writes byte 0xFF (mov #-1) to 0xFFFF7A50. It moves the call's return value into r0. In the rts delay slot it stores the low byte of that value to 0xFFFF7A75 (@(1,r4)). It returns that same value in r0. The instruction at 0x037186 (mov.l r14,@-r15) is the prologue of the next function.",
+   "purpose": "Most likely an initialise/reset routine for a group of float states (filter, previous or target values) around 0xFFFF7A54-0xFFFF7A64. It seeds all three with the current value of the quantity at 0xFFFF69F4, sets a byte flag or counter at 0xFFFF7A50 to 0xFF, and records the helper's result as a status byte at 0xFFFF7A75. The physical quantity at 0xFFFF69F4 and the meaning of the flags cannot be told from this code.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "fmov.s @r6,fr8 with r6=0xFFFF69F4 is the only external float source; it is written to 0xFFFF7A60 and then copied to 0xFFFF7A54 and 0xFFFF7A64 (all three end up equal).",
+    "mov #-1,r5 / mov.b r5,@r6 with r6=0xFFFF7A50 writes 0xFF to a byte; this looks like a sentinel or 'uninitialised/active' marker.",
+    "The return of jsr 0x00022F92 is kept in r2, stored as a byte at 0xFFFF7A75 in the delay slot, and returned in r0.",
+    "There are no comparisons or branches: the routine copies values unconditionally, which is typical of an init or reset path.",
+    "None of the addresses involved carries a verified name."
+   ],
+   "weakest_link": "The 'filter/state reset' interpretation rests only on the copy-to-several-slots pattern. Neither the identity of 0xFFFF69F4 nor what helper 0x22F92 does is known, so the purpose is not fixed by the code."
+  },
+  "fn-34EC8": {
+   "proposed_name": "ect_lookup_set_ram_78B0_78B8_then_continue",
+   "mechanism": "It saves PR, then loads the float at 0xFFFF6354 (ect_gated_c, verified coolant temperature) into fr4. It sets r4 to the ROM table descriptor at 0x000AD054 and calls table_lookup_1D (0x000BE830). It stores the result fr0 at 0xFFFF792C-124 = 0xFFFF78B0. It copies the float at 0xFFFF43FC to 0xFFFF792C, reads that value back, and also stores it at 0xFFFF792C-120 = 0xFFFF78B4. It loads the ROM float constant at 0x000CC0D0 and stores it at 0xFFFF792C-116 = 0xFFFF78B8. Finally it restores PR in the delay slot of 'bra 0x034F28'. That makes the function a tail branch into code at 0x034F28, outside the listing, which presumably finishes the work and returns.",
+   "purpose": "unknown. This looks like one branch or entry path of a routine that fills a small block of float state around 0xFFFF78B0-0xFFFF792C. It sets one coolant-temperature-dependent value, copies another RAM value, and loads a fixed ROM constant, then joins shared code at 0x034F28. What the table at 0xAD054 and the RAM at 0xFFFF43FC and 0xFFFF78B0-B8 mean cannot be told from this code.",
+   "evidence_class": "observed",
+   "evidence": [
+    "fmov.s @r2,fr4 with r2=0xFFFF6354 (ect_gated_c [VERIFIED-BOTH]) is the lookup input",
+    "r4=0x000AD054 is passed to table_lookup_1D [TRACED] at 0xBE830",
+    "fr0 is stored at r6-124, with r6=0xFFFF792C, giving 0xFFFF78B0",
+    "the float at 0xFFFF43FC is stored at 0xFFFF792C, read back, and stored at 0xFFFF78B4 (r6-120)",
+    "the ROM constant at 0x000CC0D0 is stored at 0xFFFF78B8 (r6-116)",
+    "'bra 0x034F28' with lds.l @r15+,pr in the delay slot is a tail jump into continuation code"
+   ],
+   "weakest_link": "The listing stops at the branch to 0x034F28, so the full routine's job, how the stored values are used, and what table 0xAD054 actually holds are all unseen. Only the mechanism, not the purpose, is fixed by this code."
+  },
+  "tab-ACA78": {
+   "proposed_name": "Coolant-temperature-indexed decay rate for an accumulator at 0xFFFF7378, possibly a start/after-start fuel term",
+   "what_it_does": "Each time the gate passes, the value looked up against coolant temperature is multiplied by a factor at 0xFFFF7388 and subtracted from a float accumulator at 0xFFFF7378, floored at 0. That accumulator, scaled by a second coolant table and added to a base value, feeds a max() and then a 2D-table multiply whose result is stored at 0xFFFF7374.",
+   "axis_meanings": [
+    "X: coolant temperature in \u00b0C (fr12 = 0xFFFF6350, ect_current)"
+   ],
+   "output_units": "Decrement per execution in the accumulator's own units, before the 0xFFFF7388 multiplier. The table is largest when cold (0.001 at -40 \u00b0C) and smallest when hot (0.00035 at 70 \u00b0C and above).",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0308FC/030900: descriptor 0xACA78 is passed to table_lookup_1D with fr4 = fr12, and fr12 was loaded from 0xFFFF6350 (ect_current) at 030846/030848.",
+    "0308F4-0308FA: the old accumulator [r11-40] = 0xFFFF7378 is saved to the stack at @(12,r15).",
+    "030904-03090E: fneg fr0, then fmac gives acc - table*[r11-24]; [r11-24] is 0xFFFF7388.",
+    "030910-030918: float_max(result, 0.0) is written back to 0xFFFF7378, so this is a decrement-and-floor decay.",
+    "030882-030886 and 03089C-0308A2: the multiplier at 0xFFFF7388 is set to 1.0 in one state and to the ROM constant at 0xCBE18 in the other, keyed on the result of the call to 0x23E48.",
+    "0308E2-0308F2: the decay runs only when the word at 0xFFFF67EC is greater than the value looked up from table 0xACA6C (indexed by ect_gated, stored at gbr+44), and the byte at 0xFFFF7C9D is zero.",
+    "030922-030988: three parallel accumulators (0xFFFF737C, 0xFFFF7380, 0xFFFF7384) decay the same way using tables 0xACA8C, 0xACAA0 and 0xACAB4.",
+    "0309C8/030A7C-030A9A: when r13 == 0 and the byte at @(8,r15) == 0, the code takes [-40] (this accumulator), multiplies it by [-16] (table ACAF0), adds [-8], and takes the max against the parallel path.",
+    "030AA0-030AAC: that result is multiplied by table_lookup_2D(0xAD5CC, 0xFFFF6898 value, ect_gated) and stored to 0xFFFF7374."
+   ],
+   "weakest_link": "The decay mechanism is observed, but the physical meaning of the 0xFFFF7374 output is not. Nothing in this listing shows where the accumulators are initialised (an after-start kick, for example) or who reads 0xFFFF7374, so calling it fuel enrichment rests only on structure.",
+   "live_lever": "yes",
+   "tuning_relevance": "medium",
+   "next_step": "Search for writers of 0xFFFF7378 to find the initial or reset value; a write near the start-detect routine would confirm an after-start role. Also search for readers of 0xFFFF7374 to see whether it multiplies fuel pulse width or injector base."
+  },
+  "fn-0E794": {
+   "proposed_name": "os_service_masked_call_current_ctx_field8",
+   "mechanism": "Saves PR, then reads SR, clears bits 4-7 with 0xFF0F and ORs in 0xF0. This sets the interrupt mask to level 15, so all maskable interrupts are blocked. The caller's original SR is not saved anywhere. The incoming argument r4 is pushed. It calls 0x40CE with no arguments and takes the returned pointer in r0. It loads the 32-bit word at [r0+8] into r5, restores the original r4 argument from the stack, and calls 0x10800(r4 = original arg, r5 = *(ret+8)). It then pops the stack slot, restores PR and tail-jumps to 0xFBA4, so whatever 0x10800 left in r0 is passed through and 0xFBA4's return value comes back to the caller. The bytes from 0xE7BC on (a series of register pushes, r7 down to r0) belong to the next routine, probably an interrupt or trap entry stub, and are not part of this function.",
+   "purpose": "Most likely a kernel or RTOS service wrapper. It enters a critical section with all interrupts masked and looks up a context or control-block structure (probably the current task's) via 0x40CE. It runs a service routine on the caller's argument together with a field at offset 8 of that structure, then leaves through a common exit path at 0xFBA4. That exit probably restores the interrupt level and/or runs a scheduler/dispatch check. The specific service performed is unknown.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "stc sr / and 0xFF0F / or #0xF0 / ldc r0,sr sets IMASK=15, which is an explicit interrupt-disable on SH-2.",
+    "The original SR is never saved, so restoring the interrupt level must happen elsewhere, plausibly in 0xFBA4 at a fixed level. That pattern is typical of an OS service exit or dispatch path.",
+    "r0 returned by 0x40CE is used as a struct base, and the word at offset +8 is passed as the second argument to 0x10800.",
+    "The caller's r4 is preserved across the 0x40CE call and passed unchanged as the first argument to 0x10800.",
+    "The jmp to 0xFBA4 with lds.l pr in the delay slot is a tail call, so 0xFBA4 returns directly to this function's caller.",
+    "The register-push sequence at 0xE7BC looks like the prologue of an exception or interrupt handler, consistent with this region being OS/kernel code."
+   ],
+   "weakest_link": "The bodies of 0x40CE, 0x10800 and 0xFBA4 are not shown. Calling 0x40CE a 'current task/context' getter and 0xFBA4 an 'interrupt restore / dispatch' exit is inferred from the call pattern, not observed."
+  },
+  "fn-8E3E4": {
+   "proposed_name": "sub_08E3E4_copy_byte_65C2_and_conditional_tailcall_08EF14",
+   "mechanism": "Saves PR and calls the local subroutine 0x08E474 (no arguments set up). It then reads one byte from RAM 0xFFFF65C2 and stores it unchanged to RAM 0xFFFFAB60, which takes a snapshot of that byte into what looks like this module's own copy. Next it calls the external routine 0x000582AC and zero-extends the low byte of the return value in r0. If that byte is zero, it restores PR in the delay slot of 'bra 0x08EF14'. That makes it a tail call: 0x08EF14 runs and returns straight to this function's caller. If the byte is non-zero, it restores PR and returns without calling 0x08EF14.",
+   "purpose": "unknown. Structurally it is a periodic task or sequencing wrapper: run a sub-step, latch a status byte into local RAM, then run a second step (0x08EF14) only when the predicate routine 0x000582AC returns false/zero. What the bytes and the called routines mean cannot be told from this listing.",
+   "evidence_class": "observed",
+   "evidence": [
+    "bsr 0x08E474 with a nop delay slot is an unconditional local call made before anything else.",
+    "mov.l @(0x08E600),r6 gives 0xFFFF65C2; mov.b @r6,r2 reads it; mov.l @(0x08E604),r6 gives 0xFFFFAB60; mov.b r2,@r6 stores it. This is a plain byte copy.",
+    "jsr @r2 with r2 = 0x000582AC calls a routine in another code region; its result r0 is passed through extu.b and tst.",
+    "tst r2,r2 / bf 0x08E402 returns when the result is non-zero; otherwise bra 0x08EF14 with lds.l @r15+,pr in the delay slot, which is a tail call.",
+    "None of the addresses involved carries a verified name."
+   ],
+   "weakest_link": "The meaning of 0xFFFF65C2, 0xFFFFAB60, 0x000582AC and 0x08EF14 is unknown. Without the called routines, the mechanism is certain but the purpose is not."
+  },
+  "fn-067A6": {
+   "proposed_name": "hw_transfer_then_write_port_F76C",
+   "mechanism": "Takes an argument in r4 and saves it in a stack slot. Calls 0x0068E0 with r4 = arg; the delay-slot store means r4 is unchanged. Calls 0x006984 with r4 = arg and r5 = 2. Calls 0x006A48 with no new arguments and stores its 16-bit result in r0 on the stack. It then calls critical_section_enter(r4 = &stack[0], r5 = 0xE0); this most likely saves SR into @r15 and raises the interrupt mask to level 14. Inside that section it calls 0x0000E6E4(r4 = 0xFFFFF76C, r5 = 4, r6 = 0). The mov.w sign-extends 0xF76C, so r4 holds an on-chip peripheral register address. It then calls critical_section_exit(saved SR) and returns the 16-bit value obtained from 0x006A48.",
+   "purpose": "Likely a low-level peripheral transaction. It sets up a channel or device (0x68E0, then 0x6984 with mode 2) and reads a 16-bit result (0x6A48). It then, with interrupts masked, does a read-modify-write on I/O register 0xFFFFF76C, probably clearing or setting bit 4 (or a 4-wide field) to 0. A chip-select or control-pin release is a plausible reading. What the device or signal actually is cannot be told from this code.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "r4 = 0xFFFFF76C after sign extension, which lies in the SH7058 on-chip peripheral I/O space (the port/IO register region around 0xFFFFF7xx)",
+    "The write via 0xE6E4 is wrapped in the critical_section_enter/exit helpers [TRACED], with r5 = 0xE0 consistent with an interrupt-mask level. This is typical of atomic read-modify-write on a shared port register.",
+    "The return value is the 16-bit result of 0x006A48, stored by mov.w r0,@(4,r15) and reloaded as the function result",
+    "The caller's argument is passed to both 0x68E0 and 0x6984, the second with a constant 2, suggesting channel/device selection followed by mode configuration"
+   ],
+   "weakest_link": "The roles of 0x68E0, 0x6984, 0x6A48 and 0xE6E4 were not inspected. In particular, reading (4, 0) as 'bit 4, value 0' and 0xFFFFF76C as a port data register are assumptions, not verified."
+  },
+  "fn-66DEC": {
+   "proposed_name": "eval_flagbit_0D86_via_066E2E",
+   "mechanism": "Saves PR, then calls helper 0x000582D2 with r4=8 and sign-extends its byte result into r5. It looks up a byte-flag descriptor in the ROM table at 0x0009A834, at index 0x0D86 (the literal word at 0x066E2C). The byte at table[0x0D86] is an offset into a RAM byte array based at 0xFFFFADAC, and the RAM byte at that offset is loaded. The byte at table[0x0D87] is a bitmask that is ANDed with the RAM byte. The function sets r6=1 if the masked value is positive (bit set) and r6=0 otherwise. It pushes a 0 as a stack argument and tail-calls the local routine at 0x066E2E with r4=0x00097520, r5=(result of 0x582D2(8)), r6=flag and r7=0x0009756C. It then pops the stack argument, restores PR and returns. The listing ends with the prologue of 0x066E2E (push of r12-r14), which belongs to the neighbouring function. The word 0x0D9A at 0x066E2A is a pool constant and is not used by this function.",
+   "purpose": "Unknown from the code shown. Structurally it is a thin wrapper: it tests one packed status bit, selected through a (byte-offset, bitmask) descriptor table into a RAM flag array. It passes that bit, a value from 0x582D2(8), and two ROM parameter blocks (0x97520, 0x9756C) to a shared evaluator at 0x066E2E. That shape is typical of per-monitor or per-DTC diagnostic wrappers that feed an enable condition plus calibration blocks to a common judging routine, but this is a hunch.",
+   "evidence_class": "hunch",
+   "evidence": [
+    "mov.l @(0x066F68)=0x0009A834 with index 0x0D86 and 0x0D87: two consecutive table bytes, used as an offset and a mask",
+    "mov.b @(r0,r7) with r7=0xFFFFADAC: reads a RAM byte at base+offset, then 'and r2,r6; cmp/pl r6' turns the result into a 0/1 flag",
+    "jsr 0x582D2 with r4=8, result exts.b into r5, used as the second argument",
+    "r4=0x00097520 and r7=0x0009756C are ROM addresses passed to bsr 0x066E2E, along with a stacked 0 as the fifth argument",
+    "The literal 0x0D9A sits right after the function and is likely used by a sibling wrapper with a different flag index, suggesting a family of near-identical wrappers"
+   ],
+   "weakest_link": "Neither 0x582D2 nor 0x066E2E is shown, and the contents of the ROM blocks at 0x97520 and 0x9756C are unknown. So the diagnostic or monitor interpretation and the meaning of the flag bit and the argument 8 are not supported by the code here."
+  },
+  "tab-AEB48": {
+   "proposed_name": "Target idle speed (RPM) vs coolant temperature, mode 2 with flag r11=1 (one of 10 mode/flag variants)",
+   "what_it_does": "This is a coolant-temperature-indexed base target that is high when cold (1700) and falls to 800 when warm. It is selected when state byte GBR+80 equals 2 and flag r11 equals 1. The result is stored as a target and then approached by a rate-limited ramp, which behaves like an idle-speed target.",
+   "axis_meanings": [
+    "X: coolant temperature in \u00b0C (input fr12 is loaded from 0xFFFF6350, labelled ect_current). Breakpoints run -40..110."
+   ],
+   "output_units": "probably rpm (800..1700); not proven by code",
+   "evidence_class": "inferred",
+   "evidence": [
+    "050E2E/050E30: fr12 is loaded from 0xFFFF6350 (ect_current). 0510E6 passes fmov fr12,fr4 as the lookup input, so the X axis is coolant temperature. That fits the -40..110 breakpoints.",
+    "0510B0-0510DE: the table is chosen only when mode byte @(80,gbr)==2 (cmp/eq #2 at 0510D6) and r11==1 (0510DC). r11 is the return value of 0x22CF4 (050E62-050EBA).",
+    "0510B6-051166: there are ten sibling 1D tables (AEB20, AEB34, AEB5C, AEB70, AEB84, AEB98, AEBAC, AEBC0, AEBD4, and this one). All are indexed by the same temperature and selected by mode and flags. This is a per-mode family of the same quantity.",
+    "0510EA/051168-05116A: the result in fr8 is stored to @(-104,r13) = 0xFFFF892C.",
+    "05116C-0511C8: the previous value @(-112,r13) = 0xFFFF8924 is compared with the new target. A step from another temperature table (AEAF8/AEAE4/AEB0C, stored at 0xFFFF8978) is added or subtracted, then clamped to the target with float_min/float_max. This is a rate-limited ramp toward the target.",
+    "0511CA-0511D0: the ramped value is copied to @(-116,r13) = 0xFFFF8920.",
+    "0511D2-0511F2: |target - current| times a constant, divided by the step, is stored to 0xFFFF8928, which looks like a time-to-target.",
+    "0511FC-051214: a deadband check of target against current sets flag @(87,gbr), which looks like 'target reached'.",
+    "Data: values fall monotonically from 1700 cold to 800 at 70 \u00b0C and above. That matches a fast-idle schedule with an 800 rpm warm idle, but a magnitude match is not an identification."
+   ],
+   "weakest_link": "Nothing in this function shows that the ramped value (0xFFFF8920/0xFFFF8924) is compared against engine speed. The 'rpm' unit rests only on magnitude and shape. It could instead be another idle-related target with similar scaling, such as an airflow or idle-control-valve target.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search for code that reads 0xFFFF8920 or 0xFFFF8924 (GBR-relative @(0,gbr)/@(4,gbr) when GBR=0xFFFF8920, or absolute literals). If a reader subtracts the engine-speed RAM variable from it, or feeds it into the idle feedback PI, the table is the target idle RPM. Also find which input 0x22CF4 returns, since that sets r11 and decides which variant (this table or AEB5C) is used."
+  },
+  "fn-07034": {
+   "proposed_name": "subsys_init_4166_block",
+   "mechanism": "Saves PR, then calls local routine 0x71CC. Calls helper 0xE6E4 with r4 = 0xFFFFF6EA (sign-extended from 0xF6EA), r5 = 4 and r6 = 0; this looks like an (address, size/count, value) call, but 0xE6E4's semantics are not shown. It writes byte 0 to RAM 0xFFFF4170, 0xFFFF4171, 0xFFFF4172, 0xFFFF418C, 0xFFFF4191 and 0xFFFF4193, then calls 0x72A2 and 0x76C2. It writes byte 0 to 0xFFFF4166 and 0xFFFF4199, calls 0x7716, 0x79BE and 0x7A98, restores PR and tail-branches to 0x7BB2. It takes no arguments and returns nothing of its own; every store is a constant zero.",
+   "purpose": "Most likely a one-shot initialisation/reset routine for one subsystem. It clears that subsystem's byte-sized state variables (flags or counters) in the 0xFFFF4166\u20130xFFFF4199 RAM block and chains to its sub-init routines. Which subsystem it serves is unknown from this code.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "Only constant zeros are stored, to 8 byte addresses clustered in 0xFFFF4166\u20130xFFFF4199: a clear/reset pattern.",
+    "Nothing is read, compared or computed; the function is a straight-line sequence of stores and calls, typical of an init routine.",
+    "It chains seven local routines (0x71CC, 0x72A2, 0x76C2, 0x7716, 0x79BE, 0x7A98, then tail-branch 0x7BB2), consistent with a dispatcher of sub-initialisers.",
+    "0xE6E4 is called with (0xFFFFF6EA, 4, 0). 0xFFFFF6EA lies in the on-chip peripheral register range, so this may be a peripheral-register setup or clear, possibly in the ATU-II timer area; not confirmed."
+   ],
+   "weakest_link": "Two links are unverified. The callees, including 0xE6E4's argument meaning, are not shown. Nothing checks that this runs only at power-up or reset, so 'init' rests on the all-zero-store pattern alone."
+  },
+  "fn-37F00": {
+   "proposed_name": "calc_weighted_blend_31A4_31AC_to_7AB8",
+   "mechanism": "It loads two floats from RAM: fr0 = [0xFFFF31A4], taken as r2-8 from pool value 0xFFFF31AC, and fr4 = [0xFFFF31AC]. It computes fr4 = [0xFFFF31AC]*K1 + [0xFFFF31A4]*K2, with K1 = ROM float at 0x000CC2FC and K2 = ROM float at 0x000CC2F4, using fmul followed by fmac. It loads fr5 = ROM float at 0x000CC300 (K3) in the jsr delay slot and calls float_safe_div (0x000BE628), presumably fr4/fr5 with divide-by-zero protection. The returned fr0 is stored to RAM 0xFFFF7AB8; the pool word at 0x037F30 decodes to 0xFFFF7AB8. The result is (a*K1 + b*K2)/K3. Everything from 0x037F26 to 0x037F93 is literal pool. The code at 0x037F94 onward belongs to a neighbouring function: it writes ROM constant 0x000CC338 to 0xFFFF31B4 and clears byte 0xFFFF31B8, which looks like an init routine.",
+   "purpose": "Unknown. The shape (a*K1 + b*K2)/K3 is that of a weighted average or blend of two related RAM quantities, for example a mix of two sensor or estimate values, or one step of a filter. The constant values and the identities of the RAM variables are not shown, so what is being blended cannot be determined.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "Pool 0x037F80 = 0xFFFF31AC; the fmov.s @(r0,r2) with r0=-8 reads 0xFFFF31A4, and fmov.s @r2 reads 0xFFFF31AC.",
+    "fmul with ROM constant 0x000CC2FC, then fmac fr0*[0x000CC2F4] added into fr4.",
+    "fr5 is loaded from ROM 0x000CC300 in the delay slot before jsr float_safe_div [TRACED].",
+    "After return, fr0 is stored to 0xFFFF7AB8 (pool at 0x037F30) in the rts delay slot.",
+    "None of the addresses involved carries a verified name."
+   ],
+   "weakest_link": "The meaning of the inputs (0xFFFF31A4, 0xFFFF31AC), of the output 0xFFFF7AB8 and of the constants K1/K2/K3 is unknown. Whether this is a true weighted average (K3 = K1+K2) cannot be checked without the ROM constant values. The operand order of float_safe_div (fr4/fr5) is also assumed from the helper name."
+  },
+  "fn-0FC04": {
+   "proposed_name": "check_fault_and_halt_for_reset",
+   "mechanism": "Stores the constant 0x0FB0, apparently a table pointer, into RAM 0xFFFF5B64. It then calls 0x00FD34. If that returns -1 it calls 0x00FD6A instead, and the result is kept at @(4,r15). If the final result is -1, or the byte at 0xFFFF415C is not 1, it simply returns. Otherwise: (1) it raises the SR interrupt mask to 15, blocking all maskable interrupts; (2) it calls 0x00FBBA(2); (3) it writes 0x77 to byte 0xFFFFBFAD, which is near the top of on-chip RAM; (4) inside critical_section_enter/exit (arg 0xE0), it reads item 20 via 0x6BC4, clears bit 3 (AND 0xF7) and writes it back via 0x6BF0(20, value); (5) it loads the pointer at 0xFFFF5B64 (0x0FB0), reads a function pointer from that address and calls it with r4=1 and r5=the low byte of the result; (6) it enters an infinite self-loop at 0x00FC72 ('bra 0x00FC72'). Code from 0x00FC7E onward belongs to a neighbouring function.",
+   "purpose": "Most likely a fatal-fault or reset-request path. When a check returns a code other than -1 and a mode flag is 1, it locks out interrupts, leaves a marker (0x77) in RAM that survives reset, clears a control bit, calls a handler through a vector with the code, and then hangs, presumably so the watchdog resets the ECU.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "mov.w 0xFF0F / or #240 / ldc r0,sr sets the interrupt mask to 15, so interrupts are fully disabled.",
+    "'bra 0x00FC72' with nop is an unconditional self-loop: the function never returns on this path.",
+    "0x77 is written to 0xFFFFBFAD; mov.w sign-extends 0xBFAD, and that address is in high on-chip RAM, consistent with a reset-reason marker.",
+    "An indirect call goes through @(@0xFFFF5B64), which was just set to 0x0FB0, with args (1, result byte).",
+    "There is a read-modify-write of item 20 through 0x6BC4/0x6BF0, clearing bit 3 inside a traced critical section.",
+    "Return value -1 from 0xFD34/0xFD6A is treated as 'nothing to do'."
+   ],
+   "weakest_link": "The roles of 0xFD34, 0xFD6A, 0xFBBA, 0x6BC4/0x6BF0, the flag at 0xFFFF415C and the handler at 0x0FB0 are not shown. The 'watchdog reset / fault' reading rests on the interrupt lockout plus the infinite loop, not on known identities of those callees."
+  },
+  "tab-AD3C4": {
+   "proposed_name": "Coolant-temp initial value of a decaying multiplier (floored at 1.0), possibly a post-event enrichment start value",
+   "what_it_does": "Indexed by coolant temperature (ect_gated_c at 0xFFFF6354), it gives the starting value of a float factor kept at 0xFFFF7C34 and 0xFFFF7C38. A periodic routine steps that factor down by a constant at a counter-timed rate until it reaches 1.0, and reloads the start value from this table while a word counter at 0xFFFF67EC is below a second coolant-indexed threshold table (0xAD3B8). Every cell is 1.0, so the factor starts at 1.0 and never changes.",
+   "axis_meanings": [
+    "X: coolant temperature, deg C (-40..110). The input is read from 0xFFFF6354 (ect_gated_c) just before each call."
+   ],
+   "output_units": "dimensionless multiplier (raw/2048; 1.0 = no effect)",
+   "evidence_class": "inferred",
+   "evidence": [
+    "03A5F4/03A5F6: fmov.s @0xFFFF6354 into fr4 is the lookup input. The same input is used at 03A8DA/03A956 and at 03A98A/03A990.",
+    "03A604/03A60E: the result fr0 is stored to 0xFFFF7C60-44 = 0xFFFF7C34 and to 0xFFFF7C60-40 = 0xFFFF7C38.",
+    "03A99C-03A9A2: the third function stores the result to 0xFFFF7C34 and 0xFFFF7C38 only when the 0x00022F92 call returns 1, i.e. an event-gated initialisation. It also clears the flags at gbr+48 and gbr+40 and reloads the counter at gbr+46 from 0xCBC07.",
+    "03A8F6-03A902: the byte counter at gbr+46 (0xFFFF7C62) is decremented each call. When it expires (03A90C-03A924) the counter is reloaded and the code computes float_max(value@7C34 - const@0xCC4AC, 1.0), so the factor ramps down to a floor of 1.0.",
+    "03A926-03A944: float_deadband_check of 7C34 around 1.0, together with flag 0xFFFF726C being zero, forces fr14 = 1.0, ending the correction.",
+    "03A946-03A95A: if the word at 0xFFFF67EC is less than the uint16 table 0xAD3B8 (coolant-indexed) result, the factor is re-seeded from this table (0xAD3C4).",
+    "Data: all 16 cells are 1.0. The ramp floor is also 1.0, so the factor stays 1.0 permanently."
+   ],
+   "weakest_link": "The consumer of 0xFFFF7C34/0xFFFF7C38 is not in the listing, so which quantity the factor multiplies (fuel, ignition, airflow, etc.) is unknown. 'Enrichment' is a guess based only on the ramp-to-1.0 pattern.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Search for readers of 0xFFFF7C34 and 0xFFFF7C38 (literal pool hits for these addresses outside 0x03A5E4-0x03A9B8) to see what the factor multiplies. Also identify what writes 0xFFFF67EC and what the 0x00022F92 event function tests."
+  },
+  "fn-07086": {
+   "proposed_name": "critsec_run_71CC_then_flag4191_call_E6E4",
+   "mechanism": "Saves PR and reserves a 4-byte stack slot. Calls critical_section_enter [TRACED] with r4 = pointer to that slot (where the previous state is saved) and r5 = 0x00E0. In SR terms, 0xE0 is the I3..I0 field set to 14, which would mean masking interrupts up to level 14. Inside the section it calls the local subroutine at 0x0071CC with no visible arguments; r4 and r5 are left over from the enter call and may or may not be used. It then reads the byte at 0xFFFF4191 (zero-extended). Only if that byte equals 1 does it call 0x0000E6E4 with r4 = 0xFFFFF6EA (the word 0xF6EA sign-extended), r5 = 4 and r6 = 1. In every case it ends by calling critical_section_exit [TRACED] with the saved value from the stack slot, restores PR and returns. Nothing is stored directly by this function.",
+   "purpose": "unknown. It wraps a call to the routine at 0x71CC, plus a conditional follow-up action, in an interrupt-masked critical section. The follow-up runs only when the RAM byte at 0xFFFF4191 is 1. The (0xFFFFF6EA, 4, 1) arguments look like 'set bit 4 of an on-chip peripheral register to 1', but neither the helper at 0xE6E4 nor the register is identified here.",
+   "evidence_class": "observed",
+   "evidence": [
+    "mov.w 0x00E0 -> r5 and r15 -> r4 before jsr to critical_section_enter (0xBE81C); mov.l @r15 -> r4 before critical_section_exit (0xBE82C): the whole body is bracketed by save/restore of the critical state.",
+    "bsr 0x0071CC is unconditional, inside the section.",
+    "mov.b @0xFFFF4191 / extu.b / cmp/eq #1 / bf skips the call, so the 0xE6E4 call happens only when the byte equals 1.",
+    "Arguments to 0xE6E4: r4 = 0xFFFFF6EA (sign-extended 0xF6EA, an address in the SH7058 on-chip peripheral area), r5 = 4 (loaded in the delay slot), r6 = 1."
+   ],
+   "weakest_link": "Only the control flow is observed. What 0x71CC and 0xE6E4 do, what the flag at 0xFFFF4191 means, and which peripheral register sits at 0xFFFFF6EA are all unverified. The reading of 0xE6E4 as a bit-write helper (address, bit, value) is only a hunch from its argument pattern."
+  },
+  "fn-0FE5C": {
+   "proposed_name": "sync_item7_state_masked",
+   "mechanism": "Saves PR and reserves one stack slot. Calls 0x317C with r4=0x00E0 and keeps its return value on the stack. Calls 0x2EDC with r4=7 and tests the result. If it is non-zero, calls 0x107B6(7); if zero, calls 0x107F4(7). Finally pops the saved value into r4, restores PR and tail-jumps to 0x3190(saved value). The function computes nothing itself and has no RAM accesses of its own. It is a wrapper: query something for index 7, then call one of two handlers for index 7, all bracketed by the 0x317C/0x3190 pair.",
+   "purpose": "Most likely a critical section. 0x317C would raise the SR interrupt mask (0xE0 in the SR I-bit field is level 14) and return the old SR, and 0x3190 would restore it. Inside, the function reads a state or flag for item/channel 7 through 0x2EDC and applies one of two complementary actions through 0x107B6 or 0x107F4, perhaps set/clear or enable/disable. What item 7 is and what the two actions do cannot be told from this code.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "The pairing is shown in the listing: 0x317C is called first with constant 0xE0, its result is saved, and 0x3190 is tail-called with that saved value. This is the classic shape of 'r = set_imask(level); ...; restore_sr(r)'.",
+    "0xE0 matches SH SR bits 7:4 = 0xE, a valid interrupt-mask level (14), which fits a mask-raise helper.",
+    "The same constant 7 is passed to all three inner calls (0x2EDC, 0x107B6, 0x107F4), so they act on a common index or channel.",
+    "The branch on tst r0,r0 after 0x2EDC selects between two sibling routines at 0x107B6 and 0x107F4 that are about 0x3E bytes apart. They are probably complementary operations.",
+    "No named RAM variables or table helpers appear, so the physical meaning is not established."
+   ],
+   "weakest_link": "The interrupt-mask reading of 0x317C/0x3190 and the meaning of 0x2EDC, 0x107B6 and 0x107F4 are not shown. They are inferred only from the call pattern and the 0xE0 constant. What index 7 stands for is unknown."
+  },
+  "fn-09B2C": {
+   "proposed_name": "crank_angle_event_schedule",
+   "mechanism": "Arguments: r4 = channel index (byte), fr4 = target angle, r5 = integer timer offset, r6 = flag byte. It calls 0x317C with r4=16, which looks like raising the interrupt mask, and keeps the returned value. Before returning it tail-jumps to 0x3190 with that value, presumably to restore the mask. It sums r5 + [0xFFFF42F4] + [0xFFFF4280], converts the sum to float, multiplies by 180.0 and divides by float([0xFFFF4158]); the result goes in fr5. It then computes fr4 = target - [0xFFFF4168] (float) and wraps it into a 720 window: below -60.0 it adds 720.0, above 660.0 it adds -720.0. It then subtracts fr5 from the wrapped value. If the flag is nonzero and that result is negative, it leaves without storing anything. Otherwise it fills the 28-byte record at 0xFFFF4284 + idx*28: +0 = r5, +4 = remaining value (fr4), +8 = fr5, and byte +23 = 2. If the remaining value is below 35.0, it calls 0x9F72(idx) and clears byte +23 to 0.",
+   "purpose": "Likely schedules a per-channel crank-angle event, such as ignition or injection. The timer counts appear to be turned into degrees elapsed since the last reference (counts*180/period). It then finds the degrees left from the current reference angle to the target within a 720-degree four-stroke cycle. If the event is less than 35 degrees away it is armed straight away through 0x9F72 (state 0); otherwise it is left pending (state 2) for later tooth or reference processing.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "Float literals decoded from the pool: 180.0 (0x43340000), -60.0 (0xC2700000), 720.0 (0x44340000), 660.0 (0x44250000), -720.0 (0xC4340000), 35.0 (0x420C0000).",
+    "The -60 / +660 window adjusted by \u00b1720 is a wrap over a 720-degree span, which matches one four-stroke engine cycle.",
+    "An integer count times 180 divided by the RAM value at 0xFFFF4158 reads as a time-to-angle conversion if 0xFFFF4158 holds the period of a 180-degree segment.",
+    "Records are 28 bytes each, indexed by the byte argument at base 0xFFFF4284, with a state byte at +23 set to 2 or 0.",
+    "The call pair 0x317C(16) ... 0x3190(saved) brackets the record update, which looks like an interrupt-masked critical section."
+   ],
+   "weakest_link": "The meanings of 0xFFFF4158 (180-degree period), 0xFFFF4168 (current reference angle), 0xFFFF42F4 and 0xFFFF4280 are not verified. The roles of 0x9F72 (arming a timer compare) and 0x317C/0x3190 (interrupt mask save/restore) are inferred, not shown, so the specific event type (ignition or injection) is unconfirmed."
+  },
+  "fn-07110": {
+   "proposed_name": "task_group_dispatch_with_cal_option_0x5A",
+   "mechanism": "Saves PR, then reads the RAM byte at 0xFFFF4172. If that byte is nonzero it skips all subcalls. If it is zero it calls 0x007A4C, 0x0076D2 and 0x007368 in that order. It then reads the ROM byte at 0x000C00AA (zero-extended) and, only if it equals 90 (0x5A), also calls 0x007C24. On every path it finishes with `bra 0x0076B0`, with PR restored in the delay slot. That is a tail call: 0x0076B0 runs and returns directly to this function's caller. Nothing is stored here; all side effects are in the callees.",
+   "purpose": "unknown. Structurally this is a sequencer or dispatcher for a group of sub-routines. The group is suppressed while the RAM flag 0xFFFF4172 is nonzero, and one optional routine is enabled by a calibration byte set to the magic value 0x5A. A trailing routine at 0x0076B0 always runs. What the routines do cannot be told from this listing.",
+   "evidence_class": "observed",
+   "evidence": [
+    "mov.b @r2,r3 / tst r3,r3 / bf \u2192 nonzero byte at 0xFFFF4172 skips the three bsr calls and the optional call",
+    "bsr 0x007A4C, bsr 0x0076D2, bsr 0x007368 are executed unconditionally when the flag is zero",
+    "mov.b @r1,r0 from 0x000C00AA (ROM/calibration area) / extu.b / cmp/eq #90 \u2192 0x007C24 is called only when the byte equals 0x5A",
+    "bra 0x0076B0 with lds.l @r15+,pr in the delay slot = tail call taken on both paths"
+   ],
+   "weakest_link": "The roles are not established. The idea that 0xFFFF4172 is an inhibit or busy flag and 0x000C00AA is a feature-enable calibration byte (0x5A as an 'enabled' marker) rests on the code pattern, not on any cross-checked definitions. The callees are not shown, so the overall purpose is unknown."
+  },
+  "fn-035FC": {
+   "proposed_name": "channel_handle_init_and_dispatch",
+   "mechanism": "r4 points to a caller-supplied control object and r5 is a signed 16-bit index. The function computes a 16-byte descriptor entry as r13 = 0x3F84 + (sext16(r5) << 4) and loads r14 = descriptor+4, a pointer to a shared state block. It fills in the object: obj+4 = the index (word), obj+24 = the descriptor pointer, obj+20 = the state-block pointer. It then reads the longword at 0x3F28 and, if it is nonzero, calls 0x2FEC with no explicit arguments. Next it clears obj+8. It then tests the state byte at state[0]. If the byte is zero (idle), it copies descriptor byte +2 into state[1], copies obj+12 into state+4, and tail-jumps to 0x3820 with r4 = descriptor longword +8 and r5 = obj+12. If the byte is nonzero, it forms the address 0x4090 + (sign-extended state[0]) - (unsigned descriptor byte +0). This offset is not scaled by 4, so the state values are presumably already byte offsets. It loads a code pointer from that address and tail-jumps to it with r4 = obj+12. Both exits restore PR via the delay-slot lds.l. r12-r14 are used without being saved here, so the real prologue is probably earlier, or the caller saves them; the heuristic bounds are suspect. The bytes from 0x3650 on are a literal pool, and the push at 0x3664 is the next function's prologue.",
+   "purpose": "Likely a low-level driver or OS-style service. It binds a per-call request/handle object to one of a static table of channel descriptors, records the request, then either starts the operation (the idle path calls 0x3820 with a descriptor parameter) or dispatches through a state-indexed jump table to a handler for the channel's current state. The exact peripheral or service (serial/CAN comms, flash/EEPROM access, task scheduler) cannot be told from this code alone.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "Index scaled by 16 and added to 0x3F84: a table of 16-byte descriptors.",
+    "Descriptor+4 is dereferenced as a pointer to a mutable block whose byte 0 is tested and byte 1 and long +4 are written: a per-channel state block.",
+    "Byte 0 == 0 selects the 'start' path (copy descriptor byte +2, store obj+12, call 0x3820); any other value selects an indirect jump through the table at 0x4090: state-machine dispatch.",
+    "The object receives the index, the descriptor pointer and the state pointer at +4/+24/+20, and +8 is cleared: handle/request initialisation.",
+    "Optional hook: a call to 0x2FEC is gated on the nonzero longword at 0x3F28.",
+    "Both exits are tail jumps (jmp with lds.l pr in the delay slot)."
+   ],
+   "weakest_link": "The semantic purpose (which peripheral or service the descriptors represent, and what 0x3820, 0x2FEC and the 0x4090 handlers do) is not visible. The function bounds also look truncated: r12-r14 are not saved, so a missing prologue or extra entry logic before 0x35FC cannot be ruled out."
+  },
+  "tab-AC90C": {
+   "proposed_name": "Coolant-temperature-dependent threshold or duration (one of six mode-selected variants); meaning unknown",
+   "what_it_does": "Looks up a value against current coolant temperature, picking one of six 1D tables from the byte flags at 0xFFFF90C1 and 0xFFFF72A1, and stores the float result to 0xFFFF72FC. A tiny getter at 0x02FCBA returns that RAM value to other code. The value falls steeply from 150000 at -40 C to 5000 at 80 C and above, which fits a cold-start threshold or duration, but no consumer is in the listing.",
+   "axis_meanings": [
+    "X: engine coolant temperature, deg C (-40..110). Observed: fr4 is loaded from 0xFFFF6350 ect_current at 02FC78 just before the jsr to table_lookup_1D."
+   ],
+   "output_units": "unknown (raw uint16 x8; 5000..150000; possibly ms or an accumulated quantity, unverified)",
+   "evidence_class": "hunch",
+   "evidence": [
+    "02FC76/02FC78: mov.l 0xFFFF6350 (ect_current [VERIFIED-BOTH]) into r5, fmov.s @r5,fr4. This is the lookup input, so the X axis is coolant temperature.",
+    "02FC6E-02FC7A: the byte at 0xFFFF90C1 is compared with 1. That chooses between two groups of descriptors: AC90C/AC934/AC920 versus AC8D0/AC8F8/AC8E4.",
+    "02FC72-02FC92: the byte at 0xFFFF72A1 (0, 1 or other) chooses within each group. This table, 0xAC90C, is used when 0xFFFF90C1==1 and 0xFFFF72A1==0 (02FC80 tst r2,r2 / 02FC84).",
+    "02FCAC-02FCAE: jsr table_lookup_1D at 0x0BE830 with r4 = descriptor and fr4 = ECT.",
+    "02FCB2/02FCB8: the result fr0 is stored to 0xFFFF72FC in the rts delay slot. No arithmetic is done on it in this function.",
+    "02FCBA-02FCBE: a separate getter returns @0xFFFF72FC in fr0, so the consumers are elsewhere.",
+    "Data: monotonic decrease 150000 -> 5000, flat from 80 C up. This shape fits a cold-start or warm-up limit, but the shape alone does not fix the quantity."
+   ],
+   "weakest_link": "The output is only stored to RAM 0xFFFF72FC and fetched by a getter; its consumer, and therefore its units and purpose, are not in the listing. The meanings of the selector bytes 0xFFFF90C1 and 0xFFFF72A1 are also unknown.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Find callers of the getter 0x02FCBA and any direct readers of 0xFFFF72FC. Check whether the value is compared against a timer or accumulator, or used as a time constant or limit. Also find the writers of 0xFFFF90C1 and 0xFFFF72A1 to identify the mode selection, and decode the five sibling tables (AC934, AC920, AC8D0, AC8F8, AC8E4) for contrast."
+  },
+  "tab-AF468": {
+   "proposed_name": "Front A/F sensor signal to lambda (equivalence ratio) conversion curve (candidate)",
+   "what_it_does": "This small wrapper reads a float from RAM 0xFFFF40E0, converts it through a 13-point curve and stores the result to RAM 0xFFFF8DE4. The shape looks like a wideband A/F sensor characteristic: a signed input with zero mapping to 1.0, and outputs that look like lambda or AFR divided by 14.5.",
+   "axis_meanings": [
+    "X: signed sensor quantity from RAM 0xFFFF40E0, range -1.3..0.74, with 0 mapping to 1.0. Candidate is A/F sensor pump current in mA (negative = rich, positive = lean), unverified."
+   ],
+   "output_units": "dimensionless ratio (lambda-like). Every cell equals AFR/14.5 for AFR 11, 12, 13, 14, 14.5, 15 ... 20.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "058904/058906: mov.l @(0x058A34),r2 loads 0xFFFF40E0, then fmov.s @r2,fr4 puts that RAM float in as the lookup input.",
+    "058908-05890C: r4 = descriptor 0xAF468, then jsr to table_lookup_1D at 0xBE830.",
+    "058910/058916: r2 = 0xFFFF8DE4, and the delay-slot fmov.s fr0,@r2 stores the result. There is no clamp, multiplier or other consumer in this function.",
+    "Data bytes: the outputs are exactly 22/29, 24/29, 26/29, 28/29, 29/29, 30/29 ... 40/29, which is AFR 11..20 divided by 14.5. This points to an AFR-ratio or lambda quantity.",
+    "Data bytes: the axis is monotonic and signed, crosses zero at output 1.0, and is wider on the negative (rich) side. That asymmetry matches the typical pump-current-versus-lambda curve of a Denso wideband A/F sensor."
+   ],
+   "weakest_link": "The identity of the input at 0xFFFF40E0 is not shown in this listing. Calling it A/F sensor current rests only on the curve's shape and zero crossing. The meaning of the output at 0xFFFF8DE4 also depends on readers that are not shown.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Find the writer of 0xFFFF40E0 and check whether it derives from the A/F sensor ADC or current-measurement path. Then search for readers of 0xFFFF8DE4 and check whether it feeds the closed-loop fuel trim or the logged A/F value."
+  },
+  "fn-7D526": {
+   "proposed_name": "sub_07D526_call_sequence_07D9F8_to_07E014",
+   "mechanism": "Pushes PR, then calls ten local subroutines in a fixed order with BSR: 0x07D9F8, 0x07DA1C, 0x07DAB4, 0x07DAE8, 0x07DB0E, 0x07DB80, 0x07DC04, 0x07E13C, 0x07DC88, 0x07DF6C. Each call has a NOP in its delay slot. It then tail-calls 0x07E014 with BRA, restoring PR in the delay slot, so 0x07E014 returns straight to this function's caller. It passes no arguments, reads and writes no memory itself, and has no branches or conditions.",
+   "purpose": "unknown. The code fits a dispatcher that runs one group of related routines in sequence, probably once per scheduler tick. Nothing shown identifies what that group does. The callees sit in 0x07D9F8-0x07E13C, close after this function. The order is not strictly ascending (0x07E13C runs before 0x07DC88), which suggests a data dependency between those routines.",
+   "evidence_class": "observed",
+   "evidence": [
+    "Only BSR calls with NOP delay slots; no loads, stores or compares.",
+    "The tail call 'bra 0x07E014' has 'lds.l @r15+,pr' in its delay slot, which is the standard SH tail-call pattern.",
+    "0x07E13C is called between 0x07DB0E-0x07DC04 and 0x07DC88, so the call order differs from address order."
+   ],
+   "weakest_link": "The mechanism is fully fixed by the code. The subsystem's purpose cannot be told without disassembling the callees, and none of them carries a name in the listing."
+  },
+  "tab-AC338": {
+   "proposed_name": "Coolant-temperature compensation multiplier, conditionally enabled (all cells 1.0, currently neutral)",
+   "what_it_does": "When the byte flag at 0xFFFF65C1 equals 1, coolant temperature is looked up in this table and the result is stored to 0xFFFF7288, with 0xFFFF726E set to 1. Otherwise 0xFFFF7288 is forced to 1.0 and 0xFFFF726E is cleared, so the result acts as a unity-default factor whose consumer is not in this listing.",
+   "axis_meanings": [
+    "X: engine coolant temperature, deg C (-40..110), taken from ect_current 0xFFFF6350 via fr4"
+   ],
+   "output_units": "dimensionless factor (uint8 x 0.0078125, range 0..1.99; 1.0 = no effect)",
+   "evidence_class": "inferred",
+   "evidence": [
+    "02F556/02F55C: mov.l 0xFFFF6350 (ect_current, VERIFIED-BOTH) into r6, then fmov.s @r6,fr4 in the bf/s delay slot. fr4 holds ECT when the jsr at 02F562 to table_lookup_1D 0xBE830 runs.",
+    "02F552-02F55A: mov.b @0xFFFF65C1, then cmp/eq #1 and bf/s. The lookup happens only when this flag equals 1.",
+    "02F566/02F568: the lookup result fr0 is stored to 0xFFFF7288.",
+    "02F56E-02F572: on the other path, fldi1 fr8 stores 1.0 to 0xFFFF7288. A default of exactly 1.0 marks the value as a multiplicative factor.",
+    "02F56C/02F574/02F57C: r2 = 1 on the table path and 0 on the default path, stored as a byte to 0xFFFF726E. This is a 'compensation active' status flag.",
+    "Table data: all 16 cells are 1.0, and the axis -40..110 step 10 is consistent with a coolant temperature range."
+   ],
+   "weakest_link": "It is assumed, not shown, that 0xFFFF7288 is used as a multiplier. Its reader is not in this listing. What the gating flag 0xFFFF65C1 means (which feature or mode enables this) is also unknown.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Search the ROM for literal-pool references to 0xFFFF7288 to find its consumer and what it multiplies. Search for writes to 0xFFFF65C1 to find what enables the path. Check readers of 0xFFFF726E for the status use."
+  },
+  "fn-34EF4": {
+   "proposed_name": "subsys_7940_snapshot_inputs_and_run_subtasks",
+   "mechanism": "Saves PR. Loads a 32-bit float from RAM 0xFFFF63CC and stores it to 0xFFFF7920 (r5=0xFFFF7940 plus r0=-32). Loads a byte from 0xFFFF984D and stores it to 0xFFFF7941; that store sits in the delay slot of the first bsr, so it completes before the call. It then calls eight subroutines in a fixed order with no arguments: 0x034F94, 0x0351FA, 0x03528A, 0x035218, 0x0352DE, 0x035318, 0x035340 and 0x0353BC. PR is restored in the delay slot of a 'bra 0x0355B8', so 0x0355B8 runs as a tail call and returns to this function's caller. The instructions from 0x034F28 on load 0xFFFF318C, 0x00063A88 and push r14; they look like the prologue of the next function, not part of this one.",
+   "purpose": "Top-level periodic routine for one subsystem whose working variables sit around 0xFFFF7920-0xFFFF7941. It first copies a float and a byte status or flag from elsewhere in RAM into that block as a snapshot. It then runs that subsystem's sub-steps in sequence. Which engine function the subsystem is (e.g. a particular control or diagnostic) cannot be determined from this code.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "fmov.s @r2,fr8 from 0xFFFF63CC and then fmov.s fr8,@(r0,r5) with r0=-32 and r5=0xFFFF7940 writes the float to 0xFFFF7920.",
+    "mov.b @r6,r0 from 0xFFFF984D and then mov.b r0,@(1,r5) in a bsr delay slot writes the byte to 0xFFFF7941.",
+    "Eight back-to-back bsr calls with nop delay slots and no argument setup, which is typical of a sequencer or dispatcher.",
+    "bra 0x0355B8 with lds.l @r15+,pr in its delay slot is a tail call to a ninth step.",
+    "Code after 0x034F26 (new literal loads, mov.l r14,@-r15) is a new prologue, so the function ends at 0x034F26."
+   ],
+   "weakest_link": "What the source variables at 0xFFFF63CC and 0xFFFF984D, and the called subroutines, actually represent. None are named or verified, so the subsystem's identity rests only on the shared RAM block (0xFFFF7920-0xFFFF7941) and the call structure."
+  },
+  "tab-AC360": {
+   "proposed_name": "unknown (0..1 fade-out factor vs RAM 0xFFFF64D8, written to 0xFFFF72E4)",
+   "what_it_does": "When flag byte 0xFFFF726C equals 1, the routine looks this table up using the float at 0xFFFF64D8 and stores the result to 0xFFFF72E4. The result is 1.0 up to an input of 60, then falls linearly-ish to 0 at 90. It is one of four coefficients written side by side; nothing in this listing uses them.",
+   "axis_meanings": [
+    "X: float read from RAM 0xFFFF64D8 (quantity unidentified; breakpoints 0..90 in steps of 10)"
+   ],
+   "output_units": "dimensionless factor 0..1 (uint8 * 0.0078125)",
+   "evidence_class": "unknown",
+   "evidence": [
+    "02F99E/02F9A0: mov.l @(0x02FA34),r2 (=0xFFFF64D8); fmov.s @r2,fr14 loads the input into fr14",
+    "02F9B4-02F9BA: r4=0x000AC360, jsr table_lookup_1D with fmov fr14,fr4 in the delay slot, so 0xFFFF64D8 is the X input",
+    "02F9AE: r13=0xFFFF72E8; 02F9BC/02F9BE: mov #-4,r0; fmov.s fr0,@(r0,r13) stores the result to 0xFFFF72E4",
+    "Sibling stores: AC34C(@0xFFFF620C) to 0xFFFF72E0 at 02F9B2; AC374(iat_current) to 0xFFFF72E8 at 02F9C8; bsr 0x02F9E0 on (@0xFFFF7E4C)+1 to 0xFFFF72DC at 02F9D2. Together these form a block of four coefficients.",
+    "02F98E-02F994: the whole block runs only when byte @0xFFFF726C == 1 (bf 0x02F9D4 skips it otherwise)",
+    "No multiply, compare or clamp is applied to the looked-up value inside this function. The consumer is elsewhere."
+   ],
+   "weakest_link": "Neither the identity of the input 0xFFFF64D8 nor the consumer of 0xFFFF72E4 appears in the listing. The shape (unity below 60, fading to 0 by 90) is consistent with many kinds of derate or blend factor and fixes nothing.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Search the ROM for literal-pool references to 0xFFFF72E4 (and the block 0xFFFF72DC-0xFFFF72E8) to find the consumer and see whether the four coefficients are multiplied together. Separately, search for writers of 0xFFFF64D8 to identify the X-axis quantity, and for writers of flag 0xFFFF726C."
+  },
+  "tab-ADBC4": {
+   "proposed_name": "Coolant-temperature compensation, probably ignition timing in degrees (variant 1 of 4: flag 0xFFFF90BE == 0 and mode byte 0xFFFF6254 == 1)",
+   "what_it_does": "Looks up a signed correction, likely in degrees, against current coolant temperature and stores it as a float to RAM 0xFFFF7F68. The correction is +8 at -10 \u00b0C and below, tapers to 0 between 50 and 90 \u00b0C, and goes to -3.9 at 110 \u00b0C. It is one of four sibling tables (0xADBD8, 0xADBC4, 0xADC00, 0xADBEC), chosen by two RAM state bytes.",
+   "axis_meanings": [
+    "X: engine coolant temperature, \u00b0C (input fr4 is loaded from 0xFFFF6350, the ect_current address), breakpoints -40..110"
+   ],
+   "output_units": "probably degrees (crank-angle timing advance/retard); not proven",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0403C6/0403C8: mov.l 0xFFFF6350 (ect_current) -> r2; fmov.s @r2,fr4 puts coolant temperature in fr4, the lookup's input register, so the X axis is ECT",
+    "0403CA/0403CC: byte at 0xFFFF90BE -> r6; 0403CE/0403D0: byte at 0xFFFF6254 -> r5, then extu.b into r0",
+    "0403D2 tst r6,r6 / 0403D4 bf: when 90BE==0, 0403D8 cmp/eq #1,r0 / 0403DC bf keeps 0xADBD8 if 6254!=1; otherwise 0403DE loads 0xADBC4 (this table)",
+    "0403E4-0403EA: when 90BE!=0, it uses 0xADC00 (6254!=1) or 0xADBEC (6254==1)",
+    "0403EE jsr table_lookup_1D (0xBE830); 0403F8 fmov.s fr0,@r2 with r2=0xFFFF7F68 stores the result to RAM. No clamp or multiply is applied here",
+    "Cell scaling 90/256 with bias -45 gives a signed \u00b145 range, which suits an angle quantity. Monotonic fall from +8 cold to -3.9 hot matches typical cold-advance/hot-retard timing behaviour"
+   ],
+   "weakest_link": "The output's meaning rests only on the scaling (\u00b145, 90/256 steps) and the shape of the curve. The consumer of 0xFFFF7F68 is not in this listing, so it could as easily be an AVCS or other angle offset as ignition timing. The meanings of the selector bytes 0xFFFF90BE and 0xFFFF6254 are also unknown.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search the ROM for literal-pool references to 0xFFFF7F68 and inspect its readers. Check whether the value is added into the final ignition-advance sum (or into an AVCS target). Also find the writers of 0xFFFF6254 and 0xFFFF90BE to learn which variant is normally active."
+  },
+  "fn-02FEC": {
+   "proposed_name": "call_hook_3F28_with_busy_bit14",
+   "mechanism": "Saves PR. Reads the 32-bit RAM word at 0xFFFF1290, ORs in 0x4000 (sets bit 14) and writes it back. It then loads a function pointer from the ROM longword at 0x00003F28 and calls it indirectly (jsr @r3). On return it re-reads 0xFFFF1290, ANDs with 0xBFFF (clears bit 14) and writes it back, restores PR and returns. The store sits in the rts delay slot. Arguments arrive in r4-r7 untouched and are passed straight through to the callee. Bit 14 is therefore set exactly for the duration of the indirect call.",
+   "purpose": "A wrapper that raises a status or flag bit (bit 14 of the flags word at 0xFFFF1290) while one routine, taken from a ROM pointer table, runs. The most likely use is an 'in progress' or re-entrancy marker that other code (an interrupt or scheduler path) can test. The pointer at 0x3F28 and the meaning of the flag are not resolved in this listing, so the specific purpose is unknown.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "mov.l @(0x003094) = 0xFFFF1290; or with 0x4000; store: bit 14 is set before the call",
+    "mov.l @(0x0030B0) = 0x00003F28, then mov.l @r1,r3 / jsr @r3: an indirect call through a pointer stored in ROM at 0x3F28",
+    "After the call, and with 0xBFFF and store back to 0xFFFF1290: bit 14 is cleared",
+    "The final store is in the rts delay slot, so the clear always happens before the return",
+    "Only r0-r3 are used, so r4-r7 are forwarded unchanged to the callee"
+   ],
+   "weakest_link": "The callee's identity (the value stored at ROM 0x3F28) and the readers of bit 14 at 0xFFFF1290 are not shown. The 'busy/re-entrancy flag' interpretation is a hunch about purpose; the set/call/clear mechanism itself is observed."
+  },
+  "tab-AE54C": {
+   "proposed_name": "unknown: variant 1 of 5 per-mode RPM x load map (selector byte FFFF6812 == 1), output to FFFF80F4/FFFF80F0",
+   "what_it_does": "When several enable conditions hold, the function picks one of five identically shaped 3x5 tables (AE54C, AE568, AE584, AE5A0, AE5BC) by the byte at 0xFFFF6812, which takes values 1..5. It looks the chosen table up by engine load and RPM, stores the raw result to 0xFFFF80F4, and stores that result times the constant at 0xD2D48 to 0xFFFF80F0. This table is the variant for selector 1, and every cell is 0, so it currently contributes nothing.",
+   "axis_meanings": [
+    "Y (1..3, 5 points): almost certainly engine load in g/rev. engine_load_current (FFFF63F8) is passed in fr4 and the 1..3 range fits. Which argument register maps to which axis was not checked in table_lookup_2D.",
+    "X (2000..6000, 3 points): almost certainly engine speed in rpm. rpm_current (FFFF6624) is passed in fr5."
+   ],
+   "output_units": "unknown. The raw uint8 value (scale 1) goes to FFFF80F4. The final output at FFFF80F0 is that value times the float at 0xD2D48.",
+   "evidence_class": "unknown",
+   "evidence": [
+    "0435AA/0435AC: fr15 = rpm_current (FFFF6624). 0435AE/0435B0: fr14 = engine_load_current (FFFF63F8).",
+    "04361E-043626: r4 = 0xAE54C; table_lookup_2D is called with fr4 = fr14 (load) and fr5 = fr15 (rpm).",
+    "043628-04362E: the result fr0 is stored to @(-4, 0xFFFF80F8), i.e. 0xFFFF80F4.",
+    "043692-0436A4: fr8 = float at 0xD2D48 multiplied by the value at FFFF80F4; the product is stored to 0xFFFF80F0. Every disable path writes 0 there (04369E fldi0).",
+    "043604-043618: the table is chosen by the byte at FFFF6812 (read at 0435D0/0435D2), values 1..5 mapping to AE54C/AE568/AE584/AE5A0/AE5BC. Any other value gives 0 (043678).",
+    "0435E0-0435F0 and 043682: if the return of 0x299BC equals 2, or 22CF4 returns 1 and 297A0 returns 2, the selector-3 table AE584 is forced.",
+    "0436B6-0436F2: hysteresis flags are derived from the constants at D2D38/D2D3C (rpm) and D2D40/D2D44 (load) and written to FFFF80F8 and FFFF80F9.",
+    "0435F2-0435FE: both of those flags must equal 1 before any table is used.",
+    "0435C6/0435CC and 043600: the byte at FFFF65C0 must be 0.",
+    "0435CA-0435DE: if function 0x1CF16 returns 1, the output is forced to 0.",
+    "Table data at 0xD5394 is all 0."
+   ],
+   "weakest_link": "The meaning of selector FFFF6812 (values 1..5) and the downstream use of FFFF80F0/FFFF80F4 are not visible. A 5-valued selector suggests gear position on this 5-speed car, but that is only a hunch, and nothing in the listing fixes what the output quantity is.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Search for readers of 0xFFFF80F0 (and 0xFFFF80F4) to see what the scaled value modifies, and find the writer of 0xFFFF6812 to check whether it is gear position. Also dump the floats at 0xD2D38-0xD2D48 and check whether tables AE568, AE584, AE5A0 and AE5BC are also all zero."
+  },
+  "fn-5E774": {
+   "proposed_name": "store_u8_arg_as_float_FFFF8F04",
+   "mechanism": "Zero-extends the byte argument in r4, loads fr5 = 0.0 and fr4 = 1.0 (the fldi1 sits in the jsr delay slot, so it runs before the call), then calls the traced helper fmac_interp_uint8 at 0x0BE588. The helper's float result in fr0 is stored to RAM 0xFFFF8F04; that store sits in the rts delay slot, so it always executes. The helper most plausibly computes fr0 = (float)u8 * fr4 + fr5. With a gain of 1.0 and an offset of 0.0, the function then just writes the argument byte, converted to float unchanged, into 0xFFFF8F04.",
+   "purpose": "unknown. It is a setter that publishes an 8-bit value (passed in by the caller) as a float in RAM 0xFFFF8F04. What that value means depends on the callers and on whoever reads 0xFFFF8F04, and neither is shown.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "extu.b r4,r4 shows the argument is treated as an unsigned byte.",
+    "fldi0 fr5 runs before the call and fldi1 fr4 runs in the jsr delay slot, so the helper sees fr4 = 1.0 and fr5 = 0.0.",
+    "jsr goes to 0x0BE588, labelled fmac_interp_uint8 [TRACED].",
+    "fmov.s fr0,@r2 in the rts delay slot stores the float result to 0xFFFF8F04 (loaded from the literal at 0x05E900).",
+    "There are no other inputs, branches or side effects."
+   ],
+   "weakest_link": "The exact behaviour of fmac_interp_uint8 is not shown. The reading 'u8 * gain + offset', which with 1.0 and 0.0 amounts to a plain int-to-float conversion, is inferred from the helper's name and the arguments chosen. Nothing shown identifies RAM 0xFFFF8F04 or the callers."
+  },
+  "tab-AA8D8": {
+   "proposed_name": "IAT-dependent gain on the up-count rate of an unidentified accumulator at 0xFFFF5CB0",
+   "what_it_does": "This is a dimensionless multiplier looked up from fr15 (RAM 0xFFFF6364, labelled iat_current). It scales a rate taken from table 0xAA928 (indexed by fr14 = RAM 0xFFFF5CA0). The product is stored to 0xFFFF5D0C and added each pass to an accumulator at 0xFFFF5CB0, which is then clamped by float_max against constant 0xC0BF0. Below about -9 \u00b0C it cuts the rate to ~0.65x; above about 50 \u00b0C it raises it to ~1.06x.",
+   "axis_meanings": [
+    "X: intake air temperature in \u00b0C (input register fr15 is loaded from 0xFFFF6364, labelled iat_current; breakpoints -40..110 fit a temperature axis)"
+   ],
+   "output_units": "dimensionless multiplier on the per-call increment of the accumulator at 0xFFFF5CB0",
+   "evidence_class": "inferred",
+   "evidence": [
+    "013BB6/013BB8: fr15 is loaded from 0xFFFF6364 (label iat_current) and is held in a callee-saved register across calls",
+    "013C3A-013C40: descriptor 0xAA8D8 is passed to table_lookup_1D with fr4 = fr15, so the input is the 0xFFFF6364 value",
+    "013C2E-013C38: table 0xAA928 is looked up with fr14 (from 0xFFFF5D18-120 = 0xFFFF5CA0) and saved at @(4,r15)",
+    "013C44/013C46: fr8 = that 0xAA928 result; fmul fr0,fr8 multiplies it by this table's output",
+    "013C4C: the product is stored to 0xFFFF5D18-12 = 0xFFFF5D0C",
+    "013C50: fadd fr8,fr12, where fr12 was loaded at 013BAC from 0xFFFF5CB0, so the product is an increment to that accumulator",
+    "013C52-013C62: float_max(fr12, const @0xC0BF0) is applied and the result stored back to 0xFFFF5CB0",
+    "013C1A-013C2C: this up-count path runs only when const 0xC0BDC > fr14 and float @0xFFFF5C98 >= const 0xC0BE4",
+    "013C64-013CAC: the mirror decrement path uses tables 0xAA93C x 0xAA8EC with a float_min clamp",
+    "013BC2-013BFC and 013CAE-013CB8: hysteresis flags at GBR+129 (0xFFFF5CA4 vs C0BD4/C0BD8) and GBR+130 (rpm vs C0BE8/C0BEC) zero 0xFFFF5CAC and 0xFFFF5CB0",
+    "013C08-013C12: a parallel pair, 0xAA914(fr14) x 0xAA8C4(IAT), is stored to 0xFFFF5CAC; this table looks like the IAT-correction twin of 0xAA8C4"
+   ],
+   "weakest_link": "Two links are unverified. First, the physical meaning of the accumulator at 0xFFFF5CB0 and of its rate input fr14 (0xFFFF5CA0) is unknown. Second, the axis being IAT rests on the 0xFFFF6364 label. The multiplicative role itself is observed.",
+   "live_lever": "yes",
+   "tuning_relevance": "low",
+   "next_step": "Search for readers of 0xFFFF5CB0 and 0xFFFF5CAC, and for the writer of 0xFFFF5CA0, to identify what the accumulator models. Also dump the constants at 0xC0BDC, 0xC0BE0, 0xC0BE4 and 0xC0BF0-0xC0BF4 and the data of tables 0xAA928 and 0xAA914 to get the rate units."
+  },
+  "fn-3F374": {
+   "proposed_name": "calc_final_per_cylinder_advance_with_mode_overrides",
+   "mechanism": "Prologue: saves fr12-fr15 and GBR, sets GBR to 0xFFFF7E90, and reserves an 80-byte frame. Reads rpm_current (0xFFFF6624), floats at 0xFFFF62F8 and 0xFFFF65FC, ect_current (0xFFFF6350), 0xFFFF7F68 and 0xFFFF7FBC. Reads byte flags at 8F16 (mode selector r12), 8F24, 85D7, 5BE3, 65BF and 7D18, plus the byte returned by the call to 0x5EB32.\n\nTwo hold timers, GBR+113 and GBR+114 (0xFFFF7F01 and 0xFFFF7F02). Each mirrors one flag (5BE3 or 65BF), with the flag's previous value kept at GBR+115 and GBR+116. While the flag is 1 the timer is cleared. On the flag's 1-to-0 edge the timer is reloaded from calibration byte 0xD2974 or 0xD2975. Otherwise it counts down to 0.\n\nThe output is four floats: [sp+12], fr13, fr12 and fr15. They are picked by a priority chain:\n(a) mode 8F16==3: all four = 7F0C + 8258*const - cal D2A34.\n(b) mode 8F16==1: all four = the float at 0xFFFF7EDC.\n(c) flags 8F24, 85D7 and the 0x5EB32 result all ==1, 7F68<=0 and rpm < cal D2A08: all four = 7F1C.\n(d) This case needs every one of the following:\n  - 62F8 < D2A0C;\n  - 65FC < D2A10;\n  - rpm inside the window [D2A14, D2A18);\n  - timer 1 > 0;\n  - flag 5BE3 == 0;\n  - ECT >= D2A1C.\n  If all hold, all four = cal D2A38.\n(e) The same test against the second calibration set D2A20-D2A30, with timer 2 and flag 65BF: all four = cal D2A3C.\n(f) Flag 7D18==1: base = 7F0C+8260+81F0, added to each element of the 4-float array at 0xFFFF81DC.\n(g) Otherwise a long sum is built.\n  - Additive terms (+): 7F0C, ECT-stack slot [sp+4] = 7F68, 7F6C, 7F74, 81EC, 8028, 803C, 805C, 80B4, 80C4, 80F0.\n  - Subtracted terms (-): 7FBC, 8000, 8038, 8084, 80E8.\n  - Calibration byte 0xD2976 decides how the terms are combined. If it equals 0x5A, all terms are summed. Otherwise the five terms 803C, 805C, 8028, 80C4, 7F6C and 80F0 are reduced with float_min, and 7FBC/8000 are combined with float_max (the larger is subtracted).\n  - The result is added per element to two 4-float arrays, 0xFFFF81DC[i] and 0xFFFF8088[i].\n\nAll paths branch to a common tail (0x3F760/0x3F88E, not shown). The address of float_min is stashed at [sp+20], and the tail probably clamps and stores the results.",
+   "purpose": "Most likely the final per-cylinder ignition advance. It takes a base value (7F0C), adds a set of correction terms and subtracts others (likely knock/retard terms 7FBC/8000), then applies two per-cylinder 4-element offset arrays. Special modes override with fixed values: a cranking/test mode (8F16==3 or 1), and conditional fixed-timing windows. Those windows are gated by rpm range, low load, coolant temperature and post-event hold timers. The windows may be idle or post-start events, but this is not confirmed.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "Four parallel outputs, each formed as scalar + 0xFFFF81DC[i] (+ 0xFFFF8088[i]) with i=0..3, indicate a per-cylinder quantity.",
+    "A base value plus many RAM terms, some explicitly subtracted, with a calibration switch (0xD2976==0x5A) choosing between summing everything and taking min/max of the terms, looks like a correction stack.",
+    "rpm_current and ect_current are verified inputs. They are used in rpm-window and coolant-minimum gates together with 62F8/65FC upper limits before a fixed calibration value (D2A38/D2A3C) is forced.",
+    "GBR+113/114 are down-counters reloaded from calibration bytes D2974/D2975 on the falling edge of flags 5BE3/65BF, i.e. hold timers after an event.",
+    "Mode byte 8F16 values 3 and 1 bypass all of this, either with a fixed RAM value (7EDC) or with 7F0C plus a scaled 8258 term minus a calibration value."
+   ],
+   "weakest_link": "Nothing shown verifies that the quantity is ignition timing rather than another per-cylinder value. None of the summed RAM variables (7F0C, 8000, 81DC, 8088, etc.) is cross-checked, and the store/clamp tail beyond 0x3F75E is outside the listing."
+  },
+  "fn-88BD2": {
+   "proposed_name": "any_nonzero_in_status_block_FFFF2F88_305E",
+   "mechanism": "It clears a byte result on the stack. It then calls uint16_unpack (0x0BE990) on 22 consecutive addresses from 0xFFFF2F88 to 0xFFFF3030, stepping 8 bytes. If any returned value (extu.w) is non-zero it jumps to 0x088D1C, which sets the result to 1. Without returning early, it then always calls uint8_unpack (0x0BE980) on 11 addresses from 0xFFFF3036 to 0xFFFF305E, stepping 4 bytes. Any non-zero byte (extu.b) jumps to 0x088DBA, which also sets the result to 1. It returns the result byte in r0: 1 if any of the 33 fields is non-zero, 0 if all are zero. Arguments are not used and nothing is written to RAM except the local stack byte.",
+   "purpose": "unknown. From the code alone it is a boolean 'any element of these two RAM arrays is non-zero' test. Possibly an 'any timer, counter or request still active' check used to gate something such as sleep or a store, but the code shown does not support that.",
+   "evidence_class": "observed",
+   "evidence": [
+    "22 literal-pool pointers 0xFFFF2F88..0xFFFF3030, 8 bytes apart, each passed in r4 to uint16_unpack [TRACED] and tested for non-zero",
+    "11 literal-pool pointers 0xFFFF3036..0xFFFF305E, 4 bytes apart, each passed to uint8_unpack [TRACED] and tested for non-zero",
+    "Every non-zero branch goes to 'mov #1,r6; mov.b r6,@r15'; the stack byte starts at 0 (mov #0,r6 / mov.b r6,@r15 in the delay slot)",
+    "The end of the 16-bit section always falls into the 8-bit section, so both groups are always scanned (a short-circuit within each group only)",
+    "Return value is 'mov.b @r15,r0': a single boolean byte"
+   ],
+   "weakest_link": "The mechanism is fully fixed by the code. What the RAM structures at 0xFFFF2F88 (8-byte stride, 16-bit field) and 0xFFFF3036 (4-byte stride, byte field) represent is not identified, so the purpose cannot be stated."
+  },
+  "tab-AEBD4": {
+   "proposed_name": "Idle target engine speed vs coolant temperature (state 7/8 or 4/7 branch, r11==1 variant)",
+   "what_it_does": "Indexed by current coolant temperature (fr12 from 0xFFFF6350). Gives a target of 1700 cold falling to 800 warm. The function then ramps a running value toward this target at a rate taken from a second ECT-indexed table, which is the typical shape of an idle-speed target.",
+   "axis_meanings": [
+    "X: coolant temperature, deg C (input fr4 = fr12 = ect_current at 0xFFFF6350)"
+   ],
+   "output_units": "probably engine speed in rpm (inferred from magnitude 800..1700 and ramp-to-target use; not fixed by code)",
+   "evidence_class": "inferred",
+   "evidence": [
+    "050E2E-050E30: fr12 loaded from 0xFFFF6350 (ect_current); 051148 fmov fr12,fr4 passes it as the lookup input",
+    "051142-051146: descriptor 0xAEBD4 is looked up via table_lookup_1D. This happens when state byte gbr+80 (0xFFFF89A0) is 8, or 7 with r10==1 (0x051100/0x051108), and r11==1 (05113C-051140). Sibling tables 0xAEBAC/0xAEBC0 are chosen by r8 (0xFFFF8A9D) instead",
+    "05114C/051168-05116A: result fr0->fr8 stored to 0xFFFF892C (r13=0xFFFF8994, disp -104) as the target",
+    "05116C-05118C: the running value at 0xFFFF8924 (disp -112) is compared with the target. A step-size table (0xAEAF8/0xAEAE4/0xAEB0C, also indexed by ECT) is looked up and stored at 0xFFFF8978 (disp -28)",
+    "0511A2-0511C8: the running value moves toward the target by the step and is clamped with float_max/float_min. The result goes to 0xFFFF8924 and 0xFFFF8920 (disp -116), so this is a rate-limited ramp to the target",
+    "0511D2-0511EA: |target - current| * const / step is stored to 0xFFFF8928, which estimates the time remaining until the target is reached",
+    "05119C-0511A0: in states other than 7, the target is copied directly into 0xFFFF8924 with no ramp"
+   ],
+   "weakest_link": "Calling the output rpm, and calling the function idle-speed control, rests only on the magnitude (800..1700 decreasing with warm-up) and the ramp pattern. No consumer of 0xFFFF8920/0xFFFF8924 is shown that compares the value with engine speed. The meanings of states 7/8 and of r11 (return of 0x22CF4) are also unknown.",
+   "live_lever": "yes",
+   "tuning_relevance": "high",
+   "next_step": "Search for readers of 0xFFFF8920/0xFFFF8924 (the ramped value) and 0xFFFF892C (the target). Check whether any reader subtracts them from an engine-speed RAM variable or feeds them into an idle air/ISC error term. Also decode 0x22CF4 to identify what r11 selects (for example A/C or gear/neutral)."
+  },
+  "fn-4BA30": {
+   "proposed_name": "indicator_output_pair_sequencer_8366",
+   "mechanism": "The function works on a byte block at 0xFFFF8366. The prologue that pushes r8-r14 lies before 0x04BA30; the epilogue pops them. Inputs gathered: r13 = byte 0xFFFF8E98; r11 = return of 0x281DC; stack[0], stack[4] and stack[8] = returns of 0x5EA4E, 0x5EB1A and 0x5EB26; stack[12] = return of 0x22F92; fr14 = float 0xFFFF4130; r10 = byte 0xFFFF65AE; r8 = word 0xFFFF67EC; r9 = byte 0xFFFF65C1; r14 = byte 0xFFFF8F24; r12 = byte 0xFFFF85D7. Housekeeping: blk[0] is incremented with uint8_add_sat(blk[0],1). Between calls to 0x317C(16) and 0x3190 (probably an interrupt-mask raise/restore pair), blk[13] is incremented, saturating at 255. Decision chain: (a) if r13!=0, or if r14==1 && r12==1 && stack[4]==1: clear blk[2], blk[3] and blk[12]. (b) Else if (r11==1 && stack[0]==1) or (r14==1 && stack[12]==1 && stack[8]==1): blk[12] is a free-running tick counter, incremented and saturating, that sets the outputs by phase. For blk[12]<47 both outputs are 0. For 47..93, blk[2]=1 and blk[3]=0. For 94..140 both are 1. At >=141 blk[12] is reset to 0 and both outputs are cleared. blk[12] is kept rather than cleared on this path. (c) Else if blk[0]>=63 && blk[13]>=31 && r10==0: clear blk[2], blk[3] and blk[12]. (d) Else, if fr14>8.0f, and r8 is at or above a calibration threshold (word at 0xD6018 when r9==0, word at 0xD601A when r9==1), and blk[6]!=1: call 0x04BDAA, then clear blk[12]. If any of these tests fails, set blk[2]=blk[3]=1 and clear blk[12].",
+   "purpose": "Hunch: it drives two related on/off outputs (blk[2], blk[3]), possibly a warning lamp or MIL state. They are forced on as a default or bulb-check state when a float (possibly battery voltage) is <=8.0 or a word (possibly engine speed or a timer) is below a calibration threshold. They follow a 3-phase blink/step pattern of 47 ticks per phase in a special mode, and they are handed to 0x04BDAA for normal operation. The exact purpose cannot be fixed from this code.",
+   "evidence_class": "hunch",
+   "evidence": [
+    "All reads and writes go to 0xFFFF8366 offsets 0, 2, 3, 6, 12 and 13.",
+    "blk[0] is incremented through the [TRACED] uint8_add_sat helper.",
+    "blk[13] is incremented, saturating at 255, between calls 0x317C(16) and 0x3190, which looks like a critical section.",
+    "The phase thresholds 47, 94 and 141 on blk[12] give outputs 00, 10, 11 and then a reset, i.e. a cyclic step or blink pattern.",
+    "Literal 0x41000000 at 0x04BBF0 = 8.0f is compared against the float at 0xFFFF4130.",
+    "The calibration words at ROM 0xD6018 and 0xD601A are selected by byte 0xFFFF65C1 (0 or 1) and compared with word 0xFFFF67EC.",
+    "The default fallback path sets blk[2]=blk[3]=1."
+   ],
+   "weakest_link": "None of the RAM inputs (0xFFFF4130, 0xFFFF67EC, the flags) or the outputs blk[2]/blk[3] are identified. The lamp/MIL and battery-voltage interpretation rests only on the 8.0 threshold and the blink-like pattern, and the meaning of 0x04BDAA is unknown."
+  },
+  "fn-43750": {
+   "proposed_name": "latch_index_and_dispatch_on_slot_0_6_12_18",
+   "mechanism": "Takes a byte argument in r4 (zero-extended). Only when it equals 0, 6, 12 or 18 does it do anything; otherwise it restores PR and returns. On a match it reads a signed byte from RAM 0xFFFF4308, stores it to RAM 0xFFFF81AC and reads it back. If the value is 4 or more as an unsigned 32-bit compare, it returns. Because mov.b sign-extends, any byte of 0x80 or above also fails this test, so only values 0..3 pass. For 0..3 it calls the local subroutine at 0x043782, which starts right after this function and pushes r9 and r11-r14. It then restores PR in the delay slot and tail-branches to 0x043B7C. Neither callee is shown.",
+   "purpose": "A gated dispatcher. On every sixth value of an index argument (a 0..23 slot or step counter?) it snapshots a small index byte from 0xFFFF4308 into 0xFFFF81AC. If that index is valid (0-3) it runs two processing routines, 0x043782 and then 0x043B7C. The 0-3 range would fit a per-cylinder index on a 4-cylinder engine, but the code does not prove it. The exact meaning is unknown.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "extu.b r4 then cmp/eq against 0, #6, #12, #18 selects the action path",
+    "mov.b @0xFFFF4308 -> mov.b to 0xFFFF81AC copies the byte, and it is read back from 0xFFFF81AC",
+    "mov #4; cmp/hs r6,r2; bt return: proceeds only when the value is unsigned < 4, and sign extension rejects 0x80-0xFF",
+    "bsr 0x043782, then bra 0x043B7C with lds.l @r15+,pr in the delay slot: one call followed by a tail call",
+    "No named or verified RAM variables are involved"
+   ],
+   "weakest_link": "The meanings of the r4 argument (multiples of 6 out of a 0..23 range?), of RAM 0xFFFF4308/0xFFFF81AC, and of the two callees are not shown. The idea that the 0-3 range is a cylinder index is only a guess."
+  },
+  "fn-582D2": {
+   "proposed_name": "wrap_A6728_ret_s8",
+   "mechanism": "A thin wrapper. It saves PR, loads the literal 0x000A6728 from the pool at 0x058548 and calls it with jsr. No argument registers are set up before the call, so whatever the caller left in r4\u2013r7 (and any FPU argument registers) passes straight through. After the call it restores PR and returns. The rts delay slot executes exts.b r0,r0, so the callee's return value is sign-extended from its low byte to 32 bits. The function itself reads and writes no memory. The instructions at 0x0582E0 onward (mov.l r12/r13/r14,@-r15) are the register-save prologue of the next function, not part of this one.",
+   "purpose": "unknown. It is an adapter that forwards its arguments to the routine at 0xA6728 and converts the result to a signed 8-bit value. What that routine computes cannot be told from this listing.",
+   "evidence_class": "observed",
+   "evidence": [
+    "The pool literal at 0x058548 = 0x000A6728 is the jsr target.",
+    "There are no register moves before jsr @r2, so the incoming arguments are passed through unchanged.",
+    "exts.b r0,r0 sits in the rts delay slot, so the return value is sign-extended from a byte.",
+    "sts.l pr / lds.l pr bracket the call, the normal pattern for a non-leaf wrapper.",
+    "0x0582E0 begins pushing r12\u2013r14, the typical prologue of a separate following function."
+   ],
+   "weakest_link": "Nothing is known about the callee at 0xA6728. Any statement about purpose beyond 'forward the call and return a signed byte' would need that routine's code and this wrapper's call sites."
+  },
+  "fn-0DDAC": {
+   "proposed_name": "queue_drain_dispatch_task_4534",
+   "mechanism": "Calls 0x10A46 once with r4=2. Then it loops. Each pass calls critical_section_enter(r4=stack buffer at r15, r5=0xE0); 0xE0 is probably an SR interrupt-mask level. Inside the lock it calls 0x0000F97C(r4=1, r5=0xFFFF4534) and keeps the result in r12. It also reads the byte at 0xFFFF4575 (r10+2, with r10=0xFFFF4573) into r13. It then calls critical_section_exit with the saved word at @r15. If the F97C result is zero, it loads a function pointer from 0xFFFF4534 (the pointer 0xFFFF4534 is spilled at @(4,r15)) and calls it with r4=0xFFFF4538 (the struct base +4). The loop repeats while the zero-extended byte read from 0xFFFF4575 is non-zero. After the loop it calls 0x000035A4 and returns.",
+   "purpose": "Probably a drain loop for a queue or mailbox based at 0xFFFF4534. Under interrupt lock it fetches one entry or status (F97C, mode 1) and samples a 'more pending' byte at 0xFFFF4575. When the fetch returns 0, it hands the entry buffer at 0xFFFF4538 to the callback stored at the head of the structure. It keeps going until nothing is pending, then calls 0x35A4, which may be a completion, notification or yield step. What the dispatched work actually is cannot be told from this code.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "The F97C call and the byte read from 0xFFFF4575 both sit between critical_section_enter (mask argument 0xE0) and critical_section_exit, so the fetch and the flag sample are done atomically.",
+    "The indirect call 'mov.l @r3,r2; jsr @r2' goes through a pointer stored at 0xFFFF4534, with argument 0xFFFF4538 = 0xFFFF4534+4. That is a callback plus data in the same structure.",
+    "The callback runs only when the F97C return (r12) is zero: tst r12,r12 then bf skips it when non-zero.",
+    "The loop condition is the byte at 0xFFFF4575, which was read under the lock (extu.b; tst; bf back to 0xDDC8).",
+    "The same base 0xFFFF4534 is passed as r5 to F97C and is also the address the function pointer is read from."
+   ],
+   "weakest_link": "F97C, 10A46 and 35A4 are untraced. The idea that F97C dequeues an entry and returns 0 on success, and that 0xFFFF4575 is a 'more pending' count, comes from the control-flow shape rather than from their code. It is also not established that 0xFFFF4573 and 0xFFFF4534 belong to the same queue structure."
+  },
+  "tab-AD738": {
+   "proposed_name": "Per-cylinder multiplier, first of four (possibly cylinder 1 fuel trim), indexed by RPM and RAM 0xFFFF7324",
+   "what_it_does": "Returns a dimensionless multiplier near 1.0 (0.906..1.078) from engine speed and an unknown quantity at 0xFFFF7324. The result is stored as the first float of a 4-float array at 0xFFFF7B6C..0xFFFF7B78. Three sibling tables with the same inputs fill the other three slots, which suggests one correction per cylinder of the 4-cylinder engine.",
+   "axis_meanings": [
+    "Y axis (1000..16000): probably the value read from RAM 0xFFFF7324 and passed in fr4. Its quantity is unknown. The range would fit an injector pulse width in microseconds, but that is unverified.",
+    "X axis (700..6000): probably engine speed in rpm, from rpm_current 0xFFFF6624 passed in fr5. This assignment matches by range only; the fr4/fr5-to-axis convention of table_lookup_2D is not shown."
+   ],
+   "output_units": "dimensionless multiplier (about 1.0 = no correction)",
+   "evidence_class": "inferred",
+   "evidence": [
+    "038DCA-038DCC: fr15 is loaded from 0xFFFF6624 (rpm_current [VERIFIED-BOTH]).",
+    "038DCE-038DD2: fr4 and fr14 are loaded from RAM 0xFFFF7324, the second lookup input.",
+    "038DD4-038DDA: descriptor 0xAD738 goes in r4 and table_lookup_2D (0xBE8E4) is called with fr4=[0xFFFF7324] and fr5=rpm.",
+    "038DDC-038DE0: the result fr0 is stored to @(-12, 0xFFFF7B78) = 0xFFFF7B6C.",
+    "038DE2-038E02: descriptors 0xAD754, 0xAD770 and 0xAD78C are looked up with the same two inputs. Their results go to 0xFFFF7B70, 0xFFFF7B74 and 0xFFFF7B78, forming a contiguous 4-float array. Four parallel tables on a 4-cylinder engine point to per-cylinder values.",
+    "Data: uint8 cells at scale 1/128 give values clustered around 1.0, with a flat 0.953 region at high Y and low rpm. This is consistent with a trim multiplier rather than an absolute quantity.",
+    "No consumer appears in this listing. The function only computes and stores the four values, then returns at 038E0C."
+   ],
+   "weakest_link": "The meaning rests on the four-parallel-table pattern, interpreted as per-cylinder. Nothing shown multiplies these values into fuel (or anything else), and the quantity at 0xFFFF7324 is unidentified. Whether these values feed fuel, ignition or something else is unverified.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search the ROM for readers of 0xFFFF7B6C/0xFFFF7B70/0xFFFF7B74/0xFFFF7B78, e.g. literal 0xFFFF7B78 or 0xFFFF7B6C, and check whether each is multiplied into a per-cylinder injector pulse width. Separately, find the writer of 0xFFFF7324 to identify the Y-axis quantity, and confirm the fr4/fr5 axis convention in table_lookup_2D at 0xBE8E4."
+  },
+  "fn-7C280": {
+   "proposed_name": "prioritized_request_to_4bit_output_pattern_timer",
+   "mechanism": "GBR=0xFFFFA158 for the whole function. It loads a 16-bit limit from 0xFFFF2BFC and keeps a 16-bit counter at 0xFFFF9FB2. (1) If the low nibbles of request bytes GBR+0, GBR+1 and GBR+2 are all zero, the counter is cleared and the output code at GBR+161 is set to 0. (2) If any request bit is set and counter > limit, the counter is cleared, bit0 of GBR+37 is cleared, and exactly one request bit is cleared. The scan order is byte0 bits0-3, then byte1 bits0-3, then byte2 bits0-1. The output code is then set to 0. (3) If counter <= limit and bit0 of GBR+37 is clear, the counter and output are cleared. (4) If counter <= limit and bit0 of GBR+37 is set, the counter is incremented through uint16_add_sat(counter,1). The highest-priority set request bit then picks a code that is written to GBR+161. The codes are: byte0 b0->1, b1->2, b2->4, b3->8; byte1 b0->5, b1->6, b2->10, b3->9; byte2 b0->3, b1->12. Finally, bits 0-3 of GBR+161 are copied one each to bit0 of flag bytes GBR+38, +39, +40 and +41, by setting or clearing that bit. The function then restores the stack and GBR and tail-jumps to 0x0003D2FC. The many stores of r0/r2 into stack slots @(4..116,r15) are compiler spill writes and are never read back.",
+   "purpose": "Unknown. The code is a timed sequencer. Ten pending request bits, taken in fixed priority order, each produce a 4-bit on/off pattern on four output flags. The pattern is held while an arm flag (GBR+37 bit0, set elsewhere) is on and the counter has not exceeded a limit. When the time runs out, the arm flag is dropped and the serviced request is consumed. The codes form the full set of 1-hot and 2-hot 4-bit patterns (1,2,4,8 / 5,6,10,9 / 3,12). That suggests four discrete drive lines tested singly and in pairs, for example an actuator or output self-test or a phase pattern. This reading is not established by the code shown.",
+   "evidence_class": "observed",
+   "evidence": [
+    "GBR loaded with 0xFFFFA158; request bytes at @(0..2,gbr) are tested with tst #15 (low nibble), then bit by bit",
+    "Counter at 0xFFFF9FB2 is compared with cmp/gt against the word at 0xFFFF2BFC; on overflow it is cleared and one request bit is cleared with and #-2/-3/-5/-9",
+    "On the non-expired path the counter is incremented via uint16_add_sat(counter,1) [TRACED], gated by bit0 of GBR+37",
+    "The fixed priority chain writes constants 1,2,4,8,5,6,10,9,3,12 to @(161,gbr)",
+    "Bits 1/2/4/8 of GBR+161 drive or.b/and.b #1 on GBR+38..41",
+    "The function ends with a tail-jump to 0x0003D2FC"
+   ],
+   "weakest_link": "Nothing shown names what the request bits, the limit at 0xFFFF2BFC, the arm flag GBR+37 or the output flags GBR+38..41 mean, or who reads those flags. Any physical purpose (test or actuator patterns) is a hunch based only on the 1-hot and 2-hot code values."
+  },
+  "fn-33CC4": {
+   "proposed_name": "lookup_rpm_load_map_4way_select",
+   "mechanism": "The entry point was probably found too late. The epilogue pops r14 and r13 (and r12 is pushed at 0x033D1C for the next function), but those pushes are not in the listing, so the real prologue likely sits just before 0x033CC4. Arguments: r4 is saved in r13 and is a pointer to a structure or slot whose first longword is an output float pointer; r5 is saved in r14 and is a byte flag. The function loads rpm_current (0xFFFF6624) into fr15 and engine_load_current (0xFFFF63F8) into fr14. It then calls 0x00022CF4 and zero-extends the returned byte as a selector (r6). Next it builds a second condition: if the r5 flag is nonzero the condition is forced to 0, otherwise it is the byte at 0xFFFF984D. Table choice: condition==0 and selector==1 gives descriptor 0x000AD8B8; condition==0 and selector!=1 gives 0x000AD8D4; condition!=0 and selector==1 gives 0x000AD8F0; condition!=0 and selector!=1 gives 0x000AD90C. The four descriptors are 0x1C bytes apart. It calls table_lookup_2D (0x000BE8E4) with fr4=engine load and fr5=RPM, and stores the float result to the address held in *r13.",
+   "purpose": "Unknown which calibration this is. It computes a value from an engine-load by RPM 2D map, picking one of four calibration variants. The choice depends on a mode/state byte returned by 0x22CF4 (==1 or not) and a RAM flag at 0xFFFF984D, which the caller can override with the r5 argument. Typical candidates would be ignition, AVCS, fuel or boost target maps with alternate variants, but nothing shown fixes which.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "fr15 <- rpm_current [VERIFIED-BOTH] and fr14 <- engine_load_current [VERIFIED-BOTH] are passed as fr5 and fr4 to table_lookup_2D [TRACED].",
+    "A byte return from jsr 0x22CF4 is compared against 1 to pick between two table descriptors.",
+    "The bf/s delay slot (mov #0,r2) forces the condition to 0 when the r5 argument is nonzero; otherwise the byte at 0xFFFF984D is read.",
+    "There are four descriptor addresses (0xAD8B8, 0xAD8D4, 0xAD8F0, 0xAD90C) at a 0x1C stride, consistent with consecutive 2D table descriptor structs.",
+    "The result fr0 is written through mov.l @r13,r2 / fmov.s fr0,@r2, i.e. into a float pointed to by the first word of the r4 argument.",
+    "The epilogue pops r14 and r13 without matching pushes in the listing, so the start bound is truncated."
+   ],
+   "weakest_link": "The meaning of the selector from 0x22CF4, of the flag at 0xFFFF984D and of the four calibration tables is not established. Only the 4-way table selection and the load/RPM lookup mechanism are certain; the calibration's identity, and so its purpose, is unknown."
+  },
+  "fn-44834": {
+   "proposed_name": "window_gated_counter_update_0x044834",
+   "mechanism": "GBR is set to 0xFFFF81F0. The function reads rpm_current (fr14), engine_load_current (fr15) and a float at 0xFFFF81F8 (fr12). It calls float_deadband_check with fr4 = float at 0xFFFF823C, fr5 = 0.0 and fr6 = the ROM constant at 0x044A74, and keeps the byte result on the stack. A chain of gates follows; failing any one skips to the epilogue. (1) rpm must be >= cal 0xD2DEC and < cal 0xD2DF0. (2) Load must be >= 0xD2DF4 and < 0xD2DF8. (3) The float at 0xFFFF81F8 must be >= 0xD2DFC and < 0xD2E00. (4) The float at 0xFFFF8258 must be >= 0xD2E04. (5) Byte counter GBR+59 (0xFFFF822B) must be below the byte limit at 0xD2996. When all gates pass: if byte GBR+100 (0xFFFF8254) == 1, byte GBR+58 (0xFFFF822A) is incremented with uint8_add_sat. Then, if the deadband-check result is 0, byte GBR+59 (0xFFFF822B) is incremented with uint8_add_sat. On every exit path, the float at 0xFFFF81F0 is copied to 0xFFFF823C. That location is the deadband-check input, so the check is made on the previous call's value of 0xFFFF81F0.",
+   "purpose": "Unknown. The shape fits a diagnostic or learning monitor that counts qualifying samples inside an rpm/load/parameter window. Counter 0xFFFF822B counts window samples whose previous-call 0xFFFF81F0 value failed the deadband test, and it stops at a calibrated limit. Counter 0xFFFF822A counts window samples taken while flag 0xFFFF8254 == 1. What the monitored quantities are cannot be determined from this code.",
+   "evidence_class": "observed",
+   "evidence": [
+    "rpm_current and engine_load_current [VERIFIED-BOTH] are each compared against a min/max pair of ROM constants (0xD2DEC/0xD2DF0 and 0xD2DF4/0xD2DF8), with exit on failure.",
+    "The float at 0xFFFF81F8 (0xFFFF8254 - 92) is range-checked against 0xD2DFC/0xD2E00. The float at 0xFFFF8258 must be >= 0xD2E04.",
+    "The byte at GBR+59 is compared with cmp/ge against the byte at 0xD2996 and the function exits when it has reached the limit.",
+    "uint8_add_sat [TRACED] is called with r5=1 on GBR+58 (gated by byte GBR+100 == 1) and on GBR+59 (gated by the deadband result == 0).",
+    "The epilogue copies @(0xFFFF8254-100) = 0xFFFF81F0 to @(0xFFFF8254-24) = 0xFFFF823C, which is the value passed as fr4 to float_deadband_check.",
+    "The mechanism is fixed by the code; the purpose is not, so purpose is a hunch."
+   ],
+   "weakest_link": "The exact meaning of float_deadband_check's return value (whether 0 means outside or inside the band) and the identities of 0xFFFF81F0, 0xFFFF81F8, 0xFFFF8258 and flag 0xFFFF8254 are not established. Without them the counters' semantic role (fault count versus sample count) stays unknown."
+  },
+  "tab-AA8B0": {
+   "proposed_name": "Coolant-temperature enable multiplier (0 when cold, 1 when warm) for an unidentified clamped 0..80 target",
+   "what_it_does": "Looks up a factor from coolant temperature: 0 at 10 \u00b0C and below, ramping to 1 at 20 \u00b0C and above. The function multiplies it into a product of other table factors, so the target computed here is forced to zero on a cold engine. What that target physically is cannot be told from this listing.",
+   "axis_meanings": [
+    "X: coolant temperature, \u00b0C (input fr12 is loaded from 0xFFFF6350 ect_current at 013DBE/013DC0 and passed as fr4 at 013E34)"
+   ],
+   "output_units": "dimensionless multiplier, 0..1",
+   "evidence_class": "inferred",
+   "evidence": [
+    "013DBE-013DC0: fr12 is loaded from 0xFFFF6350 (ect_current [VERIFIED-BOTH]). At 013E30-013E34, r4 = descriptor 0xAA8B0 and fr4 = fr12 go into table_lookup_1D (r13 = 0xBE830).",
+    "013E36-013E3A: the result fr0 is stored to 0xFFFF5D14-60 = 0xFFFF5CD8.",
+    "013E84-013E9A: [-76]*[-72]*[-68]*[-60] is computed with fmul. [-60] is this table; the other factors are 2D(?, rpm), 2D(0xFFFF6898, rpm) and 1D(IAT). At 013E9C-013EA8 the product goes through float_clamp_range with lower 0 (fldi0 fr5) and upper 80.0 (literal 0x42A00000 at 014004), and is stored to [-80] = 0xFFFF5CC4.",
+    "014046-014074: [-104] + ([-92]*[-72]*[-68])*[-60] (fmac at 014060) + [-100] is clamped to [0, [-80]] and stored to [-56] = 0xFFFF5CDC. Here too this table scales the main term.",
+    "01408C-0140AE: [-48]*[-72]*[-64]*[-60] goes through float_min with [-56] and is stored to [-52] = 0xFFFF5CE0. [-48] is a 1D lookup of rpm at 013E66.",
+    "In every use the value is a plain multiplier with no offset, so 0 removes that term entirely. The data (0 up to 10 \u00b0C, 1 from 20 \u00b0C) makes it a cold-engine gate."
+   ],
+   "weakest_link": "The multiplier role and the ECT axis are fixed by the code. What the gated quantity is (clamped 0..80, later rate-limited and deadband-checked into 0xFFFF5CB4/0xFFFF5C98) is not visible here. The other inputs 0xFFFF8558 and 0xFFFF6898 are unnamed, so any subsystem name (AVCS, etc.) would be a guess.",
+   "live_lever": "yes",
+   "tuning_relevance": "low",
+   "next_step": "Search for readers of 0xFFFF5CB4 ([-96], the final target), 0xFFFF5C98 ([-124]) and 0xFFFF5CC4 ([-80], the max limit) to identify the controlled quantity. In parallel, identify what 0xFFFF8558 and 0xFFFF6898 hold, and check the axes of the 2D tables 0xAA9D4/0xAA980/0xAA9B8 against named tables."
+  },
+  "tab-AE584": {
+   "proposed_name": "unknown \u2013 rpm\u00d7load term, third of five variants picked by RAM selector 0xFFFF6812 (possibly gear 3); all zeros",
+   "what_it_does": "The table is looked up from engine load and rpm. The byte at 0xFFFF6812 picks one of five sibling tables (values 1..5), and this is variant 3. The same table is also forced in by a separate override path. The result is stored to 0xFFFF80F4, then scaled by the constant at 0xD2D48 and stored to 0xFFFF80F0, which other code consumes. Every cell is 0, so the output is currently 0 in every case.",
+   "axis_meanings": [
+    "Y (1..3, 5 points): engine load in g/rev (0xFFFF63F8), inferred from magnitudes and the lookup arguments",
+    "X (2000..6000, 3 points): engine speed in rpm (0xFFFF6624), inferred from magnitudes and the lookup arguments"
+   ],
+   "output_units": "unknown; raw uint8 \u00d71, later multiplied by the float at 0xD2D48",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0435AA/0435AE: fr15 is loaded from rpm_current 0xFFFF6624 and fr14 from engine_load_current 0xFFFF63F8",
+    "043642-04364A and 043682-04368A: lookup of 0xAE584 via table_lookup_2D 0xBE8E4 with fr5=rpm and fr4=load; the breakpoints match these magnitudes (2000-6000 and 1-3)",
+    "0435D0/043604-043618: the byte at 0xFFFF6812 (r13) is compared with 1..5 to pick tables 0xAE54C, 0xAE568, 0xAE584, 0xAE5A0 or 0xAE5BC; any other value stores 0.0 (043678)",
+    "0435E0-0435F0: this table is also chosen directly when byte [r15] (from 0x299BC) == 2, or when [8]==1 (from 0x22CF4) and [4]==2 (from 0x297A0)",
+    "04364E/043690: the result is stored with fmov.s fr0,@(-4,r5), i.e. to 0xFFFF80F4",
+    "043692-0436A4: the value at 0xFFFF80F4 is multiplied by the float at 0xD2D48 and stored to 0xFFFF80F0",
+    "0435F2-043602: the lookup is gated on flags 0xFFFF80F8 and 0xFFFF80F9 both equal to 1. Subroutine 0x0436B6 sets these flags with rpm and load thresholds and hysteresis (0xD2D38-0xD2D44). The lookup is also gated on byte 0xFFFF65C0 == 0 and on 0x1CF16 returning a value other than 1; otherwise 0 is output"
+   ],
+   "weakest_link": "The meaning of the selector at 0xFFFF6812, which is only guessed to be gear, and the consumer of 0xFFFF80F0, which is not in this listing.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Search for readers of 0xFFFF80F0 and 0xFFFF80F4 to see what the scaled output modifies. Search for writers of 0xFFFF6812 to confirm whether it is the gear position. Read the float at 0xD2D48 to check whether it is nonzero."
+  },
+  "fn-45A3E": {
+   "proposed_name": "update_rpm_load_subcheck_and_combine_4_flags",
+   "mechanism": "Saves PR and GBR, then sets GBR = 0xFFFF8277. Calls 0x045F9A with fr4 = rpm_current (0xFFFF6624) and fr5 = engine_load_current (0xFFFF63F8); the fmov for fr5 sits in the bsr delay slot. After the call it reads four bytes: GBR+16 (0xFFFF8287), GBR+17 (0xFFFF8288), GBR+18 (0xFFFF8289) and GBR+19 (0xFFFF828A). It compares each with 1 and stops at the first mismatch. If all four equal 1 it stores 1 to the byte at GBR+0 (0xFFFF8277), otherwise it stores 0. The copies of bytes 18 and 19 written to the 8-byte stack frame are never read back (dead compiler spills). It then restores GBR and PR and returns. The result is a boolean AND of four status flags, refreshed every time this runs.",
+   "purpose": "Unknown from this code alone. It refreshes an rpm/load-based sub-evaluation in 0x045F9A, then publishes a combined 'all conditions satisfied' flag at 0xFFFF8277. Possibly an enable or permission flag for some monitor or feature (hunch). It is also unconfirmed that 0x045F9A writes any of the four flags it checks.",
+   "evidence_class": "observed",
+   "evidence": [
+    "GBR loaded with 0xFFFF8277; mov.b r0,@(0,gbr) writes the result to 0xFFFF8277",
+    "fr4 = @0xFFFF6624 (rpm_current) and fr5 = @0xFFFF63F8 (engine_load_current) are passed to bsr 0x045F9A",
+    "Four mov.b @(16..19,gbr) reads each go through cmp/eq #1; any failure branches to mov #0",
+    "Success path sets r0 = 1 (bra delay slot), then a common store to GBR+0"
+   ],
+   "weakest_link": "The class 'observed' covers only the mechanism: the AND of four flags, stored as 0/1 at 0xFFFF8277. The callee 0x045F9A is not shown, so it is unknown whether it sets the flags at 0xFFFF8287-828A or what conditions they represent. The functional purpose cannot be identified."
+  },
+  "fn-21A40": {
+   "proposed_name": "update_scaled_multiplier_and_lag_filtered_copies",
+   "mechanism": "The function entry is probably just before 0x021A40, because the epilogue also pops r14 and r13. GBR is set to 0xFFFF653C. It first calls 0x2F8EA and keeps the returned byte as a flag (r13). It reads a byte at 0xFFFF5C44 into r14. It looks up 1D table 0xAAE8C with the float at 0xFFFF6898 to get a gain g. It reads the float m at 0xFFFF8DE4 and computes two values. A is m clamped to [K, 2.0], where K is the pool constant at 0x21CAC. B is (1 + (m-1)*g) clamped to [K, 2.0], which scales m's deviation from 1.0 by the table gain. Calibration byte 0xC0354 selects the path. If it is 0xFF, the filter path always runs. Otherwise there are two cases. (a) If byte 0xFFFF65F6 == 1 or byte 0xFFFF5C44 == 0, all five outputs 0xFFFF653C/6540/6544/6548/654C are set to 1.0. (b) If the stored previous flag (0xFFFF6555, GBR+25) == 1 or the current flag == 1, the outputs are set directly with no filtering: 653C, 6540, 6544 and 6548 get B, and 654C gets A. If neither condition holds, the filter path runs. The filter path writes 653C = B and 654C = A. It then updates 6540, 6544 and 6548 with float_lag_filter(B, previous value, coefficient from 0xC3184 / 0xC3188 / 0xC318C, constant from 0x21CC0), giving three lag-filtered copies of B with separately calibrated rates. Finally it stores (flag == 1) into 0xFFFF6555 for the next call.",
+   "purpose": "Unknown. Mechanically it maintains a multiplier centred on 1.0 and limited to 2.0 at the top. The 0xFFFF6898-indexed table scales how far the multiplier departs from 1.0. Three lag-filtered versions are produced. They are snapped to the target while a condition is active or has just ended, held at 1.0 when an enable byte is 0 or a mode byte equals 1, and bypassed when calibration byte 0xC0354 is set to 0xFF.",
+   "evidence_class": "observed",
+   "evidence": [
+    "The fmac computes fr4 = (m-1)*g + 1, where g = table_lookup_1D(0xAAE8C, [0xFFFF6898]).",
+    "Both float_clamp_range calls take the upper bound fr6 = 2.0 (fldi1 then fadd), with the lower bound from pool 0x21CAC.",
+    "The default branch writes 1.0 (fldi1 fr8) to all five outputs, at offsets -24/-20/-16/-12/-8 from 0xFFFF6554.",
+    "There are three float_lag_filter calls on 6540/6544/6548, each with a different ROM coefficient at 0xC3184/0xC3188/0xC318C.",
+    "At the end the current-flag result (r0==1) is written to GBR+25 = 0xFFFF6555. On the next call that stored value is read and gates the bypass of filtering.",
+    "Calibration byte 0xC0354 is compared with 0xFF to force the filter path."
+   ],
+   "weakest_link": "Nothing shown identifies the physical quantities: 0xFFFF8DE4, 0xFFFF6898, the flag returned by 0x2F8EA, and the bytes at 0xFFFF5C44 and 0xFFFF65F6. The lower clamp constant at 0x21CAC and the lag-filter argument order are also not decoded, so the purpose stays unknown."
+  },
+  "fn-0DE92": {
+   "proposed_name": "task_service_callback_slot_loop",
+   "mechanism": "Calls 0x10A46 with r4=4 once at entry. It then enters a loop. Each pass calls critical_section_enter (0xBE81C) with r4 = a stack save slot and r5 = 0xE0, which is likely the interrupt-mask value. Inside that section it calls 0xF97C with r4=3 and r5=0xFFFF455C, keeping the return value in r12. It also latches the byte at 0xFFFF457B (0xFFFF4579+2) into r13. It then calls critical_section_exit (0xBE82C) with the saved slot. If r12 == 0, it loads a function pointer from the longword at 0xFFFF455C and calls it with r4 = 0xFFFF4560 (object base + 4). The loop repeats while the latched byte at 0xFFFF457B is non-zero. When the byte reads zero, it calls 0x35A4 and returns. The first 'mov r11,r4' is dead, because the jsr delay slot overwrites r4 with r15. The literal-pool words 0xFFFF4576 and 0xFFFF4548 are not referenced in this range.",
+   "purpose": "Most likely an OS or kernel-style service routine. It repeatedly polls or claims a control object at 0xFFFF455C through 0xF97C(3, obj) under interrupts-masked protection. On success (return 0) it dispatches the callback stored in that object, passing the object's payload area (obj+4). It keeps going while a pending/active flag at 0xFFFF457B is set, then finishes with a closing call to 0x35A4 (possibly task exit, wait or reschedule). The concrete engine-control meaning is unknown.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "The critical_section_enter/exit helpers (TRACED) bracket both the 0xF97C call and the read of byte 0xFFFF457B, so these accesses are deliberately made atomic.",
+    "'mov.l @(4,r15),r3; mov.l @r3,r2; jsr @r2; mov r9,r4' is an indirect call: the function pointer is the longword at 0xFFFF455C and the argument is 0xFFFF4560.",
+    "The callback runs only when 0xF97C returns zero (tst r12,r12 / bf skips it), which is consistent with a 0 = success/claimed convention.",
+    "The loop back-edge at 0x00DEDA tests the byte latched from 0xFFFF457B inside the critical section.",
+    "The 0x10A46(4) call before the loop and the 0x35A4 call after it give a setup/teardown pairing typical of a task or service body."
+   ],
+   "weakest_link": "The semantics of 0xF97C, 0x10A46 and 0x35A4 are not shown. Treating 0xF97C as a queue/semaphore 'get' that returns 0 on success, and 0x35A4 as a task-exit/wait, is assumed from the call pattern only."
+  },
+  "fn-34778": {
+   "proposed_name": "eval_window_stability_enable_flag_FFFF78A4",
+   "mechanism": "Sets GBR to 0xFFFF7888 and first calls a helper at 0x029824 with no visible arguments; what it does is not shown. It then works out a boolean in r0 and stores it as a byte at GBR+28 (0xFFFF78A4). The result is 1 only if every one of these tests passes: (1) the float at 0xFFFF7888 is >= the calibration float at 0xCC024 (the code fails if cal > value); (2) the same float is < the calibration float at 0xCC028; (3) float_abs_diff(float @0xFFFF7890, 0.0), i.e. |x|, is < the calibration float at 0xCC02C; (4) the byte at 0xFFFF78A5 (GBR+29) equals 1; (5) if the byte at 0xFFFF78A1 (GBR+25) is non-zero, the byte at 0xFFFF789C (GBR+20) must be >= the calibration byte at 0xCBBE6, compared as signed ints after zero-extension; if that byte is zero this test is skipped; (6) the float at 0xFFFF7AB4 is <= the calibration float at 0xCC040. Any failure stores 0. Afterwards it loads r4=0x00063A5C and r5=0 (apparently setting up a following call), cleans up the stack and restores GBR/PR. The listing ends before any rts or jump, so that call is not seen.",
+   "purpose": "Most likely an enable or 'conditions met' flag for some monitor or learning routine. The conditions are: a parameter inside a calibrated window, a second quantity (possibly a rate or deviation) near zero, a state byte equal to 1, an optional counter or timer having reached a calibrated minimum, and a further variable below a limit. Which subsystem it serves cannot be told from this code.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "All results go through mov.b r0,@(28,gbr) with GBR=0xFFFF7888, i.e. the byte 0xFFFF78A4, and r0 is set only to 0 or 1",
+    "The two fcmp/gt tests against 0xCC024 and 0xCC028 bound the float at 0xFFFF7888 to a window",
+    "float_abs_diff is called with fr5=0 (fldi0) on the float at 0xFFFF7890, which gives |x|; it is compared against 0xCC02C",
+    "The byte at GBR+29 must be exactly 1; the test on GBR+20 >= the byte at 0xCBBE6 is gated by the GBR+25 byte being non-zero",
+    "The float at 0xFFFF7AB4 must not exceed the calibration value at 0xCC040",
+    "None of the addresses carries a verified name"
+   ],
+   "weakest_link": "None of the RAM variables or calibration constants is identified, and the helper at 0x029824 plus the trailing call setup (r4=0x63A5C) are not visible. The subsystem, and so any meaningful name beyond 'enable flag', is unsupported; the bitwise logic itself is observed."
+  },
+  "fn-44DB0": {
+   "proposed_name": "update_engine_load_filtered_and_delta",
+   "mechanism": "Saves PR and fr14. Reads engine_load_current (float at 0xFFFF63F8) into fr4 and also keeps a copy in fr14. It calls float_lag_filter (0x000BEA40) with fr4 = current load, fr5 = the previous filtered value from RAM 0xFFFF81F4 (0xFFFF81F8 - 4), fr6 = a ROM calibration float at 0x000D2E18 (most likely the filter coefficient) and fr7 = a float constant from the literal pool at 0x044F50. It writes the result (fr0) back to 0xFFFF81F4, so that variable is a lag-filtered copy of engine load. It then computes current load minus the filtered load and stores that difference as a float at 0xFFFF81F8, then returns. Code after the rts/nop at 0x044DDE belongs to neighbouring functions and is not part of this one: at 0x044DE0 there is a 16-bit counter at 0xFFFF8224 that is cleared when the byte at 0xFFFF81BA is nonzero and otherwise counts up, saturating at 0xFFFF; another function's prologue starts at 0x044E04.",
+   "purpose": "Keeps a smoothed (first-order lagged) engine load and a load-minus-filtered-load signal. That difference acts as a high-pass, rate-of-change measure of load. It is most likely used to detect load transients such as tip-in/tip-out or load-change enrichment and compensation logic, but no consumer of 0xFFFF81F8 is shown.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0xFFFF63F8 is engine_load_current [VERIFIED-BOTH] and is loaded into both fr4 and fr14",
+    "float_lag_filter [TRACED] is called with fr5 = @(0xFFFF81F4) and its return value fr0 is stored back to 0xFFFF81F4, which is the self-feedback state of a filter",
+    "fr6 comes from the ROM calibration address 0x000D2E18 and fr7 from a pool constant, consistent with a coefficient and a scale or limit argument",
+    "fsub fr8,fr14 followed by fmov.s fr14,@r6 stores load - filtered load at 0xFFFF81F8",
+    "rts/nop at 0x044DDC/0x044DDE ends the function; the code from 0x044DE0 onward is a separate routine"
+   ],
+   "weakest_link": "The exact argument semantics of float_lag_filter (which of fr6/fr7 is the coefficient) and the values at 0x000D2E18 and 0x044F50 are not shown. The downstream use of the delta at 0xFFFF81F8 is not visible, so the 'transient detection' purpose is not confirmed."
+  },
+  "fn-45A84": {
+   "proposed_name": "update_flag_8278_when_float_8258_reaches_threshold",
+   "mechanism": "GBR is set to 0xFFFF8258, the base of a RAM block. The function reads byte 0xFFFF3244 and masks bit 0, then reads byte 0xFFFF8233. It writes 0 to byte 0xFFFF8278 (GBR+32) if any of these hold: byte 0xFFFF8233 is non-zero; bit 0 of 0xFFFF3244 is set; byte 0xFFFF8277 (GBR+31, zero-extended) is not 1; or the ROM float at 0x000D2EDC is greater than the RAM float at 0xFFFF8258 (fcmp/gt fr8,fr9 with fr9 = calibration and fr8 = RAM value). Otherwise it writes 1. Put another way, the flag is 1 only when 8233 == 0, bit 0 of 3244 is clear, 8277 == 1 and float[8258] >= cal[0xD2EDC]. The byte of 8277 is also spilled to the stack and never used. GBR is saved and restored around the function. Everything after rts/ldc.l at 0x045AC2 is the literal pool, not code.",
+   "purpose": "unknown. Structurally this is an enable/condition flag: a module state byte (8277) must be 1, two inhibit conditions (8233 non-zero, bit 0 of 3244) must be absent, and a float quantity at the head of the same RAM block must have reached a calibrated minimum. Which subsystem it belongs to cannot be told from this code.",
+   "evidence_class": "observed",
+   "evidence": [
+    "mov.l @(0x045B38) loads 0xFFFF8258 into GBR; mov.b @(31,gbr) therefore reads 0xFFFF8277 and mov.b r0,@(32,gbr) writes 0xFFFF8278",
+    "Pool word at 0x045AD8 is 0xFFFF3244; it is read as a byte and ANDed with 1, and a non-zero result makes the output 0",
+    "Byte at 0xFFFF8233 is tested with tst; a non-zero value makes the output 0",
+    "cmp/eq #1 on 8277: any value other than 1 makes the output 0",
+    "fr9 = float at ROM 0x000D2EDC, fr8 = float at RAM 0xFFFF8258; when fcmp/gt sets T (cal > RAM) the output is 0, otherwise 1",
+    "Only one store: a 0/1 byte to 0xFFFF8278"
+   ],
+   "weakest_link": "None of the RAM addresses (3244, 8233, 8258, 8277, 8278) or the calibration at 0xD2EDC is named or cross-referenced, so the subsystem and physical meaning of the threshold comparison are unknown."
+  },
+  "tab-AA888": {
+   "proposed_name": "IAT multiplier (cold-air reduction) on a rpm-based target/limit in routine 0x13D66",
+   "what_it_does": "Gives a unitless factor from intake air temperature: 0.30 at -40\u00b0C rising to 1.0 at 10\u00b0C and above. It is multiplied with two rpm-indexed 2D tables and an ECT table, and the product is clamped to 0..80 to form a ceiling for a quantity this routine computes and rate-limits. What that quantity is cannot be fixed from this listing.",
+   "axis_meanings": [
+    "X: intake air temperature, degC (input fr4 = fr15 loaded from 0xFFFF6364 iat_current)"
+   ],
+   "output_units": "dimensionless multiplier (0.30..1.0)",
+   "evidence_class": "inferred",
+   "evidence": [
+    "013DBA/013DBC: fr15 is loaded from 0xFFFF6364 (iat_current, VERIFIED-BOTH); 013E1C fmov fr15,fr4 is the lookup input for descriptor 0xAA888 (013E16), through table_lookup_1D at 013E18/013E1A.",
+    "013E1E-013E22: the result fr0 is stored to 0xFFFF5D14-68 = 0xFFFF5CD0.",
+    "013E84-013E9A: [-76] (2D table 0xAA9B8 on 0xFFFF8558 and rpm) x [-72] (2D table 0xAA980 on 0xFFFF6898 and rpm) x [-68] (this table) x [-60] (1D table 0xAA8B0 on ect_current) are multiplied together.",
+    "013E9C-013EA8: float_clamp_range is called with low 0 (fldi0 fr5) and high = literal 0x42A00000 = 80.0 (from 0x014004). The result is stored to [-80] = 0xFFFF5CC4.",
+    "014046-014074: [-92] x [-72] x [-68] x [-60] is fmac'd onto [-104], then [-100] is added. The sum is clamped to 0..[-80] and stored to [-56] = 0xFFFF5CDC. So this table scales both the ceiling and the commanded value.",
+    "0140E8-01418C: [-56]/[-52] feed [-96] (0xFFFF5CB4), which is ramped toward [-88] with float_max/float_min and a deadband. The final value goes to [-124] = 0xFFFF5C98, the GBR base."
+   ],
+   "weakest_link": "The physical quantity being scaled. It depends on what 0xFFFF8558, 0xFFFF6898 and the outputs 0xFFFF5CDC/0xFFFF5CB4/0xFFFF5C98 are. None of these is identified, and the 0..80 range is not evidence of percent or any unit.",
+   "live_lever": "yes",
+   "tuning_relevance": "medium",
+   "next_step": "Search the ROM for readers of 0xFFFF5CB4, 0xFFFF5CDC and 0xFFFF5C98 (the rate-limited output, which is also GBR base 0xFFFF5C98 here), and for the writers of 0xFFFF8558 and 0xFFFF6898. That will identify the target quantity this IAT factor derates."
+  },
+  "tab-ACB90": {
+   "proposed_name": "Coolant-temp-scheduled gain for the middle term of a three-term feedback/correction output (branch where the selector signal at 0xFFFF73EC is negative, mode != 2)",
+   "what_it_does": "A 1D lookup on coolant temperature returns a unitless gain, flat at 0.5. It is stored to 0xFFFF73B8 and multiplied by an rpm-scheduled gain (0xFFFF73C4) and by a computed signal (0xFFFF73F0). That product is the middle of three gain\u00d7gain\u00d7signal products. The three are summed, scaled by 0xFFFF7400, optionally clamped to >= 0, and written to 0xFFFF73B4.",
+   "axis_meanings": [
+    "X: engine coolant temperature, deg C (input register fr4 = fr15, loaded from ect_current 0xFFFF6350 at 030C5C and passed at 030D58)"
+   ],
+   "output_units": "dimensionless multiplier/gain (0.5 everywhere)",
+   "evidence_class": "inferred",
+   "evidence": [
+    "030C5A-030C5C: fr15 is loaded from 0xFFFF6350 (ect_current). 030D58 sets fmov fr15,fr4 in the delay slot of jsr @r9, where r9 = 0xBE830 (table_lookup_1D), so the axis is coolant temperature.",
+    "030D22-030D2A: fr9 = [r8-40] = 0xFFFF73EC is compared with 0. When 0 > value, control branches to 030D4E, which loads this descriptor 0xACB90. Otherwise ACB68/ACB54/ACB40 are used (030D32-030D40).",
+    "030D4E-030D54: if the byte returned by sub 0x21016 (kept at @(8,r15)) equals 2, the alternate descriptor 0xACB7C replaces 0xACB90.",
+    "030D5A-030D5C: the result fr0 is stored to [r8-92] = 0xFFFF73B8.",
+    "030D5E-030D66: a 1D lookup of 0xACBB8 on @r8 is stored to [r8-80]. @r8 holds rpm, written at 030C68 (fmov.s fr8,@r14 with fr8 = rpm_current).",
+    "030EA2-030EB0: fr0 = [r8-36]*[r8-80], then fmac adds fr0*[r8-92] to fr4. So this table's value multiplies the signal at 0xFFFF73F0 and the rpm gain.",
+    "030E92-030EA0 and 030EB2-030EC0 build the other two terms the same way: signal [-32] or [-28], times rpm gain [-76] or [-72], times ECT gain [-88] or [-84].",
+    "030EC2-030EC6: the sum is multiplied by [r8-20] = 0xFFFF7400.",
+    "030EC8-030EE0: if word 0xFFFF67EC < cal word 0xCBC26, float_max(x,0) is applied. The result is stored to [r8-96] = 0xFFFF73B4.",
+    "030D0A-030D18 and 030EE2-030EE6: the output is forced to 0 when the gating conditions fail."
+   ],
+   "weakest_link": "The signals at 0xFFFF73F0, 0xFFFF73EC and 0xFFFF73F4/F8 are computed in subs 0x0312DE, 0x030F02 and 0x03110C, which are not in the listing. Their physical meaning, and therefore the subsystem this controller serves (likely a PID-like correction with asymmetric gains chosen by error sign), is unverified. The reading 'gain on term 2' rests on structure only.",
+   "live_lever": "yes",
+   "tuning_relevance": "low",
+   "next_step": "Disassemble subs 0x0312DE, 0x030F02 and 0x03110C to see what writes 0xFFFF73EC, 0xFFFF73F0, 0xFFFF73F4, 0xFFFF73F8 and 0xFFFF7400; that tells whether they are error/integral/derivative terms. Then search the ROM for readers of the output 0xFFFF73B4 to identify what the correction drives."
+  },
+  "fn-0F320": {
+   "proposed_name": "periph_flag_ack_then_run_tasks_F320",
+   "mechanism": "Saves PR. Loads the sign-extended word 0xF6E8, which gives the address 0xFFFFF6E8 in the SH7058 on-chip peripheral register space, not RAM. It does a 16-bit read of that register into r3. The value is thrown away, because r3 is immediately overwritten with the call target. It then writes the 16-bit constant 0x000B (11) back to the same register; that store sits in the delay slot of the first call. It calls 0x00007110, then calls 0x00007D26, then restores PR and tail-jumps to 0x0000BB6C, so the third routine returns straight to this function's caller. Everything after 0x00F33A is literal pool or neighbouring data (a word table 0x00A0..0x00B0, bit-clear masks 0xFF7F/0xFEFF/..., and the call-target literals) and is not executed by this function.",
+   "purpose": "Probably the body of an interrupt or periodic handler. It acknowledges or clears a hardware status/flag register (a dummy read followed by a write, the usual SH7058 sequence for clearing flags), or rewrites a control register, and then runs three sub-tasks in a fixed order. What the tasks are and which peripheral the register belongs to cannot be told from this listing.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "mov.w @(0x00F35E),r4 loads 0xF6E8; the word load sign-extends it to 0xFFFFF6E8, which is in the on-chip I/O area (above the RAM at 0xFFFF0000-0xFFFFBFFF), probably in the ATU-II timer block",
+    "mov.w @r4,r3 reads the register, and r3 is overwritten by the next mov.l before anyone uses it: a dummy read",
+    "mov #11,r2 / mov.w r2,@r4 in the jsr delay slot writes 0x000B to that register",
+    "jsr 0x7110, then jsr 0x7D26, then jmp 0xBB6C with lds.l @r15+,pr in the delay slot: two calls and a tail call",
+    "The function takes no arguments and returns no value of its own"
+   ],
+   "weakest_link": "Which peripheral register lives at 0xFFFFF6E8, and whether writing 0x000B clears flags or sets a control mode, is not confirmed; there is no register map here. The roles of 0x7110, 0x7D26 and 0xBB6C are unknown, and so is whether this routine is reached from an interrupt vector."
+  },
+  "fn-30744": {
+   "proposed_name": "store_result_of_sub_23E48_to_FFFF73A2",
+   "mechanism": "Saves PR on the stack and calls the subroutine at 0x00023E48 with no arguments set up here, so any registers it reads are passed through from the caller. It then restores PR and returns. In the rts delay slot it stores the low byte of r0 (the subroutine's return value) to the RAM byte at 0xFFFF73A2. The instruction at 0x030754 (mov.l r14,@-r15) belongs to the next function's prologue.",
+   "purpose": "unknown. It is a thin wrapper that latches an 8-bit result from routine 0x23E48 (possibly a flag or state code) into the RAM byte 0xFFFF73A2. What that value means cannot be told from this code.",
+   "evidence_class": "observed",
+   "evidence": [
+    "mov.l @(0x0309D4),r2 loads 0x00023E48, then jsr @r2 calls it.",
+    "mov.l @(0x0309D8),r2 loads 0xFFFF73A2, a RAM address.",
+    "mov.b r0,@r2 sits in the rts delay slot, so it runs: it writes the low byte of r0, the call's return value, to 0xFFFF73A2.",
+    "Standard sts.l pr / lds.l pr frame and no other computation."
+   ],
+   "weakest_link": "The meaning of 0xFFFF73A2, and of the value 0x23E48 returns, is not visible here. The callee would need to be analysed to name the variable. It is also assumed that 0x23E48 returns its result in r0, which is the usual convention."
+  },
+  "tab-AE5A0": {
+   "proposed_name": "unknown: case-4 member of a five-way rpm x load table set (selector byte 0xFFFF6812), all zero",
+   "what_it_does": "When the enable conditions hold and the selector byte at 0xFFFF6812 equals 4, this table is looked up from engine load and rpm. The result is stored to 0xFFFF80F4, multiplied by the float constant at 0xD2D48, and stored to 0xFFFF80F0. Because every cell is 0, both outputs are 0 whenever this table is selected.",
+   "axis_meanings": [
+    "Y (1..3): engine load in g/rev, passed in fr4 from engine_load_current 0xFFFF63F8",
+    "X (2000..6000): engine speed in rpm, passed in fr5 from rpm_current 0xFFFF6624"
+   ],
+   "output_units": "unknown (raw uint8 with scale 1; the downstream use and the units of the 0xD2D48 multiplier are not shown)",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0435AA/0435AC: fr15 = rpm_current (0xFFFF6624); 0435AE/0435B0: fr14 = engine_load_current (0xFFFF63F8)",
+    "043658: fmov fr15,fr5 and delay slot 04365C: fmov fr14,fr4 before jsr table_lookup_2D (0xBE8E4). So fr4 = load and fr5 = rpm, which matches the Y breakpoints 1..3 and the X breakpoints 2000..6000",
+    "043604-043618: r13 (byte from 0xFFFF6812, loaded at 0435D0/0435D2) is compared with 1..5 to choose one of five descriptors, AE54C, AE568, AE584, AE5A0 and AE5BC. This table is case 4. Any other value writes 0.0 (043678)",
+    "04365E-043664: the result is stored as a float to 0xFFFF80F8-4 = 0xFFFF80F4",
+    "043692-0436A4: the value at 0xFFFF80F4 is multiplied by the constant at 0xD2D48 and stored to 0xFFFF80F0. On the disable path (04369E) 0.0 is stored instead",
+    "Enable gating: 0435DA-0435DE require the return of 0x1CF16 to differ from 1; 0435F2-0435FE require the flags at 0xFFFF80F8 and 0xFFFF80F9 to equal 1; 043600-043602 require the byte at 0xFFFF65C0 to be 0",
+    "Subroutine 0436B6 sets those two flags with hysteresis: 0xFFFF80F8 from rpm against the thresholds at 0xD2D38/0xD2D3C, and 0xFFFF80F9 from load against 0xD2D40/0xD2D44",
+    "043682: an override path uses table AE584 (case 3) no matter what the selector says, when the result of 0x299BC equals 2, or when the result of 0x22CF4 equals 1 and the result of 0x297A0 equals 2",
+    "All 15 cells are 0, so this table currently always yields 0"
+   ],
+   "weakest_link": "The meaning of the selector byte at 0xFFFF6812 is unknown. Values 1..5 with five tables suggest gear position on a 5-speed manual, but nothing here verifies that. The consumer of 0xFFFF80F0/0xFFFF80F4 is not in this listing, so the physical quantity cannot be fixed.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Search for readers of 0xFFFF80F0 (scaled output) and 0xFFFF80F4 (raw lookup) to find what consumes the value. Search for writers of 0xFFFF6812 to test whether it is the gear index. Read the float at 0xD2D48 and compare the four sibling tables, especially whether AE54C/AE568/AE584/AE5BC are non-zero."
+  },
+  "tab-AF2B8": {
+   "proposed_name": "Gear- and RPM-dependent upper limit, probably a torque ceiling (base mode, operand of the min chain)",
+   "what_it_does": "In the default mode, where the function argument r4/r14 is 0, this descriptor is loaded into gbr+224 and looked up against two inputs that likely carry RPM (Y axis) and gear (X axis). The result is stored to 0xFFFF8714 and then min'ed against a sibling table's result, so it acts as a ceiling. That ceiling feeds a weighted blend whose result goes to stack slot 68. The data allows 500 in gears 1\u20133 and 350 in gears 4\u20136, flat across RPM.",
+   "axis_meanings": [
+    "Y (800..6800): almost certainly engine speed in rpm. It is the float from RAM 0xFFFF679C, copied to stack slot 36 at 0BCEF8\u20130BCEFE and passed as one lookup argument.",
+    "X (1..6): very likely gear position. It is the byte at RAM 0xFFFF6810 converted by fmac_interp_uint8 with gain 1 and offset 0 (0BCECA\u20130BCEDA) into stack slot 20, which is passed as the other lookup argument."
+   ],
+   "output_units": "Unknown ECU-internal limit quantity; the same units as the values it is min'ed with (probably a torque-like quantity). Not established.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0BCF3A/0BCF3C: in the r14==0 path, descriptor 0x000AF2B8 is stored to gbr+224. The alternate modes 1/2/3 store 0x000ABCA0 there instead (0BCFFA, 0BD05A, 0BD0B4), so this is the base-mode variant.",
+    "0BD272\u20130BD27E: r4 = @(224,gbr); fr5 = @(20,r15), the uint8 byte from 0xFFFF6810 converted with 1x+0; fr4 = @(36,r15), the float from 0xFFFF679C; jsr table_lookup_2D (0x0BE8E4).",
+    "0BD280\u20130BD284: the result fr0 is stored to 0xFFFF8784-112 = 0xFFFF8714.",
+    "0BD286\u20130BD28E: float_min(fr4 = this result at 0xFFFF8714, fr5 = @(-100) = the result of the gbr+248 table lookup). This table is therefore a ceiling.",
+    "0BD290\u20130BD292: the min is stored to @(68,r15).",
+    "0BD2BC\u20130BD2CE: @68 is blended with fr14 (min of the 228/232 and 220 tables) using clamp01(table 260) as the weight; the result goes to @(16,r15).",
+    "0BD2FC\u20130BD30A: @68 is blended again with fr14 using clamp01(table 252) as the weight; the result goes to @(8,r15).",
+    "0BD118 branches to 0BD228, so the gbr+224 lookup runs on both branches of the 0BD0D2 test."
+   ],
+   "weakest_link": "The physical identity of the output, called torque here only because of the min/blend structure and the 350\u2013500 magnitude. Also uncertain: that 0xFFFF6810 is gear and 0xFFFF679C is RPM, and which of fr4/fr5 table_lookup_2D treats as X; these rest only on the breakpoint values matching.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Continue the listing past 0BD320 to see where stack slots @16 and @8 are finally stored, and search the readers of 0xFFFF8714 and of those final RAM outputs. Also confirm 0xFFFF6810 is gear by finding its writer. Confirm the fr4/fr5 axis order of table_lookup_2D at 0x0BE8E4. Then compare this table's values against the sibling 0xAF2F0 (gbr+248) to see whether the min ever selects this table."
+  },
+  "tab-AE62C": {
+   "proposed_name": "Per-cylinder ignition timing compensation, 4th of a set of four (likely cylinder 4), RPM x load",
+   "what_it_does": "Looked up by RPM and engine load only when RPM is below a limit, load and coolant temperature are above thresholds and a status byte from 0x2F8EA is zero; otherwise all four outputs are forced to 0. The result is stored as the fourth float of a four-element RAM array (0xFFFF81DC..0xFFFF81E8) filled from four sibling tables with the same geometry.",
+   "axis_meanings": [
+    "Y (1200..6400): engine speed, rpm. The value passed in fr4 comes from 0xFFFF6624 rpm_current.",
+    "X (0.5..2.3): engine load, g/rev. The value passed in fr5 comes from 0xFFFF63F8 engine_load_current."
+   ],
+   "output_units": "probably degrees of ignition advance (uint8 x 0.3515625 - 45, so raw 128 = 0; 0.3516 deg per count); unconfirmed",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0x044190/0x044192: fr15 is loaded from 0xFFFF6624 (rpm_current). At 0x0441F2 it is passed as fr4, the first axis input.",
+    "0x044194/0x044196: fr12 is loaded from 0xFFFF63F8 (engine_load_current). At 0x0441F8 it is passed as fr5. The axis breakpoints 1200..6400 and 0.5..2.3 match rpm and g/rev.",
+    "0x0441A4-0x0441BE: lookups happen only if rpm < [0xD2D98], load >= [0xD2D9C], ECT >= [0xD2DA0] and the byte returned by 0x2F8EA is zero. Otherwise 0x044200-0x044210 write 0.0 to all four outputs.",
+    "0x0441C0-0x0441EE: three sibling tables (0xAE5D8, 0xAE5F4, 0xAE610) are looked up with the same rpm/load inputs. They are stored to 0xFFFF81E8-12, -8 and -4. This table's result is stored to @0xFFFF81E8 at 0x0441FE, which makes a 4-element array, one entry per cylinder on a flat-four.",
+    "Cell scaling 90/256 per count with a -45 offset is a typical Subaru ignition-angle encoding. The data are sparse small positive steps (1 to 3 counts) in scattered cells, which looks like a per-cylinder trim rather than a base map."
+   ],
+   "weakest_link": "Nothing in this listing consumes the array at 0xFFFF81DC..0xFFFF81E8. Both the per-cylinder interpretation and the degrees-of-timing unit rest on the array having four elements and on the scaling. The value is not shown being added to an ignition angle or indexed by cylinder.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search for code that reads 0xFFFF81DC through 0xFFFF81E8, especially reads indexed by a cylinder counter. Confirm that the value is added to or subtracted from the final ignition timing. Also read the gate thresholds at 0xD2D98, 0xD2D9C and 0xD2DA0, and check what 0x2F8EA returns, to see whether the gate is open in normal driving."
+  },
+  "tab-AC9A4": {
+   "proposed_name": "Coolant-temperature coefficient, slot 0 of a 4-value set written to 0xFFFF7378. Possibly a transient-fuel or wall-wetting factor (hunch).",
+   "what_it_does": "Looks up a dimensionless coefficient against current coolant temperature: 0.85 at -40/-30 \u00b0C, falling to 0.10 at 80 \u00b0C and above. It multiplies the result by a common RAM multiplier at 0xFFFF7288 and stores it to 0xFFFF7378, the first of four ECT-derived coefficients (0xFFFF7378/737C/7380/7384) written together.",
+   "axis_meanings": [
+    "X: engine coolant temperature, \u00b0C (input fr4 = fr15 loaded from 0xFFFF6350 ect_current [VERIFIED-BOTH] at 0x03077C; breakpoints -40..110 consistent)"
+   ],
+   "output_units": "Dimensionless coefficient (raw/4096), then scaled by the float at 0xFFFF7288 before storage",
+   "evidence_class": "hunch",
+   "evidence": [
+    "0x03077A-0x03077C: fr15 = @0xFFFF6350 (ect_current); 0x0307C6 fmov fr15,fr4 passes it as the lookup input, so the X axis is coolant temperature",
+    "0x0307BE-0x0307C0: fr14 = @0xFFFF7288, a common multiplier",
+    "0x0307C2/0x0307C4: descriptor 0xAC9A4 is loaded and jsr @r14 calls table_lookup_1D (r14 was set to 0xBE830 at 0x03079E or 0x0307AC)",
+    "0x0307C8 fmul fr14,fr0, then 0x0307CA-0x0307CE: result stored to 0xFFFF7384-12 = 0xFFFF7378",
+    "0x0307D0-0x0307E8: three sibling ECT tables are also scaled by fr14 and stored to 0xFFFF737C, 0xFFFF7380 and 0xFFFF7384. Two of them (AC9CC/AC9B8 and ACA30/ACA1C) are chosen by a flag returned from function 0x22CF4 at 0x030780.",
+    "0x030788-0x03078C: the whole block runs only if byte 0xFFFF726C == 1",
+    "0x030790-0x030794: if byte 0xFFFF3158 is nonzero, an alternate set (AC9E0, AC9F4, ACA44, ACA58) is stored to the same four slots, unscaled",
+    "No consumer of 0xFFFF7378 appears in this listing"
+   ],
+   "weakest_link": "The physical meaning rests entirely on the cold-high/hot-low shape and the four-slot grouping. The code that reads 0xFFFF7378 is not shown, and neither is the meaning of the 0xFFFF7288 multiplier or the mode flags 0xFFFF726C/0xFFFF3158.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search the ROM for readers of 0xFFFF7378 (and its siblings 0xFFFF737C/7380/7384) to see what the coefficient multiplies or filters. Also find the writers of 0xFFFF7288, 0xFFFF726C and 0xFFFF3158 to learn the scaling and the enabling mode."
+  },
+  "tab-AD368": {
+   "proposed_name": "unknown: flag-selected 1D curve of RAM 0xFFFF62E4, result to 0xFFFF7C54 (flag==1 variant)",
+   "what_it_does": "When the byte flag at 0xFFFF844F equals 1, this curve maps the float at 0xFFFF62E4 to a value stored at 0xFFFF7C54; otherwise the sibling table 0xAD37C fills the same slot. A second pair of curves (0xAD390 / 0xAD3A4), chosen by the same flag and indexed by coolant temperature (0xFFFF6350), fills 0xFFFF7C58.",
+   "axis_meanings": [
+    "X: float read from RAM 0xFFFF62E4. Unidentified quantity. Breakpoints are 0, 1, 2.4, 4, 6 ... 32 times 0.977 (= 1000/1024), so the raw signal is probably counts scaled by 1000/1024."
+   ],
+   "output_units": "unknown (physical 424..1568 after scale 4; rises monotonically and concavely, roughly square-root shaped)",
+   "evidence_class": "unknown",
+   "evidence": [
+    "03A9BC/03A9BE: fr4 is loaded from @0xFFFF62E4 and is still in fr4 when table_lookup_1D is called at 03A9D0, so 0xFFFF62E4 is this table's X input.",
+    "03A9C4-03A9CA: mov.b @0xFFFF844F; cmp/eq #1; bf. Flag==1 selects this table (0xAD368), anything else selects 0xAD37C. Both results are stored to the same slot.",
+    "03A9D4-03A9DC: r6=0xFFFF7C58, r0=-4, fmov.s fr0,@(r0,r6). The result is stored to 0xFFFF7C54 and is not used again in this function.",
+    "03A9C0/03A9C2 and 03A9F2: ECT (0xFFFF6350) is held in fr14 and moved into fr4 in the delay slot of the second lookup (0xAD390 or 0xAD3A4). That lookup's result goes to 0xFFFF7C58 at 03A9F6. The ECT path is a parallel output, not an input to this table.",
+    "03A9F8-03A9FC: the function returns without consuming 0xFFFF7C54, so the consumer is outside this listing."
+   ],
+   "weakest_link": "Both the meaning of the input at 0xFFFF62E4 and the consumer of 0xFFFF7C54 are outside the listing. The meaning of flag 0xFFFF844F (for example MT/AT, an A/C state or an operating mode) is also unknown. Nothing in the code fixes the quantity.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search the ROM for code that reads 0xFFFF7C54 (and its sibling 0xFFFF7C58) to see how the value is consumed: multiplied, compared or clamped. Also find the writer of 0xFFFF62E4 and the writer of flag 0xFFFF844F to identify the input quantity and the selection condition. Compare this table's data with the sibling at 0xAD37C to see what the flag changes."
+  },
+  "fn-71AFA": {
+   "proposed_name": "update_filtered_sum_97B0_97B4",
+   "mechanism": "The function first calls 0x022F92 and zero-extends the returned byte. It then reads the byte flag at 0xFFFF7449 and four floats: A at 0xFFFF653C, B at 0xFFFF77C8, C at 0xFFFF76D4 and D at 0xFFFF7878. If the call returned 1, or the flag is 0, it writes 1.0f to both 0xFFFF97B0 and 0xFFFF97B4 and returns. Otherwise it computes x = A - B + C + D and clamps it with float_max(x, 0.0), so x is never negative. The clamped value is stored at 0xFFFF97B0 (0xFFFF97B4 - 4). It then calls float_lag_filter with these arguments: fr4 = the new value from 97B0, fr5 = the previous value at 97B4, fr6 = a ROM constant read from 0x000C50B4, and fr7 = a PC-relative literal at 0x071C28. The result is written back to 0xFFFF97B4. In short, 97B0 holds a raw non-negative sum, and 97B4 holds a first-order low-pass filtered copy of it. Both are forced to 1.0 when the function is disabled.",
+   "purpose": "unknown. It keeps a raw value at 0xFFFF97B0 and a smoothed value at 0xFFFF97B4. That value is a non-negative combination of four RAM floats (A - B + C + D). The value 1.0 is used as the inactive or reset default.",
+   "evidence_class": "observed",
+   "evidence": [
+    "Literals 0xFFFF653C, 0xFFFF77C8, 0xFFFF76D4 and 0xFFFF7878 are loaded into fr4, fr9, fr6 and fr7, then combined by fsub fr9,fr4; fadd fr6,fr4; fadd fr7,fr4.",
+    "float_max [TRACED] is called with fr5 = 0 (fldi0), clamping the sum to be at least 0.",
+    "The clamped result is stored with r0 = -4 relative to 0xFFFF97B4, i.e. at 0xFFFF97B0.",
+    "float_lag_filter [TRACED] is called with the new value (fr4), the old value at 0xFFFF97B4 (fr5), a constant from ROM 0x0C50B4 (fr6) and the literal at 0x071C28 (fr7). Its result is stored at 0xFFFF97B4.",
+    "On the bypass path (0x022F92 returned 1, or byte flag 0xFFFF7449 == 0), fldi1 writes 1.0 to both 0xFFFF97B0 and 0xFFFF97B4."
+   ],
+   "weakest_link": "None of the four input variables, the gate function 0x022F92 or the flag at 0xFFFF7449 are identified. The exact roles of fr6 and fr7 in float_lag_filter (coefficient versus limit) are also not established. So the physical meaning of the sum, and why 1.0 is the reset value, cannot be determined from this code."
+  },
+  "tab-AD3A4": {
+   "proposed_name": "Coolant-temperature multiplier (cold factor), selected when flag 0xFFFF844F != 1; consumer unknown",
+   "what_it_does": "Looks up a dimensionless factor from current coolant temperature, 3.5 at -40 \u00b0C falling to 1.0 at 60 \u00b0C and above, and stores it as a float to RAM 0xFFFF7C58. It is the alternate to table 0xAD390, which the code uses instead when byte flag 0xFFFF844F == 1.",
+   "axis_meanings": [
+    "X: coolant temperature, \u00b0C (input register fr4 is loaded from fr14, which holds ect_current at 0xFFFF6350)"
+   ],
+   "output_units": "dimensionless multiplier (1.0 = no correction); scale 1/8192",
+   "evidence_class": "inferred",
+   "evidence": [
+    "03A9C0/03A9C2: r2=0xFFFF6350 (ect_current [VERIFIED-BOTH]); fmov.s @r2,fr14 places ECT in fr14.",
+    "03A9F0/03A9F2: jsr table_lookup_1D with delay slot fmov fr14,fr4, so this table is indexed by ECT. The -40..110 axis fits that.",
+    "03A9EC: r4=0xAD3A4 is reached only on the fall-through path. When 0xFFFF844F == 1 (03A9C4-03A9CA), 03A9D8 loads r4=0xAD390 and bra 0x03A9EE jumps past 03A9EC, so 0xAD390 replaces this table. The two are mode-selected alternates.",
+    "03A9F4/03A9F6: the result fr0 is stored to 0xFFFF7C58. A sibling lookup (0xAD368 or 0xAD37C, indexed by the value at 0xFFFF62E4) is stored to 0xFFFF7C54 at 03A9D6/03A9DC and 03A9E8/03A9EA.",
+    "The data (3.5 to 1.0, flat at 1.0 from 60 \u00b0C) has the shape of a cold-engine multiplier that becomes neutral when warm. This is shape only; it does not fix what the factor multiplies."
+   ],
+   "weakest_link": "The consumer of 0xFFFF7C58 is not in this listing. What the factor scales (fuel enrichment, transient/wall-wetting fuel, an ignition or idle term, a timer) is unknown, and so is whether it is used as a multiplier rather than a gain or limit.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search the ROM for readers of 0xFFFF7C58 (and of 0xFFFF7C54) to see whether the value is multiplied into an injector pulse or enrichment term. Also find what writes the mode byte 0xFFFF844F and compare this table's data with 0xAD390, which shows which condition uses each."
+  },
+  "tab-AC7D8": {
+   "proposed_name": "ECT multiplier on a gated, counted event amount (possibly an extra/async injection pulse); stock flat 1.0",
+   "what_it_does": "Indexed by coolant temperature, it gives a dimensionless factor stored to 0xFFFF7C44. That factor is the last term in a product of several factors. If the product reaches a minimum it triggers an event that is counted, budgeted and handed to routine 0xDCE4. Every cell is 1.0, so this calibration applies no temperature correction.",
+   "axis_meanings": [
+    "X: engine coolant temperature, deg C (input fr14 is loaded from 0xFFFF6350 ect_current at 03A6A0/03A6A2 and passed as fr4 at 03A770)"
+   ],
+   "output_units": "dimensionless multiplier (1.0 = no change)",
+   "evidence_class": "inferred",
+   "evidence": [
+    "03A6A0-03A6A2: fr14 is loaded from 0xFFFF6350 (ect_current). 03A770 passes fmov fr14,fr4 into the 1D lookup, so the axis is ECT.",
+    "03A772-03A774: the result fr0 is stored to @(-32,r11), which is 0xFFFF7C44.",
+    "03A75C-03A768: if the call to 0x23E48 returns 0, the code writes fldi1 (1.0) to the same slot and skips the lookup, so 1.0 is the neutral value and the table is a multiplier.",
+    "03A796-03A7B4: fr8 = [0xFFFF7C54] * rpm-table(0xAC7B0) * table 0xAC7C4([0xFFFF7C50]) * [0xFFFF7C58] (and also * [0xFFFF7C38] when the 0xCC4A8 test fails), then fmul by [0xFFFF7C44] from this table.",
+    "03A7B6-03A7C2: the product is stored to 0xFFFF7C30 and compared with the threshold at 0xCC4A4. Below the threshold it exits through 03A80C.",
+    "03A7CC-03A7E4: when the product is at or above the threshold, it is copied to 0xFFFF7C3C and the value plus fr12 (from 0xFFFF734C) goes to 0xFFFF7C40. Then 0xDCE4(r4=0, r5=7, r6=0xFFFF7C3C) is called.",
+    "03A7EC-03A804: on that path counter gbr+44 is incremented, fr15 (0xFFFF62E4) is accumulated into 0xFFFF7C48, and flag bit 7 at gbr+46 is set.",
+    "03A730-03A750: the event is gated by counter gbr+44 < an ECT-based count limit (gbr+45, from 0xAC7EC/0xAC7F8) and by accumulated 0xFFFF7C48 < an ECT-based limit (0xFFFF7C4C, from 0xAD3D8/0xAD3EC)."
+   ],
+   "weakest_link": "What the event is. The guess of an extra or asynchronous injection pulse (product plus an offset, then a hardware-style call to 0xDCE4 with channel-like argument 7) rests only on the structure. Neither 0xDCE4, nor the quantity in 0xFFFF62E4, nor the offset in 0xFFFF734C has been identified.",
+   "live_lever": "yes",
+   "tuning_relevance": "low",
+   "next_step": "Disassemble 0xDCE4 to see whether it programs a timer or injector output channel 7 using the value at 0xFFFF7C3C. Also search for readers of 0xFFFF7C30/0xFFFF7C3C/0xFFFF7C40 and for writers of 0xFFFF62E4 and 0xFFFF734C. This would fix what quantity the ECT multiplier scales."
+  },
+  "fn-11880": {
+   "proposed_name": "toggle_port_b_bit15_atomic",
+   "mechanism": "Saves PR and reserves a 4-byte stack slot, then calls critical_section_enter with r4 = pointer to that slot and r5 = 0xE0. 0xE0 looks like an SR interrupt-mask value (IMASK=14), and the saved state lands in @r15. It then loads the 16-bit word at 0xFFFFF738 (mov.w of 0xF738 sign-extends). It computes r2 = ~(x | 0x7FFF), which leaves only bit 15 set, and inverted. It computes r3 = x & 0x7FFF. The sum r2 + r3 is x with bit 15 flipped and the other 15 bits unchanged, and it writes this back to 0xFFFFF738. Finally it calls critical_section_exit with the saved state from @r15 and returns. Net effect: an atomic read-modify-write that toggles bit 15 of the 16-bit register at 0xFFFFF738. The instruction at 0x0118AC (mov.l r14,@-r15) belongs to the next function.",
+   "purpose": "Atomically toggles one output bit (bit 15) of an on-chip I/O register. 0xFFFFF738 most likely corresponds to the Port B data register (PBDR) in the SH7058 I/O map, so this would flip port pin PB15. A pin toggled like this is typically a heartbeat or external-watchdog kick, but what the pin drives cannot be determined from this code.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "mov.w @(0x0118EA) loads 0xF738, which sign-extends to 0xFFFFF738, inside the SH7058 on-chip peripheral register area.",
+    "~(x|0x7FFF) + (x&0x7FFF) is algebraically x with bit 15 toggled and the low 15 bits preserved.",
+    "The read-modify-write is bracketed by the [TRACED] critical_section_enter and critical_section_exit helpers. Enter receives r5=0xE0, a likely interrupt-mask level, and a stack slot that is passed back to exit, so the update is protected against interrupts.",
+    "There are no inputs, no conditions and no return value: an unconditional toggle."
+   ],
+   "weakest_link": "The identity of 0xFFFFF738 as PBDR (Port B data register) comes from recall of the SH7055/SH7058 register map, not from anything in the listing. Which physical signal PB15 drives, e.g. an external watchdog, is not shown at all."
+  },
+  "tab-AC5D0": {
+   "proposed_name": "unknown (step contribution vs RAM 0xFFFF62DC, max-combined in routine 0x036070)",
+   "what_it_does": "A 1D lookup on the float at 0xFFFF62DC. Its output is 0 up to 70 on the axis and 0.109 from 73.4 up. The result is stored to 0xFFFF7998 and combined with float_max against two sibling contributions (0xFFFF7994 and 0xFFFF799C). The routine then scales, deadbands and min-limits that maximum into 0xFFFF7990 and 0xFFFF798C.",
+   "axis_meanings": [
+    "X: value of RAM float 0xFFFF62DC (unidentified; breakpoints 10.9..89.1, step between 70 and 73.4)"
+   ],
+   "output_units": "unknown; dimensionless fraction (0..0.109) on the same scale as the two sibling contributions it is max-ed with",
+   "evidence_class": "hunch",
+   "evidence": [
+    "036096: fmov.s @r2,fr4 with r2=0xFFFF62DC sets the lookup input. fr4 is not changed before the jsr at 0360C4, so the X axis is the value at 0xFFFF62DC.",
+    "0360A8-0360B0: mov.w @(54,gbr) is compared cmp/hs with @(56,gbr) (0xFFFF79C2 vs 0xFFFF79C4). The lookup runs only when the first is >= the second; otherwise fr14 is forced to 0 at 0360B4.",
+    "0360C8 fmov fr0,fr14 then 0360D6 fmov.s fr14,@(-88,r12) with r12=0xFFFF79F0 stores the result to 0xFFFF7998.",
+    "0360CA-0360DA: a sibling 1D table 0xAC5E4, indexed by 0xFFFF64D8 (fr15), is stored to 0xFFFF799C.",
+    "0360E6-0361BE: a third term built from rpm x load 2D tables (AD674/AD690/AD6AC/AD6C8/AD6E4/AD700), blended with (1-fr13) and (1-[0xFFFF8200]) weights, is floored to 0 below the constant at 0xCC170 and stored to 0xFFFF7994.",
+    "0361C0-0361D6: float_max(0xFFFF7998, 0xFFFF7994), then float_max with 0xFFFF799C, gives fr15. This table is one of three competing requests and the largest wins.",
+    "036250-036270 / 0362F8-036306: fr15 is multiplied by @(-80,r12) (0xFFFF79A0) and stored to 0xFFFF7990. That value is float_min-ed with 0xFFFF798C plus @(-16,r12) (0xFFFF79E0, from 1D table 0xAD090 vs rpm), and the result goes to 0xFFFF798C."
+   ],
+   "weakest_link": "The input 0xFFFF62DC is unidentified. The 10.9..89 axis could be a temperature, a speed or a percentage, and the final consumer of 0xFFFF798C/0xFFFF7990 is outside this listing. Nothing ties the output to a physical quantity.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Search for writers of 0xFFFF62DC to identify the X input, and for readers of 0xFFFF798C and 0xFFFF7990 to see what the max-selected request drives. Also check whether 0xFFFF79A0 (the multiplier at @(-80,r12)) is ever non-zero, since a zero multiplier would make this table inert."
+  },
+  "tab-ADB74": {
+   "proposed_name": "Coolant-temperature-indexed value, probably ignition timing in degrees (variant 2 of 4, chosen by two flags)",
+   "what_it_does": "Looks up a value against current coolant temperature and stores it as a float to RAM 0xFFFF7F2C. This descriptor is one of four (0xADB4C, 0xADB60, 0xADB74, 0xADB88), chosen by the byte at 0xFFFF65C0 and by the return value of routine 0x021016. It is used when the 0xFFFF65C0 byte is non-zero and 0x021016 returns zero.",
+   "axis_meanings": [
+    "X: engine coolant temperature, deg C (-40..110). Fixed by the lookup input being the ECT float, not by an axis name."
+   ],
+   "output_units": "Probably degrees of ignition advance (raw*0.3515625-20, the common Subaru timing scaling). Not confirmed by any consumer in the listing.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "04031A/04031C: mov.l @(0x0403A0),r2 = 0xFFFF6350 (ect_current [VERIFIED-BOTH]), then fmov.s @r2,fr14. The coolant temperature float is held in fr14.",
+    "040344: fmov fr14,fr4 in the delay slot of jsr @r2 (0x0BE830 table_lookup_1D). The X input is ECT.",
+    "040324: mov.b @r6,r14 with r6 = 0xFFFF65C0 (delay slot of jsr 0x021016). This is selector flag 1.",
+    "04032A: extu.b r0,r2. The byte return of 0x021016 is selector flag 2.",
+    "040326-04033E: tst r14 / tst r2 branch tree. r14!=0 and r2==0 selects this table, 0xADB74. r14!=0 and r2!=0 selects 0xADB88. r14==0 selects 0xADB60 or 0xADB4C.",
+    "040346/040348: mov.l @(0x0403C0),r2 = 0xFFFF7F2C, then fmov.s fr0,@r2. The result is only stored to RAM. No clamp or multiplier is applied in this function.",
+    "Descriptor scale 0.35156 with bias -20 matches the standard Subaru ignition-timing byte encoding. This is only a hint about units.",
+    "Data: 16.9 flat up to 60 C, 15.2 at 70 C, 12.0 from 80 C upward. Slightly more of the quantity when cold."
+   ],
+   "weakest_link": "The 'ignition timing' identity rests only on the scale/bias convention. The consumer of 0xFFFF7F2C is not in this listing, and the meanings of the 0xFFFF65C0 flag and of routine 0x021016 are unknown. The quantity could equally be an airflow, ISC or other target that happens to share this encoding.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search the ROM for readers of RAM 0xFFFF7F2C (literal 0xFFFF7F2C in pools) to see whether it is added into a timing sum or used elsewhere. Also disassemble 0x021016 and find the writers of 0xFFFF65C0 to identify the two selector conditions (e.g., idle/neutral/AC), and compare against sibling tables 0xADB4C/0xADB60/0xADB88."
+  },
+  "fn-71D92": {
+   "proposed_name": "obd_similar_conditions_check_dtc31_32 (with input snapshot preamble)",
+   "mechanism": "Preamble (0x071D92): reads byte 0xFFFF AF73 and passes it, with fr4 set from the constant at 0x071F10 (my reading is \u22480.4f) and fr5=0, to fmac_interp_uint8. It stores the float result at 0xFFFF97C0. It then copies three floats into a block: 0xFFFF2544\u219297D0, 0xFFFF254C\u219297D4, 0xFFFF2554\u219297D8. It loads r4=0x97B80 (a ROM block of pointers), r5=31, r6=32 and r7=0x97B98 (a descriptor whose +12 field points to the output byte). It restores pr and runs straight on into the routine at 0x071DC8. Core routine (0x071DC8): (1) |rpm_current \u2212 *(ptr@r4+12)| must be < 374.0 (0x43BB0000). (2) |*(0xFFFF97C0) \u2212 *(ptr@r4+16)| must be < 20.0 (0x41A0). (3) ect_current and *(ptr@r4+20) must be on the same side of 71.0 (0x428E): both below, or both at or above. If any of these fails, the output byte *(ptr@r7+12) is set to 0. If all pass, it looks up 20-byte records in the ROM table at 0x9A834 for index 31 and index 32. Record byte +2 is a slot number (\u00d72 into a status byte array); record byte +3 is a bit mask. Each mask is ANDed with the status bytes at 0xFFFF399E and at 0xFFFF3B06. If any of the four tests is nonzero, the output byte is set to 1. If none is, the output is left unchanged.",
+   "purpose": "Most likely the OBD-II 'similar conditions' test used for pending or confirmed DTC handling (for example a misfire or fuel-system monitor). The rule is: engine speed within ~375 rpm of the stored value, load within 20 %, and the same warm-up status (coolant on the same side of ~71 \u00b0C) as the stored snapshot. The flag is raised when DTC slots 31 or 32 are already flagged in either status array while current conditions match.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "Constants decode as 374.0, 20.0 and 71.0 floats, used with float_abs_diff against rpm_current and the 0x97C0 value, and with ect_current. This matches the regulatory 375 rpm / 20 % load / same warm-up criteria.",
+    "rpm_current and ect_current are [VERIFIED-BOTH].",
+    "The ECT logic accepts only 'both <71' or 'both >=71', i.e. a same-side comparison.",
+    "20-byte record indexing (idx*4+idx)*4 into 0x9A834, followed by a byte slot*2 and a byte mask ANDed against RAM arrays 0xFFFF399E and 0xFFFF3B06. This is a typical per-DTC status-bit lookup.",
+    "Output: 0 if conditions are not similar, 1 if a DTC bit is set, unchanged otherwise."
+   ],
+   "weakest_link": "That 0xFFFF97C0 (my \u22480.4 reading of the 0x071F10 constant times byte 0xFFFFAF73) is engine load in percent, and that 0xFFFF399E and 0xFFFF3B06 are DTC pending/confirmed status arrays. Neither is verified, and the identities of DTC slots 31 and 32, and what the stored reference values are, are unknown."
+  },
+  "fn-0DD52": {
+   "proposed_name": "task_drain_callback_queue_FFFF4520",
+   "mechanism": "Calls 0x10A46 with r4=1 and keeps the bases r10=0xFFFF4570 and r11=0xFFFF4520. Each pass of the loop: (1) calls critical_section_enter(r4=stack slot, r5=0xE0), which saves the old state on the stack and raises the interrupt mask to 0xE0. (2) Calls 0xF97C(r4=0, r5=0xFFFF4520) and keeps its return value in r12. (3) Reads the byte at 0xFFFF4572 (offset 2 from 0xFFFF4570) into r13. (4) Calls critical_section_exit with the saved state. If r12 == 0, it calls indirectly through the function pointer stored at 0xFFFF4520, passing r4=0xFFFF4524. It loops back while the byte read from 0xFFFF4572 is non-zero. After the loop it calls 0x35A4, restores the stack and returns. The prologue does not save r8-r14 even though it uses them, which suggests a task or top-level entry rather than an ordinary callee.",
+   "purpose": "Most likely a scheduler or RTOS task body that drains a queue or service object at 0xFFFF4520. For each item that 0xF97C reports as available (return 0), it runs the callback whose pointer is stored at 0xFFFF4520, passing a context at +4. It keeps going while a pending count or flag at 0xFFFF4572 is non-zero, then hands off through 0x35A4 (possibly a task-end or wait call).",
+   "evidence_class": "inferred",
+   "evidence": [
+    "critical_section_enter/exit [TRACED] bracket the call to 0xF97C and the read of 0xFFFF4572, so both are shared state that interrupts can change",
+    "The indirect call jsr @r2 uses r2 = @(0xFFFF4520) with r4 = 0xFFFF4524: a function pointer followed by its argument or context block",
+    "The loop condition is the byte at 0xFFFF4572 read inside the critical section, which looks like a remaining-items count or pending flag",
+    "The callback runs only when 0xF97C returns 0, which looks like a success/available status",
+    "Registers r8-r14 are used without being saved, which fits a task entry point that does not need to preserve them"
+   ],
+   "weakest_link": "What 0xF97C, 0x10A46 and 0x35A4 actually do is not shown. The queue/task interpretation depends on 0xF97C being a dequeue or check call whose 0 return means 'go ahead', and on 0xFFFF4572 being a pending count."
+  },
+  "fn-403C4": {
+   "proposed_name": "calc_ect_based_value_4table_select",
+   "mechanism": "Loads the float coolant temperature ect_current (0xFFFF6350) into fr4. Reads two byte flags: A = byte at 0xFFFF90BE and B = byte at 0xFFFF6254 (zero-extended). It then picks one of four table descriptors into r4. If A==0: 0x000ADBC4 when B==1, otherwise 0x000ADBD8. If A!=0: 0x000ADBEC when B==1, otherwise 0x000ADC00. It calls table_lookup_1D (0x000BE830) with r4 = table and fr4 = ECT. The float result in fr0 is stored to RAM 0xFFFF7F68 in the rts delay slot. Everything from 0x0403FA onward is the literal pool, not code.",
+   "purpose": "Unknown. The code computes a coolant-temperature-dependent 1D table value and stores it at 0xFFFF7F68. Which of four calibration variants is used depends on a mode/state flag (0xFFFF90BE, zero vs non-zero) and on whether a second state byte (0xFFFF6254) equals 1. It is most likely an ECT-based compensation or target used elsewhere, but neither flag nor the output is identified.",
+   "evidence_class": "observed",
+   "evidence": [
+    "mov.l @(0x0403FC)->0xFFFF6350 ect_current [VERIFIED-BOTH], fmov.s @r2,fr4 sets the lookup X input",
+    "tst r6,r6 / bf/s splits on byte 0xFFFF90BE being zero or non-zero",
+    "cmp/eq #1,r0 on byte 0xFFFF6254 selects between table pairs ADBC4/ADBD8 and ADBEC/ADC00",
+    "jsr to 0x000BE830 table_lookup_1D [TRACED] with r4 = selected table pointer",
+    "fmov.s fr0,@r2 with r2=0xFFFF7F68 in the rts delay slot stores the result",
+    "Table descriptors are spaced 0x14 or 0x28 apart (ADBC4, ADBD8, ADBEC, ADC00), consistent with four adjacent 1D table headers"
+   ],
+   "weakest_link": "The mechanism is fully fixed by the code. What the output means is not known, because neither selector flag (0xFFFF90BE, 0xFFFF6254) nor the output 0xFFFF7F68 is identified, and the table contents were not examined."
+  },
+  "fn-0300E": {
+   "proposed_name": "call_hook_3F2C_with_flag_1290_bit15",
+   "mechanism": "Saves PR. Reads the 32-bit RAM word at 0xFFFF1290, ORs in 0x00008000 (bit 15) and writes it back. Loads a 32-bit function pointer from ROM address 0x00003F2C (literal at 0x30B8 holds 0x3F2C, then mov.l @r0,r3 dereferences it) and calls it with jsr. After the call returns it re-reads 0xFFFF1290, ANDs with 0xFFFF7FFF to clear bit 15, restores PR and writes the word back in the rts delay slot. Nothing is passed to or returned from the callee by this wrapper; r4-r7 are left as the caller set them. The code from 0x003030 on (pushes of r14/r13/r12, stc sr) is the start of the next function and is not part of this one.",
+   "purpose": "A wrapper that raises a status/'in-progress' flag (bit 15 of the word at 0xFFFF1290) for the duration of an indirect call through the pointer stored at 0x3F2C, so that other code (for example an interrupt or a scheduler check) can see that the routine is running. What the flag word and the called routine actually are cannot be told from this listing.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0x003010-0x003018: ld @0xFFFF1290, OR 0x8000, store (sets bit 15)",
+    "0x00301A-0x00301E: r0=0x3F2C; r3=@r0; jsr @r3 (indirect call via a ROM pointer slot)",
+    "0x003022-0x00302E: ld @0xFFFF1290, AND 0xFFFF7FFF, store in the delay slot (clears bit 15)",
+    "The set/call/clear bracket around one call is fixed by the code; reading it as a busy flag is an interpretation",
+    "0x003030 onward starts new register saves, so it belongs to a neighbouring function"
+   ],
+   "weakest_link": "The meaning of bit 15 at 0xFFFF1290 and the identity of the routine whose pointer is at 0x3F2C are not shown. Calling it a 'busy/in-progress' flag rests only on the set-before/clear-after pattern; no reader of the bit was examined."
+  },
+  "fn-0E54E": {
+   "proposed_name": "seq_call_005798_then_049CF0",
+   "mechanism": "A thin sequencing wrapper that takes no arguments of its own and touches no RAM directly. It pushes PR, then calls the subroutine at 0x00005798 (pointer loaded from the literal at 0x00E66C) and waits for it to return. It then loads 0x00049CF0 (literal at 0x00E670) and does a tail jump (jmp, not jsr) to it, popping PR in the delay slot. The second routine therefore returns straight to this function's caller. The net effect is to run 0x5798 and then 0x49CF0 back to back. Registers r4-r7 are not changed here, so any arguments the caller placed there reach 0x5798. Whether they are still intact for 0x49CF0 depends on what 0x5798 clobbers. Any return value comes from 0x49CF0.",
+   "purpose": "unknown. It is a dispatcher or wrapper that chains two routines, probably one step of a scheduler or init list. What the two routines do cannot be told without disassembling 0x5798 and 0x49CF0.",
+   "evidence_class": "observed",
+   "evidence": [
+    "sts.l pr,@-r15 / jsr @r3 with r3 = 0x00005798: an ordinary call to 0x5798",
+    "mov.l @(0x00E670),r2 = 0x00049CF0; jmp @r2 with lds.l @r15+,pr in the delay slot: a tail call to 0x49CF0",
+    "No memory loads or stores apart from the PR save and restore, and no computation"
+   ],
+   "weakest_link": "The mechanism is fully determined by the code shown. The purpose is unknown because neither target routine is shown. Whether r4-r7 survive the call to 0x5798 is also not visible."
+  },
+  "fn-0E4E6": {
+   "proposed_name": "call_10A46_arg12_then_10D58_then_tailjump_35A4",
+   "mechanism": "The function saves PR on the stack. It calls 0x00010A46 with r4 = 12, loaded in the delay slot. It then calls 0x00010D58 with no explicit arguments. Finally it tail-jumps to 0x000035A4, restoring PR in the delay slot, so 0x35A4 returns straight to this function's caller. The function reads no RAM and stores nothing itself; all real work happens in the three callees. The code after 0x00E4F8 belongs to neighbouring functions and is ignored: two empty rts/nop stubs at 0x00E4FA and 0x00E4FE, and two tail-jump trampolines at 0x00E502 (to 0x0004793C) and 0x00E508 (to 0x00048732).",
+   "purpose": "unknown. It is a small wrapper that runs three routines in a fixed order and passes the constant 12 to the first. Its shape suggests a scheduler task or an init/step routine, for example 0x10A46 taking a channel, event or timer ID of 12, but nothing shown fixes what that argument means.",
+   "evidence_class": "observed",
+   "evidence": [
+    "mov #12,r4 sits in the delay slot of jsr @r3, where r3 = 0x00010A46, so 12 is the first argument to that callee",
+    "jsr to 0x00010D58 follows with a nop delay slot and no argument set up",
+    "jmp @r3 to 0x000035A4 with lds.l @r15+,pr in the delay slot is a tail call that returns to the original caller",
+    "There are no memory loads or stores apart from the PR save and restore"
+   ],
+   "weakest_link": "The callees 0x10A46, 0x10D58 and 0x35A4 are not shown. Their roles, and the meaning of the argument 12, are undetermined, so the evidence class applies to the mechanism only and the purpose cannot be stated."
+  },
+  "fn-602DC": {
+   "proposed_name": "scale_raw_4158_to_float_9088_and_run_subtasks",
+   "mechanism": "Saves PR, then reads a 32-bit integer from RAM 0xFFFF4158 and converts it to float with lds/float. It multiplies that by a float constant held in the literal pool at 0x0604B8 (the value is not shown) and stores the result to RAM 0xFFFF9088. The store sits in the delay slot of the first bsr. It then calls 0x06035A and 0x060392 in turn. Finally it branches to 0x06048E with PR restored in the bra delay slot, which makes that a tail call. The code from 0x0602FA onward is a separate neighbouring routine and does not belong to this function. That routine copies the byte at 0xFFFF65C0 to 0xFFFF9092 and writes 0xFFFF to the halfword at 0xFFFF9090.",
+   "purpose": "unknown. The visible part converts a raw integer quantity into a scaled float copy at 0xFFFF9088 and then sequences three subroutines, apparently a small task or step wrapper. What the quantity is and what the scale factor means cannot be told from this code.",
+   "evidence_class": "observed",
+   "evidence": [
+    "mov.l @r2,r2 from 0xFFFF4158 is a 32-bit load; lds/float turns it into float fr8.",
+    "fmul by the literal at 0x0604B8 (loaded via mova/fmov.s); the result is stored with fmov.s fr8,@r2, where r2=0xFFFF9088, in the bsr delay slot.",
+    "bsr 0x06035A and bsr 0x060392 follow; bra 0x06048E with lds.l @r15+,pr in its delay slot is a tail call.",
+    "The rts at 0x060304 belongs to code starting at 0x0602FA, after the bra, so that code is a different function."
+   ],
+   "weakest_link": "The scale constant at 0x0604B8 and the bodies of the three called routines are not shown. Without them nothing ties 0xFFFF4158 or 0xFFFF9088 to a physical quantity, so any purpose beyond the mechanism would be a guess."
+  },
+  "tab-AA8C4": {
+   "proposed_name": "Intake-air-temperature multiplier applied to the AA914 lookup (purpose of the product unknown)",
+   "what_it_does": "Indexed by the value loaded from 0xFFFF6364 (labelled iat_current), this table returns a factor of about 0.65 at cold temperatures, rising to about 1.06 at warm ones. The factor multiplies the output of table 0xAA914, which is indexed by the RAM float at 0xFFFF5CA0, and the product is stored to 0xFFFF5CAC. The product is forced to 0 when either of two hysteresis flags at GBR+129 and GBR+130 is set.",
+   "axis_meanings": [
+    "X: intake air temperature, degC (input fr15 = @0xFFFF6364, labelled iat_current; breakpoints -40..110)"
+   ],
+   "output_units": "dimensionless multiplier (about 0.65..1.06), scaling the AA914 lookup result",
+   "evidence_class": "inferred",
+   "evidence": [
+    "013BB6/013BB8: fr15 is loaded from 0xFFFF6364 (iat_current label)",
+    "013C0C/013C0E: jsr table_lookup_1D with fr4 = fr15 and r4 = 0xAA8C4, so this table is indexed by fr15",
+    "013C00-013C06: the preceding lookup of AA914, indexed by fr14 (loaded at 013BB0 from 0xFFFF5D18-120 = 0xFFFF5CA0), is saved to @r15",
+    "013C10-013C18: the saved AA914 result is multiplied by this table's fr0 and stored to 0xFFFF5D18-108 = 0xFFFF5CAC",
+    "013C2E-013C4C and 013C78-013C96: the same pattern repeats with AA928\u00d7AA8D8 and AA93C\u00d7AA8EC (fr14-indexed table times fr15-indexed table). Those products are added to fr12 (from 0xFFFF5CB0) and clamped with float_max / float_min, which looks like a temperature-weighted up/down step on an accumulator",
+    "013BF2-013BFC and 013CAE-013CB4: if flag GBR+129 (hysteresis on the 0xFFFF5CA4 value) or GBR+130 (rpm hysteresis) equals 1, 0xFFFF5CAC and 0xFFFF5CB0 are zeroed",
+    "Data: the table is flat at 0.648 up to -25 C, jumps to 1.0 at -8.9 C and saturates at 1.0625 from 50 C. This shape is consistent with temperature compensation, but the shape alone does not identify it"
+   ],
+   "weakest_link": "The axis is temperature only because the input address carries the iat_current label, and no axis is shared with a named definition. The quantity being scaled (the fr14 input at 0xFFFF5CA0 and table AA914) is unidentified, and the consumer of the product at 0xFFFF5CAC is not in this listing.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "low",
+   "next_step": "Search the ROM for readers of 0xFFFF5CAC (the product) and writers of 0xFFFF5CA0 (the fr14 input). Also decode the AA914 axis and data to learn what base quantity this IAT factor scales."
+  },
+  "fn-34C18": {
+   "proposed_name": "latch_table_value_on_flag_edge_7874",
+   "mechanism": "GBR is set to 0xFFFF7874. The function checks for either of two edge events. (1) The stored previous copy of byte GBR+12, kept at GBR+43 (0xFFFF789F), is 0 and the current byte GBR+12 (0xFFFF7880) is 1, a 0->1 rising edge. (2) Otherwise, the stored previous copy of word GBR+8, kept at GBR+38 (0xFFFF789A), is nonzero and the current word GBR+8 (0xFFFF787C) is 0, a nonzero->0 falling edge. When either edge occurs it calls the [TRACED] helper LowPW_TableProcessor (0xBE874). The arguments are r4 = table descriptor 0x000AC524 and fr4 = the float at 0xFFFF7874 (GBR+0), loaded in the jsr delay slot. The low byte of the returned r0 is stored to GBR+10 (0xFFFF787E). In every case the function then copies the current byte GBR+12 into GBR+43 and the current word GBR+8 into GBR+38, which refreshes the previous-value copies for the next call's edge detection.",
+   "purpose": "unknown. Structurally it samples and holds a value: a table lookup indexed by the float at 0xFFFF7874 is captured into 0xFFFF787E only at the moment a flag turns on or a word/counter reaches zero, and held between those events. What the flag, the word and the table mean cannot be told from this code.",
+   "evidence_class": "observed",
+   "evidence": [
+    "ldc r0,gbr with r0=0xFFFF7874; every access is GBR-relative",
+    "mov.b @(43,gbr) tested ==0 and mov.b @(12,gbr) cmp/eq #1, followed later by mov.b @(12,gbr) -> mov.b @(43,gbr): previous/current rising-edge pattern",
+    "mov.w @(38,gbr) tested !=0 and mov.w @(8,gbr) tested ==0, followed later by @(8) -> @(38) copy: falling-edge-to-zero pattern",
+    "r4=0x000AC524 and fr4=@0xFFFF7874 (delay slot) passed to LowPW_TableProcessor [TRACED]; the result is stored with mov.b r0,@(10,gbr)",
+    "Both previous-value copies are refreshed unconditionally at 0x034C44-0x034C4A"
+   ],
+   "weakest_link": "Nothing in the listing identifies what the variables at 0xFFFF7874/787C/7880 or the table at 0xAC524 represent. The helper name 'LowPW_TableProcessor' is only a traced label and does not show that this lookup relates to low pulse width, so the purpose stays unknown. Only the edge-triggered latch mechanism is fixed by the code."
+  },
+  "fn-45098": {
+   "proposed_name": "update_iat_running_minimum",
+   "mechanism": "Saves PR, loads the float iat_current (0xFFFF6364) into fr5 and the float at RAM 0xFFFF8210 into fr4 (in the jsr delay slot), then calls float_min (0x000BE970). On return it stores fr0, the smaller of the two, back to 0xFFFF8210 (in the rts delay slot), restores PR and returns. Net effect: RAM[0xFFFF8210] = min(RAM[0xFFFF8210], iat_current). The instructions from 0x0450AE on (pushes of r12-r14) are the prologue of the next function.",
+   "purpose": "Keeps a running minimum of intake air temperature in 0xFFFF8210. Each call lowers the stored value if the current IAT is colder. This looks like a 'lowest IAT seen' latch, probably since key-on or since some reset event. Other code may use it for cold-start or heat-soak decisions. When it is reset and who reads it are not shown.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "0x04509A/0x04509C: fmov.s @r2,fr5 with r2 = 0xFFFF6364, which is iat_current [VERIFIED-BOTH]",
+    "0x0450A0/0x0450A4: fr4 = float at 0xFFFF8210, loaded in the jsr delay slot",
+    "0x0450A2: jsr to 0x000BE970, which is float_min [TRACED]",
+    "0x0450AC: fmov.s fr0,@r6 with r6 = 0xFFFF8210, executed in the rts delay slot. The result is written back to the same variable it was read from, so this is a min-accumulator pattern.",
+    "There are no other inputs, conditions or branches: the update is unconditional every call."
+   ],
+   "weakest_link": "The read-min-writeback mechanism is fixed by the code, but only if float_min really returns the minimum (it is labelled [TRACED], not shown here). The 'lowest IAT since key-on' meaning depends on how 0xFFFF8210 is initialised or reset and what reads it, and none of that is in this listing."
+  },
+  "tab-AA928": {
+   "proposed_name": "Integrator decrement step vs. negative error signal at 0xFFFF5CA0 (IAT-scaled). The quantity being integrated is unidentified.",
+   "what_it_does": "When the input at 0xFFFF5CA0 is below the threshold at 0xC0BDC (i.e. negative), this table gives a negative step from that input. The step is multiplied by an IAT-indexed factor (table 0xAA8D8), added to the running accumulator at 0xFFFF5CB0 and floored at the constant at 0xC0BF0. It is the 'decrease' half of an asymmetric integral/learning update; table 0xAA93C with an upper clamp at 0xC0BF4 handles the positive side.",
+   "axis_meanings": [
+    "X: signed error-like float from RAM 0xFFFF5CA0 (struct 0xFFFF5D18-120), breakpoints -240..-0.5. Units and source are unknown; the writer is not in this listing."
+   ],
+   "output_units": "Same units as the accumulator at 0xFFFF5CB0 (unknown), as a per-execution increment. Before the IAT multiplier it ranges -1 at the largest error to -0.02 near zero.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "013BB0: fmov.s @(-120,r5),fr14 with r5=0xFFFF5D18 loads 0xFFFF5CA0 as fr14, and 013C34 passes fr14 as the X input for this table.",
+    "013BB8: fr15 = iat_current (0xFFFF6364). 013C40 passes fr15 to companion table 0xAA8D8, and 013C46 fmul multiplies this table's output by that IAT factor.",
+    "013C4C stores the product to 0xFFFF5D0C (5D18-12). 013C50 fadd fr8,fr12 adds it to fr12, which was loaded at 013BAC from 0xFFFF5CB0 (5D18-104).",
+    "013C52-013C62: float_max(fr12, [0xC0BF0]) is stored back to 0xFFFF5CB0. This is a lower-bounded accumulator, so the table is not inert.",
+    "013C1A-013C2C: the branch runs only when [0xC0BDC] > fr14 (negative error) and [0xC0BE4] <= float at 0xFFFF5C98. The mirrored branch at 013C64-013CAC uses table 0xAA93C with a float_min clamp at [0xC0BF4] for positive error.",
+    "013BC2-013BF6 / 013CAE: hysteresis flags at gbr+129 (from 0xFFFF5CA4) and gbr+130 (from rpm_current vs 0xC0BE8/0xC0BEC) zero both 0xFFFF5CB0 and 0xFFFF5CAC, disabling the integrator.",
+    "013C06-013C18: a parallel proportional-like term, table 0xAA914(fr14) * 0xAA8C4(IAT), is stored to 0xFFFF5CAC."
+   ],
+   "weakest_link": "The physical meaning of the input at 0xFFFF5CA0 and of the accumulator at 0xFFFF5CB0 is not established. The integrator structure is observed, but what is being regulated (e.g. idle rpm error) is only guessed from magnitudes and the rpm gating.",
+   "live_lever": "yes",
+   "tuning_relevance": "medium",
+   "next_step": "Search for writers of 0xFFFF5CA0 to identify the error signal (e.g. target minus actual of some quantity), and for readers of 0xFFFF5CB0 and 0xFFFF5CAC to see where the integral and proportional terms are applied. Also decode the floats at 0xC0BDC, 0xC0BE4, 0xC0BF0 and 0xC0BE8/0xC0BEC to learn the deadband, clamp and rpm gate values."
+  },
+  "tab-AF8D8": {
+   "proposed_name": "Base target map A (load x RPM), blended with map B by weight 0xFFFF90A8. Possibly the intake AVCS cam advance target, which is a hunch.",
+   "what_it_does": "Looked up with engine load (g/rev, Y) and RPM (X). The result is weighted by (1 - [FFFF90A8]) and added to map 0xAF8F4 weighted by [FFFF90A8], plus map 0xAF910 times an ECT-based 1D factor. The sum is floored at 0 and stored to 0xFFFF921C. Then 0xFFFF921C times a 1D lookup on 0xFFFF912C, plus a constant, is written to 0xFFFF9230, 0xFFFF9224 and 0xFFFF9228.",
+   "axis_meanings": [
+    "Y: engine load, g/rev (engine_load_current, passed in fr4 from stack+8)",
+    "X: engine speed, RPM (rpm_current, passed in fr5 from fr13)"
+   ],
+   "output_units": "Unknown. A quantity in the 0..30 range on the same scale as the AVCS-like sibling maps; degrees of cam advance would fit, but this is not shown.",
+   "evidence_class": "inferred",
+   "evidence": [
+    "062C78/062C7E: engine_load_current (FFFF63F8) is saved to stack+8; 062D8C-062D8E load it into fr4 as the first lookup input.",
+    "062C80/062C82: rpm_current (FFFF6624) goes into fr13; 062D92 fmov fr13,fr5 passes it as the second input.",
+    "062D88-062D96: table_lookup_2D on 0xAF8D8, result stored to r10-24 (FFFF9264).",
+    "062D98-062DB6: two sibling 2D maps, 0xAF8F4 and 0xAF910, use the same load/RPM inputs.",
+    "062DB8-062DC4: 1D table 0xAF750 on ECT (stack+4, ect_current).",
+    "062DC6-062DDA: fr4 = w*mapB + (1-w)*mapA, with w = [FFFF90A8] (stack+12) via fldi1/fsub/fmac. This table is the (1-w) term.",
+    "062DDC-062DE4: adds mapC * ECT-factor.",
+    "062DE6-062DF0: float_max(sum, 0) is stored to r10-60 (FFFF921C).",
+    "062D72-062D86 and 062DF2: gbr flags at +24 and +25 select a constant (D9F04) or 0 instead of the maps. Similar override at 062CF6-062D60.",
+    "062DF8-062E16: [D9F08] + FFFF921C * (1D lookup 0xAF764 on FFFF912C) is stored to FFFF9230, FFFF9224 and FFFF9228."
+   ],
+   "weakest_link": "Nothing in the listing shows what FFFF9230/9224/9228 drive, so the physical quantity (cam angle or otherwise) is not established. The meaning of blend weight FFFF90A8 is also unknown.",
+   "live_lever": "cannot_tell",
+   "tuning_relevance": "medium",
+   "next_step": "Search the ROM for readers of 0xFFFF9230, 0xFFFF9224 and 0xFFFF9228, and for the writer of 0xFFFF90A8. If a reader compares the value against a cam-angle measurement or feeds an OCV duty PID, this is the AVCS target. Also check whether FFFF90A8 is ever strictly below 1; if it is always 1, this map is inert."
+  },
+  "fn-3697A": {
+   "proposed_name": "check_two_inputs_below_rpm_thresholds_hyst",
+   "mechanism": "GBR is set to 0xFFFF79CC. The function reads rpm_current (0xFFFF6624) into fr14, an unidentified float at 0xFFFF62DC into fr15 and an unidentified float at 0xFFFF7348 into fr12. It calls table_lookup_1D twice with RPM as the input. Table 0x000AC5BC gives threshold A, stored at 0xFFFF79CC (r14-48 with r14=0xFFFF79FC). Table 0x000AD0A4 gives threshold B, stored at 0xFFFF79D0 (r14-44). Flag A (byte at GBR+50 = 0xFFFF79FE) uses hysteresis: it is set to 1 when [62DC] <= A - [0xCC178] and cleared to 0 when [62DC] > A. Between the two it keeps its previous value. Flag B (byte at GBR+51 = 0xFFFF79FF) works the same way, comparing [7348] against B, with the hysteresis constant at 0xCC174. The function returns r0 = 1 only if both flags equal 1, otherwise 0. The epilogue pops r14, which the listing never pushes. The heuristic start is therefore probably one instruction late: a mov.l r14,@-r15 likely sits just before 0x03697A. Everything from 0x036A10 onward is the literal pool or a neighbouring function.",
+   "purpose": "unknown. It is a boolean enable/condition check: true when two unidentified quantities are both below their own RPM-dependent limits, with hysteresis. That fits something like a low-load/low-airflow region detector feeding a diagnostic or mode enable, but what the two inputs are cannot be told from this code.",
+   "evidence_class": "observed",
+   "evidence": [
+    "Both table_lookup_1D calls take fr4 = fr14 = rpm_current [VERIFIED-BOTH], so both thresholds are functions of RPM.",
+    "fsub of the constants at 0xCC178/0xCC174 before the first compare, then a compare against the raw threshold to clear the flag, is a standard set/clear hysteresis band.",
+    "Flag bytes are written via mov.b r0,@(50,gbr) and @(51,gbr) with GBR = 0xFFFF79CC, i.e. 0xFFFF79FE and 0xFFFF79FF.",
+    "The return value is the AND of the two flags: cmp/eq #1 on each, then r2 = 1 or 0 is moved to r0.",
+    "Threshold values are cached at 0xFFFF79CC and 0xFFFF79D0."
+   ],
+   "weakest_link": "The identities of the inputs at 0xFFFF62DC and 0xFFFF7348 are unknown, so the function's real-world purpose cannot be fixed. Only the mechanism is observed."
+  },
+  "fn-71A7A": {
+   "proposed_name": "store_uint8_pack0_to_FFFF255E",
+   "mechanism": "Saves PR and calls the shared helper at 0x000BE9A0 (traced as uint8_pack) with r4 = 0; the argument is loaded in the jsr delay slot. After the return it restores PR and, in the rts delay slot, stores the low 16 bits of the helper's return value (r0) as a word to RAM 0xFFFF255E. Nothing else is read, compared or written. The bytes at 0x071A8A (rts/nop) are a separate empty stub, and 0x071A8E (mov.l r14,@-r15) is the prologue of the next function; neither belongs to this routine.",
+   "purpose": "unknown. It is a thin wrapper that refreshes or initialises the 16-bit RAM word at 0xFFFF255E from uint8_pack(0). Its structure suggests an init or periodic-update hook, but what the packed value means cannot be told from this code.",
+   "evidence_class": "observed",
+   "evidence": [
+    "0x071A7C/0x071A7E: jsr to 0x000BE9A0, labelled uint8_pack [TRACED]",
+    "0x071A80: mov #0,r4 in the delay slot, so the first argument is 0",
+    "0x071A82: r2 = 0xFFFF255E, loaded from the literal at 0x071BFC",
+    "0x071A88: mov.w r0,@r2 in the rts delay slot, so the return value is stored as a 16-bit word at 0xFFFF255E",
+    "0x071A8A-0x071A8C: rts/nop is an independent empty stub after the function's own rts"
+   ],
+   "weakest_link": "The semantics of the uint8_pack helper with argument 0 are not shown; the helper is only labelled, so what it packs and which quantity 0xFFFF255E holds remain unknown. The mechanism itself is fully observed."
+  }
+ },
+ "failed": {
+  "tab-AE370": "stopped: refusal (cyber)"
+ }
+}

@@ -5648,3 +5648,324 @@ Whether the counter sets a specific DTC (`word[gbr+32]`/`byte[gbr+35]` are
 cleared on the exit path; the non-zero writer was not chased);
 `word[0xFFFF79F0]` is also loaded at `0x03603A` and `0x0360D2`; and
 `ol_enrichment_accum` on `0xFFFF798C` now has evidence against it in this context.
+
+---
+
+## 96. Blind audit of function labels: seven label comments describe code that is not at the labelled address — **2026-10-11**
+
+**Status: recorded. Labels NOT yet changed** — renames are being held until the
+full function-label audit returns, so Ghidra is re-imported once.
+
+### How these were found
+
+`scripts/mapping/blind_audit.py` re-derived a random sample of labelled
+functions from ROM bytes with every project label stripped (only the five
+`VERIFIED-BOTH` RAM identities and the `0xBE000` maths helpers were left
+visible), then graded each blind answer against the label on record. Report:
+`docs/exploration/blind_audit/sample1/report.md`.
+
+| group | graded | agree | partly | **disagree** | blind unknown |
+|---|---|---|---|---|---|
+| named tables (definition XML, names hidden) | 29 | 7 | 20 | **0** | 2 |
+| `[TRACED]` function labels | 28 | 1 | 21 | **5** | 1 |
+| `[UNVERIFIED]` function labels | 18 | 0 | 13 | **3** | 2 |
+
+The blind reader never contradicted a definition-file table, so its
+disagreements are not noise. All eight were then decoded by hand with
+`scripts/sh2e_disasm.py` against rev 20.19c. Seven go against the label.
+
+### The seven, with bytes
+
+| address | label on record | what the bytes do |
+|---|---|---|
+| `0x045098` | `task02_knock_window` `[TRACED]` — "Knock window setup. KNOCK_FLAG+MAF, sets GBR, cal 0xD29E4/D2E60/D2E64" | Seven instructions. `04509A`–`04509C` load `0xFFFF6364` (IAT) into `fr5`; `0450A0`/`0450A4` load `[0xFFFF8210]` into `fr4`; `0450A2 jsr float_min` (`0xBE970`); `0450AC fmov.s fr0,@r6` stores back to `0xFFFF8210`; `0450AA rts`. **A running minimum of intake air temperature.** No KNOCK_FLAG, no MAF, no `ldc`, none of the three calibrations. |
+| `0x044DB0` | `task09_knock_det` `[UNVERIFIED]` — "Knock detection. KNOCK_FLAG+IAM+RPM, sets GBR" | `044DB4`–`044DB8` engine load (`0xFFFF63F8`) → `fr4`,`fr14`; `044DC8 jsr float_lag_filter` (`0xBEA40`) with coefficient `[0xD2E18]` = 0.03125 and previous value `[0xFFFF81F4]`; `044DD0` stores the filtered load to `0xFFFF81F4`; `044DD4 fsub fr8,fr14`, `044DD6` stores **load − filtered load** to `0xFFFF81F8`; `044DDC rts`. KNOCK_FLAG is first read at `0x044DE0`, which is the NEXT function. |
+| `0x00DD52` | `rtos_task1_fast_minimal` `[TRACED]` — "Body: JSR epilogue (0x35A4), RTS" | Not minimal. `00DD58 jsr rtos_task_gate` (r4=1); a loop `00DD6E`–`00DD9A` that enters a critical section, calls `0xF97C` on the object at `0xFFFF4520`, exits the critical section, and on a zero return calls through the pointer stored in that object (`00DD90`–`00DD92`); repeats while `byte[0xFFFF4572]` is non-zero; only then `00DDA0 jsr 0x35A4`. |
+| `0x00DE92` | `rtos_task4_minimal` `[TRACED]` — "Body: epilogue (0x35A4), RTS. Lowest-priority placeholder" | Same shape as `0x00DD52`, on the object at `0xFFFF455C` and flag `byte[0xFFFF457B]`, gate argument 4, dispatcher argument 3. Not a placeholder. |
+| `0x011880` | `atu_timer_capture_read` `[TRACED]` — "Reads ATU timer counter at FFFFF738 with overflow-bit handling" | A write. `011890 mov.w @r4,r2` / `011892 or r5,r2` (`0x7FFF`) / `011894 not r2,r2` isolates the inverse of bit 15; `011896`–`011898` keep bits 0–14; `01189A add`; `01189C mov.w r2,@r4` writes it back to `0xFFFFF738`, inside a critical section. **Toggles bit 15 of the word at `0xFFFFF738`.** Which peripheral register that is has NOT been checked. |
+| `0x00300E` | `injector_ic_trigger` `[UNVERIFIED]` — "Sets bit15 on external injector IC at 0xF00F00" | `003010`–`003018` OR `0x00008000` into the long at RAM `0xFFFF1290`; `00301A`–`00301E` call through the pointer stored at `0x3F2C`; `003022`–`00302E` AND it back out with `0xFFFF7FFF`. The four literals it loads are `0xFFFF1290`, `0x00008000`, `0x3F2C` and `0xFFFF7FFF`; `0xF00F00` sits in the shared pool nearby but this function does not load it. Sibling `0x002FEC` (`inj_final_hw_write`) does the same with bit 14 and the pointer at `0x3F28`. |
+| `0x009B2C` | `dt_float_correction` `[UNVERIFIED]` — "Dead time float correction … 3-branch interpolation from float tables at 0x9C14-0x9C28" | The "tables" are the constants **180.0, −60.0, 720.0, 660.0, −720.0**. `009B5E`–`009B68` compute (count × 180) ÷ period; `009B7A`–`009B9C` wrap the result by ±720. That is crank-angle arithmetic on a 720° cycle, not an injector dead-time correction. The purpose (the blind answer says event scheduling) is NOT verified; the dead-time reading is refuted. |
+
+`0x088BD2` (`diag_sensor_threshold_multi`) was only decoded for its first 60 of
+322 instructions: a chain of `uint16_unpack` calls on `0xFFFF2F88`, `2F90`,
+`2F98` … each tested for non-zero and branched to one exit, with no threshold
+compare in that span. Consistent with the blind answer, not settled.
+
+### What kind of error this is
+
+Not a decode error — every one of these addresses passes the verifier. Four of
+the seven are **boundary errors in the description**: the comment describes a
+larger body that starts at or after the next `rts`. `0x045098` ends at
+`0x0450AA` and a new prologue starts at `0x0450AE`; `0x044DB0` ends at
+`0x044DDC` and the knock-flag code begins at `0x044DE0`. The label landed on a
+short helper and kept the description of its neighbour.
+
+`[TRACED]` promised exactly what it delivered: the address was decoded. It
+never promised the name. This puts a first number on the gap: **5 of 28 sampled
+`[TRACED]` function labels (18%) and 3 of 18 `[UNVERIFIED]` ones (17%) were
+disputed, and 7 of those 8 were wrong on inspection.** Small samples.
+
+### What this does NOT establish
+
+- `0xFFFF8210` (`knock_window_state`) and `0xFFFF81F8` (`knock_thresh_config`)
+  are labelled as GBR workspace **bases**. This item shows what is stored at
+  offset 0 of each (min IAT; load − filtered load) and at `0xFFFF81F4`
+  (filtered load). It does not show the workspace names are wrong. Each has a
+  second writer that was not decoded: `0x04430E` for `0xFFFF8210`, and an
+  indexed store at `0x04435C` (base `0xFFFF8224`, offset −44) for `0xFFFF81F8`.
+- Nothing about RAM-variable labels in general, or the 614 code labels that do
+  not sit on a function entry. Neither was sampled.
+- Function bounds in the audit come from a heuristic (a run of stack pushes
+  marks an entry). All eight disputed functions were re-checked by hand; the
+  "partly agree" rows were not.
+
+### Still open
+
+Rename or re-describe the seven labels and add the old names to
+`RetireStaleLabels.java`; decode the rest of `0x088BD2`; identify the register
+at `0xFFFFF738`; find what reads `0xFFFF81F8` and `0xFFFF8210`.
+
+---
+
+## 97. Blind audit, all remaining function-entry labels: twelve more descriptions wrong, one dispute the label won — **2026-10-11**
+
+**Status: recorded. Labels NOT yet changed** (same hold as item 96).
+
+Continuation of item 96 over the other 123 `[TRACED]` labels that sit on a
+function entry. Report: `docs/exploration/blind_audit/report.md`. 117 graded:
+3 agree, 77 partly agree, **15 disagree**, 11 blind-unknown, 11 not comparable
+(the comment on record was too thin to test), 6 declined by the API.
+
+All 15 disputes were decoded by hand against rev 20.19c.
+
+### Label description wrong (12)
+
+| address | label on record | what the bytes do |
+|---|---|---|
+| `0x032958` | `fuel_correction_filter_init` — "Zeros 3 floats at FFFF770C" | `032966 fldi1 fr8`, then `03296C`/`032970`/`032972` store it to `0xFFFF7704`, `7708`, `770C`. **Sets them to 1.0, not 0**, and only when `check_cl_active` (`0x22F92`) returns 1. |
+| `0x000F4C` | `isr_dispatch_manager` — "identifies interrupt source, calls handler from isr_dispatch_table" | Calls `0xEE4`; if the result is non-zero doubles its argument (`000F60 shll r4`); `000F68 jmp` to `0xD78`. No table access in this body. |
+| `0x011848` | `descriptor_interpolation` — "1D interpolation. Allocs 224-byte workspace" | `0xE0` is the interrupt mask passed to `critical_section_enter`, not a size. Body stores a 16-bit value to a caller-supplied address twice (`01185E`, and again after `011860`) inside the critical section. No interpolation. |
+| `0x071D14` | `sensor_float_clamp_b` — "Float clamp B" | `071D20 jsr float_deadband_check` on `[0xFFFF69F0]` against 0; the result byte goes to `0xFFFF97CB`; when set, `uint8_add_sat` increments a counter at `0xFFFF97C9`, otherwise it is zeroed. A deadband debounce counter, not a clamp. |
+| `0x037ABA` | `injector_trim_application` — "Uses A/F learning tables" | Reads IAT (`0xFFFF6364`) and ECT (`0xFFFF6350`). If IAT < `[0xCC308]` (200.0) and ECT ≥ `[0xCC30C]` (−200.0) both go through `float_lag_filter` (coefficients `[0xCC304]`, `[0xCC310]`, both 0.0), else pass through raw. Stores them to `0xFFFF31A4` (IAT) and `0xFFFF31AC` (ECT), calls `0x37F00`, then `037B38`–`037B3C` write **1.0** to `0xFFFF7AB4`. No A/F learning table is read. |
+| `0x037F00` | `afl_multiplier_computation` (from item 96's sample, graded partly-agree) | Follows from the row above: computes (`[31AC]`×`[0xCC2FC]` + `[31A4]`×`[0xCC2F4]`) ÷ `[0xCC300]` → `0xFFFF7AB8`. Its inputs are the filtered ECT and IAT, so this is a **temperature blend**, and all three constants are 0.0 in this calibration. `afl_interp_primary` / `afl_interp_secondary` on `0xFFFF31AC` / `31A4` are therefore misnamed. |
+| `0x0627D8` | `vvt_error_feedback` — "PID function. Reads 4 descriptor tables … Writes FFFF920C-FFFF9228" | Thirteen instructions: one `table_lookup_2D` on `0xAF830`, result stored to `0xFFFF91FC`, returned multiplied by `[0xFFFF9210]`. The description belongs to a larger module. |
+| `0x0431B0` | `task45_timing_lu_b` — "RPM+MAF, cal 0xD2D10" | Loads RPM, **ECT and IAT** (`0431B6`–`0431C0`); no MAF or load literal in the function. Looks up `0xADFC0` (1-D) and `0xAE530` (2-D). Body past the first ten instructions was not read line by line. |
+| `0x0343CE` | `afc_output_clamp` — "Upper=200% (0xCC014), Lower=190% (0xCC018)" | `0343D6` loads the **accelerator pedal** (`0xFFFF64D8`); `0343E6`–`0343FA` set `byte[gbr+82]` when pedal ≥ `[0xCC014]` (200.0) and clear it when pedal < `[0xCC018]` (190.0). The two constants are hysteresis thresholds on an input, not clamp limits on an output. At 200/190 the flag cannot set on a 0–100 pedal. |
+| `0x00D118` | `clamp_filter` — "Clamp/filter function" | `irq_level_set(16)`, store `fr4` → `0xFFFF4498` and `fr5` → `0xFFFF449C`, `irq_level_restore`. An interrupt-masked store of a float pair. |
+| `0x066C40` | `task56_evap_test_sequence` — "EVAP active test sequence (state 1 or 2)" | While `0x21D9A` returns 2: `float_max` of `[0xFFFF653C]` into `0xFFFF9324` and `float_min` into `0xFFFF9328`. A running max/min of one signal. Nothing EVAP-specific in the body. |
+| `0x00A660` | `task10_knock_signal_read` — "Reads processed knock ADC values into per-cylinder knock state bytes" | An initialiser: `00A676`–`00A680` fill four bytes at `0xFFFF430D` with 7 and four at `0xFFFF4309` with 1; `00A686` zeroes `0xFFFF4311`. Reads nothing. |
+
+### Name defensible, comment wrong (1)
+
+`0x050DE2` `etb_target_compute_main` — "626B (largest). ECT + atm + throttle".
+The body at the label is a sequencer: eight `bsr` calls and a tail `bra` to
+`0x0517A0`, 20 instructions, no RAM access. The size and inputs describe its
+callees.
+
+### The label won (1)
+
+`0x00DF14` `rtos_task10_sensors`. The blind answer called it a one-shot startup
+initialiser. Its address is stored at `0x00402C`, in the same 0x30-stride table
+as `0x00DD52` (`0x003F9C`) and `0x00DE92` (`0x003FCC`), which supports the
+label's RTOS-task reading. **A dispute is not a verdict.**
+
+### Not settled (2)
+
+`0x00ADD6` `diagnostic_monitor_dispatch` (blind answer: peripheral init; turns
+on whether `0xFFFFED00`–`ED0A` are diagnostic timers or interrupt-priority
+registers — not checked against the SH7058 register map) and `0x045670`
+`task03_knock_thresh` (three `rts` inside the heuristic bounds, so more than
+one function was shown).
+
+### Totals for `[TRACED]` function-entry labels
+
+145 graded across items 96 and 97; 20 disputed; **16 confirmed wrong in the
+description (11%)**, 1 label upheld, 3 unsettled. The 98 "partly agree" rows
+were not re-checked and are not evidence either way.
+
+The dominant failure is still the one named in item 96: a description written
+for a module, attached to a short helper at its start.
+
+---
+
+## 98. Blind audit of tuning conclusions: `boost-control.md` and `knock.md` quote stock values and misname constants; the OL-trigger memory note has the wrong layout — **2026-10-11**
+
+**Status: recorded. The docs and memory notes named here have NOT been edited.**
+
+`scripts/mapping/claim_audit.py` took every memory note and subsystem-doc
+section citing two or more addresses (79), hid the text, and had each
+re-derived from an evidence pack built from bytes. A second pass compared
+statement by statement. Report: `docs/exploration/claim_audit/report.md`.
+
+| source | claims | graded | agree | partly | **disagree** | declined by API |
+|---|---|---|---|---|---|---|
+| memory notes | 28 | 21 | 14 | 3 | **4** | 7 |
+| doc sections | 51 | 30 | 17 | 7 | **6** | 21 |
+
+Statements: 301 supported, **26 contradicted**, 219 not addressed. All six
+disputed doc sections are in `boost-control.md` and `knock.md`. Nine of the ten
+disputed claims were checked by hand against stock and rev 20.19c; each has at
+least one real error.
+
+### Stock values written as if current
+
+| doc | address | doc says | stock | 20.19c | definition name |
+|---|---|---|---|---|---|
+| boost-control, PID terms | `0xC0BD4` | 210.0 | 210.0 | **620.58** | TD Activation Thresholds (Target Boost) |
+| boost-control, PID terms | `0xC0BDC` | 0.0 | 0.0 | **5.17** | TD Integral Negative Activation (Boost Error) |
+| boost-control, Safety | `0xC0BFC` | 0.2 | 0.2 | **0.5** | Boost Control Disable (IAM) |
+| boost-control, Safety | `0xC0BF8` | −1.0 | −1.0 | **−2.0** | Boost Control Disable (Fine Correction) |
+| knock, Key constants | `0xD2F48` | 0.35 | 0.35 | **0.25** | Fine Correction Advance Value |
+| knock, Key constants | `0xD2F4C` | −11.75 | −11.75 | **−15.0** | Fine Correction Retard Limit |
+| knock, Key constants | `0xD29EE` | 125 | 125 | **90** | Fine Correction Advance Delay |
+
+`0xC0BD4` and `0xC0BDC` have held their current values since at least 20.10.
+
+### Constants given the wrong identity
+
+- **`boost-control.md` PID terms lists three AXES as gains.** `0xC0D04`,
+  `0xC0D3C`, `0xC0D74` are the "Boost Error" axes of Turbo Dynamics
+  Proportional (`0xC0D28`), Integral Negative (`0xC0D60`) and Integral Positive
+  (`0xC0D98`) in the definition XML. The doc's −160 / −240 / 0.0 are each
+  table's first breakpoint. **There is no derivative term.** The same section
+  also gives `0xC0D74` as 0.5 ("IIR filter coefficient"); it reads 0.0 in every
+  rev.
+- **`knock.md` calls `0xD2F48` "FLKC retard step per knock event".** The
+  definition names it Fine Correction **Advance** Value. The retard step is
+  `0xD2F50` (Fine Correction Retard Value: 1.4 stock, 1.01 in 20.19c).
+
+### Structure wrong
+
+- **`project_ol_trigger_matrix` (memory).** The note puts five per-gear pairs at
+  `0xCC180`–`0xCC190` on a 4-byte stride. The bytes are ten floats,
+  `0xCC180`–`0xCC1A4`, in five (lower, upper) pairs **8 bytes apart**: stock
+  (5300, 5400) (4300, 4400) (4200, 4300) (4100, 4200) (3700, 3800); 20.19c
+  (3400, 3500) five times. So `0xCC184` is the first pair's upper value, not
+  "2nd gear", and two of the five pairs lie outside the range the note gives.
+  The definition names the block CL Delay Maximum Engine Speed (Per Gear).
+  Which pair is which gear was not decoded.
+- **`boost-control.md` Enable hysteresis.** Doc: "enables when load > 4.0,
+  disables when ≤ 5.0". At `0x05488C`–`0x0548A6` the flag `byte[gbr+128]` is
+  **set when the value is ≤ `[0xD6720]` (4.0) and cleared when it is >
+  `[0xD6724]` (5.0)**. The direction is the reverse of the doc. Whether a set
+  flag means enabled or inhibited was not decoded.
+- **`project_overrun_fuelcut_tier_system` (memory).** `0xCBCC0` does hold the
+  uint16 values 38, 38, 38, 6 (then 6, 6). But at `0x03B090`–`0x03B098` the
+  first is read alone and **compared against a counter**; only if that passes
+  is a per-tier value fetched through the pointer table at `0x063BB0`, whose
+  entries are `0xCBCC2`, `0xCBCC4`, `0xCBCC6`. The per-tier values on that path
+  are therefore offset by one from "[38, 38, 38, 6], one per tier". Only this
+  fragment was decoded; the note needs a proper trace before it is rewritten.
+- **`project_gear_determination` (memory).** The threshold set is selected by
+  `byte[0xFFFF5F03]` and `byte[0xFFFF5FB8]` (`0x023EC6`–`0x023EFE`), not
+  `FFFF5E93`/`FFFF5F03`. No consequence: the three sets are identical.
+- **`knock.md` Pipeline.** The doc places `0x43D68`, `0x45BFE`, `0x463BA` in an
+  event-driven chain and calls `0x45BFE` the per-event retard path. Their
+  addresses are stored together with `0x4438C` in one pointer list
+  (`0x04AD6C`–`0x04ADA4`), and the code around `0x45BFE` loads `0xFFFF3234`,
+  the IAM. Consistent with the blind answer (IAM learning, called from a list);
+  **not fully decoded**.
+- **`project_undefined_rom_programme` (memory)** lists `0xABC1C` as a scanner
+  artefact. It is loaded by code at `0x0783DC`, so it is a real descriptor read
+  by a different helper; only its float decode is meaningless.
+
+Not checked: `knock.md` Sign convention (`0x73600`), and the uses of `0xD2F40`,
+`0xD2F54`, `0xD2F58` in Key constants.
+
+### What this says
+
+1. **The subsystem docs are older than the rule that the definition XMLs are
+   ground truth, and it shows.** Every identity error above is contradicted by a
+   name the definition file already had.
+2. **"address = value" in a doc is checkable for free.** Seven of the 26
+   contradictions are a doc quoting the stock ROM. No model is needed to catch
+   those, only a script that reads each cited address in the current bin.
+3. **The memory notes held up better** (14 of 21 clean, one significant error)
+   than `boost-control.md` and `knock.md` (6 of the 9 graded sections disputed).
+   `injector-rescale.md`, `rev-limit-patch.md`, `cruise-tables.md` and
+   `pedal-throttle.md` came back with no contradiction.
+
+### Limits
+
+28 of 79 claims were declined by the API's safety filter and are unaudited,
+including the FFB transient clamp, the knock-flag channel, cruise/non-cruise and
+four of `transient-fuel.md`'s sections. 219 statements were not addressed. The
+evidence pack follows direct literal references only. These rates are a floor.
+
+---
+
+## 99. `0x054852` ("task51_boost_wg_calc") reads no boost calibration and gates on vehicle speed; FLKC advance is positive — **2026-10-11**
+
+**Status: `boost-control.md` and `knock.md` rewritten to match (Task 1 of
+`docs/exploration/HANDOFF_2026-10-11.md`). Labels NOT changed.** Found while
+decoding the two sections item 98 left "decode before rewriting". Rev 20.19c.
+
+### `0x054852` is not shown to be boost control
+
+Every boost calibration in the definition XML has exactly **one** literal-pool
+reference in the image, and none is in `0x054852`:
+
+```
+0xC0BF8 Boost Control Disable (Fine Correction)  pool 0x013AB0
+0xC0BFC Boost Control Disable (IAM)              pool 0x013AC4   (0xFFFF3234 IAM at 0x013AC0)
+0xC0BD4 TD Activation Thresholds (Target Boost)  pool 0x013D18
+0xC0D28 / 0xC0D60 / 0xC0D98  Turbo Dynamics P / I- / I+   descriptors 0x0AA91C / 0AA930 / 0AA944
+0xC1340 Target Boost                             descriptor 0x0AA9FC
+```
+
+`0x054852`'s pool (`0x054AA0`–`0x054AFC`) holds instead `0xD670C`–`0xD6724`,
+`0xD6185` and descriptors `0xAEFE4`/`0xAEFF0`/`0xAEFFC` — none with a
+definition entry — plus RAM `0xFFFF65FC`, `0xFFFF6624`, `0xFFFF6640`,
+`0xFFFF6644`, `0xFFFF65C0` (diag precondition, item 16) and `0xFFFF64F5`
+(debounced closed pedal, item 76) — either set drives the output down at
+`[0xD6714]` = 1.0 per call.
+
+The "enable hysteresis" (`0x05488C`–`0x0548A6`) compares **`[0xFFFF65FC]`,
+vehicle speed** (item 8), not load:
+
+```
+05488C mov.l @(0x054AC4),r6 ; fmov.s @r6,fr9   ; fr9 = [0xD6720] = 4.0
+054890 fcmp/gt fr9,fr8                           ; T = speed > 4.0
+054892 bt/s 0x05489C
+054896 mov #1,r0 / 05489A mov.b r0,@(128,gbr)    ; speed <= 4.0 -> flag = 1
+05489C ... [0xD6724] = 5.0 ; fcmp/gt ; bf          ; speed > 5.0 -> flag = 0
+```
+
+With the flag at 0 the output `[0xFFFF8B5C]` decays by `[0xD6710]` = 0.01 per
+call to 0 (`0x05495E`, `float_max` `0xBE960`); with it set (and counter
+`byte[gbr+124]` ≥ `byte[0xD6185]` = 8) the function does RPM lookups and lets
+the output fall at most `[0xD670C]` = 0.005 per call. So set = active.
+
+A function active only at ≤ 4 km/h, reading no boost calibration, is not
+plausibly the wastegate loop. **What it is, is NOT established**; the
+`task51_boost_*`/`task52_boost_*` names, the GBR base `0xFFFF8B50`
+(`boost_gbr_base`) and the RAM names under it (`boost_enable_flag`,
+`boost_wg_duty_final`, …) are all now unsupported. Not renamed.
+
+### FLKC working sign is positive = advance
+
+`knock.md` said "positive = retard". In `flkc_paths_FG` (`0x0463BA`) the
+branch gated by Fine Correction Advance Delay (`0xD29EE`, `0x04648E`) **adds**
+Fine Correction Advance Value (`0xD2F48`, +0.25) at `0x0464B2`, then clamps to
+[`0xD2F4C` −15.0, `0xD2F44` +8.0] via `0xBE56C`. Advance is positive.
+
+`0xD2F40` (100.0) is compared with `[0xFFFF8258]` at `0x04649C`–`0x0464A2`
+and picks between two branches that **both** add the advance value — it is not
+a retard gate. `0xD2F54`/`0xD2F58` (0.35) are stored to `[0xFFFF8290]`
+(`0x046520`–`0x046532`), chosen by `byte[gbr+17]`; their consumer was not
+checked, so "recovery rate" is withdrawn without replacement.
+
+### Item 98's pipeline evidence, narrowed
+
+The pointer list at `0x04AD6C`–`0x04ADA4` is confirmed (15 entries, including
+`0x4438C`, `0x43D68`, `0x45BFE`, `0x463BA`). "Code around `0x45BFE` loads
+`0xFFFF3234`" is loose: there is no such load in `0x045BFE`–`0x045D00`; the
+nearby loads are at `0x045BA4`, `0x045BBC` (list entries `0x45B44`/`0x45BBC`)
+and `0x045D50`.
+
+### Not checked
+
+What `0x054852` is; what reads `0xFFFF8B5C`; the code at `0x013AB0`–`0x013D18`
+that really reads the boost-disable and TD constants; the `0x73600` commit
+function; `0xD2F50`'s arithmetic; the consumer of `[0xFFFF8290]`.
+

@@ -5,6 +5,11 @@ Captured 2026-05-04. Full disassembly is in
 shorter summary in `knock_flkc_report.txt` (605 lines). This page is
 the navigation layer + tuning-relevant summary.
 
+**Values on this page** were re-read on 2026-10-11 from **rev 20.19c**
+(`rom/AE5L600L 20g rev 20.19c.bin`, the rev on the car, md5 `92cae827…`)
+through `scripts/defs.py`, with stock alongside where it differs. Corrections
+items 98 and 99.
+
 ## Pipeline
 
 Event-driven, executes on every 4th cylinder firing event (cylinders
@@ -32,19 +37,38 @@ flkc_paths_FG (0x463BA)        — SLOW: sustained knock state machine
 A separate task (`task11_knock_flag_read @ 0x4438C`) reads the knock
 flag from a different path.
 
+> **Disputed 2026-10-11 — not settled (corrections item 98).** The addresses
+> of `0x4438C`, `0x43D68`, `0x45BFE` and `0x463BA` are stored together in one
+> 15-entry pointer list at `0x04AD6C`–`0x04ADA4`, which reads more like "called
+> from a list" than the event-driven chain drawn above. `0xFFFF3234` (IAM) is
+> loaded at `0x045BA4`, `0x045BBC` and `0x045D50`, and by `0x0463BA` itself at
+> `0x0463D0`. Calling `0x45BFE` the per-event retard path is unverified.
+> Decode before relying on the ordering.
+
 ## Key constants
 
-From `0x000D2F40`–`0x000D2F58`:
+All eight are read by `flkc_paths_FG` (`0x0463BA`, GBR `0xFFFF8290`), in
+its advance branch `0x04648E`–`0x046532` and retard branches from `0x04669C`.
+Rev 20.19c.
 
-| Address | Value | Meaning |
-|---|---|---|
-| 0x000D2F40 | 100.0f | FLKC gate — knock_metric must be ≤ this for retard to apply |
-| 0x000D2F44 | 8.0f | FLKC upper clamp (max recovery advance cap) |
-| 0x000D2F48 | 0.35f | **FLKC retard step per knock event (deg)** |
-| 0x000D2F4C | −11.75f | **FLKC lower clamp = max retard (deg)** |
-| 0x000D2F54 | 0.35f | FLKC recovery rate (deg/cycle, path 1) |
-| 0x000D2F58 | 0.35f | FLKC recovery rate (deg/cycle, path 2) |
-| 0x000D29EE | 125 | FLKC counter threshold — cycles without knock before recovery begins |
+| Address | 20.19c | Stock | Definition name | What the code does with it |
+|---|---|---|---|---|
+| `0xD29EE` | **90** | 125 | Fine Correction Advance Delay | the advance branch runs only when counter `word[gbr+4]` ≥ this; otherwise it branches to `0x04679A` (`0x04648E`–`0x046498`) |
+| `0xD2F48` | **0.25** | 0.35 | Fine Correction **Advance** Value | **added** to the cell value (`0x0464AE`–`0x0464B2`, `0x046534`–`0x046538`), then `float_min` against a ceiling computed at `0x0463FC`–`0x046400` from IAM and `[0xFFFF8258]` |
+| `0xD2F44` | 8.0 | 8.0 | Fine Correction Advance Limit | upper bound of `float_clamp_range` (`0xBE56C`) after each step |
+| `0xD2F4C` | **−15.0** | −11.75 | Fine Correction Retard Limit | lower bound of the same clamp |
+| `0xD2F50` | **−1.01** | −1.40 | Fine Correction Retard Value (stored +1.01, scaling `-x`) | loaded at `0x04669C` and `0x04673A`, followed by the same clamp. Arithmetic not decoded |
+| `0xD2F40` | 100.0 | 100.0 | — (no definition) | compared with `[0xFFFF8258]` at `0x04649C`–`0x0464A2`; selects between two branches that **both** add the advance value. Not a retard gate |
+| `0xD2F54` | 0.35 | 0.35 | — (no definition) | stored to `[0xFFFF8290]` (this function's GBR base) when `byte[gbr+17]` ≠ 1 (`0x04652A`–`0x046532`) |
+| `0xD2F58` | 0.35 | 0.35 | — (no definition) | stored to the same place when `byte[gbr+17]` == 1 (`0x046520`–`0x046528`) |
+
+The earlier version called `0xD2F48` the retard step per knock event; the
+retard step is `0xD2F50`. It called `0xD2F40` a gate on retard and
+`0xD2F54`/`0xD2F58` recovery rates; neither holds as written. What reads
+`[0xFFFF8290]` was **not checked**, so no replacement meaning is given for
+`0xD2F54`/`0xD2F58`. `0xFFFF8258` carries three conflicting labels in
+`ImportAE5L600L.java` (`flkc_fg_limit_FR15`, `flkc_retard`,
+`knock_metric_accum`); its identity is not settled.
 
 Knock-intensity thresholds (input to level code 0/2/4/5/6/7):
 
@@ -68,10 +92,15 @@ detection enters the high-RPM gated path.
 
 ## Sign convention
 
-Internal FLKC working values: **positive = retard**, range
-[−11.75, +8.0] deg. RomRaider displays FLKC as negative — there's a
-commit function around 0x73600 that maps the working register to
-the viewable `0xFFFF93E0` (FLKC) and `0xFFFF93DC` (FBKC).
+Internal FLKC working values: **positive = advance, negative = retard**,
+clamped to [`0xD2F4C`, `0xD2F44`] = **[−15.0, +8.0]** deg on 20.19c (stock
+[−11.75, +8.0]). Evidence: the advance branch **adds** +`0xD2F48` at
+`0x0464B2` before the clamp, and the definition names the +8.0 bound the
+Advance Limit. This reverses the earlier "positive = retard".
+
+Not checked: the claim that a commit function around `0x73600` maps the
+working value to `0xFFFF93E0` (FLKC) and `0xFFFF93DC` (FBKC), and any sign
+flip it applies (corrections item 98).
 
 In log column terms (see [logs.md](logs.md)):
 
@@ -154,10 +183,14 @@ The boost control system reads IAM and fine knock correction and
 backs off the wastegate when they go bad. See
 [boost-control.md](boost-control.md):
 
-- `BoostControlDisable_IAM` (0xC0BFC) = 0.2 — disable boost control
-  if IAM < 0.2.
-- `BoostControlDisable_FineCorrection` (0xC0BF8) = −1.0 — disable if
-  fine knock corr < −1.0.
+- Boost Control Disable (IAM) (`0xC0BFC`) = **0.50, 0.65** on 20.19c
+  (stock 0.20, 0.65) — per the definition, disable below the first,
+  re-enable at the second.
+- Boost Control Disable (Fine Correction) (`0xC0BF8`) = **−2.0** on 20.19c
+  (stock −1.0).
+
+Both conditions plus the delay `0xC0BAD` must hold, per the definition's
+description; the reading code (near `0x013AB0`) is not traced.
 
 So sustained knock cuts boost as a side effect; you don't see this
 directly in the knock pipeline but it's the safety interaction.
@@ -177,8 +210,12 @@ Documented in `knock_flkc_report.txt`, kept here for context:
 - `knock_metric @ 0xFFFF8258` — cumulative knock signal used as the
   exponential weight in `flkc_paths_FG`. Computed elsewhere; not yet
   fully traced.
-- `0xFFFF93E0` (FLKC displayed by RomRaider) sign convention vs the
-  internal positive-is-retard working values — likely inverted/scaled
-  in the commit function around 0x73600.
-- IAM (`0xFFFF9270`) is not directly referenced in these paths. IAM is
-  likely updated separately based on cumulative FLKC state.
+- `0xFFFF93E0` (FLKC displayed by RomRaider) vs the internal working
+  values (positive = advance, see Sign convention) — the commit function
+  around 0x73600 is not checked.
+- IAM is `0xFFFF3234` (corrections item 81), not `0xFFFF9270`, and it IS
+  read in these paths: `flkc_paths_FG` loads it at `0x0463D0` (pool
+  `0x0465B0`), and four more literals for it sit in `0x43D00`–`0x46800`
+  (`0x44F70`, `0x45AC4`, `0x45D94`, `0x46060`). `0xFFFF9270` has no literal
+  reference anywhere in the image. Where IAM is **written** was not
+  checked (rev 20.19c, 2026-10-11).

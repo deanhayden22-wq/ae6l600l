@@ -1,0 +1,624 @@
+{
+ "answers": {
+  "mem-project_clol_function_identities": {
+   "mechanism": "Function 0x036070 computes the open-loop (CL\u2192OL) fuel enrichment target and ramps the commanded value toward it. GBR is set to 0xFFFF798C and r12 to 0xFFFF79F0. (1) Gate: the words at gbr+54 (0xFFFF79C2) and gbr+56 (0xFFFF79C4) are compared unsigned. If 79C2 < 79C4, both table results are forced to 0. Otherwise two 1D lookups run through table_lookup_1D. The first, \"CL to OL Enrichment Threshold (MAF)\" (descriptor 0xAC5D0), is indexed by [0xFFFF62DC], and its axis is defined as Throttle Plate Opening Angle. The second, \"Minimum Primary Open Loop Enrichment (Accelerator)\" (descriptor 0xAC5E4), is indexed by [0xFFFF64D8], whose axis is Accelerator Pedal Angle. The results are stored at 0xFFFF7998 and 0xFFFF799C. (2) If the gate passes, a primary OL fueling value is built from 2D maps indexed by rpm (0xFFFF6624) and load (0xFFFF63F8). The maps are the KCA alternate / additive B low/high / failsafe variants, selected by the flags 0xD299B and 0xCBBF2 and by an IAM-like value [0xFFFF3234] against the 'Fuel Map Switch (IAM)' constant. Blends use (1-x) weights. If the result is below 'Minimum Active Primary OL Enrichment' (0xCC170) it is zeroed, and it is stored at 0xFFFF7994. (3) The target is float_max(float_max(OL map, throttle-based enrichment), pedal-based enrichment). (4) float_deadband_check (eps = float at 0x0362EC, 0x38000000 \u2248 3.05e-5) gives an 'enrichment active' flag, which is saved at gbr+102 (0xFFFF79F2) as the next cycle's previous state. A second deadband check compares the previous target 0xFFFF7990 with the previous output 0xFFFF798C. The ramp step comes from \"AFL Ramp Rate (CL to OL Transition Speed)\" looked up by rpm and stored at 0xFFFF79E0. (5) The mode byte at gbr+58 (0xFFFF79C6) selects how the output is set. Mode 1: output 0xFFFF798C = [0xFFFF79B8]. Mode 2: output = [0xFFFF79BC] + [0xFFFF7994]*[0xFFFF79A0]. Otherwise the target is target\u00d7[0xFFFF79A0], stored at 0xFFFF7990. The ramp path (newly active, or output not yet equal to target) sets output = float_min(prev_output + ramp_step, target), at 0x036262/0x036264, so the ramp only rises. Otherwise output = target directly (0x0362F8). Inputs: rpm, load, throttle angle, pedal angle, IAM-like value, flags. Output: the ramped OL enrichment at 0xFFFF798C. The other listed functions only use float_min/float_max as generic clamp helpers, or read 0xFFFF62DC and 0xFFFF64D8 as throttle and pedal inputs.",
+   "addresses": [
+    {
+     "address": "0x0CCDA0",
+     "role": "Data of the 1D table 'CL to OL Enrichment Threshold (MAF)', indexed by throttle angle. Gives an enrichment floor that feeds the max() target.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0AC5D0",
+     "role": "Descriptor passed in r4 to table_lookup_1D at 0x0360BE/0x0360C4. The input is fr4 = [0xFFFF62DC] and the result goes to 0xFFFF7998.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CCD88",
+     "role": "X axis (Throttle Plate Opening Angle) of the threshold table: 10.935\u202689.06.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CCDC0",
+     "role": "Data of the 1D table 'Minimum Primary Open Loop Enrichment (Accelerator)', indexed by pedal angle. Gives an enrichment floor in the max() target.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0AC5E4",
+     "role": "Descriptor passed at 0x0360CA/0x0360CE. The input is fr4 = [0xFFFF64D8] and the result goes to 0xFFFF799C.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CCDA8",
+     "role": "X axis (Accelerator Pedal Angle 0..100) of the pedal table.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF62DC",
+     "role": "Throttle plate opening angle, a float input to the threshold table. Its meaning comes from the table's axis name. 0x01F4E6 also reads it (via r12-112) and outputs throttle minus a reference, floored at 0. It is also used there as a GBR base for nearby flags.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF64D8",
+     "role": "Accelerator pedal angle, a float input to the pedal table. Its meaning comes from the table's axis name. Elsewhere it is clamped by float_min (0x014E74 \u2192 0xFFFF5DAC) and compared in a hysteresis flag (0x01219A).",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF798C",
+     "role": "GBR base of the OL-enrichment state block and the final ramped OL enrichment output (gbr/r12-100). Written by mode 1, mode 2, the ramp path and the direct path.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF79C6",
+     "role": "Mode/state byte (gbr+58) read into r14. Value 1 = copy 0xFFFF79B8, 2 = base+OL\u00d7factor, other = normal target/ramp logic. Who writes it is not shown.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0BE960",
+     "role": "float_max helper, returns the larger of fr4/fr5. Combines OL map, throttle floor and pedal floor here; used as a generic lower clamp elsewhere.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0BE970",
+     "role": "float_min helper. Limits the ramped output to the target (0x036264); used as a generic upper clamp elsewhere.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0BE96A",
+     "role": "Inside the float_max helper body: 0xF65C decodes as fmov fr5,fr6. This is helper code, not a calibration value.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x0BE96C",
+     "role": "Inside the float_max helper: 0x000B = rts. Code, not calibration.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x0360BE",
+     "role": "Start of the gated lookup path, taken when [0xFFFF79C2] >= [0xFFFF79C4] unsigned. Loads the threshold descriptor.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0360C4",
+     "role": "jsr table_lookup_1D for the throttle threshold table.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0360CA",
+     "role": "Loads the pedal minimum-enrichment descriptor.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0360CE",
+     "role": "jsr table_lookup_1D for the pedal table (delay slot fmov fr15,fr4 = pedal).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x036262",
+     "role": "Ramp step: prev output [0xFFFF798C] + ramp rate [0xFFFF79E0], then float_min against the target 0xFFFF7990.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0362F8",
+     "role": "Non-ramp path: target\u00d7[0xFFFF79A0] is written straight to the target 0xFFFF7990 and the output 0xFFFF798C.",
+     "evidence_class": "observed"
+    }
+   ],
+   "inert_or_gated": "The pedal table 0x0CCDC0 is all 0 (0,0,0,0,0,0). Its floor in max() is inert, since the OL value is already \u22650 after the minimum-active check. The throttle threshold table is 0 up to 70 deg and 0.10938 from 73.435 deg, so it only contributes at near-wide-open throttle. Both lookups are skipped and forced to 0 when [0xFFFF79C2] < [0xFFFF79C4]. With the same gate failing, the OL map value is also set to 0 (branch to 0x0361BA). OL map results below 'Minimum Active Primary OL Enrichment' (0xCC170, value not shown) are zeroed. The ramp uses min(), so only increasing transitions are rate-limited.",
+   "evidence": [
+    "0x03607C/0x03607E: GBR=0xFFFF798C; mov.w @(54,gbr)/@(56,gbr) + cmp/hs gate at 0x0360AE and again at 0x0360E2",
+    "0x036094-0x036096 fr4=[0xFFFF62DC] \u2192 lookup with descriptor 0xAC5D0 at 0x0360C4; result fr14 \u2192 @(-88,r12)=0xFFFF7998",
+    "0x036098 fr15=[0xFFFF64D8]; 0x0360CE lookup 0xAC5E4 with fr4=fr15; result \u2192 0xFFFF799C",
+    "0x0361B2-0x0361BE: OL value zeroed if below 0xCC170, stored at 0xFFFF7994",
+    "0x0361C0-0x0361D6: two float_max calls \u2192 fr15 = max(OL, throttle floor, pedal floor)",
+    "0x0361DC: eps = 0x38000000 from 0x0362EC; deadband flag stored at sp+32, later written to gbr+102 at 0x03630C",
+    "0x036204-0x03620E: AFL Ramp Rate table (0xAD090) looked up by rpm \u2192 0xFFFF79E0",
+    "0x0361EC mov.b @(58,gbr) \u2192 r14; cmp/eq #1 / #2 select alternate outputs",
+    "0x036262-0x036270: output = float_min(prev+step, target)",
+    "0x01F4E6: fr14=@(-112,0xFFFF634C)=[0xFFFF62DC]; float_max(fr14-[0xFFFF8798],0) \u2192 0xFFFF62F8"
+   ],
+   "not_shown": "The pack does not show the following. Who writes 0xFFFF79C2/79C4/79C6, 0xFFFF79A0, 0xFFFF79B8 or 0xFFFF79BC, and what they physically are (the gate is perhaps a counter/timer vs a threshold; 79A0 is a multiplier). The value of the Minimum Active Primary OL Enrichment constant and the flag bytes 0xD299B and 0xCBBF2, so which OL map branch is active is unknown. What 0xFFFF8200 (blend factor) and 0xFFFF7F6C (timing-comp input) are. Who consumes the output 0xFFFF798C. The exact semantics of float_deadband_check's return value. Why the definition names the throttle-indexed table 'MAF'."
+  },
+  "doc-rev-limit-patch-02": {
+   "mechanism": "This is the fuel-cut rev limiter with hysteresis, and a ROM patch has been hooked into it. Function 0x03B66C reads rpm_current (0xFFFF6624) into fr15, a float at 0xFFFF65FC into fr14 and a float at 0xFFFF620C into fr12. It also reads mode bytes 0xFFFF65C0 and 0xFFFF5E95, the latter compared with 5 and 7. float_deadband_check is called with fr4 = value of 0xFFFF65FC, fr5 = 0.0 and fr6 = 1.0, and its result picks one of two paths. Both paths do `mov.l <pool>,r0 ; jmp @r0`. The jump target is 0x000F1000 in both cases. In the delay slot r2 is loaded with a pointer to a threshold: path one gets 0x0CC504 \"Rev Limit Off\" (6680 rpm) and path two gets 0x0CC508 \"Rev Limit On (2)\". So the stock on/off threshold loads have been replaced by a jump into code at 0x0F1000, which is in normally empty high ROM. That code presumably loads fr8 (on threshold) and fr6 (off threshold), possibly overriding them, and returns. After the hook the stock logic resumes at 0x03B6C0. If rpm >= fr8, 0xFFFF7CB8[1] is set to 1; if rpm < fr6 it is cleared. The same hysteresis drives 0xFFFF7CB8[2] from \"Rev Limit On (3)\" (0x0CC510) and \"Rev Limit Off (3)\" (0x0CC514). Mode conditions then select either state [1] or state [2]: byte @r15 = 0, plus 0xFFFF65C0 == 1 or call result == 2, plus 0xFFFF5E95 == 5/7 or another result == 2. If the selected state is 1, the cut flag 0xFFFF7CB8[0] is set. Otherwise [0] is cleared only when 0xFFFF620C drops below \"Rev Limit Fuel Resume (Boost)\" (0x0CC518). Getter 0x03B76E returns ([0] == 1). Function 0x03B74A clears [0], [1] and [2] when 0x22F92 returns 1. A separate function at 0x016102 compares rpm against \"Rev Limit Off\" directly. It writes flag 0xFFFF5D85 = 1 only when rpm < Rev Limit Off, two call results are both 0, and byte 0xFFFF6155 = 0. Otherwise it writes 0.",
+   "addresses": [
+    {
+     "address": "0x0F1000",
+     "role": "Not calibration data: this is the entry point of injected patch code. Function 0x03B66C transfers control here unconditionally (jmp @r0 on both branches), with r2 pointing at the Rev Limit Off or Rev Limit On (2) threshold. The bytes 0xD00D decode as `mov.l @(disp,pc),r0`, which is consistent with code. Presumably it loads or overrides the rev-limit thresholds fr8/fr6 and returns into 0x03B6B4/0x03B6C0. This is likely an aftermarket per-gear, launch-control or flat-foot-shift rev limit patch.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x03B79C",
+     "role": "Literal-pool word inside 0x03B66C, not executable code. It holds 0x000F1000 and is loaded into r0 at 0x03B6AE as the hook jump target. Its disassembly as mac.l is spurious.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x03B7A0",
+     "role": "Literal-pool word holding 0x000CC504, the address of Rev Limit Off. It is loaded into r2 in the delay slot of the jmp to 0x0F1000 at 0x03B6B2. Its disassembly as mov.b is spurious.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CC504",
+     "role": "Rev Limit Off threshold, float 6680 rpm. In 0x03B66C it is passed by pointer (r2) to the patch code on the float_deadband_check-true path. The stock instruction left after the jmp (fmov.s @r2,fr6) shows it would become fr6, the release threshold: rpm < fr6 clears state [1]. In 0x016102 it is compared directly: flag 0xFFFF5D85 is set only if 6680 > rpm_current, plus the other conditions.",
+     "evidence_class": "observed"
+    }
+   ],
+   "inert_or_gated": "The stock threshold loads in 0x03B66C are bypassed. Both branches jmp to 0x0F1000 before the original `bra 0x03B6C0 / fmov.s @r2,fr6` sequence at 0x03B6B4-0x03B6BE can run inline, so whether the definition values (Rev Limit Off = 6680) are actually used there depends on the patch code. The whole limiter state is force-cleared to 0 by 0x03B74A when 0x22F92 returns 1. Flag 0xFFFF5D85 is gated off by byte 0xFFFF6155 != 0 or by either call result being nonzero. No zero multipliers were seen.",
+   "evidence": [
+    "0x03B6AE: mov.l @(0x03B79C),r0 = 0x000F1000; 0x03B6B0 jmp @r0; delay slot 0x03B6B2 mov.l @(0x03B7A0),r2 = 0x000CC504 Rev Limit Off",
+    "0x03B6B8-0x03B6BC: same jmp to 0x000F1000 with r2 = 0x0CC508 Rev Limit On (2)",
+    "0x03B6C0-0x03B6D4: fcmp/gt fr15(rpm),fr8 -> set 0xFFFF7CB8[1]=1 if rpm>=fr8; fcmp/gt fr15,fr6 -> clear if rpm<fr6 (hysteresis)",
+    "0x03B6D6-0x03B6F2: identical hysteresis on 0xFFFF7CB8[2] using 0x0CC510 and 0x0CC514",
+    "0x03B72C-0x03B736: [0] cleared only when 0xFFFF620C < Rev Limit Fuel Resume (Boost) at 0x0CC518",
+    "0x03B76E: getter returns 0xFFFF7CB8[0]==1",
+    "0x016126-0x016140: fr9=Rev Limit Off(6680); fcmp/gt fr8(rpm),fr9; result written to 0xFFFF5D85",
+    "0x0F1000 uint16 = 0xD00D decodes as an SH mov.l PC-relative load, i.e. code"
+   ],
+   "not_shown": "The contents and behaviour of the patch code at 0x0F1000 are not shown: what it loads into fr8/fr6, where it returns, and what extra inputs it uses. Also not shown: what 0xFFFF65FC, 0xFFFF620C (probably boost or manifold pressure), 0xFFFF65C0 and 0xFFFF5E95 represent; the semantics of float_deadband_check and of calls 0x22CF4, 0x299AC, 0x299BC, 0x22F92, 0x58524 and 0x2B220; the values of the other thresholds; and how flags 0xFFFF7CB8[0] and 0xFFFF5D85 are consumed (presumably fuel cut and a related status)."
+  },
+  "mem-project_overrun_fuelcut_tier_system": {
+   "mechanism": "The two listings at 0x03AF94 are the same function, found twice by the bounds heuristic. It builds an overrun fuel-cut delay schedule. It runs only when GBR+30 (0xFFFF7C9E) is 0 (GBR = 0xFFFF7C80).\n\nIf flag 0xFFFF65C0 == 1, the base count comes from 0x0CBC9E and the stage-2/3 counts (GBR+14, GBR+16) are zeroed. Otherwise rpm_current is binned against three float thresholds: bin 0 if rpm < 2250 (0x0CC4EC), bin 1 if rpm < 3000 (0x0CC4F0), bin 2 if rpm < 4500 (0x0CC4F4), bin 3 at 4500 and above.\n\nThe bin (\u00d74) indexes pointer tables in ROM at 0x63B70\u20130x63D40. The pointers lead to uint16 calibration values loaded into r4 (later GBR+12), GBR+14 and GBR+16. Which pointer-table family is used depends on three things:\n- whether byte 0xFFFF5DB8 is zero (two families);\n- a special case: the result of call 0x22CF4 is 0 and word 0xFFFF5E74 >= 38 (uint16 at 0x0CBCC0);\n- otherwise the selector byte 0xFFFF6810 = 1, 2, 3 or 4/5, each with its own table.\n\nIf 0xFFFF8E46 == 1, the base count gets a minimum floor from 0x0CBC92. If 0xFFFF6155 == 1 and 0xFFFF615F == 0, extra offsets from 0x0C2220\u20130x0C2226 go into GBR+4..10 and GBR+27 is set to 1; otherwise those offsets are zeroed and GBR+27 cleared.\n\nThe final block converts the counts with fmac_interp_uint16 and forms cumulative thresholds with saturating adds:\n- GBR+18 = max(GBR+12, GBR+0) + GBR+4;\n- GBR+20 = that max + GBR+14 + GBR+6;\n- GBR+22 = that max + GBR+14 + GBR+16 + GBR+8;\n- GBR+24 = the same running sum + GBR+10.\nThese are staged cut-counter targets. A counter at GBR+42 is compared with GBR+18; when it has reached it, flag GBR+28 is cleared. GBR+0/GBR+28 are loaded from 0x0CBD92 only when: GBR+30 == 1, GBR+42 < GBR+18, 0xFFFF65FC >= the float at 0x0CC4F8, ECT >= the float at 0x0CC4FC, the 0x22CF4 result == 1, and 0xFFFF7EED == 1.\n\nSeparately, function 0x03ABA2 looks up the 'Overrun Fueling RPM Resume Threshold' 1-D table against ECT (fr12). It adds 0xFFFF895C and a sum of conditional float adders (held at 0xFFFF7C7C) and stores the result at 0xFFFF7C78 as the resume RPM. That value is compared with rpm_current (resume > rpm) to select a value written to 0xFFFF7C70. 0xFFFF7C6C = 0xFFFF7C70 + 0xFFFF7C74.",
+   "addresses": [
+    {
+     "address": "0x0CC4EC",
+     "role": "Float rpm threshold 2250: the bin 0/1 boundary of the cut-counter RPM bin. rpm < 2250 gives bin 0.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x03AFF6",
+     "role": "Instruction that loads the 2250 threshold pointer; start of the RPM binning code in the cut-counter function.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CC4F0",
+     "role": "Float rpm threshold 3000: the bin 1/2 boundary (2250 <= rpm < 3000 gives bin 1).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CC4F4",
+     "role": "Float rpm threshold 4500: the bin 2/3 boundary (rpm < 4500 gives bin 2, otherwise bin 3).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CBCC0",
+     "role": "uint16 threshold 38, compared with word 0xFFFF5E74 when the 0x22CF4 result is 0. If 0xFFFF5E74 >= 38, a dedicated cut-count table set is used (0x63BB0/0x63C50/0x63CF0, or 0x63C00/0x63CA0/0x63D40 when 0xFFFF5DB8 != 0) instead of the selector-indexed sets. What 0xFFFF5E74 measures is not shown.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CBD00",
+     "role": "uint16 value 100. No direct reference in the pack; its purpose is not shown, and it may be reached indirectly.",
+     "evidence_class": "unknown"
+    },
+    {
+     "address": "0x0CEED0",
+     "role": "Overrun fuel-cut resume RPM, a 1-D table by ECT read through descriptor 0xAD40C. The output plus 0xFFFF895C plus summed adders is stored at 0xFFFF7C78 and compared against rpm_current.",
+     "evidence_class": "observed"
+    }
+   ],
+   "inert_or_gated": "- The resume RPM table 0x0CEED0 is flat at 1000 rpm for every ECT from -40 to 110 \u00b0C, so its ECT dependence is inert in this calibration.\n- The whole delay-schedule computation is skipped when GBR+30 (0xFFFF7C9E) != 0.\n- When 0xFFFF65C0 == 1, the RPM binning and the 2250/3000/4500 thresholds are bypassed: the base count comes from 0x0CBC9E and stages 2/3 are 0.\n- The extra offsets from 0x0C2220.. are applied only when 0xFFFF6155 == 1 and 0xFFFF615F == 0; otherwise they are zero.\n- The 0x0CBC92 minimum floor applies only when 0xFFFF8E46 == 1.\n- Selector 0xFFFF6810 values other than 1\u20135 leave the counts unchanged (previous GBR+12; GBR+14/16 not rewritten).",
+   "evidence": [
+    "0x03AFF6\u20130x03B086: chained fcmp/gt of rpm (fr14) against 0x0CC4EC/0x0CC4F0/0x0CC4F4 sets r1 to 0, 1, 2 or 3.",
+    "0x03B09C onward: shll2 r1, then mov.l @(r0,r5) from pointer tables at 0x63Bxx/0x63Cxx/0x63Dxx, then mov.w @ptr; results stored to GBR+12/14/16.",
+    "0x03B090\u20130x03B09A: uint16 at 0x0CBCC0 (=38) compared with cmp/ge against the word read from 0xFFFF5E74.",
+    "0x03B208\u20130x03B214: if 0xFFFF8E46 == 1, r4 is raised to the 0x0CBC92 value when below it.",
+    "0x03B338\u20130x03B3BE: fmac_interp_uint16, float_max, axis_frac_to_uint16 and uint16_add_sat build cumulative GBR+18/20/22/24.",
+    "0x03B2FE\u20130x03B30C: GBR+42 compared with cmp/hs against GBR+18; when reached, GBR+28 is cleared.",
+    "0x03ACF4\u20130x03AD06: table_lookup_1D(descriptor 0xAD40C, ECT) + fr13 (0xFFFF895C) + adder sum at 0xFFFF7C7C, result stored to 0xFFFF7C78.",
+    "0x03AD52\u20130x03AD58 and 0x03ADFC\u20130x03AE04: resume value compared with rpm; a constant from 0x0CC4D8 or 0x0CC4E0 is written to 0xFFFF7C70."
+   ],
+   "not_shown": "- Physical meaning of 0xFFFF5E74, 0xFFFF65FC, 0xFFFF5DB8, 0xFFFF6810 (possibly gear, 1\u20135, a hunch), 0xFFFF65C0, 0xFFFF8E46, 0xFFFF7EED, 0xFFFF6155 and 0xFFFF615F.\n- What function 0x22CF4 returns.\n- The uint16 values reached through the pointer tables, and the values at 0x0CBC9E, 0x0CBC92, 0x0C2220\u20136, 0x0CC4F8, 0x0CC4FC and 0x0CBD92.\n- The scale constant at 0x03B558.\n- Who increments the GBR+42 counter and how the GBR+18..24 stage thresholds actually cut injectors.\n- Any use of 0x0CBD00."
+  },
+  "doc-boost-control-03": {
+   "mechanism": "This is the turbo-dynamics (TD) boost-error feedback for wastegate duty: a proportional term plus a clamped integral accumulator. Inputs are boost error (fr14 = RAM 0xFFFF5CA0), target boost (fr8 = RAM 0xFFFF5CA4), IAT (0xFFFF6364), RPM (0xFFFF6624), a wastegate-duty value at 0xFFFF5C98 (GBR base) and a WGDC ceiling at 0xFFFF5CC4. The previous integral is loaded from 0xFFFF5CB0.\n\n1) Enable flags with hysteresis. If 620.58 (0x0C0BD4) > target boost, the byte at GBR+129 (0xFFFF5D19) is set to 1, which inhibits TD. Otherwise it is cleared to 0 only once target boost >= the value at 0x0C0BD8; between the two it holds. RPM does the same against 0x0C0BE8 / 0x0C0BEC into GBR+130 (0xFFFF5D1A). If either flag is 1, the proportional (0xFFFF5CAC) and integral (0xFFFF5CB0) are both zeroed.\n\n2) Proportional. When enabled, proportional = TurboDynamicsProportional(boost error) \u00d7 TD Proportional Compensation(IAT), stored to 0xFFFF5CAC.\n\n3) Negative integral. It runs if boost error < 5.1715 (0x0C0BDC) and WGDC >= 5 (0x0C0BE4). The step is TD Integral Negative(boost error) \u00d7 IAT comp, written to 0xFFFF5D0C. The accumulator += step, then float_max(acc, -90 from 0x0C0BF0) applies a floor of -90, and the result goes to 0xFFFF5CB0. The positive branch is then skipped.\n\n4) Positive integral. Otherwise, if boost error >= 5 (0x0C0BE0) and the ceiling at 0xFFFF5CC4 > WGDC, the step is TD Integral Positive(boost error) \u00d7 IAT comp, written to 0xFFFF5D10. The accumulator += step, then float_min with the value at 0x0C0BF4 caps it, and the result goes to 0xFFFF5CB0.\n\nIf neither integral condition holds, the integral keeps its previous value. Outputs are the TD proportional and integral WGDC corrections.",
+   "addresses": [
+    {
+     "address": "0x0C0BD4",
+     "role": "Target-boost low threshold for TD inhibit, 620.58. Target boost below it sets inhibit flag 0xFFFF5D19=1. The paired release threshold is at 0x0C0BD8.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C0BDC",
+     "role": "Negative-integral boost-error activation, 5.1715. The negative integral is allowed only when boost error < 5.1715.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C0BE4",
+     "role": "Negative-integral minimum wastegate duty, 5. The negative integral is blocked if 5 > WGDC (RAM 0xFFFF5C98).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C0BE0",
+     "role": "Positive-integral boost-error activation, 5. The positive integral needs boost error >= 5 and is evaluated only if the negative branch did not run.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C0BF0",
+     "role": "Lower clamp on the cumulative TD integral, -90, applied via float_max after a negative step. The upper clamp is 0x0C0BF4.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C0D04",
+     "role": "Boost-error axis (first value -155.14) of one of the Turbo Dynamics 1D tables looked up with boost error. Hunch: the Proportional table.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x0C0D3C",
+     "role": "Boost-error axis (first value -240) of one of the TD tables. Hunch: Integral Negative, since its range is negative.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x0C0D74",
+     "role": "Boost-error axis (first value 0) of one of the TD tables. Hunch: Integral Positive.",
+     "evidence_class": "inferred"
+    }
+   ],
+   "inert_or_gated": "The whole mechanism is gated by two hysteresis flags. Target boost below 620.58 inhibits it (release level at 0x0C0BD8, value not shown), and the RPM threshold at 0x0C0BE8 / 0x0C0BEC does the same; while inhibited, P and I are forced to 0.\n\nThe negative integral needs boost error < 5.1715 and WGDC >= 5. The positive integral needs boost error >= 5 and WGDC < RAM 0xFFFF5CC4. Because the negative branch is tested first, a boost error between 5 and 5.1715 takes the negative path.\n\nThe integral is floored at -90 and capped by 0x0C0BF4 (value not shown). No zero multipliers are visible.",
+   "evidence": [
+    "013BBE-013BCA: fcmp/gt fr8,fr6 with fr6=@0x0C0BD4 (620.58). If T, mov.b #1 to @(129,gbr); otherwise 0x0C0BD8 is checked before clearing to 0, which is hysteresis.",
+    "013BF2-013BFC and 013CAE-013CB8: if flag GBR+129 or GBR+130 ==1, zero is written to 0xFFFF5CAC and 0xFFFF5CB0.",
+    "013BFE-013C18: table_lookup_1D(AA914 Turbo Dynamics Proportional, fr14), multiplied by lookup(AA8C4 IAT comp, IAT), stored to 5D18-108 = 0xFFFF5CAC.",
+    "013C1A-013C20: @0x0C0BDC > fr14 is required to continue the negative branch. 013C22-013C2C: 5 > @0xFFFF5C98 skips it.",
+    "013C2E-013C62: Integral Negative \u00d7 IAT comp goes to 0xFFFF5D0C, is fadd'ed to fr12 (loaded from 0xFFFF5CB0), passed through float_max with @0x0C0BF0 = -90, and stored to 0xFFFF5CB0.",
+    "013C64-013C76: 5 > fr14 skips the positive branch. @(0xFFFF5CC4) > WGDC is required.",
+    "013C78-013CAC: Integral Positive \u00d7 IAT comp goes to 0xFFFF5D10, is accumulated, passed through float_min with @0x0C0BF4, and stored to 0xFFFF5CB0.",
+    "The boost-error axis addresses have no direct literal references. Their link to the descriptors AA914, AA928 and AA93C is through the definition only."
+   ],
+   "not_shown": "Values at 0x0C0BD8, 0x0C0BE8, 0x0C0BEC and 0x0C0BF4 (the integral upper limit) are not shown. The pack also does not show:\n- exactly which RAM quantity 0xFFFF5C98 is (base, current or final WGDC);\n- what sets 0xFFFF5CC4 or the boost error and target boost at 0xFFFF5CA0 and 0xFFFF5CA4;\n- the sign convention and units of boost error;\n- which boost-error axis belongs to which TD table, and the full axis contents;\n- where the P and I outputs are consumed downstream, and the call rate of this routine."
+  },
+  "doc-cruise-tables-03": {
+   "mechanism": "Cruise/non-cruise table blending. One RAM weight, 0xFFFF90A8 (call it w), mixes a Cruise and a Non-Cruise version of three calibrations as out = w*NonCruise + (1-w)*Cruise.\n(1) Base timing, FUNCTION 0x040050. Four 2D lookups use X = load (0xFFFF63F8) and an rpm-like value held in 0xFFFF7F4C. 0xFFFF7F4C is normally a copy of 0xFFFF679C; under certain flag and rpm-limit conditions it is replaced by 0xFFFF804C. For each pair the result is Primary - max(Primary - Reference, 0) * k, where k is 0xFFFF7F3C. The cruise result goes to 0xFFFF7F40 and the non-cruise result to 0xFFFF7F44. The blended value goes to 0xFFFF7F58. It is then compared with the previous value 0xFFFF7F5C. If the drop is not below 'Timing Blend Correction Threshold', the code averages the old and new values using a constant. Otherwise, when flag 0xFFFF7BE2 = 1, it lag-filters with 'Timing Blend Half Ratio'. The result goes to 0xFFFF7F48 and is then lag-filtered again into 0xFFFF7F0C.\n(2) Knock correction advance max, FUNCTION 0x045972. Cruise and Non-Cruise maxima use load and 0xFFFF7F4C as inputs and are blended by w. If ROM byte 0xD299B is non-zero, the code adds [0xFFFF826C] times the product of 0xFFFF8214, 0xFFFF8204, 0xFFFF821C and 0xFFFF8218. 0xFFFF826C comes from table descriptor 0xAE664. The output goes to 0xFFFF8258.\n(3) Intake AVCS target, FUNCTION 0x062C4C. Cruise (stored to 0xFFFF9264) and Non-Cruise (stored to 0xFFFF9268) cam advance use load and rpm_current as inputs and are blended by w. The code adds table 0xAF910 times a 1D table on ECT (0xAF750), clamps the sum at >= 0 into 0xFFFF9240, then computes [0xFFFF9240] * [1D lookup on 0xFFFF912C] + [0xD9F08] into 0xFFFF924C, 0xFFFF9244 and 0xFFFF9248. Flag and condition branches override this with constant 0xD9F04, with 0, or with constant 0xD9F00 written straight to the outputs.",
+   "addresses": [
+    {
+     "address": "0x0D48D4",
+     "role": "Base Timing Primary Non-Cruise data. Looked up through descriptor 0xAE338 with load and the 0xFFFF7F4C rpm-axis value. Result fr12 becomes the non-cruise primary timing, reduced by max(Primary - Reference, 0) * [0xFFFF7F3C], stored to 0xFFFF7F44, then weighted by w in the cruise/non-cruise blend.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0D4C54",
+     "role": "Base Timing Reference Non-Cruise (AVCS) data. Looked up through descriptor 0xAE370 with the same inputs. It serves only as the reference subtracted from Primary Non-Cruise; the positive excess, scaled by 0xFFFF7F3C, is removed from primary.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0D5AC4",
+     "role": "Knock Correction Advance Max Non-Cruise data. Looked up through descriptor 0xAE69C with load and 0xFFFF7F4C. Weighted by w against the Cruise maximum. The sum, plus an optional term gated by 0xD299B, is stored to 0xFFFF8258, which is presumably the knock-advance ceiling.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0DAC34",
+     "role": "Intake Cam Advance Angle Non-Cruise data. Looked up through descriptor 0xAF8F4 with load and rpm_current, stored to 0xFFFF9268, then weighted by w against Cruise (0xFFFF9264). The blend feeds the AVCS target in 0xFFFF9240 and 0xFFFF924C.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0DAC7C",
+     "role": "A cell inside the intake cam Non-Cruise table, not a separate constant. It is 72 bytes = 36 uint16 past the table start, i.e. X=1350, Y=0.2. Its uint16 value 1820 * 180/32768 = 9.9976, which matches the listed cell. This implies the table is stored as uint16 scaled by 180/32768. It has no direct reference because it is reached through the descriptor.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF90A8",
+     "role": "Cruise/non-cruise blend weight w, applied as w*NonCruise + (1-w)*Cruise in all three functions. Its producer is not shown.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF7F4C",
+     "role": "rpm-like X input to the timing and knock-max lookups. It is set from 0xFFFF679C, or from 0xFFFF804C under the gated condition.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF7F3C",
+     "role": "Multiplier k on the positive Primary - Reference timing difference. Possibly an AVCS-deviation factor.",
+     "evidence_class": "hunch"
+    },
+    {
+     "address": "0xFFFF7F58",
+     "role": "Blended base timing before rate limiting. 0xFFFF7F5C holds the previous value. 0xFFFF7F48 is the rate-limited value and 0xFFFF7F0C is the final filtered output.",
+     "evidence_class": "observed"
+    }
+   ],
+   "inert_or_gated": "Base Timing Primary Non-Cruise and Reference Non-Cruise contain identical values on identical axes. Primary - Reference is therefore 0, max(0,0) = 0, and the k-scaled reduction is inert for non-cruise: 0xFFFF7F44 equals Primary Non-Cruise. Knock Advance Max Non-Cruise is 0 for load <= 0.94 g/rev, so no knock advance headroom exists in that region. Elsewhere it is 5.27\u00b0, rising to 6.33-7.38\u00b0 at the 3.77 and 4.0 g/rev columns above about 3600 rpm. The extra knock-max term is gated by byte 0xD299B, whose value is not shown. The AVCS blend is bypassed by flag branches: the target becomes constant 0xD9F04 when GBR+24 (0xFFFF9258) = 1, 0 when GBR+25 (0xFFFF9259) = 1 or under the 0xFFFF85D7/0xD9EFC condition, and constant 0xD9F00 under a condition set with rpm hysteresis (0xD9EF8/0xD9EF4). The base-timing rate-limit filter depends on flag 0xFFFF7BE2 = 1.",
+   "evidence": [
+    "0x040188/0x040194: descriptors 0xAE338 and 0xAE370 are passed to table_lookup_2D with fr4 = load and fr5 = @(0xFFFF7F60-20).",
+    "0x0401A4-0x0401D4: fsub, then float_max(x,0), fneg, then fmac with [sp+4] (= [0xFFFF7F3C]); results stored at 0xFFFF7F40 and 0xFFFF7F44.",
+    "0x0401D6-0x0401EA: [sp] = [0xFFFF90A8] gives w*[0xFFFF7F44] + (1-w)*[0xFFFF7F40], stored at 0xFFFF7F58.",
+    "0x04020A-0x04023C: threshold check against 0xD2B08, then either an average with a constant or float_lag_filter with 0xD2B0C.",
+    "0x045996-0x0459B6: Non-Cruise in fr12 weighted by fr13 = [0xFFFF90A8] against Cruise.",
+    "0x0459B8: byte 0xD299B gates the extra product term; output stored at 0xFFFF8258.",
+    "0x062D98-0x062DE6: intake cam Non-Cruise and Cruise blended by w, plus table 0xAF910 * 1D(ECT), then float_max(.,0).",
+    "0x0DAC7C: uint16 1820 * 180/32768 = 9.9976, equal to the X=1350, Y=0.2 cell."
+   ],
+   "not_shown": "Not shown: what writes 0xFFFF90A8 and how it moves between 0 and 1, the meaning of 0xFFFF7F3C, 0xFFFF679C and 0xFFFF804C, the value of 0xD299B, and the contents of the unnamed tables 0xAE664 and 0xAF910. Also not shown: the scalar constants 0xD2B08/0xD2B0C/0xD2B10/0xD2B14 and 0xD9F00/0xD9F04/0xD9F08, and how 0xFFFF7F0C, 0xFFFF8258 and 0xFFFF924C are consumed downstream. Table storage formats are not directly shown, apart from the uint16 scale inferred for 0x0DAC34."
+  },
+  "doc-injector-rescale-06": {
+   "mechanism": "The core function is 0x043470-0x0434F2. It runs a one-byte countdown at 0xFFFF80EC that is armed from a table, and that table is the one defined as 'Low Pulse Width Fuel Injector Compensation'. Inputs read at the top of the function: fr8=[0xFFFF62F8] (the value compared against the 'Requested Torque Ratio' threshold in 0x03F374), fr9=[0xFFFF65FC] (compared against the MAF/Load threshold in 0x03F374), fr4=rpm_current, fr6=ect_current, r14=flag byte [0xFFFF5BE3].\n\nSequence:\n1. If fr8 is below [0x0D2A0C]=0.8798, or fr8 is at or above [0x0D2D20], the counter is cleared to 0.\n2. Otherwise the code checks for a falling edge of flag 5BE3: the current flag must be 0 and the previous copy stored at 0xFFFF80ED must be 1.\n3. It then requires 0 > fr9 ([0x0D2D24]=0.0), rpm >= [0x0D2D28], rpm < [0x0D2D2C] and ECT >= [0x0D2A1C]=80.\n4. If all of these pass, it calls 0x0BE874 with descriptor 0xAE000. fr4 is still rpm at that point, so the lookup input is rpm, not a pulse width. The returned byte is stored into 0xFFFF80EC.\n5. If any condition fails, 0xFFFF80EC is decremented toward 0.\n6. Every pass ends by writing the current flag into 0xFFFF80ED.\n\nOutput: the counter byte 0xFFFF80EC. Its consumer is not shown.\n\n0x0BE874, despite its traced name, is a generic table lookup returning a byte. It is also used for the tip-in 'Applied Counter Threshold' tables in 0x03A68C.\n\nOther functions in the pack:\n- 0x02F988: while [0xFFFF726C]==1, looks up three 1D cranking IPW compensations and stores them. MAP uses input [0xFFFF620C] and goes to 0xFFFF72E0. Accelerator uses [0xFFFF64D8] and goes to 0xFFFF72E4. IAT uses iat_current and goes to 0xFFFF72E8.\n- 0x02FAD4: does a 2D cranking IPW compensation lookup on rpm and ECT and stores it at 0xFFFF72F0. The table is picked from four by the result of 0x22CF4 and flag [0xFFFF90BE]. 'Imm. Cruise' is used when both are true, 'Non-Cruise' when 0x22CF4 is true and the flag is 0, otherwise 0xAD540 or 0xAD524.\n- 0x03A68C: builds the tip-in enrichment. It multiplies [0xFFFF7C54], the RPM compensation, the Boost Error compensation (input [0xFFFF7C50]) and [0xFFFF7C58]. It also multiplies [0xFFFF7C38], but only when throttle >= [0x0CC4A4... activation D at 0x0CC4A8]. It then multiplies the ECT A compensation, or 1.0 when 0x23E48 returns 0. The product goes to 0xFFFF7C30 and is gated by the minimum-activation values.",
+   "addresses": [
+    {
+     "address": "0x0D39A8",
+     "role": "Data of the table behind descriptor 0xAE000. In 0x043470 it is looked up with rpm in fr4, and the byte result loads countdown 0xFFFF80EC.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0D3988",
+     "role": "X axis of that table (700...4500). In this caller it is indexed by rpm_current, not by IPW. It has no direct reference; it is reached through the descriptor.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0x0D2D28",
+     "role": "Lower rpm bound of the trigger window: the trigger requires rpm >= this (10000).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0D2D2C",
+     "role": "Upper rpm bound of the trigger window: the trigger requires rpm < this (10000). The code compares it with rpm, not with IPW.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0434C2",
+     "role": "Instruction that loads descriptor 0xAE000 just before the lookup call.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0BE874",
+     "role": "Generic table-lookup routine: r4 is the descriptor, fr4 the input, and the result is returned in r0 and stored as a byte. It is used for the counter preset here and for the tip-in counter thresholds.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF6624",
+     "role": "Engine rpm. Here it is the lookup input and the window variable. It is also an input to the cranking 2D tables, the tip-in RPM compensation and the boost tables.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x04347C",
+     "role": "Instruction that loads rpm into fr4; fr4 stays live as the lookup input.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0BECA8",
+     "role": "Axis lookup helper, probably called inside 0x0BE874. Not shown in the pack.",
+     "evidence_class": "hunch"
+    },
+    {
+     "address": "0xFFFF7324",
+     "role": "RAM variable with 3 references, none in the shown listings.",
+     "evidence_class": "unknown"
+    },
+    {
+     "address": "0x0D0760",
+     "role": "Axis 'Last Calculated Base Pulse Width' (first value 1000). No code shown uses it.",
+     "evidence_class": "unknown"
+    },
+    {
+     "address": "0xFFFF80EC",
+     "role": "Countdown byte: preset from the table on trigger, decremented otherwise, cleared when [0xFFFF62F8] is out of window. Byte +1 (0xFFFF80ED) holds the previous value of flag 0xFFFF5BE3 for edge detection.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0D2A0C",
+     "role": "Lower bound on [0xFFFF62F8] (0.8798). If [0xFFFF62F8] is below it, the counter is cleared. 0x03F374 also uses it as the map-switching torque-ratio threshold.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0D2A1C",
+     "role": "ECT threshold of 80: the trigger requires ect_current >= 80 here. In 0x03F374 the same constant is compared against the value at [r15], which was loaded from ect_current.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x03F49A",
+     "role": "Instruction in the map-switching selector 0x03F374 that loads the 0x0D2A0C threshold for comparison with [0xFFFF62F8].",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0D2D24",
+     "role": "Threshold on [0xFFFF65FC] (0.0): the trigger requires [0xFFFF65FC] < 0.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CF704",
+     "role": "2D cranking IPW compensation over rpm and ECT, selected when both selector conditions are true. Result goes to 0xFFFF72F0.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CF6B0",
+     "role": "2D cranking IPW compensation over rpm and ECT, selected when 0x22CF4 returns 1 and [0xFFFF90BE]==0. Result goes to 0xFFFF72F0.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CC868",
+     "role": "Cranking IPW compensation versus [0xFFFF620C] (MAP). Result goes to 0xFFFF72E0.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CC89C",
+     "role": "Cranking IPW compensation versus [0xFFFF64D8] (accelerator). Result goes to 0xFFFF72E4. The values fall to 0 at 90, which acts like a flood-clear cut.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CC8BC",
+     "role": "Cranking IPW compensation versus IAT. Result goes to 0xFFFF72E8.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CD118",
+     "role": "Tip-in RPM multiplier inside the product stored at 0xFFFF7C30.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CD14C",
+     "role": "Tip-in boost-error multiplier with input [0xFFFF7C50].",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0CD155",
+     "role": "Tip-in ECT A multiplier. It is bypassed to 1.0 when 0x23E48 returns 0.",
+     "evidence_class": "observed"
+    }
+   ],
+   "inert_or_gated": "- 0x043470 trigger is unreachable: it needs rpm >= [0x0D2D28]=10000 and rpm < [0x0D2D2C]=10000, an empty window. The table lookup never runs, and 0xFFFF80EC can only decrement or be cleared, so it stays 0.\n- The trigger also needs [0xFFFF65FC] < [0x0D2D24]=0.0, which is likely never true if that value is a nonnegative load; its sign is unknown.\n- The trigger needs ECT >= 80.\n- The trigger needs [0xFFFF62F8] within [0.8798, [0x0D2D20]).\n- Cranking IAT compensation is all 1.0, so it is inert.\n- Tip-in ECT A compensation is all 1.0, so it is inert.\n- Cranking accelerator compensation is 1.0 below 60.",
+   "evidence": [
+    "043474-04347C: fr8=[FFFF62F8], fr9=[FFFF65FC], fr4=rpm; fr4 is never reloaded before jsr BE874 at 0434C6.",
+    "0434AA-0434B8: 'fcmp/gt fr4,fr8; bt decrement' with D2D28, then 'fcmp/gt fr4,fr8; bf decrement' with D2D2C; both values are 10000, so the pair is contradictory.",
+    "0434CA-0434CE: the r0 returned from BE874 is written with mov.b to 0xFFFF80EC.",
+    "0434D0-0434E0: 80EC is decremented if positive; 0434E2-0434E6: it is cleared when fr8 is out of window.",
+    "049C-049E with 0434E8-0434EA: byte 80EC+1 is compared with 1, and r14 (5BE3) is then stored back there, giving falling-edge detection.",
+    "03A6F2/03A70A: BE874 results are stored with mov.b as tip-in counter thresholds, showing it is a byte-output lookup.",
+    "02F9A6-02F9C8: three table_lookup_1D calls whose results go to FFFF72E0, 72E4 and 72E8.",
+    "02FAF4-02FB10: table selection, then table_lookup_2D(rpm, ECT), result to FFFF72F0.",
+    "03A776-03A7B8: the tip-in product chain is stored at FFFF7C30 (r11-52)."
+   ],
+   "not_shown": "- The value at 0x0D2D20 (upper torque-ratio bound).\n- What 0xFFFF62F8, 0xFFFF65FC and 0xFFFF5BE3 physically are.\n- Who consumes the 0xFFFF80EC counter.\n- The raw data format and scaling of the 0x0D39A8 table, i.e. what byte BE874 would return.\n- The internals of 0x0BE874 and 0x0BECA8.\n- What uses 0xFFFF7324 and 0x0D0760.\n- Whether the 'Low Pulse Width' definition names really match this code: the code compares the 'max IPW' constant against rpm.\n- How the cranking compensations are combined downstream.\n- The 53 other referencing functions."
+  },
+  "mem-feedback_derived_artifacts_are_wrong_at_scale": {
+   "mechanism": "These addresses mostly feed coolant-temperature and other sensor inputs into table lookups. The one complete mechanism in the pack is function 0x039530. It reads a fraction x from 0xFFFF7800 and checks a byte flag at 0xFFFF782C. When the flag is non-zero it forms 1-x and runs float_deadband_check on it against a ROM constant. If 1-x is inside the deadband, the output 0xFFFF7BAC (0xFFFF7BC0-20) is set to 0. Otherwise it computes 1/(1-x) - 1, which equals x/(1-x), using float_safe_div. Separately it looks up table 0x0AD258 with ect_gated_c and stores the result at 0xFFFF7BC0. The next step depends on the mode byte at 0xFFFF7448. If it equals 1, the ratio is used unscaled and clamped to [0, value at 0xCC3EC]. Otherwise the ratio is multiplied by the ECT table value and clamped to [0, value at 0xCC3F0]. The clamped result goes to 0xFFFF7BAC. That value is then compared with 0xFFFF798C to decide whether it is latched into 0xFFFF7BA8 and 0xFFFF7BA4 or 0xFFFF7BA8 is zeroed. When the 0xFFFF782C flag is zero, a helper at 0x03961C is called with 0xFFFF7BAC instead, and then a deadband test on 0xFFFF798C gates the same latch. Elsewhere ect_gated_c is the X input to several 1D ECT tables: 0xAD054 into 0xFFFF78B0, 'Tip-in Enrichment Compensation D (ECT)' 0xAD3C4 into 0xFFFF7C34/7C38, and a value saved on the stack in 0x0129E8. 0xFFFF4130 is a float sensor or derived quantity. It is the input to 1D table 0xAA788 (result to 0xFFFF5C54) in 0x0129E8. It is the X input to 2D table 0xAE774 (with 0xFFFF6210) in 0x04B970. It seeds four filter/history slots 0xFFFF8B90..0xFFFF8B9C in 0x054822, which looks like init. In 0x0549D4 it is shifted into a two-sample history and the max of the two is kept in 0xFFFF8B9C.",
+   "addresses": [
+    {
+     "address": "0xFFFF6354",
+     "role": "Gated coolant temperature (C), float. Used as the X input to 1D ECT tables: 0xAD258 (multiplier in 0x039530), 0xAD054, 0xAD3C4 (Tip-in Enrichment Compensation D) and others. Also copied to the stack in 0x0129E8, which passes it to the uint16 1D lookup 0xAA7D8 for a threshold.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF4130",
+     "role": "Float input variable. Used as the 1D lookup input for 0xAA788 and the X input of 2D table 0xAE774 (Y = 0xFFFF6210). Used to initialise four filter states at 0xFFFF8B90-9C. Tracked as a previous/current pair with the max kept in 0xFFFF8B9C. Physical meaning not fixed by the code shown; 77 references suggest a widely used sensor value (possibly a temperature or voltage, hunch).",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF41E0",
+     "role": "RAM variable with 2 references. No referencing function is shown, so its role is unknown.",
+     "evidence_class": "unknown"
+    },
+    {
+     "address": "0x0AD258",
+     "role": "1D table indexed by ect_gated_c (-40..110 C). Its output (stored at 0xFFFF7BC0) multiplies the x/(1-x) ratio before the clamp in 0x039530, but only when mode byte 0xFFFF7448 != 1.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x037B74",
+     "role": "Code location inside function 0x037B4C-0x037C52, which is not included in the pack. Role unknown.",
+     "evidence_class": "unknown"
+    }
+   ],
+   "inert_or_gated": "Table 0x0AD258 holds 1.0 at every breakpoint, so the ECT multiplier is a unity no-op in this calibration. It is also bypassed entirely when mode byte 0xFFFF7448 == 1. The whole ratio path runs only when flag 0xFFFF782C != 0. It forces 0xFFFF7BAC to 0 when 1-x falls inside the deadband set by the constant at 0x039750. The result is clamped to [0, value at 0xCC3EC] or [0, value at 0xCC3F0]; those limit values are not shown.",
+   "evidence": [
+    "0x03954E loads ect_gated_c into fr15; 0x039598-0x0395A2 call table_lookup_1D(0x0AD258, ECT) and store the result to 0xFFFF7BC0.",
+    "0x039564-0x039594: fr14 = 1 - @0xFFFF7800; float_safe_div(1, fr14) then add -1 gives x/(1-x).",
+    "0x0395A6: if byte @0xFFFF7448 == 1 the ratio is used unscaled with clamp max @0xCC3EC; otherwise 0x0395B6-B8 multiply by the table value, clamp max @0xCC3F0; float_clamp_range lower bound is 0 (fldi0 fr5).",
+    "0x03957C-0x039584: inside the deadband, 0 is stored to 0xFFFF7BC0-20.",
+    "0x0395E8-0x03960A: compare with 0xFFFF798C, then latch into 0xFFFF7BA8/7BA4 or zero 0xFFFF7BA8.",
+    "0x012A02/0x012A42: 0xFFFF4130 is the input to table_lookup_1D(0xAA788), stored at 0xFFFF5C54.",
+    "0x04B972-0x04B97E: table_lookup_2D(0xAE774, 0xFFFF4130, 0xFFFF6210), stored at 0xFFFF8360.",
+    "0x054828-0x054840: 0xFFFF4130 copied into 0xFFFF8B90, 8B94, 8B98 and 8B9C.",
+    "0x0549D4-0x0549F8: old value shifted to 0xFFFF8B94, new value to 8B98, float_max of the two stored to 8B9C.",
+    "0x034ECA, 0x03A5F4, 0x03A98A: ect_gated_c used as input to 1D tables 0xAD054 and 0xAD3C4."
+   ],
+   "not_shown": "What 0xFFFF7800 represents (the fraction x) and the physical meaning of the 0x039530 output 0xFFFF7BAC. The clamp limits at 0xCC3EC/0xCC3F0 and the deadband constants. The writer of 0xFFFF4130 and its physical meaning. Any use of 0xFFFF41E0. The code around 0x037B74. Contents of tables 0xAA788, 0xAE774 and 0xAD054. The 71 other referencing functions."
+  },
+  "mem-project_gear_determination": {
+   "mechanism": "Manual-gear estimation from road speed and engine speed, followed by a debounce. Function 0x023EB8 picks one of three 5-float threshold sets: A (0x0C3474..84) if byte 0xFFFF5F03==1, else B (0x0C3488..98) if byte 0xFFFF5FB8==1, else C (0x0C349C..AC). It copies the chosen set into RAM 0xFFFF6814..0xFFFF6824 (base 0xFFFF6810 +4..+20). If flag 0xFFFF65C5==0, the gear is copied from byte 0xFFFF5E93: values 1-5 pass through, 7 becomes 1, 0 or 6 become 6/0, and values above 7 leave the result unchanged. If 0xFFFF65C5!=0, the gear is computed. When 0xFFFF65C0==1, or 0x297A0() returns 2, the result is 6/0. When rpm_current is below a literal at 0x024130, the result is 5/6. Otherwise ratio = float_safe_div(speed 0xFFFF65FC, float_safe_div(rpm, K@0x024138)), i.e. speed*K/rpm. The ratio is stored to 0xFFFF680C and compared against the five thresholds in ascending order: ratio<=thr1 gives gear 1, ... ratio<=thr5 gives 5, and anything above gives 5/6. Results are written to 0xFFFF6810 (gear byte) and 0xFFFF6811 (raw gear byte). The function at 0x024024 (the listing labelled 0x02402C is its tail) debounces this. It runs with GBR=0xFFFF6811. If the raw gear equals last pass's value (0xFFFF682A), counter 0xFFFF6828 is incremented with uint16_add_sat; otherwise the counter is cleared. When 0xFFFF65C0!=1 and the counter is >= cal 0x0C30BE (31), the raw gear is latched into 0xFFFF6812, the confirmed gear. Consumers include: 1st-gear target-boost compensation (0x013B1A, which tests 0xFFFF6810==1 and speed <= 'Speed Disable'); an enable check (0x02362C) that needs 0xFFFF6810 inside the range [0x0C3032,0x0C3033]; a gear-gated check at 0x015928 using 0xFFFF6812 < 0x0C1495; and a second gear classifier at 0x018CB8 that reuses 0xFFFF680C and 0xFFFF6814.. to write 0xFFFF5FC0, with 6 meaning above thr5.",
+   "addresses": [
+    {
+     "address": "0xFFFF6810",
+     "role": "Computed gear byte (1-5; 6 for neutral/forced case; 5 when rpm is low or ratio exceeds thr5). Also the base pointer of the gear-calc struct. Read by boost comp (==1 means 1st gear) and by the enable check at 0x02362C.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF6811",
+     "role": "Raw gear byte (0 for neutral/forced case, 6 when above thr5 or rpm is low). Input to the debounce and GBR base of the debounce function.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF6812",
+     "role": "Debounced/confirmed gear. Latched from 0xFFFF6811 after it has been stable for 31 counts. Initialised to 1 by the init code at 0x024094. Compared against cal 0x0C1495 in 0x015928.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF6814",
+     "role": "RAM copy of threshold 1 of the selected set; the 1st/2nd boundary on the speed/rpm ratio. Read by 0x018CB8 as well.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF680C",
+     "role": "Speed/rpm ratio = speed*K/rpm (K at 0x024138, value not shown). Written at 0x023FA6 (offset -4 from 0xFFFF6810) and read by the 0x018CB8 classifier.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C3474",
+     "role": "Gear Determination Thresholds A: 5 floats (0x0C3474..84), first value 13.416. Used when 0xFFFF5F03==1.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C3488",
+     "role": "Gear Determination Thresholds B: 5 floats, first value 13.416. Used when 0xFFFF5FB8==1, and loaded as the default by the init routine.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C349C",
+     "role": "Gear Determination Thresholds C: 5 floats, first value 13.416. Used when neither selector flag is set.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF5F03",
+     "role": "Selector flag: ==1 chooses threshold set A. Its physical meaning (likely a vehicle/transmission variant) is not shown.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF5E93",
+     "role": "Externally supplied gear position byte, used directly when 0xFFFF65C5==0. Its mapping (7 to 1, 0/6 to neutral) suggests a coded gear from another unit (hunch for its source).",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF65C5",
+     "role": "Mode flag: 0 means take the gear from 0xFFFF5E93; nonzero means compute it from the speed/rpm ratio.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0xFFFF65C0",
+     "role": "Boolean that forces neutral (6/0) in the gear calc and freezes the debounced gear when ==1. Possibly a clutch or neutral switch.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF65FC",
+     "role": "Vehicle speed (km/h), the numerator of the gear ratio. Compared with the 'Target Boost Compensation (1st Gear) Speed Disable' threshold in 0x013B1A.",
+     "evidence_class": "inferred"
+    },
+    {
+     "address": "0xFFFF6624",
+     "role": "rpm_current: engine speed. Gates the calc (below the 0x024130 constant gives 5/6) and is the divisor in the ratio.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0BE628",
+     "role": "float_safe_div helper, used twice to form speed/(rpm/K).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x0C30BE",
+     "role": "Debounce count threshold (uint16 = 31). The raw gear must be stable for at least this many counts of 0xFFFF6828 before it is copied into 0xFFFF6812.",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x023EB8",
+     "role": "Entry of the gear determination function (threshold-set select, ratio compute, threshold ladder).",
+     "evidence_class": "observed"
+    },
+    {
+     "address": "0x024024",
+     "role": "True entry of the gear debounce function (pushes r11-r14). The listing labelled 0x02402C is its continuation.",
+     "evidence_class": "observed"
+    }
+   ],
+   "inert_or_gated": "Gated rather than inert. The ratio ladder runs only when 0xFFFF65C5!=0, 0xFFFF65C0!=1, 0x297A0()!=2 and rpm >= the constant at 0x024130 (value not shown); below that rpm the output is forced to 5/6. The debounce latch requires 0xFFFF65C0!=1 and a counter >= 31 (0x0C30BE). All three threshold sets share the same first value (13.416), so the 1st/2nd boundary does not depend on which set is selected. The remaining four values of each set are not shown.",
+   "evidence": [
+    "023ECC/023EFC: 0xFFFF5F03==1 selects set A, else 0xFFFF5FB8==1 selects B, else C; 5 floats are stored at 0xFFFF6810+4..+20.",
+    "023F90-023FA6: two float_safe_div calls, first with fr4=rpm and fr5=K@0x024138, then with fr4=@0xFFFF65FC; the result is stored at 0xFFFF6810-4 = 0xFFFF680C.",
+    "023FAA-023FFA: ratio<=thr1 stores 1, <=thr2 stores 2, ... <=thr5 stores 5; otherwise the code branches to 02400C, which stores 5/6. Each result is written to both 0xFFFF6810 and 0xFFFF6811.",
+    "023F5A-023F74: with 0xFFFF65C5==0 the gear is taken from 0xFFFF5E93 (7 maps to 1, 0/6 to 6/0).",
+    "024038-024084: equal raw/previous gear increments 0xFFFF6828 (uint16_add_sat), else the counter is cleared; latch into 0xFFFF6812 when the counter >= 0x0C30BE and 0xFFFF65C0!=1.",
+    "013B32-013B40: 0xFFFF6810==1 and 0xFFFF65FC <= 'Target Boost Compensation (1st Gear) Speed Disable' applies the 1st-gear boost comp.",
+    "018CB8: reads 0xFFFF6814..6824 and 0xFFFF680C to classify gear 1-6 into 0xFFFF5FC0.",
+    "024094-0240C6: init code sets 0xFFFF6810=6 and 0xFFFF6812=1 and loads threshold set B."
+   ],
+   "not_shown": "Values of K at 0x024138 and of the low-rpm constant at 0x024130 (the float literals are not decoded), and the remaining threshold values. The physical meaning of selector flags 0xFFFF5F03/0xFFFF5FB8, of 0xFFFF65C5 and 0xFFFF65C0, and the source of 0xFFFF5E93. What 0x297A0 and 0x22CF4 compute. The debounce task rate, so 31 counts cannot be converted to time. Why the outputs use 5/6 and 6/0 encodings. Full consumer list (145 other functions)."
+  }
+ },
+ "failed": {
+  "doc-architecture-02": "stopped: refusal (cyber)",
+  "doc-knock-07": "stopped: refusal (cyber)"
+ }
+}

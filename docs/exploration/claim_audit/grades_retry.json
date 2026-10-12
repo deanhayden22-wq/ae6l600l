@@ -1,0 +1,246 @@
+{
+ "doc-knock-05": {
+  "grade": "partly_agree",
+  "supported": [
+   "0x0AE284 is a 1-D curve whose input is 0xFFFF4304, floored/clamped to >=0, with data spanning 0..304. The blind reader's 'on load' wording is loose, since their own evidence names 0xFFFF4304 as the input.",
+   "0x0AE290 is a 1-D curve on RPM with data roughly 8..13, used in the knock detector function.",
+   "0x0AE6D4 is an RPM x load table with values about 3.60 to 3.45, and its two load columns are identical, so the load axis is flat.",
+   "0x0AE724 is an RPM x load table that is 1000.0 everywhere.",
+   "0x0AE29C is a 1-D RPM curve that is 16.0 everywhere.",
+   "0x0AE0F8, 0x0AE00C, 0x0AE020 and 0x0AE10C are all looked up in the same post-processing function (0x043D70).",
+   "0x0AE134 is an RPM-indexed table and 0x0AE2CC is used in the same path (0x045C06).",
+   "0xFFFF8158 is a literal base address of the per-cylinder knock RAM block, not a stack frame.",
+   "The user-tunable Knock Correction Advance Max Cruise table is at 0xD5904 and Non-Cruise at 0xD5AC4."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "The detection threshold is computed in RAM rather than read from a table: threshold_A = clamp(baseline + K*deviation, 50, 359) written to 0xFFFF8154, and threshold_B = clamp(baseline + K*1000*deviation, 50, 1000) written to 0xFFFF8158. The blind answer marks 0xFFFF8154 as unknown.",
+   "K (0xAE6D4) is a dimensionless sigma multiplier and lower K means more sensitive detection.",
+   "0xFFFF8148 is the per-cylinder baseline and 0xFFFF8150 is the per-cylinder deviation. The blind answer marks both as unknown.",
+   "0xAE724 multiplies K for threshold B only.",
+   "0xAE6D4/6E8/6FC/710, 0xAE724/738/74C/760 and 0xAE29C/2A8/2B4/2C0 are per-cylinder sets, and 0xAE6D4 has 18 RPM points.",
+   "None of the twelve knock-detection calibrations has an address= entry in the project XML.",
+   "The specific purposes of the retard-amount lookups (0xAE0F8 etc.) and the FLKC threshold role of 0xAE134. The blind answer gives a different but compatible reading (a lag constant, a learning delay)."
+  ],
+  "reason": "The blind answer independently confirms most of the table facts: the axes, data ranges, flat or constant values and the functions that use them, and nothing it says conflicts with the claim. However, the claim's central statement is the RAM threshold formula, with 0xFFFF8154/8148/8150 as threshold_A, baseline and deviation, and 0xAE6D4 as the sigma multiplier K. The blind answer leaves this unresolved: it marks those RAM addresses as unknown and calls 0xAE6D4 only a 'limit/scale'."
+ },
+ "doc-cruise-tables-01": {
+  "grade": "agree",
+  "supported": [
+   "0xFFFF85E4 is tested against two RPM-indexed hysteresis curves (enter/set and exit/clear thresholds).",
+   "The enter curve at 0xD9BE4 is zero from 3200 RPM up, so the flag cannot be newly set above 3200 at any positive value.",
+   "The exit curve at 0xD9C44 is zero from 3600 RPM up, so the flag is cleared there.",
+   "The curve axes are at 0xD9BA4 / 0xD9C04 and hold RPM breakpoints.",
+   "0xFFFF63C4 is mass airflow in g/s, set below 45 (0xD9B34) and cleared at 50 (0xD9B38).",
+   "A 250-count threshold at 0xD9AD8 applies to a counter that is cleared when the enable condition fails, i.e. a dwell that resets.",
+   "A 375-count threshold exists at 0xD9ADA for a second counter.",
+   "The scheduler/task rate is not established, so the counts cannot be converted to seconds.",
+   "The Map Switching tables belong to a separate routine (0x03F01A), not the 0x85E4/MAF gate logic."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "That 0xFFFF85E4 is a torque-domain value; the blind answer says its physical meaning is not shown.",
+   "That the 375 count acts as a re-entry lockout after every dropout; the blind answer does not know who increments 0xFFFF90B4.",
+   "That this logic is the cruise entry gate. The blind answer does not name its outputs 0xFFFF90C8/90C4 as cruise.",
+   "That base timing uses the ramped blend 0xFFFF90A8 (ratio \u00d7 NonCruise + (1\u2212ratio) \u00d7 Cruise); the blind answer says 90A8 is not accessed.",
+   "That Cranking Fuel IPW Comp and Timing Compensation Imm. A/B hard-select off raw flag 0xFFFF90BE.",
+   "The specific misnamings: Vehicle Speed Low/High are RPM bounds, IAT Threshold is compared against ECT, MAF/Load Threshold is compared against vehicle speed. The blind answer says the using code is not shown.",
+   "Byte-identity to stock in 20.19c and the cruise/non-cruise cell-difference counts.",
+   "The 0x060592 detail: the claim says MAF was identified via the workspace loader at 0x060592. The blind answer places that instruction in the input-snapshot block but says it stores 0xFFFF65FC, with MAF going to a different slot. This is loosely compatible rather than a clear conflict."
+  ],
+  "reason": "The central code statements are independently confirmed. These are the 85E4 comparison against RPM-indexed enter/exit curves that are zero from 3200/3600 RPM, the MAF 45/50 g/s hysteresis, the 250/375 counters and the unknown task rate. The blind answer does not identify the logic as cruise or 85E4 as torque, and it cannot confirm the blend and hard-select consumers or the Map Switching misnamings. Nothing it says is incompatible with the claim."
+ },
+ "doc-knock-08": {
+  "grade": "agree",
+  "supported": [
+   "0xFFFF6624 is rpm_current (engine speed); the blind answer identifies it the same way, though it does not confirm the \u00d716/9 scaling",
+   "0xFFFF63F8 is engine load, not IAT; the blind answer calls it engine_load_current",
+   "IAT is 0xFFFF6364; the blind answer calls it iat_current",
+   "The knock/timing correction routine reads engine load into FR14 at 0x0437A0",
+   "Load is an axis of the RPM x load 2D lookup called at 0x043858 inside the knock routine, so the detector has a load input in code",
+   "IAM 0xFFFF9270 is not directly referenced in these paths; the blind answer reports 0 direct literal references and says it is not accessed in the shown code"
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "RPM scaling of RPM \u00d7 16/9 and its source in a crank timer ISR (the blind answer says units are not fixed by the shown code)",
+   "The load axis of the 0x043858 lookup is calibrated exactly flat (the blind answer says calibration values are not shown)",
+   "0xFFFF8258 is a cumulative knock metric used as the exponential weight in flkc_paths_FG. The blind answer only sees it read as a subtrahend or offset in 0x042F48 and 0x03684A, and says its producer is unknown",
+   "0xFFFF93E0 sign convention and its inversion or scaling in the commit function near 0x73600 (the blind answer marks both unknown)",
+   "IAM is updated separately from cumulative FLKC state"
+  ],
+  "reason": "The central code claim is supported independently: 0xFFFF63F8 is load, not IAT. It is read into FR14 at 0x0437A0 and used as a load axis in the 2D lookup at 0x043858. The rpm and IAT address identities are also supported. The remaining items are either calibration facts or about code the blind reader could not see. Its reading of 0xFFFF8258 in two other routines does not rule out the claimed knock-path use. Nothing is contradicted."
+ },
+ "mem-project_map_switch_patch_idea": {
+  "grade": "agree",
+  "supported": [
+   "0x0F1000 is a code patch hook reached by an indirect jump (literal-pool redirect into jmp @r0) in the rev-limit path. The blind answer calls it an indirect jump target / trampoline after rev-limit table selection, not a scalar.",
+   "The live interrupt vector table is at 0x0FFC50. The blind answer says 0x0FFC50 is loaded into VBR in the init/reset path.",
+   "FPSCR is set to 0x00040001. The blind answer says 0x00040001 is loaded into FPSCR via lds in init.",
+   "0x0DAE8C starts a free hole. The blind answer reads it as 0xFF erased padding with no code reference, though it says inertness cannot be confirmed.",
+   "0x0FC004 begins a free region. The blind answer reads it as 0xFF with no code reference.",
+   "The upper free region ends at 0x0FFAF8, 0x158 bytes before 0x0FFC50. This fits the blind answer's finding that the block at 0x0FFAF8 is live data, read byte-by-byte into RAM as an ID/descriptor."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "The ROM contains multi-map I/S/S# table sets.",
+   "There are several per-map rev limiters (the blind answer mentions only two rev-limit tables).",
+   "The map sets are effectively identical or unused because there is no switch input.",
+   "0x09A3C2 is an SSM-read patch. The blind answer only says it is an instruction in a message/record decode routine at 0x09A3BA; this is consistent but does not confirm a patch.",
+   "The 0x0F1000 hook borrows the jmp delay slot and returns mid-function with registers set up for the host.",
+   "The ECU is SH-2E and the FPSCR value means round-toward-zero.",
+   "The location of the cruise-control input RAM byte."
+  ],
+  "reason": "The blind answer independently confirms the claim's address-level statements: 0x0F1000 as a jump-target hook in the rev-limit code, 0x0FFC50 as the VBR/vector table, 0x00040001 as the FPSCR value, and erased padding at the free-space start addresses. Nothing it says conflicts with the claim. The map-set and switching statements are not covered."
+ },
+ "doc-rev-limit-patch-01": {
+  "grade": "disagree",
+  "supported": [
+   "0xFFFF6624 (literal pool 0x03B778) is rpm_current, loaded into FR15",
+   "0xFFFF65FC is loaded into FR14 and is most likely vehicle speed in km/h, not engine load",
+   "The condition result chooses between two threshold pairs: zero branches to 0x03B6B8 (pair B), non-zero falls through to 0x03B6AE (pair A)",
+   "Literal 0x03B7A0 points to 0xCC504 (resume/Off) and literal 0x03B7A4 points to 0xCC508",
+   "Pair A is 0xCC500/0xCC504 and pair B is 0xCC508/0xCC50C as cut/resume sets",
+   "0x03B6C0 is fcmp/gt fr15,fr8, the comparison of RPM against the cut threshold",
+   "Calibration values: 0xCC500=6700, 0xCC504=6680, 0xCC508=6700, 0xCC50C=6680"
+  ],
+  "contradicted": [
+   "Claim says the rev limiter begins at 0x03B668; blind answer says the function entry is 0x03B66C and 0x03B668 is 'code just before the function entry\u2026 inside the neighbouring listing'.",
+   "Claim says FR12 / 0xFFFF620C is airflow_maf_current; blind answer says it is a pressure value, 'likely manifold pressure', compared with 'Rev Limit Fuel Resume (Boost)' and with atmospheric subtracted from it."
+  ],
+  "not_addressed": [
+   "The exact stock literal contents of 0x03B79C (-> 0xCC500) and 0x03B7A8 (-> 0xCC50C). The blind answer sees 0x000F1000 in these slots in a patched ROM, which is consistent with the claim describing stock code, so this is not counted as a contradiction."
+  ],
+  "reason": "Most register, branch and calibration details match. The blind answer contradicts two points: the function start address (0x03B66C, not 0x03B668) and the identity of 0xFFFF620C (manifold pressure, not MAF airflow)."
+ },
+ "doc-transient-fuel-05": {
+  "grade": "disagree",
+  "supported": [
+   "0xCBC0B and 0xCBC0C are counter thresholds with a value of 3 each.",
+   "0xCC52C holds the value 1260 and takes part in the deactivation/exit conditions."
+  ],
+  "contradicted": [
+   "The claim says 0xCC51C\u20130xCC528 (510.0 / 505.0) are accel-enrichment gains that set magnitude. The blind answer says they are speed-limiter fuel-cut enable and disable thresholds (510 enable, 505 disable), compared against vehicle speed at 0xFFFF65FC.",
+   "The claim says 0xCBC0B and 0xCBC0C set the duration of the accel-enrichment decay tail. The blind answer says they are stage-delay and hysteresis counts in a speed-limiter fuel-cut state machine. They control when cut flags 3 and 4 are added and when flags clear.",
+   "The claim says 0xCC52C is a 1260 RPM threshold. The blind answer says 1260 is compared against fr13 from RAM 0xFFFF620C, whose meaning is unidentified. RPM is read separately (0xFFFF6624) and checked against 0xCC530.",
+   "The claim says these addresses belong to the accel/tip-in enrichment system, so raising the gains or counters would extend fuel enrichment. The blind answer says the routine is a speed-limiter fuel-cut state machine whose outputs are cut flags 0xFFFF7CE1..7CE5."
+  ],
+  "not_addressed": [
+   "The tau falling tables being a separate correction loop.",
+   "The post-DFCO AFR delta being driven by throttle rate rather than load rate."
+  ],
+  "reason": "Both answers agree on the counter values (3) and on 1260 sitting in the exit conditions. They disagree on what the routine is. The blind answer reads these addresses as a speed-limiter fuel-cut state machine, which contradicts the claim's central point that they are accel-enrichment magnitude and duration levers."
+ },
+ "mem-project_scheduler_event_queue": {
+  "grade": "agree",
+  "supported": [
+   "A 5-entry table at 0xFFFF2064 with a 12-byte stride (blind cites 'add #12' steps and 'mov #5' / 'cmp/ge #5').",
+   "0x010B2A is the routine that walks the table: it searches it and inserts into it.",
+   "A repeat of a matching entry bumps that entry's counter instead of taking a new slot (coalescing).",
+   "The counter is a byte at offset +8 and saturates at 255 (0xFF).",
+   "Offset +4 holds a long payload field.",
+   "A new entry is not added once the table holds 5; the bound check is near 0x010BCC ('appends stop once full'). Blind places the cmp/ge at 0x010BCE, a minor offset difference.",
+   "0x010800 wraps the call to 0x010B2A in a critical section.",
+   "0x00E774 raises the interrupt mask and calls 0x010800.",
+   "0x04A94C is gated on byte[0xFFFF8EDC] and runs a straight-line sequence of jsr calls; the blind sees the same gate in 0x049A7A.",
+   "0x04A9F0 is the rts epilogue of the gated routine.",
+   "0x043750 is the first routine called in the 0x04A94C sequence.",
+   "The task bodies are straight-line jsr chains, not table-driven dispatch.",
+   "On insert the blind sees 0xFFFF20A4 written at the end, which fits the claim's 'last posted' long."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "The table holds ISR events posted by stubs in the 0x00E970 family with r4 = event id; the blind sees 0x00E970 but cannot fix its role.",
+   "The count byte lives at 0xFFFF2060. The blind calls it a scalar operand passed to helpers, possibly a key, which is vaguer rather than conflicting.",
+   "Offset +0 is a word event id; the blind says only that a caller word is compared.",
+   "0xFFFF20A0 is the 'last posted' event id word.",
+   "0x04A94C makes exactly 24 calls (23 jsr plus a tail jmp); the blind says only 'many'.",
+   "0x04AD40 and 0x00E5EC-0x00E6C0 are literal pools rather than task tables; the blind gives these addresses no role.",
+   "The drop on a full queue has no error path and no overflow flag.",
+   "Task stubs at 0x00E4xx call the straight-line bodies at 0x04AA58, 0x049BA4 and 0x049CF0.",
+   "The prologue shared by 0x0BDA70/0x0BDAAC/0x0BDB6E/0x0BDB80 is a guarded-RAM accessor (jsr 0x0000317C, r4=16). The blind instead reads these addresses as calibration or helper pointers; the claim lists this as open, so it is not a conflict."
+  ],
+  "reason": "The blind reader independently recovers the core mechanism. It finds a 5-slot, 12-byte-stride table at 0xFFFF2064 walked by 0x010B2A, where a match bumps a counter at +8 that saturates at 255. A new entry is refused once the table is full, at the cmp/ge #5 check. The insert sits inside a critical section in 0x010800, reached from the mask-raising routine 0x00E774. It also confirms the flag-gated straight-line jsr chain at 0x04A94C, with its rts at 0x04A9F0 and first call to 0x043750. The blind calls these 'fault records' rather than 'events', but that is a naming difference, not a structural conflict. The literal-pool corrections, the exact call count and the 0xFFFF2060 count role are not confirmed, and nothing is contradicted."
+ },
+ "doc-architecture-03": {
+  "grade": "agree",
+  "supported": [
+   "0xFFFF6624 is engine RPM (blind: 'Current engine RPM, float32').",
+   "0xFFFF6350 is engine coolant temp (blind: 'Current engine coolant temp (ECT), float32').",
+   "FFFF6624, FFFF6350 and FFFF65FC, all below 0xFFFF8000, are valid live RAM variables. The blind answer treats them as RAM scalars read throughout the code.",
+   "The RAM region includes 0xFFFF0000 and extends to 0xFFFFBFFF. The blind answer labels both 0xFFFF0000 and 0xFFFFBFFF as 'RAM', and also 0xFFFF8000."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "The identity of 0xFFFF65FC as engine load. The blind answer calls it a float scalar of 'exact identity unknown'; that is vaguer, not contradictory.",
+   "ROM spans 0x00000000-0x000FFFFF (1 MB). The blind answer only treats 0x0FFFFF as calibration data, which is consistent but does not state the range.",
+   "Exact RAM bounds and the 48 KB size.",
+   "The peripheral range 0xFFFFE000-0xFFFFFFFF and ATU-II timers at 0xFFFFF6xx."
+  ],
+  "reason": "The blind answer independently identifies RPM and ECT at the claimed addresses. It treats addresses below 0xFFFF8000 as live RAM and labels 0xFFFF0000 and 0xFFFFBFFF as RAM, which is consistent with the corrected memory map. Nothing is contradicted. The load identity, the ROM and peripheral ranges, and the exact RAM bounds are only partly or not covered."
+ },
+ "doc-turbo-character-03": {
+  "grade": "partly_agree",
+  "supported": [
+   "0xCC500 and 0xCC504 are the stock rev-limiter thresholds, with an engage point of 6700 RPM. The blind answer reads 0xCC500 = 6700 as the On threshold and 0xCC504 = 6680 as the Off threshold of a hysteresis pair, both live."
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "That the stock limiter is specifically a hard fuel cut. The blind answer says the final consumer of the limiter flags, where fuel or spark is actually cut, is not shown.",
+   "Pedal-map rows 6450 and 6500 cap RQTQ to 70, versus Base = 279 at those RPMs.",
+   "A low RQTQ/Base ratio clamps TPS low and produces a soft limit.",
+   "The 6400 RPM pedal-map row has RQTQ = 70 at 100% APP, where the soft cut starts."
+  ],
+  "reason": "The blind answer independently confirms 0xCC500/0xCC504 as the stock rev-limiter pair with 6700 as the engage value. It adds that 0xCC504 is 6680, a lower disengage threshold. That refines the claim rather than contradicting it, since the claim only cites both addresses as the source of the 6700 cut. The central point of the claim, the user-built soft limiter in the pedal-map RQTQ rows and its TPS-clamping effect, is not covered by the blind answer at all."
+ },
+ "doc-transient-fuel-04": {
+  "grade": "disagree",
+  "supported": [
+   "0xCD6E6 is a rising-load tau factor table indexed by ECT, high when cold (about 3.4) and low when warm.",
+   "0xCD746 is a falling-load tau table running from 1.42 cold to 0.30 warm.",
+   "0xCD766 is a falling-load variant that is flat at 0.50 and does not depend on ECT.",
+   "0xCD848 is falling-load variant B and 0xCD868 is falling-load variant C.",
+   "Variant C goes to 0 when hot, which removes that correction.",
+   "Falling tau values are lower than rising tau values at cold temperatures.",
+   "Rising versus falling tables are selected by the sign of a load-delta value.",
+   "The ROM literal at 0x0373E8 is about 0.00458 and acts as a weighting or filter coefficient.",
+   "CAL 0xCC2B0 = 720.0 is compared against 0xFFFF8EAC."
+  ],
+  "contradicted": [
+   "Claim says 0x3735A is tau_rising_handler, which uses the rising-load table 0xCD6E6; blind answer says 0x3735A is a small routine that low-pass filters 0xFFFF7A60 via float_lag_filter into 0xFFFF7A54, and that the tau tables are used in function 0x030C46.",
+   "Claim says 0x3740C is tau_falling_handler, which uses the four falling tables; blind answer says 0x3740C is an accumulator routine that adds 0xFFFF7A54 to 0xFFFF3194 and resets it on an AF3B rising edge.",
+   "Claim says the 720.0 gate sends >=720 to the PRIMARY path (active falling tau correction) and <720 to an accumulation path; blind answer says >=720 only permits the accumulator 0xFFFF3194 to be reset on the rising edge of AF3B.",
+   "Claim says comms_state_byte 0xFFFFAF3B controls falling-variant selection; blind answer says the variants are selected by a mode byte (mode==2) from sub 0x21016 and by 0xFFFF844F, and that AF3B is the edge trigger for the accumulator reset."
+  ],
+  "not_addressed": [
+   "The rising table layout of 3 load bins \u00d7 16 ECT bins, uint16 at scale 1/2048, and the per-load values.",
+   "The tau values are dimensionless multipliers that scale a base enrichment adder.",
+   "The tau logic is triggered on load rate rather than throttle rate.",
+   "0xFFFF8EAC is in RPM units (idle)."
+  ],
+  "reason": "The blind answer confirms the table addresses and their shapes and values. It contradicts the claimed roles of 0x3735A and 0x3740C, which it describes as a lag filter and an accumulator rather than the tau handlers. It also contradicts the meaning of the 720.0 gate and the role of AF3B in selecting variants."
+ },
+ "doc-boost-control-02": {
+  "grade": "agree",
+  "supported": [
+   "Target Boost table at 0xC1340 is a 2D lookup over RPM and a load/torque-request axis (blind: fr4 = 0xFFFF8558, the 0\u2013360 axis, and fr5 = rpm)",
+   "Initial Wastegate Duty table at 0xC1150 uses the same RPM \u00d7 load-request axes",
+   "Max Wastegate Duty table at 0xC0F58 is the max WGDC table, used as the upper clamp",
+   "Target Boost Comp ECT at 0xC0CF4 is an ECT compensation multiplier",
+   "Target Boost Comp IAT at 0xC0E3C is an IAT compensation multiplier",
+   "Target Boost Comp Atm at 0xC0EC4 is an atmospheric-pressure (altitude) compensation",
+   "Target Boost Comp 1st Gear at 0xC0C0C has value 1.0, so it applies no compensation (blind: factor sits at 1.0, inert)",
+   "Init/Max WG Duty Comp ECT at 0xC0CB4 is an ECT multiplier on the WG duty",
+   "Init/Max WG Duty Comp IAT at 0xC0C94 is an IAT multiplier on the WG duty",
+   "Init/Max WG Duty Comp Atm at 0xC0E7C is an atm-pressure multiplier on the WG duty",
+   "Boost Limit Fuel Cut at 0xD2560 is a boost-pressure limit that leads to a fuel-cut request",
+   "0xC009E is the wastegate solenoid PWM frequency constant",
+   "Target Boost, Initial WG Duty and Max WG Duty share the same load/torque-request X-axis input (0xFFFF8558)"
+  ],
+  "contradicted": [],
+  "not_addressed": [
+   "Wastegate frequency value of 1.93 Hz stock (blind gives the raw value 10000 and says the physical units are not shown)",
+   "That the shared axis is specifically RQTQ and is affected by pedal-map changes (blind calls 0xFFFF8558 a load/torque-request input with the exact quantity not shown)"
+  ],
+  "reason": "Every table address and role in the claim matches the blind reading, and the shared load/torque axis is consistent with RQTQ. The 1.93 Hz figure and the exact RQTQ identity are not confirmed, but nothing in the blind answer contradicts them."
+ }
+}
