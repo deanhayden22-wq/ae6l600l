@@ -369,6 +369,9 @@ def main():
         specs = sorted(f for f in os.listdir(LIVE) if f.endswith('.json'))
         for f in specs:
             s = json.load(open(os.path.join(LIVE, f)))
+            if str(s.get('status', '')).upper().startswith('DRAFT'):
+                print(f'== {s["id"]}: DRAFT, not on the car -- skipped here; run its build script with --gates')
+                continue
             # base is stock, so the bin carries every live patch: whitelist all registered claims
             rc |= lint({**s, 'claims': [x['id'] for x in AL.load_registry()['rom'] if not x.get('retired')]},
                        base, patched, allow_tables=True, label=f'{s["id"]} (stock -> {cur})')

@@ -183,6 +183,18 @@ def knowledge():
                            if '~~' not in m.group(1)]
     except Exception:
         pass
+    plans = []
+    pdir = os.path.join(R.REPO, 'docs', 'plans')
+    for f in sorted(os.listdir(pdir)) if os.path.isdir(pdir) else []:
+        if f.endswith('.md') and not f.endswith('.claims.md'):
+            txt = open(os.path.join(pdir, f), encoding='utf-8', errors='replace').read()
+            title = next((l[2:].strip() for l in txt.split('\n') if l.startswith('# ')), f)
+            stage = re.search(r'\*\*Stage: ([^*]+)\*\*', txt)
+            oq = re.search(r'(?ms)^## Open questions for the owner\n(.*?)^## ', txt)
+            nq = len(re.findall(r'(?m)^\d+\. ', oq.group(1))) if oq else 0
+            plans.append({'file': f'docs/plans/{f}', 'title': title, 'stage': stage.group(1).strip() if stage else '?',
+                          'open_questions': nq})
+    k['plans'] = plans
     try:
         co = open(os.path.join(R.REPO, 'docs', 'corrections.md')).read()
         last = re.findall(r'(?m)^## (\d+\..*)$', co)[-3:]

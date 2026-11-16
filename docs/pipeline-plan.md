@@ -226,6 +226,10 @@ A new patch ships **twice**:
      headless terminal), so it changes nothing in the work session.
    - The runner restarts an agent that exits mid-stage, collects answers written
      before a restart, and never re-sends a prompt to an agent still working on it.
+   - **First Track B item: `docs/plans/valet-limiter.md`.** A valet-mode rev
+     limiter that survives key-off. Its Gate 0 is five verify items
+     (`docs/plans/valet-limiter.claims.md`), run through Track A before the plan
+     can be approved.
    - Track B's runner (plan, critique, build, gates, verdict) is still to do. Its
      gates exist: `patch_lint.py`, `rom_allocation.py --check-claims`,
      `patch_emulate.py`.

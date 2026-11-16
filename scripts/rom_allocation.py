@@ -169,7 +169,10 @@ def check_claims(reg, plan_path):
         tag = c.get('id', f"{c['start']}-{c['end']}")
         for o in live(reg['rom']):
             if overlaps(c, o):
-                probs.append(f'{tag} overlaps registry claim {o["id"]}')
+                if c.get('amends') == o['id'] and o['s'] <= c['s'] and c['e'] <= o['e']:
+                    continue                        # an edit inside another patch's claim, declared
+                probs.append(f'{tag} overlaps registry claim {o["id"]}'
+                             + (' (declare "amends": "%s" if it edits that patch)' % o['id']))
         for n in reg['never_touch']:
             if overlaps(c, n):
                 probs.append(f'{tag} overlaps never-touch {n["start"]}-{n["end"]}')
@@ -187,6 +190,8 @@ def check_claims(reg, plan_path):
                 probs.append(f'{tag} overlaps RAM claim {o.get("id")}')
         if not c.get('evidence'):
             probs.append(f'{tag} has no "evidence" that the RAM is unused')
+        elif str(c['evidence']).upper().startswith('PLACEHOLDER'):
+            probs.append(f'{tag} is a PLACEHOLDER, not evidence: settle it before this patch can pass')
     for p in probs:
         print('FAIL ' + p)
     print('claims clear' if not probs else f'{len(probs)} problem(s)')

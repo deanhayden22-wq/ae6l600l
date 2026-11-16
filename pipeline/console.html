@@ -201,6 +201,12 @@ function renderStatus() {
       </div>
       ${c.tail ? `<pre class="out">${esc(c.tail)}</pre>` : ''}
     </div>
+    <div class="card" style="grid-column:1/-1"><h3>Patch plans (Track B)</h3>
+      ${(k.plans || []).length ? `<table><tr><th>plan</th><th>stage</th><th>open questions</th></tr>${k.plans.map(p =>
+        `<tr><td>${esc(p.title)}<div class="muted mono">${esc(p.file)}</div></td><td>${esc(p.stage)}</td>
+         <td>${p.open_questions ? `<span style="color:var(--warn)">${p.open_questions} waiting on you</span>` : 'none'}</td></tr>`).join('')}</table>`
+        : '<p class="muted">No patch plans yet (docs/plans/).</p>'}
+    </div>
     <div class="card"><h3>Open holes</h3><ul class="tight">${(k.open_holes || []).map(h => `<li>${esc(h)}</li>`).join('')}</ul></div>
     <div class="card"><h3>Latest corrections</h3><ul class="tight">${(k.corrections || []).map(h => `<li>${esc(h)}</li>`).join('')}</ul>
       ${verRows ? `<h3 style="margin-top:14px">Verification registry <span class="muted" style="text-transform:none">${esc(k.verification.generated || '')}</span></h3><table>${verRows}</table>` : ''}
