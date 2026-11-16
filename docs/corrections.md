@@ -6110,3 +6110,20 @@ as built (r2 is reloaded at `0x0F1030` before use), and recorded as an accepted
 warning in `docs/patch-specs/launch_control.json`. Open question for the patch:
 the `fr15` offset also reaches the comparisons at `0x03B6DA`/`0x03B6EA`.
 
+## 102. `0x0BE654` (`int32_div_sat`) is a signed 16.16 fixed-point divide, not a 32-bit unsigned divide — **2026-11-15**
+
+**Status: label comment fixed in `ImportAE5L600L.java` (name kept). Found by the
+emulator's self-test (`scripts/sh2e_emu.py --selftest`, oracle 4).**
+
+The label said "32-bit unsigned divide with saturation ... saturates at +/-0x7FFFFFFF".
+Executed on 1,013 operand pairs, `0x0BE654` returns `7 / 2 -> 229376` (`= 3.5 x 65536`),
+and matches `trunc((a << 16) / b)` clamped to int32 on every case, with `b == 0`
+giving `0x7FFFFFFF` or `0x80000000` by the sign of `a`, and `a == 0` giving 0. The
+`div0s r5,r3` at `0x0BE688` makes it signed; the 16-bit pre-shift sits in the
+`shal`/`rotcl` ladder ending at `0x0BE764`. It saturates at `-0x80000000`, not
+`-0x7FFFFFFF`.
+
+Any caller analysed as "integer divide" is off by a factor of 65536 unless its
+inputs or output are rescaled. No doc or analysis file was found citing it
+(`rg 0BE654 docs disassembly/analysis`); the name is left as is.
+

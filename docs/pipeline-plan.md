@@ -179,11 +179,40 @@ A new patch ships **twice**:
    exit, stray byte, bad checksum) are each caught by the gate meant to catch
    them. Building it found the SSM handler's real entry (`0x09A3AC`) and two
    PC-relative loads in the launch hook's delay slots (dead, accepted with reasons).
-5. **Emulation harness** (gate 8), first proven by reproducing the launch patch's
-   documented behaviour (`docs/rev-limit-patch.md`).
-6. `scripts/pipeline/run.py` + the agent files (`pipeline/agent-files/`, modelled
-   on `sdlc-automation/pipeline/agent-files/`): Track A first, since it needs only
-   the reviewer and existing tools.
+5. **DONE 2026-11-15** Emulation (gate 8). Ghidra and Java are not on the Linux
+   box, so `scripts/sh2e_emu.py` is a dedicated SH-2E emulator. Its decoder is
+   separate from `sh2e_disasm.py`, and every executed instruction is cross-checked
+   against it. Four oracles that don't depend on it pass:
+   - the ECU's checksum routine vs `rom_checksum.py`, real and mutated bins
+   - `float_clamp_range`, 550 cases
+   - the ROM divide, 1,013 cases; this also corrected its label (item 102)
+   - `table_lookup` vs `desc_types` interpolation, 3,261 points across 120
+     descriptors of three cell types
+
+   `scripts/patch_emulate.py` runs the launch patch over a 432-point grid against
+   an oracle written from `rev-limit-patch.md`; all points pass. Five code
+   mutants are each caught. One of them is only caught at the exact stored
+   threshold speed, which is now a grid point.
+6. **DONE 2026-11-15 (Track A)** `pipeline/run.py` + `pipeline/agent-files/`
+   (`RULES`, `BLIND`, `settle`, `critique`, `apply`).
+   - `new` builds the records (`.pipeline/items/<slug>/`, git-excluded) and two
+     blind workspaces **outside the repo**. Outside, because Claude Code loads
+     every parent `CLAUDE.md`, and this repo's is full of the claims under test.
+   - Each blind workspace holds only the ROM, the decoder, the definitions and the
+     pack. The pack now carries raw bytes, stock vs current.
+   - `new` then opens a herdr workspace with four panes and starts `stages` in it.
+   - Proven so far: a dry run on open-holes item 9, and a full simulated run with
+     fake agents (blind, settle, objection, fix round, clean pass, accept, apply,
+     commit question).
+   - **Not yet run against real agents in herdr.** Start one from a herdr pane:
+
+     ```
+     python3 pipeline/run.py new afc-clamp-zeroed --addrs 0x0357C8,0x0357CC,0xFFFF7904 \
+         --claim-file docs/open-holes.md --section "## 9."
+     ```
+   - Track B's runner (plan, critique, build, gates, verdict) is still to do. Its
+     gates exist: `patch_lint.py`, `rom_allocation.py --check-claims`,
+     `patch_emulate.py`.
 7. Recovery-path check, owner side: confirm how this ECU is recovered after an
    interrupted or rejected flash with the tools you own, *before* the first
    code-patch flash. This is the one thing no script here can establish.

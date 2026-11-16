@@ -611,7 +611,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // Integer utility functions
         count += labelComment(0x000BE654, "int32_div_sat",
-            "[TRACED] 32-bit unsigned divide with saturation. Unrolled 32-iter div1 loop. Saturates at +/-0x7FFFFFFF");
+            "[TRACED] SIGNED 16.16 fixed-point divide with saturation: r0 = trunc((r4<<16)/r5), clamped to int32; r5==0 -> 0x7FFFFFFF/0x80000000 by the sign of r4. Unrolled div0s/div1 chain. Verified by emulation over 1,013 cases (sh2e_emu.py --selftest; corrections item 102)");
         count += labelComment(0x000BE980, "uint8_unpack",
             "[TRACED] Extracts size from packed hi:~lo byte pair");
         count += labelComment(0x000BE990, "uint16_unpack",

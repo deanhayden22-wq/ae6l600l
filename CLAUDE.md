@@ -362,7 +362,10 @@ wrong answer. Import them; do not re-derive.
 | `scripts/rom_checksum.py` | Validate the checksum table exactly as the ECU does (`0x01002A`); `--fix OUT` writes a repaired copy, never in place. Proven on all 19 bins + mutation controls (`--selftest`). |
 | `scripts/rom_allocation.py` | The ROM/RAM allocation registry `docs/allocation.json`: `--audit` proves every off-table byte in a bin is claimed, `--free` lists free ROM, `--check-claims` tests a new patch's ranges. |
 | `scripts/patch_lint.py` | Flash-safety gates 1-5 (diff whitelist, checksum, never-touch, SH-2E legality, calling convention). `--live` lints the two patches on the car from `docs/patch-specs/`. |
-| `scripts/check.sh` | Linux twin of `check.ps1`, plus the checksum gate. |
+| `scripts/check.sh` | Linux twin of `check.ps1`, plus the checksum, patch-lint and patch-emulation gates. `--full` adds the emulator and checksum self-tests (~2 min). |
+| `scripts/sh2e_emu.py` | SH-2E emulator (gate 8). Own decoder, cross-checked against `sh2e_disasm` on every instruction; `--selftest` runs four ROM-routine oracles. Use it to settle what a routine computes instead of reasoning about it. |
+| `scripts/patch_emulate.py` | Runs a patch over a grid against an oracle written from its doc. `--live` covers the patches on the car. |
+| `pipeline/run.py` | The verify pipeline in herdr: two blind readers (Claude + Codex), settle, critique, owner gate, apply. See `docs/pipeline-plan.md`. |
 | `scripts/analysis/flkc_cell_trace.py` | Replicate the FLKC band selector over a log and classify FLKC steps as cell traversal vs in-cell learning. |
 
 ### The method that actually settles things
