@@ -1,0 +1,26 @@
+{
+  "id": "launch_control",
+  "doc": "docs/rev-limit-patch.md",
+  "claims": ["launch_hook", "launch_redirect_a", "launch_redirect_b", "launch_body"],
+  "code": [
+    {
+      "entry": "0x03B668", "kind": "call", "region": ["0x03B668", "0x03B7C3"],
+      "note": "Host: the stock rev limiter with its two cut/resume loads rewritten into jumps to the detour.",
+      "exits": ["0x03D2FC"],
+      "detours": {"0x0F1000": "0x03B6B2"},
+      "accepted": [
+        {"pc": "0x03B6B2", "why": "Delay slot of jmp @r0 at 0x03B6B0. Its r2 is dead: the detour reloads r2 at 0x0F1030 before reading it. The same word runs again, outside any slot, when the detour returns here."},
+        {"pc": "0x03B6BC", "why": "Delay slot of jmp @r0 at 0x03B6BA. Its r2 is dead for the same reason; the detour always returns to 0x03B6B2, never here."}
+      ]
+    },
+    {
+      "entry": "0x0F1000", "kind": "detour", "region": ["0x0F1000", "0x0F1057"],
+      "note": "Adds an offset to fr15 (rpm) when vehicle speed is low; host saves/restores fr15, so the change does not leak past the host's return. fr9 is never read by the host; fr6, fr8, r0 and r2 are reloaded before use.",
+      "exits": ["0x03B6B2"],
+      "clobbers": ["r0", "r2", "fr6", "fr8", "fr9", "fr15"]
+    }
+  ],
+  "review_questions": [
+    "The fr15 offset also reaches the comparisons at 0x03B6DA and 0x03B6EA (thresholds from 0x03B7B0 / 0x03B7B4), which set byte +2 of the flag block at 0x03B7AC. Is that intended, and what do those thresholds gate?"
+  ]
+}

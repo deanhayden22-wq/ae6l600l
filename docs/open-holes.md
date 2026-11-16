@@ -344,6 +344,34 @@ They are **not one family** — each needs its own evidence. Three rough groups:
 
 ---
 
+## 9. Every flashed rev zeroes a ±0.5 clamp on an A/F-correction term (NEW 2026-11-15)
+
+`0x0357C8` / `0x0357CC` hold `+0.5f` / `-0.5f` in stock and `0.0` / `0.0` in every
+rev 20.8 -> 20.19d. They are the bounds passed to `float_clamp_range` (`0x0BE56C`,
+clamp(fr4, lo=fr5, hi=fr6)) at `0x03572E`-`0x035736`:
+
+```
+03572A fmov fr0,fr4            ; result of the previous clamp
+03572C mov.l @(0x0357C4),r6    ; 0x000BE56C
+03572E mova @(0x0357C8),r0
+035730 fmov.s @r0,fr6          ; hi  (stock +0.5, tuned 0.0)
+035732 mova @(0x0357CC),r0
+035734 jsr @r6
+035736 fmov.s @r0,fr5          ; lo  (stock -0.5, tuned 0.0)
+03573A..03573E                 ; stored through struct +76 = 0xFFFF7904
+```
+
+The routine starts at `0x0355B8` with `r14` = the pointer struct at ROM `0x063A88`
+(all `0xFFFF78B4`-`0xFFFF7941`, plus `0xFFFF318C`). With both bounds 0, the value
+stored to `0xFFFF7904` is always 0.0. `0xFFFF7904` carries three conflicting labels
+(`fuel_corr_param_A`, `aggregator_fuel_output`, `afc_aggregator_output`).
+
+**Open:** what quantity this is, and what zeroing it does to fuelling. It is in the
+car today, unrecorded in any definition or tune note. Decode the consumers of
+`0xFFFF7904` (rule: find the readers of the output, not the name).
+
+---
+
 ## Closed this session — do not re-litigate
 
 `docs/corrections.md` items 39–69. Headlines worth knowing before you start:

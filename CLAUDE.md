@@ -359,6 +359,10 @@ wrong answer. Import them; do not re-derive.
 | `scripts/mapping/reconcile_ram_labels.py` | Harvest and rank conflicting RAM-address label claims across the artifacts. Reports; does not adjudicate. |
 | `scripts/mapping/sync_import_java_labels.py` | Sync descriptor labels into `ImportAE5L600L.java`. Address-keyed, additive, idempotent. **Use this, not `update_import_java.py`** (insert-only, would duplicate every label). |
 | `scripts/mapping/dedupe_import_java_labels.py` | Resolve addresses carrying two `desc_*` labels. |
+| `scripts/rom_checksum.py` | Validate the checksum table exactly as the ECU does (`0x01002A`); `--fix OUT` writes a repaired copy, never in place. Proven on all 19 bins + mutation controls (`--selftest`). |
+| `scripts/rom_allocation.py` | The ROM/RAM allocation registry `docs/allocation.json`: `--audit` proves every off-table byte in a bin is claimed, `--free` lists free ROM, `--check-claims` tests a new patch's ranges. |
+| `scripts/patch_lint.py` | Flash-safety gates 1-5 (diff whitelist, checksum, never-touch, SH-2E legality, calling convention). `--live` lints the two patches on the car from `docs/patch-specs/`. |
+| `scripts/check.sh` | Linux twin of `check.ps1`, plus the checksum gate. |
 | `scripts/analysis/flkc_cell_trace.py` | Replicate the FLKC band selector over a log and classify FLKC steps as cell traversal vs in-cell learning. |
 
 ### The method that actually settles things
@@ -413,10 +417,12 @@ right concentration, but most of this ROM has never been read by anyone here.
 ## Table data vs. code
 
 Tune revs differ almost entirely in **calibration data** — stock → 20.19b is
-12,084 differing bytes, of which all but 178 are tables. For code questions the
+12,084 differing bytes, of which all but ~263 are tables (corrections item 101). For code questions the
 choice of rev is nearly irrelevant.
 
-**Two exceptions — both are live code patches in every ROM flashed to the car:**
+**Two exceptions — both are live code patches in every ROM flashed to the car** (plus three
+off-table calibration edits, all listed in `docs/allocation.json`; one of them, `0x0357C8`,
+is unexplained -- open-holes item 9):
 
 1. **`0x09A3C2`–`0x09A473` (178 bytes)** — the SSM read-addresses patch that makes
    extended datalogging possible. See [`docs/ssm-read-patch.md`](docs/ssm-read-patch.md).
@@ -439,6 +445,7 @@ rule below and is factually wrong about which address is which. Use
 
 - `patches/` - Experimental patches with unverified addresses and logic.
 - `merp mod/archive_v1/` - Archived MerpMod port (v1). Contains known errors. Do not use for reference.
+- `merp mod/` (all of it) and `scripts/patch_rom.py` - **Untrusted and out of scope (owner, 2026-11-15).** `patch_rom.py` assembles retracted RAM identities into its airflow code (IAT = engine load, atmo = a DTC counter). Not a reference, not a patch candidate. See `docs/pipeline-plan.md`.
 
 ## Verified directories
 
@@ -448,5 +455,4 @@ When analyzing the ROM, use content from:
 - `rom/` - Stock ROM binaries
 - `scripts/` - Analysis scripts
 - `logs/` - Data logs
-- `merp mod/` - Active MerpMod port (fresh files only, not archive)
 - `docs/` - Subsystem notes, tune state, architecture reference

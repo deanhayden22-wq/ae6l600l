@@ -6062,3 +6062,51 @@ that really applies the tau tables (it loads seven descriptors,
 remaining new dispute, in `ssm-read-patch.md` (claim `doc-ssm-read-patch-02`). The labels
 `fuel_accel_enrich`, `tau_rising_handler` and `tau_falling_handler` are
 candidates for the next rename pass.
+
+## 101. Flashed revs carry 263-265 off-table bytes, not 178; the ECU checks its own checksum table; SSM handler entry is `0x09A3AC` — **2026-11-15**
+
+**Status: `CLAUDE.md` and `docs/open-holes.md` (item 9) updated. Registry in
+`docs/allocation.json`; proof is `scripts/rom_allocation.py --audit`. Labels NOT changed.**
+
+Found while building Phase 0 of `docs/pipeline-plan.md`.
+
+### Off-table changes: four groups besides the two patches
+
+`CLAUDE.md` said stock -> 20.19b differs in 12,084 bytes, "all but 178 are tables".
+Diffing every rev against stock, excluding every definition table/axis extent
+(`scripts/defs.py`) and the checksum table, leaves **263 bytes (20.8-20.17a) or 265
+(20.18 on)** in eight groups. All eight are now claimed in `docs/allocation.json`:
+
+| range | what | was documented? |
+|---|---|---|
+| `0x09A3C2`-`0x09A473` | SSM read patch | yes |
+| `0x03B6AE`-`0x03B6BD`, `0x03B79C`, `0x03B7A8`, `0x0F1000`-`0x0F1057` | launch patch (hook rewrite, two literals, body) | yes (`rev-limit-patch.md`) |
+| `0x0357C8`-`0x0357CF` | two floats `+0.5`/`-0.5` -> `0.0`/`0.0` | **no** -- open-holes item 9 |
+| `0x0C009E`-`0x0C009F` | 'Wastegate Duty Cycle Frequency'; defined, but its scaling `0.01` does not resolve in `defs.py`, so it has no extent | partly |
+| `0x0D29C4`-`0x0D29C5` | knock window B length 0 -> 438 (from 20.18) | in `transient_knock_window_trace.txt:195` only; not in any definition XML |
+
+### The checksum table, decoded from the ECU's own check
+
+17 records of (start, end, stored) at `0x0FFB80`, terminator `0xFFFFFFFF` at
+`0x0FFC4C`. Routine `0x01002A` (also `0x0101BA`, and the one ending `0x087EDA`):
+sum the longs from start while the pointer < end (`010064`-`01006A`), add the stored
+long (`01007A`), `cmp/eq` with `0x5AA5A55A` (`01007E`). Range-shape helper `0x010668`
+requires start 4-aligned, start <= end, and end&3 == 3 or start == end. 12 records
+used, 5 empty `(0, 0, 0x5AA5A55A)`. All 19 bins in `rom/` pass. What the ECU does
+on a mismatch is NOT traced. `0x000000`-`0x001FFF` and `0x0FFAF8`-`0x0FFFFF` are
+covered by no record. Tool: `scripts/rom_checksum.py`.
+
+### SSM read handler entry
+
+`ssm-read-patch.md` places the function at `0x09A3B0`; it begins at `0x09A3AC`
+(`2F86 mov.l r8,@-r15` / `2F96 mov.l r9,@-r15`). A lint from `0x09A3B0` sees r8/r9
+written without a push and an rts at stack depth 8.
+
+### Launch hook: PC-relative loads in delay slots
+
+The hook rewrite leaves `mov.l @(0x03B7A0),r2` at `0x03B6B2` and `mov.l
+@(0x03B7A4),r2` at `0x03B6BC` in the delay slots of the two `jmp @r0`. Harmless
+as built (r2 is reloaded at `0x0F1030` before use), and recorded as an accepted
+warning in `docs/patch-specs/launch_control.json`. Open question for the patch:
+the `fr15` offset also reaches the comparisons at `0x03B6DA`/`0x03B6EA`.
+

@@ -1,0 +1,40 @@
+{
+  "_about": "Every ROM/RAM range that a flashed rev changes or a patch occupies OUTSIDE a definition-XML table. Checked by scripts/rom_allocation.py (gate 6 of docs/pipeline-plan.md). A new patch adds its claims here in its plan, before it is built. Never hand-delete a claim: retire it with \"retired\": \"<date> <reason>\".",
+  "_proof": "scripts/rom_allocation.py --audit rom/*.bin: every byte that any flashed rev changes vs stock, outside a definition table/axis and the checksum table, falls inside a claim below (2026-11-15: 18 of 18 revs).",
+  "base": "rom/ae5l600l.bin",
+  "never_touch": [
+    {"start": "0x000000", "end": "0x001FFF", "why": "Covered by no checksum record in any bin (rom_checksum.py). Contents not analysed; vector table expected here. A corruption here is not caught by the ECU's own check."},
+    {"start": "0x0FFAF8", "end": "0x0FFB7F", "why": "Covered by no checksum record. 0x0FFAF8 holds 8 non-0xFF bytes in every bin; not analysed."},
+    {"start": "0x0FFB80", "end": "0x0FFC4F", "why": "The checksum table and its terminator. Only scripts/rom_checksum.py --fix writes the stored sums; ranges are never changed."},
+    {"start": "0x0FFC50", "end": "0x0FFFFF", "why": "Covered by no checksum record. Not analysed."}
+  ],
+  "rom": [
+    {"id": "ssm_read_patch", "start": "0x09A3C2", "end": "0x09A473", "kind": "code-rewrite",
+     "since": "20.8", "doc": "docs/ssm-read-patch.md",
+     "note": "Replaces the stock SSM read-addresses index lookup with direct tagged RAM reads."},
+    {"id": "launch_hook", "start": "0x03B6AE", "end": "0x03B6BD", "kind": "hook-rewrite",
+     "since": "20.8", "doc": "docs/rev-limit-patch.md",
+     "note": "Both cut/resume pair loads rewritten to mov.l @(pool),r0 / jmp @r0."},
+    {"id": "launch_redirect_a", "start": "0x03B79C", "end": "0x03B79F", "kind": "literal-redirect",
+     "since": "20.8", "doc": "docs/rev-limit-patch.md", "note": "0x000CC500 -> 0x000F1000"},
+    {"id": "launch_redirect_b", "start": "0x03B7A8", "end": "0x03B7AB", "kind": "literal-redirect",
+     "since": "20.8", "doc": "docs/rev-limit-patch.md", "note": "0x000CC50C -> 0x000F1000"},
+    {"id": "launch_body", "start": "0x0F1000", "end": "0x0F1057", "kind": "injected-code",
+     "since": "20.8", "doc": "docs/rev-limit-patch.md",
+     "reads_ram": ["0xFFFF65FC", "0xFFFF65D0"], "writes_ram": [],
+     "note": "Detour, not a call: adds an offset to fr15 (rpm) and jumps back to 0x03B6B2."},
+    {"id": "afc_clamp_zeroed", "start": "0x0357C8", "end": "0x0357CF", "kind": "undefined-cal-edit",
+     "since": "20.8", "doc": "docs/open-holes.md item 9",
+     "note": "Stock floats +0.5 / -0.5, zero in every flashed rev. Bounds of float_clamp_range (0x0BE56C) at 0x03572E-0x035736; the clamped value is stored to FFFF7904 (three conflicting labels: fuel_corr_param_A / aggregator_fuel_output / afc_aggregator_output). Identity of the zeroed term NOT settled."},
+    {"id": "wgdc_freq", "start": "0x0C009E", "end": "0x0C009F", "kind": "defined-table-no-extent",
+     "since": "20.8", "doc": "docs/boost-control.md",
+     "note": "'Wastegate Duty Cycle Frequency' is defined, but its scaling '0.01' does not resolve in scripts/defs.py, so it has no byte extent. Stock 0x3FF7 -> 0x2710 in every rev. Width and unit unverified."},
+    {"id": "knock_window_b_length", "start": "0x0D29C4", "end": "0x0D29C5", "kind": "undefined-cal-edit",
+     "since": "20.18", "doc": "disassembly/analysis/transient_knock_window_trace.txt",
+     "note": "uint16 0 -> 438, the candidate edit at transient_knock_window_trace.txt:195. Not in any definition XML."}
+  ],
+  "ram": {
+    "_note": "No patch on the car writes RAM. A new patch that needs RAM claims it here with the evidence that nothing else reads or writes it (scripts/mapping/find_writers.py + a reader scan, indexed and GBR forms included). There is no proven-free RAM yet. On-chip RAM is 0xFFFF0000-0xFFFFBFFF (CLAUDE.md rule 4).",
+    "claims": []
+  }
+}
