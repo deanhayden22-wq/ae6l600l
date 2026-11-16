@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROM pipeline</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #5f6b7a; --line: #dde2e8;
+  --accent: #2f6fde; --accent-ink: #ffffff; --ok: #1f8a4c; --warn: #b26b00; --bad: #c4322b;
+  --term-bg: #10141a; --term-ink: #d6dde6; --glow: rgba(47,111,222,.35); --crucial: #c4322b;
+  --chip: #eef1f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --panel: #161b22; --ink: #e6edf3; --muted: #8b98a8; --line: #2a313b;
+    --accent: #5b8cff; --accent-ink: #0e1116; --ok: #3fb96f; --warn: #e3a33a; --bad: #f0605a;
+    --term-bg: #0a0d12; --term-ink: #cfd8e3; --glow: rgba(91,140,255,.35); --crucial: #f0605a; --chip: #1f2630;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116; --panel: #161b22; --ink: #e6edf3; --muted: #8b98a8; --line: #2a313b;
+  --accent: #5b8cff; --accent-ink: #0e1116; --ok: #3fb96f; --warn: #e3a33a; --bad: #f0605a;
+  --term-bg: #0a0d12; --term-ink: #cfd8e3; --glow: rgba(91,140,255,.35); --crucial: #f0605a; --chip: #1f2630;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+header h1 { font-size: 16px; margin: 0; letter-spacing: .2px; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+.badge.ok { color: var(--ok); } .badge.bad { color: var(--bad); }
+.spacer { flex: 1; }
+nav { display: flex; gap: 4px; padding: 8px 16px 0; flex-wrap: wrap; }
+nav button { border: 1px solid var(--line); border-bottom: none; background: var(--chip); color: var(--ink); padding: 6px 12px; border-radius: 8px 8px 0 0; cursor: pointer; font: inherit; }
+nav button.sel { background: var(--panel); font-weight: 600; }
+nav button .dot { margin-left: 6px; }
+nav button.needs { box-shadow: inset 0 -2px 0 var(--warn); }
+nav button.crucial { box-shadow: inset 0 -2px 0 var(--crucial); color: var(--crucial); }
+main { padding: 0 16px 24px; }
+.view { background: var(--panel); border: 1px solid var(--line); border-radius: 0 8px 8px 8px; padding: 14px; }
+.strip { margin: 10px 16px 0; display: grid; gap: 6px; }
+.need { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--warn); }
+.need.crucial { border-left-color: var(--crucial); }
+.need .what { flex: 1; }
+button.btn { font: inherit; padding: 5px 11px; border-radius: 7px; border: 1px solid var(--line); background: var(--chip); color: var(--ink); cursor: pointer; }
+button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.btn.danger { color: var(--bad); }
+button.btn:disabled { opacity: .5; cursor: default; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.card h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+table { width: 100%; border-collapse: collapse; }
+td, th { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.stages { display: flex; gap: 3px; }
+.stages span { flex: 1; height: 6px; border-radius: 3px; background: var(--line); min-width: 18px; }
+.stages span.done { background: var(--ok); } .stages span.cur { background: var(--accent); }
+.stagenames { display: flex; gap: 3px; font-size: 11px; color: var(--muted); }
+.stagenames span { flex: 1; min-width: 18px; }
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 900px) { .panes { grid-template-columns: 1fr; } }
+.pane { border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; min-width: 0; }
+.pane.glow { box-shadow: 0 0 0 3px var(--glow); }
+.pane .head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.pane .head .name { font-weight: 600; }
+.pane pre { margin: 0; background: var(--term-bg); color: var(--term-ink); font: 12px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding: 8px 10px; height: 340px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.pane .bar { padding: 8px 10px; border-top: 1px solid var(--line); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pane .bar.ask { background: color-mix(in srgb, var(--crucial) 10%, var(--panel)); }
+.pane .bar.dlg { background: color-mix(in srgb, var(--warn) 10%, var(--panel)); }
+.pane .bar .q { width: 100%; font-size: 13px; }
+.pane .bar input { flex: 1; min-width: 120px; font: inherit; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.dot.working { background: var(--accent); } .dot.blocked { background: var(--warn); } .dot.idle, .dot.done { background: var(--ok); }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+pre.out { background: var(--term-bg); color: var(--term-ink); padding: 8px 10px; border-radius: 6px; font: 12px/1.35 ui-monospace, Menlo, monospace; max-height: 320px; overflow: auto; white-space: pre-wrap; margin: 8px 0 0; }
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); width: min(1000px, 94vw); max-height: 88vh; padding: 0; }
+dialog .dh { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); gap: 8px; }
+dialog pre { margin: 0; padding: 12px 14px; max-height: 76vh; overflow: auto; white-space: pre-wrap; font: 12px/1.45 ui-monospace, Menlo, monospace; }
+form.new { display: grid; grid-template-columns: 140px 1fr; gap: 8px 10px; max-width: 760px; }
+form.new input, form.new textarea { font: inherit; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+ul.tight { margin: 0; padding-left: 18px; } ul.tight li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ROM pipeline</h1>
+  <span id="session" class="badge">session …</span>
+  <span id="repo" class="badge mono"></span>
+  <span class="spacer"></span>
+  <span id="clock" class="muted"></span>
+  <button class="btn" id="theme" title="Theme">◐</button>
+</header>
+<div class="strip" id="needs"></div>
+<nav id="tabs"></nav>
+<main><div class="view" id="view"></div></main>
+<dialog id="dlg"><div class="dh"><strong id="dlgTitle"></strong><span class="spacer"></span><button class="btn" onclick="dlg.close()">Close</button></div><pre id="dlgBody"></pre></dialog>
+
+<script>
+const STAGES = ['blind', 'settle', 'critique', 'gate', 'apply', 'done'];
+const ROLE_NAMES = {runner: 'runner', reviewer: 'reviewer (Codex)', tracer: 'tracer (Claude)', blind_claude: 'blind Claude'};
+let S = null, sel = (() => { try { return localStorage.getItem('romSel') || 'status'; } catch { return 'status'; } })();
+const follow = {};          // pane id -> keep scrolled to bottom
+const drafts = {};          // pane id -> text box draft
+const dlg = document.getElementById('dlg');
+
+(function theme() {
+  let t = null; try { t = localStorage.getItem('romTheme'); } catch {}
+  if (t) document.documentElement.dataset.theme = t;
+  document.getElementById('theme').onclick = () => {
+    const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const nx = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = nx; try { localStorage.setItem('romTheme', nx); } catch {}
+  };
+})();
+
+async function api(path, body) {
+  const opt = { headers: { 'X-Rom-Console': '1' } };
+  if (body !== undefined) { opt.method = 'POST'; opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || j.output || r.statusText);
+  return j;
+}
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+function select(t) { sel = t; try { localStorage.setItem('romSel', t); } catch {} render(true); }
+
+async function poll() {
+  try { S = await api('/api/state'); render(false); }
+  catch (e) { document.getElementById('session').textContent = 'console unreachable'; }
+  setTimeout(poll, 2000);
+}
+
+function stagesBar(stage) {
+  const i = STAGES.indexOf(stage);
+  return `<div class="stages">${STAGES.map((s, k) => `<span class="${k < i || stage === 'done' ? 'done' : k === i ? 'cur' : ''}"></span>`).join('')}</div>
+          <div class="stagenames">${STAGES.map(s => `<span>${s}</span>`).join('')}</div>`;
+}
+
+function render(full) {
+  if (!S) return;
+  document.getElementById('clock').textContent = 'updated ' + S.now;
+  const ses = document.getElementById('session');
+  ses.textContent = `herdr session "${S.session.name}": ${S.session.running ? 'running' : 'stopped'}`;
+  ses.className = 'badge ' + (S.session.running ? 'ok' : 'bad');
+  document.getElementById('repo').textContent = S.repo.branch;
+
+  // needs-you strip
+  const needs = [];
+  for (const it of S.items) for (const n of it.needs) needs.push({...n, slug: it.slug});
+  needs.sort((a, b) => b.crucial - a.crucial);
+  document.getElementById('needs').innerHTML = needs.slice(0, 5).map(n =>
+    `<div class="need ${n.crucial ? 'crucial' : ''}"><span class="what"><strong>${esc(n.slug)}</strong>: ${esc(n.what)}</span>
+     <button class="btn" onclick="select('${esc(n.slug)}')">Go there</button></div>`).join('');
+  const crucial = needs.filter(n => n.crucial).length;
+  document.title = (needs.length ? `(${crucial ? crucial + ' crucial + ' : ''}${needs.length - crucial}) ` : '') + 'ROM pipeline';
+
+  // tabs
+  const tabs = [`<button class="${sel === 'status' ? 'sel' : ''}" onclick="select('status')">Status</button>`];
+  for (const it of S.items) {
+    const c = it.needs.some(n => n.crucial) ? 'crucial' : it.needs.length ? 'needs' : '';
+    tabs.push(`<button class="${sel === it.slug ? 'sel' : ''} ${c}" onclick="select('${esc(it.slug)}')">${esc(it.slug)}<span class="muted"> · ${it.stage}</span></button>`);
+  }
+  tabs.push(`<button class="${sel === 'new' ? 'sel' : ''}" onclick="select('new')">+ New item</button>`);
+  document.getElementById('tabs').innerHTML = tabs.join('');
+
+  if (sel === 'status') return renderStatus();
+  if (sel === 'new') return full ? renderNew() : null;
+  const it = S.items.find(i => i.slug === sel);
+  if (!it) return select('status');
+  renderItem(it, full);
+}
+
+function renderStatus() {
+  const k = S.knowledge || {}, c = S.check;
+  const ver = k.verification?.totals;
+  const verRows = ver ? Object.entries(ver.by_flag || ver).filter(([a, b]) => typeof b === 'number')
+      .map(([f, n]) => `<tr><td>${esc(f)}</td><td class="mono">${n}</td></tr>`).join('') : '';
+  document.getElementById('view').innerHTML = `
+  <div class="grid2">
+    <div class="card" style="grid-column:1/-1"><h3>Items</h3>
+      ${S.items.length ? `<table><tr><th>item</th><th style="width:38%">stage</th><th>outcome</th><th></th></tr>
+      ${S.items.map(it => `<tr><td><a href="#" onclick="select('${esc(it.slug)}');return false">${esc(it.slug)}</a>
+        <div class="muted mono">${esc((it.addrs || []).join(' '))}</div><div class="muted">${esc(it.claim_source)}</div></td>
+        <td>${stagesBar(it.stage)}<div class="muted">${it.runner_alive ? 'runner running' : it.done ? 'done' : 'runner stopped'}${it.rounds ? ' · fix rounds ' + it.rounds : ''}</div></td>
+        <td>${esc((it.outcome || '').replace('**Outcome:**', '')) || '<span class="muted">—</span>'}</td>
+        <td>${it.needs.length ? `<span class="badge" style="color:var(${it.needs.some(n => n.crucial) ? '--crucial' : '--warn'})">needs you</span>` : ''}</td></tr>`).join('')}</table>`
+      : '<p class="muted">No items yet. Use <em>+ New item</em>.</p>'}
+    </div>
+    <div class="card"><h3>Repo health</h3>
+      <div class="row"><span class="mono">${esc(S.repo.last_commit)}</span></div>
+      <div class="row"><span>${S.repo.dirty.length ? S.repo.dirty.length + ' uncommitted change(s)' : 'working tree clean'}</span></div>
+      ${S.repo.dirty.length ? `<pre class="out">${esc(S.repo.dirty.join('\n'))}</pre>` : ''}
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" ${c.running ? 'disabled' : ''} onclick="runCheck(false)">Run checks</button>
+        <button class="btn" ${c.running ? 'disabled' : ''} onclick="runCheck(true)">Run checks + self-tests (~2 min)</button>
+        <span class="muted">${c.running ? 'running since ' + c.started + '…' : c.finished ? `last run ${c.finished}${c.full ? ' (full)' : ''}: ` +
+          (c.exit === 0 ? '<span style="color:var(--ok)">all gates clean</span>' : `<span style="color:var(--bad)">exit ${c.exit}</span>`) : 'not run since the console started'}</span>
+      </div>
+      ${c.tail ? `<pre class="out">${esc(c.tail)}</pre>` : ''}
+    </div>
+    <div class="card"><h3>Open holes</h3><ul class="tight">${(k.open_holes || []).map(h => `<li>${esc(h)}</li>`).join('')}</ul></div>
+    <div class="card"><h3>Latest corrections</h3><ul class="tight">${(k.corrections || []).map(h => `<li>${esc(h)}</li>`).join('')}</ul>
+      ${verRows ? `<h3 style="margin-top:14px">Verification registry <span class="muted" style="text-transform:none">${esc(k.verification.generated || '')}</span></h3><table>${verRows}</table>` : ''}
+    </div>
+  </div>`;
+}
+
+async function runCheck(full) { try { await api('/api/check', {full}); } catch (e) { alert(e.message); } }
+
+function renderNew() {
+  document.getElementById('view').innerHTML = `
+  <p class="muted">A verify item: two blind readers (Claude, Codex) work out what these addresses do from bytes alone, then the tracer settles every disagreement and the reviewer checks it. You decide at the gate.</p>
+  <form class="new" onsubmit="newItem(event)">
+    <label>slug</label><input name="slug" placeholder="afc-clamp-zeroed" required pattern="[a-z][a-z0-9-]{1,40}">
+    <label>addresses</label><input name="addrs" placeholder="0x0357C8,0xFFFF7904" required>
+    <label>claim file</label><input name="claim_file" placeholder="docs/open-holes.md">
+    <label>section</label><input name="section" placeholder='## 9.'>
+    <label>…or claim text</label><textarea name="claim_text" rows="4" placeholder="Used when no claim file is given"></textarea>
+    <span></span><div><button class="btn primary">Create and start</button></div>
+  </form><pre class="out" id="newOut" hidden></pre>`;
+}
+async function newItem(ev) {
+  ev.preventDefault();
+  const f = Object.fromEntries(new FormData(ev.target)), out = document.getElementById('newOut');
+  out.hidden = false; out.textContent = 'building the pack and the workspace…';
+  try { const r = await api('/api/new', f); out.textContent = r.output; select(f.slug); }
+  catch (e) { out.textContent = e.message; }
+}
+
+function renderItem(it, full) {
+  const v = document.getElementById('view');
+  if (full || !v.dataset.item || v.dataset.item !== it.slug) {
+    v.dataset.item = it.slug;
+    v.innerHTML = `
+      <div class="row"><strong style="font-size:15px">${esc(it.slug)}</strong>
+        <span class="muted mono">${esc((it.addrs || []).join(' '))}</span><span class="muted">${esc(it.claim_source)}</span></div>
+      <div id="ihead"></div>
+      <div class="row" id="files"></div>
+      <div class="panes" id="panes">${['runner', 'reviewer', 'tracer', 'blind_claude'].map(r => `
+        <div class="pane" id="pane-${r}"><div class="head"><span class="dot" id="dot-${r}"></span><span class="name">${ROLE_NAMES[r]}</span>
+          <span class="muted" id="ag-${r}"></span><span class="spacer"></span>
+          <label class="muted"><input type="checkbox" id="fol-${r}" checked> follow</label></div>
+          <pre id="pre-${r}"></pre><div id="bar-${r}"></div></div>`).join('')}</div>`;
+  }
+  document.getElementById('ihead').innerHTML = `<div style="max-width:620px">${stagesBar(it.stage)}</div>
+    <div class="row" style="margin-top:8px">
+      <span>${it.open ? (it.runner_alive ? 'runner running' : '<span style="color:var(--warn)">runner stopped</span>') : '<span style="color:var(--warn)">no workspace open</span>'}</span>
+      ${it.outcome ? `<span>· ${esc(it.outcome.replace('**Outcome:**', 'outcome:'))}</span>` : ''}
+      <span class="spacer"></span>
+      <button class="btn primary" ${it.runner_alive || it.done ? 'disabled' : ''} onclick="runner('${it.slug}','resume')">${it.open ? 'Resume runner' : 'Open & resume'}</button>
+      <button class="btn danger" ${it.runner_alive ? '' : 'disabled'} onclick="runner('${it.slug}','stop')">Stop runner</button>
+    </div>`;
+  document.getElementById('files').innerHTML = '<span class="muted">records:</span>' +
+    it.files.map(f => `<button class="btn" onclick="showFile('${it.slug}','${f}')">${f}</button>`).join('');
+  const glow = new Set(it.needs.map(n => n.role));
+  for (const r of ['runner', 'reviewer', 'tracer', 'blind_claude']) {
+    const p = it.panes[r] || {}, pre = document.getElementById('pre-' + r);
+    if (!pre) continue;
+    document.getElementById('pane-' + r).classList.toggle('glow', glow.has(r) || p.status === 'working');
+    document.getElementById('dot-' + r).className = 'dot ' + (p.status || '');
+    document.getElementById('ag-' + r).textContent = p.agent ? `${p.agent} · ${p.status}` : (it.open ? 'no agent' : '');
+    const text = p.text ?? (it.open ? '' : '(workspace not open)');
+    if (pre.dataset.t !== text) {
+      pre.textContent = text; pre.dataset.t = text;
+      if (document.getElementById('fol-' + r).checked) pre.scrollTop = pre.scrollHeight;
+    }
+    renderBar(r, p, it);
+  }
+}
+
+function renderBar(r, p, it) {
+  const bar = document.getElementById('bar-' + r);
+  const key = JSON.stringify([p.pane, p.gate, p.dialog, p.status]);
+  if (bar.dataset.k === key) return;
+  bar.dataset.k = key;
+  if (!p.pane) { bar.innerHTML = ''; return; }
+  let html = '';
+  if (p.gate) {
+    html = `<div class="bar ask"><div class="q"><strong>Your answer needed:</strong> ${esc(p.gate.question)}</div>
+      ${p.gate.choices.map(c => `<button class="btn ${c === p.gate.choices[0] ? 'primary' : ''}" onclick="sendText('${p.pane}','${c[0]}')">${esc(c)}</button>`).join('')}
+      <button class="btn" onclick="showFile('${it.slug}','settle.md')">Read settle.md</button></div>`;
+  } else if (p.status === 'blocked') {
+    const d = p.dialog;
+    html = `<div class="bar dlg"><div class="q"><strong>${esc(p.agent)} is waiting on a dialog.</strong> ${esc(d?.question || '')}</div>
+      ${d ? d.options.map((o, i) => `<button class="btn" title="${i === d.cursor ? 'where the cursor is now' : ''}" onclick="pick('${p.pane}',${i - d.cursor})">${i === d.cursor ? '❯ ' : ''}${esc(o)}</button>`).join('') : ''}
+      <button class="btn" onclick="keys('${p.pane}',['up'])">↑</button><button class="btn" onclick="keys('${p.pane}',['down'])">↓</button>
+      <button class="btn" onclick="keys('${p.pane}',['enter'])">Enter</button><button class="btn" onclick="keys('${p.pane}',['esc'])">Esc</button></div>`;
+  }
+  html += `<div class="bar"><input id="in-${r}" placeholder="type to ${esc(ROLE_NAMES[r])} (Enter sends)" value="${esc(drafts[p.pane] || '')}"
+      oninput="drafts['${p.pane}']=this.value" onkeydown="if(event.key==='Enter'){sendBox('${p.pane}','${r}')}">
+      <button class="btn" onclick="sendBox('${p.pane}','${r}')">Send</button>
+      <button class="btn" title="Ctrl+C" onclick="keys('${p.pane}',['ctrl+c'])">^C</button></div>`;
+  bar.innerHTML = html;
+}
+
+async function keys(pane, ks) { try { await api('/api/keys', {pane, keys: ks}); } catch (e) { alert(e.message); } }
+async function pick(pane, delta) { const ks = Array(Math.abs(delta)).fill(delta > 0 ? 'down' : 'up'); ks.push('enter'); await keys(pane, ks); }
+async function sendText(pane, text) { try { await api('/api/text', {pane, text, enter: true}); } catch (e) { alert(e.message); } }
+async function sendBox(pane, r) {
+  const el = document.getElementById('in-' + r); if (!el.value.trim()) return;
+  el.disabled = true;
+  try { await api('/api/text', {pane, text: el.value, enter: true}); el.value = ''; drafts[pane] = ''; }
+  catch (e) { alert(e.message); } finally { el.disabled = false; el.focus(); }
+}
+async function runner(slug, action) {
+  if (action === 'stop' && !confirm(`Stop the runner for ${slug}? Agents keep running; Resume continues from disk.`)) return;
+  try { const r = await api('/api/runner', {slug, action}); if (r.output) console.log(r.output); } catch (e) { alert(e.message); }
+}
+async function showFile(slug, name) {
+  try { const r = await api(`/api/file?item=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}`);
+        document.getElementById('dlgTitle').textContent = `${slug} / ${name}`; document.getElementById('dlgBody').textContent = r.text; dlg.showModal(); }
+  catch (e) { alert(e.message); }
+}
+poll();
+</script>
+</body>
+</html>

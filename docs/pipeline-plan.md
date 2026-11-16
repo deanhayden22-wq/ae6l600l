@@ -204,12 +204,28 @@ A new patch ships **twice**:
    - Proven so far: a dry run on open-holes item 9, and a full simulated run with
      fake agents (blind, settle, objection, fix round, clean pass, accept, apply,
      commit question).
-   - **Not yet run against real agents in herdr.** Start one from a herdr pane:
+   - It runs in a herdr session of its own, `rom`, started headless on demand, so
+     it never touches the work session (`default`). The herdr calls were tested live
+     in that session (layout, labels, `pane run`, teardown). **Not yet run against
+     real agents.** From any terminal:
 
      ```
      python3 pipeline/run.py new afc-clamp-zeroed --addrs 0x0357C8,0x0357CC,0xFFFF7904 \
          --claim-file docs/open-holes.md --section "## 9."
+     rom console        # http://127.0.0.1:47831 -- status page + live panes, gate/dialog buttons
      ```
+   - **Console** (`pipeline/console.py`, `console.html`), modelled on the sdlc console:
+     - a status page: items and their stage, what needs you, repo health with a
+       Run checks button, open holes, latest corrections, verification counts
+     - per item: the four panes live, with agent state, gate answers and dialog
+       options as buttons, a text box per pane, Resume/Stop for the runner, and the
+       records one click away
+     - loopback only; Host, header and Origin are checked, and foreign requests
+       are refused (403)
+   - The `rom` session has its own herdr config (`HERDR_CONFIG_PATH`, 220x64
+     headless terminal), so it changes nothing in the work session.
+   - The runner restarts an agent that exits mid-stage, collects answers written
+     before a restart, and never re-sends a prompt to an agent still working on it.
    - Track B's runner (plan, critique, build, gates, verdict) is still to do. Its
      gates exist: `patch_lint.py`, `rom_allocation.py --check-claims`,
      `patch_emulate.py`.

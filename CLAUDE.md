@@ -365,7 +365,7 @@ wrong answer. Import them; do not re-derive.
 | `scripts/check.sh` | Linux twin of `check.ps1`, plus the checksum, patch-lint and patch-emulation gates. `--full` adds the emulator and checksum self-tests (~2 min). |
 | `scripts/sh2e_emu.py` | SH-2E emulator (gate 8). Own decoder, cross-checked against `sh2e_disasm` on every instruction; `--selftest` runs four ROM-routine oracles. Use it to settle what a routine computes instead of reasoning about it. |
 | `scripts/patch_emulate.py` | Runs a patch over a grid against an oracle written from its doc. `--live` covers the patches on the car. |
-| `pipeline/run.py` | The verify pipeline in herdr: two blind readers (Claude + Codex), settle, critique, owner gate, apply. See `docs/pipeline-plan.md`. |
+| `pipeline/run.py` | The verify pipeline, in its own herdr session `rom` (never the work session): two blind readers (Claude + Codex), settle, critique, owner gate, apply. `rom new …` from any terminal (`~/.local/bin/rom`), `rom console` for the web console (http://127.0.0.1:47831: status page, live panes, gate and dialog buttons, records), `rom open <slug>` to rebuild a closed workspace. See `docs/pipeline-plan.md`. |
 | `scripts/analysis/flkc_cell_trace.py` | Replicate the FLKC band selector over a log and classify FLKC steps as cell traversal vs in-cell learning. |
 
 ### The method that actually settles things

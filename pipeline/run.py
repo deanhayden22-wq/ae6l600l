@@ -3,10 +3,13 @@
 
     python3 pipeline/run.py new <slug> --addrs 0x0357C8,0xFFFF7904 \
         --claim-file docs/open-holes.md --section "## 9." [--reviewer codex] [--dry-run]
+    python3 pipeline/run.py attach             # watch it / answer gates (Ctrl+b d to detach)
     python3 pipeline/run.py stages <slug>      # the runner itself; `new` starts it in its pane
     python3 pipeline/run.py status [<slug>]
 
-`new` must be run from inside a herdr pane (HERDR_ENV=1) unless --dry-run. It builds:
+Everything runs in its OWN herdr session, `rom` (socket ~/.config/herdr/sessions/rom/), started
+headless on demand. The work session (`default`) is never touched. Run `new` from any terminal.
+It builds:
 
   .pipeline/items/<slug>/              records (git-excluded): item.json, claim.md, pack.md,
                                        blind-*.md, settle.md
@@ -16,7 +19,7 @@
                                        because Claude Code loads every parent CLAUDE.md, and the
                                        repo's is full of the claims being tested.
 
-and a herdr workspace `rom/<slug>` with four panes: runner | reviewer (Codex, cwd its blind
+and, in the `rom` herdr session, a workspace `rom/<slug>` with four panes: runner | reviewer (Codex, cwd its blind
 folder, workspace-write sandbox so it can write nowhere else) / tracer (Claude, main
 checkout) | blind-claude (a fresh Claude in its blind folder).
 
@@ -45,6 +48,18 @@ AGENT_FILES = os.path.join(HERE, 'agent-files')
 RECORDS = os.path.join(REPO, '.pipeline', 'items')
 STATE = os.path.join(os.path.expanduser('~'), '.local', 'state', 'ae5l-pipeline')
 CLAUDE_MODEL = 'claude-opus-5-5'
+SESSION = 'rom'                     # a herdr session of its own, apart from the work session
+SERVER_LOG = os.path.join(os.path.expanduser('~'), '.local', 'state', 'ae5l-pipeline', 'herdr-server.log')
+# The rom session's own herdr config (HERDR_CONFIG_PATH), so nothing here changes the work session's.
+ROM_CONFIG = os.path.join(os.path.expanduser('~'), '.config', 'herdr', 'sessions', SESSION, 'config.toml')
+ROM_CONFIG_TEXT = '''# herdr config for the AE5L600L "rom" session only (written by pipeline/run.py).
+onboarding = false
+
+# The runner drives agents with no client attached; give them a real terminal, not 80x24.
+[server]
+headless_cols = 220
+headless_rows = 64
+'''
 MAX_ROUNDS = 3
 BLIND_HEADINGS = ['## Mechanism', '## Addresses', '## Inputs and outputs',
                   '## Inert or gated in this calibration', '## Statements', '## Not established']
@@ -90,14 +105,42 @@ def agent_name(role, slug):
     return base[:32] if base[0].isalpha() else ('a' + base)[:32]
 
 
+def herdr_env():
+    os.makedirs(os.path.dirname(ROM_CONFIG), exist_ok=True)
+    if not os.path.exists(ROM_CONFIG):
+        open(ROM_CONFIG, 'w').write(ROM_CONFIG_TEXT)
+    return {**os.environ, 'HERDR_CONFIG_PATH': ROM_CONFIG}
+
+
 def herdr(*args, check=True):
-    p = subprocess.run(['herdr', *args], capture_output=True, text=True)
+    p = subprocess.run(['herdr', '--session', SESSION, *args], capture_output=True, text=True, env=herdr_env())
     if check and p.returncode != 0:
         raise SystemExit(f'herdr {" ".join(args)} failed: {p.stderr.strip() or p.stdout.strip()}')
     try:
         return json.loads(p.stdout) if p.stdout.strip() else {}
     except json.JSONDecodeError:
         return {'raw': p.stdout}
+
+
+def server_running():
+    p = subprocess.run(['herdr', '--session', SESSION, 'status'], capture_output=True, text=True)
+    m = re.search(r'server:\s*\n\s*status:\s*(\S+)', p.stdout)
+    return bool(m and m.group(1) == 'running')
+
+
+def ensure_server():
+    """Start the `rom` session's server headless if it is not running. Never touches `default`."""
+    if server_running():
+        return
+    os.makedirs(os.path.dirname(SERVER_LOG), exist_ok=True)
+    subprocess.Popen(['herdr', '--session', SESSION, 'server'], stdin=subprocess.DEVNULL, env=herdr_env(),
+                     stdout=open(SERVER_LOG, 'a'), stderr=subprocess.STDOUT, start_new_session=True)
+    for _ in range(40):
+        time.sleep(0.25)
+        if server_running():
+            say(f'started the herdr session "{SESSION}" (headless; log {SERVER_LOG})')
+            return
+    raise SystemExit(f'could not start herdr session "{SESSION}"; see {SERVER_LOG}')
 
 
 def agent_status(name):
@@ -129,10 +172,10 @@ def wait_for(name, path, heads, what):
         if st != 'blocked':
             blocked_said = False
         if has_headings(path, heads) and st in ('idle', 'done', None):
-            return
-        if st is None and not os.path.exists(path):
-            say(f'   {name} is not running. Restart it, or Ctrl+C and `run.py stages` later.')
-            time.sleep(30)
+            return True
+        if st is None and not has_headings(path, heads):
+            say(f'   {name} exited before writing {os.path.basename(path)}; restarting it')
+            return False
         time.sleep(5)
 
 
@@ -213,8 +256,6 @@ def cmd_new(a):
         raise SystemExit('slug: lowercase letters, digits and dashes, starting with a letter')
     if os.path.exists(rec(slug, 'item.json')) and not a.force:
         raise SystemExit(f'{slug} exists; `run.py stages {slug}` resumes it (or --force to rebuild)')
-    if not a.dry_run and os.environ.get('HERDR_ENV') != '1':
-        raise SystemExit('run this from a herdr pane (HERDR_ENV=1), or use --dry-run')
     addrs = [int(x, 16) for x in a.addrs.split(',')]
     claim = a.claim_text + '\n' if a.claim_text else extract_claim(a.claim_file, a.section)
     rom_rel = a.rom or current_rom()
@@ -238,6 +279,13 @@ def cmd_new(a):
         for role, text in prompts(slug, item).items():
             say(f'  [{role}] {text}')
         return 0
+    open_workspace(slug, item)
+    return 0
+
+
+def open_workspace(slug, item):
+    """Build the item's herdr workspace (four panes) in the rom session and start the runner in it."""
+    ensure_server()
     ws = herdr('workspace', 'create', '--cwd', REPO, '--label', f'rom/{slug}', '--no-focus')['result']
     wid, root = ws['workspace']['workspace_id'], ws['root_pane']['pane_id']
     rev = herdr('pane', 'split', root, '--direction', 'right', '--cwd', blind_dir(slug, 'codex'))['result']['pane']['pane_id']
@@ -250,8 +298,30 @@ def cmd_new(a):
     item['workspace'] = wid
     save_item(slug, item)
     herdr('pane', 'run', root, f'python3 {os.path.join(HERE, "run.py")} stages {slug}')
-    say(f'workspace rom/{slug} ({wid}) is up; the runner is in its top-left pane.')
+    say(f'workspace rom/{slug} is up in the herdr session "{SESSION}"; the runner is its top-left pane.')
+    say('Watch it and answer gates:  rom console   (or: rom attach)')
+
+
+def cmd_open(a):
+    """Rebuild an existing item's workspace (after a herdr restart, or a closed workspace) and resume it."""
+    item = load_item(a.slug)
+    ws = item.get('workspace')
+    if ws and server_running():
+        live = [w['workspace_id'] for w in herdr('workspace', 'list')['result']['workspaces']]
+        if ws in live:
+            raise SystemExit(f'{a.slug} is already open ({ws}); `rom console` to watch it')
+    open_workspace(a.slug, item)
     return 0
+
+
+def cmd_attach(a):
+    ensure_server()
+    os.execvpe('herdr', ['herdr', 'session', 'attach', SESSION], herdr_env())
+
+
+def cmd_console(a):
+    import console
+    return console.start(open_browser=not a.no_browser)
 
 
 # ------------------------------------------------------------------ stages
@@ -266,10 +336,44 @@ def prompts(slug, item):
     }
 
 
+def wait_unblocked(name, pane):
+    """An agent showing a dialog (folder trust, a permission) waits for the owner, never crashes the run."""
+    said = False
+    while agent_status(name) in ('blocked', 'unknown'):
+        if not said:
+            say(f'   >>> {name} is waiting on a dialog in its pane ({pane}). Answer it in'
+                f'  rom console  (or rom attach); the runner continues by itself')
+            said = True
+        time.sleep(3)
+
+
 def ensure_agent(name, kind, pane, args):
     if agent_status(name):
+        wait_unblocked(name, pane)
         return
-    herdr('agent', 'start', name, '--kind', kind, '--pane', pane, '--timeout', '120000', '--', *args)
+    r = subprocess.run(['herdr', '--session', SESSION, 'agent', 'start', name, '--kind', kind, '--pane', pane,
+                        '--timeout', '120000', '--', *args], capture_output=True, text=True, env=herdr_env())
+    if r.returncode != 0:
+        if 'agent_not_ready' in r.stdout + r.stderr or agent_status(name):
+            wait_unblocked(name, pane)
+            return
+        raise SystemExit(f'could not start {name}: {(r.stderr or r.stdout).strip()}')
+
+
+def send_once(slug, item, key, name, text):
+    """Prompt an agent unless this exact step was already sent and the agent is still on it."""
+    sent = item.setdefault('sent', {})
+    if sent.get(key) and agent_status(name) == 'working':
+        say(f'   {name} is already working on {key}; not re-sending')
+        return
+    herdr('agent', 'prompt', name, text)
+    sent[key] = datetime.datetime.now().isoformat(timespec='seconds')
+    save_item(slug, item)
+
+
+def blind_claude_args():
+    return ['--model', CLAUDE_MODEL, '--allowedTools', 'Read', 'Write', 'Grep', 'Glob',
+            'Bash(python3:*)', 'Bash(xxd:*)']
 
 
 def reviewer_args(item):
@@ -280,6 +384,11 @@ def reviewer_args(item):
 
 def stage_blind(slug, item):
     out_c, out_x = rec(slug, 'blind-claude.md'), rec(slug, 'blind-codex.md')
+    for who, out in (('claude', out_c), ('codex', out_x)):      # finished before a restart: just collect
+        src = os.path.join(blind_dir(slug, who), 'answer.md')
+        if not has_headings(out, BLIND_HEADINGS) and has_headings(src, BLIND_HEADINGS):
+            shutil.copy(src, out)
+            say(f'   blind {who}: answer already written; collected')
     if has_headings(out_c, BLIND_HEADINGS) and has_headings(out_x, BLIND_HEADINGS):
         return
     say('== 1 blind: two readers, two vendors, no claim')
@@ -288,16 +397,20 @@ def stage_blind(slug, item):
     jobs = []
     if not has_headings(out_x, BLIND_HEADINGS):
         ensure_agent(rv, item['reviewer'], item['panes']['reviewer'], reviewer_args(item))
-        herdr('agent', 'prompt', rv, p)
+        send_once(slug, item, 'blind-codex', rv, p)
         jobs.append((rv, os.path.join(blind_dir(slug, 'codex'), 'answer.md'), out_x))
     if not has_headings(out_c, BLIND_HEADINGS):
-        ensure_agent(bc, 'claude', item['panes']['blind_claude'],
-                     ['--model', CLAUDE_MODEL, '--allowedTools', 'Read', 'Write', 'Grep', 'Glob',
-                      'Bash(python3:*)', 'Bash(xxd:*)'])
-        herdr('agent', 'prompt', bc, p)
+        ensure_agent(bc, 'claude', item['panes']['blind_claude'], blind_claude_args())
+        send_once(slug, item, 'blind-claude', bc, p)
         jobs.append((bc, os.path.join(blind_dir(slug, 'claude'), 'answer.md'), out_c))
     for name, src, dst in jobs:
-        wait_for(name, src, BLIND_HEADINGS, 'blind answer')
+        while not wait_for(name, src, BLIND_HEADINGS, 'blind answer'):
+            if name == rv:
+                ensure_agent(rv, item['reviewer'], item['panes']['reviewer'], reviewer_args(item))
+            else:
+                ensure_agent(bc, 'claude', item['panes']['blind_claude'], blind_claude_args())
+            item.setdefault('sent', {}).pop('blind-codex' if name == rv else 'blind-claude', None)
+            send_once(slug, item, 'blind-codex' if name == rv else 'blind-claude', name, p)
         shutil.copy(src, dst)
         say(f'   {name}: answer copied to {os.path.relpath(dst, REPO)}')
     if agent_status(bc):
@@ -317,7 +430,10 @@ def stage_settle(slug, item):
     before = os.path.getmtime(rec(slug, 'settle.md')) if os.path.exists(rec(slug, 'settle.md')) else 0
     herdr('agent', 'prompt', tr, prompts(slug, item)['settle'])
     while True:
-        wait_for(tr, rec(slug, 'settle.md'), SETTLE_HEADINGS, 'settle.md')
+        if not wait_for(tr, rec(slug, 'settle.md'), SETTLE_HEADINGS, 'settle.md'):
+            ensure_agent(tr, 'claude', item['panes']['tracer'], ['--model', CLAUDE_MODEL])
+            herdr('agent', 'prompt', tr, prompts(slug, item)['settle'])
+            continue
         if os.path.getmtime(rec(slug, 'settle.md')) > before:
             break
         time.sleep(5)
@@ -337,7 +453,9 @@ def stage_critique(slug, item):
     say(f'== 3 critique, pass {n}')
     p = prompts(slug, item)['critique'].replace('<N>', str(n))
     herdr('agent', 'prompt', rv, p)
-    wait_for(rv, out, [], f'critique pass {n}')
+    while not wait_for(rv, out, [], f'critique pass {n}'):
+        ensure_agent(rv, item['reviewer'], item['panes']['reviewer'], reviewer_args(item))
+        herdr('agent', 'prompt', rv, p)
     body = open(out).read().strip()
     with open(rec(slug, 'settle.md'), 'a') as f:
         f.write('\n\n' + body + '\n')
@@ -351,7 +469,9 @@ def stage_apply(slug, item):
     ensure_agent(tr, 'claude', item['panes']['tracer'], ['--model', CLAUDE_MODEL])
     say('== 5 apply')
     herdr('agent', 'prompt', tr, prompts(slug, item)['apply'])
-    wait_for(tr, rec(slug, 'settle.md'), SETTLE_HEADINGS + ['## Applied'], '## Applied in settle.md')
+    while not wait_for(tr, rec(slug, 'settle.md'), SETTLE_HEADINGS + ['## Applied'], '## Applied in settle.md'):
+        ensure_agent(tr, 'claude', item['panes']['tracer'], ['--model', CLAUDE_MODEL])
+        herdr('agent', 'prompt', tr, prompts(slug, item)['apply'])
     say(subprocess.run(['git', 'diff', '--stat'], cwd=REPO, capture_output=True, text=True).stdout)
     if ask('Commit these changes?', ['yes', 'no']) == 'yes':
         status = subprocess.run(['git', 'status', '--porcelain'], cwd=REPO, capture_output=True, text=True).stdout
@@ -430,10 +550,16 @@ def main():
     n.add_argument('--force', action='store_true')
     s = sub.add_parser('stages')
     s.add_argument('slug')
+    sub.add_parser('attach')
+    o = sub.add_parser('open')
+    o.add_argument('slug')
+    c = sub.add_parser('console')
+    c.add_argument('--no-browser', action='store_true')
     t = sub.add_parser('status')
     t.add_argument('slug', nargs='?')
     a = ap.parse_args()
-    return {'new': cmd_new, 'stages': cmd_stages, 'status': cmd_status}[a.cmd](a)
+    return {'new': cmd_new, 'stages': cmd_stages, 'status': cmd_status, 'attach': cmd_attach,
+            'open': cmd_open, 'console': cmd_console}[a.cmd](a)
 
 
 if __name__ == '__main__':
