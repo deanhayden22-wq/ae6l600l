@@ -38,6 +38,70 @@ public class RetireStaleLabels extends GhidraScript {
             for (Symbol s : getSymbols(name, null)) {
                 if (s.getAddress().equals(a)) {
                     s.delete();
+        // >>> BEGIN retired by sync_decoded_labels.py -- do not hand-edit >>>
+        // Names removed from ImportAE5L600L.java because a decoded trace replaced
+        // them (disassembly/maps/decoded_labels.json; corrections item 107 onward).
+        n += drop(0x00002B8CL, "ISR_CommonDispatcher");
+        n += drop(0x0000317CL, "interrupt_priority_set");
+        n += drop(0x0000317CL, "irq_level_set");
+        n += drop(0x00003190L, "irq_level_restore");
+        n += drop(0x000035FCL, "inj_channel_timer_setup");
+        n += drop(0x0000E6C4L, "sched_event_clear");
+        n += drop(0x0000E6E4L, "sched_event_post");
+        n += drop(0x0000E774L, "sched_isr_common_entry");
+        n += drop(0x0000E794L, "sched_timer_dispatch");
+        n += drop(0x0000FBA4L, "watchdog_fault_reset");
+        n += drop(0x0001076AL, "charge_workspace_init");
+        n += drop(0x0002E7D8L, "check_fuel_7234");
+        n += drop(0x0002E7E2L, "check_fuel_7235");
+        n += drop(0x00034EC8L, "afl_airflow_processor");
+        n += drop(0x00034EF4L, "afl_airflow_update");
+        n += drop(0x0003580CL, "clol_transition_core");
+        n += drop(0x0005D1D0L, "diag_monitor_status_read");
+        n += drop(0x0005E76AL, "diag_monitor_noop");
+        n += drop(0x00066626L, "evap_ect_threshold_lookup");
+        n += drop(0x00098686L, "dtc_status_check");
+        n += drop(0x0009CFEEL, "dtc_scan_loop");
+        n += drop(0x0009D052L, "dtc_counter_update");
+        n += drop(0x000BDB92L, "peripheral_io_init");
+        n += drop(0x000BDBCCL, "desc_read_float_safe");
+        n += drop(0x000BDC6AL, "peripheral_io_config");
+        n += drop(0x000BDCB6L, "desc_read_int_safe");
+        n += drop(0x000BDD5AL, "peripheral_io_read");
+        n += drop(0x000BDD88L, "peripheral_io_write");
+        n += drop(0x000BE588L, "fmac_interp_uint8");
+        n += drop(0x000BE598L, "fmac_interp_uint16");
+        n += drop(0x000BE5A8L, "axis_frac_to_uint8");
+        n += drop(0x000BE5D8L, "axis_frac_to_uint16");
+        n += drop(0x000BE608L, "float_deadband_check");
+        n += drop(0x000BE654L, "int32_div_sat");
+        n += drop(0x000BE800L, "float_clamp_with_step");
+        n += drop(0x000BE830L, "table_desc_1d_float");
+        n += drop(0x000BE874L, "LowPW_TableProcessor");
+        n += drop(0x000BE88CL, "table_desc_2d_uint8");
+        n += drop(0x000BE8C4L, "table_desc_2d_uint16");
+        n += drop(0x000BE8E4L, "table_desc_2d_typed");
+        n += drop(0x000BE944L, "table_desc_2d_uint16_int");
+        n += drop(0x000BE980L, "uint8_unpack");
+        n += drop(0x000BE990L, "uint16_unpack");
+        n += drop(0x000BEA6CL, "int_fixpoint_lerp");
+        n += drop(0x000BEAB8L, "int_count_shifts");
+        n += drop(0x000BECA8L, "LowPW_AxisLookup");
+        n += drop(0x000BECDCL, "axis_lookup_2d");
+        n += drop(0x000BED98L, "axis_lookup_2d_typed");
+        n += drop(0xFFFF1230L, "SH7058_TIER_MTU0");
+        n += drop(0xFFFF12B8L, "SH7058_SCI_TDR");
+        n += drop(0xFFFF2060L, "sched_event_count");
+        n += drop(0xFFFF318CL, "evap_pressure_baseline");
+        n += drop(0xFFFF65C5L, "engine_running_flag");
+        n += drop(0xFFFF6810L, "ol_condition_selector");
+        n += drop(0xFFFF7904L, "afc_aggregator_output");
+        n += drop(0xFFFF7904L, "aggregator_fuel_output");
+        n += drop(0xFFFF7904L, "fuel_corr_param_A");
+        n += drop(0xFFFF805CL, "gbr_kflk_805C");
+        n += drop(0xFFFF8080L, "knock_flkc_workspace");
+        n += drop(0xFFFF85DCL, "knock_fuel_interlock");
+        // <<< END retired by sync_decoded_labels.py <<<
                     println("  removed " + name + " at " + a);
                     return 1;
                 }
@@ -203,7 +267,7 @@ public class RetireStaleLabels extends GhidraScript {
         n += drop(0x00071D14L, "sensor_float_clamp_b");
         n += drop(0xFFFF31A4L, "afl_interp_secondary");
         n += drop(0xFFFF31ACL, "afl_interp_primary");
-        println("RetireStaleLabels: removed " + n + " of 150 stale label(s).");
+        println("RetireStaleLabels: removed " + n + " of 210 stale label(s).");
         println("Now re-run ImportAE5L600L to apply the current names.");
     }
 }

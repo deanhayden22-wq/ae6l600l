@@ -1,0 +1,1781 @@
+HELPER LIBRARY A -- SATURATING ADD / CLAMP / SCALE / DIVIDE / COMPARE PRIMITIVES, 0x0BE4FA..0x0BE81B
+BLIND TRACE FROM BYTES, EVERY CONTRACT CHECKED BY EMULATION -- SETTLED AFTER ADVERSARIAL REVIEW (third decode)
+====================================================================================================
+
+Date           2026-11-27
+Reference bin  rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+               The 802 bytes 0x0BE4FA..0x0BE81B are byte-identical in all 21 AE5L600L images directly under
+               rom/ (the 20 .bin files, stock rom/ae5l600l.bin through rev 20.19e, and the one 1 MB .hex), so
+               nothing here is rev-dependent.  The FPU self-test bytes this file leans on (0x058594..0x0587FB)
+               and the reset FPSCR load (0x00FA42, 0x00FCC8) are identical in the same 21 images.
+Method         Each entry dumped blind with scripts/mapping/fn_dump.py (canonical decoder, no names) and read
+               from the bytes alone; each contract then executed by scripts/sh2e_emu.py over edge-inclusive
+               grids and asserted against a model written from the bytes (scripts/trace/emu_helpers_arith.py:
+               456,566 emulated calls, exit 0; re-run 2026-11-27 against the corrected, truncating emulator of
+               corrections item 106, same calls, exit 0).  A reviewer disputed five claims and listed ten omissions;
+               each was re-decided here from bytes and emulation -- see REVIEW HISTORY, last section.
+EVIDENCE CLASS bytes + emulated for every integer contract and for the STRUCTURE of every float contract
+               (operand roles, operation order, compare sense, bounds, every special-case branch).  The final
+               rounding of a float result is: DIRECTION = bytes (the ROM's own FPU self-test demands truncated
+               fmac/fmul/fdiv results); FUSED-OR-NOT fmac = not established.  Since corrections item 106
+               (2026-11-27) the emulator computes every float operation exactly and truncates once, fmac fused,
+               and every emulated float value here is asserted BIT-EXACT against that model.  (Before item 106
+               it rounded to NEAREST, and an emulated value was not what the firmware expects wherever an
+               operation was inexact.)  Fused-vs-unfused fmac and inexact fadd/fsub rest on extensions of the
+               byte evidence -- read FLOAT ROUNDING before quoting a float value.  "inferred" only where marked;
+               the meaning a CALLER gives a value is never claimed here.
+
+SCOPE
+  Thirteen leaf routines.  None calls anything, none touches the stack, none writes memory, and none reads
+  memory other than its own literal pool -- except 0x0BE4FA, which reads the record it is handed and the two
+  arrays that record points to.  Every one returns with rts.  They are reached through literal-pool
+  pointers only: a scan of every 2-aligned long in the image finds pointers into 0x0BE4FA..0x0BE81B to
+  exactly these thirteen addresses and to no other address in the range (1,082 pointer words, all of them
+  4-aligned), and no bsr/bra/bt/bf in reached code outside the range lands inside it.  Every call site
+  found is a jsr with ONE exception: 0x0BE56C is also entered by a tail jmp (0x02FA20, listed in its
+  section), where "returns" means returns to the caller's caller.
+
+  entry     what the bytes compute (neutral name)                              calling     call    pool
+                                                                               functions   sites   words
+  0x0BE4FA  step lookup: u8 value for the highest float threshold <= x               2         2       2
+  0x0BE524  r0 = saturating signed 32-bit add                                        5         5       5
+  0x0BE53C  r0 = saturating unsigned 8-bit add                                     271       476     228
+  0x0BE554  r0 = saturating unsigned 16-bit add                                402 (+3)      712     335
+  0x0BE56C  fr0 = clamp(fr4, lo fr5, hi fr6)                                       129   256 + 1     117
+  0x0BE588  fr0 = fr4 * (u8)r4  + fr5                                               23        33      22
+  0x0BE598  fr0 = fr4 * (u16)r4 + fr5                                               98       150      83
+  0x0BE5A8  r0 = clamp(trunc((fr4 - fr6) / fr5 + 0.5), 0, 255)                     105       150      24
+  0x0BE5D8  r0 = clamp(trunc((fr4 - fr6) / fr5 + 0.5), 0, 65535)                    78       184      63
+  0x0BE608  r0 = 1 when fr4 is outside [fr5 - fr6, fr5 + fr6], else 0              104       171      98
+  0x0BE628  fr0 = fr4 / fr5 with the zero divisor replaced by 0 or +-FLT_MAX        99       147      92
+  0x0BE654  r0 = saturating signed (r4 << 16) / r5                                   3         3       3
+  0x0BE800  r0 = comparator with hysteresis; r4 passes through in the dead band     11        20      10
+
+  "pool words"        exact: 4-aligned longs in the image equal to the entry address.
+  "call sites"        this file's own count: literal constants propagated forward over the control-flow graph
+                      of all reached code (states met at joins, r0-r7 dropped after a call) and read at every
+                      jsr @Rn / jmp @Rn.  "256 + 1" is 256 jsr and one jmp.  For 0x0BE554 the propagation
+                      finds 710; two more were decoded by hand where an artificial census entry cut the flow
+                      (0x0124CC, 0x0960CE).  LOWER BOUNDS: 358 other indirect call/jump sites in reached code
+                      resolve to no constant.
+  "calling functions" the figure in disassembly/maps/function_census.json.  Byte-derived but NOT complete:
+                      for 0x0BE554 the file omits three functions whose calls are plain in the bytes (0x01200A,
+                      0x024024, 0x0946BC -- listed in that section).  For the other twelve entries the
+                      propagation reproduces the census caller set exactly.  The census partition itself has
+                      artificial entries (0x011954 is a table of bytes 1E 2D 3C 4B 5A 69 78 96 A5 B4 decoded as
+                      code; 0x0124C8 and 0x0960CC split real functions in two), so read this column as
+                      "about".
+
+ARGUMENT ORDER -- THE THING MOST LIKELY TO BE GOT WRONG BY A CALLER'S READER
+  The two integer->float routines take   raw = r4, SCALE = fr4, OFFSET = fr5.
+  The two float->integer routines take   x = fr4,  SCALE = fr5, OFFSET = fr6.
+  The scale and offset sit one register higher on the way back.  0x0BE5A8/0x0BE5D8 are the algebraic
+  inverses of 0x0BE588/0x0BE598 only if the caller shifts them accordingly.
+  The clamp takes (x, LOW, HIGH) = (fr4, fr5, fr6); the window test takes (x, CENTRE, HALF-WIDTH); the
+  hysteresis comparator takes (x, THRESHOLD, WIDTH) plus the previous state in r4.
+
+FLOAT ROUNDING -- THE DIRECTION IS DECIDED BY ROM BYTES; THE EMULATOR NOW MATCHES IT (corrections item 106)
+  The emulator computes fadd/fsub/fmul/fdiv/fmac/float exactly and truncates to float32 (round toward zero),
+  treating fmac as one fused operation.  Until 2026-11-27 it rounded to NEAREST.  The firmware expects
+  truncation and says so in bytes.  The ROM carries a CPU
+  self-test: wrapper 0x058594, body 0x0585B0, called from 0x07EF4A.  The wrapper preloads r14 with
+  0x55555555; every failed check overwrites r14 with 0xAAAAAAAA; r14 is returned in r0 (058770: 60E3 ->
+  mov r14,r0).
+0585A6: DE7F  mov.l @(0x0587A4),r14         ; = 0x55555555 const | r14 = 0x55555555 = "nothing has failed yet"
+0585A8: D07D  mov.l @(0x0587A0),r0          ; = 0x000585B0 ROM | r0 = address of the body
+0585AA: 402B  jmp @r0                       ; -> 0x0585B0 | enter the body through a register
+0585AC: 0009  nop                           ; delay slot
+
+  Its FPU part runs fmac, fmul and fdiv on INEXACT operands and demands bit-equality with constants stored
+  beside the code.  The whole stretch 0x058696..0x05874A, contiguous:
+058696: D03D  mov.l @(0x05878C),r0          ; = 0x000587DC ROM | r0 = 0x0587DC
+058698: D649  mov.l @(0x0587C0),r6          ; = 0x00000004 const | r6 = 4
+05869A: F166  fmov.s @(r0,r6),fr1           ; fr1 = [0x0587DC + 4] = [0x0587E0] = A = 0x414CCCCC
+05869C: F21C  fmov fr1,fr2                  ; fr2 = A
+05869E: F32C  fmov fr2,fr3                  ; fr3 = A
+0586A0: F43C  fmov fr3,fr4                  ; fr4 = A
+0586A2: F430  fadd fr3,fr4                  ; fr4 = A + A   (a doubling: EXACT, so this check says nothing about rounding)
+0586A4: D03A  mov.l @(0x058790),r0          ; = 0x000587E4 ROM | r0 = address of B
+0586A6: F508  fmov.s @r0,fr5                ; fr5 = B = 0x41CCCCCC
+0586A8: F544  fcmp/eq fr4,fr5               ; T = (fr5 == fr4)
+0586AA: 8901  bt 0x0586B0                   ; T=1: pass
+0586AC: 0009  nop
+0586AE: DE3E  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+0586B0: F03C  fmov fr3,fr0                  ; fr0 = A   (fmac multiplies by FR0)
+0586B2: F29D  fldi1 fr2                     ; fr2 = 1.0
+0586B4: F12C  fmov fr2,fr1                  ; fr1 = 1.0
+0586B6: F65C  fmov fr5,fr6                  ; fr6 = B
+0586B8: F26E  fmac fr0,fr6,fr2              ; fr2 = fr0 * fr6 + fr2 = A * B + 1.0          <-- INEXACT
+0586BA: D036  mov.l @(0x058794),r0          ; = 0x000587E8 ROM | r0 = address of C
+0586BC: F508  fmov.s @r0,fr5                ; fr5 = C = 0x43A45708
+0586BE: F524  fcmp/eq fr2,fr5               ; T = (fr5 == fr2)
+0586C0: 8901  bt 0x0586C6                   ; T=1: pass -- only if the fmac result is exactly 0x43A45708
+0586C2: 0009  nop
+0586C4: DE38  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+0586C6: F432  fmul fr3,fr4                  ; fr4 = fr4 * fr3 = B * A                      <-- INEXACT
+0586C8: F511  fsub fr1,fr5                  ; fr5 = C - 1.0 = 0x43A3D708   (exact)
+0586CA: F544  fcmp/eq fr4,fr5               ; T = (fr5 == fr4)
+0586CC: 8901  bt 0x0586D2                   ; T=1: pass -- only if the product is exactly 0x43A3D708
+0586CE: 0009  nop
+0586D0: DE35  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+0586D2: F433  fdiv fr3,fr4                  ; fr4 = fr4 / fr3 = (B * A) / A                <-- INEXACT
+0586D4: D030  mov.l @(0x058798),r0          ; = 0x000587EC ROM | r0 = address of D
+0586D6: F508  fmov.s @r0,fr5                ; fr5 = D = 0x41CCCCCA
+0586D8: F544  fcmp/eq fr4,fr5               ; T = (fr5 == fr4)
+0586DA: 8901  bt 0x0586E0                   ; T=1: pass -- only if the quotient is exactly 0x41CCCCCA
+0586DC: 0009  nop
+0586DE: DE32  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+0586E0: F731  fsub fr3,fr7                  ; fr7 = fr7 - fr3 = 0.0 - A   (fr7 still holds the fill-loop zero; exact)
+0586E2: F34D  fneg fr3                      ; fr3 = -A
+0586E4: F734  fcmp/eq fr3,fr7               ; T = (fr7 == fr3)
+0586E6: 8901  bt 0x0586EC                   ; T=1: pass
+0586E8: 0009  nop
+0586EA: DE2F  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+0586EC: F35D  fabs fr3                      ; fr3 = +A again
+0586EE: F034  fcmp/eq fr3,fr0               ; T = (fr0 == fr3), fr0 = A since 0x0586B0
+0586F0: 8901  bt 0x0586F6                   ; T=1: pass
+0586F2: 0009  nop
+0586F4: DE2C  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+0586F6: F535  fcmp/gt fr3,fr5               ; T = (fr5 > fr3) = (D > A): must hold
+0586F8: 8901  bt 0x0586FE                   ; T=1: pass
+0586FA: 0009  nop
+0586FC: DE2A  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+0586FE: F355  fcmp/gt fr5,fr3               ; T = (fr3 > fr5) = (A > D): must NOT hold
+058700: 8B01  bf 0x058706                   ; T=0: pass
+058702: 0009  nop
+058704: DE28  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+058706: F41D  flds fr4,fpul                 ; FPUL = the bits of fr4
+058708: F60D  fsts fpul,fr6                 ; fr6 = FPUL
+05870A: F644  fcmp/eq fr4,fr6               ; T = (fr6 == fr4)
+05870C: 8901  bt 0x058712                   ; T=1: pass
+05870E: 0009  nop
+058710: DE25  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+058712: FBA3  fdiv fr10,fr11                ; fr11 = fr11 / fr10 = 0.0 / 0.0   (both still hold the fill-loop zero)
+058714: FB35  fcmp/gt fr3,fr11              ; T = (fr11 > fr3), fr3 = A
+058716: 8B01  bf 0x05871C                   ; T=0 required
+058718: 0009  nop
+05871A: DE23  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+05871C: F3B5  fcmp/gt fr11,fr3              ; T = (fr3 > fr11)
+05871E: 8B01  bf 0x058724                   ; T=0 required
+058720: 0009  nop
+058722: DE21  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+058724: FB34  fcmp/eq fr3,fr11              ; T = (fr11 == fr3)
+058726: 8B01  bf 0x05872C                   ; T=0 required: the quotient is neither >, < nor == 12.8, i.e. UNORDERED
+058728: 0009  nop
+05872A: DE1F  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+05872C: 006A  sts fpscr,r0                  ; r0 = FPSCR
+05872E: D130  mov.l @(0x0587F0),r1          ; = 0x00000040 ROM | r1 = 0x40
+058730: 2019  and r1,r0                     ; r0 = FPSCR & 0x40
+058732: D22F  mov.l @(0x0587F0),r2          ; = 0x00000040 ROM | r2 = 0x40
+058734: 3020  cmp/eq r2,r0                  ; T = ((FPSCR & 0x40) == 0x40)
+058736: 8901  bt 0x05873C                   ; T=1: pass -- only if FPSCR bit 6 is SET after the 0/0
+058738: 0009  nop
+05873A: DE1B  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+05873C: D21E  mov.l @(0x0587B8),r2          ; = 0x00000000 const | r2 = 0
+05873E: 426A  lds r2,fpscr                  ; FPSCR := 0   (not restored before the rts at 0x058782)
+058740: 006A  sts fpscr,r0                  ; read it back
+058742: 2019  and r1,r0                     ; r0 = FPSCR & 0x40
+058744: 3020  cmp/eq r2,r0                  ; T = ((FPSCR & 0x40) == 0)
+058746: 8901  bt 0x05874C                   ; T=1: pass -- only if bit 6 reads back clear
+058748: 0009  nop
+05874A: DE17  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+;   constants read above (ROM bytes):
+;   0x0587E0: 0x414CCCCC  A = 12.799999237060547        0x0587E4: 0x41CCCCCC  B = 25.599998474121094  (= A + A)
+;   0x0587E8: 0x43A45708  C = 328.679931640625          0x0587EC: 0x41CCCCCA  D = 25.599994659423828
+;   0x0587F0: 0x00000040  the FPSCR mask                0x0587B8: 0x00000000  the value written to FPSCR
+
+  Exact rational arithmetic on those four constants (emu_helpers_arith.py t_selftest, every row asserted):
+;     check                                to nearest    TRUNCATED     away from 0   the ROM demands
+;     0586A2  fadd  A + A                  0x41CCCCCC    0x41CCCCCC    0x41CCCCCC    0x41CCCCCC   exact: decides nothing
+;     0586B8  fmac  A * B + 1.0  fused     0x43A45709    0x43A45708    0x43A45709    0x43A45708
+;                                unfused   0x43A45709    0x43A45708    0x43A45709
+;     0586C6  fmul  B * A                  0x43A3D709    0x43A3D708    0x43A3D709    0x43A3D708   (= C - 1.0, exact)
+;     0586D2  fdiv  (B * A) / A            0x41CCCCCC    0x41CCCCCA    0x41CCCCCD    0x41CCCCCA
+;             fdiv  0x43A3D708 / A alone   0x41CCCCCB    0x41CCCCCA                  0x41CCCCCA
+  Only truncation passes.  Round-to-nearest fails three of the four compares, and so does rounding up.
+
+  WHAT THAT ESTABLISHES (bytes)
+    * The firmware expects fmul, fmac and fdiv to TRUNCATE their results.
+    * The project emulator, run over these same instructions (0x058696 to 0x0586E0), now produces
+      0x43A45708, 0x43A3D708 and 0x41CCCCCA and ends with r14 = 0x55555555: it passes the arithmetic
+      checks.  Before corrections item 106 it rounded to nearest, produced 0x43A45709, 0x43A3D709 and
+      0x41CCCCCC, and FAILED them; an inexact float value that any trace emulated before 2026-11-27 is the
+      round-to-nearest answer, where the firmware expects the neighbour toward zero.
+    * Run over the WHOLE self-test 0x058594 the emulator still returns r0 = 0xAAAAAAAA, from one check
+      alone: of the 31 failed-check stores in the body (mov.l @(0x0587A8),r14; a 32nd word at 0x0585B4
+      decodes the same way but the bra at 0x0585B0 jumps over it), the only one it reaches is 0x05873A --
+      FPSCR bit 6 after 0/0, a flag bit the emulator does not model (asserted).
+  WHAT IT DOES NOT ESTABLISH
+    * FUSED OR UNFUSED fmac.  Both truncating models give 0x43A45708 on the test operands.  This is not a
+      last-ulp question: when the offset cancels most of the product, one ulp of the PRODUCT is many ulps
+      of the result.  On the script's grids the two truncating models are up to 80 float32 steps apart for
+      0x0BE588 (raw 71, scale 1.8, offset -128: -0.200003386 against -0.200004578) and up to 509 for
+      0x0BE598.  Either way fr0 is within (one ulp of the product + one ulp of the result) of the exact value.
+      The emulator implements the FUSED one; that is its stated semantics, not a byte result.
+    * fadd AND fsub.  The test exercises them only where the result is exact (0586A2, 0586C8, 0586E0).  That
+      they truncate too is an extension -- one FPU, one FPSCR.RM field -- not a byte result.
+    * TOWARD ZERO versus TOWARD MINUS INFINITY.  Every inexact operand in the test is positive.
+    * THAT THE SILICON MEETS THE TEST.  The caller acts on the verdict (next listing): a chip that rounded
+      to nearest would fail on every run and be flagged after two.  That this car is not so flagged is an
+      observation about the car, not a byte.  Logging byte 0xFFFF6C3C (1 = failed twice running) or
+      0xFFFFA344 (1 = passed) would turn it into a measurement.
+
+  The caller, complete.  It keeps a count of CONSECUTIVE failures -- through 0x0BE53C, one of this file's
+  own helpers -- and latches a flag when the count reaches byte [0x0C4732]:
+07EF4A: 2FD6  mov.l r13,@-r15
+07EF4C: 2FE6  mov.l r14,@-r15
+07EF4E: 4F22  sts.l pr,@-r15
+07EF50: 7FF8  add #-8,r15                   ; two local longs
+07EF52: D22F  mov.l @(0x07F010),r2          ; = 0xFFFF366C RAM
+07EF54: 6020  mov.b @r2,r0                  ; r0 = byte [0xFFFF366C]
+07EF56: DD28  mov.l @(0x07EFF8),r13         ; = 0xFFFF2E28 RAM | r13 = base of this routine's state words
+07EF58: 8801  cmp/eq #1,r0                  ; T = (that byte == 1)
+07EF5A: 8F03  bf/s 0x07EF64                 ; T=0: skip the clear
+07EF5C: 6ED0  mov.b @r13,r14                ; delay slot: r14 = byte [0xFFFF2E28]
+07EF5E: EE00  mov #0,r14                    ; byte [0xFFFF366C] == 1: r14 = 0 ...
+07EF60: D626  mov.l @(0x07EFFC),r6          ; = 0xFFFF6C3C RAM
+07EF62: 26E0  mov.b r14,@r6                 ; ... and byte [0xFFFF6C3C] = 0
+07EF64: D22B  mov.l @(0x07F014),r2          ; = 0xAAAAAAAA const | r2 = the fail pattern
+07EF66: 2F22  mov.l r2,@r15                 ; local verdict = 0xAAAAAAAA
+07EF68: D22B  mov.l @(0x07F018),r2          ; = 0x00058594 ROM
+07EF6A: 420B  jsr @r2                       ; -> 0x058594 | run the CPU self-test
+07EF6C: 0009  nop
+07EF6E: 2F02  mov.l r0,@r15                 ; local verdict = r0
+07EF70: 84D2  mov.b @(2,r13),r0             ; r0 = byte [0xFFFF2E2A]: the stored failure count
+07EF72: 66F2  mov.l @r15,r6                 ; r6 = verdict
+07EF74: D229  mov.l @(0x07F01C),r2          ; = 0x55555555 const
+07EF76: 3620  cmp/eq r2,r6                  ; T = (verdict == 0x55555555)
+07EF78: 8F02  bf/s 0x07EF80                 ; T=0: the self-test FAILED -> count it
+07EF7A: 6403  mov r0,r4                     ; delay slot: r4 = count
+07EF7C: A005  bra 0x07EF8A                  ; passed:
+07EF7E: E400  mov #0,r4                     ; delay slot: count = 0
+07EF80: D227  mov.l @(0x07F020),r2          ; = 0x000BE53C ROM | the saturating u8 add of this file
+07EF82: 644C  extu.b r4,r4
+07EF84: 420B  jsr @r2                       ; -> 0x0BE53C | count = min(count + 1, 255)
+07EF86: E501  mov #1,r5                     ; delay slot: r5 = 1
+07EF88: 640C  extu.b r0,r4                  ; r4 = new count
+07EF8A: 6043  mov r4,r0
+07EF8C: D519  mov.l @(0x07EFF4),r5          ; = 0x000BE9A0 ROM
+07EF8E: 450B  jsr @r5                       ; -> 0x0BE9A0 | r0 = (count << 8) | (~count & 0xFF): the byte and its complement (0x0BE9A0, listed below)
+07EF90: 80F4  mov.b r0,@(4,r15)             ; delay slot: local byte = count
+07EF92: 81D1  mov.w r0,@(2,r13)             ; word [0xFFFF2E2A] = that; its high byte, at 0xFFFF2E2A, is the count 0x07EF70 reads back
+07EF94: 66F2  mov.l @r15,r6                 ; r6 = verdict
+07EF96: D221  mov.l @(0x07F01C),r2          ; = 0x55555555 const
+07EF98: 3620  cmp/eq r2,r6                  ; T = (verdict == 0x55555555)
+07EF9A: 8908  bt 0x07EFAE                   ; T=1: passed
+07EF9C: D221  mov.l @(0x07F024),r2          ; = 0x000C4732 CAL
+07EF9E: 6620  mov.b @r2,r6                  ; r6 = byte [0x0C4732] = 2 on this bin: the limit
+07EFA0: 84F4  mov.b @(4,r15),r0             ; r0 = count
+07EFA2: 3062  cmp/hs r6,r0                  ; T = (r0 >= r6) unsigned = (count >= limit)
+07EFA4: 8B06  bf 0x07EFB4                   ; T=0: not yet
+07EFA6: EE01  mov #1,r14                    ; r14 = 1
+07EFA8: D614  mov.l @(0x07EFFC),r6          ; = 0xFFFF6C3C RAM
+07EFAA: A003  bra 0x07EFB4
+07EFAC: 26E0  mov.b r14,@r6                 ; delay slot: byte [0xFFFF6C3C] = 1 once `limit` CONSECUTIVE runs have failed
+07EFAE: E201  mov #1,r2                     ; passed:
+07EFB0: D61D  mov.l @(0x07F028),r6          ; = 0xFFFFA344 RAM
+07EFB2: 2620  mov.b r2,@r6                  ; byte [0xFFFFA344] = 1
+07EFB4: D50F  mov.l @(0x07EFF4),r5          ; = 0x000BE9A0 ROM
+07EFB6: 450B  jsr @r5                       ; -> 0x0BE9A0 | r0 = (r14 << 8) | (~r14 & 0xFF)
+07EFB8: 64EC  extu.b r14,r4                 ; delay slot: r4 = r14
+07EFBA: 2D01  mov.w r0,@r13                 ; word [0xFFFF2E28] = that
+07EFBC: 7F08  add #8,r15
+07EFBE: 4F26  lds.l @r15+,pr
+07EFC0: 6EF6  mov.l @r15+,r14
+07EFC2: 000B  rts
+07EFC4: 6DF6  mov.l @r15+,r13
+;   0x0BE9A0, the packer both stores go through (r4 in, r0 out):
+0BE9A0: 634C  extu.b r4,r3                  ; r3 = r4 & 0xFF
+0BE9A2: 4318  shll8 r3                      ; r3 = (r4 & 0xFF) << 8
+0BE9A4: 6247  not r4,r2                     ; r2 = ~r4
+0BE9A6: 622C  extu.b r2,r2                  ; r2 = ~r4 & 0xFF
+0BE9A8: 6433  mov r3,r4
+0BE9AA: 342C  add r2,r4                     ; r4 = (byte << 8) + complement
+0BE9AC: 000B  rts
+0BE9AE: 6043  mov r4,r0                     ; delay slot: r0 = r4
+;   What reads byte 0xFFFF6C3C or byte 0xFFFFA344, and how often 0x07EF4A runs (census: one caller,
+;   0x047C40): NOT traced here.
+
+  FPSCR.  In reached code FPSCR is loaded from a register in exactly two places -- the reset path and the
+  self-test above (0x05873E) -- and otherwise only saved and restored through the stack (sts.l fpscr,@-r15
+  at 002BBE 002C9A 00E7EA 00F41E 00F48E 00F712; lds.l @r15+,fpscr at 002BDC 00E820 00F42E 00F49C 00F72A).
+00FA42: D2A1  mov.l @(0x00FCC8),r2          ; = 0x00040001 const | FPSCR image: bit 18 set, low two bits (RM field) = 01, enable field zero
+00FA44: 426A  lds r2,fpscr                  ; FPSCR := 0x00040001
+;   pool 0x00FCC8: .long 0x00040001
+  The SH-2E documentation defines RM = 01 as round-to-zero and bit 18 (DN) as "denormals are zero".  That
+  definition is a property of the chip, not of this ROM -- but it now has an independent witness in the ROM:
+  the self-test constants.  The self-test then writes FPSCR = 0 and returns.  Whether that clears RM (it
+  would if RM were writable and 00 meant round-to-nearest, and the next run of the same test would then
+  fail) is NOT ESTABLISHED: the readback at 0x058740 is masked with 0x40 and never looks at bits 0-1.
+
+  THE SAME TEST SUPPORTS THE DIVIDE-BY-ZERO MODEL, IN PART.  0x058712 divides 0.0 by 0.0 and the ROM demands
+  a result that compares unordered against 12.8 in all three senses, with FPSCR bit 6 set afterwards.  That
+  is the emulator's "0/0 = NaN, no trap" (it returns 0x7FBFFFFF and passes the three compares; it does not
+  model FPSCR flag bits and fails the bit-6 check).  fr10 and fr11 are zero there because of the fill loop:
+058654: D15F  mov.l @(0x0587D4),r1          ; = 0x00000002 const | r1 = 2: pass counter
+058656: D259  mov.l @(0x0587BC),r2          ; = 0x00000001 const | r2 = 1
+058658: D04B  mov.l @(0x058788),r0          ; = 0x000587B0 ROM | r0 = pointer to three fill patterns: 0x55555555, 0xAAAAAAAA, 0x00000000
+05865A: 0008  clrt                          ; loop top (target of the bf at 0x05868A)
+05865C: F009  fmov.s @r0+,fr0               ; fr0 = next pattern, r0 += 4
+05865E: F10C  fmov fr0,fr1                  ; copy chain fr0 -> fr1 -> ... -> fr15 (the next fifteen lines)
+058660: F21C  fmov fr1,fr2
+058662: F32C  fmov fr2,fr3
+058664: F43C  fmov fr3,fr4
+058666: F54C  fmov fr4,fr5
+058668: F65C  fmov fr5,fr6
+05866A: F76C  fmov fr6,fr7
+05866C: F87C  fmov fr7,fr8
+05866E: F98C  fmov fr8,fr9
+058670: FA9C  fmov fr9,fr10
+058672: FBAC  fmov fr10,fr11
+058674: FCBC  fmov fr11,fr12
+058676: FDCC  fmov fr12,fr13
+058678: FEDC  fmov fr13,fr14
+05867A: FFEC  fmov fr14,fr15
+05867C: F0F4  fcmp/eq fr15,fr0              ; T = (fr0 == fr15): the pattern survived the chain
+05867E: 8902  bt 0x058686                   ; T=1: pass.  The target 0x058686 is ALSO the delay slot of the bra two lines down
+058680: 0009  nop
+058682: DE49  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+058684: A007  bra 0x058696                  ; failure path leaves the loop ...
+058686: 0008  clrt                          ; ... through this delay slot; the pass path lands here too.  T = 0
+058688: 312A  subc r2,r1                    ; r1 = r1 - r2 - T = r1 - 1; T = borrow.  2 -> 1 -> 0 -> 0xFFFFFFFF, T = 1 only on the third pass
+05868A: 8BE6  bf 0x05865A                   ; T=0: another pass.  THREE passes; the last pattern is 0x00000000, so fr0..fr15 = 0.0 on exit
+05868C: F08D  fldi0 fr0                     ; fr0 = 0.0
+05868E: F0F4  fcmp/eq fr15,fr0              ; T = (fr0 == fr15)
+058690: 8901  bt 0x058696                   ; T=1: pass
+058692: 0009  nop
+058694: DE44  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const | a failed check: r14 = 0xAAAAAAAA
+;   A non-zero numerator over zero (+-Inf in the emulator) and ftrc of Inf/NaN/out-of-range are NOT exercised
+;   by the self-test (its ftrc check at 0x058764 uses 12345.0); those stay emulator-model.
+;   TOOL NOTE: fn_dump 0x0585B0 prints 0x058688..0x058694 as four ".long" pool words.  They are the seven
+;   instructions above.  Cause: 0x058686 is recorded as the delay slot of the bra at 0x058684, so when the
+;   walker later arrives there as the bt target it stops.  Anyone tracing 0x0585B0 from fn_dump loses the loop.
+
+  CONSEQUENCE FOR THIS FILE
+  Operand roles, operation order, compare sense, saturation bounds and every special-case branch are
+  established and do not depend on rounding.  0x0BE56C moves bits and never rounds; it is exact.  For the
+  other six float routines every emulated result is asserted BIT-EXACT against the truncating model (each
+  operation exact, then truncated once; fmac fused) -- the arithmetic the firmware expects, as far as the
+  bytes reach (fused-vs-unfused is N1, inexact fadd/fsub is N2).  A ROUND-TO-NEAREST model -- the emulator
+  before corrections item 106, or plain Python float arithmetic -- would give a different answer:
+      0x0BE588 / 0x0BE598   in the low bits of fr0 whenever fr4 * raw + fr5 is inexact
+      0x0BE628              in the last ulp of the quotient (and +Inf where truncation saturates at FLT_MAX)
+      0x0BE5A8 / 0x0BE5D8   by one count, only when (x - offset) / scale + 0.5 lands on a rounding edge
+      0x0BE608 / 0x0BE800   in the 0/1 verdict, only when x is within one float32 step of a computed limit
+  How often that happens depends entirely on how close the inputs sit to an edge.  The script counts it on
+  two different grids per routine precisely to show that the count is a property of the grid, not a rate
+  (each is "round-to-nearest differs from the asserted truncation"; these are the same disagreements the
+  old emulator showed against the truncating model, seen from the other side):
+;     routine     broad grid (same values for every operand)        edge-targeted grid (x placed on the limit)
+;     0x0BE5A8    2 of 7,800 integer results change                 94 of 2,395
+;     0x0BE5D8    3 of 7,800                                        197 of 3,795
+;     0x0BE608    110 of 17,576 verdicts change                     73 of 828
+;     0x0BE800    34 of 35,152                                      40 of 1,580
+;     0x0BE628    206 of 624 real divides change in the last ulp    158 of 300 random non-dyadic divides
+;     0x0BE588    10,926 of 32,256 results differ (a fused nearest fmac; 10,978 for an unfused one)
+;     0x0BE598    6,072 of 16,758 (fused nearest; 6,070 unfused)
+  The old emulator was not exactly "fused" either: in 28 of 32,256 cases (all at scale 3e33) it formed the
+  sum in double first and rounded twice.  This file once quoted the old emulator against truncated-fused /
+  truncated-unfused: 10,898 / 11,859 for 0x0BE588 (the 28 double-rounded cases are why the first is not
+  10,926) and 6,072 / 6,698 for 0x0BE598.  Those figures described the old emulator.  The corrected
+  emulator computes f0*fm + fn exactly and truncates once, and the asserted contract for the two scaling
+  routines is now that value, bit-exact, in every grid case.  An UNFUSED truncating chip would differ from
+  it in 1,819 of 32,256 (0x0BE588) and 1,035 of 16,758 (0x0BE598), by up to 80 and 509 float32 steps.
+
+SH-2E LEGALITY
+  No instruction in the range is outside the SH-2E set (no FSQRT/FSCHG/FRCHG/double/MOVI20/MOVU, no
+  INVALID-SH2E word).  The bytes between routines are alignment pads (0x0000 or a nop) and literal pools.
+
+==== FUNCTION 0x0BE4FA .. 0x0BE522  (20 instructions, 2 calling functions) ====
+
+CONTRACT
+  inputs   r4  = address of a 12-byte record:  +0  int16 count (read with mov.w, so SIGN-extended)
+                                                +2  2 bytes, never read
+                                                +4  pointer to float32 thresholds[count]
+                                                +8  pointer to uint8 values[count]
+           fr4 = x (float32)
+  output   r0  = one byte of values[], ZERO-extended to 32 bits (also left in r4)
+  effects  none on memory.  Changes r0 r2 r4 r5 r6 r7 and fr8.  fr4 is preserved.
+
+MECHANISM
+  r4 = (u8) values[0]                      ; read unconditionally, before the count is looked at
+  i  = count
+  loop:
+      i = i - 1
+      if i < 0:           return r4        ; cmp/pz r5 sets T when r5 >= 0; bf leaves when T = 0
+      if thresholds[i] > x:  goto loop     ; fcmp/gt fr4,fr8 sets T when fr8 > fr4 (fr8 = thresholds[i]); bt loops when T = 1
+      r4 = (u8) values[i]
+      return r4
+
+  In words: scan the thresholds from the LAST entry down and return the value paired with the first threshold
+  that is NOT greater than x (i.e. threshold <= x for ordered floats).  If every threshold is greater than x
+  the result is values[0] -- the same answer as for thresholds[0] <= x < thresholds[1], so the bottom is
+  clamped.  x >= thresholds[count-1] returns values[count-1].  Equality selects the higher bin (x equal to a
+  threshold returns that threshold's value).
+  Edges: count 1 always returns values[0].  count <= 0 (0, or 0x8000..0xFFFF read as negative) skips the loop
+  and still returns values[0], which is still read.  Thresholds are not required to be sorted; with unsorted
+  thresholds the highest index that passes wins.  There is no interpolation and no bounds check.
+  x = NaN (EMU-MODEL: an unordered fcmp/gt leaves T = 0): the very first compare, at i = count-1, is "not
+  greater", so the scan ends there and the TOP value comes back -- 15 on record 0x0AC2B0, 12 on 0x0AB328.
+  A NaN selects the top bin, not the bottom one.
+
+EVIDENCE
+  0BE4FC-0BE500  the +8 pointer is fetched and values[0] read and zero-extended BEFORE any test
+  0BE502         count is a signed 16-bit load from +0
+  0BE504-0BE508  pre-decrement, exit when negative (cmp/pz + bf, non-delayed)
+  0BE50A-0BE514  thresholds indexed by r5*4 from the +4 pointer, compared as fcmp/gt fr4,fr8 = (fr8 > fr4)
+  0BE516-0BE51C  values indexed by r5 from the +8 pointer, byte load then extu.b
+  emulated: emu_helpers_arith.py t_step, 133 cases -- both records the ROM actually passes (below), swept one
+            float32 step either side of every threshold, plus synthetic records: count 4/1/0/-1, bytes 0x80
+            and 0xFF (zero-extension), unsorted thresholds, equal thresholds, and one NaN row per ROM record
+            (emulator model).  Exact.
+
+LISTING
+0BE4FA: 6743  mov r4,r7                     ; r7 = record pointer (r4 is about to be reused)
+0BE4FC: 5242  mov.l @(8,r4),r2              ; r2 = record[+8] = pointer to the byte values
+0BE4FE: 6420  mov.b @r2,r4                  ; r4 = values[0], sign-extended by the load
+0BE500: 644C  extu.b r4,r4                  ; r4 = (u8) values[0]: the default result
+0BE502: 6571  mov.w @r7,r5                  ; r5 = (s16) record[+0] = count
+0BE504: 75FF  add #-1,r5                    ; loop top: i = i - 1
+0BE506: 4511  cmp/pz r5                     ; T = (i >= 0)
+0BE508: 8B09  bf 0x0BE51E                   ; T=0 (i < 0): leave with whatever r4 holds (values[0] if nothing matched)
+0BE50A: 5071  mov.l @(4,r7),r0              ; r0 = record[+4] = pointer to the float thresholds
+0BE50C: 6253  mov r5,r2                     ; r2 = i
+0BE50E: 4208  shll2 r2                      ; r2 = i * 4
+0BE510: F826  fmov.s @(r0,r2),fr8           ; fr8 = thresholds[i]
+0BE512: F845  fcmp/gt fr4,fr8               ; T = (fr8 > fr4) = (thresholds[i] > x)
+0BE514: 89F6  bt 0x0BE504                   ; T=1: this threshold is above x, try the next lower one (not delayed)
+0BE516: 5672  mov.l @(8,r7),r6              ; r6 = record[+8] again
+0BE518: 6053  mov r5,r0                     ; r0 = i
+0BE51A: 026C  mov.b @(r0,r6),r2             ; r2 = values[i], sign-extended
+0BE51C: 642C  extu.b r2,r4                  ; r4 = (u8) values[i]
+0BE51E: 000B  rts                           ; return
+0BE520: 6043  mov r4,r0                     ; delay slot: r0 = r4
+;   (no literal pool; 0x0BE522 is a 0x0000 alignment pad)
+
+THE TWO RECORDS THE ROM PASSES TO 0x0BE4FA  (each has exactly one literal-pool reference in the whole image)
+  call site 1 (function 0x02F494):
+02F4A4: D270  mov.l @(0x02F668),r2          ; = 0xFFFF6354 RAM | address the float argument is read from
+02F4A6: F428  fmov.s @r2,fr4                ; fr4 = x
+02F4A8: D470  mov.l @(0x02F66C),r4          ; = 0x000AC2B0 DESC | r4 = record 0x0AC2B0 (fn_dump tags it DESC by address range; see below)
+02F4AA: D271  mov.l @(0x02F670),r2          ; = 0x000BE4FA ROM
+02F4AC: 420B  jsr @r2                       ; -> 0x0BE4FA | call
+  call site 2 (function 0x07A210):
+07A222: D297  mov.l @(0x07A480),r2          ; = 0xFFFFA198 RAM | address the float argument is read from
+07A224: F428  fmov.s @r2,fr4                ; fr4 = x
+07A226: D497  mov.l @(0x07A484),r4          ; = 0x000AB328 DESC | r4 = record 0x0AB328
+07A228: D297  mov.l @(0x07A488),r2          ; = 0x000BE4FA ROM
+07A22A: 420B  jsr @r2                       ; -> 0x0BE4FA | call
+;
+;   record 0x0AC2B0 = 0010 0000 000CC750 000CC790      count 16, thresholds 0x0CC750, values 0x0CC790
+;     thresholds  -40 -30 -20 -10 -3 10 20 30 40 50 60 70 80 90 100 110
+;     values      00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F          (16 BYTES at 0x0CC790..0x0CC79F)
+;   record 0x0AB328 = 000D 0000 000C5960 000C5994      count 13, thresholds 0x0C5960, values 0x0C5994
+;     thresholds  0 850 1250 1750 2250 2750 3250 3750 4250 4750 5250 5750 6250
+;     values      00 01 02 03 04 05 06 07 08 09 0A 0B 0C                   (13 BYTES at 0x0C5994..0x0C59A0)
+;
+;   In both records values[] is the identity 0..count-1, so at both call sites the routine returns a BIN
+;   INDEX: the number of the highest threshold that x has reached, 0 when below the first.
+;   These records have the same first 12 bytes as a 1-D table descriptor (count, a zero word where the type
+;   code sits, two pointers), but this consumer reads the second array as BYTES.  Decoding them as float32
+;   tables (which is what a typecode of 0x00 would mean) reads 64 / 52 bytes of unrelated data.
+;   What the thresholds measure, and what the callers do with the index: NOT ESTABLISHED here.
+;
+;   THE THRESHOLD ARRAY OF RECORD 0x0AB328 IS SHARED.  Besides the record's own pointer (0x0AB32C) the image
+;   holds two more pointer words equal to 0x000C5960 (0x076A5C, 0x076F50), loaded at three places in
+;   function 0x0764EE -- which has the same two callers (0x0758DE, 0x075C4A) as 0x07A210 above:
+076818: D290  mov.l @(0x076A5C),r2          ; = 0x000C5960 CAL | function 0x0764EE: r2 = the threshold array itself, no record
+07681A: E004  mov #4,r0
+07681C: F826  fmov.s @(r0,r2),fr8           ; fr8 = [0x0C5960 + 4] = thresholds[1] = 850.0
+07681E: F845  fcmp/gt fr4,fr8               ; T = (fr8 > fr4)
+07686E: D27B  mov.l @(0x076A5C),r2          ; = 0x000C5960 CAL | same function, same pool word
+076D02: D693  mov.l @(0x076F50),r6          ; = 0x000C5960 CAL | same function, second pool word
+;   The other three arrays (0x0C5994, 0x0CC750, 0x0CC790) and both records have exactly one pointer word each.
+
+==== FUNCTION 0x0BE524 .. 0x0BE536  (9 instructions, 5 calling functions) ====
+
+CONTRACT
+  inputs   r4, r5 = signed 32-bit addends (the operation is symmetric)
+  output   r0 = r4 + r5 saturated to [-2^31, 2^31 - 1]
+  effects  none on memory.  Changes r0 and r5 (r5 = the wrapped sum, or 0 on the saturating path).  r4 preserved.
+
+MECHANISM
+  r5 = r5 + r4 ; T = signed overflow                 (addv)
+  r0 = r5
+  if T == 0: return r0                               (bf/s: taken when T = 0; the slot has already copied the sum)
+  r0 = 0x7FFFFFFF
+  T  = (wrapped r5 >= 0)                             (cmp/pz) -- true exactly when two NEGATIVE addends overflowed
+  r0 = 0x7FFFFFFF + 0 + T                            (addc with r5 = 0)
+       -> 0x7FFFFFFF after positive overflow, 0x80000000 after negative overflow
+
+EVIDENCE
+  0BE524        addv is the only add; its T is the overflow flag
+  0BE52A-0BE530 the saturation value is built as 0x7FFFFFFF plus the sign test of the wrapped sum
+  emulated: t_sat_add_s32, 1,961 cases (21 x 21 edge grid including 0x7FFFFFFF, 0x80000000 and their
+            neighbours, 1,500 random pairs, 20 asserted rows).  All equal max(-2^31, min(2^31-1, r4+r5)).
+
+LISTING
+0BE524: 354F  addv r4,r5                    ; r5 = r5 + r4; T = 1 on signed overflow
+0BE526: 8F04  bf/s 0x0BE532                 ; T=0 (no overflow): return after the slot
+0BE528: 6053  mov r5,r0                     ; delay slot: r0 = sum (executed on both paths)
+0BE52A: D003  mov.l @(0x0BE538),r0          ; = 0x7FFFFFFF const | overflow: r0 = 0x7FFFFFFF
+0BE52C: 4511  cmp/pz r5                     ; T = (wrapped sum >= 0): 1 only when both addends were negative
+0BE52E: E500  mov #0,r5                     ; r5 = 0 (T untouched)
+0BE530: 305E  addc r5,r0                    ; r0 = 0x7FFFFFFF + T: 0x80000000 for negative overflow, 0x7FFFFFFF for positive
+0BE532: 000B  rts                           ; return
+0BE534: 0009  nop                           ; delay slot
+;   pool 0x0BE538: .long 0x7FFFFFFF  const
+
+==== FUNCTION 0x0BE53C .. 0x0BE552  (11 instructions, 271 calling functions) ====
+
+CONTRACT
+  inputs   r4, r5 -- only the LOW BYTE of each is used (both are zero-extended first); symmetric
+  output   r0 = min((r4 & 0xFF) + (r5 & 0xFF), 0xFF); bits 31..8 of r0 are always zero (also left in r4)
+  effects  none on memory.  Changes r0 r3 r4 r5 (r5 = 0xFF, r3 = the unsaturated 9-bit sum).
+
+MECHANISM
+  r4 = r4 & 0xFF ; r5 = r5 & 0xFF
+  r4 = r4 + r5                         ; 0..510, cannot wrap
+  r3 = r4 & 0xFFFF
+  r5 = 255                             ; mov.w from 0x0BE552 (0x00FF, sign-extension is a no-op)
+  if r3 >= 255: r4 = 255               ; cmp/ge r5,r3 sets T when r3 >= r5 (signed); bf/s skips the move when T = 0
+  return r4
+  It is an ADD only: there is no subtract path and no signed interpretation.  A caller that wants to add a
+  negative delta cannot do it with this routine (0xFF + 0x01 saturates to 0xFF, it does not wrap to 0).
+
+EVIDENCE
+  0BE53C-0BE53E both operands zero-extended from 8 bits
+  0BE546        cmp/ge r5,r3 = (r3 >= r5), r5 = 255
+  0BE548        bf/s 0x0BE54E: branch when T = 0, i.e. sum < 255 keeps the sum
+  emulated: t_sat_add_u8, 67,552 cases -- EVERY one of the 65,536 byte pairs, 2,000 random pairs with
+            garbage in the upper 24 bits, 16 asserted rows (e.g. r4 = 0xFFFFFF00, r5 = 0xFFFFFF00 -> 0).  Exact.
+
+LISTING
+0BE53C: 644C  extu.b r4,r4                  ; r4 = low byte of r4
+0BE53E: 655C  extu.b r5,r5                  ; r5 = low byte of r5
+0BE540: 345C  add r5,r4                     ; r4 = sum, 0..510
+0BE542: 634D  extu.w r4,r3                  ; r3 = sum (16-bit zero-extend changes nothing)
+0BE544: 9505  mov.w @(0x0BE552),r5          ; = 0x00FF (255) | r5 = 255, the ceiling
+0BE546: 3353  cmp/ge r5,r3                  ; T = (r3 >= r5) signed = (sum >= 255)
+0BE548: 8F01  bf/s 0x0BE54E                 ; T=0 (sum < 255): keep the sum
+0BE54A: 0009  nop                           ; delay slot
+0BE54C: 6453  mov r5,r4                     ; sum >= 255: r4 = 255
+0BE54E: 000B  rts                           ; return
+0BE550: 6043  mov r4,r0                     ; delay slot: r0 = r4
+;   pool 0x0BE552: .word 0x00FF   (the mov.w literal; fn_dump does not print word literals as pool lines)
+
+==== FUNCTION 0x0BE554 .. 0x0BE568  (10 instructions, 402 calling functions in the census, at least 405 in the bytes) ====
+
+CONTRACT
+  inputs   r4, r5 -- only the LOW 16 BITS of each are used (both zero-extended first); symmetric
+  output   r0 = min((r4 & 0xFFFF) + (r5 & 0xFFFF), 0xFFFF); bits 31..16 of r0 always zero (also left in r4)
+  effects  none on memory.  Changes r0 r4 r5 (r5 = 0x0000FFFF).
+
+MECHANISM
+  r4 = r4 & 0xFFFF ; r5 = r5 & 0xFFFF
+  r4 = r4 + r5                         ; 0..0x1FFFE, cannot wrap
+  r5 = 0x0000FFFF                      ; pool 0x0BE568
+  if r4 >= 0xFFFF (unsigned): r4 = 0xFFFF     ; cmp/hs r5,r4 sets T when r4 >= r5 unsigned; bf/s skips when T = 0
+  return r4
+  Add only, unsigned only -- same remark as 0x0BE53C.
+
+EVIDENCE
+  0BE554-0BE556 both operands zero-extended from 16 bits
+  0BE55C        cmp/hs r5,r4 = (r4 >= r5) unsigned, r5 = 0xFFFF
+  emulated: t_sat_add_u16, 6,232 cases -- 15 x 15 edge grid (0, 1, 0x7FFF, 0x8000, 0xFFFE, 0xFFFF ...),
+            3,000 random 16-bit pairs, 3,007 with non-zero upper halves.  Exact.
+
+LISTING
+0BE554: 644D  extu.w r4,r4                  ; r4 = low word of r4
+0BE556: 655D  extu.w r5,r5                  ; r5 = low word of r5
+0BE558: 345C  add r5,r4                     ; r4 = sum, 0..0x1FFFE
+0BE55A: D503  mov.l @(0x0BE568),r5          ; = 0x0000FFFF const | r5 = 0xFFFF, the ceiling
+0BE55C: 3452  cmp/hs r5,r4                  ; T = (r4 >= r5) unsigned = (sum >= 0xFFFF)
+0BE55E: 8F01  bf/s 0x0BE564                 ; T=0 (sum < 0xFFFF): keep the sum
+0BE560: 0009  nop                           ; delay slot
+0BE562: 6453  mov r5,r4                     ; sum >= 0xFFFF: r4 = 0xFFFF
+0BE564: 000B  rts                           ; return
+0BE566: 6043  mov r4,r0                     ; delay slot: r0 = r4
+;   pool 0x0BE568: .long 0x0000FFFF  const
+
+THREE CALLING FUNCTIONS THE CENSUS OMITS  (function_census.json lists 402 callers; none of these is among them)
+;   -- function 0x024024 (census: no callees, one unresolved call)
+02404A: D23E  mov.l @(0x024144),r2          ; = 0x000BE554 ROM | r2 = 0x0BE554
+02404C: E501  mov #1,r5                     ; r5 = 1
+02404E: D13E  mov.l @(0x024148),r1          ; = 0xFFFF6828 RAM
+024050: 6611  mov.w @r1,r6
+024052: 420B  jsr @r2                       ; -> 0x0BE554 | call: word [0xFFFF6828] + 1, saturating
+024054: 646D  extu.w r6,r4                  ; delay slot: r4 = the word
+;   -- function 0x0946BC (census: eleven callees, none of them 0x0BE554, one unresolved call)
+094780: D254  mov.l @(0x0948D4),r2          ; = 0x000BE554 ROM | r2 = 0x0BE554
+094782: E501  mov #1,r5                     ; r5 = 1
+094784: C500  mov.w @(0,gbr),r0             ; gbr+0 = 0xFFFFACCE
+094786: 420B  jsr @r2                       ; -> 0x0BE554 | call
+094788: 640D  extu.w r0,r4                  ; delay slot: r4 = the word
+;   -- function 0x01200A (census: callee 0x0BE53C only, one unresolved call).  The load sits before a bra over a pool:
+0120A8: D21E  mov.l @(0x012124),r2          ; = 0x000BE554 ROM | r2 = 0x0BE554
+0120AA: A03D  bra 0x012128                  ; over the literal pool 0x0120AE..0x012127
+0120AC: 0009  nop                           ; delay slot
+012128: C500  mov.w @(0,gbr),r0             ; gbr+0 = 0xFFFF5BD8
+01212A: 1F04  mov.l r0,@(16,r15)
+01212C: 420B  jsr @r2                       ; -> target NOT statically resolved | fn_dump cannot see the load across the pool; r2 = 0x000BE554 from 0x0120A8, nothing writes r2 in between
+01212E: 640D  extu.w r0,r4                  ; delay slot: r4 = the word
+;   A fourth and fifth site lie where an artificial census entry cut the flow; both are plain in the bytes:
+0124C6: D125  mov.l @(0x01255C),r1          ; = 0x000BE554 ROM | r1 = 0x0BE554
+0124C8: E501  mov #1,r5                     ; census starts a "function" here (entry 0x0124C8, evidence tailbra) because the DATA at 0x01195C decodes as bra 0x0124C8
+0124CA: 85D1  mov.w @(2,r13),r0
+0124CC: 410B  jsr @r1                       ; -> 0x0BE554 | call
+0124CE: 640D  extu.w r0,r4                  ; delay slot
+0960C6: D22D  mov.l @(0x09617C),r2          ; = 0x000BE554 ROM | r2 = 0x0BE554
+0960C8: E501  mov #1,r5
+0960CA: D12D  mov.l @(0x096180),r1          ; = 0xFFFFAD20 RAM
+0960CC: 6611  mov.w @r1,r6                  ; census starts a "function" here (entry 0x0960CC, evidence ptr)
+0960CE: 420B  jsr @r2                       ; -> 0x0BE554 | call
+0960D0: 646D  extu.w r6,r4                  ; delay slot
+
+A CALL-SITE RESOLUTION TRAP  (why a "-> 0x......" annotation on jsr @Rn is a lead, not a fact)
+;   fn_dump and the census resolve jsr @Rn by walking BACK IN ADDRESS ORDER to the nearest write of Rn.  Where the
+;   jsr is a branch target and the fall-through path reloaded the register, that names the wrong callee:
+04519C: D230  mov.l @(0x045260),r2          ; = 0x000BE554 ROM | r2 = 0x0BE554, loaded BEFORE the branch
+04519E: 8913  bt 0x0451C8                   ; T=1: go to 0x0451C8 with r2 still = 0x0BE554
+0451B8: D20B  mov.l @(0x0451E8),r2          ; = 0x000BE53C ROM | fall-through path only: r2 = 0x0BE53C
+0451C0: 420B  jsr @r2                       ; -> 0x0BE53C | fall-through path: a call to 0x0BE53C
+0451C2: E501  mov #1,r5                     ; delay slot
+0451C4: A00C  bra 0x0451E0                  ; fall-through path leaves; it never reaches 0x0451C8
+0451C6: C03E  mov.b r0,@(62,gbr)            ; gbr+62 = 0xFFFF822E | delay slot
+0451C8: E501  mov #1,r5                     ; the bt target
+0451CA: C52A  mov.w @(84,gbr),r0            ; gbr+84 = 0xFFFF8244
+0451CC: 1F05  mov.l r0,@(20,r15)
+0451CE: 420B  jsr @r2                       ; -> 0x0BE53C | fn_dump's annotation is WRONG: this site is reached only from the bt at 0x04519E, with r2 = 0x000BE554
+;   Same shape, same wrong answer, at 0x087012 (printed "-> 0x0BE9A0"; r2 = 0x000BE554 from 0x086FE4 over the
+;   bt at 0x086FE6) and, the other way round, at 0x055484 (printed "-> 0x0BE56C"; it is 0x0BE830 -- see 0x0BE56C).
+;   Three such sites touch this library; the site counts in the header table come from a control-flow
+;   propagation, not from those annotations.
+
+==== FUNCTION 0x0BE56C .. 0x0BE586  (13 instructions, 129 calling functions) ====
+
+CONTRACT
+  inputs   fr4 = x, fr5 = LOW bound, fr6 = HIGH bound
+  output   fr0 = the selected one of the three inputs, bit-for-bit (also left in fr7)
+  effects  none on memory.  Changes fr0 and fr7 only.  fr4, fr5, fr6 are preserved.  No integer register changes.
+
+MECHANISM
+  if NOT (fr4 > fr5):  return fr5       ; fcmp/gt fr5,fr4 sets T when fr4 > fr5; bt/s goes on when T = 1
+  if fr6 > fr4:        return fr4       ; fcmp/gt fr4,fr6 sets T when fr6 > fr4
+  return fr6
+  For fr5 <= fr6 this is max(fr5, min(fr4, fr6)).  The LOW test comes first, so with the bounds the wrong way
+  round (fr5 > fr6) the result is fr5 when x <= fr5 and fr6 otherwise -- never x.
+  x equal to a bound returns that bound's register (matters only for the sign of zero: x = -0, lo = +0 -> +0).
+  No arithmetic is done, so nothing is rounded.
+
+EVIDENCE
+  0BE56C/0BE56E  first test, branch sense
+  0BE576/0BE578  second test, branch sense
+  emulated: t_clamp, 17,590 cases -- 26^3 grid over {0, -0, +-1, +-0.5, 1 +- 1ulp, +-1e-30, +-1e30, +-FLT_MAX,
+            ...} of which 8,424 have lo > hi, plus 13 asserted rows and one NaN row.  Bit-exact against the model above; equal
+            to max(lo, min(x, hi)) whenever lo <= hi.
+            EMU-MODEL (asserted against the emulator's model only): x = NaN returns fr5, because a false fcmp/gt
+            takes the first exit.
+
+LISTING
+0BE56C: F455  fcmp/gt fr5,fr4               ; T = (fr4 > fr5) = (x > low)
+0BE56E: 8D02  bt/s 0x0BE576                 ; T=1: x is above the low bound, go test the high bound
+0BE570: 0009  nop                           ; delay slot
+0BE572: A006  bra 0x0BE582                  ; x <= low:
+0BE574: F75C  fmov fr5,fr7                  ; delay slot: result = fr5 (low)
+0BE576: F645  fcmp/gt fr4,fr6               ; T = (fr6 > fr4) = (high > x)
+0BE578: 8D02  bt/s 0x0BE580                 ; T=1: x is inside, result = x
+0BE57A: 0009  nop                           ; delay slot
+0BE57C: A001  bra 0x0BE582                  ; x >= high:
+0BE57E: F76C  fmov fr6,fr7                  ; delay slot: result = fr6 (high)
+0BE580: F74C  fmov fr4,fr7                  ; result = fr4 (x)
+0BE582: 000B  rts                           ; return
+0BE584: F07C  fmov fr7,fr0                  ; delay slot: fr0 = result
+
+ALSO ENTERED BY A TAIL JUMP  (the only non-jsr entry into the whole range; function 0x02F9E0)
+02FA14: D212  mov.l @(0x02FA60),r2          ; = 0x000BE56C ROM | r2 = 0x0BE56C
+02FA16: C713  mova @(0x02FA64),r0           ; -> 0x02FA64: long 0x487FFE00 f32 262136 | r0 = address of the constant 262136.0
+02FA18: F608  fmov.s @r0,fr6                ; fr6 = 262136.0 = HIGH bound
+02FA1A: F58D  fldi0 fr5                     ; fr5 = 0.0 = LOW bound
+02FA1C: FEF9  fmov.s @r15+,fr14             ; epilogue: restore fr14
+02FA1E: 4F26  lds.l @r15+,pr                ; epilogue: restore PR -- the clamp will return to THIS function's caller
+02FA20: 422B  jmp @r2                       ; -> 0x0BE56C | TAIL JUMP, not jsr: fr0 = clamp(fr4, 0.0, 262136.0) is this function's return value
+02FA22: 6EF6  mov.l @r15+,r14               ; delay slot: restore r14
+;   pool 0x02FA60: .long 0x000BE56C      0x02FA64: .long 0x487FFE00 = 262136.0f
+
+ONE SITE THAT LOOKS LIKE A CALL TO 0x0BE56C AND IS NOT  (function 0x0553C4; see the trap under 0x0BE554)
+05545A: D21D  mov.l @(0x0554D0),r2          ; = 0x000BE830 ROM | r2 = 0x0BE830, loaded BEFORE the branch
+05545C: 8B11  bf 0x055482                   ; T=0: go to 0x055482 with r2 still = 0x0BE830
+055472: D219  mov.l @(0x0554D8),r2          ; = 0x000BE56C ROM | fall-through path only: r2 = 0x0BE56C
+055478: 420B  jsr @r2                       ; -> 0x0BE56C | fall-through path: a real call to 0x0BE56C
+05547A: F6D6  fmov.s @(r0,r13),fr6          ; delay slot
+05547E: A011  bra 0x0554A4                  ; fall-through path leaves; it never reaches 0x055482
+055480: FD07  fmov.s fr0,@(r0,r13)          ; delay slot
+055482: D419  mov.l @(0x0554E8),r4          ; = 0x000AEE94 DESC | the bf target
+055484: 420B  jsr @r2                       ; -> 0x0BE56C | fn_dump's annotation is WRONG: reached only from the bf at 0x05545C, r2 = 0x000BE830.  NOT a call to 0x0BE56C
+
+==== FUNCTION 0x0BE588 .. 0x0BE596  (7 instructions, 23 calling functions) ====
+
+CONTRACT
+  inputs   r4  = raw integer -- only the low 8 bits are used, ZERO-extended (the value is never negative)
+           fr4 = SCALE (multiplier)
+           fr5 = OFFSET (added after the multiply)
+  output   fr0 = fr4 * (float)(r4 & 0xFF) + fr5      (also left in fr5)
+  effects  none on memory.  Changes r4 (masked), fr0, fr3 (= the integer as a float), fr5 (= result), FPUL.
+           fr4 is preserved.
+
+MECHANISM
+  r4   = r4 & 0xFF
+  fr3  = (float) r4                    ; lds r4,fpul / float fpul,fr3: exact, the integer is at most 255
+  fr0  = fr4
+  fr5  = fr0 * fr3 + fr5               ; fmac fr0,fr3,fr5 : FRn = FR0 * FRm + FRn with n = 5, m = 3
+  fr0  = fr5
+  Identical to 0x0BE598 except for the width of the zero-extension (first instruction).
+  A raw byte/word that the caller regards as SIGNED is not sign-extended here: 0x80 gives +128, not a negative.
+
+EVIDENCE
+  0BE588        the zero-extension (extu.b)
+  0BE590        fmac operand fields: F53E = 1111 nnnn mmmm 1110, n = 5, m = 3 -> fr5 = fr0 * fr3 + fr5
+  emulated: t_scale, 32,268 cases (14 scales x 9 offsets x all 256 byte values,
+            random garbage in the unused upper bits of r4, + 12 printed rows).
+            In every case fr0 is BIT-EXACT the real value scale*raw+offset truncated once to float32 (fused
+            truncating fmac; asserted on all 32,256 grid cases and the 12 rows), and fr5 == fr0.  Truncation
+            is what the firmware expects (ROM self-test, fmac at 0x0586B8); a fused round-to-nearest fmac would
+            differ in 10,926 of the 32,256.  Whether the product is rounded before the add (fused or not) is
+            NOT ESTABLISHED: an unfused truncating fmac differs in 1,819 of the 32,256, and with a cancelling
+            offset by up to 80 float32 steps on this grid -- see FLOAT ROUNDING.
+
+LISTING
+0BE588: 644C  extu.b r4,r4                  ; r4 = raw & 0xFF (zero-extend)
+0BE58A: 445A  lds r4,fpul                   ; FPUL = r4
+0BE58C: F32D  float fpul,fr3                ; fr3 = (float) raw, exact
+0BE58E: F04C  fmov fr4,fr0                  ; fr0 = fr4 = scale (fmac multiplies by FR0)
+0BE590: F53E  fmac fr0,fr3,fr5              ; fr5 = fr0 * fr3 + fr5 = scale * raw + offset
+0BE592: 000B  rts                           ; return
+0BE594: F05C  fmov fr5,fr0                  ; delay slot: fr0 = result
+;   (no literal pool; 0x0BE596 is a 0x0000 alignment pad)
+
+==== FUNCTION 0x0BE598 .. 0x0BE5A6  (7 instructions, 98 calling functions) ====
+
+CONTRACT
+  inputs   r4  = raw integer -- only the low 16 bits are used, ZERO-extended (the value is never negative)
+           fr4 = SCALE (multiplier)
+           fr5 = OFFSET (added after the multiply)
+  output   fr0 = fr4 * (float)(r4 & 0xFFFF) + fr5      (also left in fr5)
+  effects  none on memory.  Changes r4 (masked), fr0, fr3 (= the integer as a float), fr5 (= result), FPUL.
+           fr4 is preserved.
+
+MECHANISM
+  r4   = r4 & 0xFFFF
+  fr3  = (float) r4                    ; lds r4,fpul / float fpul,fr3: exact, the integer is at most 65535
+  fr0  = fr4
+  fr5  = fr0 * fr3 + fr5               ; fmac fr0,fr3,fr5 : FRn = FR0 * FRm + FRn with n = 5, m = 3
+  fr0  = fr5
+  Identical to 0x0BE588 except for the width of the zero-extension (first instruction).
+  A raw byte/word that the caller regards as SIGNED is not sign-extended here: 0x8000 gives +32768, not a negative.
+
+EVIDENCE
+  0BE598        the zero-extension (extu.w)
+  0BE5A0        fmac operand fields: F53E = 1111 nnnn mmmm 1110, n = 5, m = 3 -> fr5 = fr0 * fr3 + fr5
+  emulated: t_scale, 16,770 cases (14 scales x 9 offsets x 133 word values incl. 0, 0x7FFF, 0x8000, 0xFFFF,
+            random garbage in the unused upper bits of r4, + 12 printed rows).
+            In every case fr0 is BIT-EXACT the real value scale*raw+offset truncated once to float32 (fused
+            truncating fmac; asserted on all 16,758 grid cases and the 12 rows), and fr5 == fr0.  Truncation
+            is what the firmware expects (ROM self-test, fmac at 0x0586B8); a fused round-to-nearest fmac would
+            differ in 6,072 of the 16,758.  Whether the product is rounded before the add (fused or not) is
+            NOT ESTABLISHED: an unfused truncating fmac differs in 1,035 of the 16,758, and with a cancelling
+            offset by up to 509 float32 steps on this grid -- see FLOAT ROUNDING.
+
+LISTING
+0BE598: 644D  extu.w r4,r4                  ; r4 = raw & 0xFFFF (zero-extend)
+0BE59A: 445A  lds r4,fpul                   ; FPUL = r4
+0BE59C: F32D  float fpul,fr3                ; fr3 = (float) raw, exact
+0BE59E: F04C  fmov fr4,fr0                  ; fr0 = fr4 = scale (fmac multiplies by FR0)
+0BE5A0: F53E  fmac fr0,fr3,fr5              ; fr5 = fr0 * fr3 + fr5 = scale * raw + offset
+0BE5A2: 000B  rts                           ; return
+0BE5A4: F05C  fmov fr5,fr0                  ; delay slot: fr0 = result
+;   (no literal pool; 0x0BE5A6 is a 0x0000 alignment pad)
+
+==== FUNCTION 0x0BE5A8 .. 0x0BE5D0  (20 instructions, 105 calling functions) ====
+
+CONTRACT
+  inputs   fr4 = x (float), fr5 = SCALE (divisor), fr6 = OFFSET (subtracted first)
+  output   r0  = clamp(trunc((fr4 - fr6) / fr5 + 0.5), 0, 255)      (also left in r4)
+  effects  none on memory.  Changes r0 r4 r5 (r5 = 255), fr2, fr3 (= 0.5), fr4 (= the scaled value), FPUL.
+           fr5 and fr6 are preserved.
+
+MECHANISM
+  fr4 = fr4 - fr6                      ; fsub fr6,fr4
+  fr4 = fr4 / fr5                      ; fdiv fr5,fr4   -- no test for fr5 == 0
+  fr2 = fr4 + 0.5                      ; 0.5 from 0x0BE5D4
+  r4  = ftrc(fr2)                      ; truncate toward zero to a signed 32-bit integer
+  if r4 > 255: r4 = 255
+                                       ; cmp/gt r5,r4 sets T when r4 > r5 (signed); bf/s skips when T = 0
+  else if r4 < 0: r4 = 0               ; cmp/pz r4 sets T when r4 >= 0; bt/s skips the clear when T = 1
+  return r4
+
+  Rounding: add-half-then-truncate, so a positive half-way value rounds UP (0.5 -> 1, 1.5 -> 2, 2.5 -> 3),
+  not to even.  Anything negative ends at 0 (-0.5 + 0.5 = 0; below that the truncation is <= 0, clamped).
+  Top: 255.5 and everything above gives 255; values too large for a 32-bit integer rely on ftrc saturating
+  to 0x7FFFFFFF (emulator model) and are then clamped.
+  A NEGATIVE scale flips the sign before the clamp: positive (x - offset) then yields 0.
+  fr5 == 0 is not guarded: the result is whatever fdiv-by-zero followed by ftrc produces.  EMULATOR MODEL
+  (exceptions disabled, as the 0x00040001 FPSCR image would have it): (x-off) > 0 -> 255, < 0 -> 0, == 0 -> 0;
+  the sign of a -0 divisor swaps the first two.  Byte support exists for one link only: the ROM self-test
+  expects 0.0/0.0 to yield an unordered value without trapping (0x058712..0x058736).  x/0 = +-Inf and what
+  ftrc makes of Inf or NaN are the emulator's reading of the manual.
+  ROUNDING EDGE.  The step that decides a half-way case is the fadd of 0.5.  x = 0x3EFFFFFF (the float just
+  below 0.5), scale 1, offset 0: x + 0.5 = 1 - 2^-25 is an exact tie.  Round-to-nearest-even makes it 1.0
+  (the pre-item-106 emulator returned 1); a truncating fadd makes it 0x3F7FFFFF and the routine returns 0,
+  which the emulator now returns (asserted row).  The firmware expects truncation of fmul/fmac/fdiv
+  (bytes); the self-test never exercises fadd inexactly, so "0" here is that evidence extended to fadd,
+  not a byte result.  (With a truncating fadd, scale 1 and offset 0, every x below 0.5 gives 0 -- the tie
+  cannot round up.)
+
+EVIDENCE
+  0BE5AA        fsub fr6,fr4 : fr4 - fr6, offset in fr6
+  0BE5AE        fdiv fr5,fr4 : fr4 / fr5, scale in fr5
+  0BE5BA-0BE5C2 ceiling test and its branch sense
+  0BE5C4-0BE5CA floor test and its branch sense
+  emulated: t_f2u + t_edges, 11,251 cases -- 13 scales x 6 offsets x 100 x values (incl. +-0.49/0.5/0.51,
+            255 +- 0.5, +-1e30, +-FLT_MAX), a dense sweep of the output range at scale 1, the argument-order
+            rows (x=10, scale=4, offset=0.5 -> 2; x=10, scale=0.5, offset=4 -> 12), 5 divide-by-zero rows, the
+            rounding-edge row above, and an edge-targeted grid (x within two float32 steps of every point
+            where the result changes, 8 scales x 5 offsets).  The emulator equals
+            trunc(((x - off) / scale) + 0.5) with each step TRUNCATED in every case (asserted); a
+            round-to-nearest model gives a different integer in 2 of the 7,800 broad-grid cases and 94 of
+            the 2,395 edge cases -- counts that describe the grids, not the routine.
+
+LISTING
+0BE5A8: C70A  mova @(0x0BE5D4),r0           ; -> 0x0BE5D4: long 0x3F000000 f32 0.5 | r0 = address of the 0.5 constant
+0BE5AA: F461  fsub fr6,fr4                  ; fr4 = x - offset
+0BE5AC: 9510  mov.w @(0x0BE5D0),r5          ; = 0x00FF (255) | r5 = 255, the ceiling
+0BE5AE: F453  fdiv fr5,fr4                  ; fr4 = (x - offset) / scale   (no zero-divisor test)
+0BE5B0: F308  fmov.s @r0,fr3                ; fr3 = 0.5
+0BE5B2: F24C  fmov fr4,fr2                  ; fr2 = scaled value
+0BE5B4: F230  fadd fr3,fr2                  ; fr2 = scaled + 0.5
+0BE5B6: F23D  ftrc fr2,fpul                 ; FPUL = trunc toward zero
+0BE5B8: 045A  sts fpul,r4                   ; r4 = integer
+0BE5BA: 3457  cmp/gt r5,r4                  ; T = (r4 > r5) signed = (r4 > 255)
+0BE5BC: 8F02  bf/s 0x0BE5C4                 ; T=0 (not above the ceiling): go test the floor
+0BE5BE: 0009  nop                           ; delay slot
+0BE5C0: A004  bra 0x0BE5CC                  ; above the ceiling:
+0BE5C2: 6453  mov r5,r4                     ; delay slot: r4 = 255
+0BE5C4: 4411  cmp/pz r4                     ; T = (r4 >= 0)
+0BE5C6: 8D01  bt/s 0x0BE5CC                 ; T=1: in range, keep it
+0BE5C8: 0009  nop                           ; delay slot
+0BE5CA: E400  mov #0,r4                     ; negative: r4 = 0
+0BE5CC: 000B  rts                           ; return
+0BE5CE: 6043  mov r4,r0                     ; delay slot: r0 = r4
+;   pool 0x0BE5D0: .word 0x00FF, 0x0BE5D2: .word 0x0000 (pad), 0x0BE5D4: .long 0x3F000000 = 0.5f
+;   (the instruction at 0x0BE5AC is a mov.w and reads only the word 0x00FF)
+
+==== FUNCTION 0x0BE5D8 .. 0x0BE600  (20 instructions, 78 calling functions) ====
+
+CONTRACT
+  inputs   fr4 = x (float), fr5 = SCALE (divisor), fr6 = OFFSET (subtracted first)
+  output   r0  = clamp(trunc((fr4 - fr6) / fr5 + 0.5), 0, 65535)      (also left in r4)
+  effects  none on memory.  Changes r0 r4 r5 (r5 = 65535), fr2, fr3 (= 0.5), fr4 (= the scaled value), FPUL.
+           fr5 and fr6 are preserved.
+
+MECHANISM
+  fr4 = fr4 - fr6                      ; fsub fr6,fr4
+  fr4 = fr4 / fr5                      ; fdiv fr5,fr4   -- no test for fr5 == 0
+  fr2 = fr4 + 0.5                      ; 0.5 from 0x0BE600
+  r4  = ftrc(fr2)                      ; truncate toward zero to a signed 32-bit integer
+  if r4 > 65535: r4 = 65535
+                                       ; cmp/gt r5,r4 sets T when r4 > r5 (signed); bf/s skips when T = 0
+  else if r4 < 0: r4 = 0               ; cmp/pz r4 sets T when r4 >= 0; bt/s skips the clear when T = 1
+  return r4
+
+  Rounding: add-half-then-truncate, so a positive half-way value rounds UP (0.5 -> 1, 1.5 -> 2, 2.5 -> 3),
+  not to even.  Anything negative ends at 0 (-0.5 + 0.5 = 0; below that the truncation is <= 0, clamped).
+  Top: 65535.5 and everything above gives 65535; values too large for a 32-bit integer rely on ftrc saturating
+  to 0x7FFFFFFF (emulator model) and are then clamped.
+  A NEGATIVE scale flips the sign before the clamp: positive (x - offset) then yields 0.
+  fr5 == 0 is not guarded: the result is whatever fdiv-by-zero followed by ftrc produces.  EMULATOR MODEL
+  (exceptions disabled, as the 0x00040001 FPSCR image would have it): (x-off) > 0 -> 65535, < 0 -> 0, == 0 -> 0;
+  the sign of a -0 divisor swaps the first two.  Byte support exists for one link only: the ROM self-test
+  expects 0.0/0.0 to yield an unordered value without trapping (0x058712..0x058736).  x/0 = +-Inf and what
+  ftrc makes of Inf or NaN are the emulator's reading of the manual.
+  ROUNDING EDGE.  The step that decides a half-way case is the fadd of 0.5.  x = 0x3EFFFFFF (the float just
+  below 0.5), scale 1, offset 0: x + 0.5 = 1 - 2^-25 is an exact tie.  Round-to-nearest-even makes it 1.0
+  (the pre-item-106 emulator returned 1); a truncating fadd makes it 0x3F7FFFFF and the routine returns 0,
+  which the emulator now returns (asserted row).  The firmware expects truncation of fmul/fmac/fdiv
+  (bytes); the self-test never exercises fadd inexactly, so "0" here is that evidence extended to fadd,
+  not a byte result.  (With a truncating fadd, scale 1 and offset 0, every x below 0.5 gives 0 -- the tie
+  cannot round up.)
+
+EVIDENCE
+  0BE5DA        fsub fr6,fr4 : fr4 - fr6, offset in fr6
+  0BE5DE        fdiv fr5,fr4 : fr4 / fr5, scale in fr5
+  0BE5EA-0BE5F2 ceiling test and its branch sense
+  0BE5F4-0BE5FA floor test and its branch sense
+  emulated: t_f2u + t_edges, 12,647 cases -- 13 scales x 6 offsets x 100 x values (incl. +-0.49/0.5/0.51,
+            65535 +- 0.5, +-1e30, +-FLT_MAX), a dense sweep of the output range at scale 1, the argument-order
+            rows (x=10, scale=4, offset=0.5 -> 2; x=10, scale=0.5, offset=4 -> 12), 5 divide-by-zero rows, the
+            rounding-edge row above, and an edge-targeted grid (x within two float32 steps of every point
+            where the result changes, 8 scales x 5 offsets).  The emulator equals
+            trunc(((x - off) / scale) + 0.5) with each step TRUNCATED in every case (asserted); a
+            round-to-nearest model gives a different integer in 3 of the 7,800 broad-grid cases and 197 of
+            the 3,795 edge cases -- counts that describe the grids, not the routine.
+
+LISTING
+0BE5D8: C709  mova @(0x0BE600),r0           ; -> 0x0BE600: long 0x3F000000 f32 0.5 | r0 = address of the 0.5 constant
+0BE5DA: F461  fsub fr6,fr4                  ; fr4 = x - offset
+0BE5DC: D509  mov.l @(0x0BE604),r5          ; = 0x0000FFFF const | r5 = 65535, the ceiling
+0BE5DE: F453  fdiv fr5,fr4                  ; fr4 = (x - offset) / scale   (no zero-divisor test)
+0BE5E0: F308  fmov.s @r0,fr3                ; fr3 = 0.5
+0BE5E2: F24C  fmov fr4,fr2                  ; fr2 = scaled value
+0BE5E4: F230  fadd fr3,fr2                  ; fr2 = scaled + 0.5
+0BE5E6: F23D  ftrc fr2,fpul                 ; FPUL = trunc toward zero
+0BE5E8: 045A  sts fpul,r4                   ; r4 = integer
+0BE5EA: 3457  cmp/gt r5,r4                  ; T = (r4 > r5) signed = (r4 > 65535)
+0BE5EC: 8F02  bf/s 0x0BE5F4                 ; T=0 (not above the ceiling): go test the floor
+0BE5EE: 0009  nop                           ; delay slot
+0BE5F0: A004  bra 0x0BE5FC                  ; above the ceiling:
+0BE5F2: 6453  mov r5,r4                     ; delay slot: r4 = 65535
+0BE5F4: 4411  cmp/pz r4                     ; T = (r4 >= 0)
+0BE5F6: 8D01  bt/s 0x0BE5FC                 ; T=1: in range, keep it
+0BE5F8: 0009  nop                           ; delay slot
+0BE5FA: E400  mov #0,r4                     ; negative: r4 = 0
+0BE5FC: 000B  rts                           ; return
+0BE5FE: 6043  mov r4,r0                     ; delay slot: r0 = r4
+;   pool 0x0BE604: .long 0x0000FFFF  const
+;   pool 0x0BE600: .long 0x3F000000 = 0.5f   (read through mova at 0x0BE5D8, so fn_dump lists it on that line only)
+
+==== FUNCTION 0x0BE608 .. 0x0BE626  (15 instructions, 104 calling functions) ====
+
+CONTRACT
+  inputs   fr4 = x, fr5 = CENTRE, fr6 = HALF-WIDTH
+  output   r0 = 1 when x < (fr5 - fr6) or x > (fr5 + fr6);  r0 = 0 otherwise      (also left in r4)
+  effects  none on memory.  Changes r0, r4 and fr3.  fr4, fr5, fr6 are preserved.
+
+MECHANISM
+  fr3 = fr5 - fr6
+  if fr3 > fr4:  return 1              ; fcmp/gt fr4,fr3 sets T when fr3 > fr4, i.e. x below the window
+  fr3 = fr5 + fr6
+  if fr4 > fr3:  return 1              ; fcmp/gt fr3,fr4 sets T when fr4 > fr3, i.e. x above the window
+  return 0
+
+  1 means OUTSIDE.  Both edges belong to the window: x == centre - width and x == centre + width return 0.
+  Zero width: 0 only when x == centre exactly (all 1,352 grid cases).
+  NEGATIVE width: the two limits cross, and the result is 1 for every x -- with truncating fsub/fadd, which
+  the emulator implements since corrections item 106 (asserted: all 5,408 negative-width grid cases and
+  the six negative-width rows of t_window return 1).  Under ROUND-TO-NEAREST -- the emulator before item
+  106 -- it fails when the width is so small that centre - width and centre + width both round back to
+  centre; then x == centre returns 0:
+      round-to-nearest:  x = c = 10, w = -1e-30    -> 0      x = c = 10, w = -4.7e-7  -> 0   (below half an ulp of 10)
+                         x = c = 10, w = -4.8e-7   -> 1      x = c = 10, w = -1       -> 1
+                         x = c = 1e30, w = -65536  -> 0      (the width only has to be small against the centre)
+  The round-to-nearest model returns 0 in 44 of the 5,408 negative-width grid cases, every one with
+  x == centre (22 with w = -1e-30, the other 22 with the centre at +-1e30 or +-FLT_MAX).  This edge is a
+  ROUNDING-MODE artefact, not a property of the bytes: a truncated centre -/+ width cannot land back on the
+  centre from the side nearer zero, so one limit stays strictly beyond x and the result is 1.  So
+  "negative width means always outside" is what the firmware's expected arithmetic gives -- given that
+  fadd/fsub truncate too (N2; the self-test proves truncation only for fmul/fmac/fdiv).
+  It is |x - centre| > width computed as two one-sided tests, not with fabs.
+
+EVIDENCE
+  0BE60A/0BE60C  lower limit and compare sense
+  0BE614/0BE616  upper limit and compare sense
+  0BE61E/0BE620  the 0 and the 1
+  emulated: t_window + t_edges, 18,422 cases (26^3 grid, 17 asserted rows incl. one float32 step either side
+            of each edge and the negative-width rows above, one NaN row, and 828 edge-targeted cases).  The
+            emulator is exact with fsub/fadd TRUNCATED (asserted); a round-to-nearest model differs in 110 of
+            the 17,576 grid verdicts and 73 of the 828 edge cases (grid counts, not rates).
+            EMU-MODEL: x = NaN returns 0 (both fcmp/gt false).
+
+LISTING
+0BE608: F35C  fmov fr5,fr3                  ; fr3 = centre
+0BE60A: F361  fsub fr6,fr3                  ; fr3 = centre - width (lower limit)
+0BE60C: F345  fcmp/gt fr4,fr3               ; T = (fr3 > fr4) = (lower limit > x)
+0BE60E: 8D07  bt/s 0x0BE620                 ; T=1: x is below the window -> 1
+0BE610: 0009  nop                           ; delay slot
+0BE612: F35C  fmov fr5,fr3                  ; fr3 = centre
+0BE614: F360  fadd fr6,fr3                  ; fr3 = centre + width (upper limit)
+0BE616: F435  fcmp/gt fr3,fr4               ; T = (fr4 > fr3) = (x > upper limit)
+0BE618: 8D02  bt/s 0x0BE620                 ; T=1: x is above the window -> 1
+0BE61A: 0009  nop                           ; delay slot
+0BE61C: A001  bra 0x0BE622                  ; inside (edges included):
+0BE61E: E400  mov #0,r4                     ; delay slot: r4 = 0
+0BE620: E401  mov #1,r4                     ; outside: r4 = 1
+0BE622: 000B  rts                           ; return
+0BE624: 6043  mov r4,r0                     ; delay slot: r0 = r4
+;   (no literal pool; 0x0BE626 is a 0x0000 alignment pad)
+
+==== FUNCTION 0x0BE628 .. 0x0BE64E  (19 instructions, 99 calling functions) ====
+
+CONTRACT
+  inputs   fr4 = numerator, fr5 = denominator
+  output   fr0 = fr4 / fr5                          when fr5 != 0
+                 +0.0                               when fr5 == 0 and fr4 == 0
+                 +FLT_MAX (0x7F7FFFFF)              when fr5 == 0 and fr4 > 0
+                 -FLT_MAX (0xFF7FFFFF)              when fr5 == 0 and fr4 < 0
+           (also left in fr6)
+  effects  none on memory.  Changes fr0, fr6 always; fr3 and r0 only on the fr5 == 0, fr4 != 0 path
+           (r0 = 0x0BE650 from the mova).  fr4 and fr5 are preserved.
+
+MECHANISM
+  fr6 = 0.0
+  if fr5 != 0:                         ; fcmp/eq fr6,fr5 sets T when fr5 == 0; bf/s takes the divide when T = 0
+      fr6 = fr4 / fr5 ; return fr6
+  if fr4 == 0:  return fr6 (= +0.0)    ; fcmp/eq fr6,fr4 sets T when fr4 == 0
+  fr3 = FLT_MAX                        ; 0x7F7FFFFF from 0x0BE650
+  if NOT (fr4 > 0): fr3 = -fr3         ; fcmp/gt fr6,fr4 sets T when fr4 > 0; bt/s skips the fneg when T = 1
+  return fr3
+
+  Only an exactly-zero divisor is protected (+0 or -0; the sign of the zero is ignored, so 5 / -0 = +FLT_MAX).
+  A tiny non-zero divisor is divided normally and can overflow.  0 / 0 is +0.0, not NaN.
+  EMU-MODEL: a NaN numerator over a zero divisor takes the "not greater than zero" arm and returns -FLT_MAX.
+
+EVIDENCE
+  0BE628-0BE62C  the divisor test (fldi0 + fcmp/eq) and its branch sense
+  0BE630-0BE632  the 0/0 case returns the fldi0 zero
+  0BE63A-0BE640  sign selection
+  0BE646-0BE648  fmov fr4,fr6 ; fdiv fr5,fr6  -> fr4 / fr5
+  emulated: t_safe_div, 991 cases (26 x 26 grid, 14 asserted rows, 300 random non-dyadic divides, one NaN
+            row).  Zero-divisor results are bit-exact and involve no arithmetic.  For a real divide the
+            emulator returns fr4/fr5 TRUNCATED, bit-exact (asserted) -- the quotient the firmware expects
+            (ROM self-test, fdiv at 0x0586D2).  A round-to-nearest quotient would differ -- one ulp larger in
+            magnitude, or +Inf where truncation saturates -- in 206 of the 624 real divides of the grid and
+            158 of the 300 random ones (grid counts, not rates).
+            OVERFLOW: 1e30 / 1e-30 returns +FLT_MAX (0x7F7FFFFF, asserted row): a truncating divide saturates
+            instead of reaching Inf (the pre-item-106 emulator returned +Inf).  The self-test never overflows,
+            so this rests on the definition of round-toward-zero, not on a byte (N7).  Either way the overflow
+            of a real divide is not caught by this routine's own branches.
+
+LISTING
+0BE628: F68D  fldi0 fr6                     ; fr6 = 0.0
+0BE62A: F564  fcmp/eq fr6,fr5               ; T = (fr5 == fr6) = (denominator == 0)
+0BE62C: 8F0B  bf/s 0x0BE646                 ; T=0 (non-zero denominator): go divide
+0BE62E: 0009  nop                           ; delay slot
+0BE630: F464  fcmp/eq fr6,fr4               ; T = (fr4 == 0)
+0BE632: 8D0A  bt/s 0x0BE64A                 ; T=1 (0/0): return fr6 = +0.0
+0BE634: 0009  nop                           ; delay slot
+0BE636: C706  mova @(0x0BE650),r0           ; -> 0x0BE650: long 0x7F7FFFFF | r0 = address of the FLT_MAX constant
+0BE638: F308  fmov.s @r0,fr3                ; fr3 = 0x7F7FFFFF = FLT_MAX
+0BE63A: F465  fcmp/gt fr6,fr4               ; T = (fr4 > fr6) = (numerator > 0)
+0BE63C: 8D01  bt/s 0x0BE642                 ; T=1 (positive): keep +FLT_MAX
+0BE63E: 0009  nop                           ; delay slot
+0BE640: F34D  fneg fr3                      ; numerator negative: fr3 = -FLT_MAX
+0BE642: A002  bra 0x0BE64A                  ; to the exit
+0BE644: F63C  fmov fr3,fr6                  ; delay slot: fr6 = +-FLT_MAX
+0BE646: F64C  fmov fr4,fr6                  ; fr6 = numerator
+0BE648: F653  fdiv fr5,fr6                  ; fr6 = numerator / denominator
+0BE64A: 000B  rts                           ; return
+0BE64C: F06C  fmov fr6,fr0                  ; delay slot: fr0 = fr6
+;   pool 0x0BE650: .long 0x7F7FFFFF = largest finite float32 (3.4028235e38); 0x0BE64E is a nop pad
+
+==== FUNCTION 0x0BE654 .. 0x0BE7F8  (210 instructions, 3 calling functions) ====
+
+CONTRACT
+  inputs   r4 = dividend, r5 = divisor, both SIGNED 32-bit
+  output   r0 = (r4 * 65536) / r5 as a signed 32-bit value, truncated toward zero, with saturation:
+                 r4 == 0                               -> 0            (even when r5 == 0)
+                 r5 == 0, r4 > 0                       -> 0x7FFFFFFF
+                 r5 == 0, r4 < 0                       -> 0x80000000
+                 r4 == 0x80000000 and r5 == -1         -> 0x7FFFFFFF
+                 trunc(r4 / r5) >  32767               -> 0x7FFFFFFF
+                 trunc(r4 / r5) < -32768               -> 0x80000000
+                 otherwise                             -> low 32 bits of trunc((r4 << 16) / r5)
+           i.e. the quotient r4/r5 in 16.16 fixed point (0x00010000 = 1.0).
+  effects  none on memory, no stack use, MACH/MACL untouched (it is div0s/div1, not a multiply).
+           Changes r0 r1 r3 r4 r6 r7 and the Q/M/T bits.  r5 is preserved.
+
+MECHANISM
+  if r4 == 0: return 0
+  if r5 == 0: return 0x7FFFFFFF + (r4 < 0)             ; rotcl r4 puts the sign of r4 in T, addc adds it
+  if (r4 & 0x7FFFFFFF) == 0 and r5 == -1: return 0x7FFFFFFF        ; r4 is 0x80000000 here (zero already excluded)
+  r7 = r4
+  -- division 1: r6 = trunc(r4 / r5), the classic 64/32 signed sequence
+     r3:r4 = sign-extended dividend, minus 1 if negative (subc), div0s, 32 x (rotcl r4 ; div1 r5,r3),
+     final rotcl, addc -> r6
+  if r6 >  0x7FFF: return 0x7FFFFFFF                   ; cmp/gt r1,r6 sets T when r6 > r1 (signed), r1 = 0x00007FFF
+  if r6 < -0x8000: return 0x80000000                   ; cmp/gt r6,r1 sets T when r1 > r6, r1 = 0xFFFF8000; r0 = ~0x7FFFFFFF
+  -- division 2: r3:r7 = sign-extended original dividend shifted left 16 (16 x shal r7 ; rotcl r3)
+     same adjust, div0s, 32 x (rotcl r7 ; div1 r5,r3), final rotcl, addc -> r0
+  return r0
+
+  THE GUARD HAS A HOLE.  It tests the INTEGER quotient against -32768, but the 16.16 result only fits when
+  the true ratio is >= -32768.0.  When trunc(r4/r5) == -32768 and the division has a remainder (true ratio
+  strictly between -32769 and -32768) division 2 overflows and the routine returns the low 32 bits of the
+  true quotient -- a large POSITIVE number instead of 0x80000000.
+      r4 = -98304, r5 = 3  (exactly -32768)   -> 0x80000000    correct
+      r4 = -98305, r5 = 3  (-32768.33)        -> 0x7FFFAAAB    WRONG SIGN
+      r4 = -98306, r5 = 3  (-32768.67)        -> 0x7FFF5556    WRONG SIGN
+      r4 = -98307, r5 = 3  (-32769)           -> 0x80000000    saturated
+      r4 =  65537, r5 = -2 (-32768.5)         -> 0x7FFF8000    WRONG SIGN
+  The positive side has no such hole (ratio < 32768 always fits).  Whether any of the three callers can
+  present such a ratio: NOT ESTABLISHED.
+
+  Rounding is toward zero for both signs: 1/3 -> 0x00005555, -1/3 -> 0xFFFFAAAB (-21845), -3/2 -> 0xFFFE8000.
+
+EVIDENCE
+  0BE654-0BE666  zero dividend, zero divisor
+  0BE668-0BE674  the 0x80000000 / -1 case (r0 already holds 0x7FFFFFFF from 0BE668)
+  0BE676-0BE70C  division 1: 32 div1 at 0BE68C..0BE708 (every 4 bytes), 33 rotcl r4, quotient to r6
+  0BE70E-0BE71C  the two range tests; both exits go to the rts at 0BE7F4 with r0 preloaded
+  0BE71E-0BE762  16 x (shal r7 ; rotcl r3) at 0BE724..0BE762 = multiply the 64-bit dividend by 65536
+  0BE764-0BE7F2  division 2: 32 div1 at 0BE772..0BE7EE, 33 rotcl r7, quotient to r0
+  emulated: t_q16, 5,717 cases -- 41 x 41 edge grid (0, +-1, +-0x7FFF, +-0x8000, +-0x8001, +-0x10000,
+            0x7FFFFFFF, 0x80000000 ...), 4,000 random of which about a fifth have the ratio forced next to
+            +-32768, and 36 printed rows.  Every result equals the model above, including all 187 cases that fall in the
+            hole.  Paths hit: normal 4,623; SAT+ 409; SAT- 380; hole 187; zero divisor 40; zero dividend 41;
+            0x80000000/-1 1.
+            The hole result rests on the emulator's div1, a transcription of the manual's DIV1 algorithm,
+            being right in an OVERFLOWING division.  The emulator's own self-test of this routine has no
+            case in the hole (0 of its 1,014 generated pairs), so that behaviour has no second witness.
+
+LISTING
+0BE654: E000  mov #0,r0                     ; r0 = 0, the answer for a zero dividend
+0BE656: 2448  tst r4,r4                     ; T = (r4 == 0)
+0BE658: 8904  bt 0x0BE664                   ; T=1: return 0 (the divisor is not looked at)
+0BE65A: D167  mov.l @(0x0BE7F8),r1          ; = 0x7FFFFFFF const | r1 = 0x7FFFFFFF
+0BE65C: 2558  tst r5,r5                     ; T = (r5 == 0)
+0BE65E: 8B03  bf 0x0BE668                   ; T=0 (non-zero divisor): go on
+0BE660: 4424  rotcl r4                      ; divide by zero: T = sign bit of r4
+0BE662: 301E  addc r1,r0                    ; r0 = 0 + 0x7FFFFFFF + T: 0x7FFFFFFF for r4 > 0, 0x80000000 for r4 < 0
+0BE664: 000B  rts                           ; return (shared by the early exits)
+0BE666: 0009  nop                           ; delay slot
+0BE668: 6013  mov r1,r0                     ; r0 = 0x7FFFFFFF (answer if the next test hits)
+0BE66A: 2149  and r4,r1                     ; r1 = r4 with the sign bit removed
+0BE66C: 2118  tst r1,r1                     ; T = (r1 == 0): r4 is 0x80000000 (zero was excluded above)
+0BE66E: 8B02  bf 0x0BE676                   ; T=0: ordinary dividend
+0BE670: E1FF  mov #-1,r1                    ; r1 = -1
+0BE672: 3510  cmp/eq r1,r5                  ; T = (r5 == -1)
+0BE674: 89F6  bt 0x0BE664                   ; T=1: 0x80000000 / -1 -> return 0x7FFFFFFF
+0BE676: 6743  mov r4,r7                     ; r7 = original dividend, kept for division 2
+0BE678: 6143  mov r4,r1                     ; r1 = dividend
+0BE67A: 4124  rotcl r1                      ; T = sign of the dividend
+0BE67C: 333A  subc r3,r3                    ; r3 = -T: high half of the sign-extended 64-bit dividend; T stays = sign
+0BE67E: 6633  mov r3,r6                     ; r6 = r3
+0BE680: 4624  rotcl r6                      ; T = sign again
+0BE682: 266A  xor r6,r6                     ; r6 = 0 (T untouched)
+0BE684: 346A  subc r6,r4                    ; r4 = r4 - T: subtract 1 from a negative dividend (low half)
+0BE686: 336A  subc r6,r3                    ;    ... borrow into the high half
+0BE688: 2357  div0s r5,r3                   ; Q = sign(r3), M = sign(r5), T = Q xor M
+0BE68A: 4424  rotcl r4                      ; division 1: quotient bits shift into r4
+0BE68C: 3354  div1 r5,r3                    ; division 1, step 1 of 32
+0BE68E: 4424  rotcl r4
+0BE690: 3354  div1 r5,r3                    ; division 1, step 2 of 32
+0BE692: 4424  rotcl r4
+0BE694: 3354  div1 r5,r3                    ; division 1, step 3 of 32
+0BE696: 4424  rotcl r4
+0BE698: 3354  div1 r5,r3                    ; division 1, step 4 of 32
+0BE69A: 4424  rotcl r4
+0BE69C: 3354  div1 r5,r3                    ; division 1, step 5 of 32
+0BE69E: 4424  rotcl r4
+0BE6A0: 3354  div1 r5,r3                    ; division 1, step 6 of 32
+0BE6A2: 4424  rotcl r4
+0BE6A4: 3354  div1 r5,r3                    ; division 1, step 7 of 32
+0BE6A6: 4424  rotcl r4
+0BE6A8: 3354  div1 r5,r3                    ; division 1, step 8 of 32
+0BE6AA: 4424  rotcl r4
+0BE6AC: 3354  div1 r5,r3                    ; division 1, step 9 of 32
+0BE6AE: 4424  rotcl r4
+0BE6B0: 3354  div1 r5,r3                    ; division 1, step 10 of 32
+0BE6B2: 4424  rotcl r4
+0BE6B4: 3354  div1 r5,r3                    ; division 1, step 11 of 32
+0BE6B6: 4424  rotcl r4
+0BE6B8: 3354  div1 r5,r3                    ; division 1, step 12 of 32
+0BE6BA: 4424  rotcl r4
+0BE6BC: 3354  div1 r5,r3                    ; division 1, step 13 of 32
+0BE6BE: 4424  rotcl r4
+0BE6C0: 3354  div1 r5,r3                    ; division 1, step 14 of 32
+0BE6C2: 4424  rotcl r4
+0BE6C4: 3354  div1 r5,r3                    ; division 1, step 15 of 32
+0BE6C6: 4424  rotcl r4
+0BE6C8: 3354  div1 r5,r3                    ; division 1, step 16 of 32
+0BE6CA: 4424  rotcl r4
+0BE6CC: 3354  div1 r5,r3                    ; division 1, step 17 of 32
+0BE6CE: 4424  rotcl r4
+0BE6D0: 3354  div1 r5,r3                    ; division 1, step 18 of 32
+0BE6D2: 4424  rotcl r4
+0BE6D4: 3354  div1 r5,r3                    ; division 1, step 19 of 32
+0BE6D6: 4424  rotcl r4
+0BE6D8: 3354  div1 r5,r3                    ; division 1, step 20 of 32
+0BE6DA: 4424  rotcl r4
+0BE6DC: 3354  div1 r5,r3                    ; division 1, step 21 of 32
+0BE6DE: 4424  rotcl r4
+0BE6E0: 3354  div1 r5,r3                    ; division 1, step 22 of 32
+0BE6E2: 4424  rotcl r4
+0BE6E4: 3354  div1 r5,r3                    ; division 1, step 23 of 32
+0BE6E6: 4424  rotcl r4
+0BE6E8: 3354  div1 r5,r3                    ; division 1, step 24 of 32
+0BE6EA: 4424  rotcl r4
+0BE6EC: 3354  div1 r5,r3                    ; division 1, step 25 of 32
+0BE6EE: 4424  rotcl r4
+0BE6F0: 3354  div1 r5,r3                    ; division 1, step 26 of 32
+0BE6F2: 4424  rotcl r4
+0BE6F4: 3354  div1 r5,r3                    ; division 1, step 27 of 32
+0BE6F6: 4424  rotcl r4
+0BE6F8: 3354  div1 r5,r3                    ; division 1, step 28 of 32
+0BE6FA: 4424  rotcl r4
+0BE6FC: 3354  div1 r5,r3                    ; division 1, step 29 of 32
+0BE6FE: 4424  rotcl r4
+0BE700: 3354  div1 r5,r3                    ; division 1, step 30 of 32
+0BE702: 4424  rotcl r4
+0BE704: 3354  div1 r5,r3                    ; division 1, step 31 of 32
+0BE706: 4424  rotcl r4
+0BE708: 3354  div1 r5,r3                    ; division 1, step 32 of 32
+0BE70A: 4424  rotcl r4                      ; last quotient bit in
+0BE70C: 364E  addc r4,r6                    ; r6 = 0 + r4 + T = trunc(dividend / divisor), the INTEGER quotient
+0BE70E: D03A  mov.l @(0x0BE7F8),r0          ; = 0x7FFFFFFF const | r0 = 0x7FFFFFFF (answer if too big)
+0BE710: D13A  mov.l @(0x0BE7FC),r1          ; = 0x00007FFF const | r1 = 0x00007FFF
+0BE712: 3617  cmp/gt r1,r6                  ; T = (r6 > r1) signed = (quotient > 32767)
+0BE714: 896E  bt 0x0BE7F4                   ; T=1: return 0x7FFFFFFF
+0BE716: 6007  not r0,r0                     ; r0 = 0x80000000 (answer if too small)
+0BE718: 6117  not r1,r1                     ; r1 = 0xFFFF8000 = -32768
+0BE71A: 3167  cmp/gt r6,r1                  ; T = (r1 > r6) signed = (quotient < -32768)
+0BE71C: 896A  bt 0x0BE7F4                   ; T=1: return 0x80000000.  quotient == -32768 with a remainder is NOT caught
+0BE71E: 6173  mov r7,r1                     ; r1 = original dividend
+0BE720: 4124  rotcl r1                      ; T = its sign
+0BE722: 333A  subc r3,r3                    ; r3 = -T: high half of the sign-extended dividend
+0BE724: 4720  shal r7                       ; 64-bit left shift, bit 1 of 16 (low half)
+0BE726: 4324  rotcl r3                      ;    ... carry into the high half
+0BE728: 4720  shal r7                       ; 64-bit left shift, bit 2 of 16 (low half)
+0BE72A: 4324  rotcl r3                      ;    ... carry into the high half
+0BE72C: 4720  shal r7                       ; 64-bit left shift, bit 3 of 16 (low half)
+0BE72E: 4324  rotcl r3                      ;    ... carry into the high half
+0BE730: 4720  shal r7                       ; 64-bit left shift, bit 4 of 16 (low half)
+0BE732: 4324  rotcl r3                      ;    ... carry into the high half
+0BE734: 4720  shal r7                       ; 64-bit left shift, bit 5 of 16 (low half)
+0BE736: 4324  rotcl r3                      ;    ... carry into the high half
+0BE738: 4720  shal r7                       ; 64-bit left shift, bit 6 of 16 (low half)
+0BE73A: 4324  rotcl r3                      ;    ... carry into the high half
+0BE73C: 4720  shal r7                       ; 64-bit left shift, bit 7 of 16 (low half)
+0BE73E: 4324  rotcl r3                      ;    ... carry into the high half
+0BE740: 4720  shal r7                       ; 64-bit left shift, bit 8 of 16 (low half)
+0BE742: 4324  rotcl r3                      ;    ... carry into the high half
+0BE744: 4720  shal r7                       ; 64-bit left shift, bit 9 of 16 (low half)
+0BE746: 4324  rotcl r3                      ;    ... carry into the high half
+0BE748: 4720  shal r7                       ; 64-bit left shift, bit 10 of 16 (low half)
+0BE74A: 4324  rotcl r3                      ;    ... carry into the high half
+0BE74C: 4720  shal r7                       ; 64-bit left shift, bit 11 of 16 (low half)
+0BE74E: 4324  rotcl r3                      ;    ... carry into the high half
+0BE750: 4720  shal r7                       ; 64-bit left shift, bit 12 of 16 (low half)
+0BE752: 4324  rotcl r3                      ;    ... carry into the high half
+0BE754: 4720  shal r7                       ; 64-bit left shift, bit 13 of 16 (low half)
+0BE756: 4324  rotcl r3                      ;    ... carry into the high half
+0BE758: 4720  shal r7                       ; 64-bit left shift, bit 14 of 16 (low half)
+0BE75A: 4324  rotcl r3                      ;    ... carry into the high half
+0BE75C: 4720  shal r7                       ; 64-bit left shift, bit 15 of 16 (low half)
+0BE75E: 4324  rotcl r3                      ;    ... carry into the high half
+0BE760: 4720  shal r7                       ; 64-bit left shift, bit 16 of 16 (low half)
+0BE762: 4324  rotcl r3                      ;    ... carry into the high half
+0BE764: 6033  mov r3,r0                     ; r0 = high half
+0BE766: 4024  rotcl r0                      ; T = sign of the 64-bit dividend
+0BE768: 200A  xor r0,r0                     ; r0 = 0 (T untouched)
+0BE76A: 370A  subc r0,r7                    ; r7 = r7 - T: subtract 1 from a negative dividend (low half)
+0BE76C: 330A  subc r0,r3                    ;    ... borrow into the high half
+0BE76E: 2357  div0s r5,r3                   ; Q = sign(r3), M = sign(r5), T = Q xor M
+0BE770: 4724  rotcl r7                      ; division 2: quotient bits shift into r7
+0BE772: 3354  div1 r5,r3                    ; division 2, step 1 of 32
+0BE774: 4724  rotcl r7
+0BE776: 3354  div1 r5,r3                    ; division 2, step 2 of 32
+0BE778: 4724  rotcl r7
+0BE77A: 3354  div1 r5,r3                    ; division 2, step 3 of 32
+0BE77C: 4724  rotcl r7
+0BE77E: 3354  div1 r5,r3                    ; division 2, step 4 of 32
+0BE780: 4724  rotcl r7
+0BE782: 3354  div1 r5,r3                    ; division 2, step 5 of 32
+0BE784: 4724  rotcl r7
+0BE786: 3354  div1 r5,r3                    ; division 2, step 6 of 32
+0BE788: 4724  rotcl r7
+0BE78A: 3354  div1 r5,r3                    ; division 2, step 7 of 32
+0BE78C: 4724  rotcl r7
+0BE78E: 3354  div1 r5,r3                    ; division 2, step 8 of 32
+0BE790: 4724  rotcl r7
+0BE792: 3354  div1 r5,r3                    ; division 2, step 9 of 32
+0BE794: 4724  rotcl r7
+0BE796: 3354  div1 r5,r3                    ; division 2, step 10 of 32
+0BE798: 4724  rotcl r7
+0BE79A: 3354  div1 r5,r3                    ; division 2, step 11 of 32
+0BE79C: 4724  rotcl r7
+0BE79E: 3354  div1 r5,r3                    ; division 2, step 12 of 32
+0BE7A0: 4724  rotcl r7
+0BE7A2: 3354  div1 r5,r3                    ; division 2, step 13 of 32
+0BE7A4: 4724  rotcl r7
+0BE7A6: 3354  div1 r5,r3                    ; division 2, step 14 of 32
+0BE7A8: 4724  rotcl r7
+0BE7AA: 3354  div1 r5,r3                    ; division 2, step 15 of 32
+0BE7AC: 4724  rotcl r7
+0BE7AE: 3354  div1 r5,r3                    ; division 2, step 16 of 32
+0BE7B0: 4724  rotcl r7
+0BE7B2: 3354  div1 r5,r3                    ; division 2, step 17 of 32
+0BE7B4: 4724  rotcl r7
+0BE7B6: 3354  div1 r5,r3                    ; division 2, step 18 of 32
+0BE7B8: 4724  rotcl r7
+0BE7BA: 3354  div1 r5,r3                    ; division 2, step 19 of 32
+0BE7BC: 4724  rotcl r7
+0BE7BE: 3354  div1 r5,r3                    ; division 2, step 20 of 32
+0BE7C0: 4724  rotcl r7
+0BE7C2: 3354  div1 r5,r3                    ; division 2, step 21 of 32
+0BE7C4: 4724  rotcl r7
+0BE7C6: 3354  div1 r5,r3                    ; division 2, step 22 of 32
+0BE7C8: 4724  rotcl r7
+0BE7CA: 3354  div1 r5,r3                    ; division 2, step 23 of 32
+0BE7CC: 4724  rotcl r7
+0BE7CE: 3354  div1 r5,r3                    ; division 2, step 24 of 32
+0BE7D0: 4724  rotcl r7
+0BE7D2: 3354  div1 r5,r3                    ; division 2, step 25 of 32
+0BE7D4: 4724  rotcl r7
+0BE7D6: 3354  div1 r5,r3                    ; division 2, step 26 of 32
+0BE7D8: 4724  rotcl r7
+0BE7DA: 3354  div1 r5,r3                    ; division 2, step 27 of 32
+0BE7DC: 4724  rotcl r7
+0BE7DE: 3354  div1 r5,r3                    ; division 2, step 28 of 32
+0BE7E0: 4724  rotcl r7
+0BE7E2: 3354  div1 r5,r3                    ; division 2, step 29 of 32
+0BE7E4: 4724  rotcl r7
+0BE7E6: 3354  div1 r5,r3                    ; division 2, step 30 of 32
+0BE7E8: 4724  rotcl r7
+0BE7EA: 3354  div1 r5,r3                    ; division 2, step 31 of 32
+0BE7EC: 4724  rotcl r7
+0BE7EE: 3354  div1 r5,r3                    ; division 2, step 32 of 32
+0BE7F0: 4724  rotcl r7                      ; last quotient bit in
+0BE7F2: 307E  addc r7,r0                    ; r0 = 0 + r7 + T = low 32 bits of trunc((dividend << 16) / divisor)
+0BE7F4: 000B  rts                           ; return (also the target of both saturation exits)
+0BE7F6: 0009  nop                           ; delay slot
+;   pool 0x0BE7F8: .long 0x7FFFFFFF  const
+;   pool 0x0BE7FC: .long 0x00007FFF  const
+
+==== FUNCTION 0x0BE800 .. 0x0BE81C  (14 instructions, 11 calling functions) ====
+
+CONTRACT
+  inputs   fr4 = x, fr5 = THRESHOLD, fr6 = HYSTERESIS width, r4 = previous state (any 32-bit value)
+  output   r0 = 1    when NOT (fr5 > fr4)            -- x at or above the threshold
+                0    when (fr5 - fr6) > fr4          -- x below threshold minus width
+                r4   otherwise, returned unchanged and unmasked
+           (also left in r5)
+  effects  none on memory.  Changes r0, r5, and fr5 (overwritten with fr5 - fr6 whenever x < threshold).
+           r4, fr4 and fr6 are preserved.
+
+MECHANISM
+  if NOT (fr5 > fr4):  return 1        ; fcmp/gt fr4,fr5 sets T when fr5 > fr4; bt/s goes on when T = 1
+  fr5 = fr5 - fr6
+  if fr5 > fr4:        return 0        ; fcmp/gt fr4,fr5 again; bf/s takes the pass-through when T = 0
+  return r4
+
+  Sets at x >= threshold (equality sets).  Clears only at x < threshold - width (equality holds the old
+  state).  In between the previous state comes straight back, all 32 bits of it.
+  Zero or NEGATIVE width: the dead band is empty or inverted, so x < threshold gives 0 (for a negative width
+  threshold - width is above the threshold, and the first test has already claimed x >= threshold).
+  The rising edge is at the threshold itself; the width is applied on the falling side only.
+
+EVIDENCE
+  0BE800/0BE802  set test and branch sense
+  0BE80A-0BE80E  clear test and branch sense (bf/s: taken when T = 0, into the pass-through at 0BE816)
+  0BE816         mov r4,r5: the previous state is copied, not tested or masked
+  emulated: t_hyst + t_edges, 36,749 cases (26^3 grid x previous-state 0xDEADBEEF and 0, 16 asserted rows
+            incl. the four edges of the 0x046A68 call, 1 NaN row, 1,580 edge-targeted cases).  The emulator
+            is exact with the fsub TRUNCATED (asserted); a round-to-nearest model differs in 34 of the 35,152
+            grid verdicts and 40 of the 1,580 edge cases (x within one float32 step of threshold - width; grid
+            counts, not rates).  The set edge (x >= threshold) involves no arithmetic and no rounding.
+            EMU-MODEL: x = NaN returns 1 (the first fcmp/gt is false, which is the "set" arm).
+
+LISTING
+0BE800: F545  fcmp/gt fr4,fr5               ; T = (fr5 > fr4) = (threshold > x)
+0BE802: 8D02  bt/s 0x0BE80A                 ; T=1: x is below the threshold, go test the lower limit
+0BE804: 0009  nop                           ; delay slot
+0BE806: A007  bra 0x0BE818                  ; x >= threshold:
+0BE808: E501  mov #1,r5                     ; delay slot: r5 = 1
+0BE80A: F561  fsub fr6,fr5                  ; fr5 = threshold - width (lower limit; caller's fr5 is destroyed)
+0BE80C: F545  fcmp/gt fr4,fr5               ; T = (fr5 > fr4) = (lower limit > x)
+0BE80E: 8F02  bf/s 0x0BE816                 ; T=0 (x at or above the lower limit): keep the previous state
+0BE810: 0009  nop                           ; delay slot
+0BE812: A001  bra 0x0BE818                  ; x below the lower limit:
+0BE814: E500  mov #0,r5                     ; delay slot: r5 = 0
+0BE816: 6543  mov r4,r5                     ; dead band: r5 = r4, the caller's previous state, unmodified
+0BE818: 000B  rts                           ; return
+0BE81A: 6053  mov r5,r0                     ; delay slot: r0 = r5
+;   (no literal pool; the next routine starts at 0x0BE81C)
+
+
+====================================================================================================
+ESTABLISHED  (bytes + emulation unless marked)
+====================================================================================================
+ E1  0x0BE4FA..0x0BE81B holds exactly thirteen routines with entries 0BE4FA 0BE524 0BE53C 0BE554 0BE56C
+     0BE588 0BE598 0BE5A8 0BE5D8 0BE608 0BE628 0BE654 0BE800; every pointer word into the range targets one
+     of them (1,082 words).  All are leaves, use no stack, write no memory.  375 instructions, 36 bytes of
+     literal and 16 of padding.  The 802 bytes are identical in all 21 images directly under rom/.
+ E2  0BE4FA: record = {s16 count @+0, float32* @+4, u8* @+8} in r4, x in fr4; returns in r0 the zero-extended
+     byte paired with the highest-index threshold that is not greater than x; values[0] if none.
+     (0BE4FC-0BE51C)
+ E3  0BE4FA reads values[0] before testing the count, and returns it for count <= 0.  (0BE4FC-0BE508)
+ E4  0BE4FA clobbers fr8.  (0BE510)
+ E5  The two records passed to 0BE4FA are 0x0AC2B0 (count 16, thresholds 0x0CC750, 16 value BYTES at 0x0CC790)
+     and 0x0AB328 (count 13, thresholds 0x0C5960, 13 value BYTES at 0x0C5994); both value arrays are 0..n-1.
+     (02F4A8, 07A226; one pool reference each)
+ E6  The threshold array 0x0C5960 is also loaded directly, without the record, at 076818, 07686E and 076D02
+     (function 0x0764EE; pool words 0x076A5C, 0x076F50).  The other three arrays have one pointer word each.
+ E7  0BE524: r0 = r4 + r5 saturated to signed 32 bits; 0x7FFFFFFF on positive overflow, 0x80000000 on
+     negative.  (0BE524, 0BE52A-0BE530)
+ E8  0BE53C: r0 = min((r4 & 0xFF) + (r5 & 0xFF), 255).  Unsigned, add only, upper 24 input bits ignored.
+     Exhaustively emulated over all 65,536 byte pairs.  (0BE53C-0BE54C)
+ E9  0BE554: r0 = min((r4 & 0xFFFF) + (r5 & 0xFFFF), 65535).  Unsigned, add only, upper 16 input bits ignored.
+     (0BE554-0BE562)
+ E10 0BE554 is called from functions 0x01200A (01212C), 0x024024 (024052) and 0x0946BC (094786), none of which
+     is in the census caller list, and at 0124CC and 0960CE inside artificial census entries.  (bytes)
+ E11 0BE56C: fr0 = fr5 if not (fr4 > fr5), else fr4 if fr6 > fr4, else fr6.  x = fr4, low = fr5, high = fr6.
+     Bit-exact selection, preserves fr4/fr5/fr6, changes only fr0 and fr7.  (0BE56C-0BE584)
+ E12 0BE56C with low > high returns fr5 for x <= fr5 and fr6 otherwise.  (same lines; 8,424 emulated cases)
+ E13 0BE56C is entered by a tail jmp at 02FA20 with bounds (0.0, 262136.0); every other site found for all
+     thirteen entries is a jsr.  (02FA14-02FA22)
+ E14 0BE588: fr0 = fr4 * (float)(r4 & 0xFF) + fr5 by one fmac.  raw = r4 (zero-extended), SCALE = fr4,
+     OFFSET = fr5.  (0BE588-0BE594)
+ E15 0BE598: fr0 = fr4 * (float)(r4 & 0xFFFF) + fr5 by one fmac.  Same roles.  (0BE598-0BE5A4)
+ E16 0BE5A8: r0 = clamp(trunc((fr4 - fr6) / fr5 + 0.5), 0, 255).  x = fr4, SCALE = fr5, OFFSET = fr6.
+     (0BE5AA-0BE5CA; 0.5 at 0x0BE5D4, 0x00FF word at 0x0BE5D0)
+ E17 0BE5D8: r0 = clamp(trunc((fr4 - fr6) / fr5 + 0.5), 0, 65535).  Same roles.
+     (0BE5DA-0BE5FA; 0.5 at 0x0BE600, 0x0000FFFF at 0x0BE604)
+ E18 The float->integer pair takes scale/offset in fr5/fr6 while the integer->float pair takes them in
+     fr4/fr5.  (0BE590 vs 0BE5AA/0BE5AE)
+ E19 0BE5A8/0BE5D8 do not test the divisor for zero.  (no fcmp before 0BE5AE / 0BE5DE)
+ E20 0BE608: r0 = 1 if (fr5 - fr6) > fr4 or fr4 > (fr5 + fr6), else 0.  1 = outside, edges inside; with zero
+     width, 0 only for x == centre.  (0BE60A-0BE620)
+ E21 0BE628: fr0 = fr4 / fr5; for fr5 == 0 (either sign) it returns +0.0 if fr4 == 0, +FLT_MAX if fr4 > 0,
+     -FLT_MAX otherwise.  (0BE62A-0BE648, constant 0x7F7FFFFF at 0x0BE650)
+ E22 0BE654: r0 = trunc((r4 << 16) / r5) signed, with the saturation table in its CONTRACT.  Two full 32-step
+     div1 divisions.  (0BE654-0BE7F2)
+ E23 0BE654 returns a POSITIVE value when trunc(r4/r5) == -32768 with a non-zero remainder (emulated; depends
+     on the div1 model in an overflowing division).  (0BE71A-0BE71C, 0BE7F2)
+ E24 0BE800: r0 = 1 if not (fr5 > fr4); 0 if (fr5 - fr6) > fr4; otherwise r4 unchanged.  Destroys fr5.
+     (0BE800-0BE81A)
+ E25 The reset path writes 0x00040001 to FPSCR.  (00FA42-00FA44)
+ E26 The ROM's FPU self-test demands fmac(A,B,1.0) == 0x43A45708, fmul(B,A) == 0x43A3D708 and fdiv of that
+     product by A == 0x41CCCCCA, with A = 0x414CCCCC, B = 0x41CCCCCC.  In exact arithmetic those are the
+     TRUNCATED results; round-to-nearest gives 0x43A45709, 0x43A3D709 and 0x41CCCCCC (0x41CCCCCB for the
+     divide alone).  (0586B8-0586DE, constants 0x0587E0-0x0587EC; exact-rational model asserted)
+ E27 A fused and an unfused truncating fmac both give 0x43A45708 on those operands, so the self-test does not
+     tell them apart; fadd and fsub are exercised only with exact results.  (0586A2, 0586C8, 0586E0)
+ E28 Since corrections item 106 the project emulator passes that self-test's arithmetic checks: r14 =
+     0x55555555 at 0x0586E0 (before item 106 it rounded to nearest and failed them, r14 = 0xAAAAAAAA).  The
+     whole routine 0x058594 still returns r0 = 0xAAAAAAAA, and the only failed-check store it reaches is
+     0x05873A, the FPSCR bit-6 test after 0/0 -- the emulator models no FPSCR flag bits.  (emulated, asserted)
+ E29 The self-test demands that 0.0/0.0 compare unordered and set FPSCR bit 6, then writes FPSCR = 0 and
+     demands bit 6 read back clear; it returns without restoring FPSCR.  (058712-05874A)
+ E30 The self-test's caller 0x07EF4A counts consecutive failures through 0x0BE53C and sets byte 0xFFFF6C3C
+     to 1 when the count reaches byte [0x0C4732] (2 on every image); a pass zeroes the count and sets byte
+     0xFFFFA344 to 1.  The count is kept as the high byte of word 0xFFFF2E2A, packed with its complement by
+     0x0BE9A0.  (07EF64-07EFB2, 0BE9A0-0BE9AE)
+ E31 In reached code FPSCR is loaded from a register only at 00FA44 and 05873E.  (scan of reached code)
+ E32 fn_dump / the census resolver name the wrong callee at 0451CE, 055484 and 087012, and fn_dump prints the
+     live instructions 0x058688..0x058694 as pool words.  (bytes shown under 0x0BE554, 0x0BE56C and FLOAT
+     ROUNDING)
+
+====================================================================================================
+NOT ESTABLISHED  (and what would settle it)
+====================================================================================================
+ N1  Whether fmac rounds the product before adding (unfused) or not (fused).  Affects 0BE588/0BE598 by up to
+     one ulp of the PRODUCT -- many float32 steps of the result when the offset cancels it.  The emulator is
+     fused (its stated semantics); an unfused truncating fmac differs on 1,819 + 1,035 of this file's grid
+     cases.  Settled by: the SH7058 manual's description of FMAC, or one logged float that is (raw * scale +
+     offset) with a cancelling offset, compared against both models.
+ N2  The rounding of an inexact fadd/fsub.  The self-test never produces one.  Affects the half-way verdict of
+     0BE5A8/0BE5D8 (the + 0.5) and the limits of 0BE608/0BE800.  The emulator truncates them (the one-RM-field
+     extension), and every asserted value here assumes it.  Settled by the manual (one RM field governs
+     all four operations) or by a logged value.
+ N3  Toward zero versus toward minus infinity: the self-test's inexact operands are all positive.
+ N4  That the silicon passes the self-test, i.e. really truncates.  The bytes give the firmware's
+     EXPECTATION.  Settled by logging byte 0xFFFF6C3C (should stay 0) and byte 0xFFFFA344 (should be 1), and
+     by tracing what reads them.
+ N5  The rounding mode after the self-test has run.  0x05873E writes FPSCR = 0 and nothing restores it in
+     that routine; whether RM (and DN) are writable on this chip is not visible in bytes.  If they were, the
+     next run of the same test would fail.  Settled by the manual's FPSCR bit table, or by N4's log.
+ N6  How often the self-test runs, and what the flag at 0xFFFF6C3C causes.  Settled by tracing 0x047C40
+     (the one census caller of 0x07EF4A) and the readers of 0xFFFF6C3C / 0xFFFFA344.
+ N7  fdiv of a non-zero value by zero, and ftrc of Inf/NaN/out-of-range, on silicon (0BE5A8/0BE5D8 with
+     fr5 == 0; an overflowing divide in 0BE628).  Only 0.0/0.0 has byte support (E29).
+ N8  Behaviour with NaN inputs (unordered fcmp/gt), beyond what E29 implies.  Emulator rows are asserted
+     against the emulator's model only.
+ N9  Whether any caller of 0BE654 can produce a ratio in (-32769, -32768).  Settled by tracing the three
+     calling functions 0x03E0FA, 0x046F82, 0x056ED4.
+ N10 What the thresholds of records 0x0AC2B0 and 0x0AB328 measure and what the two callers do with the index.
+     Settled by tracing 0x02F494, 0x07A210 and 0x0764EE and finding the WRITERS of the RAM floats they pass.
+ N11 Whether every caller passes the scale/offset registers in the order each routine expects (E18).  This
+     trace read the helpers, not the 2,300-odd call sites.
+ N12 The exact number of call sites and calling functions.  The site counts are lower bounds (358 indirect
+     sites in reached code resolve to no constant; unreached code is not counted) and the census partition
+     has artificial entries.
+
+
+====================================================================================================
+COMPARISON WITH EXISTING CLAIMS  (done after the byte reading; every file:line re-opened for this revision)
+====================================================================================================
+Sources searched for each entry address in all its spellings (0xBE53C, 0x0BE53C, 0x000BE53C, 0BE53C):
+fn_dump.py --labels, disassembly/ghidra/ImportAE5L600L.java, docs/, disassembly/analysis/, disassembly/maps/,
+docs/verification-status.json, scripts/mapping/, and the self-test in scripts/sh2e_emu.py.
+
+LABEL CLAIMS (function_census.json "label_claim", all tagged TRACED except the two unlabelled ones)
+  0x0BE4FA  (no label anywhere)          0x0BE524  (no label anywhere)
+  0x0BE53C  uint8_add_sat                0x0BE554  uint16_add_sat           0x0BE56C  float_clamp_range
+  0x0BE588  fmac_interp_uint8            0x0BE598  fmac_interp_uint16
+  0x0BE5A8  axis_frac_to_uint8           0x0BE5D8  axis_frac_to_uint16
+  0x0BE608  float_deadband_check         0x0BE628  float_safe_div
+  0x0BE654  int32_div_sat                0x0BE800  float_clamp_with_step
+
+A. CLAIMS THE BYTES CONTRADICT OR DO NOT SUPPORT
+
+ X1  0x0BE800 "float_clamp_with_step" -- WRONG.
+     ImportAE5L600L.java:603-604  "Soft clamp from above. If fr4>fr5: 1, if fr4>fr5-fr6: 0, else: fr4"
+     Bytes: 1 when NOT(fr5 > fr4); 0 when (fr5 - fr6) > fr4; otherwise r4.  The comment has the middle and
+     bottom cases swapped, returns a float where the routine returns the caller's integer state, and nothing
+     is clamped.  The name is repeated at knock_flkc_analysis.txt:1940 and :1967.
+     Already right elsewhere: docs/tune-state.md:942 and flkc_grid_interpolation_trace.txt:41,270
+     ("hysteresis comparator").  The caller those two describe passes exactly what this contract expects:
+046A56: D535  mov.l @(0x046B2C),r5          ; = 0x000D2F70 CAL
+046A58: F658  fmov.s @r5,fr6                ; fr6 = [0x0D2F70]
+046A5A: D235  mov.l @(0x046B30),r2          ; = 0x000D2F6C CAL
+046A5C: F828  fmov.s @r2,fr8                ; fr8 = [0x0D2F6C]
+046A5E: F681  fsub fr8,fr6                  ; fr6 = [0x0D2F70] - [0x0D2F6C] = the WIDTH
+046A60: DE34  mov.l @(0x046B34),r14         ; = 0xFFFF82AD RAM
+046A62: 62E0  mov.b @r14,r2                 ; previous flag byte
+046A64: 642C  extu.b r2,r4                  ; r4 = previous state
+046A66: D634  mov.l @(0x046B38),r6          ; = 0x000BE800 ROM
+046A68: 460B  jsr @r6                       ; -> 0x0BE800 | x is already in fr4 (the caller's own first argument)
+046A6A: F558  fmov.s @r5,fr5                ; delay slot: fr5 = [0x0D2F70] = the THRESHOLD
+046A6C: 8801  cmp/eq #1,r0                  ; result normalised: flag = (r0 == 1)
+046A6E: 0229  movt r2
+046A70: 2E20  mov.b r2,@r14
+     On rev 20.19c [0x0D2F70] = 1600.0 and [0x0D2F6C] = 1500.0: the flag sets at x >= 1600 and clears at
+     x < 1600 - (1600 - 1500) = 1500.  Both subtractions are exact, so no rounding question arises here
+     (emulated: the four edges 1599.9999 / 1600 / 1500 / 1499.9999 are asserted rows of t_hyst).
+     A DEFINITION NAMES THESE CONSTANTS and agrees with the byte reading: scripts/defs.py d.at(0xD2F6C) =
+     "Fine Correction Range (RPM)" (Ignition Timing - Knock Control), four floats labelled Disable Below,
+     Enable Above, Enable Below, Disable Above = 1500, 1600, 6300, 6400 on this bin.  Set at >= "Enable
+     Above", clear below "Disable Below".  (That x is engine speed is the definition's statement; the
+     argument in fr4 was not traced back here.)
+
+ X2  0x0BE598 "fmac_interp_uint16" / 0x0BE588 "fmac_interp_uint8" -- WRONG formula, WRONG identity.
+     ImportAE5L600L.java:2139-2144  "fmac blend: fr0 = fr4 + fr3*(fr5-fr4). Core 1D interpolation for
+     uint16-indexed tables."
+     Bytes: fr0 = fr5 + fr4 * float(r4).  There is no subtraction and no second endpoint; it is a linear
+     raw-to-engineering-units conversion, and no call site of 0x0BE588, 0x0BE598, 0x0BE5A8 or 0x0BE5D8 lies
+     in the table-lookup library (sites found span 0x0168CA-0x0BCED4, 0x00571C-0x0A9562, 0x01456A-0x0A95A6
+     and 0x0145AC-0x0A9510; none in 0x0BD000..0x0BEFFF).  Repeated at docs/architecture.md:137 ("the two
+     table-interpolation primitives"), disassembly/maps/disassembly.txt:642-646, dtc_diagnostics_analysis
+     .txt:182 ("table_1d_lookup(R4=input, FR4=scale)"), diag_tasks_raw.txt:86,142,1746 ("[table_1d_lookup]"),
+     diag_tasks_analysis.txt:33, injector_deadtime_analysis.txt:123,279 ("table_lookup_float"),
+     knock_flkc_report.txt:463 ("axis_lookup(r4=index, fr4=1.0, fr5=0.0) -> r0": also the wrong return
+     register, the result is in fr0), region_010000_scout.txt:181,184, percyl_injection_output_analysis.txt:40.
+     Already right: docs/corrections.md:1520 ("u16 -> float: FR5 + FR4*x"), maf_scaling_raw.txt:418-434
+     (its header line 422 calls fr5 a "min clamp"; it is an additive offset -- imprecise).
+
+ X3  0x0BE5D8 "axis_frac_to_uint16" / 0x0BE5A8 "axis_frac_to_uint8" -- MISLEADING identity.
+     ImportAE5L600L.java:2130-2136  "Converts float axis position to uint16 index+fraction ... Used by all
+     1D/2D table lookups."
+     Bytes: one rounded, clamped integer = (fr4 - fr6) / fr5 + 0.5, not an index plus a fraction; the comment
+     omits the +0.5; and no table-lookup routine calls either one.  It is the float-to-raw packer (inverse of
+     X2).  Repeated at disassembly.txt:635-640 and :3887-3894 (which invents "(input - axis[i]) / (axis[i+1]
+     - axis[i])"), region_010000_scout.txt:183 ("interp_2d (0xBE5A8)"), :187, region_060000_scout.txt:233
+     ("desc_read_u16 (0xBE5D8)"), diag_dispatch_table_analysis.txt:109, percyl_injection_output_analysis.txt:41.
+     Already right: ffb_command_chain_trace.txt:67-72, ffb_gap_resolved_2026-08-19.txt:432-433.
+
+ X4  docs/corrections.md:1143-1145 and disassembly/maps/ram_reference.txt:135 -- IMPRECISE.
+     "0x0BE5D8 / 0x0BE5A8 are both clamp_u16(round((FR4 - FR6) / FR5)) ... clamp against 0x0000FFFF and 0"
+     True of 0x0BE5D8.  0x0BE5A8 clamps against 0x00FF (mov.w at 0x0BE5AC reads the word at 0x0BE5D0).
+
+ X5  0x0BE56C, second half of its own comment -- WRONG (bounds inverted).
+     ImportAE5L600L.java:2126  "Clamps fr4 to [fr6, fr5]. If fr4>fr5: fr7=fr5; elif fr4<fr6: fr7=fr6"
+     Bytes: fr5 is the LOW bound, fr6 the HIGH bound.  The first sentence of the same comment ("fr0 =
+     clamp(fr4, fr5, fr6)") and corrections.md:1459 are right; the older sentence was left beside it.
+     Same inversion at disassembly.txt:630.  Other names for this address that the bytes contradict:
+     ignition_timing_analysis.txt:761 ("uint8_sub_sat"), region_010000_scout.txt:174 ("interp_1d_B").
+
+ X6  0x0BE654 -- contract OVERSTATED.
+     docs/corrections.md:6119-6123, ImportAE5L600L.java:613-614, scripts/sh2e_emu.py:26-29 and the model at
+     :633-638  "matches trunc((a << 16) / b) clamped to int32 on every case"
+     The clamp is applied to the INTEGER quotient.  For trunc(a/b) == -32768 with a remainder the routine
+     returns a positive wrapped value (-98305 / 3 -> 0x7FFFAAAB; the stated model gives 0x80000000).  None of
+     the self-test's 1,014 pairs (the docs say 1,013) lies in that band, which is why it passed.
+     Also corrections.md:6127-6128 "No doc or analysis file was found citing it": fueling_pipeline_analysis
+     .txt:1004 cites it as "0xBE654 (float clamp/scale)" -- which is itself WRONG (integer divide).
+     The label name "int32_div_sat" reads as a plain integer divide; the result is 65536 times that.
+
+ X7  Records 0x0AC2B0 and 0x0AB328 are catalogued as float32 1-D table descriptors -- WRONG cell type and extent.
+     docs/verification-status.json  "descriptor data @0xCC790 (desc 0xAC2B0)" 16 cells x 4 bytes = 64, and
+                                    "descriptor data @0xC5994 (desc 0xAB328)" 13 cells x 4 bytes = 52 (both DISASM-ONLY)
+     disassembly/maps/descriptor_map.txt:172,403 ("float32"); named_descriptors.txt:367,598
+     ("1D_RPM_wide_f32_13", "1D_ECT_f32_16"); descriptor_labels.txt:100,493; ImportAE5L600L.java:3824,4166
+     ("desc_1D_ECT_f32_16_AC2B0", "desc_1D_RPM_wide_f32_13"); desc_func_xref.txt:694,836.
+     Bytes: each record is referenced once, by the call sites shown under 0x0BE4FA, and 0x0BE4FA reads the
+     second array with mov.b -- 16 and 13 unsigned bytes.  The float32 extents run into the neighbours:
+     0x0CC7A0 is the data pointer of the next record (0x0AC2BC), 0x0C59A4 the first pointer of the record at
+     0x0AB334.  fn_dump.py prints the same wrong decode for the caller ("DESC 0x0AC2B0 1D float32 x16 data
+     0..1.08665e-31").
+     docs/exploration/table_hypotheses/report.md:4646 suspected exactly this and asked for the decode; this
+     is it.  (Whether the threshold arrays are "ECT" and "RPM" as those names say was not examined here.  The
+     0x0C5960 array is not private to the record: function 0x0764EE reads it directly -- E6.)
+
+ X8  disassembly/maps/rom_region_map.txt:525  "0x0BE500-0x0BE800  768 bytes  float_data" -- WRONG.
+     It is code: eleven of the thirteen routines above and the tail of a twelfth -- 716 bytes of instructions,
+     36 of literal and 16 of alignment padding.  Lines 2672-2673 of the same file list 0x0BE4FA and 0x0BE53C
+     as ASCII strings.  The image-level "code / float_data" byte totals quoted from this map are therefore
+     not a measurement of what is code.
+
+ X9  0x0BE608 -- sense INVERTED in one place, wrong names in others.
+     disassembly.txt:3896-3904 "deadband_check: Returns 1 if input is within tolerance band" (bytes: 1 =
+     OUTSIDE).  knock_flkc_analysis.txt:1267,1864,1872,2128,2195 tag the literal "(Pull2DFloat)";
+     ignition_timing_analysis.txt:762 "table_1d_float_interp"; startup_enrichment_analysis.txt:319 "float
+     interpolation function"; region_060000_scout.txt:249 "float_abs".  All WRONG.
+
+ X10 0x0BE628 called an interpolation -- WRONG.
+     ImportAE5L600L.java:402, diag_tasks_raw.txt:101,1759,1789 ("[interp_readiness]"), diag_tasks_analysis
+     .txt:36, dtc_diagnostics_analysis.txt:206, cl_ol_master_analysis.txt:852 and disasm_3952C_annotated
+     .txt:34,94 ("ratio/interpolation"); disassembly.txt:3906-3912 ("normalize_ratio ... if (FR5 == FPUL)").
+     Bytes: a divide with a zero-divisor substitute, nothing else.
+
+ X11 0x0BE554 / 0x0BE53C given table or descriptor identities -- WRONG.
+     region_060000_scout.txt:187,202,228 ("desc_read_float (0xBE554): 114 calls -- dominant pattern"),
+     region_010000_scout.txt:173 and region_020000_scout.txt:274 ("interp_1d (0xBE554)"),
+     accel_enrichment_raw.txt:182,192,405 ("DESC_ramp_counter ... descriptor table entry": it is code),
+     boost_control_raw.txt:183 ("(desc)"), region_070000_scout.txt:308 ("float_clamp(0xBE53C)"),
+     cl_ol_analysis.txt:179 ("min/max utility") and :461 ("min_clamp(counter + 1, 1)").
+     IMPRECISE: idle_control_analysis.txt:75-76 and torque_management_raw.txt:37 ("ramp counter",
+     "descriptor-based") -- the routine is a bare saturating add and knows nothing of descriptors or ramps.
+
+ X12 Call counts in the label comments -- UNSUPPORTED as "calls".
+     ImportAE5L600L.java:2098 "685 calls", :2100 "461", :2126 "218", :2131 "147", :2135 "113", :2140 "145",
+     :2143 "31".  They sit next to the number of PC-relative LOADS of each pointer in reached code (692, 458,
+     220, 147, 111, 145, 31), not the call sites (712, 476, 257, 184, 150, 150, 33) and not the census
+     calling functions (402, 271, 129, 78, 105, 98, 23).
+
+ X13 The emulator's float arithmetic was described as "correctly rounded" (scripts/sh2e_emu.py docstring,
+     before 2026-11-27) -- it was correctly rounded TO NEAREST, which is NOT what this firmware expects.  The
+     ROM's own FPU self-test demands truncated fmac/fmul/fdiv results (E26) and the emulator failed it.  The
+     docstring flagged only fmac as a place it "may differ from silicon"; fmul and fdiv differed too, in the
+     last ulp of every inexact result.  RESOLVED by corrections item 106: the emulator now computes exactly
+     and truncates, its --selftest carries this check as oracle 5, and it passes the arithmetic checks (E28).
+     Emulated float values that other files quoted before that date are round-to-nearest answers.
+
+ X14 function_census.json "callers" of 0x0BE554 (402 functions), quoted at docs/corrections.md:6213 -- INCOMPLETE.
+     Three calling functions are missing (0x01200A, 0x024024, 0x0946BC; each has "unresolved_calls": 1), and
+     sites 0x0124CC / 0x0960CE sit in artificial entries: 0x0124C8 "tailbra", created because the data bytes
+     A5 B4 at 0x01195C decode as bra 0x0124C8 (0x011954 is a byte table that pool word 0x006F74 points at);
+     and 0x0960CC "ptr", seeded because the two instructions 0009 60CC at 0x0013F8 read as the long
+     0x000960CC.  At least 405, and the partition is itself approximate.  For the other twelve entries the
+     census caller sets are reproduced exactly.
+
+ X15 scripts/mapping/function_census.py:226-231 (resolve_reg): "it is right for the overwhelmingly common
+     ... shape and returns None otherwise" -- IMPRECISE: it can return a WRONG value.  It walks back in
+     address order; where a jsr @Rn is a branch target and the fall-through path reloaded Rn, it names the
+     fall-through's callee.  fn_dump prints the result as "-> 0x......": 0451CE "-> 0x0BE53C" (is 0x0BE554),
+     055484 "-> 0x0BE56C" (is 0x0BE830), 087012 "-> 0x0BE9A0" (is 0x0BE554).  Bytes under 0x0BE554 / 0x0BE56C.
+
+ X16 fn_dump 0x0585B0 prints the instructions at 0x058688..0x058694 as literal-pool longs
+     (";   pool 0x058688: .long 0x312A8BE6" ...).  They are subc r2,r1 / bf 0x05865A / fldi0 fr0 / fcmp/eq
+     fr15,fr0 / bt 0x058696 / nop / mov.l @(0x0587A8),r14.  Cause: scripts/mapping/function_census.py:305
+     stops at any address already visited, and :330 marks a delay slot visited -- 0x058686 is both the delay
+     slot of the bra at 0x058684 and the target of the bt at 0x05867E.
+
+B. CLAIMS THE BYTES CONFIRM
+
+ K1  uint8_add_sat / uint16_add_sat: name and "r0 = min(r4+r5, 0xFF / 0xFFFF)" (ImportAE5L600L.java:2097-2100;
+     dtc_diagnostics_analysis.txt:176; cl_ol_master_analysis.txt:854; corrections.md:582).  Add the masking
+     of the inputs and it is exact.
+ K2  0x0BE56C = clamp(fr4, lo = fr5, hi = fr6): corrections.md:1459 and :4877, ffff77d8_trace.txt:211,
+     ad258_wot_enrichment_trace.txt:246, cl_ol_master_analysis.txt:853, disasm_3952C_annotated.txt:98,
+     docs/injector-rescale.md:48, map_switching_analysis.txt:68, transient_knock_window_trace.txt:96, and the
+     emulator self-test oracle 2 (which only tests lo <= hi).
+ K3  0x0BE608 returns 1 when fr4 is OUTSIDE fr5 +/- fr6: ImportAE5L600L.java:597-599, corrections.md:4875,
+     ffff77d8_trace.txt:194, ad258_wot_enrichment_trace.txt:244, cl_ol_master_analysis.txt:851.
+ K4  0x0BE628 = fr4 / fr5 with a zero-divisor guard returning +-max by the sign of fr4: ImportAE5L600L.java:
+     600-602, ad258_wot_enrichment_trace.txt:245 (which also has the 0/0 -> 0 case), ffff77d8_trace.txt:213.
+ K5  0x0BE598 = u16 -> float as FR5 + FR4 * x: corrections.md:1520, maf_scaling_raw.txt:426-433.
+     0x0BE588 with gain 1.0 and offset 0.0 turns a byte into a float: table_hypotheses/report.md:638,644.
+ K6  0x0BE5D8 = clamp_u16(round((FR4 - FR6) / FR5)): corrections.md:1143, ffb_command_chain_trace.txt:67-72,
+     ffb_gap_resolved_2026-08-19.txt:432-433, ImportAE5L600L.java:1587.
+ K7  0x0BE654 is signed, pre-shifts by 16, returns 0 for a zero dividend, +-limit for a zero divisor, and
+     saturates at 0x80000000 not 0x80000001: corrections.md item 102 -- everywhere except the band in X6.
+ K8  0x0BE800 is a hysteresis comparator that sets at >= the upper constant and clears below the lower one:
+     docs/tune-state.md:942, flkc_grid_interpolation_trace.txt:41,270; and the definition "Fine Correction
+     Range (RPM)" at 0xD2F6C names the two constants of the 0x046A68 call consistently (X1).
+ K9  0x0BE4FA turns a float into a band index through record 0x0AC2B0 and the cells are uint8:
+     table_hypotheses/report.md:4646-4650, 6838-6844.
+ K10 The calling-function count 271 for 0x0BE53C (corrections.md:6213 = census = the propagation scan).  The
+     402 quoted beside it for 0x0BE554 is X14.
+
+
+====================================================================================================
+REVIEW HISTORY  (tracer -> adversarial reviewer -> this deciding decode; neither was presumed right)
+====================================================================================================
+DISPUTED CLAIMS
+
+ F4  Tracer: the scaling routines' result is the exact value rounded to an adjacent float32; "which
+     neighbour is not established".  Reviewer: the direction IS in the bytes.
+     REVIEWER RIGHT.  0586B8: F26E -> fmac fr0,fr6,fr2 with fr0 = 0x414CCCCC, fr6 = 0x41CCCCCC, fr2 = 1.0
+     must equal [0x0587E8] = 0x43A45708 (0586BE: F524 -> fcmp/eq fr2,fr5; 0586C0: 8901 -> bt; else r14 =
+     0xAAAAAAAA).  Exact arithmetic: nearest 0x43A45709, truncated 0x43A45708, fused or not.  The tracer's
+     adjacency property survives as a statement about the EMULATOR (49,014 grid cases).  Added here: the
+     open fused/unfused question is not bounded by "one ulp of the result" -- 80 and 509 float32 steps on the
+     two grids when the offset cancels the product.
+     UPDATE (corrections item 106): the emulator now IS the fused truncation, asserted bit-exact on all
+     49,014 grid cases; adjacency is no longer the asserted property, exactness is.
+
+ G7  Tracer: x = 0x3EFFFFFF returns 1 in the emulator, 0 under round-to-zero, "not established for silicon".
+     Reviewer: too weak -- the self-test shows the firmware expects truncation.
+     REVIEWER RIGHT, WITH THE REVIEWER'S OWN CAVEAT KEPT.  Emulator 1; truncating model 0 (asserted row).  The
+     self-test proves truncation for fmul/fmac/fdiv (0586B8, 0586C6, 0586D2); the step that decides this row
+     is an fadd, which the self-test runs only on exact operands (0586A2: F430 -> fadd fr3,fr4 = A + A).
+     UPDATE (corrections item 106): the emulator now returns 0 here, like the truncating model; the fadd
+     caveat (N2) is unchanged.
+
+ H3  Tracer: 0x0BE608 with a negative half-width returns 1 for every x.  Reviewer: refuted.
+     TRACER WRONG.  Emulated: x = c = 10, w = -1e-30 -> 0; w = -4.7e-7 -> 0; w = -4.8e-7 -> 1.  44 of the
+     5,408 negative-width cases of the tracer's own grid return 0.  The reviewer's detail "all with width
+     -1e-30" is itself off: 22 are; the other 22 have the centre at +-1e30 or +-FLT_MAX and widths up to
+     65536 (and 1e30).  The zero-width half of the claim holds.  The exception exists only under
+     round-to-nearest: the truncating model returns 1 in all 5,408.
+     UPDATE (corrections item 106): the counter-examples above were the round-to-nearest emulator's.  The
+     corrected emulator returns 1 in all 5,408 (asserted), so the tracer's claim holds for the emulator and
+     for the arithmetic the firmware expects, given N2; it fails only for a nearest-rounding model.  The
+     verdict "TRACER WRONG" now stands only for round-to-nearest.
+
+ M3  Tracer: IF RM = 01 means round-to-zero ("documentation, not bytes") then N of M grid results change.
+     Reviewer: the premise is bytes, and the counts are grid artefacts.
+     REVIEWER RIGHT ON BOTH.  Premise: E26/E28.  Counts: the same routines on an edge-targeted grid give
+     94/2,395, 197/3,795, 73/828, 40/1,580 against 2/7,800, 3/7,800, 110/17,576, 34/35,152 on the broad one.
+     The reviewer's own ratios were not reproduced (different grid) and are not quoted.
+     (Since corrections item 106 the same numbers count where ROUND-TO-NEAREST differs from the asserted,
+     truncating emulator -- the same disagreements seen from the other side.)
+
+ Q2  Tracer: census calling-function counts, plus linear-scan site counts 480/725/263/187/148.  Reviewer:
+     0x0BE554 has at least 404 callers, and the CFG site counts are 476/710/257/184/147.
+     BOTH PARTLY RIGHT.  The census figures were quoted correctly, but the census is incomplete: 024052:
+     420B -> jsr @r2 with r2 = [0x024144] = 0x000BE554 and 094786: 420B with r2 = [0x0948D4] = 0x000BE554
+     (the reviewer's two), and a third the reviewer missed, 01212C: 420B with r2 = [0x012124] = 0x000BE554
+     loaded at 0120A8 before a bra over a pool.  At least 405.  The reviewer's site counts are reproduced
+     exactly by an independent propagation (2, 5, 476, 710, 256 + 1 jmp, 33, 150, 150, 184, 171, 147, 3, 20);
+     the tracer's five larger figures do not survive.  For 0x0BE554 two further sites are real (0124CC,
+     0960CE) -> 712.  "No caller of the four scale routines in 0x0BD000..0x0BEFFF" is confirmed.
+
+WHAT THE REVIEWER SAID WAS MISSED  (each checked here before it went in)
+  1  Rounding mode decidable from the self-test bytes ............ CONFIRMED (FLOAT ROUNDING, E26).
+  2  The emulator fails the ECU's own FPU self-test ............... CONFIRMED (E28); FLOAT ROUNDING, N1-N5 and
+     X13 rewritten around it.  Since fixed in the emulator (corrections item 106); E28 and X13 updated.
+  3  Byte support for the 0.0/0.0 model ........................... CONFIRMED in part (E29).  It covers 0/0 and
+     FPSCR bit 6; x/0 with x != 0 and ftrc of Inf/NaN stay emulator-model (N7).
+  4  0x0BE608 negative-width generalisation false ................. CONFIRMED (H3 above).
+  5  0x0BE56C also reached by a tail jmp at 0x02FA20 .............. CONFIRMED (E13); SCOPE corrected.
+  6  Census undercounts callers of 0x0BE554 by two ................ CONFIRMED and extended to three (X14).
+  7  NaN into 0x0BE4FA selects the TOP bin ........................ CONFIRMED, emulator model: 15 and 12.
+  8  Threshold array 0x0C5960 has three direct loads .............. CONFIRMED (E6).
+  9  A definition names the constants of the 0x046A68 call ........ CONFIRMED (X1, K8).
+ 10  fn_dump prints live code at 0x058688..0x058694 as pool ....... CONFIRMED, with the cause (X16).
+
+FILE PROBLEMS REPORTED, AND WHAT WAS DONE
+  * The fn_dump line ";   pool 0x0BE5D0: .long 0x00FF0000  const" under 0x0BE5A8 ........ deleted.
+  * t_window and t_hyst printed rows without asserting them ............................ every printed row
+    of every test now carries a check(); the same gap in t_clamp and t_safe_div was closed too.
+  * "NEGATIVE width ... 1 for every x" under 0x0BE608 ................................... rewritten.
+  * FLOAT ROUNDING / N1 / X13 said the bytes cannot show the rounding mode ............. rewritten.
+  * "1,022 literal-pool pointers" against a column summing to 1,082 ................... 1,082 is right (E1);
+    the 1,022 was in the tracer's structured result, not in this file.
+  * "listings 0BE4FA..0BE7F6 verify 375/375" ......................................... that span holds 361
+    instructions; 375 is all thirteen routines including 0x0BE800.
+  * "jsr sites" column and the 402 for 0x0BE554 ...................................... replaced (header table).
+  * "reached only by jsr" in SCOPE ................................................... corrected.
+  * X8 said 38 bytes of pool and 14 of padding ....................................... found while repairing:
+    it is 36 and 16 (26 non-instruction words, listed by address in the sections above).

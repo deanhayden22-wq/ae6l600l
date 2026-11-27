@@ -171,3 +171,26 @@ smoothing; v9's uniform multiplier fixed it.
   how to detect hunting in logs to validate post-flash.
 - [open-issues.md](open-issues.md) — current pedal-tuning issues are
   staged for verification there.
+
+## Pedal map history and log check (added 2026-11-27)
+
+Fingerprinted across every saved bin (`Requested Torque (Accelerator Pedal) SI-DRIVE Sport`):
+changed in garn (88 cells vs stock), 20.8 (215), 20.9 (87, axis tail 78.6/86.7 -> 75/80),
+20.14 (24), 20.16 (16), 20.19e (8, top-end only). Identical 20.9-20.13, 20.14-20.15, 20.16-20.19d.
+`Requested Torque Base` and both Target Throttle tables were rewritten in 20.8 and are unchanged since.
+Per-gear `Requested Torque Limit A/B` are 500 everywhere (no limiting).
+
+Light pedal has been raised three times (20.8, 20.9, 20.16): at 8% pedal RQTQ is 56-92 vs stock 28-48.
+16.5-25% is back near stock after the 20.9 hunting cut and the 20.14 partial restore.
+
+Logs (steady pedal, warm, garn 3-21/3-30/4-1 vs 19c 8-22/11-20 vs 19e 11-24):
+- Town driving sits at 0-16.5% pedal almost all the time; above 25% is under 3% of on-pedal time.
+  Median pedal fell from ~12% (garn) to ~8% (19e).
+- Load per pedal at 2400-2800 rpm (19e): 0.32 / 0.45 / 0.59 / 0.76 / 0.89 for 0-4 / 4-8 / 8-12 /
+  12-16.5 / 16.5-20%: close to linear in airflow. Garn base: 0.25 / 0.35 / 0.44 / 0.70 / 1.00.
+- Throttle saturation (19c+19e): manifold reaches ~atmospheric at ~28% plate at 1400-2000 rpm and
+  ~28-32% at 2000-3200. More plate than that waits on the turbo.
+- Only deficit vs stock: 1200-2000 rpm x 20-37% pedal, modelled target plate 20-25% vs stock 25-31%
+  (i.e. stock reaches atmospheric there, 19e stops about 2 psi short). The 20.14 "push further" rule applies.
+- Modelled target plate (this chain) reads ~8 points below the logged `Throttle` channel at every
+  opening; relative comparisons are unaffected, absolute plate % is not established.

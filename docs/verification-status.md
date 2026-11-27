@@ -6,7 +6,7 @@
 python scripts/coverage_map.py
 ```
 
-Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-08-19 20:15.
+Machine-readable companion: [`verification-status.json`](verification-status.json) (schema v1). Generated 2026-11-27 14:53.
 
 Every flag below is recomputed from scratch on each run: the definition side from `scripts/defs.py` over both definition XMLs, the disassembly side re-derived from ROM bytes (literal-pool dereference back-trace, table descriptors decoded out of ROM, and a RAM→lookup-axis feed trace). No conclusion is read out of a derived file and trusted. Agreement across derived files is not evidence.
 
@@ -72,17 +72,17 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 
 ## 2. Coverage
 
-4720 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
+4727 entities: every addressed definition table and axis, every calibration block a ROM descriptor points at, and every RAM address either named in `ram_reference.txt` or referenced by a ROM literal pool.
 
 | Flag | Entities | Share |
 |---|---:|---:|
 | `CONFLICT` | 0 | 0.0% |
 | `BOUNDS-SUSPECT` | 52 | 1.1% |
-| `VERIFIED-BOTH` | 363 | 7.7% |
+| `VERIFIED-BOTH` | 367 | 7.8% |
 | `VERIFIED-BYTES` | 266 | 5.6% |
 | `DEFS-ONLY` | 6 | 0.1% |
-| `DISASM-ONLY` | 955 | 20.2% |
-| `UNMAPPED` | 3078 | 65.2% |
+| `DISASM-ONLY` | 958 | 20.3% |
+| `UNMAPPED` | 3078 | 65.1% |
 
 ### By entity kind
 
@@ -90,8 +90,8 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 |---|---|---|---|---|---|---|---|
 | axis | 0 | 26 | 145 | 40 | 2 | 0 | 0 |
 | ram | 0 | 0 | 6 | 0 | 0 | 230 | 3078 |
-| rom-block | 0 | 0 | 0 | 0 | 0 | 725 | 0 |
-| table | 0 | 26 | 212 | 226 | 4 | 0 | 0 |
+| rom-block | 0 | 0 | 0 | 0 | 0 | 728 | 0 |
+| table | 0 | 26 | 216 | 226 | 4 | 0 | 0 |
 
 `table` / `axis` are definition-backed. `rom-block` is a calibration block a ROM descriptor points at that no `<table>` covers. `ram` is a RAM variable — RAM is outside the ROM image, so no definition can ever cover it and the definition side contributes only indirectly, through the names of the axes a RAM variable is traced feeding.
 
@@ -100,27 +100,27 @@ Exactly one flag per entity. The rules are evaluated in the order shown; the fir
 Bytes the region map classifies as data (not code, not a 0xFF hole) and that no definition extent and no descriptor extent claims:
 
 - data bytes considered: **321,468**
-- unmapped: **255,192 (79.4%)**
-- of which 44,028 bytes lie inside the descriptor band `0x0A0000-0x0BE000` — those are descriptor STRUCTS and lookup-helper constants, not table cells, so they are unmapped by nature rather than by neglect. Excluding them, **211,164 of 277,440 calibration data bytes (76.1%) are claimed by nothing**.
+- unmapped: **256,237 (79.7%)**
+- of which 44,028 bytes lie inside the descriptor band `0x0A0000-0x0BE000` — those are descriptor STRUCTS and lookup-helper constants, not table cells, so they are unmapped by nature rather than by neglect. Excluding them, **212,209 of 277,440 calibration data bytes (76.5%) are claimed by nothing**.
 
 Largest unmapped data blocks:
 
 | Block | Region class | Unmapped bytes |
 |---|---|---:|
 | `0xA9D00`–`0xAF900` | float_data | 23,548 |
-| `0xC4000`–`0xC7E00` | float_data | 9,779 |
+| `0xC4000`–`0xC7E00` | float_data | 10,210 |
 | `0x47500`–`0x49600` | float_data | 8,448 |
 | `0x01000`–`0x02C00` | float_data | 7,132 |
 | `0x9A700`–`0x9C200` | float_data | 6,760 |
 | `0x49A00`–`0x4B100` | float_data | 5,888 |
-| `0xC0B00`–`0xC3F00` | float_data | 4,927 |
-| `0xD1D00`–`0xD4500` | float_data | 4,839 |
-| `0xD5800`–`0xD7400` | float_data | 4,805 |
+| `0xC0B00`–`0xC3F00` | float_data | 4,931 |
+| `0xD1D00`–`0xD4500` | float_data | 4,893 |
+| `0xD5800`–`0xD7400` | float_data | 4,825 |
+| `0xD8300`–`0xDAB00` | float_data | 4,601 |
 | `0x03900`–`0x04A00` | float_data | 4,352 |
-| `0xD8300`–`0xDAB00` | float_data | 4,309 |
+| `0xCD700`–`0xCF100` | float_data | 3,946 |
 | `0xC8400`–`0xCC300` | float_data | 3,886 |
 | `0x00000`–`0x00F00` | float_data | 3,840 |
-| `0xCD700`–`0xCF100` | float_data | 3,826 |
 | `0x0DF00`–`0x0EC00` | float_data | 3,328 |
 
 ## 3. Per definition category
@@ -135,12 +135,12 @@ Largest unmapped data blocks:
 | Post Start Enrichment | 0 | 13 | 0 | 13 | 0 | 0 | 0 | 26 |
 | Fueling - Primary Open Loop | 0 | 0 | 23 | 2 | 0 | 0 | 0 | 25 |
 | Fueling - Cranking | 0 | 0 | 12 | 12 | 0 | 0 | 0 | 24 |
-| Ignition Timing - Knock Control | 0 | 6 | 15 | 2 | 0 | 0 | 0 | 23 |
+| Ignition Timing - Knock Control | 0 | 6 | 16 | 1 | 0 | 0 | 0 | 23 |
 | Drive-by-Wire Throttle (DBW) | 0 | 0 | 20 | 0 | 0 | 0 | 0 | 20 |
-| Fueling - CL/OL Transition | 0 | 6 | 12 | 1 | 1 | 0 | 0 | 20 |
+| Fueling - CL/OL Transition | 0 | 6 | 13 | 0 | 1 | 0 | 0 | 20 |
 | Boost Control - Turbo Dynamics | 0 | 0 | 15 | 3 | 0 | 0 | 0 | 18 |
 | Fueling - Closed Loop | 0 | 0 | 11 | 7 | 0 | 0 | 0 | 18 |
-| Fueling - Injectors | 0 | 0 | 15 | 1 | 0 | 0 | 0 | 16 |
+| Fueling - Injectors | 0 | 0 | 16 | 0 | 0 | 0 | 0 | 16 |
 | Boost Control - Wastegate | 0 | 0 | 11 | 3 | 1 | 0 | 0 | 15 |
 | Mass Airflow / Engine Load | 0 | 0 | 14 | 1 | 0 | 0 | 0 | 15 |
 | Map Switching - Timing Blend | 0 | 0 | 14 | 0 | 0 | 0 | 0 | 14 |
@@ -148,6 +148,7 @@ Largest unmapped data blocks:
 | Alpha Drive-by-Wire Throttle (DBW) | 0 | 0 | 12 | 0 | 0 | 0 | 0 | 12 |
 | Boost Control - Target | 0 | 0 | 10 | 2 | 0 | 0 | 0 | 12 |
 | Alpha Transient Fueling (Tau) | 0 | 6 | 0 | 5 | 0 | 0 | 0 | 11 |
+| Alpha OverRun Fueling | 0 | 1 | 2 | 6 | 0 | 0 | 0 | 9 |
 | Alpha Idle Control | 0 | 2 | 6 | 0 | 0 | 0 | 0 | 8 |
 | Fueling - Warm-Up Enrichment | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 8 |
 | Idle Control | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 8 |
@@ -160,9 +161,8 @@ Largest unmapped data blocks:
 | Miscellaneous - Sensor Scalings | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 |
 | Miscellaneous - Thresholds | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 |
 | Variable Valve Timing (AVCS) | 0 | 0 | 6 | 0 | 0 | 0 | 0 | 6 |
-| Alpha OverRun Fueling | 0 | 1 | 2 | 2 | 0 | 0 | 0 | 5 |
 | Alpha Low PW Injector Comp | 0 | 1 | 3 | 0 | 0 | 0 | 0 | 4 |
-| Alpha Ignition Dwell | 0 | 0 | 2 | 1 | 0 | 0 | 0 | 3 |
+| Alpha Ignition Dwell | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 3 |
 | Manifold Pressure Sensor | 0 | 1 | 2 | 0 | 0 | 0 | 0 | 3 |
 | Alpha Engine Load Limit B Multiplier | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 |
 | Alpha Fuel Pump | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 |
@@ -334,10 +334,9 @@ Collapsed by address: a shared axis (the ECT axis at `0xCC624` serves 34 tables)
   - evidence: D5 cal_crossref.txt:298 — Ghidra label cal_Fine_Correction_Range_RPM
 - **`0xD39A8`** — Low Pulse Width Fuel Injector Compensation  
   _Alpha Low PW Injector Comp_
-  - descriptor @0xAE000 typecode implies 4 byte(s)/cell, but every routine that consumes it (0xBE874) hardcodes the cell width and never reads the typecode -- the field is dead, so it is NOT evidence against the declared uint8
   - 8 of 8 factory-ROM cells fall outside the declared min/max -10.16..14.84
   - **suspect side:** definition XML (declared min/max)
-  - evidence: D2 ROM table descriptor @0xAE000 — 1D, 8 cells x 4 bytes (data pointer); spacing to the next known table boundary implies 1 bytes/cell
+  - evidence: D2 ROM table descriptor @0xAE000 — 1D, 8 cells x 1 byte (data pointer); spacing to the next known table boundary implies 1 bytes/cell
 - **`0xD64A4`** — Idle Airflow Min Target Decel Ramping Adder Decreasing  
   _Alpha Idle Control_
   - 1 of 1 factory-ROM cells fall outside the declared min/max 0.0..255.0

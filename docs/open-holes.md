@@ -1,4 +1,4 @@
-# Open holes — current as of 2026-08-19
+# Open holes — current as of 2026-11-27
 
 Live worklist. Everything here is **scoped, reproducible, and unblocked** — each
 entry says what is known, what is not, and the concrete next move.
@@ -35,7 +35,7 @@ and these seven are the ones that are materially different rather than wording.
 | ~~`0xFFFF3234`~~ | **RESOLVED — item 81. It is the IAM.** Proven from the definition XML: cal `0x0D2CF4` (`Timing Compensation B (IAT) IAM Activation`, scaling `IgnitionAdvanceMultiplier(IAM)`, 0.60) is compared against it at `0x042F74`. `flkc_work_bank1` WRONG; `knock_learn_coarse` right in substance. | |
 | ~~`0xFFFF8258`~~ | **RESOLVED — item 80. A knock-workspace product INTEGRATOR; `knock_metric` in kind, `flkc_retard` unsupported (produces no degrees).** | |
 | ~~`0xFFFF7F68`~~ | **RESOLVED — item 80. ECT warm-up blend, 4 modes on `ect_current`. Identity vs use — both names describe it from opposite ends.** | |
-| ~~`0xFFFF1288`~~ | **RESOLVED — item 80. `rtos_scheduler_state`: SR-masked priority raise + MTU0 array. `inj_gate_hook_ptr` WRONG.** | |
+| ~~`0xFFFF1288`~~ | **RESOLVED — item 80. `rtos_scheduler_state`: SR-masked priority raise + MTU0 array. `inj_gate_hook_ptr` WRONG.** (Item 107: the "MTU0 array" `0xFFFF1230` is on-chip RAM, the RTOS queued-id array, not a timer register.) | |
 | ~~`0xFFFF8F24`~~ | **RESOLVED — item 80. Debounced flag on status byte == 90, 6-count timeout. BOTH names unsupported.** | |
 | ~~`0xFFFF895C`~~ | **RESOLVED — item 80. A clamped difference with a 1000.0 ceiling. BOTH names unsupported.** | |
 
@@ -183,6 +183,16 @@ pool, not a `task_table`.
 accessor prologue at `0x0000317C`; the full event-id map; the writer of
 `byte[0xFFFF8EDC]`.
 
+> **RETRACTED 2026-11-27 (corrections item 107).** The table mechanics above are
+> right; the identity is not. `0x00E774` **never returns**: it logs {`0x4000`,
+> vector number} through `0x010800` and jumps to `0x00FBA4`, which masks all
+> interrupts and branches to itself (`00FBB6: AFFE`). The "event ids" are **trap
+> vector numbers** and nothing drains the table — it is a fatal-trap log. The
+> scheduler is the RTOS in `0x002B8C`–`0x004090` (ready map `0xFFFF12B8`, dispatcher
+> `0x0035FC`, deferred switch `0x003664`): `rtos_core_trace.txt`. `0x0000317C` is
+> settled too: it raises the SR interrupt-mask field (a critical-section bracket),
+> it is not a RAM accessor.
+
 ---
 
 ## 6. ~~ECUFlash definition sync~~ — **CLOSED 2026-08-19**
@@ -307,10 +317,12 @@ remaining                  :  72
 They are **not one family** — each needs its own evidence. Three rough groups:
 
 1. **Synonym pairs** — same meaning, different words. Cheap: pick one, fold the
-   other's detail into the comment. e.g. `interrupt_priority_set` /
-   `irq_level_set`, `afc_target_calc` / `afc_target_computation`,
-   `fuel_overrun_cutoff` / `overrun_fuel_cutoff`, `table_desc_1d_float` /
-   `table_lookup_1D`.
+   other's detail into the comment. e.g. ~~`interrupt_priority_set` /
+   `irq_level_set`~~, `afc_target_calc` / `afc_target_computation`,
+   `fuel_overrun_cutoff` / `overrun_fuel_cutoff`, ~~`table_desc_1d_float` /
+   `table_lookup_1D`~~. (Struck pairs resolved by decoding, item 107:
+   `0x00317C` is now `sr_mask_raise_return_previous`, `0x0BE830` keeps
+   `table_lookup_1D`.)
 2. ~~**Generated vs semantic**~~ — **DONE (item 93), all 4 resolved.** The
    `desc_*` geometry was trustworthy every time; its **axis** claims were not
    (`ThrottlexRPM` where item 85 proved Mass Airflow × Engine Speed). One,
@@ -369,6 +381,70 @@ stored to `0xFFFF7904` is always 0.0. `0xFFFF7904` carries three conflicting lab
 **Open:** what quantity this is, and what zeroing it does to fuelling. It is in the
 car today, unrecorded in any definition or tune note. Decode the consumers of
 `0xFFFF7904` (rule: find the readers of the output, not the name).
+
+### Update 2026-11-27 — mechanism settled, identity still open (corrections item 107)
+
+Full trace: `disassembly/analysis/hole9_afl_trace.txt` (2,641 lines, verifier clean,
+emulated). `0x0355B8` is a **windowed PI controller**; `0xFFFF7904` is its output,
+added with weight +1 into the 1.0-centred factor `0xFFFF77BC` (clamped 0.75..1.25)
+by `0x033460`. Its window is centred on the guarded record `0xFFFF318C`, which is
+stored through a **second clamp, `0x035FFC` (hi) / `0x036000` (lo)** — the pair the
+definition calls "AF 3 Correction Limits" (it lists them min/max swapped). That
+pair is zeroed too, through the definition.
+
+* Zeroing only the defined pair still leaves `0xFFFF7904` live inside its window.
+  **The off-table `0x0357C8`/`CC` edit is what completes the disable.** With both
+  zeroed, as in every flashed rev, the term is pinned at 0 except for init/reload
+  copies. In stock it stays within about −0.13..+0.09.
+* The quoted claim above ("with both bounds 0 the value is always 0.0") holds only
+  for the store at `0x03573E`; the init (`0x034F72`) and reload (`0x035046`) writers
+  are unclamped.
+
+**Still open:** that it is the rear-O2 (AF #3) trim — only the definition name says
+so; what `0xFFFF77BC` multiplies (fuel?), so whether +`0xFFFF7904` is richer or
+leaner; which sensor `0xFFFF43FC` is (u16 `[0xFFFF4050]` × 5/65536, copied from
+peripheral `0xFFFFF834` — needs the SH7058 pin map). Next move: trace the readers
+of `0xFFFF77BC`/`0xFFFF77C8` down to the injector pulse, and the writer of
+`[0xFFFF4050]` to its A/D channel.
+
+---
+
+## 10. The live SSM patch's tagged read has no bound (latent; NEW 2026-11-27)
+
+Corrections item 107; `disassembly/analysis/stub_tables_trace.txt`. In the patched
+`0x09A3AC`, an FF / F2 / F4 item copies 1 / 2 / 4 bytes from `0xFFFF0000 | b1 b2`
+(ANY b1, b2 — on-chip registers included) to a reply cursor starting at
+`0xFFFFB3F4` that nothing compares (`09A44C`–`09A456`). The length rule admits 84
+items, so **23+ F4 items (45+ F2) overwrite `0xFFFFB44C`, then `0xFFFFB450` and the
+transport ring header at `0xFFFFB454`.** Stock could not pass `0xFFFFB447`.
+
+**Not a live problem:** `logs/logcfg.txt` requests FF items only (one byte each,
+84 at most). **It becomes one** if anyone logs through F2/F4 tags with more than
+22 four-byte or 44 two-byte items per request. If the patch is ever rebuilt
+(`scripts/patchbuild/`), add a bound; what happens after the overwrite was not
+traced.
+
+---
+
+## 11. The function programme (NEW 2026-11-27)
+
+`docs/analysis-plan.md` Part 1 is the plan; `disassembly/maps/function_census.json`
+the denominator (5,146 functions; 8.7% of code traced after batch 1, 4,462
+functions untouched). Batch 1 (item 107) decoded the runtime library, the RTOS
+core, the diagnostic tables, hole #9 and `0x042506`. Threads it left that are
+worth a trace of their own, in order:
+
+1. Readers of `0xFFFF77BC` (hole #9's "is it fuel" question).
+2. The settle times that used the integer lag filter `0x0BEA6C` at 1/65536 — they
+   are off by 256× (`maf_scaling_analysis.txt`, `adc_pipeline_trace.txt`).
+3. `0xFFFF4144` vs `0xFFFF6350`: the logged ECT is the first; the project's ECT
+   identity is the second. Are they one quantity?
+4. **The FPU rounding mode after init.** The ROM's FPU self-test (run from init
+   `0x047C40`) leaves FPSCR = 0 (`05873E`). Read the SH7058 manual's FPSCR table:
+   if RM = 00 means round-to-nearest on this core, code after init rounds to
+   nearest and the emulator's round-toward-zero (item 106) is wrong for it.
+5. The 30 census entries that are fall-through targets (function splits), and the
+   dead function `0x002D10` the orphan pass does not seed.
 
 ---
 

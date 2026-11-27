@@ -1426,6 +1426,46 @@
 	<table name="Overrun Fueling Cut Counter RPM Threshold" address="cc4ec">
 	</table>
 
+	<table name="Overrun Fuel Cut Delay (1st Gear)" category="Alpha OverRun Fueling" address="cbca0" type="2D" level="3" scaling="rawecuvalue(uint16)">
+		<description>Counts the pedal must stay released before injectors cut on overrun, about 8 ms per count (44 is about 0.35 s). One value per engine speed band; the band edges are the Low, Med and High values of 'Overrun Fueling Cut Counter RPM Threshold'. Decoded 2026-11-21 from the function at 0x3AF88; identical to stock in 20.19c. See corrections item 103.</description>
+		<table name="Engine Speed Band" type="Static Y Axis" elements="4">
+			<data>Below Low</data>
+			<data>Low to Med</data>
+			<data>Med to High</data>
+			<data>Above High</data>
+		</table>
+	</table>
+
+	<table name="Overrun Fuel Cut Delay (2nd Gear)" category="Alpha OverRun Fueling" address="cbca8" type="2D" level="3" scaling="rawecuvalue(uint16)">
+		<description>Counts the pedal must stay released before injectors cut on overrun, about 8 ms per count (44 is about 0.35 s). One value per engine speed band; the band edges are the Low, Med and High values of 'Overrun Fueling Cut Counter RPM Threshold'. Decoded 2026-11-21 from the function at 0x3AF88; identical to stock in 20.19c. See corrections item 103.</description>
+		<table name="Engine Speed Band" type="Static Y Axis" elements="4">
+			<data>Below Low</data>
+			<data>Low to Med</data>
+			<data>Med to High</data>
+			<data>Above High</data>
+		</table>
+	</table>
+
+	<table name="Overrun Fuel Cut Delay (3rd Gear)" category="Alpha OverRun Fueling" address="cbcb0" type="2D" level="3" scaling="rawecuvalue(uint16)">
+		<description>Counts the pedal must stay released before injectors cut on overrun, about 8 ms per count (44 is about 0.35 s). One value per engine speed band; the band edges are the Low, Med and High values of 'Overrun Fueling Cut Counter RPM Threshold'. Decoded 2026-11-21 from the function at 0x3AF88; identical to stock in 20.19c. See corrections item 103.</description>
+		<table name="Engine Speed Band" type="Static Y Axis" elements="4">
+			<data>Below Low</data>
+			<data>Low to Med</data>
+			<data>Med to High</data>
+			<data>Above High</data>
+		</table>
+	</table>
+
+	<table name="Overrun Fuel Cut Delay (4th and 5th Gear)" category="Alpha OverRun Fueling" address="cbcb8" type="2D" level="3" scaling="rawecuvalue(uint16)">
+		<description>Counts the pedal must stay released before injectors cut on overrun, about 8 ms per count (44 is about 0.35 s). One value per engine speed band; the band edges are the Low, Med and High values of 'Overrun Fueling Cut Counter RPM Threshold'. Decoded 2026-11-21 from the function at 0x3AF88; identical to stock in 20.19c. See corrections item 103.</description>
+		<table name="Engine Speed Band" type="Static Y Axis" elements="4">
+			<data>Below Low</data>
+			<data>Low to Med</data>
+			<data>Med to High</data>
+			<data>Above High</data>
+		</table>
+	</table>
+
 	<table name="Idle Airflow Min Target Decel Adder (RPM x ECT)" address="d7e40">
 		<table name="Engine Speed" address="d7df8"/>
 		<table name="Coolant Temp" address="d7e38" elements="2"/>

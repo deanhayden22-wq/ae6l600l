@@ -1,0 +1,1980 @@
+================================================================================
+TABLE INTERPOLATION INTERNALS  0x0BEACC .. 0x0BEDB7   --  BLIND TRACE, REVIEWED, REPAIRED
+five 1-D float-fraction handlers, two 1-D integer-fraction handlers, five 2-D
+handlers, the float axis search, the integer axis search, the 2-D search pair
+================================================================================
+Date            2026-11-27  (trace, adversarial review and third-decode repair, same day;
+                the REVIEW HISTORY section at the end says who was right about what)
+Reference bin   rom/AE5L600L 20g rev 20.19c.bin
+                md5 92cae8275cd4f9b473a3a9e36efe6449  (checked with md5sum before each pass)
+Method          Every listing is scripts/mapping/fn_dump.py output with NO labels; the
+                semantics were read from the bytes first, then every statement was run
+                in scripts/sh2e_emu.py by scripts/trace/emu_helpers_interp.py (exit 0).
+                Existing claims were opened only afterwards (COMPARISON section).
+EVIDENCE CLASS  bytes + emulated for every contract below. "inferred" is marked where used.
+                Words like "axis", "cell", "fraction" describe what the bytes do. No
+                physical identity of any table is claimed anywhere in this file.
+
+WHAT "BIT-EXACT" MEANS IN THIS FILE  (read before quoting a number from it)
+    The Python transcription of this reading equals the emulator executing the ROM
+    bytes UNDER THE SAME FLOAT ARITHMETIC.  That proves the reading.
+    The stock emulator rounds every float result TOWARD ZERO and rounds fmac once
+    (scripts/sh2e_emu.py as corrected later on 2026-11-27, corrections item 106:
+    reset loads FPSCR = 0x00040001 at 0x00FA44, and the ROM's own FPU self-test
+    demands the truncated fmac / fmul / fdiv results).  The transcription rounds with
+    its own code (exact rationals, round_bits), so the two roundings cross-check.
+    Before item 106 the emulator rounded to nearest; every figure in this file was
+    re-taken after the change.  The rounding DIRECTION is the one the ROM's self-test
+    demands of the chip.  Still NOT ESTABLISHED (a): whether the chip's fmac rounds the
+    product before the add, and whether the FPSCR = 0 that the self-test itself writes
+    is ever in force when these routines run.
+    The script also executes the same ROM bytes under three other arithmetics (emu
+    PART R: nearest with fmac rounded once -- the pre-item-106 emulator; nearest with
+    the product rounded first; toward zero with the product rounded first).
+      does NOT depend on the arithmetic:
+        search order, clamp, WHICH cell is returned at a breakpoint or outside the
+        axis, storage order, cell width, signedness, and every result of the integer
+        path (0x0BEB40, 0x0BEB90, 0x0BECDC, wrappers 0x0BE88C / 0x0BE8C4)
+      DOES depend on it:
+        interior float results (largest difference seen from the stock arithmetic:
+        2.8e-7 of the record's magnitude), the last bit of scale*raw+bias, and --
+        through ftrc -- the integer returned by 0x0BE874 / 0x0BE8AC / 0x0BE928 /
+        0x0BE944 at some inputs, by exactly one count
+
+Emulation totals (scripts/trace/emu_helpers_interp.py, 2026-11-27, re-run after
+corrections item 106 on the toward-zero emulator, exit 0):
+    83,900 bit-exact comparisons against the transcription
+           (60,360 under the stock arithmetic, 23,540 under the three alternatives)
+    72,618 checks that do NOT depend on the transcription (cell at a breakpoint,
+           clamp outside the axis, storage order, signedness, exact register-change
+           sets, whole-ROM scans, the rounding cross-check of PART R0)
+    83,970 emulated calls, 10,215,227 instructions, 0 failures, 0 emulator refusals
+    Real records exercised through the public wrappers (stock arithmetic):
+      0x0BE830  687 records (uint16 331, uint8 187, float32 169)   25,968 calls
+      0x0BE8E4  210 records (uint16 100, uint8 80,  float32 30)    29,280 calls
+      0x0BE874   23 records   0x0BE8AC  47 records                  3,001 calls
+      0x0BE88C    1 record    0x0BE8C4   5 records                    206 calls
+      0x0BE928    1 record    0x0BE944   5 records                  1,353 calls
+    No real record of the two typed wrappers carries typecode 0x0C or 0x10, so the
+    int8 / int16 handlers were driven directly and through synthetic records in RAM.
+
+HOW THE REAL RECORDS WERE FOUND  (emu "PART B record discovery"; every count is a
+count of what THIS method finds -- it is not a census of the ROM)
+    Set-valued constant propagation over the whole ROM, seeded with "nothing known"
+    at 5,116 of the 5,146 function entries of disassembly/maps/function_census.json
+    (the census as regenerated 2026-11-27; the first runs used the 5,151-entry census
+    and reset at 5,118, and every count below came out the same).
+    The other 30 are census entries that the code before them FALLS INTO (census
+    splits inside one function); resetting there loses what the function loaded before
+    the split, and did lose six call sites in earlier versions of this script (E9).
+    It follows registers (literal loads, mov #imm, copies, add #imm), longs parked in a
+    stack slot through r15, BOTH arms of a conditional select, and the two braf
+    switch tables (0x012D9C, 0x03C194); r0-r7 are forgotten after every call.
+      call sites of the eight wrappers: 956
+        0x0BE830 680    0x0BE8E4 193    0x0BE874 22    0x0BE8AC 47
+        0x0BE88C   1    0x0BE8C4   6    0x0BE928  1    0x0BE944  6
+      r4 is a constant at 909 of them  -> 940 distinct records, all structurally valid
+    A second pass also follows a long stored to, and reloaded from, a GBR-relative
+    RAM cell: 20 more sites -> 39 more records (979 in all).  That pass ASSUMES the
+    callees between the store and the reload leave the cell alone.  The assumption is
+    proved for the one site that matters to the dead-typecode list (0x0BBDCA, REVIEW
+    HISTORY E3) and for no other.
+    At the remaining 27 sites r4 is not a constant: it is indexed out of a ROM pointer
+    table (8 sites; bases 0x063E38, 0x063E48, 0x063E58, 0x063E68, 0x063FC4, 0x06403C),
+    loaded through a pointer that is not a constant (18) or reloaded from a RAM cell
+    lost at a join (1).  THOSE RECORDS ARE NOT IN THE EMULATED SET.  All 27 are calls
+    of 0x0BE830 or 0x0BE8E4.
+    Cross-checks: all 385 longs in the ROM that equal a wrapper address are
+    literal-pool entries loaded by reached code; a MAY-hold pass (union at every join,
+    an unknown path contributes nothing, so no census entry can hide a constant) finds
+    953 jsr / jmp at which some path holds a wrapper address in the target register,
+    and every one of them is among the 956 (the other 3 are stack-slot reloads that the
+    may pass drops at a store through an unknown index); no constant reaching r4 at a
+    wrapper call fails the structural record test; no record reaches two different
+    wrappers.  None of this covers code the census does not reach, or a wrapper
+    address that travels through RAM (NOT ESTABLISHED i).
+
+T-BIT SENSES RELIED ON (all checked against the encodings, n = bits 11-8, m = bits 7-4)
+    fcmp/gt FRm,FRn   T = (FRn >  FRm)          F105 at 0BECAE: T = (fr1 > fr0)
+    fcmp/eq FRm,FRn   T = (FRn == FRm)          F204: T = (fr2 == fr0)
+    cmp/ge  Rm,Rn     T = (Rn >= Rm) signed     3233 at 0BECE2: T = (r2 >= r3)
+    cmp/gt  Rm,Rn     T = (Rn >  Rm) signed     3327 at 0BECEE: T = (r3 > r2)
+    tst     Rm,Rn     T = ((Rn & Rm) == 0)
+    bt/s, bf/s        the branch condition is the T seen AT the branch; the delay slot
+                      runs afterwards in both cases and may itself rewrite T
+    fsub FRm,FRn      FRn = FRn - FRm           fdiv FRm,FRn   FRn = FRn / FRm
+    fmac FR0,FRm,FRn  FRn = FR0*FRm + FRn       sub Rm,Rn      Rn = Rn - Rm
+    muls.w Rm,Rn      MACL = (s16)Rn * (s16)Rm  dmulu.l Rm,Rn  MACH:MACL = Rn * Rm unsigned
+
+--------------------------------------------------------------------------------
+MAP OF THE REGION
+--------------------------------------------------------------------------------
+;  entry      insns  kind                              cell          reached from
+;  0x0BEACC    11    1-D, float fraction               float32       table 0BE860+0x00 ; bsr 0BEBD0, 0BEBDE
+;  0x0BEAE4    14    1-D, float fraction               int8          table 0BE860+0x0C ; bsr 0BEBFE, 0BEC0C
+;  0x0BEB00    16    1-D, float fraction               int16         table 0BE860+0x10 ; bsr 0BEC2C, 0BEC3A
+;  0x0BEB20    16    1-D, float fraction               uint8         table 0BE860+0x04 ; bsr 0BE87E, 0BEC5A, 0BEC68
+;  0x0BEB40    22    1-D, 0.32 integer fraction        uint8         bsr 0BE89C
+;  0x0BEB6C    17    1-D, float fraction               uint16        table 0BE860+0x08 ; bsr 0BE8B6, 0BEC88, 0BEC96
+;  0x0BEB90    23    1-D, 0.32 integer fraction        uint16        bsr 0BE8D4
+;  0x0BEBC0    23    2-D, float fractions              float32       table 0BE914+0x00
+;  0x0BEBF0    22    2-D, float fractions              int8          table 0BE914+0x0C
+;  0x0BEC1C    23    2-D, float fractions              int16         table 0BE914+0x10
+;  0x0BEC4C    22    2-D, float fractions              uint8         table 0BE914+0x04 ; bsr 0BE932
+;  0x0BEC78    23    2-D, float fractions              uint16        table 0BE914+0x08 ; bsr 0BE94E
+;  0x0BECA8    26    axis search, float32 axis         -             bsr 0BE836, 0BE87A, 0BE8B2, 0BED9E, 0BEDAA
+;  0x0BECDC    93    axis search, int32 axis           -             bsr 0BE896, 0BE8CE
+;  0x0BED98    16    two float axis searches           -             bsr 0BE8E8, 0BE92C, 0BE948
+;
+; Between the functions there is one 0x0000 pad word at each of 0BEAE2, 0BEB8E, 0BEBBE,
+; 0BEBEE, 0BEC4A, 0BECA6, 0BED96; from 0BEDB8 the ROM is 0xFFFF. No other word in the
+; ROM, read as a long at an even address, equals any of the 15 entries except the ten table
+; slots below and one long 0x000BEB00 at 0x0FFBC8.  That long is not a code pointer: it is
+; the START field of record 6 of the ECU checksum table (17 records of start, end, stored
+; at 0x0FFB80; 0x0FFB80 + 6*12 = 0x0FFBC8; record = 0x000BEB00, 0x000BF5FF, 0xE11D6B6A; the
+; sum of the longs 0x0BEB00..0x0BF5FF plus the stored long is 0x5AA5A55A -- emu PART E2, rule
+; from scripts/rom_checksum.py).  A checksum range happens to start at this entry address.
+; The only bsr to any of the 15 entries are the 26 listed in the "reached from" column
+; (emu PART E3); no jsr / jmp register ever holds one of them.
+;
+; 1-D handler table at 0x0BE860 (longs, indexed by the RAW typecode byte, 0BE842):
+;   0BE860  000BEACC   typecode 0x00   float32
+;   0BE864  000BEB20   typecode 0x04   uint8
+;   0BE868  000BEB6C   typecode 0x08   uint16
+;   0BE86C  000BEAE4   typecode 0x0C   int8
+;   0BE870  000BEB00   typecode 0x10   int16
+;   0BE874  next function (4F22 sts.l pr,@-r15) -> exactly five slots
+; 2-D handler table at 0x0BE914 (longs, indexed by the RAW typecode byte, 0BE8F4):
+;   0BE914  000BEBC0   typecode 0x00   float32
+;   0BE918  000BEC4C   typecode 0x04   uint8
+;   0BE91C  000BEC78   typecode 0x08   uint16
+;   0BE920  000BEBF0   typecode 0x0C   int8
+;   0BE924  000BEC1C   typecode 0x10   int16
+;   0BE928  next function (4F12 sts.l macl,@-r15) -> exactly five slots
+
+--------------------------------------------------------------------------------
+RECORD FIELDS AS THE CODE READS THEM   (proved by the wrapper listings in the
+CONTEXT section; a field the code does not read is marked so)
+--------------------------------------------------------------------------------
+;  typed 1-D record, consumer 0x0BE830
+;    +0   word, sign-extended (mov.w)   count
+;    +2   byte, zero-extended           typecode -> handler table 0BE860
+;    +4   long                          pointer to float32 axis[count]
+;    +8   long                          pointer to data[count], cell type per typecode
+;    +12  float32                       scale   } read ONLY when typecode != 0
+;    +16  float32                       bias    } (0BE84A tst r3,r3 / 0BE84C bt/s)
+;
+;  fixed-type 1-D record, consumers 0x0BE874 (uint8 cells) and 0x0BE8AC (uint16 cells)
+;    +0 count, +4 pointer to float32 axis, +8 pointer to data.
+;    The byte at +2 is NOT READ. Nothing at +12 or beyond is read.
+;
+;  integer-axis 1-D record, consumers 0x0BE88C (uint8 cells) and 0x0BE8C4 (uint16 cells)
+;    +0 count, +4 pointer to an INT32 axis[count], +8 pointer to data.
+;    The byte at +2 is NOT READ. The input is an integer in r5, not a float.
+;
+;  typed 2-D record, consumer 0x0BE8E4
+;    +0   word, sign-extended           count0 = length of axis0 AND the run length of the data
+;    +2   word, sign-extended           count1 = length of axis1 (used for the search only)
+;    +4   long                          pointer to float32 axis0[count0]   searched with fr4
+;    +8   long                          pointer to float32 axis1[count1]   searched with fr5
+;    +12  long                          pointer to data[count1][count0]
+;    +16  byte, sign-extended (mov.b)   typecode -> handler table 0BE914
+;    +20  float32 scale, +24 float32 bias, read ONLY when typecode != 0
+;
+;  fixed-type 2-D record, consumers 0x0BE928 (uint8 cells) and 0x0BE944 (uint16 cells)
+;    +0 count0, +2 count1, +4 axis0, +8 axis1, +12 data.
+;    The byte at +16 is NOT READ. Nothing at +20 or beyond is read.
+
+--------------------------------------------------------------------------------
+THE THREE ANSWERS THIS TRACE WAS ASKED FOR
+--------------------------------------------------------------------------------
+1. SEARCH ALGORITHM.  Both searches are a LINEAR scan DOWNWARD from the last
+   breakpoint (not a binary search): compare x with axis[count-1]; then
+   axis[count-2], axis[count-3] ... until a breakpoint that is not greater than x.
+   Cost grows with (count - index).  Neither search guards count <= 0 (0x0BECA8 MECHANISM).
+
+2. OUTSIDE THE AXIS: CLAMP, NEVER EXTRAPOLATE.
+   x >= axis[count-1]  ->  index = count-1, fraction = 0   (0BECD0 / 0BED8A)
+   x <  axis[0]        ->  index = 0,       fraction = 0   (0BECD6 / 0BED90)
+   Every interpolation handler returns cell[index] alone when the fraction is 0 and
+   does not load cell[index+1], so the result is exactly the last / first cell and
+   nothing beyond the table is read.  Emulated on 687 + 210 real records: 4,788
+   1-D inputs below the first or at/above the last breakpoint and 840 2-D out-of-range
+   corners all returned the edge cell.  (Which cell is returned does not depend on the
+   float rounding; the scale*raw+bias the typed wrappers then apply is one fmac.)
+
+3. 2-D ORDER AND STRIDE.  address of cell(i0, i1) = data + (i1 * count0 + i0) * size
+     i0 = index on the axis at record+4 (length = word at record+0, input fr4)
+     i1 = index on the axis at record+8 (length = word at record+2, input fr5)
+   The axis at +4 runs along memory (adjacent cells); the axis at +8 selects one of
+   count1 consecutive runs of count0 cells.  The multiplier of i1 is count0 (0BE8FA
+   loads record+0 into r0; 0BEBC4 muls.w r0,r3).  count1 never enters an address.
+   In C terms: data[count1][count0], indexed data[i1][i0].
+   Proof by emulation: 20,658 real breakpoint cells over 210 real records equal
+   data[i1*count0+i0]; in 158 of those records (14,622 cells) the transposed order
+   data[i0*count1+i1] would have produced a different number.
+   Real example, record 0x0AA834 (count0 18, count1 17, uint16, scale 0.125):
+     fr4 above axis0, fr5 below axis1 -> 0.0     = data[0*18+17] (raw 0)
+                                         transposed would be data[17*17+0] = raw 7172 -> 896.5
+     fr4 below axis0, fr5 above axis1 -> 983.875 = data[16*18+0] (raw 7871)
+
+==== FUNCTION 0x0BEACC .. 0x0BEAE2  (11 instructions, 2 callers) ====
+CONTRACT
+   in   r0  = cell index (integer)
+        r1  = pointer to the data (float32 cells, 4 bytes, big-endian)
+        fr0 = fraction (float)
+   out  fr2 = cell[r0]                                     when fr0 == 0.0
+        fr2 = cell[r0] + fr0 * (cell[r0+1] - cell[r0])     otherwise
+        no scale, no bias: the stored float is the value
+   side r0 = 4*index, r1 = address of cell[index+1]; fr1 = cell[index+1]-cell[index] on the
+        interpolating path only.  Nothing else changes: not r2-r14, fr0, fr3-fr15, mach,
+        macl or fpul (emulated A7, exact sets: {r0 r1 fr1 fr2}; {r0 r1 fr2} when fraction is 0).
+   callers: 0x0BE830 through table slot 0BE860 (typecode 0x00); 0x0BEBC0 by bsr (twice)
+MECHANISM
+   p   = r1 + 4*r0
+   v0  = float32 at p                       (loaded in the delay slot, always)
+   if fr0 == 0.0:  return v0                (fcmp/eq: -0.0 counts as 0; cell[index+1] NOT read)
+   v1  = float32 at p+4
+   return v0 + fr0*(v1 - v0)                (fsub, then fmac)
+   There is no bounds check: index and index+1 are trusted.
+EVIDENCE
+   index scaling x4: shll2 at 0BEACE; cell load fmov.s at 0BEAD6 / 0BEAD8.
+   fraction test: fldi0 0BEACC, fcmp/eq 0BEAD2 (T = fr2 == fr0), bt/s 0BEAD4.
+   formula: fsub 0BEADA (fr1 = v1 - v0), fmac 0BEADC (fr2 = fr0*fr1 + fr2).
+   emulated: scripts/trace/emu_helpers_interp.py A3 (5 cells x 5 fractions incl. -0.0; last index with
+   fraction 0 leaves the long after the table unread), A7 (register use), B1 (169
+   real float32 records through 0x0BE830), C (synthetic typecode 0x00 record).
+LISTING
+; function 0x0BEACC..0x0BEAE2  11 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEACC: F28D  fldi0 fr2               ; fr2 = 0.0 (comparison constant)
+0BEACE: 4008  shll2 r0                ; r0 = index * 4  (4-byte cells)
+0BEAD0: 310C  add r0,r1               ; r1 = data + 4*index = address of cell[index]
+0BEAD2: F204  fcmp/eq fr0,fr2         ; T = (fr2 == fr0) = (fraction == 0.0); -0.0 compares equal
+0BEAD4: 8D03  bt/s 0x0BEADE           ; T=1 -> return cell[index] alone; the slot below still runs
+0BEAD6: F219  fmov.s @r1+,fr2         ; [delay slot, always] fr2 = cell[index] (float32, as stored); r1 += 4
+0BEAD8: F118  fmov.s @r1,fr1          ; fr1 = cell[index+1]   (reached only when fraction != 0)
+0BEADA: F121  fsub fr2,fr1            ; fr1 = fr1 - fr2 = cell[index+1] - cell[index]
+0BEADC: F21E  fmac fr0,fr1,fr2        ; fr2 = fr0*fr1 + fr2 = cell[index] + fraction*(cell[index+1]-cell[index])
+0BEADE: 000B  rts                     ; result in fr2
+0BEAE0: 0009  nop
+
+==== FUNCTION 0x0BEAE4 .. 0x0BEB00  (14 instructions, 2 callers) ====
+CONTRACT
+   in   r0 = cell index, r1 = pointer to the data (1-byte cells), fr0 = fraction
+   out  fr2 = (float) cell[r0], or cell[r0] + fr0*(cell[r0+1]-cell[r0]), in RAW counts
+        cells are SIGNED 8-bit: 0x80 reads as -128.0, 0xFF as -1.0
+   side r0 = last cell read, r1 advanced, fpul = last cell read (405A lds r0,fpul); fr1 on the
+        interpolating path only (emulated A7, exact sets: {r0 r1 fr1 fr2 fpul}; {r0 r1 fr2 fpul}
+        when fraction is 0)
+   callers: 0x0BE830 through table slot 0BE86C (typecode 0x0C); 0x0BEBF0 by bsr (twice)
+MECHANISM
+   p  = r1 + r0                             (no shift: 1-byte cells)
+   v0 = (float)(int8) byte at p             (mov.b sign-extends; no extu.b follows)
+   if fr0 == 0.0: return v0                 (cell[index+1] NOT read)
+   v1 = (float)(int8) byte at p+1
+   return v0 + fr0*(v1 - v0)
+EVIDENCE
+   signedness: mov.b at 0BEAE8 / 0BEAF2 goes straight to lds at 0BEAEC / 0BEAF4 with no
+   extu.b in between (compare 0BEB28 / 0BEB32 in the unsigned twin 0x0BEB20).
+   emulated: scripts/trace/emu_helpers_interp.py A3 (cells 00 7F 80 FF 10 read back as 0, 127, -128, -1, 16),
+   A7, C (synthetic typecode 0x0C record through 0x0BE830: cell 0xFF with scale 0.5
+   bias 3.0 returns 2.5 = 0.5*(-1)+3).
+   NO REAL RECORD reaches this handler: none of the 687 typed 1-D records found carries
+   typecode 0x0C, and no position in the ROM is structurally a typed record with
+   typecode 0x0C or 0x10 (emu PART E4).
+LISTING
+; function 0x0BEAE4..0x0BEB00  14 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEAE4: 310C  add r0,r1               ; r1 = data + index  (1-byte cells, no shift)
+0BEAE6: F28D  fldi0 fr2               ; fr2 = 0.0
+0BEAE8: 6014  mov.b @r1+,r0           ; r0 = cell[index], mov.b SIGN-extends; NO extu follows -> signed 8-bit; r1 += 1
+0BEAEA: F204  fcmp/eq fr0,fr2         ; T = (fraction == 0.0)
+0BEAEC: 405A  lds r0,fpul             ; fpul = r0
+0BEAEE: 8D05  bt/s 0x0BEAFC           ; T=1 -> return cell[index] alone
+0BEAF0: F22D  float fpul,fr2          ; [delay slot, always] fr2 = (float)(int8)cell[index]
+0BEAF2: 6010  mov.b @r1,r0            ; r0 = cell[index+1], sign-extended
+0BEAF4: 405A  lds r0,fpul             ; fpul = r0
+0BEAF6: F12D  float fpul,fr1          ; fr1 = (float)(int8)cell[index+1]
+0BEAF8: F121  fsub fr2,fr1            ; fr1 = cell[index+1] - cell[index]
+0BEAFA: F21E  fmac fr0,fr1,fr2        ; fr2 = cell[index] + fraction*(cell[index+1]-cell[index])
+0BEAFC: 000B  rts                     ; result in fr2 (raw counts, unscaled)
+0BEAFE: 0009  nop
+
+==== FUNCTION 0x0BEB00 .. 0x0BEB20  (16 instructions, 2 callers) ====
+CONTRACT
+   in   r0 = cell index, r1 = pointer to the data (2-byte cells), fr0 = fraction
+   out  fr2 = (float) cell[r0], or cell[r0] + fr0*(cell[r0+1]-cell[r0]), in RAW counts
+        cells are SIGNED 16-bit: 0x8000 reads as -32768.0
+   side r0 = last cell read, r1 advanced, fpul = last cell read (405A lds r0,fpul); fr1 on the
+        interpolating path only (emulated A7, exact sets: {r0 r1 fr1 fr2 fpul}; {r0 r1 fr2 fpul}
+        when fraction is 0)
+   callers: 0x0BE830 through table slot 0BE870 (typecode 0x10); 0x0BEC1C by bsr (twice)
+MECHANISM
+   p  = r1 + 2*r0
+   v0 = (float)(int16) word at p            (mov.w sign-extends; no extu.w follows)
+   if fr0 == 0.0: return v0                 (cell[index+1] NOT read)
+   v1 = (float)(int16) word at p+2
+   return v0 + fr0*(v1 - v0)
+EVIDENCE
+   index scaling x2: shll at 0BEB02. signedness: mov.w at 0BEB08 / 0BEB10 with no extu.w
+   (0BEB12 is a nop where the unsigned twin 0x0BEB6C has extu.w at 0BEB80).
+   emulated: scripts/trace/emu_helpers_interp.py A3 (cells 0000 7FFF 8000 FFFF 0100 read back as 0, 32767,
+   -32768, -1, 256), A7, C (synthetic typecode 0x10 record).
+   NO REAL RECORD reaches this handler: none of the 687 typed 1-D records found carries
+   typecode 0x10, and no position in the ROM is structurally a typed record with
+   typecode 0x0C or 0x10 (emu PART E4).
+LISTING
+; function 0x0BEB00..0x0BEB20  16 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEB00: F28D  fldi0 fr2               ; fr2 = 0.0
+0BEB02: 4000  shll r0                 ; r0 = index * 2  (2-byte cells)
+0BEB04: F204  fcmp/eq fr0,fr2         ; T = (fraction == 0.0)   (T survives to 0BEB0C: nothing between writes T)
+0BEB06: 310C  add r0,r1               ; r1 = data + 2*index
+0BEB08: 6015  mov.w @r1+,r0           ; r0 = cell[index], mov.w SIGN-extends; NO extu follows -> signed 16-bit; r1 += 2
+0BEB0A: 405A  lds r0,fpul             ; fpul = r0
+0BEB0C: 8D06  bt/s 0x0BEB1C           ; T=1 -> return cell[index] alone
+0BEB0E: F22D  float fpul,fr2          ; [delay slot, always] fr2 = (float)(int16)cell[index]
+0BEB10: 6011  mov.w @r1,r0            ; r0 = cell[index+1], sign-extended
+0BEB12: 0009  nop                     ; padding nop inside the body (where the unsigned twin 0BEB6C has extu.w)
+0BEB14: 405A  lds r0,fpul             ; fpul = r0
+0BEB16: F12D  float fpul,fr1          ; fr1 = (float)(int16)cell[index+1]
+0BEB18: F121  fsub fr2,fr1            ; fr1 = cell[index+1] - cell[index]
+0BEB1A: F21E  fmac fr0,fr1,fr2        ; fr2 = cell[index] + fraction*(cell[index+1]-cell[index])
+0BEB1C: 000B  rts                     ; result in fr2 (raw counts, unscaled)
+0BEB1E: 0009  nop
+
+==== FUNCTION 0x0BEB20 .. 0x0BEB40  (16 instructions, 3 callers) ====
+CONTRACT
+   in   r0 = cell index, r1 = pointer to the data (1-byte cells), fr0 = fraction
+   out  fr2 = (float) cell[r0], or cell[r0] + fr0*(cell[r0+1]-cell[r0]), in RAW counts
+        cells are UNSIGNED 8-bit: 0x80 reads as 128.0, 0xFF as 255.0
+   side r0 = last cell read, r1 advanced, fpul = last cell read (405A lds r0,fpul); fr1 on the
+        interpolating path only (emulated A7, exact sets: {r0 r1 fr1 fr2 fpul}; {r0 r1 fr2 fpul}
+        when fraction is 0)
+   callers: 0x0BE830 through table slot 0BE864 (typecode 0x04); 0x0BE874 by bsr;
+            0x0BEC4C by bsr (twice)
+MECHANISM
+   p  = r1 + r0
+   v0 = (float)(uint8) byte at p            (mov.b then extu.b)
+   if fr0 == 0.0: return v0                 (cell[index+1] NOT read)
+   v1 = (float)(uint8) byte at p+1
+   return v0 + fr0*(v1 - v0)
+EVIDENCE
+   signedness: extu.b at 0BEB28 and 0BEB32.
+   emulated: scripts/trace/emu_helpers_interp.py A3, A7, B1 (187 real uint8 records through 0x0BE830),
+   B3 (23 real records through 0x0BE874), C.
+LISTING
+; function 0x0BEB20..0x0BEB40  16 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEB20: F28D  fldi0 fr2               ; fr2 = 0.0
+0BEB22: 310C  add r0,r1               ; r1 = data + index  (1-byte cells)
+0BEB24: 6014  mov.b @r1+,r0           ; r0 = cell[index] (sign-extended by mov.b); r1 += 1
+0BEB26: F204  fcmp/eq fr0,fr2         ; T = (fraction == 0.0)   (extu.b / lds below do not write T)
+0BEB28: 600C  extu.b r0,r0            ; r0 = zero-extended byte -> UNSIGNED 8-bit
+0BEB2A: 405A  lds r0,fpul             ; fpul = r0
+0BEB2C: 8D06  bt/s 0x0BEB3C           ; T=1 -> return cell[index] alone
+0BEB2E: F22D  float fpul,fr2          ; [delay slot, always] fr2 = (float)(uint8)cell[index]
+0BEB30: 6010  mov.b @r1,r0            ; r0 = cell[index+1]
+0BEB32: 600C  extu.b r0,r0            ; zero-extend
+0BEB34: 405A  lds r0,fpul             ; fpul = r0
+0BEB36: F12D  float fpul,fr1          ; fr1 = (float)(uint8)cell[index+1]
+0BEB38: F121  fsub fr2,fr1            ; fr1 = cell[index+1] - cell[index]
+0BEB3A: F21E  fmac fr0,fr1,fr2        ; fr2 = cell[index] + fraction*(cell[index+1]-cell[index])
+0BEB3C: 000B  rts                     ; result in fr2 (raw counts, unscaled)
+0BEB3E: 0009  nop
+
+==== FUNCTION 0x0BEB40 .. 0x0BEB6C  (22 instructions, 1 callers) ====
+CONTRACT
+   in   r0 = cell index, r1 = pointer to the data (1-byte cells)
+        r2 = fraction as an UNSIGNED 0.32 fixed-point number (0x80000000 = one half)
+   out  r0 = cell[r0] when r2 == 0, else an integer between the two cells:
+             d0 + floor((d1-d0) * r2 / 2^32)   when d1 >  d0
+             d0 - floor((d0-d1) * r2 / 2^32)   when d1 <= d0
+        (d0 = cell[index], d1 = cell[index+1], both UNSIGNED 8-bit)
+        Truncation is toward d0 in both directions; the result never reaches d1.
+   side r1, r3, mach, macl  (the only caller, 0x0BE88C, saves and restores mach/macl).
+        When r2 is 0 only r0 and r1 change.  fpul and the FP registers are never touched
+        (emulated A7, exact sets: {r0 r1 r3 mach macl}; {r0 r1}).
+   caller: 0x0BE88C by bsr
+MECHANISM
+   p  = r1 + r0
+   d0 = (uint8) byte at p
+   if r2 == 0: return d0                    (cell[index+1] NOT read)
+   d1 = (uint8) byte at p+1
+   if d1 > d0:  return d0 + high32( (d1-d0) * r2 )      unsigned 32x32 -> 64 product
+   else:        return d0 - high32( (d0-d1) * r2 )
+EVIDENCE
+   fraction test: tst r2,r2 0BEB44, bt/s 0BEB46.  unsigned cells: extu.b 0BEB48, 0BEB4C.
+   direction: cmp/gt r0,r1 0BEB4E sets T when r1 > r0, i.e. d1 > d0; bf/s 0BEB50 takes
+   the falling branch on T=0.  product: dmulu.l 0BEB56 / 0BEB60, high long by sts mach.
+   emulated: scripts/trace/emu_helpers_interp.py A4 (rising, flat and falling pairs at fractions 0, 1,
+   0x40000000, 0x80000000, 0xC0000000, 0xFFFFFFFF; [3,200] at 0xFFFFFFFF -> 199,
+   [200,3] at 0xFFFFFFFF -> 4), A7, B4 (the one real record, 0x0AC298).
+LISTING
+; function 0x0BEB40..0x0BEB6C  22 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEB40: 310C  add r0,r1               ; r1 = data + index  (1-byte cells)
+0BEB42: 6014  mov.b @r1+,r0           ; r0 = cell[index]; r1 += 1
+0BEB44: 2228  tst r2,r2               ; T = (r2 == 0) = (0.32 fraction == 0)
+0BEB46: 8D0F  bt/s 0x0BEB68           ; T=1 -> return cell[index] alone (0BEB68)
+0BEB48: 600C  extu.b r0,r0            ; [delay slot, always] r0 = (uint8)cell[index] = d0
+0BEB4A: 6110  mov.b @r1,r1            ; r1 = cell[index+1]
+0BEB4C: 611C  extu.b r1,r1            ; r1 = (uint8)cell[index+1] = d1
+0BEB4E: 3107  cmp/gt r0,r1            ; T = (r1 > r0) signed = (d1 > d0)
+0BEB50: 8F05  bf/s 0x0BEB5E           ; T=0 (d1 <= d0) -> falling/flat branch 0BEB5E
+0BEB52: 6303  mov r0,r3               ; [delay slot, always] r3 = d0
+0BEB54: 3108  sub r0,r1               ; rising: r1 = d1 - d0
+0BEB56: 3215  dmulu.l r1,r2           ; mach:macl = (d1-d0) * fraction   (32x32 -> 64, unsigned)
+0BEB58: 010A  sts mach,r1             ; r1 = high long = floor((d1-d0) * fraction / 2^32)
+0BEB5A: 000B  rts                     ; return
+0BEB5C: 301C  add r1,r0               ; [delay slot] r0 = d0 + r1
+0BEB5E: 3318  sub r1,r3               ; falling/flat: r3 = d0 - d1  (>= 0)
+0BEB60: 3235  dmulu.l r3,r2           ; mach:macl = (d0-d1) * fraction
+0BEB62: 010A  sts mach,r1             ; r1 = floor((d0-d1) * fraction / 2^32)
+0BEB64: 000B  rts                     ; return
+0BEB66: 3018  sub r1,r0               ; [delay slot] r0 = d0 - r1   (truncation is toward d0 in both directions)
+0BEB68: 000B  rts                     ; fraction == 0 exit: r0 = d0
+0BEB6A: 0009  nop
+
+==== FUNCTION 0x0BEB6C .. 0x0BEB8E  (17 instructions, 3 callers) ====
+CONTRACT
+   in   r0 = cell index, r1 = pointer to the data (2-byte cells), fr0 = fraction
+   out  fr2 = (float) cell[r0], or cell[r0] + fr0*(cell[r0+1]-cell[r0]), in RAW counts
+        cells are UNSIGNED 16-bit: 0x8000 reads as 32768.0
+   side r0 = last cell read, r1 advanced, fpul = last cell read (405A lds r0,fpul); fr1 on the
+        interpolating path only (emulated A7, exact sets: {r0 r1 fr1 fr2 fpul}; {r0 r1 fr2 fpul}
+        when fraction is 0)
+   callers: 0x0BE830 through table slot 0BE868 (typecode 0x08); 0x0BE8AC by bsr;
+            0x0BEC78 by bsr (twice)
+MECHANISM
+   p  = r1 + 2*r0
+   v0 = (float)(uint16) word at p           (mov.w then extu.w)
+   if fr0 == 0.0: return v0                 (cell[index+1] NOT read)
+   v1 = (float)(uint16) word at p+2
+   return v0 + fr0*(v1 - v0)
+EVIDENCE
+   index scaling x2: shll 0BEB6E.  signedness: extu.w at 0BEB76 and 0BEB80.
+   emulated: scripts/trace/emu_helpers_interp.py A3, A7, B1 (331 real uint16 records through 0x0BE830),
+   B3 (47 real records through 0x0BE8AC), C.
+LISTING
+; function 0x0BEB6C..0x0BEB8E  17 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEB6C: F28D  fldi0 fr2               ; fr2 = 0.0
+0BEB6E: 4000  shll r0                 ; r0 = index * 2  (2-byte cells)
+0BEB70: F204  fcmp/eq fr0,fr2         ; T = (fraction == 0.0)   (T survives to 0BEB7A)
+0BEB72: 310C  add r0,r1               ; r1 = data + 2*index
+0BEB74: 6015  mov.w @r1+,r0           ; r0 = cell[index] (sign-extended by mov.w); r1 += 2
+0BEB76: 600D  extu.w r0,r0            ; r0 = zero-extended word -> UNSIGNED 16-bit
+0BEB78: 405A  lds r0,fpul             ; fpul = r0
+0BEB7A: 8D06  bt/s 0x0BEB8A           ; T=1 -> return cell[index] alone
+0BEB7C: F22D  float fpul,fr2          ; [delay slot, always] fr2 = (float)(uint16)cell[index]
+0BEB7E: 6011  mov.w @r1,r0            ; r0 = cell[index+1]
+0BEB80: 600D  extu.w r0,r0            ; zero-extend
+0BEB82: 405A  lds r0,fpul             ; fpul = r0
+0BEB84: F12D  float fpul,fr1          ; fr1 = (float)(uint16)cell[index+1]
+0BEB86: F121  fsub fr2,fr1            ; fr1 = cell[index+1] - cell[index]
+0BEB88: F21E  fmac fr0,fr1,fr2        ; fr2 = cell[index] + fraction*(cell[index+1]-cell[index])
+0BEB8A: 000B  rts                     ; result in fr2 (raw counts, unscaled)
+0BEB8C: 0009  nop
+
+==== FUNCTION 0x0BEB90 .. 0x0BEBBE  (23 instructions, 1 callers) ====
+CONTRACT
+   in   r0 = cell index, r1 = pointer to the data (2-byte cells)
+        r2 = fraction as an UNSIGNED 0.32 fixed-point number
+   out  r0 = cell[r0] when r2 == 0, else
+             d0 + floor((d1-d0) * r2 / 2^32)   when d1 >  d0
+             d0 - floor((d0-d1) * r2 / 2^32)   when d1 <= d0
+        (d0, d1 UNSIGNED 16-bit)
+   side r1, r3, mach, macl  (the only caller, 0x0BE8C4, saves and restores mach/macl).
+        When r2 is 0 only r0 and r1 change.  fpul and the FP registers are never touched
+        (emulated A7, exact sets: {r0 r1 r3 mach macl}; {r0 r1}).
+   caller: 0x0BE8C4 by bsr
+MECHANISM
+   Identical to 0x0BEB40 with 2-byte cells: index doubled (shll 0BEB90), mov.w + extu.w.
+EVIDENCE
+   unsigned cells: extu.w 0BEB9A, 0BEB9E.  direction: cmp/gt r0,r1 0BEBA0 (T = d1 > d0),
+   bf/s 0BEBA2.  product: dmulu.l 0BEBA8 / 0BEBB2, sts mach.
+   emulated: scripts/trace/emu_helpers_interp.py A4, A7, B4 (5 real records: 0x0AAF3C, 0x0AD440, 0x0AE850,
+   0x0AE85C, 0x0AE868; e.g. 0x0AAF3C axis [24576, 26214] cells [901, 1016]:
+   x=25395 -> 958, x=26213 -> 1015, x=26214 -> 1016).
+LISTING
+; function 0x0BEB90..0x0BEBBE  23 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEB90: 4000  shll r0                 ; r0 = index * 2  (2-byte cells)
+0BEB92: 310C  add r0,r1               ; r1 = data + 2*index
+0BEB94: 6015  mov.w @r1+,r0           ; r0 = cell[index]; r1 += 2
+0BEB96: 2228  tst r2,r2               ; T = (r2 == 0) = (0.32 fraction == 0)
+0BEB98: 8D0F  bt/s 0x0BEBBA           ; T=1 -> return cell[index] alone (0BEBBA)
+0BEB9A: 600D  extu.w r0,r0            ; [delay slot, always] r0 = (uint16)cell[index] = d0
+0BEB9C: 6111  mov.w @r1,r1            ; r1 = cell[index+1]
+0BEB9E: 611D  extu.w r1,r1            ; r1 = (uint16)cell[index+1] = d1
+0BEBA0: 3107  cmp/gt r0,r1            ; T = (r1 > r0) signed = (d1 > d0)
+0BEBA2: 8F05  bf/s 0x0BEBB0           ; T=0 (d1 <= d0) -> falling/flat branch 0BEBB0
+0BEBA4: 6303  mov r0,r3               ; [delay slot, always] r3 = d0
+0BEBA6: 3108  sub r0,r1               ; rising: r1 = d1 - d0
+0BEBA8: 3215  dmulu.l r1,r2           ; mach:macl = (d1-d0) * fraction   (unsigned 64-bit product)
+0BEBAA: 010A  sts mach,r1             ; r1 = floor((d1-d0) * fraction / 2^32)
+0BEBAC: 000B  rts                     ; return
+0BEBAE: 301C  add r1,r0               ; [delay slot] r0 = d0 + r1
+0BEBB0: 3318  sub r1,r3               ; falling/flat: r3 = d0 - d1
+0BEBB2: 3235  dmulu.l r3,r2           ; mach:macl = (d0-d1) * fraction
+0BEBB4: 010A  sts mach,r1             ; r1 = floor((d0-d1) * fraction / 2^32)
+0BEBB6: 000B  rts                     ; return
+0BEBB8: 3018  sub r1,r0               ; [delay slot] r0 = d0 - r1
+0BEBBA: 000B  rts                     ; fraction == 0 exit: r0 = d0
+0BEBBC: 0009  nop
+
+==== FUNCTION 0x0BEBC0 .. 0x0BEBEE  (23 instructions, 1 callers) ====
+CONTRACT
+   in   r0  = count0 = number of cells in one run (the wrapper loads the word at record+0)
+        r1  = pointer to the data
+        r2  = index0 (position inside a run)        fr0 = fraction0
+        r3  = index1 (which run)                    fr1 = fraction1
+   out  fr2 = bilinear value in RAW cell units (no scale, no bias):
+              v0 = 1-D interpolation of run index1   at (index0, fraction0)
+              if fraction1 == 0.0: v0
+              else v1 = same in run index1+1;  v0 + fraction1*(v1 - v0)
+        cell(i0, i1) is at  r1 + (i1*count0 + i0) * 4      cell type: float32
+   side r0, r1, r3, fr0 (= fraction1 when it is not 0), fr1, fr3 (= fraction1), fr4 (= result),
+        macl (muls.w).  r2, r4-r14, mach and fpul are not written (emulated A7, exact sets:
+        {r0 r1 r3 fr0 fr1 fr2 fr3 fr4 macl}; without fr0 when fraction1 is 0).
+   caller: 0x0BE8E4 through table slot 0BE914 (typecode 0x00). No bsr or jsr literal reaches it.
+MECHANISM
+   run0 = r1 + (s16)r3 * (s16)(4*count0)        muls.w: both operands taken as signed 16-bit
+   run1 = run0 + 4*count0
+   v0   = 0x0BEACC(index0, run0, fraction0)
+   if fraction1 == 0.0: return v0             (run index1+1 is NOT read)
+   v1   = 0x0BEACC(index0, run1, fraction0)
+   return v0 + fraction1*(v1 - v0)            (fsub, then fmac)
+   Interpolation order: along the run (axis0) first, then between runs (axis1).
+EVIDENCE
+   stride: shll2 r0 at 0BEBC2 makes r0 = 4*count0; muls.w r0,r3 then sts macl,r3 and add r3,r1 give run0; add r1,r0 gives run1.
+   second-run skip: fldi0 fr4, fcmp/eq fr3,fr4 (T = fr4 == fr3 = fraction1 == 0), bt/s.
+   formula: fsub fr4,fr2 (fr2 = v1 - v0), fmac fr0,fr2,fr4 (fr4 = fraction1*(v1-v0) + v0).
+   emulated: scripts/trace/emu_helpers_interp.py A5 (3 x 4 grid, not square: every (index0, index1) with
+   fractions 0 returns linear element index1*3+index0; half fractions return the mean with
+   the next element in the run / the same element of the next run; the last corner reads
+   nothing after element 11), A7, B2 (30 real float32 records through 0x0BE8E4), C.
+LISTING
+; function 0x0BEBC0..0x0BEBEE  23 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEBC0: 4F22  sts.l pr,@-r15          ; save pr (this handler calls the 1-D handler twice)
+0BEBC2: 4008  shll2 r0                ; r0 = count0 * 4  (run length in bytes, 4-byte cells)
+0BEBC4: 230F  muls.w r0,r3            ; macl = (s16)r3 * (s16)r0 = index1 * (count0 * cell size) = byte offset of run index1
+0BEBC6: 031A  sts macl,r3             ; r3 = that offset
+0BEBC8: 313C  add r3,r1               ; r1 = data + index1*count0*size = start of run index1
+0BEBCA: 301C  add r1,r0               ; r0 = r1 + count0*size = start of run index1+1
+0BEBCC: 6303  mov r0,r3               ; r3 = start of run index1+1 (kept across the first call; the 1-D handler does not write r3)
+0BEBCE: F31C  fmov fr1,fr3            ; fr3 = fraction1 (fr1 is scratch in the 1-D handler)
+0BEBD0: BF7C  bsr 0x0BEACC            ; 1-D float32 interpolation in run index1: r0=index0, r1=run, fr0=fraction0 -> fr2
+0BEBD2: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEBD4: F48D  fldi0 fr4               ; fr4 = 0.0
+0BEBD6: F434  fcmp/eq fr3,fr4         ; T = (fr4 == fr3) = (fraction1 == 0.0)
+0BEBD8: 8D06  bt/s 0x0BEBE8           ; T=1 -> run index1+1 is NOT read; result = v0
+0BEBDA: F42C  fmov fr2,fr4            ; [delay slot, always] fr4 = v0 (value along run index1)
+0BEBDC: 6133  mov r3,r1               ; r1 = start of run index1+1
+0BEBDE: BF75  bsr 0x0BEACC            ; same 1-D interpolation in run index1+1 -> fr2 = v1
+0BEBE0: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEBE2: F03C  fmov fr3,fr0            ; fr0 = fraction1
+0BEBE4: F241  fsub fr4,fr2            ; fr2 = fr2 - fr4 = v1 - v0
+0BEBE6: F42E  fmac fr0,fr2,fr4        ; fr4 = fr0*fr2 + fr4 = v0 + fraction1*(v1 - v0)
+0BEBE8: 4F26  lds.l @r15+,pr          ; restore pr
+0BEBEA: 000B  rts                     ; return
+0BEBEC: F24C  fmov fr4,fr2            ; [delay slot] fr2 = result (raw cell units, unscaled)
+
+==== FUNCTION 0x0BEBF0 .. 0x0BEC1C  (22 instructions, 1 callers) ====
+CONTRACT
+   in   r0  = count0 = number of cells in one run (the wrapper loads the word at record+0)
+        r1  = pointer to the data
+        r2  = index0 (position inside a run)        fr0 = fraction0
+        r3  = index1 (which run)                    fr1 = fraction1
+   out  fr2 = bilinear value in RAW cell units (no scale, no bias):
+              v0 = 1-D interpolation of run index1   at (index0, fraction0)
+              if fraction1 == 0.0: v0
+              else v1 = same in run index1+1;  v0 + fraction1*(v1 - v0)
+        cell(i0, i1) is at  r1 + (i1*count0 + i0) * 1      cell type: int8 (signed)
+   side r0, r1, r3, fr0 (= fraction1 when it is not 0), fr1, fr3 (= fraction1), fr4 (= result),
+        macl (muls.w), fpul (written by the 1-D handler it calls: 405A lds r0,fpul).
+        r2, r4-r14 and mach are not written (emulated A7, exact sets:
+        {r0 r1 r3 fr0 fr1 fr2 fr3 fr4 macl fpul}; without fr0 when fraction1 is 0).
+   caller: 0x0BE8E4 through table slot 0BE920 (typecode 0x0C). No bsr or jsr literal reaches it.
+MECHANISM
+   run0 = r1 + (s16)r3 * (s16)(count0)        muls.w: both operands taken as signed 16-bit
+   run1 = run0 + count0
+   v0   = 0x0BEAE4(index0, run0, fraction0)
+   if fraction1 == 0.0: return v0             (run index1+1 is NOT read)
+   v1   = 0x0BEAE4(index0, run1, fraction0)
+   return v0 + fraction1*(v1 - v0)            (fsub, then fmac)
+   Interpolation order: along the run (axis0) first, then between runs (axis1).
+EVIDENCE
+   stride: no shift: r0 = count0 as passed (1-byte cells); muls.w r0,r3 then sts macl,r3 and add r3,r1 give run0; add r1,r0 gives run1.
+   second-run skip: fldi0 fr4, fcmp/eq fr3,fr4 (T = fr4 == fr3 = fraction1 == 0), bt/s.
+   formula: fsub fr4,fr2 (fr2 = v1 - v0), fmac fr0,fr2,fr4 (fr4 = fraction1*(v1-v0) + v0).
+   emulated: scripts/trace/emu_helpers_interp.py A5 (3 x 4 grid, not square: every (index0, index1) with
+   fractions 0 returns linear element index1*3+index0; half fractions return the mean with
+   the next element in the run / the same element of the next run; the last corner reads
+   nothing after element 11), A7, C (synthetic typecode 0x0C record).
+   NO REAL RECORD reaches this handler (none of the 210 typed 2-D records found carries
+   typecode 0x0C; no position in the ROM is structurally such a record, emu PART E4).
+LISTING
+; function 0x0BEBF0..0x0BEC1C  22 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEBF0: 4F22  sts.l pr,@-r15          ; save pr (this handler calls the 1-D handler twice)
+0BEBF2: 230F  muls.w r0,r3            ; macl = (s16)r3 * (s16)r0 = index1 * (count0 * cell size) = byte offset of run index1  (r0 = count0 unshifted: 1-byte cells)
+0BEBF4: 031A  sts macl,r3             ; r3 = that offset
+0BEBF6: 313C  add r3,r1               ; r1 = data + index1*count0*size = start of run index1
+0BEBF8: 301C  add r1,r0               ; r0 = r1 + count0*size = start of run index1+1
+0BEBFA: 6303  mov r0,r3               ; r3 = start of run index1+1 (kept across the first call; the 1-D handler does not write r3)
+0BEBFC: F31C  fmov fr1,fr3            ; fr3 = fraction1 (fr1 is scratch in the 1-D handler)
+0BEBFE: BF71  bsr 0x0BEAE4            ; 1-D int8 interpolation in run index1: r0=index0, r1=run, fr0=fraction0 -> fr2
+0BEC00: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEC02: F48D  fldi0 fr4               ; fr4 = 0.0
+0BEC04: F434  fcmp/eq fr3,fr4         ; T = (fr4 == fr3) = (fraction1 == 0.0)
+0BEC06: 8D06  bt/s 0x0BEC16           ; T=1 -> run index1+1 is NOT read; result = v0
+0BEC08: F42C  fmov fr2,fr4            ; [delay slot, always] fr4 = v0 (value along run index1)
+0BEC0A: 6133  mov r3,r1               ; r1 = start of run index1+1
+0BEC0C: BF6A  bsr 0x0BEAE4            ; same 1-D interpolation in run index1+1 -> fr2 = v1
+0BEC0E: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEC10: F03C  fmov fr3,fr0            ; fr0 = fraction1
+0BEC12: F241  fsub fr4,fr2            ; fr2 = fr2 - fr4 = v1 - v0
+0BEC14: F42E  fmac fr0,fr2,fr4        ; fr4 = fr0*fr2 + fr4 = v0 + fraction1*(v1 - v0)
+0BEC16: 4F26  lds.l @r15+,pr          ; restore pr
+0BEC18: 000B  rts                     ; return
+0BEC1A: F24C  fmov fr4,fr2            ; [delay slot] fr2 = result (raw cell units, unscaled)
+
+==== FUNCTION 0x0BEC1C .. 0x0BEC4A  (23 instructions, 1 callers) ====
+CONTRACT
+   in   r0  = count0 = number of cells in one run (the wrapper loads the word at record+0)
+        r1  = pointer to the data
+        r2  = index0 (position inside a run)        fr0 = fraction0
+        r3  = index1 (which run)                    fr1 = fraction1
+   out  fr2 = bilinear value in RAW cell units (no scale, no bias):
+              v0 = 1-D interpolation of run index1   at (index0, fraction0)
+              if fraction1 == 0.0: v0
+              else v1 = same in run index1+1;  v0 + fraction1*(v1 - v0)
+        cell(i0, i1) is at  r1 + (i1*count0 + i0) * 2      cell type: int16 (signed)
+   side r0, r1, r3, fr0 (= fraction1 when it is not 0), fr1, fr3 (= fraction1), fr4 (= result),
+        macl (muls.w), fpul (written by the 1-D handler it calls: 405A lds r0,fpul).
+        r2, r4-r14 and mach are not written (emulated A7, exact sets:
+        {r0 r1 r3 fr0 fr1 fr2 fr3 fr4 macl fpul}; without fr0 when fraction1 is 0).
+   caller: 0x0BE8E4 through table slot 0BE924 (typecode 0x10). No bsr or jsr literal reaches it.
+MECHANISM
+   run0 = r1 + (s16)r3 * (s16)(2*count0)        muls.w: both operands taken as signed 16-bit
+   run1 = run0 + 2*count0
+   v0   = 0x0BEB00(index0, run0, fraction0)
+   if fraction1 == 0.0: return v0             (run index1+1 is NOT read)
+   v1   = 0x0BEB00(index0, run1, fraction0)
+   return v0 + fraction1*(v1 - v0)            (fsub, then fmac)
+   Interpolation order: along the run (axis0) first, then between runs (axis1).
+EVIDENCE
+   stride: shll r0 at 0BEC1E makes r0 = 2*count0; muls.w r0,r3 then sts macl,r3 and add r3,r1 give run0; add r1,r0 gives run1.
+   second-run skip: fldi0 fr4, fcmp/eq fr3,fr4 (T = fr4 == fr3 = fraction1 == 0), bt/s.
+   formula: fsub fr4,fr2 (fr2 = v1 - v0), fmac fr0,fr2,fr4 (fr4 = fraction1*(v1-v0) + v0).
+   emulated: scripts/trace/emu_helpers_interp.py A5 (3 x 4 grid, not square: every (index0, index1) with
+   fractions 0 returns linear element index1*3+index0; half fractions return the mean with
+   the next element in the run / the same element of the next run; the last corner reads
+   nothing after element 11), A7, C (synthetic typecode 0x10 record).
+   NO REAL RECORD reaches this handler (none of the 210 typed 2-D records found carries
+   typecode 0x10; no position in the ROM is structurally such a record, emu PART E4).
+LISTING
+; function 0x0BEC1C..0x0BEC4A  23 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEC1C: 4F22  sts.l pr,@-r15          ; save pr (this handler calls the 1-D handler twice)
+0BEC1E: 4000  shll r0                 ; r0 = count0 * 2  (run length in bytes, 2-byte cells)
+0BEC20: 230F  muls.w r0,r3            ; macl = (s16)r3 * (s16)r0 = index1 * (count0 * cell size) = byte offset of run index1
+0BEC22: 031A  sts macl,r3             ; r3 = that offset
+0BEC24: 313C  add r3,r1               ; r1 = data + index1*count0*size = start of run index1
+0BEC26: 301C  add r1,r0               ; r0 = r1 + count0*size = start of run index1+1
+0BEC28: 6303  mov r0,r3               ; r3 = start of run index1+1 (kept across the first call; the 1-D handler does not write r3)
+0BEC2A: F31C  fmov fr1,fr3            ; fr3 = fraction1 (fr1 is scratch in the 1-D handler)
+0BEC2C: BF68  bsr 0x0BEB00            ; 1-D int16 interpolation in run index1: r0=index0, r1=run, fr0=fraction0 -> fr2
+0BEC2E: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEC30: F48D  fldi0 fr4               ; fr4 = 0.0
+0BEC32: F434  fcmp/eq fr3,fr4         ; T = (fr4 == fr3) = (fraction1 == 0.0)
+0BEC34: 8D06  bt/s 0x0BEC44           ; T=1 -> run index1+1 is NOT read; result = v0
+0BEC36: F42C  fmov fr2,fr4            ; [delay slot, always] fr4 = v0 (value along run index1)
+0BEC38: 6133  mov r3,r1               ; r1 = start of run index1+1
+0BEC3A: BF61  bsr 0x0BEB00            ; same 1-D interpolation in run index1+1 -> fr2 = v1
+0BEC3C: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEC3E: F03C  fmov fr3,fr0            ; fr0 = fraction1
+0BEC40: F241  fsub fr4,fr2            ; fr2 = fr2 - fr4 = v1 - v0
+0BEC42: F42E  fmac fr0,fr2,fr4        ; fr4 = fr0*fr2 + fr4 = v0 + fraction1*(v1 - v0)
+0BEC44: 4F26  lds.l @r15+,pr          ; restore pr
+0BEC46: 000B  rts                     ; return
+0BEC48: F24C  fmov fr4,fr2            ; [delay slot] fr2 = result (raw cell units, unscaled)
+
+==== FUNCTION 0x0BEC4C .. 0x0BEC78  (22 instructions, 2 callers) ====
+CONTRACT
+   in   r0  = count0 = number of cells in one run (the wrapper loads the word at record+0)
+        r1  = pointer to the data
+        r2  = index0 (position inside a run)        fr0 = fraction0
+        r3  = index1 (which run)                    fr1 = fraction1
+   out  fr2 = bilinear value in RAW cell units (no scale, no bias):
+              v0 = 1-D interpolation of run index1   at (index0, fraction0)
+              if fraction1 == 0.0: v0
+              else v1 = same in run index1+1;  v0 + fraction1*(v1 - v0)
+        cell(i0, i1) is at  r1 + (i1*count0 + i0) * 1      cell type: uint8
+   side r0, r1, r3, fr0 (= fraction1 when it is not 0), fr1, fr3 (= fraction1), fr4 (= result),
+        macl (muls.w), fpul (written by the 1-D handler it calls: 405A lds r0,fpul).
+        r2, r4-r14 and mach are not written (emulated A7, exact sets:
+        {r0 r1 r3 fr0 fr1 fr2 fr3 fr4 macl fpul}; without fr0 when fraction1 is 0).
+   callers: 0x0BE8E4 through table slot 0BE918 (typecode 0x04); 0x0BE928 by bsr.
+MECHANISM
+   run0 = r1 + (s16)r3 * (s16)(count0)        muls.w: both operands taken as signed 16-bit
+   run1 = run0 + count0
+   v0   = 0x0BEB20(index0, run0, fraction0)
+   if fraction1 == 0.0: return v0             (run index1+1 is NOT read)
+   v1   = 0x0BEB20(index0, run1, fraction0)
+   return v0 + fraction1*(v1 - v0)            (fsub, then fmac)
+   Interpolation order: along the run (axis0) first, then between runs (axis1).
+EVIDENCE
+   stride: no shift: r0 = count0 as passed (1-byte cells); muls.w r0,r3 then sts macl,r3 and add r3,r1 give run0; add r1,r0 gives run1.
+   second-run skip: fldi0 fr4, fcmp/eq fr3,fr4 (T = fr4 == fr3 = fraction1 == 0), bt/s.
+   formula: fsub fr4,fr2 (fr2 = v1 - v0), fmac fr0,fr2,fr4 (fr4 = fraction1*(v1-v0) + v0).
+   emulated: scripts/trace/emu_helpers_interp.py A5 (3 x 4 grid, not square: every (index0, index1) with
+   fractions 0 returns linear element index1*3+index0; half fractions return the mean with
+   the next element in the run / the same element of the next run; the last corner reads
+   nothing after element 11), A7, B2 (80 real uint8 records through 0x0BE8E4),
+   B5 (the one real record of 0x0BE928, 0x0ABC1C), C.
+LISTING
+; function 0x0BEC4C..0x0BEC78  22 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEC4C: 4F22  sts.l pr,@-r15          ; save pr (this handler calls the 1-D handler twice)
+0BEC4E: 230F  muls.w r0,r3            ; macl = (s16)r3 * (s16)r0 = index1 * (count0 * cell size) = byte offset of run index1  (r0 = count0 unshifted: 1-byte cells)
+0BEC50: 031A  sts macl,r3             ; r3 = that offset
+0BEC52: 313C  add r3,r1               ; r1 = data + index1*count0*size = start of run index1
+0BEC54: 301C  add r1,r0               ; r0 = r1 + count0*size = start of run index1+1
+0BEC56: 6303  mov r0,r3               ; r3 = start of run index1+1 (kept across the first call; the 1-D handler does not write r3)
+0BEC58: F31C  fmov fr1,fr3            ; fr3 = fraction1 (fr1 is scratch in the 1-D handler)
+0BEC5A: BF61  bsr 0x0BEB20            ; 1-D uint8 interpolation in run index1: r0=index0, r1=run, fr0=fraction0 -> fr2
+0BEC5C: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEC5E: F48D  fldi0 fr4               ; fr4 = 0.0
+0BEC60: F434  fcmp/eq fr3,fr4         ; T = (fr4 == fr3) = (fraction1 == 0.0)
+0BEC62: 8D06  bt/s 0x0BEC72           ; T=1 -> run index1+1 is NOT read; result = v0
+0BEC64: F42C  fmov fr2,fr4            ; [delay slot, always] fr4 = v0 (value along run index1)
+0BEC66: 6133  mov r3,r1               ; r1 = start of run index1+1
+0BEC68: BF5A  bsr 0x0BEB20            ; same 1-D interpolation in run index1+1 -> fr2 = v1
+0BEC6A: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEC6C: F03C  fmov fr3,fr0            ; fr0 = fraction1
+0BEC6E: F241  fsub fr4,fr2            ; fr2 = fr2 - fr4 = v1 - v0
+0BEC70: F42E  fmac fr0,fr2,fr4        ; fr4 = fr0*fr2 + fr4 = v0 + fraction1*(v1 - v0)
+0BEC72: 4F26  lds.l @r15+,pr          ; restore pr
+0BEC74: 000B  rts                     ; return
+0BEC76: F24C  fmov fr4,fr2            ; [delay slot] fr2 = result (raw cell units, unscaled)
+
+==== FUNCTION 0x0BEC78 .. 0x0BECA6  (23 instructions, 2 callers) ====
+CONTRACT
+   in   r0  = count0 = number of cells in one run (the wrapper loads the word at record+0)
+        r1  = pointer to the data
+        r2  = index0 (position inside a run)        fr0 = fraction0
+        r3  = index1 (which run)                    fr1 = fraction1
+   out  fr2 = bilinear value in RAW cell units (no scale, no bias):
+              v0 = 1-D interpolation of run index1   at (index0, fraction0)
+              if fraction1 == 0.0: v0
+              else v1 = same in run index1+1;  v0 + fraction1*(v1 - v0)
+        cell(i0, i1) is at  r1 + (i1*count0 + i0) * 2      cell type: uint16
+   side r0, r1, r3, fr0 (= fraction1 when it is not 0), fr1, fr3 (= fraction1), fr4 (= result),
+        macl (muls.w), fpul (written by the 1-D handler it calls: 405A lds r0,fpul).
+        r2, r4-r14 and mach are not written (emulated A7, exact sets:
+        {r0 r1 r3 fr0 fr1 fr2 fr3 fr4 macl fpul}; without fr0 when fraction1 is 0).
+   callers: 0x0BE8E4 through table slot 0BE91C (typecode 0x08); 0x0BE944 by bsr.
+MECHANISM
+   run0 = r1 + (s16)r3 * (s16)(2*count0)        muls.w: both operands taken as signed 16-bit
+   run1 = run0 + 2*count0
+   v0   = 0x0BEB6C(index0, run0, fraction0)
+   if fraction1 == 0.0: return v0             (run index1+1 is NOT read)
+   v1   = 0x0BEB6C(index0, run1, fraction0)
+   return v0 + fraction1*(v1 - v0)            (fsub, then fmac)
+   Interpolation order: along the run (axis0) first, then between runs (axis1).
+EVIDENCE
+   stride: shll r0 at 0BEC7A makes r0 = 2*count0; muls.w r0,r3 then sts macl,r3 and add r3,r1 give run0; add r1,r0 gives run1.
+   second-run skip: fldi0 fr4, fcmp/eq fr3,fr4 (T = fr4 == fr3 = fraction1 == 0), bt/s.
+   formula: fsub fr4,fr2 (fr2 = v1 - v0), fmac fr0,fr2,fr4 (fr4 = fraction1*(v1-v0) + v0).
+   emulated: scripts/trace/emu_helpers_interp.py A5 (3 x 4 grid, not square: every (index0, index1) with
+   fractions 0 returns linear element index1*3+index0; half fractions return the mean with
+   the next element in the run / the same element of the next run; the last corner reads
+   nothing after element 11), A7, B2 (100 real uint16 records through 0x0BE8E4),
+   B5 (5 real records of 0x0BE944), C.
+LISTING
+; function 0x0BEC78..0x0BECA6  23 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BEC78: 4F22  sts.l pr,@-r15          ; save pr (this handler calls the 1-D handler twice)
+0BEC7A: 4000  shll r0                 ; r0 = count0 * 2  (run length in bytes, 2-byte cells)
+0BEC7C: 230F  muls.w r0,r3            ; macl = (s16)r3 * (s16)r0 = index1 * (count0 * cell size) = byte offset of run index1
+0BEC7E: 031A  sts macl,r3             ; r3 = that offset
+0BEC80: 313C  add r3,r1               ; r1 = data + index1*count0*size = start of run index1
+0BEC82: 301C  add r1,r0               ; r0 = r1 + count0*size = start of run index1+1
+0BEC84: 6303  mov r0,r3               ; r3 = start of run index1+1 (kept across the first call; the 1-D handler does not write r3)
+0BEC86: F31C  fmov fr1,fr3            ; fr3 = fraction1 (fr1 is scratch in the 1-D handler)
+0BEC88: BF70  bsr 0x0BEB6C            ; 1-D uint16 interpolation in run index1: r0=index0, r1=run, fr0=fraction0 -> fr2
+0BEC8A: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEC8C: F48D  fldi0 fr4               ; fr4 = 0.0
+0BEC8E: F434  fcmp/eq fr3,fr4         ; T = (fr4 == fr3) = (fraction1 == 0.0)
+0BEC90: 8D06  bt/s 0x0BECA0           ; T=1 -> run index1+1 is NOT read; result = v0
+0BEC92: F42C  fmov fr2,fr4            ; [delay slot, always] fr4 = v0 (value along run index1)
+0BEC94: 6133  mov r3,r1               ; r1 = start of run index1+1
+0BEC96: BF69  bsr 0x0BEB6C            ; same 1-D interpolation in run index1+1 -> fr2 = v1
+0BEC98: 6023  mov r2,r0               ; [delay slot] r0 = index0
+0BEC9A: F03C  fmov fr3,fr0            ; fr0 = fraction1
+0BEC9C: F241  fsub fr4,fr2            ; fr2 = fr2 - fr4 = v1 - v0
+0BEC9E: F42E  fmac fr0,fr2,fr4        ; fr4 = fr0*fr2 + fr4 = v0 + fraction1*(v1 - v0)
+0BECA0: 4F26  lds.l @r15+,pr          ; restore pr
+0BECA2: 000B  rts                     ; return
+0BECA4: F24C  fmov fr4,fr2            ; [delay slot] fr2 = result (raw cell units, unscaled)
+
+==== FUNCTION 0x0BECA8 .. 0x0BECDC  (26 instructions, 4 callers) ====
+CONTRACT
+   in   r0  = count (number of breakpoints, >= 1)
+        r1  = pointer to the axis: float32[count], big-endian, expected ascending
+        fr0 = x
+   out  r0  = index, fr0 = fraction:
+          x >= axis[count-1]            ->  (count-1, 0.0)          clamp high
+          x <  axis[0]                  ->  (0, 0.0)                clamp low
+          axis[i] <= x < axis[i+1]      ->  (i, (x-axis[i]) / (axis[i+1]-axis[i])),  0 <= fraction <= 1
+        with i the HIGHEST index below count-1 whose breakpoint is not greater than x.
+        The fraction is below 1 unless float32 rounding makes x-axis[i] equal the span
+        (axis [-1e8, 1.0], x one float below 1.0 -> fraction exactly 1.0: emulated with
+        rounding toward zero, the chip's direction; the round-to-nearest transcription
+        gives 1.0 as well).
+   side fr1 (last breakpoint examined), fr2 (interior path only). r1 is preserved. No memory write.
+        fpul, mach, macl untouched (emulated A7, exact sets: {r0 fr0 fr1 fr2} interior;
+        {r0 fr0 fr1} on either clamp).
+   callers: 0x0BE830, 0x0BE874, 0x0BE8AC (one bsr each), 0x0BED98 (two bsr)
+MECHANISM
+   off = 4*(count-1)
+   if not (axis[off] > x):  return (count-1, 0.0)        includes x == last breakpoint and NaN x
+   loop:
+       if off == 0:         return (0, 0.0)               ran off the low end
+       off -= 4
+       if axis[off] > x:    goto loop                     linear scan downward
+   i = off/4
+   return (i, (x - axis[i]) / (axis[i+1] - axis[i]))      two fsub, one fdiv
+   Consequences that follow from the bytes:
+    * linear, top-down. A duplicated breakpoint resolves to the HIGHER index
+      (axis [0,10,10,20], x=10 -> index 2, fraction 0).
+    * the divisor is > 0 whenever the division is reached (axis[i+1] > x >= axis[i]).
+    * axis[count] is never read.  count = 1 always returns (0, 0.0).
+    * count <= 0 is NOT guarded.  With count = 0 the offset starts at 0xFFFFFFFC and the
+      first load is axis[-1], the long BEFORE the axis.  If that long is not greater
+      than x the routine returns index 0x3FFFFFFF (shlr2 of the offset) and fraction 0.
+      If it IS greater than x the scan does not stop at that one bad read: tst r0,r0 at
+      0BECB2 is false for 0xFFFFFFFC, so 0BECB6 steps on to axis[-2], axis[-3] ... and
+      keeps walking DOWN memory until it meets a long that is not greater than x; it
+      then interpolates there and returns an index of 0x3FFFFFFE or lower.
+      No record found at any call site has a count word below 1 (979 records, min 1, max 78).
+    * x exactly on a breakpoint gives fraction 0.0, so the handlers return that cell alone.
+EVIDENCE
+   clamp high: fcmp/gt fr0,fr1 at 0BECAE sets T when fr1 > fr0, i.e. axis[last] > x;
+   bf/s 0BECB0 leaves on T=0; 0BECD0 shlr2 gives count-1, 0BECD4 fldi0 gives fraction 0.
+   clamp low: tst r0,r0 (0BECB2 first pass, 0BECBE later passes) then bt/s 0BECB4;
+   0BECD6 mov #0,r0 and 0BECDA fldi0 fr0.
+   scan: add #-4 0BECB6, fmov.s 0BECB8, fcmp/gt 0BECBA, bt/s 0BECBC (loops while axis[i] > x).
+   fraction: fsub 0BECC0 (x - axis[i]), fmov.s 0BECC4 (axis[i+1]), fsub 0BECC8, fdiv 0BECCA.
+   emulated: scripts/trace/emu_helpers_interp.py A1 (ascending, single-element, two-element, duplicate and
+   negative axes; x from -1e30 to +1e30, one float below / on / above each end, +inf,
+   -inf, NaN; a 1e8-wide span), A7; every B and C part reaches it through a wrapper.
+   count 0, three cases (A1): the long before the axis is 0.0 and x = 1.0 -> index
+   0x3FFFFFFF, fraction 0;  the longs before the axis are 1.0, 3.0, 7.0 and x = 5.0 ->
+   axis[-2] is read as well, index 0x3FFFFFFE, fraction 0.5 = (5-3)/(7-3);  same longs and
+   x = 0.5 -> the scan walks past all three into uninitialised RAM (a read is recorded
+   at axis[-4]) and returns index 0x3FFFFFFC.
+   NaN x: the emulator gives T=0 at 0BECAE, hence (count-1, 0.0). Whether the ECU raises
+   an FPU exception on a NaN compare is not established here.
+LISTING
+; function 0x0BECA8..0x0BECDC  26 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BECA8: 70FF  add #-1,r0              ; r0 = count - 1
+0BECAA: 4008  shll2 r0                ; r0 = 4*(count-1) = byte offset of the LAST breakpoint
+0BECAC: F116  fmov.s @(r0,r1),fr1     ; fr1 = axis[count-1]
+0BECAE: F105  fcmp/gt fr0,fr1         ; T = (fr1 > fr0) = (axis[last] > x)
+0BECB0: 8F0E  bf/s 0x0BECD0           ; T=0 (x >= axis[last], or unordered) -> clamp-high exit 0BECD0
+0BECB2: 2008  tst r0,r0               ; [delay slot, always] T = (offset == 0); read by the bt/s at 0BECB4
+0BECB4: 8D0F  bt/s 0x0BECD6           ; LOOP: T=1 (offset was 0: x is below axis[0]) -> clamp-low exit 0BECD6
+0BECB6: 70FC  add #-4,r0              ; [delay slot, always] offset -= 4: step one breakpoint DOWN
+0BECB8: F116  fmov.s @(r0,r1),fr1     ; fr1 = axis[i]
+0BECBA: F105  fcmp/gt fr0,fr1         ; T = (fr1 > fr0) = (axis[i] > x)
+0BECBC: 8DFA  bt/s 0x0BECB4           ; T=1 (axis[i] > x) -> keep scanning down
+0BECBE: 2008  tst r0,r0               ; [delay slot, always] T = (offset == 0) for the test at 0BECB4
+0BECC0: F011  fsub fr1,fr0            ; here axis[i] <= x < axis[i+1]:  fr0 = fr0 - fr1 = x - axis[i]
+0BECC2: 7004  add #4,r0               ; offset of i+1
+0BECC4: F216  fmov.s @(r0,r1),fr2     ; fr2 = axis[i+1]
+0BECC6: 70FC  add #-4,r0              ; offset of i again
+0BECC8: F211  fsub fr1,fr2            ; fr2 = fr2 - fr1 = axis[i+1] - axis[i]  (> 0 here)
+0BECCA: F023  fdiv fr2,fr0            ; fr0 = fr0 / fr2 = (x - axis[i]) / (axis[i+1] - axis[i])
+0BECCC: 000B  rts                     ; return (interior)
+0BECCE: 4009  shlr2 r0                ; [delay slot] r0 = offset / 4 = i
+0BECD0: 4009  shlr2 r0                ; CLAMP HIGH: r0 = count - 1
+0BECD2: 000B  rts                     ; return
+0BECD4: F08D  fldi0 fr0               ; [delay slot] fr0 = fraction = 0.0  -> no extrapolation above the last breakpoint
+0BECD6: E000  mov #0,r0               ; CLAMP LOW: r0 = index 0
+0BECD8: 000B  rts                     ; return
+0BECDA: F08D  fldi0 fr0               ; [delay slot] fr0 = fraction = 0.0  -> no extrapolation below the first breakpoint
+
+==== FUNCTION 0x0BECDC .. 0x0BED96  (93 instructions, 2 callers) ====
+CONTRACT
+   in   r0 = count (>= 1)
+        r1 = pointer to the axis: INT32[count] (4 bytes per breakpoint), expected ascending
+        r2 = x, a SIGNED 32-bit integer
+   out  r0 = index, r1 = fraction as an unsigned 0.32 fixed-point number:
+          x >= axis[count-1]         ->  (count-1, 0)                clamp high
+          x <  axis[0]               ->  (0, 0)                      clamp low
+          axis[i] <= x < axis[i+1]   ->  (i, floor((x-axis[i]) * 2^32 / (axis[i+1]-axis[i])))
+   side r2 (remainder work), r3, T/Q/M.  No memory write.  mach, macl, fpul and the FP
+        registers untouched (emulated A7, exact sets: {r0 r1 r2 r3} interior; {r0 r1 r3}
+        on either clamp).
+   callers: 0x0BE88C, 0x0BE8C4 (one bsr each)
+MECHANISM
+   Same top-down linear scan as 0x0BECA8, on 32-bit integers with SIGNED compares.
+   Interior:  r2 = x - axis[i];  r3 = axis[i+1] - axis[i];  r1 = 0
+              div0u; 32 x (rotcl r1 ; div1 r3,r2); rotcl r1
+   which is the unsigned 64/32 divide of (r2:0) by r3, i.e. ((x-axis[i]) << 32) / span,
+   quotient truncated, valid because 0 <= r2 < r3.
+    * x and the breakpoints are compared signed: x = 0x80000000 is BELOW an axis starting at 0.
+    * the fraction is never 2^32 (it would not fit); the largest is just under 1.
+    * count <= 0 is not guarded, and the scan runs on down memory exactly as in 0x0BECA8
+      (emulated A2, longs before the axis 1, 3, 7: x = 9 -> index 0x3FFFFFFF, fraction 0;
+      x = 5 -> axis[-2] is read, index 0x3FFFFFFE, fraction 0x80000000).
+EVIDENCE
+   clamp high: cmp/ge r3,r2 at 0BECE2 sets T when r2 >= r3 (x >= axis[last]); bt/s 0BECE4.
+   clamp low: tst r0,r0 0BECE6 / 0BECF2, bt/s 0BECE8.
+   scan: cmp/gt r2,r3 at 0BECEE sets T when r3 > r2 (axis[i] > x); bt/s 0BECF0 loops.
+   axis width: mov.l @(r0,r1) at 0BECE0, 0BECEC, 0BECF8 with r0 stepped by 4.
+   divide: div0u 0BED02; 32 div1 r3,r2 at 0BED06..0BED82 (every 4 bytes); 33 rotcl r1 at
+   0BED04..0BED84.
+   emulated: scripts/trace/emu_helpers_interp.py A2 (four synthetic axes incl. negative breakpoints, a span
+   of 0xE0000000, x = INT_MIN / INT_MAX; quotient equals Python floor division in every
+   interior case), A7, B4 (6 real records).
+LISTING
+; function 0x0BECDC..0x0BED96  93 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BECDC: 70FF  add #-1,r0              ; r0 = count - 1
+0BECDE: 4008  shll2 r0                ; r0 = 4*(count-1): the axis is an array of 32-bit LONGS
+0BECE0: 031E  mov.l @(r0,r1),r3       ; r3 = axis[count-1]  (mov.l: 32-bit integer breakpoint)
+0BECE2: 3233  cmp/ge r3,r2            ; T = (r2 >= r3) SIGNED = (x >= axis[last])
+0BECE4: 8D51  bt/s 0x0BED8A           ; T=1 -> clamp-high exit 0BED8A
+0BECE6: 2008  tst r0,r0               ; [delay slot, always] T = (offset == 0); read by the bt/s at 0BECE8
+0BECE8: 8D52  bt/s 0x0BED90           ; LOOP: T=1 (offset was 0: x is below axis[0]) -> clamp-low exit 0BED90
+0BECEA: 70FC  add #-4,r0              ; [delay slot, always] offset -= 4: step one breakpoint DOWN
+0BECEC: 031E  mov.l @(r0,r1),r3       ; r3 = axis[i]
+0BECEE: 3327  cmp/gt r2,r3            ; T = (r3 > r2) SIGNED = (axis[i] > x)
+0BECF0: 8DFA  bt/s 0x0BECE8           ; T=1 (axis[i] > x) -> keep scanning down
+0BECF2: 2008  tst r0,r0               ; [delay slot, always] T = (offset == 0)
+0BECF4: 7004  add #4,r0               ; here axis[i] <= x < axis[i+1]: offset of i+1
+0BECF6: 3238  sub r3,r2               ; r2 = r2 - r3 = x - axis[i]   (dividend, high long)
+0BECF8: 011E  mov.l @(r0,r1),r1       ; r1 = axis[i+1]   (the axis pointer in r1 is consumed here)
+0BECFA: 70FC  add #-4,r0              ; offset of i again
+0BECFC: 3138  sub r3,r1               ; r1 = r1 - r3 = axis[i+1] - axis[i]
+0BECFE: 6313  mov r1,r3               ; r3 = divisor = axis[i+1] - axis[i]  (> dividend)
+0BED00: E100  mov #0,r1               ; r1 = 0 = low long of the 64-bit dividend and the quotient collector
+0BED02: 0019  div0u                   ; unsigned divide setup: M = Q = T = 0
+0BED04: 4124  rotcl r1                ; step 1/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED06: 3234  div1 r3,r2              ; step 1/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED08: 4124  rotcl r1                ; step 2/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED0A: 3234  div1 r3,r2              ; step 2/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED0C: 4124  rotcl r1                ; step 3/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED0E: 3234  div1 r3,r2              ; step 3/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED10: 4124  rotcl r1                ; step 4/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED12: 3234  div1 r3,r2              ; step 4/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED14: 4124  rotcl r1                ; step 5/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED16: 3234  div1 r3,r2              ; step 5/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED18: 4124  rotcl r1                ; step 6/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED1A: 3234  div1 r3,r2              ; step 6/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED1C: 4124  rotcl r1                ; step 7/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED1E: 3234  div1 r3,r2              ; step 7/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED20: 4124  rotcl r1                ; step 8/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED22: 3234  div1 r3,r2              ; step 8/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED24: 4124  rotcl r1                ; step 9/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED26: 3234  div1 r3,r2              ; step 9/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED28: 4124  rotcl r1                ; step 10/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED2A: 3234  div1 r3,r2              ; step 10/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED2C: 4124  rotcl r1                ; step 11/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED2E: 3234  div1 r3,r2              ; step 11/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED30: 4124  rotcl r1                ; step 12/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED32: 3234  div1 r3,r2              ; step 12/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED34: 4124  rotcl r1                ; step 13/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED36: 3234  div1 r3,r2              ; step 13/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED38: 4124  rotcl r1                ; step 14/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED3A: 3234  div1 r3,r2              ; step 14/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED3C: 4124  rotcl r1                ; step 15/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED3E: 3234  div1 r3,r2              ; step 15/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED40: 4124  rotcl r1                ; step 16/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED42: 3234  div1 r3,r2              ; step 16/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED44: 4124  rotcl r1                ; step 17/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED46: 3234  div1 r3,r2              ; step 17/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED48: 4124  rotcl r1                ; step 18/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED4A: 3234  div1 r3,r2              ; step 18/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED4C: 4124  rotcl r1                ; step 19/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED4E: 3234  div1 r3,r2              ; step 19/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED50: 4124  rotcl r1                ; step 20/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED52: 3234  div1 r3,r2              ; step 20/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED54: 4124  rotcl r1                ; step 21/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED56: 3234  div1 r3,r2              ; step 21/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED58: 4124  rotcl r1                ; step 22/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED5A: 3234  div1 r3,r2              ; step 22/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED5C: 4124  rotcl r1                ; step 23/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED5E: 3234  div1 r3,r2              ; step 23/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED60: 4124  rotcl r1                ; step 24/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED62: 3234  div1 r3,r2              ; step 24/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED64: 4124  rotcl r1                ; step 25/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED66: 3234  div1 r3,r2              ; step 25/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED68: 4124  rotcl r1                ; step 26/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED6A: 3234  div1 r3,r2              ; step 26/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED6C: 4124  rotcl r1                ; step 27/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED6E: 3234  div1 r3,r2              ; step 27/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED70: 4124  rotcl r1                ; step 28/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED72: 3234  div1 r3,r2              ; step 28/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED74: 4124  rotcl r1                ; step 29/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED76: 3234  div1 r3,r2              ; step 29/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED78: 4124  rotcl r1                ; step 30/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED7A: 3234  div1 r3,r2              ; step 30/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED7C: 4124  rotcl r1                ; step 31/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED7E: 3234  div1 r3,r2              ; step 31/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED80: 4124  rotcl r1                ; step 32/32: shift previous quotient bit (T) into r1, next dividend bit out
+0BED82: 3234  div1 r3,r2              ; step 32/32: 1-bit non-restoring divide of r2 by r3, quotient bit -> T
+0BED84: 4124  rotcl r1                ; shift in the 32nd quotient bit: r1 = 32-bit quotient
+0BED86: 000B  rts                     ; return (interior): r1 = floor((x - axis[i]) * 2^32 / (axis[i+1] - axis[i]))
+0BED88: 4009  shlr2 r0                ; [delay slot] r0 = offset / 4 = i
+0BED8A: 4009  shlr2 r0                ; CLAMP HIGH: r0 = count - 1
+0BED8C: 000B  rts                     ; return
+0BED8E: E100  mov #0,r1               ; [delay slot] r1 = fraction = 0  -> no extrapolation above the last breakpoint
+0BED90: E000  mov #0,r0               ; CLAMP LOW: r0 = index 0
+0BED92: 000B  rts                     ; return
+0BED94: E100  mov #0,r1               ; [delay slot] r1 = fraction = 0  -> no extrapolation below the first breakpoint
+
+==== FUNCTION 0x0BED98 .. 0x0BEDB8  (16 instructions, 3 callers) ====
+CONTRACT
+   in   r4  = pointer to a 2-D record
+        fr4 = first input, fr5 = second input
+   out  r2  = index0,  fr0 = fraction0   -- position of fr4 on the axis at record+4
+                                            (length = word at record+0)
+        r3  = index1,  fr1 = fraction1   -- position of fr5 on the axis at record+8
+                                            (length = word at record+2)
+   side r0, r1, fr2, fr3 (= fraction0).  r4, fr4, fr5 are preserved; fpul, mach, macl untouched
+        (emulated A7, exact set with both inputs interior: {r0 r1 r2 r3 fr0 fr1 fr2 fr3}).
+   callers: 0x0BE8E4, 0x0BE928, 0x0BE944 (one bsr each)
+MECHANISM
+   (index0, fraction0) = 0x0BECA8(count = s16 word [r4+0], axis = long [r4+4], x = fr4)
+   (index1, fraction1) = 0x0BECA8(count = s16 word [r4+2], axis = long [r4+8], x = fr5)
+   Both axes are float32 and both clamp exactly as 0x0BECA8 does.
+EVIDENCE
+   first search: mov.w @(0,r4) 0BED9A, mov.l @(4,r4) 0BED9C, fmov fr4,fr0 in the slot 0BEDA0.
+   second search: mov.w @(2,r4) 0BEDA6, mov.l @(8,r4) 0BEDA8, fmov fr5,fr0 in the slot 0BEDAC.
+   outputs: mov r0,r2 0BEDA2, fmov fr0,fr3 0BEDA4, mov r0,r3 0BEDAE, fmov fr0,fr1 0BEDB2,
+   fmov fr3,fr0 0BEDB6.
+   emulated: scripts/trace/emu_helpers_interp.py A6 (3-point and 4-point axes, inputs below / on / between /
+   above each), A7; B2, B5 and C reach it through the wrappers.
+LISTING
+; function 0x0BED98..0x0BEDB8  16 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BED98: 4F22  sts.l pr,@-r15          ; save pr
+0BED9A: 8540  mov.w @(0,r4),r0        ; r0 = (s16) word at record+0 = count0
+0BED9C: 5141  mov.l @(4,r4),r1        ; r1 = long at record+4 = pointer to axis0 (float32[count0])
+0BED9E: BF83  bsr 0x0BECA8            ; float axis search on axis0
+0BEDA0: F04C  fmov fr4,fr0            ; [delay slot] fr0 = fr4 = first input
+0BEDA2: 6203  mov r0,r2               ; r2 = index0
+0BEDA4: F30C  fmov fr0,fr3            ; fr3 = fraction0
+0BEDA6: 8541  mov.w @(2,r4),r0        ; r0 = (s16) word at record+2 = count1
+0BEDA8: 5142  mov.l @(8,r4),r1        ; r1 = long at record+8 = pointer to axis1 (float32[count1])
+0BEDAA: BF7D  bsr 0x0BECA8            ; float axis search on axis1
+0BEDAC: F05C  fmov fr5,fr0            ; [delay slot] fr0 = fr5 = second input
+0BEDAE: 6303  mov r0,r3               ; r3 = index1
+0BEDB0: 4F26  lds.l @r15+,pr          ; restore pr
+0BEDB2: F10C  fmov fr0,fr1            ; fr1 = fraction1
+0BEDB4: 000B  rts                     ; return
+0BEDB6: F03C  fmov fr3,fr0            ; [delay slot] fr0 = fraction0
+
+
+================================================================================
+CONTEXT: THE EIGHT PUBLIC WRAPPERS (not among the 15 entries; listed because they
+are the only callers and they fix the calling convention of everything above)
+================================================================================
+Each listing is fn_dump output; these lines are verified like the rest.
+
+---- WRAPPER 0x0BE830  typed 1-D: r4 = record, fr4 = x -> fr0 (scaled when typecode != 0) ----
+; function 0x0BE830..0x0BE85E  23 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BE830: 4F22  sts.l pr,@-r15          ; save pr
+0BE832: 8540  mov.w @(0,r4),r0        ; r0 = (s16) word at record+0 = count
+0BE834: 5141  mov.l @(4,r4),r1        ; r1 = long at record+4 = axis pointer
+0BE836: B237  bsr 0x0BECA8            ; float axis search -> r0 = index, fr0 = fraction
+0BE838: F04C  fmov fr4,fr0            ; [delay slot] fr0 = fr4 = x
+0BE83A: 6103  mov r0,r1               ; r1 = index
+0BE83C: 8442  mov.b @(2,r4),r0        ; r0 = byte at record+2
+0BE83E: 630C  extu.b r0,r3            ; r3 = zero-extended byte = typecode
+0BE840: C707  mova @(0x0BE860),r0           ; -> 0x0BE860: long 0x000BEACC  ||  r0 = base of the handler table (longs)
+0BE842: 023E  mov.l @(r0,r3),r2       ; r2 = long at 0BE860 + typecode
+0BE844: 6013  mov r1,r0               ; r0 = index
+0BE846: 420B  jsr @r2                       ; -> target NOT statically resolved  ||  call the 1-D handler: r0=index, r1=data, fr0=fraction -> fr2
+0BE848: 5142  mov.l @(8,r4),r1        ; [delay slot] r1 = long at record+8 = data pointer
+0BE84A: 2338  tst r3,r3               ; T = (typecode == 0)   (the handlers leave r3 alone: emulated)
+0BE84C: 8D04  bt/s 0x0BE858           ; typecode 0 -> skip scale and bias
+0BE84E: F12C  fmov fr2,fr1            ; [delay slot, always] fr1 = raw result
+0BE850: 740C  add #12,r4              ; r4 = record + 12
+0BE852: F049  fmov.s @r4+,fr0         ; fr0 = float at record+12 (scale); r4 = record + 16
+0BE854: F148  fmov.s @r4,fr1          ; fr1 = float at record+16 (bias)
+0BE856: F12E  fmac fr0,fr2,fr1        ; fr1 = fr0*fr2 + fr1 = scale*raw + bias
+0BE858: 4F26  lds.l @r15+,pr          ; restore pr
+0BE85A: 000B  rts                     ; return
+0BE85C: F01C  fmov fr1,fr0            ; [delay slot] fr0 = result
+; pool/table after the function: 0BE85E 0009 (nop pad), 0BE860.. the five handler longs listed above
+
+---- WRAPPER 0x0BE874  fixed uint8 1-D: r4 = record, fr4 = x -> r0 = trunc(raw) & 0xFF ----
+; function 0x0BE874..0x0BE88C  12 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BE874: 4F22  sts.l pr,@-r15          ; save pr
+0BE876: 8540  mov.w @(0,r4),r0        ; r0 = count (record+0)
+0BE878: 5141  mov.l @(4,r4),r1        ; r1 = axis pointer (record+4)
+0BE87A: B215  bsr 0x0BECA8            ; float axis search
+0BE87C: F04C  fmov fr4,fr0            ; [delay slot] fr0 = x
+0BE87E: B14F  bsr 0x0BEB20            ; uint8 handler DIRECTLY: the byte at record+2 is never read on this path
+0BE880: 5142  mov.l @(8,r4),r1        ; [delay slot] r1 = data pointer (record+8)
+0BE882: F23D  ftrc fr2,fpul           ; fpul = trunc toward zero(fr2): no scale, no bias
+0BE884: 005A  sts fpul,r0             ; r0 = integer result
+0BE886: 4F26  lds.l @r15+,pr          ; restore pr
+0BE888: 000B  rts                     ; return
+0BE88A: 600C  extu.b r0,r0            ; [delay slot] r0 &= 0xFF
+
+---- WRAPPER 0x0BE88C  integer-axis uint8 1-D: r4 = record, r5 = x (integer) -> r0 ----
+; function 0x0BE88C..0x0BE8AA  15 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BE88C: 4F12  sts.l macl,@-r15        ; save macl
+0BE88E: 4F02  sts.l mach,@-r15        ; save mach
+0BE890: 4F22  sts.l pr,@-r15          ; save pr
+0BE892: 8540  mov.w @(0,r4),r0        ; r0 = count (record+0)
+0BE894: 5141  mov.l @(4,r4),r1        ; r1 = axis pointer (record+4): int32[count]
+0BE896: B221  bsr 0x0BECDC            ; INTEGER axis search -> r0 = index, r1 = 0.32 fraction
+0BE898: 6253  mov r5,r2               ; [delay slot] r2 = r5 = integer input x
+0BE89A: 6213  mov r1,r2               ; r2 = 0.32 fraction
+0BE89C: B150  bsr 0x0BEB40            ; uint8 integer-fraction handler: r0=index, r1=data, r2=fraction -> r0
+0BE89E: 5142  mov.l @(8,r4),r1        ; [delay slot] r1 = data pointer (record+8)
+0BE8A0: 4F26  lds.l @r15+,pr          ; restore pr
+0BE8A2: 4F06  lds.l @r15+,mach        ; restore mach
+0BE8A4: 4F16  lds.l @r15+,macl        ; restore macl
+0BE8A6: 000B  rts                     ; return
+0BE8A8: 600C  extu.b r0,r0            ; [delay slot] r0 &= 0xFF
+
+---- WRAPPER 0x0BE8AC  fixed uint16 1-D: r4 = record, fr4 = x -> r0 = trunc(raw) & 0xFFFF ----
+; function 0x0BE8AC..0x0BE8C4  12 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BE8AC: 4F22  sts.l pr,@-r15          ; save pr
+0BE8AE: 8540  mov.w @(0,r4),r0        ; r0 = count (record+0)
+0BE8B0: 5141  mov.l @(4,r4),r1        ; r1 = axis pointer (record+4)
+0BE8B2: B1F9  bsr 0x0BECA8            ; float axis search
+0BE8B4: F04C  fmov fr4,fr0            ; [delay slot] fr0 = x
+0BE8B6: B159  bsr 0x0BEB6C            ; uint16 handler DIRECTLY: the byte at record+2 is never read on this path
+0BE8B8: 5142  mov.l @(8,r4),r1        ; [delay slot] r1 = data pointer (record+8)
+0BE8BA: F23D  ftrc fr2,fpul           ; fpul = trunc toward zero(fr2): no scale, no bias
+0BE8BC: 005A  sts fpul,r0             ; r0 = integer result
+0BE8BE: 4F26  lds.l @r15+,pr          ; restore pr
+0BE8C0: 000B  rts                     ; return
+0BE8C2: 600D  extu.w r0,r0            ; [delay slot] r0 &= 0xFFFF
+
+---- WRAPPER 0x0BE8C4  integer-axis uint16 1-D: r4 = record, r5 = x (integer) -> r0 ----
+; function 0x0BE8C4..0x0BE8E2  15 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BE8C4: 4F12  sts.l macl,@-r15        ; save macl
+0BE8C6: 4F02  sts.l mach,@-r15        ; save mach
+0BE8C8: 4F22  sts.l pr,@-r15          ; save pr
+0BE8CA: 8540  mov.w @(0,r4),r0        ; r0 = count (record+0)
+0BE8CC: 5141  mov.l @(4,r4),r1        ; r1 = axis pointer (record+4): int32[count]
+0BE8CE: B205  bsr 0x0BECDC            ; INTEGER axis search -> r0 = index, r1 = 0.32 fraction
+0BE8D0: 6253  mov r5,r2               ; [delay slot] r2 = r5 = integer input x
+0BE8D2: 6213  mov r1,r2               ; r2 = 0.32 fraction
+0BE8D4: B15C  bsr 0x0BEB90            ; uint16 integer-fraction handler
+0BE8D6: 5142  mov.l @(8,r4),r1        ; [delay slot] r1 = data pointer (record+8)
+0BE8D8: 4F26  lds.l @r15+,pr          ; restore pr
+0BE8DA: 4F06  lds.l @r15+,mach        ; restore mach
+0BE8DC: 4F16  lds.l @r15+,macl        ; restore macl
+0BE8DE: 000B  rts                     ; return
+0BE8E0: 600D  extu.w r0,r0            ; [delay slot] r0 &= 0xFFFF
+
+---- WRAPPER 0x0BE8E4  typed 2-D: r4 = record, fr4, fr5 -> fr0 (scaled when typecode != 0) ----
+; function 0x0BE8E4..0x0BE914  24 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BE8E4: 4F12  sts.l macl,@-r15        ; save macl
+0BE8E6: 4F22  sts.l pr,@-r15          ; save pr
+0BE8E8: B256  bsr 0x0BED98            ; both axis searches -> r2,fr0 = index0,fraction0 ; r3,fr1 = index1,fraction1
+0BE8EA: 4F02  sts.l mach,@-r15        ; [delay slot] save mach
+0BE8EC: E010  mov #16,r0              ; r0 = 16
+0BE8EE: 304C  add r4,r0               ; r0 = record + 16
+0BE8F0: 6600  mov.b @r0,r6            ; r6 = byte at record+16 = typecode (sign-extended, no extu)
+0BE8F2: C708  mova @(0x0BE914),r0           ; -> 0x0BE914: long 0x000BEBC0  ||  r0 = base of the 2-D handler table (longs)
+0BE8F4: 056E  mov.l @(r0,r6),r5       ; r5 = long at 0BE914 + typecode
+0BE8F6: 5143  mov.l @(12,r4),r1       ; r1 = long at record+12 = data pointer
+0BE8F8: 450B  jsr @r5                       ; -> target NOT statically resolved  ||  call the 2-D handler
+0BE8FA: 8540  mov.w @(0,r4),r0        ; [delay slot] r0 = (s16) word at record+0 = count0 = the run length
+0BE8FC: 2668  tst r6,r6               ; T = (typecode == 0)
+0BE8FE: 8D04  bt/s 0x0BE90A           ; typecode 0 -> skip scale and bias
+0BE900: F12C  fmov fr2,fr1            ; [delay slot, always] fr1 = raw result
+0BE902: 7414  add #20,r4              ; r4 = record + 20
+0BE904: F049  fmov.s @r4+,fr0         ; fr0 = float at record+20 (scale); r4 = record + 24
+0BE906: F148  fmov.s @r4,fr1          ; fr1 = float at record+24 (bias)
+0BE908: F12E  fmac fr0,fr2,fr1        ; fr1 = scale*raw + bias
+0BE90A: F01C  fmov fr1,fr0            ; fr0 = result
+0BE90C: 4F06  lds.l @r15+,mach        ; restore mach
+0BE90E: 4F26  lds.l @r15+,pr          ; restore pr
+0BE910: 000B  rts                     ; return
+0BE912: 4F16  lds.l @r15+,macl        ; [delay slot] restore macl
+
+---- WRAPPER 0x0BE928  fixed uint8 2-D: r4 = record, fr4, fr5 -> r0 = trunc(raw) & 0xFF ----
+; function 0x0BE928..0x0BE944  14 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BE928: 4F12  sts.l macl,@-r15        ; save macl
+0BE92A: 4F22  sts.l pr,@-r15          ; save pr
+0BE92C: B234  bsr 0x0BED98            ; both axis searches
+0BE92E: 4F02  sts.l mach,@-r15        ; [delay slot] save mach
+0BE930: 5143  mov.l @(12,r4),r1       ; r1 = data pointer (record+12)
+0BE932: B18B  bsr 0x0BEC4C            ; uint8 2-D handler DIRECTLY: the byte at record+16 is never read on this path
+0BE934: 8540  mov.w @(0,r4),r0        ; [delay slot] r0 = count0 (record+0)
+0BE936: F23D  ftrc fr2,fpul           ; fpul = trunc toward zero(fr2): no scale, no bias
+0BE938: 005A  sts fpul,r0             ; r0 = integer result
+0BE93A: 600C  extu.b r0,r0            ; r0 &= 0xFF
+0BE93C: 4F06  lds.l @r15+,mach        ; restore mach
+0BE93E: 4F26  lds.l @r15+,pr          ; restore pr
+0BE940: 000B  rts                     ; return
+0BE942: 4F16  lds.l @r15+,macl        ; [delay slot] restore macl
+
+---- WRAPPER 0x0BE944  fixed uint16 2-D: r4 = record, fr4, fr5 -> r0 = trunc(raw) & 0xFFFF ----
+; function 0x0BE944..0x0BE960  14 instructions  rom AE5L600L 20g rev 20.19c.bin
+0BE944: 4F12  sts.l macl,@-r15        ; save macl
+0BE946: 4F22  sts.l pr,@-r15          ; save pr
+0BE948: B226  bsr 0x0BED98            ; both axis searches
+0BE94A: 4F02  sts.l mach,@-r15        ; [delay slot] save mach
+0BE94C: 5143  mov.l @(12,r4),r1       ; r1 = data pointer (record+12)
+0BE94E: B193  bsr 0x0BEC78            ; uint16 2-D handler DIRECTLY: the byte at record+16 is never read on this path
+0BE950: 8540  mov.w @(0,r4),r0        ; [delay slot] r0 = count0 (record+0)
+0BE952: F23D  ftrc fr2,fpul           ; fpul = trunc toward zero(fr2): no scale, no bias
+0BE954: 005A  sts fpul,r0             ; r0 = integer result
+0BE956: 600D  extu.w r0,r0            ; r0 &= 0xFFFF
+0BE958: 4F06  lds.l @r15+,mach        ; restore mach
+0BE95A: 4F26  lds.l @r15+,pr          ; restore pr
+0BE95C: 000B  rts                     ; return
+0BE95E: 4F16  lds.l @r15+,macl        ; [delay slot] restore macl
+
+; Things the wrappers prove about the 15 entries
+;  * 0x0BE830 keeps the typecode in r3 across the handler call and tests it afterwards
+;    (0BE84A). All five 1-D float-fraction handlers leave r3 untouched (emulated, A7).
+;  * 0x0BE8E4 keeps the typecode in r6 and the record in r4 across the 2-D handler call.
+;  * 0x0BE830 and 0x0BE8E4 return with r4 ADVANCED (record+16 / record+24) when the
+;    typecode is not 0, and unchanged when it is 0 (0BE850/0BE852 emulated in part C;
+;    0BE902/0BE904 read from bytes).
+;  * 0x0BE874 / 0x0BE8AC / 0x0BE928 / 0x0BE944 never read the typecode byte and never
+;    read a scale or a bias: the cell type is fixed by WHICH wrapper is called.
+;  * 0x0BE88C / 0x0BE8C4 pass an integer x in r5 and an INT32 axis.
+;
+; Observation on real records (data, read by this trace's script; not a code fact):
+;  * 46 records reach a fixed-type wrapper with 0x00 in the type byte (emu PART D2):
+;      via 0x0BE874 (uint8), 7 of its 23:
+;          0x0AB2A4 0x0AB334 0x0AC450 0x0AC524 0x0ADFE8 0x0ADFF4 0x0AE000
+;      via 0x0BE8AC (uint16), 27 of its 47:
+;          0x0AA7D8 0x0AAF1C 0x0AB458 0x0AB464 0x0AB4D4 0x0AB5BC 0x0AB5C8 0x0AC26C 0x0AC278
+;          0x0ACE34 0x0ACE54 0x0ACE60 0x0ACEF0 0x0AD0B8 0x0AD0C4 0x0AD0D0 0x0AD400 0x0AD434
+;          0x0AE134 0x0AE874 0x0AE880 0x0AF504 0x0AF510 0x0AF580 0x0AF5A0 0x0AF5AC 0x0AF7C0
+;      via 0x0BE88C (uint8, int32 axis), its only record:    0x0AC298
+;      via 0x0BE8C4 (uint16, int32 axis), all 5:   0x0AAF3C 0x0AD440 0x0AE850 0x0AE85C 0x0AE868
+;      via 0x0BE928 (uint8, 2-D, byte +16), its only record: 0x0ABC1C
+;      via 0x0BE944 (uint16, 2-D, byte +16), all 5: 0x0AB074 0x0ABED0 0x0AD7E0 0x0AF4B0 0x0AF53C
+;    9 are uint8, 37 are uint16.  The other 16 records of 0x0BE874 carry 0x04 and the
+;    other 20 of 0x0BE8AC carry 0x08 -- the type the wrapper uses anyway.
+;    Every one of the 83 call sites found for these six wrappers has its r4 resolved,
+;    so the list is complete for those call sites: 44 by register / stack propagation,
+;    2 (0x0AB458, 0x0AC26C) through the RAM cell @(32,gbr) at site 0x0BBDCA.
+;    Their cells are 1 or 2 bytes wide because the wrapper says so.  Example 0x0AB2A4:
+;    count 4, axis 0x0C5814 (16 bytes), data 0x0C5824, and the next record's axis starts
+;    at 0x0C5828 -- four bytes of data for four cells.  For 44 of the 46 a 4-byte reading
+;    runs into another found record's axis or data.  A reader that takes byte +2 / +16
+;    of THESE records as a typecode will call them float32 and read four times (or
+;    twice) too many bytes.
+;  * three typed 1-D records have an axis that is not strictly increasing (0x0AB190 and
+;    0x0AD104: breakpoints 2,3 and 5,6 equal; 0x0AF468: the last three equal).  By the
+;    scan order a duplicated breakpoint is a STEP: just below it the result approaches
+;    the lower-index cell, at it the higher-index cell is returned, and the middle cell
+;    of three equal breakpoints can never be returned.  In these three records the
+;    cells on the duplicated breakpoints are equal (0x0AB190 and 0x0AD104: every cell
+;    is 32768; 0x0AF468: the last three cells are equal), so no step shows.
+
+
+================================================================================
+ESTABLISHED
+================================================================================
+ 1. Typecode -> 1-D handler: 0x00 0x0BEACC float32, 0x04 0x0BEB20 uint8, 0x08 0x0BEB6C
+    uint16, 0x0C 0x0BEAE4 int8, 0x10 0x0BEB00 int16 (longs at 0BE860..0BE873, indexed by
+    the raw byte at 0BE842).  Typecode -> 2-D handler: 0x00 0x0BEBC0, 0x04 0x0BEC4C,
+    0x08 0x0BEC78, 0x0C 0x0BEBF0, 0x10 0x0BEC1C (longs at 0BE914..0BE927, 0BE8F4).
+ 2. Cell width and signedness, from the load instructions: float32 fmov.s (0BEAD6);
+    int8 mov.b without extu (0BEAE8); int16 mov.w without extu (0BEB08); uint8
+    mov.b + extu.b (0BEB24/0BEB28, 0BEB42/0BEB48); uint16 mov.w + extu.w (0BEB74/0BEB76,
+    0BEB94/0BEB9A).  Index scaling: x4 shll2 (0BEACE), x2 shll (0BEB02, 0BEB6E, 0BEB90),
+    x1 none (0BEAE4, 0BEB22, 0BEB40).
+ 3. 1-D float-fraction contract: r0 index, r1 data, fr0 fraction -> fr2 =
+    cell[i] + fraction*(cell[i+1]-cell[i]) in raw units; cell[i+1] is not loaded when
+    the fraction is 0.0 (bt/s at 0BEAD4, 0BEAEE, 0BEB0C, 0BEB2C, 0BEB7A).
+ 4. 1-D integer-fraction contract (0x0BEB40, 0x0BEB90): r0 index, r1 data, r2 unsigned
+    0.32 fraction -> r0 = d0 +/- floor(|d1-d0| * fraction / 2^32), truncating toward
+    d0 (0BEB4E..0BEB66, 0BEBA0..0BEBB8); clobbers mach/macl.
+ 5. Float axis search 0x0BECA8: r0 count, r1 float32 axis, fr0 x -> r0 index, fr0
+    fraction; linear scan downward from the last breakpoint (0BECB4..0BECBE).
+ 6. Integer axis search 0x0BECDC: r0 count, r1 INT32 axis, r2 signed x -> r0 index,
+    r1 = floor((x-axis[i]) * 2^32 / span); signed compares (0BECE2, 0BECEE); 32-step
+    unsigned divide (0BED02..0BED84).
+ 7. Both searches CLAMP: at or above the last breakpoint -> (count-1, 0); below the
+    first -> (0, 0) (0BECD0..0BECDA, 0BED8A..0BED94).  No extrapolation exists in this
+    code.  Emulated on every real record found.
+ 8. 2-D search pair 0x0BED98: fr4 is located on the axis at record+4 (length word at
+    record+0) -> r2, fr0; fr5 on the axis at record+8 (length word at record+2) -> r3, fr1.
+ 9. 2-D storage: cell(i0, i1) at data + (i1*count0 + i0)*size; the run length is the
+    word at record+0 (0BE8FA, 0BE934, 0BE950 load it into r0; muls.w r0,r3 at 0BEBC4,
+    0BEBF2, 0BEC20, 0BEC4E, 0BEC7C).  The axis at record+4 is the contiguous one.
+    Interpolation runs along axis0 first, then between runs (axis1).
+10. Scale and bias are applied by the two TYPED wrappers only, after the handler, and
+    only when the typecode is not 0 (0BE84A..0BE856, 0BE8FC..0BE908).  Nothing in
+    0x0BEACC..0x0BEDB7 reads a scale or a bias.
+11. The six fixed-type wrappers never read the typecode byte (listings of 0x0BE874,
+    0x0BE88C, 0x0BE8AC, 0x0BE8C4, 0x0BE928, 0x0BE944 contain no load from record+2 as a
+    byte / record+16).
+12. No typed record uses typecode 0x0C or 0x10.  None of the 687 typed 1-D and 210 typed
+    2-D records found at call sites does; and, independently of any call-site scan, no
+    position in the ROM is structurally a typed record with one of those typecodes
+    (count 1..256, pointers into ROM, ascending float32 axis) while the same test finds
+    579 + 187 positions for typecodes 0x04 / 0x08 (emu PART E4).  The only longs equal to
+    0x0BEAE4 / 0x0BEB00 / 0x0BEBF0 / 0x0BEC1C are the four table slots 0BE86C, 0BE870,
+    0BE920, 0BE924 and the checksum-range bound at 0x0FFBC8; the only bsr to 0x0BEAE4 /
+    0x0BEB00 are 0BEBFE, 0BEC0C, 0BEC2C, 0BEC3A, inside the int8 / int16 2-D handlers.
+    So those four handlers are reachable only through the dispatch tables.
+13. 46 records reach a fixed-type wrapper with 0x00 in the type byte (+2 for 1-D, +16
+    for 2-D): 7 via 0x0BE874, 27 via 0x0BE8AC, 1 via 0x0BE88C, 5 via 0x0BE8C4, 1 via
+    0x0BE928, 5 via 0x0BE944; 9 uint8, 37 uint16 (list in the CONTEXT section; call
+    sites in emu PART D2; the four found after the first version are in REVIEW HISTORY).
+14. Register use, exact sets by emulation (A7).  fpul is written by the four
+    integer-cell 1-D float-fraction handlers (405A lds r0,fpul at 0BEAEC / 0BEAF4,
+    0BEB0A / 0BEB14, 0BEB2A / 0BEB34, 0BEB78 / 0BEB82) and so by the four integer-cell
+    2-D handlers that call them; not by 0x0BEACC, 0x0BEBC0, the two integer-fraction
+    handlers or the three searches.  mach / macl: only 0x0BEB40 / 0x0BEB90 (dmulu.l) and,
+    macl only, the five 2-D handlers (muls.w).
+15. 0x0BEB40 and 0x0BEB90 have exactly one caller each (bsr 0BE89C, bsr 0BE8D4) and no
+    long in the ROM points at either (emu PART E1, E3).
+16. The long 0x000BEB00 at 0x0FFBC8 is the start field of checksum-table record 6, not
+    a pointer to the int16 handler (emu PART E2).
+17. Neither axis search guards count <= 0; when the long before the axis is greater
+    than x the scan continues down memory (0BECB2..0BECBE, 0BECE6..0BECF2; emulated A1, A2).
+18. Reached code loads FPSCR with a constant twice: 0x00040001 at 0x00FA44 and
+    0x00000000 at 0x05873E; five lds.l @r15+,fpscr (002BDC, 00E820, 00F42E, 00F49C,
+    00F72A) restore a saved value (emu PART E5; listing E8 in REVIEW HISTORY).  The
+    rounding direction in force when the ROM's FPU self-test runs is toward zero
+    (corrections item 106; not re-derived in this file -- see
+    helpers_arith_trace.txt "FLOAT ROUNDING").  Which FPSCR value is in force when
+    THESE routines run is NOT ESTABLISHED (a).
+
+================================================================================
+NOT ESTABLISHED
+================================================================================
+ a. Float rounding on the car.  The DIRECTION is settled; two unknowns remain.
+    Settled after this trace's first version (corrections item 106, 2026-11-27):
+    reset loads FPSCR = 0x00040001 at 0x00FA44, and the ROM's own FPU self-test (body
+    0x0585B0, reached 0x07EF4A -> 0x058594 -> jmp 0x0585B0) compares fmac / fmul / fdiv
+    results with stored answers that are the ROUNDED-TOWARD-ZERO values; nearest misses
+    them (helpers_arith_trace.txt "FLOAT ROUNDING"; sh2e_emu.py --selftest oracle 5).
+    The emulator now rounds toward zero, and every figure in this file is from it.
+      (1) whether fmac rounds the product before the add.  The self-test's fmac check
+          passes either way.  The emulator and the transcription round fmac once.
+      (2) which FPSCR value is in force when THESE routines run.  The self-test itself
+          loads FPSCR = 0x00000000 at 0x05873E and returns without restoring it (its
+          epilogue 0x058770..0x058782 pops r8-r14 and pr only).  Whether that leaves
+          bits 1-0 = 00 in force for later code -- and what 00 means -- is not decided
+          by anything in this file (helpers_arith_trace.txt:297-299 leaves the same
+          question open).  If it does, the nearest columns below apply instead.
+    Measured consequence (emu PART R).  The counts come from the transcriptions, which
+    R1 shows bit-exact against the ROM bytes executed under each arithmetic (7,214
+    wrapper calls each); every differing ftrc input, and a sample of the differing
+    float ones, was then re-run on the ROM bytes.  Each figure is a difference from the
+    stock arithmetic (toward zero, fmac once).  Order of the three figures:
+    nearest/once (the emulator before item 106), nearest/product-first,
+    toward-zero/product-first.
+      0x0BE874 / 0x0BE8AC, 48,734 inputs at k/60 inside every interval of 69 records:
+        the integer result differs from the stock emulator's at 73 / 71 / 29 inputs,
+        always by one count.  Witness, record 0x0AB2A4 (axis -20, -10, 5, 20; cells
+        244, 39, 31, 23), x = -14.0: exact value 244 + 0.6*(39-244) = 121; stock
+        emulator (toward zero) 121; toward-zero/product-first 121; both nearest
+        variants 120.
+      0x0BE928 / 0x0BE944, 4,752 inputs at fifths inside every cell of 6 records:
+        262 / 262 / 12 differ, by one count.
+      0x0BE830, 14,058 interior inputs on 687 records: 1,418 / 1,517 / 270 results
+        differ in bits, by at most 1.6e-7 / 1.6e-7 / 8.4e-8 of the record's magnitude.
+      0x0BE8E4, 3,612 interior inputs on 210 records: 1,114 / 1,179 / 231, at most
+        2.8e-7 / 2.8e-7 / 7.9e-8.
+    Settle (1): ONE logged output of an ftrc wrapper at an input where toward-zero/once
+    and toward-zero/product-first disagree (the non-quiet run prints three, e.g.
+    0x0BE874 record 0x0AC450 at x = 2566.666748046875: 62 fused, 63 product-first).
+    Settle (2): trace what restores FPSCR after 0x05873E, if anything; or one logged
+    output where nearest and toward zero disagree (e.g. the witness above: 121 / 120).
+ b. NaN inputs on the car.  Emulated: fcmp/gt gives T=0, so a NaN x clamps HIGH
+    (count-1, 0.0).  Both FPSCR constants loaded by reached code have bits 11-7 clear.
+    If those are the exception-enable bits (Renesas layout, not checked here) no FPU
+    exception is enabled; that "if", and (a)(1), are what is not established.
+ c. The complete set of records.  956 call sites found; r4 resolved at 929.  At 27 it
+    is not a constant: 8 index a ROM pointer table (042C72, 043858, 04386E, 043920,
+    05011C, 0501EC, 05029C, 0504A6; bases 0x063E38, 0x063E48, 0x063E58, 0x063E68,
+    0x063FC4, 0x06403C), 18 load it through a pointer that is not a constant (00DA68,
+    06E8A6, 06E8B0 and 15 sites in 077CE6..077DC2), 1 reloads a RAM cell lost at a join
+    (03690C).  Settle: decode the index arithmetic at those sites, enumerate the tables.
+ d. The 39 records found only through a GBR-relative RAM cell.  They rest on the
+    assumption that the callees between store and reload do not rewrite the cell;
+    proved at 0x0BBDCA only.  Settle: read the callees between each store and reload.
+ e. What any axis, cell or record MEANS.  Not looked at; no identity is claimed.
+ f. Whether the 0x00 in byte +2 / +16 of fixed-type records is deliberate or padding,
+    and the true length of a fixed-type record (12 / 20 bytes is what neighbouring
+    records suggest; the code reads only the fields listed above).
+ g. Whether any caller passes count <= 0.  None of the 979 records found does (count
+    words min 1, max 78).  The records behind the 27 sites of (c) were not looked at.
+ h. What 0x0585B0..0x058786 is and when it runs.  Bytes seen: it reads FPSCR (05872C),
+    tests bit 6, loads FPSCR with 0 (05873E) and reads it back.  Not traced.
+ i. Calls of the wrappers from code this scan does not reach, or through RAM.  The
+    census is a recursive descent; this trace added the two braf switch tables, and one
+    call site (012E3C) is reached only through them.  Within reached code: 65 jsr / jmp
+    have a target that is not a constant; the MAY-hold pass finds no jsr / jmp at which
+    any path holds a wrapper address that is not among the 956; and no wrapper address
+    exists in the ROM outside a literal pool loaded by reached code.  Not covered: a
+    wrapper address stored to RAM (other than a stack slot) and called later, and code
+    that neither the census nor the two switch tables reach.  An earlier version's
+    check ("no unresolved jsr in a census function that loads a wrapper address") was
+    blind across a census split and passed while six sites were missing (E9).
+
+
+================================================================================
+COMPARISON WITH EXISTING CLAIMS   (opened only after everything above was written)
+================================================================================
+Sources read for this section: fn_dump.py --labels on all 23 entries above;
+disassembly/ghidra/ImportAE5L600L.java; docs/; disassembly/analysis/;
+disassembly/maps/; scripts/desc_types.py; scripts/defs.py; docs/verification-status.json.
+Nothing in the step-1 reading was changed after reading them.
+Honest limit on "blind": CLAUDE.md is always in context and states the typecode ->
+handler map, so item K2 below was known beforehand. Everything else was not.
+The third decode re-opened every file:line kept below (2026-11-27) and corrected two
+paths; the counts in C7, C11, C13-C16, K3, K6, K10, K11 are from the repaired script.
+
+---- A. CLAIMS THE BYTES CONTRADICT OR DO NOT SUPPORT -------------------------
+
+C1  0x0BECDC is not a 2-D routine.                                        [WRONG]
+    ImportAE5L600L.java:685-686  label "axis_lookup_2d", "[TRACED] 2D axis lookup
+    (two sequential 1D searches)".  final_seven_analysis.txt:334, 366, 392, 420.
+    Bytes: ONE search of ONE axis; the axis is INT32 (mov.l at 0BECE0/0BECEC/0BECF8),
+    the input is an integer in r2, the fraction is a 0.32 quotient from a 32-step
+    divide (0BED02..0BED84).  "Two sequential 1D searches" describes 0x0BED98.
+
+C2  0x0BED98 has no type awareness and computes no stride.                [WRONG]
+    ImportAE5L600L.java:687-688  "axis_lookup_2d_typed", "[TRACED] 2D axis lookup with
+    type-aware data stride".  Its 16 instructions read record+0, +2, +4, +8 and call
+    0x0BECA8 twice; no typecode load, no multiply.  The fixed-type wrappers 0x0BE928 /
+    0x0BE944 call it too.
+
+C3  0x0BECA8 is a LINEAR scan and is not specific to anything.            [WRONG / MISLEADING]
+    ImportAE5L600L.java:683-684  "LowPW_AxisLookup", "[TRACED] 1D axis binary search".
+    The loop 0BECB4..0BECBE steps one element down per pass.  It is the only float axis
+    search in the library: bsr from 0BE836, 0BE87A, 0BE8B2, 0BED9E, 0BEDAA.  The
+    register description in the same comment (r0=size, r1=axis, fr0=value -> r0=index,
+    fr0=frac) is right.  Also disassembly.txt:96, 2549 (same name), :3979 "Binary/linear".
+
+C4  0x0BE88C / 0x0BE8C4 are 1-D lookups.                                  [WRONG]
+    ImportAE5L600L.java:642-645  "table_desc_2d_uint8" / "table_desc_2d_uint16",
+    "2D descriptor lookup".  final_seven_analysis.txt:319-323, 377-381, 581-582;
+    disassembly/maps/disassembly_gaps.txt:34-35.  One count, one axis, one search, one
+    1-D handler.
+    What sets them apart is the INTEGER input (r5) and the INT32 axis, which no
+    existing description mentions.
+
+C5  Typecode order in the 0x0BE830 label.                                 [WRONG]
+    ImportAE5L600L.java:635  "Types: 0=f32, 1=i8, 2=i16, 3=u8, 4=u16".
+    Table slots 0..4 (typecode 0x00, 0x04, 0x08, 0x0C, 0x10) are f32, u8, u16, i8, i16.
+    The label lists the handlers in ADDRESS order, not in table order.
+
+C6  2-D handler table address.                                            [WRONG]
+    ImportAE5L600L.java:647  "Jump table at 0xBE916".  0BE8F2 is mova @(0x0BE914),r0;
+    the first long is at 0x0BE914.
+
+C7  "LowPW_TableProcessor" for 0x0BE874.                                  [UNSUPPORTED NAME]
+    ImportAE5L600L.java:636; injection_timing_analysis.txt:271, 281;
+    disassembly/maps/task_call_graph.txt:389, 397; disassembly.txt:95, 2548, 3225.
+    It is the generic fixed-uint8 1-D lookup: 22 call sites, 23 distinct records.
+
+C8  Extent of the library.                                                [IMPRECISE]
+    ImportAE5L600L.java:593  "(0xBE608-0xBECA8)"; disassembly.txt:581 "(0xBE608-0xBED98)".
+    Code runs to 0x0BEDB7.
+
+C9  "binary search" for 0x0BECDC.                                         [WRONG]
+    final_seven_analysis.txt:366.  Linear, top-down, like 0x0BECA8.
+
+C10 "uint32_t lookup_value".                                              [IMPRECISE]
+    final_seven_analysis.txt:352, 413.  The compares are signed (cmp/ge 0BECE2,
+    cmp/gt 0BECEE); emulated: x = 0x80000000 sorts BELOW an axis that starts at 0.
+
+C11 How widely the integer-axis path is used.                             [WRONG]
+    final_seven_analysis.txt:369-370 "Widely used across engine control" (0x0BE88C):
+    ONE call site in the ROM (0x03C568), one record (0x0AC298).
+    :423-424 "the lookup engine behind most calibration tables with uint16 output"
+    (0x0BE8C4): six call sites, five records; 331 + 100 typed uint16 records go through
+    0x0BE830 / 0x0BE8E4 and the float-fraction handler 0x0BEB6C instead.
+    :562-566 "Also called directly by various subsystem functions", "the interpolation
+    engine behind all uint16 calibration table lookups" (0x0BEB90): exactly one bsr
+    (0BE8D4), no pointer to it anywhere in the ROM.
+
+C12 0x0BEB6C is not a step lookup.                                        [WRONG, tuning-relevant]
+    cl_ol_ramp_analysis.txt:69-72  "interp_1d_uint16 (interp_type=0x08, 0xBEB6C) ...
+    This is a FLOOR/STEP lookup for u16 tables (NOT linear interpolation):
+    Output = float(u16_val[floor_index])".
+    Bytes: 0BEB86 fsub, 0BEB88 fmac.  Emulated on that file's own record 0x0AD090
+    (cells 100,100,100,100,100,50,50,37,37 on 0..8000 step 1000; result x 32768):
+        4000 -> 100    4250 -> 87.5    4500 -> 75    5000 -> 50    6500 -> 43.5    7000 -> 37
+    The value RAMPS between 4000 and 5000 and between 6000 and 7000.
+    Only that sentence is wrong.  The output table at :79-83 and the ramp-time table at
+    :112-116 list the three flat spans (0-4000, 5000-6000, 7000-8000) and are correct
+    for those spans; they are silent about 4000-5000 and 6000-7000, where the value is
+    interpolated and not held.
+    (:40 also calls the record "16 bytes"; 0x0BE830 reads a bias at +16 as well.)
+
+C13 scripts/desc_types.py takes the type byte at face value for every record. [WRONG for 46 records]
+    desc_types.py:128-135 (is_2d, typecode), :152-193 (read_table).  For a record that
+    reaches a fixed-type wrapper with 0x00 in byte +2 / +16 it decodes float32:
+        read_table(0x0AB2A4) -> [-5.3e31, 700.0, 1000.0, 3.0]    code: 4 uint8 cells
+        read_table(0x0AD0C4) -> [nan x5, 1.0 .. 5.0]             code: 10 uint16 cells
+        read_table(0x0AF4B0) -> float32 16x5                      code and definition
+                                ('Ignition Dwell'): uint16
+        read_table(0x0AC298) -> axis [0.0, 1.4e-45, 2.8e-45 ...]  code: int32 0..23
+    The module docstring's "Where the typecode lives" is true for records consumed by
+    0x0BE830 / 0x0BE8E4 only.  corrections.md:909-914 and :1103 already record the dead
+    typecode; desc_types.py has not caught up with it.  scripts/mapping/fn_dump.py
+    inherits the error in its descriptor footer (it prints "DESC 0x0ADFF4 1D float32
+    x5 data 0..900" for a record the code reads as five uint8 cells).
+    STATUS, later 2026-11-27: addressed in both tools (corrections item 106).
+    desc_types.py now has typecode_byte() (the raw byte) and typecode() / scaling() /
+    read_table() consult disassembly/maps/fixed_type_records.json: 84 records reach a
+    fixed-type wrapper there, 48 with a byte that says otherwise -- these 46 plus two
+    that reach the step lookup 0x0BE4FA (0x0AB328, 0x0AC2B0), which this file does not
+    cover.  Re-checked: read_table(0x0AB2A4) -> uint8 [244, 39, 31, 23];
+    read_table(0x0AC298) -> int32 axis [0, 1, 2, 3 ...]; 0x0AD0C4 and 0x0AF4B0 -> uint16;
+    fn_dump 0x043368 now prints "DESC 0x0ADFF4 1D uint8 x5 ... (cell type set by
+    wrapper 0x0BE874, typecode byte 0x00 not read)".  The desc_types.py line numbers
+    above are those of the version read for the first version of this file.
+
+C14 The float32 census is overstated by at least 46.                      [WRONG]
+    descriptor_map.txt:11 ("'float32': 326") and 46 of its rows, e.g. :22 0x0AA7D8,
+    :165 0x0AB2A4, :188 0x0AB458, :331 0x0ABC1C, :398 0x0AC26C, :401 0x0AC298,
+    :596 0x0AD0C4, :683 0x0AD7E0, :778 0x0ADFF4, :1053 0x0AF4B0.  The same rows feed
+    descriptor_labels.txt, named_descriptors.txt and the desc_*_f32_* names in
+    ImportAE5L600L.java (those three were not re-opened line by line in the repair).
+    CLAUDE.md "float32 326, uint8 287, uint16 481".
+    Of the 326 rows typed float32: 199 reach a typed wrapper (float32 stands), 46 reach
+    a fixed-type wrapper (9 are uint8, 37 are uint16; 6 of the 46 also have an int32
+    axis), 81 have no consumer found by this trace and are unclassified.
+    So: float32 <= 280, uint8 >= 296, uint16 >= 518.
+    The emu script prints all 46 with the call site and the wrapper that consumes each
+    (PART D2) and recounts the rows from the file (PART G).
+
+C15 docs/verification-status.json cell width of unnamed fixed-type data.  [WRONG for 37 entities]
+    37 DISASM-ONLY rom-block entities give bytes_per_cell 4 where the consuming wrapper
+    reads 1 or 2 (e.g. 0xC5824: 16 bytes claimed, 4 read; 0xC7B6C: 560 vs 140;
+    0xD95F0: 440 vs 220) -- 1,427 bytes over-claimed in total (emu PART G).  Five more
+    of the 46 are definition-named table entities and carry the dead-typecode note
+    (records 0x0AD0B8, 0x0AD7E0, 0x0AE000, 0x0AE134, 0x0AF4B0); four have no entity on
+    their data address at all (records 0x0AC298, 0x0AD0D0, 0x0AD400, 0x0ADFF4).
+
+C16 x / y naming in desc_types.py is the reverse of the definitions'.     [MISLEADING]
+    desc_types.py:120 and :159-161 call the +4 axis "y" and the +8 axis "x" and say
+    "X planes of Y values ... Do not assume row-major".  The BYTE ORDER it implements
+    (cell = data[(i8*count0 + i4)]) is exactly what the code does -- confirmed.  But
+    in all 63 definition-named 2-D records found, the definition's X Axis is the +4
+    pointer and its Y Axis the +8 pointer (0 the other way; emu PART F).  In definition
+    terms the layout IS row-major: Y rows of X cells, X contiguous.
+    read_table()['axes']['x'] is the definition's Y axis.  descriptor_map.txt's "Y:"
+    column has the same reversal.
+    desc_types.py:120 also reads the counts as bytes at +1 / +3; the code reads words
+    at +0 / +2 (same value while a count is below 256).
+    STATUS, later 2026-11-27: read_table()'s docstring now carries a NAMING note
+    stating the reversal (it says "all 61 definition-named 2-D records"; PART F of
+    this file's script finds 63 on the records it reaches -- not reconciled here).
+    The code is unchanged in naming and still reads the counts as bytes.  Line numbers
+    above are those of the version read for the first version of this file.
+
+C17 disassembly/maps/disassembly.txt (already flagged as not a disassembly). [WRONG]
+    :3928 "via GBR vtable" and :4000-4002 "C706/C707/C708 = mov.l @(..,GBR)": C7xx is
+          mova, PC-relative; the tables are at 0x0BE860 / 0x0BE914.
+    :3930-3935, :3957-3960 "if (data_type == 0) { FR0 = float[desc+12] ... }": inverted;
+          scale and bias are applied when the typecode is NOT 0.
+    :3942-3945 "0xBE890: interp_1D_2input ... two inputs (FR4, FR5)": the entry is
+          0x0BE88C and the single input is the integer r5.
+    :3983-3985 "0xBECDC: axis_search_2input ... 2D interpolation first-dimension search".
+    :3994-3996 "Type 0x00: No data / 0x04: float32 / 0x08: Alternate": 0x00 float32,
+          0x04 uint8, 0x08 uint16.
+
+C18 disassembly/maps/rom_region_map.txt:526  "0x0BE900-0x0BEB00  float_data". [WRONG]
+    0x0BE900..0x0BE913, 0x0BE928..0x0BE95F and 0x0BEACC..0x0BEAFF are code (verified
+    listings in this file, executed in emulation); 0x0BE914..0x0BE927 is the handler
+    table.  The rest of that range was not examined here.
+
+C19 docs/corrections.md:116-117 on FPSCR.                                 [IMPRECISE, INCOMPLETE]
+    "Also at 0x00FA42: lds r2,fpscr with 0x00040001 -- round-toward-zero, denormals
+    flushed."  0x00FA42 is the literal load; the lds is at 0x00FA44.  And it is not the
+    only constant load of FPSCR in reached code: 0x05873E loads 0x00000000 (listing E8).
+    The meaning attached to the bits is not something ROM bytes can confirm.
+    STATUS, later 2026-11-27: the last sentence was too strong.  The ROM's own FPU
+    self-test confirms the DIRECTION from bytes -- its stored answers are the truncated
+    results (corrections item 106; NOT ESTABLISHED a).  The two location points above
+    stand; the line numbers are those of corrections.md as read for the first version.
+
+C20 scripts/sh2e_emu.py SEMANTICS NOTES, :32-34.                           [MISLEADING]
+    "For fadd/fsub/fmul/fdiv that is correctly rounded.  fmac is rounded once (fused),
+    which the SH-2E may not do".  Correctly rounded TO NEAREST: f2b() is struct.pack('>f').
+    The emulator keeps fpscr = 0x00040001 (:107) and never consults it.  If bits 1-0 = 01
+    mean round-toward-zero, as corrections.md:116 says, every inexact fadd / fsub / fdiv
+    / fmac / float result of the emulator can sit one ulp from the chip's, not only
+    fmac's.  Its --selftest oracle 3 compares 0x0BE830 with a 1e-4 relative tolerance
+    (:614) and cannot see this.  Size of the effect on this library: NOT ESTABLISHED a.
+    STATUS, later 2026-11-27: FIXED by corrections item 106.  sh2e_emu.py now computes
+    every single-precision result exactly and rounds it toward zero (rz_bits), fmac
+    once; its --selftest oracle 5 runs the ROM's FPU self-test.  It still does not
+    consult the FPSCR value (toward zero is fixed in the code).  This file's figures
+    were re-taken on the corrected emulator; the size of the old error on this library
+    is the "nearest/once" column of NOT ESTABLISHED a.  Line numbers above are those of
+    the uncorrected sh2e_emu.py.
+
+C21 Definition XML line 309: 'CL to OL Enrichment Threshold (MAF)', float, at 0xCCDA0.  [UNSUPPORTED]
+    0xCCDA0 is the data pointer of record 0x0AC5D0 (0006 0400 000CCD88 000CCDA0, scale
+    2^-8), which reaches 0x0BE830 (call site 0360C4) with typecode 0x04: six uint8 cells 0, 0, 0, 0, 28, 28.
+    A second definition on the same address ('Minimum Primary Open Loop Enrichment
+    (Throttle)', uint8, axis 0xCCD88, line 457) agrees with the code.  The float entry has
+    no geometry (scripts/defs.py cannot read it; verification-status.json flags it
+    DEFS-ONLY) and no consumer found here reads 0xCCDA0 as a float.  Not checked:
+    whether some other code reads that address directly.
+
+---- B. CLAIMS THE BYTES CONFIRM ----------------------------------------------
+
+K1  ImportAE5L600L.java:655-679: interp_1d_float32 / _int8 / _int16 / _uint8 /
+    _uint8_int / _uint16 / _uint16_int and interp_2d_float32 / _int8 / _int16 / _uint8 /
+    _uint16 -- the cell type and the dimension in every one of the twelve names.
+K2  Typecode -> handler map and load widths: corrections.md:903-907 and :1959-1963,
+    code_chase_2026-08-16b.md:60, desc_types.py:29-33, CLAUDE.md,
+    ad258_wot_enrichment_trace.txt:76-80, merpmod_sd_port_analysis.txt:327-331 (2-D).
+K3  corrections.md:909-914, :1103: six of the eight wrappers hardcode the cell width
+    and never read the typecode.  Confirmed, and now counted: 46 records.
+K4  corrections.md:1611-1613, injector-rescale.md:270-272: 0x0BECA8 compares each axis
+    element with FR0 and returns (fr0-fr1)/(fr2-fr1).
+K5  CLAUDE.md: typecode 0x00 gets no scale / bias (0BE84A tst r3,r3 / 0BE84C bt/s);
+    the same holds in 2-D (0BE8FC / 0BE8FE).
+K6  scripts/defs.py:353-359 "3D = Y rows x X cols, X is the fast (contiguous) axis";
+    docs/cruise-tables.md:127-128 "T[y][x] = raw[y * N_load + x]".  Proved from the code
+    (stride = count at record+0) plus 63 of 63 definition bindings (emu PART F).
+K7  corrections.md:3742-3756 (item 71): "+4 pointer = the fast, contiguous axis".  That
+    item argued it from data patterns; the code now proves it (0BE8FA, 0BEBC4).
+K8  final_seven_analysis.txt:482-555: the mechanism of 0x0BEB90, line for line; and
+    :326-349 the register flow of 0x0BE88C.
+K9  fn_042506_trace.txt, the sentence "checked numerically in the emu script against
+    clamped linear interpolation on all 12 descriptors" (line 922 on 2026-11-27; that
+    file is still being edited): what 0x0BE830 does.
+K10 desc_types.py:45: no int8 / int16 record -- true of all 687 + 210 typed records
+    found, and of every position in the ROM by the structural test (emu PART E4).
+K11 Definition storagetype = code-derived cell type for all 147 readable definitions
+    that sit on the data pointer of a found record (63 2-D, 84 1-D), including the nine
+    reached through a fixed-type wrapper, five of them with a dead typecode
+    (records 0x0AD0B8, 0x0AD7E0, 0x0AE000, 0x0AE134, 0x0AF4B0).  0 disagreements; in all
+    84 1-D cases the definition's axis is the +4 pointer.  (emu PART F; see C21 for the
+    one unreadable definition entry.)
+K12 disassembly_gaps.txt:37: 0x0BEB90 is 46 bytes of 1-D uint16 linear interpolation.
+
+
+================================================================================
+REVIEW HISTORY
+================================================================================
+2026-11-27: tracer -> adversarial reviewer -> third decode.  T = the tracer (first
+version of this file and of the script), R = the reviewer, D = the third decode
+(this repair).  Neither T nor R was presumed right: every item was re-derived from
+bytes and re-run.  Counts quoted for T and R are their own figures.
+
+DISPUTED CLAIMS
+
+W4  "42 real records reach a fixed-type wrapper while carrying 0x00 in the type byte"
+    T: 42 (6 + 24 + 1 + 5 + 1 + 5).      R: at least 43 (7 + 24 + 1 + 5 + 1 + 5).
+    D: 46 (7 + 27 + 1 + 5 + 1 + 5; 9 uint8, 37 uint16).
+    R was right that T's count is wrong and right about the record T missed (0x0ADFF4,
+    listing E1).  R's own total is three short.  The qualitative statement -- 1- or
+    2-byte cells, not float32 -- stands for all 46.  What T and R both missed:
+      0x0AD0C4          the wrapper address is parked in a stack slot and reloaded, so
+                        the jsr has no literal near it (listing E2)
+      0x0AC26C 0x0AB458 the record pointer travels through the RAM cell @(32,gbr); the
+                        only calls between store and reload are 0x0BE830 (this file:
+                        no store outside its own stack frame) and 0x0BEAB0 (four
+                        instructions, no store) (listing E3)
+    Record bytes:  0x0ADFF4 = 0005 0000 000D396C 000D3980
+                   0x0AD0C4 = 000A 0000 000CE654 000CE67C
+                   0x0AC26C = 0004 0000 000F8A34 000F8A44
+                   0x0AB458 = 0002 0000 000C5EC0 000C5EC8
+    Each is tight against a neighbour at the wrapper's width: 0x0D3980 + 5 bytes is
+    followed by the axis of the next record at 0x0D3988; 0x0CE67C + 20 = 0x0CE690, the
+    axis of 0x0AD0D0; 0x0F8A44 + 8 = 0x0F8A4C, the axis of 0x0AC278.
+    Emulated: all 46 through their wrapper; breakpoint and clamp results equal the
+    1- or 2-byte cells (emu B3, B4, B5, and again under three other arithmetics, R1).
+
+W5  "No real record found at a typed-wrapper call site uses typecode 0x0C or 0x10
+    (513 1-D ..., 154 2-D ...); the int8/int16 handlers are reachable only through
+    the dispatch tables"
+    T: core claim right, counts from an incomplete scan.
+    R: core claim right; counts >= 638 / >= 186; the bracketed counts are a scan
+       artefact; 0x0FFBC8 is a checksum-table field.            All four points right.
+    D: core claim right and no longer dependent on a call-site scan (ESTABLISHED 12:
+       no position in the ROM is structurally such a record; control 579 + 187).
+       Counts with a fuller scan: 687 / 210.  They are still lower bounds of the ROM:
+       27 call sites pass a record pointer this method cannot resolve.
+    R's lower bounds hold: R's 638 1-D and 186 2-D records are all in D's 687 / 210
+    (checked record by record against R's own list, not only by count).
+    R's two criticisms of T's scan are confirmed from bytes (listings E1, E4, E5).  Three
+    further gaps existed that R did not name: the stack-slot reload of the wrapper
+    address (E2, E6; 35 call sites of 0x0BE830 load the jsr target from a stack slot),
+    the switch table at 0x012D9C (E7), whose three records share one call site that
+    control flow reaches only through the braf, and the census split of E9.
+    E9 is also where D's own first pass went wrong.  It reset all register knowledge at
+    every census entry and claimed its set contained R's; compared record by record,
+    R's 0x0AB004 and 0x0AB020 (sites 020116 / 020120, jsr @r11) were missing.  Cause:
+    0x01FE46 loads r11 = 0x0BE8E4 at 01FF38 and parks 0x0BE830 in @(48,r15) at 01FF74 /
+    01FF82, then falls into 0x020000 (census 'ptr') and 0x020012 (census 'tailbra'),
+    where a reset forgets both.  The same split hid four calls of 0x0BE830 that neither
+    T nor R found (020188, 020198, 0201A6, 020310; records 0x0AAE14, 0x0AAE28,
+    0x0AAE3C new, 0x0AAE50 already known from another site).  All five new records are
+    typed (typecode 0x08 in 1-D, 0x04 in 2-D), so W4, W5's core claim and every
+    dead-typecode statement are unchanged; only counts moved.  The first pass's
+    completeness check could not see this (NOT ESTABLISHED i); the may-hold pass that
+    replaced it finds exactly these six sites as the only ones the reset pass misses.
+    0x0FFBC8: 0x0FFB80 + 6*12; record (0x000BEB00, 0x000BF5FF, 0xE11D6B6A); the sum of
+    the longs in that range plus the stored long is 0x5AA5A55A (emu PART E2).
+
+THINGS THE REVIEWER SAID WERE MISSED
+
+M1  The record / call-site discovery is incomplete in two mechanical ways.
+    R right.  find_records was replaced by a constant-propagation pass (header, "HOW
+    THE REAL RECORDS WERE FOUND").  T's 587 / 184 / 21 / 46 call sites are 680 / 193 /
+    22 / 47; R's ">= 654 / 191 / 22" were lower bounds, as R said.  T's 743 and R's 903
+    structurally valid records are 940, or 979 with the GBR-cell pass (E9 for the last
+    six sites and five records).
+M2  A 43rd dead-typecode record, 0x0ADFF4.
+    R right (E1).  The total is 46, not 43 (W4).
+M3  The emulator rounds to nearest; the ROM loads FPSCR with bits 1-0 = 01.
+    R right on three points: every "bit-exact" number here is exact against the
+    emulator, not the chip; the witness holds (record 0x0AB2A4, x = -14.0: 120 against
+    121 -- confirmed here by executing the ROM bytes under a round-toward-zero
+    arithmetic, not only by transcription); and T's NOT ESTABLISHED (a) / (b) ignored
+    docs/corrections.md:116.
+    NOT decided in R's favour: that the chip rounds toward zero.  R took the meaning of
+    the bits from corrections.md without a manual, and reached code contains a second
+    constant load of FPSCR that neither T nor R mentions: 0x00000000 at 0x05873E (E8).
+    The rounding in force is NOT ESTABLISHED (a).
+    LATER THE SAME DAY: the direction WAS decided in R's favour, on better evidence than
+    either had -- the ROM's own FPU self-test demands truncated results (corrections
+    item 106).  The emulator was corrected to round toward zero and this file re-run on
+    it: the witness now reads 121 on the stock emulator.  What stays open is narrower
+    (NOT ESTABLISHED a: fused fmac; the FPSCR = 0 written at 0x05873E).
+    R's "68 of 47,967 inputs" was a transcription count on R's record set.  On this
+    set, with the ROM bytes executed: toward zero / fmac once and nearest / fmac once
+    differ at 73 of 48,734 (PART R2, re-run after item 106; the first run's 56 for
+    toward zero / product first against nearest / once was not re-taken).
+    R's "0 of 13,200 at random inputs" was not re-run.
+M4  The long at 0x0FFBC8 is the start field of checksum-table record 6.
+    R right (W5; ESTABLISHED 16).
+M5  Three pieces of cited evidence were not in the script.
+    R right.  Added: references to the 15 entries (PART E1, E3), the int8 / int16
+    search (PART E4), the definition join (PART F).  With the larger record set the
+    join is 84 1-D + 63 2-D (T: 60 + 48), still 0 disagreements among readable
+    definitions; one unreadable definition entry surfaced (C21).
+M6  The clobber check was a subset test and did not watch fpul; four 2-D contracts
+    omitted fpul.
+    R right.  A7 now compares exact sets per path with fpul, mach and macl watched;
+    the contracts of 0x0BEBF0, 0x0BEC1C, 0x0BEC4C, 0x0BEC78 gained fpul.
+M7  With count <= 0 and axis[-1] > x the float search does not stop at one bad read.
+    R right (0BECB2: tst r0,r0 is false for offset 0xFFFFFFFC; emulated A1).  The
+    integer search does the same (0BECE6; emulated A2).
+
+FILE PROBLEMS THE REVIEWER REPORTED
+
+F1  Wrong numbers in prose (587 / 184 / 21, 513 / 154 / 20, "42", C14's split).
+    R right that they were wrong.  Replaced by this repair's own figures, which also
+    differ from R's (W4, W5, M1).  C14's 148 / 42 / 136 split of the 326 float32 rows
+    (R: 185 / 43 / 98) is 199 / 46 / 81.
+F2  C12 called two tables in cl_ol_ramp_analysis.txt wrong that are correct as far as
+    they go.                                              R right; C12 reworded.
+F3  C4 cited disassembly_gaps.txt without its directory.   R right; fixed.  The same
+    slip in C7 (task_call_graph.txt is under disassembly/maps/) was fixed too.
+F4  NOT ESTABLISHED (b) and (g) were answerable from the repo; (a) should name the
+    rounding mode.                                         R right; (a) and (b)
+    rewritten, (g) moved to ESTABLISHED 16.
+F5  The 2-D handler CONTRACT "side" lines omitted fpul.    R right; fixed (M6).
+
+NOT DISPUTED, CHANGED ANYWAY
+    * 0x0BECA8 CONTRACT: "fraction exactly 1.0" was stated as emulated without saying
+      under which rounding; it now says so.
+    * K9's line number moved (the cited file is being edited); the sentence is quoted
+      instead.
+    * New comparison items C19 (corrections.md on FPSCR), C20 (emulator notes), C21 (a
+      definition entry on record data).
+    * Record discovery no longer resets at the census entries that the code before
+      them falls into (33 in the census then; 30 in the census regenerated later the
+      same day) (E9), and the call-site completeness check is now the may-hold
+      pass (header; NOT ESTABLISHED i).  Every count that depends on the record set was
+      re-taken from the re-run script: 956 sites, 979 records, 687 / 210 typed.
+    * Re-checked from bytes in this pass, with no change needed: the 46 dead-typecode
+      records (type byte read directly; E1-E3 paths re-read, including every store to
+      @(0,r15) between 036344 / 036398 and 0363E2 and every write of @(32,gbr) or GBR
+      between 0BBD3C / 0BBD6C and 0BBDC4); the eleven longs equal to an entry; the 26
+      bsr; checksum record 6 (sum 0x5AA5A55A); the structural 0x0C / 0x10 search
+      (repeated independently with a non-decreasing axis test and with count 1: none);
+      the seven FPSCR writes in reached code (every other 4n6A / 4n66 word in the ROM is
+      a pool word or unreached).
+
+RE-RUN AFTER CORRECTIONS ITEM 106  (later 2026-11-27)
+    scripts/sh2e_emu.py was corrected to round every single-precision result toward
+    zero (exact rationals, rz_bits; fmac rounded once).  The script then stopped at its
+    first model check: 0x0BECA8 on axis [10, 20, 40, 80] at x one float above 10.0
+    returned fraction 9.536742595628311e-08 (toward zero) where the transcription,
+    written in Python float arithmetic, said 9.536743306171047e-08 (nearest).
+    Changed in the script: the transcription now rounds toward zero on exact rationals
+    with its own round_bits (cross-checked against rz_bits in PART R0); PART R's stock
+    is toward zero / once and its alternatives are nearest / once (the old emulator),
+    nearest / product-first and toward zero / product-first; R0 now tests the nearest
+    arm against Python double arithmetic; the witness is asserted as 121 stock / 120
+    nearest; the R2 assertion indexes the nearest / once column.  Every failure was a
+    rounding effect.  No contract changed: all 68,684 checks of parts 0-E that do not
+    depend on the transcription passed as before, and the 60,360 model checks passed
+    once the model rounded like the chip.  The census regeneration (5,151 -> 5,146
+    entries, 33 -> 30 continuations) and the desc_types.py change moved no count this
+    script prints.  Prose updated: header, ESTABLISHED 18, NOT ESTABLISHED a, the
+    0x0BECA8 contract's rounding remark, and STATUS notes on C13, C16, C19, C20, M3.
+
+EVIDENCE LISTINGS  (code outside the 15 entries; fn_dump output, checked by the
+verifier like every other instruction line in this file)
+
+E1  0x0ADFF4 and 0x0ADFE8 both reach 0x0BE874: a conditional select
+04339C: 2EE8  tst r14,r14                   ; T = (r14 == 0)
+04339E: D41E  mov.l @(0x043418),r4          ; = 0x000ADFF4 DESC  ||  r4 = record 0x0ADFF4; kept when the bf/s below is taken
+0433A0: 8F01  bf/s 0x0433A6                 ; T=0 (r14 != 0) -> 0433A6 with r4 = 0x0ADFF4
+0433A2: F107  fmov.s fr0,@(r0,r1)           ; [delay slot, always] a store unrelated to r4
+0433A4: D41D  mov.l @(0x04341C),r4          ; = 0x000ADFE8 DESC  ||  fall-through arm: r4 = record 0x0ADFE8
+0433A6: D21E  mov.l @(0x043420),r2          ; = 0x000BE874 ROM  ||  r2 = fixed-uint8 1-D wrapper
+0433A8: 420B  jsr @r2                       ; -> 0x0BE874  ||  BOTH 0x0ADFF4 and 0x0ADFE8 reach 0x0BE874
+0433AA: F4FC  fmov fr15,fr4                 ; [delay slot] fr4 = x
+
+E2  0x0AD0C4 reaches 0x0BE8AC: the wrapper address goes through a stack slot
+036340: D27E  mov.l @(0x03653C),r2          ; = 0x000BE8AC ROM  ||  arm A: r2 = fixed-uint16 1-D wrapper
+036342: A04D  bra 0x0363E0                  ; to the shared call at 0363E0
+036344: 2F22  mov.l r2,@r15                 ; [delay slot] the wrapper address is PARKED in the stack slot @r15
+036394: D46C  mov.l @(0x036548),r4          ; = 0x000AD0B8 DESC  ||  arm B: r4 = record 0x0AD0B8
+036396: D669  mov.l @(0x03653C),r6          ; = 0x000BE8AC ROM  ||  r6 = the same wrapper
+036398: 2F62  mov.l r6,@r15                 ; parked in the same slot @r15
+03639A: 460B  jsr @r6                       ; -> 0x0BE8AC  ||  first call (record 0x0AD0B8)
+03639C: F4EC  fmov fr14,fr4                 ; [delay slot] fr4 = x
+0363E0: D45B  mov.l @(0x036550),r4          ; = 0x000AD0C4 DESC  ||  r4 = record 0x0AD0C4  (byte +2 = 0x00)
+0363E2: 62F2  mov.l @r15,r2                 ; r2 = the slot written at 036344 / 036398 = 0x000BE8AC; no other store to @(0,r15) lies between
+0363E4: 420B  jsr @r2                       ; -> target NOT statically resolved  ||  jsr 0x0BE8AC with r4 = 0x0AD0C4: fn_dump cannot resolve it, the stack slot does
+0363E6: F4EC  fmov fr14,fr4                 ; [delay slot] fr4 = x
+
+E3  0x0AC26C and 0x0AB458 reach 0x0BE8AC: the record pointer goes through a RAM cell
+0BBD3A: D055  mov.l @(0x0BBE90),r0          ; = 0x000AC26C DESC  ||  arm A: r0 = record 0x0AC26C  (byte +2 = 0x00)
+0BBD3C: C208  mov.l r0,@(32,gbr)            ; stored in the RAM cell @(32,gbr)
+0BBD6A: D04D  mov.l @(0x0BBEA0),r0          ; = 0x000AB458 DESC  ||  arm B: r0 = record 0x0AB458  (byte +2 = 0x00)
+0BBD6C: C208  mov.l r0,@(32,gbr)            ; stored in the same cell
+0BBDC2: D540  mov.l @(0x0BBEC4),r5          ; = 0x000BE8AC ROM  ||  r5 = fixed-uint16 1-D wrapper
+0BBDC4: C608  mov.l @(32,gbr),r0            ; r0 = the cell again; between the stores and here the only calls are 0BBD96 (0x0BE830) and 0BBDA6 (0x0BEAB0)
+0BBDC6: 6403  mov r0,r4                     ; r4 = record 0x0AC26C or 0x0AB458
+0BBDC8: 1F06  mov.l r0,@(24,r15)            ; also saved on the stack
+0BBDCA: 450B  jsr @r5                       ; -> 0x0BE8AC  ||  both reach 0x0BE8AC
+0BBDCC: F4FC  fmov fr15,fr4                 ; [delay slot] fr4 = x
+0BEAB0: F451  fsub fr5,fr4                  ; the callee at 0BBDA6, whole: fr4 = fr4 - fr5
+0BEAB2: F45D  fabs fr4                      ; fr4 = |fr4|
+0BEAB4: 000B  rts                           ; return
+0BEAB6: F04C  fmov fr4,fr0                  ; [delay slot] fr0 = fr4   -- four instructions, no store: the cell is not rewritten
+
+E4  the reviewer's example of a select (0x0AC388 and 0x0AC394 into 0x0BE874)
+02FBCE: 8801  cmp/eq #1,r0                  ; T = (r0 == 1)
+02FBD0: D41B  mov.l @(0x02FC40),r4          ; = 0x000AC388 ROM  ||  r4 = record 0x0AC388
+02FBD2: 8B00  bf 0x02FBD6                   ; T=0 -> keep 0x0AC388
+02FBD4: D41B  mov.l @(0x02FC44),r4          ; = 0x000AC394 ROM  ||  T=1 -> r4 = record 0x0AC394
+02FBD6: D21C  mov.l @(0x02FC48),r2          ; = 0x000BE874 ROM
+02FBD8: 420B  jsr @r2                       ; -> 0x0BE874  ||  both reach 0x0BE874; a nearest-literal scan keeps only 0x0AC394
+02FBDA: F4EC  fmov fr14,fr4
+
+E5  the reviewer's example of register copies (0x0AB700 into 0x0BE830, 0x0ABFC4 into 0x0BE8E4)
+0BD806: D436  mov.l @(0x0BD8E0),r4          ; = 0x000AB6F4 DESC  ||  r4 = record 0x0AB6F4 for the FIRST call only
+0BD808: DE36  mov.l @(0x0BD8E4),r14         ; = 0x000AB700 DESC  ||  r14 = record 0x0AB700, held for the second call
+0BD80A: C737  mova @(0x0BD8E8),r0           ; -> 0x0BD8E8: long 0x41A00000 f32 20
+0BD80C: FD08  fmov.s @r0,fr13
+0BD80E: DD37  mov.l @(0x0BD8EC),r13         ; = 0x000ABFC4 DESC  ||  r13 = record 0x0ABFC4, held for the third call
+0BD810: C737  mova @(0x0BD8F0),r0           ; -> 0x0BD8F0: long 0x44960000 f32 1200
+0BD812: FE08  fmov.s @r0,fr14
+0BD814: D237  mov.l @(0x0BD8F4),r2          ; = 0x000BE830 ROM
+0BD816: 420B  jsr @r2                       ; -> 0x0BE830  ||  call 1: r4 = 0x0AB6F4
+0BD818: 0009  nop
+0BD81A: FC0C  fmov fr0,fr12
+0BD81C: F4FC  fmov fr15,fr4
+0BD81E: D235  mov.l @(0x0BD8F4),r2          ; = 0x000BE830 ROM
+0BD820: 420B  jsr @r2                       ; -> 0x0BE830  ||  call 2: r4 = 0x0AB700 (slot below), not the stale literal 0x0AB6F4
+0BD822: 64E3  mov r14,r4                    ; [delay slot] r4 = r14
+0BD824: E004  mov #4,r0
+0BD826: FF07  fmov.s fr0,@(r0,r15)
+0BD828: D233  mov.l @(0x0BD8F8),r2          ; = 0x000BE8E4 ROM
+0BD82A: 64D3  mov r13,r4                    ; r4 = r13 = 0x0ABFC4
+0BD82C: F5EC  fmov fr14,fr5
+0BD82E: 420B  jsr @r2                       ; -> 0x0BE8E4  ||  call 3: the 2-D wrapper gets 0x0ABFC4; a nearest-literal scan pairs it with 0x0AB6F4 and then discards that as invalid
+0BD830: F4CC  fmov fr12,fr4
+
+E6  a call of 0x0BE830 through a stack slot
+01588A: D470  mov.l @(0x015A4C),r4          ; = 0x000AAA4C DESC
+01588C: D270  mov.l @(0x015A50),r2          ; = 0x000BE830 ROM  ||  r2 = typed 1-D wrapper
+01588E: 2F22  mov.l r2,@r15                 ; parked in the stack slot @r15
+015890: 420B  jsr @r2                       ; -> 0x0BE830  ||  first call
+015892: F49C  fmov fr9,fr4
+0158C2: D466  mov.l @(0x015A5C),r4          ; = 0x000AAA58 DESC  ||  r4 = record 0x0AAA58
+0158C4: 62F2  mov.l @r15,r2                 ; r2 = the slot = 0x000BE830 (the other arm, 0158A8, stores the same value)
+0158C6: 420B  jsr @r2                       ; -> target NOT statically resolved  ||  a call of 0x0BE830 that needs the stack slot to be seen; 35 call sites of 0x0BE830 are of this kind (4 in E9)
+0158C8: F4EC  fmov fr14,fr4
+
+E7  the switch table at 0x012D9C and the call site behind it
+012D8E: E508  mov #8,r5                     ; r5 = 8
+012D90: 3256  cmp/hi r5,r2                  ; T = (r2 > r5) unsigned
+012D92: 8D5B  bt/s 0x012E4C                 ; index above 8 -> default
+012D94: 1F01  mov.l r0,@(4,r15)
+012D96: 4200  shll r2                       ; index * 2
+012D98: C715  mova @(0x012DF0),r0           ; -> 0x012DF0: long 0x0062006A  ||  r0 = table of 9 word offsets: 0062 006A 0072 0078 0080 0086 0098 0086 0098
+012D9A: 002D  mov.w @(r0,r2),r0             ; r0 = offset[index]
+012D9C: 0023  braf r0                       ; jump to 0x012DA0 + offset: 012E02 012E0A 012E12 012E18 012E20 012E26 012E38 (the census does not follow this)
+012D9E: 0009  nop
+012E12: D498  mov.l @(0x013074),r4          ; = 0x000AA7C4 DESC  ||  case 2: r4 = record 0x0AA7C4
+012E14: A011  bra 0x012E3A                  ; to the shared call
+012E20: D496  mov.l @(0x01307C),r4          ; = 0x000AA7E4 DESC  ||  case 4: r4 = record 0x0AA7E4
+012E22: A00A  bra 0x012E3A                  ; to the shared call
+012E38: D492  mov.l @(0x013084),r4          ; = 0x000AA7F8 DESC  ||  cases 6 and 8: r4 = record 0x0AA7F8
+012E3A: D293  mov.l @(0x013088),r2          ; = 0x000BE830 ROM
+012E3C: 420B  jsr @r2                       ; -> 0x0BE830  ||  three records reach this one call site; it is reachable only through the switch
+012E3E: 0009  nop
+
+E8  the two constant loads of FPSCR
+00FA42: D2A1  mov.l @(0x00FCC8),r2          ; = 0x00040001 const  ||  r2 = 0x00040001
+00FA44: 426A  lds r2,fpscr                  ; FPSCR = 0x00040001  (bits 1-0 = 01, bit 18 set, bits 11-7 clear)
+05872C: 006A  sts fpscr,r0                  ; r0 = FPSCR
+05872E: D130  mov.l @(0x0587F0),r1          ; = 0x00000040 ROM
+058730: 2019  and r1,r0                     ; r0 &= 0x40
+058732: D22F  mov.l @(0x0587F0),r2          ; = 0x00000040 ROM
+058734: 3020  cmp/eq r2,r0                  ; T = (r0 == 0x40)
+058736: 8901  bt 0x05873C
+058738: 0009  nop
+05873A: DE1B  mov.l @(0x0587A8),r14         ; = 0xAAAAAAAA const  ||  r14 = 0xAAAAAAAA when bit 6 was not set (what that marks is not established)
+05873C: D21E  mov.l @(0x0587B8),r2          ; = 0x00000000 const  ||  r2 = 0
+05873E: 426A  lds r2,fpscr                  ; FPSCR = 0x00000000  (bits 1-0 = 00): a SECOND constant load of FPSCR
+058740: 006A  sts fpscr,r0                  ; read back
+
+E9  the census split 0x01FE46 -> 0x020000 -> 0x020012 and the six call sites behind it
+01FF38: DB57  mov.l @(0x020098),r11         ; = 0x000BE8E4 ROM  ||  r11 = typed 2-D wrapper; nothing after this writes r11 before the epilogue (020354 mov.l @r15+,r11)
+01FF3E: 4B0B  jsr @r11                      ; -> 0x0BE8E4  ||  first use (record 0x0AAFE8); none of the callees up to 020310 (0x0BE8E4, 0x0BE970, 0x0BE830, 0x0BE628, 0x0BE56C, 0x0BEA40, 0x0BE960) writes r11, and none stores through r15 except its own pushes
+01FF72: D24F  mov.l @(0x0200B0),r2          ; = 0x000BE830 ROM  ||  arm A of a select
+01FF74: 1F2C  mov.l r2,@(48,r15)            ; typed 1-D wrapper parked in the stack slot @(48,r15)
+01FF80: D14B  mov.l @(0x0200B0),r1          ; = 0x000BE830 ROM  ||  arm B
+01FF82: 1F1C  mov.l r1,@(48,r15)            ; the same value in the same slot
+01FFE8: A013  bra 0x020012                  ; one way into census entry 0x020012 (evidence 'tailbra'; its only census caller is 0x01FE46)
+01FFFE: 8906  bt 0x02000E                   ; T=1 -> 0x02000E; T=0 FALLS INTO 0x020000 (census evidence 'ptr': 0x00020000 is also a plain constant, 46 aligned longs in the ROM)
+020000: 60CC  extu.b r12,r0                 ; reads r12 and, at 02000C, @(52,r15) -- registers and frame of 0x01FE46: a continuation, not a function entry
+02000A: 8F02  bf/s 0x020012                 ; into 0x020012
+020010: C068  mov.b r0,@(104,gbr)           ; and falls into 0x020012
+020110: D496  mov.l @(0x02036C),r4          ; = 0x000AB004 DESC
+020116: 4B0B  jsr @r11                      ; -> target NOT statically resolved  ||  r11 = 0x0BE8E4 on every path: 0x0BE8E4 with record 0x0AB004 (R found this one)
+02011C: D494  mov.l @(0x020370),r4          ; = 0x000AB020 DESC
+020120: 4B0B  jsr @r11                      ; -> target NOT statically resolved  ||  0x0BE8E4 with record 0x0AB020 (R found this one)
+020184: D480  mov.l @(0x020388),r4          ; = 0x000AAE14 DESC
+020186: 51FC  mov.l @(48,r15),r1            ; r1 = the slot = 0x000BE830: r15 is not changed before the epilogue (020340 add #72,r15) and the later r15-relative long stores use offsets 52, 56, 60 and, through r0, 64 / 68 (02029A, 0202C4)
+020188: 410B  jsr @r1                       ; -> target NOT statically resolved  ||  0x0BE830 with record 0x0AAE14 (found by nobody before)
+020192: D47E  mov.l @(0x02038C),r4          ; = 0x000AAE28 DESC
+020196: 51FC  mov.l @(48,r15),r1            ; same slot
+020198: 410B  jsr @r1                       ; -> target NOT statically resolved  ||  0x0BE830 with record 0x0AAE28 (new)
+0201A0: D47B  mov.l @(0x020390),r4          ; = 0x000AAE3C DESC
+0201A4: 51FC  mov.l @(48,r15),r1            ; same slot
+0201A6: 410B  jsr @r1                       ; -> target NOT statically resolved  ||  0x0BE830 with record 0x0AAE3C (new)
+02030A: D432  mov.l @(0x0203D4),r4          ; = 0x000AAE50 ROM
+02030E: 51FC  mov.l @(48,r15),r1            ; same slot
+020310: 410B  jsr @r1                       ; -> target NOT statically resolved  ||  0x0BE830 with record 0x0AAE50 (already known from another site)
+; Records:  0x0AB004 = 000B 000E 000C3BD8 000C3C04 000C3C3C, byte +16 = 0x04 (uint8, 11 x 14)
+;           0x0AB020 = 000B 000E 000C3CD8 000C3D04 000C3D3C, byte +16 = 0x04 (uint8, 11 x 14)
+;           0x0AAE14 = 0002 0800 000C3600 000C3608 (uint16)   0x0AAE28 = 0010 0800 000C360C 000C364C (uint16)
+;           0x0AAE3C = 0002 0800 000C366C 000C3674 (uint16)
+; emu: the six sites and their records are asserted in find_records ("E9 sites", "E9 records"),
+; and are the only sites the may-hold pass finds that a reset-at-every-entry pass misses.

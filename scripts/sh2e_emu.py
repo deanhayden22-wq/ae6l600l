@@ -28,11 +28,23 @@ It is validated (--selftest) against oracles that do not depend on it:
      truncated -- not the "32-bit unsigned divide" its Ghidra label says
      (corrections item 102)
 
+  5. the ROM's own FPU self-test at 0x058696: it computes fadd / fmac / fmul /
+     fdiv on a constant and compares each with a stored answer. The stored
+     answers are the ROUNDED-TOWARD-ZERO results; round-to-nearest misses all
+     three by one bit (corrections item 106)
+
 SEMANTICS NOTES (each is a place it could differ from silicon)
-* Single-precision results are computed in double and rounded to float32. For
-  fadd/fsub/fmul/fdiv that is correctly rounded. fmac is rounded once (fused),
-  which the SH-2E may not do -- it is flagged when executed (emu.notes).
-* Denormal inputs/outputs flush to signed zero (the SH-2E FPU has no denormals).
+* Single-precision arithmetic (fadd/fsub/fmul/fdiv/fmac/float) is computed
+  EXACTLY (fractions.Fraction) and rounded TOWARD ZERO to float32, which is
+  what the chip does: reset loads FPSCR = 0x00040001 (00FA42 / 00FA44 lds;
+  RM = 01 round to zero, DN = 1) and the ROM's self-test (oracle 5) demands
+  truncated results. Before 2026-11-27 this emulator rounded to nearest and
+  was wrong in the last bit of every inexact result (corrections item 106).
+  Overflow gives +/-FLT_MAX (round-to-zero never rounds up to infinity).
+* fmac is rounded once (fused). The self-test's fmac check passes either way, so
+  fused-vs-unfused is NOT settled -- flagged when executed (emu.notes).
+* Denormal inputs/outputs flush to signed zero (DN = 1; the SH-2E FPU has no
+  denormals).
 * A PC-relative load in a delay slot uses the slot's own address as PC.
 * Any access outside ROM (0x000000-0x0FFFFF) and on-chip RAM (0xFFFF0000-0xFFFFBFFF)
   raises, unless mapped with emu.mmio(). Misaligned word/long access raises
@@ -45,6 +57,7 @@ import math
 import os
 import struct
 import sys
+from fractions import Fraction
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -88,6 +101,29 @@ def b2f(b):
     if (b & 0x7F800000) == 0:
         b &= 0x80000000
     return struct.unpack('>f', struct.pack('>I', b & M32))[0]
+
+
+def rz_bits(q):
+    """Exact rational -> float32 bits, rounded TOWARD ZERO, denormal results flushed.
+
+    The SH7058 FPU runs with FPSCR = 0x00040001 (RM = 01, DN = 1). Proof that the
+    firmware expects truncation: the self-test at 0x058696 (selftest oracle 5).
+    q must be non-zero and finite; callers handle zero / inf / nan themselves.
+    """
+    s = 0x80000000 if q < 0 else 0
+    if q < 0:
+        q = -q
+    n, d = q.numerator, q.denominator
+    e = n.bit_length() - d.bit_length()          # floor(log2 q) is e or e - 1
+    if (n << -e if e < 0 else n) < (d << e if e > 0 else d):
+        e -= 1
+    if e > 127:
+        return s | 0x7F7FFFFF                    # round-to-zero overflow: FLT_MAX, not inf
+    if e < -126:
+        return s                                 # DN = 1: denormal result -> signed zero
+    sh = 23 - e
+    m = (n << sh) // d if sh >= 0 else n // (d << -sh)
+    return s | ((e + 127) << 23) | (m & 0x7FFFFF)
 
 
 class Emu:
@@ -165,6 +201,20 @@ class Emu:
 
     def fr(self, n): return b2f(self.FR[n])
     def set_fr(self, n, f): self.FR[n] = f2b(f)
+
+    def _set_rz(self, n, exact, fallback):
+        """Store an arithmetic result: `exact` is a thunk giving the exact Fraction,
+        `fallback` the double result used for zero / inf / nan (signs and specials)."""
+        if not math.isfinite(fallback) or fallback == 0.0:
+            # zero results of finite operands are exact (sign from IEEE rules); specials pass through
+            q = exact() if math.isfinite(fallback) else None
+            if q is None or q == 0:
+                self.FR[n] = f2b(fallback)
+                return
+            self.FR[n] = rz_bits(q)          # double underflowed to 0 but the exact value is not 0
+            return
+        q = exact()
+        self.FR[n] = rz_bits(q) if q != 0 else f2b(fallback)
 
     def stub(self, addr, r0=None, fr0=None, fn=None):
         """Replace the function at addr: set r0/fr0 (or run fn(emu)) and return."""
@@ -446,12 +496,25 @@ class Emu:
     def _fpu(self, w, pc, R, n, m, d4):
         F = self.FR
         fn, fm = b2f(F[n]), b2f(F[m])
-        if d4 == 0x0: self.set_fr(n, fn + fm); return 'fadd'
-        if d4 == 0x1: self.set_fr(n, fn - fm); return 'fsub'
-        if d4 == 0x2: self.set_fr(n, fn * fm); return 'fmul'
+        fin = math.isfinite(fn) and math.isfinite(fm)
+        if d4 == 0x0:
+            if fin: self._set_rz(n, lambda: Fraction(fn) + Fraction(fm), fn + fm)
+            else: self.set_fr(n, fn + fm)
+            return 'fadd'
+        if d4 == 0x1:
+            if fin: self._set_rz(n, lambda: Fraction(fn) - Fraction(fm), fn - fm)
+            else: self.set_fr(n, fn - fm)
+            return 'fsub'
+        if d4 == 0x2:
+            if fin: self._set_rz(n, lambda: Fraction(fn) * Fraction(fm), fn * fm)
+            else: self.set_fr(n, fn * fm)
+            return 'fmul'
         if d4 == 0x3:
             if fm == 0.0:
-                self.set_fr(n, math.copysign(math.inf, fn) * math.copysign(1, fm) if fn != 0 else math.nan)
+                # x/0: signed infinity; 0/0 and NaN/0: NaN (fn != 0 is True for a NaN)
+                self.set_fr(n, math.nan if (fn == 0 or fn != fn) else math.copysign(math.inf, fn) * math.copysign(1, fm))
+            elif fin:
+                self._set_rz(n, lambda: Fraction(fn) / Fraction(fm), fn / fm)
             else:
                 self.set_fr(n, fn / fm)
             return 'fdiv'
@@ -465,12 +528,20 @@ class Emu:
         if d4 == 0xB: R[n] = (R[n] - 4) & M32; self.write(R[n], 4, F[m]); return 'fmov.s'
         if d4 == 0xC: F[n] = F[m]; return 'fmov'
         if d4 == 0xE:
-            self.notes.add(f'{pc:06X}: fmac (rounded once here; check the SH-2E manual if a result is marginal)')
-            self.set_fr(n, b2f(F[0]) * fm + fn); return 'fmac'
+            self.notes.add(f'{pc:06X}: fmac (fused: rounded once, toward zero; fused-vs-unfused not settled by the ROM self-test)')
+            f0 = b2f(F[0])
+            if fin and math.isfinite(f0):
+                self._set_rz(n, lambda: Fraction(f0) * Fraction(fm) + Fraction(fn), f0 * fm + fn)
+            else:
+                self.set_fr(n, f0 * fm + fn)
+            return 'fmac'
         if d4 == 0xD:
             if m == 0x0: F[n] = self.fpul; return 'fsts'
             if m == 0x1: self.fpul = F[n]; return 'flds'
-            if m == 0x2: self.set_fr(n, float(s32(self.fpul))); return 'float'
+            if m == 0x2:
+                v = s32(self.fpul)
+                self.FR[n] = rz_bits(Fraction(v)) if v else 0
+                return 'float'
             if m == 0x3:
                 if fn != fn:
                     v = 0x80000000
@@ -585,6 +656,12 @@ def _selftest_lookup(results):
     descs = []
     for a in TT.descriptor_candidates():
         try:
+            # Records consumed by a FIXED-type wrapper are not 0x0BE830's: their
+            # typecode byte is dead and they carry no scale/bias (corrections
+            # item 106), so read_table() rightly disagrees with what 0x0BE830
+            # would do to them. Test 0x0BE830 only on records it reads.
+            if T.fixed_type(a) is not None:
+                continue
             if T.is_2d(rom, a) or T.typecode(rom, a) not in T.TYPE_SIZES:
                 continue
             n = int.from_bytes(rom[a:a + 2], 'big')
@@ -644,9 +721,23 @@ def _selftest_div(results):
     results.append((f'divide 0x0BE654 (saturating signed Q16.16), {len(cases)} cases', bad == 0, f'{bad} mismatches'))
 
 
+def _selftest_fpu_rounding(results):
+    """Oracle 5: the ROM's own FPU self-test. 0x058696..0x0586DE computes x+x,
+    x*2x+1 (fmac), x*2x (fmul) and (2x*x)/x on the constant at 0x0587E0 and
+    compares each with a stored answer; a mismatch loads 0xAAAAAAAA into r14.
+    The answers are the round-toward-zero results (corrections item 106)."""
+    for name in ('ae5l600l.bin', 'AE5L600L 20g rev 20.19c.bin'):
+        rom = open(os.path.join(REPO, 'rom', name), 'rb').read()
+        emu = Emu(rom)
+        emu.call(0x058696, regs={14: 0x12345678}, stop_at={0x0586E0})
+        fails = emu.R[14] == 0xAAAAAAAA
+        results.append((f'ROM FPU self-test 0x058696 (round toward zero), {name}', not fails and emu.pc == 0x0586E0,
+                        f'r14 = {emu.R[14]:#010x}, stopped at {emu.pc:#08x}'))
+
+
 def selftest():
     results = []
-    for f in (_selftest_clamp, _selftest_div, _selftest_checksum, _selftest_lookup):
+    for f in (_selftest_fpu_rounding, _selftest_clamp, _selftest_div, _selftest_checksum, _selftest_lookup):
         try:
             f(results)
         except EmuError as e:

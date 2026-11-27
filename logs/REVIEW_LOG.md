@@ -29,6 +29,204 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+## 2026-11-24 — log: logs/11-24 20.19e/11-24 20.19e.csv — rom: 20.19e
+
+First 19e log. 42.1 min, 5 source logs, town driving (5th gear 99 s, max 68 mph), starts with a cold start
+(ECT 43 F, IAT 39 F, 6 min idle warm-up). IAT med 52 / max 90. ECU learning was reset by the flash (AFL 0 and
+FLKC 0 at the first sample). No AVCS lockout (p95 20).
+
+**Changeset 19c -> 19e (457 bytes, checksum valid, every byte named; 19d was never flashed):** Target Boost
+20 -> 18 psi at 3200-5600 rpm x torque >= 320 and 22 -> 18 at 4000-4800 x 360; Max WGDC -4..-7 at 4400-6000 x
+torque 300-350; Initial WGDC -7 in the 360 column; 6400 rpm WGDC rows 0 -> 45 / 30; Requested Torque 6400 row at
+full pedal 70 -> 350 with the taper rows moved to 6700 / 7000 (all three SI-DRIVE maps); Intake AVCS cruise and
+non-cruise +2.5..+4 deg at load 1.0-1.3 x 1600-3800; Primary OL (KCA Alt, B Low, B High) 0.73 column -> 14.7 at
+3300-4400; FLKC load axis 0.75/1.10/1.50/2.00 -> 1.20/1.70/2.20/2.80; Overrun Fuel Cut Delay roughly doubled below
+3000 rpm in 2nd-5th and raised at 3000-4500. One odd cell: Initial WGDC (6400 rpm, torque 0) = 59.96, rest of the
+row 30. The boost cut, the 6400 change and that cell were not in the 11-21 staged list.
+
+**Knock:** 1 FBKC event, -1.4, 3235 rpm x load 1.54, 2nd gear, mrp +2.7, OL, IAT 46, 1.0 s after a 1-2 shift =
+shift class (classifier: 56/56 samples `shift`). IAM 1.0, FLKC 0 all log. Nothing in the re-advanced AVCS zone.
+**WOT:** none (Throttle >= 95 for 4 samples total). 4 part-throttle boost events, peak mrp 12.6 psi vs target 18.1
+at 4112 rpm, pedal 35-50%, driver lifted while boost was still building. IDC max 69.7, wgdc max 80, RPM max 5433.
+**The boost-target cut, the WGDC changes and the 6400 limit removal are untested.**
+**MAF corr / fuelling:** cruise CL total trim +2.3 (1.7 V), 0.0 (1.9 V), -0.8..-1.6 (2.0-2.3 V), matched-point -0.39,
+with AFL relearning from 0. Steady OL still reads rich of command: wb - FFB (8-sample lag) -0.59 at load 0.85-1.2
+(n=525, IAT 46), -0.45 at 1.2-2.0 (n=417). Same filter on 19c: -0.45 / -0.41 (11-20), -0.46 / -0.42 (8-22),
+-0.12 / -0.39 (8-14). Not a 19e effect. Note this filter gives -0.12 on 8-14 and -0.46 on 8-22 at the same IAT,
+so the 11-21 "hot = on target, cold = rich" reading does not survive it; the offset varies by day.
+**Cliffs:** not re-run for the AVCS change (zone residency 40 s).
+**Stutter:** 398 auto-detected events / 42 min (9.4/min; 11-20 9.8, 8-22 11.0). Fuel-cut-exit timing dip median
+-8.5 (n=67) vs -8.0 on 11-20: unchanged, as expected (retard table not touched).
+**VE:** no boost residency to compare.
+
+**What 19e changed, scored:**
+- Overrun fuel cut delay: **works as built (observed).** Median lift-to-cut, warm, gear held through the cut:
+  2nd 3000-4500 0.20 -> 0.24 s (count 19 -> 24), 2nd 2250-3000 0.20 -> 0.32 (19 -> 38), 3rd 3000-4500 0.12 -> 0.28
+  (13 -> 28), 4th 2250-3000 0.36 -> 0.76 (44 -> 88), 4th 3000-4500 0.40 -> 0.40 (44 -> 47), 1st 3000-4500
+  0.08 -> 0.28 (6 -> 35). n = 1-4 per cell. Unchanged cells (> 4500 rpm) unchanged. All six sampled cells moved
+  by count x 8 ms, which is the first before/after test of the item-103 identification, and it holds.
+  **But the cut still happens on 39 of 40 lifts (98%; 19c 91-97%)**: a shift keeps the pedal at 0 for 0.5-0.8 s
+  (37 of 40 lifts were >= 0.5 s), longer than every new delay except 4th/5th below 3000.
+- OL entry (0.73 column): **moved the right way, thin (observed, low-validation).** Pedal on, warm, share of
+  samples in OL: 3300-3700 rpm x load 0.75-0.80 17% (n=53) vs 38% on 11-20; 3700-4000 x 0.75-0.80 25% (n=20) vs
+  100%; 3300-3700 x 0.80-0.85 71% (n=58) vs 85%. Predicted crossing from the map is load ~0.85 at 3300-4400.
+  5th gear > 70 mph was not driven, so the highway number this was built for is not measured.
+- AVCS +3 deg at load 1.0-1.3: **delivered, no knock, 40 s residency (low-validation).** Actual cam 13-15 deg vs
+  10-12 on 19c. Pedal for the same load reads 20-22% vs 18-20% on 11-20 and 20-23% on 8-22, i.e. inside
+  log-to-log spread; no pedal benefit can be claimed.
+- FLKC axis: nothing to read. FLKC is 0 everywhere after the reset.
+
+**Prior-flagged areas re-checked:**
+- Injector ceiling (#1): not exercised (IDC max 69.7).
+- FLKC cell 29 (#2): cleared by the flash; relearning starts from 0 on the new axis.
+- Cold rich bias: still present in OL (-0.59 / -0.45). CL trims near 0 with AFL fresh.
+- Highway open loop: partially addressed, not measured on the highway.
+
+**New issues:**
+- Initial WGDC (6400 rpm, torque 0) = 59.96 against 30 across the row. Looks like a paste leftover.
+- Full requested torque now runs to 6400 with fuel cut at 6700. 8-8 hit IDC 106% at 6315 rpm on 19c.
+
+**Tip-in pass (added 2026-11-25; pedal +4 points in 0.2 s, warm, 1200-4200 rpm, not followed by a shift):**
+- From a fuelled state (n=32): peak wb - FFB 1.80 AFR / 0.30 s below 2400 rpm, 1.08 / 0.10 s at 2400-4200, then
+  ~1.1 rich. No knock follows. Same filter: 11-20 1.85 / 1.32, 7-19 (20.19) 1.93 / 1.51, 5-28 (20.15) 2.10 / 1.75.
+  Part of the peak is the FFB step on CL -> OL against a 0.32 s wideband lag. Tip-in fuel is not the weak point.
+- After a gear change (fuel resume with the pedal on, cut and resume in different gears; 26 of 79 resumes): timing
+  median 8.5-9.5 deg against ~20 settled, 65-67% dip more than 10 deg. Fuelled tip-ins at matched pedal (>= 20%)
+  and load (>= 0.9) hold 17 deg (19c: n=69 fuelled 17.0, n=10 from cut 4.0). The low readings are single-sample
+  stabs (4-11 deg) on the rpm upswings of a ~6 Hz, +/-60-170 rpm oscillation lasting 2-3 cycles after re-engagement.
+  Same size on 20.15 (-14.5..-15.5), 20.19 (-10.4..-14.6) and 19c (-12..-15.8): long-standing, not a 19e effect.
+  Wideband is on target within the sensor lag after resume. Which routine produces the stabs is NOT identified.
+  (Traced the same day: corrections item 104. Parked by Dean - stock tables, not a tuning target.)
+- Breakdown, 8-14 + 11-20 + 11-24 pooled (n=234 fuelled tip-ins): largest lean blip is below 2000 rpm with a
+  6-12 point throttle step: 2.10 AFR median, 3.04 p90, 0.50 s (n=22). 2000-2800: 1.24-1.91. 2800-4200: 1.30-1.64.
+  A rich swing of 1.0-1.5 AFR follows about 1.8-2.1 s later, also when the tip-in stays in closed loop.
+  Knock within 2 s: 2 of 234, both above 2800 rpm.
+- Air path: throttle follows pedal by ~40 ms (cross-correlation peak at 1 sample), load reaches 90% about 0.12 s
+  after the pedal does, with 9-17% overshoot. Same or slightly quicker than the 3-21 garn-base log.
+
+**Staged for next session:**
+- A held-WOT pull (3rd or 4th, 3000 -> 6400+) to score the 18 psi target, the WGDC and the top end.
+- A highway stretch in 5th above 70 mph for the OL-entry change.
+- Decide whether the overrun delay is meant to outlast a shift; if so it needs ~0.9 s (about 110 counts).
+
+## 2026-11-20 (+ 2026-08-22) — logs: logs/11-20 20.19c/1120 20.19c.csv, logs/8-22 20.19c/8-22 20.19c.csv — rom: 20.19c
+
+Reviewed 2026-11-21. 8-22 had been driven in August but never copied or reviewed; both scored together.
+11-20 is the first cold-season log (IAT med 68 / min 46). No AVCS lockout on either (p95 20).
+
+**Knock:** 11-20: 1 FBKC onset, -1.4, 2785 rpm x load 1.45, 2nd gear, OL, IAT 57 — trivial. 8-22: FBKC 0 all log. IAM 1.0 both.
+FLKC (per-cell, bucketed selector): **exactly one cell holds retard on both logs — cell 29 (4000-4600 rpm x load >= 2.0) = -0.75.** Every other visited cell reads 0. It was -1.00 on 8-14. Unchanged 8-22 -> 11-20 = residency-starved, not relearning.
+**WOT:** none sustained (8-22 longest 0.84 s; 11-20 none). 8-22: 8 boost events, peak 20.7 vs target 20.3, wgdc max 80, knock-free. IDC max **93.6% @ 4618 rpm, 58% throttle, IAT 81**.
+**MAF corr / fuelling:** 11-20 cruise CL total trim -0.8..-3.9% across 1.55-2.55 V, AFL learned -3.12. The summer light-load lean (+5.5% at 1.65-1.75 V on 8-14 and 8-22) is gone. Steady OL at load 0.85-1.2 reads **0.45 AFR richer than commanded** at IAT 52 (n=3628) vs +0.42 lean at IAT 99 (8-2) and 0.00 at IAT 81 (8-14). ~7% hot-to-cold swing. Cause unknown.
+**Refined 2026-11-21:** the richness does NOT track intake temperature within the 11-20 drive (steady OL wb-cmd: -0.35 at IAT 40-55, -0.46 at 55-65, -0.63 at 65-75, -0.43 at 75-85). It is a per-day / seasonal offset, not a function of logged IAT. `MAF Compensation (IAT)` (`0xC3BB0`) is all zeros in stock and 19c, so no IAT fuel table is involved. Candidates, none verified: fuel density/temperature, winter blend, MAF sensor.
+**Cliffs:** not re-run (no table change since 8-14).
+**Stutter:** auto-detector 788 events / 80 min (11-20), 309 / 28 min (8-22) — in family with prior 19c logs. Fuel-cut-exit timing dip (min timing in 0.6 s after resume vs 1.5 s later, pedal on, 2000-3800 rpm): median -9.5 (11-20), -15.5 (8-22), -12.5 (8-14), -14.0 (8-2), -15.5 (7-26 19b). Present on every log, so not a 19b artefact. Not compared against garn base with this definition.
+**VE:** see auto-rollup below; no rev change.
+
+**Highway open loop (observed, 11-20):** 5th gear > 70 mph on-pedal is 42% OL. OL entry follows LOAD, not the 3400 rpm per-gear limit: at 3000-3400 rpm load 0.8-0.9 is 57% OL and >= 0.9 is 98%; at 3400-3900 rpm load < 0.7 is 0-1% OL. The switch point matches where the interpolated Primary OL B map crosses `Minimum Active Primary Open Loop Enrichment` (13.82): load 0.94 @ 3000, 0.85 @ 3200, 0.80 @ 3600, with `CL to OL Delay` = 0 (stock 750). This corrects the 2026-11-15 reading that the 3400 rpm limit forces OL regardless of load. The 13.82 comparison itself is still not decoded from ROM bytes — the evidence is that the log matches the map crossing at every RPM band checked.
+
+**Driver-reported stutter located (added 2026-11-21):** 11-20 log0002, 100-165 s after its start, 3rd gear,
+35-40 mph, 2150-2500 rpm, pedal 11-20%, load 0.65-1.1, closed loop, ECT 140 -> 176 F (warm-up).
+Observed: nothing the ECU commands oscillates (timing 19-24 steady, AVCS 10-20 following load, throttle sd 0.2%,
+no fuel cut, FBKC 0, front AFR on target). Pedal jitter is 3-4x normal (0.36 %/sample vs 0.08-0.13) and tracks
+crank speed at zero lag (r = +0.65, ~6 Hz) = the car was physically shaking the driver's foot. The car
+under-accelerates for its airflow: 3rd gear 2200-2600 rpm at load 0.75-0.9 gives -3 rpm/s in the window vs +20
+elsewhere in the same log; load 1.0-1.15 gives +18 vs +127 (n=54, thin). AFC ran +1.6..+4.7 in the window against
+a drive that otherwise trimmed negative. The 25 Hz RPM ripple metric does NOT discriminate (same value in 5th-gear
+cruise at equal load, every log). Hunch, not verified: weak combustion / misfire during warm-up; a road grade is
+the alternative and cannot be excluded from this log. (Later the same day: Dean confirmed the road climbs, and the gear is 4th not 3rd — see corrections item 103 — so this reads as lugging; misfire is the less likely explanation.) Misfire counters (SSM 0x0000CE/CF/D8/D9) are not in the
+current logger config.
+
+**Prior-flagged areas re-checked:**
+- Injector ceiling (#1): unchanged — 93.6% at part throttle, 4618 rpm.
+- 8-14 FLKC band 2900-4300 x 1.4-2.8 (#2): all those cells back to 0; only cell 29 remains at -0.75. Improved.
+- A(IAT) hot-side low-load knock (#3): no instance (neither log was hot).
+- High-IAT WOT (#4): still untested; will not be testable until summer.
+- Light-load lean tilt (#5): reversed in cold air; now reads as part of a temperature-dependent fuelling error rather than a fixed MAF-curve tilt.
+
+**New issues:**
+- Cold-air rich bias: ~3% in CL (trimmed), ~0.45 AFR beyond command in OL. Raises injector duty at WOT in winter.
+- 20.19d as built has a flaw: first FLKC load boundary at 1.30 leaves a writable sliver (load 1.25-1.28 falling; gate hysteresis decoded at 0x046A4A/0x0BE800) in the cell that is read back for all load < 1.30. Top boundary 3.50 is dead (gate clears at 3.50). Proposed replacement axis 1.20 / 1.70 / 2.20 / 2.80. Not built.
+
+**Staged for next session:**
+- Decide: corrected FLKC axis (replaces 19d) and the OL-map 0.73-column change for highway CL.
+- Cold held-WOT log to read IDC and boost overshoot in dense air.
+- Compare the fuel-cut-exit timing dip against a garn-base log with the same definition.
+
+## ingest 2026-11-20 (rev 20.19c) auto-rollup (2026-11-21 17:50)
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 291
+  overlap (≥30 samples in each): 82
+  cells with |Δ| ≥ 3%: 37
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    3000 × -11.0    8.81 →  10.37 g/s  (+17.62%, n=969/1027)
+    1200 ×  -9.5    5.48 →   6.40 g/s  (+16.73%, n=385/14354)
+    3300 × -11.0    9.73 →  11.29 g/s  (+16.08%, n=291/1963)
+    1600 × -10.5    6.40 →   7.08 g/s  (+10.66%, n=536/1862)
+    1600 × -10.0    6.84 →   7.56 g/s  (+10.51%, n=243/4429)
+    3700 × -11.0   11.01 →  12.09 g/s  (+9.79%, n=47/1620)
+    2200 × -10.5    7.91 →   8.67 g/s  (+9.62%, n=181/22841)
+    2600 × -11.0    8.12 →   8.88 g/s  (+9.38%, n=2270/570)
+     800 ×  -7.0    6.64 →   7.25 g/s  (+9.29%, n=238/388)
+    1900 × -10.5    7.35 →   8.02 g/s  (+9.17%, n=384/7994)
+
+  Top VE LOSSES:
+    1200 × -10.5    5.56 →   4.86 g/s  (-12.46%, n=54/397)
+    2200 ×  -6.0   25.91 →  23.76 g/s  (-8.28%, n=58/5701)
+    2200 ×  -5.5   27.88 →  25.59 g/s  (-8.22%, n=149/4267)
+    1200 × -10.0    5.78 →   5.32 g/s  (-8.10%, n=314/2740)
+    2200 ×  -5.0   29.63 →  27.28 g/s  (-7.92%, n=222/4800)
+    2200 ×  -4.5   31.18 →  29.45 g/s  (-5.53%, n=128/3623)
+    2200 ×  -8.0   18.14 →  17.17 g/s  (-5.33%, n=308/6869)
+    2200 ×  -8.5   16.03 →  15.40 g/s  (-3.93%, n=178/9866)
+     800 ×  -8.5    5.40 →   5.20 g/s  (-3.60%, n=951/14418)
+    3700 ×  -7.5   34.98 →  33.74 g/s  (-3.55%, n=35/346)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 66  mean|c|= 1.23%  median|c|= 1.34%  in_tol= 84.8%  max= 3.7%
+    verdict: WIN — VE up + trim tighter
+
+
+## ingest 2026-08-22 (rev 20.19c) auto-rollup (2026-11-21 17:50)
+
+## VE proxy: 20.19c vs 20.19b
+  cells with data — 20.19b: 124, 20.19c: 291
+  overlap (≥30 samples in each): 82
+  cells with |Δ| ≥ 3%: 38
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19b → 20.19c):
+    1200 ×  -9.5    5.48 →   6.41 g/s  (+16.86%, n=385/11660)
+    3300 × -11.0    9.73 →  11.29 g/s  (+16.06%, n=291/1955)
+    3000 × -11.0    8.81 →  10.13 g/s  (+14.89%, n=969/864)
+    3700 × -11.0   11.01 →  12.09 g/s  (+9.78%, n=47/1602)
+    2600 × -11.0    8.12 →   8.88 g/s  (+9.38%, n=2270/570)
+     800 ×  -7.0    6.64 →   7.25 g/s  (+9.29%, n=238/388)
+    1600 × -10.5    6.40 →   6.95 g/s  (+8.69%, n=536/1525)
+    1600 × -10.0    6.84 →   7.34 g/s  (+7.27%, n=243/2877)
+    1900 × -10.5    7.35 →   7.83 g/s  (+6.61%, n=384/6276)
+    1600 ×  -6.5   13.91 →  14.82 g/s  (+6.53%, n=55/1725)
+
+  Top VE LOSSES:
+    2200 ×  -6.0   25.91 →  23.59 g/s  (-8.93%, n=58/4517)
+    2200 ×  -5.5   27.88 →  25.43 g/s  (-8.81%, n=149/3565)
+    2200 ×  -5.0   29.63 →  27.11 g/s  (-8.50%, n=222/3947)
+    1200 × -10.5    5.56 →   5.11 g/s  (-7.94%, n=54/160)
+    2200 ×  -4.5   31.18 →  29.43 g/s  (-5.59%, n=128/2859)
+    2200 ×  -8.0   18.14 →  17.16 g/s  (-5.36%, n=308/6274)
+    1200 × -10.0    5.78 →   5.50 g/s  (-4.96%, n=314/1912)
+    2200 ×  -8.5   16.03 →  15.23 g/s  (-4.94%, n=178/8360)
+    2200 ×  -9.0   13.71 →  13.12 g/s  (-4.30%, n=66/5742)
+    3000 × -10.5   11.20 →  10.72 g/s  (-4.28%, n=321/10608)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19b: cells= 39  mean|c|= 2.05%  median|c|= 1.92%  in_tol= 51.3%  max= 6.3%
+             20.19c: cells= 66  mean|c|= 1.20%  median|c|= 1.29%  in_tol= 83.3%  max= 3.4%
+    verdict: WIN — VE up + trim tighter
+
+
 ## ingest 2026-08-14 (rev 20.19c) auto-rollup (2026-08-16 17:21)
 
 ## VE proxy: 20.19c vs 20.19b

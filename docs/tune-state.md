@@ -919,6 +919,14 @@ Verified diff, **243 bytes / 53 runs**:
   offsetting. Light-load lean back at 1.6 V +3.12 **against the charge-temp
   hunch** (8-8 was +0.78 at similar IAT).
 
+- **8-22** (28.1 min, reviewed 2026-11-21): 8 boost events to 20.7 psi vs target 20.3, knock-free (FBKC 0 all log).
+  IDC max 93.6% @ 4618 rpm at 58% throttle. No sustained WOT (longest 0.84 s). FLKC: only cell 29
+  (4000-4600 x load >= 2.0) holds retard, -0.75.
+- **11-20** (80.4 min highway, **first cold-season log**, IAT med 68 / min 46, no boost): one trivial FBKC -1.4.
+  FLKC identical to 8-22 (cell 29 = -0.75, all else 0). **Runs rich in cold air**: cruise trim -0.8..-3.9% with
+  AFL -3.12; steady OL 0.45 AFR richer than commanded (vs +0.42 lean at IAT 99 on 8-2). **Highway is 42% open
+  loop above 70 mph**, entered by load where the OL B map crosses 13.82 — not by the 3400 rpm per-gear limit.
+
 ### 20.19c → 20.19d — BUILT, NOT FLASHED, NOT DRIVEN
 
 Verified diff, **15 bytes / 2 runs**: 13 bytes at **`0xD2F29`–`0xD2F36`** plus the
@@ -930,6 +938,37 @@ that its justification rested on the FLKC bilinear-vs-nearest-cell question —
 which was settled since: **the FLKC grid is BUCKETED 7×5, write and read each
 touch exactly one cell** (`project_flkc_grid_is_bucketed`). Re-check the intent
 against that finding before flashing.
+
+**Re-checked 2026-11-21 — do not flash 19d as built.** Gate hysteresis decoded (`0x046A4A` -> `0x0BE800`):
+the lower load flag sets at >= 1.30 and clears below 1.25; the upper flag clears at >= 3.50. With 19d's first
+boundary at 1.30, band 0 (everything below 1.30, i.e. all cruise) is writable while load falls through 1.25-1.28
+and is read back unconditionally. Its top band (>= 3.50) can never be written. Proposed replacement axis:
+**1.20 / 1.70 / 2.20 / 2.80** — band 0 dead and always 0, four live bands, widest 0.70 load. Not built.
+Current need is small: the only stored FLKC on the car is cell 29 at -0.75.
+
+### 20.19d -> 20.19e — FLASHED, first log 2026-11-24
+
+Built from 19d with the FLKC axis replaced, so effectively 19c + the list below. **19d was never flashed.**
+Verified diff 19c -> 19e: **457 bytes / 65 runs**, checksum valid, every changed byte inside a defined table.
+
+| Table | 19c -> 19e |
+|---|---|
+| Target Boost (`0xC1340`) | 20 -> 18 psi at 3200-5600 rpm x torque >= 320; 22 -> 18 at 4000-4800 x 360; 6000 row -> 17, 6400 row -> 15 |
+| Max Wastegate Duty (`0xC0F58`) | -4..-7 at 4400-6000 x torque 300-350; 6400 row 0 -> 45 |
+| Initial Wastegate Duty (`0xC1150`) | -7 in the 360 column from 4000 rpm; +1..+3.6 at 3600-4000; 6400 row 0 -> 30 (cell at torque 0 = 59.96, probably a leftover) |
+| Requested Torque, 3 SI-DRIVE maps | 6400 row at full pedal 70 -> 350; RPM axis tail 6450/6500 -> 6700/7000 |
+| Intake AVCS cruise + non-cruise | +2.5..+4 deg at load 1.0-1.3 x 1600-3800 (10-12.5 -> 14-15) |
+| Primary OL (KCA Alt, B Low, B High) | 0.73 load column -> 14.7 at 3300-4400; 13.44 -> 13.94 at 4800 |
+| FLKC load axis (`0xD2F28`) | 0.75/1.10/1.50/2.00 -> 1.20/1.70/2.20/2.80 (the 11-21 replacement for 19d's axis) |
+| Overrun Fuel Cut Delay (`0xCBCA0`-`0xCBCBF`) | 1st `44 44 6 13` -> `44 44 35 25`; 2nd `19 19 19 9` -> `38 38 24 9`; 3rd `25 25 13 6` -> `50 50 28 6`; 4th/5th `44 44 44 6` -> `88 88 47 6` |
+
+**11-24 log (42 min town, cold start, no WOT, peak 12.6 psi):**
+- Overrun delay measures as built in all six cells sampled (count x 8 ms). The cut still fires on 39 of 40 lifts
+  because a shift is 0.5-0.8 s off the pedal.
+- OL entry at 3300-4000 rpm moved from load ~0.76-0.80 toward ~0.85 (thin, n = 20-58 per cell; highway not driven).
+- AVCS delivers 13-15 deg in the edited zone, no knock in 40 s.
+- One shift-class FBKC -1.4. IAM 1.0. FLKC and AFL reset by the flash.
+- **Untested: 18 psi target, WGDC, 6400 limit removal, FLKC axis.**
 
 ## Baseline log
 
