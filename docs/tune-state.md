@@ -948,6 +948,8 @@ Current need is small: the only stored FLKC on the car is cell 29 at -0.75.
 
 ### 20.19d -> 20.19e — FLASHED, first log 2026-11-24
 
+**2026-11-28 update:** two more drives (`logs/11-28 20.19e/` day1 = 11-25, day2 = 11-28). No reflash. Knock: 3 incidents on day2, 2 of them inside the AVCS +3 zone (2754 x 1.07 post-shift in 3rd; 1700-1784 x 1.04 1st-gear pull-away, IAT 86), both -2.8. Low-validation; watch it before adding more cam. Boost peak 16.7 psi vs target 17.2 in a 1.3 s burst; the 18 psi top end, highway OL change and pedal pull-away cells are still unmeasured. See REVIEW_LOG 2026-11-25 + 2026-11-28.
+
 Built from 19d with the FLKC axis replaced, so effectively 19c + the list below. **19d was never flashed.**
 Verified diff 19c -> 19e: **457 bytes / 65 runs**, checksum valid, every changed byte inside a defined table.
 

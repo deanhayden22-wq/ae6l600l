@@ -29,6 +29,124 @@ Per-entry template:
 ---
 
 <!-- Entries below this line, newest first -->
+
+## 2026-11-25 + 2026-11-28 — logs: logs/11-28 20.19e/11-28 20.19e day1.csv, … day2.csv — rom: 20.19e
+
+Two drives uploaded in one folder. Split by the logger's own clock (it runs continuously across key cycles; file
+times read 2009-01-01 for log0001-0003 and 2009-01-03 for log0004-0007): day1 = log0001-0003 (24.7 min, cold start),
+day2 = log0004-0007 (40.5 min, ~2.7 days later). Dates confirmed by Dean. No reflash since 11-24 (AFL carried
+over at 3.9). AVCS p95 19 / 20, no lockout. IAM 1.0, FLKC 0 both days.
+
+**Knock:** day1 none. Day2: 3 incidents, 6 FBKC steps, min -2.8.
+- 2754-2787 rpm x load 1.05-1.09, 3rd gear 33 mph, 1.3-1.5 s after a shift, OL, avcs 13, IAT 61 -> -2.8 (shift class).
+- 1700-1784 rpm x load 1.03-1.05, 1st-gear pull-away at 9 mph, CL, wb 14.6-14.7, avcs 12, IAT 86 -> -2.8
+  (classifier says maybe-shift only because MPH < 10; it is a pull-away).
+- 4950 rpm x load 2.72, 13.9 psi, 0.48 s after a shift, wb 12.11 vs FFB 11.64 -> -1.4 (shift class).
+- One more single step: 5054 rpm x load 1.05, 1st gear, pedal 19%, OL -> -1.4 (load class).
+- **Two of the three incidents are inside the 19e AVCS +3 zone (1600-3800 x load 1.0-1.3).** Zone knock rate:
+  19c 0.44 steps per zone-minute (12 steps / 1625 s); 19e pooled 2.1 (4 / 115 s: 11-24 0/37 s, day1 0/40 s,
+  day2 4/38 s). Two incidents only, so not significant yet; first sign the cam re-advance may cost knock margin
+  at low rpm. Watch item (observed events, inferred cause).
+**WOT:** none held. Day1: a 1.3 s burst to 16.7 psi at 3939 rpm vs target 17.2 (throttle 57%, wgdc 68, IDC 76,
+FBKC 0) and an 11-sample throttle-100 stab at 2967-3254. **18 psi target, WGDC changes and top end still untested.**
+Day2 boost max 13.9 psi (pedal <= 64%).
+**MAF corr / fuelling:** cold-season CL trims still read rich: day1 -4.7 / -5.2 at 1.5 / 1.6 V (IAT 37), day2
+-2.4 .. -3.0 across 1.4-1.9 V (IAT 52-61). Steady OL wb - FFB (8-sample lag) -0.39 / -0.42 (day1), -0.31 / -0.42
+(day2) at load 0.85-1.2 / 1.2-2.0: same rich-of-command offset as 11-20 and 11-24.
+**OL entry (0.73 column):** day2 3300-3700 x load 0.80-0.85 96% OL (n=27), 0.75-0.80 0% (n=62); 3700-4400 x
+0.75-0.80 31% (n=39), 0.80-0.85 68% (n=62). Thin; no >70 mph highway on either day (max 69.6).
+**Stutter:** auto-detected 126 (day1, 5.1/min) and 334 (day2, 8.2/min); 11-24 9.4/min.
+**Gearing (observed):** day2 1st-gear part-throttle rev to 6559 rpm at 35.4 mph = 11,110 rpm/mile, the same short
+1st seen in every post-swap log (Type RA 3.083 would read ~39.7 mph there).
+
+**Prior-flagged areas re-checked:**
+- Held-WOT / 18 psi target: not done.
+- Highway OL above 70 mph: not done.
+- Pedal-map pull-away cells (1100-2100 rpm x pedal 22-40%): 0.17% / 0.24% of samples, still not testable from
+  normal driving.
+- Cold rich bias: unchanged.
+
+**New issues:**
+- Knock in the re-advanced AVCS zone (above). If it repeats, back the +3 deg off at 1600-2200 rpm first.
+
+**Staged for next session:**
+- Same three deliberate tests: held pull 3000 -> 6400 in 3rd/4th; 5th above 70 mph; 1200-2000 rpm pull-aways at
+  25-35% pedal.
+- Add the ECU gear estimate (byte 0xFFFF6810) to the logger to verify the gear-threshold proposal.
+## ingest 2026-11-28 (rev 20.19e) auto-rollup (2026-11-28 11:54)
+
+## VE proxy: 20.19e vs 20.19c
+  cells with data — 20.19c: 291, 20.19e: 171
+  overlap (≥30 samples in each): 125
+  cells with |Δ| ≥ 3%: 61
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19c → 20.19e):
+    3700 × -10.5   13.87 →  17.22 g/s  (+24.10%, n=643/128)
+    1200 ×  -5.0   13.32 →  16.10 g/s  (+20.91%, n=140/47)
+    1200 × -10.5    4.86 →   5.88 g/s  (+20.85%, n=397/148)
+    3700 ×  -9.5   20.99 →  25.17 g/s  (+19.89%, n=286/85)
+    3700 ×  -8.5   26.67 →  31.95 g/s  (+19.79%, n=299/43)
+    3300 ×  -9.5   18.23 →  21.00 g/s  (+15.18%, n=981/193)
+    3700 ×  -8.0   29.49 →  33.65 g/s  (+14.11%, n=150/55)
+    3300 × -10.0   15.83 →  18.04 g/s  (+13.99%, n=849/77)
+    1200 ×  -8.5    7.74 →   8.77 g/s  (+13.36%, n=5990/942)
+    3000 × -10.0   13.50 →  15.27 g/s  (+13.10%, n=1975/238)
+
+  Top VE LOSSES:
+    3000 ×  -4.0   41.65 →  38.14 g/s  (-8.42%, n=3066/215)
+    1900 ×  -2.0   32.44 →  30.13 g/s  (-7.12%, n=331/478)
+    2600 ×  -3.0   41.10 →  38.32 g/s  (-6.77%, n=1526/116)
+     800 ×  -9.0    4.11 →   3.84 g/s  (-6.51%, n=50294/12328)
+     800 ×  -7.5    5.88 →   5.62 g/s  (-4.43%, n=7192/133)
+    3300 × -10.5   12.01 →  11.59 g/s  (-3.51%, n=4965/100)
+    2600 ×  -2.0   44.63 →  43.08 g/s  (-3.46%, n=820/35)
+    2600 ×  -9.0   16.19 →  16.69 g/s  (+3.07%, n=6237/1238)
+    1900 ×  -7.5   15.28 →  15.76 g/s  (+3.16%, n=1988/171)
+    2200 ×  -7.0   20.73 →  21.40 g/s  (+3.22%, n=4784/533)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19c: cells= 66  mean|c|= 1.23%  median|c|= 1.34%  in_tol= 84.8%  max= 3.7%
+             20.19e: cells= 42  mean|c|= 1.22%  median|c|= 1.49%  in_tol= 64.3%  max= 8.6%
+    verdict: WIN — VE up + trim tighter
+
+
+## ingest 2026-11-25 (rev 20.19e) auto-rollup (2026-11-28 11:53)
+
+## VE proxy: 20.19e vs 20.19c
+  cells with data — 20.19c: 291, 20.19e: 154
+  overlap (≥30 samples in each): 106
+  cells with |Δ| ≥ 3%: 81
+
+  Top VE GAINS (rpm × mrp psi → MAF g/s 20.19c → 20.19e):
+    3700 × -10.5   13.87 →  19.04 g/s  (+37.26%, n=643/96)
+     800 ×  -9.0    4.11 →   5.08 g/s  (+23.59%, n=50294/283)
+    1200 ×  -5.0   13.32 →  16.10 g/s  (+20.91%, n=140/47)
+    1200 × -10.5    4.86 →   5.88 g/s  (+20.85%, n=397/148)
+    3700 ×  -9.5   20.99 →  25.17 g/s  (+19.89%, n=286/85)
+    3700 ×  -8.5   26.67 →  31.95 g/s  (+19.79%, n=299/43)
+    3000 × -10.0   13.50 →  15.66 g/s  (+15.96%, n=1975/188)
+    1200 ×  -8.5    7.74 →   8.92 g/s  (+15.34%, n=5990/888)
+    3300 ×  -9.5   18.23 →  21.00 g/s  (+15.18%, n=981/193)
+    3700 ×  -8.0   29.49 →  33.79 g/s  (+14.58%, n=150/54)
+
+  Top VE LOSSES:
+    1900 ×  -6.0   20.10 →  20.76 g/s  (+3.27%, n=1512/43)
+    3000 ×  -5.5   34.29 →  35.47 g/s  (+3.44%, n=1688/346)
+    2200 ×  -3.5   33.37 →  34.53 g/s  (+3.50%, n=3115/301)
+    3000 ×  -8.0   22.93 →  23.79 g/s  (+3.79%, n=3502/587)
+    1600 ×  -6.5   14.83 →  15.39 g/s  (+3.79%, n=1728/70)
+    1900 × -10.5    8.02 →   8.33 g/s  (+3.89%, n=7994/845)
+    2600 ×  -4.5   34.39 →  35.77 g/s  (+4.00%, n=1612/162)
+     800 ×  -8.5    5.20 →   5.41 g/s  (+4.05%, n=14418/179)
+    3700 ×  -5.0   46.05 →  48.08 g/s  (+4.41%, n=347/32)
+    3300 × -11.0   11.29 →  11.82 g/s  (+4.72%, n=1963/424)
+
+  MAF trim health (cells with ≥30 samples; in-tol = |mean_corr|<2%):
+             20.19c: cells= 66  mean|c|= 1.23%  median|c|= 1.34%  in_tol= 84.8%  max= 3.7%
+             20.19e: cells= 40  mean|c|= 0.81%  median|c|= 0.90%  in_tol= 85.0%  max= 9.4%
+    verdict: WIN — VE up + trim tighter
+
+
 ## 2026-11-24 — log: logs/11-24 20.19e/11-24 20.19e.csv — rom: 20.19e
 
 First 19e log. 42.1 min, 5 source logs, town driving (5th gear 99 s, max 68 mph), starts with a cold start
