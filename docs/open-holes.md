@@ -448,6 +448,16 @@ routines read. The A/D question (`0xFFFF43FC`) is unchanged.
   `0xFFFF8EDC`.** If `[8E7E]` drops to 0 once warm and stays there, the trim acts in all
   warm closed loop and re-enabling it is a live fuel change (with the gates still to pass).
 
+### Update 2026-11-27 (batch 4) — (a) closed to the injector register (corrections item 115)
+
+`injector_path_trace.txt` (audited). The pulse each injector gets is
+min((trunc(4·PW) + latency) >> 4, 0xFFFF) in register `0xFFFFF640 + 2j`, with
+PW = clamp(per-cylinder FFB · (AFC + AFL + `[7AE4]`) · load · "Injector Flow Scaling" ·
+per-injector trim · low-pulse factor, 300, 262136). So the chain is complete: trim `[7904]` →
+CL target `[77C8]` → logged AFC → the pulse. **Only (b) remains: the cold-start log of the
+SPECIAL-exit bytes.** AFL then learns from AFC's lag (item 116), so a trim change would also
+move AFL over time.
+
 ---
 
 ## 10. The live SSM patch's tagged read has no bound (latent; NEW 2026-11-27)
@@ -470,16 +480,19 @@ traced.
 ## 11. The function programme (NEW 2026-11-27)
 
 `docs/analysis-plan.md` Part 1 is the plan; `disassembly/maps/function_census.json`
-the denominator (5,146 functions; after batch 3, 10.7% of code analysed and 13.6%
-listed — raw dumps are not analysis, item 108 — and 4,157 functions untouched). Batch 1 (item 107) decoded the runtime library, the RTOS
+the denominator (5,146 functions; after batch 4, 14.7% of code analysed and 17.3%
+listed — raw dumps are not analysis, item 108 — and 3,975 functions untouched). Batch 1 (item 107) decoded the runtime library, the RTOS
 core, the diagnostic tables, hole #9 and `0x042506`; batch 2 (item 108) the
 launch-patch closure, hole #9's identity, five tuned-region functions and the
 1,278 classified small functions; batch 3 (items 111-113) logged AFC's controller, the
 SPECIAL-exit gate, the FFB residual, the timing-integrator bound, the overrun ladder and
-the `0xFFFF8EDC` gate. Threads worth a trace of their own, in order:
+the `0xFFFF8EDC` gate; batch 4 (items 114-118) the injector pulse, AFL learning, the rest of
+the FFB sum, the MAF/load cap, the overrun timing terms, power-on RAM, the FBKC step enable
+and the angle scheduler. Threads worth a trace of their own, in order:
 
-1. ~~Readers of `0xFFFF77BC`~~ — done in batches 2-3 (items 108, 111): it is the CL lambda
-   target and it drives logged AFC. **Batch 4's list is in `docs/analysis-plan.md`.**
+1. ~~Readers of `0xFFFF77BC`~~ — done in batches 2-4 (items 108, 111, 115): it is the CL lambda
+   target, it drives logged AFC, and AFC multiplies the injector pulse. **Batch 5's list is in
+   `docs/analysis-plan.md`; its step 0 is two census tool fixes (item 114 Tooling).**
 2. The settle times that used the integer lag filter `0x0BEA6C` at 1/65536 — they
    are off by 256× (`maf_scaling_analysis.txt`, `adc_pipeline_trace.txt`).
 3. `0xFFFF4144` vs `0xFFFF6350`: the logged ECT is the first; the project's ECT
@@ -524,6 +537,15 @@ bounded, so they are not excluded. **Settle with a log** of `0xFFFF73B4` alongsi
 tip-ins: if it tracks the residual, this hole closes. Lift-then-tip-in transients take a
 snap branch with a larger tail than the settled-step figures.
 
+### Update 2026-11-27 (batch 4) — the other addends are excluded (corrections item 114)
+
+`ffb_cl_side_trace.txt`. `[7354]` / `[7374]` are **post-start enrichment** ("Table_Post_Start_Enrich_*":
+0.5 / 0.10 warm, decaying away within a few hundred passes of start), `[7A44]` is 0 (no writer,
+zeroed at every reset — item 117), and the per-cylinder addends read no load rate. The
+multiplier on OL enrichment is `[79A0]` ("Primary Open Loop Fueling Compensation (ECT)",
+≤ 1.0), not `[79C0]` as item 111 said. **Left: `[73B4]` (log it) and `[798C]`'s ramp paths
+with `[79C6]` == 1 / 2 (`0x03606C`, not decoded).**
+
 ---
 
 ## 13. What lowers timing during an overrun fuel cut? (NEW 2026-11-27, corrections item 113)
@@ -534,7 +556,20 @@ fires only at the cut exit (rpm below the resume threshold), so it does not expl
 held through the cut. Either those cuts took the IMMEDIATE path (`03B53A`..`03B544`), or
 another timing term acts during the cut. **Next:** log `0xFFFF7C9A` (tier), `0xFFFF7CAA`,
 `0xFFFF8020` and `0xFFFF5E96` / `0xFFFF5D85` through a few lifts; then decode whichever
-term moves. Also open: whether the four `[7D80]` channels are injectors or coils (`0x00A280`).
+term moves. (Whether the four `[7D80]` channels are injectors or coils was open here; batch 4 settled it below.)
+
+### Update 2026-11-27 (batch 4) — no cut-gated term found; a closed-throttle floor is the lead (corrections item 118)
+
+`overrun_timing_trace.txt`. No decoded term gated on a cut byte holds timing low through a
+counted cut: `[8028]` (−24.96 warm, ramping out over 36 calls) acts only at a cut that ends by
+rpm falling below the resume threshold. **The 20° plateau seen through coasting cuts matches the
+20.19c "Base Timing Idle Minimum" (`0x0ADB38`, 20.08 from 1800 rpm) feeding a closed-throttle
+blend** — a hypothesis. Also live and not cut-gated: the `[7EC0]` cap's load (`0x03ED56`, down to
+−2.07). Decode `0x03FBBC`'s `[85D7]` gate path and `0x03ED56`'s inputs, or log `0xFFFF7F10`,
+`0xFFFF7EC0`, `0xFFFF8028` with timing through lifts. The four `[7D80]` channels are the
+injector channels (item 115). The angle scheduler `0x03D856` arms the pulse register
+`0xFFFFF640 + 2j` and skips a channel whose bit is set. One exception: the resync path
+`0x03DB16` runs for every record whether its bit is set or not.
 
 ---
 

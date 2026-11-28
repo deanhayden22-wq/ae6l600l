@@ -174,13 +174,15 @@ Everything above holds. The audit added:
   `0xFFFF2000` == 0xAA55) that meets narrow start-up conditions, and no resolved code
   changes it mid-drive. So the freeze can only apply from a reset onward, never partway
   through a drive. While it is non-zero, `0x04AA58` does nothing, so the rev-limit latch
-  does not run at all until the next reset. On a cold start the value depends on the reset DMA
-  transfer `0x010398` (zero if it is a fill; not decoded). What physical situation the
+  does not run at all until the next reset. On a cold start it is 0: the reset DMA
+  `0x010398` zero-fills 0xFFFF4000..BF9F on every reset (corrections item 117). What physical situation the
   warm-start condition stands for, and whether an ordinary key-on is a warm reset, are
   not established.
 - **An active latch `0xFFFF7CB8`** forces the channel-suppress word `0xFFFF7D80` to
   0xFFFF (`0x03D2FC`) and clears bit 5 of `0xFFFF6A29` (`0x03B76E` → `0x026CF4`). Whether
-  those channels are injectors or coils is not established.
+  those channels are injectors or coils is not established. **Settled 2026-11-27 (corrections item 115):
+  they are the four injector channels** — the angle scheduler `0x03D856` that arms each injector's
+  pulse register skips a channel whose `[7D80]` bit is set (one exception, the resync path `0x03DB16`).
 - **Gate 8's oracle read 0.0 where the patch reads `[0x0F1048]`.** Fixed in
   `scripts/patch_emulate.py`; the word is 0.0 in every live bin, so no result changed.
 - `pr` on entry to the patch is `0x03B6A8` (left by the window test's `jsr`), not the

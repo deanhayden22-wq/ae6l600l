@@ -71,8 +71,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] NMI handler - saves all regs, checks NMI source, handles watchdog");
         count += labelComment(0x00000BFA, "DefaultExceptionHandler",
             "[DECODED] Default exception handler - infinite loop (bra self)");
-        count += labelComment(0x00000C0C, "Entry",
-            "[TRACED] Power-on reset entry point. Calls HW init, then main scheduler.");
 
         // Scheduler / Task table
         count += labelComment(0x0004A94C, "sched_periodic_dispatch",
@@ -151,18 +149,9 @@ public class ImportAE5L600L extends GhidraScript {
             + "fuel-path consumer exists anywhere in the image.");
 
         // -- item 88: the coolant fractions are a STAGED DECAY BANK, inert >40 degC ----
-        count += labelComment(0x0002EFD2, "fn_2EFD2_coolant_decay_bank",
-            "[TRACED] GBR = 0xFFFF726C (two bytes below the transient knock inhibit flag FFFF726E). "
-            + "Charge: [FFFF728C] = [FFFF72DC], four outputs seeded, gbr+3..6 = 1. "
-            + "Decay: [FFFF728C] = max([FFFF728C] * f(coolant), 0.0), then four staged "
-            + "comparisons that each clear one flag as the accumulator falls below its "
-            + "RAM threshold. ALL EIGHT coolant curves are a flat 0.900 above 40 degC, so "
-            + "the coolant axis is inert at operating temperature. corrections.md item 88.");
         count += labelComment(0xFFFF728CL, "coolant_decay_accumulator",
             "[TRACED] Multiplicative accumulator. Exactly two writers, both in fn 0x02EFD2: "
             + "0x02F1EE charges it from [FFFF72DC], 0x02F178 decays it by f(coolant).");
-        count += labelComment(0xFFFF72DCL, "coolant_decay_charge_value",
-            "[TRACED] RAM. Value the accumulator is reset to at 0x02F1E6. Writer NOT traced.");
         count += labelComment(0xFFFF726FL, "coolant_decay_flag_0",
             "[TRACED] gbr+3. Set on charge, cleared when the accumulator falls below [FFFF7328].");
         count += labelComment(0xFFFF7270L, "coolant_decay_flag_1",
@@ -186,8 +175,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "knock-workspace integrator (item 80). Unidentified.");
         count += labelComment(0xFFFF7F48L, "fn_3684A_term_7F48",
             "[TRACED] Float input to the 0x03684A mix. UNIDENTIFIED (item 86).");
-        count += labelComment(0xFFFF7E90L, "fn_3684A_term_7E90",
-            "[TRACED] Float subtrahend in the 0x03684A mix. UNIDENTIFIED (item 86).");
 
         // -- item 84: the RTOS event queue ---------------------------------------
         count += labelComment(0x00010B2A, "sched_event_queue_walk",
@@ -226,11 +213,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Knock detection. GBR=0xFFFF80FC. Writes KNOCK_FLAG [0xFFFF81BA] and KNOCK_BANK_FLAG [0xFFFF81BB]");
         count += labelComment(0x00043470, "LowPW_GateFunction",
             "[CITED] Low PW Injector Comp gate: checks RPM < max and IPW < max");
-        count += labelComment(0x0004438C, "task11_knock_flag_read",
-            "[TRACED] Task [11] Knock flag consumer. Gates on check_transient_knock_inhibit (0x2F8FE, FFFF726E) "
-            + "and flkc_state_flag_reader_table slot 0 (0x29858, FFFF970E). If transient inhibit active "
-            + "or FLKC slot not converged: skips knock response. Otherwise: reads KNOCK_FLAG/BANK_FLAG "
-            + "and dispatches to DAM knock table (cal 0xD2DC4/D2DD4). GBR=FFFF81F0.");
         count += labelComment(0x00043D68, "task12_knock_post",
             "[DECODED] Task [12] Knock post-process - writes 0xFFFF81D9, refs knock GBR base, cal 0xD2D60-74");
         count += labelComment(0x00045BFE, "flkc_path_J",
@@ -243,8 +225,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00044188, "task00_timing_percyl",
             "[TRACED] Task [0] Per-cylinder timing comp. RPM+MAF, cal Timing Comp Max RPM/Min Load/Min ECT");
         // Knock → Timing Feedback
-        count += labelComment(0x00045970, "task01_knock_timing_fb",
-            "[TRACED] Task [1] Post-knock timing adjustment. Knock corr state RAM 0x8204-821C");
         // Knock Window Setup
         count += labelComment(0x00045098, "iat_running_min_update",
             "[TRACED] Running minimum of intake air temp: [0xFFFF8210] = float_min(0xBE970)([0xFFFF8210], IAT "
@@ -259,28 +239,22 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0004530A, "task05_knock_det",
             "[TRACED] Task [5] Knock detection. KNOCK_FLAG+MAF+IAM, sets GBR");
         count += labelComment(0x00045354, "task06_knock_det",
-            "[UNVERIFIED] Task [6] Knock detection. KNOCK_FLAG+MAF, sets GBR");
+            "[TRACED] Task [6] Knock detection. KNOCK_FLAG+MAF, sets GBR");
         count += labelComment(0x000450AE, "task07_knock_det",
-            "[CITED] Task [7] Knock detection. KNOCK_FLAG+MAF, sets GBR");
+            "[TRACED] Task [7] Knock detection. KNOCK_FLAG+MAF, sets GBR");
         count += labelComment(0x00044E04, "task08_knock_window",
             "[TRACED] Task [8] Knock window setup. Gates on check_transient_knock_inhibit (0x2F8FE). "
             + "Loads RPM/IAM/FFFF6898. Iterates 35 flkc_fg_var entries vs KnockWindow_FLKC_Cell_Threshold "
             + "(0xD2E34) with uint8_add_sat. Iterates 6 knock history slots vs 0xD2E3C/40/44/48. "
             + "GBR=FFFF8210. Cal 0xD2E1C/20/2C/34/3C/40/44/48, threshold 0xD299C.");
-        count += labelComment(0x00044DB0, "load_lag_filter_and_delta",
-            "[CITED] Lag-filters engine load (0xFFFF63F8) through 0xBEA40 with coefficient [0xD2E18]=0.03125 "
-            + "into 0xFFFF81F4, then stores load minus filtered load to 0xFFFF81F8. rts at 0x044DDC. KNOCK_FLAG "
-            + "is first read at 0x044DE0, the NEXT function. Was task09_knock_det. corrections.md item 96.");
-        count += labelComment(0x000448F4, "task10_knock_config",
-            "[TRACED] Task [10] Knock config dispatcher. RPM+MAF+sched, multi-RAM refs");
         // Tasks 11/12 already labeled above
         // Rough Correction
         count += labelComment(0x00045A3E, "task13_rough_corr",
-            "[UNVERIFIED] Task [13] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
+            "[DECODED] Task [13] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
         count += labelComment(0x00044834, "task14_knock_thresh_lu",
-            "[UNVERIFIED] Task [14] Knock threshold lookup. 8 cal params 0xD2DEC-0xD2E04");
+            "[TRACED] Task [14] Knock threshold lookup. 8 cal params 0xD2DEC-0xD2E04");
         count += labelComment(0x00045A84, "task15_rough_corr",
-            "[UNVERIFIED] Task [15] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
+            "[TRACED] Task [15] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
         // FLKC Pipeline
         count += labelComment(0x00045BBC, "task16_flkc_pre",
             "[TRACED] Task [16] FLKC pre-process. KNOCK_FLAG+FLKC_BASE_STEP+IAM+MAF");
@@ -293,7 +267,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "and FLKC_BASE_STEP (FFFF323C) update via 0xBDBCC. Sets flkc_fg_R0_init (FFFF3244) "
             + "bits [1:0]=0b10 on successful update. Writes result to flkc_post_state (FFFF8286).");
         count += labelComment(0x000459F6, "task20_knock_win_upd",
-            "[TRACED] Task [20] Knock window per-cyl update. IAM+MAF, sets GBR");
+            "[DECODED] Task [20] Knock window per-cyl update. IAM+MAF, sets GBR");
         count += labelComment(0x000467AE, "task21_knock_win_upd",
             "[DECODED] Task [21] Knock window per-cyl update. MAF+cyl index, sets GBR");
         count += labelComment(0x000461D2, "task22_knock_percyl",
@@ -314,7 +288,7 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] Task [28] FLKC recovery. Advance recovery steps 0xD2EEC-0xD2F08");
         // Timing Pipeline
         count += labelComment(0x00044296, "task29_timing_percyl",
-            "[TRACED] Task [29] Per-cyl timing comp. Calls flkc_state_flag_reader_table slot 0 (0x29858, "
+            "[DECODED] Task [29] Per-cyl timing comp. Calls flkc_state_flag_reader_table slot 0 (0x29858, "
             + "FFFF970E) — skip timing correction if FLKC learning slot 0 not converged. "
             + "Also calls 0x2997C. Uses knock_GBR_base (FFFF81F0) + FFFF8260/828C float offsets. "
             + "Writes per-cylinder timing comp to FFFF81EC.");
@@ -330,8 +304,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Task [34] Timing throttle comp. Throttle+MAF voltage+injector");
         count += labelComment(0x000418AC, "task35_timing_corr",
             "[DECODED] Task [35] Timing correction stage. Cal 0xD2C04, timing state RAM");
-        count += labelComment(0x000419BA, "task37_timing_multiaxis",
-            "[TRACED] Task [37] Timing multi-axis. RPM+MAF, 3 cal params, 3 BSR calls");
         // Ignition Output
         count += labelComment(0x00042A78, "task38_ign_output",
             "[TRACED] Task [38] Ignition output. RPM+MAF+throttle, cal 0xD2CB0-CB8");
@@ -359,8 +331,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0004359C, "task48_final_timing",
             "[TRACED] Task [48] Final timing/injector output. Throttle+MAF+boost, 4 JSR");
         // Base Advance
-        count += labelComment(0x0003F00C, "task49_base_advance",
-            "[TRACED] Task [49] Base timing advance. RPM+MAF+load+ATM, 16+ RAM refs");
         count += labelComment(0x0003F368, "task50_timing_blend_int",
             "[TRACED] Task [50] Timing blend integration. RPM+MAF+cl_enable, blend output");
         // Boost / Wastegate
@@ -495,17 +465,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "See cl_ol_master_analysis.txt Section 4, disasm_3162C_annotated.txt.");
 
         // ── AFL Learning Functions ────────────────────────────────────────────
-        count += labelComment(0x00034884, "afl_learning_entry",
-            "[TRACED] AFL (A/F Learning) entry point. Dispatches to afl_learning_core (0x3452A). "
-            + "Gates: cl_active_check (0x345A4) requires CL mode (FFFF7448==1) — learning frozen in OL.");
-        count += labelComment(0x0003452A, "afl_learning_core",
-            "[TRACED] AFL learning core. Updates per-range stored values (FFFF316C/317C/317C/3184). "
-            + "4 airflow ranges (0-6, 6-23, 23-40, 40-80 g/s, breakpoints at CC074-CC07C). "
-            + "Learning gate: 0x34C54 reads FFFF7448; if OL, skips update. ");
-        count += labelComment(0x000345A4, "afl_cl_active_check",
-            "[TRACED] AFL CL-active gate (10-condition check). Called from afl_learning_core. "
-            + "Checks FFFF8F24, CC020 (MAF<=70g/s), FFFF73A4, FFFF7354, FFFF7374, "
-            + "FFFF7A14, FFFF7A20, FFFF7D18, FFFF7BE2 etc. All must pass to allow AFL update.");
 
         // ── Path A Phase Functions (already partially labeled, update details) ─
         count += labelComment(0x00036F76, "clol_post_transition_B",
@@ -534,7 +493,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00058902, "frontO2_scaling_lookup",
             "[DECODED] Front O2 sensor scaling table lookup. Accesses descriptor near 0xAF468.");
         count += labelComment(0x00004A2C, "frontO2_scaling_init",
-            "[TRACED] Front O2 sensor scaling initialization/read. Accesses descriptor near 0xAF45C.");
+            "[DECODED] Front O2 sensor scaling initialization/read. Accesses descriptor near 0xAF45C.");
 
         // AFC (Short-Term Fuel Correction) Pipeline
         count += labelComment(0x00033304, "afc_dispatcher",
@@ -690,8 +649,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Active flag; cleared on knock entry");
         count += labelComment(0xFFFF829DL, "flkc_fg_retard_done",
             "[TRACED] Set to 1 after retard applied");
-        count += labelComment(0xFFFF829EL, "flkc_fg_enable",
-            "[TRACED] Must == 1 to enter main logic");
         count += labelComment(0xFFFF82A0L, "flkc_fg_exit_flag",
             "[TRACED] Set to 1 at normal exit");
         count += labelComment(0xFFFF82A1L, "flkc_fg_bank_route",
@@ -715,8 +672,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] FLKC learning convergence flag for slot 15. Read by flkc_state_flag_slot15 (0x2999C). "
             + "When non-zero: task19 consolidates FLKC corrections, task23 propagates per-cell "
             + "corrections, task56 EVAP precondition passes.");
-        count += labelComment(0xFFFF8258L, "flkc_fg_limit_FR15",
-            "[TRACED] Loaded into FR15, compared vs 100.0");
         count += labelComment(0xFFFF3244L, "flkc_fg_R0_init",
             "[TRACED] Early R0 setup");
         count += labelComment(0xFFFF8233L, "flkc_fg_flag_8233",
@@ -1064,18 +1019,8 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] Main fueling entry (non-returning). Dispatched from fuel_dispatch_table_B.");
         count += labelComment(0x00033278, "fuel_precalc",
             "[TRACED] Fueling pre-calculation. Dispatched from fuel_dispatch_table_A.");
-        count += labelComment(0x0003452A, "afl_core_entry",
-            "[TRACED] A/F Learning core entry. Calls CL active check, range selection, value update. Dispatch B.");
-        count += labelComment(0x000344BA, "afl_range_loop",
-            "[TRACED] A/F Learning 4-range loop. Iterates ranges A-D at FFFF316C, 8-byte stride.");
         count += labelComment(0x000344EE, "afl_validity_check",
-            "[UNVERIFIED] A/F Learning range validity check. Iterates 4 ranges, calls 0xBDCB6.");
-        count += labelComment(0x000345A4, "cl_active_check",
-            "[TRACED] CL Active Check: 10-condition gate. Returns 1=CL active (learning OK), 0=inactive. "
-            + "Checks FFFF8F24, CC020 (MAF<=70g/s), FFFF73A4, FFFF7354, FFFF7374, "
-            + "FFFF7A14, FFFF7A20, FFFF7D18, FFFF7BE2.");
-        count += labelComment(0x00034488, "afl_sub_dispatcher",
-            "[TRACED] A/F Learning sub-dispatcher. Dispatched from fuel_dispatch_table_A.");
+            "[DECODED] A/F Learning range validity check. Iterates 4 ranges, calls 0xBDCB6.");
         count += labelComment(0x000357D0, "clol_transition_sub_B",
             "[DECODED] CL/OL transition sub B. Dispatched from fuel_dispatch_table_A.");
         count += labelComment(0x00036008, "clol_delay_manager_A",
@@ -1103,7 +1048,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0003BB6C, "fuel_accel_enrich",
             "[TRACED] Acceleration enrichment. Tip-in/out gains CC51C-530, cal 0xCBC0B/0C. Pipeline B.");
         count += labelComment(0x0003CD34, "fuel_warmup_enrich",
-            "[TRACED] Warmup/cold-start enrichment. Reads ECT FFFF69FC, IAT FFFF69F0. Pipeline B.");
+            "[DECODED] Warmup/cold-start enrichment. Reads ECT FFFF69FC, IAT FFFF69F0. Pipeline B.");
         count += labelComment(0x0003EB8C, "fuel_overrun_cutoff",
             "[TRACED] Overrun fuel cutoff. RPM/airflow thresholds, cal 0xD29AA, tail-calls 0x46BCC. Pipeline B.");
 
@@ -1458,29 +1403,11 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Fuel correction parameter D (float). Read by fuel_correction_final.");
         count += labelComment(0xFFFF77DCL, "fuel_corr_cl_target_A",
             "[TRACED] CL target comp A output (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
-            "[TRACED] CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
-            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
-            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
-            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
-            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
-            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
-            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
-            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
-            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
-            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
-            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
-            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
-            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
-            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
-            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
 
         count += labelComment(0xFFFF316CL, "afl_table_base",
             "[TRACED] A/F Learning table base in RAM (4 ranges x 8 bytes = 32 bytes)");
         count += labelComment(0xFFFF78A0L, "afl_output_struct",
-            "[UNVERIFIED] A/F Learning output data structure base (~100 bytes). +3=CL active flag.");
-        count += labelComment(0xFFFF787FL, "afl_airflow_range_idx",
-            "[CITED] Current A/F Learning airflow range index (byte, 0-3: A/B/C/D)");
+            "[TRACED] A/F Learning output data structure base (~100 bytes). +3=CL active flag.");
         count += labelComment(0xFFFF8F24L, "cl_global_enable",
             "[TRACED] Global CL enable flag (byte). Must be non-zero for CL fueling.");
         count += labelComment(0xFFFF7BE2L, "cl_enable_final",
@@ -1596,28 +1523,12 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] OL enrichment dispatch. Reads FFFF79C6 mode state (always 0). Values 1/2 are dead code hooks.");
 
         // AFL Core Functions
-        count += labelComment(0x00034488, "afl_sub_dispatcher",
-            "[TRACED] AFL sub-dispatcher. Dispatch Table A entry [5]. Orchestrates AFL learning cycle.");
-        count += labelComment(0x000344BA, "afl_range_loop",
-            "[TRACED] AFL range loop. Iterates 4 learning ranges (0-3).");
         count += labelComment(0x000344EE, "afl_validity_check",
-            "[UNVERIFIED] AFL validity check before learning cycle.");
-        count += labelComment(0x0003452A, "afl_core_entry",
-            "[TRACED] AFL core entry. Calls: airflow range -> CL check -> range select -> value update -> store -> max check -> transition.");
-        count += labelComment(0x000345A4, "afl_cl_active_check",
-            "[TRACED] AFL CL active check. 10-condition gate including FFFF8F24, MAF>70g/s, FFFF7BE2, etc.");
-        count += labelComment(0x00034778, "afl_range_selection",
-            "[TRACED] AFL range selection with additional enable logic.");
-        count += labelComment(0x00034884, "afl_value_update",
-            "[TRACED] AFL value update. Actual learning adjustment. Step size 0.001 (CC05C). Limits +/-25% (CC064/CC068).");
-        count += labelComment(0x00034B1C, "afl_value_store",
-            "[UNVERIFIED] AFL value store. Clamp + write to FFFF316C+(range*8) array.");
+            "[DECODED] AFL validity check before learning cycle.");
         count += labelComment(0x00034C18, "afl_clol_transition_handler",
-            "[UNVERIFIED] AFL CL/OL transition handler. Calls afl_clol_mode_check at 0x34C54.");
+            "[DECODED] AFL CL/OL transition handler. Calls afl_clol_mode_check at 0x34C54.");
         count += labelComment(0x00034CC8, "afl_max_airflow_rate_check",
-            "[TRACED] AFL max airflow learning rate check. <35g/s: 88 ticks, >=35g/s: 244 ticks (~2.8x slower).");
-        count += labelComment(0x00034D52, "afl_airflow_range_determination",
-            "[CITED] AFL airflow range determination. Selects range 0-3 from breakpoints at CC074-CC07C.");
+            "[DECODED] AFL max airflow learning rate check. <35g/s: 88 ticks, >=35g/s: 244 ticks (~2.8x slower).");
 
         // AFL Application (KEY: no CL/OL gate!)
         count += labelComment(0x00037ABA, "iat_ect_filter_and_blend",
@@ -1627,7 +1538,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "then writes 1.0 to 0xFFFF7AB4. No A/F learning table is read. Was injector_trim_application. "
             + "corrections.md item 97.");
         count += labelComment(0x00037B74, "afl_application",
-            "[TRACED] AFL APPLICATION. Writes FFFF7AB4 multiplier. WARNING: Does NOT check FFFF7448 CL/OL mode. Does NOT check airflow max. Only gates: FFFF726C (transient), FFFF7C68 (status). AFL persists into OL.");
+            "[DECODED] AFL APPLICATION. Writes FFFF7AB4 multiplier. WARNING: Does NOT check FFFF7448 CL/OL mode. Does NOT check airflow max. Only gates: FFFF726C (transient), FFFF7C68 (status). AFL persists into OL.");
         count += labelComment(0x00037F00, "iat_ect_weighted_blend",
             "[TRACED] ([0xFFFF31AC] ECT x [0xCC2FC] + [0xFFFF31A4] IAT x [0xCC2F4]) passed with [0xCC300] to "
             + "0xBE628, result to 0xFFFF7AB8. All three constants are 0.0 on rev 20.19c. A temperature blend, "
@@ -1656,15 +1567,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF31ACL, "ect_filtered_31AC",
             "[TRACED] Lag-filtered (or raw) coolant temp, float. Written by 0x037ABA, read by 0x037F00. Was "
             + "afl_interp_primary. corrections.md item 97.");
-        count += labelComment(0xFFFF726CL, "transient_state_flag",
-            "[TRACED] Transient state flag (byte). Gates AFL application — when set, forces FFFF7AB4=1.0.");
         count += labelComment(0xFFFF726EL, "transient_knock_inhibit",
             "[TRACED] Transient knock inhibit flag (byte). Read by check_transient_knock_inhibit (0x2F8FE). "
             + "When ==1: tasks 8/10/11 suppress knock window/flag updates (tip-in protection). "
             + "Distinct from transient_state_flag (FFFF726C) which gates AFL/fuel corrections.");
-        count += labelComment(0xFFFF7E4CL, "transient_accum_ptr",
-            "[TRACED] Pointer/accumulator used by transient_correction_calc (0x2F984). "
-            + "Loaded as 32-bit value, used in float multiply chain for tip-in enrichment.");
         count += labelComment(0xFFFF65F1L, "transient_enable_gate",
             "[TRACED] Gate flag checked by transient_correction_calc (0x2F984). When zero, skips tip-in "
             + "calculation entirely. Related to 0x2F974 entry guard.");
@@ -1699,8 +1605,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] OL active flag (byte). Written by Path A state machine.");
         count += labelComment(0xFFFF7AB4L, "afl_multiplier_output",
             "[TRACED] AFL multiplier output (float). Written by afl_application at 0x37B74. Consumed by fuel PW calc at 0x0301E4. Applied unconditionally in CL and OL.");
-        count += labelComment(0xFFFF7C68L, "engine_status_flag",
-            "[TRACED] Engine status flag (byte). Gates AFL application — abnormal condition forces FFFF7AB4=1.0.");
 
         // ── CL/OL Path B — FFFF7452 Readiness Inputs & Working Variables ─────
         count += labelComment(0xFFFF7450L, "cl_speed_readiness",
@@ -1798,9 +1702,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7990L, "ol_enrichment_target",
             "[TRACED] OL enrichment accumulator target (float). Computed as FR15 * ol_blend_coeff. "
             + "WRITE 4 filter clamps ol_enrichment_accum to not drop below this target.");
-        count += labelComment(0xFFFF79A0L, "ol_blend_coeff",
-            "[TRACED] OL enrichment blend coefficient (float). Multiplied with target enrichment value "
-            + "to compute ol_enrichment_target. Controls blend rate.");
         count += labelComment(0xFFFF79C7L, "clol_diagnostic_flag",
             "[TRACED] CL/OL diagnostic flag (byte). Set by ol_condition_checker (0x3643A) to indicate "
             + "which condition triggered the OL transition. Used for SSM/diagnostics.");
@@ -1975,9 +1876,6 @@ public class ImportAE5L600L extends GhidraScript {
         // ── Context Save/Restore (ISR prologue) ────────────────────────────
 
         // ── CL/OL Mode Check Helpers ───────────────────────────────────────
-        count += labelComment(0x00022F92, "check_cl_active",
-            "[DECODED] 111 calls. Reads FFFF65F6 byte, returns T-bit = (value==1). "
-            + "Quick CL-mode gate used throughout fuel/timing/diagnostic code.");
         count += labelComment(0x0002F8EA, "check_transient_flag",
             "[DECODED] 65 calls. Reads FFFF726C byte (transient flag), returns T-bit = (value==1). "
             + "Transient condition gate for AFL/fuel corrections.");
@@ -1991,9 +1889,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "and FFFF726C == 1, then calls 3x table_1d_desc (0xAC34C, 0xAC360, 0xAC374) for "
             + "tip-in RPM/load factors. Float multiply chain writes results to FFFF72E8/72F4/7300. "
             + "Final stage calls check_cl_active — skips update if not in closed-loop mode.");
-        count += labelComment(0x0003AB20, "check_engine_status",
-            "[TRACED] 35 calls. Reads FFFF7C68 byte (engine status), returns T-bit = (value==1). "
-            + "Gates AFL application — forces multiplier=1.0 on abnormal.");
 
         // ── Diagnostic / Sensor Validation Framework ───────────────────────
         count += labelComment(0x000582D2, "check_engine_running_diag",
@@ -2019,7 +1914,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Address / Offset Calculation ───────────────────────────────────
         count += labelComment(0x00006B5A, "calc_table_offset",
-            "[TRACED] 53 calls. Complex offset computation using calibration base 0xC0080 "
+            "[DECODED] 53 calls. Complex offset computation using calibration base 0xC0080 "
             + "and lookup tables at 0x1190C/0x11914/0x1193C. Returns computed address in r0. "
             + "Used by calibration descriptor reads to resolve table pointers.");
 
@@ -2070,7 +1965,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── FLKC Learning State Flag Dispatch Table ────────────────────────
         count += labelComment(0x00029858, "flkc_state_flag_reader_table",
-            "[TRACED] Dispatch table of 16-byte stubs (NOT a single function). Each stub reads one byte "
+            "[DECODED] Dispatch table of 16-byte stubs (NOT a single function). Each stub reads one byte "
             + "from the FFFF970E learning state flag array and returns R0=2 (non-zero/converged) "
             + "or R0=0 (zero/empty). Callers JSR to a specific offset to check a specific flag slot. "
             + "Covers FFFF970E-FFFF9737 (41 bytes). Dead slots return R0=0 unconditionally. "
@@ -2087,7 +1982,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0001CF16, "engine_state_helper",
             "[TRACED] 10 calls. Engine state utility. Called from AFL/timing/boost contexts.");
         count += labelComment(0x00021D9A, "cl_readiness_check",
-            "[TRACED] 12 calls. CL readiness evaluation. Called from CL/OL transition, fuel, and AFL code. "
+            "[DECODED] 12 calls. CL readiness evaluation. Called from CL/OL transition, fuel, and AFL code. "
             + "Referenced by clol_cond analysis.");
         count += labelComment(0x000717B2, "eeprom_read_helper",
             "[TRACED] 25 calls. EEPROM/NV-memory read utility. Called from DTC and adaptation contexts.");
@@ -2150,9 +2045,9 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Remaining High-Value Targets ───────────────────────────────────
         count += labelComment(0x00006828, "io_read_word_atomic",
-            "[TRACED] 15 calls. Atomic word read from I/O region with interrupt protection.");
+            "[DECODED] 15 calls. Atomic word read from I/O region with interrupt protection.");
         count += labelComment(0x00006884, "io_read_2word_atomic",
-            "[TRACED] 20 calls. Atomic 2-word read from I/O region.");
+            "[DECODED] 20 calls. Atomic 2-word read from I/O region.");
         count += labelComment(0x0000CA72, "timer_reload",
             "[TRACED] 11 calls. Timer/counter reload function. Called in groups (0xCBC6-0xCBDA range).");
         count += labelComment(0x00002EDC, "stack_frame_setup",
@@ -2173,8 +2068,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[UNVERIFIED] 10 calls. DTC history memory update. Writes fault history for readout.");
 
         // ── Known RAM: Status Check Addresses ──────────────────────────────
-        count += labelComment(0xFFFF65F6L, "cl_active_flag",
-            "[TRACED] Byte: 1=closed loop active. Read by check_cl_active (0x22F92), 111 calls.");
         count += labelComment(0xFFFFB71CL, "dtc_master_enable",
             "[TRACED] Byte: DTC system master enable. Read by dtc_set_code/dtc_clear_code.");
         count += labelComment(0xFFFF36F0L, "diag_mode_status",
@@ -2206,14 +2099,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "(b) axis 0x0C0294 via descriptor 0x0AA760 reads 0,8,16..120 = km/h; "
             + "(c) launch-control patch 0x0F1000 compares it to 8.0515 = 5 mph via LCSPEED(MPH) toexpr x*.621. "
             + "Engine load is 0xFFFF63F8. See docs/corrections.md item 9.");
-        count += labelComment(0xFFFF67ECL, "dtc_maturation_counter_67EC",
-            "[TRACED] CORRECTED 2026-07-26. uint16 DTC MATURATION COUNTER at +4 in the 0xFFFF67E8 counter block. "
-            + "NOT atmospheric pressure and NOT a float. Access census over all 99 pool refs: 99 int16 "
-            + "(mov.w) accesses, ZERO FP accesses -- e.g. 0x01202A mov.l @(0x01210C),r6 ; 0x01202C mov.w @r6,r11, "
-            + "in a function that reads real floats through fmov.s from FFFF6624/FFFF6634 in the same breath. "
-            + "Reset to 0 at 0x023AA8; incremented through the saturating u16 helper 0x0BE554 at 0x023AB2; "
-            + "compared against the uint16 calibration at 0xC0212 (=306) at 0x01207E. Barometric pressure is "
-            + "the float at 0xFFFF6898. See docs/corrections.md item 15.");
         count += labelComment(0xFFFF65C0L, "diag_precondition_flag_65C0",
             "[TRACED] CORRECTED 2026-07-26. BYTE boolean in the 0xFFFF65B7-0xFFFF65C6 flag block. NOT throttle position "
             + "and NOT a float. Census: 89 int8 accesses, ZERO FP accesses; every address in that block is "
@@ -2241,22 +2126,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF6364L, "iat_current",
             "[TRACED] CORRECTED 2026-07-26. INTAKE AIR TEMPERATURE (float, degC). See the full proof on the earlier "
             + "labelComment for this address and docs/corrections.md item 12.");
-        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
-            "[TRACED] CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
-            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
-            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
-            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
-            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
-            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
-            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
-            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
-            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
-            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
-            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
-            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
-            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
-            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
-            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
         count += labelComment(0xFFFF6254L, "flag_6254",
             "[TRACED] CORRECTED 2026-07-26. BYTE boolean at +4 in the 0xFFFF6250 block. NOT mass airflow and NOT a float. "
             + "Census: 51 int8 accesses, ZERO FP accesses. Set to the literal 1 together with its siblings at "
@@ -2290,12 +2159,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "all the SAME unnamed 0..1 axis 0xC4514, and ZERO temperature-named axes -- while 0xFFFF6364 reaches "
             + "9. A value clamped to [0,1] cannot be a -40..120 C temperature, so the old name is refuted outright. "
             + "WHICH ratio it is remains UNRESOLVED and is deliberately not guessed. corrections.md items 23 + 33.");
-        count += labelComment(0xFFFF6C48L, "diag_status_code_6C48",
-            "[CITED] CORRECTED 2026-07-26. BYTE status/result code. NOT battery voltage and NOT a float. Census: "
-            + "34 int8 accesses (13 loads, 21 stores), ZERO FP accesses. Every stored constant is a "
-            + "nibble-doubled sentinel -- 0x00/0x33/0x55/0x77/0xAA/0xBB/0xDD/0xEE (e.g. 0x02C148 mov #-69,r2 ; "
-            + "0x02C14C mov.b r2,@r1 stores 0xBB). A voltage does not take eight discrete hand-written values. "
-            + "Real battery voltage is the float at 0xFFFF4130. See docs/corrections.md item 14.");
 
         // ── ADC / Sensor Raw + Status (0xFFFF61xx-0xFFFF65xx) ──────────────
         count += labelComment(0xFFFF6155L, "adc_channel_status",
@@ -2340,15 +2203,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "'Turbo Dynamics Proportional / Boost Error', 0xC0D3C 'Turbo Dynamics Integral Negative / "
             + "Boost Error', 0xC0D74 'Turbo Dynamics Integral Positive / Boost Error'. 3 of 3 named axes agree. "
             + "See docs/corrections.md item 22.");
-        count += labelComment(0xFFFF62E4L, "throttle_angle_change",
-            "[CITED] IDENTIFIED 2026-07-26. THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger value (float, %, "
-            + "axis 0..31.3). 0x03A9BC mov.l @(0x03AA70),r2 (=FFFF62E4) ; 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) "
-            + "; 0x03A9D0 jsr 0x0BE830 -> descriptor 0x0AD368, axis 0xCED08 = 'Throttle Tip-in Enrichment A / "
-            + "Throttle Angle Change'; the alternate branch reaches 0xCED74 'Throttle Tip-in Enrichment B / "
-            + "Throttle Angle Change', selected by the byte at 0xFFFF844F. Tuning-relevant. "
-            + "See docs/corrections.md item 22.");
         count += labelComment(0xFFFF7324L, "last_calc_base_pulse_width",
-            "[CITED] IDENTIFIED 2026-07-26. LAST CALCULATED BASE PULSE WIDTH (float; ms toexpr x*.001; axis "
+            "[TRACED] IDENTIFIED 2026-07-26. LAST CALCULATED BASE PULSE WIDTH (float; ms toexpr x*.001; axis "
             + "1000..16000 = 1..16 ms). 0x038DCE mov.l @(0x038E14),r2 (=FFFF7324) ; 0x038DD0 fmov.s @r2,fr4 ; "
             + "0x038DD8 jsr 0x0BE8E4 with delay fmov fr15,fr5 (FR15 = [FFFF6624] rpm) -> descriptor 0x0AD738, "
             + "axis0 0xD0760 = 'Per Injector Pulse Width Compensation A / Last Calculated Base Pulse Width', "
@@ -2444,7 +2300,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF9058L, "sched_state_A",
             "[UNVERIFIED] 32 refs. Scheduler state variable A.");
         count += labelComment(0xFFFF9FC6L, "sched_timer_base",
-            "[UNVERIFIED] 22 refs. Scheduler timer base. GBR base (3 uses).");
+            "[TRACED] 22 refs. Scheduler timer base. GBR base (3 uses).");
         count += labelComment(0xFFFF9FA8L, "sched_timer_B",
             "[UNVERIFIED] 17 refs. Scheduler timer variable B.");
         count += labelComment(0xFFFF91C4L, "sched_queue_base",
@@ -2455,10 +2311,6 @@ public class ImportAE5L600L extends GhidraScript {
         // ── Fuel / Timing Working (0xFFFF7xxx) ─────────────────────────────
         count += labelComment(0xFFFF798CL, "timing_state_var",
             "[TRACED] 17 refs. Timing state variable. Referenced by task35_timing_corr.");
-        count += labelComment(0xFFFF7E90L, "timing_output_A",
-            "[TRACED] 25 refs. Timing output value A.");
-        count += labelComment(0xFFFF7D68L, "throttle_delta_pos",
-            "[TRACED] 19 refs. Positive throttle rate of change (float). Used by accel enrichment. Was timing_blend_state.");
         count += labelComment(0xFFFF7C9DL, "fuel_state_byte",
             "[TRACED] 32 refs. Fuel state byte/flag.");
 
@@ -2486,12 +2338,6 @@ public class ImportAE5L600L extends GhidraScript {
         // From SH7058 hardware manual + cross-reference with code context.
         // Only addresses actually referenced in the ROM are labeled.
 
-        count += labelComment(0xFFFF0000L, "SH7058_STBCR",
-            "[TRACED] 9 refs. Standby Control Register (power management). Module stop control bits.");
-        count += labelComment(0xFFFF0004L, "SH7058_STBCR2",
-            "[TRACED] 2 refs. Standby Control Register 2. Additional module stop bits.");
-        count += labelComment(0xFFFF0008L, "SH7058_STBCR3",
-            "[TRACED] 2 refs. Standby Control Register 3. Peripheral clock gating.");
         count += labelComment(0xFFFF0020L, "SH7058_SYSCR",
             "[TRACED] 2 refs. System Control Register. Bus width, endianness, clock divider.");
         count += labelComment(0xFFFF12B0L, "SH7058_SCI_SMR",
@@ -2629,7 +2475,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00E654, "stubpool_slot_26", "[TRACED] Literal pool slot 26 at 0x0E654 holds 0x047B66. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00E658, "stubpool_slot_27", "[TRACED] Literal pool slot 27 at 0x0E658 holds 0x049A7A. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x049A7A, "stubpool_target_27",
-            "[TRACED] Slot 27 of the LITERAL POOL at 0x00E5EC (0x0E658), called from a 0x00E4xx task stub. "
+            "[DECODED] Slot 27 of the LITERAL POOL at 0x00E5EC (0x0E658), called from a 0x00E4xx task stub. "
             + "RENAMED from \"isr_handler_27\", which was positional over a structure misread as an "
             + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
             + "the 0x0-0x400 vector table. corrections.md item 91.");
@@ -2896,9 +2742,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "Channel map: ADDR4=Baro(402C), ADDR5=TPS(402E), ADDR7=VBatt(4032), "
             + "ADDR14=MAP-baro(4040), ADDR15=MAF(4042), ADDR22=MAP-man(4050), "
             + "ADDR26=FuelT(4058), ADDR28=O2(405C), ADDR29=ECT(405E), ADDR30=IAT(4060).");
-        count += labelComment(0x0000AE50L, "task10_init_irq_scratch",
-            "[TRACED] Task 10 call_01: tiny function. Manipulates interrupt-level mask bits (0xFF0F), "
-            + "bit operation on SR scratch value, immediate RTS. Init helper.");
         count += labelComment(0x0000ACF4L, "task10_batv_calibrate",
             "[TRACED] Task 10 call_29: Battery Voltage calibration. Reads FFFF4032 (Battery Voltage raw "
             + "ADC ADDR7), scales via ROM table 0xC4A74, writes calibrated float to FFFF432C/432E.");
@@ -2973,16 +2816,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "0xF97C -> 0xE54E (wrapper) -> 0x5798 (pre-calc) -> 0x049CF0 (runner). "
             + "References 0xBE81C and sub-table base 0x11BA4.");
 
-        count += labelComment(0x00000C0CL, "rtos_reset_entry",
-            "[TRACED] Power-on reset entry point (= vec_PowerOnResetPC = 0x0C0C). "
-            + "Initial SP = 0xFFFFBFA0. Calls HW init (0xC20, 0xC54), "
-            + "then RTOS startup 0x65C with R4=R5=0. Main loop at 0x0C1C is infinite BRA.");
 
-        count += labelComment(0x0000065CL, "rtos_startup",
-            "[TRACED] RTOS startup / initialization. Called from reset entry (0x0C0C) with R4=R5=0. "
-            + "Registers task table @ 0x3F80, starts scheduler. "
-            + "Calls gate infra (0x004C), hardware setup (0x762, 0x78E), RTOS init (0x598). "
-            + "Checks magic at FFFF_BFFC, calls scheduler watchdog (0x0EE4).");
 
         // -- Sub-task pool: OL-gated dispatchers (all check FFFF8EDC) --
         count += labelComment(0x00049CF0L, "fuel_dispatch_tableB_runner",
@@ -3129,7 +2963,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "Called from cl_monitor_state_machine on state 0->1 transition.");
 
         count += labelComment(0x0004AE82L, "ol_fuel_table_init",
-            "[TRACED] Multi-function fuel table initializer, gated by FFFF8EDC==0. "
+            "[DECODED] Multi-function fuel table initializer, gated by FFFF8EDC==0. "
             + "If R14==1: calls 0x303C0, 0x46C88, 0x475A8, 0x3DBF4. "
             + "If R14!=1: calls 0x44132, 0x475B0, 0x3DBFC. "
             + "Tail-calls 0x6F0C2.");
@@ -3265,10 +3099,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "all with R4=0. Background throttle position processing.");
 
         // --- Fuel path helper functions (Task 5/6/9) ---
-        count += labelComment(0x0000FE22L, "charge_table_advance",
-            "[TRACED] Double-buffered function pointer selector. Struct at FFFF5B70 "
-            + "(12 bytes/entry: 2 func ptrs + slot index). Ping-pongs slot "
-            + "0/1 each call, returns selected function pointer. Called by Task 5/6.");
 
         count += labelComment(0x0000FDECL, "charge_table_store",
             "[TRACED] Stores a new function pointer into the next slot of the "
@@ -3315,11 +3145,11 @@ public class ImportAE5L600L extends GhidraScript {
             + "Workspace: FFFF4284, 28 bytes/channel. Calls 0xA55E (get_channel_count) "
             + "and 0xA4E0 (process_channel). Allocs 224-byte workspace per iteration.");
         count += labelComment(0x0000A4E0L, "maf_process_channel",
-            "[TRACED] Per-channel intake processing. Clamps count to 0xFFFF, computes "
+            "[DECODED] Per-channel intake processing. Clamps count to 0xFFFF, computes "
             + "remainder, calls atomic_store_u16_twice (0x11848) and stores "
             + "accumulator result to FFFF4294[ch].");
         count += labelComment(0x0000A55EL, "maf_get_channel_count",
-            "[TRACED] Reads raw crank-synced MAF count from intake channel table (0x11A7C) "
+            "[DECODED] Reads raw crank-synced MAF count from intake channel table (0x11A7C) "
             + "and adds to accumulator at FFFF4294[ch]. Returns new total count.");
         count += labelComment(0x00009A72L, "intake_channel_processor",
             "[TRACED] Per-channel intake processor. Descriptor dispatch(group=16), computes "
@@ -3340,7 +3170,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "Ch0: F640/F444/0x10000, Ch1: F642/F446/0x20000, "
             + "Ch2: F644/F448/0x40000, Ch3: F646/F44A/0x80000.");
         count += labelComment(0x00011848L, "atomic_store_u16_twice",
-            "[TRACED] Stores a 16-bit value (r5) to the caller-supplied address (r4) twice (0x01185E, "
+            "[DECODED] Stores a 16-bit value (r5) to the caller-supplied address (r4) twice (0x01185E, "
             + "0x011864) inside a critical section (0xBE81C/0xBE82C). 0xE0 is the interrupt mask, not a "
             + "workspace size. No interpolation. Was descriptor_interpolation. corrections.md item 97.");
 
@@ -4878,8 +4708,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Injection status array (2-byte entries). Read by ISR[21] gate logic.");
         count += labelComment(0xFFFF3D1CL, "inj_status_end",
             "[TRACED] End pointer for injection status array.");
-        count += labelComment(0xFFFF36BEL, "inj_ign_port_status",
-            "[TRACED] Injection/ignition port status word. Read by ISR[21] and ISR[22].");
 
         // -- Calibration for ATU --
         count += labelComment(0x000C008C, "atu_interp_cal_table",
@@ -5104,24 +4932,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Monitoring state byte: 1=transitioning, 2=active. Read by task58 maturation.");
         count += labelComment(0xFFFF65A9L, "engine_state_extended",
             "[TRACED] Engine state extended byte. Read by task58 extended MAF diagnostics.");
-        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
-            "[TRACED] CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
-            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
-            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
-            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
-            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
-            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
-            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
-            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
-            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
-            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
-            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
-            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
-            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
-            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
-            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
-        count += labelComment(0xFFFF63FCL, "barometric_pressure",
-            "[TRACED] Barometric/atmospheric pressure (float). Read by task56 EVAP.");
         count += labelComment(0xFFFF3B06L, "diag_indexed_lookup_table",
             "[TRACED] Diagnostic indexed lookup table. Accessed at FFFF3B06 + R4*2 by 0x58518.");
 
@@ -5198,19 +5008,17 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Ignition Timing Sub-Functions ──
         count += labelComment(0x00040314, "task30_pre_calc",
-            "[TRACED] Task30 base timing pre-calculation subroutine.");
+            "[DECODED] Task30 base timing pre-calculation subroutine.");
         count += labelComment(0x00040520, "task34_throttle_calc_sub",
             "[TRACED] Task34 throttle timing calc subroutine.");
         count += labelComment(0x00044296, "task29_timing_percyl",
-            "[TRACED] Task 29: secondary per-cylinder timing computation.");
+            "[DECODED] Task 29: secondary per-cylinder timing computation.");
         count += labelComment(0x00046296, "task27_knock_timing",
             "[TRACED] Task 27: knock timing retard per-cylinder.");
 
         // ── Ignition Timing Workspace RAM ──
         count += labelComment(0xFFFF7F64L, "base_timing_output",
             "[TRACED] Base timing output (float). Written by task30.");
-        count += labelComment(0xFFFF7F10L, "gbr_base_timing_ws",
-            "[TRACED] GBR base for task30 base timing workspace.");
         count += labelComment(0xFFFF8098L, "ign_output_workspace",
             "[TRACED] Ignition output workspace (float). Task38.");
         count += labelComment(0xFFFF80AEL, "dwell_output",
@@ -5225,8 +5033,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Final combined timing advance (float). Task48 output.");
         count += labelComment(0xFFFF81E8L, "per_cyl_timing_corr",
             "[TRACED] Per-cylinder timing corrections (float[4]). Task0/29.");
-        count += labelComment(0xFFFF8258L, "flkc_retard",
-            "[TRACED] FLKC retard value (float).");
         count += labelComment(0xFFFF322CL, "FLKC_slow_learning_value",
             "[TRACED] Fine knock learn (FLKC slow) learning value (float).");
         count += labelComment(0xFFFF3248L, "flkc_grid",
@@ -5405,10 +5211,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "then calls 0x9E4A stub to write FFFF4280. Also calls 0xBE598 "
             + "for float path. Tail-calls 0x3190 (irq level restore). "
             + "Called from Task 10 dead time update chain.");
-        count += labelComment(0x00030430, "status_byte_copy",
-            "[TRACED] Copies FFFF726C to FFFF7370.");
-        count += labelComment(0x00030744, "sensor_prep",
-            "[TRACED] Calls 0x23E48, writes FFFF73A2.");
         count += labelComment(0x00030ACC, "base_fuel_map_combiner",
             "[TRACED] 2D map + descriptors to FFFF73AC base fuel.");
         count += labelComment(0x00030B68, "base_fuel_table_calc",
@@ -5430,15 +5232,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000403C4, "ect_warmup_correction",
             "[TRACED] Mode-selected ECT correction, 4 curves.");
         count += labelComment(0x0003CD34, "warmup_coldstart_enrichment",
-            "[TRACED] ECT/IAT indexed warmup enrichment.");
+            "[DECODED] ECT/IAT indexed warmup enrichment.");
 
         // ── ECT Warmup Consumer ──
         count += labelComment(0x0003F374, "ect_warmup_consumer",
             "[TRACED] ECT warmup consumer (2050 bytes). Reads FFFF7F68, outputs 8 per-channel corrections.");
-        count += labelComment(0x0003FA8C, "warmup_state_init",
-            "[TRACED] Embedded sub: initializes warmup state struct.");
-        count += labelComment(0x0003FACE, "warmup_mode_transition",
-            "[TRACED] Embedded sub: warmup mode transition evaluator.");
 
         // ── Fuel Cut / Injector Output Chain ──
         count += labelComment(0x00046BCC, "fuel_cut_output_tail",
@@ -5462,7 +5260,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00008408, "hw_timer_init",
             "[TRACED] Hardware timer initialization.");
         count += labelComment(0x00009E4AL, "dead_time_apply_stub",
-            "[TRACED] Dead time apply stub (3 instr). R2=FFFF4280; RTS; delay: [FFFF4280]=R4. "
+            "[DECODED] Dead time apply stub (3 instr). R2=FFFF4280; RTS; delay: [FFFF4280]=R4. "
             + "Called from 0x0303C2 (JSR) with R4=zero-extended uint16 dead time. "
             + "Writes the current dead time to injector_dead_time_applied.");
         count += labelComment(0x0003D63AL, "dead_time_read_stub",
@@ -5479,7 +5277,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "BF/S if window expired; MOV.W R0,@(20,R7) writes ATU OCR; "
             + "BSR 0xA4E0; JSR 0xBE82C. Final per-cylinder pulse width write.");
         count += labelComment(0x00009B2CL, "crank_angle_calc_9B2C",
-            "[CITED] ([0xFFFF4280]+[0xFFFF42F4]+arg) x 180.0 / [0xFFFF4158]; then (arg fr4 - [0xFFFF4168]) "
+            "[DECODED] ([0xFFFF4280]+[0xFFFF42F4]+arg) x 180.0 / [0xFFFF4158]; then (arg fr4 - [0xFFFF4168]) "
             + "is wrapped by +720/-720 against -60 and 660 (constants at 0x9C14-0x9C28 are 180, -60, 720, 660, "
             + "-720, not tables). Arithmetic on a 720-degree cycle, NOT an injector dead-time correction. "
             + "Purpose unverified. Was dt_float_correction. corrections.md item 96.");
@@ -5560,8 +5358,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Default fuel multiplier (float, 1.05).");
         count += labelComment(0xFFFF7A74L, "fuel_trim_af_ratio",
             "[TRACED] A/F ratio fuel trim input (float).");
-        count += labelComment(0xFFFF7AB0L, "injector_trim_workspace",
-            "[TRACED] Injector trim workspace (4 slots).");
 
         // ── OL Enrichment State ──
         count += labelComment(0xFFFF7954L, "ol_enrichment_factor_A",
@@ -5605,8 +5401,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Injection channel enable mask. 0xFF = all 8 channels.");
 
         // ── ECT Warmup Consumer State ──
-        count += labelComment(0xFFFF7E90L, "warmup_corr_cyl0",
-            "[TRACED] Final warmup correction cylinder 0 (float).");
         count += labelComment(0xFFFF7E94L, "warmup_corr_cyl1",
             "[TRACED] Final warmup correction cylinder 1 (float).");
         count += labelComment(0xFFFF7E98L, "warmup_corr_cyl2",
@@ -6131,9 +5925,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000C36F8, "cal_Atmospheric_Pressure",
             "[TRACED] RomRaider: Atmospheric Pressure");
         count += labelComment(0x000C3B7C, "cal_Intake_Temperature",
-            "[CITED] RomRaider: Intake Temperature");
+            "[TRACED] RomRaider: Intake Temperature");
         count += labelComment(0x000C3B90, "cal_Mass_Airflow",
-            "[CITED] RomRaider: Mass Airflow");
+            "[TRACED] RomRaider: Mass Airflow");
         count += labelComment(0x000C3BB0, "cal_MAF_Compensation_IAT",
             "[TRACED] RomRaider: MAF Compensation (IAT)");
         count += labelComment(0x000C3BD8, "cal_Manifold_Pressure",
@@ -6159,7 +5953,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CC830, "cal_Min_Primary_Base_Enrichment_1_Non_Primary_OL",
             "[TRACED] RomRaider: Min Primary Base Enrichment 1 (Non-Primary OL)_");
         count += labelComment(0x000CC840, "cal_Manifold_Pressure",
-            "[CITED] RomRaider: Manifold Pressure");
+            "[TRACED] RomRaider: Manifold Pressure");
         count += labelComment(0x000CC868, "cal_Cranking_Fuel_IPW_Compensation_MAP",
             "[TRACED] RomRaider: Cranking Fuel IPW Compensation (MAP)");
         count += labelComment(0x000CC874, "cal_Accelerator_Pedal_Angle",
@@ -6175,7 +5969,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CCD30, "cal_Primary_Open_Loop_Fueling_Compensation_Timing_Compensati",
             "[TRACED] RomRaider: Primary Open Loop Fueling Compensation (Timing Compensation)_");
         count += labelComment(0x000CCD38, "cal_Engine_Speed",
-            "[UNVERIFIED] RomRaider: Engine Speed");
+            "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000CCD88, "cal_Throttle_Plate_Opening_Angle",
             "[TRACED] RomRaider: Throttle Plate Opening Angle");
         count += labelComment(0x000CCDA0, "cal_Minimum_Primary_Open_Loop_Enrichment_Throttle",
@@ -6189,7 +5983,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CE5B8, "cal_Engine_Speed",
             "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000CE618, "cal_Mass_Airflow",
-            "[CITED] RomRaider: Mass Airflow");
+            "[TRACED] RomRaider: Mass Airflow");
         count += labelComment(0x000CE6CC, "cal_Primary_Open_Loop_Fueling_Compensation_ECT",
             "[TRACED] RomRaider: Primary Open Loop Fueling Compensation (ECT)");
         count += labelComment(0x000CED74, "cal_Throttle_Angle_Change",
@@ -6285,7 +6079,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000D2DA0, "cal_Timing_Comp_Minimum_Coolant_Temp_Per_Cylinder",
             "[TRACED] RomRaider: Timing Comp Minimum Coolant Temp (Per Cylinder)");
         count += labelComment(0x000D2DAC, "cal_Feedback_Correction_Range_RPM",
-            "[UNVERIFIED] RomRaider: Feedback Correction Range (RPM)");
+            "[TRACED] RomRaider: Feedback Correction Range (RPM)");
         count += labelComment(0x000D2DD8, "cal_Extended_Feedback_Correction_High_RPM_Compensation",
             "[TRACED] RomRaider: Extended Feedback Correction High RPM Compensation");
         count += labelComment(0x000D2EBC, "cal_Rough_Correction_Range_RPM",
@@ -6321,7 +6115,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000D38A0, "cal_Timing_Compensation_B_IAT",
             "[TRACED] RomRaider: Timing Compensation B (IAT)");
         count += labelComment(0x000D3C04, "cal_Engine_Speed",
-            "[UNVERIFIED] RomRaider: Engine Speed");
+            "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000D3C2C, "cal_Rough_Correction_Learning_Delay_Increasing",
             "[TRACED] RomRaider: Rough Correction Learning Delay (Increasing)_");
         count += labelComment(0x000D4688, "cal_Engine_Load",
@@ -6531,7 +6325,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- Alpha Engine Load Limit B Multiplier ---
         count += labelComment(0x000AAE20, "cal_Engine_Load_Limit_B_Maximum_RPM_Multiplier",
-            "[UNVERIFIED] RomRaider: Engine Load Limit B Maximum (RPM) - Multiplier");
+            "[TRACED] RomRaider: Engine Load Limit B Maximum (RPM) - Multiplier");
 
         // --- Map Switching - Cruise/Non-Cruise ---
         count += labelComment(0x000D29AE, "cal_Map_Switching_Cruise_Switch_Min_Delay_A",
@@ -6788,8 +6582,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "Feeds definition-named axis 0xCC840 'Cranking Fuel IPW Compensation (MAP) / Manifold Pressure'; "
             + "span 0..1500. Corroborated by 0xC0BC8 'Boost disable during fuel cut-Boost(bar) threshold' "
             + "= 1.68 bar absolute compared against this value at 0x0141F2. See docs/corrections.md item 9.");
-        count += labelComment(0xFFFF6430L, "adc_processed_secondary",
-            "[CITED] ADC processed secondary sensor value");
         count += labelComment(0xFFFF6598L, "adc_processed_temp",
             "[TRACED] ADC processed intermediate sensor value (float). Pipeline temp between raw ADC and engine state.");
         count += labelComment(0xFFFF65A2L, "engine_state_var_A",
@@ -6816,8 +6608,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Ignition timing workspace variable (float). Multiple re");
 
         // --- knock_flkc (25 labels) ---
-        count += labelComment(0xFFFF81F8L, "knock_thresh_config",
-            "[TRACED] Knock threshold config workspace (GBR base). Task04/10.");
         count += labelComment(0xFFFF8210L, "knock_window_state",
             "[TRACED] Knock window state workspace (GBR base). Task08.");
         count += labelComment(0xFFFF8318L, "knock_state_var",
@@ -6884,7 +6674,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF922CL, "scheduler_counter",
             "[UNVERIFIED] Scheduler counter variable");
         count += labelComment(0xFFFF9358L, "sched_event_counter",
-            "[UNVERIFIED] Scheduler event/task counter (GBR base). Scheduler region.");
+            "[TRACED] Scheduler event/task counter (GBR base). Scheduler region.");
         count += labelComment(0xFFFF9FBCL, "sched_timer_extended_C",
             "[UNVERIFIED] Scheduler timer extension C (GBR base). Adjacent to sched_timer_base cluster.");
         count += labelComment(0xFFFF9FDFL, "sched_timer_state",
@@ -6977,8 +6767,6 @@ public class ImportAE5L600L extends GhidraScript {
         // REGION 0x020000 UTILITY LIBRARY LABELS
         // Key functions identified from scout analysis
         // =====================================================================
-        count += labelComment(0x00022F92L, "check_cl_active",
-            "[DECODED] Flag reader: returns 1 if FFFF65F6 == 1 (closed-loop active). 111 callers -- #1 most-called in region.");
         count += labelComment(0x0002F8EAL, "check_transient_flag",
             "[DECODED] Flag reader: returns 1 if FFFF726C == 1 (transient_state_flag). 65 callers.");
         count += labelComment(0x00022CEAL, "check_accel_pedal_idle",
@@ -6993,7 +6781,7 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] DECODED (item 92): reads byte[FFFF971C], returns 2 if non-zero else 0. It is a READ, not a store, and there is no float. Supersedes \"float_store_to_ram\". "
             +             "DTC flag reader: returns 2 if FFFF971C nonzero (P0137 rear O2 low). 14 callers.");
         count += labelComment(0x00021D9AL, "check_sensor_valid",
-            "[TRACED] Sensor validity check: reads FFFF6552. Called from CL/OL transition. 12 callers.");
+            "[DECODED] Sensor validity check: reads FFFF6552. Called from CL/OL transition. 12 callers.");
         count += labelComment(0x000297A0L, "diag_flag_reader_cluster_start",
             "[DECODED] DECODED 2026-08-19 (item 92): reads byte[FFFF9704], returns 2 if non-zero else 0. Six instructions, no float and no descriptor. Supersedes \"float_load_from_desc\". "
             +             "Start of 45 sequential DTC flag readers (16B each). FFFF9704-FFFF9742. "
@@ -7275,23 +7063,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "0xFFFF40B4 at 0x0203E0 mov.l @(0x0205E4),r2 (=0xFFFF40B4) ; 0x0203E2 fmov.s @r2,fr8 ; 0x0203E4 "
             + "mov.l @(0x0205E8),r14 (=0xFFFF6424) ; 0x0203E6 mov #-112,r0 ; 0x0203E8 fmov.s fr8,@(r0,r14) "
             + "=> 0xFFFF6424-112 = 0xFFFF63B4. corrections.md item 29.");
-        count += labelComment(0xFFFF63B8L, "maf_sample_prev",
-            "[CITED] IDENTIFIED 2026-07-27. Previous MAF sample (float, g/s), slot 1 of the 2-entry shift register that "
-            + "feeds 0xFFFF63C0. Written 0x01FF04 fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-120; read back at "
-            + "0x01FF24. corrections.md item 29.");
-        count += labelComment(0xFFFF63BCL, "maf_sample_curr",
-            "[CITED] IDENTIFIED 2026-07-27. Current MAF sample (float, g/s), slot 2 of the shift register feeding "
-            + "0xFFFF63C0. Written 0x01FF0C fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-116, sourced from "
-            + "0xFFFF6424 which is itself loaded from 0xFFFF63B4. corrections.md item 29.");
-        count += labelComment(0xFFFF63C0L, "maf_uncompensated_gps",
-            "[CITED] IDENTIFIED 2026-07-27. MASS AIRFLOW, 2-sample average, BEFORE the charge-temperature compensation (float, g/s). "
-            + "0x01FF20 r1=0xFFFF6430 ; 0x01FF24 fmov.s @(r0,r1),fr8 (r0=-120 => 0xFFFF63B8) ; 0x01FF28 fmov.s "
-            + "@(r0,r1),fr9 (r0=-116 => 0xFFFF63BC) ; 0x01FF2A fadd fr9,fr8 ; 0x01FF30 fmul fr4,fr8 with FR4 = "
-            + "*(0x020090) = 0.5 ; 0x01FF34 fmov.s fr8,@(r0,r1) (r0=-112) => 0xFFFF63C0 = 0.5*(63B8+63BC). It is "
-            + "then fed straight back out as the axis-1 input: 0x01FF3A fmov.s @(r0,r1),fr5 ; 0x01FF3E jsr "
-            + "0x0BE8E4 with r4 = 0x0AAFE8 = counts 5x8, axis1 0xC3B90, whose definition name ends \"/ Mass "
-            + "Airflow\" (1.6..290 g/s). The computed-address form is why a literal-pool-only trace cannot see "
-            + "it. corrections.md items 28 + 29.");
 
         // --- ADC throttle/TPS ---
         count += labelComment(0xFFFF643CL, "gbr_adc_643C",
@@ -7333,7 +7104,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF69F8L, "gbr_adc_69F8",
             "[UNVERIFIED] GBR workspace base (1 use). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF6A18L, "gbr_adc_6A18",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC pressure/misc.");
+            "[TRACED] GBR workspace base (1 use). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF6A64L, "gbr_adc_6A64",
             "[TRACED] GBR workspace base (2 uses). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF6A74L, "gbr_adc_6A74",
@@ -7373,18 +7144,14 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF721CL, "gbr_fuel_721C",
             "[UNVERIFIED] GBR workspace base (2 uses). Region: fuel state.");
         count += labelComment(0xFFFF7244L, "gbr_fuel_7244",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: fuel state.");
+            "[TRACED] GBR workspace base (2 uses). Region: fuel state.");
         count += labelComment(0xFFFF726DL, "gbr_fuel_726D",
             "[TRACED] GBR workspace base (1 use). Region: fuel state.");
         count += labelComment(0xFFFF7278L, "gbr_fuel_7278",
             "[TRACED] GBR workspace base (2 uses). Region: fuel state.");
         count += labelComment(0xFFFF72A0L, "gbr_fuel_72A0",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: fuel state.");
-        count += labelComment(0xFFFF72B4L, "gbr_fuel_72B4",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: fuel state.");
-        count += labelComment(0xFFFF7354L, "gbr_fuel_7354",
             "[TRACED] GBR workspace base (1 use). Region: fuel state.");
-        count += labelComment(0xFFFF7374L, "gbr_fuel_7374",
+        count += labelComment(0xFFFF72B4L, "gbr_fuel_72B4",
             "[TRACED] GBR workspace base (1 use). Region: fuel state.");
         count += labelComment(0xFFFF73B0L, "gbr_fuel_73B0",
             "[TRACED] GBR workspace base (1 use). Region: fuel state.");
@@ -7400,15 +7167,11 @@ public class ImportAE5L600L extends GhidraScript {
             "[UNVERIFIED] GBR workspace base (2 uses). Region: AFC/AFL state.");
         count += labelComment(0xFFFF7858L, "gbr_afc_7858",
             "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
-        count += labelComment(0xFFFF7874L, "gbr_afc_7874",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: AFC/AFL state.");
         count += labelComment(0xFFFF7888L, "gbr_afc_7888",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: AFC/AFL state.");
+            "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF78ACL, "gbr_afc_78AC",
             "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF7950L, "gbr_afc_7950",
-            "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
-        count += labelComment(0xFFFF79C0L, "gbr_afc_79C0",
             "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF79CCL, "gbr_afc_79CC",
             "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
@@ -7418,10 +7181,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Phase 7 sub-C ol_transition_completion_check");
         count += labelComment(0xFFFF7A2CL, "gbr_afl_7A2C",
             "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
-        count += labelComment(0xFFFF7A78L, "gbr_afl_7A78",
-            "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
-        count += labelComment(0xFFFF7AA0L, "gbr_afl_7AA0",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: AFL/fuel trim.");
         count += labelComment(0xFFFF7AB8L, "gbr_afl_7AB8",
             "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
 
@@ -7441,29 +7200,23 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7D2AL, "gbr_tim_7D2A",
             "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
         count += labelComment(0xFFFF7D5CL, "gbr_tim_7D5C",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
+            "[TRACED] GBR workspace base (1 use). Region: timing state.");
 
         // --- timing workspace ---
         count += labelComment(0xFFFF7E74L, "gbr_tim_7E74",
             "[UNVERIFIED] GBR workspace base (1 use). Region: timing workspace.");
-        count += labelComment(0xFFFF7EC0L, "base_advance_state",
-            "[TRACED] Task49 base advance workspace. GBR base for base_advance calculations.");
         count += labelComment(0xFFFF7ED4L, "gbr_tim_7ED4",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: timing workspace.");
+            "[TRACED] GBR workspace base (1 use). Region: timing workspace.");
         count += labelComment(0xFFFF7EECL, "gbr_tim_7EEC",
             "[TRACED] GBR workspace base (1 use). Region: timing workspace.");
-        count += labelComment(0xFFFF7F0CL, "timing_blend_app",
-            "[TRACED] Task32 timing blend application workspace.");
         count += labelComment(0xFFFF7F74L, "gbr_tim_7F74",
             "[TRACED] GBR workspace base (2 uses). Region: timing workspace.");
         count += labelComment(0xFFFF7F8CL, "gbr_tim_7F8C",
             "[TRACED] GBR workspace base (1 use). Region: timing workspace.");
 
         // --- knock_flkc ---
-        count += labelComment(0xFFFF8020L, "gbr_kflk_8020",
-            "[TRACED] GBR workspace base (2 uses). Region: knock_flkc.");
         count += labelComment(0xFFFF8024L, "gbr_kflk_8024",
-            "[CITED] GBR workspace base (1 use). Region: knock_flkc.");
+            "[TRACED] GBR workspace base (1 use). Region: knock_flkc.");
         count += labelComment(0xFFFF804CL, "gbr_kflk_804C",
             "[TRACED] GBR workspace base (1 use). Region: knock_flkc.");
         count += labelComment(0xFFFF8068L, "gbr_kflk_8068",
@@ -7476,8 +7229,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Knock detection workspace extension.");
         count += labelComment(0xFFFF821CL, "knock_thresh_calc",
             "[TRACED] Task03 knock threshold calculation workspace.");
-        count += labelComment(0xFFFF8277L, "roughness_detection",
-            "[UNVERIFIED] Task13 roughness detection workspace.");
 
         // --- idle control ---
         count += labelComment(0xFFFF8330L, "gbr_idle_8330",
@@ -7489,7 +7240,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF8354L, "gbr_idle_8354",
             "[TRACED] GBR workspace base (1 use). Region: idle control.");
         count += labelComment(0xFFFF8358L, "gbr_idle_8358",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: idle control.");
+            "[TRACED] GBR workspace base (1 use). Region: idle control.");
         count += labelComment(0xFFFF8364L, "gbr_idle_8364",
             "[TRACED] GBR workspace base (1 use). Region: idle control.");
         count += labelComment(0xFFFF8378L, "gbr_idle_8378",
@@ -7691,7 +7442,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- scheduler queues ---
         count += labelComment(0xFFFF9124L, "gbr_sched_9124",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler queues.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler queues.");
         count += labelComment(0xFFFF91E0L, "gbr_sched_91E0",
             "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler queues.");
         count += labelComment(0xFFFF9218L, "gbr_sched_9218",
@@ -8050,10 +7801,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00016558L, "battery_voltage_state_eval",
             "[TRACED] 4 callers. Compares battery voltage (FFFF4130) against 9.0V/9.5V "
             + "hysteresis thresholds (cal 0xC152C/C1530); sets low-voltage flag FFFF5E45.");
-        count += labelComment(0x00011880L, "io_F738_toggle_bit15",
-            "[TRACED] A write, not a read: inside a critical section, toggles bit 15 of the word at "
-            + "0xFFFFF738 and keeps bits 0-14 (0x011890-0x01189C). Which peripheral register that is has NOT "
-            + "been checked. Was atu_timer_capture_read. corrections.md item 96.");
         count += labelComment(0x00014278L, "bit_test_nz",
             "[TRACED] Returns 1 if (R4 & R5) != 0. Part of trio: bit_test/bit_extract/byte_pair_merge "
             + "at 0x14278/82/8C.");
@@ -8134,34 +7881,22 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
 
         // -- item 74: task37 one-shot timing retard ---------------------------
-        count += labelComment(0x00041BE4, "timing_oneshot_retard",
-            "[TRACED] task37 stage 4. Applies ECT retard (desc 0xADE08) for ONE call when "
-            + "[FFFF7C9A] hit 4 on the previous pass and [FFFF7C78] > rpm; then recovers "
-            + "toward 0 at +0.7 deg/call, clamped by float_min so it never advances. "
-            + "Output arbitrated most-retard-wins into FFFF8028. NOT FBKC, NOT FLKC.");
-        count += label(0x00041A02, "task37_stage1");
-        count += label(0x00041A48, "task37_stage2");
-        count += labelComment(0x00041A7E, "task37_stage3",
-            "[TRACED] Uses desc 0xAE170 / 0xAE17C, both all-zero on this calibration.");
         count += labelComment(0x000ADE08, "desc_task37_ect_retard",
             "[TRACED] 1D uint8 x16 on ECT. [0,0,0,0,0,-8.09,-11.95,-16.17,...]. The ONLY "
             + "descriptor FUN_00041be4 loads. Base of a 17-record contiguous array "
             + "at stride 0x14; indexing NOT demonstrated -- do not assume it.");
         count += labelComment(0x000D2C0C, "cal_task37_rpm_gate_INERT",
-            "[CITED] Compared as rpm_current < this. Value is 0.0, so the gate can NEVER "
+            "[TRACED] Compared as rpm_current < this. Value is 0.0, so the gate can NEVER "
             + "fire. No XML definition. corrections.md item 74.");
         count += labelComment(0x000D2980, "cal_task37_counter_B_reload",
             "[TRACED] Reload for FFFF8033 = 1: the retard applies for exactly ONE call.");
         count += label(0x000D2981, "cal_task37_counter_A_reload");
         count += labelComment(0x000D2982, "cal_task37_byte_gate",
-            "[CITED] = 4. Compared against byte [FFFF5E94] when the engine is not running.");
-        count += labelComment(0xFFFF8028L, "kflk_retard_arbitrated",
-            "[TRACED] = float_min(FFFF8020, FFFF8024). Most-retard-wins across sibling "
-            + "timing channels.");
+            "[TRACED] = 4. Compared against byte [FFFF5E94] when the engine is not running.");
         count += label(0xFFFF8032L, "task37_counter_A");
         count += label(0xFFFF8033L, "task37_counter_B");
         count += labelComment(0xFFFF8036L, "task37_prev_precond_latch",
-            "[UNVERIFIED] Latched previous value of FFFF65C0.");
+            "[TRACED] Latched previous value of FFFF65C0.");
         count += label(0xFFFF5E94L, "task37_gate_byte_5E94");
 
         // -- item 72: func_37B74 fuel multiplier is dead ----------------------
@@ -8171,7 +7906,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CC330, "cal_afl_ramp_down_rate_ZERO",
             "[TRACED] AFL ramp-down rate = 0.0. Same effect on the max(x-0,0) arm.");
         count += labelComment(0x000D0740, "cal_afl_2d_correction_NEUTRAL",
-            "[CITED] Data for desc 0xAD71C, 16x2 uint8. All 32 cells raw 0x80 = 0.0 after "
+            "[TRACED] Data for desc 0xAD71C, 16x2 uint8. All 32 cells raw 0x80 = 0.0 after "
             + "scale 0.00390625 / bias -0.5. Neutral-filled, NOT empty. This is why "
             + "func_37B74's product is 0 and the fuel multiplier is a constant 1.0.");
         count += label(0xFFFF7AC4L, "afl_product_term_C");
@@ -8203,11 +7938,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0xFFFF7C94L, "overrun_dwell_threshold_2");
         count += label(0xFFFF7C96L, "overrun_dwell_threshold_3");
         count += labelComment(0x000AE17CL, "desc_task37_stage3_mode1_ZERO",
-            "[CITED] 6 cells, all 0.0. Stage 3 mode 1 accumulates this into gbr_kflk_8024.");
+            "[TRACED] 6 cells, all 0.0. Stage 3 mode 1 accumulates this into gbr_kflk_8024.");
         count += labelComment(0x000AE170L, "desc_task37_stage3_mode2_ZERO",
-            "[CITED] 6 cells, all 0.0. Stage 3 mode 2 source.");
+            "[TRACED] 6 cells, all 0.0. Stage 3 mode 2 source.");
         count += labelComment(0x000D2C28L, "cal_task37_stage3_mode3_ZERO",
-            "[CITED] = 0.0. Stage 3 mode 3 writes this to gbr_kflk_8024 directly.");
+            "[TRACED] = 0.0. Stage 3 mode 3 writes this to gbr_kflk_8024 directly.");
 
         // -- item 80: five open-hole-1 adjudications --------------------------
         count += labelComment(0xFFFF7F68L, "ect_warmup_blend_out",
@@ -8216,12 +7951,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "Written at 0x0403F8. 'blend_output' named the same thing from the "
             + "consumer side -- identity vs use, not a conflict. Item 80.");
         count += label(0xFFFF90BEL, "ect_warmup_mode_flag_A");
-        count += labelComment(0xFFFF8258L, "knock_metric_accum",
-            "[TRACED] Accumulator: += [0xFFFF826C] * ([8214]*[8204]*knock_thresh_calc*"
-            + "knock_det_workspace_ext), at 0x0459E4. Integrates knock-detector terms; "
-            + "produces NO degrees, so the competing 'flkc_retard' name is unsupported. "
-            + "Whether it is later converted to retard is NOT established.");
-        count += label(0xFFFF826CL, "knock_metric_gain");
         count += labelComment(0xFFFF8F24L, "status90_debounced_flag",
             "[TRACED] Set 1 when byte [0xFFFF8F12] == 90; cleared after 6 consecutive non-90 "
             + "samples. Written at 0x05E9C6. NEITHER 'blend_state_b' NOR "
@@ -8252,9 +7981,38 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00000040L, "set_sp_and_jump",
             "[DECODED] Class 75 (2): r15 = constant SP, jump to r4. Trace: stub_shapes_b_trace.txt "
             + "(corrections item 108).");
+        count += labelComment(0x0000065CL, "boot_block_decision",
+            "[DECODED] Boot decision. SP:=0xFFFFBFA0; WDT (0x000762: RSTCSR 0x5A1F, TCNT 0, TCSR 0xA53C), "
+            + "HCAN set-up; 0x000598/0x00054A write 0xFFFFBFE4..BFFB and words BFB8/BFBA:=0; byte BFAC:=0; if "
+            + "long 0xFFFFBFFC != 0x5AA5A55A runs the message window 0x0007E0(7); on every exit long "
+            + "0xFFFFBFFC:=0x5AA5A55A and jumps via 0x000040 (SP 0xFFFFBFA0) to [0x001000]=0x00127C on this "
+            + "ROM. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x000007E0L, "boot_msg_window",
+            "[DECODED] Boot message window: counts (r4 & 0xFFFF) WDT overflow events (TCSR bit 7, polled; "
+            + "0x000484 services) and returns 1 at once when that is 0; each pass writes byte 0xFFFFBFA8 := "
+            + "(BFEC == 0x55) and takes CAN messages into the ring 0xFFFFB4E0; returns 0 if FF 86 00.. is seen. "
+            + "Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00000C0CL, "reset_entry",
+            "[DECODED] Power-on / manual-reset vector target (SP 0xFFFFBFA0 from 0x000004): calls 0x000C20, "
+            + "0x000C54, then 0x00065C(r4=0,r5=0), which never returns. Writes no RAM itself. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00000C20L, "boot_bsc_sysc_init",
+            "[DECODED] BCR1:=0x000F, BCR2:=0, WCR:=0x7777, RAMER:=0, byte 0xFFFFBFAD:=0x77, SYSCR2:=0x3C04, "
+            + "ICR:=0, then spins while ICR bit 15 (NMIL) reads 0. Trace: poweron_state_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x00000C54L, "boot_port_init",
+            "[DECODED] Stores constants to 43 port words 0xFFFFF720..0xFFFFF778; no RAM access. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x00000D78L, "busy_wait_8n_D78",
             "[DECODED] Class 76 (2): busy-wait r5 = 0 .. (r4 << 3) (cmp/hs r4,r5: T when r5 >= r4 unsigned); "
             + "no memory access. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000127CL, "boot_stage2_entry",
+            "[DECODED] Stage 2 entry (SP 0xFFFFBFA0): byte [[0x002000]]=0xFFFF204C := 0x77 unless the word is "
+            + "blank; calls 0x0012C0(0). Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x000012C0L, "boot_stage2",
+            "[DECODED] Stage 2 (SP 0xFFFFBFA0, saves nothing): word 0xFFFF800C := 0xA53C (class 0), 0x001332 "
+            + "WDT writes, HCAN, longs 0xFFFF809C..80AF; byte 0xFFFF204C := 0x88; 0x001008 loads SP 0xFFFFBF7C "
+            + "and jumps to [0x0FFFF8]=0x00FA34. Trace: poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x000015FCL, "empty_function",
             "[DECODED] Class 2 (68 members): rts; nop. No register, flag or memory changes. Trace: "
             + "stub_shapes_a_trace.txt (corrections item 108).");
@@ -8899,6 +8657,12 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0000A690L, "empty_fn_00A690",
             "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
             + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000AE1CL, "ipr_clear_all",
+            "[TRACED] Words 0xFFFFED00..0xFFFFED16 (IPRA..IPRL) := 0. Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0000AE50L, "iprl_wdt_prio14",
+            "[DECODED] IPRL 0xFFFFED16 := (IPRL & 0xFF0F) | 0xE0: WDT ITI priority 14 (manual Table 7.4). "
+            + "Trace: poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x0000B072L, "empty_fn_00B072",
             "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
             + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
@@ -8908,6 +8672,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0000B2A6L, "empty_fn_00B2A6",
             "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
             + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B2AAL, "wdt_stop",
+            "[DECODED] TCSR := 0xA500|(TCSR&0xDF) (TME 0); RSTCSR := 0x5A1F; TCSR := 0xA518. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x0000B2E6L, "empty_fn_00B2E6",
             "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
             + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
@@ -9476,6 +9243,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0000F694L, "jmp_to_006316_00F694",
             "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x006316. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F6E6L, "wdt_iti_handler",
+            "[DECODED] Vector 224 (WDT ITI): pushes r7..r0, fr11..fr0, pr, fpul, fpscr (100-byte frame with "
+            + "SR/PC), clears TCSR OVF (A500|(TCSR&0x7F)), calls 0x010AD8, pops, rte. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x0000F766L, "irq_v229_ack_halt",
             "[TRACED] Shape class 88: u16[P] = 0xFC81 with P = 0xFFFFD008 or 0xFFFFD808 (no read); tail-call "
             + "G = 0x00E774 with r4 = C. Member parameters: K=0xfc81 P=0xffffd808 C=0xe5 G=0xe774 irq vector "
@@ -9487,6 +9258,15 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0000F86CL, "empty_fn_00F86C",
             "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
             + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000FA34L, "app_entry",
+            "[DECODED] Application entry (SP 0xFFFFBF7C, unused): SR.I:=15, VBR:=0x000FFC50, "
+            + "FPSCR:=0x00040001, jsr 0x0040CA whose delay slot 0x0040CC sets SP:=[0x011CC8]=0xFFFF12DC; byte "
+            + "0xFFFFBFAD:=0x88; 0x00FA5A. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x0000FA5AL, "app_init_sequence",
+            "[DECODED] Init sequence: 0x00AD98 (incl. 0x00B2AA WDT stop), 0x00AE1C IPRs:=0, 0x00AE50 "
+            + "IPRL[7:4]:=14, 0x0108DA(0), 0x010942 TME:=1, SR.I:=13 (ITI window opens), 0x010290, 0x00FBBA(0), "
+            + "0x0BEAB8(2000), masked 0x006BC4/0x006BF0, 0x00AE1C (window closes at 0x00AE4E), 0x003324(0). "
+            + "Trace: poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x0000FBA4L, "halt_forever",
             "[DECODED] SR mask = 15, zeroes the 16-bit pair at the address in the literal at 0x00FBD6, then "
             + "00FBB6: bra 0x00FBB6 forever (until a watchdog or reset). Trace: rtos_core_trace.txt "
@@ -9507,6 +9287,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] id < 15 -> jsr [0x011BD4+4*id](arg). Otherwise 0x00DCE4(1, id-15, &arg). Event 15 -> "
             + "row 0 -> bare rts 0x00E4FE; event 16 -> row 1 -> 0x00E502 -> 0x04793C. Trace: "
             + "revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0000FE22L, "mailbox_read_alternate",
+            "[DECODED] r0 = long [0xFFFF5B70+12*r4+4*idx], with idx = byte [rec+9]; then idx = (idx+1) mod 2. "
+            + "This is a two-slot mailbox read alternately. Trace: ffb_cl_side_trace.txt (corrections item "
+            + "114).");
         count += labelComment(0x0000FE58L, "empty_fn_00FE58",
             "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
             + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
@@ -9517,10 +9301,38 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] Marker != 0xAA55 -> 5B8D := 1. 5B8D == 0 -> post event 16 (0x04793C). 5B8D == 1 at the "
             + "re-read -> RAM test, clear 0xFFFF2000..3FFF, marker := 0x55AA, event 18. Marker present with "
             + "5B8D outside {0,1}: nothing. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x00010290L, "reset_ram_tests",
+            "[DECODED] Tests A 0xFFFF4000..BF9F (destructive); if passed, B 0xFFFF0000..001F (masked 0xE0 "
+            + "section) and C 0xFFFF0020..1FFF (SP moved to 0xFFFFBF9C) with save/restore; always 0x010398; "
+            + "byte 0xFFFF5B89 := 1 or 8*B_fail + 2*C_fail. Trace: poweron_state_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x00010398L, "reset_dma_zero_fill",
+            "[DECODED] DMAC ch0: SAR=DAR=0xFFFF4000 (long 0 stored there), DMATCR 0x1FE8, CHCR 0x001F0128 "
+            + "then DE: auto-request burst longword fixed-source fill -> 0xFFFF4000..0xFFFFBF9F := 0; spins on "
+            + "TE. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00010448L, "ram_test",
+            "[DECODED] RAM test of [r4,r5]: stride 16/32 strided passes via 0x0105AA plus pattern heads per "
+            + "block, up to [0x0C4730]=2 attempts, mismatches reported through 0x01068E; r0 = 1 on failure. "
+            + "Stays inside the range when its length is a multiple of the stride and no block head lies closer "
+            + "than a stride to end (true for all four ROM ranges). Trace: poweron_state_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x000105AAL, "ram_test_stride_pass",
+            "[DECODED] One strided write/verify pass (0xA55A5AA5 / 0x5AA5A55A) from a to the first a+k*s >= "
+            + "lim; returns fail flag. Trace: poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x0001076AL, "trap_log_clear",
             "[DECODED] Clears the five-record trap log at 0xFFFF2060 (stores value:~value pairs via 0x0BDB6E "
             + "/ 0x0BDB80, no FPU). Not a charge workspace init. Trace: rtos_core_trace.txt (corrections item "
             + "107).");
+        count += labelComment(0x00010878L, "boot_wdt_limit_set",
+            "[DECODED] Reads TCSR & 7 (0x1C -> 4 on this path); long 0xFFFF0000 := trunc(fr4/(CKS==3 ? 0.8192 "
+            + ": 1.6384) + 0.5) = 183 for 300.0; long 0xFFFF0004 := 0. Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x000108DAL, "boot_wdt_arm",
+            "[DECODED] Inside a 0xE0 section: delay(300), 0x011880, byte 0xFFFF0008:=r4; r4==0 -> "
+            + "0x010C52(4); 0x010878(300.0). Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00010942L, "wdt_start",
+            "[DECODED] TCSR := 0xA520 | TCSR byte (TME := 1); 0x1C -> 0x3C, interval mode. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x00010962L, "call_then_tail_branch",
             "[DECODED] Class 4 (62 members): bsr A, then bra B with the caller's PR restored. There is no "
             + "argument set-up: A gets the caller's state and B gets exactly what A left in r0-r14, fr0-fr15 "
@@ -9529,6 +9341,16 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x010950. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0x00010AD8L, "boot_wdt_count",
+            "[DECODED] long 0xFFFF0004 += 1; if count < [0xFFFF0000] (unsigned) tail-calls 0x011880; else "
+            + "0x010800(0x2100/0x2200/0x2300 for byte 0xFFFF0008 = 0/1/other, 0) and jmp 0x00FBA4. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00010C52L, "wdt_set_cks",
+            "[DECODED] TCSR := 0xA518, then 0xA518 | r4 | (old TCSR & 0x20); on the reset path r4=4, old TME "
+            + "0 -> TCSR 0x1C. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00011880L, "port_F738_bit15_toggle",
+            "[DECODED] Inside a 0xE0 section inverts bit 15 of port word 0xFFFFF738. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0x00011EEAL, "initpair_20AC",
             "[TRACED] Shape class 34: r0 = F(r4 = V) with F = 0x0BE9B0 and V = 0 in every member; u32[A] = "
             + "r0; return r0. By the 0x0BE9B0 Member parameters: F=0xbe9b0 V=0 A=0xffff20ac. Shape-matched and "
@@ -9611,11 +9433,11 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] Class 5 (58 members): r0 = ((byte[K] & M) != 0), since X = 1 in all members. T is left "
             + "= ((byte[K] & M) == 0). Trace: stub_shapes_a_trace.txt (corrections item 108).");
         count += labelComment(0x0001CF22L, "test_61F4_m40",
-            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
             + "K=0xFFFF61F4 M=0x40 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
             + "(corrections item 108).");
         count += labelComment(0x0001CF2EL, "test_61F4_m20",
-            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
             + "K=0xFFFF61F4 M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
             + "(corrections item 108).");
         count += labelComment(0x0001CF3AL, "test_61F4_m10",
@@ -9716,6 +9538,31 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x0204BA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0x0001FE46L, "airflow_cap_load_and_lift_latch",
+            "[DECODED] One function 0x01FE46..0x02035E (census splits it at 0x020000/0x020012). Writes [63C4] "
+            + "= min([63C0]*[63F0] + [69F4]*0x0C3104, 0x0C3100), where [63C0] is the mean of the window max and "
+            + "min. It also writes the g/rev chain [63E0] [63DC] [63E4] [6408] [6414] [63E8], the "
+            + "[641C]/[641A]/[641B] latch, and the engine-load cell [63F8] with its rule list (frozen against "
+            + "rising while [641C]==1), plus [63FC] and [6400]. Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x000203DCL, "maf_window_sampler",
+            "[DECODED] [63B4] = [40B4]. If byte [65F6] == 1, [6420] = [6424] = 0x0AAE00([6350]); otherwise "
+            + "[6420] = max([6420], [63B4]) and [6424] = min([6424], [63B4]). Trace: fn_01FE46_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00020426L, "airflow_8call_delta",
+            "[DECODED] byte [6438] = sat([6438]+1). When it reaches >= 8 (0x0C302D): [63C8] = [63C4] - "
+            + "[6434], [6434] = [63C4], and [6438] = 0. Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0x00020580L, "latch_hold_counter_20580",
+            "[DECODED] byte [6418] = 0 if byte [641A] == 1, else sat_u8([6418]+1). Trace: fn_01FE46_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00020678L, "seed_airflow_load_and_clear_latch",
+            "[DECODED] Unconditionally seeds the airflow cells with 0x0AAE00([6350]) and the g/rev cells with "
+            + "0x0AAE50([6350]). Clears bytes [641C] [641A] [641B], sets [6419] = [6438] = 0xFF and [6439] = "
+            + "byte [65F6]. Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0x00020726L, "seed_and_clear_latch_if_65F6",
+            "[DECODED] Only when byte [65F6] == 1: seeds [63B8] [63BC] [63C0] [63C4] [63CC] with "
+            + "0x0AAE00([6350]) and the g/rev cells with 0x0AAE50([6350]), and clears [641C] [641A] [641B]. "
+            + "Writes nothing otherwise. GBR is 0xFFFF63B8. Trace: fn_01FE46_trace.txt (corrections item 114).");
         count += labelComment(0x000207D0L, "thunk_to_0207FA",
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x0207FA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
@@ -9769,6 +9616,12 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00022CF4L, "test_65C5_eq1",
             "[DECODED] r0 = (byte [0xFFFF65C5] == 1); clobbers r0, r6, T. Emulated over all 256 byte values. "
             + "Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0x00022F1CL, "copy_415C_to_65F6",
+            "[DECODED] Inside a critical section, byte [65F6] = byte [415C]. If that byte is 1, it also sets "
+            + "byte [65F7] = 0 and calls 0x006FF6 with r4 = 0. Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x00022F92L, "get_65F6_is_1",
+            "[DECODED] Returns ([65F6] == 1). Trace: overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0x000230F4L, "initpair_2220",
             "[TRACED] Shape class 34: r0 = F(r4 = V) with F = 0x0BE9B0 and V = 0 in every member; u32[A] = "
             + "r0; return r0. By the 0x0BE9B0 Member parameters: F=0xbe9b0 V=0 A=0xffff2220. Shape-matched and "
@@ -9792,6 +9645,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x023458. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0x00023A94L, "count_67EC_since_726C",
+            "[DECODED] If byte [726C]==1: word [67EC] = 0 and nothing else. Otherwise [67EC] and [67E8] each "
+            + "= sat16(+1). It is the only [67EC] writer find_writers shows. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
         count += labelComment(0x00023EB8L, "gear_estimate_writer",
             "[DECODED] Writer of byte 0xFFFF6810. Copies one of three threshold sets "
             + "(0x0C3474/0x0C3488/0x0C349C) to 0xFFFF6814..6824 by bytes 0xFFFF5F03/0xFFFF5FB8. Mode byte "
@@ -9958,7 +9815,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "K=0xFFFFA181 M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
             + "(corrections item 108).");
         count += labelComment(0x0002B28CL, "test_A176_m01",
-            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
             + "K=0xFFFFA176 M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
             + "(corrections item 108).");
         count += labelComment(0x0002B298L, "test_A16C_m01",
@@ -10002,10 +9859,29 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Shape class 48: r0 = F(r4 = V) with F = 0x0BE9A0, V = 0 -> 0x00FF; u16[A] = r0; u8[B] "
             + "= V2 (= 0); return r0 (0x00FF). Member parameters: F=0xbe9a0 V=0 A=0xffff3154 V2=0 B=0xffff7268. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002E8C0L, "eeprom_phase_dispatch",
+            "[DECODED] Copies the high byte of word [3154] into [7268] when the value:~value pair is "
+            + "consistent, else rebuilds the word from [7268]. Then dispatches phases A/B/C on gate byte [8E98] "
+            + "!= 0. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0002EB02L, "eeprom_writeback_pass",
+            "[DECODED] One pass of a six-word serial-EEPROM write-back (GBR 0xFFFF7244). Session-start writes "
+            + "come before the lock test. Backs off unless byte [0xFFFF6C48] is 0 or 0xEE. 7 busy passes -> "
+            + "finish without EWDS. State 2/3 or V<6.0 -> EWDS and finish. 0xEE is written only on a ready, "
+            + "non-aborting pass. Verifies and retries up to cal byte 0x0C472C=3, and writes word k to address "
+            + "483+k. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0002ED88L, "eeprom_outcome_record",
+            "[DECODED] Phase C. ([726A]==1 and count>6) or state 3 -> [7268] = 1 and word [3154] = 0x01FE. "
+            + "Else state 2 -> [7268] = 0 and word 0x00FF. Otherwise no outcome. Always sets [7265] = 1. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
         count += labelComment(0x0002EF08L, "thunk_to_02F85E",
-            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x02F85E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0x0002EF0CL, "runtime_floor_rearm_check",
+            "[DECODED] if 0x022F92()==1 (byte [65F6]==1): bsr 0x02F83E (bytes [726C] [72C8] [726F..7272]:=1, "
+            + "[72D1]:=0); then 0x02F57E and tail jump 0x02F6E0 (not decoded). Called by task-9 runner 0x04907C "
+            + "at 0491B0 on every pass with byte [8EDC]==0. Trace: injector_path_trace.txt (corrections item "
+            + "114).");
         count += labelComment(0x0002EF26L, "call_02F718_then_02F768",
             "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x02F718 B=0x02F768. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
@@ -10024,9 +9900,31 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0002EF4CL, "call_02F22A_then_02EFD2",
             "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x02F22A B=0x02EFD2. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002EF56L, "crank_flag_726C",
+            "[DECODED] [72A8] = AC804([6350]) = 500. [72C8] = 0 if [6624] > 500, 1 if [6624] <= 300, else "
+            + "held. [726C] = [726D] = 0 when [72C8]==0 and [7E4C] >= [72A4] (=0), else [726C] = 1. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0002EFD2L, "per_channel_pulse_after_start_floor",
+            "[DECODED] PW_j=[7290+4j]: RESET ([726C]!=0) to [72DC]; else if any flag byte [726F..7272]==1, "
+            + "EVERY channel (flag 0 or not) gets [7328+4j] if > [728C] else [728C], with "
+            + "[728C]=max([728C]*T(D,[6354]),0) and flag_j cleared when its pulse beats the floor; else COPY "
+            + "[7328+4j]. Latch [72D1]=1 when byte [7306]==1. Trace: injector_path_trace.txt (corrections item "
+            + "114).");
         count += labelComment(0x0002F2C2L, "lookup1d_ect_store",
             "[DECODED] Class 102 (2): f32[B] = 0x0BE830(R, f32[0xFFFF6350]); R = 0x0AC2BC (all cells 0) or "
             + "0x0AD0DC. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002F550L, "set_7288",
+            "[DECODED] [7288] = AC338([6350]) (flat 1.0) and [726E]=1 if byte [65C1]==1; otherwise [7288] = "
+            + "1.0 and [726E] = 0. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0002F974L, "mode0_factor_lookups",
+            "[DECODED] Returns at once if byte [0xFFFF65F1] != 0. If (signed) byte [726C] == 1: "
+            + "[72E0]/[72E4]/[72E8] = 1-D lookups of 0x0AC34C/0x0AC360/0x0AC374 at f32 [620C]/[64D8]/[6364], "
+            + "and [72DC] = 0x02F9E0(r4=[7E4C]+1), where r4 is unused. Trace: fns_03D856_02EB02_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0002F9E0L, "mode0_duration_clamp",
+            "[DECODED] fr0 = clamp([7300] + [72FC]*[72E0]*[72E4]*[72EC]*[72F4]*[72E8], 0, 262136) via "
+            + "0x0BE56C. The r4 argument has no effect. Trace: fns_03D856_02EB02_trace.txt (corrections item "
+            + "114).");
         count += labelComment(0x0002FA68L, "thunk_to_02FA94",
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x02FA94. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
@@ -10035,8 +9933,9 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] Shape class 49: r = F() & 0xFF; if r == K (K = 1): tail-call G (r0 = 1 at G); else "
             + "return r. Member parameters: F=0x22f92 K=1 G=0x2fa94. Shape-matched and emulated per member. "
             + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
-        count += labelComment(0x0002FB1CL, "float_getter",
-            "[DECODED] Class 103 (2): fr0 = f32[A]. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002FB1CL, "get_f32_72EC",
+            "[DECODED] fr0 = f32 [0xFFFF72EC]; r4 is never read. Trace: fns_03D856_02EB02_trace.txt "
+            + "(corrections item 114).");
         count += labelComment(0x0002FB68L, "thunk_to_02FB88",
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x02FB88. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
@@ -10050,7 +9949,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "T=0x02FB96. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
         count += labelComment(0x0002FCBAL, "getf_72FC",
-            "[TRACED] Shape class 103: fr0 = f32[A]. Member parameters: A=0xffff72fc. Shape-matched and "
+            "[DECODED] Shape class 103: fr0 = f32[A]. Member parameters: A=0xffff72fc. Shape-matched and "
             + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
         count += labelComment(0x0002FD3AL, "thunk_to_02FD8C",
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
@@ -10064,6 +9963,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x02FF8E "
             + "B=0x02FFA2 C=0x02FFE0 D=0x0301E4. Shape-matched and emulated per member. Trace: "
             + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002FF8EL, "set_pulse_lower_clamp",
+            "[DECODED] [733C] = 0.0 if byte [641C]==1 (sign-extended cmp/eq) else [0x0CBE08]=300.0; only "
+            + "writer found; called at 02FF7E right before the tail branch to 0x0301E4. Trace: "
+            + "injector_path_trace.txt (corrections item 114).");
         count += labelComment(0x0002FFE0L, "ffb_sum_and_clamp",
             "[DECODED] Live branch (byte 0x0CBBD2 = 0 in all three bins): S = "
             + "[73B4]+[7A08]+[7A14]+[7AF4]+[7B8C]+1.0-[7A44]+[7BCC]+[7BA8]+max(min([798C]+[7A20],0.52), "
@@ -10078,6 +9981,36 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] [7348] = clamp([63F8]*[0x0CBE0C] (\"Injector Flow Scaling\", 4916.0), 0, 131072) when "
             + "byte 0x0F8A84 == 0, as it is in 20.19c and stock. Trace: cl_target_to_fuel_trace.txt "
             + "(corrections item 111).");
+        count += labelComment(0x00030430L, "init_7370",
+            "[DECODED] byte [7370] = byte [726C]. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0003043AL, "ffb_cl_addend_a_runner",
+            "[DECODED] Calls 0x030454 on every call, then tail-branches to 0x0304BE only when bit 0 of r4 "
+            + "(the 0x04AA58 runner argument) is clear (030444-03044A). Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00030454L, "seed_7358_while_726C",
+            "[DECODED] If byte [726C]==1: [7358] = 0x0AC970(E)*[7288] ([90C1]==0,[3158]==0), 0x0AC984(E) "
+            + "([90C1]==0,[3158]!=0), 0x0AC948(E)*[7288] ([90C1]!=0,[3158]==0), 0x0AC95C(E) (both !=0), "
+            + "E=[6350]. Otherwise it writes nothing. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x000304BEL, "post_start_addend_7354",
+            "[DECODED] [7354] = AD594([6898],[6354]) * [7358] * [7364] (* [7360] if byte [7369]==1). [7358] "
+            + "*= 0.8984375 every N=AC3AC/AC3A0([6350])*[7368] calls, only while zext [67EC] > 38 and byte "
+            + "[7C9D]==0. A latch zeroes [7358]/[7354] when the previous [7354] is within +-2^-12 and "
+            + "[726C]==0. Byte [7370] = [726C]. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00030744L, "init_73A2",
+            "[DECODED] byte [73A2] = (byte [67FC]==1). Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00030754L, "ffb_cl_addend_b_runner",
+            "[DECODED] Calls 0x03076E on every call, then tail-branches to 0x03082E only when bit 0 of r4 is "
+            + "clear (03075E-030764). Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0003076EL, "seed_7378_7384_while_726C",
+            "[DECODED] If byte [726C]==1, seeds [7378]/[737C]/[7380]/[7384] from coolant tables of [6350]. "
+            + "With [3158]==0 these are AC9A4, AC9CC-or-AC9B8, ACA08 and ACA30-or-ACA1C, times [7288]. With "
+            + "[3158]!=0 they are AC9E0, AC9F4, ACA44 and ACA58. Otherwise it writes nothing. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0003082EL, "post_start_addend_7374",
+            "[DECODED] [7374] = max(P0*[7390]+[7398], P1*[7394]+[739C]) * AD5CC([6898],[6354]). P0/P1 = "
+            + "[7378]/[737C] if [90C1]==0 and [647C]==1, else [7380]/[7384]. Each is decayed linearly (floored "
+            + "at 0) only while zext [67EC] > [73A0](=0) and [7C9D]==0. [7390] = ACAF0(E) and [7394] = ACB04(E) "
+            + "= 0 when [67FC]==1; both are 1.0 otherwise. Trace: ffb_cl_side_trace.txt (corrections item 114).");
         count += labelComment(0x00030C38L, "transient_residual_writer",
             "[DECODED] Writes [73B4] every call: 0 if u16 [67EC] < (625 latch clear / 25 latch set) or bit1 "
             + "of byte [61F4]; else (T1+T2+T3)*[7400], max(.,0) while [67EC] < 875, no upper bound. Calls "
@@ -10222,22 +10155,64 @@ public class ImportAE5L600L extends GhidraScript {
             + "[7810]=(1-[780C])*[7808]+[7804]*[780C] (fmac). [780C] is a 0..1 ramp that steps +-10 per call "
             + "and rises while byte [85D7]==1 and [65FC] < 4.0. Byte [7871] = byte ... Trace: "
             + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0x00034488L, "afl_seed_7878",
+            "[DECODED] [78A1]=[6254]; [7878]=clamp(cell[[787F]],-0.25,0.25), with no range check on [787F]; "
+            + "[78AA]=1. Called only at 0x047F4C on 0x047C40's [8EDC]==0 arm. The call at 0x047D98 to 0x00FACA "
+            + "comes before it on one path, and whether 0x00FACA returns is not established. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0x000344BAL, "afl_cells_clear",
+            "[DECODED] Writes the four cell records 0xFFFF316C+8i := 0.0 with valid check words. Its only "
+            + "call site is 0x048972 in 0x048732, reached straight-line from 0x048732's entry. 0x048732 has two "
+            + "callers: event 17 and 0x047C40 (bsr 0x047DA6). Trace: afl_learning_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0003452AL, "afl_pass",
+            "[DECODED] Each pass: [78A6]=old [78A1]; [78A1]=byte [6254]; copies [6350],[6364],[63FC],[69FC] "
+            + "to [7888]..[7894], word [6A22] to [7898], ([65F6]==1) to [78A0]; then calls 0x034D52, 0x0345A4, "
+            + "0x034778, 0x034884, 0x034B1C; then [7874]=[7D68], 0x034CC8, 0x034C18, and tail-branches to "
+            + "0x034CEE. The copies stored in delay slots happen before the callee runs. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
         count += labelComment(0x00034592L, "thunk_to_034DA6",
-            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x034DA6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
         count += labelComment(0x00034596L, "call_034C54_then_034D2E",
-            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x034C54 B=0x034D2E. "
+            "[DECODED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x034C54 B=0x034D2E. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
         count += labelComment(0x000345A0L, "thunk_to_034DD6",
-            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x034DD6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0x000345A4L, "afl_enable_conjunctions_78A3_7883",
+            "[DECODED] Two bodies. The first writes [78A3] = 70>[788C] && |[73A4]|<=2^-8 && "
+            + "|[7354]|,|[7374]|<=2^-12 && |[7A14]|<=2^-10 && |[7A20]|<=2^-8 && bytes [7D18],[8F24],[7BE2]==0 "
+            + "(NaN counts as inside). It falls through to 0x034644, which writes [7883] = [7448]==1 && "
+            + "[78A7]>=128 && [A56A],[ACE6],[94B1]==0 && [7453]==1 && [78A8]>=128 && [7324]>[733C] && "
+            + "[78A3]==1. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0x00034778L, "afl_gate_7884",
+            "[DECODED] [78A4] = 75<=[7888]<95 && 0.012>|[7890]| && [78A5]==1 && ([78A1]==0 || [789C]>=78) && "
+            + "!([7AB4]>10000). [78AA] hysteresis on [7A44]: set at <=-2 or NaN, cleared above -1. [7884] = "
+            + "[7883] && [9709]==0 && (|[7894]|<=2^-11 || ([78AA] && w[7898]>=29)) && [78A4]. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0x00034884L, "afl_learning_step",
+            "[DECODED] The learning step. Struct 0x063A5C. Updates [78A9]. Resets the window ([7881]=0, "
+            + "[7882]=128) when G1-G4 fail or the mode-1 dt test fails. Otherwise it samples e = W0[7704] - 1/t "
+            + "+ [7BA8] + 1 (t=[77C8], replaced by 1.0 inside +-2^-13 or NaN) and votes up (e>=1.01) or down "
+            + "(e<0.99). At [7881]==40 (mode 1) or 16 it steps cell[[787F]] by +-0.001 (votes >=144 / <113), "
+            + "clamps to +-0.25 (0x0CC04C/50) and writes it with ... Trace: afl_learning_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x00034B1CL, "afl_applied_value_update",
+            "[DECODED] [7878] = clamp(clamp(x,-0.25,0.25),-0.5,0.5), where x = cell[[787F]] when "
+            + "0.02>|[7878]-cell| or [78A0]==1, and otherwise 0x0BEA40 lag(cell, [7878], k=0.0156, eps 2^-11). "
+            + "[7885]=1 while lagging, 0 on a snap. Trace: afl_learning_trace.txt (corrections item 114).");
         count += labelComment(0x00034C54L, "afc_lag_window_counter",
             "[DECODED] If byte [787E] > 0: byte [789E] += 1 until it reaches cal byte 0x0CBBEE (20), then "
             + "byte [787E] = 0; else byte [789E] = 0. Then if byte [7448] == 1, byte [7453] == 1 and 0.95 < "
             + "[7708] < 1.05 (strict): byte [787E] -= 1 when non-zero. Trace: afc_coefficients_trace.txt "
             + "(corrections item 111).");
+        count += labelComment(0x00034D52L, "afl_cell_index_34D52",
+            "[DECODED] [787F] = 0..3 from [63C4] against 0x0CC074/78/7C; NaN gives 3. [78A5] = 1.6<=x<80. "
+            + "When [78A0]==1 it writes index 0 and flag 0. Trace: afl_learning_trace.txt (corrections item "
+            + "114).");
         count += labelComment(0x00034EC8L, "ctl7904_init",
             "[DECODED] Init. Sets [78B0] = lookup(0xAD054,[6354]), [792C] = [78B4] = [43FC] and [78B8] = 0.7, "
             + "then falls into 0x034F28. Trace: hole9_afl_trace.txt (corrections item 107).");
@@ -10287,6 +10262,20 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00036062L, "call_036962_then_036848",
             "[DECODED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x036962 B=0x036848. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00036322L, "cl_ol_delay_counter_79C2",
+            "[DECODED] [79F3] = 0x036978(). [79C4]==0: [79C2] = 65535, then TAIL. [79F3]==1: [79C2] = 0, and "
+            + "[79C0] = subtract-or-zero of 0x0AD0D0 (65535) unless [7C68]==1, which holds it. [79F4]==1 "
+            + "(falling edge): [79C2] = [79C0]. Otherwise [79C2] = sat16(+0x0AD0B8 (1)); if the old [79C2] < "
+            + "[79C4], [79C0] = the new [79C2], else TAIL. TAIL: [79C0] = subtract-or-zero of 0x0AD0C4 (65535). "
+            + "Then [79C8] = (0 < [79C2] < [79C4]) and [79F4] = ... Trace: ffb_cl_side_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x00036962L, "ol_target_multiplier_79A0",
+            "[DECODED] [79A0] = 0x0AD0DC([6350]), in [0, 1.0] in every bin compared. No other store to it is "
+            + "found. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00036978L, "cl_ol_transition_test",
+            "[DECODED] [79CC]=AC5BC([6624]), [79D0]=AD0A4([6624]). [79FE]/[79FF] are hysteresis bytes for "
+            + "[62DC] vs [79CC]-8.4 and [7348] vs [79D0]-756. Returns 1 iff both bytes are 1. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
         count += labelComment(0x00036AAAL, "thunk_to_036AB2",
             "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x036AB2. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
@@ -10312,12 +10301,34 @@ public class ImportAE5L600L extends GhidraScript {
             + "A2=0xffff319c F2=0xbdbcc. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
             + "(corrections item 108).");
         count += labelComment(0x00037570L, "call_03757E_then_0376EC",
-            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x03757E B=0x0376EC. "
+            "[DECODED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x03757E B=0x0376EC. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
         count += labelComment(0x0003757AL, "thunk_to_0375B8",
-            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x0375B8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0x0003757EL, "reset_per_cyl_addends",
+            "[DECODED] If byte [65F6]==1: [7A78..7A84] = 0.0, [7AAC] = [895C], and bytes [7AB1] = [7AA0] = 0. "
+            + "Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x000375B8L, "per_cyl_addend_dispatch",
+            "[DECODED] Maps byte [9FC6] 0/1/2/3 to cylinder index 0/2/1/3, calls 0x037604, then tail-calls "
+            + "0x037710(index). Any other byte value does nothing. Trace: ffb_cl_side_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x00037604L, "per_cyl_counter_gate_37604",
+            "[DECODED] [7AB1] = (|[895C]-[7AAC]| < 100) and clears [7AB0] when false; [7AAC] = [895C]. [7AA0] "
+            + "= 1 iff 75<=[67EC]<=7500, [62F8]<6.3, [6624]>300, [620C]<500, ([0CBBF8]==1 or bit0 [A176]), "
+            + "[6354]>=70, [6364]>=0, [7AB1]==1 and [7AB0]>=38. Trace: ffb_cl_side_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x000376ECL, "count_7AB0",
+            "[DECODED] [7AB0] = sat8([7AB0]+1) if byte [7AB1]==1, else 0. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00037710L, "per_cyl_addend_7A78",
+            "[DECODED] Updates the above/below counters of the cylinder in r4, against [99B4] vs "
+            + "AB880-or-AB51C([6624])*AD464([6624]), while [7AA0]==1 (all counters zeroed otherwise). Cap "
+            + "[7A88+4i] = 1.0, or max(old x-0.025, 0.19999999) when 0x021D9A()==1 and [6540]<=0.75. [7C18]==1: "
+            + "x = clamp(max(x-0.8,0),0,cap) for all four. Otherwise each cylinder with cnt>=2 steps to "
+            + "clamp(min(x+0.4,cap_i),0,cap), cap_i = 0.79999995/0/0.59999996/0. ... Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
         count += labelComment(0x00037B6CL, "thunk_to_037C52",
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x037C52. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
@@ -10326,6 +10337,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x037CA0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0x00037D74L, "s4_factor_7ABC",
+            "[DECODED] if bytes [7AD0]==0,[7AD2]==0, u8 [7ADD]>=2, u8 [7ADE]>=2: [7ACC]=[7320], "
+            + "[7ABC]=T2(AD71C,[7ACC],[7AB8]) (table all raw 0x80 -> 0.0); else [7ABC]=0.0. Trace: "
+            + "injector_path_trace.txt (corrections item 114).");
         count += labelComment(0x00038158L, "arm_block_7B3A_then_reset",
             "[DECODED] Writes [7B3E] = 1, [7B3F] = 0, CNT16 = 0xFFFF and [7B3D] = byte [65C0], then "
             + "tail-branches to 0x038860. Trace: fn_0382C2_trace.txt (corrections item 108).");
@@ -10358,6 +10373,9 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Shape class 49: r = F() & 0xFF; if r == K (K = 1): tail-call G (r0 = 1 at G); else "
             + "return r. Member parameters: F=0x22f92 K=1 G=0x38d4c. Shape-matched and emulated per member. "
             + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00038DC0L, "pipwc_trim_lookup",
+            "[DECODED] [7B6C+4j] = T2(PIPWC A..D, fr4=[7324] (+4 axis), fr5=[6624] (+8 axis)), j=0..3; writes "
+            + "those four cells only. Trace: injector_path_trace.txt (corrections item 114).");
         count += labelComment(0x00038E30L, "force_flag_bits_7B9F_7BA0",
             "[DECODED] Calls 0x0392A4, ORs 0x80, 0x20 and 0x08 into both 0xFFFF7B9F and 0xFFFF7BA0, then "
             + "tail-calls 0x0393EA. Decoded as a supporting listing; its caller 0x047C40 is not traced. Trace: "
@@ -10400,6 +10418,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x03952C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0x000397ACL, "small_pulse_factor_F",
+            "[DECODED] if 4000.0 > [6624] and 600.0 > [7344] (strict, NaN fails): [7BC8]=T(AC760,[7344]), "
+            + "[7BC4]=clamp([7BC8],0.5,1.5); else [7BC4]=1.0 ([7BC8] untouched). Trace: injector_path_trace.txt "
+            + "(corrections item 114).");
         count += labelComment(0x00039860L, "thunk_to_03988E",
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x03988E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
@@ -10429,6 +10451,15 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
             + "K=0xFFFF7C5E M=0x80 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
             + "(corrections item 108).");
+        count += labelComment(0x0003AAA4L, "any_cut_byte_7C68",
+            "[DECODED] [7C68] = 1 iff any of eleven bytes [7C9D] [7CB8] [7CBC] [7CD5] [7CE5] [7CE8] [7CF4] "
+            + "[7CF9] [7D11] [7D2E] [7D48] == 1 (reads stop at the first 1), else 0. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003AB06L, "reset_any_cut_byte",
+            "[DECODED] [7C68] = 0 when [65F6] == 1, else nothing. Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0003AB20L, "get_any_cut_byte",
+            "[DECODED] Returns r0 = ([7C68] == 1). Trace: overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0x0003AB90L, "thunk_to_03AE5A",
             "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x03AE5A. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
@@ -10526,6 +10557,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0003CB62L, "is_7D2E_eq1",
             "[DECODED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFF7D2E I=1. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003CD00L, "init_7D58_block",
+            "[DECODED] init (caller 0x047C40): [7D58..7D64]=1.0, [7D70]=[0x0CC56C], u16 [7D74]=0xFFFF, byte "
+            + "[7D7D]=(byte [65F6]==1). Trace: injector_path_trace.txt (corrections item 114).");
         count += labelComment(0x0003CD46L, "thunk_to_03D21A",
             "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
             + "T=0x03D21A. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
@@ -10533,20 +10567,69 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0003D4F0L, "getw_7D80",
             "[DECODED] Shape class 89: r0 = s16[A] (sign-extended). Member parameters: A=0xffff7d80. "
             + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0003D50EL, "pending_angle",
+            "[DECODED] Mode 0: rec+32 = trunc(0x02F8A6(word rec+4)*65536). Mode 1: rec+32 = "
+            + "trunc((180+[7280])*65536). Any other mode byte writes nothing. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
         count += labelComment(0x0003D552L, "call_02F8EA_tail_03D698_if1",
-            "[TRACED] Shape class 49: r = F() & 0xFF; if r == K (K = 1): tail-call G (r0 = 1 at G); else "
+            "[DECODED] Shape class 49: r = F() & 0xFF; if r == K (K = 1): tail-call G (r0 = 1 at G); else "
             + "return r. Member parameters: F=0x2f8ea K=1 G=0x3d698. Shape-matched and emulated per member. "
             + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
         count += labelComment(0x0003D56AL, "call_02F8EA_tail_03D698_if0",
             "[DECODED] Shape class 42: r = F(); if (r & 0xFF) == 0: tail-call G (r0 = r at G); else return r "
             + "unchanged. Member parameters: F=0x2f8ea G=0x3d698. Shape-matched and emulated per member. Trace: "
             + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0003D582L, "pending_duration",
+            "[DECODED] Mode 0: rec+24 = trunc(0x02F9E0 * [7DA4] / 0.25), the same for every event number. "
+            + "Mode 1: rec+24 = trunc([7290+4ch]*[7DA4]/0.25) for ch<=3. Both modes clear rec+36. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003D634L, "get_cal_0CBDB4",
+            "[DECODED] r0 = cal long [0x0CBDB4] (0x7850 in all three bins); r4 unused. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003D708L, "scheduler_record_init",
+            "[DECODED] Record init. Writes +0..+7, +8 target, +12 k, +16 hw, +17, +20, +24, +28 = +32 = "
+            + "720<<16, +36 (pads untouched). S+0/4/8/9/10 = 0, S+13 = 1, and 0x009E44 is called with cal long "
+            + "0x0CBDB4. Reached only on 0x047C40's [8EDC] == 0 path. Trace: fns_03D856_02EB02_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0003D856L, "angle_scheduler_4ch",
+            "[DECODED] Per-call angle scheduler over four 40-byte records at 0xFFFF7DA8. Angle = 30*(r4&0xFF, "
+            + "-24 once if >=24)<<16 on a 720<<16 cycle. Re-arm when d>=720; state 0 tests the status byte "
+            + "[0xFFFF429B+28*hw] first, then d<=100 -> state 2, else count once per arming and fire unless "
+            + "cut. An init request clears the fields and sets counts, and the main loop runs in the same call. "
+            + "A resync (0x03DB16) stores S+9/S+10, so ... Trace: fns_03D856_02EB02_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0003DB16L, "resync",
+            "[DECODED] Resync from byte [0xFFFF4167]. Stores S+9 = mode index and S+10 = mask. For each "
+            + "record: re-arm fields, 0x03D582, 0x03D50E, 0x009D48(hw), +28 = +32, then the new mode's check "
+            + "sets the state. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
         count += labelComment(0x0003DBF4L, "set_7E55_1",
-            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7E55 I=1 (byte 0x01). "
+            "[DECODED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7E55 I=1 (byte 0x01). "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003DBFCL, "scheduler_reset_counters",
+            "[DECODED] Calls 0x009D48(byte rec+16) for each record, then word S+0 = 0, long S+4 = 0, byte S+8 "
+            + "= 0. Record fields are not written. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
         count += labelComment(0x0003DD46L, "set_7E50_1",
-            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7E50 I=1 (byte 0x01). "
+            "[DECODED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7E50 I=1 (byte 0x01). "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003DD4EL, "driver_angle_fold_once",
+            "[DECODED] r0 = 30*byte[0xFFFF7E54] - 10 - r4 (16.16), with -720 once if >= 720 and +720 once if "
+            + "< 0. The byte is the unreduced step byte, so 255 -> 6920. Trace: fns_03D856_02EB02_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0003DFC8L, "fire_mode1",
+            "[DECODED] Mode-1 fire function: calls 0x009B2C(hw, rec+20, 0, angle) or 0x009C38/0x009D48 by "
+            + "sub-state. Calls 0x03E0FA when rec+2 != 0. Writes [7E50] = 1 unless rec+7 != 0, and never "
+            + "touches [7E4C]. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003E0BAL, "mode1_check",
+            "[DECODED] Mode-1 check: r0 = 1 iff d > rec+32 and d >= 0x03E0FA(rec+16). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003E0FAL, "duration_to_angle_check",
+            "[DECODED] r0 = 180*Q16div(rec+24 + cal long [0x0CBDB4] + [4280], [4158]) + rec+28. This is the "
+            + "calibration read of the 0x03D856 tree. Trace: fns_03D856_02EB02_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0003E168L, "fire_mode0",
+            "[DECODED] Mode-0 fire function. rec+7 != 0 -> rec+2 = 2. 'Too early' (d - rec+28 >= 30deg) -> no "
+            + "driver call and rec+6 = 1. Otherwise calls 0x009A72(hw, rec+20, angle), then [7E4C] = sat+1 and "
+            + "[7E50] = 1 (only on those calls). Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
         count += labelComment(0x0003E2B0L, "ret0_03E2B0",
             "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
             + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
@@ -10575,6 +10658,32 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0003EA5AL, "set_7E75_0",
             "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7E75 I=0 (byte 0x00). "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003ED56L, "cap_load_value_7ECC",
+            "[DECODED] [7ED0] = 69.65 if [65C5]!=1 and word [5E74] >= 38, else by byte [6810]: 1/2/3 -> "
+            + "0x0ADAC0/0x0ADAD4/0x0ADAE8(x), 4/5 -> 10.0, other -> 69.7; [7ECC] = max([7ED0], "
+            + "0x0ADAAC([6350])). Lowest [7ECC] -2.07. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003EF58L, "trigger_7EED",
+            "[DECODED] [7EFE] = [6254]==1 ? sat16(+1) : 0; [7EED] = 0 if ([6254]==1 and [7EFE] > 100) or 0 > "
+            + "x, else ([7EEC]==1). No cut byte read. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003F00CL, "logged_timing_bounds",
+            "[DECODED] Writes the post-sum bounds of the logged cell: [7EC0] cap (OFF 69.65 and latch clear / "
+            + "LOAD [7ECC] every call while latch [7F09] set and [7EEA]==1 / RAMP +0.7), [7EC4] (69.65 for any "
+            + "real x), [7EC8] (loaded on rising edge of [7EED] from 0x0ADB10([620C]), -100/call when "
+            + "[7EED]==0), [7EE4] (-20.0 on every path with shipped tables). The cut byte reaches only [7EE8], "
+            + "[7F06] and the [7EEB] set test. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003FA8CL, "init_bounds_state",
+            "[DECODED] (bytes only) Init: [7ECC]=[7EC0]=[7EC4]=69.65, [7EDC]=12.0, words "
+            + "[7EFC]=[7EFE]=0xFFFF, [7EE8]=0xFF, [7EE4]=0x0ADA98([6350]). Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0003FACEL, "reset_bounds_state",
+            "[DECODED] (bytes only) On [65F6]==1: resets 0x03F00C state incl. [7EC0]=[7EC4]=69.65, "
+            + "[7EF0]=[805C], [7F05]=[85D7], [7F09]=0, [7EE4]=0x0ADA98([6350]), [7EE8]=0xFF, "
+            + "[7F06]=([7C68]==1), [7EEB]=0, [7F0B]=[7EED]; never writes [7EC8]. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003FBBCL, "blend_weight_7F10",
+            "[DECODED] k=[7F10]: -0.0156/call while [85D7]==1, +0.0156 otherwise, clamped 0..1 (65 calls end "
+            + "to end); jumps to the end only when already at an end and x >= 6000 / [65FC] >= 200 / [65FC] < "
+            + "0. Trace: overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0x0004092AL, "init_7FD4_state",
             "[DECODED] Seeds [7FD4]:=1.0, words [7FE6] [7FE8] [7FEA] [7FF8] [7FFC]:=0xFFFF, [7FF0]:=1, "
             + "[7FFB]:=[90BE], [7FFF]:=[8E7E], [7FF2]:=[65C0], [7FF3]:=[85D7]; nothing else (write set exact). "
@@ -10616,6 +10725,35 @@ public class ImportAE5L600L extends GhidraScript {
             + "[8000]=max(R'-max([8258]-[81EC],0),0) on every call, plus [8014], [801C], [801E], [801F], and "
             + "[8018] when acting in states 1/2/4. Trace: timing_0410D4_0415B8_trace.txt (corrections item "
             + "108).");
+        count += labelComment(0x00041954L, "reset_8020_block",
+            "[DECODED] Only when [65F6]==1: zeroes [8020] [8024] [8028] [802E] [8032] [8033] [8035] [8037] "
+            + "[802C] [802D], [8030]=0xFFFF, [8034]=[7C9A], [8036]=[65C0]. Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x000419BAL, "overrun_retard_sequence",
+            "[DECODED] No state of its own: bsr 0x041A02, bsr 0x041A48, bsr 0x041A7E, then bra 0x041BE4 with "
+            + "PR restored in the slot. Called once per pass of task body 0x04AA58 (04AC18), after 0x03AAA4 and "
+            + "before 0x03F00C / 0x03F368. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x000419CCL, "cut_counters_802E_8030",
+            "[DECODED] [7C9D]==1: [802E] = sat16(+1), [8030]=0; else [802E]=0, [8030] = sat16(+1). Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041A02L, "mode_gate_802C",
+            "[DECODED] [802C] = 1 iff ([8E09]==0 or [8E0D]==1) and [6350] > 200.0 and 0.0 > [63F8] and 0.0 > "
+            + "x; written every call. 0 for physical inputs with the shipped cal. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041A48L, "edge_latch_802D",
+            "[DECODED] [8037] = [7C9D] every call; [802D] = 0 if [85D7]==1, else on a falling edge of [7C9D] "
+            + "0 if [7C78] > x else 1, else unchanged. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041A7EL, "mode_machine_8024",
+            "[DECODED] Mode 0..3 from [802C]/[7C9D]/[802D]/[802E]/[8030]/[43FC]; mode 1/2: [8024] = "
+            + "min([8024] + table(x), 0) with all-zero tables 0x0AE17C/0x0AE170; mode 3: [8024] = 0x0D2C28 "
+            + "(0.0); else 0.0. [8035] = mode. Neutral by calibration (code live: patched copy emulated). "
+            + "Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041BE4L, "cut_exit_retard_8028",
+            "[DECODED] Arm on [7C78] > x and previous-call tier [8034]==4 (every such call, no edge test): "
+            + "[8032]=0,[8033]=1 and [8020] = 0x0ADE08([6350]) in the same call; else counters decrement; ramp "
+            + "[8020] = min([8020]+0.7, 0); reset to 0 on ([65C5]!=1 and [5E94]<4) or [6254]==0 or [6634] < -20 "
+            + "or x < 0. [8028] = min([8020],[8024]); [8034]=[7C9A]; [8036]=[65C0]. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0x00041D84L, "zero_rec_3204",
             "[TRACED] Shape class 31: tail-call F = 0x0BDBCC with r4 = A (a RAM address) and fr4 = 0.0. By "
             + "the 0x0BDBCC contract Member parameters: A=0xffff3204 F=0xbdbcc. Shape-matched and emulated per "
@@ -10630,12 +10768,42 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
             + "K=0xFFFF8098 M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
             + "(corrections item 108).");
+        count += labelComment(0x00042ED8L, "term_80B4_42ED8",
+            "[DECODED] [79C8]==1: [80B4] = max([80B4]-0.5, 0x0AE514(x,[63F8]) = 0); else min([80B4]+0.01, 0). "
+            + "0.0 is a fixed point; reaches 0.0 from any start (NaN included) whatever [79C8] does. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0x000432B0L, "set_80C8_FF",
             "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFF80C8 I=-1 (byte 0xFF). "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
         count += labelComment(0x00044132L, "set_81AC_FF",
             "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFF81AC I=-1 (byte 0xFF). "
             + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004438CL, "fbkc_update_81F0",
+            "[DECODED] FBKC routine, decoded only on its [8234] and [81F0] paths. A head chain that never "
+            + "reads [8234] runs first: bit 6 of [61F4] -> [81F0]=0.0; [7E76]==1, [7F10] outside 1 +- 2^-8, or "
+            + "[824A]==1 -> relax min(x+0.35, 0); [970E] or [9718] != 0 -> -5.0; [824C] != 1 -> [81FC]. After "
+            + "that come blocks A, B, C and the main block, each gated by [8234]==1 and [824B]==[824C]==1, with "
+            + "steps 0.0 / 1.4, floor -11.799999 ... Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0x000448F4L, "fbkc_step_enable_8234",
+            "[DECODED] Writes byte [0xFFFF8234] := 1 if any of G1..G23 holds, else 1 iff [798C] > 0 and u8 "
+            + "[8249] < 63 (the [8253] tail term needs byte 0x0D299A == 90, and it is 0). It also clears [8249] "
+            + "when [798C] is not > 0, and updates [824D] and [8253] through 0x0457D2 / 0x0457F4. It runs only "
+            + "on 0x04AA58 passes with byte [8EDC] == 0. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0x00044DB0L, "load_lag_and_delta",
+            "[DECODED] [81F4] = lag([63F8], k=0.03125, snap 2^-14); [81F8] = [63F8] - [81F4]. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0x000457D2L, "rpm_hyst_824D",
+            "[DECODED] byte [824D] := 1 if 1500.0 > fr4; := 0 if not (1600.0 > fr4), NaN included; otherwise "
+            + "unchanged. The limits are 0x0D2F6C / 0x0D2F70. Trace: fn_0448F4_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x000457F4L, "thresh_79A8_to_8253",
+            "[DECODED] byte [8253] := 1 if not (10000 > [79A8]); else := 0 if 10000 > [79A8]. Both limits are "
+            + "10000.0 as shipped, so the byte is written on every call. Trace: fn_0448F4_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00045970L, "kc_adv_max_blend",
+            "[DECODED] [826C] = T(0x0AE664) = 0.0 (the table is all zero). [8258] = (1-w)T(0x0AE680) + "
+            + "wT(0x0AE69C), w=[90A8]. It overwrites [8258] and does not accumulate. Trace: fn_0448F4_trace.txt "
+            + "(corrections item 114).");
         count += labelComment(0x00045F0AL, "zero_rec_3234",
             "[DECODED] Shape class 31: tail-call F = 0x0BDBCC with r4 = A (a RAM address) and fr4 = 0.0. By "
             + "the 0x0BDBCC contract Member parameters: A=0xffff3234 F=0xbdbcc. Shape-matched and emulated per "
@@ -10990,9 +11158,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0005D36AL, "float_to_u8",
             "[DECODED] Class 68 (3): r0 = sat8(f32[X]) & 0xFF. Trace: stub_shapes_b_trace.txt (corrections "
             + "item 108).");
-        count += labelComment(0x0005D37EL, "float_to_u8_scaled_5D37E",
-            "[DECODED] Class 37 (6): r0 = sat8((f32[X] - OFF)/SC) & 0xFF via 0x0BE5A8, per-member X/OFF/SC in "
-            + "the MAP. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D37EL, "ssm_get_7E90",
+            "[DECODED] SSM getter table 0x06423C entry 0x11: r0 = clamp(trunc(([7E90] + 64)/0.5 + 0.5), 0, "
+            + "255). Trace: overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0x0005D396L, "f2u8_4128",
             "[TRACED] Shape class 51: r0 = sat8(f32[X] - OFF) & 0xFF (scale 1.0): (x + 40) or (x + 50) "
             + "rounded half-up and clamped to 0..255. Member parameters: X=0xffff4128 F=0xbe5a8 OFF=@05D5B4:-40 "
@@ -11023,7 +11191,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "parameters: K=0xFFFF4130 C=0.07999999821186066 (0x3DA3D70A @ 0x05D5D4). Shape-matched and "
             + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
         count += labelComment(0x0005D478L, "f2u8_7D84",
-            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            "[DECODED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
             + "parameters: K=0xFFFF7D84 C=256.0 (0x43800000 @ 0x05D5EC). Shape-matched and emulated per member. "
             + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
         count += labelComment(0x0005D4A6L, "f2u8_689C",
@@ -12793,6 +12961,15 @@ public class ImportAE5L600L extends GhidraScript {
             + "(otherwise); else [0x0F1054] / [0x0F1048], both 0.0 in 20.19c. fr8=[0x0CC500]; jmp 0x03B6B2. "
             + "Clobbers r0,r2,fr6,fr8,fr9,T; no memory write; pr untouched (0x03B6A8 on entry, not the caller's "
             + "return address). Trace: launch_closure_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF0000L, "boot_wdt_limit",
+            "[TRACED] long; trunc(300/1.6384+0.5)=183 written by 0x010878; compared by 0x010AD8 (0x010AE8) "
+            + "Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF0004L, "boot_wdt_iti_count",
+            "[TRACED] long; 0 at 0x010878, +1 per WDT ITI taken (0x010AE4); 0..182 at the kernel start, value "
+            + "timing-dependent Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF0008L, "boot_wdt_code_select",
+            "[TRACED] byte; 0x0108DA's argument (0 at reset); selects expiry code 0x2100/0x2200/0x2300 "
+            + "(0x010AF2) Trace: poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF1230L, "rtos_queued_ids",
             "[TRACED] On-chip RAM, not an MTU register: the array of queued task ids that [KCB+36] points to. "
             + "Trace: rtos_core_trace.txt (corrections item 107).");
@@ -12802,6 +12979,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF2000L, "keepblock_marker_2000",
             "[TRACED] 0xAA55 = warm marker (set by 0x010198 at the end of a cold start); 0x55AA during the "
             + "cold path (0x01018A). Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF204CL, "boot_handover_byte_204C",
+            "[TRACED] byte; 0x77 at 0x00128A, 0x88 at 0x001324 (address from ROM long 0x002000) Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF2060L, "trap_log_count",
             "[TRACED] Count byte of the five-record trap log at 0xFFFF2064 (stride 12), filled by 0x010800 "
             + "from 0x00E774 with {code 0x4000, vector number}. Nothing drains it; item 84's 'scheduler event "
@@ -12809,6 +12989,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF223CL, "pair16_init_223C",
             "[TRACED] u32 set to 0x0000FFFF (value 0 : complement) by 0x024CA0 and 0x024CB0 through 0x0BE9B0. "
             + "Meaning not established. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF3154L, "eeprom_outcome_pair_word",
+            "[TRACED] value:~value word of [7268] (0x01FE / 0x00FF), written by 0x02ED88 and rebuilt by "
+            + "0x02E8C0 when inconsistent. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF318CL, "ctl7904_centre_rec",
             "[TRACED] Guarded float record (value + two check words) holding the centre of the 0xFFFF7904 "
             + "window; stepped by 0.0005 in 0x0359A4 and stored through the clamp ROM 0x036000 (lo) .. 0x035FFC "
@@ -12817,25 +13000,79 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF3694L, "cnt_3694",
             "[TRACED] High byte of word 3694/3695: counter incremented on qualifying warm starts, compared "
             + "with LIM 0xFFFF8EEE by 0x05CB1C. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF36BEL, "startup_reinit_request_word",
+            "[TRACED] 0x047C40 calls 0x048732 (full re-init including the AFL cell clear) iff this "
+            + "word==0x4055 at its entry with [8EDC]==0. 0x05D070 writes 0x4055 (caller 0x098FE4), 0x05D032 "
+            + "writes 0xAA55. 0x04793C accepts 0x4055 or 0xAA55. Trace: afl_learning_trace.txt (corrections "
+            + "item 114).");
         count += labelComment(0xFFFF40E0L, "front_o2_sensor_ma",
             "[TRACED] Front O2 sensor current (mA): x of \"Front Oxygen Sensor Scaling\" (axis pointer 0x0D8D74 "
             + "= definition axis \"Front Oxygen Sensor\"); read by 0x058902. Trace: hole9_identity_trace.txt "
             + "(corrections item 108).");
+        count += labelComment(0xFFFF5B6CL, "fbba_arg_5B6C",
+            "[TRACED] byte; 0x00FBBA's argument, 0 at reset (0x00FA8A) Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF5B89L, "reset_ramtest_result",
+            "[TRACED] byte; 1 = range A failed, else 8*B_fail + 2*C_fail (0x010352) Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF5B8DL, "startup_status_5B8D",
             "[TRACED] Zeroed by 0x0100E4. 0x010124 sets 1 when marker 0xFFFF2000 != 0xAA55; 0x01001C stores "
             + "0x04793C's result (0 pass / 1 fail). Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF62E4L, "plate_change_2calls",
+            "[TRACED] 0x01F588: [62DC] minus [62DC] from two calls earlier Trace: fn_01FE46_trace.txt "
+            + "(corrections item 114).");
         count += labelComment(0xFFFF63B0L, "ffff4130_lag_filtered",
             "[TRACED] Written only (find_writers lower bound) by 0x01FDF2 (bit copy of f32[0xFFFF4130]) and "
             + "0x01FDD4 (0x0BEA40 lag toward f32[0xFFFF4130], k = 0.5, eps = 10*2^-15). Same quantity and units "
             + "as 0xFFFF4130; the label adc_processed_temperature_B is unsupported. Trace: "
             + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF63B8L, "maf_window_max_snap",
+            "[TRACED] snapshot of running max [6420] (01FF04) Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF63BCL, "maf_window_min_snap",
+            "[TRACED] snapshot of running min [6424] (01FF0C) Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF63C0L, "maf_window_mid_gps",
+            "[CITED] ([63B8]+[63BC])*0.5 = (max+min)/2 of [63B4] samples since the previous 0x01FE46 call "
+            + "Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
+            "[TRACED] min(window mean * MAF Compensation(IAT) + [69F4]*0x0C3104, MAF Limit 0x0C3100); written "
+            + "at 01FF66 Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63DCL, "gps_per_679C_load",
+            "[UNVERIFIED] min([63C4]*60/[679C], Limit A), written only when [679C] > 0.1953125 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63E0L, "gps_per_rpm_load",
+            "[UNVERIFIED] min([63C4]*60/RPM, Limit A), written only when RPM > 0.1953125 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63F4L, "load_comp_blend",
+            "[UNVERIFIED] (1-[90A8])*0x0AB004 + [90A8]*0x0AB020; the maps are byte-identical, so it equals the "
+            + "Cruise value Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63FCL, "load_cell_delta",
+            "[TRACED] [63F8] new minus entry value, every 0x01FE46 call (020328) Trace: fn_01FE46_trace.txt "
+            + "(corrections item 114).");
         count += labelComment(0xFFFF6404L, "ffb_641C_threshold",
-            "[UNVERIFIED] f32 written by 0x01FE46 at 01FF8C: 0x0AAE64(RPM) when [65FC] >= 50 else 0x0AAE78(RPM) = "
+            "[TRACED] f32 written by 0x01FE46 at 01FF8C: 0x0AAE64(RPM) when [65FC] >= 50 else 0x0AAE78(RPM) = "
             + "32.0 Trace: ffb_residual_trace.txt (corrections item 111).");
-        count += labelComment(0xFFFF641CL, "ffb_641C_latch",
-            "[TRACED] u8 set by 0x01FE46 (01FFE6) when [73D0] >= [6404] with other gates; cleared by 0x01FE46 "
-            + "/ 0x020678 / 0x020726; read by 0x02FF8E ([733C]) and 0x030F02 Trace: ffb_residual_trace.txt "
-            + "(corrections item 111).");
+        count += labelComment(0xFFFF6418L, "latch_hold_counter_6418",
+            "[TRACED] 0x020580: 0 if [641A]==1 else sat+1 Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF641AL, "latch_set_this_call",
+            "[TRACED] 1 on a set call, else 0 (01FFEA / 01FFEE) Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF641BL, "latch_hold_enable",
+            "[TRACED] 1 on every set call; 0 once u8 [6418] >= 13 Trace: fn_01FE46_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0xFFFF641CL, "lift_latch_641C",
+            "[TRACED] set by the 0x01FE46 set gate; held/cleared per hold gate; cleared by 0x020678/0x020726; "
+            + "freezes [63F8] against rising Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6420L, "maf_window_max",
+            "[UNVERIFIED] 0x0203DC: max([6420],[63B4]); restarted at [63B4] by 0x01FE46 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6424L, "maf_window_min",
+            "[TRACED] 0x0203DC: min([6424],[63B4]); restarted at [63B4] by 0x01FE46 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6430L, "factor_AAE3C",
+            "[TRACED] 0x0AAE3C([6898]), 1.0 flat; also the literal base used in 0x01FE46 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF6458L, "u0_ratio_6458",
             "[TRACED] float written by 0x0209DC: 020D7E = max(([0xFFFF44A8]-fr15)/(fr13-fr15)*100, 0) or the "
             + "old value; 020CFC = U1 on the r11 == 2 branch. Read by 0x039316. Identity not established. "
@@ -12857,6 +13094,13 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] u8 = (ROM byte 0x0C303F == 0xAA) ? 0 : 1, a calibration option; 0x55 in all 20 bins, so "
             + "always 1. Not an engine-running state. Read by 0x022CF4 (== 1). Trace: fn_042506_trace.txt "
             + "(corrections item 107).");
+        count += labelComment(0xFFFF65F6L, "byte_65F6_copy_of_415C",
+            "[TRACED] 0x022F1C copies byte [415C]; 0x022DB0 zeroes it; ==1 triggers re-seeding in "
+            + "0x020726/0x0203DC. Identity not established. Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF67ECL, "passes_since_crank_67EC",
+            "[TRACED] u16. 0x023A94 holds it at 0 while byte [726C]==1, else increments it once per 0x04907C "
+            + "main-list pass (saturating). It is the decay gate of [7354] (>38) and [7374] (>0). Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF6810L, "gear_estimate",
             "[TRACED] u8 gear estimate 1..5, 6 = none determined. Writer 0x023EB8: "
             + "[0xFFFF65FC]/([0xFFFF6624]/1000) ladder against the definition tables 'Gear Determination "
@@ -12869,6 +13113,9 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Byte F9 of 0x0410D4. Set to 1 by 0x026634 (with 69E4/69E5/69E7). 0x026698 sets it to 0 "
             + "when [6350]>70.0 or NOT(lut(0x0AAF5C,[6354])>[63D4]). Never set to non-zero there. Physical "
             + "meaning not established. Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF6A00L, "one_plus_afl_x_tbl0AB140",
+            "[TRACED] 0x02782C: (1+[7878])*[6A30], times [6A34] when bit 7 of [6A53] and bit 5 of [6A52]; the "
+            + "consumer is not decoded. Trace: afl_learning_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF6A29L, "flags_6A29_bit5_cleared_by_revlim",
             "[TRACED] Bit 5 written by 0x026CF4 only (0x026DE8 or.b #32 / 0x026DEC and.b #223, GBR "
             + "0xFFFF6A29): cleared on every pass while b0 == 1. Meaning of the bit not established. Trace: "
@@ -12877,11 +13124,54 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] u8 = (u8[0xFFFF8CAA] == 1), written by 0x027D78 (class 100); GBR base of 0x027D86, "
             + "which reads it at @(0,gbr) and runs 0x027DB8.. only when it is 1. Meaning not established. "
             + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF6C48L, "eeprom_owner_token_in_02EB02",
+            "[TRACED] In 0x02EB02 / 0x02E968: 0 = free, 0xEE written by 0x02EB02 on ready non-aborting "
+            + "passes, 0 at finish. Other sentinels belong to other clients (not established). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7268L, "eeprom_writeback_outcome",
+            "[TRACED] 1 = busy timeout or gave up, 0 = all written (0x02ED88). Kept consistent with word "
+            + "[3154] by 0x02E8C0 (copy if the pair is consistent, else the word is rebuilt). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF726CL, "crank_stall_flag",
+            "[TRACED] u8. 1 while [6624] (axis Engine Speed) <= 300 until [6624] > 500 (0x02EF56); also set "
+            + "to 1 by 0x02F83E. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7288L, "post_start_seed_multiplier",
+            "[TRACED] f32 = 0x0AC338([6350]) (flat 1.0) or 1.0, by 0x02F550 / 0x02F85E. Multiplies the "
+            + "[3158]==0 seeds. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF72DCL, "mode0_duration_clamp_copy",
+            "[TRACED] Written only by 0x02F974 (02F9D2) = 0x02F9E0 clamp. Readers not checked. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF72E0L, "mode0_factor_a",
+            "[TRACED] 0x02F974: lookup 0x0AC34C at f32 [620C]; used in the mode-0 duration product. Physical "
+            + "meaning not established. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF733CL, "pulse_lower_clamp",
+            "[TRACED] f32 lower clamp of all 0x0301E4 outputs: 0.0 if byte [641C]==1 else 300.0 ([0x0CBE08]); "
+            + "sole writer 0x02FF8E (02FFA0), run just before 0x0301E4 Trace: injector_path_trace.txt "
+            + "(corrections item 114).");
         count += labelComment(0xFFFF7348L, "load_x_injector_scaling",
             "[TRACED] clamp([63F8]*'Injector Flow Scaling' raw,0,131072), written by 0x030378; multiplies C "
             + "in 0x0301E4. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7354L, "post_start_addend_a",
+            "[TRACED] f32 CL-side FFB addend = AD594*[7358]*[7364](*[7360]), written by 0x0304BE. Seeded "
+            + "while [726C]==1, decays afterwards. Range [0, 4.53125]. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7358L, "post_start_a_state",
+            "[TRACED] f32 seed of [7354] (0x030454 while [726C]==1). Multiplied by 0.8984375 per N calls "
+            + "while [67EC]>38; zero latch. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7374L, "post_start_addend_b",
+            "[TRACED] f32 CL-side FFB addend = P0*[7390]*AD5CC with the shipped tables, written by 0x03082E. "
+            + "Range [0, 1.540802]. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7378L, "post_start_b_seed_pair_a",
+            "[UNVERIFIED] f32 P0 when [90C1]==0 and [647C]==1. Seeded by 0x03076E, decays linearly in 0x03082E. "
+            + "Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7380L, "post_start_b_seed_pair_b",
+            "[UNVERIFIED] f32 P0 otherwise. Seeded by 0x03076E, decays linearly in 0x03082E. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF73A0L, "addend_b_decay_threshold",
+            "[TRACED] u16 = 0x0ACA6C([6354]) = 0, written by 0x03082E. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
         count += labelComment(0xFFFF73D0L, "ffb_follower_fast",
-            "[UNVERIFIED] f32 lag state of [73B0] written by 0x0312DE (031484); also read by 0x01FE46 to set byte "
+            "[TRACED] f32 lag state of [73B0] written by 0x0312DE (031484); also read by 0x01FE46 to set byte "
             + "[641C] Trace: ffb_residual_trace.txt (corrections item 111).");
         count += labelComment(0xFFFF7441L, "ffb_mult_decay_counter",
             "[TRACED] u8, counter of the [73E0]/[73E4] decay in 0x03110C (031248-0312AA); not reset by the "
@@ -12999,16 +13289,70 @@ public class ImportAE5L600L extends GhidraScript {
             + "[7804]*[780C]; read only by the 0x033460 SPECIAL exit (0335AC). 0.0 or 0.20001221 in "
             + "20.19c/stock. Physical meaning not established. Trace: hole9_identity_trace.txt (corrections "
             + "item 108).");
+        count += labelComment(0xFFFF7874L, "copy_of_7D68",
+            "[TRACED] f32 copied from [7D68] by 0x03452A (034586) before bsr 0x034CC8 Trace: "
+            + "injector_path_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF787EL, "afc_lag_window_countdown",
             "[TRACED] Decremented by 0x034C54 when non-zero and 0.95 < [7708] < 1.05 (with bytes [7448] == 1 "
             + "and [7453] == 1); zeroed when byte [789E] reaches cal 0x0CBBEE. Its setter is not traced. Trace: "
             + "afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF787FL, "afl_cell_index_787F",
+            "[TRACED] 0..3 from [63C4] vs 0x0CC074/78/7C (0x034D52); 0 when [78A0]==1. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7881L, "afl_window_samples",
+            "[TRACED] Sample count of the current AFL window. Incremented at 0x034A44-0x034A4E, cleared at "
+            + "0x034AFE. Not reset by a change of [787F]. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7882L, "afl_window_votes",
+            "[TRACED] Vote counter of the current window: reset to 128 at 0x034B06, +1 when e>=1.01, -1 when "
+            + "e<0.99. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7883L, "afl_gate_byte_7883",
+            "[TRACED] byte written by 0x0345A4 second body: 1 iff nine terms incl. [7324] > [733C]; meaning "
+            + "in 0x03452A not established Trace: injector_path_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7884L, "afl_gate_g1",
+            "[TRACED] Conjunction written by 0x0347F0 body at 0x03487A; read by 0x034884 and 0x071B58. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7885L, "afl_7878_lagging_flag",
+            "[TRACED] 1 while 0x034B1C lags [7878] toward the cell, 0 on a snap (0x034B70). Read by 0x03CD4A "
+            + "and 0x03CFDA. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF78A9L, "afl_g2_consecutive_7884",
+            "[TRACED] Consecutive passes with [7884]==1, saturating (0x0348E2-0x0348F0). G2 needs >=63. "
+            + "Trace: afl_learning_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF7904L, "cl_target_trim_7904",
             "[TRACED] Output of the windowed PI controller 0x0355B8, added with weight +1 into the CL lambda "
             + "target [77BC] by 0x033460: positive = higher target lambda (leaner by the definitions' AFR "
             + "convention). Pinned at 0 in every flashed rev (0x0357C8/CC and 0x035FFC/6000 zeroed). Reaches "
             + "[77C8] only while byte [8E7E] != 1 or byte [9720] != 0. Open-holes #9. Trace: "
             + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF79A0L, "ol_target_multiplier",
+            "[TRACED] f32 = 0x0AD0DC([6350]) in [0,1]; only writer 0x036962. Scales [7990] in 0x03606C. "
+            + "Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF79C0L, "cl_ol_delay_counter_copy",
+            "[TRACED] u16 counter (mov.w only, 0x036322). Not read by 0x03606C. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF79C2L, "cl_ol_delay_counter",
+            "[TRACED] u16. Counts calls while the 0x036978 test fails. 0x03606C compares it with [79C4]. "
+            + "Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF79C8L, "gate_79C8",
+            "[TRACED] 0x036322 036428: 1 iff 0 < [79C2] < [79C4]; only writer found. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7A78L, "per_cyl_addend_0",
+            "[TRACED] f32 array [7A78+4i], i=0..3, written by 0x037710; zeroed by 0x03757E. Enters [7310+4i] "
+            + "only. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7A88L, "per_cyl_addend_cap_0",
+            "[TRACED] f32 array: the upper clamp of [7A78+4i], 1.0 or max(old-0.025, 0.19999999). Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7AA0L, "per_cyl_counter_gate_7AA0",
+            "[TRACED] u8, set by 0x037604 from eleven tests; zeroed by 0x03757E. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7AACL, "prev_895C",
+            "[UNVERIFIED] f32 [895C] as saved by the previous 0x037604 run, or by 0x03757E. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7AB0L, "stable_895C_pass_count",
+            "[TRACED] u8. Passes of 0x04907C with the latest [7AB1]==1, saturating at 255 (0x0376EC). Cleared "
+            + "by 0x037604 when its test fails. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7AB1L, "stable_895C_flag",
+            "[TRACED] u8 (|[895C]-[7AAC]| < 100), written by 0x037604; zeroed by 0x03757E. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF7AF4L, "fn382C2_x_out",
             "[TRACED] f32 output of 0x0382C2: clamp(A_ACC+B_ACC[*RAMP], LO, HI) when EN==1, else dead "
             + "band/decay; +0.0 on FORCE0. Read by 0x02FFE0 at 0x03004A. Physical meaning not established. "
@@ -13099,6 +13443,9 @@ public class ImportAE5L600L extends GhidraScript {
             + "0x033460 and P3 in 0x039F42 when byte [8E7E]==1. It is 0 after every call in 20.19c/stock "
             + "because [0x0CC488]=0.0 > [653C] never holds. Trace: hole9_identity_trace.txt (corrections item "
             + "108).");
+        count += labelComment(0xFFFF7C68L, "any_cut_byte",
+            "[TRACED] 0x03AAA4: 1 iff any of eleven cut bytes incl. [7C9D] == 1. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF7C6CL, "resume_band_7C6C",
             "[TRACED] f32 [7C70] + [7C74]; writer 03AE3A; read by 0x015672 added to [7C78] Trace: "
             + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
@@ -13196,15 +13543,81 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Same rule with 0x0CC510/0x0CC514 on the same (tuned: offset) x. Written "
             + "0x03B6E4/0x03B6F2, cleared 0x03B760; read only at 0x03B71A. Trace: launch_closure_trace.txt "
             + "(corrections item 108).");
+        count += labelComment(0xFFFF7D58L, "ratio_7D58",
+            "[TRACED] f32 written by 0x03D0B8 (clamp([7324]/[7338]-[7878]-[7AE4],0,2) / 2.0 / 1.0); "
+            + "initialised to 1.0 by 0x03CD00 together with [7D5C..7D64] Trace: injector_path_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7D68L, "fn_03CD4A_out",
+            "[TRACED] f32 = 0x03D23A([7D5C],[7D64],[7D68],stack byte) written at 03CF54; 0x03D23A not decoded "
+            + "Trace: injector_path_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF7D80L, "channel_suppress_mask",
             "[TRACED] Word written only by 0x03D2FC (0x03D44C): 0xFFFF if any of six bytes (7CB8 among them) "
             + "==1, else bits 0..3 from four flag groups; bit k set makes 0x03DCB6 return at once for channel "
             + "k. Physical channel type not established. Trace: launch_closure_trace.txt (corrections item "
             + "108).");
+        count += labelComment(0xFFFF7D84L, "sched_active_duration_plus_734C",
+            "[TRACED] f32 [7D84+4k] = [7D94+4k] + f32 [734C], or 0.0 while cut (0x03D648). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7D94L, "sched_active_duration_export",
+            "[TRACED] f32 [7D94+4k] = rec_k+20 * 0.25, or 0.0 while cut (0x03D648). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7DA4L, "sched_duration_scale_1p0",
+            "[TRACED] Constant 1.0 written by 0x03D68C every task-5 pass before 0x03D856. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7DA8L, "sched_records_4x40",
+            "[TRACED] Four 40-byte channel records; the layout is in the file's RAM LAYOUT. Pads +13..15, "
+            + "+18, +19, +37..39 are never written. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E48L, "sched_event_count_u16",
+            "[TRACED] S+0: saturating +1 each time a record is counted (0x03DA9E / 0x03D930). Zeroed by "
+            + "0x03D708, the init path and 0x03DBFC. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E4CL, "sched_mode0_fire_count_s32",
+            "[TRACED] S+4: saturating +1 per 0x03E168 call that reached 0x009A72 (0x03DD32). Zeroed by "
+            + "0x03D708, the init path and 0x03DBFC. Read by 0x02F974, where it has no effect, and by 0x02EF56 "
+            + "(not checked). Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E50L, "sched_fired_flag",
+            "[TRACED] S+8: set to 1 by 0x03DD46, from 0x03E168 on calls that reached 0x009A72 and from "
+            + "0x03DFC8 unless rec+7 != 0. Zeroed by 0x03D708 and 0x03DBFC, not by the init path. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E51L, "sched_saved_mode_index",
+            "[TRACED] S+9: 0 or 2. Written by 0x03D856 at 0x03D99E and by 0x03DB16 at 0x03DB4A. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E52L, "sched_saved_mask",
+            "[TRACED] S+10: copy of word [7D80]. Written by 0x03D856 at 0x03D9BA and by 0x03DB16 at 0x03DB4E. "
+            + "Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E54L, "sched_last_step_byte",
+            "[TRACED] S+12: the unreduced r4&0xFF of the last 0x03D856 call (0x03D880). Read by 0x03DD4E. "
+            + "Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E55L, "sched_init_request",
+            "[TRACED] S+13: 1 makes the next 0x03D856 call take the init path. Set by 0x03D708 and 0x03DBF4; "
+            + "cleared at 0x03D8A2. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E90L, "timing_cell_slot0_clamped",
+            "[TRACED] 0x03F368 03F9FA: clamp(clamp(clamp(S0,-20,[7EC0]),-20,[7EC4]) - [7EC8], [7EE4], 69.65); "
+            + "SSM id 0x11 reports it. Trace: overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF7EA0L, "out_03F368_7EA0",
             "[TRACED] first of four floats [7EA0..7EAC] written by 0x03F368 at 0x03FA38..0x03FA6E = "
             + "clamp([81DC..81E8] + ([7F0C]+[7F68]+[7F6C]-[7FBC]), -20, 69.65) when [0D2976]==90. Meaning not "
             + "established. Trace: timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7EC0L, "timing_cap_A",
+            "[TRACED] 0x03F00C: 69.65 (OFF) / [7ECC] (LOAD while latch [7F09]) / +0.7 ramp. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7EC8L, "timing_subtrahend",
+            "[UNVERIFIED] 0x03F00C: 0x0ADB10([620C]) on rising edge of [7EED], held while 1, -100/call to 0 while "
+            + "0. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7ECCL, "timing_cap_A_load",
+            "[TRACED] 0x03ED56: max([7ED0], 0x0ADAAC([6350])); 0x03FA8C: 69.65. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7EE4L, "timing_floor",
+            "[TRACED] 0x03F00C: -20.0 on every path with shipped tables. Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7F09L, "cap_A_latch",
+            "[TRACED] 0x03F00C: set on falling edge of [85D7], cleared only on the OFF branch (03F160). "
+            + "Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7F0CL, "blend_out_sum_term0",
+            "[TRACED] 0x04004A tail: k*[7F48] + (1-k)*[7F18] or [7F48]; first term of the sum. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7F10L, "blend_weight_k",
+            "[TRACED] 0x03FBBC: steps 0.0156/call toward 0 while [85D7]==1, toward 1 otherwise. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF7FB0L, "bound_factor_7FB0",
             "[TRACED] Float factor of H. Lag or copy of [7FB4]; equal to [7FB4] in both bins. Trace: "
             + "timing_bound_040AF6_trace.txt (corrections item 111).");
@@ -13263,6 +13676,13 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF801FL, "ramp_counter",
             "[TRACED] byte action counter of 0x0415B8 (0x0417E4), compared with divider [0D297E]. Trace: "
             + "timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF8020L, "cut_exit_retard_state",
+            "[TRACED] 0x041BE4: table 0x0ADE08([6350]) on each armed call, else min(+0.7, 0), reset to 0; "
+            + "always <= 0. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8028L, "cut_exit_retard_term",
+            "[TRACED] = min([8020],[8024]) written every call by 0x041BE4 (041D0E); added into the 0x03F368 "
+            + "sum only on the sixteen-term path (03F644). Trace: overrun_timing_trace.txt (corrections item "
+            + "114).");
         count += labelComment(0xFFFF8034L, "prev_overrun_tier_041BE4",
             "[TRACED] u8 copy of [7C9A] stored at the end of every 0x041BE4 run (041D12) and tested by the "
             + "next run's arm (041C2A). 0x041954 also writes it when 0x022F92 returns 1. Trace: "
@@ -13275,6 +13695,64 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] u16 flag word; bits 0x1000/0x2000/0x4000 select 0x042506's output path. Stored at "
             + "twelve sites in 0x04209A, 0x042368 and 0x041EEE (three through a stack-held base find_writers.py "
             + "misses). No knock quantity read. Trace: fn_042506_trace.txt (corrections item 107).");
+        count += labelComment(0xFFFF80B4L, "term_80B4_80B4",
+            "[TRACED] 0x042ED8: converges to 0.0 from any start; sum term. Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF81ECL, "fbkc_timing_term",
+            "[TRACED] 0x044296: [81F0] + [8260] + [828C] (or [81F0] alone, or 0). A term of the 0x03F368 sum. "
+            + "Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF81F4L, "load_lag",
+            "[TRACED] 0x044DB0: first-order lag of [63F8] (0x0BEA40, k = [0x0D2E18] = 0.03125, snap 2^-14). "
+            + "Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF81F8L, "load_minus_lag",
+            "[TRACED] 0x044DB0: [63F8] - lag([63F8]) with k = 0.03125. G11/G12 compare it with "
+            + "0xBDCCCCCC/0x3DCCCCCC. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF81FCL, "fbkc_81F0_saved",
+            "[TRACED] 0x04581A: [81F0] saved while [824C] == 1. Restored into [81F0] when [824C] != 1. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF822CL, "cnt_since_79C8",
+            "[TRACED] 0x044CEA: 0 when [79C8] == 1, else +1 (saturating 255). 0x044300 sets it to 255 at "
+            + "init. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8234L, "fbkc_step_enable",
+            "[TRACED] Written only by 0x0448F4 at 0x044CCA (0 or 1). 0x04438C needs it == 1 for blocks "
+            + "A/B/C/main. 0x02487C packs it into bit 6 of [6893]. Trace: fn_0448F4_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF8235L, "fbkc_rpm_hi_ok_copy",
+            "[TRACED] 0x04581A: 1 iff [824C] == 1. The value 0 selects head exit 7 ([81F0] = [81FC]). Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8240L, "cnt_5BE2_set",
+            "[TRACED] 0x044D12: u16 count of calls while [5BE2] != 0 (saturating), else 0. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8249L, "cnt_798C_pos",
+            "[TRACED] 0x044D12: counts up while [798C] > 0 (saturating 255), else 0. 0x044B1A also clears it. "
+            + "Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF824AL, "fbkc_load_below_min",
+            "[TRACED] 0x0456E0: 1 when load < 0.95, 0 when load >= 1.0 (20.19c; stock 0.75/0x3F4CCCCC). FBKC "
+            + "head exit 4. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF824BL, "fbkc_rpm_above_lo",
+            "[TRACED] 0x04578C via 0x0BE800: 1 at RPM >= 1200, 0 below 1100 (20.19c). Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF824CL, "fbkc_rpm_below_hi",
+            "[TRACED] 0x04578C: 1 when RPM < 6000, 0 when RPM >= 6100 (20.19c). Trace: fn_0448F4_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF824DL, "rpm_below_fine_lo_hyst",
+            "[TRACED] 0x0457D2: 1 when RPM < 1500, 0 when RPM >= 1600, held in between. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8253L, "v79A8_ge_10000",
+            "[TRACED] 0x0457F4: written every call as shipped. Only reader is the 0x0448F4 tail, which is "
+            + "dead (0x0D299A = 0). Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8258L, "kc_adv_max_blended_8258",
+            "[TRACED] 0x045970: (1-[90A8]) T(KC Advance Max Cruise) + [90A8] T(Non-Cruise). Overwritten every "
+            + "call. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF826CL, "kc_gain_0AE664",
+            "[TRACED] 0x045970: T(0x0AE664), an all-zero table, so 0.0 every call as shipped. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8277L, "rough_corr_window_ok",
+            "[TRACED] 0x045A3E: AND of [8287..828A], set by 0x045F9A on the Rough Correction Range constants "
+            + "(tuned). Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF829EL, "fine_corr_window_ok",
+            "[TRACED] 0x0467AE: AND of [82AD..82B0], set by 0x046A4A on the Fine Correction Range constants. "
+            + "Trace: fn_0448F4_trace.txt (corrections item 114).");
         count += labelComment(0xFFFF8320L, "r04907C_pass_counter_8320",
             "[TRACED] With gate 0xFF, 0x04907C adds 1 per call and makes its five calls when the low nibble "
             + "is 0. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
@@ -13322,9 +13800,24 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF8EEDL, "gate_8EDC_shadow",
             "[TRACED] Shadow of the gate byte; it decides the gate when the word is inconsistent. Written by "
             + "0x05CB1C and 0x05CBC8. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF97B0L, "max0_653C_m_77C8_p_76D4_p_afl",
+            "[TRACED] 0x071AFA: max([653C]-[77C8]+[76D4]+[7878], 0), or 1.0 when [65F6]==1 or [7449]==0. "
+            + "[97B4] is its k=0.125 lag. Trace: afl_learning_trace.txt (corrections item 114).");
         count += labelComment(0xFFFFACF6L, "cnt_inc_block_ACF6",
             "[TRACED] 1 blocks the CNT increment in 0x05B73C. Set to 1 only by 0x0914AE; no resolved store "
             + "clears it. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFFBFA8L, "boot_window_flag_BFA8",
+            "[TRACED] byte; (BFEC == 0x55), written only when the boot window runs Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFFBFB8L, "boot_ring_wr_index",
+            "[TRACED] word; mod 100, 0 at reset (0x00054A, 0x0004D6) Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFFBFBAL, "boot_ring_rd_index",
+            "[TRACED] word; mod 100, 0 at reset (0x00054A, 0x000524) Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFFBFFCL, "boot_marker_BFFC",
+            "[TRACED] long 0x5AA5A55A written by 0x000756 on every boot-block exit; gates only the message "
+            + "window Trace: poweron_state_trace.txt (corrections item 114).");
         // <<< END decoded labels <<<
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");

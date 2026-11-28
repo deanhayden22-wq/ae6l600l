@@ -168,6 +168,12 @@ unverified (~8 ms family → 438 ≈ 3.5 s). Either sign is engine-safe to A/B.
 > the integrator can rise only in an early window, if at all. Whether it is ever non-zero on the car
 > is not established. **Log `0xFFFF69E6`, `0xFFFF7FF4` and `0xFFFF7FBC` before crediting the 20.19c
 > window B change with any effect** — it may have none.
+>
+> **Update 2026-11-27 (corrections item 117):** RAM 0xFFFF4000..BF9F is zero-filled by DMA on every
+> reset, so `[FFFF69E6]` and `[FFFF7FBC]` are 0 at every kernel start and the latch `[FFFF7FF4]` starts
+> clear. If the integrator's update `0x0410D4` runs once before init `0x026634` sets `[69E6]`, the latch
+> trips at once and `FFFF7FBC` is 0 for the whole drive. That order is still the open question; the log
+> above settles it.
 
 **Plan (Dean to schedule):**
 1. 20.18 candidate = single-variable: arm window B 0 → 438 (factory STI value,

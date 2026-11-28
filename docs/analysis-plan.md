@@ -18,23 +18,26 @@ read.** Everything here is measured by `scripts/mapping/function_census.py`
 
 ## The denominator, by function
 
-Measured 2026-11-27 after batch 3 (item 111). Item 105's first figures were
+Measured 2026-11-27 after batch 4 (item 114). Item 105's first figures were
 5,151 functions / 572,310 bytes / 15,798 traced (5.5%); after batch 1, 24,930 (8.7%);
-after batch 2, 32,111 listed / 22,698 analysed.
+after batch 2, 32,111 listed / 22,698 analysed; after batch 3, 38,965 / 30,734.
 
 ```
-functions                 5,146      432 labels now [DECODED]; 1,681 carry a label
+functions                 5,146      572 labels now [DECODED]; 1,759 carry a label
 instructions            286,163      = 572,326 bytes of code (NOT 444,928)
-  listed, byte-verified  38,965      = 13.6%  (11.2% after batch 2, 8.7% after batch 1)
-  ...analysed            30,734      = 10.7%  (7.9% after batch 2; listed in a file that
+  listed, byte-verified  49,418      = 17.3%  (13.6% after batch 3, 11.2% after batch 2)
+  ...analysed            42,104      = 14.7%  (10.7% after batch 3; listed in a file that
                                                states what the code does; the 13
                                                *_raw.txt dumps excluded)
 
-functions >= 90% listed     818      (719 after batch 2, 541 after batch 1, 293 before)
-  ...>= 90% analysed        642      (532 after batch 2; 176 are covered by raw dumps alone)
-functions partly listed     171
-functions never touched   4,157      (4,262 after batch 2, 4,797 before batch 1)
+functions >= 90% listed     995      (818 after batch 3, 719 after batch 2, 293 before batch 1)
+  ...>= 90% analysed        830      (642 after batch 3; 165 are covered by raw dumps alone)
+functions partly listed     176
+functions never touched   3,975      (4,157 after batch 3, 4,797 before batch 1)
 ```
+
+(The function count still includes the false splits item 114 found — `0x01FE46` counts as two;
+batch 5 step 0 fixes the census.)
 
 **"Listed" is not "decoded".** Until item 108 every figure here, and the `[DECODED]`
 tag, counted the `*_raw.txt` files: byte-correct listing dumps with no contracts (and
@@ -43,17 +46,17 @@ both; `--rank` and the `[DECODED]` tag use `analysed`.
 
 | region | functions | never touched | instructions | listed | analysed |
 |---|---|---|---|---|---|
-| `0x000000` | 881 | 723 | 26,582 | 9.6% | 8.4% |
-| `0x010000` | 505 | 449 | 26,825 | 3.4% | 3.4% |
-| `0x020000` | 505 | 385 | 27,750 | 8.8% | 7.5% |
-| `0x030000` | 402 | 232 | 26,508 | **53.0%** | **47.4%** |
-| `0x040000` | 304 | 199 | 26,177 | **33.4%** | 20.1% |
-| `0x050000` | 631 | 466 | 26,927 | 17.8% | 15.2% |
-| `0x060000` | 369 | 305 | 22,906 | 8.7% | 2.9% |
-| `0x070000` | 413 | 392 | 27,602 | 2.1% | 0.7% |
+| `0x000000` | 881 | 689 | 26,582 | 14.9% | 13.7% |
+| `0x010000` | 505 | 434 | 26,825 | 6.6% | 6.6% |
+| `0x020000` | 505 | 356 | 27,750 | 14.8% | 14.0% |
+| `0x030000` | 402 | 159 | 26,508 | **70.1%** | **66.8%** |
+| `0x040000` | 304 | 177 | 26,177 | **40.1%** | 27.6% |
+| `0x050000` | 631 | 463 | 26,927 | 17.9% | 15.2% |
+| `0x060000` | 369 | 302 | 22,906 | 9.3% | 3.4% |
+| `0x070000` | 413 | 391 | 27,602 | 2.2% | 0.9% |
 | `0x080000` | 492 | 473 | 27,583 | 1.0% | 1.0% |
-| `0x090000` | 353 | 325 | 23,350 | 4.0% | 3.2% |
-| `0x0A0000` | 180 | 172 | 17,389 | 1.0% | 1.0% |
+| `0x090000` | 353 | 324 | 23,350 | 4.0% | 3.3% |
+| `0x0A0000` | 180 | 171 | 17,389 | 1.0% | 1.0% |
 | `0x0B0000` | 110 | 36 | 6,536 | **23.4%** | **23.4%** |
 | `0x0F0000` | 1 | 0 | 28 | 100% — the launch patch | 100% |
 
@@ -109,12 +112,12 @@ file. Every trace above them currently rests on the helper's *name*. Item 102
 showed what that costs: `int32_div_sat` was a 16.16 fixed-point divide, off by
 65536 for anyone who trusted the label.
 
-**Tier 1 — code that is in the car and unexplained.** — **done to the injector pulse, batches 1–3.**
+**Tier 1 — code that is in the car and unexplained.** — **done, batches 1–4.**
 Open-holes #9 (the zeroed clamp at `0x0357C8`, routine `0x0355B8`, output
 `0xFFFF7904`): mechanism (batch 1), identity (batch 2: a trim on the
 closed-loop lambda target `0xFFFF77BC`) and reach (batch 3: it drives logged AFC
-`0xFFFF76D4`, a live integrator) settled; what is left is the path from
-`0x0301E4` to the injector pulse and a cold-start log of the SPECIAL-exit bytes.
+`0xFFFF76D4`, a live integrator; batch 4: AFC multiplies the injector register,
+item 115) settled; what is left is a cold-start log of the SPECIAL-exit bytes.
 The dependency closure of both live patches is done (SSM: batch 1, open-holes #10;
 launch: batch 2, `launch_closure_trace.txt`; the `0xFFFF8EDC` gate: batch 3 —
 written at most once per reset, on a warm start).
@@ -122,7 +125,8 @@ written at most once per reset, on a warm start).
 **Tier 2 — tuned subsystems, largest untraced function first.**
 `0x2E000`–`0x47000` (fuel, CL/OL, ignition, knock). The head of the list as it
 stood after batch 1 (`0x042506` and `0x0359A4` came off it in batch 1; the
-seven marked ✓ in batch 2, `0x030C38` in batch 3):
+seven marked ✓ in batch 2, `0x030C38` in batch 3, `0x0448F4`, `0x037710`, `0x03D856`,
+`0x02EB02` in batch 4):
 
 | entry | instructions | descriptors | GBR |
 |---|---|---|---|
@@ -131,12 +135,12 @@ seven marked ✓ in batch 2, `0x030C38` in batch 3):
 | ✓ `0x0410D4` | 505 | 0 | `0xFFFF7FBC` |
 | ✓ `0x038E64` | 479 | 12 | `0xFFFF7B7C` |
 | ✓ `0x03AF88` | 423 | 0 | `0xFFFF7C80` |
-| `0x0448F4` | 421 | 0 | `0xFFFF81F8` |
-| `0x037710` | 329 | 3 | `0xFFFF7A78` |
-| `0x03D856` | 328 | 0 | – |
+| ✓ `0x0448F4` | 421 | 0 | `0xFFFF81F8` |
+| ✓ `0x037710` | 329 | 3 | `0xFFFF7A78` |
+| ✓ `0x03D856` | 328 | 0 | – |
 | ✓ `0x0415B8` | 292 | 6 | `0xFFFF8000` |
 | ✓ `0x03AB94` | 287 | 0 | `0xFFFF7C6C` |
-| `0x02EB02` | 283 | 0 | `0xFFFF7244` |
+| ✓ `0x02EB02` | 283 | 0 | `0xFFFF7244` |
 | ✓ `0x030C38` | 279 | 6 | `0xFFFF73B0` |
 
 `python scripts/mapping/function_census.py --rank 60` prints the live list.
@@ -273,31 +277,64 @@ Tier 3 follow-through (918 member names) ran as a script at integration.
 4. Any drive: `0xFFFF69E6`, `0xFFFF7FF4`, `0xFFFF7FBC` (is the timing integrator ever
    non-zero?).
 
-## Batch 4 — next
+## Batch 4 — done 2026-11-27 (corrections items 114-118)
 
-In order; one cluster per line. Each comes out of a batch-3 "not established".
+Eight clusters: the injector path (`0x0301E4` to the register), the rest of the FFB sum,
+`0x01FE46`, the overrun timing terms, power-on RAM, `0x0448F4`, `0x03D856`/`0x02EB02`, and
+AFL learning. 26 agents (trace, refute, settle; an extra audit on the injector path and AFL),
+no failures, about 2.2 hours of wall clock.
 
-1. **From `0x0301E4` to the injector pulse:** the readers of its outputs
-   `0xFFFF7320`..`0xFFFF7344` — `0x037D74`, `0x0345A4`, `0x038DC0`, `0x03D0B8`,
-   `0x02EF4C`, `0x07D50A`, `0x0397AC`. Settles whether logged AFC, AFL and FFB
-   multiply the pulse (open-holes #9, #12).
-2. **The rest of the FFB sum:** writers of `[0xFFFF7354]`, `[0xFFFF7374]`,
-   `[0xFFFF7A44]` and the `[79C0]` scaling of `[798C]`; and `0x037710` (329,
-   GBR `0xFFFF7A78` — the per-cylinder addends `[7A78+4i]`).
-3. **`0x01FE46` in full** (221): the `[641C]` latch that drops `0x0301E4`'s lower
-   clamp, and its use of "MAF Limit (Maximum)" `0x0C3100` (300 in stock, 475 in 20.19c,
-   read at `01FF5C` with `[63C4]`) — the one tuned value in this function.
-4. **What lowers timing during an overrun cut (open-holes #13):** `0x041BE4` in full
-   and its caller chain `0x0419BA` ← `0x04AA58`, the `[8020]`/`[8028]` terms.
-5. **Start-up state:** the reset DMA at `0x010398` (CHCR `0x001F0128` against the
-   SH7058 manual), the RAM test `0x010448`, and `0x047C40` (it runs `0x026634` and the
-   `[73E0]` seeder). Settles the cold-start `[8EDC]` value and the power-on
-   `[7FF4]`/`[69E6]`.
-6. **Tier 2 remainder:** `0x0448F4` (421, GBR `0xFFFF81F8`), `0x03D856` (328),
-   `0x02EB02` (283, GBR `0xFFFF7244`).
-7. **The other readers of logged AFC's lags and of W:** `0x034884` (273, reads
-   `[7704]`) and `0x06847E` (reads W `[0xFFFF7484]`) — they decide whether anything
-   but fuel follows AFC.
+| measure | result |
+|---|---|
+| verified instruction lines added | 13,953 in 8 files (11,370 more instructions analysed, 10,453 more listed) |
+| functions newly at >= 90% analysed | 188 |
+| claims made / confirmed / refuted / imprecise / missed | 313 / 264 / 3 / 46 / 41 |
+| contradictions with existing labels and docs, verified from bytes | 54 |
+| labels | 214 new decoded records; 79 more names retired — `RetireStaleLabels.java` drops 353 |
+| closed | open-holes #9 (a): the injector pulse formula (item 115); the power-on questions of items 111/114 (item 117) |
+| corrected | item 111's `[79C0]` (it is `[79A0]`), item 74's `0x0ADE08` range and reset gates, item 80's `[8258]` |
+
+**What it taught:**
+
+* **Ask the reset path before arguing about a latch.** Three open questions across two
+  batches (the cold-start rev-limit freeze, `[7A44]`, the timing latch's start state) were
+  all answered by one fact: the reset DMA zero-fills 0xFFFF4000..BF9F. Decode start-up once,
+  early, for any new subsystem.
+* **Follow the outputs of a "consumer" to a register, not to a name.** `0x0301E4` had been
+  labelled `fuel_pulse_width_calc` for a year; the real pulse also passes through a per-channel
+  floor, per-injector trims and an undefined low-pulse table before it reaches `0xFFFFF640`.
+* **The census is now the weakest tool again.** It split `0x01FE46` at a false pointer seed and
+  works from an 818-record descriptor set. Fix it before the next batch (step 0 below).
+
+## Batch 5 — next
+
+**Step 0 — tools (script work, no agents), before any trace:**
+
+1. `function_census.py`: reject a pointer seed that lands inside already-proven code at an
+   address that is not an entry (`0x020000` inside `0x01FE46`); re-run and list every function
+   that merges.
+2. Reconcile the descriptor scanners: `coverage_map.scan_descriptors` (818 records, used by the
+   census, `fn_dump` and the verification registry) vs `descriptor_map.txt` (1,094, item 60's
+   scanner). Find which records each misses and why, make one scanner the source, and re-run
+   `coverage_map.py` — the registry's counts will move.
+
+Then the traces, in order; each comes out of a batch-4 "not established":
+
+1. **The last FFB piece:** `0x03606C`'s `[798C]` ramp paths with `[79C6]` == 1 / 2 (open-holes #12).
+2. **The closed-throttle timing floor (open-holes #13):** `0x03FBBC` (the `[85D7]`-gated blend with
+   "Base Timing Idle Minimum") and `0x03ED56` (the `[7EC0]` cap load) with their inputs.
+3. **Where the other AFL readers go:** `0x02782C` ((1 + AFL) × table → `[6A00]`/`[6A04]`), `0x071AFA`
+   (`[97B0]`), `0x03CD4A`/`0x03D23A` (`[7D68]` → `[7874]`).
+4. **The order of start-up:** when `0x047C40` (task 10) runs `0x026634` relative to the first
+   `0x0410D4` call — decides whether the timing integrator can ever leave 0.
+5. **Who writes `[415C]`** (copied to `[65F6]`, which re-seeds airflow and load and re-arms the
+   after-start floor) and **who sets `[36BE]` = 0x4055** (the AFL clear on a warm start, via
+   handler `0x098FE4`).
+6. **Tier 2 remainder** from `function_census.py --rank 60` after step 0.
+
+**Logs that still settle more than a trace** (from batch 3, all still open): the cold-start
+SPECIAL-exit bytes; `0xFFFF73B4` through tip-ins; overrun lifts with `0xFFFF7C9A`, `0xFFFF8028`,
+`0xFFFF7F10`, `0xFFFF7EC0` and timing; and `0xFFFF69E6`, `0xFFFF7FF4`, `0xFFFF7FBC` on any drive.
 
 Run it as a FRESH workflow with these targets.
 

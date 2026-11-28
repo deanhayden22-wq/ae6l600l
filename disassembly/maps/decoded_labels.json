@@ -12,6 +12,56 @@
    "decoded_name": "set_sp_and_jump"
   },
   {
+   "address": "0x00065C",
+   "kind": "function",
+   "name": "boot_block_decision",
+   "comment": "Boot decision. SP:=0xFFFFBFA0; WDT (0x000762: RSTCSR 0x5A1F, TCNT 0, TCSR 0xA53C), HCAN set-up; 0x000598/0x00054A write 0xFFFFBFE4..BFFB and words BFB8/BFBA:=0; byte BFAC:=0; if long 0xFFFFBFFC != 0x5AA5A55A runs the message window 0x0007E0(7); on every exit long 0xFFFFBFFC:=0x5AA5A55A and jumps via 0x000040 (SP 0xFFFFBFA0) to [0x001000]=0x00127C on this ROM.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_block_decision"
+  },
+  {
+   "address": "0x0007E0",
+   "kind": "function",
+   "name": "boot_msg_window",
+   "comment": "Boot message window: counts (r4 & 0xFFFF) WDT overflow events (TCSR bit 7, polled; 0x000484 services) and returns 1 at once when that is 0; each pass writes byte 0xFFFFBFA8 := (BFEC == 0x55) and takes CAN messages into the ring 0xFFFFB4E0; returns 0 if FF 86 00.. is seen.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_msg_window"
+  },
+  {
+   "address": "0x000C0C",
+   "kind": "function",
+   "name": "reset_entry",
+   "comment": "Power-on / manual-reset vector target (SP 0xFFFFBFA0 from 0x000004): calls 0x000C20, 0x000C54, then 0x00065C(r4=0,r5=0), which never returns. Writes no RAM itself.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "reset_entry"
+  },
+  {
+   "address": "0x000C20",
+   "kind": "function",
+   "name": "boot_bsc_sysc_init",
+   "comment": "BCR1:=0x000F, BCR2:=0, WCR:=0x7777, RAMER:=0, byte 0xFFFFBFAD:=0x77, SYSCR2:=0x3C04, ICR:=0, then spins while ICR bit 15 (NMIL) reads 0.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_bsc_sysc_init"
+  },
+  {
+   "address": "0x000C54",
+   "kind": "function",
+   "name": "boot_port_init",
+   "comment": "Stores constants to 43 port words 0xFFFFF720..0xFFFFF778; no RAM access.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_port_init"
+  },
+  {
    "address": "0x000D78",
    "kind": "function",
    "name": "busy_wait_8n_D78",
@@ -20,6 +70,26 @@
    "item": 108,
    "cluster": "stub_shapes_b",
    "decoded_name": "busy_wait_8n"
+  },
+  {
+   "address": "0x00127C",
+   "kind": "function",
+   "name": "boot_stage2_entry",
+   "comment": "Stage 2 entry (SP 0xFFFFBFA0): byte [[0x002000]]=0xFFFF204C := 0x77 unless the word is blank; calls 0x0012C0(0).",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_stage2_entry"
+  },
+  {
+   "address": "0x0012C0",
+   "kind": "function",
+   "name": "boot_stage2",
+   "comment": "Stage 2 (SP 0xFFFFBFA0, saves nothing): word 0xFFFF800C := 0xA53C (class 0), 0x001332 WDT writes, HCAN, longs 0xFFFF809C..80AF; byte 0xFFFF204C := 0x88; 0x001008 loads SP 0xFFFFBF7C and jumps to [0x0FFFF8]=0x00FA34.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_stage2"
   },
   {
    "address": "0x0015FC",
@@ -1657,6 +1727,26 @@
    "decoded_name": "empty_fn_00A690"
   },
   {
+   "address": "0x00AE1C",
+   "kind": "function",
+   "name": "ipr_clear_all",
+   "comment": "Words 0xFFFFED00..0xFFFFED16 (IPRA..IPRL) := 0.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "ipr_clear_all"
+  },
+  {
+   "address": "0x00AE50",
+   "kind": "function",
+   "name": "iprl_wdt_prio14",
+   "comment": "IPRL 0xFFFFED16 := (IPRL & 0xFF0F) | 0xE0: WDT ITI priority 14 (manual Table 7.4).",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "iprl_wdt_prio14"
+  },
+  {
    "address": "0x00B072",
    "kind": "function",
    "name": "empty_fn_00B072",
@@ -1685,6 +1775,16 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "empty_fn_00B2A6"
+  },
+  {
+   "address": "0x00B2AA",
+   "kind": "function",
+   "name": "wdt_stop",
+   "comment": "TCSR := 0xA500|(TCSR&0xDF) (TME 0); RSTCSR := 0x5A1F; TCSR := 0xA518.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "wdt_stop"
   },
   {
    "address": "0x00B2E6",
@@ -2991,6 +3091,16 @@
    "decoded_name": "jmp_to_006316"
   },
   {
+   "address": "0x00F6E6",
+   "kind": "function",
+   "name": "wdt_iti_handler",
+   "comment": "Vector 224 (WDT ITI): pushes r7..r0, fr11..fr0, pr, fpul, fpscr (100-byte frame with SR/PC), clears TCSR OVF (A500|(TCSR&0x7F)), calls 0x010AD8, pops, rte.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "wdt_iti_handler"
+  },
+  {
    "address": "0x00F766",
    "kind": "function",
    "name": "irq_v229_ack_halt",
@@ -3019,6 +3129,26 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "empty_fn_00F86C"
+  },
+  {
+   "address": "0x00FA34",
+   "kind": "function",
+   "name": "app_entry",
+   "comment": "Application entry (SP 0xFFFFBF7C, unused): SR.I:=15, VBR:=0x000FFC50, FPSCR:=0x00040001, jsr 0x0040CA whose delay slot 0x0040CC sets SP:=[0x011CC8]=0xFFFF12DC; byte 0xFFFFBFAD:=0x88; 0x00FA5A.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "app_entry"
+  },
+  {
+   "address": "0x00FA5A",
+   "kind": "function",
+   "name": "app_init_sequence",
+   "comment": "Init sequence: 0x00AD98 (incl. 0x00B2AA WDT stop), 0x00AE1C IPRs:=0, 0x00AE50 IPRL[7:4]:=14, 0x0108DA(0), 0x010942 TME:=1, SR.I:=13 (ITI window opens), 0x010290, 0x00FBBA(0), 0x0BEAB8(2000), masked 0x006BC4/0x006BF0, 0x00AE1C (window closes at 0x00AE4E), 0x003324(0).",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "app_init_sequence"
   },
   {
    "address": "0x00FBA4",
@@ -3079,6 +3209,16 @@
    "decoded_name": "post_event"
   },
   {
+   "address": "0x00FE22",
+   "kind": "function",
+   "name": "mailbox_read_alternate",
+   "comment": "r0 = long [0xFFFF5B70+12*r4+4*idx], with idx = byte [rec+9]; then idx = (idx+1) mod 2. This is a two-slot mailbox read alternately.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "mailbox_read_alternate"
+  },
+  {
    "address": "0x00FE58",
    "kind": "function",
    "name": "empty_fn_00FE58",
@@ -3109,12 +3249,82 @@
    "decoded_name": "warm_cold_start_decision"
   },
   {
+   "address": "0x010290",
+   "kind": "function",
+   "name": "reset_ram_tests",
+   "comment": "Tests A 0xFFFF4000..BF9F (destructive); if passed, B 0xFFFF0000..001F (masked 0xE0 section) and C 0xFFFF0020..1FFF (SP moved to 0xFFFFBF9C) with save/restore; always 0x010398; byte 0xFFFF5B89 := 1 or 8*B_fail + 2*C_fail.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "reset_ram_tests"
+  },
+  {
+   "address": "0x010398",
+   "kind": "function",
+   "name": "reset_dma_zero_fill",
+   "comment": "DMAC ch0: SAR=DAR=0xFFFF4000 (long 0 stored there), DMATCR 0x1FE8, CHCR 0x001F0128 then DE: auto-request burst longword fixed-source fill -> 0xFFFF4000..0xFFFFBF9F := 0; spins on TE.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "reset_dma_zero_fill"
+  },
+  {
+   "address": "0x010448",
+   "kind": "function",
+   "name": "ram_test",
+   "comment": "RAM test of [r4,r5]: stride 16/32 strided passes via 0x0105AA plus pattern heads per block, up to [0x0C4730]=2 attempts, mismatches reported through 0x01068E; r0 = 1 on failure. Stays inside the range when its length is a multiple of the stride and no block head lies closer than a stride to end (true for all four ROM ranges).",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "ram_test"
+  },
+  {
+   "address": "0x0105AA",
+   "kind": "function",
+   "name": "ram_test_stride_pass",
+   "comment": "One strided write/verify pass (0xA55A5AA5 / 0x5AA5A55A) from a to the first a+k*s >= lim; returns fail flag.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "ram_test_stride_pass"
+  },
+  {
    "address": "0x01076A",
    "kind": "function",
    "name": "trap_log_clear",
    "comment": "Clears the five-record trap log at 0xFFFF2060 (stores value:~value pairs via 0x0BDB6E / 0x0BDB80, no FPU). Not a charge workspace init.",
    "trace": "disassembly/analysis/rtos_core_trace.txt",
    "item": 107
+  },
+  {
+   "address": "0x010878",
+   "kind": "function",
+   "name": "boot_wdt_limit_set",
+   "comment": "Reads TCSR & 7 (0x1C -> 4 on this path); long 0xFFFF0000 := trunc(fr4/(CKS==3 ? 0.8192 : 1.6384) + 0.5) = 183 for 300.0; long 0xFFFF0004 := 0.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_wdt_limit_set"
+  },
+  {
+   "address": "0x0108DA",
+   "kind": "function",
+   "name": "boot_wdt_arm",
+   "comment": "Inside a 0xE0 section: delay(300), 0x011880, byte 0xFFFF0008:=r4; r4==0 -> 0x010C52(4); 0x010878(300.0).",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_wdt_arm"
+  },
+  {
+   "address": "0x010942",
+   "kind": "function",
+   "name": "wdt_start",
+   "comment": "TCSR := 0xA520 | TCSR byte (TME := 1); 0x1C -> 0x3C, interval mode.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "wdt_start"
   },
   {
    "address": "0x010962",
@@ -3135,6 +3345,36 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "thunk_to_010950"
+  },
+  {
+   "address": "0x010AD8",
+   "kind": "function",
+   "name": "boot_wdt_count",
+   "comment": "long 0xFFFF0004 += 1; if count < [0xFFFF0000] (unsigned) tail-calls 0x011880; else 0x010800(0x2100/0x2200/0x2300 for byte 0xFFFF0008 = 0/1/other, 0) and jmp 0x00FBA4.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_wdt_count"
+  },
+  {
+   "address": "0x010C52",
+   "kind": "function",
+   "name": "wdt_set_cks",
+   "comment": "TCSR := 0xA518, then 0xA518 | r4 | (old TCSR & 0x20); on the reset path r4=4, old TME 0 -> TCSR 0x1C.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "wdt_set_cks"
+  },
+  {
+   "address": "0x011880",
+   "kind": "function",
+   "name": "port_F738_bit15_toggle",
+   "comment": "Inside a 0xE0 section inverts bit 15 of port word 0xFFFFF738.",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "port_F738_bit15_toggle"
   },
   {
    "address": "0x011EEA",
@@ -3667,6 +3907,66 @@
    "decoded_name": "thunk_to_0204BA"
   },
   {
+   "address": "0x01FE46",
+   "kind": "function",
+   "name": "airflow_cap_load_and_lift_latch",
+   "comment": "One function 0x01FE46..0x02035E (census splits it at 0x020000/0x020012). Writes [63C4] = min([63C0]*[63F0] + [69F4]*0x0C3104, 0x0C3100), where [63C0] is the mean of the window max and min. It also writes the g/rev chain [63E0] [63DC] [63E4] [6408] [6414] [63E8], the [641C]/[641A]/[641B] latch, and the engine-load cell [63F8] with its rule list (frozen against rising while [641C]==1), plus [63FC] and [6400].",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "airflow_cap_load_and_lift_latch"
+  },
+  {
+   "address": "0x0203DC",
+   "kind": "function",
+   "name": "maf_window_sampler",
+   "comment": "[63B4] = [40B4]. If byte [65F6] == 1, [6420] = [6424] = 0x0AAE00([6350]); otherwise [6420] = max([6420], [63B4]) and [6424] = min([6424], [63B4]).",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "maf_window_sampler"
+  },
+  {
+   "address": "0x020426",
+   "kind": "function",
+   "name": "airflow_8call_delta",
+   "comment": "byte [6438] = sat([6438]+1). When it reaches >= 8 (0x0C302D): [63C8] = [63C4] - [6434], [6434] = [63C4], and [6438] = 0.",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "airflow_8call_delta"
+  },
+  {
+   "address": "0x020580",
+   "kind": "function",
+   "name": "latch_hold_counter_20580",
+   "comment": "byte [6418] = 0 if byte [641A] == 1, else sat_u8([6418]+1).",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "latch_hold_counter"
+  },
+  {
+   "address": "0x020678",
+   "kind": "function",
+   "name": "seed_airflow_load_and_clear_latch",
+   "comment": "Unconditionally seeds the airflow cells with 0x0AAE00([6350]) and the g/rev cells with 0x0AAE50([6350]). Clears bytes [641C] [641A] [641B], sets [6419] = [6438] = 0xFF and [6439] = byte [65F6].",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "seed_airflow_load_and_clear_latch"
+  },
+  {
+   "address": "0x020726",
+   "kind": "function",
+   "name": "seed_and_clear_latch_if_65F6",
+   "comment": "Only when byte [65F6] == 1: seeds [63B8] [63BC] [63C0] [63C4] [63CC] with 0x0AAE00([6350]) and the g/rev cells with 0x0AAE50([6350]), and clears [641C] [641A] [641B]. Writes nothing otherwise. GBR is 0xFFFF63B8.",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "seed_and_clear_latch_if_65F6"
+  },
+  {
    "address": "0x0207D0",
    "kind": "function",
    "name": "thunk_to_0207FA",
@@ -3807,6 +4107,26 @@
    "decoded_name": "test_65C5_eq1"
   },
   {
+   "address": "0x022F1C",
+   "kind": "function",
+   "name": "copy_415C_to_65F6",
+   "comment": "Inside a critical section, byte [65F6] = byte [415C]. If that byte is 1, it also sets byte [65F7] = 0 and calls 0x006FF6 with r4 = 0.",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "copy_415C_to_65F6"
+  },
+  {
+   "address": "0x022F92",
+   "kind": "function",
+   "name": "get_65F6_is_1",
+   "comment": "Returns ([65F6] == 1).",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "get_65F6_is_1"
+  },
+  {
    "address": "0x0230F4",
    "kind": "function",
    "name": "initpair_2220",
@@ -3865,6 +4185,16 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "thunk_to_023458"
+  },
+  {
+   "address": "0x023A94",
+   "kind": "function",
+   "name": "count_67EC_since_726C",
+   "comment": "If byte [726C]==1: word [67EC] = 0 and nothing else. Otherwise [67EC] and [67E8] each = sat16(+1). It is the only [67EC] writer find_writers shows.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "count_67EC_since_726C"
   },
   {
    "address": "0x023EB8",
@@ -4461,6 +4791,36 @@
    "decoded_name": "init_3154_7268"
   },
   {
+   "address": "0x02E8C0",
+   "kind": "function",
+   "name": "eeprom_phase_dispatch",
+   "comment": "Copies the high byte of word [3154] into [7268] when the value:~value pair is consistent, else rebuilds the word from [7268]. Then dispatches phases A/B/C on gate byte [8E98] != 0.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "eeprom_phase_dispatch"
+  },
+  {
+   "address": "0x02EB02",
+   "kind": "function",
+   "name": "eeprom_writeback_pass",
+   "comment": "One pass of a six-word serial-EEPROM write-back (GBR 0xFFFF7244). Session-start writes come before the lock test. Backs off unless byte [0xFFFF6C48] is 0 or 0xEE. 7 busy passes -> finish without EWDS. State 2/3 or V<6.0 -> EWDS and finish. 0xEE is written only on a ready, non-aborting pass. Verifies and retries up to cal byte 0x0C472C=3, and writes word k to address 483+k.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "eeprom_writeback_pass"
+  },
+  {
+   "address": "0x02ED88",
+   "kind": "function",
+   "name": "eeprom_outcome_record",
+   "comment": "Phase C. ([726A]==1 and count>6) or state 3 -> [7268] = 1 and word [3154] = 0x01FE. Else state 2 -> [7268] = 0 and word 0x00FF. Otherwise no outcome. Always sets [7265] = 1.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "eeprom_outcome_record"
+  },
+  {
    "address": "0x02EF08",
    "kind": "function",
    "name": "thunk_to_02F85E",
@@ -4469,6 +4829,16 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "thunk_to_02F85E"
+  },
+  {
+   "address": "0x02EF0C",
+   "kind": "function",
+   "name": "runtime_floor_rearm_check",
+   "comment": "if 0x022F92()==1 (byte [65F6]==1): bsr 0x02F83E (bytes [726C] [72C8] [726F..7272]:=1, [72D1]:=0); then 0x02F57E and tail jump 0x02F6E0 (not decoded). Called by task-9 runner 0x04907C at 0491B0 on every pass with byte [8EDC]==0.",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "runtime_floor_rearm_check"
   },
   {
    "address": "0x02EF26",
@@ -4521,6 +4891,26 @@
    "decoded_name": "call_02F22A_then_02EFD2"
   },
   {
+   "address": "0x02EF56",
+   "kind": "function",
+   "name": "crank_flag_726C",
+   "comment": "[72A8] = AC804([6350]) = 500. [72C8] = 0 if [6624] > 500, 1 if [6624] <= 300, else held. [726C] = [726D] = 0 when [72C8]==0 and [7E4C] >= [72A4] (=0), else [726C] = 1.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "crank_flag_726C"
+  },
+  {
+   "address": "0x02EFD2",
+   "kind": "function",
+   "name": "per_channel_pulse_after_start_floor",
+   "comment": "PW_j=[7290+4j]: RESET ([726C]!=0) to [72DC]; else if any flag byte [726F..7272]==1, EVERY channel (flag 0 or not) gets [7328+4j] if > [728C] else [728C], with [728C]=max([728C]*T(D,[6354]),0) and flag_j cleared when its pulse beats the floor; else COPY [7328+4j]. Latch [72D1]=1 when byte [7306]==1.",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "per_channel_pulse_after_start_floor"
+  },
+  {
    "address": "0x02F2C2",
    "kind": "function",
    "name": "lookup1d_ect_store",
@@ -4529,6 +4919,36 @@
    "item": 108,
    "cluster": "stub_shapes_b",
    "decoded_name": "lookup1d_ect_store"
+  },
+  {
+   "address": "0x02F550",
+   "kind": "function",
+   "name": "set_7288",
+   "comment": "[7288] = AC338([6350]) (flat 1.0) and [726E]=1 if byte [65C1]==1; otherwise [7288] = 1.0 and [726E] = 0.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "set_7288"
+  },
+  {
+   "address": "0x02F974",
+   "kind": "function",
+   "name": "mode0_factor_lookups",
+   "comment": "Returns at once if byte [0xFFFF65F1] != 0. If (signed) byte [726C] == 1: [72E0]/[72E4]/[72E8] = 1-D lookups of 0x0AC34C/0x0AC360/0x0AC374 at f32 [620C]/[64D8]/[6364], and [72DC] = 0x02F9E0(r4=[7E4C]+1), where r4 is unused.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "mode0_factor_lookups"
+  },
+  {
+   "address": "0x02F9E0",
+   "kind": "function",
+   "name": "mode0_duration_clamp",
+   "comment": "fr0 = clamp([7300] + [72FC]*[72E0]*[72E4]*[72EC]*[72F4]*[72E8], 0, 262136) via 0x0BE56C. The r4 argument has no effect.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "mode0_duration_clamp"
   },
   {
    "address": "0x02FA68",
@@ -4553,12 +4973,12 @@
   {
    "address": "0x02FB1C",
    "kind": "function",
-   "name": "float_getter",
-   "comment": "Class 103 (2): fr0 = f32[A].",
-   "trace": "disassembly/analysis/stub_shapes_b_trace.txt",
-   "item": 108,
-   "cluster": "stub_shapes_b",
-   "decoded_name": "float_getter"
+   "name": "get_f32_72EC",
+   "comment": "fr0 = f32 [0xFFFF72EC]; r4 is never read.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "get_f32_72EC"
   },
   {
    "address": "0x02FB68",
@@ -4631,6 +5051,16 @@
    "decoded_name": "chain4_02FF8E_0301E4"
   },
   {
+   "address": "0x02FF8E",
+   "kind": "function",
+   "name": "set_pulse_lower_clamp",
+   "comment": "[733C] = 0.0 if byte [641C]==1 (sign-extended cmp/eq) else [0x0CBE08]=300.0; only writer found; called at 02FF7E right before the tail branch to 0x0301E4.",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "set_pulse_lower_clamp"
+  },
+  {
    "address": "0x02FFE0",
    "kind": "function",
    "name": "ffb_sum_and_clamp",
@@ -4659,6 +5089,86 @@
    "item": 111,
    "cluster": "cl_target_to_fuel",
    "decoded_name": "load_times_injector_scaling"
+  },
+  {
+   "address": "0x030430",
+   "kind": "function",
+   "name": "init_7370",
+   "comment": "byte [7370] = byte [726C].",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "init_7370"
+  },
+  {
+   "address": "0x03043A",
+   "kind": "function",
+   "name": "ffb_cl_addend_a_runner",
+   "comment": "Calls 0x030454 on every call, then tail-branches to 0x0304BE only when bit 0 of r4 (the 0x04AA58 runner argument) is clear (030444-03044A).",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "ffb_cl_addend_a_runner"
+  },
+  {
+   "address": "0x030454",
+   "kind": "function",
+   "name": "seed_7358_while_726C",
+   "comment": "If byte [726C]==1: [7358] = 0x0AC970(E)*[7288] ([90C1]==0,[3158]==0), 0x0AC984(E) ([90C1]==0,[3158]!=0), 0x0AC948(E)*[7288] ([90C1]!=0,[3158]==0), 0x0AC95C(E) (both !=0), E=[6350]. Otherwise it writes nothing.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "seed_7358_while_726C"
+  },
+  {
+   "address": "0x0304BE",
+   "kind": "function",
+   "name": "post_start_addend_7354",
+   "comment": "[7354] = AD594([6898],[6354]) * [7358] * [7364] (* [7360] if byte [7369]==1). [7358] *= 0.8984375 every N=AC3AC/AC3A0([6350])*[7368] calls, only while zext [67EC] > 38 and byte [7C9D]==0. A latch zeroes [7358]/[7354] when the previous [7354] is within +-2^-12 and [726C]==0. Byte [7370] = [726C].",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "post_start_addend_7354"
+  },
+  {
+   "address": "0x030744",
+   "kind": "function",
+   "name": "init_73A2",
+   "comment": "byte [73A2] = (byte [67FC]==1).",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "init_73A2"
+  },
+  {
+   "address": "0x030754",
+   "kind": "function",
+   "name": "ffb_cl_addend_b_runner",
+   "comment": "Calls 0x03076E on every call, then tail-branches to 0x03082E only when bit 0 of r4 is clear (03075E-030764).",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "ffb_cl_addend_b_runner"
+  },
+  {
+   "address": "0x03076E",
+   "kind": "function",
+   "name": "seed_7378_7384_while_726C",
+   "comment": "If byte [726C]==1, seeds [7378]/[737C]/[7380]/[7384] from coolant tables of [6350]. With [3158]==0 these are AC9A4, AC9CC-or-AC9B8, ACA08 and ACA30-or-ACA1C, times [7288]. With [3158]!=0 they are AC9E0, AC9F4, ACA44 and ACA58. Otherwise it writes nothing.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "seed_7378_7384_while_726C"
+  },
+  {
+   "address": "0x03082E",
+   "kind": "function",
+   "name": "post_start_addend_7374",
+   "comment": "[7374] = max(P0*[7390]+[7398], P1*[7394]+[739C]) * AD5CC([6898],[6354]). P0/P1 = [7378]/[737C] if [90C1]==0 and [647C]==1, else [7380]/[7384]. Each is decayed linearly (floored at 0) only while zext [67EC] > [73A0](=0) and [7C9D]==0. [7390] = ACAF0(E) and [7394] = ACB04(E) = 0 when [67FC]==1; both are 1.0 otherwise.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "post_start_addend_7374"
   },
   {
    "address": "0x030C38",
@@ -4981,6 +5491,36 @@
    "decoded_name": "special_exit_blend_term"
   },
   {
+   "address": "0x034488",
+   "kind": "function",
+   "name": "afl_seed_7878",
+   "comment": "[78A1]=[6254]; [7878]=clamp(cell[[787F]],-0.25,0.25), with no range check on [787F]; [78AA]=1. Called only at 0x047F4C on 0x047C40's [8EDC]==0 arm. The call at 0x047D98 to 0x00FACA comes before it on one path, and whether 0x00FACA returns is not established.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_seed_7878"
+  },
+  {
+   "address": "0x0344BA",
+   "kind": "function",
+   "name": "afl_cells_clear",
+   "comment": "Writes the four cell records 0xFFFF316C+8i := 0.0 with valid check words. Its only call site is 0x048972 in 0x048732, reached straight-line from 0x048732's entry. 0x048732 has two callers: event 17 and 0x047C40 (bsr 0x047DA6).",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_cells_clear"
+  },
+  {
+   "address": "0x03452A",
+   "kind": "function",
+   "name": "afl_pass",
+   "comment": "Each pass: [78A6]=old [78A1]; [78A1]=byte [6254]; copies [6350],[6364],[63FC],[69FC] to [7888]..[7894], word [6A22] to [7898], ([65F6]==1) to [78A0]; then calls 0x034D52, 0x0345A4, 0x034778, 0x034884, 0x034B1C; then [7874]=[7D68], 0x034CC8, 0x034C18, and tail-branches to 0x034CEE. The copies stored in delay slots happen before the callee runs.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_pass"
+  },
+  {
    "address": "0x034592",
    "kind": "function",
    "name": "thunk_to_034DA6",
@@ -5011,6 +5551,46 @@
    "decoded_name": "thunk_to_034DD6"
   },
   {
+   "address": "0x0345A4",
+   "kind": "function",
+   "name": "afl_enable_conjunctions_78A3_7883",
+   "comment": "Two bodies. The first writes [78A3] = 70>[788C] && |[73A4]|<=2^-8 && |[7354]|,|[7374]|<=2^-12 && |[7A14]|<=2^-10 && |[7A20]|<=2^-8 && bytes [7D18],[8F24],[7BE2]==0 (NaN counts as inside). It falls through to 0x034644, which writes [7883] = [7448]==1 && [78A7]>=128 && [A56A],[ACE6],[94B1]==0 && [7453]==1 && [78A8]>=128 && [7324]>[733C] && [78A3]==1.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_enable_conjunctions_78A3_7883"
+  },
+  {
+   "address": "0x034778",
+   "kind": "function",
+   "name": "afl_gate_7884",
+   "comment": "[78A4] = 75<=[7888]<95 && 0.012>|[7890]| && [78A5]==1 && ([78A1]==0 || [789C]>=78) && !([7AB4]>10000). [78AA] hysteresis on [7A44]: set at <=-2 or NaN, cleared above -1. [7884] = [7883] && [9709]==0 && (|[7894]|<=2^-11 || ([78AA] && w[7898]>=29)) && [78A4].",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_gate_7884"
+  },
+  {
+   "address": "0x034884",
+   "kind": "function",
+   "name": "afl_learning_step",
+   "comment": "The learning step. Struct 0x063A5C. Updates [78A9]. Resets the window ([7881]=0, [7882]=128) when G1-G4 fail or the mode-1 dt test fails. Otherwise it samples e = W0[7704] - 1/t + [7BA8] + 1 (t=[77C8], replaced by 1.0 inside +-2^-13 or NaN) and votes up (e>=1.01) or down (e<0.99). At [7881]==40 (mode 1) or 16 it steps cell[[787F]] by +-0.001 (votes >=144 / <113), clamps to +-0.25 (0x0CC04C/50) and writes it with ...",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_learning_step"
+  },
+  {
+   "address": "0x034B1C",
+   "kind": "function",
+   "name": "afl_applied_value_update",
+   "comment": "[7878] = clamp(clamp(x,-0.25,0.25),-0.5,0.5), where x = cell[[787F]] when 0.02>|[7878]-cell| or [78A0]==1, and otherwise 0x0BEA40 lag(cell, [7878], k=0.0156, eps 2^-11). [7885]=1 while lagging, 0 on a snap.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_applied_value_update"
+  },
+  {
    "address": "0x034C54",
    "kind": "function",
    "name": "afc_lag_window_counter",
@@ -5019,6 +5599,16 @@
    "item": 111,
    "cluster": "afc_coefficients",
    "decoded_name": "afc_lag_window_counter"
+  },
+  {
+   "address": "0x034D52",
+   "kind": "function",
+   "name": "afl_cell_index_34D52",
+   "comment": "[787F] = 0..3 from [63C4] against 0x0CC074/78/7C; NaN gives 3. [78A5] = 1.6<=x<80. When [78A0]==1 it writes index 0 and flag 0.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_cell_index"
   },
   {
    "address": "0x034EC8",
@@ -5150,6 +5740,36 @@
    "decoded_name": "call_036962_then_036848"
   },
   {
+   "address": "0x036322",
+   "kind": "function",
+   "name": "cl_ol_delay_counter_79C2",
+   "comment": "[79F3] = 0x036978(). [79C4]==0: [79C2] = 65535, then TAIL. [79F3]==1: [79C2] = 0, and [79C0] = subtract-or-zero of 0x0AD0D0 (65535) unless [7C68]==1, which holds it. [79F4]==1 (falling edge): [79C2] = [79C0]. Otherwise [79C2] = sat16(+0x0AD0B8 (1)); if the old [79C2] < [79C4], [79C0] = the new [79C2], else TAIL. TAIL: [79C0] = subtract-or-zero of 0x0AD0C4 (65535). Then [79C8] = (0 < [79C2] < [79C4]) and [79F4] = ...",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "cl_ol_delay_counter_79C2"
+  },
+  {
+   "address": "0x036962",
+   "kind": "function",
+   "name": "ol_target_multiplier_79A0",
+   "comment": "[79A0] = 0x0AD0DC([6350]), in [0, 1.0] in every bin compared. No other store to it is found.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "ol_target_multiplier_79A0"
+  },
+  {
+   "address": "0x036978",
+   "kind": "function",
+   "name": "cl_ol_transition_test",
+   "comment": "[79CC]=AC5BC([6624]), [79D0]=AD0A4([6624]). [79FE]/[79FF] are hysteresis bytes for [62DC] vs [79CC]-8.4 and [7348] vs [79D0]-756. Returns 1 iff both bytes are 1.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "cl_ol_transition_test"
+  },
+  {
    "address": "0x036AAA",
    "kind": "function",
    "name": "thunk_to_036AB2",
@@ -5230,6 +5850,56 @@
    "decoded_name": "thunk_to_0375B8"
   },
   {
+   "address": "0x03757E",
+   "kind": "function",
+   "name": "reset_per_cyl_addends",
+   "comment": "If byte [65F6]==1: [7A78..7A84] = 0.0, [7AAC] = [895C], and bytes [7AB1] = [7AA0] = 0.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "reset_per_cyl_addends"
+  },
+  {
+   "address": "0x0375B8",
+   "kind": "function",
+   "name": "per_cyl_addend_dispatch",
+   "comment": "Maps byte [9FC6] 0/1/2/3 to cylinder index 0/2/1/3, calls 0x037604, then tail-calls 0x037710(index). Any other byte value does nothing.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "per_cyl_addend_dispatch"
+  },
+  {
+   "address": "0x037604",
+   "kind": "function",
+   "name": "per_cyl_counter_gate_37604",
+   "comment": "[7AB1] = (|[895C]-[7AAC]| < 100) and clears [7AB0] when false; [7AAC] = [895C]. [7AA0] = 1 iff 75<=[67EC]<=7500, [62F8]<6.3, [6624]>300, [620C]<500, ([0CBBF8]==1 or bit0 [A176]), [6354]>=70, [6364]>=0, [7AB1]==1 and [7AB0]>=38.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "per_cyl_counter_gate"
+  },
+  {
+   "address": "0x0376EC",
+   "kind": "function",
+   "name": "count_7AB0",
+   "comment": "[7AB0] = sat8([7AB0]+1) if byte [7AB1]==1, else 0.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "count_7AB0"
+  },
+  {
+   "address": "0x037710",
+   "kind": "function",
+   "name": "per_cyl_addend_7A78",
+   "comment": "Updates the above/below counters of the cylinder in r4, against [99B4] vs AB880-or-AB51C([6624])*AD464([6624]), while [7AA0]==1 (all counters zeroed otherwise). Cap [7A88+4i] = 1.0, or max(old x-0.025, 0.19999999) when 0x021D9A()==1 and [6540]<=0.75. [7C18]==1: x = clamp(max(x-0.8,0),0,cap) for all four. Otherwise each cylinder with cnt>=2 steps to clamp(min(x+0.4,cap_i),0,cap), cap_i = 0.79999995/0/0.59999996/0. ...",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "per_cyl_addend_7A78"
+  },
+  {
    "address": "0x037B6C",
    "kind": "function",
    "name": "thunk_to_037C52",
@@ -5248,6 +5918,16 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "thunk_to_037CA0"
+  },
+  {
+   "address": "0x037D74",
+   "kind": "function",
+   "name": "s4_factor_7ABC",
+   "comment": "if bytes [7AD0]==0,[7AD2]==0, u8 [7ADD]>=2, u8 [7ADE]>=2: [7ACC]=[7320], [7ABC]=T2(AD71C,[7ACC],[7AB8]) (table all raw 0x80 -> 0.0); else [7ABC]=0.0.",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "s4_factor_7ABC"
   },
   {
    "address": "0x038158",
@@ -5328,6 +6008,16 @@
    "item": 108,
    "cluster": "stub_members_b",
    "decoded_name": "call_022F92_tail_038D4C_if1"
+  },
+  {
+   "address": "0x038DC0",
+   "kind": "function",
+   "name": "pipwc_trim_lookup",
+   "comment": "[7B6C+4j] = T2(PIPWC A..D, fr4=[7324] (+4 axis), fr5=[6624] (+8 axis)), j=0..3; writes those four cells only.",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "pipwc_trim_lookup"
   },
   {
    "address": "0x038E30",
@@ -5430,6 +6120,16 @@
    "decoded_name": "thunk_to_03952C"
   },
   {
+   "address": "0x0397AC",
+   "kind": "function",
+   "name": "small_pulse_factor_F",
+   "comment": "if 4000.0 > [6624] and 600.0 > [7344] (strict, NaN fails): [7BC8]=T(AC760,[7344]), [7BC4]=clamp([7BC8],0.5,1.5); else [7BC4]=1.0 ([7BC8] untouched).",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "small_pulse_factor_F"
+  },
+  {
    "address": "0x039860",
    "kind": "function",
    "name": "thunk_to_03988E",
@@ -5508,6 +6208,36 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "test_7C5E_m80"
+  },
+  {
+   "address": "0x03AAA4",
+   "kind": "function",
+   "name": "any_cut_byte_7C68",
+   "comment": "[7C68] = 1 iff any of eleven bytes [7C9D] [7CB8] [7CBC] [7CD5] [7CE5] [7CE8] [7CF4] [7CF9] [7D11] [7D2E] [7D48] == 1 (reads stop at the first 1), else 0.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "any_cut_byte_7C68"
+  },
+  {
+   "address": "0x03AB06",
+   "kind": "function",
+   "name": "reset_any_cut_byte",
+   "comment": "[7C68] = 0 when [65F6] == 1, else nothing.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "reset_any_cut_byte"
+  },
+  {
+   "address": "0x03AB20",
+   "kind": "function",
+   "name": "get_any_cut_byte",
+   "comment": "Returns r0 = ([7C68] == 1).",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "get_any_cut_byte"
   },
   {
    "address": "0x03AB90",
@@ -5730,6 +6460,16 @@
    "decoded_name": "is_7D2E_eq1"
   },
   {
+   "address": "0x03CD00",
+   "kind": "function",
+   "name": "init_7D58_block",
+   "comment": "init (caller 0x047C40): [7D58..7D64]=1.0, [7D70]=[0x0CC56C], u16 [7D74]=0xFFFF, byte [7D7D]=(byte [65F6]==1).",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "init_7D58_block"
+  },
+  {
    "address": "0x03CD46",
    "kind": "function",
    "name": "thunk_to_03D21A",
@@ -5748,6 +6488,16 @@
    "item": 108,
    "cluster": "stub_members_b",
    "decoded_name": "getw_7D80"
+  },
+  {
+   "address": "0x03D50E",
+   "kind": "function",
+   "name": "pending_angle",
+   "comment": "Mode 0: rec+32 = trunc(0x02F8A6(word rec+4)*65536). Mode 1: rec+32 = trunc((180+[7280])*65536). Any other mode byte writes nothing.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "pending_angle"
   },
   {
    "address": "0x03D552",
@@ -5770,6 +6520,56 @@
    "decoded_name": "call_02F8EA_tail_03D698_if0"
   },
   {
+   "address": "0x03D582",
+   "kind": "function",
+   "name": "pending_duration",
+   "comment": "Mode 0: rec+24 = trunc(0x02F9E0 * [7DA4] / 0.25), the same for every event number. Mode 1: rec+24 = trunc([7290+4ch]*[7DA4]/0.25) for ch<=3. Both modes clear rec+36.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "pending_duration"
+  },
+  {
+   "address": "0x03D634",
+   "kind": "function",
+   "name": "get_cal_0CBDB4",
+   "comment": "r0 = cal long [0x0CBDB4] (0x7850 in all three bins); r4 unused.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "get_cal_0CBDB4"
+  },
+  {
+   "address": "0x03D708",
+   "kind": "function",
+   "name": "scheduler_record_init",
+   "comment": "Record init. Writes +0..+7, +8 target, +12 k, +16 hw, +17, +20, +24, +28 = +32 = 720<<16, +36 (pads untouched). S+0/4/8/9/10 = 0, S+13 = 1, and 0x009E44 is called with cal long 0x0CBDB4. Reached only on 0x047C40's [8EDC] == 0 path.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "scheduler_record_init"
+  },
+  {
+   "address": "0x03D856",
+   "kind": "function",
+   "name": "angle_scheduler_4ch",
+   "comment": "Per-call angle scheduler over four 40-byte records at 0xFFFF7DA8. Angle = 30*(r4&0xFF, -24 once if >=24)<<16 on a 720<<16 cycle. Re-arm when d>=720; state 0 tests the status byte [0xFFFF429B+28*hw] first, then d<=100 -> state 2, else count once per arming and fire unless cut. An init request clears the fields and sets counts, and the main loop runs in the same call. A resync (0x03DB16) stores S+9/S+10, so ...",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "angle_scheduler_4ch"
+  },
+  {
+   "address": "0x03DB16",
+   "kind": "function",
+   "name": "resync",
+   "comment": "Resync from byte [0xFFFF4167]. Stores S+9 = mode index and S+10 = mask. For each record: re-arm fields, 0x03D582, 0x03D50E, 0x009D48(hw), +28 = +32, then the new mode's check sets the state.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "resync"
+  },
+  {
    "address": "0x03DBF4",
    "kind": "function",
    "name": "set_7E55_1",
@@ -5780,6 +6580,16 @@
    "decoded_name": "set_7E55_1"
   },
   {
+   "address": "0x03DBFC",
+   "kind": "function",
+   "name": "scheduler_reset_counters",
+   "comment": "Calls 0x009D48(byte rec+16) for each record, then word S+0 = 0, long S+4 = 0, byte S+8 = 0. Record fields are not written.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "scheduler_reset_counters"
+  },
+  {
    "address": "0x03DD46",
    "kind": "function",
    "name": "set_7E50_1",
@@ -5788,6 +6598,56 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "set_7E50_1"
+  },
+  {
+   "address": "0x03DD4E",
+   "kind": "function",
+   "name": "driver_angle_fold_once",
+   "comment": "r0 = 30*byte[0xFFFF7E54] - 10 - r4 (16.16), with -720 once if >= 720 and +720 once if < 0. The byte is the unreduced step byte, so 255 -> 6920.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "driver_angle_fold_once"
+  },
+  {
+   "address": "0x03DFC8",
+   "kind": "function",
+   "name": "fire_mode1",
+   "comment": "Mode-1 fire function: calls 0x009B2C(hw, rec+20, 0, angle) or 0x009C38/0x009D48 by sub-state. Calls 0x03E0FA when rec+2 != 0. Writes [7E50] = 1 unless rec+7 != 0, and never touches [7E4C].",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "fire_mode1"
+  },
+  {
+   "address": "0x03E0BA",
+   "kind": "function",
+   "name": "mode1_check",
+   "comment": "Mode-1 check: r0 = 1 iff d > rec+32 and d >= 0x03E0FA(rec+16).",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "mode1_check"
+  },
+  {
+   "address": "0x03E0FA",
+   "kind": "function",
+   "name": "duration_to_angle_check",
+   "comment": "r0 = 180*Q16div(rec+24 + cal long [0x0CBDB4] + [4280], [4158]) + rec+28. This is the calibration read of the 0x03D856 tree.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "duration_to_angle_check"
+  },
+  {
+   "address": "0x03E168",
+   "kind": "function",
+   "name": "fire_mode0",
+   "comment": "Mode-0 fire function. rec+7 != 0 -> rec+2 = 2. 'Too early' (d - rec+28 >= 30deg) -> no driver call and rec+6 = 1. Otherwise calls 0x009A72(hw, rec+20, angle), then [7E4C] = sat+1 and [7E50] = 1 (only on those calls).",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "fire_mode0"
   },
   {
    "address": "0x03E2B0",
@@ -5870,6 +6730,66 @@
    "decoded_name": "set_7E75_0"
   },
   {
+   "address": "0x03ED56",
+   "kind": "function",
+   "name": "cap_load_value_7ECC",
+   "comment": "[7ED0] = 69.65 if [65C5]!=1 and word [5E74] >= 38, else by byte [6810]: 1/2/3 -> 0x0ADAC0/0x0ADAD4/0x0ADAE8(x), 4/5 -> 10.0, other -> 69.7; [7ECC] = max([7ED0], 0x0ADAAC([6350])). Lowest [7ECC] -2.07.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "cap_load_value_7ECC"
+  },
+  {
+   "address": "0x03EF58",
+   "kind": "function",
+   "name": "trigger_7EED",
+   "comment": "[7EFE] = [6254]==1 ? sat16(+1) : 0; [7EED] = 0 if ([6254]==1 and [7EFE] > 100) or 0 > x, else ([7EEC]==1). No cut byte read.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "trigger_7EED"
+  },
+  {
+   "address": "0x03F00C",
+   "kind": "function",
+   "name": "logged_timing_bounds",
+   "comment": "Writes the post-sum bounds of the logged cell: [7EC0] cap (OFF 69.65 and latch clear / LOAD [7ECC] every call while latch [7F09] set and [7EEA]==1 / RAMP +0.7), [7EC4] (69.65 for any real x), [7EC8] (loaded on rising edge of [7EED] from 0x0ADB10([620C]), -100/call when [7EED]==0), [7EE4] (-20.0 on every path with shipped tables). The cut byte reaches only [7EE8], [7F06] and the [7EEB] set test.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "logged_timing_bounds"
+  },
+  {
+   "address": "0x03FA8C",
+   "kind": "function",
+   "name": "init_bounds_state",
+   "comment": "(bytes only) Init: [7ECC]=[7EC0]=[7EC4]=69.65, [7EDC]=12.0, words [7EFC]=[7EFE]=0xFFFF, [7EE8]=0xFF, [7EE4]=0x0ADA98([6350]).",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "init_bounds_state"
+  },
+  {
+   "address": "0x03FACE",
+   "kind": "function",
+   "name": "reset_bounds_state",
+   "comment": "(bytes only) On [65F6]==1: resets 0x03F00C state incl. [7EC0]=[7EC4]=69.65, [7EF0]=[805C], [7F05]=[85D7], [7F09]=0, [7EE4]=0x0ADA98([6350]), [7EE8]=0xFF, [7F06]=([7C68]==1), [7EEB]=0, [7F0B]=[7EED]; never writes [7EC8].",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "reset_bounds_state"
+  },
+  {
+   "address": "0x03FBBC",
+   "kind": "function",
+   "name": "blend_weight_7F10",
+   "comment": "k=[7F10]: -0.0156/call while [85D7]==1, +0.0156 otherwise, clamped 0..1 (65 calls end to end); jumps to the end only when already at an end and x >= 6000 / [65FC] >= 200 / [65FC] < 0.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "blend_weight_7F10"
+  },
+  {
    "address": "0x04092A",
    "kind": "function",
    "name": "init_7FD4_state",
@@ -5940,6 +6860,76 @@
    "decoded_name": "ramp_state_machine_8000"
   },
   {
+   "address": "0x041954",
+   "kind": "function",
+   "name": "reset_8020_block",
+   "comment": "Only when [65F6]==1: zeroes [8020] [8024] [8028] [802E] [8032] [8033] [8035] [8037] [802C] [802D], [8030]=0xFFFF, [8034]=[7C9A], [8036]=[65C0].",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "reset_8020_block"
+  },
+  {
+   "address": "0x0419BA",
+   "kind": "function",
+   "name": "overrun_retard_sequence",
+   "comment": "No state of its own: bsr 0x041A02, bsr 0x041A48, bsr 0x041A7E, then bra 0x041BE4 with PR restored in the slot. Called once per pass of task body 0x04AA58 (04AC18), after 0x03AAA4 and before 0x03F00C / 0x03F368.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "overrun_retard_sequence"
+  },
+  {
+   "address": "0x0419CC",
+   "kind": "function",
+   "name": "cut_counters_802E_8030",
+   "comment": "[7C9D]==1: [802E] = sat16(+1), [8030]=0; else [802E]=0, [8030] = sat16(+1).",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "cut_counters_802E_8030"
+  },
+  {
+   "address": "0x041A02",
+   "kind": "function",
+   "name": "mode_gate_802C",
+   "comment": "[802C] = 1 iff ([8E09]==0 or [8E0D]==1) and [6350] > 200.0 and 0.0 > [63F8] and 0.0 > x; written every call. 0 for physical inputs with the shipped cal.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "mode_gate_802C"
+  },
+  {
+   "address": "0x041A48",
+   "kind": "function",
+   "name": "edge_latch_802D",
+   "comment": "[8037] = [7C9D] every call; [802D] = 0 if [85D7]==1, else on a falling edge of [7C9D] 0 if [7C78] > x else 1, else unchanged.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "edge_latch_802D"
+  },
+  {
+   "address": "0x041A7E",
+   "kind": "function",
+   "name": "mode_machine_8024",
+   "comment": "Mode 0..3 from [802C]/[7C9D]/[802D]/[802E]/[8030]/[43FC]; mode 1/2: [8024] = min([8024] + table(x), 0) with all-zero tables 0x0AE17C/0x0AE170; mode 3: [8024] = 0x0D2C28 (0.0); else 0.0. [8035] = mode. Neutral by calibration (code live: patched copy emulated).",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "mode_machine_8024"
+  },
+  {
+   "address": "0x041BE4",
+   "kind": "function",
+   "name": "cut_exit_retard_8028",
+   "comment": "Arm on [7C78] > x and previous-call tier [8034]==4 (every such call, no edge test): [8032]=0,[8033]=1 and [8020] = 0x0ADE08([6350]) in the same call; else counters decrement; ramp [8020] = min([8020]+0.7, 0); reset to 0 on ([65C5]!=1 and [5E94]<4) or [6254]==0 or [6634] < -20 or x < 0. [8028] = min([8020],[8024]); [8034]=[7C9A]; [8036]=[65C0].",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "cut_exit_retard_8028"
+  },
+  {
    "address": "0x041D84",
    "kind": "function",
    "name": "zero_rec_3204",
@@ -5971,6 +6961,16 @@
    "decoded_name": "test_8098_m20"
   },
   {
+   "address": "0x042ED8",
+   "kind": "function",
+   "name": "term_80B4_42ED8",
+   "comment": "[79C8]==1: [80B4] = max([80B4]-0.5, 0x0AE514(x,[63F8]) = 0); else min([80B4]+0.01, 0). 0.0 is a fixed point; reaches 0.0 from any start (NaN included) whatever [79C8] does.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "term_80B4"
+  },
+  {
    "address": "0x0432B0",
    "kind": "function",
    "name": "set_80C8_FF",
@@ -5989,6 +6989,66 @@
    "item": 108,
    "cluster": "stub_members_a",
    "decoded_name": "set_81AC_FF"
+  },
+  {
+   "address": "0x04438C",
+   "kind": "function",
+   "name": "fbkc_update_81F0",
+   "comment": "FBKC routine, decoded only on its [8234] and [81F0] paths. A head chain that never reads [8234] runs first: bit 6 of [61F4] -> [81F0]=0.0; [7E76]==1, [7F10] outside 1 +- 2^-8, or [824A]==1 -> relax min(x+0.35, 0); [970E] or [9718] != 0 -> -5.0; [824C] != 1 -> [81FC]. After that come blocks A, B, C and the main block, each gated by [8234]==1 and [824B]==[824C]==1, with steps 0.0 / 1.4, floor -11.799999 ...",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_update_81F0"
+  },
+  {
+   "address": "0x0448F4",
+   "kind": "function",
+   "name": "fbkc_step_enable_8234",
+   "comment": "Writes byte [0xFFFF8234] := 1 if any of G1..G23 holds, else 1 iff [798C] > 0 and u8 [8249] < 63 (the [8253] tail term needs byte 0x0D299A == 90, and it is 0). It also clears [8249] when [798C] is not > 0, and updates [824D] and [8253] through 0x0457D2 / 0x0457F4. It runs only on 0x04AA58 passes with byte [8EDC] == 0.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_step_enable_8234"
+  },
+  {
+   "address": "0x044DB0",
+   "kind": "function",
+   "name": "load_lag_and_delta",
+   "comment": "[81F4] = lag([63F8], k=0.03125, snap 2^-14); [81F8] = [63F8] - [81F4].",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "load_lag_and_delta"
+  },
+  {
+   "address": "0x0457D2",
+   "kind": "function",
+   "name": "rpm_hyst_824D",
+   "comment": "byte [824D] := 1 if 1500.0 > fr4; := 0 if not (1600.0 > fr4), NaN included; otherwise unchanged. The limits are 0x0D2F6C / 0x0D2F70.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "rpm_hyst_824D"
+  },
+  {
+   "address": "0x0457F4",
+   "kind": "function",
+   "name": "thresh_79A8_to_8253",
+   "comment": "byte [8253] := 1 if not (10000 > [79A8]); else := 0 if 10000 > [79A8]. Both limits are 10000.0 as shipped, so the byte is written on every call.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "thresh_79A8_to_8253"
+  },
+  {
+   "address": "0x045970",
+   "kind": "function",
+   "name": "kc_adv_max_blend",
+   "comment": "[826C] = T(0x0AE664) = 0.0 (the table is all zero). [8258] = (1-w)T(0x0AE680) + wT(0x0AE69C), w=[90A8]. It overwrites [8258] and does not accumulate.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "kc_adv_max_blend"
   },
   {
    "address": "0x045F0A",
@@ -7014,12 +8074,12 @@
   {
    "address": "0x05D37E",
    "kind": "function",
-   "name": "float_to_u8_scaled_5D37E",
-   "comment": "Class 37 (6): r0 = sat8((f32[X] - OFF)/SC) & 0xFF via 0x0BE5A8, per-member X/OFF/SC in the MAP.",
-   "trace": "disassembly/analysis/stub_shapes_b_trace.txt",
-   "item": 108,
-   "cluster": "stub_shapes_b",
-   "decoded_name": "float_to_u8_scaled"
+   "name": "ssm_get_7E90",
+   "comment": "SSM getter table 0x06423C entry 0x11: r0 = clamp(trunc(([7E90] + 64)/0.5 + 0.5), 0, 255).",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "ssm_get_7E90"
   },
   {
    "address": "0x05D396",
@@ -12093,6 +13153,36 @@
    "decoded_name": "launch_offset_inject"
   },
   {
+   "address": "0xFFFF0000",
+   "kind": "ram",
+   "name": "boot_wdt_limit",
+   "comment": "long; trunc(300/1.6384+0.5)=183 written by 0x010878; compared by 0x010AD8 (0x010AE8)",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_wdt_limit"
+  },
+  {
+   "address": "0xFFFF0004",
+   "kind": "ram",
+   "name": "boot_wdt_iti_count",
+   "comment": "long; 0 at 0x010878, +1 per WDT ITI taken (0x010AE4); 0..182 at the kernel start, value timing-dependent",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_wdt_iti_count"
+  },
+  {
+   "address": "0xFFFF0008",
+   "kind": "ram",
+   "name": "boot_wdt_code_select",
+   "comment": "byte; 0x0108DA's argument (0 at reset); selects expiry code 0x2100/0x2200/0x2300 (0x010AF2)",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_wdt_code_select"
+  },
+  {
    "address": "0xFFFF1230",
    "kind": "ram",
    "name": "rtos_queued_ids",
@@ -12119,6 +13209,16 @@
    "decoded_name": "keepblock_marker_2000"
   },
   {
+   "address": "0xFFFF204C",
+   "kind": "ram",
+   "name": "boot_handover_byte_204C",
+   "comment": "byte; 0x77 at 0x00128A, 0x88 at 0x001324 (address from ROM long 0x002000)",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_handover_byte_204C"
+  },
+  {
    "address": "0xFFFF2060",
    "kind": "ram",
    "name": "trap_log_count",
@@ -12135,6 +13235,16 @@
    "item": 108,
    "cluster": "stub_shapes_b",
    "decoded_name": "pair16_init_223C"
+  },
+  {
+   "address": "0xFFFF3154",
+   "kind": "ram",
+   "name": "eeprom_outcome_pair_word",
+   "comment": "value:~value word of [7268] (0x01FE / 0x00FF), written by 0x02ED88 and rebuilt by 0x02E8C0 when inconsistent.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "eeprom_outcome_pair_word"
   },
   {
    "address": "0xFFFF318C",
@@ -12155,6 +13265,16 @@
    "decoded_name": "cnt_3694"
   },
   {
+   "address": "0xFFFF36BE",
+   "kind": "ram",
+   "name": "startup_reinit_request_word",
+   "comment": "0x047C40 calls 0x048732 (full re-init including the AFL cell clear) iff this word==0x4055 at its entry with [8EDC]==0. 0x05D070 writes 0x4055 (caller 0x098FE4), 0x05D032 writes 0xAA55. 0x04793C accepts 0x4055 or 0xAA55.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "startup_reinit_request_word"
+  },
+  {
    "address": "0xFFFF40E0",
    "kind": "ram",
    "name": "front_o2_sensor_ma",
@@ -12163,6 +13283,26 @@
    "item": 108,
    "cluster": "hole9_identity",
    "decoded_name": "front_o2_sensor_ma"
+  },
+  {
+   "address": "0xFFFF5B6C",
+   "kind": "ram",
+   "name": "fbba_arg_5B6C",
+   "comment": "byte; 0x00FBBA's argument, 0 at reset (0x00FA8A)",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "fbba_arg_5B6C"
+  },
+  {
+   "address": "0xFFFF5B89",
+   "kind": "ram",
+   "name": "reset_ramtest_result",
+   "comment": "byte; 1 = range A failed, else 8*B_fail + 2*C_fail (0x010352)",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "reset_ramtest_result"
   },
   {
    "address": "0xFFFF5B8D",
@@ -12175,6 +13315,16 @@
    "decoded_name": "startup_status_5B8D"
   },
   {
+   "address": "0xFFFF62E4",
+   "kind": "ram",
+   "name": "plate_change_2calls",
+   "comment": "0x01F588: [62DC] minus [62DC] from two calls earlier",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "plate_change_2calls"
+  },
+  {
    "address": "0xFFFF63B0",
    "kind": "ram",
    "name": "ffff4130_lag_filtered",
@@ -12183,6 +13333,86 @@
    "item": 108,
    "cluster": "stub_shapes_b",
    "decoded_name": "ffff4130_lag_filtered"
+  },
+  {
+   "address": "0xFFFF63B8",
+   "kind": "ram",
+   "name": "maf_window_max_snap",
+   "comment": "snapshot of running max [6420] (01FF04)",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "maf_window_max_snap"
+  },
+  {
+   "address": "0xFFFF63BC",
+   "kind": "ram",
+   "name": "maf_window_min_snap",
+   "comment": "snapshot of running min [6424] (01FF0C)",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "maf_window_min_snap"
+  },
+  {
+   "address": "0xFFFF63C0",
+   "kind": "ram",
+   "name": "maf_window_mid_gps",
+   "comment": "([63B8]+[63BC])*0.5 = (max+min)/2 of [63B4] samples since the previous 0x01FE46 call",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "maf_window_mid_gps"
+  },
+  {
+   "address": "0xFFFF63C4",
+   "kind": "ram",
+   "name": "mass_airflow_gps",
+   "comment": "min(window mean * MAF Compensation(IAT) + [69F4]*0x0C3104, MAF Limit 0x0C3100); written at 01FF66",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "maf_capped_gps"
+  },
+  {
+   "address": "0xFFFF63DC",
+   "kind": "ram",
+   "name": "gps_per_679C_load",
+   "comment": "min([63C4]*60/[679C], Limit A), written only when [679C] > 0.1953125",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "gps_per_679C_load"
+  },
+  {
+   "address": "0xFFFF63E0",
+   "kind": "ram",
+   "name": "gps_per_rpm_load",
+   "comment": "min([63C4]*60/RPM, Limit A), written only when RPM > 0.1953125",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "gps_per_rpm_load"
+  },
+  {
+   "address": "0xFFFF63F4",
+   "kind": "ram",
+   "name": "load_comp_blend",
+   "comment": "(1-[90A8])*0x0AB004 + [90A8]*0x0AB020; the maps are byte-identical, so it equals the Cruise value",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "load_comp_blend"
+  },
+  {
+   "address": "0xFFFF63FC",
+   "kind": "ram",
+   "name": "load_cell_delta",
+   "comment": "[63F8] new minus entry value, every 0x01FE46 call (020328)",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "load_cell_delta"
   },
   {
    "address": "0xFFFF6404",
@@ -12195,14 +13425,74 @@
    "decoded_name": "ffb_641C_threshold"
   },
   {
+   "address": "0xFFFF6418",
+   "kind": "ram",
+   "name": "latch_hold_counter_6418",
+   "comment": "0x020580: 0 if [641A]==1 else sat+1",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "latch_hold_counter"
+  },
+  {
+   "address": "0xFFFF641A",
+   "kind": "ram",
+   "name": "latch_set_this_call",
+   "comment": "1 on a set call, else 0 (01FFEA / 01FFEE)",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "latch_set_this_call"
+  },
+  {
+   "address": "0xFFFF641B",
+   "kind": "ram",
+   "name": "latch_hold_enable",
+   "comment": "1 on every set call; 0 once u8 [6418] >= 13",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "latch_hold_enable"
+  },
+  {
    "address": "0xFFFF641C",
    "kind": "ram",
-   "name": "ffb_641C_latch",
-   "comment": "u8 set by 0x01FE46 (01FFE6) when [73D0] >= [6404] with other gates; cleared by 0x01FE46 / 0x020678 / 0x020726; read by 0x02FF8E ([733C]) and 0x030F02",
-   "trace": "disassembly/analysis/ffb_residual_trace.txt",
-   "item": 111,
-   "cluster": "ffb_residual",
-   "decoded_name": "ffb_641C_latch"
+   "name": "lift_latch_641C",
+   "comment": "set by the 0x01FE46 set gate; held/cleared per hold gate; cleared by 0x020678/0x020726; freezes [63F8] against rising",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "lift_latch_641C"
+  },
+  {
+   "address": "0xFFFF6420",
+   "kind": "ram",
+   "name": "maf_window_max",
+   "comment": "0x0203DC: max([6420],[63B4]); restarted at [63B4] by 0x01FE46",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "maf_window_max"
+  },
+  {
+   "address": "0xFFFF6424",
+   "kind": "ram",
+   "name": "maf_window_min",
+   "comment": "0x0203DC: min([6424],[63B4]); restarted at [63B4] by 0x01FE46",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "maf_window_min"
+  },
+  {
+   "address": "0xFFFF6430",
+   "kind": "ram",
+   "name": "factor_AAE3C",
+   "comment": "0x0AAE3C([6898]), 1.0 flat; also the literal base used in 0x01FE46",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "factor_AAE3C"
   },
   {
    "address": "0xFFFF6458",
@@ -12253,6 +13543,26 @@
    "item": 107
   },
   {
+   "address": "0xFFFF65F6",
+   "kind": "ram",
+   "name": "byte_65F6_copy_of_415C",
+   "comment": "0x022F1C copies byte [415C]; 0x022DB0 zeroes it; ==1 triggers re-seeding in 0x020726/0x0203DC. Identity not established.",
+   "trace": "disassembly/analysis/fn_01FE46_trace.txt",
+   "item": 114,
+   "cluster": "fn_01FE46",
+   "decoded_name": "byte_65F6_copy_of_415C"
+  },
+  {
+   "address": "0xFFFF67EC",
+   "kind": "ram",
+   "name": "passes_since_crank_67EC",
+   "comment": "u16. 0x023A94 holds it at 0 while byte [726C]==1, else increments it once per 0x04907C main-list pass (saturating). It is the decay gate of [7354] (>38) and [7374] (>0).",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "passes_since_726C"
+  },
+  {
    "address": "0xFFFF6810",
    "kind": "ram",
    "name": "gear_estimate",
@@ -12281,6 +13591,16 @@
    "decoded_name": "gate_69E6"
   },
   {
+   "address": "0xFFFF6A00",
+   "kind": "ram",
+   "name": "one_plus_afl_x_tbl0AB140",
+   "comment": "0x02782C: (1+[7878])*[6A30], times [6A34] when bit 7 of [6A53] and bit 5 of [6A52]; the consumer is not decoded.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "one_plus_afl_x_tbl0AB140"
+  },
+  {
    "address": "0xFFFF6A29",
    "kind": "ram",
    "name": "flags_6A29_bit5_cleared_by_revlim",
@@ -12301,6 +13621,76 @@
    "decoded_name": "flag_8CAA_eq1_gbr_base"
   },
   {
+   "address": "0xFFFF6C48",
+   "kind": "ram",
+   "name": "eeprom_owner_token_in_02EB02",
+   "comment": "In 0x02EB02 / 0x02E968: 0 = free, 0xEE written by 0x02EB02 on ready non-aborting passes, 0 at finish. Other sentinels belong to other clients (not established).",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "eeprom_owner_token_in_02EB02"
+  },
+  {
+   "address": "0xFFFF7268",
+   "kind": "ram",
+   "name": "eeprom_writeback_outcome",
+   "comment": "1 = busy timeout or gave up, 0 = all written (0x02ED88). Kept consistent with word [3154] by 0x02E8C0 (copy if the pair is consistent, else the word is rebuilt).",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "eeprom_writeback_outcome"
+  },
+  {
+   "address": "0xFFFF726C",
+   "kind": "ram",
+   "name": "crank_stall_flag",
+   "comment": "u8. 1 while [6624] (axis Engine Speed) <= 300 until [6624] > 500 (0x02EF56); also set to 1 by 0x02F83E.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "crank_stall_flag"
+  },
+  {
+   "address": "0xFFFF7288",
+   "kind": "ram",
+   "name": "post_start_seed_multiplier",
+   "comment": "f32 = 0x0AC338([6350]) (flat 1.0) or 1.0, by 0x02F550 / 0x02F85E. Multiplies the [3158]==0 seeds.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "post_start_seed_multiplier"
+  },
+  {
+   "address": "0xFFFF72DC",
+   "kind": "ram",
+   "name": "mode0_duration_clamp_copy",
+   "comment": "Written only by 0x02F974 (02F9D2) = 0x02F9E0 clamp. Readers not checked.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "mode0_duration_clamp_copy"
+  },
+  {
+   "address": "0xFFFF72E0",
+   "kind": "ram",
+   "name": "mode0_factor_a",
+   "comment": "0x02F974: lookup 0x0AC34C at f32 [620C]; used in the mode-0 duration product. Physical meaning not established.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "mode0_factor_a"
+  },
+  {
+   "address": "0xFFFF733C",
+   "kind": "ram",
+   "name": "pulse_lower_clamp",
+   "comment": "f32 lower clamp of all 0x0301E4 outputs: 0.0 if byte [641C]==1 else 300.0 ([0x0CBE08]); sole writer 0x02FF8E (02FFA0), run just before 0x0301E4",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "pulse_lower_clamp"
+  },
+  {
    "address": "0xFFFF7348",
    "kind": "ram",
    "name": "load_x_injector_scaling",
@@ -12309,6 +13699,66 @@
    "item": 111,
    "cluster": "cl_target_to_fuel",
    "decoded_name": "load_x_injector_scaling"
+  },
+  {
+   "address": "0xFFFF7354",
+   "kind": "ram",
+   "name": "post_start_addend_a",
+   "comment": "f32 CL-side FFB addend = AD594*[7358]*[7364](*[7360]), written by 0x0304BE. Seeded while [726C]==1, decays afterwards. Range [0, 4.53125].",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "post_start_addend_a"
+  },
+  {
+   "address": "0xFFFF7358",
+   "kind": "ram",
+   "name": "post_start_a_state",
+   "comment": "f32 seed of [7354] (0x030454 while [726C]==1). Multiplied by 0.8984375 per N calls while [67EC]>38; zero latch.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "post_start_a_state"
+  },
+  {
+   "address": "0xFFFF7374",
+   "kind": "ram",
+   "name": "post_start_addend_b",
+   "comment": "f32 CL-side FFB addend = P0*[7390]*AD5CC with the shipped tables, written by 0x03082E. Range [0, 1.540802].",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "post_start_addend_b"
+  },
+  {
+   "address": "0xFFFF7378",
+   "kind": "ram",
+   "name": "post_start_b_seed_pair_a",
+   "comment": "f32 P0 when [90C1]==0 and [647C]==1. Seeded by 0x03076E, decays linearly in 0x03082E.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "post_start_b_seed_pair_a"
+  },
+  {
+   "address": "0xFFFF7380",
+   "kind": "ram",
+   "name": "post_start_b_seed_pair_b",
+   "comment": "f32 P0 otherwise. Seeded by 0x03076E, decays linearly in 0x03082E.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "post_start_b_seed_pair_b"
+  },
+  {
+   "address": "0xFFFF73A0",
+   "kind": "ram",
+   "name": "addend_b_decay_threshold",
+   "comment": "u16 = 0x0ACA6C([6354]) = 0, written by 0x03082E.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "addend_b_decay_threshold"
   },
   {
    "address": "0xFFFF73D0",
@@ -12671,6 +14121,16 @@
    "decoded_name": "special_exit_blend"
   },
   {
+   "address": "0xFFFF7874",
+   "kind": "ram",
+   "name": "copy_of_7D68",
+   "comment": "f32 copied from [7D68] by 0x03452A (034586) before bsr 0x034CC8",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "copy_of_7D68"
+  },
+  {
    "address": "0xFFFF787E",
    "kind": "ram",
    "name": "afc_lag_window_countdown",
@@ -12681,6 +14141,76 @@
    "decoded_name": "lag_window_countdown_byte"
   },
   {
+   "address": "0xFFFF787F",
+   "kind": "ram",
+   "name": "afl_cell_index_787F",
+   "comment": "0..3 from [63C4] vs 0x0CC074/78/7C (0x034D52); 0 when [78A0]==1.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_cell_index"
+  },
+  {
+   "address": "0xFFFF7881",
+   "kind": "ram",
+   "name": "afl_window_samples",
+   "comment": "Sample count of the current AFL window. Incremented at 0x034A44-0x034A4E, cleared at 0x034AFE. Not reset by a change of [787F].",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_window_samples"
+  },
+  {
+   "address": "0xFFFF7882",
+   "kind": "ram",
+   "name": "afl_window_votes",
+   "comment": "Vote counter of the current window: reset to 128 at 0x034B06, +1 when e>=1.01, -1 when e<0.99.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_window_votes"
+  },
+  {
+   "address": "0xFFFF7883",
+   "kind": "ram",
+   "name": "afl_gate_byte_7883",
+   "comment": "byte written by 0x0345A4 second body: 1 iff nine terms incl. [7324] > [733C]; meaning in 0x03452A not established",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "afl_gate_byte_7883"
+  },
+  {
+   "address": "0xFFFF7884",
+   "kind": "ram",
+   "name": "afl_gate_g1",
+   "comment": "Conjunction written by 0x0347F0 body at 0x03487A; read by 0x034884 and 0x071B58.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_gate_g1"
+  },
+  {
+   "address": "0xFFFF7885",
+   "kind": "ram",
+   "name": "afl_7878_lagging_flag",
+   "comment": "1 while 0x034B1C lags [7878] toward the cell, 0 on a snap (0x034B70). Read by 0x03CD4A and 0x03CFDA.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_7878_lagging_flag"
+  },
+  {
+   "address": "0xFFFF78A9",
+   "kind": "ram",
+   "name": "afl_g2_consecutive_7884",
+   "comment": "Consecutive passes with [7884]==1, saturating (0x0348E2-0x0348F0). G2 needs >=63.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "afl_g2_consecutive_7884"
+  },
+  {
    "address": "0xFFFF7904",
    "kind": "ram",
    "name": "cl_target_trim_7904",
@@ -12689,6 +14219,106 @@
    "item": 108,
    "cluster": "hole9_identity",
    "decoded_name": "cl_target_trim_7904"
+  },
+  {
+   "address": "0xFFFF79A0",
+   "kind": "ram",
+   "name": "ol_target_multiplier",
+   "comment": "f32 = 0x0AD0DC([6350]) in [0,1]; only writer 0x036962. Scales [7990] in 0x03606C.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "ol_target_multiplier"
+  },
+  {
+   "address": "0xFFFF79C0",
+   "kind": "ram",
+   "name": "cl_ol_delay_counter_copy",
+   "comment": "u16 counter (mov.w only, 0x036322). Not read by 0x03606C.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "cl_ol_delay_counter_copy"
+  },
+  {
+   "address": "0xFFFF79C2",
+   "kind": "ram",
+   "name": "cl_ol_delay_counter",
+   "comment": "u16. Counts calls while the 0x036978 test fails. 0x03606C compares it with [79C4].",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "cl_ol_delay_counter"
+  },
+  {
+   "address": "0xFFFF79C8",
+   "kind": "ram",
+   "name": "gate_79C8",
+   "comment": "0x036322 036428: 1 iff 0 < [79C2] < [79C4]; only writer found.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "gate_79C8"
+  },
+  {
+   "address": "0xFFFF7A78",
+   "kind": "ram",
+   "name": "per_cyl_addend_0",
+   "comment": "f32 array [7A78+4i], i=0..3, written by 0x037710; zeroed by 0x03757E. Enters [7310+4i] only.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "per_cyl_addend_0"
+  },
+  {
+   "address": "0xFFFF7A88",
+   "kind": "ram",
+   "name": "per_cyl_addend_cap_0",
+   "comment": "f32 array: the upper clamp of [7A78+4i], 1.0 or max(old-0.025, 0.19999999).",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "per_cyl_addend_cap_0"
+  },
+  {
+   "address": "0xFFFF7AA0",
+   "kind": "ram",
+   "name": "per_cyl_counter_gate_7AA0",
+   "comment": "u8, set by 0x037604 from eleven tests; zeroed by 0x03757E.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "per_cyl_counter_gate"
+  },
+  {
+   "address": "0xFFFF7AAC",
+   "kind": "ram",
+   "name": "prev_895C",
+   "comment": "f32 [895C] as saved by the previous 0x037604 run, or by 0x03757E.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "prev_895C"
+  },
+  {
+   "address": "0xFFFF7AB0",
+   "kind": "ram",
+   "name": "stable_895C_pass_count",
+   "comment": "u8. Passes of 0x04907C with the latest [7AB1]==1, saturating at 255 (0x0376EC). Cleared by 0x037604 when its test fails.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "stable_895C_pass_count"
+  },
+  {
+   "address": "0xFFFF7AB1",
+   "kind": "ram",
+   "name": "stable_895C_flag",
+   "comment": "u8 (|[895C]-[7AAC]| < 100), written by 0x037604; zeroed by 0x03757E.",
+   "trace": "disassembly/analysis/ffb_cl_side_trace.txt",
+   "item": 114,
+   "cluster": "ffb_cl_side",
+   "decoded_name": "stable_895C_flag"
   },
   {
    "address": "0xFFFF7AF4",
@@ -12969,6 +14599,16 @@
    "item": 108,
    "cluster": "hole9_identity",
    "decoded_name": "b_cl_exit_copy2_select"
+  },
+  {
+   "address": "0xFFFF7C68",
+   "kind": "ram",
+   "name": "any_cut_byte",
+   "comment": "0x03AAA4: 1 iff any of eleven cut bytes incl. [7C9D] == 1.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "any_cut_byte"
   },
   {
    "address": "0xFFFF7C6C",
@@ -13271,6 +14911,26 @@
    "decoded_name": "revlim_hyst_b2"
   },
   {
+   "address": "0xFFFF7D58",
+   "kind": "ram",
+   "name": "ratio_7D58",
+   "comment": "f32 written by 0x03D0B8 (clamp([7324]/[7338]-[7878]-[7AE4],0,2) / 2.0 / 1.0); initialised to 1.0 by 0x03CD00 together with [7D5C..7D64]",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "ratio_7D58"
+  },
+  {
+   "address": "0xFFFF7D68",
+   "kind": "ram",
+   "name": "fn_03CD4A_out",
+   "comment": "f32 = 0x03D23A([7D5C],[7D64],[7D68],stack byte) written at 03CF54; 0x03D23A not decoded",
+   "trace": "disassembly/analysis/injector_path_trace.txt",
+   "item": 114,
+   "cluster": "injector_path",
+   "decoded_name": "fn_03CD4A_out"
+  },
+  {
    "address": "0xFFFF7D80",
    "kind": "ram",
    "name": "channel_suppress_mask",
@@ -13281,6 +14941,126 @@
    "decoded_name": "channel_suppress_mask"
   },
   {
+   "address": "0xFFFF7D84",
+   "kind": "ram",
+   "name": "sched_active_duration_plus_734C",
+   "comment": "f32 [7D84+4k] = [7D94+4k] + f32 [734C], or 0.0 while cut (0x03D648).",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_active_duration_plus_734C"
+  },
+  {
+   "address": "0xFFFF7D94",
+   "kind": "ram",
+   "name": "sched_active_duration_export",
+   "comment": "f32 [7D94+4k] = rec_k+20 * 0.25, or 0.0 while cut (0x03D648).",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_active_duration_export"
+  },
+  {
+   "address": "0xFFFF7DA4",
+   "kind": "ram",
+   "name": "sched_duration_scale_1p0",
+   "comment": "Constant 1.0 written by 0x03D68C every task-5 pass before 0x03D856.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_duration_scale_1p0"
+  },
+  {
+   "address": "0xFFFF7DA8",
+   "kind": "ram",
+   "name": "sched_records_4x40",
+   "comment": "Four 40-byte channel records; the layout is in the file's RAM LAYOUT. Pads +13..15, +18, +19, +37..39 are never written.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_records_4x40"
+  },
+  {
+   "address": "0xFFFF7E48",
+   "kind": "ram",
+   "name": "sched_event_count_u16",
+   "comment": "S+0: saturating +1 each time a record is counted (0x03DA9E / 0x03D930). Zeroed by 0x03D708, the init path and 0x03DBFC.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_event_count_u16"
+  },
+  {
+   "address": "0xFFFF7E4C",
+   "kind": "ram",
+   "name": "sched_mode0_fire_count_s32",
+   "comment": "S+4: saturating +1 per 0x03E168 call that reached 0x009A72 (0x03DD32). Zeroed by 0x03D708, the init path and 0x03DBFC. Read by 0x02F974, where it has no effect, and by 0x02EF56 (not checked).",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_mode0_fire_count_s32"
+  },
+  {
+   "address": "0xFFFF7E50",
+   "kind": "ram",
+   "name": "sched_fired_flag",
+   "comment": "S+8: set to 1 by 0x03DD46, from 0x03E168 on calls that reached 0x009A72 and from 0x03DFC8 unless rec+7 != 0. Zeroed by 0x03D708 and 0x03DBFC, not by the init path.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_fired_flag"
+  },
+  {
+   "address": "0xFFFF7E51",
+   "kind": "ram",
+   "name": "sched_saved_mode_index",
+   "comment": "S+9: 0 or 2. Written by 0x03D856 at 0x03D99E and by 0x03DB16 at 0x03DB4A.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_saved_mode_index"
+  },
+  {
+   "address": "0xFFFF7E52",
+   "kind": "ram",
+   "name": "sched_saved_mask",
+   "comment": "S+10: copy of word [7D80]. Written by 0x03D856 at 0x03D9BA and by 0x03DB16 at 0x03DB4E.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_saved_mask"
+  },
+  {
+   "address": "0xFFFF7E54",
+   "kind": "ram",
+   "name": "sched_last_step_byte",
+   "comment": "S+12: the unreduced r4&0xFF of the last 0x03D856 call (0x03D880). Read by 0x03DD4E.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_last_step_byte"
+  },
+  {
+   "address": "0xFFFF7E55",
+   "kind": "ram",
+   "name": "sched_init_request",
+   "comment": "S+13: 1 makes the next 0x03D856 call take the init path. Set by 0x03D708 and 0x03DBF4; cleared at 0x03D8A2.",
+   "trace": "disassembly/analysis/fns_03D856_02EB02_trace.txt",
+   "item": 114,
+   "cluster": "fns_03D856_02EB02",
+   "decoded_name": "sched_init_request"
+  },
+  {
+   "address": "0xFFFF7E90",
+   "kind": "ram",
+   "name": "timing_cell_slot0_clamped",
+   "comment": "0x03F368 03F9FA: clamp(clamp(clamp(S0,-20,[7EC0]),-20,[7EC4]) - [7EC8], [7EE4], 69.65); SSM id 0x11 reports it.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "timing_cell_slot0_clamped"
+  },
+  {
    "address": "0xFFFF7EA0",
    "kind": "ram",
    "name": "out_03F368_7EA0",
@@ -13289,6 +15069,76 @@
    "item": 108,
    "cluster": "timing_0410D4_0415B8",
    "decoded_name": "out_03F368_7EA0"
+  },
+  {
+   "address": "0xFFFF7EC0",
+   "kind": "ram",
+   "name": "timing_cap_A",
+   "comment": "0x03F00C: 69.65 (OFF) / [7ECC] (LOAD while latch [7F09]) / +0.7 ramp.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "timing_cap_A"
+  },
+  {
+   "address": "0xFFFF7EC8",
+   "kind": "ram",
+   "name": "timing_subtrahend",
+   "comment": "0x03F00C: 0x0ADB10([620C]) on rising edge of [7EED], held while 1, -100/call to 0 while 0.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "timing_subtrahend"
+  },
+  {
+   "address": "0xFFFF7ECC",
+   "kind": "ram",
+   "name": "timing_cap_A_load",
+   "comment": "0x03ED56: max([7ED0], 0x0ADAAC([6350])); 0x03FA8C: 69.65.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "timing_cap_A_load"
+  },
+  {
+   "address": "0xFFFF7EE4",
+   "kind": "ram",
+   "name": "timing_floor",
+   "comment": "0x03F00C: -20.0 on every path with shipped tables.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "timing_floor"
+  },
+  {
+   "address": "0xFFFF7F09",
+   "kind": "ram",
+   "name": "cap_A_latch",
+   "comment": "0x03F00C: set on falling edge of [85D7], cleared only on the OFF branch (03F160).",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "cap_A_latch"
+  },
+  {
+   "address": "0xFFFF7F0C",
+   "kind": "ram",
+   "name": "blend_out_sum_term0",
+   "comment": "0x04004A tail: k*[7F48] + (1-k)*[7F18] or [7F48]; first term of the sum.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "blend_out_sum_term0"
+  },
+  {
+   "address": "0xFFFF7F10",
+   "kind": "ram",
+   "name": "blend_weight_k",
+   "comment": "0x03FBBC: steps 0.0156/call toward 0 while [85D7]==1, toward 1 otherwise.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "blend_weight_k"
   },
   {
    "address": "0xFFFF7FB0",
@@ -13461,6 +15311,26 @@
    "decoded_name": "ramp_counter"
   },
   {
+   "address": "0xFFFF8020",
+   "kind": "ram",
+   "name": "cut_exit_retard_state",
+   "comment": "0x041BE4: table 0x0ADE08([6350]) on each armed call, else min(+0.7, 0), reset to 0; always <= 0.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "cut_exit_retard_state"
+  },
+  {
+   "address": "0xFFFF8028",
+   "kind": "ram",
+   "name": "cut_exit_retard_term",
+   "comment": "= min([8020],[8024]) written every call by 0x041BE4 (041D0E); added into the 0x03F368 sum only on the sixteen-term path (03F644).",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "cut_exit_retard_term"
+  },
+  {
    "address": "0xFFFF8034",
    "kind": "ram",
    "name": "prev_overrun_tier_041BE4",
@@ -13485,6 +15355,196 @@
    "comment": "u16 flag word; bits 0x1000/0x2000/0x4000 select 0x042506's output path. Stored at twelve sites in 0x04209A, 0x042368 and 0x041EEE (three through a stack-held base find_writers.py misses). No knock quantity read.",
    "trace": "disassembly/analysis/fn_042506_trace.txt",
    "item": 107
+  },
+  {
+   "address": "0xFFFF80B4",
+   "kind": "ram",
+   "name": "term_80B4_80B4",
+   "comment": "0x042ED8: converges to 0.0 from any start; sum term.",
+   "trace": "disassembly/analysis/overrun_timing_trace.txt",
+   "item": 114,
+   "cluster": "overrun_timing",
+   "decoded_name": "term_80B4"
+  },
+  {
+   "address": "0xFFFF81EC",
+   "kind": "ram",
+   "name": "fbkc_timing_term",
+   "comment": "0x044296: [81F0] + [8260] + [828C] (or [81F0] alone, or 0). A term of the 0x03F368 sum.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_timing_term"
+  },
+  {
+   "address": "0xFFFF81F4",
+   "kind": "ram",
+   "name": "load_lag",
+   "comment": "0x044DB0: first-order lag of [63F8] (0x0BEA40, k = [0x0D2E18] = 0.03125, snap 2^-14).",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "load_lag"
+  },
+  {
+   "address": "0xFFFF81F8",
+   "kind": "ram",
+   "name": "load_minus_lag",
+   "comment": "0x044DB0: [63F8] - lag([63F8]) with k = 0.03125. G11/G12 compare it with 0xBDCCCCCC/0x3DCCCCCC.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "load_minus_lag"
+  },
+  {
+   "address": "0xFFFF81FC",
+   "kind": "ram",
+   "name": "fbkc_81F0_saved",
+   "comment": "0x04581A: [81F0] saved while [824C] == 1. Restored into [81F0] when [824C] != 1.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_81F0_saved"
+  },
+  {
+   "address": "0xFFFF822C",
+   "kind": "ram",
+   "name": "cnt_since_79C8",
+   "comment": "0x044CEA: 0 when [79C8] == 1, else +1 (saturating 255). 0x044300 sets it to 255 at init.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "cnt_since_79C8"
+  },
+  {
+   "address": "0xFFFF8234",
+   "kind": "ram",
+   "name": "fbkc_step_enable",
+   "comment": "Written only by 0x0448F4 at 0x044CCA (0 or 1). 0x04438C needs it == 1 for blocks A/B/C/main. 0x02487C packs it into bit 6 of [6893].",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_step_enable"
+  },
+  {
+   "address": "0xFFFF8235",
+   "kind": "ram",
+   "name": "fbkc_rpm_hi_ok_copy",
+   "comment": "0x04581A: 1 iff [824C] == 1. The value 0 selects head exit 7 ([81F0] = [81FC]).",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_rpm_hi_ok_copy"
+  },
+  {
+   "address": "0xFFFF8240",
+   "kind": "ram",
+   "name": "cnt_5BE2_set",
+   "comment": "0x044D12: u16 count of calls while [5BE2] != 0 (saturating), else 0.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "cnt_5BE2_set"
+  },
+  {
+   "address": "0xFFFF8249",
+   "kind": "ram",
+   "name": "cnt_798C_pos",
+   "comment": "0x044D12: counts up while [798C] > 0 (saturating 255), else 0. 0x044B1A also clears it.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "cnt_798C_pos"
+  },
+  {
+   "address": "0xFFFF824A",
+   "kind": "ram",
+   "name": "fbkc_load_below_min",
+   "comment": "0x0456E0: 1 when load < 0.95, 0 when load >= 1.0 (20.19c; stock 0.75/0x3F4CCCCC). FBKC head exit 4.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_load_below_min"
+  },
+  {
+   "address": "0xFFFF824B",
+   "kind": "ram",
+   "name": "fbkc_rpm_above_lo",
+   "comment": "0x04578C via 0x0BE800: 1 at RPM >= 1200, 0 below 1100 (20.19c).",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_rpm_above_lo"
+  },
+  {
+   "address": "0xFFFF824C",
+   "kind": "ram",
+   "name": "fbkc_rpm_below_hi",
+   "comment": "0x04578C: 1 when RPM < 6000, 0 when RPM >= 6100 (20.19c).",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fbkc_rpm_below_hi"
+  },
+  {
+   "address": "0xFFFF824D",
+   "kind": "ram",
+   "name": "rpm_below_fine_lo_hyst",
+   "comment": "0x0457D2: 1 when RPM < 1500, 0 when RPM >= 1600, held in between.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "rpm_below_fine_lo_hyst"
+  },
+  {
+   "address": "0xFFFF8253",
+   "kind": "ram",
+   "name": "v79A8_ge_10000",
+   "comment": "0x0457F4: written every call as shipped. Only reader is the 0x0448F4 tail, which is dead (0x0D299A = 0).",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "v79A8_ge_10000"
+  },
+  {
+   "address": "0xFFFF8258",
+   "kind": "ram",
+   "name": "kc_adv_max_blended_8258",
+   "comment": "0x045970: (1-[90A8]) T(KC Advance Max Cruise) + [90A8] T(Non-Cruise). Overwritten every call.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "kc_adv_max_blend"
+  },
+  {
+   "address": "0xFFFF826C",
+   "kind": "ram",
+   "name": "kc_gain_0AE664",
+   "comment": "0x045970: T(0x0AE664), an all-zero table, so 0.0 every call as shipped.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "kc_gain_0AE664"
+  },
+  {
+   "address": "0xFFFF8277",
+   "kind": "ram",
+   "name": "rough_corr_window_ok",
+   "comment": "0x045A3E: AND of [8287..828A], set by 0x045F9A on the Rough Correction Range constants (tuned).",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "rough_corr_window_ok"
+  },
+  {
+   "address": "0xFFFF829E",
+   "kind": "ram",
+   "name": "fine_corr_window_ok",
+   "comment": "0x0467AE: AND of [82AD..82B0], set by 0x046A4A on the Fine Correction Range constants.",
+   "trace": "disassembly/analysis/fn_0448F4_trace.txt",
+   "item": 114,
+   "cluster": "fn_0448F4",
+   "decoded_name": "fine_corr_window_ok"
   },
   {
    "address": "0xFFFF8320",
@@ -13625,6 +15685,16 @@
    "decoded_name": "gate_8EDC_shadow"
   },
   {
+   "address": "0xFFFF97B0",
+   "kind": "ram",
+   "name": "max0_653C_m_77C8_p_76D4_p_afl",
+   "comment": "0x071AFA: max([653C]-[77C8]+[76D4]+[7878], 0), or 1.0 when [65F6]==1 or [7449]==0. [97B4] is its k=0.125 lag.",
+   "trace": "disassembly/analysis/afl_learning_trace.txt",
+   "item": 114,
+   "cluster": "afl_learning",
+   "decoded_name": "max0_653C_m_77C8_p_76D4_p_afl"
+  },
+  {
    "address": "0xFFFFACF6",
    "kind": "ram",
    "name": "cnt_inc_block_ACF6",
@@ -13633,6 +15703,46 @@
    "item": 111,
    "cluster": "revlim_freeze_gate",
    "decoded_name": "cnt_inc_block_ACF6"
+  },
+  {
+   "address": "0xFFFFBFA8",
+   "kind": "ram",
+   "name": "boot_window_flag_BFA8",
+   "comment": "byte; (BFEC == 0x55), written only when the boot window runs",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_window_flag_BFA8"
+  },
+  {
+   "address": "0xFFFFBFB8",
+   "kind": "ram",
+   "name": "boot_ring_wr_index",
+   "comment": "word; mod 100, 0 at reset (0x00054A, 0x0004D6)",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_ring_wr_index"
+  },
+  {
+   "address": "0xFFFFBFBA",
+   "kind": "ram",
+   "name": "boot_ring_rd_index",
+   "comment": "word; mod 100, 0 at reset (0x00054A, 0x000524)",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_ring_rd_index"
+  },
+  {
+   "address": "0xFFFFBFFC",
+   "kind": "ram",
+   "name": "boot_marker_BFFC",
+   "comment": "long 0x5AA5A55A written by 0x000756 on every boot-block exit; gates only the message window",
+   "trace": "disassembly/analysis/poweron_state_trace.txt",
+   "item": 114,
+   "cluster": "poweron_state",
+   "decoded_name": "boot_marker_BFFC"
   }
  ]
 }

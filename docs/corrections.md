@@ -6891,3 +6891,251 @@ Until then, treat both editor names, and the "Exhaust" table's displayed values,
 * The 20.19c band-edge move (1800/2500 → 2250/3000 rpm) never makes a tier come sooner while byte `[5DB8]` ==
   0; with `[5DB8]` != 0 it brings tier 1 forward for x in 2500..3000. The only writer found (`0x015BFA`) stores
   0. The flat 1000 resume table raises both the resume and the re-entry rpm.
+
+---
+
+## 114. Function programme batch 4: the injector pulse, AFL learning, the post-start FFB addends, the MAF/load cap, the overrun timing terms, power-on RAM, the FBKC step enable and the angle scheduler — **CORRECTS item 111's `0xFFFF79C0` (the OL multiplier is `0xFFFF79A0`) and the labels at `0xFFFF726C`, `0xFFFF63FC`, `0xFFFF7AB0`, `0xFFFF8258`, `0xFFFF81F8`, `0x0448F4`, `0x02EFD2`, 2026-11-27**
+
+Eight clusters, same method as items 107-111 (blind trace from `fn_dump.py` → independent reviewer with
+its own emulation → settle; the injector path and AFL learning also got a fourth, independent audit).
+Files in `disassembly/analysis/`, all verifier clean; emulation in `scripts/trace/emu_<cluster>.py`, all
+exit 0 when re-run at integration (about 1.56 million assertions between them):
+
+| cluster | file | instruction lines | contracts |
+|---|---|---|---|
+| from `0x0301E4` to the injector register (item 115) | `injector_path_trace.txt` | 2,767 | 10 |
+| how AFL learns (item 116) | `afl_learning_trace.txt` | 1,366 | 12 |
+| the rest of the FFB sum: `[7354]`/`[7374]`, `[79A0]`, `[7A44]`, per-cylinder `[7A78+4i]` | `ffb_cl_side_trace.txt` | 1,741 | 26 |
+| `0x01FE46` in full: the MAF/load cap and the lift latch `[641C]` | `fn_01FE46_trace.txt` | 1,008 | 9 |
+| timing terms around the overrun cut (item 118) | `overrun_timing_trace.txt` | 1,684 | 22 |
+| power-on RAM state (item 117) | `poweron_state_trace.txt` | 1,388 | 24 |
+| `0x0448F4`: the FBKC step enable | `fn_0448F4_trace.txt` | 1,685 | 21 |
+| `0x03D856` (the four-channel angle scheduler) and `0x02EB02` (EEPROM write-back) | `fns_03D856_02EB02_trace.txt` | 2,314 | 21 |
+
+The tracers made 313 claims; reviewers confirmed 264, refuted 3, called 46 imprecise and reported 41
+omissions. 54 contradictions with existing labels and docs were verified from bytes. Spot-checked again at
+integration: `0x02FF8E`'s 300 / 0 clamp store, the definition data pointers of the per-injector, latency and
+flow-scaling tables, the record `0x0AC760`, the CHCR field decode of item 117, and the tuned pool word
+`0x020384`. Code analysed: **30,734 → 42,104 instructions (10.7% → 14.7%)**; listed 38,965 → 49,418
+(13.6% → 17.3%); functions ≥90% analysed 642 → 830.
+
+### The FFB sum is complete except `[798C]`'s ramp paths (open-holes #12)
+
+* **`[7354]` and `[7374]` are post-start enrichment, not transient terms.** `0x0304BE` / `0x03082E` (and the
+  seeders `0x030454` / `0x03076E` that run while the crank flag `[726C]` is 1) take their seeds, delays and
+  steps from the definition tables `Table_Post_Start_Enrich_*`: `[7354]` = seed × `0x0AD594` (0.5 warm, up to
+  4.53 cold), held for 39 task-9 passes after start, then decaying over about 217 calls; `[7374]` = 0.1001
+  warm, up to 1.54 cold, decaying linearly over about 286 calls. Neither reads a load change.
+* **Item 111 named the wrong cell:** the OL enrichment `[798C]` is multiplied by **`[0xFFFF79A0]`**, not
+  `[79C0]` (`0x03606C`: r12 = `0xFFFF79F0` at `0360D2`, r0 = −80 at `036250` / `0362F8`). `[79A0]` is written
+  only by `0x036962` as the definition table "Primary Open Loop Fueling Compensation (ECT)" at `[6350]`: 1.0
+  at ≥ 60 °C in 20.19c, never above 1.0 — it can only scale the OL map down. `[79C0]` is a u16 CL→OL delay
+  counter (`0x036322`); the old label `ol_blend_coeff` on `[79A0]` ("~0.1 from CC284",
+  `cl_ol_master_analysis.txt:558`) was wrong too.
+* **`[7A44]` has no writer** (three searches plus this one) and item 117 shows it is zeroed at every reset,
+  so the "− `[7A44]`" term of the sum is 0.0. "CL integral" (`cl_ol_master_analysis.txt:615`) is unsupported.
+* The per-cylinder addends `[7A78+4i]` (`0x037710`) read no load rate either.
+* **So for the warm tip-in excess, `[73B4]` remains the only established candidate;** `[798C]` on its
+  `[79C6]` == 1 / 2 ramp paths is the last undecoded piece.
+* `0xFFFF726C` (was `transient_state_flag`) is the **crank/stall flag**: `0x02EF56` sets it while RPM ≤ 300 and
+  clears it once RPM > 500. `0xFFFF67EC` (item 111's "unsupported") is therefore the count of task-9 passes
+  since cranking ended (`0x023A94`) — not a DTC counter.
+
+### `0x01FE46`: the MAF/load cap and the lift latch
+
+* `[63C4]` = min(MAF window mean × "MAF Compensation (IAT)" + `[69F4]`·`0x0C3104`, **"MAF Limit (Maximum)"**
+  `0x0C3100`), written by `0x01FE46` itself at `01FF66`. **The 20.19c limit of 475 g/s clips nothing the sensor
+  can report**: "MAF Sensor Scaling" ends at 440.6 g/s and the lookup clamps there, so raising the limit
+  further changes nothing — extending the MAF curve is what would move the ceiling. Stock's 300 g/s would have
+  clipped the logged peaks of 305-345 g/s. The g/rev loads are capped by "Engine Load Limit A (Maximum)"
+  (a definition-named literal-pool word, `0x020384`: 4.0 stock, 8.0 in 20.19c/e) and Limit B (record `0x0AAE14`,
+  also tuned), both about 8 g/rev in the tune.
+* The "Cruise" and "Non-Cruise" Engine Load Compensation maps are byte-identical in every AE5L600L image, so
+  the `[90A8]` blend between them is inert; editing only one of them would make it matter.
+* **The lift latch `[641C]`** freezes engine load `[63F8]` against rising during a fast throttle close from
+  boost (≥ 4400 rpm, ≥ 50 km/h, warm, lagged MAP ≥ about 1000-1060 mmHg) and drops `0x0301E4`'s lower pulse
+  clamp to 0. Its fuel effect is not sized.
+* `0xFFFF63FC` (was `barometric_pressure`) is the change of `[63F8]` in that call; `0xFFFF63B8`/`63BC` are the
+  window max/min snapshots, not previous/current samples; `0xFFFF6430` is a 1.0-flat factor, not an ADC value.
+  `0xFFFF65F6` (`cl_active_flag`) is unsupported: it is a copy of byte `[415C]` (`0x022F1C`), and while it is 1
+  `0x020726` re-seeds airflow and load with coolant-indexed values every pass (2.2 g/s warm) — its identity
+  needs `[415C]`'s writer.
+* The census splits this function at a false pointer entry `0x020000` (it is 559 instructions, not 221) —
+  see Tooling.
+
+### `0x0448F4`: the FBKC step enable, and two knock-path identities
+
+`0x0448F4` (was `task10_knock_config`; "10" was a call position, not a task) writes no timing or fuel value:
+it computes byte `[0xFFFF8234]`, the enable of FBKC's knock step and delayed recovery in `0x04438C`. Its live
+gates as shipped (identical in every bin): `0x0D2E08` (60 °C), `0x0D29E0` (13), `0x0D2EDC` (3.8), `0x0D2F6C`/`70`
+(1500/1600 rpm), `0x0D2E10`/`14` (±0.1), `0x0D2997`/`98` (90/38), `0x0D2999` (63). **The FBKC window itself is
+tuned in 20.19c** (`[824A]` load 0.95/1.0, rpm 1100/1200/6000/6100, recovery count 70, Rough Correction window,
+Fine Correction upper load pair), so stock-based reasoning about when FBKC acts does not carry over.
+
+* **`0xFFFF8258` is not a cumulative knock signal** (item 80, `docs/knock.md:210`): `0x045970` overwrites it
+  each call with (1−w)·"KC Advance Max (Cruise)" + w·"(Non-Cruise)", w = `[90A8]`, and never reads the old value.
+* `0xFFFF81F8` (was `knock_thresh_config`) = `[63F8]` − lag(`[63F8]`), a load high-pass; `0xFFFF8277` is the AND
+  of four Rough Correction window bytes, not a roughness detector.
+
+### `0x03D856` and `0x02EB02`
+
+`0x03D856` is the four-channel angle scheduler that arms each channel's pulse (item 115) and the stage where the
+cut mask `[7D80]` suppresses events (a cut bit means the record is counted but never fired, and `0x03D648`
+reports 0.0). Its body reads no calibration; its ROM tables `0x063DDC`..`0x063E3B` are identical in every bin.
+One undefined cal long, `0x0CBDB4` (0x7850), turns a duration into an angle for mode-1 re-fire checks — its
+meaning is not established; do not edit it. `0x02EB02` is EEPROM write-back housekeeping (retry limit
+`0x0C472C` = 3). `0xFFFF7D94`+4k are the per-channel active durations (not "sensor baselines"), `0xFFFF7E4C` an
+int32 fire count (not `transient_accum_ptr`), and `0xFFFF65F1`'s label had its sense inverted.
+
+### Tooling found on the way
+
+* **The census splits functions at false pointer seeds.** `0x020000` (a long `0x00020000` somewhere) is
+  accepted as a `ptr` entry inside `0x01FE46`, so the census files 0x01FE46..0x020000 (221) and
+  0x020012..0x02035E (329, "tailbra") as two functions, with 0x020000..0x020010 in neither as a function body.
+  A pointer seed that lands inside already-proven code that is not an entry should be rejected. Not fixed.
+* **Two descriptor scanners disagree.** `coverage_map.scan_descriptors` (which `function_census.py` and so
+  `fn_dump.py` use) finds 818 records; `descriptor_map.txt` (item 60's scanner) has 1,094. At least `0x0AAE00`
+  and `0x0AAE50` are missing from the census set, so `fn_dump` prints their pool words as plain ROM, and the
+  verification registry's "descriptors decoded" is also from the 818. Not fixed.
+* `find_writers` reports a pool long at `037F88` as a GBR store to `0xFFFF7E90` (false positive), as it did for
+  `0x037546` in item 108.
+
+### Labels
+
+214 new records (item 114) in `disassembly/maps/decoded_labels.json` (1,567 in all, 1,306 functions); 79 more
+names retired (353 in `RetireStaleLabels.java`). Twelve existing names the bytes do not contradict were kept
+(the batch-2 template names on six stubs, `prev_overrun_tier_041BE4`, `ffb_641C_threshold`, `halt_forever` ...);
+`mass_airflow_gps` keeps its name with the decoded formula as its comment. **Run `RetireStaleLabels.java` before
+re-importing.**
+
+---
+
+## 115. The injector pulse decoded end to end: logged AFC, AFL and FFB multiply it — **CLOSES open-holes #9's question (a); NEW, 2026-11-27**
+
+`injector_path_trace.txt` (2,767 lines; audited; 180,838 assertions). For channel j (0..3) and a fresh pulse:
+
+    PW_j      = [7290+4j]  (0x02EFD2)  = [7328+4j] once the after-start floor has released
+    [7328+4j] = clamp( [7310+4j] · S4 · C · PIPWC_j · F ,  [733C] ,  262136 )          (0x0301E4)
+    C         = ( [76D4] logged AFC + [7878] logged AFL + [7AE4] ) · [7348]
+    [7348]    = clamp( [63F8] engine load · "Injector Flow Scaling" raw 4916.0 , 0 , 131072 )   (0x030378)
+    [7310+4j] = per-cylinder FFB = clamp( (S + [7B44+4j] + [7A78+4j]) · [7340] , 0 , 32 )        (0x02FFE0)
+    PIPWC_j   = "Per Injector Pulse Width Compensation A/B/C/D" ( [7324] , RPM )   0.898 .. 1.086   (0x038DC0)
+    F         = clamp( record 0x0AC760 ([7344]) , 0.5 , 1.5 ) when RPM < 4000 and [7344] < 600, else 1.0 (0x0397AC)
+    S4        = 1.0 (three of its four factors are 0.0 in every bin)                                (0x037B74)
+    [733C]    = 300.0 (0x0CBE08), or 0.0 when the lift latch [641C] == 1                            (0x02FF8E)
+    register  = min( (trunc(4·PW_j) + L) >> 4 , 0xFFFF )  ->  u16 0xFFFFF640 + 2j   (0x03DFC8 -> ... -> 0x011848)
+    L         = "Injector Latency_" ( battery voltage [4130] , manifold pressure [6210] )           (0x0303C0)
+
+and the pulse start is the compare value written to `0xFFFFF444 + 2j`. With the definitions' scalings (PW
+axis ×0.001 ms, latency ×0.00025 ms) one register count is 4 µs; the timer clock itself is not established
+from bytes. Everything after `0x0301E4` adds only: the after-start floor of `0x02EFD2` (while ANY of the four
+flag bytes `[726F..7272]` is 1, every channel gets max(pulse, decaying floor `[728C]`) — collective, not per
+channel; the floor decays by 0.85-0.96 per call and can be re-armed at run time when byte `[65F6]` becomes 1),
+the factor `[7DA4]` = 1.0, truncation to quarter units, the latency, and per-channel suppression by `[7D80]`
+in `0x03D856`. All 13,201 code and calibration bytes involved are identical in stock, 20.19c and 20.19e.
+
+* **So hole #9 is closed through to the pulse:** the zeroed trim `[7904]` → CL target `[77C8]` (item 108) →
+  logged AFC `[76D4]` (item 111) → C → the injector register. Remaining for #9: whether SPECIAL ends at warm-up
+  (a cold-start log).
+* **The real low-pulse-width multiplier is the undefined record `0x0AC760`** (data `0x0CD078`, axis
+  `0x0CD058`): ×1.266 at a base pulse ≤ 300 (0.3 ms), falling to ×1.0 at 600, below 4000 rpm. The definition
+  table "Low Pulse Width Fuel Injector Compensation" points elsewhere (`0x0D39A8`, item 36).
+* The minimum pulse is 300 (0.3 ms) unless the lift latch is set. `0x0301E4`'s other outputs feed only the
+  next pass's factors (`[7344]` → F, `[7320]` → S4, `[7324]` → the PIPWC axis) or A/F learning (`[7324] >
+  [733C]` is one of nine terms of the AFL gate byte `[7883]`, item 116), and `0x07D620` (a diagnostic gate).
+* Not covered: a pulse rewritten while in flight (`0x009C38`), `0x009F72`'s status-set branch, and MODE 0 —
+  bytes only or not decoded.
+
+---
+
+## 116. How AFL learns: four airflow cells, stepped from the AFC lag W0, kept across warm resets — **CORRECTS the labels at `0x034884`, `0x03452A`, `0x0345A4`, `0x034D52`; NEW, 2026-11-27**
+
+`afl_learning_trace.txt` (1,366 lines; audited; 424,219 checks).
+
+* **The learned values are four float cells** in guarded 8-byte records at `0xFFFF316C`/`3174`/`317C`/`3184`
+  (the block item 117 shows is kept across warm resets). The current cell `[787F]` comes from `0x034D52`
+  comparing `[63C4]` with "A/F Learning #1 Airflow Ranges" (`0x0CC074`/`78`/`7C`): **stock 5.6 / 10 / 50 g/s,
+  20.19c and 20.19e 6 / 23 / 40 g/s.**
+* **Logged AFL `[7878]` is the applied value, not a cell:** each pass of `0x03452A` `0x034B1C` sets it to the
+  current cell when within 0.02 (or on a forced snap), else lags toward it (k = 0.0156), clamped by "A/F
+  Learning #1 Limits" (±0.25) and ±0.5.
+* **The learning signal is W0 = `[7704]`, the k = 1/64 lag of logged AFC** (item 111), not AFC itself:
+  e = W0 − 1/`[77C8]` + `[7BA8]` + 1.0 votes UP at ≥ 1.01 and DOWN below 0.99 (with target 1.0: W0 above +1 % /
+  below −1 %). Votes accumulate over a window — **40 passes in mode 1** (`[6254]` == 1, each also needing
+  |`[6540]` − `[77C8]`| < 0.05) or **16 in mode 0** — and the cell then steps **±0.001** if the votes are ≥ 144 /
+  < 113 (of a 128 start), clamped to ±0.25 by `0x0CC04C`/`50` (not by the definition's Limits). Fastest: 0.001
+  per 41 (mode 1) or 17 (mode 0) passes; 0.25 takes 250 steps.
+* **Gates** (all must hold or the window restarts): ECT 75..95 °C, |load change| `[63FC]` < 0.012, the AFL
+  gate `[7883]` (nine terms, one of them the base pulse above its 300 clamp), `[9709]` == 0, and more
+  (`0x034778`, `0x0345A4`).
+* **The breakpoints pick the cell that receives each decision, not where the samples came from:** a change of
+  cell does not restart the window, so until neighbouring cells are 0.02 apart (20 steps; all are 0.0 after a
+  clear) votes gathered in one airflow range can step another range's cell. Moving a breakpoint does not
+  cleanly separate learning by airflow.
+* **The cells are cleared on a cold start and on any start where word `[36BE]` == 0x4055** (set by `0x05D070`
+  from handler `0x098FE4`, request not identified) with `[8EDC]` == 0 — so a warm start can reset AFL too.
+* Logged AFL moves in steps of 1/128 = 0.78 %, so about 8 learning steps (≥ ~328 passes) per logged count.
+  `[7878]` has seven readers, not one: besides `0x0301E4` (item 115), `0x02782C` ((1 + AFL) × table),
+  `0x071AFA`, `0x03D0B8` and three exports — "AFL acts only through the pulse" is not established.
+* Learning code, gates, rates and limits are identical in stock, 20.19c and 20.19e; only the breakpoints differ.
+  Old labels on these functions (`afl_learning_entry`, `afl_value_update`, `afl_range_selection`,
+  `afl_airflow_range_determination`, `afl_cl_active_check`) are replaced.
+
+---
+
+## 117. Power-on RAM: `0xFFFF4000`..`0xFFFFBF9F` is zeroed by DMA on every reset; `0xFFFF2000`..`3FFF` is kept — **CORRECTS `startup_hw_init_analysis.txt:172` and the labels at `0xFFFF0000`/`0004`/`0008`, `0x00AE50`; CLOSES the power-on questions of items 111 and 114, 2026-11-27**
+
+`poweron_state_trace.txt` (1,388 lines; 24 functions from the reset vector to the kernel start).
+
+* `0x010398` stores a zero long at `0xFFFF4000` and programs DMAC channel 0: SAR = DAR = `0xFFFF4000`, DMATCR =
+  `0x1FE8`, CHCR = `0x001F0128`. By the SH7058 hardware manual's CHCR table that is auto-request (RS = 11111),
+  source fixed (SM = 00), destination incremented (DM = 01), longword (TS = 10), burst (TM = 1): **0x1FE8
+  copies of the zero long over 0xFFFF4000..0xFFFFBF9C, on every reset, warm or cold**, after a destructive
+  pattern test of that range by `0x010290`, and on both outcomes of that test. Only `0xFFFF5B89` (test result)
+  and `0xFFFF5B6C` are written in the range before the kernel starts. Evidence class: bytes + emulated + the
+  manufacturer's register table (cited by the trace; not re-read here).
+* `0xFFFF0000`..`1FFF` is pattern-tested and restored; **`0xFFFF2000`..`3FFF` is not touched at reset**
+  (pre-reset content on a warm start, undefined on a cold one) — that is where the AFL cells (item 116) and the
+  warm-start marker `0xFFFF2000` live. `0xFFFFBFA0`..`BFFF` is a boot-block area, not cleared.
+* **Consequences:** byte `0xFFFF8EDC`, latch `0xFFFF7FF4`, integrator `0xFFFF7FBC`, gate `0xFFFF69E6`,
+  `0xFFFF7A44` and latch `0xFFFF8E66` are all 0 at every kernel start. So the rev-limit freeze gate is 0 on a
+  cold start (the open half of item 111), `[7A44]` is 0 forever (item 114), and the SPECIAL-exit latch starts
+  clear. For the timing integrator it means `[69E6]` = 0 and `[7FBC]` = 0 at start: if `0x0410D4` runs once
+  before `0x026634` sets `[69E6]`, the latch trips at once and `[7FBC]` stays 0 for the drive. That order is
+  still not established.
+* `0xFFFF0000`/`0004`/`0008` are on-chip RAM (manual: H'FFFF0000..H'FFFFBFFF), not the standby-control
+  registers `SH7058_STBCR*` the labels claimed: they hold a **boot watchdog** — limit 183 WDT intervals, the ITI
+  count, and an expiry-code byte; if the count reaches the limit before the kernel starts, the ECU halts in
+  `0x00FBA4`. Not a calibration and unchanged in all 20 bins, but **a patch that lengthens the boot path before
+  `0x00FABC` could trip it.**
+* `startup_hw_init_analysis.txt:172` ("RAM clear FFFF0000-FFFFBFFF zeroed") was wrong in range.
+
+---
+
+## 118. The timing terms around the overrun cut: the cut-exit retard `[8028]`, the post-sum bounds of `0x03F00C`, and "Map Switching" scalars that switch nothing — **CORRECTS item 74 (`0x0ADE08`, the `0x041BE4` reset gates) and the labels at `0x03F00C`, `0x0ADAFC`, `0x0ADB38`, `0xFFFF8020`, `0xFFFF7C68`, 2026-11-27**
+
+`overrun_timing_trace.txt` (1,684 lines; 21,935 emulated cases).
+
+* **No decoded term gated on an overrun-cut byte holds timing low through a counted (pedal-lift) cut.** The
+  cut-gated term is `[8028]` = min(`[8020]`, `[8024]`) with `[8024]` = 0.0 in practice: on the arm (item 113)
+  `[8020]` = record `0x0ADE08`(ECT), then it ramps out at +0.7 per call (`0x0D2C10`), 36 calls from −24.96.
+  **Item 74's "up to −16.17°" was wrong: the table reaches −20.04 at 50-60 °C and −24.96 from 70 °C.** Item 74's
+  "only live reset gate is engine-speed delta < −20" was wrong too: `[6254]` == 0, (`[65C5]` != 1 and `[5E94]` <
+  4) and `[6634]` < −20.0 are all live. `[8028]` reaches the logged timing only on `0x03F368`'s sixteen-term
+  sum path. Table and ramp are identical in stock, 20.19c and 20.19e — **they are the lever for the post-cut
+  timing dip at ~1800 rpm exits**, and nothing else.
+* **The 20° plateau logged through most coasting cuts** matches the 20.19c "Base Timing Idle Minimum" cell
+  (`0x0ADB38`, 20.08 from 1800 rpm) feeding the `[85D7]`-gated blend in `0x03FBBC`: a closed-throttle
+  mechanism, not a fuel-cut one — **a hypothesis**, open-holes #13. `0x0ADB38` is a 1-D rpm table used as a
+  speed-gated floor max(`[7F28]`, ·) at `0x03FCA2`, not a "primary base timing map".
+* **`0x03F00C`** (was `task49_base_advance`) writes the bounds applied after the timing sum: caps `[7EC0]`/`[7EC4]`,
+  subtrahend `[7EC8]`, floor `[7EE4]`. `0x0ADAFC` is the `[7EC4]` cap against a count and `0x0ADB10` the `[7EC8]`
+  subtrahend against `[620C]` (both 1-D; not "base advance maps"). **The `[7EC0]` cap's LOAD (`0x03ED56`, down to
+  −2.07) is a live timing-lowering bound that is not cut-gated; whether it engages on the car is not
+  established** — do not tune against it until its inputs are decoded or logged.
+* **"Map Switching" scalars that switch nothing:** `0x0D2A40`/`44`/`50`/`54`/`58`/`5C`/`60`/`64`, `0x0D2A9C`, `0x0D2AA0`,
+  `0x0D2ABC` and `0x0D29AC` (project-invented names, CLAUDE.md) are all consumed by `0x03F00C` as cap gates, ramps
+  and decays — e.g. `0x0D2ABC` is the per-call decay of `[7EC8]`, `0x0D2A60`/`64` the +0.7 ramp of the `[7EC0]` cap.
+  Names wrong, stored values right.
+* `0xFFFF8020` is the overrun-retard block (written only by `0x041BE4`/`0x041A7E`/`0x041954`), not a knock/FLKC
+  workspace; `0xFFFF7C68` is the OR of eleven cut bytes (the ladder's `[7C9D]` first), not an engine status.

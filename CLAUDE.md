@@ -54,8 +54,8 @@ These exist because confident-but-wrong answers have been produced here before.
    .\scripts\check.ps1
    ```
 
-   Current baseline: **99.95% of 53,334 lines match; 0 known errors**
-   (`scripts/check.sh`, 2026-11-27, after function-programme batch 3). The 29 remaining
+   Current baseline: **99.96% of 67,287 lines match; 0 known errors**
+   (`scripts/check.sh`, 2026-11-27, after function-programme batch 4). The 29 remaining
    mismatches are 28 deliberate symbolic labels plus one self-correcting
    reasoning passage — that count has not moved as the corpus grew.
    Keep it that way — re-run the verifier after editing any analysis file.
@@ -92,8 +92,8 @@ These exist because confident-but-wrong answers have been produced here before.
    | `[CITED]` | mentioned in `corrections.md`, no byte-level check | treat as a lead |
    | `[UNVERIFIED]` | **the name is the only artefact** | a hypothesis. Never a premise. |
 
-   **583 of 3,688 labels (16%) are `[UNVERIFIED]`; 432 (12%) are `[DECODED]`**
-   (2026-11-27, after batch 3 and the 918 small-function names, which are `[TRACED]`).
+   **562 of 3,833 labels (15%) are `[UNVERIFIED]`; 572 (15%) are `[DECODED]`**
+   (2026-11-27, after batch 4; the 918 small-function names are `[TRACED]`).
    In the listing they look exactly like the rest.
 
    **`[TRACED]` on a function label is weaker than it reads** (corrections item
@@ -128,13 +128,15 @@ These exist because confident-but-wrong answers have been produced here before.
 hit rates, the triage-before-decode sequence, and the standing rules that each
 cost something to learn. Read it before starting a new line of analysis.
 **Part 1 (2026-11-27) is the function programme:** census-driven, one function
-card at a time, blind trace → adversarial review → settle. Batches 1–3 are done
-(items 106-113: runtime library, RTOS, diagnostic tables, both live patches' closure,
-hole #9 traced to the closed-loop lambda target and on into logged AFC, five
-fuel/timing functions, all 127 small-function shapes and their members, the FFB
-residual, the SPECIAL exit, the timing-integrator bound, the overrun ladder, the
-`0xFFFF8EDC` gate); batch 4 is listed there, led by the path from `0x0301E4` to the
-injector pulse, with four logs that would settle more than another trace.
+card at a time, blind trace → adversarial review → settle. Batches 1–4 are done
+(items 106-118: runtime library, RTOS, diagnostic tables, both live patches' closure,
+hole #9 traced to the closed-loop lambda target, into logged AFC and on to the
+injector register, five fuel/timing functions, all 127 small-function shapes and
+their members, the FFB residual and the rest of its sum, the SPECIAL exit, the
+timing-integrator bound, the overrun ladder and its timing terms, the `0xFFFF8EDC`
+gate, AFL learning, the MAF/load cap, power-on RAM); batch 5 is listed there. **Its
+step 0 is two census tool fixes** (a false pointer seed splits functions; the census
+uses an 818-record descriptor set, not the 1,094) — do them before the next trace.
 
 **[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist. Items 1-6
 all closed (2026-08-18/19). **Item 7 is the successor programme: 947 of 1,094
@@ -165,9 +167,9 @@ name survives as a secondary symbol, still searchable and still in the Symbol
 Tree.
 
 **After any label retirement, run `disassembly/ghidra/RetireStaleLabels.java`
-first, then re-run the import.** The current copy removes 274 names: 150 retired
-by corrections items 91–93 (129) and 96–97 (21), and 124 by the function programme
-(items 107–111, managed block written by `sync_decoded_labels.py`). It is idempotent and touches only those exact
+first, then re-run the import.** The current copy removes 353 names: 150 retired
+by corrections items 91–93 (129) and 96–97 (21), and 203 by the function programme
+(items 107–114, managed block written by `sync_decoded_labels.py`). It is idempotent and touches only those exact
 (address, name) pairs.
 
 > **Ghidra runs the copies in `~/ghidra_scripts`, not the repo's.** Copy both scripts
@@ -204,9 +206,9 @@ its status. Two worth carrying in your head:
   **IAT is `FFFF6364`** (was `ect_startup`); the earlier item-9 claim that IAT
   was `FFFF69F0` is **RETRACTED** — `FFFF69F0` reaches zero named axes.
   Several "sensors" are diagnostic plumbing read only as bytes: `FFFF67EC` is a
-  uint16 counter (called a DTC counter by item 15 — **unsupported**: item 111 finds
-  `0x023A94` counting passes while byte `[726C]` != 1 and zeroing it otherwise, with
-  no DTC in those bytes), `FFFF65C0` a precondition flag. Real throttle is
+  uint16 count of task-9 passes since cranking ended (item 114: `0x023A94` zeroes it while
+  the crank/stall flag `[726C]` is 1; item 15's "DTC counter" was wrong), `FFFF65C0` a
+  precondition flag. Real throttle is
   `FFFF62DC` (plate) and `FFFF64D8` (**pedal**, not throttle_raw).
 - **The FFB transient term `0xFFFF7B8C` tops out at +0.047, not its +0.09998 clamp** (item
   109). The 2026-08-19 "FFB 10.2 = this term pinned at its clamp" answer is retracted; the
@@ -226,6 +228,21 @@ its status. Two worth carrying in your head:
 - **The overrun retard arm fires at the cut exit, not through the cut** (item 113,
   correcting 103 and 79), and the "Overrun Fuel Cut Delay" cells set the count to tier
   1, which cuts one channel. The full cut is at cell + ext2.
+- **The injector pulse is decoded to the register** (item 115): u16 `0xFFFFF640 + 2j` =
+  min((trunc(4·PW) + "Injector Latency_") >> 4, 0xFFFF), PW = clamp(per-cylinder FFB ·
+  (AFC + AFL + `[7AE4]`) · load · "Injector Flow Scaling" · "Per Injector Pulse Width
+  Compensation" · low-pulse factor, 300, 262136), then an after-start floor. The real
+  low-pulse multiplier is the undefined record `0x0AC760` — "Low Pulse Width Fuel Injector
+  Compensation" is not it (item 36). `[7D80]`'s four cut channels are the injectors.
+- **AFL learns from W0, the 1/64 lag of logged AFC** (item 116): four cells at `0xFFFF316C`..
+  selected by "A/F Learning #1 Airflow Ranges" (6/23/40 g/s in 20.19c), ±0.001 per 16- or
+  40-pass vote window, ±0.25; logged AFL is a smoothed copy of the current cell. The
+  breakpoints choose which cell a decision lands in, not where its samples came from.
+- **RAM `0xFFFF4000`..`BF9F` is zeroed by DMA on every reset; `0xFFFF2000`..`3FFF` is kept**
+  (item 117), and `0xFFFF0000`..`0008` is a boot watchdog, not standby registers. Every
+  latch named in items 111-114 starts at 0 at every kernel start.
+- **The 20.19c MAF limit of 475 g/s clips nothing**: "MAF Sensor Scaling" ends at 440.6 g/s
+  (item 114). Extend the MAF curve to move the airflow ceiling.
 - **The timing integrator `0xFFFF7FBC` has a one-way latch that pins it at 0** (item
   111). Whether it is ever non-zero on the car, and so whether 20.19c's window B
   (`0xD29C4` = 438) does anything, is not established — log before crediting it.
@@ -467,11 +484,11 @@ image        1,048,576 bytes
 | layer | figure |
 |---|---|
 | code **reached by control flow** (`function_census.py`) | **286,163 instructions = 572,326 bytes in 5,146 functions** — the block above is a 256-byte classifier that files FPU-dense code and literal pools under `float_data` |
-| code **analysed** — in a verified file that states what it does | **30,734 instructions = 10.7% of code** after batch 3 (22,698 = 7.9% after batch 2; census `analysed_*`; excludes the 13 `*_raw.txt` listing dumps, item 108) |
-| code **listed** in any verified file, dumps included | **38,965 instructions = 13.6% of code** after batch 3 (32,111 = 11.2% after batch 2, 24,930 = 8.7% after batch 1, 15,798 = 5.5% before it; the old "18,099 = 8.1%" counted 2,527 literal-pool words printed in instruction format) |
-| functions ≥90% listed / partly / **never touched** | 818 / 171 / **4,157** — of the 818, **642 are ≥90% analysed**; 176 are covered by raw dumps alone |
-| functions carrying any label | 1,681 of 5,146 (709 before the 918 small-function names) |
-| labelled addresses | 2,668 ROM + 1,020 RAM (432 `[DECODED]`) |
+| code **analysed** — in a verified file that states what it does | **42,104 instructions = 14.7% of code** after batch 4 (30,734 = 10.7% after batch 3, 22,698 = 7.9% after batch 2; census `analysed_*`; excludes the 13 `*_raw.txt` listing dumps, item 108) |
+| code **listed** in any verified file, dumps included | **49,418 instructions = 17.3% of code** after batch 4 (38,965 = 13.6% after batch 3, 32,111 = 11.2% after batch 2, 15,798 = 5.5% before batch 1; the old "18,099 = 8.1%" counted 2,527 literal-pool words printed in instruction format) |
+| functions ≥90% listed / partly / **never touched** | 995 / 176 / **3,975** — of the 995, **830 are ≥90% analysed**; 165 are covered by raw dumps alone |
+| functions carrying any label | 1,759 of 5,146 (709 before the 918 small-function names) |
+| labelled addresses | 2,746 ROM + 1,087 RAM (572 `[DECODED]`) |
 | table descriptors decoded from bytes | 1,094 |
 | …**named** by a definition | **147** |
 | …**unnamed** | **947** (open-holes #7) |
