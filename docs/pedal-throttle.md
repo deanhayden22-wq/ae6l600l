@@ -192,5 +192,24 @@ Logs (steady pedal, warm, garn 3-21/3-30/4-1 vs 19c 8-22/11-20 vs 19e 11-24):
   ~28-32% at 2000-3200. More plate than that waits on the turbo.
 - Only deficit vs stock: 1200-2000 rpm x 20-37% pedal, modelled target plate 20-25% vs stock 25-31%
   (i.e. stock reaches atmospheric there, 19e stops about 2 psi short). The 20.14 "push further" rule applies.
-- Modelled target plate (this chain) reads ~8 points below the logged `Throttle` channel at every
-  opening; relative comparisons are unaffected, absolute plate % is not established.
+- ~~Modelled target plate reads ~8 points below logged `Throttle`, unexplained.~~ **Explained
+  2026-11-27** (byte-level, not yet a verifier-checked trace file):
+  1. Units. The code reads the target tables through descriptors `0x0AF22C`/`0x0AF248` with scale
+     `0x3AFA0000` = 0.0019073 (max cell 86.0); the definition displays them at 0.0022707, i.e. **1.19x**
+     the ECU value. Logged `Throttle` (id `0x015`) is **1.25x** f32[`0xFFFF62D4`] (corrections, diagnostic
+     tables section: getter divides by 80/255, logger rpn assumes 100/255).
+  2. An adder. `0x0BC468` writes target = cruise/non-cruise blend (`0xFFFF90A8`) + f32[`0xFFFF8578`]
+     (= table `0x0AF37C` x factor, all zero -> 0), clamped to the max table, into `0xFFFF8550`.
+     `0x04F2E8` copies it to `0xFFFF8434`; `0x0BC1E0` adds f32[`0xFFFF8798`] and pushes the sum through a
+     0-50 step delay line at `0xFFFF8478`. `0xFFFF8798` is written only by `0x0BD7C0` (`0BD886`): an
+     airflow demand f32[`0xFFFF87B0`] converted to plate at the current rpm (tables `0x0AF1CC`,
+     `0x0AF398` inverted via `0x0BDD9C`, baro factor `0x0AF194` of `0xFFFF6898`), clamped by
+     `0x0F8AEC`/`0x0F8AF0`. It is the idle-airflow plate, added on top of the pedal target always.
+     All of those tables are stock in 20.19e.
+  Check (11-24 20.19e log, ECU units = logged/1.25 vs table x 0.0019073): the residual is flat across
+  target opening at a given rpm (6.3-6.6 at 2500-3000 for targets 0-30) and equals the pedal-off plate
+  at the same rpm (2000-2500 5.33 vs 5.33; 2500-3000 6.55 vs 6.59; 3000-3500 7.07 vs 7.22; 3500-4000
+  7.90 vs 7.84; 4000-5000 9.76 vs 9.41). Rule of thumb: logged Throttle ~= 1.05 x ECUFlash cell +
+  1.25 x idle-air plate (~7 logged points at 2000-2500, ~8 at 2800, ~10 at 3600, ~12-13 at 5000).
+  Rev-to-rev comparisons were unaffected (same adder both sides). Not established: what writes
+  `0xFFFF87B0` and which definition tables set it; whether idle-airflow tables differ from stock.
