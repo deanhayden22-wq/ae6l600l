@@ -1,0 +1,1513 @@
+LAUNCH-CONTROL PATCH CLOSURE: injected code 0x0F1000 and the rev-limit flag update 0x03B668 / 0x03B6B2
+=======================================================================================================
+Date        : 2026-11-27
+Reference   : rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449   (the bin on the car)
+Also decoded: rom/ae5l600l.bin (stock)          md5 a8ea39d447f977e270e27ee670243c88
+Method      : blind trace -- every listing below is scripts/mapping/fn_dump.py output started at the real entry,
+              both bins; semantics settled by scripts/trace/emu_launch_closure.py; names and docs read only afterwards.
+EVIDENCE CLASS: bytes + emulated (132,910 assertions, 0 failures, both bins). Identities of the RAM inputs are NOT
+              settled here: "x" is shorthand for f32 [0xFFFF6624] and "speed"/"spd" for f32 [0xFFFF65FC]; what they
+              physically are is a claim of other files, weighed only in the COMPARISON section. Exactly one input
+              class depends on the FPU rounding mode (two float32 values of x, see N6); nothing else does.
+              Repaired 2026-11-27 after an adversarial review and again after an independent audit; see
+              REVIEW HISTORY at the end (AUDIT subsection).
+
+Lines whose 16-bit word differs between the two bins are marked TUNED / STOCK. scripts/verify_disasm_v2.py checks
+each against whichever ROM it is given and skips the other (bytes differ), so the file verifies against both.
+
+SUMMARY (each point is proved in the sections that follow)
+  * One host routine, 0x03B668, is called from function 0x04AA58 (call at 0x04AAA4) on every run in which
+    int8 [0xFFFF8EDC] == 0; when that byte is non-zero 0x04AA58 returns at 0x04AE62 without calling it, and the
+    same byte also skips the reset path (0x049BA4 -> 0x03B74A) and the channel path (0x04AF88 / 0x04AF9A). It loads
+    x = f32 [0xFFFF6624], tests f32 [0xFFFF65FC] against the window [-1.0, +1.0], updates two hysteresis bytes
+    0xFFFF7CB9 / 0xFFFF7CBA, selects one of them, latches 0xFFFF7CB8 from it, and tail-jumps to 0x03D2FC.
+  * STOCK: inside the window the first byte uses cut/resume [0x0CC508]/[0x0CC50C], outside it [0x0CC500]/[0x0CC504].
+    Both pairs hold 6700.0 / 6650.0 in stock, so the window changes nothing in stock behaviour.
+  * TUNED: five instruction words (0x03B6AE, 0x03B6B0, 0x03B6B8, 0x03B6BA, 0x03B6BC) and two pool longs (0x03B79C,
+    0x03B7A8) are rewritten so that
+    BOTH window outcomes jump to 0x0F1000. The patch adds 2700.0 to x (in fr15) when f32 [0xFFFF65FC] is below
+    K = 8.0515299, loads fr8 = [0x0CC500] and jumps back to 0x03B6B2. Every pass therefore compares against
+    [0x0CC500]/[0x0CC504] = 6700.0/6680.0, and the offset also reaches the second pair [0x0CC510]/[0x0CC514].
+  * The byte [0xFFFF65D0] the patch tests is functionally INERT IN THIS CALIBRATION: both branches add 2700.0
+    exactly when speed < K; above K one branch adds [0x0F1054] and the other [0x0F1048], and both words hold 0.0.
+    They differ only at speed == K bit-exactly and at NaN. A non-zero [0x0F1054] would make the byte matter
+    (proved on a modified in-memory copy).
+  * Tuned trip points with the offset active: set at x >= 4000.0, clear at x < 3980.0 -- for every float32 x except
+    the one float just below each threshold (4000 - 2^-12, 3980 - 2^-12). There the fadd at 0x0F102E is an exact
+    tie: rounded toward zero (the emulator) the byte is not set / is cleared; rounded to nearest it would be set /
+    held. The FPU rounding mode in normal running is not settled (N6), so neither answer is claimed for those two.
+  * No code path found dereferences [0x0CC508] or [0x0CC50C] in 20.19c: no long anywhere in the bin equals
+    0x0CC50C (the stock literal 0x03B7A8 was redirected), and the only long equal to 0x0CC508 (0x03B7A4) has one
+    loader, 0x03B6BC, which is the delay slot of the jmp at 0x03B6BA. Whichever long that slot load reads (the
+    delay-slot PC convention is not settled, N7), r2 is rewritten at 0x0F1030 before anything reads it.
+  * Output: byte [0xFFFF7CB8] == 1 makes 0x03D2FC write word [0xFFFF7D80] = 0xFFFF. A set bit k of that word makes
+    0x03DCB6 return at once for channel k, skipping 0x03DD46, 0x009C00 (-> 0x00A280, a peripheral-register driver)
+    and 0x07CB28. 0x03DC46 drives channels 0..3; 0x009C00 is reached only for a channel whose byte 0x063E34[ch] is 1,
+    which in this table is channels 0..3. Whether those channels are injectors or coils is NOT established from
+    bytes (see NOT ESTABLISHED).
+
+==== FUNCTION 0x03B668 .. 0x03B6B2  (37 instructions, 1 caller) ====
+CONTRACT
+  void, no arguments. Caller: 0x04AA58 (call at 0x04AAA4; 0x04AA58 executes no FPU instruction at all), reached
+          only when int8 [0xFFFF8EDC] == 0 (0x04AA5C..0x04AA64; see CALL SITE). Literal 0x0003B668 occurs only at
+          0x04ACDC in either bin.
+  Reads   f32 [0xFFFF6624] -> fr15, f32 [0xFFFF65FC] -> fr14, f32 [0xFFFF620C] -> fr12,
+          int8 [0xFFFF65C0] -> r13, int8 [0xFFFF5E95] -> r14,
+          via callees: int8 [0xFFFF65C5] (0x022CF4), [0xFFFF971D] (0x0299AC), [0xFFFF971C] (0x0299BC).
+  Saves   r13, r14, pr, fr12, fr14, fr15 and opens a 12-byte frame; these are restored only at 0x03B738..0x03B748.
+  Ends    STOCK: falls through 0x03B6B0 into 0x03B6B2 (moving pair) or branches to 0x03B6B8 (window pair).
+          TUNED: both paths jmp to 0x0F1000 (0x03B6B0 and 0x03B6BA), which comes back at 0x03B6B2.
+MECHANISM
+  fr15 = [0xFFFF6624];  fr14 = [0xFFFF65FC];  fr12 = [0xFFFF620C]
+  @r15     = ([0xFFFF65C5] == 1)                      ; 0/1
+  r13      = int8 [0xFFFF65C0]
+  @(4,r15) = ([0xFFFF971D] != 0) ? 2 : 0
+  @(8,r15) = ([0xFFFF971C] != 0) ? 2 : 0
+  r14      = int8 [0xFFFF5E95]
+  outside  = 0x0BE608(fr4 = fr14, fr5 = 0.0, fr6 = 1.0)  ; 1 when fr14 < -1.0 or fr14 > +1.0; edges and NaN -> 0
+  STOCK:  outside ? (fr8 = [0x0CC500], fr6 = [0x0CC504]) : (fr8 = [0x0CC508], fr6 = [0x0CC50C]);  goto 0x03B6C0
+  TUNED:  goto 0x0F1000 either way. The jmp delay slots (0x03B6B2, 0x03B6BC) load r2: 0x0CC504 / 0x0CC508 if a slot
+          uses its own address as PC (fn_dump's and the emulator's convention), the erased long 0xFFFFFFFF at
+          0x0F10F0 / 0x0F10E8 if it uses the branch target. Dead either way: 0x0F1000..0x0F102E never names r2 and
+          0x0F1030 rewrites it.
+  Edge cases: the window is closed (|v| == 1.0 is inside); NaN is "inside" (both fcmp in 0x0BE608 are false).
+EVIDENCE
+  0x03B678 / 0x03B67C / 0x03B680 load the three floats; 0x03B6A0..0x03B6A6 build the window call; 0x03B6AA tst + 0x03B6AC bt.
+  Stock 0x03B6AE: D23B -> pool 0x03B79C = 0x000CC500; tuned D03B (same pool, r0) with 0x03B79C = 0x000F1000.
+  emulated: scripts/trace/emu_launch_closure.py test_03B668 (main grid: 16 x-values x 9 speeds x 2 flag values x 2
+  start states per bin, fr15/fr8/fr6 captured at 0x03B6C0); stock executes 0x03B6BE (window pair) in 128 runs, tuned in 0.
+LISTING
+03B668: 2FD6  mov.l r13,@-r15                 ; save r13 (reused for byte [0xFFFF65C0])
+03B66A: 2FE6  mov.l r14,@-r15                 ; save r14 (reused for byte [0xFFFF5E95])
+03B66C: 4F22  sts.l pr,@-r15                  ; save pr
+03B66E: FFCB  fmov.s fr12,@-r15               ; save fr12
+03B670: FFEB  fmov.s fr14,@-r15               ; save fr14
+03B672: FFFB  fmov.s fr15,@-r15               ; save fr15
+03B674: 7FF4  add #-12,r15                    ; 12-byte frame: @r15 <- 0x022CF4 result, @(4,r15) <- 0x0299AC, @(8,r15) <- 0x0299BC
+03B676: D240  mov.l @(0x03B778),r2          ; = 0xFFFF6624 RAM
+03B678: FF28  fmov.s @r2,fr15                 ; fr15 = f32 [0xFFFF6624]: the value all four limiter compares use
+03B67A: D240  mov.l @(0x03B77C),r2          ; = 0xFFFF65FC RAM
+03B67C: FE28  fmov.s @r2,fr14                 ; fr14 = f32 [0xFFFF65FC]: argument of the window test at 0x03B6A4
+03B67E: D240  mov.l @(0x03B780),r2          ; = 0xFFFF620C RAM
+03B680: FC28  fmov.s @r2,fr12                 ; fr12 = f32 [0xFFFF620C]: compared with [0x0CC518] at 0x03B730
+03B682: D240  mov.l @(0x03B784),r2          ; = 0x00022CF4 ROM
+03B684: 420B  jsr @r2                       ; -> 0x022CF4  -- r0 = (int8 [0xFFFF65C5] == 1) ? 1 : 0
+03B686: 0009  nop
+03B688: 2F00  mov.b r0,@r15                   ; byte @r15 = that 0/1
+03B68A: D63F  mov.l @(0x03B788),r6          ; = 0xFFFF65C0 RAM
+03B68C: D23F  mov.l @(0x03B78C),r2          ; = 0x000299AC ROM
+03B68E: 420B  jsr @r2                       ; -> 0x0299AC  -- r0 = (byte [0xFFFF971D] != 0) ? 2 : 0
+03B690: 6D60  mov.b @r6,r13                   ; delay slot, runs before the call: r13 = int8 [0xFFFF65C0]
+03B692: D23F  mov.l @(0x03B790),r2          ; = 0x000299BC ROM
+03B694: 420B  jsr @r2                       ; -> 0x0299BC  -- r0 = (byte [0xFFFF971C] != 0) ? 2 : 0
+03B696: 80F4  mov.b r0,@(4,r15)               ; delay slot: byte @(4,r15) = 0x0299AC result (0/2)
+03B698: 80F8  mov.b r0,@(8,r15)               ; byte @(8,r15) = 0x0299BC result (0/2)
+03B69A: D63E  mov.l @(0x03B794),r6          ; = 0xFFFF5E95 RAM
+03B69C: 6E60  mov.b @r6,r14                   ; r14 = int8 [0xFFFF5E95]
+03B69E: D23E  mov.l @(0x03B798),r2          ; = 0x000BE608 ROM
+03B6A0: F4EC  fmov fr14,fr4                   ; fr4 = [0xFFFF65FC]
+03B6A2: F69D  fldi1 fr6                       ; fr6 = 1.0 (half-width)
+03B6A4: 420B  jsr @r2                       ; -> 0x0BE608  -- window test: r0 = 1 if fr4 < fr5-fr6 or fr4 > fr5+fr6 (helpers_arith contract)
+03B6A6: F58D  fldi0 fr5                       ; delay slot: fr5 = 0.0 (centre) -> window [-1.0, +1.0], edges inside
+03B6A8: 620C  extu.b r0,r2                    ; r2 = zero-extended result
+03B6AA: 2228  tst r2,r2                       ; T = (r2 == 0): [0xFFFF65FC] inside [-1,+1] (or NaN)
+03B6AC: 8904  bt 0x03B6B8                     ; T=1 inside -> 0x03B6B8 (second pair in stock);  T=0 outside -> falls through
+; -- TUNED (20.19c) bytes at 0x03B6AE: --
+03B6AE: D03B  mov.l @(0x03B79C),r0          ; = 0x000F1000 CAL  -- TUNED: pool 0x03B79C redirected; stock word here is D23B
+03B6B0: 402B  jmp @r0                       ; -> 0x0F1000  -- TUNED: jump to the patch; slot 0x03B6B2 loads r2 (value depends on the slot PC convention; dead either way: rewritten at 0x0F1030)
+; -- STOCK (ae5l600l.bin) bytes at 0x03B6AE: --
+03B6AE: D23B  mov.l @(0x03B79C),r2          ; = 0x000CC500 CAL  -- STOCK: r2 = 0x0CC500
+03B6B0: F828  fmov.s @r2,fr8                  ; STOCK: fr8 = [0x0CC500] = 6700.0; falls into 0x03B6B2 (moving pair)
+;   pool 0x03B778: .long 0xFFFF6624  RAM
+;   pool 0x03B77C: .long 0xFFFF65FC  RAM
+;   pool 0x03B780: .long 0xFFFF620C  RAM
+;   pool 0x03B784: .long 0x00022CF4  ROM
+;   pool 0x03B788: .long 0xFFFF65C0  RAM
+;   pool 0x03B78C: .long 0x000299AC  ROM
+;   pool 0x03B790: .long 0x000299BC  ROM
+;   pool 0x03B794: .long 0xFFFF5E95  RAM
+;   pool 0x03B798: .long 0x000BE608  ROM
+;   pool 0x03B79C: .long 0x000F1000 in 20.19c, 0x000CC500 in stock
+
+==== FUNCTION 0x0F1000 .. 0x0F1038  (28 instructions, 2 callers) ====
+CONTRACT  (tuned bin only; stock 0x0F1000..0x0F105F is erased 0xFF)
+  Entered by jmp from 0x03B6B0 or 0x03B6BA with fr15 = f32 [0xFFFF6624] and pr = 0x03B6A8, the return address of
+  the jsr 0x0BE608 at 0x03B6A4 (the caller's return address is in the frame, saved at 0x03B66C, reloaded at 0x03B742).
+  in     fr15, f32 [0xFFFF65FC], int8 [0xFFFF65D0]
+  out    fr15 = fr15 + add, spd = f32 [0xFFFF65FC], K = f32 [0x0F104C] (bits 0x4100D311 = 8.0515299)
+           [0xFFFF65D0] == 1 :  add = spd < K  ? [0x0F1050] : [0x0F1054]       (2700.0 : 0.0 in 20.19c)
+           [0xFFFF65D0] != 1 :  add = spd > K  ? [0x0F1048] : [0x0F1050]       (0.0 : 2700.0 in 20.19c)
+         fr8 = [0x0CC500] (6700.0 in both bins)
+  clobbers r0 (= 0x03B6B2), r2 (= 0x0CC500), fr6 (= K), fr8, fr9 (= spd), T. No memory write, no stack use, pr kept.
+  returns  by jmp to 0x03B6B2 -- not rts.
+MECHANISM
+  fr9 = [0xFFFF65FC];  fr6 = K
+  if int8 [0xFFFF65D0] == 1:  add = (K > fr9) ? [0x0F1050] : [0x0F1054]   ; fcmp/gt fr9,fr6 : T = fr6 > fr9
+  else:                       add = (fr9 > K) ? [0x0F1048] : [0x0F1050]   ; fcmp/gt fr6,fr9 : T = fr9 > fr6
+  fr15 += add;  fr8 = [0x0CC500];  goto 0x03B6B2
+  With [0x0F1048] = [0x0F1054] = 0.0 (20.19c) the two branches agree for every speed except spd == K exactly
+  (byte==1 -> 0.0, else 2700.0) and NaN (same split). So in this calibration the byte [0xFFFF65D0] does not gate
+  the offset; the speed alone does. +inf -> 0.0; any negative speed -> 2700.0. Only the byte==1 branch can ever
+  read [0x0F1054] (speed >= K or NaN); only the byte!=1 branch reads [0x0F1048] (speed > K).
+  The offset is added to the COMPARED value, not to the thresholds: the effective trip points become x >= 4000.0
+  (cut, 6700 - 2700) and x < 3980.0 (resume, 6680 - 2700), for BOTH hysteresis bytes (0x03B6C0..0x03B6F2 all use fr15).
+  ROUNDING: near the thresholds x lies in [2048, 4096), where floats are 2^-12 apart, and x + 2700 lies in
+  [4096, 8192), where they are 2^-11 apart. So the fadd is exact when x has no 2^-12 bit (every integer x), and
+  otherwise the sum is an exact tie between two floats. Only two such x can move a compare: x = 4000 - 2^-12 (sum
+  6700 - 2^-12) and x = 3980 - 2^-12 (sum 6680 - 2^-12). Toward zero they give 6699.99951 / 6679.99951 (not set /
+  cleared); to nearest-even they give 6700.0 / 6680.0 (set / held). Exhaustive over every float32 x in
+  [3900, 4096): no other x differs. With no offset (speed above K) fr8 = 0.0 and the fadd is exact.
+WHAT THE HOST RELIES ON AFTERWARDS (each checked)
+  r0   : 0x03B6B2.. writes r0 before every read (0x03B6C4/D0/DE/EE, 0x03B6FA, 0x03B71A, 0x03B71E). Safe.
+  r2   : reloaded at 0x03B6B2, 0x03B6D6, 0x03B6E6, 0x03B72C/0x03B738. Safe.
+  fr6  : reloaded at 0x03B6B6 (delay slot). fr8: the patch supplies [0x0CC500] -- the displaced stock load. Safe.
+  fr9  : not read in 0x03B6B2..0x03B748, nor in 0x03D2FC (integer only), nor in the caller 0x04AA58 (no FPU code).
+         Stock never touched fr9 here; tuned leaves it = speed. Harmless to every reader found, and fr0..fr11 are
+         scratch in this ROM's calling convention (callee-saved fr12..fr15 are what 0x03B668 saves).
+  fr15 : the offset copy is local; 0x03B73C restores the caller's fr15 (emulated: fr12..fr15, r8..r14, r15, pr equal
+         their entry values at 0x03D2FC in every grid case).
+  pr   : 0x03B6A8 throughout the patch (emulated through the host, both window outcomes); nothing between 0x0F1000
+         and 0x03B740 reads pr, and 0x03B742 lds.l reloads the caller's return address from the frame.
+  PC-relative loads in the two jmp delay slots (0x03B6B2, 0x03B6BC) only feed r2, which the patch overwrites, so the
+  delay-slot PC convention cannot change behaviour: slot-address PC reads 0x03B7A0 / 0x03B7A4 (0x0CC504 / 0x0CC508),
+  target-relative PC reads 0x0F10F0 / 0x0F10E8 (erased, 0xFFFFFFFF). 0x0F1000..0x0F102E contains no operand r2.
+  0x03B6B2 also runs as a normal instruction when 0x0F1034 jumps back; that execution feeds fr6 at 0x03B6B6.
+EVIDENCE
+  0x0F100C cmp/eq + 0x0F100E bf/s; 0x0F1012 F695 (n=6, m=9) and 0x0F101E F965 (n=9, m=6); mova targets
+  0x0F104C / 0x0F1054 / 0x0F1050 / 0x0F1048 resolved by fn_dump; 0x0F102E fadd fr8,fr15; 0x0F1034 jmp, 0x0F1036 slot.
+  emulated: test_patch -- 13 speeds (incl. K, both float neighbours of K, -5, +inf, NaN) x flag bytes 0x00/0x01/0x02/0xFF;
+  fr15 offset, fr8, r0, r2, fr6, fr9, untouched registers, no memory writes all asserted. Then 5 speeds x 2 flag
+  values on an in-memory copy with [0x0F1048] = 111.0 and [0x0F1054] = 555.0: byte==1 above K adds 555, byte!=1
+  above K adds 111 -- which word each branch reads is settled, not inferred from the mova encoding alone.
+  emulated: test_rounding_edge -- x in {3980 - 2*2^-12, 3980 - 2^-12, 3980, 4000 - 2*2^-12, 4000 - 2^-12, 4000} x start
+  0/1 x flag 0/1 at speed 0: fr15 at 0x03B6C0 equals the toward-zero sum in every case; the round-to-nearest sum
+  changes b1/b2 exactly at (4000 - 2^-12, start 0) and (3980 - 2^-12, start 1); integer model over every float32 x in
+  [3900, 4096) finds no other such input. static_facts: no operand r2 in 0x0F1000..0x0F102E.
+LISTING
+0F1000: D00D  mov.l @(0x0F1038),r0          ; = 0xFFFF65FC RAM  -- r0 = 0xFFFF65FC
+0F1002: F908  fmov.s @r0,fr9                  ; fr9 = f32 [0xFFFF65FC]
+0F1004: C711  mova @(0x0F104C),r0           ; -> 0x0F104C: long 0x4100D311 f32 8.05153  -- r0 = 0x0F104C
+0F1006: F608  fmov.s @r0,fr6                  ; fr6 = K = f32 bits 0x4100D311 = 8.0515299 (fn_dump prints it rounded)
+0F1008: D00C  mov.l @(0x0F103C),r0          ; = 0xFFFF65D0 RAM  -- r0 = 0xFFFF65D0
+0F100A: 6000  mov.b @r0,r0                    ; r0 = int8 [0xFFFF65D0] (sign-extended)
+0F100C: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+0F100E: 8F06  bf/s 0x0F101E                   ; T=0 (byte != 1) -> 0x0F101E, after the slot
+0F1010: 0009  nop                             ; delay slot
+0F1012: F695  fcmp/gt fr9,fr6                 ; byte == 1 path: T = (fr6 > fr9) = (K > speed)
+0F1014: 8D06  bt/s 0x0F1024                   ; T=1 (speed < K) -> 0x0F1024 (2700.0)
+0F1016: 0009  nop                             ; delay slot
+0F1018: C70E  mova @(0x0F1054),r0           ; -> 0x0F1054: long 0x00000000 f32 0  -- speed >= K or NaN: r0 -> 0x0F1054 (0.0 in 20.19c; a different word from 0x0F1048)
+0F101A: A007  bra 0x0F102C                    ; -> 0x0F102C
+0F101C: 0009  nop                             ; delay slot
+0F101E: F965  fcmp/gt fr6,fr9                 ; byte != 1 path: T = (fr9 > fr6) = (speed > K)
+0F1020: 8D03  bt/s 0x0F102A                   ; T=1 (speed > K) -> 0x0F102A (0.0)
+0F1022: 0009  nop                             ; delay slot
+0F1024: C70A  mova @(0x0F1050),r0           ; -> 0x0F1050: long 0x4528C000 f32 2700  -- reached when speed < K (byte==1) or !(speed > K) (byte!=1): r0 -> 2700.0
+0F1026: A001  bra 0x0F102C                    ; -> 0x0F102C
+0F1028: 0009  nop                             ; delay slot
+0F102A: C707  mova @(0x0F1048),r0           ; -> 0x0F1048: long 0x00000000 f32 0  -- r0 -> 0x0F1048 (0.0)
+0F102C: F808  fmov.s @r0,fr8                  ; fr8 = [0x0F1048], [0x0F1050] or [0x0F1054] = 0.0, 2700.0 or 0.0 in 20.19c
+0F102E: FF80  fadd fr8,fr15                   ; fr15 = fr15 + fr8: the limiter compares see [0xFFFF6624] + 2700 below K
+0F1030: D204  mov.l @(0x0F1044),r2          ; = 0x000CC500 CAL  -- r2 = 0x0CC500
+0F1032: D003  mov.l @(0x0F1040),r0          ; = 0x0003B6B2 ROM  -- r0 = 0x03B6B2
+0F1034: 402B  jmp @r0                       ; -> 0x03B6B2  -- jump back into the host at 0x03B6B2 (pr untouched: still 0x03B6A8 from the jsr at 0x03B6A4; never read, 0x03B742 reloads pr)
+0F1036: F828  fmov.s @r2,fr8                  ; delay slot: fr8 = [0x0CC500] = 6700.0 -- the stock load displaced from 0x03B6B0
+;   pool 0x0F1038: .long 0xFFFF65FC  RAM
+;   pool 0x0F103C: .long 0xFFFF65D0  RAM
+;   pool 0x0F1040: .long 0x0003B6B2  ROM
+;   pool 0x0F1044: .long 0x000CC500  CAL
+;   data 0x0F1048: .long 0x00000000  f32 0.0
+;   data 0x0F104C: .long 0x4100D311  f32 8.0515299
+;   data 0x0F1050: .long 0x4528C000  f32 2700.0
+;   data 0x0F1054: .long 0x00000000  f32 0.0
+;   0x0F1058.. erased 0xFF.  Stock: 0x0F1000..0x0F105F all 0xFF.
+
+==== FUNCTION 0x03B6B2 .. 0x03B74A  (75 instructions, 1 caller) ====
+CONTRACT
+  TUNED: entered only from 0x0F1000 (jmp). STOCK: not an entry -- the fall-through of 0x03B668 (0x03B6B0 -> 0x03B6B2);
+  the stock window path enters at 0x03B6B8 and falls into 0x03B6C0. 75 = 72 printed by fn_dump + the 3 at 0x03B6B8
+  that are reached as a branch target (tuned); stock has 4 there.
+  in     fr15 = x (tuned: + launch offset), fr8 = cut, fr6 = resume (both loaded on the way in),
+         fr12 = [0xFFFF620C], r13 = [0xFFFF65C0], r14 = [0xFFFF5E95], frame bytes @r15 / @(4,r15) / @(8,r15).
+  writes byte [0xFFFF7CB9], [0xFFFF7CBA], [0xFFFF7CB8] (each only on some paths); nothing else.
+  ends   restores the frame of 0x03B668 and tail-jumps to 0x03D2FC.
+MECHANISM
+  b1 = byte [0xFFFF7CB9]:  if !(cut  > x): b1 = 1   elif resume  > x: b1 = 0   else unchanged     ; 0x03B6C0..0x03B6D4
+  b2 = byte [0xFFFF7CBA]:  if !(cut2 > x): b2 = 1   elif resume2 > x: b2 = 0   else unchanged     ; 0x03B6D6..0x03B6F2
+      cut2 = [0x0CC510] = 6700.0, resume2 = [0x0CC514] = 6650.0 stock / 6680.0 tuned
+      NaN x sets the byte (the "cut > x" compare is false).
+  use_b2 = ([0xFFFF65C5] != 1) and ([0xFFFF65C0] == 1 or [0xFFFF971D] != 0)
+                               and ([0xFFFF5E95] == 5 or == 7 or [0xFFFF971C] != 0)                ; 0x03B6F4..0x03B714
+  s = use_b2 ? b2 : b1                          (re-read as int8 then zero-extended; only the value 0x01 counts as set)
+  b0 = byte [0xFFFF7CB8]:  if s == 1: b0 = 1
+                           elif [0x0CC518] (1260.0) > [0xFFFF620C]: b0 = 0
+                           else unchanged                                                        ; 0x03B720..0x03B736
+  So the latched output b0 is SET by the selected hysteresis byte and RELEASED only when that byte is clear AND
+  [0xFFFF620C] < 1260.0. While [0xFFFF620C] >= 1260.0 (or NaN) a set b0 stays set even below the resume point.
+  Effective tuned trip points with the offset active (speed < K): b1/b2 set at x >= 4000.0, clear at x < 3980.0,
+  except at x = 4000 - 2^-12 and x = 3980 - 2^-12, where the result depends on the FPU rounding mode (0x0F1000
+  MECHANISM, ROUNDING; toward zero: not set / cleared; to nearest: set / held).
+  Without the offset: set at x >= 6700.0, clear at x < 6680.0 (tuned) / 6650.0 (stock) -- no rounding involved.
+EVIDENCE
+  Compare senses: 0x03B6C0 F8F5 fcmp/gt fr15,fr8 -> T = fr8 > fr15; 0x03B6CC F6F5 -> T = fr6 > fr15; 0x03B6DA / 0x03B6EA
+  as 0x03B6C0; 0x03B730 F8C5 -> T = fr8 > fr12. Selector compares 0x03B6F6 tst, 0x03B6FC/0x03B702/0x03B708/0x03B70C/
+  0x03B712 cmp/eq. Stores 0x03B6CA, 0x03B6D4 (disp 1), 0x03B6E4, 0x03B6F2 (disp 2), 0x03B72A, 0x03B736 (@r5).
+  emulated: test_03B668 -- 760 cases per bin (main grid, rising/falling sweeps, a 288-case selector grid with b1 != b2,
+  and the b0 rule over [0xFFFF620C] in {0, 1259, 1260, 1261, 5000} and source bytes {0, 1, 2, 0xFF}).
+  Sweep (tuned, speed 0.0, start 0): b1 = 0 up to x = 3999, 1 from 4000. Start 1: still 1 at 3980, 0 at 3979.
+  Sweep (tuned, speed 30.0): set at 6700, kept 6680..6699, clear at 6679. Stock: set 6700, clear 6649, both speeds.
+  (Sweep values are integers, so these sums are exact; the two non-integer tie inputs are covered by
+  test_rounding_edge, see the 0x0F1000 EVIDENCE.)
+LISTING
+03B6B2: D23B  mov.l @(0x03B7A0),r2          ; = 0x000CC504 CAL  -- r2 = 0x0CC504
+03B6B4: A004  bra 0x03B6C0                    ; -> 0x03B6C0
+03B6B6: F628  fmov.s @r2,fr6                  ; delay slot: fr6 = [0x0CC504] resume (stock 6650.0, tuned 6680.0)
+; -- 0x03B6B8 is a branch target of 0x03B6AC, so it is code although fn_dump (started at 0x03B6B2) prints it as pool --
+; -- TUNED (20.19c) bytes at 0x03B6B8: --
+03B6B8: D03B  mov.l @(0x03B7A8),r0          ; = 0x000F1000 CAL  -- TUNED: pool 0x03B7A8 redirected (stock 0x0CC50C); stock word here is D23A
+03B6BA: 402B  jmp @r0                       ; -> 0x0F1000  -- TUNED: jump to the patch (stock: fmov.s @r2,fr8)
+03B6BC: D239  mov.l @(0x03B7A4),r2          ; = 0x000CC508 CAL  -- TUNED jmp delay slot; fn_dump resolves it with the slot's own address as PC (a target-relative PC would read erased 0x0F10E8). DEAD either way: r2 rewritten at 0x0F1030, unread before
+; -- STOCK (ae5l600l.bin) bytes at 0x03B6B8: --
+03B6B8: D23A  mov.l @(0x03B7A4),r2          ; = 0x000CC508 CAL  -- STOCK: r2 = 0x0CC508
+03B6BA: F828  fmov.s @r2,fr8                  ; STOCK: fr8 = [0x0CC508] = 6700.0 cut (window path)
+03B6BC: D23A  mov.l @(0x03B7A8),r2          ; = 0x000CC50C CAL  -- STOCK: r2 = 0x0CC50C
+03B6BE: F628  fmov.s @r2,fr6                  ; same word in both bins. STOCK: fr6 = [0x0CC50C] = 6650.0, falls into 0x03B6C0. TUNED: never executed
+; (fn_dump started at 0x03B6B2 prints 0x03B6B8..0x03B6BF as two pool longs; they are the code listed above, not pool)
+03B6C0: F8F5  fcmp/gt fr15,fr8                ; T = (fr8 > fr15) = (cut > x)
+03B6C2: 8903  bt 0x03B6CC                     ; T=1 (x < cut) -> 0x03B6CC;  T=0 (x >= cut, or NaN): SET
+03B6C4: E001  mov #1,r0                       ; r0 = 1
+03B6C6: D539  mov.l @(0x03B7AC),r5          ; = 0xFFFF7CB8 RAM  -- r5 = 0xFFFF7CB8
+03B6C8: A005  bra 0x03B6D6                    ; -> 0x03B6D6
+03B6CA: 8051  mov.b r0,@(1,r5)                ; delay slot: byte [0xFFFF7CB9] = 1
+03B6CC: F6F5  fcmp/gt fr15,fr6                ; T = (fr6 > fr15) = (resume > x)
+03B6CE: 8B02  bf 0x03B6D6                     ; T=0 (x >= resume) -> 0x03B6D6, byte kept;  T=1 (x < resume): CLEAR
+03B6D0: E000  mov #0,r0                       ; r0 = 0
+03B6D2: D536  mov.l @(0x03B7AC),r5          ; = 0xFFFF7CB8 RAM  -- r5 = 0xFFFF7CB8
+03B6D4: 8051  mov.b r0,@(1,r5)                ; byte [0xFFFF7CB9] = 0
+03B6D6: D236  mov.l @(0x03B7B0),r2          ; = 0x000CC510 CAL  -- r2 = 0x0CC510
+03B6D8: F828  fmov.s @r2,fr8                  ; fr8 = [0x0CC510] = 6700.0 (both bins)
+03B6DA: F8F5  fcmp/gt fr15,fr8                ; T = (fr8 > fr15) = (cut2 > x)
+03B6DC: 8903  bt 0x03B6E6                     ; T=1 -> 0x03B6E6;  T=0 (x >= cut2, or NaN): SET
+03B6DE: E001  mov #1,r0                       ; r0 = 1
+03B6E0: D532  mov.l @(0x03B7AC),r5          ; = 0xFFFF7CB8 RAM  -- r5 = 0xFFFF7CB8
+03B6E2: A007  bra 0x03B6F4                    ; -> 0x03B6F4
+03B6E4: 8052  mov.b r0,@(2,r5)                ; delay slot: byte [0xFFFF7CBA] = 1
+03B6E6: D233  mov.l @(0x03B7B4),r2          ; = 0x000CC514 CAL  -- r2 = 0x0CC514
+03B6E8: F828  fmov.s @r2,fr8                  ; fr8 = [0x0CC514] (stock 6650.0, tuned 6680.0)
+03B6EA: F8F5  fcmp/gt fr15,fr8                ; T = (fr8 > fr15) = (resume2 > x)
+03B6EC: 8B02  bf 0x03B6F4                     ; T=0 -> 0x03B6F4, byte kept;  T=1: CLEAR
+03B6EE: E000  mov #0,r0                       ; r0 = 0
+03B6F0: D52E  mov.l @(0x03B7AC),r5          ; = 0xFFFF7CB8 RAM  -- r5 = 0xFFFF7CB8
+03B6F2: 8052  mov.b r0,@(2,r5)                ; byte [0xFFFF7CBA] = 0
+03B6F4: 65F0  mov.b @r15,r5                   ; r5 = int8 @r15 = (byte [0xFFFF65C5] == 1)
+03B6F6: 2558  tst r5,r5                       ; T = (r5 == 0)
+03B6F8: 8B10  bf 0x03B71C                     ; T=0 ([0xFFFF65C5] == 1) -> 0x03B71C: first byte 0xFFFF7CB9 selected
+03B6FA: 60DC  extu.b r13,r0                   ; r0 = zero-extended byte [0xFFFF65C0]
+03B6FC: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+03B6FE: 8902  bt 0x03B706                     ; T=1 -> 0x03B706
+03B700: 84F4  mov.b @(4,r15),r0               ; r0 = int8 @(4,r15) (0x0299AC result, 0/2)
+03B702: 8802  cmp/eq #2,r0                    ; T = (r0 == 2)
+03B704: 8B0A  bf 0x03B71C                     ; T=0 -> 0x03B71C: first byte selected
+03B706: 60EC  extu.b r14,r0                   ; r0 = zero-extended byte [0xFFFF5E95]
+03B708: 8805  cmp/eq #5,r0                    ; T = (r0 == 5)
+03B70A: 8904  bt 0x03B716                     ; T=1 -> 0x03B716
+03B70C: 8807  cmp/eq #7,r0                    ; T = (r0 == 7)
+03B70E: 8902  bt 0x03B716                     ; T=1 -> 0x03B716
+03B710: 84F8  mov.b @(8,r15),r0               ; r0 = int8 @(8,r15) (0x0299BC result, 0/2)
+03B712: 8802  cmp/eq #2,r0                    ; T = (r0 == 2)
+03B714: 8B02  bf 0x03B71C                     ; T=0 -> 0x03B71C: first byte selected
+03B716: D525  mov.l @(0x03B7AC),r5          ; = 0xFFFF7CB8 RAM  -- r5 = 0xFFFF7CB8
+03B718: A002  bra 0x03B720                    ; -> 0x03B720
+03B71A: 8452  mov.b @(2,r5),r0                ; delay slot: r0 = int8 [0xFFFF7CBA] (second byte selected)
+03B71C: D523  mov.l @(0x03B7AC),r5          ; = 0xFFFF7CB8 RAM  -- r5 = 0xFFFF7CB8
+03B71E: 8451  mov.b @(1,r5),r0                ; r0 = int8 [0xFFFF7CB9] (first byte selected)
+03B720: 600C  extu.b r0,r0                    ; r0 = zero-extended
+03B722: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+03B724: 8B02  bf 0x03B72C                     ; T=0 (selected byte != 1) -> 0x03B72C
+03B726: E201  mov #1,r2                       ; r2 = 1
+03B728: A006  bra 0x03B738                    ; -> 0x03B738
+03B72A: 2520  mov.b r2,@r5                    ; delay slot: byte [0xFFFF7CB8] = 1
+03B72C: D222  mov.l @(0x03B7B8),r2          ; = 0x000CC518 CAL  -- r2 = 0x0CC518
+03B72E: F828  fmov.s @r2,fr8                  ; fr8 = [0x0CC518] = 1260.0 (both bins)
+03B730: F8C5  fcmp/gt fr12,fr8                ; T = (fr8 > fr12) = (1260.0 > [0xFFFF620C])
+03B732: 8B01  bf 0x03B738                     ; T=0 ([0xFFFF620C] >= 1260, or NaN) -> 0x03B738: byte [0xFFFF7CB8] kept
+03B734: E200  mov #0,r2                       ; r2 = 0
+03B736: 2520  mov.b r2,@r5                    ; byte [0xFFFF7CB8] = 0
+03B738: D220  mov.l @(0x03B7BC),r2          ; = 0x0003D2FC ROM  -- r2 = 0x03D2FC
+03B73A: 7F0C  add #12,r15                     ; drop the frame
+03B73C: FFF9  fmov.s @r15+,fr15               ; restore fr15 (the offset copy is discarded here)
+03B73E: FEF9  fmov.s @r15+,fr14               ; restore fr14
+03B740: FCF9  fmov.s @r15+,fr12               ; restore fr12
+03B742: 4F26  lds.l @r15+,pr                  ; restore pr
+03B744: 6EF6  mov.l @r15+,r14                 ; restore r14
+03B746: 422B  jmp @r2                       ; -> 0x03D2FC  -- tail-jump 0x03D2FC (mask combiner); it returns to the caller of 0x03B668
+03B748: 6DF6  mov.l @r15+,r13                 ; delay slot: restore r13
+;   pool 0x03B7A0: .long 0x000CC504  CAL
+;   pool 0x03B7AC: .long 0xFFFF7CB8  RAM
+;   pool 0x03B7B0: .long 0x000CC510  CAL
+;   pool 0x03B7B4: .long 0x000CC514  CAL
+;   pool 0x03B7B8: .long 0x000CC518  CAL
+;   pool 0x03B7BC: .long 0x0003D2FC  ROM
+;   pool 0x03B7A4: .long 0x000CC508  (both bins)
+;   pool 0x03B7A8: .long 0x000F1000 in 20.19c, 0x000CC50C in stock
+
+==== FUNCTION 0x03B74A .. 0x03B76E  (18 instructions, 1 caller) ====
+CONTRACT
+  Caller 0x049BA4 (a different task function from 0x04AA58). If int8 [0xFFFF65F6] == 1: bytes [0xFFFF7CB8],
+  [0xFFFF7CB9], [0xFFFF7CBA] = 0 and tail-jump 0x03D2FC (mask recomputed). Otherwise return with nothing written.
+  This is the only other writer of the three bytes found (pool scan for 0xFFFF7CB8 and find_writers.py, a lower
+  bound; GBR scan: 41 census functions install a GBR within 1020 bytes below 0xFFFF7CB8..7CBA / 0xFFFF7D80, among
+  them 0x03AF88 with GBR 0xFFFF7C80 (+56..+58 would name the bytes); none of their 588 GBR displacement ops and none
+  of their three r0-indexed GBR ops touches them, and the 91 callees that inherit those GBRs hold no GBR op).
+EVIDENCE
+  0x03B754 cmp/eq #1 + 0x03B756 bf; stores 0x03B75C / 0x03B75E / 0x03B760.
+  emulated: test_03B74A ([0xFFFF65F6] in {0,1,2}, both bins).
+LISTING
+03B74A: 4F22  sts.l pr,@-r15                  ; save pr
+03B74C: D21C  mov.l @(0x03B7C0),r2          ; = 0x00022F92 ROM
+03B74E: 420B  jsr @r2                       ; -> 0x022F92  -- r0 = (int8 [0xFFFF65F6] == 1)
+03B750: 0009  nop
+03B752: 600C  extu.b r0,r0                    ; zero-extend
+03B754: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+03B756: 8B07  bf 0x03B768                     ; T=0 -> 0x03B768: return, nothing written
+03B758: E000  mov #0,r0                       ; r0 = 0
+03B75A: D614  mov.l @(0x03B7AC),r6          ; = 0xFFFF7CB8 RAM  -- r6 = 0xFFFF7CB8
+03B75C: 2600  mov.b r0,@r6                    ; byte [0xFFFF7CB8] = 0
+03B75E: 8061  mov.b r0,@(1,r6)                ; byte [0xFFFF7CB9] = 0
+03B760: 8062  mov.b r0,@(2,r6)                ; byte [0xFFFF7CBA] = 0
+03B762: D216  mov.l @(0x03B7BC),r2          ; = 0x0003D2FC ROM  -- r2 = 0x03D2FC
+03B764: 422B  jmp @r2                       ; -> 0x03D2FC  -- tail-jump: the mask is recomputed with the cleared byte
+03B766: 4F26  lds.l @r15+,pr                  ; delay slot: restore pr
+03B768: 4F26  lds.l @r15+,pr                  ; restore pr
+03B76A: 000B  rts                             ; return
+03B76C: 0009  nop
+;   pool 0x03B7AC: .long 0xFFFF7CB8  RAM
+;   pool 0x03B7BC: .long 0x0003D2FC  ROM
+;   pool 0x03B7C0: .long 0x00022F92  ROM
+
+==== FUNCTION 0x022CF4 / 0x0299AC / 0x0299BC / 0x022F92 / 0x02B22C  (5 / 8 / 8 / 5 / 6 instructions; many callers) ====
+CONTRACT
+  0x022CF4: r0 = (int8 [0xFFFF65C5] == 1).          0x022F92: r0 = (int8 [0xFFFF65F6] == 1).
+  0x0299AC: r0 = (byte [0xFFFF971D] != 0) ? 2 : 0.  0x0299BC: r0 = (byte [0xFFFF971C] != 0) ? 2 : 0.
+  0x02B22C: r0 = bit 0 of byte [0xFFFFA17E]. 0x02B238 / 0x02B244 / 0x02B250 are the same six instructions for
+            [0xFFFFA17F] / [0xFFFFA180] / [0xFFFFA181] (pools 0x02B2AC / 0x02B2B0 / 0x02B2B4; dumped, not listed).
+  None writes memory. 0x0299AC/0x0299BC: the bf/s delay slot (mov #2) runs on both paths.
+LISTING
+022CF4: D60C  mov.l @(0x022D28),r6          ; = 0xFFFF65C5 RAM  -- r6 = 0xFFFF65C5
+022CF6: 6060  mov.b @r6,r0                    ; r0 = int8 [0xFFFF65C5]
+022CF8: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+022CFA: 000B  rts
+022CFC: 0029  movt r0                         ; delay slot: r0 = T
+;   pool 0x022D28: .long 0xFFFF65C5  RAM
+0299AC: D633  mov.l @(0x029A7C),r6          ; = 0xFFFF971D RAM
+0299AE: 6260  mov.b @r6,r2                    ; r2 = int8 [0xFFFF971D]
+0299B0: 2228  tst r2,r2                       ; T = (r2 == 0)
+0299B2: 8F01  bf/s 0x0299B8                   ; T=0 (byte != 0) -> 0x0299B8 with r0 = 2
+0299B4: E002  mov #2,r0                       ; delay slot, both paths: r0 = 2
+0299B6: E000  mov #0,r0                       ; byte == 0: r0 = 0
+0299B8: 000B  rts
+0299BA: 0009  nop
+;   pool 0x029A7C: .long 0xFFFF971D  RAM
+0299BC: D630  mov.l @(0x029A80),r6          ; = 0xFFFF971C RAM
+0299BE: 6260  mov.b @r6,r2                    ; r2 = int8 [0xFFFF971C]
+0299C0: 2228  tst r2,r2                       ; T = (r2 == 0)
+0299C2: 8F01  bf/s 0x0299C8                   ; T=0 (byte != 0) -> 0x0299C8 with r0 = 2
+0299C4: E002  mov #2,r0                       ; delay slot, both paths: r0 = 2
+0299C6: E000  mov #0,r0                       ; byte == 0: r0 = 0
+0299C8: 000B  rts
+0299CA: 0009  nop
+;   pool 0x029A80: .long 0xFFFF971C  RAM
+022F92: D617  mov.l @(0x022FF0),r6          ; = 0xFFFF65F6 RAM
+022F94: 6060  mov.b @r6,r0                    ; r0 = int8 [0xFFFF65F6]
+022F96: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+022F98: 000B  rts
+022F9A: 0029  movt r0                         ; delay slot: r0 = T
+;   pool 0x022FF0: .long 0xFFFF65F6  RAM
+02B22C: D61E  mov.l @(0x02B2A8),r6          ; = 0xFFFFA17E RAM
+02B22E: 6060  mov.b @r6,r0                    ; r0 = int8 [0xFFFFA17E]
+02B230: C801  tst #1,r0                       ; T = ((r0 & 1) == 0)
+02B232: 0029  movt r0                         ; r0 = T
+02B234: 000B  rts
+02B236: CA01  xor #1,r0                       ; delay slot: r0 ^= 1 -> r0 = bit 0 of the byte
+;   pool 0x02B2A8: .long 0xFFFFA17E  RAM
+
+==== FUNCTION 0x03D2FC .. 0x03D45A  (175 instructions, 17 callers) ====
+CONTRACT  -- the consumer of byte [0xFFFF7CB8]
+  Inside a critical section (0x00317C with r4 = 0x10 ... 0x003190), computes and stores word [0xFFFF7D80]
+  (when the saved mask is 0, the closing 0x003190 tail-jumps on into the deferred task-switch path 0x003664 --
+  rtos_core contract):
+    0xFFFF  if any of bytes [0xFFFF7CB8], [0xFFFF7CBC], [0xFFFF7CD5], [0xFFFF7CE8], [0xFFFF7CF4], [0xFFFF7D48] == 1
+    else    bit k (k = 0..3) set if any byte of group k == 1, or bit 0 of [0xFFFFA17E + k] is set:
+              group 0: 7CA3 7CE1 7CFA 7D14 7D2F 7D4D     group 1: 7CA4 7CE2 7CFB 7D15 7D30 7D4E
+              group 2: 7CA5 7CE3 7CFC 7D16 7D31 7D4F     group 3: 7CA6 7CE4 7CFD 7D17 7D32 7D50   (all 0xFFFF....)
+            bits 4..15 = 0.
+  The two hysteresis bytes 0xFFFF7CB9 / 0xFFFF7CBA are NOT read here; only the latched b0 is.
+  17 callers tail-jump here after updating their own flag bytes (0x03B6B2 and 0x03B74A among them).
+EVIDENCE
+  0x03D324..0x03D32C: [0xFFFF7CB8] == 1 -> 0x03D448 mov #-1,r14 -> 0x03D44C mov.w r14,@r6 (r6 = 0xFFFF7D80).
+  emulated: test_03D2FC, 14 flag patterns per bin (critical-section calls stubbed; the emulator raises on ldc sr);
+  then, with read tracking, the all-clear path reads exactly 30 flag bytes in 0xFFFF7C90..0xFFFF7D80 (the 6 + 4 x 6
+  listed above) plus bytes 0xFFFFA17E..A181 through the helpers, and each of the 30 set to 1 alone gives 0xFFFF
+  (the six) or 1 << k (group k).
+LISTING
+03D2FC: 2FE6  mov.l r14,@-r15                 ; save r14
+03D2FE: 4F22  sts.l pr,@-r15                  ; save pr
+03D300: 7FF0  add #-16,r15                    ; 16-byte frame
+03D302: D256  mov.l @(0x03D45C),r2          ; = 0x0000317C ROM
+03D304: 420B  jsr @r2                       ; -> 0x00317C  -- critical-section enter (rtos_core contract)
+03D306: E410  mov #16,r4                      ; delay slot: r4 = 0x10, the SR value wanted
+03D308: D255  mov.l @(0x03D460),r2          ; = 0x0002B22C ROM
+03D30A: 420B  jsr @r2                       ; -> 0x02B22C  -- r0 = bit0 [0xFFFFA17E]
+03D30C: 2F02  mov.l r0,@r15                   ; delay slot: @r15 = SR mask returned by 0x00317C
+03D30E: D255  mov.l @(0x03D464),r2          ; = 0x0002B238 ROM
+03D310: 420B  jsr @r2                       ; -> 0x02B238  -- r0 = bit0 [0xFFFFA17F]
+03D312: 80F4  mov.b r0,@(4,r15)               ; delay slot: byte @(4,r15) = bit0 [0xFFFFA17E]
+03D314: D654  mov.l @(0x03D468),r6          ; = 0x0002B244 ROM
+03D316: 460B  jsr @r6                       ; -> 0x02B244  -- r0 = bit0 [0xFFFFA180]
+03D318: 80F8  mov.b r0,@(8,r15)               ; delay slot: byte @(8,r15) = bit0 [0xFFFFA17F]
+03D31A: D454  mov.l @(0x03D46C),r4          ; = 0x0002B250 ROM
+03D31C: 440B  jsr @r4                       ; -> 0x02B250  -- r0 = bit0 [0xFFFFA181]
+03D31E: 80FC  mov.b r0,@(12,r15)              ; delay slot: byte @(12,r15) = bit0 [0xFFFFA180]
+03D320: 640C  extu.b r0,r4                    ; r4 = bit0 [0xFFFFA181]
+03D322: D653  mov.l @(0x03D470),r6          ; = 0xFFFF7CB8 RAM
+03D324: 6060  mov.b @r6,r0                    ; r0 = int8 [0xFFFF7CB8]
+03D326: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+03D328: 8F02  bf/s 0x03D330                   ; T=0 -> 0x03D330
+03D32A: EE00  mov #0,r14                      ; delay slot (both paths): r14 = 0
+03D32C: A08C  bra 0x03D448                    ; [0xFFFF7CB8] == 1 -> 0x03D448: mask = all ones
+03D32E: 0009  nop
+03D330: D650  mov.l @(0x03D474),r6          ; = 0xFFFF7CBC RAM
+03D332: 6060  mov.b @r6,r0                    ; r0 = int8 [0xFFFF7CBC]; == 1 -> 0x03D448
+03D334: 8801  cmp/eq #1,r0
+03D336: 8B01  bf 0x03D33C
+03D338: A086  bra 0x03D448
+03D33A: 0009  nop
+03D33C: D24E  mov.l @(0x03D478),r2          ; = 0xFFFF7CD5 RAM
+03D33E: 6020  mov.b @r2,r0                    ; r0 = int8 [0xFFFF7CD5]; == 1 -> 0x03D448
+03D340: 8801  cmp/eq #1,r0
+03D342: 8B01  bf 0x03D348
+03D344: A080  bra 0x03D448
+03D346: 0009  nop
+03D348: D24C  mov.l @(0x03D47C),r2          ; = 0xFFFF7CE8 RAM
+03D34A: 6020  mov.b @r2,r0                    ; r0 = int8 [0xFFFF7CE8]; == 1 -> 0x03D448
+03D34C: 8801  cmp/eq #1,r0
+03D34E: 897B  bt 0x03D448
+03D350: D24B  mov.l @(0x03D480),r2          ; = 0xFFFF7CF4 RAM
+03D352: 6020  mov.b @r2,r0                    ; r0 = int8 [0xFFFF7CF4]; == 1 -> 0x03D448
+03D354: 8801  cmp/eq #1,r0
+03D356: 8977  bt 0x03D448
+03D358: D24A  mov.l @(0x03D484),r2          ; = 0xFFFF7D48 RAM
+03D35A: 6020  mov.b @r2,r0                    ; r0 = int8 [0xFFFF7D48]; == 1 -> 0x03D448
+03D35C: 8801  cmp/eq #1,r0
+03D35E: 8973  bt 0x03D448
+03D360: D249  mov.l @(0x03D488),r2          ; = 0xFFFF7CA3 RAM
+03D362: 6020  mov.b @r2,r0                    ; bit-0 group: [0xFFFF7CA3] == 1 -> 0x03D396
+03D364: 8801  cmp/eq #1,r0
+03D366: 8916  bt 0x03D396
+03D368: D248  mov.l @(0x03D48C),r2          ; = 0xFFFF7CE1 RAM
+03D36A: 6020  mov.b @r2,r0                    ; [0xFFFF7CE1]
+03D36C: 8801  cmp/eq #1,r0
+03D36E: 8912  bt 0x03D396
+03D370: D647  mov.l @(0x03D490),r6          ; = 0xFFFF7CFA RAM
+03D372: 6060  mov.b @r6,r0                    ; [0xFFFF7CFA]
+03D374: 8801  cmp/eq #1,r0
+03D376: 890E  bt 0x03D396
+03D378: D646  mov.l @(0x03D494),r6          ; = 0xFFFF7D14 RAM
+03D37A: 6060  mov.b @r6,r0                    ; [0xFFFF7D14]
+03D37C: 8801  cmp/eq #1,r0
+03D37E: 890A  bt 0x03D396
+03D380: D645  mov.l @(0x03D498),r6          ; = 0xFFFF7D2F RAM
+03D382: 6060  mov.b @r6,r0                    ; [0xFFFF7D2F]
+03D384: 8801  cmp/eq #1,r0
+03D386: 8906  bt 0x03D396
+03D388: D244  mov.l @(0x03D49C),r2          ; = 0xFFFF7D4D RAM
+03D38A: 6020  mov.b @r2,r0                    ; [0xFFFF7D4D]
+03D38C: 8801  cmp/eq #1,r0
+03D38E: 8902  bt 0x03D396
+03D390: 84F4  mov.b @(4,r15),r0               ; bit0 [0xFFFFA17E]
+03D392: 8801  cmp/eq #1,r0
+03D394: 8B00  bf 0x03D398                     ; T=0 -> 0x03D398, bit 0 stays clear
+03D396: EE01  mov #1,r14                      ; r14 = 1 (bit 0)
+03D398: D641  mov.l @(0x03D4A0),r6          ; = 0xFFFF7CA4 RAM
+03D39A: 6060  mov.b @r6,r0                    ; bit-1 group: [0xFFFF7CA4], 7CE2, 7CFB, 7D15, 7D30, 7D4E, bit0 [A17F]
+03D39C: 8801  cmp/eq #1,r0
+03D39E: 8916  bt 0x03D3CE
+03D3A0: D240  mov.l @(0x03D4A4),r2          ; = 0xFFFF7CE2 RAM
+03D3A2: 6020  mov.b @r2,r0
+03D3A4: 8801  cmp/eq #1,r0
+03D3A6: 8912  bt 0x03D3CE
+03D3A8: D63F  mov.l @(0x03D4A8),r6          ; = 0xFFFF7CFB RAM
+03D3AA: 6060  mov.b @r6,r0
+03D3AC: 8801  cmp/eq #1,r0
+03D3AE: 890E  bt 0x03D3CE
+03D3B0: D23E  mov.l @(0x03D4AC),r2          ; = 0xFFFF7D15 RAM
+03D3B2: 6020  mov.b @r2,r0
+03D3B4: 8801  cmp/eq #1,r0
+03D3B6: 890A  bt 0x03D3CE
+03D3B8: D23D  mov.l @(0x03D4B0),r2          ; = 0xFFFF7D30 RAM
+03D3BA: 6020  mov.b @r2,r0
+03D3BC: 8801  cmp/eq #1,r0
+03D3BE: 8906  bt 0x03D3CE
+03D3C0: D23C  mov.l @(0x03D4B4),r2          ; = 0xFFFF7D4E RAM
+03D3C2: 6020  mov.b @r2,r0
+03D3C4: 8801  cmp/eq #1,r0
+03D3C6: 8902  bt 0x03D3CE
+03D3C8: 84F8  mov.b @(8,r15),r0
+03D3CA: 8801  cmp/eq #1,r0
+03D3CC: 8B01  bf 0x03D3D2
+03D3CE: E002  mov #2,r0                       ; r0 = 2
+03D3D0: 2E0B  or r0,r14                       ; r14 |= 2
+03D3D2: D639  mov.l @(0x03D4B8),r6          ; = 0xFFFF7CA5 RAM
+03D3D4: 6060  mov.b @r6,r0                    ; bit-2 group: [0xFFFF7CA5], 7CE3, 7CFC, 7D16, 7D31, 7D4F, bit0 [A180]
+03D3D6: 8801  cmp/eq #1,r0
+03D3D8: 8916  bt 0x03D408
+03D3DA: D638  mov.l @(0x03D4BC),r6          ; = 0xFFFF7CE3 RAM
+03D3DC: 6060  mov.b @r6,r0
+03D3DE: 8801  cmp/eq #1,r0
+03D3E0: 8912  bt 0x03D408
+03D3E2: D637  mov.l @(0x03D4C0),r6          ; = 0xFFFF7CFC RAM
+03D3E4: 6060  mov.b @r6,r0
+03D3E6: 8801  cmp/eq #1,r0
+03D3E8: 890E  bt 0x03D408
+03D3EA: D636  mov.l @(0x03D4C4),r6          ; = 0xFFFF7D16 RAM
+03D3EC: 6060  mov.b @r6,r0
+03D3EE: 8801  cmp/eq #1,r0
+03D3F0: 890A  bt 0x03D408
+03D3F2: D635  mov.l @(0x03D4C8),r6          ; = 0xFFFF7D31 RAM
+03D3F4: 6060  mov.b @r6,r0
+03D3F6: 8801  cmp/eq #1,r0
+03D3F8: 8906  bt 0x03D408
+03D3FA: D634  mov.l @(0x03D4CC),r6          ; = 0xFFFF7D4F RAM
+03D3FC: 6060  mov.b @r6,r0
+03D3FE: 8801  cmp/eq #1,r0
+03D400: 8902  bt 0x03D408
+03D402: 84FC  mov.b @(12,r15),r0
+03D404: 8801  cmp/eq #1,r0
+03D406: 8B01  bf 0x03D40C
+03D408: E004  mov #4,r0                       ; r0 = 4
+03D40A: 2E0B  or r0,r14                       ; r14 |= 4
+03D40C: D630  mov.l @(0x03D4D0),r6          ; = 0xFFFF7CA6 RAM
+03D40E: 6060  mov.b @r6,r0                    ; bit-3 group: [0xFFFF7CA6], 7CE4, 7CFD, 7D17, 7D32, 7D50, bit0 [A181] (r4)
+03D410: 8801  cmp/eq #1,r0
+03D412: 8916  bt 0x03D442
+03D414: D62F  mov.l @(0x03D4D4),r6          ; = 0xFFFF7CE4 RAM
+03D416: 6060  mov.b @r6,r0
+03D418: 8801  cmp/eq #1,r0
+03D41A: 8912  bt 0x03D442
+03D41C: D62E  mov.l @(0x03D4D8),r6          ; = 0xFFFF7CFD RAM
+03D41E: 6060  mov.b @r6,r0
+03D420: 8801  cmp/eq #1,r0
+03D422: 890E  bt 0x03D442
+03D424: D62D  mov.l @(0x03D4DC),r6          ; = 0xFFFF7D17 RAM
+03D426: 6060  mov.b @r6,r0
+03D428: 8801  cmp/eq #1,r0
+03D42A: 890A  bt 0x03D442
+03D42C: D62C  mov.l @(0x03D4E0),r6          ; = 0xFFFF7D32 RAM
+03D42E: 6060  mov.b @r6,r0
+03D430: 8801  cmp/eq #1,r0
+03D432: 8906  bt 0x03D442
+03D434: D62B  mov.l @(0x03D4E4),r6          ; = 0xFFFF7D50 RAM
+03D436: 6060  mov.b @r6,r0
+03D438: 8801  cmp/eq #1,r0
+03D43A: 8902  bt 0x03D442
+03D43C: 6043  mov r4,r0
+03D43E: 8801  cmp/eq #1,r0
+03D440: 8B03  bf 0x03D44A
+03D442: E008  mov #8,r0                       ; r0 = 8
+03D444: A001  bra 0x03D44A
+03D446: 2E0B  or r0,r14                       ; delay slot: r14 |= 8
+03D448: EEFF  mov #-1,r14                     ; r14 = -1 (0xFFFF in the word)
+03D44A: D627  mov.l @(0x03D4E8),r6          ; = 0xFFFF7D80 RAM  -- r6 = 0xFFFF7D80
+03D44C: 26E1  mov.w r14,@r6                   ; word [0xFFFF7D80] = low 16 bits of r14
+03D44E: D227  mov.l @(0x03D4EC),r2          ; = 0x00003190 ROM
+03D450: 64F2  mov.l @r15,r4                   ; r4 = saved SR mask
+03D452: 7F10  add #16,r15                     ; drop the frame
+03D454: 4F26  lds.l @r15+,pr                  ; restore pr
+03D456: 422B  jmp @r2                       ; -> 0x003190  -- tail-jump: critical-section leave, return to the caller
+03D458: 6EF6  mov.l @r15+,r14                 ; delay slot: restore r14
+;   pool 0x03D45C: .long 0x0000317C  ROM
+;   pool 0x03D460: .long 0x0002B22C  ROM
+;   pool 0x03D464: .long 0x0002B238  ROM
+;   pool 0x03D468: .long 0x0002B244  ROM
+;   pool 0x03D46C: .long 0x0002B250  ROM
+;   pool 0x03D470: .long 0xFFFF7CB8  RAM
+;   pool 0x03D474: .long 0xFFFF7CBC  RAM
+;   pool 0x03D478: .long 0xFFFF7CD5  RAM
+;   pool 0x03D47C: .long 0xFFFF7CE8  RAM
+;   pool 0x03D480: .long 0xFFFF7CF4  RAM
+;   pool 0x03D484: .long 0xFFFF7D48  RAM
+;   pool 0x03D488: .long 0xFFFF7CA3  RAM
+;   pool 0x03D48C: .long 0xFFFF7CE1  RAM
+;   pool 0x03D490: .long 0xFFFF7CFA  RAM
+;   pool 0x03D494: .long 0xFFFF7D14  RAM
+;   pool 0x03D498: .long 0xFFFF7D2F  RAM
+;   pool 0x03D49C: .long 0xFFFF7D4D  RAM
+;   pool 0x03D4A0: .long 0xFFFF7CA4  RAM
+;   pool 0x03D4A4: .long 0xFFFF7CE2  RAM
+;   pool 0x03D4A8: .long 0xFFFF7CFB  RAM
+;   pool 0x03D4AC: .long 0xFFFF7D15  RAM
+;   pool 0x03D4B0: .long 0xFFFF7D30  RAM
+;   pool 0x03D4B4: .long 0xFFFF7D4E  RAM
+;   pool 0x03D4B8: .long 0xFFFF7CA5  RAM
+;   pool 0x03D4BC: .long 0xFFFF7CE3  RAM
+;   pool 0x03D4C0: .long 0xFFFF7CFC  RAM
+;   pool 0x03D4C4: .long 0xFFFF7D16  RAM
+;   pool 0x03D4C8: .long 0xFFFF7D31  RAM
+;   pool 0x03D4CC: .long 0xFFFF7D4F  RAM
+;   pool 0x03D4D0: .long 0xFFFF7CA6  RAM
+;   pool 0x03D4D4: .long 0xFFFF7CE4  RAM
+;   pool 0x03D4D8: .long 0xFFFF7CFD  RAM
+;   pool 0x03D4DC: .long 0xFFFF7D17  RAM
+;   pool 0x03D4E0: .long 0xFFFF7D32  RAM
+;   pool 0x03D4E4: .long 0xFFFF7D50  RAM
+;   pool 0x03D4E8: .long 0xFFFF7D80  RAM
+;   pool 0x03D4EC: .long 0x00003190  ROM
+
+==== FUNCTION 0x03DCB6 .. 0x03DD32  (62 instructions, 2 callers) ====
+CONTRACT  -- a consumer of word [0xFFFF7D80]
+  in  r4 = channel, low byte used (0x03DCDC extu.b): 0..3 from 0x03DC46's loop (r14 = 0..3, 0x03DCA8 cmp/ge r13,r14
+      with r13 = 4); from the pointer-held handler 0x04AF9A it is the first long of a message record (0x04AFA2
+      mov.l @r4,r2 -> 0x04AFAC mov r2,r4), not bounded by these bytes. fr4 = a float.
+  If bit (1 << channel) of word [0xFFFF7D80] is set: return at once (0x03DD46, 0x009C00 and 0x07CB28 all skipped).
+  Otherwise: if int8 [0x063E34 + channel] == 1, call 0x009C00 once (r4 = byte 0x063E30[channel], r5 = trunc(fr4 /
+  0.25)); then bsr 0x03DD46 (byte [0xFFFF7E50] = 1); then call 0x07CB28 (r4 = channel, fr4) -- the last two whatever
+  the 0x063E34 byte is. 0x063E34[ch] == 1 holds for ch 0..3 (table 01 01 01 01 00 0A DF 5C ...), so channels 4..7 skip
+  0x009C00 but still reach 0x03DD46 and 0x07CB28.
+  0x009C00 is a bra to 0x00A280, which (in the part read, 0x00A280..0x00A376) reads word 0xFFFFF440, writes words
+  0xFFFFF666 / 0xFFFFF66A (0x00A340, 0x00A348, 0x00A374) and passes 0xFFFFF66C to 0x00E6E4 -- on-chip peripheral space.
+  So word 0xFFFF7D80 = 0xFFFF suppresses this per-channel output scheduling on all four channels 0..3.
+EVIDENCE
+  0x03DCE6 tst r2,r6 (T = no common bit) + 0x03DCE8 bf/s 0x03DD20. 0x03DCFC mov.b @(r0,r12),r0 with r0 = r13 = 0 and
+  r12 = 0x063E34 + channel, 0x03DCFE cmp/eq #1, 0x03DD00 bf 0x03DD0E (skips the jsr at 0x03DD0A). The loop runs once
+  (r10 = 1 at 0x03DCF8, 0x03DD10 cmp/ge r10,r13: T = r13 >= 1). Tables read from bytes (identical in both bins):
+  0x063DDC = 1,2,4,...,0x8000; 0x063E30 = 00 01 02 03 01 01 01 01; 0x063E34 = 01 01 01 01 00 0A DF 5C.
+  0x00A280 peripheral addresses from fn_dump 0x00A280 (0x00A2A0 / 0x00A2AE, 0x00A2E6, 0x00A304).
+  emulated: test_03DCB6 -- masks 0x0000/0x0001/0x0004/0x00F0/0xFFFF x channels 0..7, both bins: 0x009C00 called exactly
+  when the bit is clear AND byte 0x063E34[ch] == 1, with (r4, r5) = (byte 0x063E30[ch], 4000) for fr4 = 1000.0;
+  0x07CB28 called with (r4, fr4) = (ch, 1000.0) and byte [0xFFFF7E50] = 1 exactly when the bit is clear.
+LISTING
+03DCB6: 2F96  mov.l r9,@-r15
+03DCB8: 2FA6  mov.l r10,@-r15
+03DCBA: 2FB6  mov.l r11,@-r15
+03DCBC: 2FC6  mov.l r12,@-r15
+03DCBE: 2FD6  mov.l r13,@-r15
+03DCC0: 2FE6  mov.l r14,@-r15
+03DCC2: 4F22  sts.l pr,@-r15
+03DCC4: FFEB  fmov.s fr14,@-r15
+03DCC6: FE4C  fmov fr4,fr14                   ; fr14 = fr4 (argument; quantity not established)
+03DCC8: D283  mov.l @(0x03DED8),r2          ; = 0x0003D4F0 ROM
+03DCCA: 420B  jsr @r2                       ; -> 0x03D4F0  -- r0 = word [0xFFFF7D80] (getter 0x03D4F0)
+03DCCC: 6943  mov r4,r9                       ; delay slot: r9 = r4 (channel argument)
+03DCCE: 6603  mov r0,r6                       ; r6 = mask
+03DCD0: F8EC  fmov fr14,fr8
+03DCD2: C782  mova @(0x03DEDC),r0           ; -> 0x03DEDC: long 0x3E800000 f32 0.25
+03DCD4: F908  fmov.s @r0,fr9
+03DCD6: F893  fdiv fr9,fr8                    ; fr8 = fr4 / 0.25
+03DCD8: F83D  ftrc fr8,fpul                   ; FPUL = trunc(fr4 / 0.25)
+03DCDA: D481  mov.l @(0x03DEE0),r4          ; = 0x00063DDC ROM  -- r4 = 0x063DDC: uint16 table, entry i = 1 << i (read from bytes, i = 0..15)
+03DCDC: 699C  extu.b r9,r9                    ; r9 = zero-extended channel
+03DCDE: 6093  mov r9,r0
+03DCE0: 4000  shll r0
+03DCE2: 024D  mov.w @(r0,r4),r2               ; r2 = 1 << channel
+03DCE4: 622D  extu.w r2,r2
+03DCE6: 2628  tst r2,r6                       ; T = ((r2 & mask) == 0)
+03DCE8: 8F1A  bf/s 0x03DD20                   ; T=0 (channel bit SET) -> 0x03DD20: return, 0x009C00, 0x03DD46 and 0x07CB28 not called
+03DCEA: 0E5A  sts fpul,r14                    ; delay slot: r14 = trunc(fr4 / 0.25)
+03DCEC: ED00  mov #0,r13
+03DCEE: DB7D  mov.l @(0x03DEE4),r11         ; = 0x00063E30 ROM
+03DCF0: 3B9C  add r9,r11                      ; r11 = 0x063E30 + channel (bytes 00 01 02 03 for channels 0..3)
+03DCF2: DC7D  mov.l @(0x03DEE8),r12         ; = 0x00063E34 ROM
+03DCF4: 3C9C  add r9,r12                      ; r12 = 0x063E34 + channel (bytes 01 01 01 01 for 0..3, then 00 0A DF 5C)
+03DCF6: A00B  bra 0x03DD10
+03DCF8: EA01  mov #1,r10                      ; delay slot: r10 = 1: the loop runs once
+03DCFA: 60D3  mov r13,r0
+03DCFC: 00CC  mov.b @(r0,r12),r0              ; r0 = int8 [0x063E34 + channel]
+03DCFE: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+03DD00: 8B05  bf 0x03DD0E                     ; T=0 (byte != 1, e.g. channels 4..7) -> 0x03DD0E: 0x009C00 not called
+03DD02: 60D3  mov r13,r0
+03DD04: 04BC  mov.b @(r0,r11),r4              ; r4 = int8 [0x063E30 + channel]
+03DD06: 644C  extu.b r4,r4
+03DD08: D278  mov.l @(0x03DEEC),r2          ; = 0x00009C00 ROM
+03DD0A: 420B  jsr @r2                       ; -> 0x009C00  -- call 0x009C00 = bra 0x00A280 (writes peripheral words 0xFFFFF666 / 0xFFFFF66A)
+03DD0C: 65E3  mov r14,r5                      ; delay slot: r5 = trunc(fr4 / 0.25)
+03DD0E: 7D01  add #1,r13
+03DD10: 3DA3  cmp/ge r10,r13                  ; T = (r13 >= r10) signed
+03DD12: 8BF2  bf 0x03DCFA                     ; T=0 -> loop
+03DD14: B017  bsr 0x03DD46                    ; 0x03DD46: byte [0xFFFF7E50] = 1 (03DD46 mov #1,r2 / 03DD4C mov.b r2,@r6)
+03DD16: 0009  nop
+03DD18: 6493  mov r9,r4
+03DD1A: D275  mov.l @(0x03DEF0),r2          ; = 0x0007CB28 ROM
+03DD1C: 420B  jsr @r2                       ; -> 0x07CB28  -- call 0x07CB28 (r4 = channel, fr4 = argument)
+03DD1E: F4EC  fmov fr14,fr4
+03DD20: FEF9  fmov.s @r15+,fr14
+03DD22: 4F26  lds.l @r15+,pr
+03DD24: 6EF6  mov.l @r15+,r14
+03DD26: 6DF6  mov.l @r15+,r13
+03DD28: 6CF6  mov.l @r15+,r12
+03DD2A: 6BF6  mov.l @r15+,r11
+03DD2C: 6AF6  mov.l @r15+,r10
+03DD2E: 000B  rts
+03DD30: 69F6  mov.l @r15+,r9
+;   pool 0x03DED8: .long 0x0003D4F0  ROM
+;   pool 0x03DEE0: .long 0x00063DDC  ROM
+;   pool 0x03DEE4: .long 0x00063E30  ROM
+;   pool 0x03DEE8: .long 0x00063E34  ROM
+;   pool 0x03DEEC: .long 0x00009C00  ROM
+;   pool 0x03DEF0: .long 0x0007CB28  ROM
+
+==== FUNCTION 0x03DB16 .. 0x03DBF4  (111 instructions, 1 caller)  -- excerpt ====
+  The other code consumer of the mask (through getter 0x03D4F0; the third getter caller 0x03D856 compares it with a
+  saved copy at 0x03D9A6..0x03D9BA). For each of four 40-byte records at 0xFFFF7DA8 it stores byte record+1 =
+  (mask has bit (1 << byte record+12)). Not decoded beyond this point.
+LISTING
+03DB3E: D24F  mov.l @(0x03DC7C),r2          ; = 0x0003D4F6 ROM
+03DB40: 420B  jsr @r2                       ; -> 0x03D4F6
+03DB42: 4A00  shll r10
+03DB44: DE4E  mov.l @(0x03DC80),r14         ; = 0xFFFF7E51 RAM
+03DB46: D24F  mov.l @(0x03DC84),r2          ; = 0x0003D4F0 ROM
+03DB48: 420B  jsr @r2                       ; -> 0x03D4F0  -- r0 = word [0xFFFF7D80]
+03DB4A: 2E00  mov.b r0,@r14                   ; delay slot: byte [0xFFFF7E51] = 0x03D4F6 result
+03DB4C: D74E  mov.l @(0x03DC88),r7          ; = 0xFFFF7E52 RAM
+03DB4E: 2701  mov.w r0,@r7                    ; word [0xFFFF7E52] = copy of the mask
+03DB50: D94E  mov.l @(0x03DC8C),r9          ; = 0xFFFF7DA8 RAM  -- r9 = 0xFFFF7DA8: four 40-byte records (loop ends at r9 + 160, 0x03DBD8..0x03DBDE)
+03DB52: 6B93  mov r9,r11
+03DB54: A040  bra 0x03DBD8
+03DB56: E802  mov #2,r8
+03DB58: 55B2  mov.l @(8,r11),r5
+03DB5A: B111  bsr 0x03DD80
+03DB5C: 64A3  mov r10,r4
+03DB5E: 6D03  mov r0,r13
+03DB60: E000  mov #0,r0
+03DB62: 80B7  mov.b r0,@(7,r11)
+03DB64: D63D  mov.l @(0x03DC5C),r6          ; = 0x00063DFC ROM
+03DB66: DE46  mov.l @(0x03DC80),r14         ; = 0xFFFF7E51 RAM
+03DB68: 62E0  mov.b @r14,r2
+03DB6A: 602C  extu.b r2,r0
+03DB6C: 026C  mov.b @(r0,r6),r2
+03DB6E: 2B20  mov.b r2,@r11
+03DB70: D745  mov.l @(0x03DC88),r7          ; = 0xFFFF7E52 RAM
+03DB72: 6671  mov.w @r7,r6                    ; r6 = mask copy
+03DB74: D43A  mov.l @(0x03DC60),r4          ; = 0x00063DDC ROM
+03DB76: 84BC  mov.b @(12,r11),r0              ; r0 = byte record+12 (channel number)
+03DB78: 600C  extu.b r0,r0
+03DB7A: 4000  shll r0
+03DB7C: 024D  mov.w @(r0,r4),r2               ; r2 = 1 << channel (0x063DDC)
+03DB7E: 622D  extu.w r2,r2
+03DB80: 2628  tst r2,r6                       ; T = ((r2 & mask) == 0)
+03DB82: 8D01  bt/s 0x03DB88                   ; T=1 -> 0x03DB88 with r0 = 0
+03DB84: E000  mov #0,r0
+03DB86: E001  mov #1,r0                       ; bit set: r0 = 1
+03DB88: 80B1  mov.b r0,@(1,r11)               ; byte record+1 = r0
+;   pool 0x03DC60: .long 0x00063DDC  ROM
+;   pool 0x03DC84: .long 0x0003D4F0  ROM
+;   pool 0x03DC88: .long 0xFFFF7E52  RAM
+;   pool 0x03DC8C: .long 0xFFFF7DA8  RAM
+
+==== FUNCTION 0x015624 .. 0x015672  (39 instructions, 1 caller) ====
+CONTRACT  -- the other direct reader of word [0xFFFF7D80]
+  count = number of set bits among bits 0..15 (mask table 0x063668 = 1 << i).
+  byte [0xFFFF5DDD] = (count >= 4);  byte [0xFFFF5DDE] = (2 <= count < 4).  Mask 0xFFFF -> (1, 0).
+EVIDENCE
+  0x015648 cmp/ge r14,r2: T = r2 >= 16; 0x015650 / 0x01565A cmp/ge: T = count >= 4 / >= 2. emulated: test_015624.
+LISTING
+015624: 2FE6  mov.l r14,@-r15
+015626: D263  mov.l @(0x0157B4),r2          ; = 0xFFFF7D80 RAM
+015628: 6721  mov.w @r2,r7                    ; r7 = word [0xFFFF7D80]
+01562A: E100  mov #0,r1                       ; r1 = 0 (count)
+01562C: 6513  mov r1,r5
+01562E: 6413  mov r1,r4
+015630: A009  bra 0x015646
+015632: EE10  mov #16,r14                     ; delay slot: r14 = 16
+015634: D660  mov.l @(0x0157B8),r6          ; = 0x00063668 ROM  -- r6 = 0x063668: uint16 table, entry i = 1 << i
+015636: 6043  mov r4,r0
+015638: 026D  mov.w @(r0,r6),r2               ; r2 = 1 << i
+01563A: 622D  extu.w r2,r2
+01563C: 2728  tst r2,r7                       ; T = ((r2 & r7) == 0)
+01563E: 8900  bt 0x015642
+015640: 7101  add #1,r1                       ; count++ when bit i is set
+015642: 7501  add #1,r5
+015644: 7402  add #2,r4
+015646: 625C  extu.b r5,r2
+015648: 32E3  cmp/ge r14,r2                   ; T = (i >= 16) signed
+01564A: 8BF3  bf 0x015634                     ; T=0 -> loop
+01564C: 621C  extu.b r1,r2
+01564E: E604  mov #4,r6
+015650: 3263  cmp/ge r6,r2                    ; T = (count >= 4)
+015652: 8B01  bf 0x015658                     ; T=0 -> 0x015658
+015654: A006  bra 0x015664
+015656: E601  mov #1,r6                       ; delay slot: r6 = 1 (count >= 4)
+015658: E502  mov #2,r5
+01565A: 3253  cmp/ge r5,r2                    ; T = (count >= 2)
+01565C: 8F02  bf/s 0x015664                   ; T=0 -> 0x015664 (r6 = 0, r2 = 0)
+01565E: E600  mov #0,r6                       ; delay slot, both paths: r6 = 0
+015660: A001  bra 0x015666
+015662: E201  mov #1,r2                       ; delay slot: r2 = 1 (2 <= count < 4)
+015664: E200  mov #0,r2                       ; r2 = 0
+015666: D455  mov.l @(0x0157BC),r4          ; = 0xFFFF5DDD RAM
+015668: 2460  mov.b r6,@r4                    ; byte [0xFFFF5DDD] = r6 (count >= 4)
+01566A: 6023  mov r2,r0
+01566C: 8041  mov.b r0,@(1,r4)                ; byte [0xFFFF5DDE] = r2 (2 <= count < 4)
+01566E: 000B  rts
+015670: 6EF6  mov.l @r15+,r14
+;   pool 0x0157B4: .long 0xFFFF7D80  RAM
+;   pool 0x0157B8: .long 0x00063668  ROM
+;   pool 0x0157BC: .long 0xFFFF5DDD  RAM
+
+==== FUNCTION 0x03D4F0 / 0x03B76E / 0x03AAA4  (3 / 5 / 49 instructions) ====
+CONTRACT
+  0x03D4F0: r0 = int16 word [0xFFFF7D80]. Callers 0x03D856, 0x03DB16, 0x03DCB6.
+  0x03B76E: r0 = (int8 [0xFFFF7CB8] == 1). Caller 0x026CF4 (excerpt below: b0 == 1 clears bit 5 of [0xFFFF6A29]).
+  0x03AAA4: byte [0xFFFF7C68] = 1 if any of 0xFFFF7C9D, 7CB8, 7CBC, 7CD5, 7CE5, 7CE8, 7CF4, 7CF9, 7D11, 7D2E, 7D48
+            equals 1, else 0. Called from 0x04AA58 at 0x04AAB6, after 0x03B668. Readers of 0xFFFF7C68 not decoded.
+LISTING
+03D4F0: D270  mov.l @(0x03D6B4),r2          ; = 0xFFFF7D80 RAM
+03D4F2: 000B  rts
+03D4F4: 6021  mov.w @r2,r0                    ; delay slot: r0 = int16 word [0xFFFF7D80]
+;   pool 0x03D6B4: .long 0xFFFF7D80  RAM
+03B76E: D60F  mov.l @(0x03B7AC),r6          ; = 0xFFFF7CB8 RAM
+03B770: 6060  mov.b @r6,r0                    ; r0 = int8 [0xFFFF7CB8]
+03B772: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+03B774: 000B  rts
+03B776: 0029  movt r0                         ; delay slot: r0 = T
+;   pool 0x03B7AC: .long 0xFFFF7CB8  RAM
+03AAA4: D621  mov.l @(0x03AB2C),r6          ; = 0xFFFF7C9D RAM
+03AAA6: 6060  mov.b @r6,r0                    ; r0 = int8 [0xFFFF7C9D]; == 1 -> 0x03AAFE
+03AAA8: 8801  cmp/eq #1,r0
+03AAAA: 8928  bt 0x03AAFE
+03AAAC: D620  mov.l @(0x03AB30),r6          ; = 0xFFFF7CB8 RAM
+03AAAE: 6060  mov.b @r6,r0                    ; r0 = int8 [0xFFFF7CB8]; == 1 -> 0x03AAFE
+03AAB0: 8801  cmp/eq #1,r0
+03AAB2: 8924  bt 0x03AAFE
+03AAB4: D61F  mov.l @(0x03AB34),r6          ; = 0xFFFF7CBC RAM
+03AAB6: 6060  mov.b @r6,r0
+03AAB8: 8801  cmp/eq #1,r0
+03AABA: 8920  bt 0x03AAFE
+03AABC: D61E  mov.l @(0x03AB38),r6          ; = 0xFFFF7CD5 RAM
+03AABE: 6060  mov.b @r6,r0
+03AAC0: 8801  cmp/eq #1,r0
+03AAC2: 891C  bt 0x03AAFE
+03AAC4: D61D  mov.l @(0x03AB3C),r6          ; = 0xFFFF7CE5 RAM
+03AAC6: 6060  mov.b @r6,r0
+03AAC8: 8801  cmp/eq #1,r0
+03AACA: 8918  bt 0x03AAFE
+03AACC: D61C  mov.l @(0x03AB40),r6          ; = 0xFFFF7CE8 RAM
+03AACE: 6060  mov.b @r6,r0
+03AAD0: 8801  cmp/eq #1,r0
+03AAD2: 8914  bt 0x03AAFE
+03AAD4: D61B  mov.l @(0x03AB44),r6          ; = 0xFFFF7CF4 RAM
+03AAD6: 6060  mov.b @r6,r0
+03AAD8: 8801  cmp/eq #1,r0
+03AADA: 8910  bt 0x03AAFE
+03AADC: D61A  mov.l @(0x03AB48),r6          ; = 0xFFFF7CF9 RAM
+03AADE: 6060  mov.b @r6,r0
+03AAE0: 8801  cmp/eq #1,r0
+03AAE2: 890C  bt 0x03AAFE
+03AAE4: D619  mov.l @(0x03AB4C),r6          ; = 0xFFFF7D11 RAM
+03AAE6: 6060  mov.b @r6,r0
+03AAE8: 8801  cmp/eq #1,r0
+03AAEA: 8908  bt 0x03AAFE
+03AAEC: D618  mov.l @(0x03AB50),r6          ; = 0xFFFF7D2E RAM
+03AAEE: 6060  mov.b @r6,r0
+03AAF0: 8801  cmp/eq #1,r0
+03AAF2: 8904  bt 0x03AAFE
+03AAF4: D617  mov.l @(0x03AB54),r6          ; = 0xFFFF7D48 RAM
+03AAF6: 6060  mov.b @r6,r0
+03AAF8: 8801  cmp/eq #1,r0
+03AAFA: 8F01  bf/s 0x03AB00                   ; T=0 (none of the eleven == 1) -> 0x03AB00 with r2 = 0
+03AAFC: E200  mov #0,r2                       ; delay slot: r2 = 0
+03AAFE: E201  mov #1,r2                       ; r2 = 1 (some byte == 1)
+03AB00: D615  mov.l @(0x03AB58),r6          ; = 0xFFFF7C68 RAM
+03AB02: 000B  rts
+03AB04: 2620  mov.b r2,@r6                    ; delay slot: byte [0xFFFF7C68] = r2
+;   pool 0x03AB2C: .long 0xFFFF7C9D  RAM
+;   pool 0x03AB30: .long 0xFFFF7CB8  RAM
+;   pool 0x03AB34: .long 0xFFFF7CBC  RAM
+;   pool 0x03AB38: .long 0xFFFF7CD5  RAM
+;   pool 0x03AB3C: .long 0xFFFF7CE5  RAM
+;   pool 0x03AB40: .long 0xFFFF7CE8  RAM
+;   pool 0x03AB44: .long 0xFFFF7CF4  RAM
+;   pool 0x03AB48: .long 0xFFFF7CF9  RAM
+;   pool 0x03AB4C: .long 0xFFFF7D11  RAM
+;   pool 0x03AB50: .long 0xFFFF7D2E  RAM
+;   pool 0x03AB54: .long 0xFFFF7D48  RAM
+;   pool 0x03AB58: .long 0xFFFF7C68  RAM
+
+==== FUNCTION 0x026CF4 .. 0x026E06  (137 instructions, 1 caller)  -- excerpt, audit addition ====
+CONTRACT  -- the consumer of getter 0x03B76E (b0 = byte [0xFFFF7CB8])
+  GBR = 0xFFFF6A29 for the whole body (set once, 0x026D0A; saved at 0x026D06 and restored at 0x026DF0). Every exit
+  but one ends at 0x026DEA: r0 = 0, and.b #223,@(r0,gbr) -- bit 5 of byte [0xFFFF6A29] := 0. The one other exit,
+  0x026DE4..0x026DE8, sets that bit (or.b #32,@(r0,gbr), r0 = 0) and is reached only when every test passes. The
+  test on b0 is byte @(8,r15) = the 0x03B76E result (0x026D3A, in the jsr 0x029828 delay slot); 0x026D96..0x026D9A
+  branches to 0x026DEA when it is non-zero. So b0 == 1 forces bit 5 of [0xFFFF6A29] to 0 on every pass of 0x026CF4,
+  and the bit can be 1 only while b0 != 1. The other tests (byte [0xFFFF726C] via 0x02F8EA, f32 [0xFFFF6350] against
+  [0x0C4200] = -40.0, bit 7 of [0xFFFF6A29], 0x0BE608 on f32 [0xFFFF798C], bytes [0xFFFF6A4D] / [0xFFFF6A4E] /
+  [0xFFFF7C9D] / [0xFFFF970B] / [0x0C41D2] / [0xFFFF69E8] / [0xFFFF6A51], table 0x0AB1B8 (uint16, all 0) against
+  f32 [0xFFFF620C], word [0xFFFF67EA] and f32 [0xFFFF6354] against [0x0C41E0] / [0x0C41E2] / [0x0C4204]) are read
+  from the bytes but not decoded further here. The only RAM write is byte [0xFFFF6A29] (emulated). What bit 5 of
+  [0xFFFF6A29] does, and who reads it: NOT established (N3).
+EVIDENCE
+  emulated: test_026CF4, both bins -- with every other test passing: b0 = 0, 2, 0xFF -> bit 5 set; b0 = 1 -> bit 5
+  clear (from 0x00 and from 0x7F); b0 = 1 with any of five other tests failing -> clear. Write set = {0xFFFF6A29}.
+LISTING
+026D08: D07B  mov.l @(0x026EF8),r0          ; = 0xFFFF6A29 RAM
+026D0A: 401E  ldc r0,gbr                    ; GBR = 0xFFFF6A29
+026D2E: D67A  mov.l @(0x026F18),r6          ; = 0xFFFF7C9D RAM
+026D30: D27A  mov.l @(0x026F1C),r2          ; = 0x0003B76E ROM
+026D32: 420B  jsr @r2                       ; -> 0x03B76E  -- r0 = (int8 [0xFFFF7CB8] == 1)
+026D34: 6E60  mov.b @r6,r14                   ; delay slot: r14 = int8 [0xFFFF7C9D]
+026D36: D57A  mov.l @(0x026F20),r5          ; = 0x00029828 ROM
+026D38: 450B  jsr @r5                       ; -> 0x029828
+026D3A: 80F8  mov.b r0,@(8,r15)               ; delay slot: byte @(8,r15) = b0 test result (0/1)
+026D3C: 80FC  mov.b r0,@(12,r15)              ; byte @(12,r15) = 0x029828 result
+026D96: 84F8  mov.b @(8,r15),r0               ; r0 = b0 test result
+026D98: 2008  tst r0,r0                       ; T = (r0 == 0)
+026D9A: 8B26  bf 0x026DEA                     ; T=0 (b0 == 1) -> 0x026DEA: bit 5 cleared
+026DE4: E000  mov #0,r0                       ; every test passed: r0 = 0
+026DE6: A002  bra 0x026DEE
+026DE8: CF20  or.b #32,@(r0,gbr)              ; delay slot: byte [0xFFFF6A29] |= 0x20
+026DEA: E000  mov #0,r0                       ; any test failed (b0 == 1 among them): r0 = 0
+026DEC: CDDF  and.b #223,@(r0,gbr)            ; byte [0xFFFF6A29] &= 0xDF
+;   pool 0x026EF8: .long 0xFFFF6A29  RAM
+;   pool 0x026F18: .long 0xFFFF7C9D  RAM
+;   pool 0x026F1C: .long 0x0003B76E  ROM
+;   pool 0x026F20: .long 0x00029828  ROM
+
+==== FUNCTION 0x016102 .. 0x016142  (32 instructions, 1 caller) ====
+CONTRACT  -- the only other reader of cal 0x0CC504
+  byte [0xFFFF5D85] = 1 iff the low byte of 0x058524's r0 == 0 (stored at 0x016110, re-read at 0x01611A) and the low
+  byte of 0x02B220's r0 == 0 (0x016120 extu.b) and [0x0CC504] > f32 [0xFFFF6624] and
+  int8 [0xFFFF6155] == 0; else 0. The launch offset does not reach this compare (it reads [0xFFFF6624] directly),
+  but the tune's 6650 -> 6680 change of [0x0CC504] does.
+EVIDENCE  0x01612A F985 fcmp/gt fr8,fr9: T = fr9 > fr8. emulated: test_016102 (callees stubbed).
+LISTING
+016102: 4F22  sts.l pr,@-r15
+016104: 7FFC  add #-4,r15
+016106: D221  mov.l @(0x01618C),r2          ; = 0x00058524 ROM
+016108: 420B  jsr @r2                       ; -> 0x058524  -- call 0x058524
+01610A: 0009  nop
+01610C: D620  mov.l @(0x016190),r6          ; = 0x0002B220 ROM
+01610E: 460B  jsr @r6                       ; -> 0x02B220
+016110: 2F00  mov.b r0,@r15                   ; delay slot: byte @r15 = 0x058524 result
+016112: D520  mov.l @(0x016194),r5          ; = 0xFFFF6155 RAM
+016114: 6550  mov.b @r5,r5                    ; r5 = int8 [0xFFFF6155]
+016116: D220  mov.l @(0x016198),r2          ; = 0xFFFF6624 RAM
+016118: F828  fmov.s @r2,fr8                  ; fr8 = f32 [0xFFFF6624] (no launch offset on this path)
+01611A: 62F0  mov.b @r15,r2
+01611C: 2228  tst r2,r2                       ; T = (0x058524 result == 0)
+01611E: 8F0A  bf/s 0x016136                   ; T=0 -> r2 = 0
+016120: 660C  extu.b r0,r6                    ; delay slot: r6 = zero-extended 0x02B220 result
+016122: 2668  tst r6,r6                       ; T = (r6 == 0)
+016124: 8B07  bf 0x016136                     ; T=0 -> r2 = 0
+016126: D21D  mov.l @(0x01619C),r2          ; = 0x000CC504 CAL
+016128: F928  fmov.s @r2,fr9                  ; fr9 = [0x0CC504] (stock 6650.0, tuned 6680.0)
+01612A: F985  fcmp/gt fr8,fr9                 ; T = (fr9 > fr8) = ([0x0CC504] > [0xFFFF6624])
+01612C: 8B03  bf 0x016136                     ; T=0 -> r2 = 0
+01612E: 2558  tst r5,r5                       ; T = ([0xFFFF6155] == 0)
+016130: 8B01  bf 0x016136                     ; T=0 -> r2 = 0
+016132: A001  bra 0x016138
+016134: E201  mov #1,r2                       ; delay slot: r2 = 1
+016136: E200  mov #0,r2                       ; r2 = 0
+016138: D619  mov.l @(0x0161A0),r6          ; = 0xFFFF5D85 RAM
+01613A: 7F04  add #4,r15
+01613C: 4F26  lds.l @r15+,pr
+01613E: 000B  rts
+016140: 2620  mov.b r2,@r6                    ; delay slot: byte [0xFFFF5D85] = r2
+;   pool 0x01618C: .long 0x00058524  ROM
+;   pool 0x016190: .long 0x0002B220  ROM
+;   pool 0x016194: .long 0xFFFF6155  RAM
+;   pool 0x016198: .long 0xFFFF6624  RAM
+;   pool 0x01619C: .long 0x000CC504  CAL
+;   pool 0x0161A0: .long 0xFFFF5D85  RAM
+
+==== WRITER OF 0xFFFF65D0  (excerpt of FUNCTION 0x022760 .. 0x022B9E, 498 instructions) ====
+  Byte [0xFFFF65D0] is written only here (GBR-relative, GBR = 0xFFFF65AA; find_writers.py and a census GBR scan):
+    := 1  if [0xFFFF65C5] == 1 and local == 1 and byte [0x0C3040] != 0xFF        (0x022B52)
+    := 0  if [0xFFFF65C5] == 0, or local == 0 and [0xFFFF65E1] >= [0x0C3040]     (0x022B6A)
+    else kept. [0xFFFF65E1] counts up (saturating) while local == 0 and is zeroed while local != 0.
+  i.e. a hold-off latch of ([0xFFFF65C5] == 1 and local == 1). The local (@(8,r15) of 0x022760) is not traced. Because
+  the patch's result does not depend on this byte (above), its meaning does not affect the rev-limit decision.
+LISTING
+; GBR is set once in 0x022760: 0xFFFF65AA (fn_dump started at the entry)
+022B22: 84F8  mov.b @(8,r15),r0               ; r0 = int8 @(8,r15): a local of 0x022760, not traced here
+022B24: 6E0C  extu.b r0,r14                   ; r14 = zero-extended local
+022B26: 2EE8  tst r14,r14                     ; T = (r14 == 0)
+022B28: 8F05  bf/s 0x022B36                   ; T=0 (local != 0) -> 0x022B36 with r0 = 0
+022B2A: E000  mov #0,r0
+022B2C: D238  mov.l @(0x022C10),r2          ; = 0x000BE53C ROM
+022B2E: E501  mov #1,r5
+022B30: C437  mov.b @(55,gbr),r0            ; gbr+55 = 0xFFFF65E1
+022B32: 420B  jsr @r2                       ; -> 0x0BE53C  -- local == 0: r0 = saturating u8 add([0xFFFF65E1], 1)
+022B34: 640C  extu.b r0,r4
+022B36: C037  mov.b r0,@(55,gbr)            ; gbr+55 = 0xFFFF65E1  -- byte [0xFFFF65E1] = r0: counter, reset while the local is non-zero
+022B38: C41B  mov.b @(27,gbr),r0            ; gbr+27 = 0xFFFF65C5  -- r0 = int8 [0xFFFF65C5]
+022B3A: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+022B3C: 8B0A  bf 0x022B54                     ; T=0 -> 0x022B54
+022B3E: 60E3  mov r14,r0
+022B40: 8801  cmp/eq #1,r0                    ; T = (local == 1)
+022B42: 8B07  bf 0x022B54                     ; T=0 -> 0x022B54
+022B44: D533  mov.l @(0x022C14),r5          ; = 0x000C3040 CAL
+022B46: 6250  mov.b @r5,r2                    ; r2 = int8 [0x0C3040] (7 in both bins)
+022B48: E6FF  mov #-1,r6
+022B4A: 3260  cmp/eq r6,r2                    ; T = (r2 == -1), i.e. byte 0xFF
+022B4C: 8902  bt 0x022B54                     ; T=1 -> 0x022B54
+022B4E: E001  mov #1,r0
+022B50: A00C  bra 0x022B6C                    ; -> 0x022B6C
+022B52: C026  mov.b r0,@(38,gbr)            ; gbr+38 = 0xFFFF65D0  -- delay slot: byte [0xFFFF65D0] = 1
+022B54: C41B  mov.b @(27,gbr),r0            ; gbr+27 = 0xFFFF65C5
+022B56: 2008  tst r0,r0                       ; T = ([0xFFFF65C5] == 0)
+022B58: 8906  bt 0x022B68                     ; T=1 -> 0x022B68: clear
+022B5A: 2EE8  tst r14,r14
+022B5C: 8B06  bf 0x022B6C                     ; T=0 (local != 0) -> 0x022B6C: kept
+022B5E: C437  mov.b @(55,gbr),r0            ; gbr+55 = 0xFFFF65E1  -- r0 = int8 [0xFFFF65E1]
+022B60: D52C  mov.l @(0x022C14),r5          ; = 0x000C3040 CAL
+022B62: 6250  mov.b @r5,r2
+022B64: 3022  cmp/hs r2,r0                    ; T = (r0 >= r2) unsigned compare of the sign-extended bytes
+022B66: 8B01  bf 0x022B6C                     ; T=0 (counter below [0x0C3040]) -> 0x022B6C: kept
+022B68: E000  mov #0,r0                       ; r0 = 0
+022B6A: C026  mov.b r0,@(38,gbr)            ; gbr+38 = 0xFFFF65D0  -- byte [0xFFFF65D0] = 0
+;   pool 0x022C10: .long 0x000BE53C  ROM
+;   pool 0x022C14: .long 0x000C3040  CAL
+
+==== CALL SITE  (excerpt of FUNCTION 0x04AA58 .. 0x04AE6A, 330 instructions) ====
+CONTRACT  (audit addition)
+  0x04AA58 tests int8 [0xFFFF8EDC] first. Non-zero: bra 0x04AE62, pop the frame, rts -- 0x03B668 is NOT called, so
+  bytes 0xFFFF7CB8..7CBA keep their values that run. Zero: a straight run of nine jsr (0x04AA6E..0x04AA9E, no
+  branch between) and then the jsr 0x03B668 at 0x04AAA4. The same test opens 0x049BA4 (the only caller of the reset
+  path 0x03B74A: 0x049BA8..0x049BB2 -> 0x049CE8 rts) and the two message handlers 0x04AF88 / 0x04AF9A that forward
+  to 0x03DC46 / 0x03DCB6 (0x04AF8C / 0x04AF9E tst, bf -> rts). So while [0xFFFF8EDC] != 0 the latch is neither
+  updated nor reset, and 0x03DCB6 is not reached through those handlers. The other 15 callers of 0x03D2FC can still
+  recompute [0xFFFF7D80] from the held [0xFFFF7CB8]. What 0xFFFF8EDC is: NOT established (N2).
+EVIDENCE
+  emulated: test_audit_gate, both bins -- 0x04AA58 with its nine leading callees stubbed and 0x049BA4 with its ten
+  stubbed: [0xFFFF8EDC] = 0x00 reaches 0x03B668 / 0x03B74A; 0x01, 0x80, 0xFF return through 0x04AE62 / 0x049CE8 with no
+  callee entered and no RAM write.
+LISTING
+04AA58: 4F22  sts.l pr,@-r15
+04AA5A: 7FF8  add #-8,r15
+04AA5C: D295  mov.l @(0x04ACB4),r2          ; = 0xFFFF8EDC RAM
+04AA5E: 6620  mov.b @r2,r6                    ; r6 = int8 [0xFFFF8EDC]
+04AA60: 2668  tst r6,r6                       ; T = (r6 == 0)
+04AA62: 8901  bt 0x04AA68                     ; T=1 (byte == 0) -> 0x04AA68: the body, which calls 0x03B668
+04AA64: A1FD  bra 0x04AE62                    ; byte != 0 -> 0x04AE62: return, nothing below runs
+04AA66: 0009  nop
+04AE62: 7F08  add #8,r15                      ; (the byte != 0 exit)
+04AE64: 4F26  lds.l @r15+,pr
+04AE66: 000B  rts
+04AE68: 0009  nop
+;   pool 0x04ACB4: .long 0xFFFF8EDC  RAM
+049BA8: D264  mov.l @(0x049D3C),r2          ; = 0xFFFF8EDC RAM
+049BAA: 6620  mov.b @r2,r6                    ; 0x049BA4 (caller of 0x03B74A): r6 = int8 [0xFFFF8EDC]
+049BAC: 2668  tst r6,r6                       ; T = (r6 == 0)
+049BAE: 8901  bt 0x049BB4                     ; T=1 -> body (ten jsr, then 0x049BF2 jsr 0x03B74A)
+049BB0: A09A  bra 0x049CE8                    ; byte != 0 -> 0x049CE8: return, 0x03B74A not called
+049BB2: 0009  nop
+049BF0: D25D  mov.l @(0x049D68),r2          ; = 0x0003B74A ROM
+049BF2: 420B  jsr @r2                       ; -> 0x03B74A
+;   pool 0x049D3C: .long 0xFFFF8EDC  RAM
+04AAA2: D28E  mov.l @(0x04ACDC),r2          ; = 0x0003B668 ROM
+04AAA4: 420B  jsr @r2                       ; -> 0x03B668  -- the only call of 0x03B668 (no arguments)
+04AAA6: 0009  nop
+04AAA8: D28D  mov.l @(0x04ACE0),r2          ; = 0x0003C396 ROM
+04AAAA: 420B  jsr @r2                       ; -> 0x03C396
+04AAAC: 0009  nop
+04AAAE: D28D  mov.l @(0x04ACE4),r2          ; = 0x0003C7EE ROM
+04AAB0: 420B  jsr @r2                       ; -> 0x03C7EE
+04AAB2: 0009  nop
+04AAB4: D28C  mov.l @(0x04ACE8),r2          ; = 0x0003AAA4 ROM
+04AAB6: 420B  jsr @r2                       ; -> 0x03AAA4  -- later in the same task: 0x03AAA4 ORs [0xFFFF7CB8] into [0xFFFF7C68]
+04AAB8: 0009  nop
+;   pool 0x04ACDC: .long 0x0003B668  ROM
+;   pool 0x04ACE8: .long 0x0003AAA4  ROM
+
+==== REV-LIMIT DECISION AS A WHOLE (both bins) ====
+  x        = f32 [0xFFFF6624]   (+2700.0 in 20.19c when f32 [0xFFFF65FC] < 8.0515299)
+  cut/res  = stock: [0x0CC500]/[0x0CC504] when |[0xFFFF65FC]| > 1.0, else [0x0CC508]/[0x0CC50C]   (6700/6650 both)
+             tuned: [0x0CC500]/[0x0CC504] always                                                (6700/6680)
+  b1  0xFFFF7CB9 : set x >= cut, clear x < res, hold between
+  b2  0xFFFF7CBA : same with [0x0CC510]/[0x0CC514] (6700/6650 stock, 6700/6680 tuned), same x
+  b0  0xFFFF7CB8 : set when the selected byte (b2 only under the 0x03B6F4 selector, else b1) == 1;
+                   cleared when it is not and [0xFFFF620C] < [0x0CC518] = 1260.0; else held
+  0xFFFF7D80     : 0xFFFF while b0 == 1 (0x03D2FC) -> 0x03DCB6 returns at once for every channel 0..15,
+                   0x03DB16 marks every record, 0x015624 sets [0xFFFF5DDD]
+  reset          : 0x03B74A clears b0/b1/b2 when [0xFFFF65F6] == 1
+  gate           : none of the above is updated or reset while int8 [0xFFFF8EDC] != 0 (0x04AA58 and 0x049BA4
+                   both return first); the three bytes then hold
+  b0 also        : clears bit 5 of byte [0xFFFF6A29] in 0x026CF4 (via 0x03B76E) and sets [0xFFFF7C68] in 0x03AAA4
+  Tuned, launch active (speed < K): cut at x >= 4000.0, resume at x < 3980.0 -- a 20-unit band, 30 narrower than
+  stock's 50, because [0x0CC504] moved from 6650.0 to 6680.0. Exception: x = 4000 - 2^-12 and x = 3980 - 2^-12
+  depend on the FPU rounding mode (N6).
+
+==== CALIBRATION SCALARS READ (all f32, read with fmov.s @Rn; no displacement or index form found reaching them) ====
+;  address   stock    20.19c   reader
+;  0x0CC500  6700.0   6700.0   stock 0x03B6B0; tuned 0x0F1036 (pool 0x0F1044)          cut, pair 1
+;  0x0CC504  6650.0   6680.0   0x03B6B6 (pool 0x03B7A0); also 0x016128 (pool 0x01619C) resume, pair 1
+;  0x0CC508  6700.0   6700.0   stock 0x03B6BA only; tuned: literal 0x03B7A4 loaded only at 0x03B6BC (jmp slot), r2 dead
+;  0x0CC50C  6650.0   6680.0   stock 0x03B6BE only; tuned: no long anywhere in the bin equals 0x0CC50C
+;  0x0CC510  6700.0   6700.0   0x03B6D8                                                  cut, pair 2
+;  0x0CC514  6650.0   6680.0   0x03B6E8                                                  resume, pair 2
+;  0x0CC518  1260.0   1260.0   0x03B72E, compared with f32 [0xFFFF620C]
+;  0x0F104C  (erased) 8.0515299  patch, compared with f32 [0xFFFF65FC]
+;  0x0F1050  (erased) 2700.0     patch offset
+;  0x0C3040  byte 7   byte 7     0x022B46 / 0x022B62 (hold-off count for 0xFFFF65D0)
+;  20.19c holds 24 aligned longs with values in 0x0CC4C0..0x0CC51C; each has exactly one mov.l @(disp,PC) loader.
+;  23 of them are dereferenced by fmov.s @Rn: 21 on the next instruction, 0x0CC504 (loader 0x03B6B2, run as a normal
+;  instruction when 0x0F1034 returns) in the bra delay slot 0x03B6B6, and 0x0CC500 (loader 0x0F1030) in the jmp delay
+;  slot 0x0F1036. Following every control path from each load until the register is rewritten (callees not entered;
+;  a path ends at rts / jmp), the register has no other use: no displacement or index base, no copy, no arithmetic.
+;  The 24th, 0x03B7A4 = 0x0CC508, is loaded only at 0x03B6BC in the 0x03B6BA jmp delay slot; r2 is not named in
+;  0x0F1000..0x0F102E and is rewritten at 0x0F1030, so it is never used. (static_facts / literal_uses.)
+
+==== EMULATION ====
+  python3 scripts/trace/emu_launch_closure.py  -> "checks: 132910  failures: 0", exit 0, about 10 s, deterministic.
+  Static part: patched bytes, pool longs, cal values, patch constants, and every aligned pool long equal to
+  0x0CC500 / 0x0CC504 / 0x0CC508 / 0x0CC50C / 0xFFFF7CB8 / 0xFFFF7D80 in both bins; 0x0CC508 / 0x0CC50C at any
+  byte alignment; the loaders of 0x03B7A4; both delay-slot PC readings of the two slot loads; no operand r2 in
+  0x0F1000..0x0F102E; literal_uses (every literal in 0x0CC4C0..0x0CC51C and every use of the loaded register);
+  gbr_scan (census functions whose GBR reaches 0xFFFF7CB8..7CBA / 0xFFFF7D80, their GBR ops, inherited-GBR callees).
+  Dynamic part: 0x0F1000 alone (52 cases + 10 on a mutated in-memory copy); test_rounding_edge (24 emulated cases at
+  and beside the two tie inputs + an integer model over every float32 x in [3900, 4096)); test_oracle_compare (462
+  cases against scripts/patch_emulate.py launch_oracle + 2 through its launch_setup); 0x03B668 to 0x03D2FC (760
+  cases per bin, fr15/fr8/fr6 captured at 0x03B6C0, callee-saved registers and the write set checked); 0x03B74A;
+  0x03D2FC (14 patterns, the read set, and each of the 30 flag bytes alone); 0x03DCB6 (5 masks x channels 0..7);
+  0x015624; 0x016102.
+  Audit additions: audit_base_scan (every literal RAM base within 60 bytes below 0xFFFF7CBA and its straight-line
+  @(d,Rn) uses); test_audit_pr (pr at 0x0F1000 entry, through the host); test_oracle_0F1048_gap (launch_oracle on two
+  modified in-memory copies); per bin: test_audit_grid (a second oracle, audit_oracle, over x = NaN / +-inf / -500 /
+  1e9, speed -1.0 / one float beyond -1.0 / -0.0 / NaN / +-inf / 8.0 / 8.1, flag byte 0x81 / 0xFF, start states 2 /
+  0xFF / b1 != b2, q = NaN -- 960 stock + 3,840 tuned -- and 720 selector cases per bin with the high bit set in every
+  selector byte); test_audit_readset (the complete RAM read set of 0x03B668 .. 0x03D2FC); test_audit_gate (0x04AA58 /
+  0x049BA4 against [0xFFFF8EDC]); test_026CF4.
+  Inputs are the RAM cells the bytes name; nothing else is initialised, and the write set of 0x03B668..0x03D2FC is
+  asserted to be a subset of {0xFFFF7CB8, 0xFFFF7CB9, 0xFFFF7CBA}. test_oracle_compare asserts the state of
+  scripts/patch_emulate.py as read on 2026-11-27; if that file changes, it fails and K4 must be re-checked.
+
+==== COMPARISON WITH EXISTING CLAIMS (step 4 -- read only after the listings, emulation and contracts above) ====
+Sources read: docs/rev-limit-patch.md, CLAUDE.md, docs/corrections.md, docs/patch-specs/launch_control.json,
+docs/plans/valet-limiter.claims.md, docs/transient-fuel.md, docs/verification-status.json, scripts/patch_emulate.py,
+disassembly/ghidra/ImportAE5L600L.java, fn_dump --labels, the definition XMLs via scripts/defs.py, and every
+disassembly/analysis file that names one of the traced addresses.
+
+CONTRADICTED BY THE BYTES
+  C1  docs/rev-limit-patch.md:180-181 "it redirects via a literal-pool value rather than patching an instruction".
+      WRONG. Five instruction words are rewritten as well: 0x03B6AE D23B->D03B, 0x03B6B0 F828->402B, 0x03B6B8
+      D23A->D03B, 0x03B6BA F828->402B, 0x03B6BC D23A->D239. Without them the redirected pool longs would only be
+      dereferenced as floats. (docs/corrections.md:6083 already lists "hook rewrite" for 0x03B6AE-0x03B6BD;
+      the doc's own snippet at :60-62 shows the rewritten pair.) The same doc's :8 "Entry: two literal redirects"
+      is incomplete for the same reason.
+  C2  docs/rev-limit-patch.md:171 and docs/plans/valet-limiter.claims.md:201 "no writer found" for 0xFFFF65D0.
+      SUPERSEDED: 0x022760 writes it GBR-relative at 0x022B52 (:= 1) and 0x022B6A (:= 0), GBR = 0xFFFF65AA.
+      A literal-pool scan cannot see these stores (CLAUDE.md "find the writer" method).
+  C3  disassembly/analysis/accel_enrichment_analysis.txt:57, :83, :291, :612 call 0x3D2FC "enrich_apply ...
+      applies workspace state to fuel output". WRONG. 0x03D2FC reads 30 flag bytes and four bit helpers and
+      writes one 16-bit word, 0xFFFF7D80 (0xFFFF if any of six "all" bytes == 1, else a 4-bit OR). There is no
+      enrichment arithmetic and no FPU instruction in it.
+  C4  disassembly/analysis/torque_management_analysis.txt:199-200 "0xCC518 ... RPM below which boost-related fuel
+      cut resumes" and :499 "1260 RPM". WRONG quantity: 0x03B72E/0x03B730 compare [0x0CC518] with fr12 = f32
+      [0xFFFF620C], not with [0xFFFF6624]. The definition agrees with the bytes (scaling ManifoldPressure).
+      disassembly/analysis/accel_enrichment_analysis.txt:415 "[rpm_threshold start]" at 0xCC518: same error.
+  C5  disassembly/analysis/torque_management_analysis.txt:203-206 "The rev limit is implemented via the overrun fuel
+      cut path: overrun_state (0xFFFF7E8C) ... Fuel cut gating at 0x46BCC sets bitmask = 0xFFFF". WRONG for this
+      path: 0x03B668..0x03B748 writes only 0xFFFF7CB8/7CB9/7CBA (emulated write set) and chains to 0x03D2FC, which
+      writes 0xFFFF7D80. No literal 0xFFFF7CB8 or 0xFFFF7D80 exists in or near 0x046BCC (pool scan: 0xFFFF7CB8 at
+      0x03AB30/0x03B7AC/0x03D470 only; 0xFFFF7D80 at 0x0157B4/0x03D4E8/0x03D6B4 only).
+
+MISLEADING OR IMPRECISE
+  M1  docs/rev-limit-patch.md:56 / :181 "using the jmp delay slot to keep / preserve the stock load". The kept load
+      (r2 = 0x0CC504 at 0x03B6B2, r2 = 0x0CC508 at 0x03B6BC) is dead: r2 is overwritten at 0x0F1030 and 0x03B6B2
+      re-executes its own load when the patch returns. docs/patch-specs/launch_control.json:accepted says so.
+  M2  docs/rev-limit-patch.md:131 "Both branches of the flag test converge on the same behaviour ... only the
+      boundary at exactly 5 mph differs". True only while [0x0F1054] == [0x0F1048]; above K the byte==1 branch
+      reads [0x0F1054] (the word the definitions call "FFS RPM delta") and the other reads [0x0F1048]. Also NaN.
+  M3  docs/rev-limit-patch.md:141/:143 "First limiter stage" / "Second limiter stage". The two bytes are parallel
+      hysteresis results on the same x, not sequential stages; per pass exactly ONE of them drives 0xFFFF7CB8,
+      chosen by the 0x03B6F4..0x03B714 selector ([0xFFFF65C5], [0xFFFF65C0], [0xFFFF971D], [0xFFFF5E95], [0xFFFF971C]).
+  M4  CLAUDE.md:477-478 "edit 0xCC500 (cut) and 0xCC504 (resume)". Incomplete: [0x0CC510]/[0x0CC514] drive the
+      latch whenever the selector picks 0xFFFF7CBA, and they also see the launch offset (docs/rev-limit-patch.md:160
+      gives the complete advice: change both pairs).
+  M5  docs/verification-status.json entries 0xCC508 and 0xCC50C are VERIFIED-BOTH on "D1 literal-pool dereference".
+      Its inputs are stock and 20.19b. In 20.19c no long names 0x0CC50C, and the only literal naming 0x0CC508
+      (0x03B7A4) is loaded only in the 0x03B6BA jmp delay slot into r2, which is dead; neither is dereferenced on
+      any path found. The code-side evidence exists only in stock; on the car the two definitions ("Rev Limit On
+      (2)" / "Rev Limit Off (2)", tinywrex patches) edit cells that no code path found reads.
+  M6  docs/patch-specs/launch_control.json:43 "fr6, fr8, r0 and r2 are reloaded before use". fr8 is not reloaded by
+      the host before 0x03B6C0; the patch supplies it ([0x0CC500] in the 0x0F1036 delay slot). Behaviour is
+      unaffected; the wording is imprecise.
+  M7  disassembly/analysis/secondary_table_b.txt:156-157 call 0x4AF88 / 0x4AF9A "OL gate" and 0x3DC46 "fuel
+      correction apply". UNSUPPORTED by these bytes: 0x04AF88/0x04AF9A test byte [0xFFFF8EDC] == 0 and forward a
+      message record's float (and, for 0x04AF9A, its channel long) to 0x03DC46 / 0x03DCB6, the channel-gated output
+      path. Nothing here establishes "OL" or "fuel correction".
+
+CONFIRMED BY THE BYTES
+  K1  docs/rev-limit-patch.md:116 / CLAUDE.md:475-476: below 8.05 km/h the compared value is raised by 2700, cut at
+      4000. Also: resume moves to 3980 (not stated there). Both hold for every float32 x except the one float just
+      below each threshold, where the result depends on the FPU rounding mode (N6).
+  K2  docs/rev-limit-patch.md:139-160 and CLAUDE.md:477: pair 2 (0xCC508/0xCC50C) is dead in the tuned bin (no read
+      found on any literal, GBR or emulated path; computed addresses not excluded, N8); pair 3
+      also sees the offset. Also answers docs/corrections.md:6110 ("Open question for the patch: the fr15 offset
+      also reaches the comparisons at 0x03B6DA/0x03B6EA"): yes, emulated.
+  K3  docs/corrections.md:3250-3262: stock 6700/6650 on all three pairs; 20.19c changes only the three resume values
+      to 6680.
+  K4  scripts/patch_emulate.py launch_oracle: its b1/b2 predictions agree with this file's unstubbed emulation on
+      every case tested EXCEPT the two tie inputs with the offset active. test_oracle_compare (7 speeds incl. K and
+      both neighbours, flag bytes 0/1/0x81, 11 values of x incl. 4000 - 2^-12 and 3980 - 2^-12, both start states =
+      462 cases): 28 disagree, every one at x = 4000 - 2^-12 (start 0: emulator 0, oracle 1) or x = 3980 - 2^-12 (start 1:
+      emulator 0, oracle 1). The cause: the oracle forms eff = r32(r32(rpm) + r32(off)) with r32 = E.b2f(E.f2b(.)),
+      i.e. struct.pack, round-to-nearest; the emulator rounds the fadd toward zero. Run through gate 8's own
+      launch_setup (stubs 0x022CF4 / 0x0299AC / 0x0299BC / 0x0BE608, fixed selector bytes) the same two inputs
+      disagree the same way, so gate 8 would report a failure if its grid held either value. Its current grid
+      (3990.0, 3999.9, 4000.0, 4010.0, ...) holds neither, and which side is right depends on the unsettled rounding
+      mode (N6). Gaps as before: the oracle asserts only 0xFFFF7CB9/7CBA, never 0xFFFF7CB8 -- the one byte 0x03D2FC
+      reads -- and it stubs the selector inputs and 0x0BE608, so the selector and the 1260 release are not exercised
+      by gate 8. (The reviewer counted 44 disagreements on a 462-case grid not reproduced here; the disagreement set,
+      the two tie inputs, is the same.) Audit: a further gap -- for byte != 1 and speed > K the oracle adds a
+      hard-coded 0.0 (scripts/patch_emulate.py:83) where 0x0F102A reads [0x0F1048]; it does read [0x0F1054] on the
+      byte == 1 branch. Equal in 20.19c (both 0.0), so no case disagrees today. On an in-memory copy with
+      [0x0F1048] = 111.0 (x = 6600, speed 30, byte 0) the emulator sets b1/b2 and the oracle does not
+      (test_oracle_0F1048_gap); with [0x0F1054] = 111.0 and byte 1 the two agree.
+  K5  The 32BITBASE definition "Rev Limit (Fuel Cut)" at 0xCC500 says "equal to or exceeds the 'On' value ... drops
+      below the 'Off' value": matches 0x03B6C0 (set when !(cut > x)) and 0x03B6CC (clear when resume > x).
+      "Rev Limit Fuel Resume (Boost)" at 0xCC518 says fueling resumes only when manifold pressure drops below it:
+      matches 0x03B72C..0x03B736 exactly, with fr12 = f32 [0xFFFF620C]. That ties [0xFFFF620C] to the definition's
+      manifold-pressure scaling -- a definition-side corroboration of corrections item 9 (0xFFFF620C), not a
+      byte-only proof.
+  K6  docs/transient-fuel.md:97 left 0x3D2FC undecoded after the speed limiter writes 0xFFFF7CE1..0xFFFF7CE5: the
+      decode above shows 0xFFFF7CE1..7CE4 feed bits 0..3 of 0xFFFF7D80 and 0xFFFF7CE8 forces 0xFFFF; 0xFFFF7CE5 is
+      not read by 0x03D2FC (it is read by 0x03AAA4).
+  K7  disassembly/analysis/stub_shapes_a_trace.txt:129 (0x009C00 -> 0x00A280), :719-722 (0x02B22C..0x02B250, bit 0
+      of 0xFFFFA17E..A181), :894 (0x0299AC: 2 / 0 on 0xFFFF971D), :1095 (0x03B76E on 0xFFFF7CB8 == 1).
+  K8  Label claims on referenced addresses (fn_dump --labels): rpm_current (0xFFFF6624), vehicle_speed_kmh
+      (0xFFFF65FC), manifold_pressure_map (0xFFFF620C), float_outside_window (0x0BE608) are consistent with how the
+      bytes USE them; only the last is settled by bytes here. check_engine_running (0x022CF4), diag_check_P0137
+      (0x0299BC), check_cl_active (0x022F92), engine_status_flag (0xFFFF7C68), torque_decel_workspace (0xFFFF7CBC):
+      not tested by this trace; the bytes give their mechanical contracts only (0xFFFF7CBC is used as a flag byte
+      compared with 1 in 0x03D2FC and 0x03AAA4).
+
+FUEL OR SPARK
+  The definitions name 0xCC500 "Rev Limit (Fuel Cut)" and its description speaks of fuel; docs/transient-fuel.md
+  names the sibling limiter feeding the same combiner a fuel cut. The bytes reach only "word 0xFFFF7D80 bit set ->
+  0x03DCB6 skips the per-channel call into the 0x00A280 peripheral driver; 0x03DB16 marks the channel's record".
+  Nothing in the bytes traced here distinguishes injector from coil channels. Recorded as NOT ESTABLISHED (N1).
+
+ESTABLISHED
+  E1  0x03B668 loads fr15 = f32 [0xFFFF6624], fr14 = f32 [0xFFFF65FC], fr12 = f32 [0xFFFF620C] (0x03B676..0x03B680).
+  E2  Stock window: 0x0BE608(fr14, 0.0, 1.0) == 0 (|v| <= 1 or NaN) selects [0x0CC508]/[0x0CC50C]
+      (0x03B6AC -> 0x03B6B8..0x03B6BE), else [0x0CC500]/[0x0CC504] (0x03B6AE..0x03B6B6). Values identical in stock.
+  E3  Tuned: 0x03B6AE/0x03B6B0 = D03B 402B and 0x03B6B8/0x03B6BA/0x03B6BC = D03B 402B D239; pools 0x03B79C and
+      0x03B7A8 = 0x000F1000. Both window outcomes enter 0x0F1000.
+  E4  0x0F1000 adds [0x0F1050] = 2700.0 to fr15 when f32 [0xFFFF65FC] < K = 8.0515299 (0x0F104C, bits 0x4100D311);
+      above K it adds [0x0F1054] (byte [0xFFFF65D0] == 1) or [0x0F1048] (otherwise), both 0.0 in 20.19c, so the
+      byte changes the 20.19c result only at speed == K exactly or NaN (0x0F100C..0x0F102A; emulated + mutation).
+  E5  0x0F1000 clobbers r0, r2, fr6, fr8, fr9, T; sets fr8 = [0x0CC500]; returns by jmp 0x03B6B2 (0x0F1034/0x0F1036);
+      no host reader depends on the clobbered values (r0/r2/fr6 rewritten first, fr9 unread, caller has no FPU code).
+      pr on entry is 0x03B6A8 (left by the jsr 0x0BE608 at 0x03B6A4), not the caller's return address; the patch does
+      not touch it and 0x03B742 reloads the caller's pr from the frame (emulated through the host, test_audit_pr).
+  E6  Hysteresis (0x03B6C0..0x03B6F2): byte := 1 when !(cut > x), := 0 when resume > x, else held; two bytes,
+      0xFFFF7CB9 with pair 1 and 0xFFFF7CBA with [0x0CC510]/[0x0CC514]; the offset reaches both.
+  E7  Selector 0x03B6F4..0x03B71E and latch 0x03B720..0x03B736 as in MECHANISM; release of 0xFFFF7CB8 needs
+      [0xFFFF620C] < [0x0CC518] = 1260.0.
+  E8  Tuned trip points with the offset: set at [0xFFFF6624] >= 4000, clear below 3980 (emulated sweep), for every
+      float32 value except 4000 - 2^-12 and 3980 - 2^-12, where the 0x0F102E fadd is an exact tie (emulated:
+      toward zero gives not set / cleared; round-to-nearest would give set / held; exhaustive integer model over
+      [3900, 4096) finds no other such value). Without the offset 6700 / 6680 (tuned), 6700 / 6650 (stock), exact.
+  E9  No code path found dereferences [0x0CC508]/[0x0CC50C] in 20.19c: no long at any alignment equals 0x0CC50C;
+      the single 0x0CC508 long (0x03B7A4) has one loader, 0x03B6BC, the delay slot of jmp @r0 at 0x03B6BA; r2 is not
+      named in 0x0F1000..0x0F102E and is rewritten at 0x0F1030, whichever long the slot load reads; 0x03B6BE never
+      executes (0 of 576 tuned main-grid runs).
+  E10 0x03D2FC: [0xFFFF7CB8] == 1 -> word [0xFFFF7D80] = 0xFFFF (0x03D324..0x03D32C, 0x03D448, 0x03D44C). It reads
+      30 flag bytes (the six that force 0xFFFF and four groups of six, 0x03D322..0x03D436) and bit 0 of
+      0xFFFFA17E..A181 (emulated read set; each of the 30 alone gives its effect).
+  E11 0x03DCB6: a set bit (1 << channel) in [0xFFFF7D80] returns at once, skipping 0x009C00 (-> 0x00A280, peripheral
+      words 0xFFFFF666/0xFFFFF66A written), 0x03DD46 and 0x07CB28 for that channel (0x03DCE6/0x03DCE8). With the bit
+      clear, 0x009C00 is called only if int8 [0x063E34 + channel] == 1 (0x03DCFC..0x03DD00; true for channels 0..3),
+      while 0x03DD46 (byte [0xFFFF7E50] = 1) and 0x07CB28 (r4 = channel) are called for any channel (emulated 0..7).
+  E12 Other readers: 0x015624 (bit count -> 0xFFFF5DDD/5DDE), 0x03DB16 (record+1 flags), 0x03D856 (change test);
+      byte 0xFFFF7CB8 is also read by 0x03AAA4 (-> 0xFFFF7C68) and getter 0x03B76E, whose caller 0x026CF4 clears
+      bit 5 of byte [0xFFFF6A29] whenever b0 == 1 (0x026D3A, 0x026D96..0x026D9A -> 0x026DEC and.b #223,@(r0,gbr),
+      GBR 0xFFFF6A29; emulated, test_026CF4).
+  E13 Writers of 0xFFFF7CB8..7CBA found: only 0x03B6CA/0x03B6D4/0x03B6E4/0x03B6F2/0x03B72A/0x03B736 and 0x03B74A
+      (literal-pool scan, find_writers.py and the GBR scan of E16 -- a lower bound, see N8).
+  E14 Writer of 0xFFFF65D0: 0x022760 at 0x022B52 (:= 1) and 0x022B6A (:= 0), GBR 0xFFFF65AA.
+  E15 [0x0CC504] is also read by 0x016102 (0x016128) against raw [0xFFFF6624] -> byte [0xFFFF5D85].
+  E16 No GBR-relative access to 0xFFFF7CB8..7CBA or 0xFFFF7D80/81 in the census: 41 functions install a GBR at most
+      1020 bytes below them (0x03AF88, GBR 0xFFFF7C80 at 0x03AFA0, is one; +56..+58 would name the flag bytes); their
+      588 GBR displacement ops resolve elsewhere; the three r0-indexed GBR ops resolve to 0xFFFF7B9F (0x038EB0,
+      r0 = 35 from 0x038EAC, run before the bsr) and 0xFFFF7C5E (0x03A804, 0x03A80E, r0 = 46); the 91 callees that
+      inherit those GBRs hold no GBR op (emulation script gbr_scan).
+  E17 Every literal in 0x0CC4C0..0x0CC51C (24 in 20.19c) is dereferenced only by fmov.s @Rn, except 0x03B7A4
+      (0x0CC508), which is loaded into a dead r2 (CALIBRATION SCALARS note; static_facts / literal_uses).
+  E18 0x04AA58 calls 0x03B668 only when int8 [0xFFFF8EDC] == 0 (0x04AA5C..0x04AA64; else bra 0x04AE62, rts), and
+      0x049BA4 calls 0x03B74A only under the same condition (0x049BA8..0x049BB2 -> 0x049CE8). While the byte is
+      non-zero b0/b1/b2 are neither updated nor reset by these paths (emulated both bins, test_audit_gate).
+  E19 The complete RAM read set of 0x03B668 .. 0x03D2FC (stack excluded, every selector branch, both window outcomes)
+      is f32 [0xFFFF6624], [0xFFFF65FC], [0xFFFF620C] and bytes [0xFFFF65C5], [0xFFFF65C0], [0xFFFF971D],
+      [0xFFFF971C], [0xFFFF5E95], [0xFFFF7CB9], [0xFFFF7CBA], plus [0xFFFF65D0] in 20.19c only. [0xFFFF7CB8] is
+      written on this path, never read (emulated, test_audit_readset).
+  E20 Bytes 0xFFFF7CB9 / 0xFFFF7CBA are read only at 0x03B71A / 0x03B71E and written only in 0x03B6B2..0x03B760,
+      among all accesses through a literal RAM base within 60 bytes below them (67 such loaders; audit_base_scan,
+      linear, a lower bound like N8) and all census GBR ops (E16). Nothing found outside the host reads them.
+
+NOT ESTABLISHED
+  N1  Whether the channels gated by [0xFFFF7D80] are fuel injectors, ignition coils, or something else. The bytes take
+      the cut to "skip the per-channel call into the 0x00A280 peripheral driver". Settling it needs either the
+      SH7058 timer-unit register map applied to 0x00A280's accesses (0xFFFFF666/0xFFFFF66A/0xFFFFF66C/0xFFFFF440) together with the
+      board's pin assignment, or a trace of the float handed to 0x03DCB6 (message records dispatched through the
+      pointer table at 0x011D58 -> 0x04AF88 / 0x04AF9A) back to its producer (pulse-width vs dwell/advance calculation).
+  N2  The physical identity of f32 [0xFFFF6624], f32 [0xFFFF65FC], f32 [0xFFFF620C] and of bytes [0xFFFF65C5],
+      [0xFFFF65C0], [0xFFFF5E95], [0xFFFF971C], [0xFFFF971D], [0xFFFF65F6], [0xFFFF65D0], [0xFFFF8EDC]. Writers
+      located but not decoded: 0xFFFF6624 at 0x0232BC / 0x02393E, 0xFFFF65FC at 0x0230B2 (indexed off 0xFFFF6648 /
+      0xFFFF6600), 0xFFFF65C5 at 0x022972 (GBR), 0xFFFF8EDC at 0x05CB50 / 0x05CBE6 (find_writers.py; both are WORD
+      stores, mov.w r0,@r5, while every reader here reads the byte). Decoding those writers, or the definition-axis
+      method, would settle them. Other files name 0xFFFF8EDC (an OL/CL gate, a scheduler-disable flag); those names
+      are claims and are not used here.
+  N3  What 0x00A280, 0x03DD46, 0x07CB28, 0x03D856 and the rest of 0x03DB16 do with the channel; what reads
+      0xFFFF7C68, 0xFFFF5DDD/5DDE, 0xFFFF5D85 and bit 5 of 0xFFFF6A29 (0x026CF4 clears it while b0 == 1; what the
+      bit drives is not decoded).
+  N4  The meaning of the selector inputs (when 0xFFFF7CBA rather than 0xFFFF7CB9 drives the latch).
+  N5  Task periods of 0x04AA58 (caller of 0x03B668) and 0x049BA4 (caller of 0x03B74A), hence how many passes a
+      set/clear takes in real time.
+  N6  The outcome at x = 4000 - 2^-12 (set or not, from 0) and x = 3980 - 2^-12 (cleared or held, from 1) with the
+      offset active. It depends on the FPU rounding mode in normal running (docs/open-holes.md item 11, point 4: the
+      self-test leaves FPSCR = 0 after init). The emulator rounds toward zero; scripts/patch_emulate.py launch_oracle
+      rounds to nearest; they disagree exactly there. Settled by the SH7058 manual's FPSCR RM table plus the FPSCR
+      value in normal running. Every other result in this file is exact (integer x, compares against exact
+      constants or K, fadd of 0.0) and does not depend on the rounding mode.
+  N7  The PC an SH-2E uses for a PC-relative load in a delay slot. fn_dump and the emulator use the slot's own address,
+      so 0x03B6BC reads 0x03B7A4 (0x0CC508) and the slot 0x03B6B2 reads 0x03B7A0; a target-relative PC would read
+      0x0F10E8 / 0x0F10F0 (erased). r2 is dead in both cases, so no claim here depends on it. Settled by the SH-2E
+      programming manual's delay-slot rule.
+  N8  Whether any computed address (base + index register, or a GBR value the census did not resolve) reaches
+      0x0CC508 / 0x0CC50C or 0xFFFF7CB8..7CBA. The literal, find_writers and GBR scans are lower bounds; they find none.
+
+REVIEW HISTORY  (the adversarial review of the blind trace, settled from bytes in a third pass, 2026-11-27)
+
+  C17  blind: "Tuned trip points with the offset active: the hysteresis bytes set at f32[0xFFFF6624] >= 4000 and
+       clear below 3980."
+       review: imprecise -- true for integer x only; at x = 4000 - 2^-12 and 3980 - 2^-12 the fadd is a tie.
+       RIGHT: the reviewer. The sum x + 2700 for x in [2048, 4096) with the 2^-12 bit set falls exactly halfway
+       between two floats 2^-11 apart; toward zero and to-nearest-even land on opposite sides of 6700 / 6680.
+       Deciding evidence:
+      0F102E: FF80  fadd fr8,fr15                   ; fr8 = 2700.0 with the offset active: the only inexact step
+      03B6C0: F8F5  fcmp/gt fr15,fr8                ; T = (cut > x): cut = 6700.0 exactly, so only the rounded x matters
+       emulated: test_rounding_edge -- x = 4000 - 2^-12, start 0: fr15 = 6699.99951171875, b1/b2 stay 0 (RNE: 6700.0,
+       set); x = 3980 - 2^-12, start 1: fr15 = 6679.99951171875, b1/b2 cleared (RNE: 6680.0, held). Integer model over
+       every float32 x in [3900, 4096): these two are the only inputs where the modes differ. Repaired: SUMMARY,
+       0x0F1000 MECHANISM (ROUNDING), 0x03B6B2 MECHANISM, DECISION AS A WHOLE, K1, E8, N6.
+
+  C18  blind: "[0x0CC508] and [0x0CC50C] are never dereferenced in 20.19c ... The only long equal to 0x0CC508
+       (0x03B7A4) is loaded into r2 in the 0x03B6BC delay slot ... 0x03B6BE never executes."
+       review: imprecise -- the conclusion holds, but which long the slot load reads is only the emulator's
+       delay-slot PC convention.
+       RIGHT: the reviewer. Deciding evidence:
+      03B6BA: 402B  jmp @r0                       ; TUNED: 0x03B6BC is this jmp's delay slot
+      03B6BC: D239  mov.l @(0x03B7A4),r2          ; slot-address PC -> 0x03B7A4; target-relative PC -> 0x0F10E8 (erased)
+      0F1030: D204  mov.l @(0x0F1044),r2          ; r2 rewritten; no instruction in 0x0F1000..0x0F102E names r2
+       static: 0x0CC50C occurs at no byte alignment in 20.19c; 0x0CC508 only at 0x03B7A4; the only mov.l @(disp,PC)
+       addressing 0x03B7A4 is 0x03B6BC (stock: 0x03B6B8). Repaired: SUMMARY, 0x03B668 MECHANISM, the 0x03B6B0 /
+       0x03B6BC comments, M5, E9, N7.
+
+  C19  blind: "Every literal in 0x0CC4C0..0x0CC51C used anywhere in 20.19c is dereferenced directly with fmov.s @Rn.
+       None is used as a base with a displacement."
+       review: imprecise -- 0x03B7A4 (= 0x0CC508) is loaded but never dereferenced, contradicting the file's own
+       0x0CC508 row; the "next instruction" wording was also wrong for the delay-slot loads.
+       RIGHT: the reviewer. 24 aligned longs fall in the range; one loader each; 23 dereferenced by fmov.s @Rn
+       (21 on the next instruction, 0x0CC504 at 0x03B6B6, 0x0CC500 at 0x0F1036); 0x0CC508 never. Deciding evidence:
+      0F1036: F828  fmov.s @r2,fr8                  ; 0x0CC500 dereferenced in the jmp slot, three instructions after its load
+      03B6BC: D239  mov.l @(0x03B7A4),r2          ; 0x0CC508: loaded, never dereferenced (C18)
+       static: literal_uses follows every control path from each load to the register's next write; no displacement,
+       index, copy or arithmetic use of any of the 24. Repaired: CALIBRATION SCALARS note, E17.
+
+  C22  blind: "0x03DCB6 ... With the bit clear it calls 0x009C00 once, with r4 = byte 0x063E30[ch] ..."
+       review: imprecise -- the call is also gated by byte 0x063E34[ch] == 1; channels >= 4 (possible through
+       0x04AF9A) skip 0x009C00 but still call 0x07CB28.
+       RIGHT: the reviewer. Deciding evidence:
+      03DCF2: DC7D  mov.l @(0x03DEE8),r12         ; = 0x00063E34 ROM
+      03DCF4: 3C9C  add r9,r12                      ; r12 = 0x063E34 + channel
+      03DCFC: 00CC  mov.b @(r0,r12),r0              ; r0 = int8 [0x063E34 + channel] (r0 = r13 = 0)
+      03DCFE: 8801  cmp/eq #1,r0                    ; T = (r0 == 1)
+      03DD00: 8B05  bf 0x03DD0E                     ; T=0 -> the jsr 0x009C00 at 0x03DD0A is skipped
+      03DD14: B017  bsr 0x03DD46                    ; reached either way
+      03DD1C: 420B  jsr @r2                       ; -> 0x07CB28, reached either way
+       bytes: 0x063E34.. = 01 01 01 01 00 0A DF 5C. 0x04AF9A passes the first long of a record as the channel
+       (04AFA2 mov.l @r4,r2 / 04AFAC mov r2,r4). emulated: test_03DCB6, channels 0..7: ch 4..7 with the bit clear make
+       no 0x009C00 call and call 0x07CB28 with r4 = ch. Also added: 0x03DD46 writes byte [0xFFFF7E50] = 1.
+       Repaired: SUMMARY, 0x03DCB6 CONTRACT / EVIDENCE / comments, E11.
+
+  C33  blind: "patch_emulate.py launch_oracle and this trace's emulation agree on bytes 7CB9/7CBA over 352 cases."
+       review: imprecise -- they disagree at the one-ulp-below-threshold inputs because the oracle rounds to nearest.
+       RIGHT: the reviewer on the mechanism. The blind 352-case grid (a scratch script, not reproduced here) is
+       described only as "11 x values"; in the cases run here only the two tie inputs disagree. On a 462-case grid
+       with them, 28 cases disagree (the reviewer reported 44 on a grid not reproduced), all at those two inputs
+       with the offset active. Deciding evidence: scripts/patch_emulate.py:34-35 r32 = E.b2f(E.f2b(x)) and
+       :84 eff = r32(r32(rpm) + r32(off)) -- E.f2b is struct.pack, round-to-nearest; the emulator truncates.
+       emulated: test_oracle_compare, plus gate 8's own launch_setup at the two inputs (emulator 0, oracle 1).
+       Repaired: K4.
+
+  MISSED (reviewer), each checked here and accepted:
+  M-a  0x03D2FC reads 30 flag bytes, not 22 (the file's C3 said 22 while its own contract listed 30). Emulated read
+       set on the all-clear path = the 30 listed bytes + 0xFFFFA17E..A181 via the helpers. Fixed in C3, added to E10.
+      03D324: 6060  mov.b @r6,r0                    ; first: [0xFFFF7CB8]
+      03D436: 6060  mov.b @r6,r0                    ; last: [0xFFFF7D50] (group 3)
+  M-b  N6 ("nothing depends on the last bit of a float") was wrong for the fadd at 0x0F102E, and gate 8 would report
+       a failure at those inputs. Same evidence as C17 / C33. N6 rewritten.
+  M-c  The 0x063E34[ch] == 1 gate in 0x03DCB6. Same evidence as C22.
+  M-d  GBR 0xFFFF7C80 (0x03AF88) is within byte reach of 0xFFFF7CB8..7CBA and was not named. Checked more widely:
+      03AFA0: 401E  ldc r0,gbr                    ; GBR = 0xFFFF7C80 (+56..+58 = 0xFFFF7CB8..7CBA)
+      038EAC: E023  mov #35,r0                      ; r0-indexed op 0x038EB0 (in the bsr slot) -> 0xFFFF7B7C + 35 = 0xFFFF7B9F
+      03A802: E02E  mov #46,r0                      ; r0-indexed op 0x03A804 -> 0xFFFF7C30 + 46 = 0xFFFF7C5E
+       gbr_scan: 41 census functions with a GBR within 1020 bytes below the targets, 588 displacement ops, 0 hits;
+       91 inherited-GBR callees, 0 GBR ops. The reviewer's 0xFFFF7C80 conclusion holds and extends to all 41.
+       Added as E16; the 0x03B74A CONTRACT now cites it.
+
+  FILE PROBLEMS (reviewer), each fixed: the two "; pool 0x03B6B8 / 0x03B6BC" lines that labelled code as pool data
+  are replaced by a note; "22 flag bytes" -> 30; N6 rewritten and the trip-point statements qualified; the
+  CALIBRATION SCALARS note no longer contradicts the 0x0CC508 row; the 0x03DCB6 contract has the 0x063E34 condition.
+  The reviewer's verifier note (all instruction lines agree, none in pool format) needed no change and still holds.
+
+  AUDIT  (independent pass, 2026-11-27: every entry re-dumped blind with fn_dump and re-derived before the prose was
+  read; then each settled claim checked against that derivation and a second oracle, audit_oracle, with inputs the
+  earlier grids never used)
+  Checked, no change: E3 (stock/tuned words and pool longs), E4 (F695 n=6 m=9 -> T = K > spd; F965 n=9 m=6 -> T = spd
+  > K; the four mova targets), E8 (the tie arithmetic: 6700 and 6680 are even multiples of 2^-11, so RNE rounds the two
+  ties up and RTZ down), E9, E10 (30 bytes, groups as listed), E11 (03DCE6 tst, 03DD10 3DA3 n=13 m=10 -> T = r13 >=
+  r10; 0x03DC46 3ED3 n=14 m=13 -> channels 0..3), E13 (find_writers.py agrees: 0x03B6CA/D4/E4/F2, 0x03B72A/36,
+  0x03B75C/5E/60), E14 (GBR 0xFFFF65AA set once at 0x022774; +38 = 0xFFFF65D0), E15 (F985 n=9 m=8), E16, E17, K4
+  (28 / 462 reproduced). Every fcmp/gt and cmp/ge operand order in the listings re-read from the word, not the comment.
+  All 17 callers of 0x03D2FC reach it by jmp (one tail-jump each, 0x03AF84 .. 0x07C4D0). The only literals naming
+  0x03B668..0x03B7C3 or 0x0F1000..0x0F1057 are 0x026F1C, 0x03B79C, 0x03B7A8, 0x049D68, 0x04ACDC, 0x0F1040; the four
+  "bsr 0x03B68A.." words at 0x03BB52..0x03BB5E that a linear decode shows are the pool longs 0x000CBD9A..0x000CBDA0
+  of 0x03B8E6, not branches. New-input grid (NaN / +-inf / -500 / 1e9 x, the negative window edge, NaN / +-inf / -0.0
+  speed, flag 0x81 / 0xFF, start states 2 / 0xFF / mixed, q = NaN; 4,800 cases) and the high-bit selector grid (1,440)
+  agree with audit_oracle in both bins.
+  Changed (each proved from bytes, each now asserted by the script):
+  A1  pr at the patch entry. The 0x0F1000 CONTRACT and the 0x0F1034 comment said pr was the return address of
+      0x03B668's caller. WRONG: the jsr 0x0BE608 at 0x03B6A4 leaves pr = 0x03B6A8, and the caller's address is in the
+      frame (0x03B66C) until 0x03B742. Harmless -- nothing reads pr before 0x03B742 -- but it was never tested: the
+      earlier test_patch ran 0x0F1000 on its own with pr preset.
+      03B6A4: 420B  jsr @r2                       ; -> 0x0BE608  -- sets pr = 0x03B6A8; the last pr write before 0x0F1000
+      03B742: 4F26  lds.l @r15+,pr                  ; the first pr access after it
+      emulated: test_audit_pr (both window outcomes: pr = 0x03B6A8 at 0x0F1000, caller's pr back at 0x03D2FC).
+      Repaired: 0x0F1000 CONTRACT and listing comment, WHAT THE HOST RELIES ON (pr), E5.
+  A2  A path nobody traced: the caller gate. SUMMARY said 0x03B668 is called "once per run" of 0x04AA58. 0x04AA58
+      first tests int8 [0xFFFF8EDC] and returns without calling it when the byte is non-zero; 0x049BA4 (the reset
+      path's caller) and 0x04AF88 / 0x04AF9A (the channel path) make the same test. So the latch holds, unrefreshed and
+      unreset, while that byte is non-zero.
+      04AA62: 8901  bt 0x04AA68                     ; byte == 0 -> body
+      04AA64: A1FD  bra 0x04AE62                    ; byte != 0 -> rts, 0x03B668 never called
+      emulated: test_audit_gate, both bins, [0xFFFF8EDC] in {0, 1, 0x80, 0xFF}. Its writers (0x05CB50 / 0x05CBE6, word
+      stores) are located, not decoded. Repaired: SUMMARY, 0x03B668 CONTRACT, CALL SITE (now with the gate listing),
+      DECISION AS A WHOLE, E18, N2.
+  A3  A consumer that was not followed: 0x026CF4, the only caller of getter 0x03B76E, was listed as not decoded (N3).
+      b0 == 1 clears bit 5 of byte [0xFFFF6A29] on every pass (0x026D96..0x026D9A -> 0x026DEC); the bit is set only when
+      b0 != 1 and every other test passes. New excerpt section; E12, N3 updated. emulated: test_026CF4.
+  A4  K4 gap: launch_oracle hard-codes 0.0 where 0x0F102A reads [0x0F1048] (scripts/patch_emulate.py:83). No disagreement
+      in 20.19c; wrong on a copy with [0x0F1048] != 0. emulated: test_oracle_0F1048_gap. Repaired: K4.
+  A5  Read and write sets settled more widely: the complete RAM read set of 0x03B668 .. 0x03D2FC equals the CONTRACT
+      list (E19); 0xFFFF7CB9 / 0xFFFF7CBA are touched only inside the host (E20, audit_base_scan). find_writers.py
+      --reads reports NO read of 0xFFFF7CB9 or 0xFFFF7CBA, although 0x03B71E / 0x03B71A read them, so that tool's read
+      listing cannot be used to look for consumers here (tool limitation, not repaired in this file).
+  A6  Precision only: 0x016102 tests the LOW BYTE of the two callee results (0x016110 mov.b, 0x016120 extu.b), not r0;
+      0x03D2FC's closing 0x003190 continues into the deferred task-switch path 0x003664 when the saved mask is 0
+      (rtos_core contract).
+  Stock vs tuned, not stated before: 20.19c also changes 0x0CC4EC (1800.0 -> 2250.0) and 0x0CC4F0 (2500.0 -> 3000.0),
+  inside the 0x0CC4C0..0x0CC51C range literal_uses covers. Their only loaders, 0x03AFF6 / 0x03B002, are in 0x03AF88, a
+  different function; no function in this file reads them (literal_uses output), so the decision above is unaffected.

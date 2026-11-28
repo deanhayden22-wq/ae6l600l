@@ -80,7 +80,9 @@ def launch_oracle(rom, p):
     if p['flag_65d0'] == 1:
         off = f32(rom, 0x0F1050) if thr > spd else f32(rom, 0x0F1054)
     else:
-        off = 0.0 if spd > thr else f32(rom, 0x0F1050)
+        # 0x0F102A: mova @(0x0F1048) -- the "no offset" value is a ROM word, not a literal 0.0
+        # (0.0 in every live bin; corrections item 108).
+        off = f32(rom, 0x0F1048) if spd > thr else f32(rom, 0x0F1050)
     eff = r32(r32(p['rpm']) + r32(off))
 
     def stage(cut, res):

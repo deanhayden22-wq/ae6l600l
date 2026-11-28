@@ -41,6 +41,7 @@ public class RetireStaleLabels extends GhidraScript {
         // >>> BEGIN retired by sync_decoded_labels.py -- do not hand-edit >>>
         // Names removed from ImportAE5L600L.java because a decoded trace replaced
         // them (disassembly/maps/decoded_labels.json; corrections item 107 onward).
+        n += drop(0x00000D78L, "isr_int_acknowledge");
         n += drop(0x00002B8CL, "ISR_CommonDispatcher");
         n += drop(0x0000317CL, "interrupt_priority_set");
         n += drop(0x0000317CL, "irq_level_set");
@@ -51,12 +52,32 @@ public class RetireStaleLabels extends GhidraScript {
         n += drop(0x0000E774L, "sched_isr_common_entry");
         n += drop(0x0000E794L, "sched_timer_dispatch");
         n += drop(0x0000FBA4L, "watchdog_fault_reset");
+        n += drop(0x00010124L, "stubpool_target_25");
         n += drop(0x0001076AL, "charge_workspace_init");
+        n += drop(0x00022CF4L, "check_engine_running");
+        n += drop(0x000278D2L, "check_maf_valid");
         n += drop(0x0002E7D8L, "check_fuel_7234");
         n += drop(0x0002E7E2L, "check_fuel_7235");
+        n += drop(0x000301E4L, "fuel_pulse_width_calc");
+        n += drop(0x00031C9CL, "fuel_percyl_array_init");
+        n += drop(0x00031DB4L, "avcs_control");
+        n += drop(0x00032892L, "per_element_correction_calc");
+        n += drop(0x00032958L, "correction_filter_reset_to_1");
+        n += drop(0x00032AA8L, "fuel_correction_array");
+        n += drop(0x00033460L, "fuel_aggregator_tail");
+        n += drop(0x000340A0L, "afc_pi_output");
+        n += drop(0x00034C54L, "afl_clol_gate");
+        n += drop(0x00034C54L, "afl_clol_mode_check");
         n += drop(0x00034EC8L, "afl_airflow_processor");
         n += drop(0x00034EF4L, "afl_airflow_update");
         n += drop(0x0003580CL, "clol_transition_core");
+        n += drop(0x00038158L, "main_ipw_calculator");
+        n += drop(0x00038E30L, "ltft_learning_algorithm");
+        n += drop(0x0003AE6CL, "overrun_fuelcut_classifier");
+        n += drop(0x000415B8L, "task36_timing_percond");
+        n += drop(0x000582ACL, "check_diag_state");
+        n += drop(0x0005CC9AL, "sensor_diag_helper");
+        n += drop(0x0005D1CAL, "diag_monitor_status_read_B");
         n += drop(0x0005D1D0L, "diag_monitor_status_read");
         n += drop(0x0005E76AL, "diag_monitor_noop");
         n += drop(0x00066626L, "evap_ect_threshold_lookup");
@@ -93,14 +114,57 @@ public class RetireStaleLabels extends GhidraScript {
         n += drop(0xFFFF12B8L, "SH7058_SCI_TDR");
         n += drop(0xFFFF2060L, "sched_event_count");
         n += drop(0xFFFF318CL, "evap_pressure_baseline");
+        n += drop(0xFFFF63B0L, "adc_processed_temperature_B");
+        n += drop(0xFFFF6458L, "gbr_adc_6458");
+        n += drop(0xFFFF653CL, "o2_sensor_voltage");
+        n += drop(0xFFFF653CL, "ram_sensor_val");
+        n += drop(0xFFFF6540L, "o2_sensor_conditioned");
         n += drop(0xFFFF65C5L, "engine_running_flag");
         n += drop(0xFFFF6810L, "ol_condition_selector");
+        n += drop(0xFFFF6A29L, "gbr_adc_6A29");
+        n += drop(0xFFFF6A84L, "gbr_adc_6A84");
+        n += drop(0xFFFF7348L, "fuel_base_factor");
+        n += drop(0xFFFF7474L, "intake_previous_output");
+        n += drop(0xFFFF7478L, "intake_duty_correction");
+        n += drop(0xFFFF7480L, "intake_avcs_workspace");
+        n += drop(0xFFFF76D4L, "fuel_enrichment_A");
+        n += drop(0xFFFF770CL, "correction_filter_base");
+        n += drop(0xFFFF7710L, "gbr_fuel_7710");
+        n += drop(0xFFFF7730L, "fuel_correction_array_base");
+        n += drop(0xFFFF77BCL, "fuel_pipeline_base");
+        n += drop(0xFFFF77C8L, "afc_output");
+        n += drop(0xFFFF7804L, "afc_p_total");
+        n += drop(0xFFFF7808L, "afc_i_total");
+        n += drop(0xFFFF7810L, "afc_pi_blend_out");
+        n += drop(0xFFFF787EL, "gbr_afc_787E");
         n += drop(0xFFFF7904L, "afc_aggregator_output");
         n += drop(0xFFFF7904L, "aggregator_fuel_output");
+        n += drop(0xFFFF7904L, "ctl7904_out");
         n += drop(0xFFFF7904L, "fuel_corr_param_A");
+        n += drop(0xFFFF7AF4L, "fuel_ipw_state_B");
+        n += drop(0xFFFF7AF8L, "gbr_afl_7AF8");
+        n += drop(0xFFFF7B38L, "wot_active_flag");
+        n += drop(0xFFFF7B7CL, "gbr_afl_7B7C");
+        n += drop(0xFFFF7B8CL, "gbr_afl_7B8C");
+        n += drop(0xFFFF7C6CL, "gbr_tim_7C6C");
+        n += drop(0xFFFF7C78L, "task37_rpm_threshold");
+        n += drop(0xFFFF7C80L, "gbr_tim_7C80");
+        n += drop(0xFFFF7C82L, "gbr_tim_7C82");
+        n += drop(0xFFFF7C92L, "gbr_tim_7C92");
+        n += drop(0xFFFF7C9AL, "tier_state_7C9A");
+        n += drop(0xFFFF7CAAL, "overrun_dwell_counter");
+        n += drop(0xFFFF7FB0L, "gbr_tim_7FB0");
+        n += drop(0xFFFF7FBCL, "timing_final_advance");
+        n += drop(0xFFFF7FD4L, "gbr_base_corr_init_ws");
+        n += drop(0xFFFF8000L, "gbr_base_percond_ws");
+        n += drop(0xFFFF8034L, "task37_prev_tier_latch");
         n += drop(0xFFFF805CL, "gbr_kflk_805C");
         n += drop(0xFFFF8080L, "knock_flkc_workspace");
         n += drop(0xFFFF85DCL, "knock_fuel_interlock");
+        n += drop(0xFFFF8E65L, "gbr_sched_8E65");
+        n += drop(0xFFFF8ECCL, "gbr_sched_8ECC");
+        n += drop(0xFFFF8EDCL, "ol_dispatch_gate");
+        n += drop(0xFFFF8EDCL, "sched_disable_flag");
         // <<< END retired by sync_decoded_labels.py <<<
                     println("  removed " + name + " at " + a);
                     return 1;
@@ -267,7 +331,7 @@ public class RetireStaleLabels extends GhidraScript {
         n += drop(0x00071D14L, "sensor_float_clamp_b");
         n += drop(0xFFFF31A4L, "afl_interp_secondary");
         n += drop(0xFFFF31ACL, "afl_interp_primary");
-        println("RetireStaleLabels: removed " + n + " of 210 stale label(s).");
+        println("RetireStaleLabels: removed " + n + " of 274 stale label(s).");
         println("Now re-run ImportAE5L600L to apply the current names.");
     }
 }

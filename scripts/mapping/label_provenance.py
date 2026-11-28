@@ -55,11 +55,16 @@ CENSUS = os.path.join(REPO, 'disassembly', 'maps', 'function_census.json')
 
 
 def decoded_entries():
-    """Census function entries whose body is >= 90% in verified files."""
+    """Census function entries whose body is >= 90% in verified files that ANALYSE it.
+
+    A *_raw.txt listing dump does not count: it proves the bytes were listed, not that
+    anyone worked out what the function does (corrections item 108 -- 66 legacy names
+    were being stamped [DECODED] on the strength of a raw dump alone)."""
     import json
     try:
         with open(CENSUS) as fh:
-            return {int(f['entry'], 16) for f in json.load(fh)['functions'] if f['traced_pct'] >= 90}
+            return {int(f['entry'], 16) for f in json.load(fh)['functions']
+                    if f.get('analysed_pct', f['traced_pct']) >= 90}
     except (OSError, ValueError, KeyError):
         return set()
 

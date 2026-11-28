@@ -965,6 +965,9 @@ Verified diff 19c -> 19e: **457 bytes / 65 runs**, checksum valid, every changed
 **11-24 log (42 min town, cold start, no WOT, peak 12.6 psi):**
 - Overrun delay measures as built in all six cells sampled (count x 8 ms). The cut still fires on 39 of 40 lifts
   because a shift is 0.5-0.8 s off the pedal.
+  *(2026-11-27, corrections item 113: each cell is the count to TIER 1 of the overrun ladder, which cuts one
+  output channel. All four cut at cell + ext2 from undefined words `0x0CBCF2`..; editing a cell shifts every
+  tier by the same count. The "x 8 ms" is corroborated by these logs but is not in the ROM bytes.)*
 - OL entry at 3300-4000 rpm moved from load ~0.76-0.80 toward ~0.85 (thin, n = 20-58 per cell; highway not driven).
 - AVCS delivers 13-15 deg in the edited zone, no knock in 40 s.
 - One shift-class FBKC -1.4. IAM 1.0. FLKC and AFL reset by the flash.

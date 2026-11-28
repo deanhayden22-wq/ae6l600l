@@ -835,6 +835,11 @@ def own_literals(code):
 # claims and prior work -- carried, never used as evidence
 # --------------------------------------------------------------------------
 
+def is_raw_dump(name):
+    """A *_raw.txt file: a verifier-clean listing dump with no per-function contract."""
+    return name.endswith('_raw.txt')
+
+
 def traced_addresses(rom):
     """Instruction addresses quoted in analysis files whose bytes match the ROM."""
     out = collections.defaultdict(set)
@@ -973,12 +978,17 @@ def build(rom_path):
         n = len(body)
         tr = [pc for pc in body if pc in traced]
         files = collections.Counter(f for pc in tr for f in traced[pc])
+        # "analysed": present in a file that states what the code DOES. The 13
+        # *_raw.txt files are byte-correct listing dumps with no contracts; a
+        # function covered only by them has been listed, not decoded (item 108).
+        an = [pc for pc in tr if any(not is_raw_dump(f) for f in traced[pc])]
         name, tag = labels.get(e, (None, None))
         funcs.append(dict(
             entry=f'0x{e:06X}', end=f'0x{body[-1] + 2:06X}', evidence=c.entries[e],
             insns=n, bytes=n * 2, traced=len(tr),
             traced_pct=round(100.0 * len(tr) / n, 1),
             traced_in=[f for f, _ in files.most_common(4)],
+            analysed=len(an), analysed_pct=round(100.0 * len(an) / n, 1),
             fpu=fpu,
             callers=sorted(f'0x{x:06X}' for x in callers.get(e, ()) if x is not None),
             callees=sorted(f'0x{x:06X}' for x in callees),
@@ -1009,6 +1019,11 @@ def build(rom_path):
         functions_untouched=sum(1 for f in funcs if f['traced'] == 0),
         functions_partial=sum(1 for f in funcs if 0 < f['traced_pct'] < 90),
         functions_done=sum(1 for f in funcs if f['traced_pct'] >= 90),
+        # the same three counts excluding *_raw.txt listing dumps (no contracts)
+        analysed_insns=sum(f['analysed'] for f in funcs),
+        analysed_pct=round(100.0 * sum(f['analysed'] for f in funcs) / total, 2) if total else 0.0,
+        functions_analysed_done=sum(1 for f in funcs if f['analysed_pct'] >= 90),
+        functions_listed_only=sum(1 for f in funcs if f['traced_pct'] >= 90 and f['analysed_pct'] < 90),
         fpu_insns=sum(f['fpu'] for f in funcs),
         dispatch_tables={f'0x{s_:06X}': [f'0x{b:06X}', n] for s_, (b, n) in sorted(c.tables.items())},
         unresolved_indirect_sites=len(c.unresolved),
@@ -1031,7 +1046,7 @@ def rank(funcs, top):
     """Untraced work, biggest unknowns first. Purely mechanical score."""
     rows = []
     for f in funcs:
-        left = f['insns'] - f['traced']
+        left = f['insns'] - f['analysed']        # a raw listing dump is still work to do
         if left < 8:
             continue
         score = left * (1 + 0.5 * len(f['descriptors']) + 0.1 * len(f['callers']))
@@ -1052,9 +1067,9 @@ def main():
         print(f'{k:42s} {v}')
     if args.rank:
         print()
-        print(f'{"entry":9s} {"ev":7s} {"insns":>6s} {"traced":>6s} {"desc":>4s} {"calr":>4s}  gbr / label claim')
+        print(f'{"entry":9s} {"ev":7s} {"insns":>6s} {"anlsd":>6s} {"desc":>4s} {"calr":>4s}  gbr / label claim')
         for f in rank(funcs, args.rank):
-            print(f'{f["entry"]:9s} {f["evidence"]:7s} {f["insns"]:6d} {f["traced_pct"]:5.1f}% '
+            print(f'{f["entry"]:9s} {f["evidence"]:7s} {f["insns"]:6d} {f["analysed_pct"]:5.1f}% '
                   f'{len(f["descriptors"]):4d} {len(f["callers"]):4d}  '
                   f'{",".join(f["gbr"]) or "-"}  {f["label_claim"] or ""}')
     if args.json:

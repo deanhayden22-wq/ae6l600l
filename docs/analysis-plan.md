@@ -18,35 +18,44 @@ read.** Everything here is measured by `scripts/mapping/function_census.py`
 
 ## The denominator, by function
 
-Measured 2026-11-27 after batch 1 and the tool corrections of item 106 (CFG call
-resolution, delay-slot walk, data-seed rejection). Item 105's first figures were
-5,151 functions / 572,310 bytes / 15,798 traced (5.5%).
+Measured 2026-11-27 after batch 3 (item 111). Item 105's first figures were
+5,151 functions / 572,310 bytes / 15,798 traced (5.5%); after batch 1, 24,930 (8.7%);
+after batch 2, 32,111 listed / 22,698 analysed.
 
 ```
-functions                 5,146      245 labels now [DECODED]
+functions                 5,146      432 labels now [DECODED]; 1,681 carry a label
 instructions            286,163      = 572,326 bytes of code (NOT 444,928)
-  traced, byte-verified  24,930      = 8.7%   (was 15,798 = 5.5% before batch 1)
+  listed, byte-verified  38,965      = 13.6%  (11.2% after batch 2, 8.7% after batch 1)
+  ...analysed            30,734      = 10.7%  (7.9% after batch 2; listed in a file that
+                                               states what the code does; the 13
+                                               *_raw.txt dumps excluded)
 
-functions >= 90% traced     541      (was 293)
-functions partly traced     143
-functions never touched   4,462      (was 4,797)
+functions >= 90% listed     818      (719 after batch 2, 541 after batch 1, 293 before)
+  ...>= 90% analysed        642      (532 after batch 2; 176 are covered by raw dumps alone)
+functions partly listed     171
+functions never touched   4,157      (4,262 after batch 2, 4,797 before batch 1)
 ```
 
-| region | functions | never touched | instructions | traced |
-|---|---|---|---|---|
-| `0x000000` | 881 | 796 | 26,582 | 6.5% |
-| `0x010000` | 505 | 482 | 26,825 | 1.6% |
-| `0x020000` | 505 | 425 | 27,750 | 4.1% |
-| `0x030000` | 402 | 322 | 26,508 | **22.5%** |
-| `0x040000` | 304 | 209 | 26,177 | **29.1%** |
-| `0x050000` | 631 | 492 | 26,927 | 11.0% |
-| `0x060000` | 369 | 315 | 22,906 | 8.0% |
-| `0x070000` | 413 | 398 | 27,602 | 1.9% |
-| `0x080000` | 492 | 479 | 27,583 | 0.6% |
-| `0x090000` | 353 | 330 | 23,350 | 3.7% |
-| `0x0A0000` | 180 | 176 | 17,389 | 0.8% |
-| `0x0B0000` | 110 | 37 | 6,536 | **23.4%** |
-| `0x0F0000` | 1 | 1 | 28 | 0.0% — the launch patch |
+**"Listed" is not "decoded".** Until item 108 every figure here, and the `[DECODED]`
+tag, counted the `*_raw.txt` files: byte-correct listing dumps with no contracts (and
+their headers still say "SH-2" and carry old guessed names). The census now reports
+both; `--rank` and the `[DECODED]` tag use `analysed`.
+
+| region | functions | never touched | instructions | listed | analysed |
+|---|---|---|---|---|---|
+| `0x000000` | 881 | 723 | 26,582 | 9.6% | 8.4% |
+| `0x010000` | 505 | 449 | 26,825 | 3.4% | 3.4% |
+| `0x020000` | 505 | 385 | 27,750 | 8.8% | 7.5% |
+| `0x030000` | 402 | 232 | 26,508 | **53.0%** | **47.4%** |
+| `0x040000` | 304 | 199 | 26,177 | **33.4%** | 20.1% |
+| `0x050000` | 631 | 466 | 26,927 | 17.8% | 15.2% |
+| `0x060000` | 369 | 305 | 22,906 | 8.7% | 2.9% |
+| `0x070000` | 413 | 392 | 27,602 | 2.1% | 0.7% |
+| `0x080000` | 492 | 473 | 27,583 | 1.0% | 1.0% |
+| `0x090000` | 353 | 325 | 23,350 | 4.0% | 3.2% |
+| `0x0A0000` | 180 | 172 | 17,389 | 1.0% | 1.0% |
+| `0x0B0000` | 110 | 36 | 6,536 | **23.4%** | **23.4%** |
+| `0x0F0000` | 1 | 0 | 28 | 100% — the launch patch | 100% |
 
 | function size | functions | share of code |
 |---|---|---|
@@ -100,48 +109,50 @@ file. Every trace above them currently rests on the helper's *name*. Item 102
 showed what that costs: `int32_div_sat` was a 16.16 fixed-point divide, off by
 65536 for anyone who trusted the label.
 
-**Tier 1 — code that is in the car and unexplained.**
+**Tier 1 — code that is in the car and unexplained.** — **done to the injector pulse, batches 1–3.**
 Open-holes #9 (the zeroed clamp at `0x0357C8`, routine `0x0355B8`, output
-`0xFFFF7904`) — **mechanism done in batch 1**, identity open (readers of
-`0xFFFF77BC`). Then the dependency closure of the two live patches — every
-function they hook or return into (`pipeline-plan.md` priority 1). The SSM side
-is done (batch 1, open-holes #10). **The launch side is not:** the patch code at
-`0x0F1000` and the rev-limiter functions that reach it, `0x03B668` (37
-instructions) and `0x03B6B2` (75), have **no verified listing on file** — the
-prose in `rev-limit-patch.md` and the emulation in `patch_emulate.py` are all there is.
+`0xFFFF7904`): mechanism (batch 1), identity (batch 2: a trim on the
+closed-loop lambda target `0xFFFF77BC`) and reach (batch 3: it drives logged AFC
+`0xFFFF76D4`, a live integrator) settled; what is left is the path from
+`0x0301E4` to the injector pulse and a cold-start log of the SPECIAL-exit bytes.
+The dependency closure of both live patches is done (SSM: batch 1, open-holes #10;
+launch: batch 2, `launch_closure_trace.txt`; the `0xFFFF8EDC` gate: batch 3 —
+written at most once per reset, on a warm start).
 
 **Tier 2 — tuned subsystems, largest untraced function first.**
-`0x2E000`–`0x47000` (fuel, CL/OL, ignition, knock) is 41,795 instructions and 28%
-traced. 50 functions of 150+ instructions there are under 20% traced and hold
-12,621 instructions between them. The head of that list (`0x042506` and
-`0x0359A4` came off it in batch 1):
+`0x2E000`–`0x47000` (fuel, CL/OL, ignition, knock). The head of the list as it
+stood after batch 1 (`0x042506` and `0x0359A4` came off it in batch 1; the
+seven marked ✓ in batch 2, `0x030C38` in batch 3):
 
 | entry | instructions | descriptors | GBR |
 |---|---|---|---|
-| `0x032204` | 748 | 1 | – |
-| `0x0382C2` | 593 | 8 | `0xFFFF7AF4` |
-| `0x0410D4` | 505 | 0 | `0xFFFF7FBC` |
-| `0x038E64` | 479 | 12 | `0xFFFF7B7C` |
-| `0x03AF88` | 423 | 0 | `0xFFFF7C80` |
+| ✓ `0x032204` | 748 | 1 | – |
+| ✓ `0x0382C2` | 593 | 8 | `0xFFFF7AF4` |
+| ✓ `0x0410D4` | 505 | 0 | `0xFFFF7FBC` |
+| ✓ `0x038E64` | 479 | 12 | `0xFFFF7B7C` |
+| ✓ `0x03AF88` | 423 | 0 | `0xFFFF7C80` |
 | `0x0448F4` | 421 | 0 | `0xFFFF81F8` |
 | `0x037710` | 329 | 3 | `0xFFFF7A78` |
 | `0x03D856` | 328 | 0 | – |
-| `0x0415B8` | 292 | 6 | `0xFFFF8000` |
-| `0x03AB94` | 287 | 0 | `0xFFFF7C6C` |
+| ✓ `0x0415B8` | 292 | 6 | `0xFFFF8000` |
+| ✓ `0x03AB94` | 287 | 0 | `0xFFFF7C6C` |
 | `0x02EB02` | 283 | 0 | `0xFFFF7244` |
-| `0x030C38` | 279 | 6 | `0xFFFF73B0` |
+| ✓ `0x030C38` | 279 | 6 | `0xFFFF73B0` |
 
 `python scripts/mapping/function_census.py --rank 60` prints the live list.
 Descriptor-heavy functions first: each one decoded also settles the tables it
 consumes, which is how Part 2's 947 unnamed tables actually get closed.
 
-**Tier 3 — bulk classification by script.**
-~~The stub families behind the dispatch tables at `0x06423C` and `0x064F7C`~~ —
-**done in batch 1**: two 848-entry getter/setter tables of the diagnostic services,
-224 stubs in 63 classes (`stub_tables_trace.txt`). Left: the 1,646 functions of
-12 instructions or fewer (`scripts/mapping/stub_classes.py` groups 1,278 of them
-into 127 shapes, `disassembly/maps/stub_classes.json`); the 168 unreferenced
-functions. Group by instruction pattern with literals masked, decode
+**Tier 3 — bulk classification by script.** — **done, batches 1–3.**
+The diagnostic getter/setter tables (batch 1, 224 stubs in 63 classes) and the
+127 shapes of `stub_classes.json` (batch 2: 1,278 functions, every member
+re-decoded, shape-matched and emulated from its own bytes —
+`stub_shapes_a/b_trace.txt`, `--map` on their scripts prints each member's
+parameters). Left: the 368 small functions in singleton shapes, the 168
+unreferenced functions. **Members are named** (batch 3:
+`scripts/mapping/stub_member_names.py` gave 918 of the 1,273 members a name from
+their own parameters, e.g. `get_s8_FFFF5B6C`; members that already had a label kept it,
+and 104 in classes without a template were left). Group by instruction pattern with literals masked, decode
 one example per class, emit the map. Reading these one at a time would cost more
 than everything in Tiers 0–2 and establish less.
 
@@ -186,24 +197,109 @@ emulation scripts repaired for the emulator fix. About 2.5 hours of wall clock.
 * **A second settle pass found more every time it ran** (four clusters, by
   accident). For a cluster something will later depend on, settle twice.
 
-## Batch 2 — next
+## Batch 2 — done 2026-11-27 (corrections items 108, 109)
 
-In order; one cluster per line.
+Nine clusters: the launch-patch closure, hole #9's identity, five tuned-region
+functions (`0x0382C2`, `0x038E64`, `0x032204`, `0x0410D4`/`0x0415B8`,
+`0x03AF88`/`0x03AB94`) and the 127 small-function shapes. 29 agents (trace, refute,
+settle; an extra audit on the two clusters that are in the car), no failures,
+about 1.6 hours of wall clock.
 
-1. **Launch patch closure (Tier 1):** `0x0F1000` + `0x03B668` + `0x03B6B2`, and
-   the rev-limit compare they feed. Live code with no verified listing.
-2. **Hole #9 identity:** `0x033460` (252 instructions, 34% traced) and the readers
-   of `0xFFFF77BC` / `0xFFFF77C8` down to the injector pulse.
-3. **`0x0382C2`** (593, 8 descriptors) — descriptor-heavy, closes tables.
-4. **`0x038E64`** (479, 12 descriptors).
-5. **`0x032204`** (748) — reads `0xFFFF7904` behind a calibration switch that is 0.
-6. **`0x0410D4`** (505) and **`0x0415B8`** (292, the cold retard writer of item 104).
-7. **`0x03AF88`** (423) and **`0x03AB94`** (287) — same GBR neighbourhood.
-8. **Tier 3:** classify the 127 stub shapes of `stub_classes.json` — one verified
-   example per shape, the rest by masked-pattern match.
+| measure | result |
+|---|---|
+| verified instruction lines added | 8,254 in 9 files (7,181 distinct new instructions in the census) |
+| functions newly at >= 90% traced | 178 |
+| claims made / confirmed / refuted / imprecise / missed | 407 / 369 / 1 / 37 / 49 |
+| contradictions with existing labels and docs, verified from bytes | 71 |
+| labels | 196 new decoded records; 35 more names retired — `RetireStaleLabels.java` drops 245 |
+| retracted | the answer of `ffb_gap_resolved_2026-08-19.txt` (item 109) |
+| gate fixed | gate 8's launch oracle (`0x0F1048` was hard-coded 0.0) |
 
-Run it as a FRESH workflow with these targets; do not resume batch 1's run
-(resume re-runs every agent after the first changed one).
+**What it taught:**
+
+* **Bound the term before you explain a measurement with it.** The 2026-08-19
+  FFB answer read a clamp table and stopped. The seeds and weights upstream of the
+  clamp cap the term at half of it. A clamp is a ceiling, not a value.
+* **"Is this lever live" has a cheap answer more often than not.** `0x0382C2`'s
+  output can never be non-zero (16 flat tables, an empty enable window);
+  `0x032204`'s calibration is inert; the hole #9 trim is overridden by the
+  SPECIAL exit whenever `[8E7E]`==1. Read the enable path and the clamp constants
+  first (standing rule 2), then decide whether the body is worth reading.
+* **Cross-check a batch's stubs against the last batch's contracts.** Batch 2
+  stubbed `0x00E774` and called 64 handlers "returning to the interrupt exit";
+  batch 1 had decoded it as a fatal halt. Integration is where those meet.
+
+## Batch 3 — done 2026-11-27 (corrections items 111, 112, 113)
+
+Seven clusters: the FFB residual (`0x02FFE0`, the `0x030C38` tree), the CL target's
+route to fuel (the `0x032B10` bound chain), the SPECIAL-exit gate (`0x05A498`, the
+`[9720]` path of `0x028210`), logged AFC's coefficients (`0x031D88`..`0x0320AC`), the
+timing integrator's bound (`0x040AF6`), the overrun ladder (`0x03AE6C`, `0x03B3DA`) and
+the `0xFFFF8EDC` gate (`0x05CB1C`). 23 agents (trace, refute, settle; an extra audit on
+the FFB residual and the SPECIAL exit), no failures, about 2.5 hours of wall clock. The
+Tier 3 follow-through (918 member names) ran as a script at integration.
+
+| measure | result |
+|---|---|
+| verified instruction lines added | 9,982 in 7 files (8,036 more instructions analysed, 6,854 more listed) |
+| functions newly at >= 90% analysed | 110 |
+| claims made / confirmed / refuted / imprecise / unsupported / missed | 253 / 213 / 3 / 35 / 2 / 37 |
+| contradictions with existing labels and docs, verified from bytes | 37 |
+| labels | 125 new decoded records + 918 small-function names; 29 more names retired — `RetireStaleLabels.java` drops 274 |
+| definition names contradicted by their consumer | 2 — "Intake/Exhaust Duty Correction A" are logged-AFC model tables (item 112) |
+| corrected | items 79 and 103 (the overrun retard arm, item 113); item 108's launch-latch caveat (narrowed) |
+
+**What it taught:**
+
+* **The definition layer can be wrong about identity even when every byte agrees.**
+  Both misnamed tables are `VERIFIED-BOTH`. Their axis names were right, and that is
+  what made the consumer readable: MAF × RPM into a dead time and a time constant.
+  Join on the axes, then decode the consumer before trusting a table name.
+* **Look for latches before you emulate a climb.** The first timing-bound answer
+  was "YES, it can be non-zero". It had set the gate byte to 1 by construction and
+  missed a one-way latch that pins the term at 0 the first time the gate is 0. When
+  a term "can rise", ask what stops it from ever starting.
+* **A log beats a trace for "does it happen on the car".** Four questions this batch
+  narrowed now hinge on run-time state the bytes cannot give (power-on RAM, task
+  order, which path a cut takes). The logs that settle them are listed below; take
+  them before tracing further on those fronts.
+
+**Logs that would settle more than another trace:**
+
+1. Cold start to warm: `0xFFFF8E7E`, `0xFFFF8E66`, `0xFFFF8E65`, `0xFFFF8E68`, `0xFFFF8EDC`
+   (does SPECIAL end at warm-up? open-holes #9).
+2. Tip-ins, including lift-then-tip-in: `0xFFFF73B4` alongside FFB (open-holes #12).
+3. A few overrun lifts: `0xFFFF7C9A`, `0xFFFF7CAA`, `0xFFFF8020`, timing, IPW (open-holes #13).
+4. Any drive: `0xFFFF69E6`, `0xFFFF7FF4`, `0xFFFF7FBC` (is the timing integrator ever
+   non-zero?).
+
+## Batch 4 — next
+
+In order; one cluster per line. Each comes out of a batch-3 "not established".
+
+1. **From `0x0301E4` to the injector pulse:** the readers of its outputs
+   `0xFFFF7320`..`0xFFFF7344` — `0x037D74`, `0x0345A4`, `0x038DC0`, `0x03D0B8`,
+   `0x02EF4C`, `0x07D50A`, `0x0397AC`. Settles whether logged AFC, AFL and FFB
+   multiply the pulse (open-holes #9, #12).
+2. **The rest of the FFB sum:** writers of `[0xFFFF7354]`, `[0xFFFF7374]`,
+   `[0xFFFF7A44]` and the `[79C0]` scaling of `[798C]`; and `0x037710` (329,
+   GBR `0xFFFF7A78` — the per-cylinder addends `[7A78+4i]`).
+3. **`0x01FE46` in full** (221): the `[641C]` latch that drops `0x0301E4`'s lower
+   clamp, and its use of "MAF Limit (Maximum)" `0x0C3100` (300 in stock, 475 in 20.19c,
+   read at `01FF5C` with `[63C4]`) — the one tuned value in this function.
+4. **What lowers timing during an overrun cut (open-holes #13):** `0x041BE4` in full
+   and its caller chain `0x0419BA` ← `0x04AA58`, the `[8020]`/`[8028]` terms.
+5. **Start-up state:** the reset DMA at `0x010398` (CHCR `0x001F0128` against the
+   SH7058 manual), the RAM test `0x010448`, and `0x047C40` (it runs `0x026634` and the
+   `[73E0]` seeder). Settles the cold-start `[8EDC]` value and the power-on
+   `[7FF4]`/`[69E6]`.
+6. **Tier 2 remainder:** `0x0448F4` (421, GBR `0xFFFF81F8`), `0x03D856` (328),
+   `0x02EB02` (283, GBR `0xFFFF7244`).
+7. **The other readers of logged AFC's lags and of W:** `0x034884` (273, reads
+   `[7704]`) and `0x06847E` (reads W `[0xFFFF7484]`) — they decide whether anything
+   but fuel follows AFC.
+
+Run it as a FRESH workflow with these targets.
 
 ## Rules this part adds
 

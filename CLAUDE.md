@@ -54,8 +54,8 @@ These exist because confident-but-wrong answers have been produced here before.
    .\scripts\check.ps1
    ```
 
-   Current baseline: **99.92% of 35,132 lines match; 0 known errors**
-   (`scripts/check.sh`, 2026-11-27, after function-programme batch 1). The 29 remaining
+   Current baseline: **99.95% of 53,334 lines match; 0 known errors**
+   (`scripts/check.sh`, 2026-11-27, after function-programme batch 3). The 29 remaining
    mismatches are 28 deliberate symbolic labels plus one self-correcting
    reasoning passage — that count has not moved as the corpus grew.
    Keep it that way — re-run the verifier after editing any analysis file.
@@ -87,13 +87,14 @@ These exist because confident-but-wrong answers have been produced here before.
 
    | tag | meaning | what you may do |
    |---|---|---|
-   | `[DECODED]` | a function entry whose **body** is ≥90% present, instruction by instruction, in verifier-checked files (`function_census.json` `traced_pct`). Added 2026-11-27, item 107 | reason from the contract in the comment; the name may still be a summary |
+   | `[DECODED]` | a function entry whose **body** is ≥90% present, instruction by instruction, in verifier-checked files that **analyse** it — a `*_raw.txt` listing dump does not count (`function_census.json` `analysed_pct`). Added 2026-11-27, items 107-108 | reason from the contract in the comment; the name may still be a summary |
    | `[TRACED]` | the address string **occurs** in a verifier-checked file under `disassembly/analysis/` — a call-site *mention* qualifies; it does **not** mean the body was decoded | reason from it, but see below |
    | `[CITED]` | mentioned in `corrections.md`, no byte-level check | treat as a lead |
    | `[UNVERIFIED]` | **the name is the only artefact** | a hypothesis. Never a premise. |
 
-   **666 of 2,516 labels (26%) are `[UNVERIFIED]`; 245 (10%) are `[DECODED]`**
-   (2026-11-27). In the listing they look exactly like the rest.
+   **583 of 3,688 labels (16%) are `[UNVERIFIED]`; 432 (12%) are `[DECODED]`**
+   (2026-11-27, after batch 3 and the 918 small-function names, which are `[TRACED]`).
+   In the listing they look exactly like the rest.
 
    **`[TRACED]` on a function label is weaker than it reads** (corrections item
    105): of 489 function labels tagged `[TRACED]`, **336 have zero body
@@ -127,9 +128,13 @@ These exist because confident-but-wrong answers have been produced here before.
 hit rates, the triage-before-decode sequence, and the standing rules that each
 cost something to learn. Read it before starting a new line of analysis.
 **Part 1 (2026-11-27) is the function programme:** census-driven, one function
-card at a time, blind trace → adversarial review → settle. Batch 1 is done
-(items 106-107: runtime library, RTOS, diagnostic tables, hole #9); batch 2 is
-listed there, led by the launch patch, which still has no verified listing.
+card at a time, blind trace → adversarial review → settle. Batches 1–3 are done
+(items 106-113: runtime library, RTOS, diagnostic tables, both live patches' closure,
+hole #9 traced to the closed-loop lambda target and on into logged AFC, five
+fuel/timing functions, all 127 small-function shapes and their members, the FFB
+residual, the SPECIAL exit, the timing-integrator bound, the overrun ladder, the
+`0xFFFF8EDC` gate); batch 4 is listed there, led by the path from `0x0301E4` to the
+injector pulse, with four logs that would settle more than another trace.
 
 **[`docs/open-holes.md`](docs/open-holes.md)** is the live worklist. Items 1-6
 all closed (2026-08-18/19). **Item 7 is the successor programme: 947 of 1,094
@@ -160,8 +165,9 @@ name survives as a secondary symbol, still searchable and still in the Symbol
 Tree.
 
 **After any label retirement, run `disassembly/ghidra/RetireStaleLabels.java`
-first, then re-run the import.** The current copy removes the 150 names retired
-by corrections items 91–93 (129) and 96–97 (21). It is idempotent and touches only those exact
+first, then re-run the import.** The current copy removes 274 names: 150 retired
+by corrections items 91–93 (129) and 96–97 (21), and 124 by the function programme
+(items 107–111, managed block written by `sync_decoded_labels.py`). It is idempotent and touches only those exact
 (address, name) pairs.
 
 > **Ghidra runs the copies in `~/ghidra_scripts`, not the repo's.** Copy both scripts
@@ -198,8 +204,31 @@ its status. Two worth carrying in your head:
   **IAT is `FFFF6364`** (was `ect_startup`); the earlier item-9 claim that IAT
   was `FFFF69F0` is **RETRACTED** — `FFFF69F0` reaches zero named axes.
   Several "sensors" are diagnostic plumbing read only as bytes: `FFFF67EC` is a
-  uint16 DTC counter, `FFFF65C0` a precondition flag. Real throttle is
+  uint16 counter (called a DTC counter by item 15 — **unsupported**: item 111 finds
+  `0x023A94` counting passes while byte `[726C]` != 1 and zeroing it otherwise, with
+  no DTC in those bytes), `FFFF65C0` a precondition flag. Real throttle is
   `FFFF62DC` (plate) and `FFFF64D8` (**pedal**, not throttle_raw).
+- **The FFB transient term `0xFFFF7B8C` tops out at +0.047, not its +0.09998 clamp** (item
+  109). The 2026-08-19 "FFB 10.2 = this term pinned at its clamp" answer is retracted; the
+  rest of the transient excess comes from another addend (open-holes #12). A clamp is a
+  ceiling, not a value — bound the inputs before explaining a measurement with one.
+- **`0xFFFF77BC`/`0xFFFF77C8` are the closed-loop lambda target** (item 108), not "AFC
+  output"; `0xFFFF653C` is the atmospheric-compensated front-O2 lambda, not a sensor
+  voltage. Hole #9's zeroed trim adds to that target (positive = leaner), but only when
+  `0x033460` is not on its SPECIAL exit — which looks cold-start-only (secondary-air
+  DTCs, coolant-at-start window; a hypothesis, item 111).
+- **Logged AFC (`0xFFFF76D4`) is a live closed-loop integrator** (item 111). Its error
+  is 1/target − 1/front-O2 lambda, and its gains are recomputed every call from a plant model.
+  **"Intake Duty Correction A" (`0xCFA38`) and "Exhaust Duty Correction A" (`0xD121C`) are
+  that model's dead time and time constant on MAF × RPM, not AVCS tables** (item 112):
+  their only consumer is `0x031DB4`, and the "Exhaust" scaling is wrong for this ROM. Both are
+  `VERIFIED-BOTH` — the flag never covered the name. The rename waits for the owner (open-holes #14).
+- **The overrun retard arm fires at the cut exit, not through the cut** (item 113,
+  correcting 103 and 79), and the "Overrun Fuel Cut Delay" cells set the count to tier
+  1, which cuts one channel. The full cut is at cell + ext2.
+- **The timing integrator `0xFFFF7FBC` has a one-way latch that pins it at 0** (item
+  111). Whether it is ever non-zero on the car, and so whether 20.19c's window B
+  (`0xD29C4` = 438) does anything, is not established — log before crediting it.
 - **The cruise/non-cruise blend ratio is `0xFFFF90A8`, not `0xFFFF7F60`**
   (item 38). The decision is the `0x60ECC`–`0x6114E` chain calibrated at
   `0xD9AC4`–`0xD9E26`, **not** tasks 50/32/31/33 and **not** the `0xD29AC` /
@@ -390,6 +419,7 @@ wrong answer. Import them; do not re-derive.
 | `scripts/mapping/function_census.py` | **The function-level denominator.** Recursive descent from both vector tables, through `jsr`/`jmp` (targets by forward constant propagation over the CFG, `reg_states()` — item 106), `bsr`, `bra` tail calls, indexed dispatch tables and pointer-held entries; data-like seeds rejected and listed. One row per function: extent, instructions, callers, callees, GBR, RAM/descriptor/cal literals, and how much of the body is already in a verified file. `--rank N` prints the untraced worklist. Writes `disassembly/maps/function_census.json`. Built 2026-11-27; corrections item 105. |
 | `scripts/mapping/fn_dump.py` | Print one function as a **verifier-format listing** with every literal, pool word, resolved call target, GBR offset and descriptor geometry annotated from bytes. Blind by default; `--labels` appends existing names as claims; `--tables` dumps the tables it reads. **Start every trace from this — never type a listing by hand.** Start it at the real function entry: register values (call targets, GBR) are propagated from there. |
 | `scripts/mapping/stub_classes.py` | Group small functions by instruction shape with literals masked (1,278 of the 1,646 functions of ≤12 instructions fall into 127 shapes). Writes `disassembly/maps/stub_classes.json`. Tier 3 of `analysis-plan.md`. |
+| `scripts/mapping/stub_member_names.py` | Name the members of the 127 small-function shape classes from each member's own parameters (`get_s8_FFFF5B6C`, `irq_v72_ack_halt` ...), parsing the member maps in `stub_shapes_a/b_trace.txt`. Members that already have a label keep it. `--apply` merges into `decoded_labels.json`; then run `sync_decoded_labels.py --apply`. 918 named, item 111. |
 | `scripts/mapping/sync_decoded_labels.py` | Apply `disassembly/maps/decoded_labels.json` (labels a byte-level trace settled) to `ImportAE5L600L.java` as one managed block placed last (so primary); removes every older statement at those addresses and adds contradicted names to `RetireStaleLabels.java`. Idempotent. Item 107. |
 | `scripts/mapping/table_triage.py` | Triage every ROM descriptor no definition names: geometry, cell type, scale, data range, flat?, axis names where an axis is shared with a defined table, consumers, RAM context, subsystem hint. `--live` drops flat and diagnostic. **947 unnamed → 73 worth looking at.** Built 2026-08-19; see `docs/analysis-plan.md`. |
 | `scripts/mapping/find_writers.py` | Find every WRITE to a RAM address. Handles direct, displacement, indexed `@(r0,Rn)` and GBR-relative forms, and tracks `r0` through `add`/`extu`. |
@@ -400,7 +430,7 @@ wrong answer. Import them; do not re-derive.
 | `scripts/rom_allocation.py` | The ROM/RAM allocation registry `docs/allocation.json`: `--audit` proves every off-table byte in a bin is claimed, `--free` lists free ROM, `--check-claims` tests a new patch's ranges. |
 | `scripts/patch_lint.py` | Flash-safety gates 1-5 (diff whitelist, checksum, never-touch, SH-2E legality, calling convention). `--live` lints the two patches on the car from `docs/patch-specs/`. |
 | `scripts/check.sh` | Linux twin of `check.ps1`, plus the checksum, patch-lint and patch-emulation gates. `--full` adds the emulator and checksum self-tests (~2 min). |
-| `scripts/sh2e_emu.py` | SH-2E emulator (gate 8). Own decoder, cross-checked against `sh2e_disasm` on every instruction; `--selftest` runs five ROM-routine oracles, including **the ROM's own FPU self-test at `0x058696`**. Float arithmetic is exact and **rounded toward zero**, as the chip does (FPSCR `0x00040001`) — before 2026-11-27 it rounded to nearest, wrong in the last bit (item 106). Use it to settle what a routine computes instead of reasoning about it. |
+| `scripts/sh2e_emu.py` | SH-2E emulator (gate 8). Own decoder, cross-checked against `sh2e_disasm` on every instruction; `--selftest` runs five ROM-routine oracles, including **the ROM's own FPU self-test at `0x058696`**. Float arithmetic is exact and **rounded toward zero**, as the chip does — the SH7058 FPU has no other rounding mode (manual feature list, item 110; the ROM self-test proves it, item 106). Before 2026-11-27 it rounded to nearest, wrong in the last bit. Use it to settle what a routine computes instead of reasoning about it. |
 | `scripts/sh2e_asm.py` | Two-pass SH-2E assembler for patch code. Every emitted instruction is round-tripped through `sh2e_disasm` (a mismatch is an error); it re-assembles the live launch detour byte-identically. Not `patch_rom.py`'s assembler (quarantined). |
 | `scripts/patchbuild/<patch>.py` | One build script per patch; `--gates` builds shadow + live bins into `out/` (git-ignored) and runs every gate. Placeholders live in one `PLACEHOLDERS` block, and gate 6 refuses them. |
 | `scripts/patch_emulate.py` | Runs a patch over a grid against an oracle written from its doc. `--live` covers the patches on the car. |
@@ -437,17 +467,18 @@ image        1,048,576 bytes
 | layer | figure |
 |---|---|
 | code **reached by control flow** (`function_census.py`) | **286,163 instructions = 572,326 bytes in 5,146 functions** — the block above is a 256-byte classifier that files FPU-dense code and literal pools under `float_data` |
-| code **traced and byte-verified** by this project | **24,930 instructions = 8.7% of code** after batch 1 (15,798 = 5.5% before it; the old "18,099 = 8.1%" counted 2,527 literal-pool words printed in instruction format) |
-| functions ≥90% traced / partly / **never touched** | 541 / 143 / **4,462** |
-| functions carrying any label | 578 of 5,146 |
-| labelled addresses | 1,599 ROM + 916 RAM (245 `[DECODED]`) |
+| code **analysed** — in a verified file that states what it does | **30,734 instructions = 10.7% of code** after batch 3 (22,698 = 7.9% after batch 2; census `analysed_*`; excludes the 13 `*_raw.txt` listing dumps, item 108) |
+| code **listed** in any verified file, dumps included | **38,965 instructions = 13.6% of code** after batch 3 (32,111 = 11.2% after batch 2, 24,930 = 8.7% after batch 1, 15,798 = 5.5% before it; the old "18,099 = 8.1%" counted 2,527 literal-pool words printed in instruction format) |
+| functions ≥90% listed / partly / **never touched** | 818 / 171 / **4,157** — of the 818, **642 are ≥90% analysed**; 176 are covered by raw dumps alone |
+| functions carrying any label | 1,681 of 5,146 (709 before the 918 small-function names) |
+| labelled addresses | 2,668 ROM + 1,020 RAM (432 `[DECODED]`) |
 | table descriptors decoded from bytes | 1,094 |
 | …**named** by a definition | **147** |
 | …**unnamed** | **947** (open-holes #7) |
 | data bytes claimed by neither defs nor disassembly | **256,237 of 321,468 = 79.7%** |
 | entities `VERIFIED-BOTH` | 367 of 4,727 = 7.8% |
 
-**Fully disassembled, barely analysed.** The verified 8.7% is concentrated in the
+**Fully disassembled, barely analysed.** The analysed 7.9% is concentrated in the
 subsystems that get tuned — knock, fuelling, CL/OL, the scheduler — which is the
 right concentration, but most of this ROM has never been read by anyone here.
 
@@ -475,7 +506,9 @@ is unexplained -- open-holes item 9):
    vehicle speed (`0xFFFF65FC`) is below ~8.05 km/h (5 mph) it adds **2700 RPM** to the value the rev limiter
    compares, so the limiter trips at an actual **4000 RPM** instead of 6700.
    Side effect: the second rev-limit pair (`0xCC508`/`0xCC50C`) is now
-   **unreachable** — edit `0xCC500` (cut) and `0xCC504` (resume).
+   **unreachable** — edit `0xCC500` (cut) / `0xCC504` (resume) **and** the second stage `0xCC510` / `0xCC514`
+   (the patch offset reaches both; item 108). The whole latch freezes while byte `0xFFFF8EDC` != 0 —
+   a byte written at most once per reset, on a warm start, never mid-drive (item 111).
    See [`docs/rev-limit-patch.md`](docs/rev-limit-patch.md).
 
 > When diffing revs, do **not** filter to code-classified regions only. Injected

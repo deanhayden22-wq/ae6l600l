@@ -120,12 +120,18 @@ def main():
     recs = {int(r['address'], 16): r for r in spec}
 
     java = open(JAVA, encoding='utf-8').read()
-    java, _ = strip_block(java, BEGIN, END)
+    java, old_managed = strip_block(java, BEGIN, END)
     retire_src = open(RETIRE, encoding='utf-8').read()
     retire_src, old_block = strip_block(retire_src, R_BEGIN, R_END)
     retired = set()
     for m in re.finditer(r'drop\((0x[0-9A-Fa-f]+)L, "([^"]+)"\)', old_block):
         retired.add((int(m.group(1), 16), m.group(2)))
+    # A name this tool itself applied in an earlier run, and a later batch renamed (or
+    # dropped), is just as stale in an already-imported program: retire it too.
+    for m in STMT.finditer(old_managed or ''):
+        a, n = int(m.group(1), 16), m.group(2)
+        if n != recs.get(a, {}).get('name'):
+            retired.add((a, n))
 
     # 1. remove existing statements at record addresses
     removed = []
@@ -159,7 +165,7 @@ def main():
         lit = f'0x{a:08X}L'
         lines.append(f'        count += labelComment({lit}, "{jstr(r["name"])}",\n{wrap(c)});')
     lines.append(END)
-    block = '\n'.join(lines) + '\n\n'
+    block = '\n'.join(lines) + '\n'
     java = java.replace(ANCHOR, block + ANCHOR, 1)
 
     # 3. retire block

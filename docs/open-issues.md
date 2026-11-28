@@ -149,6 +149,26 @@ A/B" + 2 alt-path bleeds). Survey data: `rom/reference/README.md`.
 evidence-integrator → desensitizes); event-B source untraced; tick unit
 unverified (~8 ms family → 438 ≈ 3.5 s). Either sign is engine-safe to A/B.
 
+> **Update 2026-11-27 (corrections item 108, `timing_0410D4_0415B8_trace.txt`):
+> the sign is settled from bytes.** `FFFF7FBC` is a clamped integrator (0 .. `[FFFF7FC0]`)
+> written only by `0x0410D4`, and the timing routine `0x03F368` **subtracts** it at every
+> read (`03F8AC`/`03F8C8`), so it can only retard its outputs (`[FFFF7EA0..7EAC]`, clamped
+> −20..69.65). Window B (`0xD29C4` = 438, armed since 20.19c) enables flag `[FFFF7FDC]`,
+> which blocks every increment of the integrator and, with byte `[FFFF65C0]` == 1, bleeds it
+> by 0.015 — so arming it can only REMOVE that retard. Still open: whether the integrator is
+> ever non-zero on the car (its bound's four factors come from `0x040AF6`, not decoded),
+> and that "knock" is what drives it (not established either way). Batch 3, item 4.
+>
+> **Update 2026-11-27 (corrections item 111, `timing_bound_040AF6_trace.txt`): the window may
+> be acting on a term that is always 0.** The bound H is non-zero only while the Cruise
+> request byte `[FFFF90BE]` == 1 or byte `[FFFF3158]` == 1 (≈ 20.0 cold, ≈ 15.0 at ≥ 70 °C, same in
+> stock). More importantly, a one-way latch `[FFFF7FF4]` pins `FFFF7FBC` at 0 from the first call
+> where gate byte `[FFFF69E6]` is 0 and the integrator is near 0 (`0411D8`..`041258`; the only writer
+> found stores 1). `[69E6]` is set only at init (`0x026634`) and is cleared once ECT exceeds 70 °C. So
+> the integrator can rise only in an early window, if at all. Whether it is ever non-zero on the car
+> is not established. **Log `0xFFFF69E6`, `0xFFFF7FF4` and `0xFFFF7FBC` before crediting the 20.19c
+> window B change with any effect** — it may have none.
+
 **Plan (Dean to schedule):**
 1. 20.18 candidate = single-variable: arm window B 0 → 438 (factory STI value,
    bleed untouched). Purpose of first log = sign determination via shift-class
@@ -158,7 +178,8 @@ unverified (~8 ms family → 438 ≈ 3.5 s). Either sign is engine-safe to A/B.
 2. Fallback/companion lever (proven plumbing): FBKC no-knock advance delay
    0xD29DE 70 → 35 — halves false-pull duration (13 s → 6.5 s from −8.4°).
    Hold for 20.19 to keep attribution clean.
-3. Next disassembly session: FFFF7FBC comparison consumer (sign, static), flagB
+3. Next disassembly session: ~~FFFF7FBC comparison consumer (sign, static)~~ (done,
+   item 108 — subtracted at every read), flagB
    writer (event B), ctrB incrementer (tick unit), FFFF65C1 writer (the other
    inhibit's duration source).
 

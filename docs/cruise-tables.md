@@ -94,6 +94,12 @@ Re-run the comparison after any new rev; these counts go stale silently.
   (`result = ratio × NonCruise + (1 − ratio) × Cruise`), so it crossfades.
 - **Cranking Fuel IPW Comp** and **Timing Compensation Imm. A/B** hard-select
   off the raw flag `0xFFFF90BE` — they snap, no interpolation.
+- Re-confirmed from bytes 2026-11-27 (corrections item 111, `timing_bound_040AF6_trace.txt`):
+  `0x06114E` steps `[0xFFFF90A8]` by ±0.008 per call within 0..1 (toward 0 = Cruise while
+  `[0xFFFF90BE]` == 1) and is the only writer found of `0xFFFF90BE`, which it sets from
+  bytes `[972E]`, `[9705]` and `[90C4]` — no temperature input (the old Ghidra names
+  `timing_dispatch_state` / `ect_warmup_mode_flag_A` are retired). The same request byte
+  also enables the bound of the timing integrator `0xFFFF7FBC` (`0x040AF6`).
 
 ### Do not use these names
 

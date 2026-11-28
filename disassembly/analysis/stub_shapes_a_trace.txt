@@ -1,0 +1,2301 @@
+SMALL-FUNCTION SHAPE CLASSES 0..29 (983 FUNCTIONS) -- BLIND TRACE
+====================================================================================================
+Date            2026-11-27
+Reference bin   rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Method          Each class example is printed by scripts/mapping/fn_dump.py (blind) and read; every member
+                is re-decoded, shape-matched, parametrised and emulated by scripts/trace/emu_stub_shapes_a.py.
+EVIDENCE CLASS  bytes + emulated for every contract and every member parameter below.  Callees that are
+                stubbed (0x002B8C, 0x00E774, bsr/bra/jmp targets) are NOT decoded; RAM / peripheral MEANING
+                is not established anywhere in this file.
+Verify          python3 scripts/verify_disasm_v2.py --rom "rom/AE5L600L 20g rev 20.19c.bin" <this file>
+Script          python3 scripts/trace/emu_stub_shapes_a.py   (exit 0; --map prints the member lines below)
+Review          Repaired 2026-11-27 after an adversarial review was decided against the bytes:
+                this file states only what survived.  See REVIEW HISTORY at the end.
+
+Scope           disassembly/maps/stub_classes.json classes 0..29 (its member lists are the only thing taken
+                from it; they are re-proved here).  Callers are census caller FUNCTIONS
+                (disassembly/maps/function_census.json), at most three listed per member, then +N.
+Library         Calls into 0x0BE9A0, 0x0BE5A8 and 0x002B8C use the verified CONTRACT sections of
+                helpers_wrap_trace.txt, helpers_arith_trace.txt and rtos_core_trace.txt.  0x0BE9A0 and
+                0x0BE5A8 are RUN in the emulator, not stubbed; 0x002B8C is stubbed.
+Notation        byte/word/long/float[A] = big-endian access at A.  sext8 / sext16 = sign extension.
+                In listings, text after ";" up to " -- " is fn_dump's annotation; the rest is this trace.
+
+SCRIPT SUMMARY (verbatim output of emu_stub_shapes_a.py --quiet; each line prefixed ';')
+; emu_stub_shapes_a: shape classes 0..29 of disassembly/maps/stub_classes.json
+; reference bin md5 92cae8275cd4f9b473a3a9e36efe6449
+; class  0: 139 members, 139 match the shape of 0x000BFA (2 insns),    139 emulated cases
+; class  1: 118 members, 118 match the shape of 0x00207C (8 insns),    236 emulated cases
+; class  2:  68 members,  68 match the shape of 0x0015FC (2 insns),     68 emulated cases
+; class  3:  65 members,  65 match the shape of 0x00FBC0 (3 insns),    650 emulated cases
+; class  4:  62 members,  62 match the shape of 0x010962 (5 insns),     62 emulated cases
+; class  5:  58 members,  58 match the shape of 0x01CEF6 (6 insns),  14848 emulated cases
+; class  6:  56 members,  56 match the shape of 0x004214 (2 insns),     56 emulated cases
+; class  7:  46 members,  46 match the shape of 0x0297A0 (8 insns),  11776 emulated cases
+; class  8:  44 members,  44 match the shape of 0x0161CA (4 insns),     44 emulated cases
+; class  9:  40 members,  40 match the shape of 0x02259C (8 insns),    120 emulated cases
+; class 10:  34 members,  34 match the shape of 0x022CEA (5 insns),   8704 emulated cases
+; class 11:  25 members,  25 match the shape of 0x00E3E4 (3 insns),     25 emulated cases
+; class 12:  19 members,  19 match the shape of 0x00717C (7 insns),     19 emulated cases
+; class 13:  19 members,  19 match the shape of 0x00E8E4 (6 insns),     57 emulated cases
+; class 14:  18 members,  18 match the shape of 0x05D31E (11 insns),    594 emulated cases
+; class 15:  16 members,  16 match the shape of 0x00F122 (7 insns),     48 emulated cases
+; class 16:  15 members,  15 match the shape of 0x003B2A (2 insns),     15 emulated cases
+; class 17:  14 members,  14 match the shape of 0x018660 (9 insns),     14 emulated cases
+; class 18:  13 members,  13 match the shape of 0x00FBBA (3 insns),    104 emulated cases
+; class 19:  13 members,  13 match the shape of 0x05DC94 (4 insns),    130 emulated cases
+; class 20:  12 members,  12 match the shape of 0x02D318 (3 insns),     12 emulated cases
+; class 21:  11 members,  11 match the shape of 0x006FF6 (3 insns),     88 emulated cases
+; class 22:  11 members,  11 match the shape of 0x00F1CA (7 insns),     33 emulated cases
+; class 23:  11 members,  11 match the shape of 0x0182EC (11 insns),     11 emulated cases
+; class 24:  10 members,  10 match the shape of 0x025C24 (4 insns),     10 emulated cases
+; class 25:  10 members,  10 match the shape of 0x05D790 (10 insns),     40 emulated cases
+; class 26:   9 members,   9 match the shape of 0x0056EC (4 insns),     54 emulated cases
+; class 27:   9 members,   9 match the shape of 0x00EA70 (9 insns),     27 emulated cases
+; class 28:   9 members,   9 match the shape of 0x00F56A (3 insns),     27 emulated cases
+; class 29:   9 members,   9 match the shape of 0x015BFA (5 insns),      9 emulated cases
+; members proved and emulated: 983   removed: 0 []
+; emulated cases: 38020
+; handlers whose r4 equals the vector number of their stub: 64
+; vector slots 64..231: 118 hold a class-1 stub (one each), 47 hold 0x0000E852,
+;   3 hold 0x00F3F2 / 0x00F460 / 0x00F6E6 (v = 184 / 186 / 224); slots holding 0x0000E852:
+;     73 75 77 79 81 82 83 85 87 89 91 93 94 95 105 106
+;     107 117 118 119 125 126 127 133 134 135 141 142 143 173 175 177
+;     179 181 182 183 185 189 191 193 195 197 198 199 225 226 227
+; review checks (non-members, asserted):
+;   R1 0x05850E: r0 = u8[0xFFFFAD52 + (r4 & 0xFF)], 49 cases
+;   R1 0x05DCAE: r0 = u8[0xFFFFAD52 + ROM u8[0x065C2E + (r4 & 0xFFFF)]], 118 cases
+;   R2 0x055FB8: word[0xFFFF3474] = 0x01FE iff the 4 pair conditions hold, 512 cases (86 stores)
+;   R3 0x0281DC: two-byte reader, returns 1 / 2 / 0, 1536 cases
+;   R4 0x004CCA / 0x009106 = rts; nop (0x00E1B0 literals); bodies 0x004CCE / 0x00910A (0x00E2FC literals)
+;   R5 class 7: 46 readers in 0xFFFF9704..0xFFFF9742, 17 bytes read by none: 9725 9726 9727 9728 9729 972A 972B 9730 9731 9732 9733 9734 9738 9739 973A 973F 9740
+; ALL ASSERTIONS PASSED
+
+SHAPE PROOF
+  For every member: census end - entry == 2 * insns (contiguous), every word decodes to an SH-2E
+  instruction (no .word / INVALID), and the masked tuple equals the example's.  Masking (the script's
+  own rule): PC-relative displacement (mov.l / mov.w / mova), 8-bit immediates (mov / add / cmp/eq /
+  tst / and / xor / or), bra / bsr displacement, 4-bit struct displacement; the literal a PC-relative
+  load reads is reduced to RAM / PERIPH / LOW / OTHER.  Conditional-branch displacements are kept.
+  Register fields are never masked.  Result: 983 of 983 members match; none removed.
+
+CLASS INDEX
+   0  139 x  2 insns  e.g. 0x000BFA  bra T; nop -- branch thunk (137) or endless loop (2)
+   1  118 x  8 insns  e.g. 0x00207C  interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H with PR = r0
+   2   68 x  2 insns  e.g. 0x0015FC  rts; nop -- empty function
+   3   65 x  3 insns  e.g. 0x00FBC0  r0 = sign-extended byte [K]
+   4   62 x  5 insns  e.g. 0x010962  call A, then tail-branch to B
+   5   58 x  6 insns  e.g. 0x01CEF6  r0 = ((byte [K] & M) != 0) -- single-mask flag test
+   6   56 x  2 insns  e.g. 0x004214  r0 = constant I
+   7   46 x  8 insns  e.g. 0x0297A0  r0 = (byte [K] != 0) ? A : B
+   8   44 x  4 insns  e.g. 0x0161CA  byte [K] = I
+   9   40 x  8 insns  e.g. 0x02259C  word [K] = value:~value pair of the constant I (via 0x0BE9A0)
+  10   34 x  5 insns  e.g. 0x022CEA  r0 = (byte [K] == I)
+  11   25 x  3 insns  e.g. 0x00E3E4  jmp T via r3 -- tail-jump thunk
+  12   19 x  7 insns  e.g. 0x00717C  call A, call B, then tail-branch to C
+  13   19 x  6 insns  e.g. 0x00E8E4  interrupt handler: read word [P], write word V to [P], goto 0x00E774 with r4 = N
+  14   18 x 11 insns  e.g. 0x05D31E  r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8)
+  15   16 x  7 insns  e.g. 0x00F122  interrupt handler: as class 13, V from mov #imm, N from a word literal
+  16   15 x  2 insns  e.g. 0x003B2A  entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] to [r1], pop r3, rts
+  17   14 x  9 insns  e.g. 0x018660  call A, B, C, then tail-branch to D
+  18   13 x  3 insns  e.g. 0x00FBBA  byte [K] = r4 (via r6)
+  19   13 x  4 insns  e.g. 0x05DC94  r0 = zero-extended byte [K]
+  20   12 x  3 insns  e.g. 0x02D318  jmp T via r2 -- tail-jump thunk
+  21   11 x  3 insns  e.g. 0x006FF6  byte [K] = r4 (via r2)
+  22   11 x  7 insns  e.g. 0x00F1CA  interrupt handler: as class 13, V from a long literal, N from a word literal
+  23   11 x 11 insns  e.g. 0x0182EC  call A, B, C, D, then tail-branch to E
+  24   10 x  4 insns  e.g. 0x025C24  byte [K] = 0xFF
+  25   10 x 10 insns  e.g. 0x05D790  r0 = 0 always (0x0BE5A8 on the constant input 0.0)
+  26    9 x  4 insns  e.g. 0x0056EC  word [B] = word [A], then FALL THROUGH into the next function
+  27    9 x  9 insns  e.g. 0x00EA70  interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 with r4 = N
+  28    9 x  3 insns  e.g. 0x00F56A  interrupt handler: goto 0x00E774 with r4 = N, nothing else
+  29    9 x  5 insns  e.g. 0x015BFA  byte [K] = I and byte [K+D] = I
+
+====================================================================================================
+==== FUNCTION 0x000BFA .. 0x000BFE  (2 instructions, 1 caller) -- CLASS 0, 139 members ====
+====================================================================================================
+SHAPE  bra T; nop -- branch thunk (137) or endless loop (2)
+CONTRACT
+  in      nothing.   out  nothing.   memory  none.
+  effect  control passes to T with every register, flag and PR unchanged.  Entered by
+          jsr/bsr it is therefore a TAIL CALL: T's rts returns to this function's caller.
+  T == entry for 2 members (0x000BFA, 0x0035F8): the function never returns and touches
+          no memory -- an endless loop.  Whether anything (an interrupt) leaves it is not
+          decided by these bytes.
+  parameter  T = bra target (12-bit displacement, pc + 4 + 2*disp).
+MECHANISM
+  pc := T  (the slot is nop)
+EVIDENCE
+  word AFFE at 0x000BFA: disp field 0xFFE = -2 -> target 0x000BFA + 4 - 4 = 0x000BFA (itself).
+  emulated: emu_stub_shapes_a.py t_bra, 139 cases, entry T / S / Q / M / FPUL random.  137
+    members: T stubbed, T reached once with PR = the caller's PR, r15 unchanged, r0-r14,
+    T / S / Q / M / FPUL / GBR / MACH / MACL and fr0-fr15 unchanged, after exactly 2 steps, no
+    RAM read, no RAM write.  2 members (T == entry): stepped 40 times, pc never leaves the
+    entry, registers / flags / fr0-fr15 / PR unchanged, nothing read or written.
+  script: 139 emulated cases for this class, all asserted.
+LISTING
+; function 0x000BFA..0x000BFE  2 instructions  rom AE5L600L 20g rev 20.19c.bin
+000BFA: AFFE  bra 0x000BFA                    ; pc := 0x000BFA (itself), after the slot: an endless loop
+000BFC: 0009  nop                             ; [slot] no effect
+MEMBERS  (139; parameters read from each member's own bytes)
+;   0x000BFA  callers 1 [000BAC]                 T=0x000BFA  (bra to itself: endless loop)
+;   0x0035F8  callers 1 [003476]                 T=0x0035F8  (bra to itself: endless loop)
+;   0x0085AC  callers 1 [00E4BA]                 T=0x008948
+;   0x009A54  callers 4 [00F192,00F1A0,00F1AE+1] T=0x00A1A6
+;   0x009C00  callers 1 [03DCB6]                 T=0x00A280
+;   0x00C36C  callers 1 [00E534]                 T=0x00C374
+;   0x00C370  callers 1 [00E534]                 T=0x00C3DA
+;   0x01096C  callers 1 [00E1B0]                 T=0x010950
+;   0x0133CE  callers 1 [048E16]                 T=0x013422
+;   0x01912A  callers 1 [04907C]                 T=0x0193F0
+;   0x01BC34  callers 1 [047C40]                 T=0x01BBF0
+;   0x01F3B4  callers 1 [01D26A]                 T=0x01F478
+;   0x01F3B8  callers 1 [01D26A]                 T=0x01F492
+;   0x01FE42  callers 1 [04A6FA]                 T=0x0204BA
+;   0x0207D0  callers 1 [049BA4]                 T=0x0207FA
+;   0x02271C  callers 1 [047C40]                 T=0x022CB6
+;   0x022720  callers 1 [048E16]                 T=0x022CB6
+;   0x022724  callers 1 [047C40]                 T=0x022CB6
+;   0x022728  callers 1 [048E16]                 T=0x022CB6
+;   0x02273A  callers 1 [048E16]                 T=0x022760
+;   0x02273E  callers 1 [04907C]                 T=0x022BB0
+;   0x022742  callers 1 [049BA4]                 T=0x022C84
+;   0x023270  callers 1 [047C40]                 T=0x0238EA
+;   0x023274  callers 1 [048E16]                 T=0x0238EA
+;   0x023282  callers 1 [049CF0]                 T=0x023434
+;   0x0232A2  callers 2 [04AED4,04AF12]          T=0x023458
+;   0x024DE4  callers 1 [05AE60]                 T=0x024ED8
+;   0x0258D0  callers 1 [04A03E]                 T=0x0258DE
+;   0x026100  callers 1 [04907C]                 T=0x026104
+;   0x0263F2  callers 1 [04A6FA]                 T=0x026512
+;   0x0263F6  callers 1 [04AA58]                 T=0x026584
+;   0x0267D4  callers 1 [049CF0]                 T=0x0272B8
+;   0x02820C  callers 1 [047C40]                 T=0x028210
+;   0x02EF08  callers 1 [047C40]                 T=0x02F85E
+;   0x02EF30  callers 1 [04A420]                 T=0x02F494
+;   0x02EF34  callers 1 [04A674]                 T=0x02F550
+;   0x02EF38  callers 1 [04A6FA]                 T=0x02F2C2
+;   0x02FA68  callers 1 [047C40]                 T=0x02FA94
+;   0x02FB68  callers 1 [047C40]                 T=0x02FB88
+;   0x02FB84  callers 1 [04A420]                 T=0x02FB96
+;   0x02FD3A  callers 1 [048E16]                 T=0x02FD8C
+;   0x02FD3E  callers 1 [04907C]                 T=0x02FE7E
+;   0x03160A  callers 1 [049CF0]                 T=0x03161E
+;   0x031A66  callers 1 [04907C]                 T=0x031C08
+;   0x032B5A  callers 1 [049BA4]                 T=0x03308E
+;   0x034592  callers 1 [04A420]                 T=0x034DA6
+;   0x0345A0  callers 1 [04AA58]                 T=0x034DD6
+;   0x03605A  callers 1 [04907C]                 T=0x036322
+;   0x03605E  callers 1 [049CF0]                 T=0x03643A
+;   0x036AAA  callers 1 [04907C]                 T=0x036AB2
+;   0x036AAE  callers 1 [04AA58]                 T=0x036B48
+;   0x036C38  callers 1 [04907C]                 T=0x036C44
+;   0x036C3C  callers 1 [049CF0]                 T=0x036C48
+;   0x036C40  callers 1 [04A6FA]                 T=0x036D14
+;   0x03756C  callers 1 [047C40]                 T=0x03757E
+;   0x03757A  callers 2 [04AED4,04AF12]          T=0x0375B8
+;   0x037B68  callers 1 [049CF0]                 T=0x037B74
+;   0x037B6C  callers 1 [04A420]                 T=0x037C52
+;   0x037B70  callers 1 [04AA58]                 T=0x037CA0
+;   0x038178  callers 1 [04AA58]                 T=0x0382C2
+;   0x038E60  callers 1 [04907C]                 T=0x0392A4
+;   0x039524  callers 1 [04AA58]                 T=0x03952C
+;   0x039528  callers 1 [049CF0]                 T=0x039668
+;   0x039860  callers 1 [04AA58]                 T=0x03988E
+;   0x039864  callers 1 [04907C]                 T=0x039952
+;   0x03A21E  callers 1 [04907C]                 T=0x03A3E6
+;   0x03A222  callers 1 [049CF0]                 T=0x03A230
+;   0x03AB90  callers 1 [04907C]                 T=0x03AE5A
+;   0x03C374  callers 1 [047C40]                 T=0x03C3A4
+;   0x03C378  callers 1 [048E16]                 T=0x03C6F0
+;   0x03C392  callers 1 [04A94C]                 T=0x03C516
+;   0x03C7EA  callers 1 [04907C]                 T=0x03C800
+;   0x03CD46  callers 1 [04A6FA]                 T=0x03D21A
+;   0x03E2B4  callers 1 [04A03E]                 T=0x03E2BC
+;   0x03E2B8  callers 1 [04A03E]                 T=0x03E352
+;   0x03E4BC  callers 1 [04A03E]                 T=0x03E4C4
+;   0x03E4C0  callers 1 [04A03E]                 T=0x03E54C
+;   0x0500E4  callers 1 [04907C]                 T=0x050222
+;   0x050E08  callers 1 [04A6FA]                 T=0x051A50
+;   0x053C28  callers 1 [04A03E]                 T=0x053CEA
+;   0x0588FA  callers 1 [047C40]                 T=0x058964
+;   0x0588FE  callers 1 [0486EE]                 T=0x058964
+;   0x05891C  callers 1 [04907C]                 T=0x058992
+;   0x05F87A  callers 1 [049CF0]                 T=0x05FE08
+;   0x06291A  callers 1 [049CF0]                 T=0x062A8E
+;   0x0662D0  callers 1 [0729DC]                 T=0x0665C0
+;   0x0665BC  callers 1 [072DD4]                 T=0x066F94
+;   0x06B450  callers 1 [048732]                 T=0x06B716
+;   0x06B754  callers 1 [0729DC]                 T=0x06BA6A
+;   0x06B7A4  callers 1 [048732]                 T=0x06BA6A
+;   0x06D5EA  callers 1 [048732]                 T=0x06D8A2
+;   0x06F5B4  callers 1 [04A03E]                 T=0x06F5C2
+;   0x06F8B2  callers 1 [048DB8]                 T=0x06F968
+;   0x070768  callers 1 [04907C]                 T=0x0707A8
+;   0x071328  callers 1 [072DD4]                 T=0x071672
+;   0x071AB2  callers 1 [04A03E]                 T=0x071AFA
+;   0x071AB6  callers 1 [04A420]                 T=0x071CE0
+;   0x07CB16  callers 1 [04907C]                 T=0x07CDCE
+;   0x07CE6E  callers 1 [04907C]                 T=0x07D070
+;   0x07D1CC  callers 1 [072DD4]                 T=0x07D312
+;   0x07D506  callers 1 [04907C]                 T=0x07D554
+;   0x07D50A  callers 1 [049CF0]                 T=0x07D620
+;   0x07F95A  callers 1 [04907C]                 T=0x07F962
+;   0x07F95E  callers 1 [0A68E4]                 T=0x07FA08
+;   0x07FF90  callers 1 [04907C]                 T=0x07FF98
+;   0x07FF94  callers 1 [04A03E]                 T=0x07FFC6
+;   0x080C50  callers 1 [04907C]                 T=0x08189E
+;   0x080C54  callers 1 [049CF0]                 T=0x0818B0
+;   0x080C58  callers 1 [04A03E]                 T=0x080E44
+;   0x080C78  callers 1 [072DD4]                 T=0x080D9C
+;   0x081B22  callers 1 [04A03E]                 T=0x081B4A
+;   0x081B46  callers 1 [072DD4]                 T=0x081D86
+;   0x081F70  callers 1 [0729DC]                 T=0x08211E
+;   0x081FA4  callers 1 [048732]                 T=0x08211E
+;   0x0821C0  callers 1 [0729DC]                 T=0x08250C
+;   0x082210  callers 1 [048732]                 T=0x08250C
+;   0x0825E0  callers 1 [04907C]                 T=0x0825E8
+;   0x0825E4  callers 1 [04907C]                 T=0x082702
+;   0x082A68  callers 1 [048732]                 T=0x08396E
+;   0x0839C4  callers 1 [048732]                 T=0x084326
+;   0x084378  callers 1 [048732]                 T=0x084978
+;   0x0849F4  callers 1 [048732]                 T=0x084D8C
+;   0x084A3E  callers 1 [0729DC]                 T=0x084D8C
+;   0x085252  callers 1 [048732]                 T=0x085D14
+;   0x087604  callers 1 [072DD4]                 T=0x087B2E
+;   0x088160  callers 1 [0729DC]                 T=0x0884A4
+;   0x088164  callers 1 [048732]                 T=0x0884A4
+;   0x08D398  callers 1 [04A420]                 T=0x08D6F4
+;   0x08D3D2  callers 1 [072DD4]                 T=0x08D8B8
+;   0x08DC2C  callers 1 [04907C]                 T=0x08DC3E
+;   0x08DE90  callers 1 [072DD4]                 T=0x08E1F6
+;   0x08E588  callers 1 [072DD4]                 T=0x08EF62
+;   0x08FA50  callers 1 [04A420]                 T=0x08FB88
+;   0x0900A6  callers 1 [04907C]                 T=0x0900B8
+;   0x0900B4  callers 1 [04AA58]                 T=0x0900D2
+;   0x0903E6  callers 1 [04907C]                 T=0x0903EE
+;   0x0903EA  callers 1 [04AA58]                 T=0x090408
+;   0x090962  callers 1 [072DD4]                 T=0x090FFC
+;   0x0965BC  callers 1 [072DD4]                 T=0x096690
+
+====================================================================================================
+==== FUNCTION 0x00207C .. 0x00208C  (8 instructions, 0 callers) -- CLASS 1, 118 members ====
+====================================================================================================
+SHAPE  interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H with PR = r0
+CONTRACT
+  in      nothing (entered through the vector table, not by a call).
+  effect  push r0, push PR, push r1 (r15 drops by 12 here), call 0x002B8C, then jump to H
+          with PR := the r0 value 0x002B8C returned.  By 0x002B8C's CONTRACT (rtos_core_trace,
+          verified library) that value is 0x002BD4, so H's rts lands in 0x002BD4.  (0x002B8C
+          itself pushes 20 more longs -- also from its CONTRACT, not re-derived here.)
+  parameter  H = the long at stub+16 (stub+20 holds 0x00002B8C in all 118).
+  vector  each of the 118 stub addresses occurs in exactly one long of 0x0FFC50 + 4*v
+          (v = 0..235 scanned; the ROM ends after slot 235), listed per member as vec=.  The
+          118 slots are distinct and lie INSIDE v = 64..231 without filling it: the other 50
+          slots in that range hold 0x0000E852 (47) or 0x00F3F2 / 0x00F460 / 0x00F6E6
+          (v = 184 / 186 / 224) -- see the ';' block below.  The 118 handlers H are distinct.
+          That 0x0FFC50 is the vector base comes from the rtos_core_trace CONTRACT (VBR loaded
+          at 0x00FA40).
+MECHANISM
+  [r15-4] = r0;  r0 = 0x002B8C;  [r15-8] = PR;  PR = stub+10;  [r15-12] = r1 (jsr slot)
+  call 0x002B8C                         -> r0 = 0x002BD4 per its CONTRACT
+  r1 = H;  PR = r0 (jmp slot);  pc = H
+EVIDENCE
+  00207C..00208A, one listing below; every member is byte-identical except the long at +16.
+  ;   non-stub slots in 64..231 (asserted by check_vector_range()):
+  ;   0x0000E852 at v = 73 75 77 79 81 82 83 85 87 89 91 93 94 95 105 106 107 117 118 119 125
+  ;     126 127 133 134 135 141 142 143 173 175 177 179 181 182 183 185 189 191 193 195 197 198
+  ;     199 225 226 227 (47).  0x00E852: D41B mov.l -> r4 = 0x00010000; AF8E bra 0x00E774; nop.
+  ;   0x00F3F2 (v = 184), 0x00F460 (v = 186), 0x00F6E6 (v = 224): each starts 2F76 2F66 2F56
+  ;     (mov.l r7 / r6 / r5,@-r15) -- it saves registers itself and is not reached through a
+  ;     class-1 stub.  Bodies not decoded here (NOT ESTABLISHED e).
+  emulated: t_isr_stub, 236 cases (118 members x 2 return values of the stubbed 0x002B8C:
+    0x002BD4 and 0x00012344 -- PR at H equals whichever was returned, so PR comes from r0, not
+    from a constant).  At 0x002B8C: PR = stub+10, r15 = entry-12, r0 = 0x002B8C, r1 = entry r1.
+    Stack words: [S-4] = entry r0, [S-8] = entry PR, [S-12] = entry r1.  At H: r1 = H,
+    r2-r14 unchanged, no RAM write outside the stack, no peripheral access.
+  script: 236 emulated cases for this class, all asserted.
+LISTING
+; function 0x00207C..0x00208C  8 instructions  rom AE5L600L 20g rev 20.19c.bin
+00207C: 2F06  mov.l r0,@-r15                  ; push r0                       [r15-4] = r0
+00207E: D004  mov.l @(0x002090),r0          ; = 0x00002B8C ROM -- r0 = 0x002B8C (the shared prologue)
+002080: 4F22  sts.l pr,@-r15                  ; push PR                       [r15-8] = caller PR
+002082: 400B  jsr @r0                       ; -> 0x002B8C -- call 0x002B8C, PR = 0x002086 (returns r0 = 0x002BD4 per its CONTRACT)
+002084: 2F16  mov.l r1,@-r15                  ; [slot] push r1  [r15-12] = r1, executed before 0x002B8C starts
+002086: D101  mov.l @(0x00208C),r1          ; = 0x0000E8D8 ROM -- r1 = H = 0x00E8D8 (the long at stub+16, the only per-stub field)
+002088: 412B  jmp @r1                       ; -> 0x00E8D8 -- jump to H; never returns here
+00208A: 402A  lds r0,pr                       ; [slot] PR = r0, so H returns (rts) to the address 0x002B8C handed back
+;   pool 0x00208C: .long 0x0000E8D8  ROM
+;   pool 0x002090: .long 0x00002B8C  ROM
+MEMBERS  (118; parameters read from each member's own bytes)
+;   0x00207C  callers 0                          H=0x00E8D8  vec=64
+;   0x002094  callers 0                          H=0x00E8E4  vec=65
+;   0x0020AC  callers 0                          H=0x00E8F0  vec=66
+;   0x0020C4  callers 0                          H=0x00E8FC  vec=67
+;   0x0020DC  callers 0                          H=0x00E908  vec=68
+;   0x0020F4  callers 0                          H=0x00E914  vec=69
+;   0x00210C  callers 0                          H=0x00E920  vec=70
+;   0x002124  callers 0                          H=0x00E92C  vec=71
+;   0x00213C  callers 0                          H=0x00E938  vec=72
+;   0x002154  callers 0                          H=0x00E946  vec=74
+;   0x00216C  callers 0                          H=0x00E954  vec=76
+;   0x002184  callers 0                          H=0x00E962  vec=78
+;   0x00219C  callers 0                          H=0x00E970  vec=80
+;   0x0021B4  callers 0                          H=0x00E97A  vec=84
+;   0x0021CC  callers 0                          H=0x00E986  vec=86
+;   0x0021E4  callers 0                          H=0x00E99C  vec=88
+;   0x0021FC  callers 0                          H=0x00E9B2  vec=90
+;   0x002214  callers 0                          H=0x00E9BE  vec=92
+;   0x00222C  callers 0                          H=0x00E9F4  vec=96
+;   0x002244  callers 0                          H=0x00EA08  vec=97
+;   0x00225C  callers 0                          H=0x00EA14  vec=98
+;   0x002274  callers 0                          H=0x00EA20  vec=99
+;   0x00228C  callers 0                          H=0x00EA2C  vec=100
+;   0x0022A4  callers 0                          H=0x00EA38  vec=101
+;   0x0022BC  callers 0                          H=0x00EA44  vec=102
+;   0x0022D4  callers 0                          H=0x00EA50  vec=103
+;   0x0022EC  callers 0                          H=0x00EA5C  vec=104
+;   0x002304  callers 0                          H=0x00EA70  vec=108
+;   0x00231C  callers 0                          H=0x00EA82  vec=109
+;   0x002334  callers 0                          H=0x00EA94  vec=110
+;   0x00234C  callers 0                          H=0x00EAA6  vec=111
+;   0x002364  callers 0                          H=0x00EAB8  vec=112
+;   0x00237C  callers 0                          H=0x00EACA  vec=113
+;   0x002394  callers 0                          H=0x00EADC  vec=114
+;   0x0023AC  callers 0                          H=0x00EAEE  vec=115
+;   0x0023C4  callers 0                          H=0x00EB18  vec=116
+;   0x0023DC  callers 0                          H=0x00EB2A  vec=120
+;   0x0023F4  callers 0                          H=0x00EB36  vec=121
+;   0x00240C  callers 0                          H=0x00EB42  vec=122
+;   0x002424  callers 0                          H=0x00EC9E  vec=123
+;   0x00243C  callers 0                          H=0x00ECAA  vec=124
+;   0x002454  callers 0                          H=0x00ECB6  vec=128
+;   0x00246C  callers 0                          H=0x00ECC2  vec=129
+;   0x002484  callers 0                          H=0x00EE14  vec=130
+;   0x00249C  callers 0                          H=0x00EE22  vec=131
+;   0x0024B4  callers 0                          H=0x00EE30  vec=132
+;   0x0024CC  callers 0                          H=0x00EE5C  vec=136
+;   0x0024E4  callers 0                          H=0x00EFA4  vec=137
+;   0x0024FC  callers 0                          H=0x00F0F8  vec=138
+;   0x002514  callers 0                          H=0x00F106  vec=139
+;   0x00252C  callers 0                          H=0x00F114  vec=140
+;   0x002544  callers 0                          H=0x00F122  vec=144
+;   0x00255C  callers 0                          H=0x00F130  vec=145
+;   0x002574  callers 0                          H=0x00F13E  vec=146
+;   0x00258C  callers 0                          H=0x00F14C  vec=147
+;   0x0025A4  callers 0                          H=0x00F15A  vec=148
+;   0x0025BC  callers 0                          H=0x00F168  vec=149
+;   0x0025D4  callers 0                          H=0x00F176  vec=150
+;   0x0025EC  callers 0                          H=0x00F184  vec=151
+;   0x002604  callers 0                          H=0x00F192  vec=152
+;   0x00261C  callers 0                          H=0x00F1A0  vec=153
+;   0x002634  callers 0                          H=0x00F1AE  vec=154
+;   0x00264C  callers 0                          H=0x00F1BC  vec=155
+;   0x002664  callers 0                          H=0x00F1CA  vec=156
+;   0x00267C  callers 0                          H=0x00F1D8  vec=157
+;   0x002694  callers 0                          H=0x00F1E6  vec=158
+;   0x0026AC  callers 0                          H=0x00F240  vec=159
+;   0x0026C4  callers 0                          H=0x00F24E  vec=160
+;   0x0026DC  callers 0                          H=0x00F25C  vec=161
+;   0x0026F4  callers 0                          H=0x00F26A  vec=162
+;   0x00270C  callers 0                          H=0x00F278  vec=163
+;   0x002724  callers 0                          H=0x00F286  vec=164
+;   0x00273C  callers 0                          H=0x00F294  vec=165
+;   0x002754  callers 0                          H=0x00F2A2  vec=166
+;   0x00276C  callers 0                          H=0x00F2B0  vec=167
+;   0x002784  callers 0                          H=0x00F2BE  vec=168
+;   0x00279C  callers 0                          H=0x00F2CC  vec=169
+;   0x0027B4  callers 0                          H=0x00F2DA  vec=170
+;   0x0027CC  callers 0                          H=0x00F2E8  vec=171
+;   0x0027E4  callers 0                          H=0x00F2F6  vec=172
+;   0x0027FC  callers 0                          H=0x00F304  vec=174
+;   0x002814  callers 0                          H=0x00F312  vec=176
+;   0x00282C  callers 0                          H=0x00F320  vec=178
+;   0x002844  callers 0                          H=0x00F390  vec=180
+;   0x00285C  callers 0                          H=0x00F4CE  vec=187
+;   0x002874  callers 0                          H=0x00F4DC  vec=188
+;   0x00288C  callers 0                          H=0x00F518  vec=192
+;   0x0028A4  callers 0                          H=0x00F4EC  vec=190
+;   0x0028BC  callers 0                          H=0x00F536  vec=194
+;   0x0028D4  callers 0                          H=0x00F542  vec=196
+;   0x0028EC  callers 0                          H=0x00F54E  vec=200
+;   0x002904  callers 0                          H=0x00F576  vec=204
+;   0x00291C  callers 0                          H=0x00F5A2  vec=208
+;   0x002934  callers 0                          H=0x00F5CE  vec=212
+;   0x00294C  callers 0                          H=0x00F5FA  vec=216
+;   0x002964  callers 0                          H=0x00F55C  vec=201
+;   0x00297C  callers 0                          H=0x00F586  vec=205
+;   0x002994  callers 0                          H=0x00F5B2  vec=209
+;   0x0029AC  callers 0                          H=0x00F5DE  vec=213
+;   0x0029C4  callers 0                          H=0x00F608  vec=217
+;   0x0029DC  callers 0                          H=0x00F56A  vec=202
+;   0x0029F4  callers 0                          H=0x00F596  vec=206
+;   0x002A0C  callers 0                          H=0x00F5C2  vec=210
+;   0x002A24  callers 0                          H=0x00F5EE  vec=214
+;   0x002A3C  callers 0                          H=0x00F616  vec=218
+;   0x002A54  callers 0                          H=0x00F570  vec=203
+;   0x002A6C  callers 0                          H=0x00F59C  vec=207
+;   0x002A84  callers 0                          H=0x00F5C8  vec=211
+;   0x002A9C  callers 0                          H=0x00F5F4  vec=215
+;   0x002AB4  callers 0                          H=0x00F61C  vec=219
+;   0x002ACC  callers 0                          H=0x00F67C  vec=220
+;   0x002AE4  callers 0                          H=0x00F75C  vec=228
+;   0x002AFC  callers 0                          H=0x00F688  vec=221
+;   0x002B14  callers 0                          H=0x00F766  vec=229
+;   0x002B2C  callers 0                          H=0x00F694  vec=222
+;   0x002B44  callers 0                          H=0x00F772  vec=230
+;   0x002B5C  callers 0                          H=0x00F69A  vec=223
+;   0x002B74  callers 0                          H=0x00F778  vec=231
+
+====================================================================================================
+==== FUNCTION 0x0015FC .. 0x001600  (2 instructions, 1 caller) -- CLASS 2, 68 members ====
+====================================================================================================
+SHAPE  rts; nop -- empty function
+CONTRACT
+  Returns at once.  Reads nothing, writes nothing, changes no register (r0 included).
+MECHANISM
+  return
+EVIDENCE
+  emulated: t_rts_nop, 68 cases: r0-r14, fr0-fr15 and T / S / Q / M / FPUL / GBR / MACH / MACL
+    equal their random entry values, 2 steps, no RAM read, no memory write.
+  script: 68 emulated cases for this class, all asserted.
+LISTING
+; function 0x0015FC..0x001600  2 instructions  rom AE5L600L 20g rev 20.19c.bin
+0015FC: 000B  rts                             ; return to PR
+0015FE: 0009  nop                             ; [slot] no effect: nothing is read or written
+MEMBERS  (68; parameters read from each member's own bytes)
+;   0x0015FC  callers 1 [00134E]
+;   0x003774  callers 1 [0036C4]
+;   0x003778  callers 1 [0036C4]
+;   0x003794  callers 1 [0036C4]
+;   0x003798  callers 0
+;   0x004210  callers 1 [00E1B0]
+;   0x0042EC  callers 1 [00F4EC]
+;   0x004302  callers 1 [00F542]
+;   0x004CCA  callers 1 [00E1B0]
+;   0x004EEA  callers 1 [004CE6]
+;   0x006624  callers 1 [00DF14]
+;   0x006CE2  callers 1 [00E1B0]
+;   0x009106  callers 1 [00E1B0]
+;   0x009BFC  callers 0
+;   0x00A690  callers 1 [00E1B0]
+;   0x00B072  callers 1 [00ADD6]
+;   0x00B2A2  callers 1 [00AD98]
+;   0x00B2A6  callers 1 [00ADD6]
+;   0x00B2E6  callers 1 [00AD98]
+;   0x00B2EA  callers 1 [00ADD6]
+;   0x00B364  callers 1 [00ADD6]
+;   0x00B470  callers 1 [00AD98]
+;   0x00B474  callers 1 [00ADD6]
+;   0x00B4DE  callers 1 [00ADD6]
+;   0x00C9CC  callers 1 [00DF14]
+;   0x00C9D0  callers 1 [00E1B0]
+;   0x00CBEE  callers 1 [00E448]
+;   0x00E4FA  callers 1 [002FEC]
+;   0x00E4FE  callers 0
+;   0x00E52A  callers 0
+;   0x00E5E4  callers 0
+;   0x00E5E8  callers 0
+;   0x00F86C  callers 1 [00DF14]
+;   0x00FE58  callers 1 [00DF14]
+;   0x0128BE  callers 1 [04A674]
+;   0x01F3BC  callers 1 [01D26A]
+;   0x01F3C0  callers 1 [01D26A]
+;   0x01F3C4  callers 1 [01D26A]
+;   0x01F3C8  callers 1 [01D26A]
+;   0x01F3CC  callers 1 [01D26A]
+;   0x031D84  callers 1 [049BA4]
+;   0x036C44  callers 1 [036C38]
+;   0x055BD4  callers 1 [047C40]
+;   0x057AD6  callers 1 [05EE9C]
+;   0x057FC8  callers 0
+;   0x0587FC  callers 3 [047B66,047C40,0486EE]
+;   0x058918  callers 1 [048E16]
+;   0x05E76A  callers 4 [05F718,05F758,09A3AC+1]
+;   0x05E7BA  callers 4 [05F718,05F758,09A3AC+1]
+;   0x05E7BE  callers 4 [05F718,05F758,09A3AC+1]
+;   0x05FE74  callers 1 [05F860]
+;   0x05FE78  callers 1 [05F860]
+;   0x060026  callers 1 [05F860]
+;   0x0616EC  callers 0
+;   0x071A76  callers 1 [09EB62]
+;   0x071A8A  callers 1 [09EB62]
+;   0x071AAE  callers 1 [0A6464]
+;   0x07D3E8  callers 1 [0A666E]
+;   0x07D3FC  callers 1 [09EB62]
+;   0x07E268  callers 1 [047C40]
+;   0x08C3B8  callers 1 [09EB62]
+;   0x08C3CC  callers 1 [09EB62]
+;   0x08C3F0  callers 1 [0A65C4]
+;   0x098864  callers 0
+;   0x09CFEA  callers 0
+;   0x09E034  callers 1 [09DF94]
+;   0x09E038  callers 1 [09DF94]
+;   0x0BEA3C  callers 0
+
+====================================================================================================
+==== FUNCTION 0x00FBC0 .. 0x00FBC6  (3 instructions, 5 callers) -- CLASS 3, 65 members ====
+====================================================================================================
+SHAPE  r0 = sign-extended byte [K]
+CONTRACT
+  out     r0 = byte [K] SIGN-extended (0x80..0xFF -> 0xFFFFFF80..0xFFFFFFFF); r2 = K.
+  memory  one byte read.  No write.
+  parameter  K (RAM, all 65).
+MECHANISM
+  r2 = K;  r0 = sext8(byte[K])
+EVIDENCE
+  emulated: t_ld_s8, 650 cases (65 x bytes 00 01 02 7F 80 81 FE FF 5A A5): r0 = sext8(b), r2 = K,
+    other registers unchanged, no write, no uninitialised read.
+  script: 650 emulated cases for this class, all asserted.
+LISTING
+; function 0x00FBC0..0x00FBC6  3 instructions  rom AE5L600L 20g rev 20.19c.bin
+00FBC0: D256  mov.l @(0x00FD1C),r2          ; = 0xFFFF5B6C RAM -- r2 = K = 0xFFFF5B6C
+00FBC2: 000B  rts                             ; return
+00FBC4: 6020  mov.b @r2,r0                    ; [slot] r0 = SIGN-extended byte [K] (0x80..0xFF -> 0xFFFFFF80..0xFFFFFFFF)
+;   pool 0x00FD1C: .long 0xFFFF5B6C  RAM
+MEMBERS  (65; parameters read from each member's own bytes)
+;   0x00FBC0  callers 5 [005598,005B0A,005C84+2] K=0xFFFF5B6C
+;   0x029BA8  callers 1 [04B6BC]                 K=0xFFFF979E
+;   0x046DB8  callers 1 [04789C]                 K=0xFFFF7E75
+;   0x047604  callers 1 [046CB6]                 K=0xFFFF8318
+;   0x058524  callers 11 [0155F8,016102,01BBF0+8] K=0xFFFFAD44
+;   0x05852A  callers 1 [0153D0]                 K=0xFFFFAD45
+;   0x05D1DA  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F0B
+;   0x05D1FE  callers 3 [05F718,09A3AC,09A628]   K=0xFFFFAF73
+;   0x05DC82  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF36BA
+;   0x05DC88  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF36BC
+;   0x05DC8E  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F11
+;   0x05DCA4  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF837C
+;   0x05DCC8  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF837D
+;   0x05DCE8  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF340E
+;   0x05DCEE  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF9FD1
+;   0x05DCF4  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF9FD2
+;   0x05DEA0  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF9FD3
+;   0x05DEA6  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF9FD4
+;   0x05DFBA  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F0E
+;   0x05DFC0  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F0F
+;   0x05DFC6  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F10
+;   0x05DFCC  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8378
+;   0x05DFD2  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8379
+;   0x05DFD8  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF837A
+;   0x05DFDE  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF36B8
+;   0x05E1F8  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF250C
+;   0x05E1FE  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF250E
+;   0x05E204  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF2510
+;   0x05E4A8  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF20D4
+;   0x05E4AE  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF20D6
+;   0x05E4B4  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF20D8
+;   0x05E4BA  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF20DA
+;   0x05E4C0  callers 3 [05F718,09A3AC,09A628]   K=0xFFFFB018
+;   0x05E4C6  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF5DB6
+;   0x05E51A  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F12
+;   0x05E550  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F08
+;   0x05E556  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F09
+;   0x05E57A  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F13
+;   0x05E5EE  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8E94
+;   0x05E632  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF20DC
+;   0x05E752  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F14
+;   0x05E758  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F15
+;   0x05E75E  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F16
+;   0x07042E  callers 2 [070252,07034A]          K=0xFFFF2508
+;   0x070434  callers 0                          K=0xFFFF2E38
+;   0x07043A  callers 0                          K=0xFFFF2560
+;   0x070440  callers 0                          K=0xFFFF2E3E
+;   0x070446  callers 0                          K=0xFFFF2E3C
+;   0x07044C  callers 0                          K=0xFFFF2F48
+;   0x070452  callers 0                          K=0xFFFF2EB8
+;   0x070458  callers 0                          K=0xFFFF2E2C
+;   0x07045E  callers 0                          K=0xFFFF9746
+;   0x070464  callers 0                          K=0xFFFF9747
+;   0x07046A  callers 0                          K=0xFFFF9748
+;   0x070470  callers 0                          K=0xFFFF9749
+;   0x070476  callers 0                          K=0xFFFF974A
+;   0x07047C  callers 0                          K=0xFFFF974B
+;   0x070482  callers 0                          K=0xFFFF9743
+;   0x070488  callers 0                          K=0xFFFF9744
+;   0x07048E  callers 0                          K=0xFFFF9745
+;   0x070494  callers 0                          K=0xFFFF30BC
+;   0x07049A  callers 0                          K=0xFFFF233C
+;   0x0704A0  callers 0                          K=0xFFFF2570
+;   0x0704A6  callers 0                          K=0xFFFF307C
+;   0x0704AC  callers 0                          K=0xFFFF9733
+
+====================================================================================================
+==== FUNCTION 0x010962 .. 0x01096C  (5 instructions, 1 caller) -- CLASS 4, 62 members ====
+====================================================================================================
+SHAPE  call A, then tail-branch to B
+CONTRACT
+  effect  calls A (bsr), then branches to B with the caller's PR restored: B returns to this
+          function's caller.  No argument is set up: A receives the caller's registers
+          unchanged; B receives whatever A left in r0-r14, fr0-fr15 and T (only PR and r15
+          are restored between them).  Writes only the stack word that holds PR.
+  parameters  A = bsr target, B = bra target.
+MECHANISM
+  push PR;  A();  pop PR;  goto B
+EVIDENCE
+  emulated: chain(), 62 cases.  A and B stubbed: order A then B; at A PR = entry+6, r15 = S-4 and
+    [S-4] = caller PR; at B PR = caller PR, r15 = S.  A sees the caller's r0-r14 / fr0-fr15 / T;
+    the A stub then LEAVES new random r0-r14 / fr0-fr15 / T, and B sees exactly those (so the
+    member adds nothing between the calls); no RAM write.
+  script: 62 emulated cases for this class, all asserted.
+LISTING
+; function 0x010962..0x01096C  5 instructions  rom AE5L600L 20g rev 20.19c.bin
+010962: 4F22  sts.l pr,@-r15                  ; push caller PR
+010964: B15F  bsr 0x010C26                    ; call A = 0x010C26, PR = 0x010968
+010966: 0009  nop                             ; [slot] no effect -- A gets the caller's r4..r7 untouched
+010968: A159  bra 0x010C1E                    ; branch to B = 0x010C1E with PR = caller PR: tail call
+01096A: 4F26  lds.l @r15+,pr                  ; [slot] pop caller PR, r15 back to its entry value
+MEMBERS  (62; parameters read from each member's own bytes)
+;   0x010962  callers 1 [00DF14]                 A=0x010C26  B=0x010C1E
+;   0x017D32  callers 1 [04907C]                 A=0x017DEA  B=0x017DF4
+;   0x021F66  callers 1 [049CF0]                 A=0x022210  B=0x0224DA
+;   0x023278  callers 1 [04907C]                 A=0x0235F8  B=0x0238B2
+;   0x0240C8  callers 1 [049BA4]                 A=0x023EB8  B=0x024024
+;   0x0243AC  callers 1 [04A03E]                 A=0x0243B6  B=0x02487C
+;   0x0258C6  callers 1 [049CF0]                 A=0x025BA8  B=0x025978
+;   0x0258D4  callers 1 [04A6FA]                 A=0x0259E0  B=0x025B28
+;   0x0261A8  callers 1 [0486EE]                 A=0x0261B2  B=0x02627E
+;   0x02B1DC  callers 2 [047C40,04A6C6]          A=0x02ACD4  B=0x02B0D0
+;   0x02BEF6  callers 1 [04907C]                 A=0x02BF00  B=0x02BF54
+;   0x02EF26  callers 1 [049CF0]                 A=0x02F718  B=0x02F768
+;   0x02EF4C  callers 1 [04AA58]                 A=0x02F22A  B=0x02EFD2
+;   0x033376  callers 1 [04907C]                 A=0x03388C  B=0x0338E2
+;   0x0333E6  callers 1 [04A674]                 A=0x0339E4  B=0x033F9E
+;   0x034596  callers 1 [04A6FA]                 A=0x034C54  B=0x034D2E
+;   0x036062  callers 1 [04A420]                 A=0x036962  B=0x036848
+;   0x037570  callers 1 [04907C]                 A=0x03757E  B=0x0376EC
+;   0x03816E  callers 1 [04907C]                 A=0x038860  B=0x03817C
+;   0x038928  callers 1 [04907C]                 A=0x038D34  B=0x038940
+;   0x039E0C  callers 1 [04907C]                 A=0x039E20  B=0x039E4A
+;   0x039E16  callers 1 [04AA58]                 A=0x039E6E  B=0x039F42
+;   0x03A226  callers 2 [04AED4,04AF12]          A=0x03A32E  B=0x03A350
+;   0x03E6CC  callers 1 [04A03E]                 A=0x03E766  B=0x03E77E
+;   0x03E6D6  callers 1 [04A03E]                 A=0x03E766  B=0x03E7C0
+;   0x040516  callers 1 [04AA58]                 A=0x040520  B=0x040528
+;   0x043464  callers 1 [04AA58]                 A=0x04346E  B=0x0434F2
+;   0x0530B8  callers 1 [04907C]                 A=0x0530C2  B=0x0530E4
+;   0x055568  callers 1 [04907C]                 A=0x0555A0  B=0x055896
+;   0x0559C4  callers 1 [04907C]                 A=0x0559CE  B=0x0559D8
+;   0x0588F0  callers 1 [047C40]                 A=0x058944  B=0x058992
+;   0x058920  callers 1 [049CF0]                 A=0x05892A  B=0x058944
+;   0x05E994  callers 1 [04A6C6]                 A=0x05E99E  B=0x05E9F0
+;   0x06B4C4  callers 1 [04A6C6]                 A=0x06B4CE  B=0x06B5AE
+;   0x06BAD8  callers 1 [04A03E]                 A=0x06BAE2  B=0x06BB52
+;   0x06C000  callers 1 [04A420]                 A=0x06C00A  B=0x06C2A8
+;   0x06CAF4  callers 1 [04907C]                 A=0x06CAFE  B=0x06CB98
+;   0x06E47C  callers 1 [04907C]                 A=0x06E486  B=0x06E50E
+;   0x06F0B8  callers 1 [04AA58]                 A=0x06F0CE  B=0x06F114
+;   0x06F260  callers 1 [04907C]                 A=0x06F26A  B=0x06F322
+;   0x06F5B8  callers 1 [04A6C6]                 A=0x06F6B4  B=0x06F6E2
+;   0x06FC14  callers 1 [047C40]                 A=0x06FC70  B=0x06FC56
+;   0x0710C8  callers 1 [04A420]                 A=0x0710D2  B=0x071152
+;   0x0712C2  callers 1 [04A420]                 A=0x0714A4  B=0x07132C
+;   0x0717A8  callers 1 [04907C]                 A=0x0717DA  B=0x0717EC
+;   0x072674  callers 1 [049BA4]                 A=0x07267E  B=0x0727F0
+;   0x072F54  callers 1 [04907C]                 A=0x072F5E  B=0x073006
+;   0x07C9E8  callers 1 [04A03E]                 A=0x07C9F2  B=0x07CA4C
+;   0x07F584  callers 1 [04907C]                 A=0x07F58E  B=0x07F5EE
+;   0x082B40  callers 1 [049CF0]                 A=0x0833A4  B=0x08340C
+;   0x084E6C  callers 1 [04907C]                 A=0x084E80  B=0x085068
+;   0x084E76  callers 1 [04907C]                 A=0x084F86  B=0x085164
+;   0x085F8C  callers 1 [04A03E]                 A=0x085F96  B=0x085FFC
+;   0x088270  callers 1 [04A420]                 A=0x08827A  B=0x088350
+;   0x08D908  callers 1 [04A03E]                 A=0x08D912  B=0x08D982
+;   0x08FC10  callers 1 [04A03E]                 A=0x08FC1A  B=0x08FC8A
+;   0x0900AA  callers 1 [049CF0]                 A=0x09021A  B=0x090334
+;   0x09123C  callers 1 [04A674]                 A=0x091246  B=0x091292
+;   0x095A90  callers 1 [04907C]                 A=0x095AA4  B=0x095C10
+;   0x095A9A  callers 1 [04907C]                 A=0x095B7E  B=0x095D28
+;   0x095E58  callers 1 [04907C]                 A=0x095E6C  B=0x095FD0
+;   0x095E62  callers 1 [04907C]                 A=0x095F42  B=0x0960EA
+
+====================================================================================================
+==== FUNCTION 0x01CEF6 .. 0x01CF02  (6 instructions, 0 callers) -- CLASS 5, 58 members ====
+====================================================================================================
+SHAPE  r0 = ((byte [K] & M) != 0) -- single-mask flag test
+CONTRACT
+  out     r0 = ((byte[K] & M) == 0) XOR X.  X = 1 in all 58 members, so r0 = 1 iff
+          (byte[K] & M) != 0, else 0.  T is left = ((byte[K] & M) == 0).
+  memory  one byte read.  No write.
+  parameters  K (RAM), M (8-bit mask, zero-extended), X.
+MECHANISM
+  r6 = K;  r0 = sext8(byte[K]);  T = ((r0 & M) == 0);  r0 = T;  r0 ^= X
+EVIDENCE
+  T sense: tst #imm,r0 sets T = 1 when (r0 & imm) == 0; imm zero-extended (01CEFA).
+  emulated: t_bit, 14,848 cases (58 members x all 256 byte values), r0 and T asserted.
+  script: 14848 emulated cases for this class, all asserted.
+LISTING
+; function 0x01CEF6..0x01CF02  6 instructions  rom AE5L600L 20g rev 20.19c.bin
+01CEF6: D604  mov.l @(0x01CF08),r6          ; = 0xFFFF61E4 RAM -- r6 = K = 0xFFFF61E4
+01CEF8: 6060  mov.b @r6,r0                    ; r0 = sign-extended byte [K]
+01CEFA: C801  tst #1,r0                       ; T = ((r0 & M) == 0), M = 0x01 zero-extended
+01CEFC: 0029  movt r0                         ; r0 = T
+01CEFE: 000B  rts                             ; return
+01CF00: CA01  xor #1,r0                       ; [slot] r0 ^= X (X = 1): r0 = 1 iff (byte & M) != 0
+;   pool 0x01CF08: .long 0xFFFF61E4  RAM
+MEMBERS  (58; parameters read from each member's own bytes)
+;   0x01CEF6  callers 0                          K=0xFFFF61E4  M=0x01  X=1
+;   0x01CF16  callers 10 [013B1A,0399FE,03B8E6+7] K=0xFFFF61F4  M=0x80  X=1
+;   0x01CF22  callers 1 [04438C]                 K=0xFFFF61F4  M=0x40  X=1
+;   0x01CF2E  callers 1 [0448F4]                 K=0xFFFF61F4  M=0x20  X=1
+;   0x01CF3A  callers 1 [052644]                 K=0xFFFF61F4  M=0x10  X=1
+;   0x01CF46  callers 1 [03161E]                 K=0xFFFF61F4  M=0x08  X=1
+;   0x01CF52  callers 3 [0268AE,0371E6,03CD4A]   K=0xFFFF61F4  M=0x04  X=1
+;   0x01CF5E  callers 1 [030C38]                 K=0xFFFF61F4  M=0x02  X=1
+;   0x01CF6A  callers 0                          K=0xFFFF61F4  M=0x01  X=1
+;   0x0278D2  callers 7 [02487C,032D52,034D2E+4] K=0xFFFF6A29  M=0x80  X=1
+;   0x0278DE  callers 2 [037186,03CD4A]          K=0xFFFF6A29  M=0x40  X=1
+;   0x02B220  callers 5 [0155F8,016102,026410+2] K=0xFFFFA179  M=0x01  X=1
+;   0x02B22C  callers 1 [03D2FC]                 K=0xFFFFA17E  M=0x01  X=1
+;   0x02B238  callers 1 [03D2FC]                 K=0xFFFFA17F  M=0x01  X=1
+;   0x02B244  callers 1 [03D2FC]                 K=0xFFFFA180  M=0x01  X=1
+;   0x02B250  callers 1 [03D2FC]                 K=0xFFFFA181  M=0x01  X=1
+;   0x02B25C  callers 1 [046BCC]                 K=0xFFFFA182  M=0x01  X=1
+;   0x02B268  callers 1 [046BCC]                 K=0xFFFFA183  M=0x01  X=1
+;   0x02B274  callers 1 [046BCC]                 K=0xFFFFA184  M=0x01  X=1
+;   0x02B280  callers 1 [046BCC]                 K=0xFFFFA185  M=0x01  X=1
+;   0x02B28C  callers 2 [037604,03A350]          K=0xFFFFA176  M=0x01  X=1
+;   0x02B298  callers 0                          K=0xFFFFA16C  M=0x01  X=1
+;   0x02BE2C  callers 2 [03439E,0353BC]          K=0xFFFFA3AE  M=0x10  X=1
+;   0x03AA24  callers 0                          K=0xFFFF7C5E  M=0x80  X=1
+;   0x042E88  callers 1 [023458]                 K=0xFFFF8098  M=0x20  X=1
+;   0x04E82E  callers 1 [05DF20]                 K=0xFFFF83AC  M=0x80  X=1
+;   0x04E83A  callers 1 [05DF20]                 K=0xFFFF83AC  M=0x40  X=1
+;   0x04E846  callers 1 [05DF20]                 K=0xFFFF83AC  M=0x20  X=1
+;   0x04E852  callers 1 [05DF20]                 K=0xFFFF83AC  M=0x10  X=1
+;   0x04E85E  callers 1 [05DF20]                 K=0xFFFF83AC  M=0x02  X=1
+;   0x04E86A  callers 2 [05CE9C,05DF20]          K=0xFFFF83AC  M=0x01  X=1
+;   0x05EA4E  callers 1 [04BA1A]                 K=0xFFFF8F1D  M=0x80  X=1
+;   0x05EA5A  callers 1 [0272E2]                 K=0xFFFF8F1D  M=0x40  X=1
+;   0x05EA66  callers 1 [058AC2]                 K=0xFFFF8F1D  M=0x20  X=1
+;   0x05EA72  callers 1 [011F16]                 K=0xFFFF8F1D  M=0x10  X=1
+;   0x05EA7E  callers 1 [02796C]                 K=0xFFFF8F1D  M=0x02  X=1
+;   0x05EA8A  callers 0                          K=0xFFFF8F1D  M=0x01  X=1
+;   0x05EA96  callers 0                          K=0xFFFF8F1E  M=0x08  X=1
+;   0x05EAA2  callers 1 [01383C]                 K=0xFFFF8F1E  M=0x04  X=1
+;   0x05EAAE  callers 1 [05A498]                 K=0xFFFF8F1E  M=0x01  X=1
+;   0x05EABA  callers 0                          K=0xFFFF8F1F  M=0x01  X=1
+;   0x05EAC6  callers 0                          K=0xFFFF8F20  M=0x80  X=1
+;   0x05EAD2  callers 1 [05A498]                 K=0xFFFF8F21  M=0x80  X=1
+;   0x05EADE  callers 1 [059B42]                 K=0xFFFF8F21  M=0x40  X=1
+;   0x05EAEA  callers 1 [027AB8]                 K=0xFFFF8F21  M=0x20  X=1
+;   0x05EAF6  callers 0                          K=0xFFFF8F21  M=0x08  X=1
+;   0x05EB02  callers 1 [03E352]                 K=0xFFFF8F21  M=0x04  X=1
+;   0x05EB0E  callers 1 [03E54C]                 K=0xFFFF8F21  M=0x02  X=1
+;   0x05EB1A  callers 1 [04BA1A]                 K=0xFFFF8F22  M=0x80  X=1
+;   0x05EB26  callers 1 [04BA1A]                 K=0xFFFF8F22  M=0x40  X=1
+;   0x05EB32  callers 1 [03F368]                 K=0xFFFF8F22  M=0x20  X=1
+;   0x05EB3E  callers 2 [03B3DA,0517A0]          K=0xFFFF8F22  M=0x10  X=1
+;   0x05EB4A  callers 1 [03CBB4]                 K=0xFFFF8F23  M=0x80  X=1
+;   0x05EB56  callers 1 [03CBB4]                 K=0xFFFF8F23  M=0x40  X=1
+;   0x05EB62  callers 1 [03CBB4]                 K=0xFFFF8F23  M=0x20  X=1
+;   0x05EB6E  callers 1 [03CBB4]                 K=0xFFFF8F23  M=0x10  X=1
+;   0x05EB7A  callers 1 [03CBB4]                 K=0xFFFF8F23  M=0x08  X=1
+;   0x05EB86  callers 1 [03CBB4]                 K=0xFFFF8F23  M=0x04  X=1
+
+====================================================================================================
+==== FUNCTION 0x004214 .. 0x004218  (2 instructions, 0 callers) -- CLASS 6, 56 members ====
+====================================================================================================
+SHAPE  r0 = constant I
+CONTRACT
+  out     r0 = I (8-bit immediate, sign-extended).  I = 0 for 54 members, 1 for 0x09EF10,
+          2 for 0x0A9858.  Nothing else changes.
+MECHANISM
+  return I
+EVIDENCE
+  emulated: t_const, 56 cases: r0 = I; r1-r14, fr0-fr15 and T / S / Q / M / FPUL unchanged; no
+    RAM read, no write.
+  script: 56 emulated cases for this class, all asserted.
+LISTING
+; function 0x004214..0x004218  2 instructions  rom AE5L600L 20g rev 20.19c.bin
+004214: 000B  rts                             ; return
+004216: E000  mov #0,r0                       ; [slot] r0 = I = 0 (sign-extended 8-bit immediate)
+MEMBERS  (56; parameters read from each member's own bytes)
+;   0x004214  callers 0                          I=0
+;   0x01382C  callers 1 [04793C]                 I=0
+;   0x014274  callers 1 [04793C]                 I=0
+;   0x01FD8C  callers 1 [034F94]                 I=0
+;   0x021DAE  callers 4 [036C48,036D14,07AB36+1] I=0
+;   0x0281C8  callers 1 [05FE08]                 I=0
+;   0x0281FC  callers 0                          I=0
+;   0x0297F0  callers 2 [012928,021B64]          I=0
+;   0x029804  callers 2 [034778,0358A0]          I=0
+;   0x029818  callers 2 [0268AE,036D14]          I=0
+;   0x029824  callers 2 [034778,052644]          I=0
+;   0x029898  callers 1 [034F94]                 I=0
+;   0x0298AC  callers 0                          I=0
+;   0x0298B0  callers 0                          I=0
+;   0x0298C4  callers 0                          I=0
+;   0x0299EC  callers 3 [015C28,015EEE,037B74]   I=0
+;   0x029A10  callers 0                          I=0
+;   0x029A14  callers 1 [015EDC]                 I=0
+;   0x029A28  callers 0                          I=0
+;   0x029A2C  callers 0                          I=0
+;   0x029A50  callers 0                          I=0
+;   0x029A54  callers 0                          I=0
+;   0x029A58  callers 0                          I=0
+;   0x029A5C  callers 0                          I=0
+;   0x029A60  callers 0                          I=0
+;   0x029A64  callers 1 [040AF6]                 I=0
+;   0x029BA4  callers 7 [0268AE,0272E2,03161E+4] I=0
+;   0x02BE38  callers 2 [03439E,0353BC]          I=0
+;   0x03E2B0  callers 1 [04793C]                 I=0
+;   0x046DCA  callers 2 [046DCE,046F82]          I=0
+;   0x058A9C  callers 1 [04793C]                 I=0
+;   0x05D3F8  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05D3FC  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05D436  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05D43A  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05DCAA  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05DEBE  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05DEC2  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05DFE4  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05DFE8  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05E2E6  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05E4CC  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05E4D0  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05E638  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05E71E  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05E722  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05E73A  callers 3 [05F718,09A3AC,09A628]   I=0
+;   0x05F7E2  callers 0                          I=0
+;   0x0614E4  callers 2 [01FE46,02487C]          I=0
+;   0x0614E8  callers 1 [050E0C]                 I=0
+;   0x0614EC  callers 1 [050E0C]                 I=0
+;   0x0614F0  callers 1 [050E0C]                 I=0
+;   0x098868  callers 0                          I=0
+;   0x09D92C  callers 1 [09D8C0]                 I=0
+;   0x09EF10  callers 0                          I=1
+;   0x0A9858  callers 0                          I=2
+
+====================================================================================================
+==== FUNCTION 0x0297A0 .. 0x0297B0  (8 instructions, 18 callers) -- CLASS 7, 46 members ====
+====================================================================================================
+SHAPE  r0 = (byte [K] != 0) ? A : B
+CONTRACT
+  out     r0 = A if byte[K] != 0, else B.  A = 2 and B = 0 in all 46 members.
+  memory  one byte read.  No write.
+  parameters  K (RAM), A, B (8-bit immediates, sign-extended).
+MECHANISM
+  r2 = sext8(byte[K])
+  if r2 != 0: r0 = A            (bf/s taken, A set in the slot)
+  else:       r0 = B            (slot runs as the next instruction, then B overrides it)
+EVIDENCE
+  T sense: tst r2,r2 sets T = 1 when r2 == 0 (0297A4).  bf/s 0x0297AC branches when T = 0 and
+    executes the slot 0297A8 first; with T = 1 the slot still runs (sequentially) and 0297AA
+    then writes B.
+  emulated: t_nzsel, 11,776 cases (46 x all 256 byte values).
+  script: 11776 emulated cases for this class, all asserted.
+LISTING
+; function 0x0297A0..0x0297B0  8 instructions  rom AE5L600L 20g rev 20.19c.bin
+0297A0: D65C  mov.l @(0x029914),r6          ; = 0xFFFF9704 RAM -- r6 = K = 0xFFFF9704
+0297A2: 6260  mov.b @r6,r2                    ; r2 = sign-extended byte [K]
+0297A4: 2228  tst r2,r2                       ; T = (r2 == 0), i.e. byte == 0
+0297A6: 8F01  bf/s 0x0297AC                   ; T = 0 (byte != 0): run the slot, then go to 0x0297AC
+0297A8: E002  mov #2,r0                       ; [slot] r0 = A = 2 -- also runs as the next instruction when T = 1
+0297AA: E000  mov #0,r0                       ; reached only when T = 1 (byte == 0): r0 = B = 0, overriding the slot
+0297AC: 000B  rts                             ; return
+0297AE: 0009  nop                             ; [slot] no effect
+;   pool 0x029914: .long 0xFFFF9704  RAM
+MEMBERS  (46; parameters read from each member's own bytes)
+;   0x0297A0  callers 18 [01229E,018CB6,018DC0+15] K=0xFFFF9704  A=2  B=0
+;   0x0297B0  callers 16 [012232,012F84,015AA4+13] K=0xFFFF9705  A=2  B=0
+;   0x0297C0  callers 7 [012F84,01F97C,025B28+4] K=0xFFFF9706  A=2  B=0
+;   0x0297D0  callers 9 [013D58,01CF80,022230+6] K=0xFFFF9707  A=2  B=0
+;   0x0297E0  callers 2 [012928,021B64]          K=0xFFFF9708  A=2  B=0
+;   0x0297F4  callers 2 [034778,0358A0]          K=0xFFFF9709  A=2  B=0
+;   0x029808  callers 3 [0268AE,036D14,0A85B2]   K=0xFFFF970A  A=2  B=0
+;   0x029828  callers 3 [023B18,0268AE,026CF4]   K=0xFFFF970B  A=2  B=0
+;   0x029838  callers 0                          K=0xFFFF970C  A=2  B=0
+;   0x029848  callers 2 [023B18,0448F4]          K=0xFFFF970D  A=2  B=0
+;   0x029858  callers 5 [02487C,044296,04438C+2] K=0xFFFF970E  A=2  B=0
+;   0x029868  callers 1 [062116]                 K=0xFFFF970F  A=2  B=0
+;   0x029878  callers 0                          K=0xFFFF9710  A=2  B=0
+;   0x029888  callers 2 [034F94,039668]          K=0xFFFF9711  A=2  B=0
+;   0x02989C  callers 0                          K=0xFFFF9712  A=2  B=0
+;   0x0298B4  callers 2 [013D58,03E6E0]          K=0xFFFF9713  A=2  B=0
+;   0x0298C8  callers 7 [01FE46,0268AE,03CD4A+4] K=0xFFFF9714  A=2  B=0
+;   0x0298D8  callers 2 [060568,0606A6]          K=0xFFFF9715  A=2  B=0
+;   0x0298E8  callers 3 [0209DC,060568,0606A6]   K=0xFFFF9716  A=2  B=0
+;   0x02995C  callers 3 [0209DC,060568,0606A6]   K=0xFFFF9717  A=2  B=0
+;   0x02996C  callers 1 [0209DC]                 K=0xFFFF9719  A=2  B=0
+;   0x02997C  callers 3 [013D58,044296,04438C]   K=0xFFFF9718  A=2  B=0
+;   0x02998C  callers 1 [013D58]                 K=0xFFFF971A  A=2  B=0
+;   0x02999C  callers 10 [03FFD6,04590A,04592E+7] K=0xFFFF971B  A=2  B=0
+;   0x0299AC  callers 5 [01BBF0,01C13E,03B668+2] K=0xFFFF971D  A=2  B=0
+;   0x0299BC  callers 14 [014EB6,01511C,015FD8+11] K=0xFFFF971C  A=2  B=0
+;   0x0299CC  callers 0                          K=0xFFFF971E  A=2  B=0
+;   0x0299DC  callers 1 [022F56]                 K=0xFFFF971F  A=2  B=0
+;   0x0299F0  callers 6 [021FE0,025660,033460+3] K=0xFFFF9720  A=2  B=0
+;   0x029A00  callers 2 [013D58,022292]          K=0xFFFF9721  A=2  B=0
+;   0x029A18  callers 1 [05F954]                 K=0xFFFF9722  A=2  B=0
+;   0x029A30  callers 4 [03E2BC,03E352,03E4C4+1] K=0xFFFF9723  A=2  B=0
+;   0x029A40  callers 1 [0272E2]                 K=0xFFFF9724  A=2  B=0
+;   0x029AA0  callers 7 [024EE8,024F9C,036E86+4] K=0xFFFF972E  A=2  B=0
+;   0x029AB0  callers 7 [0155A0,01DAAE,01E816+4] K=0xFFFF972C  A=2  B=0
+;   0x029AC0  callers 7 [0155A0,01DAAE,01E816+4] K=0xFFFF972D  A=2  B=0
+;   0x029AD0  callers 0                          K=0xFFFF9737  A=2  B=0
+;   0x029AE0  callers 4 [0156CE,021416,0BB5C8+1] K=0xFFFF9735  A=2  B=0
+;   0x029AF0  callers 4 [0156CE,021416,0BB5C8+1] K=0xFFFF9736  A=2  B=0
+;   0x029B00  callers 1 [03BE70]                 K=0xFFFF973B  A=2  B=0
+;   0x029B10  callers 4 [01E360,023120,03BE70+1] K=0xFFFF973C  A=2  B=0
+;   0x029B20  callers 3 [023120,056A16,056B02]   K=0xFFFF973D  A=2  B=0
+;   0x029B30  callers 1 [0BB90C]                 K=0xFFFF973E  A=2  B=0
+;   0x029B40  callers 8 [014540,01BBF0,01C13E+5] K=0xFFFF9741  A=2  B=0
+;   0x029B50  callers 1 [03BE70]                 K=0xFFFF972F  A=2  B=0
+;   0x029B60  callers 1 [050A5A]                 K=0xFFFF9742  A=2  B=0
+
+====================================================================================================
+==== FUNCTION 0x0161CA .. 0x0161D2  (4 instructions, 0 callers) -- CLASS 8, 44 members ====
+====================================================================================================
+SHAPE  byte [K] = I
+CONTRACT
+  effect  byte[K] = I & 0xFF (I = 0 for 30 members, 1 for 13, 2 for 0x08C31E); r2 = I, r6 = K.
+  parameters  I (8-bit immediate), K (RAM).
+MECHANISM
+  byte[K] = I
+EVIDENCE
+  emulated: t_st_imm, 44 cases: K pre-filled with ~I, afterwards = I; the only RAM byte written
+    is K; r2 = I.
+  script: 44 emulated cases for this class, all asserted.
+LISTING
+; function 0x0161CA..0x0161D2  4 instructions  rom AE5L600L 20g rev 20.19c.bin
+0161CA: E200  mov #0,r2                       ; r2 = I = 0
+0161CC: D690  mov.l @(0x016410),r6          ; = 0xFFFF5DD3 RAM -- r6 = K = 0xFFFF5DD3
+0161CE: 000B  rts                             ; return
+0161D0: 2620  mov.b r2,@r6                    ; [slot] byte [K] = low byte of I
+;   pool 0x016410: .long 0xFFFF5DD3  RAM
+MEMBERS  (44; parameters read from each member's own bytes)
+;   0x0161CA  callers 0                          K=0xFFFF5DD3  I=0 (byte 0x00)
+;   0x01CB1C  callers 1 [04793C]                 K=0xFFFF61E0  I=1 (byte 0x01)
+;   0x01F3D0  callers 1 [01D26A]                 K=0xFFFF6310  I=1 (byte 0x01)
+;   0x02E364  callers 1 [05E844]                 K=0xFFFF7235  I=1 (byte 0x01)
+;   0x03DBF4  callers 1 [04AE82]                 K=0xFFFF7E55  I=1 (byte 0x01)
+;   0x03DD46  callers 3 [03DCB6,03DFC8,03E168]   K=0xFFFF7E50  I=1 (byte 0x01)
+;   0x03EA5A  callers 1 [04AA58]                 K=0xFFFF7E75  I=0 (byte 0x00)
+;   0x040520  callers 1 [040516]                 K=0xFFFF7F82  I=0 (byte 0x00)
+;   0x0469C6  callers 1 [04438C]                 K=0xFFFF829C  I=0 (byte 0x00)
+;   0x046A3A  callers 1 [045DF8]                 K=0xFFFF829D  I=0 (byte 0x00)
+;   0x046A42  callers 1 [045BFE]                 K=0xFFFF82A0  I=0 (byte 0x00)
+;   0x0475A8  callers 1 [04AE82]                 K=0xFFFF831D  I=1 (byte 0x01)
+;   0x04BC20  callers 1 [04AA58]                 K=0xFFFF8373  I=0 (byte 0x00)
+;   0x057B90  callers 2 [057D86,057E2E]          K=0xFFFF8D75  I=0 (byte 0x00)
+;   0x058A84  callers 1 [047C40]                 K=0xFFFFB018  I=1 (byte 0x01)
+;   0x058AA0  callers 1 [047C40]                 K=0xFFFF8E17  I=1 (byte 0x01)
+;   0x05940A  callers 1 [04793C]                 K=0xFFFF8E30  I=1 (byte 0x01)
+;   0x0616E4  callers 2 [0622A0,062310]          K=0xFFFF9128  I=0 (byte 0x00)
+;   0x0662C4  callers 1 [05D032]                 K=0xFFFF61E0  I=0 (byte 0x00)
+;   0x06C3CE  callers 1 [047C40]                 K=0xFFFF9584  I=0 (byte 0x00)
+;   0x07CB28  callers 1 [03DCB6]                 K=0xFFFFA232  I=1 (byte 0x01)
+;   0x07F678  callers 1 [047C40]                 K=0xFFFFA36C  I=0 (byte 0x00)
+;   0x07F8C8  callers 1 [047C40]                 K=0xFFFFA374  I=1 (byte 0x01)
+;   0x07FADC  callers 1 [047C40]                 K=0xFFFFA37E  I=0 (byte 0x00)
+;   0x07FC80  callers 1 [047C40]                 K=0xFFFFA38C  I=0 (byte 0x00)
+;   0x07FC88  callers 1 [047C40]                 K=0xFFFFA38D  I=0 (byte 0x00)
+;   0x0827FC  callers 1 [047C40]                 K=0xFFFFA44A  I=0 (byte 0x00)
+;   0x087074  callers 1 [04793C]                 K=0xFFFFA59C  I=1 (byte 0x01)
+;   0x08707C  callers 1 [05D032]                 K=0xFFFFA59C  I=0 (byte 0x00)
+;   0x087EF0  callers 1 [047C40]                 K=0xFFFFA5DE  I=0 (byte 0x00)
+;   0x08C31E  callers 1 [047C40]                 K=0xFFFFA827  I=2 (byte 0x02)
+;   0x08CEC2  callers 1 [07C9F2]                 K=0xFFFFA83C  I=0 (byte 0x00)
+;   0x08CECA  callers 1 [07C9F2]                 K=0xFFFFA83D  I=0 (byte 0x00)
+;   0x08CED2  callers 1 [07CA4C]                 K=0xFFFFA840  I=0 (byte 0x00)
+;   0x08CEDA  callers 1 [07CA4C]                 K=0xFFFFA841  I=0 (byte 0x00)
+;   0x08CF38  callers 1 [0729DC]                 K=0xFFFFA84A  I=0 (byte 0x00)
+;   0x08D186  callers 1 [07CA4C]                 K=0xFFFFA84C  I=0 (byte 0x00)
+;   0x08D18E  callers 1 [07CA4C]                 K=0xFFFFA84D  I=0 (byte 0x00)
+;   0x08D2D8  callers 1 [07C9F2]                 K=0xFFFFA854  I=0 (byte 0x00)
+;   0x08D2E0  callers 1 [07C9F2]                 K=0xFFFFA855  I=0 (byte 0x00)
+;   0x097514  callers 1 [05D032]                 K=0xFFFF8E30  I=0 (byte 0x00)
+;   0x0990EA  callers 1 [047C40]                 K=0xFFFFB71C  I=0 (byte 0x00)
+;   0x09ED44  callers 1 [05AB44]                 K=0xFFFFAF3D  I=1 (byte 0x01)
+;   0x0A85FC  callers 1 [0A67E2]                 K=0xFFFFAF72  I=0 (byte 0x00)
+
+====================================================================================================
+==== FUNCTION 0x02259C .. 0x0225AC  (8 instructions, 1 caller) -- CLASS 9, 40 members ====
+====================================================================================================
+SHAPE  word [K] = value:~value pair of the constant I (via 0x0BE9A0)
+CONTRACT
+  effect  word[K] = ((I & 0xFF) << 8) | (~I & 0xFF); r0 = the same.  The caller's r4 is not an
+          input: the jsr slot overwrites it with I.  I = 0 (0x00FF) for 36 members, I = 1
+          (0x01FE) for 0x02259C, 0x024ED8, 0x05CA32, I = 7 (0x07F8) for 0x0A7108.
+  clobbers  r0 = r4 = the stored word (0x0BE9A8 mov r3,r4 / 0x0BE9AA add r2,r4 / 0x0BE9AE
+          mov r4,r0); r3 = (I & 0xFF) << 8 (0x0BE9A0 extu.b / 0x0BE9A2 shll8); r2 = K on return
+          (the library leaves r2 = ~I & 0xFF at 0x0BE9A4 / 0x0BE9A6, overwritten by the K load).
+          T, FPUL and fr0-fr15 are unchanged (no library instruction writes them).
+  parameters  I (8-bit immediate), K (RAM, even).
+MECHANISM
+  r0 = 0x0BE9A0(r4 = I)         library CONTRACT: (v << 8) | (~v & 0xFF), v = r4 & 0xFF
+  word[K] = r0
+EVIDENCE
+  emulated: t_pair, 120 cases (40 members x 3 random register / flag states), 0x0BE9A0 RUN (not
+    stubbed): word[K] and r0 asserted against the formula; r4 = the word, r3 = (I & 0xFF) << 8,
+    r2 = K, every other r0-r14 / fr0-fr15 / T / FPUL unchanged; the only RAM read is the PR
+    pop on the stack; only K, K+1 written; r15 restored.
+  script: 120 emulated cases for this class, all asserted.
+LISTING
+; function 0x02259C..0x0225AC  8 instructions  rom AE5L600L 20g rev 20.19c.bin
+02259C: 4F22  sts.l pr,@-r15                  ; push caller PR
+02259E: D219  mov.l @(0x022604),r2          ; = 0x000BE9A0 ROM -- r2 = 0x0BE9A0 (library: r0 = (v << 8) | (~v & 0xFF), v = r4 & 0xFF)
+0225A0: 420B  jsr @r2                       ; -> 0x0BE9A0 -- call it, PR = 0x0225A4
+0225A2: E401  mov #1,r4                       ; [slot] r4 = I = 1, so the caller's r4 is never used
+0225A4: D218  mov.l @(0x022608),r2          ; = 0xFFFF221C RAM -- r2 = K = 0xFFFF221C
+0225A6: 4F26  lds.l @r15+,pr                  ; pop caller PR
+0225A8: 000B  rts                             ; return
+0225AA: 2201  mov.w r0,@r2                    ; [slot] word [K] = r0 = 0x01FE for I = 1 (value byte, complement byte)
+;   pool 0x022604: .long 0x000BE9A0  ROM
+;   pool 0x022608: .long 0xFFFF221C  RAM
+MEMBERS  (40; parameters read from each member's own bytes)
+;   0x02259C  callers 1 [05AE60]                 K=0xFFFF221C  I=1  stored word 0x01FE
+;   0x024ED8  callers 1 [024DE4]                 K=0xFFFF2248  I=1  stored word 0x01FE
+;   0x029BD4  callers 1 [048732]                 K=0xFFFF2560  I=0  stored word 0x00FF
+;   0x02D790  callers 1 [048732]                 K=0xFFFF3150  I=0  stored word 0x00FF
+;   0x04B288  callers 1 [048732]                 K=0xFFFF33A8  I=0  stored word 0x00FF
+;   0x056022  callers 1 [048732]                 K=0xFFFF3474  I=0  stored word 0x00FF
+;   0x05CA22  callers 1 [047C40]                 K=0xFFFF3692  I=0  stored word 0x00FF
+;   0x05CA32  callers 1 [05AB44]                 K=0xFFFF3692  I=1  stored word 0x01FE
+;   0x05CE40  callers 1 [048732]                 K=0xFFFF36B4  I=0  stored word 0x00FF
+;   0x05E7EA  callers 9 [04CA4E,04CC2A,04CC72+6] K=0xFFFF8F0C  I=0  stored word 0x00FF
+;   0x06C3D6  callers 1 [048732]                 K=0xFFFF2498  I=0  stored word 0x00FF
+;   0x06C6D8  callers 1 [048732]                 K=0xFFFF249C  I=0  stored word 0x00FF
+;   0x06C6E8  callers 1 [048732]                 K=0xFFFF249E  I=0  stored word 0x00FF
+;   0x06C900  callers 1 [048732]                 K=0xFFFF24A0  I=0  stored word 0x00FF
+;   0x06C910  callers 1 [048732]                 K=0xFFFF24A2  I=0  stored word 0x00FF
+;   0x06CDB0  callers 1 [048732]                 K=0xFFFF24A4  I=0  stored word 0x00FF
+;   0x06E224  callers 1 [048732]                 K=0xFFFF24E4  I=0  stored word 0x00FF
+;   0x06FC04  callers 2 [048732,06FF1A]          K=0xFFFF2504  I=0  stored word 0x00FF
+;   0x071A66  callers 1 [09EB62]                 K=0xFFFF255C  I=0  stored word 0x00FF
+;   0x071A7A  callers 1 [09EB62]                 K=0xFFFF255E  I=0  stored word 0x00FF
+;   0x0757C6  callers 2 [074C7E,09EB62]          K=0xFFFF2BEC  I=0  stored word 0x00FF
+;   0x0757D6  callers 2 [074C7E,09EB62]          K=0xFFFF2BEE  I=0  stored word 0x00FF
+;   0x0757E6  callers 2 [074C7E,09EB62]          K=0xFFFF2BF0  I=0  stored word 0x00FF
+;   0x0757F6  callers 2 [074C7E,09EB62]          K=0xFFFF2BF2  I=0  stored word 0x00FF
+;   0x075806  callers 2 [074C7E,09EB62]          K=0xFFFF2BF4  I=0  stored word 0x00FF
+;   0x075816  callers 2 [074C7E,09EB62]          K=0xFFFF2BF6  I=0  stored word 0x00FF
+;   0x07D3EC  callers 1 [09EB62]                 K=0xFFFF2E20  I=0  stored word 0x00FF
+;   0x07F69A  callers 1 [048732]                 K=0xFFFF2E2C  I=0  stored word 0x00FF
+;   0x07FAFE  callers 1 [048732]                 K=0xFFFF2E38  I=0  stored word 0x00FF
+;   0x07FCAA  callers 1 [048732]                 K=0xFFFF2E3C  I=0  stored word 0x00FF
+;   0x07FCBA  callers 1 [048732]                 K=0xFFFF2E3E  I=0  stored word 0x00FF
+;   0x082810  callers 1 [048732]                 K=0xFFFF2EB8  I=0  stored word 0x00FF
+;   0x087084  callers 0                          K=0xFFFF2F40  I=0  stored word 0x00FF
+;   0x087F0C  callers 1 [048732]                 K=0xFFFF2F48  I=0  stored word 0x00FF
+;   0x08C3A8  callers 1 [09EB62]                 K=0xFFFF307A  I=0  stored word 0x00FF
+;   0x08C3BC  callers 1 [09EB62]                 K=0xFFFF3078  I=0  stored word 0x00FF
+;   0x08EFE2  callers 1 [048732]                 K=0xFFFF30B0  I=0  stored word 0x00FF
+;   0x08F826  callers 1 [048732]                 K=0xFFFF30BC  I=0  stored word 0x00FF
+;   0x09DDF8  callers 1 [048732]                 K=0xFFFF36EC  I=0  stored word 0x00FF
+;   0x0A7108  callers 1 [0A67E2]                 K=0xFFFF3C9C  I=7  stored word 0x07F8
+
+====================================================================================================
+==== FUNCTION 0x022CEA .. 0x022CF4  (5 instructions, 15 callers) -- CLASS 10, 34 members ====
+====================================================================================================
+SHAPE  r0 = (byte [K] == I)
+CONTRACT
+  out     r0 = 1 if sext8(byte[K]) == I (I sign-extended), else 0.  I = 1 in all 34 members,
+          so r0 = 1 iff byte[K] == 0x01 (0xFF, 0x02 ... all give 0).
+  memory  one byte read.  No write.
+  parameters  K (RAM), I.
+MECHANISM
+  r0 = sext8(byte[K]);  T = (r0 == I);  r0 = T
+EVIDENCE
+  T sense: cmp/eq #imm,r0 sets T = 1 when r0 == sign-extended imm (022CEE).
+  emulated: t_eq, 8,704 cases (34 x all 256 byte values).
+  script: 8704 emulated cases for this class, all asserted.
+LISTING
+; function 0x022CEA..0x022CF4  5 instructions  rom AE5L600L 20g rev 20.19c.bin
+022CEA: D60E  mov.l @(0x022D24),r6          ; = 0xFFFF65B1 RAM -- r6 = K = 0xFFFF65B1
+022CEC: 6060  mov.b @r6,r0                    ; r0 = sign-extended byte [K]
+022CEE: 8801  cmp/eq #1,r0                    ; T = (r0 == I), I = 1 sign-extended
+022CF0: 000B  rts                             ; return
+022CF2: 0029  movt r0                         ; [slot] r0 = T: 1 iff byte [K] == 1
+;   pool 0x022D24: .long 0xFFFF65B1  RAM
+MEMBERS  (34; parameters read from each member's own bytes)
+;   0x022CEA  callers 15 [0186C4,05D7B6,0764EE+12] K=0xFFFF65B1  I=1
+;   0x022CF4  callers 100 [0124F0,013D58,014E8A+97] K=0xFFFF65C5  I=1
+;   0x022F92  callers 111 [013108,013D58,015AD2+108] K=0xFFFF65F6  I=1
+;   0x023E48  callers 15 [0304BE,030744,03082E+12] K=0xFFFF67FC  I=1
+;   0x0281CC  callers 2 [05D12C,05FE08]          K=0xFFFF96A0  I=1
+;   0x02BE10  callers 0                          K=0xFFFFA39E  I=1
+;   0x02BE1A  callers 0                          K=0xFFFFA39D  I=1
+;   0x02BE40  callers 0                          K=0xFFFF2F44  I=1
+;   0x02BE4A  callers 0                          K=0xFFFFA5B4  I=1
+;   0x02BE54  callers 0                          K=0xFFFF2F46  I=1
+;   0x02BE5E  callers 0                          K=0xFFFFA5B5  I=1
+;   0x02E7D8  callers 1 [05E2EA]                 K=0xFFFF7234  I=1
+;   0x02E7E2  callers 1 [05E2EA]                 K=0xFFFF7235  I=1
+;   0x02F8EA  callers 65 [012928,01511C,01BAB0+62] K=0xFFFF726C  I=1
+;   0x02F8F4  callers 6 [012928,012FF4,01F7E0+3] K=0xFFFF726D  I=1
+;   0x02F8FE  callers 4 [01383C,04438C,0448F4+1] K=0xFFFF726E  I=1
+;   0x03AB20  callers 34 [0141D6,014DA8,015AD2+31] K=0xFFFF7C68  I=1
+;   0x03B64C  callers 0                          K=0xFFFF7C9D  I=1
+;   0x03B76E  callers 1 [026CF4]                 K=0xFFFF7CB8  I=1
+;   0x03BCD4  callers 0                          K=0xFFFF7CE0  I=1
+;   0x03BCDE  callers 0                          K=0xFFFF7CE5  I=1
+;   0x03BDBE  callers 1 [08DBC0]                 K=0xFFFF7CE8  I=1
+;   0x03CB62  callers 1 [05DB60]                 K=0xFFFF7D2E  I=1
+;   0x0584BE  callers 43 [06BAE2,06BB52,06BC1A+40] K=0xFFFFAE08  I=1
+;   0x0584C8  callers 59 [066B4C,067D18,0693EC+56] K=0xFFFFAE09  I=1
+;   0x0584D2  callers 6 [02B334,06665E,073A74+3] K=0xFFFFAE0A  I=1
+;   0x0584DC  callers 2 [0724C8,07F106]          K=0xFFFFAE0B  I=1
+;   0x0584E6  callers 0                          K=0xFFFFAE0C  I=1
+;   0x0584F0  callers 0                          K=0xFFFFAE0D  I=1
+;   0x0584FA  callers 9 [082702,084F86,085164+6] K=0xFFFFAE0E  I=1
+;   0x058504  callers 8 [0153D0,01BBF0,01C13E+5] K=0xFFFFAE0F  I=1
+;   0x058530  callers 2 [079D00,07BE30]          K=0xFFFFAF34  I=1
+;   0x05853A  callers 1 [07BBAE]                 K=0xFFFFAF33  I=1
+;   0x061496  callers 2 [0209DC,05DA88]          K=0xFFFF90BB  I=1
+
+====================================================================================================
+==== FUNCTION 0x00E3E4 .. 0x00E3EA  (3 instructions, 0 callers) -- CLASS 11, 25 members ====
+====================================================================================================
+SHAPE  jmp T via r3 -- tail-jump thunk
+CONTRACT
+  effect  r3 = T, then control passes to T with PR unchanged (tail call).  No memory access.
+  parameter  T (long literal, code address).
+MECHANISM
+  r3 = T;  goto T
+EVIDENCE
+  emulated: t_jmp, 25 cases: T stubbed, reached once with PR = caller PR, r15 unchanged, r3 = T,
+    every other register unchanged, no write.
+  script: 25 emulated cases for this class, all asserted.
+LISTING
+; function 0x00E3E4..0x00E3EA  3 instructions  rom AE5L600L 20g rev 20.19c.bin
+00E3E4: D311  mov.l @(0x00E42C),r3          ; = 0x000035A4 ROM -- r3 = T = 0x0035A4
+00E3E6: 432B  jmp @r3                       ; -> 0x0035A4 -- jump to T; PR untouched, so T returns to this function's caller
+00E3E8: 0009  nop                             ; [slot] no effect
+;   pool 0x00E42C: .long 0x000035A4  ROM
+MEMBERS  (25; parameters read from each member's own bytes)
+;   0x00E3E4  callers 0                          T=0x0035A4
+;   0x00E502  callers 0                          T=0x04793C
+;   0x00E508  callers 0                          T=0x048732
+;   0x00E52E  callers 1 [00FDB4]                 T=0x049A7A
+;   0x00E590  callers 1 [00FDB4]                 T=0x04A674
+;   0x00E596  callers 1 [00FDB4]                 T=0x04A6C6
+;   0x00E59C  callers 1 [00FDB4]                 T=0x04A6FA
+;   0x00F61C  callers 1 [002AB4]                 T=0x008CBC
+;   0x00F694  callers 1 [002B2C]                 T=0x006316
+;   0x00F772  callers 1 [002B44]                 T=0x006316
+;   0x028200  callers 1 [047C40]                 T=0x029750
+;   0x028206  callers 1 [04A03E]                 T=0x029750
+;   0x058A8C  callers 1 [048E16]                 T=0x0983E4
+;   0x067B32  callers 1 [072DD4]                 T=0x06B1D8
+;   0x0734E0  callers 1 [072DD4]                 T=0x07494E
+;   0x0758BE  callers 1 [04A420]                 T=0x07ADD8
+;   0x09CACC  callers 2 [09CE7E,09D0B8]          T=0x098940
+;   0x09CAD2  callers 1 [09CE7E]                 T=0x09894A
+;   0x09CAD8  callers 7 [09D236,09D294,09D390+4] T=0x098950
+;   0x09CADE  callers 7 [09D17C,09D1AA,09D1D8+4] T=0x09895A
+;   0x09CAE4  callers 1 [09D45A]                 T=0x098982
+;   0x09E1CA  callers 1 [049CF0]                 T=0x0A6122
+;   0x09E1D0  callers 1 [04A03E]                 T=0x0A3BEC
+;   0x0A67D6  callers 1 [049CF0]                 T=0x0A84A4
+;   0x0A67DC  callers 1 [04A03E]                 T=0x0A8482
+
+====================================================================================================
+==== FUNCTION 0x00717C .. 0x00718A  (7 instructions, 1 caller) -- CLASS 12, 19 members ====
+====================================================================================================
+SHAPE  call A, call B, then tail-branch to C
+CONTRACT
+  effect  as class 4 with two calls: A(), B(), then goto C with the caller's PR restored.  No
+          argument set-up of its own.
+  parameters  A, B (bsr targets), C (bra target).
+MECHANISM
+  push PR;  A();  B();  pop PR;  goto C
+EVIDENCE
+  emulated: chain(), 19 cases: order A, B, C; PR at A = entry+6, at B = entry+10, at C = caller PR;
+    r15 = S-4 holding the caller PR during A and B, = S at C; A sees the caller's r0-r14 /
+    fr0-fr15 / T, B sees what the A stub left, C what the B stub left (each stub leaves new
+    random values); no RAM write.
+  script: 19 emulated cases for this class, all asserted.
+LISTING
+; function 0x00717C..0x00718A  7 instructions  rom AE5L600L 20g rev 20.19c.bin
+00717C: 4F22  sts.l pr,@-r15                  ; push caller PR
+00717E: B090  bsr 0x0072A2                    ; call A = 0x0072A2, PR = 0x007182
+007180: 0009  nop                             ; [slot] no effect
+007182: B29E  bsr 0x0076C2                    ; call B = 0x0076C2, PR = 0x007186
+007184: 0009  nop                             ; [slot] no effect
+007186: A487  bra 0x007A98                    ; branch to C = 0x007A98 with the caller PR restored: tail call
+007188: 4F26  lds.l @r15+,pr                  ; [slot] pop caller PR
+MEMBERS  (19; parameters read from each member's own bytes)
+;   0x00717C  callers 1 [006FFC]                 A=0x0072A2  B=0x0076C2  C=0x007A98
+;   0x01774A  callers 1 [04907C]                 A=0x017A46  B=0x017A72  C=0x017A7C
+;   0x01FE34  callers 1 [049CF0]                 A=0x020468  B=0x0204F8  C=0x02053E
+;   0x02272C  callers 1 [047C40]                 A=0x022746  B=0x022760  C=0x022B9E
+;   0x026642  callers 1 [049CF0]                 A=0x026650  B=0x026698  C=0x0266E0
+;   0x038932  callers 1 [04AA58]                 A=0x0389C4  B=0x038BD2  C=0x038C50
+;   0x0399E0  callers 1 [04907C]                 A=0x0399FE  B=0x039B1E  C=0x039D1C
+;   0x03C396  callers 1 [04AA58]                 A=0x03C3F4  B=0x03C440  C=0x03C6E0
+;   0x0539B0  callers 1 [04907C]                 A=0x053AF8  B=0x053A76  C=0x0539C8
+;   0x06290C  callers 1 [049BA4]                 A=0x06297E  B=0x062A46  C=0x06291E
+;   0x06B864  callers 1 [048E16]                 A=0x06B872  B=0x06B8B6  C=0x06B93C
+;   0x06F8B6  callers 1 [049CF0]                 A=0x06F8C4  B=0x06FA10  C=0x06FBAA
+;   0x07CB1A  callers 1 [04907C]                 A=0x07CB30  B=0x07CC30  C=0x07CCD0
+;   0x07CE72  callers 1 [04907C]                 A=0x07CE80  B=0x07CEF4  C=0x07CF94
+;   0x0822D0  callers 1 [04907C]                 A=0x0822DE  B=0x08232E  C=0x0823C4
+;   0x083AB8  callers 1 [049CF0]                 A=0x083B6C  B=0x083C70  C=0x083DF0
+;   0x0860A4  callers 1 [049CF0]                 A=0x0860B2  B=0x08611A  C=0x08614E
+;   0x08DC30  callers 1 [049CF0]                 A=0x08DC80  B=0x08DCE4  C=0x08DD1A
+;   0x08E2A0  callers 1 [048E16]                 A=0x08E2AE  B=0x08E2DE  C=0x08E346
+
+====================================================================================================
+==== FUNCTION 0x00E8E4 .. 0x00E8F0  (6 instructions, 1 caller) -- CLASS 13, 19 members ====
+====================================================================================================
+SHAPE  interrupt handler: read word [P], write word V to [P], goto 0x00E774 with r4 = N
+CONTRACT
+  effect  r3 = word[P] (a read whose value is not used: 0x00E774 overwrites r3 at 0x00E778
+          before any instruction reads it), word[P] = V, then branch to 0x00E774 with r4 = N.
+          PR is not touched: it still holds what the stub set (0x002BD4) when 0x00E774 starts.
+  parameters  P (word literal sign-extended: peripheral space 0xFFFFE000+), V (word literal),
+          N (8-bit immediate).  T = 0x00E774 for all 19.
+  cross-check  N = the vector slot number of the class-1 stub that jumps to this handler, 19/19.
+          (V has exactly one 0 bit in its low byte for P = 0xFFFFED1A / 0xFFFFF42C, and one 0
+          bit in its low 9 / 15 bits for P = 0xFFFFF45E / 0xFFFFF480 -- a byte fact; what the bit
+          means is not established.)
+MECHANISM
+  r4 = P;  r3 = sext16(word[P]);  r2 = V;  word[P] = V;  r4 = N;  goto 0x00E774
+EVIDENCE
+  0x00E774 entry (fn_dump 0x00E774, not a class member):
+  ;   00E774 4F22 sts.l pr,@-r15 / 00E776 0002 stc sr,r0 / 00E778 938C mov.w @(0x00E894),r3
+  ;   -- r3 is written at 0x00E778 and not read before it.
+  emulated: t_periph, 57 cases (19 x planted word[P] = 0x0000 / 0xFFFF / 0x1234): exactly one
+    16-bit read of P and one 16-bit write of V to P whatever was planted; r3 = the planted value;
+    r4 = N at 0x00E774; PR and r15 unchanged; no RAM write.
+  script: 57 emulated cases for this class, all asserted.
+LISTING
+; function 0x00E8E4..0x00E8F0  6 instructions  rom AE5L600L 20g rev 20.19c.bin
+00E8E4: 9473  mov.w @(0x00E9CE),r4          ; = 0xED1A (-4838) -> 0xFFFFED1A PERIPH -- r4 = P = 0xFFFFED1A (word literal, sign-extended)
+00E8E6: 6341  mov.w @r4,r3                    ; r3 = word [P] (read; 0x00E774 overwrites r3 at 0x00E778 before reading it)
+00E8E8: 9272  mov.w @(0x00E9D0),r2          ; = 0x00BF (191) -- r2 = V = 0x00BF
+00E8EA: 2421  mov.w r2,@r4                    ; word [P] = V
+00E8EC: AF42  bra 0x00E774                    ; branch to 0x00E774; PR still = 0x002BD4 from the stub
+00E8EE: E441  mov #65,r4                      ; [slot] r4 = N = 65 = this handler's vector number
+;   pool 0x00E9CC: .long 0x1700ED1A  const
+;   pool 0x00E9D0: .long 0x00BF00DF  const
+MEMBERS  (19; parameters read from each member's own bytes)
+;   0x00E8E4  callers 1 [002094]                 P=0xFFFFED1A  V=0x00BF  N=65  T=0x00E774  via stub 0x002094 = vector 65
+;   0x00E8F0  callers 1 [0020AC]                 P=0xFFFFED1A  V=0x00DF  N=66  T=0x00E774  via stub 0x0020AC = vector 66
+;   0x00E8FC  callers 1 [0020C4]                 P=0xFFFFED1A  V=0x00EF  N=67  T=0x00E774  via stub 0x0020C4 = vector 67
+;   0x00E908  callers 1 [0020DC]                 P=0xFFFFED1A  V=0x00F7  N=68  T=0x00E774  via stub 0x0020DC = vector 68
+;   0x00E914  callers 1 [0020F4]                 P=0xFFFFED1A  V=0x00FB  N=69  T=0x00E774  via stub 0x0020F4 = vector 69
+;   0x00E920  callers 1 [00210C]                 P=0xFFFFED1A  V=0x00FD  N=70  T=0x00E774  via stub 0x00210C = vector 70
+;   0x00E92C  callers 1 [002124]                 P=0xFFFFED1A  V=0x00FE  N=71  T=0x00E774  via stub 0x002124 = vector 71
+;   0x00E97A  callers 1 [0021B4]                 P=0xFFFFF42C  V=0x00FE  N=84  T=0x00E774  via stub 0x0021B4 = vector 84
+;   0x00E9B2  callers 1 [0021FC]                 P=0xFFFFF42C  V=0x00F7  N=90  T=0x00E774  via stub 0x0021FC = vector 90
+;   0x00E9BE  callers 1 [002214]                 P=0xFFFFF42C  V=0x00EF  N=92  T=0x00E774  via stub 0x002214 = vector 92
+;   0x00EA08  callers 1 [002244]                 P=0xFFFFF45E  V=0x01FD  N=97  T=0x00E774  via stub 0x002244 = vector 97
+;   0x00EA14  callers 1 [00225C]                 P=0xFFFFF45E  V=0x01FB  N=98  T=0x00E774  via stub 0x00225C = vector 98
+;   0x00EA20  callers 1 [002274]                 P=0xFFFFF45E  V=0x01F7  N=99  T=0x00E774  via stub 0x002274 = vector 99
+;   0x00EA2C  callers 1 [00228C]                 P=0xFFFFF45E  V=0x01EF  N=100  T=0x00E774  via stub 0x00228C = vector 100
+;   0x00EA38  callers 1 [0022A4]                 P=0xFFFFF45E  V=0x01DF  N=101  T=0x00E774  via stub 0x0022A4 = vector 101
+;   0x00EA44  callers 1 [0022BC]                 P=0xFFFFF45E  V=0x01BF  N=102  T=0x00E774  via stub 0x0022BC = vector 102
+;   0x00EA50  callers 1 [0022D4]                 P=0xFFFFF45E  V=0x017F  N=103  T=0x00E774  via stub 0x0022D4 = vector 103
+;   0x00EC9E  callers 1 [002424]                 P=0xFFFFF480  V=0x7FF7  N=123  T=0x00E774  via stub 0x002424 = vector 123
+;   0x00ECAA  callers 1 [00243C]                 P=0xFFFFF480  V=0x7FEF  N=124  T=0x00E774  via stub 0x00243C = vector 124
+
+====================================================================================================
+==== FUNCTION 0x05D31E .. 0x05D334  (11 instructions, 3 callers) -- CLASS 14, 18 members ====
+====================================================================================================
+SHAPE  r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8)
+CONTRACT
+  out     r0 = clamp(trunc(x / C + 0.5), 0, 255), x = float[K], offset fr6 = 0.0.  The final
+          extu.b changes nothing (the library result is already 0..255).  C > 0 in all 18.
+  edges   negative x -> 0.  (k+0.25)C -> k for 0 <= k <= 255; (k+0.75)C -> k+1 for
+          0 <= k <= 254.  Saturation starts at x/C = 254.5 (x/C + 0.5 reaches 255): any x/C
+          clearly above 254.5 gives 255 (254.4C -> 254, 254.6C -> 255 asserted).  So
+          (k+0.25)C gives 255, not k, for k >= 256, and (k+0.75)C gives 255 for k >= 255.
+          In exact arithmetic x/C = k + 0.5 rounds UP; whether a float x/C lands exactly on
+          k + 0.5 is a last-bit question and is not claimed (NOT ESTABLISHED g).
+  clobbers  (0x0BE5A8's own writes, re-asserted here)  r4 = r0 (0BE5CE mov r4,r0);
+          r5 = 255 (0BE5AC); r2 = 0x0BE5A8 (this member's own load); fr4 = x/C (0BE5AA fsub,
+          0BE5AE fdiv -- the caller's fr4 does not survive); fr2 = x/C + 0.5 (0BE5B2/0BE5B4);
+          fr3 = 0.5 (0BE5B0); fr5 = C, fr6 = 0.0 (set by the member); FPUL = trunc(x/C + 0.5)
+          BEFORE the clamp (0BE5B6 ftrc); T = 1 unless that truncated value is negative, then 0
+          (0BE5BA cmp/gt r5,r4 sets T when r4 > 255 signed; on the bf/s path 0BE5C4 cmp/pz r4
+          sets T when r4 >= 0).  r1, r3, r6-r14, fr0, fr1, fr7-fr15 unchanged.
+  memory  one float read.  No write.
+  parameters  K (RAM), C (float32 read by mova + fmov.s from the function's own pool).
+MECHANISM
+  fr4 = float[K];  fr5 = C;  fr6 = 0.0
+  r0 = 0x0BE5A8()               library CONTRACT: clamp(trunc((fr4 - fr6)/fr5 + 0.5), 0, 255)
+  r0 &= 0xFF
+EVIDENCE
+  emulated: t_f2u, 594 cases (18 members x 33 inputs: -1000C, -10C, -C, -0.25C, -0.0, 0.0,
+    (k+0.25)C and (k+0.75)C for k = 0 1 2 10 100 127 128 200 254 255 256 1000, 254.4C, 254.6C
+    and 1e6*C), 0x0BE5A8 RUN.  Expected values from exact rationals, and each one also checked
+    against the edge rule above (edge_rule()).  An input is asserted only if x/C + 0.5 is
+    >= 1e-3 from an integer; all 594 were.  That guard is not a last-bit guard at large
+    magnitude (at x/C ~ 1e6 a float32 ulp is ~0.06), but every such input clamps to 255, so no
+    asserted r0 depends on the last bit of a float.  Clobbers asserted: r4 = r0, r5 = 255,
+    r2 = 0x0BE5A8, fr3 = 0.5, fr5 = C, fr6 = 0.0, fr4 / fr2 = x/C / x/C + 0.5 to 1e-6 relative,
+    FPUL = trunc exactly below |x/C| = 1e5 (within 1 above), T = (FPUL >= 0); all other r0-r14
+    and fr0-fr15 unchanged; the only non-stack RAM read is float[K].  1e6*C keeps ftrc inside
+    int32 (no overflow behaviour relied on).
+  script: 594 emulated cases for this class, all asserted.
+LISTING
+; function 0x05D31E..0x05D334  11 instructions  rom AE5L600L 20g rev 20.19c.bin
+05D31E: 4F22  sts.l pr,@-r15                  ; push caller PR
+05D320: D29A  mov.l @(0x05D58C),r2          ; = 0xFFFF620C RAM -- r2 = K = 0xFFFF620C
+05D322: F428  fmov.s @r2,fr4                  ; fr4 = x = float [K]
+05D324: D296  mov.l @(0x05D580),r2          ; = 0x000BE5A8 ROM -- r2 = 0x0BE5A8 (library: r0 = clamp(trunc((fr4-fr6)/fr5 + 0.5), 0, 255))
+05D326: F68D  fldi0 fr6                       ; fr6 = 0.0 (offset)
+05D328: C799  mova @(0x05D590),r0           ; -> 0x05D590: long 0x40F00533 f32 7.500635 -- r0 -> C
+05D32A: 420B  jsr @r2                       ; -> 0x0BE5A8 -- call it, PR = 0x05D32E
+05D32C: F508  fmov.s @r0,fr5                  ; [slot] fr5 = C = 7.500635 (divisor)
+05D32E: 4F26  lds.l @r15+,pr                  ; pop caller PR
+05D330: 000B  rts                             ; return
+05D332: 600C  extu.b r0,r0                    ; [slot] r0 = r0 & 0xFF: no change, the library result is already 0..255
+;   pool 0x05D580: .long 0x000BE5A8  ROM
+;   pool 0x05D58C: .long 0xFFFF620C  RAM
+MEMBERS  (18; parameters read from each member's own bytes)
+;   0x05D31E  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF620C  C=7.500634670257568 (0x40F00533 @ 0x05D590)
+;   0x05D3E2  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF62D4  C=0.31372547149658203 (0x3EA0A0A0 @ 0x05D5C4)
+;   0x05D43E  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF4130  C=0.07999999821186066 (0x3DA3D70A @ 0x05D5D4)
+;   0x05D478  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF7D84  C=256.0 (0x43800000 @ 0x05D5EC)
+;   0x05D4A6  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF689C  C=7.500634670257568 (0x40F00533 @ 0x05D590)
+;   0x05D4F8  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF64D8  C=0.39215683937072754 (0x3EC8C8C8 @ 0x05D604)
+;   0x05D522  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF6388  C=0.019999999552965164 (0x3CA3D70A @ 0x05D5E4)
+;   0x05D54A  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF5C98  C=0.3919999897480011 (0x3EC8B439 @ 0x05D610)
+;   0x05D68C  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8354  C=0.3913894295692444 (0x3EC86432 @ 0x05D850)
+;   0x05D6CE  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF91C4  C=0.39215683937072754 (0x3EC8C8C8 @ 0x05D864)
+;   0x05D6E4  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF91C8  C=0.39215683937072754 (0x3EC8C8C8 @ 0x05D864)
+;   0x05D6FA  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF643C  C=0.03199999779462814 (0x3D03126E @ 0x05D870)
+;   0x05D710  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF6448  C=0.03199999779462814 (0x3D03126E @ 0x05D870)
+;   0x05D77A  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF653C  C=0.0078125 (0x3C000000 @ 0x05D88C)
+;   0x05DFEC  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF3234  C=0.0625 (0x3D800000 @ 0x05E0CC)
+;   0x05E01A  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF6598  C=0.07999999821186066 (0x3DA3D70A @ 0x05E0E0)
+;   0x05E174  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF4108  C=7.500634670257568 (0x40F00533 @ 0x05E390)
+;   0x05E1CA  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF5EC0  C=0.7999999523162842 (0x3F4CCCCC @ 0x05E3AC)
+
+====================================================================================================
+==== FUNCTION 0x00F122 .. 0x00F130  (7 instructions, 1 caller) -- CLASS 15, 16 members ====
+====================================================================================================
+SHAPE  interrupt handler: as class 13, V from mov #imm, N from a word literal
+CONTRACT
+  effect  r3 = word[P] (value unused, as in class 13), word[P] = V & 0xFFFF where V is an 8-bit
+          immediate SIGN-extended, r4 = N, branch to 0x00E774.
+  parameters  P (word literal), V (8-bit imm), N (word literal).  T = 0x00E774 for all 16.
+  cross-check  N = vector slot number of the stub that jumps here, 16/16.
+MECHANISM
+  r4 = P;  r3 = sext16(word[P]);  r2 = V;  word[P] = V;  r4 = N;  goto 0x00E774
+EVIDENCE
+  emulated: t_periph, 48 cases (16 x 3 planted values): one 16-bit read, one 16-bit write of V;
+    r4 = N; PR, r15 unchanged; no RAM write.
+  script: 48 emulated cases for this class, all asserted.
+LISTING
+; function 0x00F122..0x00F130  7 instructions  rom AE5L600L 20g rev 20.19c.bin
+00F122: 946E  mov.w @(0x00F202),r4          ; = 0xF522 (-2782) -> 0xFFFFF522 PERIPH -- r4 = P = 0xFFFFF522
+00F124: 6341  mov.w @r4,r3                    ; r3 = word [P] (read; dead in 0x00E774)
+00F126: E20E  mov #14,r2                      ; r2 = V = 14 (sign-extended 8-bit immediate)
+00F128: 2421  mov.w r2,@r4                    ; word [P] = low 16 bits of V
+00F12A: 946B  mov.w @(0x00F204),r4          ; = 0x0090 (144) -- r4 = N = 144 (word literal) = this handler's vector number
+00F12C: AB22  bra 0x00E774                    ; branch to 0x00E774
+00F12E: 0009  nop                             ; [slot] no effect
+;   pool 0x00F200: .long 0x008CF522  const
+;   pool 0x00F204: .long 0x00900091  const
+MEMBERS  (16; parameters read from each member's own bytes)
+;   0x00F122  callers 1 [002544]                 P=0xFFFFF522  V=0x000E  N=144  T=0x00E774  via stub 0x002544 = vector 144
+;   0x00F130  callers 1 [00255C]                 P=0xFFFFF522  V=0x000D  N=145  T=0x00E774  via stub 0x00255C = vector 145
+;   0x00F13E  callers 1 [002574]                 P=0xFFFFF522  V=0x000B  N=146  T=0x00E774  via stub 0x002574 = vector 146
+;   0x00F14C  callers 1 [00258C]                 P=0xFFFFF522  V=0x0007  N=147  T=0x00E774  via stub 0x00258C = vector 147
+;   0x00F15A  callers 1 [0025A4]                 P=0xFFFFF5A2  V=0x000E  N=148  T=0x00E774  via stub 0x0025A4 = vector 148
+;   0x00F168  callers 1 [0025BC]                 P=0xFFFFF5A2  V=0x000D  N=149  T=0x00E774  via stub 0x0025BC = vector 149
+;   0x00F176  callers 1 [0025D4]                 P=0xFFFFF5A2  V=0x000B  N=150  T=0x00E774  via stub 0x0025D4 = vector 150
+;   0x00F184  callers 1 [0025EC]                 P=0xFFFFF5A2  V=0x0007  N=151  T=0x00E774  via stub 0x0025EC = vector 151
+;   0x00F2BE  callers 1 [002784]                 P=0xFFFFF69E  V=0x003E  N=168  T=0x00E774  via stub 0x002784 = vector 168
+;   0x00F2CC  callers 1 [00279C]                 P=0xFFFFF69E  V=0x003D  N=169  T=0x00E774  via stub 0x00279C = vector 169
+;   0x00F2DA  callers 1 [0027B4]                 P=0xFFFFF69E  V=0x003B  N=170  T=0x00E774  via stub 0x0027B4 = vector 170
+;   0x00F2E8  callers 1 [0027CC]                 P=0xFFFFF69E  V=0x0037  N=171  T=0x00E774  via stub 0x0027CC = vector 171
+;   0x00F2F6  callers 1 [0027E4]                 P=0xFFFFF69E  V=0x002F  N=172  T=0x00E774  via stub 0x0027E4 = vector 172
+;   0x00F304  callers 1 [0027FC]                 P=0xFFFFF69E  V=0x001F  N=174  T=0x00E774  via stub 0x0027FC = vector 174
+;   0x00F312  callers 1 [002814]                 P=0xFFFFF6E8  V=0x000E  N=176  T=0x00E774  via stub 0x002814 = vector 176
+;   0x00F4CE  callers 1 [00285C]                 P=0xFFFFF5CA  V=0x0003  N=187  T=0x00E774  via stub 0x00285C = vector 187
+
+====================================================================================================
+==== FUNCTION 0x003B2A .. 0x003B2E  (2 instructions, 1 caller) -- CLASS 16, 15 members ====
+====================================================================================================
+SHAPE  entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] to [r1], pop r3, rts
+CONTRACT
+  The census gives each member a 2-instruction extent; that is an artefact of the dispatch
+  table.  No member ends in rts: each FALLS THROUGH into the next, so the real body of member
+  0x003B2A + 4k (k = 0..14, D = 60 - 4k) is 0x003B2A + 4k .. 0x003B6C:
+  in      r1 = destination, r2 = source; [r15] = a saved r3 (pushed by the dispatcher).
+  effect  long[r1 + o] = long[r2 + o] for o = D, D-4, ..., 4, 0 (descending), i.e. D/4 + 1
+          longs; then r3 = pop, return.  r0 = long[r2] (the last copied).
+  dispatcher (0x003B14, the census caller of all 15; ';' lines below): push r3; if r0 >u 64
+          goto 0x003BB4 (not decoded); r3 = long[0x003B70 + r0]; jmp @r3.  The table at
+          0x003B70 maps r0 = 0, 4, 8 .. 64 to 0x003B6A, 0x003B66, 0x003B62 .. 0x003B2A, so
+          r0 = 4n (n >= 2) enters the member that copies n longs.
+MECHANISM
+  for o in D, D-4, ..., 0:  long[r1+o] = long[r2+o]       (through r0)
+  r3 = pop();  return
+EVIDENCE
+  ;   dispatcher, from fn_dump 0x003B14 --end 0x003B24:
+  ;   003B14 2F36 mov.l r3,@-r15 / 003B16 E340 mov #64,r3 / 003B18 3302 cmp/hs r0,r3
+  ;   (T = 1 when r3 >=u r0, i.e. 64 >=u r0) / 003B1A 8B4B bf 0x003BB4 (taken when r0 >u 64)
+  ;   003B1C D301 mov.l @(0x003B24),r3 = 0x00003B70 / 003B1E 033E mov.l @(r0,r3),r3 / 003B20 432B jmp @r3
+  ;   table 0x003B70..0x003BB3, 17 longs: 0x3B6A 0x3B66 0x3B62 0x3B5E 0x3B5A 0x3B56 0x3B52 0x3B4E
+  ;   0x3B4A 0x3B46 0x3B42 0x3B3E 0x3B3A 0x3B36 0x3B32 0x3B2E 0x3B2A
+  emulated: t_copy_chain, 15 cases: saved r3 planted at [S-4], r15 = S-4, 18 source longs
+    random, 18 destination longs = 0xDEADBEEF; afterwards exactly the D/4 + 1 lowest destination
+    longs equal the source, the rest are untouched; r3 = saved, r15 = S, r0 = long[r2];
+    2*(D/4+1) + 2 steps.
+  script: 15 emulated cases for this class, all asserted.
+LISTING  (census extent is 0x003B2A..0x003B2E; listed to the real end with --end 0x003B6E)
+; function 0x003B2A..0x003B6E  34 instructions  rom AE5L600L 20g rev 20.19c.bin
+003B2A: 502F  mov.l @(60,r2),r0               ; census entry 0x003B2A (D = 60): r0 = long [r2+60]
+003B2C: 110F  mov.l r0,@(60,r1)               ; long [r1+60] = r0;  no rts: falls into the next member
+003B2E: 502E  mov.l @(56,r2),r0               ; census entry 0x003B2E (D = 56): r0 = long [r2+56]
+003B30: 110E  mov.l r0,@(56,r1)               ; long [r1+56] = r0
+003B32: 502D  mov.l @(52,r2),r0               ; census entry 0x003B32 (D = 52): r0 = long [r2+52]
+003B34: 110D  mov.l r0,@(52,r1)               ; long [r1+52] = r0
+003B36: 502C  mov.l @(48,r2),r0               ; census entry 0x003B36 (D = 48): r0 = long [r2+48]
+003B38: 110C  mov.l r0,@(48,r1)               ; long [r1+48] = r0
+003B3A: 502B  mov.l @(44,r2),r0               ; census entry 0x003B3A (D = 44): r0 = long [r2+44]
+003B3C: 110B  mov.l r0,@(44,r1)               ; long [r1+44] = r0
+003B3E: 502A  mov.l @(40,r2),r0               ; census entry 0x003B3E (D = 40): r0 = long [r2+40]
+003B40: 110A  mov.l r0,@(40,r1)               ; long [r1+40] = r0
+003B42: 5029  mov.l @(36,r2),r0               ; census entry 0x003B42 (D = 36): r0 = long [r2+36]
+003B44: 1109  mov.l r0,@(36,r1)               ; long [r1+36] = r0
+003B46: 5028  mov.l @(32,r2),r0               ; census entry 0x003B46 (D = 32): r0 = long [r2+32]
+003B48: 1108  mov.l r0,@(32,r1)               ; long [r1+32] = r0
+003B4A: 5027  mov.l @(28,r2),r0               ; census entry 0x003B4A (D = 28): r0 = long [r2+28]
+003B4C: 1107  mov.l r0,@(28,r1)               ; long [r1+28] = r0
+003B4E: 5026  mov.l @(24,r2),r0               ; census entry 0x003B4E (D = 24): r0 = long [r2+24]
+003B50: 1106  mov.l r0,@(24,r1)               ; long [r1+24] = r0
+003B52: 5025  mov.l @(20,r2),r0               ; census entry 0x003B52 (D = 20): r0 = long [r2+20]
+003B54: 1105  mov.l r0,@(20,r1)               ; long [r1+20] = r0
+003B56: 5024  mov.l @(16,r2),r0               ; census entry 0x003B56 (D = 16): r0 = long [r2+16]
+003B58: 1104  mov.l r0,@(16,r1)               ; long [r1+16] = r0
+003B5A: 5023  mov.l @(12,r2),r0               ; census entry 0x003B5A (D = 12): r0 = long [r2+12]
+003B5C: 1103  mov.l r0,@(12,r1)               ; long [r1+12] = r0
+003B5E: 5022  mov.l @(8,r2),r0                ; census entry 0x003B5E (D = 8): r0 = long [r2+8]
+003B60: 1102  mov.l r0,@(8,r1)                ; long [r1+8] = r0
+003B62: 5021  mov.l @(4,r2),r0                ; census entry 0x003B62 (D = 4): r0 = long [r2+4]
+003B64: 1101  mov.l r0,@(4,r1)                ; long [r1+4] = r0
+003B66: 6022  mov.l @r2,r0                    ; not a class member (entry for r0 = 4 in the table): r0 = long [r2]
+003B68: 2102  mov.l r0,@r1                    ; long [r1] = r0 -- every member ends by copying offset 0
+003B6A: 000B  rts                             ; return (r0 = the last long copied = long [r2])
+003B6C: 63F6  mov.l @r15+,r3                  ; [slot] pop r3: restores the r3 the dispatcher 0x003B14 pushed
+MEMBERS  (15; parameters read from each member's own bytes)
+;   0x003B2A  callers 1 [003B14]                 D=60  copies 16 longs  (offsets 60..0 step -4)
+;   0x003B2E  callers 1 [003B14]                 D=56  copies 15 longs  (offsets 56..0 step -4)
+;   0x003B32  callers 1 [003B14]                 D=52  copies 14 longs  (offsets 52..0 step -4)
+;   0x003B36  callers 1 [003B14]                 D=48  copies 13 longs  (offsets 48..0 step -4)
+;   0x003B3A  callers 1 [003B14]                 D=44  copies 12 longs  (offsets 44..0 step -4)
+;   0x003B3E  callers 1 [003B14]                 D=40  copies 11 longs  (offsets 40..0 step -4)
+;   0x003B42  callers 1 [003B14]                 D=36  copies 10 longs  (offsets 36..0 step -4)
+;   0x003B46  callers 1 [003B14]                 D=32  copies 9 longs  (offsets 32..0 step -4)
+;   0x003B4A  callers 1 [003B14]                 D=28  copies 8 longs  (offsets 28..0 step -4)
+;   0x003B4E  callers 1 [003B14]                 D=24  copies 7 longs  (offsets 24..0 step -4)
+;   0x003B52  callers 1 [003B14]                 D=20  copies 6 longs  (offsets 20..0 step -4)
+;   0x003B56  callers 1 [003B14]                 D=16  copies 5 longs  (offsets 16..0 step -4)
+;   0x003B5A  callers 1 [003B14]                 D=12  copies 4 longs  (offsets 12..0 step -4)
+;   0x003B5E  callers 1 [003B14]                 D=8  copies 3 longs  (offsets 8..0 step -4)
+;   0x003B62  callers 1 [003B14]                 D=4  copies 2 longs  (offsets 4..0 step -4)
+
+====================================================================================================
+==== FUNCTION 0x018660 .. 0x018672  (9 instructions, 1 caller) -- CLASS 17, 14 members ====
+====================================================================================================
+SHAPE  call A, B, C, then tail-branch to D
+CONTRACT
+  effect  as class 4 with three calls: A(), B(), C(), then goto D with the caller's PR restored.
+  parameters  A, B, C (bsr targets), D (bra target).
+MECHANISM
+  push PR;  A();  B();  C();  pop PR;  goto D
+EVIDENCE
+  emulated: chain(), 14 cases: order, PR / r15, and each callee seeing what the previous stub
+    left, as in class 12.
+  script: 14 emulated cases for this class, all asserted.
+LISTING
+; function 0x018660..0x018672  9 instructions  rom AE5L600L 20g rev 20.19c.bin
+018660: 4F22  sts.l pr,@-r15                  ; push caller PR
+018662: B02F  bsr 0x0186C4                    ; call A = 0x0186C4, PR = 0x018666
+018664: 0009  nop                             ; [slot] no effect
+018666: B0A3  bsr 0x0187B0                    ; call B = 0x0187B0, PR = 0x01866A
+018668: 0009  nop                             ; [slot] no effect
+01866A: B0C1  bsr 0x0187F0                    ; call C = 0x0187F0, PR = 0x01866E
+01866C: 0009  nop                             ; [slot] no effect
+01866E: A11B  bra 0x0188A8                    ; branch to D = 0x0188A8 with the caller PR restored: tail call
+018670: 4F26  lds.l @r15+,pr                  ; [slot] pop caller PR
+MEMBERS  (14; parameters read from each member's own bytes)
+;   0x018660  callers 1 [048E16]                 A=0x0186C4  B=0x0187B0  C=0x0187F0  D=0x0188A8
+;   0x01A168  callers 1 [04A03E]                 A=0x01A1B8  B=0x01A220  C=0x01A2B0  D=0x01A31C
+;   0x027D66  callers 1 [04907C]                 A=0x027D78  B=0x027D86  C=0x027E34  D=0x0280CC
+;   0x02FF7C  callers 1 [04AA58]                 A=0x02FF8E  B=0x02FFA2  C=0x02FFE0  D=0x0301E4
+;   0x03AE5A  callers 1 [03AB90]                 A=0x03B3DA  B=0x03AF88  C=0x03AE6C  D=0x03B62C
+;   0x03C7EE  callers 1 [04AA58]                 A=0x03C82E  B=0x03C8FE  C=0x03C972  D=0x03CAAE
+;   0x03CD34  callers 1 [049CF0]                 A=0x03D0B8  B=0x03CD4A  C=0x03CF96  D=0x03CFDA
+;   0x040918  callers 1 [04AA58]                 A=0x040A9C  B=0x040AF6  C=0x041030  D=0x0410D4
+;   0x0419BA  callers 1 [04AA58]                 A=0x041A02  B=0x041A48  C=0x041A7E  D=0x041BE4
+;   0x053C16  callers 1 [04907C]                 A=0x053D78  B=0x053C44  C=0x053C7E  D=0x053C2C
+;   0x06D890  callers 1 [048E16]                 A=0x06DA84  B=0x06DA9E  C=0x06DB50  D=0x06DB80
+;   0x080538  callers 1 [04A03E]                 A=0x08054A  B=0x0806AC  C=0x0806BC  D=0x08070E
+;   0x085D88  callers 1 [04A03E]                 A=0x085D9A  B=0x085DE8  C=0x085E5C  D=0x085EE2
+;   0x090930  callers 1 [04A03E]                 A=0x09111A  B=0x090A2C  C=0x090966  D=0x090AFC
+
+====================================================================================================
+==== FUNCTION 0x00FBBA .. 0x00FBC0  (3 instructions, 5 callers) -- CLASS 18, 13 members ====
+====================================================================================================
+SHAPE  byte [K] = r4 (via r6)
+CONTRACT
+  in      r4 (only its low byte is stored).   effect  byte[K] = r4 & 0xFF; r6 = K.
+  parameter  K (RAM).
+MECHANISM
+  byte[K] = r4
+EVIDENCE
+  emulated: t_st_r4, 104 cases (13 x r4 = 0, 1, 0x7F, 0x80, 0xFF, 0x1FF, 0x12345678,
+    0xFFFFFF00): byte[K] = r4 & 0xFF, only K written, r6 = K, other registers unchanged.
+  script: 104 emulated cases for this class, all asserted.
+LISTING
+; function 0x00FBBA..0x00FBC0  3 instructions  rom AE5L600L 20g rev 20.19c.bin
+00FBBA: D658  mov.l @(0x00FD1C),r6          ; = 0xFFFF5B6C RAM -- r6 = K = 0xFFFF5B6C
+00FBBC: 000B  rts                             ; return
+00FBBE: 2640  mov.b r4,@r6                    ; [slot] byte [K] = low byte of r4
+;   pool 0x00FD1C: .long 0xFFFF5B6C  RAM
+MEMBERS  (13; parameters read from each member's own bytes)
+;   0x00FBBA  callers 5 [00DF14,00FA5A,00FACA+2] K=0xFFFF5B6C
+;   0x0133D2  callers 1 [08DC3E]                 K=0xFFFF5C74
+;   0x05E764  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F0B
+;   0x05E7A8  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F11
+;   0x05E822  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F0E
+;   0x05E828  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F0F
+;   0x05E82E  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F10
+;   0x05E878  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F12
+;   0x05E89C  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F13
+;   0x05E8C4  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F14
+;   0x05E8CA  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F15
+;   0x05E8D0  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F16
+;   0x09894A  callers 1 [09CAD2]                 K=0xFFFFB04A
+
+====================================================================================================
+==== FUNCTION 0x05DC94 .. 0x05DC9C  (4 instructions, 3 callers) -- CLASS 19, 13 members ====
+====================================================================================================
+SHAPE  r0 = zero-extended byte [K]
+CONTRACT
+  out     r0 = byte[K] ZERO-extended (0..255); r2 = the sign-extended byte; r6 = K.
+  memory  one byte read.  No write.
+  parameter  K (RAM).
+MECHANISM
+  r2 = sext8(byte[K]);  r0 = r2 & 0xFF
+EVIDENCE
+  emulated: t_ld_u8, 130 cases (13 x 10 byte values incl. 0x7F 0x80 0xFF).
+  script: 130 emulated cases for this class, all asserted.
+LISTING
+; function 0x05DC94..0x05DC9C  4 instructions  rom AE5L600L 20g rev 20.19c.bin
+05DC94: D646  mov.l @(0x05DDB0),r6          ; = 0xFFFF8F1D RAM -- r6 = K = 0xFFFF8F1D
+05DC96: 6260  mov.b @r6,r2                    ; r2 = sign-extended byte [K]
+05DC98: 000B  rts                             ; return
+05DC9A: 602C  extu.b r2,r0                    ; [slot] r0 = r2 & 0xFF: ZERO-extended byte [K]
+;   pool 0x05DDB0: .long 0xFFFF8F1D  RAM
+MEMBERS  (13; parameters read from each member's own bytes)
+;   0x05DC94  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F1D
+;   0x05DC9C  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F1E
+;   0x05E488  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF61CC
+;   0x05E490  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF61CD
+;   0x05E498  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF61CE
+;   0x05E4A0  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF61CF
+;   0x05E50A  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F1F
+;   0x05E512  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F22
+;   0x05E538  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F21
+;   0x05E540  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F20
+;   0x05E548  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF8F23
+;   0x05E622  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF840D
+;   0x05E62A  callers 3 [05F718,09A3AC,09A628]   K=0xFFFF61D0
+
+====================================================================================================
+==== FUNCTION 0x02D318 .. 0x02D31E  (3 instructions, 1 caller) -- CLASS 20, 12 members ====
+====================================================================================================
+SHAPE  jmp T via r2 -- tail-jump thunk
+CONTRACT
+  effect  r2 = T, then control passes to T with PR unchanged.  No memory access.
+  parameter  T.  (0x04B4E4 -> 0x05AA24 and 0x04B4EA -> 0x05AA2A are themselves members, so
+          those two chains end at 0x05EC76 and 0x05ED02.)
+MECHANISM
+  r2 = T;  goto T
+EVIDENCE
+  emulated: t_jmp, 12 cases (as class 11, scratch register r2).
+  script: 12 emulated cases for this class, all asserted.
+LISTING
+; function 0x02D318..0x02D31E  3 instructions  rom AE5L600L 20g rev 20.19c.bin
+02D318: D21A  mov.l @(0x02D384),r2          ; = 0x0007C994 ROM -- r2 = T = 0x07C994
+02D31A: 422B  jmp @r2                       ; -> 0x07C994 -- jump to T; PR untouched: tail call
+02D31C: 0009  nop                             ; [slot] no effect
+;   pool 0x02D384: .long 0x0007C994  ROM
+MEMBERS  (12; parameters read from each member's own bytes)
+;   0x02D318  callers 1 [02C226]                 T=0x07C994
+;   0x0471E2  callers 1 [04AA58]                 T=0x046DCE
+;   0x04AF7C  callers 0                          T=0x05AB14
+;   0x04AF82  callers 0                          T=0x05AB2C
+;   0x04B4D8  callers 1 [00DF14]                 T=0x05A928
+;   0x04B4DE  callers 1 [00E2FC]                 T=0x05A97C
+;   0x04B4E4  callers 1 [00F55C]                 T=0x05AA24
+;   0x04B4EA  callers 1 [00F54E]                 T=0x05AA2A
+;   0x05AA24  callers 1 [04B4E4]                 T=0x05EC76
+;   0x05AA2A  callers 1 [04B4EA]                 T=0x05ED02
+;   0x05AE92  callers 1 [09F2E4]                 T=0x05B510
+;   0x05AE98  callers 1 [09F90A]                 T=0x05B574
+
+====================================================================================================
+==== FUNCTION 0x006FF6 .. 0x006FFC  (3 instructions, 2 callers) -- CLASS 21, 11 members ====
+====================================================================================================
+SHAPE  byte [K] = r4 (via r2)
+CONTRACT
+  effect  byte[K] = r4 & 0xFF; r2 = K.  Same as class 18 with r2 as the address register.
+  parameter  K (RAM).
+MECHANISM
+  byte[K] = r4
+EVIDENCE
+  emulated: t_st_r4, 88 cases (11 x 8 r4 values).
+  script: 88 emulated cases for this class, all asserted.
+LISTING
+; function 0x006FF6..0x006FFC  3 instructions  rom AE5L600L 20g rev 20.19c.bin
+006FF6: D23A  mov.l @(0x0070E0),r2          ; = 0xFFFF4171 RAM -- r2 = K = 0xFFFF4171
+006FF8: 000B  rts                             ; return
+006FFA: 2240  mov.b r4,@r2                    ; [slot] byte [K] = low byte of r4
+;   pool 0x0070E0: .long 0xFFFF4171  RAM
+MEMBERS  (11; parameters read from each member's own bytes)
+;   0x006FF6  callers 2 [022EB4,022F1C]          K=0xFFFF4171
+;   0x05E76E  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF36BE
+;   0x05E7AE  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F1D
+;   0x05E7B4  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F1E
+;   0x05E86C  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F1F
+;   0x05E872  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F22
+;   0x05E87E  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F21
+;   0x05E884  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F20
+;   0x05E88A  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F23
+;   0x05E890  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F08
+;   0x05E896  callers 4 [05F718,05F758,09A3AC+1] K=0xFFFF8F09
+
+====================================================================================================
+==== FUNCTION 0x00F1CA .. 0x00F1D8  (7 instructions, 1 caller) -- CLASS 22, 11 members ====
+====================================================================================================
+SHAPE  interrupt handler: as class 13, V from a long literal, N from a word literal
+CONTRACT
+  effect  r3 = word[P] (value unused), word[P] = V & 0xFFFF (V is a long literal, e.g.
+          0x0000FFEF), r4 = N, branch to 0x00E774.  P = 0xFFFFF66A in all 11; V has exactly
+          one 0 bit in its low 15 bits (byte fact only).
+  parameters  P, V, N.  T = 0x00E774 for all 11.
+  cross-check  N = vector slot number of the stub that jumps here, 11/11.
+MECHANISM
+  r4 = P;  r3 = sext16(word[P]);  r2 = V;  word[P] = V;  r4 = N;  goto 0x00E774
+EVIDENCE
+  emulated: t_periph, 33 cases (11 x 3 planted values).
+  script: 33 emulated cases for this class, all asserted.
+LISTING
+; function 0x00F1CA..0x00F1D8  7 instructions  rom AE5L600L 20g rev 20.19c.bin
+00F1CA: 9424  mov.w @(0x00F216),r4          ; = 0xF66A (-2454) -> 0xFFFFF66A PERIPH -- r4 = P = 0xFFFFF66A
+00F1CC: 6341  mov.w @r4,r3                    ; r3 = word [P] (read; dead in 0x00E774)
+00F1CE: D219  mov.l @(0x00F234),r2          ; = 0x0000FFEF const -- r2 = V = 0x0000FFEF (long literal)
+00F1D0: 2421  mov.w r2,@r4                    ; word [P] = low 16 bits of V = 0xFFEF
+00F1D2: 9421  mov.w @(0x00F218),r4          ; = 0x009C (156) -- r4 = N = 156 = this handler's vector number
+00F1D4: AACE  bra 0x00E774                    ; branch to 0x00E774
+00F1D6: 0009  nop                             ; [slot] no effect
+;   pool 0x00F214: .long 0x0097F66A  const
+;   pool 0x00F218: .long 0x009C009D  const
+;   pool 0x00F234: .long 0x0000FFEF  const
+MEMBERS  (11; parameters read from each member's own bytes)
+;   0x00F1CA  callers 1 [002664]                 P=0xFFFFF66A  V=0xFFEF  N=156  T=0x00E774  via stub 0x002664 = vector 156
+;   0x00F1D8  callers 1 [00267C]                 P=0xFFFFF66A  V=0xFFDF  N=157  T=0x00E774  via stub 0x00267C = vector 157
+;   0x00F1E6  callers 1 [002694]                 P=0xFFFFF66A  V=0xFFBF  N=158  T=0x00E774  via stub 0x002694 = vector 158
+;   0x00F240  callers 1 [0026AC]                 P=0xFFFFF66A  V=0xFF7F  N=159  T=0x00E774  via stub 0x0026AC = vector 159
+;   0x00F24E  callers 1 [0026C4]                 P=0xFFFFF66A  V=0xFEFF  N=160  T=0x00E774  via stub 0x0026C4 = vector 160
+;   0x00F25C  callers 1 [0026DC]                 P=0xFFFFF66A  V=0xFDFF  N=161  T=0x00E774  via stub 0x0026DC = vector 161
+;   0x00F26A  callers 1 [0026F4]                 P=0xFFFFF66A  V=0xFBFF  N=162  T=0x00E774  via stub 0x0026F4 = vector 162
+;   0x00F278  callers 1 [00270C]                 P=0xFFFFF66A  V=0xF7FF  N=163  T=0x00E774  via stub 0x00270C = vector 163
+;   0x00F286  callers 1 [002724]                 P=0xFFFFF66A  V=0xEFFF  N=164  T=0x00E774  via stub 0x002724 = vector 164
+;   0x00F294  callers 1 [00273C]                 P=0xFFFFF66A  V=0xDFFF  N=165  T=0x00E774  via stub 0x00273C = vector 165
+;   0x00F2A2  callers 1 [002754]                 P=0xFFFFF66A  V=0xBFFF  N=166  T=0x00E774  via stub 0x002754 = vector 166
+
+====================================================================================================
+==== FUNCTION 0x0182EC .. 0x018302  (11 instructions, 1 caller) -- CLASS 23, 11 members ====
+====================================================================================================
+SHAPE  call A, B, C, D, then tail-branch to E
+CONTRACT
+  effect  as class 4 with four calls, then goto E with the caller's PR restored.
+  parameters  A, B, C, D (bsr targets), E (bra target).
+MECHANISM
+  push PR;  A();  B();  C();  D();  pop PR;  goto E
+EVIDENCE
+  emulated: chain(), 11 cases, asserted as in class 12.
+  script: 11 emulated cases for this class, all asserted.
+LISTING
+; function 0x0182EC..0x018302  11 instructions  rom AE5L600L 20g rev 20.19c.bin
+0182EC: 4F22  sts.l pr,@-r15                  ; push caller PR
+0182EE: B0AB  bsr 0x018448                    ; call A = 0x018448, PR = 0x0182F2
+0182F0: 0009  nop                             ; [slot] no effect
+0182F2: B0BA  bsr 0x01846A                    ; call B = 0x01846A, PR = 0x0182F6
+0182F4: 0009  nop                             ; [slot] no effect
+0182F6: B101  bsr 0x0184FC                    ; call C = 0x0184FC, PR = 0x0182FA
+0182F8: 0009  nop                             ; [slot] no effect
+0182FA: B11B  bsr 0x018534                    ; call D = 0x018534, PR = 0x0182FE
+0182FC: 0009  nop                             ; [slot] no effect
+0182FE: A134  bra 0x01856A                    ; branch to E = 0x01856A with the caller PR restored: tail call
+018300: 4F26  lds.l @r15+,pr                  ; [slot] pop caller PR
+MEMBERS  (11; parameters read from each member's own bytes)
+;   0x0182EC  callers 1 [04907C]                 A=0x018448  B=0x01846A  C=0x0184FC  D=0x018534  E=0x01856A
+;   0x021F34  callers 1 [049CF0]                 A=0x021F70  B=0x021F90  C=0x021FE0  D=0x022230  E=0x022292
+;   0x0263DC  callers 1 [04907C]                 A=0x026406  B=0x0265AE  C=0x026410  D=0x026470  E=0x0264A0
+;   0x03C37C  callers 1 [04907C]                 A=0x03C3A4  B=0x03C6B2  C=0x03C67A  D=0x03C6D8  E=0x03C76C
+;   0x053228  callers 1 [04907C]                 A=0x053248  B=0x05336A  C=0x0533DE  D=0x053498  E=0x053546
+;   0x0535A0  callers 1 [04907C]                 A=0x05390A  B=0x0535CA  C=0x053610  D=0x05363A  E=0x0536BC
+;   0x055572  callers 1 [04907C]                 A=0x0558AC  B=0x055716  C=0x0556F0  D=0x0556A0  E=0x055856
+;   0x06D20C  callers 1 [04A03E]                 A=0x06D222  B=0x06D27A  C=0x06D2DE  D=0x06D3A8  E=0x06D4C0
+;   0x083AC6  callers 1 [04A03E]                 A=0x083ADC  B=0x083EC0  C=0x083F48  D=0x083F8E  E=0x084028
+;   0x08FA3A  callers 1 [04A03E]                 A=0x08FA54  B=0x08FA78  C=0x08FAA4  D=0x08FAEC  E=0x08FB58
+;   0x08FDA4  callers 1 [04A420]                 A=0x08FDBA  B=0x08FDEE  C=0x08FEB6  D=0x08FF28  E=0x090038
+
+====================================================================================================
+==== FUNCTION 0x025C24 .. 0x025C2C  (4 instructions, 1 caller) -- CLASS 24, 10 members ====
+====================================================================================================
+SHAPE  byte [K] = 0xFF
+CONTRACT
+  effect  byte[K] = I & 0xFF with I = -1 in all 10 members, i.e. 0xFF; r6 = 0xFFFFFFFF, r2 = K.
+  parameters  I, K (RAM).
+MECHANISM
+  byte[K] = 0xFF
+EVIDENCE
+  emulated: t_st_imm, 10 cases (K pre-filled with 0x00).
+  script: 10 emulated cases for this class, all asserted.
+LISTING
+; function 0x025C24..0x025C2C  4 instructions  rom AE5L600L 20g rev 20.19c.bin
+025C24: E6FF  mov #-1,r6                      ; r6 = I = -1 = 0xFFFFFFFF
+025C26: D28F  mov.l @(0x025E64),r2          ; = 0xFFFF69A2 RAM -- r2 = K = 0xFFFF69A2
+025C28: 000B  rts                             ; return
+025C2A: 2260  mov.b r6,@r2                    ; [slot] byte [K] = 0xFF
+;   pool 0x025E64: .long 0xFFFF69A2  RAM
+MEMBERS  (10; parameters read from each member's own bytes)
+;   0x025C24  callers 1 [047C40]                 K=0xFFFF69A2  I=-1 (byte 0xFF)
+;   0x03BCCC  callers 1 [047C40]                 K=0xFFFF7CE6  I=-1 (byte 0xFF)
+;   0x0432B0  callers 1 [047C40]                 K=0xFFFF80C8  I=-1 (byte 0xFF)
+;   0x044132  callers 1 [04AE82]                 K=0xFFFF81AC  I=-1 (byte 0xFF)
+;   0x06B410  callers 1 [047C40]                 K=0xFFFF9544  I=-1 (byte 0xFF)
+;   0x06E5BC  callers 1 [047C40]                 K=0xFFFF964E  I=-1 (byte 0xFF)
+;   0x06E5C4  callers 1 [0729DC]                 K=0xFFFF964E  I=-1 (byte 0xFF)
+;   0x08CF40  callers 1 [047C40]                 K=0xFFFFA849  I=-1 (byte 0xFF)
+;   0x08DA1C  callers 1 [047C40]                 K=0xFFFFA882  I=-1 (byte 0xFF)
+;   0x08DA24  callers 1 [0729DC]                 K=0xFFFFA882  I=-1 (byte 0xFF)
+
+====================================================================================================
+==== FUNCTION 0x05D790 .. 0x05D7A4  (10 instructions, 3 callers) -- CLASS 25, 10 members ====
+====================================================================================================
+SHAPE  r0 = 0 always (0x0BE5A8 on the constant input 0.0)
+CONTRACT
+  out     r0 = 0, for every entry state.  fr4 and fr6 are both set to 0.0 before 0x0BE5A8, so
+          the library computes trunc((0 - 0)/C + 0.5) = 0; C (finite, > 0 in all 10)
+          cannot change that.  Reads NO RAM (only its own PR push / pop on the stack).
+  clobbers  r4 = 0, r5 = 255, r2 = 0x0BE5A8; fr2 = fr3 = 0.5, fr4 = +0.0, fr5 = C, fr6 = +0.0;
+          FPUL = 0; T = 1 (0BE5C4 cmp/pz on r4 = 0).  r1, r3, r6-r14, fr0, fr1, fr7-fr15
+          unchanged.  A caller relying on fr4 or r4 surviving the call would be misled.
+  parameter  C (float32, own pool) -- inert.
+MECHANISM
+  fr6 = 0.0;  fr4 = fr6;  fr5 = C;  r0 = 0x0BE5A8() = 0;  r0 &= 0xFF
+EVIDENCE
+  emulated: t_zero_f2u, 40 cases (10 x 4 random entry states, r0-r14 / fr0-fr15 / T / FPUL
+    random), 0x0BE5A8 RUN: r0 = 0 every time; nothing was planted in RAM and no uninitialised
+    read occurred; every logged RAM read is the stack PR pop; no peripheral access; no write;
+    every clobber above asserted, every other register unchanged.
+  script: 40 emulated cases for this class, all asserted.
+LISTING
+; function 0x05D790..0x05D7A4  10 instructions  rom AE5L600L 20g rev 20.19c.bin
+05D790: 4F22  sts.l pr,@-r15                  ; push caller PR
+05D792: D22C  mov.l @(0x05D844),r2          ; = 0x000BE5A8 ROM -- r2 = 0x0BE5A8 (same library routine as class 14)
+05D794: F68D  fldi0 fr6                       ; fr6 = 0.0 (offset)
+05D796: F46C  fmov fr6,fr4                    ; fr4 = fr6 = 0.0 -- the input is the constant zero, no RAM is read
+05D798: C73C  mova @(0x05D88C),r0           ; -> 0x05D88C: long 0x3C000000 f32 0.0078125 -- r0 -> C
+05D79A: 420B  jsr @r2                       ; -> 0x0BE5A8 -- call it, PR = 0x05D79E
+05D79C: F508  fmov.s @r0,fr5                  ; [slot] fr5 = C = 0.0078125
+05D79E: 4F26  lds.l @r15+,pr                  ; pop caller PR
+05D7A0: 000B  rts                             ; return
+05D7A2: 600C  extu.b r0,r0                    ; [slot] r0 = 0: trunc((0 - 0)/C + 0.5) = trunc(0.5) = 0 for any finite C != 0
+;   pool 0x05D844: .long 0x000BE5A8  ROM
+MEMBERS  (10; parameters read from each member's own bytes)
+;   0x05D790  callers 3 [05F718,09A3AC,09A628]   C=0.0078125 (0x3C000000 @ 0x05D88C)
+;   0x05E160  callers 3 [05F718,09A3AC,09A628]   C=7.500634670257568 (0x40F00533 @ 0x05E390)
+;   0x05E21E  callers 3 [05F718,09A3AC,09A628]   C=0.39215683937072754 (0x3EC8C8C8 @ 0x05E3C4)
+;   0x05E232  callers 3 [05F718,09A3AC,09A628]   C=0.39215683937072754 (0x3EC8C8C8 @ 0x05E3C4)
+;   0x05E246  callers 3 [05F718,09A3AC,09A628]   C=0.03199999779462814 (0x3D03126E @ 0x05E3C8)
+;   0x05E25A  callers 3 [05F718,09A3AC,09A628]   C=0.03199999779462814 (0x3D03126E @ 0x05E3C8)
+;   0x05E296  callers 3 [05F718,09A3AC,09A628]   C=0.39215683937072754 (0x3EC8C8C8 @ 0x05E3C4)
+;   0x05E2AA  callers 3 [05F718,09A3AC,09A628]   C=0.39215683937072754 (0x3EC8C8C8 @ 0x05E3C4)
+;   0x05E2BE  callers 3 [05F718,09A3AC,09A628]   C=0.03199999779462814 (0x3D03126E @ 0x05E3C8)
+;   0x05E2D2  callers 3 [05F718,09A3AC,09A628]   C=0.03199999779462814 (0x3D03126E @ 0x05E3C8)
+
+====================================================================================================
+==== FUNCTION 0x0056EC .. 0x0056F4  (4 instructions, 1 caller) -- CLASS 26, 9 members ====
+====================================================================================================
+SHAPE  word [B] = word [A], then FALL THROUGH into the next function
+CONTRACT
+  effect  word[B] = word[A]; r3 = A, r2 = sext16(the word), r1 = B.  The member has NO return:
+          execution continues at entry + 8, which the census lists as a separate function
+          with its own caller.  The member is therefore "copy, then run the function that
+          follows"; what that function does is not decoded here.
+  parameters  A, B (RAM, even).
+MECHANISM
+  word[B] = word[A];  continue at entry + 8
+EVIDENCE
+  emulated: t_wcopy, 54 cases (9 x words 0000 0001 7FFF 8000 FFFF 5AA5): run stops at entry + 8
+    (stop_at) with word[B] = word[A], PR and r15 unchanged, only B, B+1 written.
+  script: 54 emulated cases for this class, all asserted.
+LISTING
+; function 0x0056EC..0x0056F4  4 instructions  rom AE5L600L 20g rev 20.19c.bin
+0056EC: D31D  mov.l @(0x005764),r3          ; = 0xFFFF402E RAM -- r3 = A = 0xFFFF402E
+0056EE: 6231  mov.w @r3,r2                    ; r2 = sign-extended word [A]
+0056F0: D11D  mov.l @(0x005768),r1          ; = 0xFFFF410C RAM -- r1 = B = 0xFFFF410C
+0056F2: 2121  mov.w r2,@r1                    ; word [B] = word [A]; NO return: execution continues at 0x0056F4
+;   pool 0x005764: .long 0xFFFF402E  RAM
+;   pool 0x005768: .long 0xFFFF410C  RAM
+MEMBERS  (9; parameters read from each member's own bytes)
+;   0x0056EC  callers 1 [00DF14]                 A=0xFFFF402E -> B=0xFFFF410C  falls through to 0x0056F4
+;   0x005790  callers 1 [00DF14]                 A=0xFFFF405C -> B=0xFFFF4114  falls through to 0x005798
+;   0x005978  callers 1 [00DF14]                 A=0xFFFF4060 -> B=0xFFFF412C  falls through to 0x005980
+;   0x005A18  callers 1 [00DF14]                 A=0xFFFF402C -> B=0xFFFF4134  falls through to 0x005A20
+;   0x006584  callers 1 [00DF14]                 A=0xFFFF405E -> B=0xFFFF4148  falls through to 0x00658C
+;   0x008124  callers 1 [00DF14]                 A=0xFFFF4032 -> B=0xFFFF41E4  falls through to 0x00812C
+;   0x0081C0  callers 1 [00DF14]                 A=0xFFFF4058 -> B=0xFFFF41EC  falls through to 0x0081C8
+;   0x00A594  callers 1 [00DF14]                 A=0xFFFF4040 -> B=0xFFFF4300  falls through to 0x00A59C
+;   0x00ACF4  callers 1 [00DF14]                 A=0xFFFF4032 -> B=0xFFFF432C  falls through to 0x00ACFC
+
+====================================================================================================
+==== FUNCTION 0x00EA70 .. 0x00EA82  (9 instructions, 1 caller) -- CLASS 27, 9 members ====
+====================================================================================================
+SHAPE  interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 with r4 = N
+CONTRACT
+  effect  r3 = word[P] (unused), word[P] = V, r4 = P + 2, r2 = word[P+2] (read), word[P+2] = V,
+          r4 = N, branch to 0x00E774.  r5 = V.  P = 0xFFFFF62C in all 9.
+          r2's read value is not used by 0x00E774's own instructions up to its jsr 0x010800
+          (r2 is next written at 0x00E78C); whether 0x010800 reads r2 is not established.
+  parameters  P, V (word literal), ADD = 2, N.  T = 0x00E774 for all 9.
+  cross-check  N = vector slot number of the stub that jumps here, 9/9.
+MECHANISM
+  r4 = P; r3 = word[P]; r5 = V; word[P] = V; r4 += 2; r2 = word[P+2]; word[P+2] = V; r4 = N
+  goto 0x00E774
+EVIDENCE
+  emulated: t_periph, 27 cases (9 x 3 planted values; [P+2] planted differently from [P]):
+    reads [(P,2), (P+2,2)] and writes [(P,2,V), (P+2,2,V)] in that order; r3, r2 = the planted
+    values; r5 = V; r4 = N.
+  script: 27 emulated cases for this class, all asserted.
+LISTING
+; function 0x00EA70..0x00EA82  9 instructions  rom AE5L600L 20g rev 20.19c.bin
+00EA70: 9451  mov.w @(0x00EB16),r4          ; = 0xF62C (-2516) -> 0xFFFFF62C PERIPH -- r4 = P = 0xFFFFF62C
+00EA72: 6341  mov.w @r4,r3                    ; r3 = word [P] (read; dead in 0x00E774)
+00EA74: 9545  mov.w @(0x00EB02),r5          ; = 0x01FE (510) -- r5 = V = 0x01FE
+00EA76: 2451  mov.w r5,@r4                    ; word [P] = V
+00EA78: 7402  add #2,r4                       ; r4 = P + 2 = 0xFFFFF62E
+00EA7A: 6241  mov.w @r4,r2                    ; r2 = word [P+2] (read)
+00EA7C: 2451  mov.w r5,@r4                    ; word [P+2] = V
+00EA7E: AE79  bra 0x00E774                    ; branch to 0x00E774
+00EA80: E46C  mov #108,r4                     ; [slot] r4 = N = 108 = this handler's vector number
+;   pool 0x00EB00: .long 0xF45E01FE  const
+;   pool 0x00EB14: .long 0x00FFF62C  const
+MEMBERS  (9; parameters read from each member's own bytes)
+;   0x00EA70  callers 1 [002304]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x01FE  N=108  T=0x00E774  via stub 0x002304 = vector 108
+;   0x00EA82  callers 1 [00231C]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x01FD  N=109  T=0x00E774  via stub 0x00231C = vector 109
+;   0x00EA94  callers 1 [002334]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x01FB  N=110  T=0x00E774  via stub 0x002334 = vector 110
+;   0x00EAA6  callers 1 [00234C]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x01F7  N=111  T=0x00E774  via stub 0x00234C = vector 111
+;   0x00EAB8  callers 1 [002364]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x01EF  N=112  T=0x00E774  via stub 0x002364 = vector 112
+;   0x00EACA  callers 1 [00237C]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x01DF  N=113  T=0x00E774  via stub 0x00237C = vector 113
+;   0x00EADC  callers 1 [002394]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x01BF  N=114  T=0x00E774  via stub 0x002394 = vector 114
+;   0x00EAEE  callers 1 [0023AC]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x017F  N=115  T=0x00E774  via stub 0x0023AC = vector 115
+;   0x00EB18  callers 1 [0023C4]                 P=0xFFFFF62C  P+2=0xFFFFF62E  V=0x00FF  N=116  T=0x00E774  via stub 0x0023C4 = vector 116
+
+====================================================================================================
+==== FUNCTION 0x00F56A .. 0x00F570  (3 instructions, 1 caller) -- CLASS 28, 9 members ====
+====================================================================================================
+SHAPE  interrupt handler: goto 0x00E774 with r4 = N, nothing else
+CONTRACT
+  effect  r4 = N (word literal, sign-extended), branch to 0x00E774.  No peripheral or RAM
+          access.
+  parameter  N.  T = 0x00E774 for all 9.
+  cross-check  N = vector slot number of the stub that jumps here, 9/9.
+MECHANISM
+  r4 = N;  goto 0x00E774
+EVIDENCE
+  emulated: t_periph, 27 cases: no peripheral read or write, r4 = N, other registers unchanged.
+  script: 27 emulated cases for this class, all asserted.
+LISTING
+; function 0x00F56A..0x00F570  3 instructions  rom AE5L600L 20g rev 20.19c.bin
+00F56A: 945E  mov.w @(0x00F62A),r4          ; = 0x00CA (202) -- r4 = N = 202 (word literal) = this handler's vector number
+00F56C: A902  bra 0x00E774                    ; branch to 0x00E774; no register write to a peripheral first
+00F56E: 0009  nop                             ; [slot] no effect
+;   pool 0x00F628: .long 0xF00400CA  const
+MEMBERS  (9; parameters read from each member's own bytes)
+;   0x00F56A  callers 1 [0029DC]                 N=202  T=0x00E774  via stub 0x0029DC = vector 202
+;   0x00F570  callers 1 [002A54]                 N=203  T=0x00E774  via stub 0x002A54 = vector 203
+;   0x00F596  callers 1 [0029F4]                 N=206  T=0x00E774  via stub 0x0029F4 = vector 206
+;   0x00F59C  callers 1 [002A6C]                 N=207  T=0x00E774  via stub 0x002A6C = vector 207
+;   0x00F5C2  callers 1 [002A0C]                 N=210  T=0x00E774  via stub 0x002A0C = vector 210
+;   0x00F5C8  callers 1 [002A84]                 N=211  T=0x00E774  via stub 0x002A84 = vector 211
+;   0x00F5EE  callers 1 [002A24]                 N=214  T=0x00E774  via stub 0x002A24 = vector 214
+;   0x00F5F4  callers 1 [002A9C]                 N=215  T=0x00E774  via stub 0x002A9C = vector 215
+;   0x00F616  callers 1 [002A3C]                 N=218  T=0x00E774  via stub 0x002A3C = vector 218
+
+====================================================================================================
+==== FUNCTION 0x015BFA .. 0x015C04  (5 instructions, 1 caller) -- CLASS 29, 9 members ====
+====================================================================================================
+SHAPE  byte [K] = I and byte [K+D] = I
+CONTRACT
+  effect  byte[K] = I, byte[K + D] = I; r0 = I, r6 = K.  I = 0 in all 9; D = 1 (7 members),
+          2 (0x02E35A), 12 (0x0967C8).
+  parameters  I, K (RAM), D (mov.b displacement, bytes).
+MECHANISM
+  byte[K] = I;  byte[K+D] = I
+EVIDENCE
+  emulated: t_st2, 9 cases: both bytes pre-filled 0x5A, afterwards = I; exactly K and K+D
+    written; r0 = I.
+  script: 9 emulated cases for this class, all asserted.
+LISTING
+; function 0x015BFA..0x015C04  5 instructions  rom AE5L600L 20g rev 20.19c.bin
+015BFA: E000  mov #0,r0                       ; r0 = I = 0
+015BFC: D645  mov.l @(0x015D14),r6          ; = 0xFFFF5DB8 RAM -- r6 = K = 0xFFFF5DB8
+015BFE: 2600  mov.b r0,@r6                    ; byte [K] = I
+015C00: 000B  rts                             ; return
+015C02: 8061  mov.b r0,@(1,r6)                ; [slot] byte [K + D] = I, D = 1 (mov.b displacement is in bytes)
+;   pool 0x015D14: .long 0xFFFF5DB8  RAM
+MEMBERS  (9; parameters read from each member's own bytes)
+;   0x015BFA  callers 1 [01436E]                 K=0xFFFF5DB8  K+1=0xFFFF5DB9  I=0
+;   0x02E35A  callers 1 [05E844]                 K=0xFFFF7234  K+2=0xFFFF7236  I=0
+;   0x08496E  callers 1 [081B4A]                 K=0xFFFFA511  K+1=0xFFFFA512  I=0
+;   0x084D82  callers 1 [081B4A]                 K=0xFFFFA527  K+1=0xFFFFA528  I=0
+;   0x08D094  callers 1 [0729DC]                 K=0xFFFFA84C  K+1=0xFFFFA84D  I=0
+;   0x08D1D4  callers 1 [0729DC]                 K=0xFFFFA854  K+1=0xFFFFA855  I=0
+;   0x08FD24  callers 1 [0729DC]                 K=0xFFFFABD2  K+1=0xFFFFABD3  I=0
+;   0x0903DC  callers 1 [0729DC]                 K=0xFFFFABFC  K+1=0xFFFFABFD  I=0
+;   0x0967C8  callers 1 [047C40]                 K=0xFFFFAD34  K+12=0xFFFFAD40  I=0
+
+====================================================================================================
+ESTABLISHED
+====================================================================================================
+ 1. All 983 members of stub_classes.json classes 0..29 have the shape of their class example under an
+    independent masking rule; none is removed; every census extent is contiguous and decodes as SH-2E.
+    (emu_stub_shapes_a.py, SHAPE PROOF; 38,020 emulated cases, exit 0.)
+ 2. Class 0: 137 members are `bra T; nop` tail thunks (registers, PR, memory untouched); 0x000BFA and
+    0x0035F8 branch to themselves and never return (word AFFE at each entry).
+ 3. Class 1: the 118 stubs 0x00207C .. 0x002B74 push r0, PR, r1, call 0x002B8C, and jump to the long at
+    stub+16 with PR = the r0 0x002B8C returns (0x00208A lds r0,pr in the jmp slot).  Each stub address
+    is held by exactly one long of 0x0FFC50 + 4v; the 118 slots are distinct and lie inside 64..231
+    without filling it -- the other 50 slots there hold 0x0000E852 (47) or 0x00F3F2 / 0x00F460 /
+    0x00F6E6 (v = 184 / 186 / 224), entries that push their own registers (2F76 2F66 2F56).
+ 4. Class 2: 68 empty functions (rts; nop).  Class 6: 56 constant returns (0 x54, 1 at 0x09EF10,
+    2 at 0x0A9858).
+ 5. Byte readers: class 3 r0 = sext8(byte[K]) (65); class 19 r0 = zero-extended byte[K] (13); class 5
+    r0 = ((byte[K] & M) != 0) with X = 1 everywhere (58); class 7 r0 = 2 if byte[K] != 0 else 0 (46);
+    class 10 r0 = (byte[K] == 1) (34).  T senses: tst sets T on a zero AND (01CEFA, 0297A4); cmp/eq #imm
+    on equality with the sign-extended immediate (022CEE); bf/s at 0297A6 is taken on T = 0.
+ 6. Byte / word writers: class 8 byte[K] = I (44); class 24 byte[K] = 0xFF (10); class 18 / 21
+    byte[K] = r4 low byte (13 / 11); class 29 byte[K] = byte[K+D] = 0 (9); class 9 word[K] =
+    (I << 8) | (~I & 0xFF) through 0x0BE9A0 (40: 0x00FF x36, 0x01FE x3, 0x07F8 at 0x0A7108), leaving
+    r0 = r4 = the word, r3 = (I & 0xFF) << 8, r2 = K (0BE9A0..0BE9AE).
+ 7. Class 14: r0 = clamp(trunc(float[K]/C + 0.5), 0, 255) through 0x0BE5A8 with offset 0 (18).  Class
+    25: r0 = 0 for every entry state -- fr4 = fr6 = 0.0 at 0x05D796 -- and no RAM read (10).  Class
+    14 edges: negative x -> 0, (k+0.25)C -> k for k <= 255, (k+0.75)C -> k+1 for k <= 254, x/C
+    clearly above 254.5 -> 255.  Both classes leave r4 = r0, r5 = 255, r2 = 0x0BE5A8, fr2 =
+    x/C + 0.5, fr3 = 0.5, fr4 = x/C, fr5 = C, fr6 = 0.0, FPUL = the pre-clamp trunc, T = (that
+    trunc >= 0) (0BE5A8..0BE5CE; asserted).
+ 8. Classes 4 / 12 / 17 / 23: 1 / 2 / 3 / 4 bsr calls in order, then a bra tail call with the caller PR
+    restored (lds.l @r15+,pr in the bra slot); no argument set-up: each callee receives exactly the
+    r0-r14 / fr0-fr15 / T the previous one left (62 / 19 / 14 / 11).
+ 9. Classes 11 / 20: jmp tail thunks through r3 / r2 (25 / 12).
+10. Class 16: the 15 census "functions" 0x003B2A .. 0x003B62 are entries into one unrolled copy that runs
+    to 0x003B6C; member D copies D/4 + 1 longs [r2+o] -> [r1+o], o = D .. 0, then pops r3 and returns.
+    Reached through the table 0x003B70 indexed by r0 in 0x003B14 (r0 >u 64 goes to 0x003BB4).
+11. Class 26: the 9 members copy word[A] -> word[B] and fall through into entry + 8; they do not return.
+12. Classes 13 / 15 / 22 / 27 / 28 (64 handlers, the targets of 64 of the class-1 stubs): one 16-bit
+    read of P (value dead in 0x00E774), one or two 16-bit writes of a constant V (none for class 28),
+    then bra 0x00E774 with r4 = N, and N equals the vector slot of the stub that reaches the handler in
+    64 of 64.  P values: 0xFFFFED1A, 0xFFFFF42C, 0xFFFFF45E, 0xFFFFF480, 0xFFFFF522, 0xFFFFF5A2,
+    0xFFFFF5CA, 0xFFFFF62C/0xFFFFF62E, 0xFFFFF66A, 0xFFFFF69E, 0xFFFFF6E8.
+13. Non-member facts the comparison below relies on (script part E, each asserted):
+    0x05850E r0 = u8[0xFFFFAD52 + (r4 & 0xFF)] (05850E D61B -> 0xFFFFAD52; 058510 extu.b r4,r0;
+    058512 mov.b @(r0,r6),r2; 058516 extu.b r2,r0).  0x05DCAE r0 = u8[0xFFFFAD52 + k],
+    k = ROM u8[0x065C2E + (r4 & 0xFFFF)] (05DCB2 -> 0x065CBC; 05DCB4 mov.w -> -142; 05DCB8
+    extu.w; 05DCBA mov.b @(r0,r5),r4; 05DCBE jsr 0x05850E).  0x055FB8 stores pair(1) = 0x01FE
+    to word 0xFFFF3474 (05600E -> 0x0BE9A0; 056012 mov #1,r4; 056016 mov.w r0,@r2) iff four
+    (byte == 1 or byte == 1) pair tests pass.  0x0281DC is 13 instructions: r0 = 1 if
+    byte[0xFFFF96A8] == 1, else 2 if byte[0xFFFF96A9] == 1, else 0.  0x004CCA / 0x009106 are
+    rts; nop and are the literals 0x00E1B0 calls (0x00E2E8 / 0x00E2E0); 0x004CCE / 0x00910A are
+    the literals 0x00E2FC calls (0x00E404 / 0x00E40C).  The 46 class-7 readers leave 17 bytes of
+    0xFFFF9704..0xFFFF9742 unread.
+
+====================================================================================================
+NOT ESTABLISHED (and what would settle it)
+====================================================================================================
+ a. What any RAM cell named here IS (317 RAM / peripheral addresses touched: 285 UNMAPPED, 16
+    DISASM-ONLY, 16 not in docs/verification-status.json).  These functions are readers and writers,
+    not meanings.  Settle per cell: trace a writer that computes the value, or a read that feeds a
+    definition-named axis.
+ b. Which peripheral register each P is, and whether the read-before-write in classes 13 / 15 / 22 /
+    27 is a hardware flag-clear protocol.  Needs the SH7058 hardware manual's register map.
+ c. Which interrupt source each vector number 64..231 is (names like IRQ0 / CMT0 / ADI0).  Needs the
+    hardware manual's vector table; bytes give only the slot number.
+ d. What 0x00E774 does after its first three instructions (it calls 0x010800 with r4 = 0x4000,
+    r5 = N, then jmps to 0x00FBA4 -- fn_dump only, not traced), and whether 0x010800 reads the r2
+    left by class 27.  Decode 0x00E774 / 0x010800 / 0x00FBA4.
+ e. Every stubbed callee: 0x002B8C (used through its CONTRACT), the bsr / bra / jmp targets of
+    classes 0, 4, 11, 12, 17, 20, 23, and the functions class 26 falls into.  Also the vector
+    entries that bypass the class-1 stubs: 0x00E852 (its jump target 0x00E774 included) and the
+    bodies of 0x00F3F2 / 0x00F460 / 0x00F6E6.
+ f. How the self-loops 0x000BFA / 0x0035F8 are left, if ever.  9 longs of the table at 0x000000
+    (slots 4..10, 12, 13) hold 0x00000BFA; whether VBR = 0 is in force when those exceptions can
+    occur is not decided here (rtos_core_trace NOT ESTABLISHED k covers the VBR := 0 load).
+ g. The exact float result of class 14 at a rounding boundary, including whether a float x/C
+    can land exactly on k + 0.5 (and so round up) or on the 254.5 clamp onset: no assertion here
+    depends on it (open-holes #11; every asserted case is >= 1e-3 from a boundary, and the
+    large-magnitude cases where 1e-3 is not a last-bit guard all clamp to 255).
+ h. Class 10's sign-extension of I is untested in the negative range: all 34 members have I = 1, so
+    a mutant that drops the sign extension survives (checked; it is equivalent for these members).
+
+====================================================================================================
+COMPARISON WITH EXISTING CLAIMS  (step 4 -- written after everything above was asserted)
+====================================================================================================
+Sources: Ghidra labels parsed from disassembly/ghidra/ImportAE5L600L.java by numeric address (3,779
+label sites); docs/*.md and disassembly/analysis/*.txt searched for every member address in any of the
+forms 0xBE53C / 0x0BE53C / 0x000BE53C / 0BE53C; docs/verification-status.json for every RAM / peripheral
+parameter.  152 of the 983 members carry at least one Ghidra label (166 label sites).  Nothing below
+changed a contract above.  Blindness note: before step 4 the header block (first 30 lines) of
+stub_tables_trace.txt was opened while checking the verifier's --rom convention; it names none of these
+members and no contract was taken from it.
+
+CONTRADICTED BY BYTES
+  C1. 0x004CCA  "tps_multi_stage_calc" [TRACED] (ImportAE5L600L.java:3327-3330): "Task 0 call_26.
+      ... calls 5 subs (0x4DAC, 0x4F5E, 0x5004, 0x5376, tail-call 0x4EEE)".  The label text joins two
+      different functions.  Its ADDRESS is right for "Task 0 call_26": 0x004CCA is the literal
+      0x00E1B0 calls (pool 0x00E2E8 = 0x00004CCA, 00E25A jsr), and it is 000B 0009 (rts; nop) -- an
+      empty function.  Its BODY text describes 0x004CCE (sts.l pr / 0x004CD0 bsr 0x004DAC), a separate
+      census function reached only from 0x00E2FC (pool 0x00E404 = 0x00004CCE, 00E320 jsr).  Moving
+      the label 4 bytes would carry the 0x00E1B0 attribution onto a function 0x00E1B0 never calls;
+      leaving it keeps a body description on an empty function.  Whether 0x00E1B0 is "Task 0" is a
+      label claim not checked here.
+  C2. 0x009106  "injection_state_machine_bg" [TRACED] (java:3322-3325): "Task 0 call_24. ... Reads
+      FFFF4272 state byte, dispatches ...".  Same split as C1: 0x009106 is rts; nop and is the
+      literal 0x00E1B0 calls (pool 0x00E2E0, 00E24E jsr); 0x00910A, the census function that loads
+      0xFFFF4272 (00910C mov.l -> 0xFFFF4272, 00910E mov.b @r3,r4), is reached only from 0x00E2FC
+      (pool 0x00E40C, 00E32C jsr).  task0_background.txt:204-222 already records, for both, an rts at the
+      labelled address and the real body 4 bytes later.
+  C3. 0x058524  "diag_read_state_E" [DECODED] (java:2050-2051): "Reads diag_state_E[R4] at
+      FFFFAD52+R4. Returns active fault bitmask."  Bytes: r0 = sext8(byte[0xFFFFAD44]); no r4, no
+      index, a different address.  The text describes the mechanics of 0x05850E, the census
+      function after it, which java:2052 already labels diag_read_state_E_indexed: r0 =
+      u8[0xFFFFAD52 + (r4 & 0xFF)] (ESTABLISHED 13).  0x05DCAE (stub_tables G36) is not that reader:
+      it remaps the index through ROM u8[0x065C2E + (r4 & 0xFFFF)] and then calls 0x05850E.  "Fault
+      bitmask" is a meaning; not established.
+  C4. 0x0297B0  "float_load_from_desc_B" (java:2107): "Variant of float_load_from_desc".  Bytes: r0 = 2
+      if byte[0xFFFF9705] != 0 else 0 -- no float, no descriptor (the sibling 0x0297A0's float name
+      was retired by corrections item 92; this alias survived, and the same address also carries
+      diag_check_P0032, java:2148).
+  C5. Instruction counts in item-92 text.  docs/corrections.md:5457 "All five contested functions are
+      six-instruction byte flag readers"; its listing (corrections.md:5460-5466) stops at 0x0297AC and
+      omits the 0x0297AE nop slot.  By bytes: 0x0297A0 = 8, 0x0299BC = 8, 0x0278D2 = 6, 0x023E48 = 5
+      instructions.  The table row corrections.md:5474 and java:7125 call 0x0278D2 a "five-instruction"
+      bit test (it is 6); java:7128 calls 0x0297A0 "Six instructions" (8); java:2019 calls 0x02F8FE a
+      "6-instruction leaf stub" (5).  For these the semantics agree with the bytes; only the counts
+      are wrong.  The fifth contested function, 0x0281DC (not a member of these classes), is
+      neither a six-instruction nor a single-byte reader: it is 13 instructions and reads TWO bytes
+      -- r0 = 1 if byte[0xFFFF96A8] == 1, else 2 if byte[0xFFFF96A9] == 1 (0281E8 mov.b @(1,r5),r0),
+      else 0 (ESTABLISHED 13) -- so the corrections.md:5473 row "byte[FFFF96A8]" omits the second
+      byte.
+  C6. java:7130 (on 0x0297A0): "Start of 45 sequential DTC flag readers (16B each). FFFF9704-FFFF9742".
+      By bytes there are 46 readers of this shape, each reading one byte inside 0xFFFF9704..0xFFFF9742;
+      they do not cover that range -- 17 of its 63 bytes are read by none of them (9725-972B,
+      9730-9734, 9738-973A, 973F, 9740).  They are not all 16 bytes apart (0x0297E0 -> 0x0297F4 ->
+      0x029808 are 20 bytes; class-6 return-0 stubs sit in the gaps) and not in address order of the
+      byte they read (0x02996C reads ..9719, 0x02997C reads ..9718).
+  C7. Duplicate DTC names on different bytes: diag_check_P0107 on 0x029838 (java:7171, byte ..970C) and
+      on 0x029848 (java:2155, byte ..970D); diag_check_P0171 on 0x0299CC (java:7191, byte ..971E) and on
+      0x0299F0 (java:2169, byte ..9720).  At most one of each pair can be right.
+  C8. Labels that describe a body these bytes do not contain (the function is a 4-to-11-instruction
+      thunk / setter; whatever is described must be in a callee, if anywhere):
+      0x04BC20 task54_idle_control [DECODED] (java:397) "Throttle RAM, no FPU, GBR state machine" --
+        bytes: byte[0xFFFF8373] = 0, four instructions, no GBR.
+      0x040520 task34_throttle_calc_sub [DECODED] (java:5295) -- bytes: byte[0xFFFF7F82] = 0.
+      0x040918 task33_timing_ws_init [DECODED] (java:327) "Multi-GBR-write, 3 BSR calls" -- 3 bsr calls
+        agree; there is no GBR write in the function.
+      0x03CD34 fuel_warmup_enrich (java:1114) "Reads ECT FFFF69FC, IAT FFFF69F0" -- the function reads no
+        RAM (3 bsr + bra).  Also cites FFFF69F0 as IAT, which CLAUDE.md records as RETRACTED.
+      0x03605E ol_fuel_map_selector [DECODED] (java:1092) "Reads IAM from FFFF3234, compares vs CC16C",
+        0x03756C injector_trim_init (java:5528) "Reads FFFF895C, zeros FFFF7AB0", 0x03A222
+        percyl_fuel_trim (java:5538) "4-iteration loop", 0x0900B4 task55_mps_diag (java:401) "Gates:
+        ...", 0x03160A, 0x036C3C, 0x037B68, 0x039528 (java:5483, 1098, 1108, 1110) -- each address is a
+        `bra T; nop` (T = 0x03643A, 0x03757E, 0x03A230, 0x0900D2, 0x03161E, 0x036C48, 0x037B74,
+        0x039668).  docs/corrections.md:2263-2311 (items 46-47) already resolves seven of these --
+        0x03605E, 0x03756C, 0x03A222, 0x03160A, 0x036C3C, 0x037B68, 0x039528 -- as dispatch-table
+        stubs; 0x0900B4 appears nowhere in corrections.md.  The labels still sit on the stubs.
+      0x00F312 ADI0_Handler [DECODED] (java:1563) "clears ADF flag, advances ADC state machine" -- the
+        handler writes 0x000E to word 0xFFFFF6E8 after reading it and goes to the common 0x00E774 with
+        r4 = 176, the same shape as 15 other class-15 handlers.  No state machine is in its bytes; what
+        0x00E774 does next, and whether 0xFFFFF6E8 holds an ADF flag, is not established (NOT a and b).
+  C9. 0xFFFF3474 "inj_channel_enable ... 0xFF = all 8 channels" (java:5723-5724).  find_writers.py
+      reports two direct writers, both 16-bit pair stores through 0x0BE9A0: the class-9 member
+      0x056022 stores pair(0) = 0x00FF (byte 0xFFFF3474 = 0x00, 0xFFFF3475 = 0xFF), and 0x055FB8
+      (05600E -> 0x0BE9A0, 056012 mov #1,r4, 056014 -> 0xFFFF3474, 056016 mov.w r0,@r2) stores
+      pair(1) = 0x01FE (0x01 at 3474, 0xFE at 3475) when its four pair tests pass.  So the value byte
+      at 0xFFFF3474 is written as 0x00 or 0x01 by these writers, never 0xFF; a "0xFF" reading matches
+      only the complement byte of the 0x00FF store.  find_writers is a lower bound (it misses stores
+      whose base comes from a stack slot), and which writer the label was derived from is not
+      established.
+
+LABEL NAME vs LABEL NAME (bytes cannot pick)
+  0x022CF4 check_engine_running (java:2013, 7108) reads byte[0xFFFF65C5] == 1, which the bytes confirm;
+    the RAM label on 0xFFFF65C5, opt_C303F_not_AA (java:8898), says the byte is a calibration option
+    "Not an engine-running state".  docs/boost-control.md:169 already flags the function name as a label
+    only.  This file's contract is name-free and holds either way.
+  0x043464 carries task47_mapswitch_lowpw (java:359) and task47_ign_timing_lowpw (java:4848, "NOT fuel
+    injection"); the bytes are bsr 0x04346E then bra 0x0434F2 and decide neither.
+  Class 7's readers are named diag_check_Pxxxx (DTC) at java:2147-2185; the bytes they read are labelled
+    gbr_learn_9704 / learning_flag_table_base (..970E) / learning_flag_slot15 (..971B) / gbr_learn_972C /
+    gbr_learn_9735, and 0x029858 / 0x02999C carry flkc_* names.  Two naming schemes for one array;
+    neither is established by these bytes.
+  0x00ACF4 task10_batv_calibrate (java:2959) and 0xFFFF432C batv_calibrated "calibrated FLOAT"
+    (java:2987): this member stores a 16-bit word copy of [0xFFFF4032] into 0xFFFF432C.  The function it
+    falls into (0x00ACFC) also loads the literal 0xFFFF432C (pool 0x00AD70), so whether the word is
+    later overwritten by a float is not established here.
+
+CONFIRMED BY BYTES (mechanics only; no name is confirmed)
+  * rtos_core_trace.txt CONTRACT of 0x002B8C, "WHAT THE 118 CALLERS ARE": 118 stubs at 0x00207C + 24k,
+    handler at stub+16, one vector each, all inside 64..231 (they do not fill it: 50 slots there hold
+    other longs, ESTABLISHED 3); 9 handlers make no register write (vectors 202, 203,
+    206, 207, 210, 211, 214, 215, 218 = class 28 exactly); vectors 108..116 make two (= class 27); and
+    r4 = vector number at 0x00E774 (64 of 64 here).
+  * stub_tables_trace.txt class table: G07 (18, sat8(f32[RAM]/k)) = class 14; G22 (10, constant 0, no
+    RAM) = class 25; G35 (13, zero-extended byte) = class 19; G01 (37, s8[RAM]) are 37 of class 3; G12
+    (16, constant 0) are 16 of class 6; S53 (10, u8[RAM] = r4) are 10 of class 18; S55 (10) are 10 of
+    class 21; S54's three rts/nop stubs are in class 2.  The S60 rows for 0x02E35A / 0x02E364 agree with
+    classes 29 / 8.
+  * corrections.md item 92 table (5471-5475): 0x0297A0 reads byte[FFFF9704], 0x0299BC byte[FFFF971C],
+    0x0278D2 byte[FFFF6A29], 0x023E48 byte[FFFF67FC], none uses a float or a descriptor -- agree (counts
+    aside, C5).  java:7125 "tests bit 7, returns the inverted flag": r0 = 1 iff bit 7 is set (the
+    inverse of T) -- agrees.
+  * corrections.md:2263-2311 (items 46-47): the B[]/A[]/C[] dispatch-slot stubs 0x03160A, 0x03605E,
+    0x036C3C, 0x03756C, 0x037B68 / 0x037B6C / 0x037B70, 0x039524 / 0x039528, 0x03A222 are bra thunks to
+    the targets listed there -- all agree with the class-0 member map.
+  * Class-6 return_0_stub_* labels (26, java:7149-7251): all return 0.  Class-10 "Flag reader (T1)" and
+    "returns 1 if == 1" texts (0x022CEA, 0x022CF4, 0x022F92, 0x023E48, 0x0281CC, 0x02BE10 .. 0x02BE5E,
+    0x02E7D8, 0x02E7E2, 0x02F8EA, 0x03AB20, 0x0584BE, 0x0584C8): agree.  Class-7 "returns 2 if set"
+    texts: agree.
+  * 0x0085AC "Redirect stub: BRA 0x8948", 0x0662D0 "Trampoline: bra 0x665C0": agree.  0x00C36C /
+    0x00C370 "Slot 28 / 31 of the literal pool at 0x00E5EC (0x0E65C / 0x0E668)": the longs at 0x00E65C /
+    0x00E668 are 0x0000C36C / 0x0000C370 -- agree.
+  * 0x000BFA DefaultExceptionHandler / exc_trap_infinite_loop "infinite loop (bra self)": agrees;
+    "illegal instruction / address error" is a vector-name claim (NOT c), though 9 slots of the table
+    at 0x000000 do hold 0x00000BFA.
+  * Class-1 labels ISR_IRQ0..7 (java:1529-1543) on vectors 64..71 and "dispatches to 0xE8D8 / 0xE8E4 /
+    0xE8F0 / 0xE8FC", ISR_ATU_ITV -> 0xE970 (vector 80), ISR_CMT_CMI0 -> 0xF2F6 (vector 172), ISR_ADI0 ->
+    0xF312 (vector 176): every handler address agrees with the stub's long at +16.  The source names
+    are NOT c.
+  * 0x05850E diag_read_state_E_indexed (java:2052-2053) "Reads diag_state_E array at FFFFAD52 indexed
+    by R4": mechanics agree (r0 = u8[0xFFFFAD52 + (r4 & 0xFF)], ESTABLISHED 13); "fault bitmask
+    byte" is a meaning, not established.
+  * 0x08C31E "Write constant 2 to FFFFA827", 0x09ED44 "sets FFFFAF3D = 1. 4 instructions", 0x05CA32
+    "uint8_pack(1) to FFFF3692", 0x071A7A "Packs uint8(0) -> FFFF255E", 0x05E7A8 / 0x05E76E / 0x05E7AE
+    "Write R4 byte to ...", 0x05D1DA / 0x05D1FE readers, 0x06F0B8 "precondition (0x6F0CE) then maturation
+    (0x6F114)", 0x04B4D8 "4 JMP entries (6 bytes each) ... [4B4F0] = 0x5A928" (long at 0x04B4F0 =
+    0x0005A928), 0x00E3E4 "Immediate JMP to ... 0x35A4", 0x00A594 "Copies raw MAP (FFFF4040->FFFF4300)"
+    (the copy only; the filter is in the next function): agree.
+  * 0x0584C8 "First of 8 consecutive enable gates at +0x0A intervals (FFFFAE09-AE0F)": the readers
+    0x0584BE .. 0x058504 are +0x0A apart and read 0xFFFFAE08 .. 0xFFFFAE0F -- 8 gates if 0x0584BE
+    (AE08) is counted, 7 over the quoted range AE09-AE0F.
+
+UNTOUCHED BY ANY CLAIM
+  Class 16 (0 of 15 members mentioned anywhere); classes 12, 13, 22, 23, 25, 27, 28, 29 carry no member
+  label.
+
+====================================================================================================
+REVIEW HISTORY  (2026-11-27: tracer's file, adversarial reviewer, deciding decode by a third reader)
+====================================================================================================
+Each item: the claim, who was right, the deciding evidence.  Every number below is re-asserted by
+emu_stub_shapes_a.py (exit 0); the bytes were read with fn_dump / sh2e_disasm, not taken from either
+side's text.
+
+DISPUTED CLAIMS
+  C1c  "the slots are v = 64..231" (class 1 vector cross-check).  REVIEWER RIGHT (imprecise).  The
+       118 stub addresses do each occur in exactly one long of 0x0FFC50 + 4v (v = 0..235; the ROM
+       ends after 235) and the slots run from 64 to 231, but they do not fill that range: 50 slots in
+       64..231 hold no stub.  47 hold 0x0000E852 (00E852: D41B mov.l -> r4 = 0x00010000 / AF8E bra
+       0x00E774 / 0009 nop); v = 184 / 186 / 224 hold 0x00F3F2 / 0x00F460 / 0x00F6E6, each starting
+       2F76 2F66 2F56 (pushes its own registers; no class-1 stub reaches it).  The 118 handlers at
+       stub+16 are distinct.  Asserted: check_vector_range().  Fixed in the class-1 CONTRACT,
+       EVIDENCE (';' block) and ESTABLISHED 3.
+  C14b "(k+0.25)C -> k; (k+0.75)C -> k+1; x >= 255.5C -> 255".  REVIEWER RIGHT (imprecise).  The
+       grid's own k = 256 and 1000 (and k = 255 for +0.75) violate the first two as worded: they give
+       255 (clamp).  Emulation of 0x05D31E (C = 7.500635): 255.75C -> 255, 256.25C -> 255,
+       254.6C -> 255, 254.4C -> 254, so saturation starts at x/C = 254.5, not 255.5.  The tracer's
+       "no asserted case within 1e-3 of a boundary" held (all asserted), but 1e-3 is no last-bit
+       guard at x/C ~ 1e6; every such input clamps, so no asserted r0 depended on it.  Repaired edge
+       statement asserted per input by edge_rule(); grid grew to 33 inputs (594 cases).
+
+MISSED (per reviewer) -- each checked here
+  M1   0x05850E, not 0x05DCAE, is the direct r4-indexed reader of 0xFFFFAD52.  REVIEWER RIGHT.
+       One refinement: the 0x05DCAE remap index is r4 & 0xFFFF (extu.w), not r4.  Emulated (R1,
+       49 + 118 cases).  Fixed in C3; added to CONFIRMED (0x05850E label mechanics).  Deciding bytes
+       (fn_dump 0x05850E and 0x05DCAE):
+05850E: D61B  mov.l @(0x05857C),r6          ; = 0xFFFFAD52 RAM -- r6 = base 0xFFFFAD52
+058510: 604C  extu.b r4,r0                    ; index = r4 & 0xFF
+058512: 026C  mov.b @(r0,r6),r2               ; r2 = sext8(byte[0xFFFFAD52 + index])
+058516: 602C  extu.b r2,r0                    ; [rts slot] r0 = that byte zero-extended
+05DCB2: D542  mov.l @(0x05DDBC),r5          ; = 0x00065CBC ROM -- r5 = 0x065CBC
+05DCB4: 945C  mov.w @(0x05DD70),r4          ; = 0xFF72 (-142) -> 0xFFFFFF72 PERIPH -- an addend, not an address: r5 + (-142) = 0x065C2E
+05DCB8: 606D  extu.w r6,r0                    ; r0 = entry r4 & 0xFFFF (r6 = r4 at 0x05DCB0)
+05DCBA: 045C  mov.b @(r0,r5),r4               ; r4 = ROM byte[0x065C2E + (r4 & 0xFFFF)]
+05DCBE: 420B  jsr @r2                       ; -> 0x05850E -- the direct reader, r4 = that byte (extu.b in the slot)
+  M2   0xFFFF3474 has a second direct writer storing 0x01FE.  REVIEWER RIGHT.  It is inside census
+       function 0x055FB8 and conditional.  find_writers.py 0xFFFF3474 lists exactly 056016 and
+       056030.  Emulated (R2, 512 cases): 0x01FE stored iff the four pair tests pass, nothing written
+       otherwise.  "Either 0x00FF or 0x01FE" holds for the writers found; find_writers is a lower
+       bound.  Fixed in C9.  Deciding bytes (fn_dump 0x055FB8):
+05600E: D23B  mov.l @(0x0560FC),r2          ; = 0x000BE9A0 ROM -- the pair builder
+056010: 420B  jsr @r2                       ; -> 0x0BE9A0 -- r0 = (1 << 8) | (~1 & 0xFF) = 0x01FE
+056012: E401  mov #1,r4                       ; [slot] r4 = 1
+056014: D23A  mov.l @(0x056100),r2          ; = 0xFFFF3474 RAM
+056016: 2201  mov.w r0,@r2                    ; word[0xFFFF3474] = 0x01FE: 0x01 at 3474, 0xFE at 3475
+  M3   0x004CCA / 0x009106 labels correctly name 0x00E1B0's call targets; moving them would carry a
+       wrong attribution.  REVIEWER RIGHT.  0x00E1B0 pool 0x00E2E8 = 0x00004CCA (00E25A jsr), pool
+       0x00E2E0 = 0x00009106 (00E24E jsr); 0x00E2FC pool 0x00E404 = 0x00004CCE (00E320 jsr), pool
+       0x00E40C = 0x0000910A (00E32C jsr); census callers [0x00E1B0] / [0x00E2FC] accordingly.  The
+       tracer's "label is on the wrong address" was itself imprecise: the label joins an attribution
+       that fits the address to a body that does not.  Fixed in C1 / C2 (R4 asserts the literals).
+  M4   0x0281DC is 13 instructions and reads two bytes.  REVIEWER RIGHT.  Emulated (R3, 1,536
+       cases).  Added to C5.  Deciding bytes (fn_dump 0x0281DC; 0x0281DE is mov.b @r5,r0):
+0281DC: D506  mov.l @(0x0281F8),r5          ; = 0xFFFF96A8 RAM -- r5 = 0xFFFF96A8
+0281E0: 8801  cmp/eq #1,r0                    ; T = (sext8(byte[96A8]) == 1)
+0281E2: 8B01  bf 0x0281E8                     ; taken when T = 0 (byte[96A8] != 1)
+0281E6: E001  mov #1,r0                       ; [slot of the rts at 0x0281E4] return 1
+0281E8: 8451  mov.b @(1,r5),r0                ; r0 = sext8(byte[0xFFFF96A9]) (displacement already in bytes)
+0281EA: 8801  cmp/eq #1,r0                    ; T = (byte[96A9] == 1)
+0281EC: 8F01  bf/s 0x0281F2                   ; T = 0: slot then rts -> return 0
+0281EE: E000  mov #0,r0                       ; [slot] r0 = 0 (also runs when T = 1)
+0281F0: E002  mov #2,r0                       ; reached only when T = 1: return 2
+  M5   The 50 non-stub slots in 64..231.  REVIEWER RIGHT -- see C1c.
+  M6   Classes 9 / 14 / 25 did not declare the library clobbers.  REVIEWER RIGHT, with corrections
+       to the list: for class 9, r2 is K on return (the library's r2 is overwritten at 0x0225A4),
+       so the net clobbers are r0, r2 (= K), r3, r4; T is untouched.  For 14 / 25: r0, r4 (= r0),
+       r5 = 255, r2 = 0x0BE5A8 (the member's own load), fr2, fr3, fr4 (= x/C), fr5, fr6, FPUL, and
+       T (= 1 unless the pre-clamp trunc is negative).  0BE5A8: C70A mova; F461 fsub / F453 fdiv
+       into fr4; F308 into fr3; F24C / F230 into fr2; F23D ftrc -> FPUL; 045A sts fpul,r4; 9510
+       mov.w -> r5; 3457 cmp/gt r5,r4; 4411 cmp/pz r4 (words at 0x0BE5A8..0x0BE5C4).  0x0BE9A0..AE:
+       634C, 4318, 6247, 622C, 6433, 342C, 6043.  All asserted in t_pair / t_f2u / t_zero_f2u;
+       contracts and ESTABLISHED 6 / 7 updated.
+  M7   Three "emulated" statements were not asserted.  REVIEWER RIGHT on all three.  t_zero_f2u
+       never looked at uninit_reads; t_bra never checked T; chain()'s stubs left registers
+       unchanged, so "B receives whatever A left" was vacuous.  Now: every RAM read is logged
+       (stack included) and class 25 asserts no uninitialised read and stack-only reads; entry
+       T / S / Q / M / FPUL are randomised and asserted unchanged for classes 0, 2, 6, 9; chain()
+       stubs leave new random r0-r14 / fr0-fr15 / T and the next callee must see exactly those.
+       Mutation check: replacing that expectation with "entry registers" fails at 0x010962 callee 1;
+       replacing class 14's T rule with "T = 1" fails.  All three statements hold.
+
+FILE PROBLEMS (per reviewer) -- each checked here
+  F1   C3 named 0x05DCAE as the r4-indexed reader.  RIGHT; see M1.
+  F2   C8 said items 46-47 resolve all eight bra stubs.  RIGHT: grep of docs/corrections.md finds
+       0x0900B4 nowhere; items 46-47 (corrections.md:2263-2311) list the other seven (A[13] 0x03756C,
+       B[5] 0x03160A, B[8] 0x039528, B[10] 0x036C3C, B[11] 0x037B68, B[15] 0x03605E, B[17] 0x03A222).
+  F3   "the slots are v = 64..231" reads as contiguous.  RIGHT; see C1c.
+  F4   C6 "46 readers over 0xFFFF9704..0xFFFF9742" suggests full coverage.  RIGHT: 17 of the 63
+       bytes are read by no class-7 member (R5 asserts the list).
+  F5   C5 left out 0x0281DC.  RIGHT; see M4.
+  F6   C14b fails for k >= 256 / k >= 255.  RIGHT; see C14b.
+  F7   The three unasserted emulation statements.  RIGHT; see M7.
+  F8   Class 9 / 14 / 25 clobbers.  RIGHT in substance; see M6 for the corrected list.
+
+Nothing the reviewer raised was wrong outright.  Two refinements came from the bytes rather than
+either side: the 0x05DCAE remap index is r4 & 0xFFFF, and class 9 leaves r2 = K, not the library's
+~I & 0xFF.

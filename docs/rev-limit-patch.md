@@ -159,6 +159,35 @@ which loads `0xCC504` for the resume value. Path B's delay slot does set
 pair 1 (`0xCC500`/`0xCC504`) and pair 3 (`0xCC510`/`0xCC514`) — and change both,
 or the two stages will disagree.
 
+## Verified listing and audit (2026-11-27, corrections item 108)
+
+`disassembly/analysis/launch_closure_trace.txt` is the verified listing of the patch and
+its host (`0x03B668`, `0x0F1000`, `0x03B6B2`), traced blind, reviewed, settled and then
+independently audited; `scripts/trace/emu_launch_closure.py` (132,910 checks, exit 0).
+Everything above holds. The audit added:
+
+- **The latch freezes while byte `0xFFFF8EDC` != 0.** `0x03B668` is called from
+  `0x04AA58` only on passes where that byte is 0 (`04AA62`/`04AA64`); the same byte gates
+  the reset caller `0x049BA4`. A cut latched at that moment holds until the byte returns
+  to 0. **Narrowed 2026-11-27 (corrections item 111, `revlim_freeze_gate_trace.txt`):**
+  the byte is written by `0x05CB1C` at most once per reset, only on a warm start (marker
+  `0xFFFF2000` == 0xAA55) that meets narrow start-up conditions, and no resolved code
+  changes it mid-drive. So the freeze can only apply from a reset onward, never partway
+  through a drive. While it is non-zero, `0x04AA58` does nothing, so the rev-limit latch
+  does not run at all until the next reset. On a cold start the value depends on the reset DMA
+  transfer `0x010398` (zero if it is a fill; not decoded). What physical situation the
+  warm-start condition stands for, and whether an ordinary key-on is a warm reset, are
+  not established.
+- **An active latch `0xFFFF7CB8`** forces the channel-suppress word `0xFFFF7D80` to
+  0xFFFF (`0x03D2FC`) and clears bit 5 of `0xFFFF6A29` (`0x03B76E` → `0x026CF4`). Whether
+  those channels are injectors or coils is not established.
+- **Gate 8's oracle read 0.0 where the patch reads `[0x0F1048]`.** Fixed in
+  `scripts/patch_emulate.py`; the word is 0.0 in every live bin, so no result changed.
+- `pr` on entry to the patch is `0x03B6A8` (left by the window test's `jsr`), not the
+  host's return address. Harmless: nothing reads it before the host restores `pr`.
+- Results at exactly `4000 − 2⁻¹²` and `3980 − 2⁻¹²` round down (the SH7058 FPU
+  rounds toward zero only — corrections item 110), as the emulator models.
+
 ## Open question — `0xFFFF65D0`
 
 Not in `disassembly/maps/ram_reference.txt`. Established facts only:
