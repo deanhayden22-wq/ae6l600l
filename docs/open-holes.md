@@ -1,4 +1,4 @@
-# Open holes — current as of 2026-08-19
+# Open holes — current as of 2026-11-27
 
 Live worklist. Everything here is **scoped, reproducible, and unblocked** — each
 entry says what is known, what is not, and the concrete next move.
@@ -35,7 +35,7 @@ and these seven are the ones that are materially different rather than wording.
 | ~~`0xFFFF3234`~~ | **RESOLVED — item 81. It is the IAM.** Proven from the definition XML: cal `0x0D2CF4` (`Timing Compensation B (IAT) IAM Activation`, scaling `IgnitionAdvanceMultiplier(IAM)`, 0.60) is compared against it at `0x042F74`. `flkc_work_bank1` WRONG; `knock_learn_coarse` right in substance. | |
 | ~~`0xFFFF8258`~~ | **RESOLVED — item 80. A knock-workspace product INTEGRATOR; `knock_metric` in kind, `flkc_retard` unsupported (produces no degrees).** | |
 | ~~`0xFFFF7F68`~~ | **RESOLVED — item 80. ECT warm-up blend, 4 modes on `ect_current`. Identity vs use — both names describe it from opposite ends.** | |
-| ~~`0xFFFF1288`~~ | **RESOLVED — item 80. `rtos_scheduler_state`: SR-masked priority raise + MTU0 array. `inj_gate_hook_ptr` WRONG.** | |
+| ~~`0xFFFF1288`~~ | **RESOLVED — item 80. `rtos_scheduler_state`: SR-masked priority raise + MTU0 array. `inj_gate_hook_ptr` WRONG.** (Item 107: the "MTU0 array" `0xFFFF1230` is on-chip RAM, the RTOS queued-id array, not a timer register.) | |
 | ~~`0xFFFF8F24`~~ | **RESOLVED — item 80. Debounced flag on status byte == 90, 6-count timeout. BOTH names unsupported.** | |
 | ~~`0xFFFF895C`~~ | **RESOLVED — item 80. A clamped difference with a 1000.0 ceiling. BOTH names unsupported.** | |
 
@@ -183,6 +183,16 @@ pool, not a `task_table`.
 accessor prologue at `0x0000317C`; the full event-id map; the writer of
 `byte[0xFFFF8EDC]`.
 
+> **RETRACTED 2026-11-27 (corrections item 107).** The table mechanics above are
+> right; the identity is not. `0x00E774` **never returns**: it logs {`0x4000`,
+> vector number} through `0x010800` and jumps to `0x00FBA4`, which masks all
+> interrupts and branches to itself (`00FBB6: AFFE`). The "event ids" are **trap
+> vector numbers** and nothing drains the table — it is a fatal-trap log. The
+> scheduler is the RTOS in `0x002B8C`–`0x004090` (ready map `0xFFFF12B8`, dispatcher
+> `0x0035FC`, deferred switch `0x003664`): `rtos_core_trace.txt`. `0x0000317C` is
+> settled too: it raises the SR interrupt-mask field (a critical-section bracket),
+> it is not a RAM accessor.
+
 ---
 
 ## 6. ~~ECUFlash definition sync~~ — **CLOSED 2026-08-19**
@@ -307,10 +317,12 @@ remaining                  :  72
 They are **not one family** — each needs its own evidence. Three rough groups:
 
 1. **Synonym pairs** — same meaning, different words. Cheap: pick one, fold the
-   other's detail into the comment. e.g. `interrupt_priority_set` /
-   `irq_level_set`, `afc_target_calc` / `afc_target_computation`,
-   `fuel_overrun_cutoff` / `overrun_fuel_cutoff`, `table_desc_1d_float` /
-   `table_lookup_1D`.
+   other's detail into the comment. e.g. ~~`interrupt_priority_set` /
+   `irq_level_set`~~, `afc_target_calc` / `afc_target_computation`,
+   `fuel_overrun_cutoff` / `overrun_fuel_cutoff`, ~~`table_desc_1d_float` /
+   `table_lookup_1D`~~. (Struck pairs resolved by decoding, item 107:
+   `0x00317C` is now `sr_mask_raise_return_previous`, `0x0BE830` keeps
+   `table_lookup_1D`.)
 2. ~~**Generated vs semantic**~~ — **DONE (item 93), all 4 resolved.** The
    `desc_*` geometry was trustworthy every time; its **axis** claims were not
    (`ThrottlexRPM` where item 85 proved Mass Airflow × Engine Speed). One,
@@ -341,6 +353,234 @@ They are **not one family** — each needs its own evidence. Three rough groups:
   it.** Twice this session the older name turned out to be right.
 * `scripts/mapping/dedupe_import_java_labels.py` handles **`desc_*` only** — it
   will not see any of these.
+
+---
+
+## 9. Every flashed rev zeroes a ±0.5 clamp on an A/F-correction term (NEW 2026-11-15)
+
+`0x0357C8` / `0x0357CC` hold `+0.5f` / `-0.5f` in stock and `0.0` / `0.0` in every
+rev 20.8 -> 20.19d. They are the bounds passed to `float_clamp_range` (`0x0BE56C`,
+clamp(fr4, lo=fr5, hi=fr6)) at `0x03572E`-`0x035736`:
+
+```
+03572A fmov fr0,fr4            ; result of the previous clamp
+03572C mov.l @(0x0357C4),r6    ; 0x000BE56C
+03572E mova @(0x0357C8),r0
+035730 fmov.s @r0,fr6          ; hi  (stock +0.5, tuned 0.0)
+035732 mova @(0x0357CC),r0
+035734 jsr @r6
+035736 fmov.s @r0,fr5          ; lo  (stock -0.5, tuned 0.0)
+03573A..03573E                 ; stored through struct +76 = 0xFFFF7904
+```
+
+The routine starts at `0x0355B8` with `r14` = the pointer struct at ROM `0x063A88`
+(all `0xFFFF78B4`-`0xFFFF7941`, plus `0xFFFF318C`). With both bounds 0, the value
+stored to `0xFFFF7904` is always 0.0. `0xFFFF7904` carries three conflicting labels
+(`fuel_corr_param_A`, `aggregator_fuel_output`, `afc_aggregator_output`).
+
+**Open:** what quantity this is, and what zeroing it does to fuelling. It is in the
+car today, unrecorded in any definition or tune note. Decode the consumers of
+`0xFFFF7904` (rule: find the readers of the output, not the name).
+
+### Update 2026-11-27 — mechanism settled, identity still open (corrections item 107)
+
+Full trace: `disassembly/analysis/hole9_afl_trace.txt` (2,641 lines, verifier clean,
+emulated). `0x0355B8` is a **windowed PI controller**; `0xFFFF7904` is its output,
+added with weight +1 into the 1.0-centred factor `0xFFFF77BC` (clamped 0.75..1.25)
+by `0x033460`. Its window is centred on the guarded record `0xFFFF318C`, which is
+stored through a **second clamp, `0x035FFC` (hi) / `0x036000` (lo)** — the pair the
+definition calls "AF 3 Correction Limits" (it lists them min/max swapped). That
+pair is zeroed too, through the definition.
+
+* Zeroing only the defined pair still leaves `0xFFFF7904` live inside its window.
+  **The off-table `0x0357C8`/`CC` edit is what completes the disable.** With both
+  zeroed, as in every flashed rev, the term is pinned at 0 except for init/reload
+  copies. In stock it stays within about −0.13..+0.09.
+* The quoted claim above ("with both bounds 0 the value is always 0.0") holds only
+  for the store at `0x03573E`; the init (`0x034F72`) and reload (`0x035046`) writers
+  are unclamped.
+
+**Still open:** that it is the rear-O2 (AF #3) trim — only the definition name says
+so; what `0xFFFF77BC` multiplies (fuel?), so whether +`0xFFFF7904` is richer or
+leaner; which sensor `0xFFFF43FC` is (u16 `[0xFFFF4050]` × 5/65536, copied from
+peripheral `0xFFFFF834` — needs the SH7058 pin map). Next move: trace the readers
+of `0xFFFF77BC`/`0xFFFF77C8` down to the injector pulse, and the writer of
+`[0xFFFF4050]` to its A/D channel.
+
+### Update 2026-11-27 (batch 2) — identity settled to the CL target; two questions left (corrections item 108)
+
+`disassembly/analysis/hole9_identity_trace.txt` (1,925 lines, verifier clean, 70,000+
+assertions, independently audited).
+
+* **`0xFFFF77BC` is the closed-loop target in lambda units** (`0x033460`): 1.0 + the
+  definition tables "CL Fueling Target Compensation A/B (Load)" and "... Imm. Cruise /
+  Non-Cruise (ECT)" (AFR points / 14.7) + `[0xFFFF7904]` + other addends, clamped to
+  0.85..`[7BDC]` (≤ 1.05 here) and 0.75..1.25. `0xFFFF77C8` is what other routines read.
+* **Sign: positive `0xFFFF7904` = higher target lambda = leaner.** So re-enabling the trim
+  (restoring ±0.5 at `0x0357C8`/`CC`, or the defined pair) would let it lean or richen the
+  closed-loop target within those clamps.
+* **But it only reaches `[77C8]` while byte `[0xFFFF8E7E]` != 1 or byte `[0xFFFF9720]` != 0.**
+  Otherwise `0x033460` takes its SPECIAL exit and `[77C8]` is 1.0 (or 1.20 at standstill),
+  whatever the trim or the CL target tables say.
+
+**Still open (batch 3, items 2):** (a) whether `[77C8]` reaches the injector pulse —
+`0x032204` takes 1/`[77C8]` into its state block, and `0x032B10` is the next consumer;
+(b) when `[8E7E]` is 1 — its only writer is `0x05A498`. **Do not re-enable the trim until
+(b) is known**: if `[8E7E]` is 1 in normal closed loop, the trim changes nothing that other
+routines read. The A/D question (`0xFFFF43FC`) is unchanged.
+
+### Update 2026-11-27 (batch 3) — the trim reaches logged AFC; SPECIAL looks cold-start-only (corrections items 111, 112)
+
+`cl_target_to_fuel_trace.txt`, `afc_coefficients_trace.txt`, `special_exit_gate_trace.txt`.
+
+* **(a) answered up to the injector pulse.** `[77C8]` drives logged AFC `0xFFFF76D4`, a live
+  closed-loop integrator: v = ... + P0·(1/`[77C8]` − 1/`[653C]`), P0 = 0.0017..0.059 at the
+  emulated operating points, so a positive trim (higher target lambda) pulls AFC down —
+  leaner, as item 108 read — within AFC's −25 % / +25 % window. On SPECIAL/STEP exits it
+  also moves AFC's clamp bounds. AFC then multiplies, with AFL and `[7348]` (load × "Injector
+  Flow Scaling"), into the outputs of `0x0301E4`; **from there to the injector pulse is not
+  traced.**
+* **(b) narrowed, not closed.** `[8E7E]` = an output of the sequencer `0x05A498` is on; it can
+  turn on only with `[8E38]` (coolant `[4144]` latched at start-up) in [0, 60), `[225C]` != 0
+  and several latches clear, and `[9720]` is built only from secondary-air DTC bits (which
+  20.19c disables). Reading: SPECIAL is the cold-start secondary-air phase — a hypothesis.
+  **Settle with one cold-start log of `0xFFFF8E7E`, `0xFFFF8E66`, `0xFFFF8E65`, `0xFFFF8E68`,
+  `0xFFFF8EDC`.** If `[8E7E]` drops to 0 once warm and stays there, the trim acts in all
+  warm closed loop and re-enabling it is a live fuel change (with the gates still to pass).
+
+### Update 2026-11-27 (batch 4) — (a) closed to the injector register (corrections item 115)
+
+`injector_path_trace.txt` (audited). The pulse each injector gets is
+min((trunc(4·PW) + latency) >> 4, 0xFFFF) in register `0xFFFFF640 + 2j`, with
+PW = clamp(per-cylinder FFB · (AFC + AFL + `[7AE4]`) · load · "Injector Flow Scaling" ·
+per-injector trim · low-pulse factor, 300, 262136). So the chain is complete: trim `[7904]` →
+CL target `[77C8]` → logged AFC → the pulse. **Only (b) remains: the cold-start log of the
+SPECIAL-exit bytes.** AFL then learns from AFC's lag (item 116), so a trim change would also
+move AFL over time.
+
+---
+
+## 10. The live SSM patch's tagged read has no bound (latent; NEW 2026-11-27)
+
+Corrections item 107; `disassembly/analysis/stub_tables_trace.txt`. In the patched
+`0x09A3AC`, an FF / F2 / F4 item copies 1 / 2 / 4 bytes from `0xFFFF0000 | b1 b2`
+(ANY b1, b2 — on-chip registers included) to a reply cursor starting at
+`0xFFFFB3F4` that nothing compares (`09A44C`–`09A456`). The length rule admits 84
+items, so **23+ F4 items (45+ F2) overwrite `0xFFFFB44C`, then `0xFFFFB450` and the
+transport ring header at `0xFFFFB454`.** Stock could not pass `0xFFFFB447`.
+
+**Not a live problem:** `logs/logcfg.txt` requests FF items only (one byte each,
+84 at most). **It becomes one** if anyone logs through F2/F4 tags with more than
+22 four-byte or 44 two-byte items per request. If the patch is ever rebuilt
+(`scripts/patchbuild/`), add a bound; what happens after the overwrite was not
+traced.
+
+---
+
+## 11. The function programme (NEW 2026-11-27)
+
+`docs/analysis-plan.md` Part 1 is the plan; `disassembly/maps/function_census.json`
+the denominator (5,146 functions; after batch 4, 14.7% of code analysed and 17.3%
+listed — raw dumps are not analysis, item 108 — and 3,975 functions untouched). Batch 1 (item 107) decoded the runtime library, the RTOS
+core, the diagnostic tables, hole #9 and `0x042506`; batch 2 (item 108) the
+launch-patch closure, hole #9's identity, five tuned-region functions and the
+1,278 classified small functions; batch 3 (items 111-113) logged AFC's controller, the
+SPECIAL-exit gate, the FFB residual, the timing-integrator bound, the overrun ladder and
+the `0xFFFF8EDC` gate; batch 4 (items 114-118) the injector pulse, AFL learning, the rest of
+the FFB sum, the MAF/load cap, the overrun timing terms, power-on RAM, the FBKC step enable
+and the angle scheduler. Threads worth a trace of their own, in order:
+
+1. ~~Readers of `0xFFFF77BC`~~ — done in batches 2-4 (items 108, 111, 115): it is the CL lambda
+   target, it drives logged AFC, and AFC multiplies the injector pulse. **Batch 5's list is in
+   `docs/analysis-plan.md`; its step 0 is two census tool fixes (item 114 Tooling).**
+2. The settle times that used the integer lag filter `0x0BEA6C` at 1/65536 — they
+   are off by 256× (`maf_scaling_analysis.txt`, `adc_pipeline_trace.txt`).
+3. `0xFFFF4144` vs `0xFFFF6350`: the logged ECT is the first; the project's ECT
+   identity is the second. Are they one quantity?
+4. ~~**The FPU rounding mode after init.**~~ — **settled 2026-11-27 (corrections item
+   110):** the SH7058 hardware manual's FPU feature list says it supports round to zero
+   only ("subset of IEEE standard"), so FPSCR = 0 at `05873E` cannot select
+   round-to-nearest; the emulator's round-toward-zero holds for all running code. Not
+   read: the manual's FPSCR bit table (what the RM field does when written 00).
+5. The 30 census entries that are fall-through targets (function splits), and the
+   dead function `0x002D10` the orphan pass does not seed.
+
+---
+
+## 12. What supplies the FFB transient excess? (REOPENED 2026-11-27, corrections item 109)
+
+At settled WOT this ROM commands the OL map exactly (11.0); during transients FFB sits
+up to ~0.8 AFR richer (residual median +0.053, max +0.098 in the 2026-08-19 logs).
+`ffb_gap_resolved_2026-08-19.txt` attributed all of it to `0xFFFF7B8C` pinned at its
++0.09998 clamp. **That is retracted:** with this calibration `[7B8C]` cannot exceed
++0.046875 (`fn_038E64_trace.txt`), and `[7AF4]` is never non-zero (`fn_0382C2_trace.txt`).
+
+**Open:** which of the other addends of the base sum at `0x02FFE0` —
+`[0xFFFF73B4]`, `[0xFFFF7A08]`, `[0xFFFF7A14]` — supplies the rest. Decode `0x02FFE0`
+(confirm the sum's form from bytes; it is from `ffb_command_chain_trace.txt`) and
+`0x030C38` (GBR `0xFFFF73B0`); bound `[7A08]`/`[7A14]` from their already-traced
+writers `0x036B48`/`0x036BF4`/`0x036C48`. Matters for injector sizing and for any
+transient-fuel change: do not tune against `[7B8C]` as if it were the whole term.
+
+### Update 2026-11-27 (batch 3) — `[73B4]` is the candidate (corrections item 111)
+
+`ffb_residual_trace.txt` (2,392 lines, audited). The sum's form is confirmed from bytes, with
+six addends that count only through a max(OL, CL) term. **`[73B4]` (written by `0x030C38`) is
+the only addend whose range the bytes establish that has a rate-of-change input**, and it can supply the
+whole excess by itself: a warm one-call step of 0.01·`[620C]` by 0.20 / 0.25 gives +0.059 / +0.082
+for two calls. Its gain includes **tauA, a plane of "Tau Input A Rising Load Activation"** (20.19c
+0.25 / 0.30 vs stock 0.5), it has **no upper clamp**, and it has a cold multiplier up to 4.95.
+`[7A08]` is 0 warm; `[7A14]` reads no rate.
+
+**Still open:** `[7354]`, `[7374]`, `[7A44]` and the `[79C0]` scaling of `[798C]` are not
+bounded, so they are not excluded. **Settle with a log** of `0xFFFF73B4` alongside FFB through
+tip-ins: if it tracks the residual, this hole closes. Lift-then-tip-in transients take a
+snap branch with a larger tail than the settled-step figures.
+
+### Update 2026-11-27 (batch 4) — the other addends are excluded (corrections item 114)
+
+`ffb_cl_side_trace.txt`. `[7354]` / `[7374]` are **post-start enrichment** ("Table_Post_Start_Enrich_*":
+0.5 / 0.10 warm, decaying away within a few hundred passes of start), `[7A44]` is 0 (no writer,
+zeroed at every reset — item 117), and the per-cylinder addends read no load rate. The
+multiplier on OL enrichment is `[79A0]` ("Primary Open Loop Fueling Compensation (ECT)",
+≤ 1.0), not `[79C0]` as item 111 said. **Left: `[73B4]` (log it) and `[798C]`'s ramp paths
+with `[79C6]` == 1 / 2 (`0x03606C`, not decoded).**
+
+---
+
+## 13. What lowers timing during an overrun fuel cut? (NEW 2026-11-27, corrections item 113)
+
+Item 103 logged timing 15-25° low while IPW = 0, recovering within 0.6 s of fuel resume, and
+attributed it to the `[0xFFFF8020]` retard armed by `0x041BE4`. On the count path that arm
+fires only at the cut exit (rpm below the resume threshold), so it does not explain a retard
+held through the cut. Either those cuts took the IMMEDIATE path (`03B53A`..`03B544`), or
+another timing term acts during the cut. **Next:** log `0xFFFF7C9A` (tier), `0xFFFF7CAA`,
+`0xFFFF8020` and `0xFFFF5E96` / `0xFFFF5D85` through a few lifts; then decode whichever
+term moves. (Whether the four `[7D80]` channels are injectors or coils was open here; batch 4 settled it below.)
+
+### Update 2026-11-27 (batch 4) — no cut-gated term found; a closed-throttle floor is the lead (corrections item 118)
+
+`overrun_timing_trace.txt`. No decoded term gated on a cut byte holds timing low through a
+counted cut: `[8028]` (−24.96 warm, ramping out over 36 calls) acts only at a cut that ends by
+rpm falling below the resume threshold. **The 20° plateau seen through coasting cuts matches the
+20.19c "Base Timing Idle Minimum" (`0x0ADB38`, 20.08 from 1800 rpm) feeding a closed-throttle
+blend** — a hypothesis. Also live and not cut-gated: the `[7EC0]` cap's load (`0x03ED56`, down to
+−2.07). Decode `0x03FBBC`'s `[85D7]` gate path and `0x03ED56`'s inputs, or log `0xFFFF7F10`,
+`0xFFFF7EC0`, `0xFFFF8028` with timing through lifts. The four `[7D80]` channels are the
+injector channels (item 115). The angle scheduler `0x03D856` arms the pulse register
+`0xFFFFF640 + 2j` and skips a channel whose bit is set. One exception: the resync path
+`0x03DB16` runs for every record whether its bit is set or not.
+
+---
+
+## 14. Two definition tables are misnamed for this ROM — owner decision (NEW 2026-11-27, corrections item 112)
+
+"Intake Duty Correction A" (`0x0CFA38`) and "Exhaust Duty Correction A" (`0x0D121C`) are
+the dead time and time constant of logged AFC's plant model. Their only consumer is
+`0x031DB4`, and they have nothing to do with AVCS. The "Exhaust" table's scaling is also
+wrong (it displays −95..−82 where the code reads 0.09..0.35). The XMLs are ECUFlash's, so the
+rename and the scaling fix wait for the owner. Use `.\scripts\sync_defs.ps1`, then `-Push`,
+as item 85 describes. Neither table differs from stock in any rev.
 
 ---
 

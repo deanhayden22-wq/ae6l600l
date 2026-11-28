@@ -20,6 +20,14 @@ the navigation layer + tuning-relevant summary.
 > 80–100 °C regime the car runs in. It was briefly suspected of being a
 > wall-wetting / X-factor term bearing on the cusp stab-lean — **that is
 > retired**. None of the eight is defined in any XML.
+>
+> **Corrected 2026-11-27 (corrections item 115, `injector_path_trace.txt`):** `0x02EFD2` is the
+> **after-start pulse floor** of the injector path, not a separate accumulator. While any of the four
+> flag bytes `[726F..7272]` is 1, every channel's pulse is max(its `0x0301E4` pulse, a floor `[728C]`
+> that decays by 0.85-0.96 per call); the floor is gone once every channel's pulse has beaten it, and
+> it can be re-armed at run time when byte `[65F6]` becomes 1. GBR `0xFFFF726C` is the crank/stall
+> flag (RPM ≤ 300 until > 500), not a transient flag (item 114). "Inert at operating temperature"
+> still holds in effect: the floor matters only just after a start.
 
 ## What's transient fueling for
 

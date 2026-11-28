@@ -6062,3 +6062,1080 @@ that really applies the tau tables (it loads seven descriptors,
 remaining new dispute, in `ssm-read-patch.md` (claim `doc-ssm-read-patch-02`). The labels
 `fuel_accel_enrich`, `tau_rising_handler` and `tau_falling_handler` are
 candidates for the next rename pass.
+
+## 101. Flashed revs carry 263-265 off-table bytes, not 178; the ECU checks its own checksum table; SSM handler entry is `0x09A3AC` — **2026-11-15**
+
+**Status: `CLAUDE.md` and `docs/open-holes.md` (item 9) updated. Registry in
+`docs/allocation.json`; proof is `scripts/rom_allocation.py --audit`. Labels NOT changed.**
+
+Found while building Phase 0 of `docs/pipeline-plan.md`.
+
+### Off-table changes: four groups besides the two patches
+
+`CLAUDE.md` said stock -> 20.19b differs in 12,084 bytes, "all but 178 are tables".
+Diffing every rev against stock, excluding every definition table/axis extent
+(`scripts/defs.py`) and the checksum table, leaves **263 bytes (20.8-20.17a) or 265
+(20.18 on)** in eight groups. All eight are now claimed in `docs/allocation.json`:
+
+| range | what | was documented? |
+|---|---|---|
+| `0x09A3C2`-`0x09A473` | SSM read patch | yes |
+| `0x03B6AE`-`0x03B6BD`, `0x03B79C`, `0x03B7A8`, `0x0F1000`-`0x0F1057` | launch patch (hook rewrite, two literals, body) | yes (`rev-limit-patch.md`) |
+| `0x0357C8`-`0x0357CF` | two floats `+0.5`/`-0.5` -> `0.0`/`0.0` | **no** -- open-holes item 9 |
+| `0x0C009E`-`0x0C009F` | 'Wastegate Duty Cycle Frequency'; defined, but its scaling `0.01` does not resolve in `defs.py`, so it has no extent | partly |
+| `0x0D29C4`-`0x0D29C5` | knock window B length 0 -> 438 (from 20.18) | in `transient_knock_window_trace.txt:195` only; not in any definition XML |
+
+### The checksum table, decoded from the ECU's own check
+
+17 records of (start, end, stored) at `0x0FFB80`, terminator `0xFFFFFFFF` at
+`0x0FFC4C`. Routine `0x01002A` (also `0x0101BA`, and the one ending `0x087EDA`):
+sum the longs from start while the pointer < end (`010064`-`01006A`), add the stored
+long (`01007A`), `cmp/eq` with `0x5AA5A55A` (`01007E`). Range-shape helper `0x010668`
+requires start 4-aligned, start <= end, and end&3 == 3 or start == end. 12 records
+used, 5 empty `(0, 0, 0x5AA5A55A)`. All 19 bins in `rom/` pass. What the ECU does
+on a mismatch is NOT traced. `0x000000`-`0x001FFF` and `0x0FFAF8`-`0x0FFFFF` are
+covered by no record. Tool: `scripts/rom_checksum.py`.
+
+### SSM read handler entry
+
+`ssm-read-patch.md` places the function at `0x09A3B0`; it begins at `0x09A3AC`
+(`2F86 mov.l r8,@-r15` / `2F96 mov.l r9,@-r15`). A lint from `0x09A3B0` sees r8/r9
+written without a push and an rts at stack depth 8.
+
+### Launch hook: PC-relative loads in delay slots
+
+The hook rewrite leaves `mov.l @(0x03B7A0),r2` at `0x03B6B2` and `mov.l
+@(0x03B7A4),r2` at `0x03B6BC` in the delay slots of the two `jmp @r0`. Harmless
+as built (r2 is reloaded at `0x0F1030` before use), and recorded as an accepted
+warning in `docs/patch-specs/launch_control.json`. Open question for the patch:
+the `fr15` offset also reaches the comparisons at `0x03B6DA`/`0x03B6EA`.
+
+## 102. `0x0BE654` (`int32_div_sat`) is a signed 16.16 fixed-point divide, not a 32-bit unsigned divide — **2026-11-15**
+
+**Status: label comment fixed in `ImportAE5L600L.java` (name kept). Found by the
+emulator's self-test (`scripts/sh2e_emu.py --selftest`, oracle 4).**
+
+The label said "32-bit unsigned divide with saturation ... saturates at +/-0x7FFFFFFF".
+Executed on 1,013 operand pairs, `0x0BE654` returns `7 / 2 -> 229376` (`= 3.5 x 65536`),
+and matches `trunc((a << 16) / b)` clamped to int32 on every case, with `b == 0`
+giving `0x7FFFFFFF` or `0x80000000` by the sign of `a`, and `a == 0` giving 0. The
+`div0s r5,r3` at `0x0BE688` makes it signed; the 16-bit pre-shift sits in the
+`shal`/`rotcl` ladder ending at `0x0BE764`. It saturates at `-0x80000000`, not
+`-0x7FFFFFFF`.
+
+Any caller analysed as "integer divide" is off by a factor of 65536 unless its
+inputs or output are rescaled. No doc or analysis file was found citing it
+(`rg 0BE654 docs disassembly/analysis`); the name is left as is.
+
+---
+
+## 103. The overrun retard is HELD for the whole fuel cut, tier 4 is on the dwell ladder, and the lift-to-cut delay tables are found — **CORRECTS ITEMS 74 AND 79, 2026-11-21**
+
+Full trace: `disassembly/analysis/overrun_cut_delay_and_retard_trace.txt` (77 instruction lines, verifier clean).
+
+**Item 74 called the task37 retard "one-shot ... applies for exactly ONE call". Wrong.** The arm at
+`0x041C22`-`0x041C3A` runs on every pass while `[0xFFFF7C78] > rpm` and the previous pass's tier byte
+`[0xFFFF8034] == 4`, and each time reloads `[0xFFFF8033] = 1`. So `[0xFFFF8020]` is held at the `0xADE08` ECT
+table value (-24.96 deg at 70 degC and above) for as long as tier 4 persists, then ramps out at +0.7 deg per call
+(`0xD2C10`). Logs agree: Timing sits 15-25 deg low while IPW = 0 and recovers within 0.6 s of fuel resume.
+
+**Item 79 said "Tier 4 is NOT on that ladder". Wrong.** `0x03AEB6`-`0x03AEBE` tests dwell `[0xFFFF7CAA]` >=
+`[0xFFFF7C98]` first and branches to the tier-4 entry at `0x03AF4A`. It is the top rung. Item 79's second route
+(dwell > 625 etc.) is real and additional.
+
+**New: the lift-to-cut delay.** The function at `0x03AF88` picks an RPM band from `0xCC4EC`/`0xCC4F0`/`0xCC4F4`
+(2250/3000/4500; stock 1800/2500/4500) and a gear from `[0xFFFF6810]`, then fetches a uint16 count through pointer
+tables at `0x63B70`-`0x63BF0`. Counts at `0xCBCA0`-`0xCBCBF`, identical to stock, no XML definition:
+gear 1 `44 44 6 13`, gear 2 `19 19 19 9`, gear 3 `25 25 13 6`, gear 4/5 `44 44 44 6`. Measured lift-to-cut times
+in three logs match these row for row at about 8 ms per count. **Not walked:** the path from that count to the cut
+flag; the identification rests on the measured match.
+
+**Side effect:** the measured rows only line up if the 16.2 mph/1000 rpm gear is 4th. Log reviews before this date
+that call it 3rd are off by one gear.
+
+
+---
+
+## 104. The final timing sum decoded; `0xFFFF803C` is a CAN-requested retard no definition covers — **NEW, 2026-11-25**
+
+Full trace: `disassembly/analysis/timing_sum_and_can_retard_trace.txt` (203 instruction lines, verifier clean).
+Reference bin 20.19e; every table and constant cited is byte-identical to stock.
+
+**The sum.** With byte `[0xD2976] == 90` (stock and 19e) total timing is a straight sum at `0x03F618`-`0x03F674`
+of sixteen RAM terms. Retard channels in it: `+[0xFFFF8028]` (the overrun retard of items 74/79/103),
+`+[0xFFFF803C]` (new, below) and `-[0xFFFF8000]` (cold-engine retard, writer ~`0x0415B8`).
+
+**`0xFFFF803C`, function `0x041E00`.** While byte `[0xFFFF5DD8] == 1` and float `[0xFFFF5E64] >= 1.0` it applies
+descriptor `0xADE1C` indexed by `[0xFFFF5E64]` (0 / 1.96 / 3.92 / 5.88 / 7.84 / 25.1 / 100 ->
+0 / -4.92 / -9.84 / -15.12 / -20.04 / 0 / 0 deg), then recovers at +1.05 deg per call above 800 rpm (`0xADE30`).
+A continuous request is cut off after 125 calls (`[0xD29CC]`). `0xADE1C` is the "-20.04 table" item 74 left
+unattributed.
+
+**Its input is a CAN byte.** `[0xFFFF5E64]` = byte 1 of received frame `0x421` x 100/255 (unpack `0x016928`-`0x016940`,
+message table `0x063690`, record `0x063730`). The same value also feeds a torque map at `0x03C82E` (`0xAD7C4`).
+
+**`0xFFFF8000` is zero warm.** Every ECT-axis table its writer reads is 0 at 70 degC and above; `0xAE46C` holds
+up to 20.04 deg at 20-50 degC. It is a cold-running retard, relevant to warm-up driveability only.
+
+**Why this was traced:** post-shift timing stabs in the logs (REVIEW_LOG 2026-11-24, tip-in pass). The overrun
+retard is excluded by observation (no retard during the short shift cut, so nothing to ramp out). `0xFFFF803C`
+fits the shape (stab size follows a small request; recovery is fast). **NOT established:** that frame `0x421` is
+present on this car, which module sends it, or that the channel is what fires. Settle by logging floats
+`0xFFFF803C`, `0xFFFF8028` and `0xFFFF5E64` through a shift.
+
+---
+
+## 105. The coverage figures were wrong in both halves, `[TRACED]` means "mentioned", and there is now a function census — **NEW, 2026-11-27**
+
+Tool: `scripts/mapping/function_census.py` -> `disassembly/maps/function_census.json`. Reference bin 20.19c.
+
+**The denominator.** CLAUDE.md and `analysis-plan.md` quote "code 444,928 bytes (42.4%)" from
+`rom_region_map.txt`, a 256-byte-block classifier. Following control flow from the two vector tables
+(`0x0` and the live one at `0x0FFC50`), through every `bsr`, every `jsr`/`jmp` whose register is a
+PC-relative literal (16-bit `mov.w` literals included: `000662: mov.w @(0x00071C),r3 / jsr @r3`), the
+indexed dispatch tables, and pointer-held entries, reaches **286,155 instructions = 572,310 bytes** in
+**5,151 functions**. The classifier files FPU-dense code and literal pools under `float_data`. Cross-checks:
+zero reached instructions overlap a PC-relative literal word; the walk reaches 2,694 of the 2,699 function
+entries in the Ghidra export; `0x40`-`0xC0000` accounts as 572 KB code, 105 KB literal pools, 55 KB erased,
+58 KB other data (22.8 KB of it the descriptor records, 8.2 KB the pointer tables at `0x0640B2`).
+
+**The numerator.** "18,099 instruction addresses traced" counted every line in `disassembly/analysis/*.txt`
+shaped like an instruction. **2,527 of them are literal-pool words** that the `*_raw.txt` files print in
+instruction format (`04836A`-`0484FE` in `fuel_pump_raw.txt` is a 203-word pool). The verifier passes them
+because it decodes the same bytes the same way on both sides. Instructions actually traced: **15,798**.
+
+**So: 5.5% of code is traced, not 8.1%.** 293 functions are at least 90% covered, 61 partly, **4,797 have
+never had one instruction committed.** Only 578 of the 5,151 carry any label.
+
+**`[TRACED]` does not mean the body was decoded.** `label_provenance.py` stamps `[TRACED]` when the
+address string occurs anywhere in the analysis corpus, so a call-site mention qualifies. Of 489 function
+labels tagged `[TRACED]`, **336 have zero body instructions in any verified file**; 127 are at least 90%
+covered. The thirteen most-called helpers in the ROM (`0x0BE9A0` 487 callers, `0x0BE554` 402, `0x0BE53C`
+271, `0x0BE830` 263, `0x00317C`/`0x003190` 234 each ...) are all tagged `[TRACED]` with no body on file.
+Item 102 (`0x0BE654`) was one of these.
+
+**Also found by the census**
+
+* 170 functions (3,664 instructions) have **no static reference at all** - no literal, no `bsr`, no table
+  slot (`0x008170`, the flag readers at `0x029878`-`0x029AE0`). Tagged `orphan`; dead unless an address is
+  computed.
+* 387 functions are entered only by a plain `bra` tail call (`034F24: bra 0x0355B8`, the open-holes #9
+  routine). Any walk that names functions from `jsr`/`bsr` targets alone merges them into a neighbour.
+* Two indexed pointer tables nobody has looked at: `0x06423C` (1,696 code pointers) and `0x064F7C` (848),
+  dispatched from `0x05F738`/`0x05F78E` and from `0x09A690`/`0x09A69A` inside the SSM handler region.
+* 419 indirect call sites remain unresolved (register not a literal). Their targets are reached only if
+  something else names them.
+
+**Limits.** Function extents are the address-order partition between entries; shared tails go to the lower
+entry. `ptr` (95) and `orphan` (170) entries are heuristic and counted separately. `interrupt_vectors.txt`
+still prints a table at VBR=0 that item 3 retired; it is stale, not re-examined here.
+
+---
+
+## 106. Four tools were wrong: the emulator rounds the wrong way, the census mis-resolved calls, and 48 table records are not the type their byte says — **CORRECTS ITEM 105 AND `desc_types.py`, 2026-11-27**
+
+Found by the batch-1 function traces (item 107), each re-checked from bytes before the tool was changed.
+
+**1. `sh2e_emu.py` rounded to nearest; the chip rounds toward zero.** Reset loads FPSCR = `0x00040001`
+(`00FA42: D2A1 mov.l` / `00FA44: 426A lds r2,fpscr`; RM = 01, DN = 1) and the ROM's own FPU self-test at
+`0x058696` compares x+x, x·2x+1 (`fmac`), x·2x (`fmul`) and (2x·x)/x on x = `0x414CCCCC` with stored answers
+`0x41CCCCCC`, `0x43A45708`, `0x43A3D708` (= `0x43A45708` - 1.0), `0x41CCCCCA`. Computed exactly and truncated
+those are what you get; rounded to nearest the last three come out `0x43A45709`, `0x43A3D709`, `0x41CCCCCC`
+and the test loads its failure marker `0xAAAAAAAA` into r14 (`0586C4`, `0586D0`, `0586DE`). The emulator stored
+the right FPSCR and never consulted it. **Fixed:** fadd/fsub/fmul/fdiv/fmac/float are computed exactly
+(`fractions.Fraction`) and truncated to float32; overflow gives FLT_MAX. The self-test is now oracle 5 of
+`--selftest` (passes; the old emulator fails it). Effect: the last bit of inexact float results, and now and
+then the integer an `ftrc` produces. Six of the eight batch-1 emulation scripts asserted round-to-nearest bit
+patterns and were repaired (item 107); no function contract changed. Fused-vs-unfused `fmac` is still not
+settled (the self-test passes either way).
+
+**What the self-test does NOT settle.** It checks its arithmetic while FPSCR still holds the reset value,
+then itself writes FPSCR = `0x00000000` (`05873E: 426A lds r2,fpscr`) and returns without restoring it. Those
+are the only two constant FPSCR loads in reached code (the other five pop a saved context). It is called
+from the init routine `0x047C40` (task `0x00DF14`) through `0x07EF4A`. If the SH-2E honoured RM = 00 as
+round-to-nearest, that task would round to nearest after init. As far as this project knows the SH-2E FPU
+implements round-to-zero only, but no copy of the SH7058 manual's FPSCR table is in the repo to cite —
+**settle it from the manual.** Until then the emulator models what the ROM demonstrably expects.
+
+**2. `function_census.resolve_reg` named the wrong callee at branch joins.** It walked backwards in address
+order. `0451CE: 420B jsr @r2` is reached by `04519E: bt 0x0451C8` with r2 = `0x0BE554` (loaded at `04519C`);
+the backward walk finds `0451B8` (r2 = `0x0BE53C`) on the fall-through path. Seven sites were wrong this way
+(`0x040E58`, `0x0451CE`, `0x0466F0`, `0x055484`, `0x067D94`, `0x087012`, `0x092DF8`), four of them "resolved" to
+a RAM address or a pool word. **Fixed:** `reg_states()` propagates register values forward over the real
+control-flow graph, delay slots included, keeping up to four constants per register at a join (r4 =
+`0x0AC388` or `0x0AC394` before the call at `02FBD8`). It agrees with the old walk at every other site, never
+fails where the old walk succeeded, and resolves 146 more: unresolved indirect sites 419 -> 273.
+`fn_dump.py` uses it for every `jsr`/`jmp` and GBR annotation.
+
+**3. The census walker dropped code that a branch enters through a delay slot.** A delay-slot address was
+marked visited, so a later branch to it stopped the walk (`0x058686`, the tail of the FPU self-test's register
+fill: seven live instructions printed as pool longs). Fixed: only addresses walked in sequence stop a walk.
+
+**4. Twelve pointer/orphan seeds were data.** New rejection tests, each a property of the bytes: an
+instruction that occurs nowhere in the 116,872 vector-rooted instructions and that data produces readily
+(`trapa`, `sleep`, `mac.l`, `mac.w`); a post-increment load into its own address register (`mov.l @r6+,r6`,
+undefined); a call whose target the CFG resolves to a constant that is not code (`0x011954`: `bra 0x0124C8`
+with `mov #-46,r1` in the slot, then `jsr @r1`, a call to `0xFFFFFFD2`). The twelve are listed in
+`function_census.json` under `rejected_seeds`. One known false positive survives (`0x0A9F5C`, 22 instructions in
+a byte table) because none of the tests fires on it.
+
+**New census: 5,146 functions, 286,163 instructions = 572,326 bytes** (item 105 said 5,151 / 572,310).
+After batch 1: 24,930 instructions traced = **8.7%**; 541 functions at least 90% traced, 4,462 untouched.
+
+**5. 48 table records are not the cell type their typecode byte says.** `0x0BE830`/`0x0BE8E4` dispatch on
+the byte. The fixed-type wrappers never read it — the cell type is set by WHICH wrapper is called:
+`0BE874 .. 0BE87E: B14F bsr 0x0BEB20` (uint8), `0BE8AC .. 0BE8B6: B159 bsr 0x0BEB6C` (uint16), `0x0BE88C`/
+`0x0BE8C4` (same, with an INT32 axis and an integer input), `0x0BE928`/`0x0BE944` (2-D), and `0x0BE4FA`
+(a step lookup: float thresholds, uint8 values, no interpolation). 48 records reach one of them with a byte
+that says otherwise, almost all `0x00`. Read at face value they are float32: `08D3F2: D466` r4 = `0x0AB2A4`,
+`08D3F4: D266` r2 = `0x0BE874`, `08D3F6: 420B jsr @r2`; record `0x0AB2A4` = count 4, data `0x0C5824`, and the
+next record's axis starts at `0x0C5828` — four BYTES of data. `desc_types.read_table(0x0AB2A4)` returned
+[-5.3e31, 700, 1000, 3]; it is uint8 [244, 39, 31, 23] on a -20..20 axis. **Fixed:**
+`scripts/mapping/fixed_type_records.py` derives the list from every call site of the seven wrappers (three
+records reach one through a GBR slot or a stack slot; those are listed with their bytes and re-checked each
+run) and writes `disassembly/maps/fixed_type_records.json`; `desc_types.typecode()`, `scaling()` and
+`read_table()` consult it, and `typecode_byte()` keeps the raw byte. So **the float32 count is overstated by
+at least 48** (CLAUDE.md "float32 326"); `descriptor_map.txt` and its derivatives are stale on those rows
+until regenerated. `coverage_map.py` now sizes these records by the wrapper too (it already knew the six
+wrappers ignore the byte, but still used it for the extent): four definition-named tables moved to
+VERIFIED-BOTH (363 -> 367) and ~1,100 over-claimed data bytes were released (unclaimed 79.4% -> 79.7%). The two independent traces that found this (helpers_interp: 46 records; helpers_arith:
+the 2 step-lookup records) agree with the generated list exactly.
+
+**Also:** `find_writers.py` misses stores whose base register is reloaded from a stack slot that holds a
+literal (`0x042438`, `0x042482`, `0x041F9C` for `0xFFFF8080`); a writer list from it is a lower bound. Not fixed.
+
+---
+
+## 107. Function programme batch 1: the runtime library, the RTOS core, the diagnostic tables, open-holes #9 and `0x042506` decoded — **CORRECTS ITEM 84, 2026-11-27**
+
+Eight clusters, each traced blind from bytes (listing printed by `fn_dump.py`), attacked by an independent
+reviewer with its own emulation, then settled by a third decode; four were settled twice because of a
+workflow re-run, and the second pass found more each time. Files in `disassembly/analysis/` (all verifier
+clean; emulation scripts in `scripts/trace/emu_<cluster>.py`, all exit 0):
+
+| cluster | file | instruction lines | functions with a contract |
+|---|---|---|---|
+| saturating / clamp / divide / convert helpers | `helpers_arith_trace.txt` | 662 | 13 |
+| table wrappers, SR mask, lag filters | `helpers_wrap_trace.txt` | 699 | 22 |
+| interpolation and axis search | `helpers_interp_trace.txt` | 625 | 15 |
+| guarded RAM records `0x0BDB30`.. | `helpers_desc_read_trace.txt` | 998 | 19 |
+| open-holes #9, `0xFFFF7904` controller | `hole9_afl_trace.txt` | 2,641 | 22 |
+| RTOS / interrupt primitives | `rtos_core_trace.txt` | 2,161 | 9 |
+| diagnostic getter/setter tables | `stub_tables_trace.txt` | 2,558 | 40 |
+| `0x042506` | `fn_042506_trace.txt` | 1,158 | 14 |
+
+Evidence class: bytes + emulation. The emulation ran on the round-to-nearest emulator (item 106); no
+contract below depends on the last bit of a float, and the scripts were re-run on the fixed emulator.
+The tracers made 398 claims; reviewers confirmed 359, refuted 7, called 32 imprecise and reported 57
+omissions; the settled files carry 236 (merged, corrected, narrowed). 125 contradictions with existing
+labels and docs were verified from bytes; the ones that matter are below, the full lists are in each file.
+
+### The helper library (`0x0BDA70`-`0x0BEDB7`)
+
+Every one of these had a `[TRACED]` label and no body on file (item 105). What the bytes say, where it
+differs from the label:
+
+* `0x0BE800` is a **hysteresis comparator returning an integer state**: 1 when not(fr5 > fr4), 0 when
+  (fr5 - fr6) > fr4, else the caller's r4 unchanged (`0BE800: F545 fcmp/gt fr4,fr5` ... `0BE816: 6543`).
+  The label `float_clamp_with_step` swapped two cases and returned a float. It is the gate behind the knock
+  fine-correction RPM enable (>= 1600 on, < 1500 off).
+* `0x0BE588` / `0x0BE598` are **raw-to-float conversions** fr0 = fr5 + fr4·raw (one `fmac`), not
+  interpolation; `0x0BE5A8` / `0x0BE5D8` are the inverse **packers** trunc((x - fr6)/fr5 + 0.5) clamped to
+  255 / 65535 (`0x0BE5A8` clamps to 255, not 65535 as items in this file said).
+* `0x0BE56C`: **fr5 is the LOW bound, fr6 the HIGH** (the label had them reversed).
+* `0x0BE608` returns 1 when x is **outside** the window (older text had the sense inverted).
+* `0x0BE654` (item 102) has a guard hole: an integer quotient of exactly -32768 with a remainder returns a
+  positive wrapped value (-98305/3 -> `0x7FFFAAAB`).
+* `0x0BEA6C` is an integer lag filter whose factor is **(1 - r6/256)**: `0BEA6C: C709 mova` reads
+  `0x3B800000` = 2^-8. The 1/65536 reading in `maf_scaling_raw.txt`, `maf_scaling_analysis.txt` and
+  `adc_pipeline_trace.txt` is wrong by 256x, and so are the settle times derived from it.
+* `0x0BEAB8` is a busy-wait (r0 never written); `0x0BE980`/`0x0BE990` return a check residue (0 when the
+  value:~value pair is consistent), not the value; `0x0BE9C0` shifts 16 and saturates (label: 14).
+* **Axis search is a linear scan down from the top and clamps at both ends** — no extrapolation, no binary
+  search (`0x0BECA8`, `0x0BECDC`); a duplicated breakpoint is a step. `0x0BED98` is two float searches, no
+  type logic. The 2-D cell is `data[i8·count4 + i4]`: in definition terms (X = the +4 axis) row-major.
+* `0x0BDB30`-`0x0BDD9B` are **guarded RAM records**, not descriptor reads or peripheral I/O: a float or long
+  plus two check words ~(hi16 + lo16). `0x0BDBCC` is the float WRITER (refuses NaN silently), `0x0BDCB6`
+  the VALIDATOR (r0 = 0 means VALID — `cl_ol_analysis.txt:146` has the sense inverted), `0x0BDB92` /
+  `0x0BDC6A` the long pair. Every `desc_read_*` and `peripheral_io_*` label on them was wrong.
+  About 132 such records exist; their writers show up only as calls to `0x0BDBCC` / `0x0BDB92`.
+
+### RTOS and interrupts — **item 84's "event queue" is a fatal-trap log**
+
+* `0x00317C` **raises** the SR interrupt-mask field to r4 (an SR image: `0x10`/`0x90`/`0xB0`/`0xE0`, not a
+  level 0-15) only when r4 is higher, and returns SR & `0xF0`; 404 call sites. `0x003190` loads SR from r4
+  and, when the mask comes back to 0 and a switch is due, tail-jumps into the deferred task switch
+  `0x003664`. They are critical-section brackets, not data accessors (every "A/D channel select",
+  "injector gate" and "IPL 16" reading of them is wrong).
+* `0x00E6E4` sets or clears bits of a 16-bit on-chip register word (136 sites). No event, no queue.
+* **`0x00E774` never returns.** It masks interrupts, logs {code `0x4000`, vector number} through
+  `0x010800` into the five-record table at `0xFFFF2060`, and jumps to `0x00FBA4`, which masks all
+  interrupts, zeroes a register pair and stops: `00FBB6: AFFE bra 0x00FBB6`. Item 84 read the table as
+  a coalescing scheduler event queue; the "event ids" are trap vector numbers and nothing drains it.
+  Vectors 80, 172, 176 and 204 — `isr_map.txt` "RTOS SCHEDULER TICK", "ADC service" — are such traps.
+* `0xFFFF12B8` and `0xFFFF1230` are on-chip RAM (the ready map and the queued-id array), not the SCI/MTU
+  registers their labels name; `0x0035FC` is the task dispatcher, not "injection channel timer setup".
+
+### The diagnostic tables `0x06423C` / `0x064F7C` (item 105's "1,696 pointers")
+
+Two adjacent 848-entry tables: the GETTERS and SETTERS of the read/write-by-index services `0xA8` / `0xB8`,
+dispatched from five sites (census missed `0x09A466`). 224 distinct stubs; 486 getter slots return the
+constant `0xFF`, 816 setter slots are the null setter `0x05E76A`; one index (`0x060`) is writable through
+service `0xB8`. `diag_dispatch_table_analysis.txt`'s "597 monitors x three pointers" is wrong.
+Two consequences for log reading, both from the getters:
+* logged **Throttle** (id `0x015`) is **1.25 x f32[`0xFFFF62D4`]**: the getter divides by 80/255
+  (`05D3EC: C775 mova` -> `0x3EA0A0A0`), the logger's rpn assumes 100/255;
+* logged **ECT** (id `0x008`) is f32[`0xFFFF4144`] (getter `0x05D204`), **not** `0xFFFF6350`. Whether the two
+  are stages of one quantity is not established.
+
+### The live SSM patch: the tagged read is unbounded
+
+In the patched `0x09A3AC`, an FF / F2 / F4 item reads 1 / 2 / 4 bytes at `0xFFFF0000 | b1 b2` for ANY b1, b2
+(on-chip registers included) and stores them from `0xFFFFB3F4` through a cursor nothing compares
+(`09A418: DA33` r10 = `0xFFFFB3F4`; `09A44C`-`09A456` store and increment, no bound). The request-length rule
+admits 84 items, so 23+ F4 items (or 45+ F2) overwrite `0xFFFFB44C` (the `0xB8` reply length), then the
+mode byte `0xFFFFB450` and the transport ring header at `0xFFFFB454`. Stock stored one byte per item,
+indexed, and could not pass `0xFFFFB447`. **The logcfg in use requests FF items only (one byte each, 84 at
+most), so it cannot reach the overrun.** Do not log through F2/F4 tags with more than 22 four-byte or 44
+two-byte items in one request. `docs/ssm-read-patch.md`'s example "`0xF465FC` load" names vehicle speed
+(item 9).
+
+### Open-holes #9: the zeroed clamp completes a disable the definition only half-does
+
+`0x0357C8`/`0x0357CC` bound the output `0xFFFF7904` of a windowed PI controller (`0x0355B8`), added with
+weight +1 into the 1.0-centred factor at `0xFFFF77BC` (clamped 0.75..1.25). Its twin pair `0x035FFC` /
+`0x036000` — the definition's "AF 3 Correction Limits", min and max swapped in `disassembly.txt` — bounds
+only the controller's stored centre `0xFFFF318C` (a guarded record, not `evap_pressure_baseline`). With only
+the defined pair zeroed the controller still writes a non-zero `0xFFFF7904`; with both zeroed, as in every
+flashed rev, the term is pinned at 0 apart from init/reload copies. In stock it stays within about
+-0.13..+0.09. **Not established:** that it is the rear-O2 (AF #3) trim (only the definition name says so),
+what `0xFFFF77BC` multiplies, or which sensor `0xFFFF43FC` is (u16 [`0xFFFF4050`] x 5/65536, from peripheral
+`0xFFFFF834`).
+
+### `0x042506`: a gear-indexed, non-positive timing term
+
+It writes `0xFFFF805C`, summed into total timing at `03F656`; every value it can write is zero or negative
+(down to about -30.7 here, for at most 24 consecutive calls on the product path). Selected by gear
+(`0xFFFF6810` is the **gear estimate** 1..5, 6 = none, written by `0x023EB8` from the "Gear Determination
+Thresholds" — not "ol_condition_selector"), the rpm side of 3000 and a 0..3 step counter. Its 12 tables and
+18 step arrays have no definition and are identical stock -> tune; what changed is the gear thresholds.
+`0xFFFF65C5` ("engine_running_flag") is a calibration option, always 1 in all 20 bins.
+
+### Tooling corrections found on the way
+
+Item 106. Plus: `find_writers.py` misses stack-slot-based stores (lower bound); 30 census entries are
+fall-through targets of the code before them (one function split in two); `rom_region_map.txt` calls the
+helper library and most of `0x042100`-`0x042A00` data.
+
+### Labels
+
+`scripts/mapping/sync_decoded_labels.py` applies `disassembly/maps/decoded_labels.json`: one label per
+decoded function (and the RAM cells above), placed last in `ImportAE5L600L.java` so it is primary; every
+contradicted name is removed and listed in `RetireStaleLabels.java`. Names the bytes do not contradict
+(`uint8_add_sat`, `table_lookup_1D`, `interp_1d_*` ...) are kept; only their comments change.
+**Run `RetireStaleLabels.java` before re-importing.**
+
+---
+
+## 108. Function programme batch 2: the launch patch closed, open-holes #9 traced to the closed-loop lambda target, five fuel/timing functions and 1,278 small functions decoded — **CORRECTS the labels at `0x0340A0`, `0xFFFF77C8`, `0xFFFF653C`, `0xFFFF7FBC`, `0xFFFF63B0`, 2026-11-27**
+
+Nine clusters, same method as item 107 (blind trace from `fn_dump.py` → independent reviewer with its own
+emulation → settle; the launch patch and hole #9 also got a fourth, independent audit). Files in
+`disassembly/analysis/`, all verifier clean; emulation in `scripts/trace/emu_<cluster>.py`, all exit 0
+(about 300,000 assertions between them):
+
+| cluster | file | instruction lines | contracts |
+|---|---|---|---|
+| launch patch `0x0F1000` and its host `0x03B668`/`0x03B6B2` | `launch_closure_trace.txt` | 704 | 4 |
+| hole #9: what `0xFFFF77BC`/`0xFFFF77C8` are | `hole9_identity_trace.txt` | 1,925 | 4 (+ O2 chain) |
+| `0x0382C2` (state block `0xFFFF7AF4`) | `fn_0382C2_trace.txt` | 825 | 8 |
+| `0x038E64` (state block `0xFFFF7B7C`) | `fn_038E64_trace.txt` | 866 | 10 |
+| `0x032204` (the value behind logged AFC) | `fn_032204_trace.txt` | 903 | 4 |
+| `0x0410D4` / `0x0415B8` (timing terms `0xFFFF7FBC` / `0xFFFF8000`) | `timing_0410D4_0415B8_trace.txt` | 1,288 | 5 |
+| `0x03AF88` / `0x03AB94` (overrun count ladder, resume threshold) | `fns_03AF88_03AB94_trace.txt` | 737 | 3 |
+| small-function shape classes 0–29 (983 functions) | `stub_shapes_a_trace.txt` | 219 | 34 |
+| small-function shape classes 30–126 (295 functions) | `stub_shapes_b_trace.txt` | 787 | 102 |
+
+The tracers made 407 claims; reviewers confirmed 369, refuted 1, called 37 imprecise and reported 49
+omissions. 71 contradictions with existing labels and docs were verified from bytes. Every member of the
+127 small-function classes was re-decoded, shape-matched and emulated from its own bytes (1,273 proved, 5
+are data). Code listed in verified files: **24,930 → 32,111 instructions (8.7% → 11.2%)**; functions ≥90%
+listed 541 → 719. **But see the last tooling bullet: only 22,698 (7.9%) is analysed** — the rest of
+those figures, before and after, is raw listing dumps.
+
+### Hole #9: the zeroed trim feeds the closed-loop lambda target (identity, sign, and when it applies)
+
+`0x033460` (was `fuel_aggregator_tail`) writes `0xFFFF77BC` = clamp(clamp(S, 0.85, [7BDC]), 0.75, 1.25),
+where S = 1.0 + the definition tables "CL Fueling Target Compensation A/B (Load)" and "... Imm. Cruise /
+Non-Cruise (ECT)" (both scaled so they add AFR points / 14.7) + `[0xFFFF7904]` with weight +1 + other
+addends. **So `0xFFFF77BC` is a closed-loop target in lambda units**, and `0xFFFF77C8` (was `afc_output`)
+is what every other routine reads of it. Evidence: bytes + definitions (two definition-named tables feed
+the sum with signs matching their scalings); emulated.
+
+* **Sign:** positive `0xFFFF7904` raises the target lambda (leaner, by the definitions' AFR convention).
+* **But** `0xFFFF77C8` follows that sum only on the COPY/COPY2/STEP exits. With byte `[0xFFFF8E7E]` == 1
+  and byte `[0xFFFF9720]` == 0 the exit is always SPECIAL (`0x039E6E` clears `[0xFFFF7BEC]` on every
+  call because `[0x0CC488]` = 0.0, so COPY2 never follows), where `[77C8]` is 1.0 — or **1.20 (17.64 AFR)
+  at standstill** with byte `[0xFFFF85D7]` == 1 and `[0xFFFF65FC]` < 4.0 — whatever the trim or the CL
+  target tables say.
+* In this calibration the target never exceeds 1.05 (15.435 AFR) once `[7BDC]` is stored; every edit to
+  the CL Fueling Target Compensation A/B tables can only enrich it. 20.19c differs from stock in 12 cells
+  of those tables, all 0.0005–0.005 richer.
+* The "hand-over capture" (`[77CC]`, `[7814]`/`[7818]`) is unreachable from any in-range state.
+* **The O2 chain, from definition axes:** `0xFFFF40E0` front O2 current (mA) → `0x058902` → `0xFFFF8DE4`
+  front O2 lambda ("Front Oxygen Sensor Scaling") → `0x021A3C` → `0xFFFF653C` atmospheric-compensated
+  front-O2 lambda (was `o2_sensor_voltage`; "Front Oxygen Sensor Compensation (Atm. Pressure)", x =
+  `0xFFFF6898` atmospheric pressure) → `0xFFFF6540` its lag (k = 0.5).
+* **`0x0340A0` is not an "AFC PI output"** (label, `cl_ol_master_analysis.txt:595/:839`,
+  `fueling_pipeline_analysis.txt:227-262`): `0xACEA0`/`0xACEC8` are looked up at `[0xFFFF6350]` (ECT axis)
+  and `0xACEB4`/`0xACEDC` at `[0xFFFF68DC]` — not load and RPM (`0340EA`/`034118`: `F4FC fmov fr15,fr4`,
+  fr15 = `[6350]` from `0340BA`; `0340F6`/`034122`: `F4DC fmov fr13,fr4`, fr13 = `[68DC]` from `0340C2`).
+  There is no error input and no integrator. It computes the SPECIAL-exit term `[0xFFFF7810]` = (1-a)·B +
+  a·A, a = `[0xFFFF780C]`, a 0..1 ramp; `[7810]` is 0.0 or 0.2000 in 20.19c and stock.
+
+**Not established:** whether `[77C8]` reaches the injector pulse (`0x032204` takes 1/`[77C8]` into a
+41-term model; next: `0x032B10`), and when `[8E7E]`/`[9720]` take the values that select SPECIAL (writers
+`0x05A498`, `0x028210`). **Before re-enabling the trim, settle that**: if `[8E7E]` is usually 1 in closed
+loop, the trim does nothing to the target other routines read.
+
+### The launch patch: settled as documented, plus three things the audit found
+
+The patch behaves as `docs/rev-limit-patch.md` says (below K = 8.0515 km/h the limiter compares
+rpm + 2700: cut 4000, resume 3980; `0x0CC508`/`0x0CC50C` dead; the offset also reaches the second stage
+`0x0CC510`/`0x0CC514` whenever the selector `0x03B6F4`..`0x03B714` picks `0xFFFF7CBA`). New:
+
+1. **The whole latch freezes while byte `[0xFFFF8EDC]` != 0.** `0x03B668` runs only on passes of
+   `0x04AA58` where that byte is 0 (`04AA62: 8901 bt` / `04AA64: A1FD bra 0x04AE62`); the same byte gates
+   the reset caller `0x049BA4`. A cut latched at that moment holds until the byte returns to 0. Writers
+   `0x05CB50`/`0x05CBE6` not decoded.
+2. **Gate 8's launch oracle hard-coded 0.0 where the patch reads `[0x0F1048]`** (`0F102A: C707 mova`).
+   0.0 in every live bin, so no live result changes; fixed in `scripts/patch_emulate.py` (live pass, 432
+   points).
+3. An active latch `0xFFFF7CB8` forces the channel-suppress word `0xFFFF7D80` = 0xFFFF (`0x03D2FC`) and
+   clears bit 5 of `0xFFFF6A29` through `0x03B76E` → `0x026CF4`. Whether the suppressed channels are
+   injectors or coils is not established.
+
+Also: `pr` at patch entry is `0x03B6A8` (left by `jsr 0x0BE608` at `03B6A4`), not the caller's return
+address as the old listing said — harmless, never read. The tune's `0x0CC4EC`/`0x0CC4F0` edits do not feed
+this decision.
+
+### Five fuel/timing functions
+
+* **`0x0382C2` → `0xFFFF7AF4` is never non-zero on any shipped calibration.** Two clamped accumulators
+  with anti-windup; all 16 of its tables are flat 0.0, and its only enable writer (`0x03817C`, `0381BC`..)
+  always writes 0 (empty window, `K_C7A` = `K_C7C` = 0). `0xFFFF7B38` is not a "WOT active flag".
+  `fueling_pipeline_analysis.txt:711-782` is wrong on four operand-level points (latch semantics, an
+  inverted compare at `038342`, the selector at `038414`, min vs max at `03847A`).
+* **`0x038E64` → `0xFFFF7B8C`** is an edge-seeded hold-and-decay term, not a recursive filter, and its
+  reachable maximum is +0.046875 — see item 109. `0x038E30` (was `ltft_learning_algorithm`) is 24
+  instructions that force flag bits and reset the block; `0x0CC3C4` = 3600.0 is a main-path gate, not an
+  LTFT threshold.
+* **`0x032204` → `0xFFFF76D4`, the value behind the logged AFC byte** (getter `0x05D2C0` ≈ 128·x): an
+  accumulator clamped to [`[0xFFFF7714]`, `[0xFFFF7710]`] then [0.5, 1.5], reset to 1.0. It reads
+  1/`[0xFFFF653C]` and 1/`[0xFFFF77C8]`. Whether it moves depends on coefficients written by `0x0320AC`
+  (not decoded). `0x031C9C` (was `fuel_percyl_array_init`) zeroes 42/42/41-float state arrays — none
+  indexed by cylinder. `0x04438C` (FBKC) runs with GBR = `0xFFFF81F0`, so its five gate bytes are
+  `0xFFFF824A`/`8234`/`8235`/`824B`/`824C`, not `0xFFFF7494`/`7495` (`fbkc_path_trace.txt:18,31-33`).
+* **`0x0410D4` / `0x0415B8`.** `0xFFFF7FBC` (was `timing_final_advance`) is a clamped integrator
+  (0..`[0xFFFF7FC0]`) that `0x03F368` **subtracts** at every read (`03F8AC`, `03F8C8`: `fsub` of `sp+8`),
+  so +1.0 lowers each timing output by 1.0. It is written only by `0x0410D4` and zeroed by `0x040970`.
+  `0xFFFF8000` is a ramped, floored term from `0x0415B8`, subtracted only on `0x03F368`'s two sum paths.
+  The only 20.19c change reaching these functions is `0x0D29C4` = 438 (stock 0), which enables the
+  `[0xFFFF7FDC]` flag that blocks the integrator's increments. Whether `[7FBC]` can be non-zero on the
+  car depends on `0x040AF6` (not decoded); "knock" is not established for either term.
+* **`0x03AF88` / `0x03AB94`.** `0x03AF88` builds the four u16 rungs of the overrun count ladder
+  (`0xFFFF7C92`..`98`) that `0x03AE6C` compares; `0x0CC4EC`/`F0`/`F4` are the rpm band edges choosing which
+  row of counts loads — no band disables anything. Rung 3 always equals rung 4, so tier 3 is unreachable.
+  The base counts are the definition's "Overrun Fuel Cut Delay" (`0x0CBCA0`..); rungs 2-4 come from
+  undefined words `0x0CBCF2`..`0x0CBD91`. `0x03AB94` writes the resume threshold `0xFFFF7C78` = table
+  `0x0AD40C`(ECT) + `[0xFFFF895C]` + adders 0..3000 rpm. `0x037546`'s claimed writers of this block are
+  pool-long halves (`find_writers.py` false positives).
+
+### Small functions: 1,278 in 127 shapes — mostly plumbing, and many labels on them were wrong
+
+Accessors, setters, thunks, flag tests, float→byte scalings, 118 interrupt entry stubs and 64 interrupt
+acknowledge handlers that each pass their own vector number to `0x00E774` — which batch 1 decoded as
+`fatal_trap_log_and_halt`, so those 64 are **unexpected-interrupt traps**: acknowledge, log, halt until the
+watchdog (the batch-2 traces stubbed `0x00E774`; the cross-check is this integration's). None reads a
+calibration lever.
+Labels on stubs whose bytes do not contain the described logic (retired): `0x000D78` (a busy-wait, not
+`isr_int_acknowledge`), `0x05D1CA` (returns ROM constant `[0x064238]` = 0), `0x022CF4`
+(`check_engine_running` — it tests the calibration option `0xFFFF65C5`, item 107). Still standing but wrong,
+in names this batch did not replace: `0x004CCA`/`0x009106` are empty functions (`rts; nop`) — the bodies
+the labels describe are at `0x004CCE`/`0x00910A`; `0x058524` reads unindexed `0xFFFFAD44`; `0x0297B0`
+touches no float; `0x04BC20`, `0x040918`, `0x03CD34` have no GBR write; `0x03605E`, `0x03756C`,
+`0x03A222`, `0x0900B4` and four more are `bra` thunks; `0x09DD78` is a 5-instruction indexed byte clear.
+**`0xFFFF63B0` is not a temperature**: both writers derive it from `0xFFFF4130` (battery voltage, item 10)
+— a bit copy at `0x01FDF2` and a k = 0.5 lag at `0x01FDD4`. `0xFFFF40C8`/`0xFFFF12B4` are on-chip RAM,
+not peripheral registers.
+
+### Tooling found on the way
+
+* `find_writers.py` misses `@(r0,Rn)` stores whose `r0` comes from a `mov #imm` in a delay slot or another
+  block, and `--reads` misses displacement reads (`0x03B71A`/`0x03B71E`). Writer/reader lists from it are
+  lower bounds. Not fixed.
+* The census undercounts tail-branch callers (`0x038158` → `0x038860`) and misses eight typed records at
+  `0x038E64` because the E-input records are read through `0x0BE830` with a register-computed pointer.
+* `sync_decoded_labels.py`: a name it applied in an earlier batch and a later batch renamed was never
+  retired, and every run added a blank line. Both fixed.
+* **"Traced" counted raw listing dumps, so `[DECODED]` overstated (CORRECTS items 105 and 107's
+  figures).** The census's `traced` is "instruction present in a verifier-checked file". 13 files
+  (`*_raw.txt`: `mystery_subs_raw`, `diag_tasks_raw`, `fuel_pump_raw`, `map_switching_raw` ...) are
+  byte-correct listing dumps with no contracts. 187 of the 719 "≥90% traced" functions (and 9,413 of
+  the 32,111 instructions) are in nothing else — `0x040AF6`, which the batch-2 timing tracers rightly
+  called "not decoded", showed as 100% traced. 66 legacy names on such functions (`diag_check_P0113`,
+  `full_maf_recalc`, `map_baro_processing` ...) were being stamped `[DECODED]`. The census now also
+  reports `analysed` (raw dumps excluded): **22,698 instructions = 7.9%, 532 functions ≥90%**;
+  `label_provenance.py` stamps `[DECODED]` from `analysed_pct` (365 → 295), and `--rank` ranks by it.
+
+### Labels
+
+196 new records in `disassembly/maps/decoded_labels.json` (317 total): 105 functions (every contract above
+with a usable name; partly-decoded functions are not labelled) and 91 RAM cells. 35 more names are retired (245 in `RetireStaleLabels.java`). Twelve existing names
+the bytes do not contradict were kept (`exc_trap_infinite_loop`, `ISR_IRQ0`, `diag_read_state_E_indexed`
+...). **Run `RetireStaleLabels.java` before re-importing.**
+
+---
+
+## 109. The FFB transient term `0xFFFF7B8C` cannot reach its +0.09998 clamp — **RETRACTS the answer of `ffb_gap_resolved_2026-08-19.txt`, 2026-11-27**
+
+`ffb_gap_resolved_2026-08-19.txt` explained "FFB 10.2 against an 11.0 map" as `0xFFFF7B8C` "pinned at
+its upper clamp" +0.0999756 (table `0x0CE784` via record `0x0AD12C`), and called the block a recursive,
+wall-wetting-style filter. Item 108's trace of `0x038E64` (`fn_038E64_trace.txt`, emulated, 17,061
+cases) shows both are wrong:
+
+* It is **edge-seeded hold-and-decay**: on a hysteresis edge each state is SET from a table at X0
+  (`038FAA: FF0C fmov fr0,fr15` — a seed, not an accumulation), held for a counted number of calls
+  (4 / 0 / 8 / 0), then stepped toward zero by a constant (`0x03949E`). Nothing feeds back.
+* O1 = clamp(A·aL·aE + C·cL·cE·M, lo1, hi1), O2 = clamp(D·dL·dE·M + B·bL·bE, lo2, **0.0**), S = O1 + O2.
+  With M = 1.0 (`K_P` = `K_Q` = 0.0) and the ROM tables, identical in stock, 20.19c and 20.19e
+  (re-read 2026-11-27 with `desc_types.read_table`): seed A `0x0AC710` ∈ [−0.0352, 0], seed C `0x0AC724`
+  ∈ [0.0117, **0.0234375**], B = 0, D ≤ 0; cL ≤ 1.0, **cE ≤ 2.0**. So **S ≤ 0.0234375 × 1 × 2 =
+  +0.046875**, and the +0.0999756 bound is never attained.
+
+**What this does to the FFB question:** the "10.2 vs 11.0" transient residual (median +0.053, max +0.098
+in the 2026-08-19 logs) is NOT explained by this term, which supplies at most about half of it. The other
+addends of the same sum at `0x02FFE0` (`base = 1.0 + [73B4] + [7A08] + [7A14] + [7AF4] + [7B8C]` per
+`ffb_command_chain_trace.txt`) are the candidates; `[7AF4]` is excluded (item 108: it is never non-zero).
+Decode `0x02FFE0` and the writers of `[0xFFFF73B4]`, `[0xFFFF7A08]`, `[0xFFFF7A14]`. The section 1 finding
+of that file (settled WOT commands 11.0 exactly; the excess is transient-only) is not affected.
+
+---
+
+## 110. The SH7058 FPU rounds toward zero only — the emulator's rounding holds after init — **CLOSES open-holes #11 item 4 (the FPSCR caveat of item 106), 2026-11-27**
+
+Item 106 proved from the ROM's own FPU self-test (`0x058696`) that arithmetic rounds toward zero with
+FPSCR = `0x00040001`, but noted the self-test then writes FPSCR = 0 (`05873E`) and does not restore it, so
+code after init might round to nearest if RM = 00 meant that on this core (it does on SH-4 and SH-2A).
+
+Renesas's SH7058 F-ZTAT hardware manual lists, among the FPU features, that it supports round to zero as
+the rounding mode, "subset of IEEE standard" — the same line appears in the SH7055S manual; a Renesas
+community answer states that SH-2E always uses round to zero. SH-2A's manual, by contrast, lists two
+rounding modes. **So the SH-2E FPU has no round-to-nearest mode to select, and `scripts/sh2e_emu.py`'s
+round-toward-zero is right for code that runs after init as well.** Evidence class: manufacturer's
+feature summary (cited, web, 2026-11-27); the manual's FPSCR bit-field table was not read, so what the
+RM field holds after the write of 0 is not established (it cannot select a mode the FPU lacks).
+Sources: renesas.com/en/document/mah/sh-2e-sh7058-f-ztat-tm-hardware-manual,
+renesas.com/en/document/mah/sh-2e-sh7055s-hardware-manual,
+community.renesas.com/mcu/legacy-mcu/f/sh-family/3773/fpu-usage-in-sh2e-cpu.
+
+Effect on traces: every "depends on the unsettled FPU rounding mode" caveat in items 106-108 and in the
+batch-2 files (`launch_closure_trace.txt` N6, the tie inputs at 4000 − 2⁻¹² / 3980 − 2⁻¹²) now resolves
+to the round-toward-zero result the emulator gives. The fused-vs-unfused `fmac` question is separate and
+still open.
+
+---
+
+## 111. Function programme batch 3: logged AFC is a live closed-loop integrator the hole #9 trim reaches, the SPECIAL exit and the FFB residual traced, the timing integrator latches to 0, the `0xFFFF8EDC` gate is set at most once per reset — **CORRECTS the labels at `0x032AA8`, `0x032892`, `0xFFFF7730`, `0xFFFF8EDC`, `0x00DCE4`, `0x04793C`, `0xFFFF90BE`, `0xFFFF90A8` and the status of `0xFFFF7FBC`, 2026-11-27**
+
+Seven clusters, same method as items 107/108 (blind trace from `fn_dump.py` → independent reviewer with its
+own emulation → settle; the FFB residual and the SPECIAL-exit gate also got a fourth, independent audit).
+Files in `disassembly/analysis/`, all verifier clean; emulation in `scripts/trace/emu_<cluster>.py`, all
+exit 0 when re-run at integration (about 4.7 million assertions between them, 2.26 million in the
+SPECIAL-exit script alone):
+
+| cluster | file | instruction lines | contracts |
+|---|---|---|---|
+| FFB residual: the sum `0x02FFE0` and the `[0xFFFF73B4]` tree `0x030C38` | `ffb_residual_trace.txt` | 2,392 | 8 |
+| how `0xFFFF77C8` reaches fuel: the `0x032B10` bound chain, `0x0301E4` | `cl_target_to_fuel_trace.txt` | 1,239 | 16 |
+| the SPECIAL exit's gate bytes: `0x05A498` (`[8E7E]`) and the `[9720]` path of `0x028210` | `special_exit_gate_trace.txt` | 2,128 | 18 |
+| logged-AFC coefficients `0x031D88`..`0x0320AC`, filters `0x03297A` | `afc_coefficients_trace.txt` | 1,146 | 16 |
+| the bound of the timing integrator `0xFFFF7FBC`: `0x040AF6` | `timing_bound_040AF6_trace.txt` | 1,295 | 9 |
+| the overrun ladder `0x03AE5A` / `0x03AE6C` / `0x03B3DA` | `overrun_ladder_trace.txt` | 783 | 6 |
+| the writer of byte `0xFFFF8EDC` (`0x05CB1C`) and the start-up path | `revlim_freeze_gate_trace.txt` | 999 | 18 |
+
+The tracers made 253 claims; reviewers confirmed 213, refuted 3, called 35 imprecise and 2 unsupported, and
+reported 37 omissions. 37 contradictions with existing labels and docs were verified from bytes. Spot-checked
+again at integration from the bytes: the record/data references of item 112, the latch at `0x0411D8`..`0x041258`
+(and that `find_writers` finds one store to `0xFFFF7FF4`), the arm at `0x041C22`..`0x041C3A` (item 113), and the
+`[225C]` → `[8E68]` store at `0x05A31E`/`0x05A3D8`. Code analysed: **22,698 → 30,734 instructions (7.9% → 10.7%)**;
+listed 32,111 → 38,965 (11.2% → 13.6%); functions ≥90% analysed 532 → 642.
+
+### Logged AFC is a live closed-loop integrator, and the hole #9 trim reaches it
+
+`0xFFFF76D4` (R8; SSM id `0x009` through the getter `0x05D2C0`) is updated on every pass of the `0x04A94C`
+chain whose gate byte `[0xFFFF65F0]` is `00`/`06`/`0C`/`12` and with byte `[0xFFFF7448]` != 0:
+
+    R8_n = clamp(clamp(R8_(n-1) + v_n, LO, HI), 0.5, 1.5)
+    v_n  = SUM(k=1..d+1) P4[k]·h_k  +  P2·(R0_n − R0_(n−1))  +  P0·(R1_n − R0_n),   R1 = 1/[77C8],  R0 = 1/[653C]
+
+so the driving error is **(1 / closed-loop target) − (1 / atmospheric-compensated front-O2 lambda)**, and h is
+the history of v. Evidence: bytes + emulated (`afc_coefficients_trace.txt`, with `fn_032204_trace.txt` E9-E12).
+
+* **The gains are not stored; they are recomputed every call from a plant model** (`0x031D88`..`0x0320AC`):
+  T = 30/RPM, a dead time L = min(table `0x0AD620`(MAF, RPM), 40) whose integer part d is the controller's
+  delay count, a time constant TAU = table `0x0AD848`(MAF, RPM), and an exp(−x) approximation `0x03286C`. At
+  seven emulated operating points P0 = 0.0017..0.059, P2 = −0.59..+0.36, d = 9..12. The two tables are the
+  ones the definitions call "Intake/Exhaust Duty Correction A" — **item 112**.
+* **Authority.** HI = table `0x0AC4C0` at `[0xFFFF40C8]` (1.25 at ≤ 32, 1.1015625 from 96 up: +25 % / +10 %)
+  in the default modes of `0x032B5E`; LO = max(table `0x0AC4D4`(`[40C8]`), 0.75) from `0x032E28`. The
+  logged AFC in the two 20.19c logs spans −25.0 .. +20.3 % — the −25 % floor is LO = 0.75 exactly. The reset
+  `0x032AA8` (was `fuel_correction_array`) sets LO = HI = 1.0 when byte `[65F6]` == 1, pinning R8 at 1.0. All
+  of these tables are identical in every bin: no rev has touched this loop.
+* **Consumer.** `0x0301E4` (was `fuel_pulse_width_calc`) forms C = (R8 + `[7878]` + `[7AE4]`) · `[7348]`, where
+  `[7878]` is logged AFL (item 70) and `[7348]` = clamp(load `[63F8]` × "Injector Flow Scaling" raw, 0, 131072)
+  (`0x030378`), and multiplies C into seven clamped outputs `[7320]`..`[7344]`, lower clamp `[733C]` (300, or
+  0 when byte `[641C]` == 1). Whether those reach the injector pulse is **not traced**.
+* **For hole #9 (open-holes #9, item 108's question (a)):** the trim `[7904]` reaches fuel. A larger target
+  lambda makes R1 smaller and v more negative, so R8 falls — leaner, the same sign item 108 read. It does so
+  through the P0 error term (non-zero at every emulated point) and, on SPECIAL/STEP exits only, through
+  the clamp bounds (`0x033186`: K = R/`[77C8]` − 1 − `[7BE4]`, R = (`[63C4]` + `[68D8]`)/`[63C4]`, used by
+  `0x0330CA`/`0x033128`; an upper bound built that way persists through modes 5/7/8/21/23). Its authority is
+  R8's −25 / +25 % window. Not established: whether `[7320]`..`[7344]` are the injector pulse.
+* `0x032892` (was `per_element_correction_calc`, "42-element loop") has no loop — 74 straight-line
+  instructions writing P1..P3; the 41-iteration loop is in its caller `0x0320AC` (`0321D0`/`0321D2`).
+  `0xFFFF7730` (was `fuel_correction_array_base`) is one float, the cap clamp(1/((1+`[7BE4]`)·T(`0x0ACE40`,
+  `[6350]`)), 0.5, 1.5); the 29-float array `0x032AA8` fills starts at `0xFFFF7734`. `0x0ACE34`'s cells are
+  uint16 (its only consumer is the fixed-type wrapper `0x0BE8AC`; already in `fixed_type_records.json`, item
+  106), all 0 — its `desc_1D_Load_f32_16` label text is stale. `0x0AC4C0`/`0x0AC4D4` are looked up at `[40C8]`,
+  not vehicle speed (`desc_1D_VehSpd_*` labels unsupported).
+
+### The SPECIAL exit: when the target ignores the trim
+
+`0x033460` takes SPECIAL (target 1.0, or 1.20 at standstill) exactly when byte `[8E7E]` == 1 and byte
+`[9720]` == 0 (item 108). Now decoded:
+
+* **`[9720]`** (`0x028210`, written every call) = 1 iff byte `[0xFFFFAD44]` == 1 and at least one of 17 DTC
+  status bits is set. The 17 records of table `0x09A834` carry the codes 0410 0411 0413 0414 0416 0417 1410
+  2431 2432 2433 2440 2441 2442 2443 2444 2257 2258; the 15 the project XML names are "(Pxxxx) SECONDARY AIR
+  ..." (definition join). **20.19c disables those 15 DTCs** (enable byte 00; stock 01); whether a disabled
+  DTC keeps its status bit clear is not decoded.
+* **`[8E7E]`** = "an output of the sequencer `0x05A498` is on": it drives bits 0x20/0x40 of on-chip register
+  word `0xFFFFF754` from bytes `[8E7F]`/`[8E80]`, and every store to `[8E7E]` writes ([8E7F]==1 || [8E80]==1)
+  (sticky when neither is stored). In normal running it goes 0→1 only on a call where r5 =
+  [8E46]==1 && [8E64]==1 && [8E45]==1 && [8E65]==0 && [8E68]==0, which also needs byte `[225C]` != 0 (else
+  `0x05A26E` forces `[8E68]` = 1), `[8E6A]` == 0 and both hysteresis bytes `[8E79]` (MAF `[63C4]` vs 30.0) and
+  `[8E7A]` at 0. Once the set-only latch `[8E66]` is 1 and both outputs are off, SPECIAL cannot be taken again
+  in normal running. `[8E45]` needs `[8E38]` in [0, 60), and `[8E38]` is not live: it is a copy of `[4144]`
+  (the logged ECT, item 107) taken by `0x0594F8` at init or by `0x05979C` on a 0→1 edge of `[65C2]`.
+* **Reading (hypothesis, not established):** outputs on a port register, an enable window on coolant at
+  start of 0..60 °C, and a fault byte built only from secondary-air DTCs look like the **cold-start
+  secondary-air sequence**, during which the CL target is pinned. If so, SPECIAL is a cold-start-only state
+  and the trim acts in ordinary warm closed loop. **Settle by logging `0xFFFF8E7E`, `0xFFFF8E66`,
+  `0xFFFF8E65`, `0xFFFF8E68` and `0xFFFF8EDC` from a cold start.** Every function involved has the same code
+  and calibration bytes in stock and 20.19c apart from those DTC enables.
+* Scheduling: `0x05A498` (in `0x059F94`, from task function `0x049CF0`), `0x028210` (`0x04A03E`) and
+  `0x033460` (`0x04A94C`) all run only on passes where byte `[8EDC]` == 0, so both gate bytes hold while it
+  is non-zero.
+
+### The FFB residual: `[0xFFFF73B4]` is the candidate (open-holes #12)
+
+`0x02FFE0` forms S = `[73B4]` + `[7A08]` + `[7A14]` + `[7AF4]` + `[7B8C]` + 1.0 − `[7A44]` + `[7BCC]` + `[7BA8]` +
+max(min(`[798C]`+`[7A20]`, 0.52), min(`[73A4]`+`[7BE4]`, 0.65) + `[7354]` + `[7374]`) and stores
+clamp(S·`[7340]`, 0, 32) to `[730C]` (byte `0x0CBBD2` = 0 in every bin; `[7340]` = 1.0 unless byte `[8F24]` == 1).
+Six addends enter only through the max and are masked while the other side is larger.
+
+* **`0x030C38` writes `[73B4]` = (T1 + T2 + T3) · `[7400]`**, gated to 0 below a `[67EC]` threshold. T1 is a
+  table product of the two-call change of `[73B0]` = 0.01·`[620C]` (manifold pressure), an rpm deadband, and
+  **tauA = one of three planes of the definition table "Tau Input A Rising Load Activation"** (data
+  `0x0CD6E6`; 20.19c 0.25/0.30/0.50 at 90 °C, stock 0.5); T2 = 0.02·`[73D8]`·k(ECT, `[73B0]`), `[73D8]` =
+  `[73B0]` minus a slow lag of it; T3 = 0 here. `[7400]` is a cold multiplier seeded from `[6354]`
+  (4.9502 at 0 °C, 1.25 at ≥ 80 °C) that decays to 1.0. **No clamp bounds `[73B4]` above** (+15.92 emulated
+  cold); only the 32.0 clamp on the whole sum does.
+* With the 20.19c tables, warm, a one-call step of `[73B0]` by 0.20 / 0.25 gives `[73B4]` = +0.059 / +0.082 on
+  that call and the next, then a tail of about 0.004 for about 100 calls. A rise just after a fall takes the
+  snap branch of `0x0312DE` and gives a larger, longer tail (2.64 vs 1.61 summed, 226 vs 160 calls).
+* **Of the addends whose range is established from bytes, only `[73B4]` has a rate-of-change input, and it
+  can supply the observed +0.05..+0.098 by itself;** `[7B8C]` adds at most +0.047 (item 109), `[7A08]` is 0
+  warm, `[7BCC]`/`[7BA8]` are forced to 0 whenever OL enrichment `[798C]` is non-zero, `[7A14]`/`[7A20]` read no
+  rate. **Not excluded:** `[7354]`, `[7374]`, `[7A44]` (no writer found by three searches) and the `[79C0]`
+  scaling of `[798C]`.
+* The tree's lag state `[73D0]` is also read by `0x01FE46`, which sets byte `[641C]` — the byte that drops
+  `0x0301E4`'s lower clamp `[733C]` from 300 to 0. Editing table `0x0AC41C` (`[73E8]`, flat 1.0) would also move
+  timing-code gates in `0x03F00C` (`03F10A`) and `0x041EEE` (`041FF6`).
+
+### The timing integrator `0xFFFF7FBC` latches to 0, and may never act on the car
+
+`0x040AF6` (was `timing_offset_applier`) and `0x041030` (was `timing_cyl_selector`) write only the bound
+H = `[7FB8]`·`[7FB0]`·`[7FC4]`·`[7FD4]`·0.01 (×0 when byte `[67FC]` == 1). With the shipped tables H ≈ 20.04 at
+`[6354]` ≤ 30 °C, ≈ 15.03 at ≥ 70 °C, **and non-zero only while byte `[3158]` == 1 or byte `[90BE]` == 1** (the
+Cruise request; `[90BE]` was `ect_warmup_mode_flag_A`, and `0xFFFF90A8`, was `timing_dispatch_state`, is the
+0..1 Non-Cruise weight of the `0x04004A` blend, stepped ±0.008 per call by `0x06114E`), `[9707]` == 0 and
+`[67FC]` != 1. Same in stock and 20.19c.
+
+**The latch item 108 did not have:** one `0x0410D4` call with byte `[69E6]` == 0 while |`[7FBC]`| ≤
+0.001373291015625 (or NaN) sets byte `[0xFFFF7FF4]` = 1 (`0411D8`..`0411F6`: `tst r9,r9` on the `[69E6]` byte,
+`jsr 0x0BE608` with tolerance `[0x041394]`, `C038 mov.b r0,@(56,gbr)`, GBR = `0xFFFF7FBC`), and from then on
+`[7FBC]` := +0.0 on every call before any other step (`04124A`..`041258`). That store of 1 is the only writer
+`find_writers` reports (a lower bound). `[69E6]` is set to 1 only by `0x026634` and cleared by `0x026698`
+when ECT `[6350]` > 70.0 or a coolant-table test on `[63D4]` fails. **So `[7FBC]` can rise only in a window
+while `[69E6]` == 1 and before the latch trips; whether that ever happens on the car is NOT established**
+(power-on contents of `[7FF4]`/`[7FBC]`/`[69E6]`, and when `0x047C40` runs, decide it). The 20.19c change
+`0x0D29C4` = 438 (window B, which blocks increments after a 0→1 edge of byte `[85D7]`) may therefore change
+nothing in practice. Log `0xFFFF69E6`, `0xFFFF7FF4` and `0xFFFF7FBC` to settle it.
+
+### The `0xFFFF8EDC` gate: written at most once per reset, on a warm start
+
+`0x05CB1C` (only caller `0x04793C`, the handler of start-up event 16) writes the value:~value word
+`0xFFFF8EDC` and shadow `0xFFFF8EED` with g = 0x00, 0xA5 or 0xFF: g = (V == 1) ? (CNT ≥ LIM ? 0xFF : 0xA5) : 0x00,
+V from the validated word `0xFFFF8ECC` (`0x05B690`: an external device's register 17 and a window test), CNT
+= byte `[0xFFFF3694]`, LIM = byte `[0xFFFF8EEE]`. It runs only on a warm start (marker word `0xFFFF2000` ==
+0xAA55); the bytes describe the condition as two externally read counts ×60 matching a stored float near
+3600 or 5400. 21 of the byte's 28 readers return at once for any non-zero value — `0x04AA58` (with it the
+rev-limit latch, `0x03B668`, `0x038178`, `0x030C38`) among them — and 7 take other paths; the kernel and task
+0 keep running, so the old label `sched_disable_flag` was wrong too. **No resolved code changes the byte
+mid-drive**, so item 108's "a cut latched at that moment holds until the byte returns to 0" can only happen
+from a reset onward, not later in a running cycle. A cold start depends on the reset DMA transfer
+`0x010398` (CHCR `0x001F0128` not decoded): zero only if it is a fill. What the warm-start condition stands
+for, and whether an ordinary key-on is a warm reset, are not established. Also: `0x049CF0`'s label comment is
+reversed (gate 0x01/0xA5 → `jmp 0x05AB44` with r4 = 1; 0xFF calls `0x021F66` first); `0x00DCE4` (was
+`desc_table_walk`) dispatches one row of the event table `0x011B98`; `0x04793C` (was `isr_rcan0`) is not an
+ISR; task 10 (`0x00DF14`) is queued once per kernel start, not every 20 ms; `0xFFFF5B8D` is a start-up
+status byte, not a sensor byte (`task10_analysis.txt:130`).
+
+### Unsupported, not retracted
+
+`0xFFFF67EC` (`dtc_maturation_counter_67EC`, item 15): `0x023A94` makes it a saturating count of passes
+while byte `[726C]` != 1, zeroed while `[726C]` == 1; the overrun gate needs it ≥ 750 and the FFB tree uses
+13/25/625/875. Nothing in those bytes involves a DTC. Its identity needs its readers decoded.
+
+### Tooling found on the way
+
+* `find_writers.py` lists `0x040AF6`'s stores to `0xFFFF7FB0`..`7FD7` but flags them "LIKELY NOT A REAL
+  WRITER", and `--code-only` hides them — real writers can be suppressed by its heuristic. A reviewer's
+  claim that it misses them outright did not reproduce. Writer counts from the whole-image scans are lower
+  bounds (12,241 of 30,557 stores have an unresolved base).
+
+### Labels
+
+125 new records (item 111) in `disassembly/maps/decoded_labels.json`: 65 functions and 60 RAM cells, one naming
+scheme for the logged-AFC loop (`afc_*`). Plus **918 small-function member names** from the batch-2 shape
+classes (item 108), generated from each member's own parameters by the new
+`scripts/mapping/stub_member_names.py` — members that already had a label keep it. 1,356 records in all;
+29 more names retired (274 in `RetireStaleLabels.java`). **Run `RetireStaleLabels.java` before re-importing.**
+
+---
+
+## 112. "Intake Duty Correction A" and "Exhaust Duty Correction A" are the dead time and time constant of the logged-AFC model, not AVCS tables — **CORRECTS the definition names at `0x0CFA38` / `0x0D121C` and the label `avcs_control` at `0x031DB4`, 2026-11-27**
+
+The project XML places the base tables "Intake Duty Correction A" (data `0x0CFA38`, record `0x0AD620`) and
+"Exhaust Duty Correction A" (data `0x0D121C`, record `0x0AD848`) — base description "AVCS intake/exhaust cam
+duty cycle correction based on VVT position error and engine speed", axes Mass Airflow × Engine Speed. Both
+are `VERIFIED-BOTH`, which covers geometry and bytes, not identity (item 36).
+
+**From the bytes** (`afc_coefficients_trace.txt`; re-checked at integration):
+
+* Each record long occurs once in the image, in `0x031DB4`'s pool (`0x031F5C`, `0x031F6C`), and each data
+  pointer occurs only in its record (`0x0AD62C`, `0x0AD854`). No other consumer.
+* `0x031DB4` (was `avcs_control`): `031E12`..`031E28` look up `0x0AD620` through `0x0BE8E4` with fr4 =
+  `[0xFFFF63C4]` (MAF g/s, `VERIFIED-BOTH`) and fr5 = `[0xFFFF6624]` (RPM), take min(·, 40.0) (`jsr 0x0BE970`,
+  `[0x031F68]` = 40.0) and store L to `[0xFFFF7478]`; `031E34`..`031E40` look up `0x0AD848` → `[0xFFFF76E8]`, ×
+  `0x0AC45C` → TAU `[0xFFFF7480]`. `0x031F98` uses trunc(L) as the integer dead time d of the AFC controller
+  (`031FDA ftrc`) and TAU as the divisor of T = 30/RPM in its pole terms. There is no VVT-error input and no
+  duty output. Its hysteresis is on `[0xFFFF40C8]` (byte `[7700]` = 1 at ≤ 500, 0 above 550), not rpm.
+* So the "Intake" table is **the dead time of the closed-loop fuel model in combustion events** (5..22,
+  capped at 40) and the "Exhaust" table **its time constant** (0.090..0.350, against T in seconds per event)
+  — units inferred from the algebra. The axis names agree with the consumer; the table names do not.
+* **The "Exhaust Duty Correction A" scaling is wrong for this ROM too:** the definition displays (x·0.003051758)
+  − 100 (−95.5 .. −82.5 "degrees"); the code applies the record's scale 2⁻¹⁴ (0.090 .. 0.350). The "Intake"
+  table's x·0.2 matches the record.
+* Identical in every bin (stock through 20.19e).
+
+**What follows:** editing these two tables changes logged-AFC loop dynamics (gains and delay), not cam
+timing; no AVCS effect was found (`0x06847E`, a second reader of the model's W, is undecoded). The
+definition XMLs are not edited here — ECUFlash owns them. Renaming the two tables and fixing the `0x0D121C`
+scaling is the owner's decision, through the verified repo→editor path (`sync_defs.ps1 -Push`, item 85).
+Until then, treat both editor names, and the "Exhaust" table's displayed values, as wrong.
+
+---
+
+## 113. The overrun retard arm fires at the cut exit, not through the cut, and the "Overrun Fuel Cut Delay" cells reach one channel — **CORRECTS ITEMS 79 AND 103 at `0x041BE4` and `0x03AE6C`, 2026-11-27**
+
+`overrun_ladder_trace.txt` (783 lines; emulated, 65 cases plus the arm-timing test).
+
+* **The arm** (`041C22: FEF5 fcmp/gt fr15,fr14` → T = `[7C78]` > x; `041C28`/`041C2A: 8804 cmp/eq #4` on
+  `[0xFFFF8034]`, the tier the previous `0x041BE4` run saved at `041D12`) loads `[8032]`/`[8033]`. On the COUNT
+  path with the band `[7C6C]` ≥ 0, tier 4 needs x ≥ `[7C78]`, so the arm and a counted cut are mutually
+  exclusive: **the arm fires only once x has fallen below `[7C78]`** — on the first `0x041BE4` run after the
+  `0x03AE5A` pass that drops the tier, and on any run between x falling and that pass. **Item 103's "held for
+  the whole fuel cut" is wrong on the count path**; it holds only on the IMMEDIATE path (`03B53A`..`03B544`),
+  with a negative band, or if `0x041BE4` runs while `0x03AE5A` does not (task 9's `0x04907C` is skipped while
+  `[8EDC]` != 0). **Item 79's "fires on the edge into tier 4"** is wrong too: no edge into tier 4 is tested.
+  Item 74's "one call" fits if `0x041BE4` runs once per `0x03AE5A` pass and after it (order not established).
+* **Item 103's log observation still stands** — timing 15-25° low while IPW = 0, recovering within 0.6 s of
+  resume — **but this arm does not explain it on the count path.** Either those cuts took the IMMEDIATE path,
+  or another term lowers timing during the cut (open-holes #13).
+* **The ladder:** rungs `[7C92]` = M + add, `[7C94]` = M + ext1 + add, `[7C96]` = `[7C98]` = M + ext2 + add,
+  M = max(base, `[7C80]`). The tier sets bits of `[7D80]` (tier 1 → 0x0001, 2 → 0x0003, 4 → 0x000F), and a set bit
+  makes `0x03DCB6` skip that output channel: **tier 1 cuts one channel, the full cut is tier 4.** Tier 4 is the
+  top rung (`03AEBC`: `[7CAA]` ≥ `[7C98]` → `03AF4A`) or the second route; `0x03AF4A` is only the tier-4 store
+  run, and `0x03AE6C` ends at `03AF84` (`jmp @r2` → `0x03D2FC`) — `0x03AFF6` belongs to `0x03AF88`. The label
+  comments on `0xFFFF7C9A`/`0xFFFF7CAA` that still said "NOT on this ladder" are replaced.
+* **The "Overrun Fuel Cut Delay" cells** (`0x0CBCA0`.., `VERIFIED-BYTES`; project-written description "Counts
+  the pedal must stay released before injectors cut on overrun") are the BASE term: the count to tier 1, one
+  channel. All four channels cut at base + ext2 (+ add), ext2 from the undefined words `0x0CBCF2`... Editing a
+  cell shifts every tier by the same count. If the logged IPW item 103 matched is channel 0's, its match is
+  with tier 1. The gate also needs `[67EC]` ≥ 750, the rpm window and five more flags (`03B5B4`..`03B5DA`).
+* **8 ms per count is not in the bytes** (2,500 counts per CMT period, 8 handler entries per pass; the clock
+  divider and P-clock are not in the ROM). It agrees with item 103's logs: corroboration only.
+* The 20.19c band-edge move (1800/2500 → 2250/3000 rpm) never makes a tier come sooner while byte `[5DB8]` ==
+  0; with `[5DB8]` != 0 it brings tier 1 forward for x in 2500..3000. The only writer found (`0x015BFA`) stores
+  0. The flat 1000 resume table raises both the resume and the re-entry rpm.
+
+---
+
+## 114. Function programme batch 4: the injector pulse, AFL learning, the post-start FFB addends, the MAF/load cap, the overrun timing terms, power-on RAM, the FBKC step enable and the angle scheduler — **CORRECTS item 111's `0xFFFF79C0` (the OL multiplier is `0xFFFF79A0`) and the labels at `0xFFFF726C`, `0xFFFF63FC`, `0xFFFF7AB0`, `0xFFFF8258`, `0xFFFF81F8`, `0x0448F4`, `0x02EFD2`, 2026-11-27**
+
+Eight clusters, same method as items 107-111 (blind trace from `fn_dump.py` → independent reviewer with
+its own emulation → settle; the injector path and AFL learning also got a fourth, independent audit).
+Files in `disassembly/analysis/`, all verifier clean; emulation in `scripts/trace/emu_<cluster>.py`, all
+exit 0 when re-run at integration (about 1.56 million assertions between them):
+
+| cluster | file | instruction lines | contracts |
+|---|---|---|---|
+| from `0x0301E4` to the injector register (item 115) | `injector_path_trace.txt` | 2,767 | 10 |
+| how AFL learns (item 116) | `afl_learning_trace.txt` | 1,366 | 12 |
+| the rest of the FFB sum: `[7354]`/`[7374]`, `[79A0]`, `[7A44]`, per-cylinder `[7A78+4i]` | `ffb_cl_side_trace.txt` | 1,741 | 26 |
+| `0x01FE46` in full: the MAF/load cap and the lift latch `[641C]` | `fn_01FE46_trace.txt` | 1,008 | 9 |
+| timing terms around the overrun cut (item 118) | `overrun_timing_trace.txt` | 1,684 | 22 |
+| power-on RAM state (item 117) | `poweron_state_trace.txt` | 1,388 | 24 |
+| `0x0448F4`: the FBKC step enable | `fn_0448F4_trace.txt` | 1,685 | 21 |
+| `0x03D856` (the four-channel angle scheduler) and `0x02EB02` (EEPROM write-back) | `fns_03D856_02EB02_trace.txt` | 2,314 | 21 |
+
+The tracers made 313 claims; reviewers confirmed 264, refuted 3, called 46 imprecise and reported 41
+omissions. 54 contradictions with existing labels and docs were verified from bytes. Spot-checked again at
+integration: `0x02FF8E`'s 300 / 0 clamp store, the definition data pointers of the per-injector, latency and
+flow-scaling tables, the record `0x0AC760`, the CHCR field decode of item 117, and the tuned pool word
+`0x020384`. Code analysed: **30,734 → 42,104 instructions (10.7% → 14.7%)**; listed 38,965 → 49,418
+(13.6% → 17.3%); functions ≥90% analysed 642 → 830.
+
+### The FFB sum is complete except `[798C]`'s ramp paths (open-holes #12)
+
+* **`[7354]` and `[7374]` are post-start enrichment, not transient terms.** `0x0304BE` / `0x03082E` (and the
+  seeders `0x030454` / `0x03076E` that run while the crank flag `[726C]` is 1) take their seeds, delays and
+  steps from the definition tables `Table_Post_Start_Enrich_*`: `[7354]` = seed × `0x0AD594` (0.5 warm, up to
+  4.53 cold), held for 39 task-9 passes after start, then decaying over about 217 calls; `[7374]` = 0.1001
+  warm, up to 1.54 cold, decaying linearly over about 286 calls. Neither reads a load change.
+* **Item 111 named the wrong cell:** the OL enrichment `[798C]` is multiplied by **`[0xFFFF79A0]`**, not
+  `[79C0]` (`0x03606C`: r12 = `0xFFFF79F0` at `0360D2`, r0 = −80 at `036250` / `0362F8`). `[79A0]` is written
+  only by `0x036962` as the definition table "Primary Open Loop Fueling Compensation (ECT)" at `[6350]`: 1.0
+  at ≥ 60 °C in 20.19c, never above 1.0 — it can only scale the OL map down. `[79C0]` is a u16 CL→OL delay
+  counter (`0x036322`); the old label `ol_blend_coeff` on `[79A0]` ("~0.1 from CC284",
+  `cl_ol_master_analysis.txt:558`) was wrong too.
+* **`[7A44]` has no writer** (three searches plus this one) and item 117 shows it is zeroed at every reset,
+  so the "− `[7A44]`" term of the sum is 0.0. "CL integral" (`cl_ol_master_analysis.txt:615`) is unsupported.
+* The per-cylinder addends `[7A78+4i]` (`0x037710`) read no load rate either.
+* **So for the warm tip-in excess, `[73B4]` remains the only established candidate;** `[798C]` on its
+  `[79C6]` == 1 / 2 ramp paths is the last undecoded piece.
+* `0xFFFF726C` (was `transient_state_flag`) is the **crank/stall flag**: `0x02EF56` sets it while RPM ≤ 300 and
+  clears it once RPM > 500. `0xFFFF67EC` (item 111's "unsupported") is therefore the count of task-9 passes
+  since cranking ended (`0x023A94`) — not a DTC counter.
+
+### `0x01FE46`: the MAF/load cap and the lift latch
+
+* `[63C4]` = min(MAF window mean × "MAF Compensation (IAT)" + `[69F4]`·`0x0C3104`, **"MAF Limit (Maximum)"**
+  `0x0C3100`), written by `0x01FE46` itself at `01FF66`. **The 20.19c limit of 475 g/s clips nothing the sensor
+  can report**: "MAF Sensor Scaling" ends at 440.6 g/s and the lookup clamps there, so raising the limit
+  further changes nothing — extending the MAF curve is what would move the ceiling. Stock's 300 g/s would have
+  clipped the logged peaks of 305-345 g/s. The g/rev loads are capped by "Engine Load Limit A (Maximum)"
+  (a definition-named literal-pool word, `0x020384`: 4.0 stock, 8.0 in 20.19c/e) and Limit B (record `0x0AAE14`,
+  also tuned), both about 8 g/rev in the tune.
+* The "Cruise" and "Non-Cruise" Engine Load Compensation maps are byte-identical in every AE5L600L image, so
+  the `[90A8]` blend between them is inert; editing only one of them would make it matter.
+* **The lift latch `[641C]`** freezes engine load `[63F8]` against rising during a fast throttle close from
+  boost (≥ 4400 rpm, ≥ 50 km/h, warm, lagged MAP ≥ about 1000-1060 mmHg) and drops `0x0301E4`'s lower pulse
+  clamp to 0. Its fuel effect is not sized.
+* `0xFFFF63FC` (was `barometric_pressure`) is the change of `[63F8]` in that call; `0xFFFF63B8`/`63BC` are the
+  window max/min snapshots, not previous/current samples; `0xFFFF6430` is a 1.0-flat factor, not an ADC value.
+  `0xFFFF65F6` (`cl_active_flag`) is unsupported: it is a copy of byte `[415C]` (`0x022F1C`), and while it is 1
+  `0x020726` re-seeds airflow and load with coolant-indexed values every pass (2.2 g/s warm) — its identity
+  needs `[415C]`'s writer.
+* The census splits this function at a false pointer entry `0x020000` (it is 559 instructions, not 221) —
+  see Tooling.
+
+### `0x0448F4`: the FBKC step enable, and two knock-path identities
+
+`0x0448F4` (was `task10_knock_config`; "10" was a call position, not a task) writes no timing or fuel value:
+it computes byte `[0xFFFF8234]`, the enable of FBKC's knock step and delayed recovery in `0x04438C`. Its live
+gates as shipped (identical in every bin): `0x0D2E08` (60 °C), `0x0D29E0` (13), `0x0D2EDC` (3.8), `0x0D2F6C`/`70`
+(1500/1600 rpm), `0x0D2E10`/`14` (±0.1), `0x0D2997`/`98` (90/38), `0x0D2999` (63). **The FBKC window itself is
+tuned in 20.19c** (`[824A]` load 0.95/1.0, rpm 1100/1200/6000/6100, recovery count 70, Rough Correction window,
+Fine Correction upper load pair), so stock-based reasoning about when FBKC acts does not carry over.
+
+* **`0xFFFF8258` is not a cumulative knock signal** (item 80, `docs/knock.md:210`): `0x045970` overwrites it
+  each call with (1−w)·"KC Advance Max (Cruise)" + w·"(Non-Cruise)", w = `[90A8]`, and never reads the old value.
+* `0xFFFF81F8` (was `knock_thresh_config`) = `[63F8]` − lag(`[63F8]`), a load high-pass; `0xFFFF8277` is the AND
+  of four Rough Correction window bytes, not a roughness detector.
+
+### `0x03D856` and `0x02EB02`
+
+`0x03D856` is the four-channel angle scheduler that arms each channel's pulse (item 115) and the stage where the
+cut mask `[7D80]` suppresses events (a cut bit means the record is counted but never fired, and `0x03D648`
+reports 0.0). Its body reads no calibration; its ROM tables `0x063DDC`..`0x063E3B` are identical in every bin.
+One undefined cal long, `0x0CBDB4` (0x7850), turns a duration into an angle for mode-1 re-fire checks — its
+meaning is not established; do not edit it. `0x02EB02` is EEPROM write-back housekeeping (retry limit
+`0x0C472C` = 3). `0xFFFF7D94`+4k are the per-channel active durations (not "sensor baselines"), `0xFFFF7E4C` an
+int32 fire count (not `transient_accum_ptr`), and `0xFFFF65F1`'s label had its sense inverted.
+
+### Tooling found on the way
+
+* **The census splits functions at false pointer seeds.** `0x020000` (a long `0x00020000` somewhere) is
+  accepted as a `ptr` entry inside `0x01FE46`, so the census files 0x01FE46..0x020000 (221) and
+  0x020012..0x02035E (329, "tailbra") as two functions, with 0x020000..0x020010 in neither as a function body.
+  A pointer seed that lands inside already-proven code that is not an entry should be rejected. Not fixed.
+* **Two descriptor scanners disagree.** `coverage_map.scan_descriptors` (which `function_census.py` and so
+  `fn_dump.py` use) finds 818 records; `descriptor_map.txt` (item 60's scanner) has 1,094. At least `0x0AAE00`
+  and `0x0AAE50` are missing from the census set, so `fn_dump` prints their pool words as plain ROM, and the
+  verification registry's "descriptors decoded" is also from the 818. Not fixed.
+* `find_writers` reports a pool long at `037F88` as a GBR store to `0xFFFF7E90` (false positive), as it did for
+  `0x037546` in item 108.
+
+### Labels
+
+214 new records (item 114) in `disassembly/maps/decoded_labels.json` (1,567 in all, 1,306 functions); 79 more
+names retired (353 in `RetireStaleLabels.java`). Twelve existing names the bytes do not contradict were kept
+(the batch-2 template names on six stubs, `prev_overrun_tier_041BE4`, `ffb_641C_threshold`, `halt_forever` ...);
+`mass_airflow_gps` keeps its name with the decoded formula as its comment. **Run `RetireStaleLabels.java` before
+re-importing.**
+
+---
+
+## 115. The injector pulse decoded end to end: logged AFC, AFL and FFB multiply it — **CLOSES open-holes #9's question (a); NEW, 2026-11-27**
+
+`injector_path_trace.txt` (2,767 lines; audited; 180,838 assertions). For channel j (0..3) and a fresh pulse:
+
+    PW_j      = [7290+4j]  (0x02EFD2)  = [7328+4j] once the after-start floor has released
+    [7328+4j] = clamp( [7310+4j] · S4 · C · PIPWC_j · F ,  [733C] ,  262136 )          (0x0301E4)
+    C         = ( [76D4] logged AFC + [7878] logged AFL + [7AE4] ) · [7348]
+    [7348]    = clamp( [63F8] engine load · "Injector Flow Scaling" raw 4916.0 , 0 , 131072 )   (0x030378)
+    [7310+4j] = per-cylinder FFB = clamp( (S + [7B44+4j] + [7A78+4j]) · [7340] , 0 , 32 )        (0x02FFE0)
+    PIPWC_j   = "Per Injector Pulse Width Compensation A/B/C/D" ( [7324] , RPM )   0.898 .. 1.086   (0x038DC0)
+    F         = clamp( record 0x0AC760 ([7344]) , 0.5 , 1.5 ) when RPM < 4000 and [7344] < 600, else 1.0 (0x0397AC)
+    S4        = 1.0 (three of its four factors are 0.0 in every bin)                                (0x037B74)
+    [733C]    = 300.0 (0x0CBE08), or 0.0 when the lift latch [641C] == 1                            (0x02FF8E)
+    register  = min( (trunc(4·PW_j) + L) >> 4 , 0xFFFF )  ->  u16 0xFFFFF640 + 2j   (0x03DFC8 -> ... -> 0x011848)
+    L         = "Injector Latency_" ( battery voltage [4130] , manifold pressure [6210] )           (0x0303C0)
+
+and the pulse start is the compare value written to `0xFFFFF444 + 2j`. With the definitions' scalings (PW
+axis ×0.001 ms, latency ×0.00025 ms) one register count is 4 µs; the timer clock itself is not established
+from bytes. Everything after `0x0301E4` adds only: the after-start floor of `0x02EFD2` (while ANY of the four
+flag bytes `[726F..7272]` is 1, every channel gets max(pulse, decaying floor `[728C]`) — collective, not per
+channel; the floor decays by 0.85-0.96 per call and can be re-armed at run time when byte `[65F6]` becomes 1),
+the factor `[7DA4]` = 1.0, truncation to quarter units, the latency, and per-channel suppression by `[7D80]`
+in `0x03D856`. All 13,201 code and calibration bytes involved are identical in stock, 20.19c and 20.19e.
+
+* **So hole #9 is closed through to the pulse:** the zeroed trim `[7904]` → CL target `[77C8]` (item 108) →
+  logged AFC `[76D4]` (item 111) → C → the injector register. Remaining for #9: whether SPECIAL ends at warm-up
+  (a cold-start log).
+* **The real low-pulse-width multiplier is the undefined record `0x0AC760`** (data `0x0CD078`, axis
+  `0x0CD058`): ×1.266 at a base pulse ≤ 300 (0.3 ms), falling to ×1.0 at 600, below 4000 rpm. The definition
+  table "Low Pulse Width Fuel Injector Compensation" points elsewhere (`0x0D39A8`, item 36).
+* The minimum pulse is 300 (0.3 ms) unless the lift latch is set. `0x0301E4`'s other outputs feed only the
+  next pass's factors (`[7344]` → F, `[7320]` → S4, `[7324]` → the PIPWC axis) or A/F learning (`[7324] >
+  [733C]` is one of nine terms of the AFL gate byte `[7883]`, item 116), and `0x07D620` (a diagnostic gate).
+* Not covered: a pulse rewritten while in flight (`0x009C38`), `0x009F72`'s status-set branch, and MODE 0 —
+  bytes only or not decoded.
+
+---
+
+## 116. How AFL learns: four airflow cells, stepped from the AFC lag W0, kept across warm resets — **CORRECTS the labels at `0x034884`, `0x03452A`, `0x0345A4`, `0x034D52`; NEW, 2026-11-27**
+
+`afl_learning_trace.txt` (1,366 lines; audited; 424,219 checks).
+
+* **The learned values are four float cells** in guarded 8-byte records at `0xFFFF316C`/`3174`/`317C`/`3184`
+  (the block item 117 shows is kept across warm resets). The current cell `[787F]` comes from `0x034D52`
+  comparing `[63C4]` with "A/F Learning #1 Airflow Ranges" (`0x0CC074`/`78`/`7C`): **stock 5.6 / 10 / 50 g/s,
+  20.19c and 20.19e 6 / 23 / 40 g/s.**
+* **Logged AFL `[7878]` is the applied value, not a cell:** each pass of `0x03452A` `0x034B1C` sets it to the
+  current cell when within 0.02 (or on a forced snap), else lags toward it (k = 0.0156), clamped by "A/F
+  Learning #1 Limits" (±0.25) and ±0.5.
+* **The learning signal is W0 = `[7704]`, the k = 1/64 lag of logged AFC** (item 111), not AFC itself:
+  e = W0 − 1/`[77C8]` + `[7BA8]` + 1.0 votes UP at ≥ 1.01 and DOWN below 0.99 (with target 1.0: W0 above +1 % /
+  below −1 %). Votes accumulate over a window — **40 passes in mode 1** (`[6254]` == 1, each also needing
+  |`[6540]` − `[77C8]`| < 0.05) or **16 in mode 0** — and the cell then steps **±0.001** if the votes are ≥ 144 /
+  < 113 (of a 128 start), clamped to ±0.25 by `0x0CC04C`/`50` (not by the definition's Limits). Fastest: 0.001
+  per 41 (mode 1) or 17 (mode 0) passes; 0.25 takes 250 steps.
+* **Gates** (all must hold or the window restarts): ECT 75..95 °C, |load change| `[63FC]` < 0.012, the AFL
+  gate `[7883]` (nine terms, one of them the base pulse above its 300 clamp), `[9709]` == 0, and more
+  (`0x034778`, `0x0345A4`).
+* **The breakpoints pick the cell that receives each decision, not where the samples came from:** a change of
+  cell does not restart the window, so until neighbouring cells are 0.02 apart (20 steps; all are 0.0 after a
+  clear) votes gathered in one airflow range can step another range's cell. Moving a breakpoint does not
+  cleanly separate learning by airflow.
+* **The cells are cleared on a cold start and on any start where word `[36BE]` == 0x4055** (set by `0x05D070`
+  from handler `0x098FE4`, request not identified) with `[8EDC]` == 0 — so a warm start can reset AFL too.
+* Logged AFL moves in steps of 1/128 = 0.78 %, so about 8 learning steps (≥ ~328 passes) per logged count.
+  `[7878]` has seven readers, not one: besides `0x0301E4` (item 115), `0x02782C` ((1 + AFL) × table),
+  `0x071AFA`, `0x03D0B8` and three exports — "AFL acts only through the pulse" is not established.
+* Learning code, gates, rates and limits are identical in stock, 20.19c and 20.19e; only the breakpoints differ.
+  Old labels on these functions (`afl_learning_entry`, `afl_value_update`, `afl_range_selection`,
+  `afl_airflow_range_determination`, `afl_cl_active_check`) are replaced.
+
+---
+
+## 117. Power-on RAM: `0xFFFF4000`..`0xFFFFBF9F` is zeroed by DMA on every reset; `0xFFFF2000`..`3FFF` is kept — **CORRECTS `startup_hw_init_analysis.txt:172` and the labels at `0xFFFF0000`/`0004`/`0008`, `0x00AE50`; CLOSES the power-on questions of items 111 and 114, 2026-11-27**
+
+`poweron_state_trace.txt` (1,388 lines; 24 functions from the reset vector to the kernel start).
+
+* `0x010398` stores a zero long at `0xFFFF4000` and programs DMAC channel 0: SAR = DAR = `0xFFFF4000`, DMATCR =
+  `0x1FE8`, CHCR = `0x001F0128`. By the SH7058 hardware manual's CHCR table that is auto-request (RS = 11111),
+  source fixed (SM = 00), destination incremented (DM = 01), longword (TS = 10), burst (TM = 1): **0x1FE8
+  copies of the zero long over 0xFFFF4000..0xFFFFBF9C, on every reset, warm or cold**, after a destructive
+  pattern test of that range by `0x010290`, and on both outcomes of that test. Only `0xFFFF5B89` (test result)
+  and `0xFFFF5B6C` are written in the range before the kernel starts. Evidence class: bytes + emulated + the
+  manufacturer's register table (cited by the trace; not re-read here).
+* `0xFFFF0000`..`1FFF` is pattern-tested and restored; **`0xFFFF2000`..`3FFF` is not touched at reset**
+  (pre-reset content on a warm start, undefined on a cold one) — that is where the AFL cells (item 116) and the
+  warm-start marker `0xFFFF2000` live. `0xFFFFBFA0`..`BFFF` is a boot-block area, not cleared.
+* **Consequences:** byte `0xFFFF8EDC`, latch `0xFFFF7FF4`, integrator `0xFFFF7FBC`, gate `0xFFFF69E6`,
+  `0xFFFF7A44` and latch `0xFFFF8E66` are all 0 at every kernel start. So the rev-limit freeze gate is 0 on a
+  cold start (the open half of item 111), `[7A44]` is 0 forever (item 114), and the SPECIAL-exit latch starts
+  clear. For the timing integrator it means `[69E6]` = 0 and `[7FBC]` = 0 at start: if `0x0410D4` runs once
+  before `0x026634` sets `[69E6]`, the latch trips at once and `[7FBC]` stays 0 for the drive. That order is
+  still not established.
+* `0xFFFF0000`/`0004`/`0008` are on-chip RAM (manual: H'FFFF0000..H'FFFFBFFF), not the standby-control
+  registers `SH7058_STBCR*` the labels claimed: they hold a **boot watchdog** — limit 183 WDT intervals, the ITI
+  count, and an expiry-code byte; if the count reaches the limit before the kernel starts, the ECU halts in
+  `0x00FBA4`. Not a calibration and unchanged in all 20 bins, but **a patch that lengthens the boot path before
+  `0x00FABC` could trip it.**
+* `startup_hw_init_analysis.txt:172` ("RAM clear FFFF0000-FFFFBFFF zeroed") was wrong in range.
+
+---
+
+## 118. The timing terms around the overrun cut: the cut-exit retard `[8028]`, the post-sum bounds of `0x03F00C`, and "Map Switching" scalars that switch nothing — **CORRECTS item 74 (`0x0ADE08`, the `0x041BE4` reset gates) and the labels at `0x03F00C`, `0x0ADAFC`, `0x0ADB38`, `0xFFFF8020`, `0xFFFF7C68`, 2026-11-27**
+
+`overrun_timing_trace.txt` (1,684 lines; 21,935 emulated cases).
+
+* **No decoded term gated on an overrun-cut byte holds timing low through a counted (pedal-lift) cut.** The
+  cut-gated term is `[8028]` = min(`[8020]`, `[8024]`) with `[8024]` = 0.0 in practice: on the arm (item 113)
+  `[8020]` = record `0x0ADE08`(ECT), then it ramps out at +0.7 per call (`0x0D2C10`), 36 calls from −24.96.
+  **Item 74's "up to −16.17°" was wrong: the table reaches −20.04 at 50-60 °C and −24.96 from 70 °C.** Item 74's
+  "only live reset gate is engine-speed delta < −20" was wrong too: `[6254]` == 0, (`[65C5]` != 1 and `[5E94]` <
+  4) and `[6634]` < −20.0 are all live. `[8028]` reaches the logged timing only on `0x03F368`'s sixteen-term
+  sum path. Table and ramp are identical in stock, 20.19c and 20.19e — **they are the lever for the post-cut
+  timing dip at ~1800 rpm exits**, and nothing else.
+* **The 20° plateau logged through most coasting cuts** matches the 20.19c "Base Timing Idle Minimum" cell
+  (`0x0ADB38`, 20.08 from 1800 rpm) feeding the `[85D7]`-gated blend in `0x03FBBC`: a closed-throttle
+  mechanism, not a fuel-cut one — **a hypothesis**, open-holes #13. `0x0ADB38` is a 1-D rpm table used as a
+  speed-gated floor max(`[7F28]`, ·) at `0x03FCA2`, not a "primary base timing map".
+* **`0x03F00C`** (was `task49_base_advance`) writes the bounds applied after the timing sum: caps `[7EC0]`/`[7EC4]`,
+  subtrahend `[7EC8]`, floor `[7EE4]`. `0x0ADAFC` is the `[7EC4]` cap against a count and `0x0ADB10` the `[7EC8]`
+  subtrahend against `[620C]` (both 1-D; not "base advance maps"). **The `[7EC0]` cap's LOAD (`0x03ED56`, down to
+  −2.07) is a live timing-lowering bound that is not cut-gated; whether it engages on the car is not
+  established** — do not tune against it until its inputs are decoded or logged.
+* **"Map Switching" scalars that switch nothing:** `0x0D2A40`/`44`/`50`/`54`/`58`/`5C`/`60`/`64`, `0x0D2A9C`, `0x0D2AA0`,
+  `0x0D2ABC` and `0x0D29AC` (project-invented names, CLAUDE.md) are all consumed by `0x03F00C` as cap gates, ramps
+  and decays — e.g. `0x0D2ABC` is the per-call decay of `[7EC8]`, `0x0D2A60`/`64` the +0.7 ramp of the `[7EC0]` cap.
+  Names wrong, stored values right.
+* `0xFFFF8020` is the overrun-retard block (written only by `0x041BE4`/`0x041A7E`/`0x041954`), not a knock/FLKC
+  workspace; `0xFFFF7C68` is the OR of eleven cut bytes (the ladder's `[7C9D]` first), not an engine status.

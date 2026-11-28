@@ -44,7 +44,43 @@ Census of this ROM (rev 20.19c, md5 92cae8275cd4f9b473a3a9e36efe6449):
   float32 149,  uint8 215,  uint16 396,  int8 0,  int16 0   (total 760)
 Note there are ZERO int8/int16 descriptors -- the old map's 215 "int16" rows
 were uint8 and its 396 "uint8" rows were uint16.
+(That census predates corrections items 60 and 106; see disassembly/maps.)
+
+THE TYPECODE BYTE IS DEAD FOR SOME RECORDS (corrections item 106, 2026-11-27)
+Everything above is true for records consumed by the TYPED wrappers 0x0BE830 /
+0x0BE8E4. The FIXED-TYPE wrappers never read the byte -- the cell width is set by
+WHICH wrapper is called (0BE874 always `bsr 0x0BEB20`, uint8; 0BE8AC always
+`bsr 0x0BEB6C`, uint16; 0x0BE88C / 0x0BE8C4 also take an INT32 axis; 0x0BE928 /
+0x0BE944 are 2-D; 0x0BE4FA is a step lookup with uint8 values). 48 records reach
+one of them with a byte that says something else -- mostly 0x00, which read at
+face value makes them float32: record 0x0AB2A4 has count 4 and its data at
+0x0C5824 is followed by the next record's axis at 0x0C5828, four BYTES of data.
+typecode() / read_table() / scaling() below therefore consult
+disassembly/maps/fixed_type_records.json, which scripts/mapping/fixed_type_records.py
+derives from the call sites of those wrappers. typecode_byte() is the raw byte.
 """
+import json as _json
+import os as _os
+
+_FIXED_PATH = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..',
+                            'disassembly', 'maps', 'fixed_type_records.json')
+_FIXED = None
+
+
+def fixed_type(addr):
+    """The consumer-implied type of a record, or None if no fixed-type wrapper reads it.
+
+    Returns dict(dim, cell_typecode, axis, typecode_byte, consumers, via).
+    axis is 'float32', 'int32', or 'float32-step' (0x0BE4FA: no interpolation).
+    """
+    global _FIXED
+    if _FIXED is None:
+        try:
+            with open(_FIXED_PATH) as fh:
+                _FIXED = {int(k, 16): v for k, v in _json.load(fh)['records'].items()}
+        except (OSError, ValueError, KeyError):
+            _FIXED = {}
+    return _FIXED.get(addr)
 
 # typecode byte -> short name (the form used in Ghidra label names)
 TYPE_SHORT = {
@@ -130,9 +166,18 @@ def is_2d(rom, addr):
     return rom[addr + 3] != 0
 
 
-def typecode(rom, addr):
+def typecode_byte(rom, addr):
+    """The raw byte at +2 / +16. Use typecode() for the cell type."""
     o = _OFF["2D" if is_2d(rom, addr) else "1D"]["typecode"]
     return rom[addr + o]
+
+
+def typecode(rom, addr):
+    """The EFFECTIVE cell typecode: the consuming fixed-type wrapper's, else the byte."""
+    fx = fixed_type(addr)
+    if fx is not None:
+        return fx['cell_typecode']
+    return typecode_byte(rom, addr)
 
 
 def scaling(rom, addr):
@@ -141,6 +186,8 @@ def scaling(rom, addr):
     Returns None for typecode 0x00 -- the fields are NOT a scale there.
     """
     import struct
+    if fixed_type(addr) is not None:
+        return None, None              # fixed-type wrappers read no scale / bias
     tc = typecode(rom, addr)
     if tc == 0x00:
         return None, None
@@ -159,6 +206,15 @@ def read_table(rom, addr):
     2-D layout note: the data is stored as X planes of Y values (verified on
     0xAE6D4 -- the two 18-value load planes are byte-identical), so
     values[x][y]. Do not assume row-major.
+    NAMING: here "y" is the +4 axis and "x" the +8 axis. In every
+    definition-named 2-D records (63 joined on the data pointer) the DEFINITION's X axis is the +4 pointer, so
+    in definition terms the data is row-major (Y rows of X cells) -- same bytes,
+    opposite names (helpers_interp trace, corrections item 106). The cell
+    address the code computes is data[i8 * count4 + i4] (0x0BEBC0..0x0BEC78).
+
+    Records consumed by a fixed-type wrapper (fixed_type() is not None) are read
+    with the WRAPPER's cell type, no scale/bias, and an int32 axis where the
+    wrapper takes one; the result carries 'fixed' = that record's entry.
     """
     import struct
     two = is_2d(rom, addr)
@@ -173,6 +229,12 @@ def read_table(rom, addr):
         v = decode_cell(rom, a, tc)
         return v if sc is None else v * sc + bi
 
+    fx = fixed_type(addr)
+    ax_int = fx is not None and fx['axis'] == 'int32'
+
+    def axv(a):
+        return struct.unpack_from(">i", rom, a)[0] if ax_int else struct.unpack_from(">f", rom, a)[0]
+
     dp = struct.unpack_from(">I", rom, addr + o["data"])[0]
     if two:
         ny, nx = rom[addr + 1], rom[addr + 3]
@@ -186,7 +248,7 @@ def read_table(rom, addr):
     else:
         n = struct.unpack_from(">H", rom, addr)[0]
         ax = struct.unpack_from(">I", rom, addr + o["axis"])[0]
-        axes = {"x": [struct.unpack_from(">f", rom, ax + 4 * i)[0] for i in range(n)]}
+        axes = {"x": [axv(ax + 4 * i) for i in range(n)]}
         vals = [cell(dp + i * w) for i in range(n)]
     return {"dim": "2D" if two else "1D", "typecode": tc, "type_name": TYPE_NAMES[tc],
-            "axes": axes, "values": vals, "scale": sc, "bias": bi}
+            "axes": axes, "values": vals, "scale": sc, "bias": bi, "fixed": fx}

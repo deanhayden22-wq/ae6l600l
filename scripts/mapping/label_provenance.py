@@ -20,10 +20,15 @@ corrections.md records every fix, but it is 95 items long and nobody reads it
 before trusting a label in the listing. This tool moves the warning to where the
 wrong conclusion actually forms: the comment attached to the label.
 
-THE THREE CLASSES
-  TRACED      the address appears in a verifier-checked file under
-              disassembly/analysis/. Bytes were decoded and machine-checked
-              against the ROM. Strongest available.
+THE FOUR CLASSES
+  DECODED     a function entry whose BODY is at least 90% present, instruction
+              by instruction, in verifier-checked files (function_census.json
+              traced_pct). Added 2026-11-27 (corrections item 107) because
+              TRACED turned out to mean far less than it reads: 336 of 489
+              TRACED function labels had no body on file (item 105).
+  TRACED      the address STRING appears in a verifier-checked file under
+              disassembly/analysis/. A call-site mention qualifies, so for a
+              function this does NOT mean the body was decoded.
   CITED       appears in docs/corrections.md but in no analysis file. Somebody
               reasoned about it and wrote it down; no byte-level check.
   UNVERIFIED  appears in neither. The name is the ONLY artefact. Treat as a
@@ -45,7 +50,23 @@ JAVA = os.path.join(REPO, 'disassembly', 'ghidra', 'ImportAE5L600L.java')
 ANALYSIS = os.path.join(REPO, 'disassembly', 'analysis', '*.txt')
 CORRECTIONS = os.path.join(REPO, 'docs', 'corrections.md')
 
-TAGS = ('[TRACED]', '[CITED]', '[UNVERIFIED]')
+TAGS = ('[DECODED]', '[TRACED]', '[CITED]', '[UNVERIFIED]')
+CENSUS = os.path.join(REPO, 'disassembly', 'maps', 'function_census.json')
+
+
+def decoded_entries():
+    """Census function entries whose body is >= 90% in verified files that ANALYSE it.
+
+    A *_raw.txt listing dump does not count: it proves the bytes were listed, not that
+    anyone worked out what the function does (corrections item 108 -- 66 legacy names
+    were being stamped [DECODED] on the strength of a raw dump alone)."""
+    import json
+    try:
+        with open(CENSUS) as fh:
+            return {int(f['entry'], 16) for f in json.load(fh)['functions']
+                    if f.get('analysed_pct', f['traced_pct']) >= 90}
+    except (OSError, ValueError, KeyError):
+        return set()
 
 
 def corpora():
@@ -56,8 +77,10 @@ def corpora():
     return traced, cited
 
 
-def classify(addr, traced, cited):
+def classify(addr, traced, cited, decoded=frozenset()):
     forms = ('%06X' % addr, '%08X' % addr, '%05X' % addr)
+    if addr in decoded:
+        return 'DECODED'
     if any(f in traced for f in forms):
         return 'TRACED'
     if any(f in cited for f in forms):
@@ -77,19 +100,20 @@ def main():
 
     src = open(JAVA, encoding='utf-8', errors='replace').read()
     traced, cited = corpora()
+    decoded = decoded_entries()
 
-    counts = {'TRACED': 0, 'CITED': 0, 'UNVERIFIED': 0}
+    counts = {'DECODED': 0, 'TRACED': 0, 'CITED': 0, 'UNVERIFIED': 0}
     seen = {}
     for m in re.finditer(r'labelComment\((0x[0-9A-Fa-f]+)L?,\s*"([^"]+)"', src):
         a = int(m.group(1), 16)
         if a not in seen:
-            seen[a] = classify(a, traced, cited)
+            seen[a] = classify(a, traced, cited, decoded)
     for c in seen.values():
         counts[c] += 1
 
     total = len(seen)
     print('labelled addresses: %d' % total)
-    for k in ('TRACED', 'CITED', 'UNVERIFIED'):
+    for k in ('DECODED', 'TRACED', 'CITED', 'UNVERIFIED'):
         print('  %-11s %5d  %4.0f%%' % (k, counts[k], 100.0 * counts[k] / total))
     print()
     print('UNVERIFIED means the name is the only artefact -- no decoded trace and')

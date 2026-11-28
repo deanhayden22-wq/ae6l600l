@@ -87,6 +87,8 @@ OR-ing `0x000F0000` forces the high nibble-pair to `0xFF` in all three cases, so
 every tag lands on RAM base `0xFFFF0000` — while the tag's **low nibble**
 (`F`/`2`/`4`) simultaneously selects the read width. One byte carries both the
 address prefix and the data type, and the `2`/`4` literally name the byte count.
+(`0xFFFF0000` is the start of on-chip RAM; its first words hold the boot watchdog's limit and
+count — corrections item 117 — not the standby-control registers an old label claimed.)
 
 Untagged entries fall through to the stock getter-table path, so nothing breaks.
 

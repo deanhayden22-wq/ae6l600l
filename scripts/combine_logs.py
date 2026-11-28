@@ -287,6 +287,37 @@ def write_out(out, dest, paths, keep_sources, force):
 
 
 # ---------------------------------------------------------------------------
+# push to the analysis box
+# ---------------------------------------------------------------------------
+
+PUSH_ENV = "LOG_PUSH_TARGET"   # e.g. user@host:/path/to/repo/logs/
+
+
+def push_folder(folder):
+    """scp the finished log folder to $LOG_PUSH_TARGET, if it is set.
+
+    Returns a one-line status for the summary, or None when no target is set.
+    BatchMode means a missing SSH key fails fast instead of hanging on a
+    password prompt the GUI cannot show.
+    """
+    target = os.environ.get(PUSH_ENV, "").strip()
+    if not target:
+        return None
+    import subprocess
+    cmd = ["scp", "-rp", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+           str(folder), target]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    except Exception as e:  # scp missing, timeout, ...
+        return "Push FAILED (%s). Folder is still saved locally." % e
+    if r.returncode != 0:
+        err = (r.stderr or r.stdout).strip().splitlines()
+        return "Push FAILED (scp exit %d: %s). Folder is still saved locally." % (
+            r.returncode, err[-1] if err else "no output")
+    return "Pushed to %s" % target
+
+
+# ---------------------------------------------------------------------------
 # reporting
 # ---------------------------------------------------------------------------
 
@@ -385,7 +416,11 @@ def _run_gui():
         messagebox.showerror("Combine failed", str(e))
         return 2
 
-    messagebox.showinfo("Done", summarize(out, report, dest, copied))
+    msg = summarize(out, report, dest, copied)
+    pushed = push_folder(dest.parent)
+    if pushed:
+        msg += "\n\n" + pushed
+    messagebox.showinfo("Done", msg)
     return 0
 
 
@@ -408,6 +443,10 @@ def run_cli(args):
         return 2
 
     print(summarize(out, report, dest, copied))
+    if not args.no_push:
+        pushed = push_folder(Path(dest).parent)
+        if pushed:
+            print(pushed)
     return 0
 
 
@@ -425,6 +464,8 @@ def main():
     p.add_argument("--no-copy-sources", action="store_true",
                    help="don't copy the raw logs into the output folder")
     p.add_argument("--force", action="store_true", help="overwrite existing output")
+    p.add_argument("--no-push", action="store_true",
+                   help="don't scp the result to $%s even if it is set" % PUSH_ENV)
     args = p.parse_args()
 
     if not args.logs and not args.dir:

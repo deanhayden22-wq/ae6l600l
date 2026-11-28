@@ -1,0 +1,2123 @@
+HELPERS 0x0BDB30..0x0BDD9B -- CHECKSUMMED-RECORD READ / WRITE / VALIDATE HELPERS
+AND SIX SMALL INTEGER LEAVES (blind trace, adversarially reviewed, third decode)
+
+Date           2026-11-27
+Reference bin  rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Method         Blind: every function dumped with scripts/mapping/fn_dump.py (no labels), read from
+               bytes, then executed in scripts/sh2e_emu.py against stated contracts
+               (scripts/trace/emu_helpers_desc_read.py, exit 0, 766,059 assertions).
+               A reviewer disputed parts of the first version; a third decode settled each disputed
+               item from bytes and repaired this file. See REVIEW HISTORY (last section).
+EVIDENCE CLASS bytes (canonical decoder, every instruction line verifier-checked) + emulated.
+               The callees 0x00317C / 0x003190 / 0x003664 and the context save 0x003440 are EXECUTED
+               too: the emulation script adds a modelled SR and `ldc Rm,sr` to sh2e_emu. Only the
+               scheduler beyond 0x0034B4 and the resume routines are bytes only.
+               Whole-ROM call-site figures come from a constant-propagation scan whose method and
+               limits are stated with the table. Caller-side samples are decoded from bytes.
+               WHAT the RAM records hold is NOT established here -- only how they are guarded.
+
+Scope          0x0BDB30..0x0BDD9B holds FIFTEEN code blocks, not fourteen: the fourteen entries
+               given, plus 0x0BDD0C..0x0BDD1B (8 instructions, no caller found anywhere in the
+               ROM). Bytes not covered by a function: 0x0BDD02 = 0000 (pad), 0x0BDD04 and
+               0x0BDD08 = literal pool, 0x0BDD9A = 0000 (pad). The next function 0x0BDD9C is
+               reported by entry signature only. Four routines OUTSIDE the range are traced as
+               far as the cluster depends on them: 0x00317C, 0x003190, 0x003664, 0x003440.
+
+T-BIT CONVENTIONS USED BELOW (each is relied on somewhere)
+  cmp/eq Rm,Rn   T=1 when Rn == Rm            cmp/ge Rm,Rn   T=1 when Rn >= Rm (signed)
+  cmp/gt Rm,Rn   T=1 when Rn >  Rm (signed)   cmp/hi Rm,Rn   T=1 when Rn >  Rm (unsigned)
+  cmp/hs Rm,Rn   T=1 when Rn >= Rm (unsigned) cmp/eq #imm,r0 T=1 when r0 == sign-extended imm
+  cmp/pz Rn      T=1 when Rn >= 0 (signed)    tst Rm,Rn      T=1 when (Rn & Rm) == 0
+  fcmp/eq FRm,FRn  T=1 when FRn == FRm (T=0 if either is NaN)
+  fcmp/gt FRm,FRn  T=1 when FRn >  FRm
+  bt = branch when T=1, bf = branch when T=0. bt/s and bf/s decide on T as it stands AT the
+  branch, then the delay slot runs, then control goes to the target (or falls through).
+  Every conditional delay slot in the cluster is a mov #imm / mov / extu.w, so none alters T.
+
+
+================================================================================
+SHARED FACTS (proved in the sections that follow)
+================================================================================
+
+THREE GUARDED STORAGE FORMATS
+
+  REC8   8 bytes, long-aligned (the code does 32-bit and fmov.s access at +0)
+           +0  long   V     the value: raw float32 bits, or a 32-bit integer
+           +4  word   CK    check word
+           +6  word   CK    second copy of the same check word
+         CK(V) = ~( (V >> 16) + (V & 0xFFFF) ) & 0xFFFF
+         i.e. the one's complement of the 16-bit sum of the two halves of V.
+         A record is VALID when CK(V) equals the word at +4 OR the word at +6.
+         It is NOT a comparison of two copies of the value: there is one value and
+         two copies of its 16-bit check word.
+
+  PAIR8  2 bytes:  +0 byte b,  +1 byte ~b         valid when [+0] == ~[+1] (8 bits)
+  PAIR16 4 bytes:  +0 word w,  +2 word ~w         valid when [+0] == ~[+2] (16 bits)
+
+  CONSTANT-FILL MEMORY (emulated, all 256 fill bytes through every validator and the reader)
+    REC8    8 x 0x00 and 8 x 0xFF are INVALID.  8 x 0x55 is VALID: CK(0x55555555) =
+            ~(0x5555 + 0x5555) & 0xFFFF = 0x5555, which is the word at +4. It reads back as
+            the value 0x55555555 (as a float: 1.4660155e13). 0x55 is the only constant fill
+            that validates. So "blank memory is invalid" holds for 0x00 and 0xFF, not in general.
+    PAIR8 / PAIR16   no constant fill validates (b == ~b is impossible).
+
+  function   format  action                       masks IRQ   failure return
+  ---------  ------  ---------------------------  ----------  ---------------------------
+  0x0BDB30   REC8    read float, else default     yes         fr0 = caller's fr4 (default)
+  0x0BDBCC   REC8    write float                  yes         r0 = 1 if fr4 is NaN (no write)
+  0x0BDCB6   REC8    validate float + refresh CK  yes         r0 = 1 (record untouched)
+  0x0BDB92   REC8    write long                   yes         none (always r0 = 0)
+  0x0BDC6A   REC8    validate long + refresh CK   yes         r0 = 1 (record untouched)
+  0x0BDB6E   PAIR8   write byte + complement      NO          none (always r0 = 0)
+  0x0BDC0E   PAIR8   validate                     yes         r0 = 1
+  0x0BDB80   PAIR16  write word + complement      NO          none (always r0 = 0)
+  0x0BDC3C   PAIR16  validate                     yes         r0 = 1
+
+  There is NO range check anywhere in this cluster, and no function here reads a
+  table descriptor or a peripheral register. The only memory touched is the record
+  the caller points at (plus the stack).
+
+THE INTERRUPT WINDOW (every "yes" above uses exactly this sequence)
+
+      jsr 0x00317C  with r4 = 16 (0x10)      -> r0 = old (SR & 0xF0)
+      mov r0,r4                              -> r4 = saved mask, kept until ...
+      ... touch the record ...
+      jsr 0x003190  with r4 = saved mask     -> SR = saved mask
+
+  0x00317C raises the SR interrupt mask to r4 only if r4 is unsigned-greater than
+  the current (SR & 0xF0); with r4 = 0x10 that means: mask level 0 becomes level 1,
+  any level >= 1 is left alone. It is NOT "disable all interrupts": priority 2..15
+  sources stay enabled inside the window.
+  0x003190 writes SR = r4 on every exit. If r4 == 0 (the caller was running with
+  everything enabled) it also reads byte @(1, long @0xFFFF12A0) and, unless that
+  byte is 1, tail-jumps to 0x003664 after SR = 0.
+
+  SR SIDE EFFECT of every "yes" row. 0x003190 loads the WHOLE of SR, and what it is
+  given is (old SR & 0xF0) (003180). So each masked helper returns with the I field
+  as it found it and with M, Q, S and T all 0, whatever they were on entry -- at any
+  entry mask (emulated, section 9). The NaN exit of 0x0BDBCC, the two unmasked
+  writers and the six leaves load nothing into SR. In this ROM that is inert: no
+  reached instruction is `sets`, `clrs`, `mac.l` or `mac.w` (scan of the 286,090
+  reached instructions), M and Q are set afresh by div0s/div0u, and T does not
+  survive any call.
+
+  WHAT THE WINDOW COVERS. Entered at mask 0, the record is touched at I = 1 and
+  nowhere else (emulated: every access logged with the I field at that instant).
+  0x0BDB30 looks at the value TWICE inside one window (two word reads for the check,
+  then a separate long read for the result); the two validators read it once.
+
+  THE MASK-0 EXIT. A helper entered at mask 0 leaves through 0x003190's r4 == 0 path.
+  If the byte is not 1 that is 0x003664, which may save the running context
+  (0x003440) and hand the CPU to the scheduler; the helper's last instructions then
+  run only when the context is resumed. By then its work on the record is complete
+  (emulated, section 8). What survives such a switch is r8-r14, gbr, mach, macl, pr,
+  SR, and fr12-fr15 only when a byte in the record at long @0xFFFF12A0 is 4 -- NOT
+  r0-r7, fr0-fr11 or fpul. No helper RESULT depends on those: every result is
+  rebuilt from r14 / fr14 / an immediate after the call to 0x003190.
+
+==== FUNCTION 0x00317C .. 0x003190  (9 instructions, 239 callers) ====   [callee of the cluster]
+CONTRACT   in  r4 = wanted SR value (the cluster always passes 0x10; over the 404 call sites in the
+               ROM r4 is always a constant: 0x10 at 365, 0x90 at 25, 0xE0 at 8, 0xB0 at 6)
+           out r0 = SR & 0x00F0 as it was on entry (the old interrupt-mask field, in place)
+           effect  if r4 >u (SR & 0xF0): SR = r4 (the whole register is loaded; with r4 = 0x10
+                   that also clears T, S, Q and M)
+                   else SR unchanged except T = 0 (left by the cmp/hi).   clobbers r5 (= 0xF0)
+MECHANISM  r0 = SR & 0xF0; if (unsigned) r4 > r0 then SR = r4; return r0
+EVIDENCE   003182/84: cmp/hi r0,r4 sets T when r4 > r0 unsigned; bf (T=0) skips the ldc.
+           emulated natively, SR modelled (section 0): 16 I values x 6 flag patterns x 8 values of
+           r4 = 768 cases; SR is loaded at 003188 iff r4 >u (SR & 0xF0). With r4 = 0x10 only I = 0
+           is raised (SR becomes 0x010).
+LISTING
+00317C: 9505  mov.w @(0x00318A),r5          ; = 0x00F0 (240)  | r5 = 0x00F0 (the I3..I0 field of SR)
+00317E: 0002  stc sr,r0                     ; r0 = SR
+003180: 2059  and r5,r0                     ; r0 = SR & 0xF0 = old mask  -> RETURN VALUE
+003182: 3406  cmp/hi r0,r4                  ; T = (r4 > old mask), unsigned
+003184: 8B02  bf 0x00318C                   ; T=0 (r4 <= old): leave SR alone
+003186: 000B  rts                           ; r4 > old:
+003188: 440E  ldc r4,sr                     ; (slot) SR = r4
+;   pool 0x00318A: .word 0x00F0
+00318C: 000B  rts                           ; plain return, r0 = old mask
+00318E: 0009  nop
+
+==== FUNCTION 0x003190 .. 0x0031A8  (12 instructions, 239 callers) ====   [callee of the cluster]
+CONTRACT   in  r4 = SR value to restore (the r0 that 0x00317C returned, i.e. old SR & 0xF0)
+           effect  SR = r4 on all three exits (the whole register: M, Q, S, T take r4's bits, which
+                   are 0 when r4 came from 0x00317C).
+                   r4 != 0                                      -> rts, r0 untouched
+                   r4 == 0 and byte @(1, long @0xFFFF12A0) == 1 -> rts, r0 = 1 (that byte)
+                   r4 == 0 and that byte != 1                   -> jmp 0x003664 (PR unchanged, so
+                                                                   0x003664 returns to OUR caller,
+                                                                   with r0 = 0)
+           clobbers r5, r6, r0 on the r4 == 0 paths
+MECHANISM  see CONTRACT. 0xFFFF12A0 = 0xFFFF1288 + 24 (base from literal pool 0x0031A8).
+EVIDENCE   003190/92: tst r4,r4 sets T when r4 == 0; bf (T=0, r4 != 0) -> 0031A4.
+           00319A/9C: cmp/eq #1,r0 sets T when the byte is 1; bt -> 0031A4.
+           emulated natively (section 0): r4 in {0x10, 0x70, 0xF0, 0x3F3, 0} x byte in {0, 1, 2, 0xFF}.
+           The SR load is observed at 0031A6 on the rts exits and at 0031A2 on the tail exit, where
+           the next pc is 0x003664 with PR still the caller's.
+LISTING
+003190: 2448  tst r4,r4                     ; T = (r4 == 0)
+003192: 8B07  bf 0x0031A4                   ; r4 != 0 -> restore and return
+003194: D504  mov.l @(0x0031A8),r5          ; = 0xFFFF1288 RAM  | base of a RAM structure
+003196: 5656  mov.l @(24,r5),r6             ; r6 = long @0xFFFF12A0 (a pointer)
+003198: 8461  mov.b @(1,r6),r0              ; r0 = byte @(1, that pointer)
+00319A: 8801  cmp/eq #1,r0                  ; T = (byte == 1)
+00319C: 8902  bt 0x0031A4                   ; == 1 -> restore and return
+00319E: D603  mov.l @(0x0031AC),r6          ; = 0x00003664 ROM  | else continue in 0x003664
+0031A0: 462B  jmp @r6                       ; -> 0x003664  | tail-jump
+0031A2: 440E  ldc r4,sr                     ; (slot) SR = r4 = 0
+0031A4: 000B  rts                           ; return
+0031A6: 440E  ldc r4,sr                     ; (slot) SR = r4
+;   pool 0x0031A8: .long 0xFFFF1288  RAM
+;   pool 0x0031AC: .long 0x00003664  ROM
+
+==== FUNCTION 0x003664 .. 0x0036B0  (38 instructions, 1 callers) ====   [the mask-0 exit of 0x003190]
+CONTRACT   in  nothing in registers (reached by `jmp` from 0031A0, SR already 0)
+               RAM, all relative to the literal 0xFFFF1288: long +16 (0xFFFF1298), word +4
+               (0xFFFF128C), word +6 (0xFFFF128E), long +8 (0xFFFF1290), long +24 (0xFFFF12A0)
+           out r0 = 0 on every path
+           effect  SR is loaded from long @0xFFFF1298, then
+                   word +4 == word +6                 -> SR = SR-as-entered, rts
+                   else bit 0x1000 of long +8 is set  -> SR = SR-as-entered, rts
+                   else  long +8 := 0x0100 and 0x003440(r4 = 0xFFFF1288, r5 = SR-as-entered,
+                         r6 = long +24) is called: the running context is SAVED and control leaves
+                         through 0x0034B4. The epilogue 0036A0.. runs only when it is resumed.
+                   The two rts-directly paths preserve r13, r14, pr and touch no FP register.
+           WHAT the two words and the bit mean is not established here (NOT ESTABLISHED 4).
+MECHANISM  see CONTRACT. The hook at 003688..003694 (0x00300E(2) when long @ROM 0x003F2C is
+           non-zero) is dead in this bin: that ROM long is 0x00000000.
+EVIDENCE   003678/7A: cmp/eq r0,r3 sets T when the two words are equal; bt -> 0036A4.
+           003680/82: tst r3,r2 sets T when (long & 0x1000) == 0; bf (T=0, bit SET) -> 0036A4.
+           00368C/8E: tst r3,r3 sets T when the ROM long is 0; bt -> 003696, past the hook.
+           emulated natively (section 0): 36 no-switch cases -- r0 = 0, SR as entered, SR loaded at
+           003670 and 0036A4 only, long +8 not written, fr8 untouched; 3 switch cases reach
+           0x003440 with r4 = 0xFFFF1288, r5 = 0, r6 = long +24, pr = 0x0036A0, long +8 == 0x0100.
+LISTING
+003664: 2FE6  mov.l r14,@-r15               ; push r14
+003666: 2FD6  mov.l r13,@-r15               ; push r13
+003668: 4F22  sts.l pr,@-r15                ; push pr
+00366A: 0D02  stc sr,r13                    ; r13 = SR as entered (0 when reached from 0031A0: the slot there loaded SR = 0)
+00366C: DE11  mov.l @(0x0036B4),r14         ; = 0xFFFF1288 RAM  | r14 = base of the structure
+00366E: 53E4  mov.l @(16,r14),r3            ; r3 = long @0xFFFF1298
+003670: 430E  ldc r3,sr                     ; SR = that long
+003672: 85E2  mov.w @(4,r14),r0             ; r0 = word @0xFFFF128C
+003674: 6303  mov r0,r3                     ; r3 = it
+003676: 85E3  mov.w @(6,r14),r0             ; r0 = word @0xFFFF128E
+003678: 3300  cmp/eq r0,r3                  ; T = (word +4 == word +6)
+00367A: 8913  bt 0x0036A4                   ; equal -> 0036A4: no switch
+00367C: 9318  mov.w @(0x0036B0),r3          ; = 0x1000 (4096)  | r3 = 0x1000
+00367E: 52E2  mov.l @(8,r14),r2             ; r2 = long @0xFFFF1290
+003680: 2238  tst r3,r2                     ; T = ((long +8 & 0x1000) == 0)
+003682: 8B0F  bf 0x0036A4                   ; T=0, bit set -> 0036A4: no switch
+003684: 9015  mov.w @(0x0036B2),r0          ; = 0x0100 (256)  | r0 = 0x0100
+003686: 1E02  mov.l r0,@(8,r14)             ; long @0xFFFF1290 := 0x0100  (RAM WRITE, switch path only)
+003688: D20B  mov.l @(0x0036B8),r2          ; = 0x00003F2C ROM
+00368A: 6322  mov.l @r2,r3                  ; r3 = long @ROM 0x003F2C = 0x00000000 in this bin
+00368C: 2338  tst r3,r3                     ; T = (it is 0)
+00368E: 8902  bt 0x003696                   ; always taken in this bin: skip the hook
+003690: D30A  mov.l @(0x0036BC),r3          ; = 0x0000300E ROM
+003692: 430B  jsr @r3                       ; -> 0x00300E  | hook(2) -- dead here
+003694: E402  mov #2,r4
+003696: 65D3  mov r13,r5                    ; r5 = SR as entered
+003698: D209  mov.l @(0x0036C0),r2          ; = 0x00003440 ROM
+00369A: 56E6  mov.l @(24,r14),r6            ; r6 = long @0xFFFF12A0
+00369C: 420B  jsr @r2                       ; -> 0x003440  | SAVE CONTEXT; comes back at 0036A0 only when this context is resumed
+00369E: 64E3  mov r14,r4                    ; (slot) r4 = 0xFFFF1288
+0036A0: A001  bra 0x0036A6                  ; resumed: fall into the epilogue
+0036A2: 0009  nop
+0036A4: 4D0E  ldc r13,sr                    ; no-switch exits: SR = SR as entered
+0036A6: E000  mov #0,r0                     ; r0 = 0  -> RETURN VALUE on every path
+0036A8: 4F26  lds.l @r15+,pr                ; pop pr
+0036AA: 6DF6  mov.l @r15+,r13               ; pop r13
+0036AC: 000B  rts
+0036AE: 6EF6  mov.l @r15+,r14               ; (slot) pop r14
+;   pool 0x0036B0: .long 0x10000100  const
+;   pool 0x0036B4: .long 0xFFFF1288  RAM
+;   pool 0x0036B8: .long 0x00003F2C  ROM
+;   pool 0x0036BC: .long 0x0000300E  ROM
+;   pool 0x0036C0: .long 0x00003440  ROM
+
+==== FUNCTION 0x003440 .. 0x003476  (27 instructions, 2 callers) ====   [context save, called at 00369C and 002F4C]
+CONTRACT   in  r4 = 0xFFFF1288 (at 00369C), r5 = SR image to resume with, r6 = pointer to a record
+               whose byte +0 selects the frame size and whose long +4 points at a state byte
+           effect  pushes, in this order:  r5, pr, [4 bytes left unwritten], r8, r9, r10, r11, r12,
+                   gbr, r13, mach, r14, macl and -- ONLY when byte @(0,r6) == 4 -- fr12, fr13, fr14,
+                   fr15.  Then byte @(0, long @(4,r6)) := 4, long @(12,r4) := r15, and it branches
+                   to 0x0034B4. It does not return to its caller by rts.
+           NOT pushed: r0-r7, fr0-fr11, fpul, fpscr.  (r15 is stored, not pushed.)
+MECHANISM  A voluntary context save holding exactly what the C calling convention makes a CALLEE
+           preserve. The matching reloads are reached through the ROM table at 0x004090
+           (0x0000379C, 0x000037F0, 0x000037A0, 0x000037F4; indexed at 00363E..00364C):
+           0x00379C pops fr15..fr12, macl, r14, mach, r13, gbr, r12..r8, one long into r0 (the
+           unwritten gap) and `rte` (PC, SR <- the pr and r5 pushed first). 0x0037F0 is the same
+           without the four FP pops. Neither reloads r1-r7 or fr0-fr11.
+EVIDENCE   00345E/60: cmp/eq #4,r0 sets T when the byte is 4; bf/s (T=0, byte != 4) -> 00346C,
+           skipping the four FP pushes 003464..00346A.
+           emulated natively (section 0): run from 00369C to 0x0034B4 with a sentinel in every
+           register. The frame is 17 longs when the byte is 4 and 13 when it is 0 or 12, in the
+           order above; no sentinel of r0-r7, fr0-fr11 or fpul is in it.
+           WHICH resume routine the dispatcher picks (0035FC..00364C) was read, not emulated.
+LISTING
+003440: 2F56  mov.l r5,@-r15                ; push r5 = SR image the resume `rte` will load
+003442: 4F22  sts.l pr,@-r15                ; push pr = address the resume `rte` will go to
+003444: 7FFC  add #-4,r15                   ; 4-byte gap, never written (the resume routine pops it into r0)
+003446: 2F86  mov.l r8,@-r15                ; push r8
+003448: 2F96  mov.l r9,@-r15                ; push r9
+00344A: 2FA6  mov.l r10,@-r15               ; push r10
+00344C: 2FB6  mov.l r11,@-r15               ; push r11
+00344E: 2FC6  mov.l r12,@-r15               ; push r12
+003450: 4F13  stc.l gbr,@-r15               ; push gbr
+003452: 2FD6  mov.l r13,@-r15               ; push r13
+003454: 4F02  sts.l mach,@-r15              ; push mach
+003456: 2FE6  mov.l r14,@-r15               ; push r14
+003458: 4F12  sts.l macl,@-r15              ; push macl
+00345A: 5361  mov.l @(4,r6),r3              ; r3 = long @(4,r6)
+00345C: 8460  mov.b @(0,r6),r0              ; r0 = byte @(0,r6)
+00345E: 8804  cmp/eq #4,r0                  ; T = (byte == 4)
+003460: 8F04  bf/s 0x00346C                 ; T=0, byte != 4 -> 00346C: no FP registers saved
+003462: 0009  nop
+003464: FFCB  fmov.s fr12,@-r15             ; push fr12
+003466: FFDB  fmov.s fr13,@-r15             ; push fr13
+003468: FFEB  fmov.s fr14,@-r15             ; push fr14
+00346A: FFFB  fmov.s fr15,@-r15             ; push fr15   (fr0-fr11 are never pushed)
+00346C: E004  mov #4,r0
+00346E: 8030  mov.b r0,@(0,r3)              ; byte @(0,r3) := 4
+003470: 14F3  mov.l r15,@(12,r4)            ; long @(12,r4) := r15  (0xFFFF1294 when r4 = 0xFFFF1288)
+003472: A01F  bra 0x0034B4                  ; on to the scheduler
+003474: 0009  nop
+; where it goes (0x0034B4, the tail of the preceding block; NOT traced beyond the jmp):
+0034B4: D503  mov.l @(0x0034C4),r5          ; = 0x00000000 const
+0034B6: 450E  ldc r5,sr                     ; SR = 0
+0034B8: 5544  mov.l @(16,r4),r5             ; r5 = long @(16,r4)
+0034BA: 450E  ldc r5,sr                     ; SR = that long
+0034BC: D102  mov.l @(0x0034C8),r1          ; = 0x000035FC ROM
+0034BE: 8543  mov.w @(6,r4),r0              ; r0 = word @(6,r4)
+0034C0: 412B  jmp @r1                       ; -> 0x0035FC  | dispatcher, r5 = that word
+0034C2: 6503  mov r0,r5                     ; (slot)
+; the dispatcher's indirect jump through the table at ROM 0x004090 (from fn_dump 0x0035FC):
+00363E: D308  mov.l @(0x003660),r3          ; = 0x00004090 ROM  | table: 0x0000379C 0x000037F0 0x000037A0 0x000037F4
+003640: 61D0  mov.b @r13,r1                 ; r1 = byte @r13
+003642: 323C  add r3,r2                     ; r2 (= byte @r14, loaded at 003626) + table base
+003644: 54C3  mov.l @(12,r12),r4
+003646: 611C  extu.b r1,r1
+003648: 3218  sub r1,r2                     ; ... - byte @r13
+00364A: 6022  mov.l @r2,r0                  ; r0 = the table long
+00364C: 402B  jmp @r0                       ; -> target NOT statically resolved  | resume routine
+00364E: 4F26  lds.l @r15+,pr
+; resume routine 0x00379C, the mirror of the 17-long frame above. fn_dump 0x00379C prints
+; 0x0037A0..0x0037CC as "pool": those bytes are the body of the OTHER table entry 0x0037A0
+; (full-context resume: pr, r7..r1, fpul, fr11, fpscr, fr10..fr0, then joins at 0037CE).
+00379C: A017  bra 0x0037CE                  ; skip the caller-saved pops of entry 0x0037A0
+00379E: 6F43  mov r4,r15                    ; (slot) r15 = r4 = saved stack pointer
+0037CE: FFF9  fmov.s @r15+,fr15             ; pop fr15
+0037D0: FEF9  fmov.s @r15+,fr14             ; pop fr14
+0037D2: FDF9  fmov.s @r15+,fr13             ; pop fr13
+0037D4: FCF9  fmov.s @r15+,fr12             ; pop fr12   (no fr0-fr11 on this path)
+0037D6: 4F16  lds.l @r15+,macl              ; pop macl
+0037D8: 6EF6  mov.l @r15+,r14               ; pop r14
+0037DA: 4F06  lds.l @r15+,mach              ; pop mach
+0037DC: 6DF6  mov.l @r15+,r13               ; pop r13
+0037DE: 4F17  ldc.l @r15+,gbr               ; pop gbr
+0037E0: 6CF6  mov.l @r15+,r12               ; pop r12
+0037E2: 6BF6  mov.l @r15+,r11               ; pop r11
+0037E4: 6AF6  mov.l @r15+,r10               ; pop r10
+0037E6: 69F6  mov.l @r15+,r9                ; pop r9
+0037E8: 68F6  mov.l @r15+,r8                ; pop r8
+0037EA: 60F6  mov.l @r15+,r0                ; r0 = the unwritten gap  (r1-r7 are not reloaded)
+0037EC: 002B  rte                           ; PC, SR <- the pr and r5 that 003442 / 003440 pushed
+0037EE: 0009  nop
+; resume routine 0x0037F0, the mirror of the 13-long frame (no FP pops). As above, fn_dump
+; prints the other entry's body 0x0037F4..0x003804 as "pool".
+0037F0: A009  bra 0x003806                  ; skip the caller-saved pops of entry 0x0037F4
+0037F2: 6F43  mov r4,r15                    ; (slot) r15 = r4
+003806: 4F16  lds.l @r15+,macl              ; pop macl
+003808: 6EF6  mov.l @r15+,r14               ; pop r14
+00380A: 4F06  lds.l @r15+,mach              ; pop mach
+00380C: 6DF6  mov.l @r15+,r13               ; pop r13
+00380E: 4F17  ldc.l @r15+,gbr               ; pop gbr
+003810: 6CF6  mov.l @r15+,r12               ; pop r12
+003812: 6BF6  mov.l @r15+,r11               ; pop r11
+003814: 6AF6  mov.l @r15+,r10               ; pop r10
+003816: 69F6  mov.l @r15+,r9                ; pop r9
+003818: 68F6  mov.l @r15+,r8                ; pop r8
+00381A: 60F6  mov.l @r15+,r0                ; r0 = the unwritten gap
+00381C: 002B  rte                           ; PC, SR
+00381E: 0009  nop
+
+==== FUNCTION 0x0BDB30 .. 0x0BDB6E  (31 instructions, 3 callers) ====
+CONTRACT   in  r4 = address of a REC8 record,  fr4 = default value
+           out fr0 = float at [r4] if CK(V) == word[r4+4] or CK(V) == word[r4+6]
+                     else fr0 = fr4 (bit-exact, NaN included)
+           effect  none on the record: it never writes, so a single bad check word is NOT repaired
+                   here (contrast 0x0BDCB6). Interrupt window around the reads.
+                   SR on return: I as found, M = Q = S = T = 0.  Preserves r14, fr14, pr.
+                   r0 is NOT a result: it is the last check word read (sign-extended) when
+                   0x003190 leaves by its r4 != 0 exit, the byte 1 on the mask-0 rts exit, and 0
+                   after the 0x003664 exit.
+           The value is read TWICE: two 16-bit reads feed the check (0BDB42, 0BDB44) and a separate
+           32-bit read produces the result (0BDB5C). Both lie inside the window, so only an
+           interrupt of priority above max(entry level, 1) can fall between them.
+MECHANISM  fr14 = fr4; ENTER
+           ck = ~(sext16(word[r4]) + sext16(word[r4+2]))       ; only the low 16 bits are used
+           if u16(ck) == word[r4+4] or u16(ck) == word[r4+6]: fr14 = float[r4]
+           LEAVE; fr0 = fr14
+           No NaN test, no range test on the stored value.
+EVIDENCE   0BDB50/52: cmp/eq r2,r6 ; bt -> 0BDB5C (the load). 0BDB58/5A: cmp/eq ; bf (T=0, second
+           word also differs) -> 0BDB5E, skipping the load, so fr14 keeps the default.
+           emulated: section 4 (25 values x 3 defaults x 4 check-word states x 4 masks; on every
+           case the access order word +0, word +2, word +4, [word +6], long +0 and r0 are asserted;
+           all 256 constant fills), section 7 (intermediate write states), section 8 (0x003664 exit).
+LISTING
+0BDB30: 2FE6  mov.l r14,@-r15               ; push r14
+0BDB32: 4F22  sts.l pr,@-r15                ; push pr
+0BDB34: FFEB  fmov.s fr14,@-r15             ; push fr14
+0BDB36: FE4C  fmov fr4,fr14                 ; fr14 = default
+0BDB38: 6E43  mov r4,r14                    ; r14 = record
+0BDB3A: D272  mov.l @(0x0BDD04),r2          ; = 0x0000317C ROM  | ENTER
+0BDB3C: 420B  jsr @r2                       ; -> 0x00317C  | r0 = old SR mask
+0BDB3E: E410  mov #16,r4                    ; (slot) r4 = 0x10
+0BDB40: 6403  mov r0,r4                     ; r4 = saved mask (untouched until 0BDB60)
+0BDB42: 66E1  mov.w @r14,r6                 ; r6 = sext16(V high half)   FIRST look at the value: two word reads
+0BDB44: 85E1  mov.w @(2,r14),r0             ; r0 = sext16(V low half)
+0BDB46: 306C  add r6,r0                     ; r0 = high + low
+0BDB48: 6607  not r0,r6                     ; r6 = ~(high + low)
+0BDB4A: 85E2  mov.w @(4,r14),r0             ; r0 = word at +4
+0BDB4C: 620D  extu.w r0,r2                  ; r2 = stored check word (zero-extended)
+0BDB4E: 666D  extu.w r6,r6                  ; r6 = CK(V), 16 bits
+0BDB50: 3620  cmp/eq r2,r6                  ; T = (CK(V) == [+4])
+0BDB52: 8903  bt 0x0BDB5C                   ; match -> load
+0BDB54: 85E3  mov.w @(6,r14),r0             ; r0 = word at +6
+0BDB56: 620D  extu.w r0,r2                  ; r2 = second check word
+0BDB58: 3620  cmp/eq r2,r6                  ; T = (CK(V) == [+6])
+0BDB5A: 8B00  bf 0x0BDB5E                   ; T=0: neither matches -> keep default
+0BDB5C: FEE8  fmov.s @r14,fr14              ; fr14 = stored float   SECOND look: a separate long read
+0BDB5E: D26A  mov.l @(0x0BDD08),r2          ; = 0x00003190 ROM  | LEAVE
+0BDB60: 420B  jsr @r2                       ; -> 0x003190  | SR = saved mask (r4)
+0BDB62: 0009  nop
+0BDB64: F0EC  fmov fr14,fr0                 ; fr0 = value or default  -> RETURN VALUE
+0BDB66: FEF9  fmov.s @r15+,fr14             ; pop fr14
+0BDB68: 4F26  lds.l @r15+,pr                ; pop pr
+0BDB6A: 000B  rts
+0BDB6C: 6EF6  mov.l @r15+,r14               ; (slot) pop r14
+;   pool 0x0BDD04: .long 0x0000317C  ROM
+;   pool 0x0BDD08: .long 0x00003190  ROM
+
+==== FUNCTION 0x0BDB6E .. 0x0BDB80  (9 instructions, 4 callers) ====
+CONTRACT   in  r4 = address of a PAIR8 (word-aligned: it is written with one mov.w),
+               r5 = byte value (bits 31..8 ignored)
+           out r0 = 0 always
+           effect  byte[r4] = r5 & 0xFF, byte[r4+1] = ~r5 & 0xFF.  No interrupt window, SR untouched. Leaf.
+MECHANISM  word[r4] = ((r5 & 0xFF) << 8) + (~r5 & 0xFF)
+EVIDENCE   emulated: section 5, all 256 values with junk in r5[31:8]; the result always passes 0x0BDC0E.
+LISTING
+0BDB6E: 625C  extu.b r5,r2                  ; r2 = b = r5 & 0xFF
+0BDB70: 6623  mov r2,r6                     ; r6 = b
+0BDB72: 4618  shll8 r6                      ; r6 = b << 8
+0BDB74: 6227  not r2,r2                     ; r2 = ~b
+0BDB76: 652C  extu.b r2,r5                  ; r5 = ~b & 0xFF
+0BDB78: 365C  add r5,r6                     ; r6 = (b << 8) | (~b & 0xFF)
+0BDB7A: 2461  mov.w r6,@r4                  ; word[r4] = that  (byte b, then byte ~b)
+0BDB7C: 000B  rts
+0BDB7E: E000  mov #0,r0                     ; (slot) r0 = 0
+
+==== FUNCTION 0x0BDB80 .. 0x0BDB92  (9 instructions, 3 callers) ====
+CONTRACT   in  r4 = address of a PAIR16 (long-aligned: one mov.l), r5 = word value (bits 31..16 ignored)
+           out r0 = 0 always
+           effect  word[r4] = r5 & 0xFFFF, word[r4+2] = ~r5 & 0xFFFF.  No interrupt window, SR untouched. Leaf.
+MECHANISM  long[r4] = ((r5 & 0xFFFF) << 16) + (~r5 & 0xFFFF)
+EVIDENCE   emulated: section 5, 209 values x 3 junk patterns; the result always passes 0x0BDC3C.
+LISTING
+0BDB80: 6653  mov r5,r6                     ; r6 = w
+0BDB82: 6257  not r5,r2                     ; r2 = ~w
+0BDB84: 652D  extu.w r2,r5                  ; r5 = ~w & 0xFFFF
+0BDB86: 666D  extu.w r6,r6                  ; r6 = w & 0xFFFF
+0BDB88: 4628  shll16 r6                     ; r6 = w << 16
+0BDB8A: 356C  add r6,r5                     ; r5 = (w << 16) | (~w & 0xFFFF)
+0BDB8C: 2452  mov.l r5,@r4                  ; long[r4] = that  (word w, then word ~w)
+0BDB8E: 000B  rts
+0BDB90: E000  mov #0,r0                     ; (slot) r0 = 0
+
+==== FUNCTION 0x0BDB92 .. 0x0BDBCC  (29 instructions, 12 callers) ====
+CONTRACT   in  r4 = address of a REC8 record, r5 = 32-bit value (any bit pattern)
+           out r0 = 0 always
+           effect  inside an interrupt window, in this order:
+                   word[r4+4] = CK(r5);  long[r4] = r5;  word[r4+6] = CK(r5)
+                   SR on return: I as found, M = Q = S = T = 0.  preserves r12, r13, r14, pr
+MECHANISM  CK is computed from a stack copy of r5 BEFORE the window opens.
+           There is no validity test of any kind (integer twin of 0x0BDBCC without the NaN test).
+           The record is never read.
+EVIDENCE   0BDBB4 (+4), 0BDBB6 (value), 0BDBBC (+6, in the delay slot of the jsr to 0x003190, so it
+           executes before the mask is restored).
+           emulated: section 2 (28 values x 4 masks, record asserted untouched at ENTER and complete
+           at LEAVE, exactly three stores) and section 7 (write order observed instruction by
+           instruction).
+LISTING
+0BDB92: 2FC6  mov.l r12,@-r15
+0BDB94: 2FD6  mov.l r13,@-r15
+0BDB96: 2FE6  mov.l r14,@-r15
+0BDB98: 4F22  sts.l pr,@-r15
+0BDB9A: 7FFC  add #-4,r15                   ; 4-byte scratch
+0BDB9C: 6C53  mov r5,r12                    ; r12 = value
+0BDB9E: 6D43  mov r4,r13                    ; r13 = record
+0BDBA0: 2F52  mov.l r5,@r15                 ; scratch = value
+0BDBA2: 62F1  mov.w @r15,r2                 ; r2 = sext16(high half)
+0BDBA4: 85F1  mov.w @(2,r15),r0             ; r0 = sext16(low half)
+0BDBA6: 320C  add r0,r2                     ; r2 = high + low
+0BDBA8: 6E27  not r2,r14                    ; r14 = ~(high + low) = CK (low 16 bits used)
+0BDBAA: D256  mov.l @(0x0BDD04),r2          ; = 0x0000317C ROM  | ENTER
+0BDBAC: 420B  jsr @r2                       ; -> 0x00317C  | r0 = old SR mask
+0BDBAE: E410  mov #16,r4                    ; (slot) r4 = 0x10
+0BDBB0: 6403  mov r0,r4                     ; r4 = saved mask
+0BDBB2: 60E3  mov r14,r0                    ; r0 = CK
+0BDBB4: 81D2  mov.w r0,@(4,r13)             ; WRITE 1: word[rec+4] = CK
+0BDBB6: 2DC2  mov.l r12,@r13                ; WRITE 2: long[rec] = value
+0BDBB8: D253  mov.l @(0x0BDD08),r2          ; = 0x00003190 ROM  | LEAVE
+0BDBBA: 420B  jsr @r2                       ; -> 0x003190  | SR = saved mask
+0BDBBC: 81D3  mov.w r0,@(6,r13)             ; (slot, runs BEFORE 0x003190) WRITE 3: word[rec+6] = CK
+0BDBBE: E000  mov #0,r0                     ; r0 = 0  -> RETURN VALUE
+0BDBC0: 7F04  add #4,r15
+0BDBC2: 4F26  lds.l @r15+,pr
+0BDBC4: 6EF6  mov.l @r15+,r14
+0BDBC6: 6DF6  mov.l @r15+,r13
+0BDBC8: 000B  rts
+0BDBCA: 6CF6  mov.l @r15+,r12               ; (slot) pop r12
+;   pool 0x0BDD04: .long 0x0000317C  ROM
+;   pool 0x0BDD08: .long 0x00003190  ROM
+
+==== FUNCTION 0x0BDBCC .. 0x0BDC0E  (33 instructions, 166 callers) ====
+CONTRACT   in  r4 = address of a REC8 record, fr4 = float value
+           out r0 = 0  value stored
+               r0 = 1  fr4 is NaN: NOTHING is written and the interrupt mask is not touched
+           effect  (non-NaN) inside an interrupt window, in this order:
+                   word[r4+4] = CK(bits);  float[r4] = fr4;  word[r4+6] = CK(bits)
+                   SR on return: (stored) I as found, M = Q = S = T = 0;
+                                 (NaN) nothing is loaded into SR, T = 0 from the fcmp/eq
+                   preserves r13, r14, fr14, pr
+           This is a WRITE. It reads nothing but its arguments.
+           NOBODY READS THE r0 = 1 REFUSAL: see "DOES ANYTHING READ r0" in the scan section.
+MECHANISM  if !(fr4 == fr4): return 1
+           bits = raw float32 of fr4 (via a stack copy); ck = ~(sext16(hi) + sext16(lo))
+           ENTER; word[+4] = ck; float[+0] = fr4; word[+6] = ck; LEAVE; return 0
+           Infinities and (emulator: denormals) pass the NaN test and are stored bit-exact.
+           No range check.
+EVIDENCE   0BDBDA/DC/DE: fcmp/eq fr4,fr4 sets T when fr4 == fr4 (false only for NaN); bf/s runs the
+           slot (r2 = 1) and branches when T=0 to 0BDC00, where r0 = r2 = 1 and the epilogue follows
+           -- no store and no jsr on that path. Fall-through path ends 0BDBFE r2 = 0.
+           0BDBF4 (+4), 0BDBF6 (value), 0BDBFC (+6, delay slot of the jsr to 0x003190).
+           emulated: section 1 (16 non-NaN patterns x 4 masks, 9 NaN patterns x 4 masks, 400 random)
+           and section 7 (write order; every intermediate state validates as old or new value).
+           Caller side: at all 324 call sites where r4 resolves to a constant it is a RAM address;
+           19 sampled sites are listed below.
+LISTING
+0BDBCC: 2FD6  mov.l r13,@-r15
+0BDBCE: 2FE6  mov.l r14,@-r15
+0BDBD0: 4F22  sts.l pr,@-r15
+0BDBD2: FFEB  fmov.s fr14,@-r15
+0BDBD4: 7FFC  add #-4,r15                   ; 4-byte scratch
+0BDBD6: FE4C  fmov fr4,fr14                 ; fr14 = value
+0BDBD8: 6E43  mov r4,r14                    ; r14 = record
+0BDBDA: F444  fcmp/eq fr4,fr4               ; T = (value == value); T=0 only for NaN
+0BDBDC: 8F10  bf/s 0x0BDC00                 ; NaN -> 0BDC00 with r2 = 1
+0BDBDE: E201  mov #1,r2                     ; (slot) r2 = 1
+0BDBE0: FFEA  fmov.s fr14,@r15              ; scratch = raw bits of value
+0BDBE2: 62F1  mov.w @r15,r2                 ; r2 = sext16(high half)
+0BDBE4: 85F1  mov.w @(2,r15),r0             ; r0 = sext16(low half)
+0BDBE6: 320C  add r0,r2                     ; r2 = high + low
+0BDBE8: 6D27  not r2,r13                    ; r13 = ~(high + low) = CK
+0BDBEA: D246  mov.l @(0x0BDD04),r2          ; = 0x0000317C ROM  | ENTER
+0BDBEC: 420B  jsr @r2                       ; -> 0x00317C  | r0 = old SR mask
+0BDBEE: E410  mov #16,r4                    ; (slot) r4 = 0x10
+0BDBF0: 6403  mov r0,r4                     ; r4 = saved mask
+0BDBF2: 60D3  mov r13,r0                    ; r0 = CK
+0BDBF4: 81E2  mov.w r0,@(4,r14)             ; WRITE 1: word[rec+4] = CK
+0BDBF6: FEEA  fmov.s fr14,@r14              ; WRITE 2: float[rec] = value
+0BDBF8: D243  mov.l @(0x0BDD08),r2          ; = 0x00003190 ROM  | LEAVE
+0BDBFA: 420B  jsr @r2                       ; -> 0x003190  | SR = saved mask
+0BDBFC: 81E3  mov.w r0,@(6,r14)             ; (slot, runs BEFORE 0x003190) WRITE 3: word[rec+6] = CK
+0BDBFE: E200  mov #0,r2                     ; r2 = 0 (stored)
+0BDC00: 6023  mov r2,r0                     ; r0 = 0 stored / 1 NaN refused  -> RETURN VALUE
+0BDC02: 7F04  add #4,r15
+0BDC04: FEF9  fmov.s @r15+,fr14
+0BDC06: 4F26  lds.l @r15+,pr
+0BDC08: 6EF6  mov.l @r15+,r14
+0BDC0A: 000B  rts
+0BDC0C: 6DF6  mov.l @r15+,r13               ; (slot) pop r13
+;   pool 0x0BDD04: .long 0x0000317C  ROM
+;   pool 0x0BDD08: .long 0x00003190  ROM
+
+==== FUNCTION 0x0BDC0E .. 0x0BDC3C  (23 instructions, 2 callers) ====
+CONTRACT   in  r4 = address of a PAIR8
+           out r0 = 0 if byte[r4] == (~byte[r4+1] & 0xFF), else r0 = 1
+           effect  read-only on the pair; interrupt window around the two reads; preserves r14, pr
+                   SR on return: I as found, M = Q = S = T = 0.
+           It does NOT return the stored byte -- only the verdict.
+MECHANISM  ENTER; r14 = (u8(byte[r4]) == u8(~byte[r4+1])) ? 0 : 1; LEAVE; r0 = r14
+EVIDENCE   0BDC26/28/2A/2C: cmp/eq r2,r5 ; bf/s runs the slot (r14 = 1) and branches when T=0
+           (mismatch) past 0BDC2C; on a match 0BDC2C overwrites r14 with 0.
+           emulated: section 5 (6,104 cases: every b with ~b, b, 0x00, 0xFF and all 8 single-bit
+           errors; all 256 constant fills are invalid).
+LISTING
+0BDC0E: 2FE6  mov.l r14,@-r15
+0BDC10: 4F22  sts.l pr,@-r15
+0BDC12: 6E43  mov r4,r14                    ; r14 = pair address
+0BDC14: D23B  mov.l @(0x0BDD04),r2          ; = 0x0000317C ROM  | ENTER
+0BDC16: 420B  jsr @r2                       ; -> 0x00317C
+0BDC18: E410  mov #16,r4                    ; (slot) r4 = 0x10
+0BDC1A: 6403  mov r0,r4                     ; r4 = saved mask
+0BDC1C: 62E0  mov.b @r14,r2                 ; r2 = byte[+0]
+0BDC1E: 652C  extu.b r2,r5                  ; r5 = u8(byte[+0])
+0BDC20: 84E1  mov.b @(1,r14),r0             ; r0 = byte[+1]
+0BDC22: 6207  not r0,r2                     ; r2 = ~byte[+1]
+0BDC24: 622C  extu.b r2,r2                  ; r2 = ~byte[+1] & 0xFF
+0BDC26: 3520  cmp/eq r2,r5                  ; T = (byte[+0] == ~byte[+1])
+0BDC28: 8F01  bf/s 0x0BDC2E                 ; mismatch -> keep r14 = 1
+0BDC2A: EE01  mov #1,r14                    ; (slot) r14 = 1
+0BDC2C: EE00  mov #0,r14                    ; match: r14 = 0
+0BDC2E: D236  mov.l @(0x0BDD08),r2          ; = 0x00003190 ROM  | LEAVE
+0BDC30: 420B  jsr @r2                       ; -> 0x003190  | SR = saved mask
+0BDC32: 0009  nop
+0BDC34: 60E3  mov r14,r0                    ; r0 = 0 valid / 1 invalid  -> RETURN VALUE
+0BDC36: 4F26  lds.l @r15+,pr
+0BDC38: 000B  rts
+0BDC3A: 6EF6  mov.l @r15+,r14
+;   pool 0x0BDD04: .long 0x0000317C  ROM
+;   pool 0x0BDD08: .long 0x00003190  ROM
+
+==== FUNCTION 0x0BDC3C .. 0x0BDC6A  (23 instructions, 1 callers) ====
+CONTRACT   in  r4 = address of a PAIR16
+           out r0 = 0 if word[r4] == (~word[r4+2] & 0xFFFF), else r0 = 1
+           effect  read-only on the pair; interrupt window; preserves r14, pr. Verdict only.
+                   SR on return: I as found, M = Q = S = T = 0.
+MECHANISM  word-sized twin of 0x0BDC0E (mov.w / extu.w in place of mov.b / extu.b).
+EVIDENCE   0BDC54/56/58/5A, same shape as 0x0BDC0E.
+           emulated: section 5 (8,342 cases incl. all 16 single-bit errors per value; all 256
+           constant fills are invalid).
+           Reached only through r9 in 0x010708 (jsr @r9 at 01072C and 01073E).
+LISTING
+0BDC3C: 2FE6  mov.l r14,@-r15
+0BDC3E: 4F22  sts.l pr,@-r15
+0BDC40: 6E43  mov r4,r14                    ; r14 = pair address
+0BDC42: D230  mov.l @(0x0BDD04),r2          ; = 0x0000317C ROM  | ENTER
+0BDC44: 420B  jsr @r2                       ; -> 0x00317C
+0BDC46: E410  mov #16,r4                    ; (slot) r4 = 0x10
+0BDC48: 6403  mov r0,r4                     ; r4 = saved mask
+0BDC4A: 62E1  mov.w @r14,r2                 ; r2 = word[+0]
+0BDC4C: 652D  extu.w r2,r5                  ; r5 = u16(word[+0])
+0BDC4E: 85E1  mov.w @(2,r14),r0             ; r0 = word[+2]
+0BDC50: 6207  not r0,r2                     ; r2 = ~word[+2]
+0BDC52: 622D  extu.w r2,r2                  ; r2 = ~word[+2] & 0xFFFF
+0BDC54: 3520  cmp/eq r2,r5                  ; T = (word[+0] == ~word[+2])
+0BDC56: 8F01  bf/s 0x0BDC5C                 ; mismatch -> keep r14 = 1
+0BDC58: EE01  mov #1,r14                    ; (slot) r14 = 1
+0BDC5A: EE00  mov #0,r14                    ; match: r14 = 0
+0BDC5C: D22A  mov.l @(0x0BDD08),r2          ; = 0x00003190 ROM  | LEAVE
+0BDC5E: 420B  jsr @r2                       ; -> 0x003190  | SR = saved mask
+0BDC60: 0009  nop
+0BDC62: 60E3  mov r14,r0                    ; r0 = 0 valid / 1 invalid  -> RETURN VALUE
+0BDC64: 4F26  lds.l @r15+,pr
+0BDC66: 000B  rts
+0BDC68: 6EF6  mov.l @r15+,r14
+;   pool 0x0BDD04: .long 0x0000317C  ROM
+;   pool 0x0BDD08: .long 0x00003190  ROM
+
+==== FUNCTION 0x0BDC6A .. 0x0BDCB6  (38 instructions, 3 callers) ====
+CONTRACT   in  r4 = address of a REC8 record
+           out r0 = 0  CK(V) equals word[r4+4] or word[r4+6]  (record valid)
+               r0 = 1  it equals neither                      (record invalid)
+           effect  valid:   BOTH check words are rewritten with CK(V) (so a single damaged check
+                            word is repaired); V itself is never written.
+                   invalid: the record is left exactly as found. Nothing is defaulted here.
+                   Interrupt window around read + refresh. Preserves r13, r14, pr.
+                   SR on return: I as found, M = Q = S = T = 0.  No FP register is touched.
+           It does NOT return the value. Callers test r0 and read the record themselves.
+MECHANISM  ENTER; V = long[r4] (ONE integer load, copied to a stack scratch); ck = ~(sext16(hi) + sext16(lo))
+           if u16(ck) == word[+4]            -> ok
+           else if u16(ck) == word[+6]       -> ok
+           else                              -> r14 = 1, skip the refresh
+           ok: r14 = 0; word[+4] = ck; word[+6] = ck
+           LEAVE; r0 = r14
+           No NaN test and no range test: a NaN whose check word matches is "valid".
+EVIDENCE   0BDC8E/90: cmp/eq r2,r6 ; bt -> 0BDC9C (refresh). 0BDC96/98/9A: cmp/eq ; bf/s runs the slot
+           (r14 = 1) and branches when T=0 to 0BDCA4, past the two stores. 0BDC9C r14 = 0.
+           emulated: section 3 (25 values x 6 check-word states x 4 masks with the access order
+           asserted, all 256 constant fills, 600 random records) and section 7.
+LISTING
+0BDC6A: 2FD6  mov.l r13,@-r15
+0BDC6C: 2FE6  mov.l r14,@-r15
+0BDC6E: 4F22  sts.l pr,@-r15
+0BDC70: 7FFC  add #-4,r15                   ; 4-byte scratch
+0BDC72: 6D43  mov r4,r13                    ; r13 = record
+0BDC74: D223  mov.l @(0x0BDD04),r2          ; = 0x0000317C ROM  | ENTER
+0BDC76: 420B  jsr @r2                       ; -> 0x00317C
+0BDC78: E410  mov #16,r4                    ; (slot) r4 = 0x10
+0BDC7A: 6403  mov r0,r4                     ; r4 = saved mask
+0BDC7C: 62D2  mov.l @r13,r2                 ; r2 = V (long)
+0BDC7E: 2F22  mov.l r2,@r15                 ; scratch = V
+0BDC80: 62F1  mov.w @r15,r2                 ; r2 = sext16(high half)
+0BDC82: 85F1  mov.w @(2,r15),r0             ; r0 = sext16(low half)
+0BDC84: 320C  add r0,r2                     ; r2 = high + low
+0BDC86: 6527  not r2,r5                     ; r5 = ~(high + low) = CK(V)
+0BDC88: 85D2  mov.w @(4,r13),r0             ; r0 = word[+4]
+0BDC8A: 620D  extu.w r0,r2                  ; r2 = stored check word
+0BDC8C: 665D  extu.w r5,r6                  ; r6 = u16(CK(V))
+0BDC8E: 3620  cmp/eq r2,r6                  ; T = (CK(V) == [+4])
+0BDC90: 8904  bt 0x0BDC9C                   ; match -> refresh
+0BDC92: 85D3  mov.w @(6,r13),r0             ; r0 = word[+6]
+0BDC94: 620D  extu.w r0,r2                  ; r2 = second check word
+0BDC96: 3620  cmp/eq r2,r6                  ; T = (CK(V) == [+6])
+0BDC98: 8F04  bf/s 0x0BDCA4                 ; T=0: neither -> 0BDCA4 with r14 = 1
+0BDC9A: EE01  mov #1,r14                    ; (slot) r14 = 1
+0BDC9C: EE00  mov #0,r14                    ; valid: r14 = 0
+0BDC9E: 6053  mov r5,r0                     ; r0 = CK(V)
+0BDCA0: 81D2  mov.w r0,@(4,r13)             ; word[+4] = CK(V)
+0BDCA2: 81D3  mov.w r0,@(6,r13)             ; word[+6] = CK(V)
+0BDCA4: D218  mov.l @(0x0BDD08),r2          ; = 0x00003190 ROM  | LEAVE
+0BDCA6: 420B  jsr @r2                       ; -> 0x003190  | SR = saved mask
+0BDCA8: 0009  nop
+0BDCAA: 60E3  mov r14,r0                    ; r0 = 0 valid / 1 invalid  -> RETURN VALUE
+0BDCAC: 7F04  add #4,r15
+0BDCAE: 4F26  lds.l @r15+,pr
+0BDCB0: 6EF6  mov.l @r15+,r14
+0BDCB2: 000B  rts
+0BDCB4: 6DF6  mov.l @r15+,r13
+;   pool 0x0BDD04: .long 0x0000317C  ROM
+;   pool 0x0BDD08: .long 0x00003190  ROM
+
+==== FUNCTION 0x0BDCB6 .. 0x0BDD02  (38 instructions, 63 callers) ====
+CONTRACT   in  r4 = address of a REC8 record
+           out r0 = 0  CK(V) equals word[r4+4] or word[r4+6]  (record valid)
+               r0 = 1  it equals neither                      (record invalid)
+           effect  valid:   BOTH check words are rewritten with CK(V) (so a single damaged check
+                            word is repaired); V itself is never written.
+                   invalid: the record is left exactly as found. Nothing is defaulted here.
+                   Interrupt window around read + refresh. Preserves r13, r14, pr.
+                   SR on return: I as found, M = Q = S = T = 0.
+                   fr8: loaded with the float at [r4] at 0BDCC8 and not written again inside this
+                        function. It still holds that float on return when 0x003190 leaves by rts
+                        (entry mask != 0, or mask 0 with the byte == 1) and when 0x003664 takes one
+                        of its two no-switch exits. If 0x003664 saves the context (0x003440), fr8 is
+                        neither saved nor reloaded, so on return it holds whatever ran in between
+                        left there. fr8 is caller-saved, and no call site reads it afterwards.
+           It does NOT return the value. Callers test r0 and read the record themselves.
+MECHANISM  ENTER; V = float[r4] moved through fr8 to a stack scratch (ONE load, a bit copy);
+           ck = ~(sext16(hi) + sext16(lo))
+           if u16(ck) == word[+4]            -> ok
+           else if u16(ck) == word[+6]       -> ok
+           else                              -> r14 = 1, skip the refresh
+           ok: r14 = 0; word[+4] = ck; word[+6] = ck
+           LEAVE; r0 = r14
+           No NaN test and no range test: a NaN whose check word matches is "valid".
+EVIDENCE   0BDCDA/DC: cmp/eq r2,r6 ; bt -> 0BDCE8 (refresh). 0BDCE2/E4/E6: cmp/eq ; bf/s runs the slot
+           (r14 = 1) and branches when T=0 to 0BDCF0, past the two stores. 0BDCE8 r14 = 0.
+           No fcmp anywhere in 0BDCB6..0BDD00; 0BDCC8 is the only FP load and 0BDCCA the only FP store.
+           Instruction-for-instruction the same as 0x0BDC6A (PC-relative displacement fields aside)
+           except 0BDCC8/0BDCCA (fmov.s through fr8) in place of 0BDC7C/0BDC7E (mov.l through r2).
+           emulated: section 3 (25 values x 6 check-word states x 4 masks with the access order
+           asserted, all 256 constant fills, 600 random records), section 7, and section 8 for fr8:
+           equal to the record float on the direct and no-switch exits; on the switch exit it is
+           live in the register and absent from the frame 0x003440 pushes.
+           Caller side: at all 129 jsr sites in the ROM the instruction at the return address is
+           `exts.b r0,Rn` and the next one is `tst`; none reads fr8 before writing it, calling on,
+           or returning. Eleven sampled sites are listed below.
+LISTING
+0BDCB6: 2FD6  mov.l r13,@-r15
+0BDCB8: 2FE6  mov.l r14,@-r15
+0BDCBA: 4F22  sts.l pr,@-r15
+0BDCBC: 7FFC  add #-4,r15                   ; 4-byte scratch
+0BDCBE: 6D43  mov r4,r13                    ; r13 = record
+0BDCC0: D210  mov.l @(0x0BDD04),r2          ; = 0x0000317C ROM  | ENTER
+0BDCC2: 420B  jsr @r2                       ; -> 0x00317C
+0BDCC4: E410  mov #16,r4                    ; (slot) r4 = 0x10
+0BDCC6: 6403  mov r0,r4                     ; r4 = saved mask
+0BDCC8: F8D8  fmov.s @r13,fr8               ; fr8 = V (float, raw)
+0BDCCA: FF8A  fmov.s fr8,@r15               ; scratch = raw bits of V
+0BDCCC: 62F1  mov.w @r15,r2                 ; r2 = sext16(high half)
+0BDCCE: 85F1  mov.w @(2,r15),r0             ; r0 = sext16(low half)
+0BDCD0: 320C  add r0,r2                     ; r2 = high + low
+0BDCD2: 6527  not r2,r5                     ; r5 = ~(high + low) = CK(V)
+0BDCD4: 85D2  mov.w @(4,r13),r0             ; r0 = word[+4]
+0BDCD6: 620D  extu.w r0,r2                  ; r2 = stored check word
+0BDCD8: 665D  extu.w r5,r6                  ; r6 = u16(CK(V))
+0BDCDA: 3620  cmp/eq r2,r6                  ; T = (CK(V) == [+4])
+0BDCDC: 8904  bt 0x0BDCE8                   ; match -> refresh
+0BDCDE: 85D3  mov.w @(6,r13),r0             ; r0 = word[+6]
+0BDCE0: 620D  extu.w r0,r2                  ; r2 = second check word
+0BDCE2: 3620  cmp/eq r2,r6                  ; T = (CK(V) == [+6])
+0BDCE4: 8F04  bf/s 0x0BDCF0                 ; T=0: neither -> 0BDCF0 with r14 = 1
+0BDCE6: EE01  mov #1,r14                    ; (slot) r14 = 1
+0BDCE8: EE00  mov #0,r14                    ; valid: r14 = 0
+0BDCEA: 6053  mov r5,r0                     ; r0 = CK(V)
+0BDCEC: 81D2  mov.w r0,@(4,r13)             ; word[+4] = CK(V)
+0BDCEE: 81D3  mov.w r0,@(6,r13)             ; word[+6] = CK(V)
+0BDCF0: D205  mov.l @(0x0BDD08),r2          ; = 0x00003190 ROM  | LEAVE
+0BDCF2: 420B  jsr @r2                       ; -> 0x003190  | SR = saved mask
+0BDCF4: 0009  nop
+0BDCF6: 60E3  mov r14,r0                    ; r0 = 0 valid / 1 invalid  -> RETURN VALUE
+0BDCF8: 7F04  add #4,r15
+0BDCFA: 4F26  lds.l @r15+,pr
+0BDCFC: 6EF6  mov.l @r15+,r14
+0BDCFE: 000B  rts
+0BDD00: 6DF6  mov.l @r15+,r13
+;   pool 0x0BDD04: .long 0x0000317C  ROM
+;   pool 0x0BDD08: .long 0x00003190  ROM
+; 0x0BDD02: .word 0x0000   alignment pad (not executed: 0BDCFE is rts, 0BDD00 its slot)
+; 0x0BDD04: .long 0x0000317C   0x0BDD08: .long 0x00003190   -- the only literal pool of the cluster
+
+==== FUNCTION 0x0BDD0C .. 0x0BDD1C  (8 instructions, 0 callers) ====   [not in the entry list given]
+CONTRACT   in  r4, r5 (low 16 bits of each used)
+           out r0 = max( u16(r4) - u16(r5), 0 )       (unsigned 16-bit saturating subtract)
+           effect  none. Leaf; clobbers r2, r5.
+MECHANISM  r2 = u16(r4) - u16(r5); if r2 < 0: r2 = 0; r0 = u16(r2)
+EVIDENCE   0BDD12/14: cmp/pz r2 sets T when r2 >= 0; bt skips the clamp to 0.
+           emulated: section 6 (700 cases).
+           REACHABILITY: no literal-pool long equal to 0x000BDD0C exists at any even offset in
+           the ROM, and no bsr/bra resolves to it. Valid SH-2E code, apparently never called.
+LISTING
+0BDD0C: 624D  extu.w r4,r2                  ; r2 = u16(r4)
+0BDD0E: 655D  extu.w r5,r5                  ; r5 = u16(r5)
+0BDD10: 3258  sub r5,r2                     ; r2 = a - b
+0BDD12: 4211  cmp/pz r2                     ; T = (a - b >= 0)
+0BDD14: 8900  bt 0x0BDD18                   ; non-negative -> keep
+0BDD16: E200  mov #0,r2                     ; negative -> 0
+0BDD18: 000B  rts
+0BDD1A: 602D  extu.w r2,r0                  ; (slot) r0 = u16(result)
+
+==== FUNCTION 0x0BDD1C .. 0x0BDD5A  (31 instructions, 3 callers) ====
+CONTRACT   in  r4 = a, r5 = b, r6 = k   (low 16 bits of each, all treated as UNSIGNED)
+           out r0 = b                                   if k == 0
+               r0 = a + (((b - a) * (0x10000 - k)) >> 16)   if k != 0 and b >= a
+               r0 = a - (((a - b) * (0x10000 - k)) >> 16)   if k != 0 and b <  a
+           effect  none. Leaf; MACL saved and restored; clobbers r1, r2, r4, r5, r6.
+           In words: a 16-bit weighted mean, weight k/65536 on a (r4) and (65536-k)/65536 on b (r5),
+           with the step away from a truncated toward zero, so the result never overshoots b and
+           equals a whenever |b - a| * (65536 - k) < 65536.  Result always lies in [min(a,b), max(a,b)].
+MECHANISM  k == 0 is special-cased because the weight 0x10000 does not fit the extu.w at 0BDD32.
+EVIDENCE   0BDD22/24: tst r6,r6 sets T when k == 0; bf/s (T=0, k != 0) -> 0BDD2C.
+           0BDD36/38: cmp/ge r4,r5 sets T when r5 >= r4 (b >= a); bf/s (T=0, b < a) -> 0BDD48.
+           emulated: section 6 (4,100 cases incl. junk upper halves; MACL sentinel survives).
+           WHICH operand is "old" and which is "new" is a caller matter and NOT established here:
+           at 02264C the result is stored back to the address r5 was read from (0xFFFF659C);
+           at 0571C2 both inputs were biased by +0x8000 first (signed made unsigned) and k = 0x1000.
+LISTING
+0BDD1C: 4F12  sts.l macl,@-r15              ; push macl
+0BDD1E: 644D  extu.w r4,r4                  ; a = u16(r4)
+0BDD20: 666D  extu.w r6,r6                  ; k = u16(r6)
+0BDD22: 2668  tst r6,r6                     ; T = (k == 0)
+0BDD24: 8F02  bf/s 0x0BDD2C                 ; k != 0 -> 0BDD2C
+0BDD26: 655D  extu.w r5,r5                  ; (slot) b = u16(r5)
+0BDD28: A014  bra 0x0BDD54                  ; k == 0:
+0BDD2A: 6253  mov r5,r2                     ; (slot) result = b
+0BDD2C: E201  mov #1,r2                     ; r2 = 1
+0BDD2E: 4228  shll16 r2                     ; r2 = 0x10000
+0BDD30: 3268  sub r6,r2                     ; r2 = 0x10000 - k
+0BDD32: 612D  extu.w r2,r1                  ; r1 = w = (0x10000 - k) & 0xFFFF   (1..65535)
+0BDD34: 6653  mov r5,r6                     ; r6 = b
+0BDD36: 3543  cmp/ge r4,r5                  ; T = (b >= a)
+0BDD38: 8F06  bf/s 0x0BDD48                 ; b < a -> 0BDD48
+0BDD3A: 6243  mov r4,r2                     ; (slot) r2 = a
+0BDD3C: 3648  sub r4,r6                     ; r6 = b - a
+0BDD3E: 0167  mul.l r6,r1                   ; macl = (b - a) * w
+0BDD40: 021A  sts macl,r2                   ; r2 = product
+0BDD42: 4229  shlr16 r2                     ; r2 = product >> 16 (logical)
+0BDD44: A006  bra 0x0BDD54
+0BDD46: 324C  add r4,r2                     ; (slot) result = a + step
+0BDD48: 3258  sub r5,r2                     ; r2 = a - b
+0BDD4A: 0127  mul.l r2,r1                   ; macl = (a - b) * w
+0BDD4C: 061A  sts macl,r6                   ; r6 = product
+0BDD4E: 4629  shlr16 r6                     ; r6 = product >> 16
+0BDD50: 3468  sub r6,r4                     ; r4 = a - step
+0BDD52: 6243  mov r4,r2                     ; result = a - step
+0BDD54: 6023  mov r2,r0                     ; r0 = result  -> RETURN VALUE
+0BDD56: 000B  rts
+0BDD58: 4F16  lds.l @r15+,macl              ; (slot) pop macl
+
+==== FUNCTION 0x0BDD5A .. 0x0BDD6E  (10 instructions, 14 callers) ====
+CONTRACT   in  r4 = x, r5 = hi, r6 = lo      (signed 32-bit)
+           out r0 = hi if x >= hi;  else x if x > lo;  else lo
+           effect  none. Leaf; clobbers r2.
+           Argument order is (value, UPPER, LOWER). The upper bound is tested first, so with
+           inverted bounds (hi < lo) the result is hi when x >= hi and lo otherwise.
+MECHANISM  see CONTRACT
+EVIDENCE   0BDD5A/5C: cmp/ge r5,r4 sets T when r4 >= r5; bf (T=0, x < hi) -> 0BDD62.
+           0BDD62/64/66/68: cmp/gt r6,r4 sets T when r4 > r6; bt/s runs the slot (r2 = x) and
+           branches when x > lo; otherwise 0BDD68 r2 = lo.
+           emulated: section 6 (4,244 cases, incl. inverted bounds and the 32-bit extremes).
+           Caller side: 01D8A8 passes r5 = 0x7FFF and r6 = 0xFFFF8000 (= -128 << 8);
+           056EF6 passes r5 = 0x10000000 and r6 = 0xF07FFF81.
+LISTING
+0BDD5A: 3453  cmp/ge r5,r4                  ; T = (x >= hi), signed
+0BDD5C: 8B01  bf 0x0BDD62                   ; x < hi -> 0BDD62
+0BDD5E: A004  bra 0x0BDD6A                  ; x >= hi:
+0BDD60: 6253  mov r5,r2                     ; (slot) result = hi
+0BDD62: 3467  cmp/gt r6,r4                  ; T = (x > lo), signed
+0BDD64: 8D01  bt/s 0x0BDD6A                 ; x > lo -> return x
+0BDD66: 6243  mov r4,r2                     ; (slot) result = x
+0BDD68: 6263  mov r6,r2                     ; x <= lo: result = lo
+0BDD6A: 000B  rts
+0BDD6C: 6023  mov r2,r0                     ; (slot) r0 = result
+
+==== FUNCTION 0x0BDD6E .. 0x0BDD78  (5 instructions, 1 callers) ====
+CONTRACT   in  r4, r5 (UNSIGNED 32-bit)      out r0 = min(r4, r5)      Leaf; clobbers r5.
+MECHANISM  if r4 >u r5: r0 = r5 else r0 = r4
+EVIDENCE   0BDD6E/70: cmp/hi r5,r4 sets T when r4 > r5 unsigned; bt keeps r5.
+           emulated: section 6 (1,696 cases; 0xFFFFFFFF vs 1 returns 1, so it is unsigned).
+           Caller side: 056F60 passes r4 = u16 + 2 and r5 = 0x0000FFFF (a ceiling at 0xFFFF).
+LISTING
+0BDD6E: 3456  cmp/hi r5,r4                  ; T = (r4 > r5), unsigned
+0BDD70: 8900  bt 0x0BDD74                   ; r4 larger -> return r5
+0BDD72: 6543  mov r4,r5                     ; else r5 = r4
+0BDD74: 000B  rts
+0BDD76: 6053  mov r5,r0                     ; (slot) r0 = the smaller
+
+==== FUNCTION 0x0BDD78 .. 0x0BDD88  (8 instructions, 1 callers) ====
+CONTRACT   in  r4, r5      out r0 = r4 if u16(r4) >= u16(r5) else r5
+           The COMPARISON uses the low 16 bits (unsigned); the RETURN is the whole chosen register,
+           upper 16 bits included. Ties return r4. Leaf; clobbers r1, r2, r6.
+MECHANISM  16-bit unsigned max.
+EVIDENCE   0BDD7C/7E/80/82: cmp/ge r2,r6 sets T when u16(r4) >= u16(r5); bt/s runs the slot (r1 = r4)
+           and skips 0BDD82 (r1 = r5) when T=1.
+           emulated: section 6 (1,696 cases; 0x00018000 vs 0x00027FFF returns 0x00018000).
+LISTING
+0BDD78: 664D  extu.w r4,r6                  ; r6 = u16(r4)
+0BDD7A: 625D  extu.w r5,r2                  ; r2 = u16(r5)
+0BDD7C: 3623  cmp/ge r2,r6                  ; T = (u16(r4) >= u16(r5))
+0BDD7E: 8D01  bt/s 0x0BDD84                 ; T=1 -> return r4
+0BDD80: 6143  mov r4,r1                     ; (slot) r1 = r4
+0BDD82: 6153  mov r5,r1                     ; T=0: r1 = r5
+0BDD84: 000B  rts
+0BDD86: 6013  mov r1,r0                     ; (slot) r0 = r1
+
+==== FUNCTION 0x0BDD88 .. 0x0BDD9A  (9 instructions, 7 callers) ====
+CONTRACT   in  r4, r5 (compared as SIGNED 32-bit)
+           out r0 = r4 - r5 if r4 > r5, else r5 - r4        (absolute difference, modulo 2^32)
+           Leaf; clobbers r2 and whichever of r4/r5 was the minuend.
+MECHANISM  larger minus smaller. Read as unsigned the result is always the true distance
+           (0x7FFFFFFF vs 0x80000000 gives 0xFFFFFFFF).
+EVIDENCE   0BDD88/8A: cmp/gt r5,r4 sets T when r4 > r5 signed; bf (T=0, r4 <= r5) -> 0BDD92.
+           emulated: section 6 (1,696 cases).
+           Caller side: 056F88 passes r5 = 0 (so r0 = |r4|); 06C132 passes two zero-extended words.
+LISTING
+0BDD88: 3457  cmp/gt r5,r4                  ; T = (r4 > r5), signed
+0BDD8A: 8B02  bf 0x0BDD92                   ; r4 <= r5 -> 0BDD92
+0BDD8C: 3458  sub r5,r4                     ; r4 = r4 - r5
+0BDD8E: A002  bra 0x0BDD96
+0BDD90: 6243  mov r4,r2                     ; (slot) result = r4 - r5
+0BDD92: 3548  sub r4,r5                     ; r5 = r5 - r4
+0BDD94: 6253  mov r5,r2                     ; result = r5 - r4
+0BDD96: 000B  rts
+0BDD98: 6023  mov r2,r0                     ; (slot) r0 = result
+; 0x0BDD9A: .word 0x0000   alignment pad
+
+==== FUNCTION 0x0BDD9C .. 0x0BE4FA  (943 instructions, 3 callers) ====   ENTRY SIGNATURE ONLY -- NOT TRACED
+CONTRACT   in  r4 = address of a structure S;  fr4, fr5 = two floats
+           (established from the first 26 instructions only)
+           S+2  word   N    (0BDDB0)          S+8  long  pointer to an array A of float (0BDDB6)
+           The first loop walks i = N-1 downward while A[i] > fr5 (0BDDC2..0BDDCE), i.e. fr5 is
+           being located in the float array at S+8 whose length is the word at S+2.
+           Saves r14 and MACL, 56-byte frame; fr4 is parked at frame+8, fr5 at frame+12, S at frame+4.
+           Everything else about this function -- including what fr4 indexes and what it returns --
+           is NOT established here.
+LISTING    (prologue and first search loop only)
+0BDD9C: 2FE6  mov.l r14,@-r15               ; push r14
+0BDD9E: 4F12  sts.l macl,@-r15              ; push macl
+0BDDA0: 7FC8  add #-56,r15                  ; 56-byte frame
+0BDDA2: E00C  mov #12,r0
+0BDDA4: FF57  fmov.s fr5,@(r0,r15)          ; frame+12 = fr5
+0BDDA6: F14C  fmov fr4,fr1
+0BDDA8: E008  mov #8,r0
+0BDDAA: FF47  fmov.s fr4,@(r0,r15)          ; frame+8 = fr4
+0BDDAC: 6143  mov r4,r1
+0BDDAE: 1F41  mov.l r4,@(4,r15)             ; frame+4 = S
+0BDDB0: 8541  mov.w @(2,r4),r0              ; r0 = word[S+2] = N
+0BDDB2: 70FF  add #-1,r0                    ; N - 1
+0BDDB4: 6603  mov r0,r6
+0BDDB6: 5242  mov.l @(8,r4),r2              ; r2 = long[S+8] = A
+0BDDB8: 6503  mov r0,r5
+0BDDBA: 4508  shll2 r5
+0BDDBC: 352C  add r2,r5                     ; r5 = &A[N-1]
+0BDDBE: A005  bra 0x0BDDCC
+0BDDC0: 6203  mov r0,r2                     ; (slot) i = N-1
+0BDDC2: F858  fmov.s @r5,fr8                ; fr8 = A[i]
+0BDDC4: F855  fcmp/gt fr5,fr8               ; T = (A[i] > fr5)
+0BDDC6: 8B03  bf 0x0BDDD0                   ; A[i] <= fr5 -> found
+0BDDC8: 75FC  add #-4,r5                    ; step back one float
+0BDDCA: 72FF  add #-1,r2                    ; i -= 1
+0BDDCC: 4211  cmp/pz r2                     ; T = (i >= 0)
+0BDDCE: 89F8  bt 0x0BDDC2                   ; loop while i >= 0
+
+================================================================================
+CALLER-SIDE CONFIRMATION (call sites sampled across the ROM, decoded from bytes)
+================================================================================
+; Each excerpt is cut from fn_dump of the calling function. Annotations are mechanical.
+
+;---- 0x0BDBCC: nineteen sites in eleven calling functions, 0x004xxx .. 0x0BDxxx -------------
+; In every one r4 is a RAM address and fr4 a float; none reads r0 afterwards. Where fr4 comes
+; from: fldi0 / fldi1 directly (3, 5, 6) or through fr14 (8); the fr0 a call just returned (2,
+; 4); a stack float (7, 11, 12); a ROM calibration float (1: 0x000C0064); a callee-saved FP
+; register filled earlier (9: fr14 / fr15 = the two records' own old values -- stored back
+; unchanged, increased by a RAM float, or replaced by 0.0, depending on the path;  10: fr14 =
+; the RAM float at 0xFFFF85B8).
+
+; (1) fn 0x004BCA: record 0xFFFF2050 <- float read from ROM 0x000C0064; then PAIR8 0xFFFF2058 <- 0
+004BCC: D31F  mov.l @(0x004C4C),r3          ; = 0xFFFF2058 RAM
+004BCE: 7FFC  add #-4,r15
+004BD0: D41C  mov.l @(0x004C44),r4          ; = 0xFFFF2050 RAM
+004BD2: 2F32  mov.l r3,@r15
+004BD4: D31A  mov.l @(0x004C40),r3          ; = 0x000C0064 CAL
+004BD6: D220  mov.l @(0x004C58),r2          ; = 0x000BDBCC ROM
+004BD8: 420B  jsr @r2                       ; -> 0x0BDBCC
+004BDA: F438  fmov.s @r3,fr4
+004BDC: D31F  mov.l @(0x004C5C),r3          ; = 0x000BDB6E ROM
+004BDE: E500  mov #0,r5
+004BE0: 430B  jsr @r3                       ; -> 0x0BDB6E
+004BE2: 64F2  mov.l @r15,r4
+; (2) fn 0x012FF4: record 0xFFFF20B0 <- fr0 returned by 0x0BE8E4
+013020: D435  mov.l @(0x0130F8),r4          ; = 0x000AA850 DESC
+013022: D22C  mov.l @(0x0130D4),r2          ; = 0x000BE8E4 ROM
+013024: F5FC  fmov fr15,fr5
+013026: 420B  jsr @r2                       ; -> 0x0BE8E4
+013028: F4EC  fmov fr14,fr4
+01302A: D42C  mov.l @(0x0130DC),r4          ; = 0xFFFF20B0 RAM
+01302C: D233  mov.l @(0x0130FC),r2          ; = 0x000BDBCC ROM
+01302E: 420B  jsr @r2                       ; -> 0x0BDBCC
+013030: F40C  fmov fr0,fr4
+; (3) fn 0x0190B0: four consecutive records 0xFFFF6070/78/80/88 <- 1.0, 1.0, 0.0, 0.0 (8-byte pitch)
+0190DE: D47E  mov.l @(0x0192D8),r4          ; = 0xFFFF6070 RAM
+0190E0: DE7E  mov.l @(0x0192DC),r14         ; = 0x000BDBCC ROM
+0190E2: 4E0B  jsr @r14                      ; -> 0x0BDBCC
+0190E4: F49D  fldi1 fr4
+0190E6: D47E  mov.l @(0x0192E0),r4          ; = 0xFFFF6078 RAM
+0190E8: 4E0B  jsr @r14                      ; -> 0x0BDBCC
+0190EA: F49D  fldi1 fr4
+0190EC: D47D  mov.l @(0x0192E4),r4          ; = 0xFFFF6080 RAM
+0190EE: 4E0B  jsr @r14                      ; -> 0x0BDBCC
+0190F0: F48D  fldi0 fr4
+0190F2: D47D  mov.l @(0x0192E8),r4          ; = 0xFFFF6088 RAM
+0190F4: 4E0B  jsr @r14                      ; -> 0x0BDBCC
+0190F6: F48D  fldi0 fr4
+; (4) fn 0x0259E0: tail-jump; record 0xFFFF2260 <- fr0 of 0x0BE960
+025B0C: F40C  fmov fr0,fr4
+025B0E: D236  mov.l @(0x025BE8),r2          ; = 0x000BE960 ROM
+025B10: 420B  jsr @r2                       ; -> 0x0BE960
+025B12: F58D  fldi0 fr5
+025B14: F40C  fmov fr0,fr4
+025B16: D435  mov.l @(0x025BEC),r4          ; = 0xFFFF2260 RAM
+025B18: D235  mov.l @(0x025BF0),r2          ; = 0x000BDBCC ROM
+025B1A: FFF9  fmov.s @r15+,fr15
+025B1C: FEF9  fmov.s @r15+,fr14
+025B1E: FDF9  fmov.s @r15+,fr13
+025B20: FCF9  fmov.s @r15+,fr12
+025B22: 4F26  lds.l @r15+,pr
+025B24: 422B  jmp @r2                       ; -> 0x0BDBCC
+025B26: 6EF6  mov.l @r15+,r14
+; (5) fn 0x0357E8: the whole function is "record 0xFFFF318C <- 0.0" (tail-jump)
+0357E8: D47D  mov.l @(0x0359E0),r4          ; = 0xFFFF318C RAM
+0357EA: D27E  mov.l @(0x0359E4),r2          ; = 0x000BDBCC ROM
+0357EC: 422B  jmp @r2                       ; -> 0x0BDBCC
+0357EE: F48D  fldi0 fr4
+; (6) fn 0x05B82E: record 0xFFFF3674 <- 0.0
+05BA60: E001  mov #1,r0
+05BA62: C028  mov.b r0,@(40,gbr)            ; gbr+40 = 0xFFFF8ED0
+05BA64: D47C  mov.l @(0x05BC58),r4          ; = 0xFFFF3674 RAM
+05BA66: D67D  mov.l @(0x05BC5C),r6          ; = 0x000BDBCC ROM
+05BA68: 460B  jsr @r6                       ; -> 0x0BDBCC
+05BA6A: F48D  fldi0 fr4
+; (7) fn 0x0714A4: records 0xFFFF2520 and 0xFFFF2528 <- two stack floats (second is a tail-jump)
+0714E0: D47D  mov.l @(0x0716D8),r4          ; = 0xFFFF2520 RAM
+0714E2: D27E  mov.l @(0x0716DC),r2          ; = 0x000BDBCC ROM
+0714E4: 420B  jsr @r2                       ; -> 0x0BDBCC
+0714E6: F4F8  fmov.s @r15,fr4
+0714E8: D478  mov.l @(0x0716CC),r4          ; = 0xFFFF2528 RAM
+0714EA: D27C  mov.l @(0x0716DC),r2          ; = 0x000BDBCC ROM
+0714EC: E004  mov #4,r0
+0714EE: F4F6  fmov.s @(r0,r15),fr4
+0714F0: 7F08  add #8,r15
+0714F2: FEF9  fmov.s @r15+,fr14
+0714F4: 422B  jmp @r2                       ; -> 0x0BDBCC
+0714F6: 4F26  lds.l @r15+,pr
+; (8) fn 0x074E30: ten consecutive stores of fr14 = 0.0 to records 0xFFFF2D38..0xFFFF2D80 (8-byte pitch);
+;     first two and last one shown
+074E3E: D458  mov.l @(0x074FA0),r4          ; = 0xFFFF2D38 RAM
+074E40: DE58  mov.l @(0x074FA4),r14         ; = 0x000BDBCC ROM
+074E42: FE8D  fldi0 fr14
+074E44: 4E0B  jsr @r14                      ; -> 0x0BDBCC
+074E46: F4EC  fmov fr14,fr4
+074E48: D457  mov.l @(0x074FA8),r4          ; = 0xFFFF2D40 RAM
+074E4A: 4E0B  jsr @r14                      ; -> 0x0BDBCC
+074E4C: F4EC  fmov fr14,fr4
+074E78: D453  mov.l @(0x074FC8),r4          ; = 0xFFFF2D80 RAM
+074E7A: 4E0B  jsr @r14                      ; -> 0x0BDBCC
+074E7C: F4EC  fmov fr14,fr4
+; (9) fn 0x08FDEE: records 0xFFFF30D0 <- fr14, 0xFFFF30C8 <- fr15. Both registers were loaded from
+;     those same two records by plain fmov.s (no validator, no 0x0BDB30). Three paths reach the
+;     stores: both zeroed (byte @0xFFFF8E98 != 0); fr14 += float @0xFFFF6350 and fr15 += float
+;     @0xFFFF6364 (byte @0xFFFF30D8 < cal byte @0x000C4749); or both UNCHANGED, so the old values
+;     are written back (08FE3C bt -> 08FE4E..08FE8C reads fr14 / fr15 only as call arguments).
+08FDF6: D26F  mov.l @(0x08FFB4),r2          ; = 0xFFFF6350 RAM
+08FDF8: F928  fmov.s @r2,fr9                ; fr9 = float @0xFFFF6350
+08FDFA: D26F  mov.l @(0x08FFB8),r2          ; = 0xFFFF6364 RAM
+08FDFC: F828  fmov.s @r2,fr8                ; fr8 = float @0xFFFF6364
+08FDFE: D766  mov.l @(0x08FF98),r7          ; = 0xFFFF30D8 RAM
+08FE00: E0F8  mov #-8,r0
+08FE02: FE76  fmov.s @(r0,r7),fr14          ; fr14 = float @(0xFFFF30D8 - 8) = record 0xFFFF30D0, raw read
+08FE04: E0F0  mov #-16,r0
+08FE06: FF76  fmov.s @(r0,r7),fr15          ; fr15 = float @(0xFFFF30D8 - 16) = record 0xFFFF30C8, raw read
+08FE24: 2668  tst r6,r6                     ; r6 = byte @0xFFFF8E98 (08FE0C/0E); T = (it is 0)
+08FE26: 8904  bt 0x08FE32                   ; T=1 -> 08FE32; T=0 falls into the zeroing path
+08FE28: FF8D  fldi0 fr15                    ; path A: fr15 = 0.0
+08FE2A: FEFC  fmov fr15,fr14                ; ... fr14 = 0.0, then bra 0x08FE8E
+08FE3A: 3623  cmp/ge r2,r6                  ; T = (u8 byte @0xFFFF30D8 >= u8 cal byte @0x000C4749)
+08FE3C: 8907  bt 0x08FE4E                   ; T=1 -> path C: 08FE4E..08FE8C never writes fr14 / fr15
+08FE3E: FE90  fadd fr9,fr14                 ; path B (T=0): fr14 += fr9
+08FE40: FF80  fadd fr8,fr15                 ; ... fr15 += fr8, then call 0x0BE53C and bra 0x08FE8E
+08FE8E: D440  mov.l @(0x08FF90),r4          ; = 0xFFFF30D0 RAM
+08FE90: D23C  mov.l @(0x08FF84),r2          ; = 0x000BDBCC ROM
+08FE92: 420B  jsr @r2                       ; -> 0x0BDBCC  | store fr14
+08FE94: F4EC  fmov fr14,fr4                 ; (slot) fr4 = fr14 (callee-saved register, not a literal and not a fresh load)
+08FE96: D43D  mov.l @(0x08FF8C),r4          ; = 0xFFFF30C8 RAM
+08FE98: D23A  mov.l @(0x08FF84),r2          ; = 0x000BDBCC ROM
+08FE9A: 420B  jsr @r2                       ; -> 0x0BDBCC  | store fr15
+08FE9C: F4FC  fmov fr15,fr4                 ; (slot) fr4 = fr15
+; (10) fn 0x0BCD46: VALIDATE-THEN-REWRITE, on one branch only. When the function's byte argument
+;      u8(r4) is 0: 0x0BDCB6(0xFFFF85DC); if the verdict is non-zero the record is rewritten by
+;      0x0BDBCC with fr14 = float @(0xFFFF8630 - 120) = @0xFFFF85B8, which was read in the delay
+;      slot of the jsr, i.e. BEFORE the validator ran. Later on the same branch the record is
+;      stored AGAIN (0BCE12) with a newly computed float, whatever the verdict was.
+0BCD56: D641  mov.l @(0x0BCE5C),r6          ; = 0xFFFF5DEF RAM
+0BCD58: 6D4C  extu.b r4,r13                 ; r13 = u8(r4), the argument
+0BCD5A: 2DD8  tst r13,r13                   ; T = (argument == 0)
+0BCD5C: 8F24  bf/s 0x0BCDA8                 ; T=0, argument != 0 -> 0BCDA8: everything down to 0BCDA6 is skipped
+0BCD5E: 6E60  mov.b @r6,r14                 ; (slot)
+0BCD60: D53F  mov.l @(0x0BCE60),r5          ; = 0xFFFF8630 RAM
+0BCD62: E088  mov #-120,r0                  ; r0 = -120
+0BCD64: D43F  mov.l @(0x0BCE64),r4          ; = 0xFFFF85DC RAM
+0BCD66: D240  mov.l @(0x0BCE68),r2          ; = 0x000BDCB6 ROM
+0BCD68: 420B  jsr @r2                       ; -> 0x0BDCB6  | VALIDATE record 0xFFFF85DC
+0BCD6A: FE56  fmov.s @(r0,r5),fr14          ; (slot, runs before the validator) fr14 = float @0xFFFF85B8; fr14 is callee-saved
+0BCD6C: 620E  exts.b r0,r2                  ; r2 = verdict as a signed byte
+0BCD6E: 2228  tst r2,r2                     ; T = (verdict == 0)
+0BCD70: 8903  bt 0x0BCD7A                   ; valid -> skip the rewrite
+0BCD72: D43C  mov.l @(0x0BCE64),r4          ; = 0xFFFF85DC RAM
+0BCD74: D23D  mov.l @(0x0BCE6C),r2          ; = 0x000BDBCC ROM
+0BCD76: 420B  jsr @r2                       ; -> 0x0BDBCC  | REWRITE the record (verdict != 0)
+0BCD78: F4EC  fmov fr14,fr4                 ; (slot) fr4 = fr14
+0BCDFC: 2DD8  tst r13,r13                   ; T = (argument == 0) again
+0BCDFE: 8F0E  bf/s 0x0BCE1E                 ; T=0, argument != 0 -> 0BCE1E
+0BCE00: FF0A  fmov.s fr0,@r15               ; (slot) scratch = fr0, the result of 0x0BE970 / 0x0BE960 just above
+0BCE02: C4A7  mov.b @(167,gbr),r0           ; gbr+167 = 0xFFFF873B
+0BCE04: 2008  tst r0,r0
+0BCE06: 8902  bt 0x0BCE0E
+0BCE08: D20F  mov.l @(0x0BCE48),r2          ; = 0x000717B2 ROM
+0BCE0A: 420B  jsr @r2                       ; -> 0x0717B2
+0BCE0C: E408  mov #8,r4
+0BCE0E: D415  mov.l @(0x0BCE64),r4          ; = 0xFFFF85DC RAM
+0BCE10: D216  mov.l @(0x0BCE6C),r2          ; = 0x000BDBCC ROM
+0BCE12: 420B  jsr @r2                       ; -> 0x0BDBCC  | SECOND store to the same record, not conditional on the verdict
+0BCE14: F4F8  fmov.s @r15,fr4               ; (slot) fr4 = the scratch float
+0BCE16: 66F2  mov.l @r15,r6                 ; r6 = the same 32 bits
+0BCE18: 6067  not r6,r0                     ; r0 = ~bits
+0BCE1A: A009  bra 0x0BCE30
+0BCE1C: C200  mov.l r0,@(0,gbr)             ; gbr+0 = 0xFFFF8694  | (slot) long @0xFFFF8694 := ~bits, a one's-complement copy kept outside the record
+; (11),(12) fn 0x0BCEA4: records 0xFFFF85F4 and 0xFFFF85FC <- floats from the stack frame
+0BD470: D426  mov.l @(0x0BD50C),r4          ; = 0xFFFF85F4 RAM
+0BD472: E00C  mov #12,r0
+0BD474: D524  mov.l @(0x0BD508),r5          ; = 0x000BDBCC ROM
+0BD476: 450B  jsr @r5                       ; -> 0x0BDBCC
+0BD478: F4F6  fmov.s @(r0,r15),fr4
+0BD484: D422  mov.l @(0x0BD510),r4          ; = 0xFFFF85FC RAM
+0BD486: E010  mov #16,r0
+0BD488: D51F  mov.l @(0x0BD508),r5          ; = 0x000BDBCC ROM
+0BD48A: 450B  jsr @r5                       ; -> 0x0BDBCC
+0BD48C: F4F6  fmov.s @(r0,r15),fr4
+
+;---- 0x0BDBCC through a stack-spilled pointer: fn 0x01E360 (NOT part of the sample above) ------
+; The function pointer is spilled to the stack and one call goes through the slot. fn_dump
+; cannot resolve that call; it is settled here by hand. r4 comes from a structure
+; (long @(8,r12) / @(12,r12)), so the record address at these sites is not a literal.
+01E484: 54C2  mov.l @(8,r12),r4             ; r4 = long @(8,r12)
+01E486: D669  mov.l @(0x01E62C),r6          ; = 0x000BDBCC ROM
+01E488: 2F62  mov.l r6,@r15                 ; SPILL: long @r15 := 0x000BDBCC
+01E48A: 460B  jsr @r6                       ; -> 0x0BDBCC
+01E48C: F40C  fmov fr0,fr4                  ; (slot) fr4 = fr0
+01E53E: 54C2  mov.l @(8,r12),r4
+01E540: D23A  mov.l @(0x01E62C),r2          ; = 0x000BDBCC ROM
+01E542: 2F22  mov.l r2,@r15                 ; the same slot written again with the same pointer
+01E544: 420B  jsr @r2                       ; -> 0x0BDBCC
+01E546: F49C  fmov fr9,fr4
+01E5F4: 54C3  mov.l @(12,r12),r4            ; r4 = long @(12,r12)
+01E5F6: 66F2  mov.l @r15,r6                 ; r6 = the spilled pointer
+01E5F8: 460B  jsr @r6                       ; -> target NOT statically resolved  | by hand: -> 0x0BDBCC (the slot holds 0x000BDBCC on every path: 01E488, 01E542)
+01E5FA: F49C  fmov fr9,fr4                  ; (slot) fr4 = fr9
+
+;---- 0x0BDCB6: eleven sites, ten calling functions, 0x004xxx .. 0x0BCxxx --------------------
+; In every one r4 is a RAM address and r0 is consumed at once as a signed byte flag
+; (exts.b r0,Rn ; tst Rn,Rn): zero = carry on, non-zero = failure path.
+
+; (1) fn 0x004BEC: 0x0BDCB6(0xFFFF2050), then 0x0BDC0E(0xFFFF2058); returns 1 if either failed
+004BEC: 2FE6  mov.l r14,@-r15
+004BEE: EE00  mov #0,r14
+004BF0: D316  mov.l @(0x004C4C),r3          ; = 0xFFFF2058 RAM
+004BF2: 4F22  sts.l pr,@-r15
+004BF4: D213  mov.l @(0x004C44),r2          ; = 0xFFFF2050 RAM
+004BF6: 7FF8  add #-8,r15
+004BF8: 2F32  mov.l r3,@r15
+004BFA: 1F21  mov.l r2,@(4,r15)
+004BFC: D318  mov.l @(0x004C60),r3          ; = 0x000BDCB6 ROM
+004BFE: 430B  jsr @r3                       ; -> 0x0BDCB6
+004C00: 6423  mov r2,r4
+004C02: 600E  exts.b r0,r0
+004C04: 2008  tst r0,r0
+004C06: 8F07  bf/s 0x004C18
+004C08: 0009  nop
+004C0A: D316  mov.l @(0x004C64),r3          ; = 0x000BDC0E ROM
+004C0C: 430B  jsr @r3                       ; -> 0x0BDC0E
+004C0E: 64F2  mov.l @r15,r4
+004C10: 600E  exts.b r0,r0
+004C12: 2008  tst r0,r0
+004C14: 8D01  bt/s 0x004C1A
+004C16: 0009  nop
+004C18: EE01  mov #1,r14
+004C1A: 60E3  mov r14,r0
+004C1C: 7F08  add #8,r15
+004C1E: 4F26  lds.l @r15+,pr
+004C20: 000B  rts
+004C22: 6EF6  mov.l @r15+,r14
+; (2) fn 0x0128F8: record 0xFFFF20B0
+0128FC: E600  mov #0,r6
+0128FE: D491  mov.l @(0x012B44),r4          ; = 0xFFFF20B0 RAM
+012900: D291  mov.l @(0x012B48),r2          ; = 0x000BDCB6 ROM
+012902: 420B  jsr @r2                       ; -> 0x0BDCB6
+012904: 2F60  mov.b r6,@r15
+012906: 620E  exts.b r0,r2
+012908: 2228  tst r2,r2
+01290A: 8B06  bf 0x01291A
+; (3),(4) fn 0x01E14C: records 0xFFFF210C, 0xFFFF2114 (then 211C, 2124); any failure -> 01E1D0
+01E152: D46A  mov.l @(0x01E2FC),r4          ; = 0xFFFF210C RAM
+01E154: D570  mov.l @(0x01E318),r5          ; = 0x000BDCB6 ROM
+01E156: 450B  jsr @r5                       ; -> 0x0BDCB6
+01E158: 2F60  mov.b r6,@r15
+01E15A: 620E  exts.b r0,r2
+01E15C: 2228  tst r2,r2
+01E15E: 8B37  bf 0x01E1D0
+01E160: D469  mov.l @(0x01E308),r4          ; = 0xFFFF2114 RAM
+01E162: D56D  mov.l @(0x01E318),r5          ; = 0x000BDCB6 ROM
+01E164: 450B  jsr @r5                       ; -> 0x0BDCB6
+01E166: 0009  nop
+01E168: 620E  exts.b r0,r2
+01E16A: 2228  tst r2,r2
+01E16C: 8B30  bf 0x01E1D0
+; (5) fn 0x0357F0: record 0xFFFF318C (the one fn 0x0357E8 writes); r14 = 1 on failure
+0357F0: 2FE6  mov.l r14,@-r15
+0357F2: 4F22  sts.l pr,@-r15
+0357F4: D47A  mov.l @(0x0359E0),r4          ; = 0xFFFF318C RAM
+0357F6: D27C  mov.l @(0x0359E8),r2          ; = 0x000BDCB6 ROM
+0357F8: 420B  jsr @r2                       ; -> 0x0BDCB6
+0357FA: EE00  mov #0,r14
+0357FC: 620E  exts.b r0,r2
+0357FE: 2228  tst r2,r2
+035800: 8900  bt 0x035804
+035802: EE01  mov #1,r14
+; (6) fn 0x046104: loop, record = 0xFFFF3248 + r12 (added in the delay slot)
+046120: D47C  mov.l @(0x046314),r4          ; = 0xFFFF3248 RAM
+046122: D280  mov.l @(0x046324),r2          ; = 0x000BDCB6 ROM
+046124: 420B  jsr @r2                       ; -> 0x0BDCB6
+046126: 34CC  add r12,r4
+046128: 620E  exts.b r0,r2
+04612A: 2228  tst r2,r2
+04612C: 8B0A  bf 0x046144
+; (7) fn 0x05B2E4: record 0xFFFF3674 (the one fn 0x05B82E writes)
+05B2E8: E600  mov #0,r6
+05B2EA: D44D  mov.l @(0x05B420),r4          ; = 0xFFFF3674 RAM
+05B2EC: D24E  mov.l @(0x05B428),r2          ; = 0x000BDCB6 ROM
+05B2EE: 420B  jsr @r2                       ; -> 0x0BDCB6
+05B2F0: 2F60  mov.b r6,@r15
+05B2F2: 620E  exts.b r0,r2
+05B2F4: 2228  tst r2,r2
+05B2F6: 8901  bt 0x05B2FC
+; (8) fn 0x074FD0: record 0xFFFF2D40
+074FD4: E600  mov #0,r6
+074FD6: D49F  mov.l @(0x075254),r4          ; = 0xFFFF2D40 RAM
+074FD8: D59F  mov.l @(0x075258),r5          ; = 0x000BDCB6 ROM
+074FDA: 450B  jsr @r5                       ; -> 0x0BDCB6
+074FDC: 2F60  mov.b r6,@r15
+074FDE: 620E  exts.b r0,r2
+074FE0: 2228  tst r2,r2
+074FE2: 8901  bt 0x074FE8
+; (9) fn 0x094D44: record 0xFFFF3478
+094D48: E600  mov #0,r6
+094D4A: D4A7  mov.l @(0x094FE8),r4          ; = 0xFFFF3478 RAM
+094D4C: D2A7  mov.l @(0x094FEC),r2          ; = 0x000BDCB6 ROM
+094D4E: 420B  jsr @r2                       ; -> 0x0BDCB6
+094D50: 2F60  mov.b r6,@r15
+094D52: 620E  exts.b r0,r2
+094D54: 2228  tst r2,r2
+094D56: 8901  bt 0x094D5C
+; (10) fn 0x0BC728: record 0xFFFF85E4 (r4 loaded at 0BC754 and still live at the jsr)
+0BC754: D48D  mov.l @(0x0BC98C),r4          ; = 0xFFFF85E4 RAM
+0BC770: D287  mov.l @(0x0BC990),r2          ; = 0x000BDCB6 ROM
+0BC772: 420B  jsr @r2                       ; -> 0x0BDCB6
+0BC774: FF87  fmov.s fr8,@(r0,r15)
+0BC776: 620E  exts.b r0,r2
+0BC778: 2228  tst r2,r2
+0BC77A: 8F27  bf/s 0x0BC7CC
+; (11) fn 0x0BCEA4: record 0xFFFF85EC
+0BCF48: D48A  mov.l @(0x0BD174),r4          ; = 0xFFFF85EC RAM
+0BCF4A: D58B  mov.l @(0x0BD178),r5          ; = 0x000BDCB6 ROM
+0BCF4C: 450B  jsr @r5                       ; -> 0x0BDCB6
+0BCF4E: C241  mov.l r0,@(260,gbr)           ; gbr+260 = 0xFFFF8784
+0BCF50: 660E  exts.b r0,r6
+0BCF52: 2668  tst r6,r6
+0BCF54: 8D01  bt/s 0x0BCF5A
+
+;---- 0x0BDCB6 through a stack-spilled pointer: fn 0x0753C8, eleven more sites -------------------
+; The pointer is loaded and called directly once (0754AE), spilled to long @(4,r15) (0754AC, and
+; again at 075564 for the path that arrives from 0754A6 without passing 0754AC), and each of
+; the ten later calls reloads it from the slot. fn_dump prints those ten as "target NOT
+; statically resolved". r4 is a RAM literal and r0 a signed-byte flag at all eleven.
+0754A8: D495  mov.l @(0x075700),r4          ; = 0xFFFF259C RAM
+0754AA: D296  mov.l @(0x075704),r2          ; = 0x000BDCB6 ROM
+0754AC: 1F21  mov.l r2,@(4,r15)             ; SPILL: long @(4,r15) := 0x000BDCB6
+0754AE: 420B  jsr @r2                       ; -> 0x0BDCB6  | direct call, record 0xFFFF259C
+0754B0: 0009  nop
+0754B2: 620E  exts.b r0,r2                  ; verdict as a signed byte
+0754B4: 2228  tst r2,r2
+0754B6: 8B53  bf 0x075560                   ; non-zero -> 075560
+0754B8: D493  mov.l @(0x075708),r4          ; = 0xFFFF25A4 RAM
+0754BA: 56F1  mov.l @(4,r15),r6             ; r6 = the spilled pointer
+0754BC: 460B  jsr @r6                       ; -> target NOT statically resolved  | by hand: -> 0x0BDCB6, record 0xFFFF25A4. Same shape at 0754CA, 0754D8, 0754E6, 0754F4
+0754BE: 0009  nop
+0754C0: 620E  exts.b r0,r2                  ; verdict as a signed byte
+0754C2: 2228  tst r2,r2
+0754C4: 8B4C  bf 0x075560
+075560: EA01  mov #1,r10
+075562: D668  mov.l @(0x075704),r6          ; = 0x000BDCB6 ROM
+075564: 1F61  mov.l r6,@(4,r15)             ; SPILL again
+075566: D474  mov.l @(0x075738),r4          ; = 0xFFFF2D38 RAM
+075568: 56F1  mov.l @(4,r15),r6             ; r6 = the spilled pointer
+07556A: 460B  jsr @r6                       ; -> target NOT statically resolved  | by hand: -> 0x0BDCB6, record 0xFFFF2D38. Same shape at 07557C, 07558E, 0755A0, 0755B2
+07556C: 0009  nop
+07556E: 620E  exts.b r0,r2                  ; verdict as a signed byte
+075570: 2228  tst r2,r2
+075572: 8901  bt 0x075578
+
+;---- the other entries, at least one site each ------------------------------------------------
+
+; 0x0BDB30  fn 0x004B62 (whole function): record = 0xFFFF2050 + 8 * u8(r4), default = float @0x000C0064
+004B62: 7FFC  add #-4,r15
+004B64: D336  mov.l @(0x004C40),r3          ; = 0x000C0064 CAL
+004B66: 2F40  mov.b r4,@r15
+004B68: F438  fmov.s @r3,fr4
+004B6A: 64F0  mov.b @r15,r4
+004B6C: D235  mov.l @(0x004C44),r2          ; = 0xFFFF2050 RAM
+004B6E: 644C  extu.b r4,r4
+004B70: D135  mov.l @(0x004C48),r1          ; = 0x000BDB30 ROM
+004B72: 4408  shll2 r4
+004B74: 4400  shll r4
+004B76: 342C  add r2,r4
+004B78: 412B  jmp @r1                       ; -> 0x0BDB30
+004B7A: 7F04  add #4,r15
+; 0x0BDB30  fn 0x00515C: same record base and default; the result fr0 is used as fr5
+005248: F488  fmov.s @r8,fr4
+00524A: D432  mov.l @(0x005314),r4          ; = 0xFFFF2050 RAM
+00524C: D332  mov.l @(0x005318),r3          ; = 0x000BDB30 ROM
+00524E: 430B  jsr @r3                       ; -> 0x0BDB30
+005250: 34BC  add r11,r4
+005252: F50C  fmov fr0,fr5
+; 0x0BDB6E + 0x0BDB80  fn 0x01076A: PAIR8 0xFFFF2060 <- 0; PAIR16 0xFFFF20A0 <- 0;
+;           then five PAIR16 at 0xFFFF2064 + 12*i <- 0
+010776: D430  mov.l @(0x010838),r4          ; = 0xFFFF2060 RAM
+010778: D334  mov.l @(0x01084C),r3          ; = 0x000BDB6E ROM
+01077A: 430B  jsr @r3                       ; -> 0x0BDB6E
+01077C: E500  mov #0,r5
+01077E: DB34  mov.l @(0x010850),r11         ; = 0x000BDB80 ROM
+010780: D430  mov.l @(0x010844),r4          ; = 0xFFFF20A0 RAM
+010782: 4B0B  jsr @r11                      ; -> 0x0BDB80
+010784: E500  mov #0,r5
+010786: E200  mov #0,r2
+010788: D332  mov.l @(0x010854),r3          ; = 0xFFFF20A8 RAM
+01078A: EA05  mov #5,r10
+01078C: DE2E  mov.l @(0x010848),r14         ; = 0xFFFF2064 RAM
+01078E: 6C23  mov r2,r12
+010790: 2320  mov.b r2,@r3
+010792: 6D23  mov r2,r13
+010794: E500  mov #0,r5
+010796: 4B0B  jsr @r11                      ; -> 0x0BDB80
+010798: 64E3  mov r14,r4
+01079A: 60C3  mov r12,r0
+01079C: 80E8  mov.b r0,@(8,r14)
+01079E: 7D01  add #1,r13
+0107A0: 63DC  extu.b r13,r3
+0107A2: 33A3  cmp/ge r10,r3
+0107A4: 8FF6  bf/s 0x010794
+0107A6: 7E0C  add #12,r14
+; 0x0BDC0E + 0x0BDC3C  fn 0x010708: the matching validator -- PAIR8 0xFFFF2060, PAIR16 0xFFFF20A0,
+;           five PAIR16 at 0xFFFF2064 + 12*i; r12 = 1 as soon as one fails
+010710: D449  mov.l @(0x010838),r4          ; = 0xFFFF2060 RAM
+010712: 2FB6  mov.l r11,@-r15
+010714: 2FA6  mov.l r10,@-r15
+010716: 2F96  mov.l r9,@-r15
+010718: 4F22  sts.l pr,@-r15
+01071A: D348  mov.l @(0x01083C),r3          ; = 0x000BDC0E ROM
+01071C: 430B  jsr @r3                       ; -> 0x0BDC0E
+01071E: ED01  mov #1,r13
+010720: 600E  exts.b r0,r0
+010722: 2008  tst r0,r0
+010724: 8F11  bf/s 0x01074A
+010726: 0009  nop
+010728: D945  mov.l @(0x010840),r9          ; = 0x000BDC3C ROM
+01072A: D446  mov.l @(0x010844),r4          ; = 0xFFFF20A0 RAM
+01072C: 490B  jsr @r9                       ; -> 0x0BDC3C
+01072E: 0009  nop
+010730: 600E  exts.b r0,r0
+010732: 2008  tst r0,r0
+010734: 8F09  bf/s 0x01074A
+010736: 0009  nop
+010738: DE43  mov.l @(0x010848),r14         ; = 0xFFFF2064 RAM
+01073A: EA05  mov #5,r10
+01073C: EB00  mov #0,r11
+01073E: 490B  jsr @r9                       ; -> 0x0BDC3C
+010740: 64E3  mov r14,r4
+010742: 600E  exts.b r0,r0
+010744: 2008  tst r0,r0
+010746: 8D02  bt/s 0x01074E
+010748: 0009  nop
+01074A: A005  bra 0x010758
+01074C: 6CD3  mov r13,r12
+01074E: 7B01  add #1,r11
+010750: 62BC  extu.b r11,r2
+010752: 32A3  cmp/ge r10,r2
+010754: 8FF3  bf/s 0x01073E
+010756: 7E0C  add #12,r14
+; 0x0BDB92  fn 0x09EB42 (whole function): record 0xFFFF3C78 <- 0xA5A5A5A5, record 0xFFFF3C70 <- 0
+09EB42: 4F22  sts.l pr,@-r15
+09EB44: D448  mov.l @(0x09EC68),r4          ; = 0xFFFF3C78 RAM
+09EB46: D249  mov.l @(0x09EC6C),r2          ; = 0x000BDB92 ROM
+09EB48: D549  mov.l @(0x09EC70),r5          ; = 0xA5A5A5A5 const
+09EB4A: 420B  jsr @r2                       ; -> 0x0BDB92
+09EB4C: 0009  nop
+09EB4E: D449  mov.l @(0x09EC74),r4          ; = 0xFFFF3C70 RAM
+09EB50: E500  mov #0,r5
+09EB52: D246  mov.l @(0x09EC6C),r2          ; = 0x000BDB92 ROM
+09EB54: 422B  jmp @r2                       ; -> 0x0BDB92
+09EB56: 4F26  lds.l @r15+,pr
+; 0x0BDC6A  fn 0x09F2E4: record 0xFFFF3C70 + 8 = 0xFFFF3C78; r0 tested as a signed byte
+09F2E8: DE29  mov.l @(0x09F390),r14         ; = 0xFFFF3C70 RAM
+09F2EA: 64E3  mov r14,r4
+09F2EC: D629  mov.l @(0x09F394),r6          ; = 0x000BDC6A ROM
+09F2EE: 460B  jsr @r6                       ; -> 0x0BDC6A
+09F2F0: 7408  add #8,r4
+09F2F2: 620E  exts.b r0,r2
+09F2F4: 2228  tst r2,r2
+09F2F6: 8B30  bf 0x09F35A
+; 0x0BDD1C  fn 0x022636: a = word @0xFFFF659E, b = word @0xFFFF659C, k = word @ROM 0x000C30B4;
+;           result stored to 0xFFFF659C
+02263A: D211  mov.l @(0x022680),r2          ; = 0x000BDD1C ROM
+02263C: D611  mov.l @(0x022684),r6          ; = 0x000C30B4 CAL
+02263E: 6561  mov.w @r6,r5
+022640: 615D  extu.w r5,r1
+022642: DE0A  mov.l @(0x02266C),r14         ; = 0xFFFF659C RAM
+022644: 66E1  mov.w @r14,r6
+022646: 656D  extu.w r6,r5
+022648: 85E1  mov.w @(2,r14),r0
+02264A: 640D  extu.w r0,r4
+02264C: 420B  jsr @r2                       ; -> 0x0BDD1C
+02264E: 6613  mov r1,r6
+022650: 2E01  mov.w r0,@r14
+; 0x0BDD1C  fn 0x0571A4: both operands biased by 0x8000, k = 16 << 8 = 0x1000
+0571AE: D68A  mov.l @(0x0573D8),r6          ; = 0x000D6194 CAL
+0571B0: 6461  mov.w @r6,r4
+0571B2: DE8A  mov.l @(0x0573DC),r14         ; = 0x00008000 ROM
+0571B4: 34EC  add r14,r4
+0571B6: C502  mov.w @(4,gbr),r0             ; gbr+4 = 0xFFFF8D26
+0571B8: 30EC  add r14,r0
+0571BA: D189  mov.l @(0x0573E0),r1          ; = 0x000BDD1C ROM
+0571BC: 644D  extu.w r4,r4
+0571BE: 650D  extu.w r0,r5
+0571C0: E610  mov #16,r6
+0571C2: 410B  jsr @r1                       ; -> 0x0BDD1C
+0571C4: 4618  shll8 r6
+0571C6: 600F  exts.w r0,r0
+0571C8: 30E8  sub r14,r0
+; 0x0BDD5A  fn 0x01D85A: hi = 0x7FFF, lo = -128 << 8 = -32768
+01D8A0: D743  mov.l @(0x01D9B0),r7          ; = 0x000BDD5A ROM
+01D8A2: 956C  mov.w @(0x01D97E),r5          ; = 0x7FFF (32767)
+01D8A4: 1F51  mov.l r5,@(4,r15)
+01D8A6: E680  mov #-128,r6
+01D8A8: 470B  jsr @r7                       ; -> 0x0BDD5A
+01D8AA: 4618  shll8 r6
+; 0x0BDD5A  fn 0x056ED4: hi = 16 << 24 = 0x10000000, lo = 0xF07FFF81
+056EEE: D191  mov.l @(0x057134),r1          ; = 0x000BDD5A ROM
+056EF0: D691  mov.l @(0x057138),r6          ; = 0xF07FFF81 const
+056EF2: E510  mov #16,r5
+056EF4: 4518  shll8 r5
+056EF6: 410B  jsr @r1                       ; -> 0x0BDD5A
+056EF8: 4528  shll16 r5
+; 0x0BDD6E  fn 0x056F40: min(u16 + 2, 0xFFFF)
+056F58: 640D  extu.w r0,r4
+056F5A: 7402  add #2,r4
+056F5C: D27C  mov.l @(0x057150),r2          ; = 0x000BDD6E ROM
+056F5E: E5FF  mov #-1,r5
+056F60: 420B  jsr @r2                       ; -> 0x0BDD6E
+056F62: 655D  extu.w r5,r5
+056F64: E6FC  mov #-4,r6
+056F66: 2069  and r6,r0
+; 0x0BDD5A then 0x0BDD88  fn 0x056F40: clamp to +/-32767, store, then 0x0BDD88(x, 0) = |x|
+056F76: D26F  mov.l @(0x057134),r2          ; = 0x000BDD5A ROM
+056F78: E680  mov #-128,r6
+056F7A: 955E  mov.w @(0x05703A),r5          ; = 0x7FFF (32767)
+056F7C: 420B  jsr @r2                       ; -> 0x0BDD5A
+056F7E: 4618  shll8 r6
+056F80: C100  mov.w r0,@(0,gbr)             ; gbr+0 = 0xFFFF8D14
+056F82: C500  mov.w @(0,gbr),r0             ; gbr+0 = 0xFFFF8D14
+056F84: 6403  mov r0,r4
+056F86: D273  mov.l @(0x057154),r2          ; = 0x000BDD88 ROM
+056F88: 420B  jsr @r2                       ; -> 0x0BDD88
+056F8A: E500  mov #0,r5
+; 0x0BDD78  fn 0x0579B4: two calls, operands zero-extended words
+057A04: 640D  extu.w r0,r4
+057A06: 6043  mov r4,r0
+057A08: 81F2  mov.w r0,@(4,r15)
+057A0A: D61C  mov.l @(0x057A7C),r6          ; = 0x000BDD78 ROM
+057A0C: C519  mov.w @(50,gbr),r0            ; gbr+50 = 0xFFFF8D5E
+057A0E: 460B  jsr @r6                       ; -> 0x0BDD78
+057A10: 650D  extu.w r0,r5
+057A12: 81F4  mov.w r0,@(8,r15)
+057A14: C516  mov.w @(44,gbr),r0            ; gbr+44 = 0xFFFF8D58
+057A16: 650D  extu.w r0,r5
+057A18: 85F2  mov.w @(4,r15),r0
+057A1A: D618  mov.l @(0x057A7C),r6          ; = 0x000BDD78 ROM
+057A1C: 460B  jsr @r6                       ; -> 0x0BDD78
+057A1E: 640D  extu.w r0,r4
+; 0x0BDD88  fn 0x06C00A: two zero-extended words, result stored as a word
+06C126: 56D6  mov.l @(24,r13),r6
+06C128: 6261  mov.w @r6,r2
+06C12A: 642D  extu.w r2,r4
+06C12C: 52D7  mov.l @(28,r13),r2
+06C12E: 6521  mov.w @r2,r5
+06C130: D256  mov.l @(0x06C28C),r2          ; = 0x000BDD88 ROM
+06C132: 420B  jsr @r2                       ; -> 0x0BDD88
+06C134: 655D  extu.w r5,r5
+06C136: 81F6  mov.w r0,@(12,r15)
+
+;---- whole-ROM call-site scan (third decode; replaces the first version's linear heuristic) ----
+; METHOD. Each of the 5,151 functions of disassembly/maps/function_census.json is walked by
+; recursive descent inside its own extent (286,090 instructions reached) and r0-r15 plus the
+; r15-relative stack slots are constant-propagated to a fixpoint (at a join a value survives
+; only if every path agrees). Across a jsr the callee is ASSUMED to preserve r8-r15 and the
+; caller's stack slots and to destroy r0-r7. A "site" is a jsr / jmp @Rn (or bsr) whose target
+; is then a known constant. 17,346 sites resolve; 114 indirect sites in the whole ROM do not.
+; REPRODUCED by a second scanner written independently for the review (same assumptions,
+; different code: 17,461 sites, 112 unresolved; it models fewer instructions, e.g. not extu.b).
+; Every figure in the table below came out the same (sites, calling functions, distinct r4,
+; first use of r0) except the r4-constant site counts, which are lower bounds in both scanners
+; (0x0BDBCC 320 vs 323, 0x00317C 399 vs 404; the five 0x00317C sites the second scanner leaves
+; open are `mov #-112,r4 / extu.b r4,r4` = 0x90 and `mov #-80,r4 / extu.b` = 0xB0, as counted).
+; CROSS-CHECKS, all from bytes (each re-run by the second scanner):
+;   * every ROM long equal to a cluster entry (any even offset, whole image) is the literal of at
+;     least one reached `mov.l @(pool),Rn` -- none is left over for a pointer table; the three
+;     other words in the ROM shaped like such a load (0x005FBC, 0x022062, 0x03D12A) are pool data;
+;   * no bsr / bra reaches any entry;
+;   * no function holds both a literal load of a cluster entry and an unresolved indirect call;
+;   * a loaded cluster pointer is never stored to non-stack memory and never passed in r4-r7 to
+;     another call; it is spilled to the stack in two functions only (0x01E360, 0x0753C8).
+; So the counts are complete for statically loaded pointers. They are blind to an address built
+; by arithmetic at run time (none was seen). The caller-function counts equal the census's for
+; every entry except three where this scan finds one more calling function (0x054FD6 for
+; 0x0BDBCC, 0x0570E4 for 0x0BDD5A, 0x008AC4 for 0x00317C / 0x003190).
+;
+;   entry      pool   sites      calling   r4 constant       first use of r0 after return
+;              longs  jsr+jmp    functions (sites/distinct)  (jsr sites)
+;   0x0BDB30     3      2+1          3        0 / --         not read (1 overwritten, 1 call first)
+;   0x0BDB6E     5      4+1          4        3 / 2          not read (1 overwritten, 2 call first,
+;                                                            1 rts next)
+;   0x0BDB80     3      4+1          3        3 / 1          not read (2 overwritten, 1 call first,
+;                                                            1 rts next)
+;   0x0BDB92    10     36+3         12       39 / 10         not read (14 overwritten, 18 call
+;                                                            first, 3 tail-jump first, 1 rts next)
+;   0x0BDBCC   113    330+37       166      323 / 122        not read (108 overwritten, 161 call
+;                                                            first, 21 tail-jump first, 30 rts
+;                                                            next, 10 a mixture of those by path)
+;   0x0BDC0E     2      2+0          2        2 / 2          read, 2 of 2
+;   0x0BDC3C     1      2+0          1        1 / 1          read, 2 of 2
+;   0x0BDC6A     3     10+0          3       10 / 10         read, 10 of 10
+;   0x0BDCB6    60    129+0         63      124 / 121        read, 129 of 129 (exts.b r0,Rn ; tst)
+;   0x0BDD0C     0      0            0       --              --
+;   0x0BDD1C     3      4            3     (integer leaves: operands are values, r0 is the result
+;   0x0BDD5A     6     20           14      and is read at every site)
+;   0x0BDD6E     1      1            1
+;   0x0BDD78     1      2            1
+;   0x0BDD88     5     10            7
+;   0x00317C   176    404+0        239      404 / 4          read, 404 of 404
+;   0x003190   176    270+112      239       --              not read
+;
+; STACK-SPILLED POINTERS. 0x0BDCB6: 119 of the 129 sites call through a register loaded from the
+; literal pool; the other 10 are the slot reloads in fn 0x0753C8 (excerpt above). 0x0BDBCC: 366
+; of 367 through a literal-loaded register, 1 through a slot (01E5F8 in fn 0x01E360, above).
+;
+; TWO SITES THE PROPAGATION LEAVES OPEN ARE SETTLED BY HAND: single-pass loops whose pointer is a
+; register that is stepped by 8 after the call. Both run exactly once, on record 0xFFFF3D08:
+; 0488C4 (0x0BDBCC; listing under A2 below) and 047980 (0x0BDCB6):
+047976: DE88  mov.l @(0x047B98),r14         ; = 0xFFFF3D08 RAM
+047978: DD88  mov.l @(0x047B9C),r13         ; = 0xFFFF3D10 RAM
+04797A: A009  bra 0x047990
+04797C: 6BA3  mov r10,r11
+04797E: D288  mov.l @(0x047BA0),r2          ; = 0x000BDCB6 ROM
+047980: 420B  jsr @r2                       ; -> 0x0BDCB6  | VALIDATE
+047982: 64E3  mov r14,r4                    ; (slot) r4 = r14
+047984: 620E  exts.b r0,r2                  ; verdict as a signed byte
+047986: 2228  tst r2,r2
+047988: 8901  bt 0x04798E                   ; valid -> 04798E
+04798A: A003  bra 0x047994
+04798C: EB01  mov #1,r11
+04798E: 7E08  add #8,r14                    ; r14 += 8
+047990: 3ED2  cmp/hs r13,r14                ; T = (r14 >= r13), unsigned
+047992: 8BF4  bf 0x04797E                   ; T=0, r14 < 0xFFFF3D10 -> again. From 0xFFFF3D08 that is ONE pass
+;
+; RECORD ADDRESSES (r4 constant at the call)
+;   0x0BDBCC  122 distinct, 0xFFFF2050..0xFFFF85FC, all long-aligned RAM, none closer than 8
+;             bytes to another (gaps: 8 x85, 12 x5, 16 x1, 20 x7, larger x23)
+;             by 4 KB page: 0xFFFF2xxx 73, 0xFFFF3xxx 36, 0xFFFF6xxx 8, 0xFFFF8xxx 5
+;   0x0BDCB6  122 distinct (121 by propagation + 0xFFFF3D08 by hand) -- THE SAME 122 ADDRESSES.
+;             Every record with a constant address that is written through 0x0BDBCC is validated
+;             through 0x0BDCB6 somewhere, and the reverse.
+;   0x0BDB92  10 distinct: 0xFFFF3C70 3C78 3C80 3C88 3CB0 3CB8 3CC8 3CD0 3CE0 3CE8
+;   0x0BDC6A  the same 10. No address is used by both the float pair and the long pair.
+;   These are LOWER BOUNDS on the record population: at 43 sites of 0x0BDBCC and 4 of 0x0BDCB6
+;   (034506, 038CF2, 042E04, 046124) r4 is computed (a base plus an index, or a pointer read
+;   from a structure), and all 3 sites of 0x0BDB30 index from 0xFFFF2050.
+;   The 122 float-record addresses:
+;   FFFF2050 FFFF20B0 FFFF20C4 FFFF20CC FFFF20EC FFFF20F4 FFFF20FC FFFF2104
+;   FFFF210C FFFF2114 FFFF211C FFFF2124 FFFF2138 FFFF2140 FFFF2148 FFFF2150
+;   FFFF2158 FFFF2160 FFFF2168 FFFF217C FFFF2184 FFFF218C FFFF2194 FFFF219C
+;   FFFF21A4 FFFF21AC FFFF21B4 FFFF21BC FFFF21C4 FFFF21D4 FFFF21DC FFFF21E4
+;   FFFF21EC FFFF21F4 FFFF2200 FFFF2208 FFFF2210 FFFF2224 FFFF222C FFFF2234
+;   FFFF2240 FFFF224C FFFF2254 FFFF2260 FFFF2268 FFFF2270 FFFF24F8 FFFF2520
+;   FFFF2528 FFFF2530 FFFF2544 FFFF254C FFFF2554 FFFF2574 FFFF259C FFFF25A4
+;   FFFF25AC FFFF25B4 FFFF25BC FFFF25C4 FFFF2D38 FFFF2D40 FFFF2D48 FFFF2D50
+;   FFFF2D58 FFFF2D60 FFFF2D68 FFFF2D70 FFFF2D78 FFFF2D80 FFFF2E08 FFFF2E10
+;   FFFF2E18 FFFF3060 FFFF3068 FFFF3070 FFFF30A0 FFFF30C0 FFFF30C8 FFFF30D0
+;   FFFF318C FFFF3194 FFFF319C FFFF31A4 FFFF31AC FFFF31E0 FFFF31E8 FFFF31F0
+;   FFFF31F8 FFFF3204 FFFF322C FFFF3234 FFFF323C FFFF3428 FFFF3430 FFFF3438
+;   FFFF344C FFFF3454 FFFF345C FFFF3464 FFFF3478 FFFF364C FFFF3654 FFFF3674
+;   FFFF36C8 FFFF36D0 FFFF36D8 FFFF36E0 FFFF3D08 FFFF6070 FFFF6078 FFFF6080
+;   FFFF6088 FFFF6794 FFFF679C FFFF67A4 FFFF6A74 FFFF85DC FFFF85E4 FFFF85EC
+;   FFFF85F4 FFFF85FC
+;
+; DOES ANYTHING READ r0 OF 0x0BDBCC (the NaN refusal)?  Followed from every call site:
+;   level 1   367 sites. At none of the 330 jsr sites is r0 read. 76 functions can hand the value
+;             to THEIR caller: 36 tail-jump to 0x0BDBCC (37 sites), 33 can return with r0
+;             untouched after the jsr (one function does both, so 68 so far), and 8 more
+;             tail-jump onward into a function that returns without touching r0 -- seven into
+;             0x003190, whose r4 != 0 exit leaves r0 alone (0x035F48, 0x05B82E, 0x05BB38,
+;             0x05BE18, 0x07B7A8, 0x07B8C2, 0x07D3B8) and one into 0x0469CE (0x045B44).
+;   level 2   96 call sites of those 76 functions: r0 read at none; 19 further functions pass it on.
+;   level 3   20 call sites of those 19: r0 read at none; ONE function passes it on --
+;             0x00E55C tail-jumps into the level-2 function 0x04A03E:
+00E570: D243  mov.l @(0x00E680),r2          ; = 0x0004A03E ROM
+00E572: 422B  jmp @r2                       ; -> 0x04A03E  | tail-jump: 0x04A03E's r0 becomes 0x00E55C's
+;             0x00E55C has no call site. It is entry 8 of the ROM table at 0x011BD4 (the long at
+;             0x011BF4 is 0x0000E55C) and is called through it by 0x00FDB4, which then returns
+;             without writing r0:
+00FDC8: D03E  mov.l @(0x00FEC4),r0          ; = 0x00011BD4 ROM
+00FDCE: 01EE  mov.l @(r0,r14),r1            ; r1 = table long [u16(r4) * 4]
+00FDD0: 410B  jsr @r1                       ; -> table 0x011BD4 x15
+00FDD4: A006  bra 0x00FDE4                  ; r0 not touched from here to the rts
+00FDE8: 000B  rts
+;   beyond    followed upward from 0x00FDB4: 52 more call sites in four more levels (23, 16, 10,
+;             3), r0 read at none. The chain ends at six vector-table entries (0x00282C,
+;             0x00288C, 0x002B2C, 0x002B44, 0x002B5C, 0x002B74; their addresses are the ROM longs
+;             at 0x0FFF18, 0x0FFF50, 0x0FFFC8, 0x0FFFE8, 0x0FFFCC, 0x0FFFEC) and at 0x010F4C, which
+;             has no known caller and no reference anywhere in the image.
+;   535 call sites (+ the table call at 00FDD0), 127 functions, 0 reads. Of the 95 level-1 and
+;   level-2 functions none has its address in a ROM long that is not a loaded literal; 0x00E55C
+;   (level 3) is the one that does, and is covered above. The "passes it on" rule is an OVER-
+;   approximation: it lets r0 survive any callee that might not write it. The 0x04A03E link, for
+;   one, needs 0x05BB38's r0 to survive the dozen calls 0x05B0A0 makes before its rts (05B0AE ..
+;   05B0FC). Over-approximating can only add readers, and none was found.
+;   Reproduced with an independent scanner written for the review (levels 76 / 19 / 1 and the
+;   site counts above; 9 of the 96 level-2 "sites" are `bra` tail-calls into a level-1 function).
+;   The NaN refusal is therefore dead information on every statically known path: a NaN handed
+;   to 0x0BDBCC is silently not stored and the record keeps its previous contents.
+;
+; CONSEQUENCE FOR THE PROJECT'S TOOLS. The stores happen inside the helper through r4, so no
+; guarded record has a visible writer in a literal-pool scan. scripts/mapping/find_writers.py
+; reports "no writes found" for 0xFFFF3674, 0xFFFF2D38 and 0xFFFF2D40 and only four phantom hits
+; in float data (0x0DA6DC, 0x0DA7C8, ...) for 0xFFFF85DC, while the bytes show 21 stores to
+; 0xFFFF3674 alone (all jsr 0x0BDBCC with r4 = 0xFFFF3674, e.g. 05B22A, 05B978, 05BA68). To find
+; the writer of a guarded record, search for call sites of 0x0BDBCC / 0x0BDB92 with that r4.
+
+;---- FPSCR loads (bears on the NaN test at 0BDBDA) ---------------------------------------------
+; Every instruction in the ROM that can put a value into FPSCR. Two load a literal; neither
+; literal has any of the exception-enable bits 11..7 set.
+00FA42: D2A1  mov.l @(0x00FCC8),r2          ; = 0x00040001 const
+00FA44: 426A  lds r2,fpscr                  ; FPSCR = 0x00040001 (start-up, right after VBR is set)
+05873C: D21E  mov.l @(0x0587B8),r2          ; = 0x00000000 const
+05873E: 426A  lds r2,fpscr                  ; FPSCR = 0x00000000
+; The other six are stack pops. The only pushes of FPSCR in the ROM are six `sts.l fpscr,@-r15`
+; (002BBE, 002C9A, 00E7EA, 00F41E, 00F48E, 00F712); if each pop takes back what one of those
+; stored (the pairing was read, not walked), a pop can only restore what FPSCR already held:
+002BDC: 4F66  lds.l @r15+,fpscr
+00E820: 4F66  lds.l @r15+,fpscr
+00F42E: 4F66  lds.l @r15+,fpscr
+00F49C: 4F66  lds.l @r15+,fpscr
+00F72A: 4F66  lds.l @r15+,fpscr
+0037B6: 4F66  lds.l @r15+,fpscr             ; in resume entry 0x0037A0 (ROM table 0x004098); not in the census, decoded directly
+; All other words of the shape 0x4n6A / 0x4n66 below 0x0C0000 are halves of pool longs
+; (0xFFFF426A, 0x000C4A6A, 0x476A6000 = 60000.0, 0xFFFF4166, 0x000C4866 ...), 24 in all, each
+; one the target of a reached `mov.l @(pool),Rn` or `mova`. The two injected code patches
+; (0x09A3C2..0x09A473, 0x0F1000..0x0F1057) contain no FPSCR load.
+
+
+================================================================================
+COMPARISON WITH EXISTING CLAIMS
+================================================================================
+Made by the first tracer AFTER the blind reading was written: fn_dump --labels,
+disassembly/ghidra/ImportAE5L600L.java, docs/, disassembly/analysis/, disassembly/maps/,
+docs/verification-status.json. The third decode re-checked the byte side of every entry and
+the cited line numbers (all still correct on 2026-11-27), corrected the counts in A1 and B9,
+and split A11: a name is listed as CONTRADICTED only where the bytes refute it.
+
+Existing names for the entries (census label_claim / ImportAE5L600L.java):
+    0x0BDB92 peripheral_io_init [TRACED]      0x0BDBCC desc_read_float_safe [TRACED]
+    0x0BDC6A peripheral_io_config [TRACED]    0x0BDCB6 desc_read_int_safe [TRACED]
+    0x0BDD5A peripheral_io_read [TRACED]      0x0BDD88 peripheral_io_write [UNVERIFIED]
+    0x00317C interrupt_priority_set [TRACED] AND irq_level_set [TRACED]   (two labels, one address)
+    0x003190 interrupt_restore [TRACED]      AND irq_level_restore [TRACED]
+    the other nine entries carry no label.
+All six cluster labels are contradicted by the bytes. Five of them are stamped [TRACED].
+
+A. CONTRADICTED BY THE BYTES
+
+A1. 0x0BDBCC "desc_read_float_safe" -- ImportAE5L600L.java:2103-2105
+      "Reads float from descriptor ptr r4 ... Returns validated float or 0."
+    Bytes: it STORES fr4 to [r4] (0BDBF6), r4 is a RAM address at all 324 sites where it is a constant,
+    and it returns r0 = 0 / 1 (0BDC00), never a float. A write, not a read; nothing "descriptor".
+    (The NaN self-compare and the 0x317C(16) / 0x3190 bracket in the same comment are right.)
+    Same name repeated in maps/disassembly.txt:600, maps/thunk_resolution.txt:26-57,
+    analysis/region_060000_scout.txt:250, analysis/fuel_pump_raw.txt:2974 and 3391,
+    analysis/injection_timing_analysis.txt:484, analysis/fueling_pipeline_analysis.txt:1492.
+
+A2. 0x0BDBCC under other names:
+    analysis/tau_alpha_analysis.txt:91, 148-158 and tau_alpha_raw.txt:123, 175
+      "DESC_0BDBCC / DESC_tau_falling -- tau falling load table apply"
+      -> there is no table and no descriptor; it stores fr4 into the record at r4.
+    analysis/fueling_pipeline_analysis.txt:1675-1691, 1765-1785, 1843-1882
+      "FUNC_BDBCC (per-cylinder injection callback) ... injector_output(R4=old_SR) -> fire
+       injection ... [+4]: uint16 channel mask (written by func_BDBCC from R13)"
+      -> wrong throughout. The word at +4 is the check word CK(V). The pseudocode quotes
+      instructions that are not in the function ("fmov.s FR15,@R14", "mov.b @(R14+1)"); the real
+      ones are 0BDBE0 fmov.s fr14,@r15 and 0BDBE4 mov.w @(2,r15),r0. The call it describes is:
+048742: DE5D  mov.l @(0x0488B8),r14         ; = 0xFFFF3D08 RAM
+048744: DD5D  mov.l @(0x0488BC),r13         ; = 0xFFFF3D10 RAM
+048746: A0C0  bra 0x0488CA
+048748: FE8D  fldi0 fr14
+0488C0: D205  mov.l @(0x0488D8),r2          ; = 0x000BDBCC ROM
+0488C2: 64E3  mov r14,r4
+0488C4: 420B  jsr @r2                       ; -> 0x0BDBCC
+0488C6: F4EC  fmov fr14,fr4
+0488C8: 7E08  add #8,r14
+0488CA: 3ED2  cmp/hs r13,r14
+0488CC: 8BF8  bf 0x0488C0
+      i.e. one call 0x0BDBCC(record 0xFFFF3D08, 0.0). The delay slot 0488C6 is F4EC
+      "fmov fr14,fr4" (a register move of the 0.0 loaded at 048748), not the
+      "fmov.s @R14,FR4" that line 1678 of that file prints. No injector is involved.
+    analysis/injection_timing_analysis.txt:483-485
+      "DESCRIPTOR LOOP A (0xFFFF3D08->0xFFFF3D10): Calls desc_read_float_safe (0xBDBCC) on each
+       descriptor entry. If ANY entry is non-zero (signed test), sets R11=1"
+      -> the loop calls 0x0BDCB6, and what is tested is the validator's verdict in r0:
+04796E: D488  mov.l @(0x047B90),r4          ; = 0xFFFF3D08 RAM
+047970: D288  mov.l @(0x047B94),r2          ; = 0x000BDBCC ROM
+047972: 420B  jsr @r2                       ; -> 0x0BDBCC
+047974: F48D  fldi0 fr4
+047976: DE88  mov.l @(0x047B98),r14         ; = 0xFFFF3D08 RAM
+047978: DD88  mov.l @(0x047B9C),r13         ; = 0xFFFF3D10 RAM
+04797A: A009  bra 0x047990
+04797C: 6BA3  mov r10,r11
+04797E: D288  mov.l @(0x047BA0),r2          ; = 0x000BDCB6 ROM
+047980: 420B  jsr @r2                       ; -> 0x0BDCB6
+047982: 64E3  mov r14,r4
+047984: 620E  exts.b r0,r2
+047986: 2228  tst r2,r2
+047988: 8901  bt 0x04798E
+    analysis/startup_enrichment_analysis.txt:316 "1D interpolation (table lookup variant)" -> wrong.
+    analysis/ignition_timing_analysis.txt:769 "float_clamp_range" -> wrong, nothing is clamped.
+    analysis/region_020000_scout.txt:277 "desc_read_float -- Descriptor float read" -> wrong.
+    analysis/sensor_diag_analysis.txt:101, 860, 881 and region_070000_scout.txt:96, 316 "eeprom_op"
+      -> unsupported: the function touches the RAM record and the stack, nothing else.
+    analysis/secondary_table_b.txt:79, 104, 125 "float_store_clamp" -> store yes, clamp no.
+    maps/disassembly.txt:2840, 3232 "A/F Learning table interpolation/update" -> no interpolation.
+    analysis/cl_ol_analysis.txt:140 "table utility" -> not a table function.
+    analysis/region_010000_scout.txt:195, 199 "float/math library" (also for 0x0BDCB6) -> no arithmetic
+      on the value in either.
+
+A3. 0x0BDCB6 "desc_read_int_safe" -- ImportAE5L600L.java:2155-2157
+      "Reads integer value from descriptor ptr r4 ... reads data with boundary checks ...
+       Integer variant of desc_read_float_safe."
+    Bytes: it loads a FLOAT (0BDCC8 fmov.s @r13,fr8); it returns only a verdict r0 = 0/1 (0BDCF6);
+    its only compares are cmp/eq against the two check words (no boundary or range test); r4 is
+    RAM. The integer variant is 0x0BDC6A. 0x0BDCB6 is the VALIDATOR that pairs with the WRITER
+    0x0BDBCC, not an integer twin of it.
+    Same name in maps/disassembly.txt:606 and analysis/sensor_diag_analysis.txt:706, 712, 864
+      (:712 "includes checksum or range validation": checksum yes, range no).
+    analysis/secondary_table_b.txt:65 "float_compare_clamp" -> wrong.
+    analysis/startup_enrichment_analysis.txt:318 "interpolation function" -> wrong.
+    analysis/cl_ol_analysis.txt:146-148 "If result != 0: R14 = 1 (valid) / If result == 0: R14 = 0
+      (invalid)" -> the sense is INVERTED. r0 = 0 is the valid verdict (0BDCE8), so 0357FA-035802
+      (excerpt (5) above) leaves r14 = 1 when record 0xFFFF318C is INVALID.
+
+A4. 0x0BDD5A "peripheral_io_read" -- java:2355-2356 "Peripheral register read utility."
+    Bytes: reads no memory at all. Signed clamp (x, hi, lo).
+A5. 0x0BDD88 "peripheral_io_write" -- java:2357-2358 [UNVERIFIED] "Peripheral register write utility."
+    Bytes: writes no memory at all. Absolute difference of two registers.
+    (docs/exploration/table_hypotheses/results.json:5166, 12400, 14262 already flag this name as
+    unverified and use the call as "0xBDD88(x, 0)"; with r5 = 0 the result is |x|.)
+A6. 0x0BDB92 "peripheral_io_init" -- java:2359-2360 "Peripheral I/O initialization. Called during
+    startup and reconfiguration."
+    Bytes: stores a long and its two check words into a RAM record. No peripheral access.
+A7. 0x0BDC6A "peripheral_io_config" -- java:2361-2362, analysis/final_seven_analysis.txt:148-243,
+    maps/disassembly_gaps.txt:32.
+    final_seven's instruction lines and its checksum logic are right (see B1), but its reading of
+    the two calls is not: :165-170 and :215 "R0 = peripheral_reg_read(16) ... R4 = raw register
+    value ... // read port 16" and
+    :210-211, :240-241 "0x317C peripheral_reg_read(channel) -- reads SH7058 I/O register /
+    0x3190 peripheral_reg_write() -- writes SH7058 I/O register". 0x00317C and 0x003190 touch SR
+    (and, in 0x003190, two RAM reads) and nothing else; the value moved into r4 at 0BDC7A is the
+    saved interrupt mask handed back to 0x003190. "config_struct / io_config_t / Peripheral I/O
+    configuration" has no support in the bytes. Return 1 is "neither check word matches".
+
+A8. 0x00317C "interrupt_priority_set" -- java:2108-2110
+      "Sets SR interrupt mask to level r4 (0-15). Reads SR, masks with 0x00F0, shifts r4 into
+       I-bits. Returns old SR in r0. Used by all descriptor reads for atomicity."
+    Bytes: there is no shift (00317E stc, 003180 and, 003182 cmp/hi, 003188 ldc): r4 is the SR
+    image itself and 0x10 is level 1. It only RAISES (003182-003184). r0 is SR & 0xF0, not SR.
+    Its callers here are RAM-record helpers, not descriptor reads.
+    The pair under other names:
+    analysis/fueling_pipeline_analysis.txt:1006, 1027, 1050, 1308, 1347-1361, 1412, 1445, 1740,
+      1799-1800, 1881-1882 ("func_317C(R4=16) // rpm/load gate", "0x3190 (hardware injector
+      output)", "func_3190: INJECTOR GATE ... Gate injection pulse to MTU hardware",
+      "IPL raised to 16") -> wrong. Neither function reads RPM or load or writes a timer.
+    analysis/fuel_pump_analysis.txt:209, 212 "Timer/counter utility / Another timer utility" -> wrong.
+    analysis/region_020000_scout.txt:283-284 "get_ad_channel (317C) A/D channel select /
+      get_ad_raw (3190) A/D raw read", region_070000_scout.txt:249, 341, 349 -> wrong.
+    analysis/maf_scaling_analysis.txt:167 "descriptor store (0x3190)" -> wrong.
+    analysis/ol_bypass_state_machine.txt:650, 718 "interrupt_save ... priority level 16" -> the
+      role is right, the level is not: 0x10 in SR bits 7..4 is level 1 (there is no level 16).
+
+A9. 0x0BDB6E / 0x0BDB80
+    docs/corrections.md:4970-4971 and analysis/scheduler_event_queue_trace.txt:331-332 (repeated in
+    docs/open-holes.md:182-183 and docs/exploration/claim_audit/grades_retry.json:160):
+      "the guarded-RAM accessor prologue jsr 0x0000317C ; r4 = 16 shared by
+       0x0BDA70 / 0x0BDAAC / 0x0BDB6E / 0x0BDB80"
+    -> false for 0x0BDB6E and 0x0BDB80: both are 9-instruction leaves with no jsr at all.
+    (0x0BDA70 and 0x0BDAAC, outside this file, do open that way: 0BDA7C-0BDA80, 0BDAB8-0BDABC.)
+    The open question recorded there is answered by the 0x00317C section above: the "prologue"
+    is the interrupt-mask window, not an access layer of its own.
+    analysis/secondary_table_b.txt:117-118 "BDB6E (float_init) / BDB80 (float_init_pair)",
+    analysis/region_010000_scout.txt:188, 191 "float_init2 / float_init -- Float workspace init",
+    java:3434 "BDB6E/BDB80 (float_init)" -> there is no float in either; each stores an integer
+    and its one's complement.
+
+A10. Two callers decoded in this file:
+    analysis/secondary_table_b.txt:123-127, 260 and java:3437-3439 -- 0x004BCA
+      "charge_validation_check ... OL charge validation ... Float clamp + BDB6E"
+      -> it validates nothing and clamps nothing: it stores the ROM float @0x000C0064 into
+      record 0xFFFF2050 and 0 into PAIR8 0xFFFF2058 (004BCC-004BE2 above). A (re)initialisation.
+    analysis/secondary_table_b.txt:129-131, 261 -- 0x004BEC
+      "charge_convergence_check ... Returns R14=1 if convergence detected"
+      -> it returns 1 when record 0xFFFF2050 or pair 0xFFFF2058 FAILS its integrity check
+      (004BEC-004C22 above). ("charge" / "OL" were not examined.)
+
+A11. A RAM name contradicted by the bytes (docs/verification-status.json flag DISASM-ONLY, source
+     disassembly/maps/ram_reference.txt):
+    0xFFFF85DC "knock_fuel_interlock -- Knock/fuel interlock control byte" (ram_reference.txt:323)
+      -> not a byte. An 8-byte REC8 FLOAT record: validated at 0BCD68, written with a float at
+      0BCD76 and 0BCE12 (excerpt (10)) and at 04F5BA; every other literal use of the address is
+      a float access (019176 and 0864E0: fmov.s @r2,fr8; 01A1C4: fmov.s @r2,fr7; 0BCB42:
+      fmov.s @r6,fr4; 0BCB8C and 0BCBA0 load it as a base for fmov.s stores at other offsets).
+      What the float means is not established.
+
+A11b. RAM names whose TYPE the bytes fix but whose meaning they neither support nor refute
+     (same source; the first version filed the first two under "contradicted"):
+    0xFFFF3674 "timer_counter_C -- Timer/counter C" (ram_reference.txt:230)
+      -> a REC8 float record, not an integer counter: 21 stores through 0x0BDBCC (15 of them
+      fldi0 in the delay slot), one validation (05B2EE), three plain fmov.s reads (05CD0C, 097118,
+      0973F4). Six stores can be non-zero. 05B978 / 05BCE8 / 05BF08 write (float)(u16 @0xFFFF8EE0)
+      * 60.0 when byte @0xFFFF8EE2 is 0 and * 0.002 otherwise (05B952..05B97A, through 0xFFFF8EA8).
+      05B926 writes 0.0 or min(float @0x000C5658, 60000.0) (05B8F0..05B906); 05BC1E / 05BEB6
+      write 0.0 or float @0x000C5658 / @0x000C565C, replaced by 0.0 below 180.0, capped at 60000.0
+      (05BBF0..05BC0E, 05BE92..05BEB0: fcmp/gt fr4,fr8 is T when 180.0 > the value). In this bin
+      those two floats are 3600.0 and 5400.0. 05CD0C..05CD34 divides the stored float
+      by 60.0 or 0.002 (0x0BE628 = fr4 / fr5; chosen by byte @0xFFFF367C) and rounds it back to a
+      u16. That is how a duration kept in seconds would be handled, so "timer" is NOT refuted;
+      it is not proved either (the u16 comes from the structure at 0xFFFF8EDE that 0x00C8E8 is
+      handed just before; neither was decoded).
+    0xFFFF2D38, 0xFFFF2D40 "system_state_timer_A / _B -- timer counter" (ram_reference.txt:374-375)
+      -> REC8 float records, the first two of the ten at 0xFFFF2D38..0xFFFF2D80 that fn 0x074E30
+      sets to 0.0 (074E3E-074E4C above). They mirror each other: 07516C-075174 stores the float
+      read from 0xFFFF2D40 into 0xFFFF2D38, 0752E2-0752EC stores the float read from 0xFFFF2D38
+      into 0xFFFF2D40. Validated at 07556A and 074FDA. Whether the float is a time is not established.
+    0xFFFF85E4 "fuel_knock_state_var" (:312) -> REC8 float record (0BC754 / 0BC772); name not tested.
+    0xFFFF20A0 "system_state_cluster_base" (:372) -> a PAIR16 written by 0x0BDB80 and validated by
+      0x0BDC3C; name not supported by anything here.
+    0xFFFF3C70 "cal_mirror_state_base" (:357) -> REC8 long record (0x0BDB92 stores 0 at 09EB54;
+      its neighbour 0xFFFF3C78 gets 0xA5A5A5A5); name not tested.
+
+A12. docs/analysis-plan.md:91 "The helper library 0x0BDB30-0x0BEDB8" -> the family does not start at
+    0x0BDB30: 0x0BDA70, 0x0BDAAC and 0x0BDAE8 use the same literal pool (0x0BDD04 / 0x0BDD08) and the
+    same interrupt window, immediately below. Imprecise boundary, nothing more.
+
+B. CONFIRMED BY THE BYTES
+
+B1. analysis/final_seven_analysis.txt:158-207, 213-237 -- the 0x0BDC6A listing, the check
+    ~(upper + lower) against two stored copies, the refresh of both, the 0/1 return and the layout
+    +0 long / +4 word / +6 word. Identical to the reading above.
+B2. analysis/final_seven_analysis.txt:293-300, 580 and maps/disassembly_gaps.txt:33 -- 0x0BDD5A is an
+    integer clamp with R4 = value, R5 = high bound, R6 = low bound.
+B3. java:5800-5803 "irq_level_set" (the second label on 0x00317C): R5 = 0xF0; R0 = SR & R5;
+    CMP/HI R0,R4; raise only if higher. java:5804-5806 "irq_level_restore" on 0x003190. Both match.
+    Each of these two addresses therefore carries two labels telling different stories; the later
+    pair is the correct one.
+B4. analysis/fueling_pipeline_analysis.txt:1787-1797 -- the FUNC_317C pseudocode (raise only, returns
+    old SR & 0xF0, 0x10 gives IMASK = 1) is right, although lines 1738 and 1881 of the same file
+    contradict it.
+B5. analysis/knock_flkc_report.txt:454 "write_float_ptr(r4=ptr, fr4=value)" -- right signature
+    ("IIR" at :337 / :454 is not: nothing is filtered inside the function).
+    analysis/mystery_subs_analysis.txt:367 "(float write)" and
+    analysis/injection_timing_analysis.txt:128 "(learning table write)" -- right that it is a write.
+B6. analysis/scheduler_event_queue_trace.txt:243, 246 -- 0x0BDB80(r14, id) "store id word" and
+    0x0BDB6E(0xFFFF2060, count+1): right as far as they go (each also stores the complement).
+B7. java:1178, maps/disassembly.txt:3233, analysis/cl_ol_analysis.txt:146 -- 0x0BDCB6 used as a
+    "validity check": right in kind. java:307, 318 -- 0x0BDBCC used to update records
+    0xFFFF3234 / 0xFFFF323C / 0xFFFF3248 + i*8: consistent with a store.
+B8. java:2104 (NaN self-compare; 0x317C(16) + 0x3190) and java:2111-2113 ("Restores SR interrupt
+    mask from r4 ... may call 0x3664") -- right; imprecise only about the flag, which is
+    byte @(1, long @(0xFFFF1288 + 0x18)) and is looked at only when r4 == 0.
+B9. Call counts quoted in the labels against the scan in this file (jsr + jmp sites):
+    0x0BDD5A 20 = 20, 0x0BDD88 10 = 10, 0x0BDC6A 10 = 10; 0x0BDBCC 309 vs 367, 0x0BDCB6 120 vs 129,
+    0x0BDB92 17 vs 39 (17 is its count of literal loads), 0x00317C 298 vs 404, 0x003190 181 vs 382.
+
+C. DEFINITIONS / VERIFICATION-STATUS
+    The cluster touches no definition-XML table, no descriptor and no fixed RAM address of its own,
+    so there is no VERIFIED-BOTH / CONFLICT entity to check. docs/verification-status.json has no
+    entity at all for 0xFFFF1288, 0xFFFF2050, 0xFFFF2058, 0xFFFF2060, 0xFFFF3C78 or 0x000C0064;
+    0xFFFF318C, 0xFFFF3234, 0xFFFF20B0, 0xFFFF210C, 0xFFFF6070, 0xFFFF659C are UNMAPPED.
+
+D. WHAT THE COMPARISON SHOWS ABOUT THE LABEL TAGS
+    Five labels here are [TRACED] and wrong about what the function does. Two of them
+    (0x0BDC6A, 0x0BDD5A) were even byte-traced in final_seven_analysis.txt with the right mechanics
+    and kept a wrong name; the callee names in that trace (peripheral_reg_read / _write) were never
+    decoded and turned a checksum validator into "peripheral I/O". [TRACED] covered the address.
+
+
+================================================================================
+ESTABLISHED
+================================================================================
+ 1. REC8 layout and check word. V at +0 (long), check word at +4 and again at +6;
+    CK(V) = ~((V >> 16) + (V & 0xFFFF)) & 0xFFFF.  Computed at 0BDB42-0BDB4E, 0BDBA2-0BDBA8,
+    0BDBE2-0BDBE8, 0BDC80-0BDC8C, 0BDCCC-0BDCD8; stored at 0BDBB4/0BDBBC and 0BDBF4/0BDBFC.
+ 2. Validity rule is "CK(V) == [+4] OR CK(V) == [+6]" (0BDB50-0BDB5A, 0BDC8E-0BDC98,
+    0BDCDA-0BDCE4). It is a one's-complement sum check with a duplicated check word, not a
+    two-copy compare of the value, not a complement-of-value check, and not a range check.
+    Of the 256 constant fills only 0x55 validates (as the value 0x55555555); 0x00 and 0xFF do
+    not. No constant fill validates as a PAIR8 / PAIR16. Emulated (sections 3, 4, 5).
+ 3. 0x0BDBCC is a float WRITE: (r4 = record, fr4 = value) -> r0 = 0; NaN -> r0 = 1 and no
+    write, no mask change (0BDBDA-0BDBDE, 0BDC00). Emulated.
+ 4. 0x0BDCB6 is a float-record VALIDATE: r0 = 0 valid / 1 invalid; on valid both check words are
+    rewritten (0BDCEA-0BDCEE); on invalid nothing is written; the value is never returned in
+    r0/fr0. It has no NaN test (no fcmp in 0BDCB6..0BDD00). fr8 is loaded with the record's
+    float at 0BDCC8 and still holds it on return ONLY when no context switch happens inside
+    0x003190 / 0x003664; see 9. Emulated.
+ 5. 0x0BDB92 / 0x0BDC6A are the integer twins of 3 / 4; 0x0BDB92 has no NaN test and always
+    returns 0. Emulated.
+ 6. 0x0BDB30 is the only function here that RETURNS a stored value: fr0 = float if valid, else the
+    caller's fr4. It never writes the record. It reads the value twice (0BDB42/0BDB44 for the
+    check, 0BDB5C for the result); the validators read it once (0BDC7C, 0BDCC8). Emulated with
+    the access order logged.
+ 7. 0x0BDB6E / 0x0BDC0E: byte + complement pair, write (unmasked, r0 = 0) and validate
+    (masked, r0 = 0/1). 0x0BDB80 / 0x0BDC3C: the same for a word. Emulated.
+ 8. Write order in 0x0BDBCC and 0x0BDB92 is +4, value, +6, with the +6 store in the delay slot of
+    the jsr to 0x003190 (0BDBF4, 0BDBF6, 0BDBFC; 0BDBB4, 0BDBB6, 0BDBBC). Starting from a record
+    whose +6 word is good, each of the four states the record passes through validates and reads
+    as either the complete old value or the complete new value. If the +6 word was ALREADY bad,
+    the first intermediate state (old value, new +4 word) is valid exactly when CK(new) == CK(old)
+    -- then it reads as the old value -- and invalid otherwise; the two later states are valid as
+    the new value regardless. Emulated (section 7: 6 pairs with equal check words, 304 without).
+ 9. Interrupt handling. 0x00317C(0x10) raises the SR mask from level 0 to level 1 and otherwise
+    leaves it (003182-003188); 0x003190 loads SR with the saved (old SR & 0xF0) on every exit
+    (0031A2, 0031A6), so every masked helper returns with I as found and M = Q = S = T = 0. With a
+    saved mask of 0 and byte @(1, long @0xFFFF12A0) != 1 it tail-jumps to 0x003664 (0031A0),
+    which returns r0 = 0 either at once (word @0xFFFF128C == word @0xFFFF128E, or bit 0x1000 of
+    long @0xFFFF1290 set: 003678-003682, 0036A4) or after saving the context through 0x003440
+    (00369C). 0x003440 saves SR, pr, r8-r14, gbr, mach, macl and, only when byte @(0,r6) == 4,
+    fr12-fr15 (003440-00346A); the resume routine 0x00379C reloads exactly that
+    (0037CE-0037EC). r0-r7, fr0-fr11 and fpul do not survive that path. All of it executed
+    natively with a modelled SR, except the scheduler from 0x0034B4 on and the resume routines,
+    which are bytes only.
+    0x0BDB6E, 0x0BDB80 and the six integer leaves do not touch SR's I, M, Q or S at all.
+    No reached instruction in the ROM is sets, clrs, mac.l or mac.w.
+10. 0x0BDD0C = u16 saturating subtract (uncalled). 0x0BDD1C = u16 weighted mean
+    a +/- ((|b-a| * (0x10000-k)) >> 16), k == 0 -> b. 0x0BDD5A = signed clamp (x, hi, lo).
+    0x0BDD6E = unsigned 32-bit min. 0x0BDD78 = max by low 16 bits, whole register returned.
+    0x0BDD88 = signed absolute difference. All emulated against a Python reference.
+11. No function in 0x0BDB30..0x0BDD9B reads a table descriptor, an axis, calibration ROM or a
+    peripheral register. The only literal pool (0x0BDD04, 0x0BDD08) holds two code addresses.
+12. Bytes of 0x0BDB30..0x0BDD9B, 0x00317C..0x0031AF, 0x003440..0x003477, 0x0034B4..0x0034CB,
+    0x003664..0x0036C3, 0x00379C..0x00381F and the table 0x004090..0x00409F are identical in
+    rom/ae5l600l.bin and in the 20.19c reference, so everything above holds for both.
+13. Call sites, whole ROM (scan section): 0x0BDBCC 367 (330 jsr + 37 jmp) in 166 functions;
+    0x0BDCB6 129 jsr in 63 functions; 0x0BDB92 39; 0x0BDC6A 10; 0x0BDB30 3; 0x0BDB6E 5;
+    0x0BDB80 5; 0x0BDC0E 2; 0x0BDC3C 2. Ten of the 0x0BDCB6 sites and one 0x0BDBCC site call
+    through a stack-spilled copy of the pointer (0754AC/075564 -> 0754BC.., 01E488 -> 01E5F8).
+    Where r4 is a constant, 0x0BDBCC is given 122 distinct long-aligned RAM addresses in
+    0xFFFF2050..0xFFFF85FC and 0x0BDCB6 the same 122; 0x0BDB92 and 0x0BDC6A share the same 10
+    (0xFFFF3C70..0xFFFF3CE8). No address is in both families.
+14. Use of r0 by callers. After 0x0BDCB6 (129 of 129), 0x0BDC6A (10 of 10), 0x0BDC0E and
+    0x0BDC3C (2 of 2 each) the instruction at the return address is exts.b r0,Rn followed by
+    tst. After 0x0BDBCC r0 is read at none of the 330 jsr sites, nor at any of the 168 further
+    call sites of the 127 functions that can (by an over-approximating rule) pass its r0 upward,
+    including the table-dispatched 0x00E55C and its dispatcher 0x00FDB4 (00E572, 00FDD0..00FDE8):
+    the NaN refusal is never read on any statically known path.
+15. Function 0x0BCD46, when its byte argument is 0, validates record 0xFFFF85DC (0BCD68) and, if
+    the verdict is non-zero, rewrites it with the float read from 0xFFFF85B8 before the
+    validation call (0BCD6A, 0BCD76); on the same branch it then stores a newly computed float
+    to the record whatever the verdict was (0BCE12). With a non-zero argument none of the
+    three calls runs (0BCD5A/0BCD5C, 0BCDFC/0BCDFE).
+16. FPSCR: the only literal loads are 0x00040001 (00FA44) and 0x00000000 (05873E); the six other
+    writers are stack pops. Bits 11..7 are 0 in both literals.
+17. scripts/mapping/find_writers.py cannot see a store made through 0x0BDBCC / 0x0BDB92: it
+    reports no writer for 0xFFFF3674, 0xFFFF2D38, 0xFFFF2D40 (21, 2 and 2 helper stores exist).
+
+================================================================================
+NOT ESTABLISHED
+================================================================================
+ 1. WHAT any record holds. 122 float records and 10 long records are named above by address
+    only, and at 47 call sites r4 is computed, so there may be more. Settle per record by
+    decoding its writer (the caller that computes fr4) -- not from a label.
+ 2. WHY the records are guarded (battery-backed / learned values that must survive reset, versus
+    plain cross-task shared data). The torn-write property in ESTABLISHED 8 is consistent with
+    reset tolerance but does not prove intent. Settle by decoding the reset path: is
+    0xFFFF2000..0xFFFF3FFF cleared at start-up, and do the callers that test 0x0BDCB6 run from init?
+ 3. What the level-1 mask protects against. Only priority-1 interrupt sources are held off, and
+    0x0BDB30 looks at the value twice inside that window. Whether any interrupt of priority >= 2
+    writes a guarded record was not examined. Settle from the IPRx set-up and the vector table.
+ 4. What word @0xFFFF128C, word @0xFFFF128E, bit 0x1000 of long @0xFFFF1290 and the record at
+    long @0xFFFF12A0 ARE (running task / ready task / lock is the obvious reading and is not
+    proved here), which resume routine the dispatcher selects for a frame saved by 0x003440,
+    and what runs in between. Bytes were read for 0x0034B4..0x0034C2 and 0x00363E..0x00364E
+    only. Settle by tracing 0x0034CC / 0x0035FC (disassembly/analysis/rtos_core_trace.txt covers
+    that ground; it was not used as evidence here).
+ 5. Whether a NaN ever reaches 0x0BDBCC at run time. If one does, the store is skipped and
+    nothing in the ROM notices (ESTABLISHED 14). The follow-up covers every statically resolved
+    call, tail-jump and bra tail-call, plus the one table dispatch the chain meets (0x00FDB4).
+    It ends at six vector-table entries and at 0x010F4C, which nothing in the image references;
+    whoever reaches 0x010F4C (if anything does) is outside the follow-up. A pointer built at run
+    time would escape it too (none was seen).
+ 6. The size of the record population. 122 + 10 are the addresses that are constants at a call
+    site. The scan's assumptions (callee preserves r8-r15 and the caller's frame) are the
+    calling convention, not a proof per callee.
+ 7. Behaviour of 0x0BDBCC for a signalling NaN or a denormal on silicon. The emulator gives T=0
+    for every NaN and flushes denormals to zero for the compare. No instruction loads FPSCR
+    with an exception-enable bit (ESTABLISHED 16), PROVIDED each of the six stack pops takes
+    back what an sts.l fpscr pushed -- the pairing was read, not walked. That an fcmp/eq on a
+    signalling NaN cannot trap with the enable clear is the hardware manual's statement, not
+    something these bytes show.
+ 8. How 0x0BDD0C is reached, if at all (no reference found). And everything about 0x0BDD9C
+    beyond the entry signature above.
+ 9. In 0x0BDD1C, which operand is the previous output and which the new sample (caller matter).
+10. Whether 0xFFFF3674, 0xFFFF2D38 and 0xFFFF2D40 are timers (comparison A11b). Settle
+    0xFFFF3674 by decoding 0x00C8E8 and the u16 at 0xFFFF8EE0; the pair by decoding what fn
+    0x07515E / 0x0752D4 store into the other eight records of the run.
+
+
+================================================================================
+REVIEW HISTORY
+================================================================================
+T = the first trace, R = the adversarial review, D = this third decode (bytes, then native
+emulation). Claim ids are the review's. Evidence addresses refer to listings in this file.
+
+C09  fr8 after 0x0BDCB6.                                   R right; R's condition was too narrow
+     T: "on return fr8 holds the float at [r4]" -- asserted in a rig where 0x003190 was a stub.
+     R: only when 0x003190 returns directly. D: 0x003440 pushes SR, pr, r8-r14, gbr, mach, macl
+     and (byte == 4) fr12-fr15, never fr8 (003440..00346A); the resume routine reloads the same
+     set (0037CE..0037EC). Run natively (section 8): fr8 == the float on the rts exits of
+     0x003190 AND on the two no-switch exits of 0x003664, which R's wording left out; on the
+     switch exit the float is live in fr8 and absent from the 17-long frame. "No NaN test" was
+     never in dispute (no fcmp in 0BDCB6..0BDD00).
+C18  "old value + new +4 word is invalid if +6 was already bad".                       R right
+     The state is (old, CK(new), bad): valid iff CK(old) == CK(new). T asserted the claim for
+     one pair; T's own list held a counter-example (0x00010002 -> 0x00020001, both 0xFFFC).
+     D: rule asserted on 310 pairs through 0x0BDCB6, 0x0BDC6A and 0x0BDB30 (section 7).
+C34  where fr4 comes from at the 19 sampled 0x0BDBCC sites.                             R right
+     T's list omitted the ROM float at site (1) (004BD4 loads r3 = 0x000C0064, 004BDA
+     fmov.s @r3,fr4) and the callee-saved registers at site (9) (08FE94, 08FE9C; filled at
+     08FE02, 08FE06). D adds that at (9) the two registers hold the records' OWN old values,
+     read by plain fmov.s, and on one of the three paths (08FE3C bt 0x08FE4E) reach the stores
+     unchanged. The site list, the r4 literals and "r0 never read" all hold.
+C35  "124 jsr sites of 0x0BDCB6".                                                       R right
+     124 was 119 literal-register sites plus 5 of the 10 stack-slot sites in fn 0x0753C8.
+     D, by constant propagation with stack slots: 129 jsr sites in 63 functions; at all 129 the
+     return address holds exts.b r0,Rn and the next word is tst. The 11 samples hold. T's
+     "non-zero takes the failure path" is a reading of the callers, not shown here; dropped.
+C36  record-address sets "119, and 108 inside them".                                    R right
+     D: 122 and 122, the same set (0xFFFF3D08 at the single-pass loop 047976..047992 settled by
+     hand); 10 and 10 for the long pair. R reported 45 + 4 sites with a computed r4; D resolves
+     two more (02394A, 023956: a literal plus a constant register) and gets 43 + 4. The gap
+     histogram is recomputed for 122 addresses (T's did not add up).
+C38  fn 0x0BCD46.                                                                       R right
+     T's instruction reading was correct but unconditional. The sequence runs only when
+     u8(r4) == 0 (0BCD58 extu.b r4,r13 / 0BCD5A tst r13,r13 / 0BCD5C bf/s 0x0BCDA8: T=1 when the
+     byte is 0, bf/s leaves when it is not), and the record is stored again at 0BCE12. D adds
+     that this second store is on the same branch (0BCDFC tst r13,r13 / 0BCDFE bf/s 0x0BCE1E).
+
+RAM names 0xFFFF3674, 0xFFFF2D38, 0xFFFF2D40 (T: contradicted; R: undetermined).        R right
+     A float that is reset to 0.0 can be a timer. D decoded the non-zero writers of 0xFFFF3674
+     (u16 * 60.0 or * 0.002, converted back the same way at 05CD0C..05CD34): consistent with a
+     duration, proof of nothing. Moved to comparison A11b and NOT ESTABLISHED 10.
+     0xFFFF85DC "... control byte" STAYS contradicted: of its nine literal uses none is a byte
+     access (three helper arguments, four fmov.s reads, two bases for fmov.s stores elsewhere).
+
+What R said was missing -- each checked by D:
+  * stack-spilled function pointers (fn 0x0753C8, fn 0x01E360)      confirmed, excerpts added
+  * writer set == validator set (122 / 122, 10 / 10)                 confirmed
+  * M, Q, S, T cleared on return from every masked helper            confirmed natively (section 9)
+  * 0x003664 -> 0x003440 and what it saves                           confirmed; two sections added
+  * 8 x 0x55 is a valid record                                       confirmed; 0x55 is the only fill
+  * no FPSCR load sets an enable bit                                 confirmed. R listed five stack
+        restores; there is a sixth at 0037B6, in resume entry 0x0037A0, which neither the census
+        nor fn_dump decodes as code (it is reached only through the ROM table at 0x004090).
+  * 0x0BDB30 reads the value twice                                   confirmed (access log)
+  * find_writers.py is blind to these stores                         confirmed (ESTABLISHED 17)
+  * nobody reads 0x0BDBCC's r0 one level up (68 functions, 82 sites) reproduced exactly. D adds
+        the path R did not follow -- a tail-jump onward into a function that returns without
+        touching r0 (0x003190's r4 != 0 exit; 0x0469CE) -- which makes it 76 functions and 96
+        sites, then 19 functions and 20 sites one level further. Still no read. (The first
+        repair then said "nothing passes it on" at that level and "no ROM dispatch table can
+        reach them"; both were wrong by one function -- see the second check below.)
+
+Second check of D's repair (same date, before sign-off). Every count in the scan section was
+re-derived with an independent scanner; three statements did not survive as written:
+  * level 3 of the 0x0BDBCC r0 follow-up: 0x00E55C passes r0 on (00E572 jmp -> 0x04A03E) and is
+    reached through the ROM table 0x011BD4 (long 0x011BF4) from 0x00FDB4, which returns r0
+    untouched (00FDD0..00FDE8). Followed up: 52 more sites, 31 more functions, still 0 reads.
+    Fixed in the scan section, ESTABLISHED 14 and NOT ESTABLISHED 5. The unreproduced
+    "coarser variant, 13,589 instruction points" sentence was removed.
+  * site (9), fn 0x08FDEE: "either zeroed or increased by a RAM float" missed the third path
+    on which the old values are stored back unchanged (08FE3A cmp/ge r2,r6 / 08FE3C bt 0x08FE4E).
+  * comparison A11b, 0xFFFF3674: "the non-zero stores at 05B978 / 05BCE8 / 05BF08" named three
+    of six. 05B926, 05BC1E and 05BEB6 store 0.0 or a calibration float (0x000C5658 = 3600.0 /
+    0x000C565C = 5400.0) clamped at 60000.0. The "timer" verdict (undetermined) is unchanged.
+Re-derived and unchanged: 129 / 63 / 124 / 121 (0x0BDCB6), 330+37 / 166 / 122 (0x0BDBCC), the
+122-address list and its gap histogram (85 / 5 / 1 / 7 / 23), 10 = 10 for the long pair,
+the r0 first-use split (108 / 161 / 21 / 30 / 10), "no path reads fr8" at all 129 0x0BDCB6
+sites, the 0x00317C r4 split (365 / 25 / 8 / 6), the four cross-checks, the three extra caller
+functions, the FPSCR inventory (the one further 0x4n62 word, 0x0980BA, is the low half of the
+data long 0x000C4962), and the bad-+6 rule in a separate stubbed-window rig.
+
+File problems R reported: the gap histogram, the hybrid 124, the unqualified 119 / 108 / 8 / 8 / 6,
+the unconditional fr8 sentence and the one-pair counter-case are all corrected above.
+
+Emulation script. T's harness replaced 0x00317C / 0x003190 by stubs written from T's own reading
+(R's objection). It now runs them natively: SREmu adds a real SR and `ldc Rm,sr` to sh2e_emu.
+T's assertions all survive that change except the two that were wrong (fr8 unconditional, the
+one-pair counter-case). Added: SR on return, access order, all 256 fills, the bad-+6 rule, the
+0x003664 exits, the 0x003440 frame.

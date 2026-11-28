@@ -1,0 +1,2399 @@
+POWER-ON RAM STATE -- THE RESET PATH 0x000C0C -> 0x00065C -> 0x00127C -> 0x00FA34, THE RAM TESTS, THE RESET DMA
+AND THE BOOT WATCHDOG (WDT INTERVAL-TIMER INTERRUPT, VECTOR 224)
+BLIND TRACE FROM BYTES, CONTRACT CHECKED BY EMULATION, DMAC / WDT / INTC SETTINGS DECODED FROM THE SH7058 MANUAL
+REPAIRED after adversarial review (see REVIEW HISTORY at the end)
+====================================================================================================
+
+Date           2026-11-27
+Reference bin  rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+               Every ROM byte executed or read by the emulation runs below (6,593 bytes, including the ITI
+               handler 0x00F6E6 / 0x010AD8 / 0x011880, the expiry path 0x010800 / 0x010B2A / 0x00FBA4, the
+               peripheral set-up 0x00AD98.., the pools and the vector table words) is identical in all 20
+               1 MB images under rom/ (emu pass Z).  Nothing below is rev-dependent.
+Method         Dumped blind with scripts/mapping/fn_dump.py from the power-on vector, then executed in an
+               extension of scripts/sh2e_emu.py: scripts/trace/emu_poweron_state.py (passes A..J, Z; exit 0).
+EVIDENCE CLASS bytes + emulated for the whole path 0x000C0C -> 0x003324, with interrupt acceptance OFF (pass C,
+               32 runs) and with the WDT interval-timer interrupt ACCEPTED (pass G, 5 runs + 1 expiry run);
+               final RAM compared byte by byte with the starting image; 0x010290, 0x010398, 0x010448, 0x0105AA,
+               0x01068E (fault injection), 0x0007E0 and the warm / cold block 0x010124 run alone.  The DMAC,
+               WDT and interrupt-controller behaviour is a model of the manufacturer's manual (cited below),
+               not ROM code; the ratio of CPU instructions to WDT clocks is a model INPUT, so the NUMBER of
+               interrupts taken is not established.  Physical identities: NOT established for any RAM cell.
+Hardware source  Renesas "SH-2E SH7058 F-ZTAT Hardware Manual", REJ09B0046-0300H, Rev. 3.00 (Sep 2004):
+               section 10.2 Table 10.1 (DMAC registers and addresses, p.166-167), 10.2.3 DMATCR (p.169),
+               10.2.4 CHCR bit table and bit descriptions (p.170-174), 10.2.5 DMAOR (p.175-176), 10.3.4
+               Table 10.3 (on-chip memory to on-chip memory supported, p.182), 9.2 Table 9.2 (BSC registers,
+               RAMER H'FFFFEC26), 24.1 (on-chip RAM H'FFFF0000..H'FFFFBFFF, 48 kB, DMAC-accessible, p.941),
+               19.3.2 SDSR (bits 11, 9, 8 always read 1, bits 15-12 and 10 read 0, p.701), 25.2.3 SYSCR2
+               (MSTOP2 = H-UDI clock, write with H'3C in the upper byte, p.947-948), ICR bit 15 NMIL;
+               7.3 Table 7.3 (WDT ITI = vector 224, offset H'380, priority from IPRL bits 7-4, p.115),
+               Table 7.4 (IPRL = SCI4 / HCAN0 / WDT / HCAN1, p.116; IPRA..IPRL = H'0000 after reset),
+               7.4.1 (accepted only if priority > SR.I; SR and PC pushed; SR.I := the priority, p.119-120),
+               13.2.2 TCSR (bit 7 OVF, cleared only by writing 0 after reading 1; bit 6 WT/IT, 0 = interval
+               timer mode: ITI request on each overflow; bit 5 TME, 0 = TCNT cleared and stopped; bits 4,3
+               read 1; CKS 3 = phi/256, 4 = phi/512, p.440-441), 13.2.3 RSTCSR (bit 6 RSTE, bit 5 RSTS,
+               p.442), 13.2.4 (TCSR / TCNT written by word to H'FFFFEC10 with H'A5 / H'5A, RSTCSR by word to
+               H'FFFFEC12; byte reads TCSR H'FFFFEC10, TCNT H'FFFFEC11, RSTCSR H'FFFFEC13, p.443).
+Displacements are already in bytes.  "Reset" below means a pass through the power-on / manual-reset vector
+0x000C0C.  "Cold" and "warm" are used in this ROM's own sense (0x010124): warm = word 0xFFFF2000 == 0xAA55 at
+the time task 10 runs; the reset path itself never reads that word (emu pass C: identical instruction set).
+"ITI" = the WDT interval-timer interrupt.  "Acceptance window" = from 0x00FA84 (after 0x00FA82 lowers SR.I to
+13) to 0x00AE4E (second call of 0x00AE1C, from 0x00FABC, zeroes IPRL): the only span of the reset path in
+which the ITI's priority 14 exceeds SR.I.
+
+ANSWER
+  1. On EVERY reset, warm or cold, 0xFFFF4000..0xFFFFBF9F is all zero when the kernel starts.  0x010290 (called
+     once, from 0x00FA86) first pattern-tests that range destructively, then 0x010398 programs DMAC channel 0
+     with SAR = DAR = 0xFFFF4000, DMATCR = 0x1FE8, CHCR = 0x001F0128 after storing a zero long at 0xFFFF4000.
+     By the manual's CHCR table that is auto-request (RS 11111), source FIXED (SM 00), destination INCREMENTED
+     (DM 01), LONGWORD units (TS 10), burst (TM 1): 0x1FE8 copies of the zero long to 0xFFFF4000,
+     0xFFFF4004, .., 0xFFFFBF9C.  The CPU spins on TE.  The fill runs on both outcomes of the RAM test (the
+     failure branch 0x0102B6 goes straight to it) and does not depend on any marker.  After it, only two bytes
+     in the range are written before the kernel start: 0xFFFF5B89 := RAM-test result bits (0 when all pass)
+     and 0xFFFF5B6C := 0.  This holds with or without WDT interrupts: the ITI handler, when it returns, writes
+     only long 0xFFFF0004 and its own stack frame, and frames pushed into the range while SP sits at
+     0xFFFFBF9C (range-C test) are erased by the later fill (pass G).
+  2. The reset path runs a BOOT WATCHDOG on the WDT interval-timer interrupt.  0x010878 (via 0x0108DA) sets
+     long 0xFFFF0000 := 183 (limit), long 0xFFFF0004 := 0 (count), byte 0xFFFF0008 := 0.  0x00AE50 sets IPRL
+     bits 7-4 (the WDT ITI priority, manual Table 7.4) to 14, 0x010942 sets TCSR TME (TCSR 0x3C: interval
+     mode, CKS 4), and 0x00FA82 lowers SR.I to 13, so from 0x00FA84 on every WDT overflow requests an ITI that
+     is taken outside the 0xE0 critical sections (a request raised inside one waits for its end; overflows
+     while OVF is still set are not counted separately).  Vector 224 (VBR 0x000FFC50 + 0x380 = 0x0FFFD0 -> 0x00F6E6)
+     saves r0-r7, fr0-fr11, pr, fpul, fpscr, clears OVF and calls 0x010AD8: count += 1; count < limit ->
+     0x011880 (toggles bit 15 of port word 0xFFFFF738) and return; count >= limit -> 0x010800(0x2100, 0)
+     (0x2200 / 0x2300 for byte 0xFFFF0008 = 1 / other) and the endless loop 0x00FBA4 (SR.I := 15): the
+     kernel never starts.  0x00FABC (0x00AE1C) zeroes IPRL just before 0x003324, closing the window.  So at
+     the kernel start 0xFFFF0004 = the number of ITIs taken in the window, 0..182.  How many that is depends
+     on the ratio of CPU speed to the WDT clock, which the bytes do not give: NOT ESTABLISHED (pass G shows
+     6..101 with model rates; pass C, acceptance off, shows 0).
+  3. Table of RAM after a reset, at the call 0x003324(0) (the kernel start); "perfect RAM" (no RAM-test
+     mismatch reported) is assumed except where stated:
+
+;  range                     cold start (RAM content undefined)         warm start (RAM kept from before)
+;  ------------------------  -----------------------------------------  ---------------------------------
+;  0xFFFF0000..0xFFFF0003    long 183 (0x000000B7) [0x010878]           same
+;  0xFFFF0004..0xFFFF0007    long N = number of WDT ITIs taken in the   same
+;                            acceptance window, 0 <= N <= 182 [0 at
+;                            0x010878, +1 per ITI at 0x010AE4]; N not
+;                            established (timing)
+;  0xFFFF0008                byte 0 [0x0108DA]                          same
+;  0xFFFF0009..0xFFFF001F    undefined (tested, saved and restored)     pre-reset content
+;  0xFFFF0020..0xFFFF1FFF    undefined (tested, saved and restored),    pre-reset content, same stack window
+;                            except a stack window ending at
+;                            0xFFFF12DB (SP 0xFFFF12DC): 0xFFFF125C..
+;                            0xFFFF12DB with no ITI; down to at most
+;                            0xFFFF11FC when ITIs are taken (ISR frame
+;                            residue, kept by the range-C save /
+;                            restore); exact extent timing-dependent;
+;                            the kernel start then builds its own
+;                            blocks here
+;  0xFFFF2000..0xFFFF3FFF    undefined except byte 0xFFFF204C = 0x88     pre-reset content except 0xFFFF204C = 0x88
+;                            (not tested, not filled at reset); a RAM-  (same RAM-fault exception)
+;                            test mismatch adds 0x010800 log writes in
+;                            0xFFFF2060..0xFFFF20A7 (pass J)
+;  0xFFFF4000..0xFFFFBF9F    0x00 everywhere (DMA fill); 0xFFFF5B89 =   identical: 0x00 everywhere, 5B89 / 5B6C
+;                            test result bits, 0xFFFF5B6C = 0           as for cold
+;  0xFFFFBFA0..0xFFFFBFFF    boot-block area, NOT cleared: BFAC = 0,    same, except BFA8 is not written
+;                            BFAD = 0x88, BFB8..BFBB = 0, BFE4..BFFF =  (boot marker 0x5AA5A55A at BFFC
+;                            00x8 AA 00 00 00 00x8 AA 00 00 00          present -> the message window is
+;                            5A A5 A5 5A; BFA8 = 0 when the boot        skipped) and keeps its pre-reset
+;                            marker was absent (written in the window); value; others pre-reset content
+;                            every other byte undefined
+
+     "183": 0x010878 computes trunc(300.0 / 1.6384 + 0.5) = 183 unless TCSR & 7 (CKS) reads 3, which gives
+     trunc(300.0 / 0.8192 + 0.5) = 366.  The byte read at 0x010884 returns TCSR = 0x1C (CKS 4) because
+     0x00AD98 -> 0x00B2AA has stopped the WDT (0x00B2B8 TCSR := A500 | (TCSR & 0xDF), 0x00B2C4 TCSR := 0xA518)
+     and 0x010C52(4), called at 0x01092A just before, writes TCSR := 0xA518 | 4 | old TME (0) = 0x1C.  The
+     0xA53C that 0x001332 wrote is overwritten twice before the read.  So 183: 300 / 1.6384 = 183.105.., no
+     last-bit question.  (Pass C asserts the write sequence and the 0x1C read in all 32 runs.)
+     BFB8 / BFBA count messages taken / consumed in the boot window (mod 100): 0 when no CAN message arrives.
+     Later, in task 10, 0x010124 (revlim_freeze_gate_trace.txt, verified; re-run here as emu pass F)
+     pattern-tests 0xFFFF2000..0xFFFF3FFF with 0x010448, clears it to zero and writes word 0xFFFF2000 :=
+     0x55AA when the marker is not 0xAA55 or when event 16 reports failure; otherwise that block keeps its
+     pre-reset content.  Later in the same task 0x010198 writes word 0xFFFF2000 := 0xAA55 when byte
+     0xFFFF5B8D == 1 (revlim_freeze_gate_trace.txt:1186-1192, verified), so the 0x55AA does not last.  Whether
+     any other code clears that block was not searched: NOT ESTABLISHED.
+  4. Consequence for the cells the brief names -- all lie in 0xFFFF4000..0xFFFFBF9F, so all are ZERO at the
+     kernel start after every reset, cold or warm, with or without ITIs, and no instruction between the fill
+     and 0x003324 writes them (emu pass C, all 32 runs; pass G, 5 runs):
+       0xFFFF8EDC  byte 0x00; the word 0xFFFF8EDC/8EDD = 0x0000 (inconsistent as value:~value), shadow 0xFFFF8EED
+                   = 0x00, 0xFFFF8ECC = 0x0000, 0xFFFF8EF6 = 0x00.  This settles revlim_freeze_gate_trace.txt
+                   NOT ESTABLISHED d: the post-reset gate is 0x00.  Writers found (find_writers, a lower
+                   bound): 0x05CB50 in 0x05CB1C and 0x05CBE6 in 0x05CBC8, both task code after the kernel start.
+       0xFFFF7FF4  byte 0x00 (latch).  Writer found: 0x0411F6 (GBR store), task code.
+       0xFFFF7FBC  long 0x00000000 = float +0.0 (integrator).  Writers found: 0x041258, 0x041552 (indexed).
+       0xFFFF69E6  byte 0x00 (gate).  Writers found: 0x02663C, 0x0266C2.
+       0xFFFF7A44  long 0x00000000 = float +0.0.  find_writers.py finds no writer (a lower bound); if there is
+                   none, the addend is +0.0 for the whole drive cycle.
+       0xFFFF8E66  byte 0x00 (set-only latch).  Writer found: 0x05A252.  It reads 0 after every reset until that
+                   writer runs; it is NOT preserved across a reset.
+  5. Not established: what the RAM holds at power-up (the manual gives no initial value; the table says
+     "undefined"); whether the ECU keeps RAM powered across an ignition cycle (so how often a cold start in
+     0x010124's sense happens) -- a board fact, not in the ROM; how many ITIs the window takes on the real
+     chip (so the exact value of 0xFFFF0004 and the exact extent of the ISR residue); the kernel start
+     0x003324 onwards (ldc sr, not part of this trace).
+
+RESET PATH (call order, stack pointer, RAM written outside 0xFFFF4000..0xFFFFBF9F)
+;  vector 0x000000 / 0x000008 = 0x00000C0C, SP 0x000004 / 0x00000C = 0xFFFFBFA0 (power-on and manual reset)
+;  0x000C0C  bsr 0x000C20      BSC, RAMER := 0, SYSCR2, wait NMI pin high      byte 0xFFFFBFAD := 0x77
+;            bsr 0x000C54      port registers 0xFFFFF720..0xFFFFF778 only
+;            jsr 0x00065C(0,0) SP := 0xFFFFBFA0 (0x00004C)
+;               0x000762 WDT: RSTCSR := 0x5A1F, TCNT := 0, TCSR := 0xA53C (class 0)   (no RAM)
+;               0x00078E / 0x0001B4 HCAN                                       (no RAM)
+;               0x000598                                                       0xFFFFBFE4..0xFFFFBFFB
+;               0x00054A                                                       words 0xFFFFBFB8, 0xFFFFBFBA := 0
+;               byte 0xFFFFBFAC := 0
+;               marker [0xFFFFBFFC] != 0x5AA5A55A -> 0x0007E0(7) message window  byte 0xFFFFBFA8 (+ ring 0xFFFFB4E0..)
+;                 (polls TCSR bit 7 OVF; IPRL = 0 after reset, so no interrupt)
+;               long 0xFFFFBFFC := 0x5AA5A55A; 0x000040: SP := 0xFFFFBFA0, jmp [0x001000] = 0x00127C
+;  0x00127C  SP 0xFFFFBFA0.  byte 0xFFFF204C := 0x77 ([0x002000] = 0xFFFF204C); jsr 0x0012C0(0)
+;  0x0012C0  SP 0xFFFFBFA0.  word 0xFFFF800C := 0xA53C; 0x001332 WDT; 0x00105C HCAN; 0x0019F0: longs
+;            0xFFFF809C..0xFFFF80AF; byte 0xFFFF204C := 0x88; 0x001008: SP := 0xFFFFBF7C, jmp [0x0FFFF8] = 0x00FA34
+;  0x00FA34  SP 0xFFFFBF7C (used by no instruction).  SR I := 15, VBR := 0x000FFC50, FPSCR := 0x00040001;
+;            jsr 0x0040CA, whose rts delay slot 0x0040CC sets SP := [0x011CC8] = 0xFFFF12DC; byte 0xFFFFBFAD := 0x88
+;  0x00FA5A  SP 0xFFFF12DC.  0x00AD98 peripherals (0x00B2AA: WDT stopped, RSTCSR 0x5A1F, TCSR 0xA518);
+;            0x00AE1C IPRA..IPRL := 0; 0x00AE50 IPRL bits 7-4 := 14 (WDT ITI priority);
+;            0x0108DA(0): 0x010C52(4) TCSR := 0x1C, 0x010878: 0xFFFF0000 := 183, 0xFFFF0004 := 0, byte
+;            0xFFFF0008 := 0; 0x010942 TCSR := 0x3C (TME on); SR I := 13 -- ITI acceptance window opens;
+;            0x010290: RAM tests + DMA fill (0xFFFF5B89); 0x00FBBA(0): byte 0xFFFF5B6C := 0;
+;            0x0BEAB8(2000) delay; 0x006BC4 / 0x006BF0 external device (stack only, I = 14);
+;            0x00AE1C IPRL := 0 -- window closes; 0x003324(0)
+;  any ITI in the window: 0x00F6E6 -> 0x010AD8: long 0xFFFF0004 += 1 (+ its 100..108-byte stack frame)
+  Every write before 0x010290 that lands in 0xFFFF4000..0xFFFFBF9F (0xFFFF800C, 0xFFFF809C..0xFFFF80AF, the
+  boot ring 0xFFFFB4E0..0xFFFFB7FF, the stacks at 0xFFFFBFA0 and below) is overwritten by the test and then by
+  the fill.
+
+==== FUNCTION 0x000C0C .. 0x000C20 (10 instructions, 0 callers: the power-on and manual-reset vector) ====
+CONTRACT
+  Entered with SP = 0xFFFFBFA0 (vector longs 0x000004 / 0x00000C).  Calls 0x000C20, 0x000C54, then
+  0x00065C(r4 = 0, r5 = 0), which never returns.  Writes no RAM itself.
+MECHANISM
+  bsr 0x000C20; bsr 0x000C54; r5 = 0; jsr 0x00065C with r4 = r5 in the delay slot; spin (unreachable).
+EVIDENCE
+  vector words read in emu pass A; 000C18 jsr @r3 with r3 = [0x000D64] = 0x0000065C; 000C1A delay slot r4 = 0.
+  emulated: pass C (32 runs from this entry reach 0x003324).
+LISTING
+000C0C: B008  bsr 0x000C20                    ; BSC / RAMER / SYSCR2 / ICR set-up, byte 0xFFFFBFAD := 0x77
+000C0E: 0009  nop
+000C10: B020  bsr 0x000C54                    ; port registers 0xFFFFF720..0xFFFFF778 (no RAM)
+000C12: 0009  nop
+000C14: D353  mov.l @(0x000D64),r3          ; = 0x0000065C ROM
+000C16: E500  mov #0,r5                       ; r5 = 0
+000C18: 430B  jsr @r3                       ; -> 0x00065C | 0x00065C(r4 = 0, r5 = 0): boot decision, never returns
+000C1A: 6453  mov r5,r4                       ; delay slot: r4 = r5 = 0
+000C1C: AFFE  bra 0x000C1C                    ; unreachable spin
+000C1E: 0009  nop
+;   pool 0x000D64: .long 0x0000065C  ROM
+
+==== FUNCTION 0x000C20 .. 0x000C54 (26 instructions, 1 caller: 0x000C0C) ====
+CONTRACT
+  BCR1 0xFFFFEC20 := 0x000F, BCR2 0xFFFFEC22 := 0, WCR 0xFFFFEC24 := 0x7777, RAMER 0xFFFFEC26 := 0 (manual
+  Table 9.2: no flash emulation in RAM, so no part of the RAM is overlaid on the flash);
+  byte 0xFFFFBFAD := 0x77; SYSCR2 := 0x3C04 (key 0x3C, MSTOP2 = 1); ICR 0xFFFFED18 := 0; then spin while
+  ICR bit 15 (NMIL, the NMI pin level) reads 0.  The only RAM write is 0xFFFFBFAD.
+MECHANISM
+  000C4C tst r5,r3 with r5 = 0x00008000: T = ((ICR & 0x8000) == 0); 000C4E bt loops while T = 1.  The
+  emulation's ICR read returns 0x8000 (an input of the model: the pin is high).
+EVIDENCE
+  000C32 add #6,r2: r2 = 0xFFFFEC20 + 6 = 0xFFFFEC26; 000C34 mov.w r5,@r2 with r5 = 0.  000C3A mov.b r3,@r1
+  with r3 = 119 = 0x77, r1 = 0xFFFFBFAD.  emulated: pass C (BFAD later becomes 0x88 at 0x00FA54).
+LISTING
+000C20: 9284  mov.w @(0x000D2C),r2          ; = 0xEC20 (-5088) -> 0xFFFFEC20 PERIPH
+000C22: E30F  mov #15,r3
+000C24: 2231  mov.w r3,@r2                    ; BCR1 0xFFFFEC20 := 0x000F (manual Table 9.2)
+000C26: E500  mov #0,r5
+000C28: 9381  mov.w @(0x000D2E),r3          ; = 0xEC22 (-5086) -> 0xFFFFEC22 PERIPH
+000C2A: 2351  mov.w r5,@r3                    ; BCR2 0xFFFFEC22 := 0
+000C2C: 9180  mov.w @(0x000D30),r1          ; = 0x7777 (30583)
+000C2E: 9080  mov.w @(0x000D32),r0          ; = 0xEC24 (-5084) -> 0xFFFFEC24 PERIPH
+000C30: 2011  mov.w r1,@r0                    ; WCR 0xFFFFEC24 := 0x7777
+000C32: 7206  add #6,r2
+000C34: 2251  mov.w r5,@r2                    ; RAMER 0xFFFFEC26 := 0: no flash emulation in RAM
+000C36: E377  mov #119,r3
+000C38: 917C  mov.w @(0x000D34),r1          ; = 0xBFAD (-16467) -> 0xFFFFBFAD RAM
+000C3A: 2130  mov.b r3,@r1                    ; byte 0xFFFFBFAD := 0x77 (boot-block area, above the application stack top 0xFFFFBFA0)
+000C3C: 907B  mov.w @(0x000D36),r0          ; = 0x3C04 (15364)
+000C3E: 937B  mov.w @(0x000D38),r3          ; = 0xF70A (-2294) -> 0xFFFFF70A PERIPH
+000C40: 2301  mov.w r0,@r3                    ; SYSCR2 write address 0xFFFFF70A := 0x3C04: key 0x3C, MSTOP2 = 1, MSTOP3/1/0 = 0
+000C42: 947A  mov.w @(0x000D3A),r4          ; = 0xED18 (-4840) -> 0xFFFFED18 PERIPH
+000C44: 2451  mov.w r5,@r4                    ; ICR 0xFFFFED18 := 0
+000C46: D548  mov.l @(0x000D68),r5          ; = 0x00008000 ROM
+000C48: 6341  mov.w @r4,r3
+000C4A: 633D  extu.w r3,r3
+000C4C: 2358  tst r5,r3                       ; T = ((ICR & 0x8000) == 0): NMIL, NMI pin low
+000C4E: 89FB  bt 0x000C48                     ; T=1: keep waiting until the NMI pin reads high
+000C50: 000B  rts
+000C52: 0009  nop
+;   pool 0x000D2C: .long 0xEC20EC22  const
+;   pool 0x000D30: .long 0x7777EC24  const
+;   pool 0x000D34: .long 0xBFAD3C04  const f32 -1.353394
+;   pool 0x000D38: .long 0xF70AED18  const
+;   pool 0x000D68: .long 0x00008000  ROM
+
+==== FUNCTION 0x000C54 .. 0x000D2C (108 instructions, 2 callers: 0x000C0C, 0x00065C via 0x000748) ====
+CONTRACT
+  Stores constants to 43 port words 0xFFFFF720..0xFFFFF778 (manual Table A.1 includes PAIOR 0xFFFFF720, PADR
+  0xFFFFF726, PHIOR 0xFFFFF728, PHDR 0xFFFFF72C, PBDR 0xFFFFF738, PCDR 0xFFFFF73E, PDIOR 0xFFFFF740, PLDR
+  0xFFFFF75E, PGDR 0xFFFFF764).  No RAM read or write.  The pin meaning is not decoded here.
+MECHANISM
+  Straight-line code: r4 = 0, r5 = 0xFFFF; base registers loaded from mov.w literals and stepped by add #imm;
+  no branch, no call, no load except the mov.w / mov.l literals.
+EVIDENCE
+  every base register is a mov.w literal in 0xF720..0xF764 sign-extended to 0xFFFFF7xx, advanced by add #imm
+  up to 0xFFFFF778.  emulated: pass C logs the 43 store addresses and no RAM access from 0x000C54..0x000D2C.
+LISTING
+000C54: 9672  mov.w @(0x000D3C),r6          ; = 0xF720 (-2272) -> 0xFFFFF720 PERIPH
+000C56: E400  mov #0,r4
+000C58: 2641  mov.w r4,@r6                    ; port A IOR 0xFFFFF720 := 0; the stores below cover 43 words 0xFFFFF720..0xFFFFF778
+000C5A: D544  mov.l @(0x000D6C),r5          ; = 0x0000FFFF const
+000C5C: 936F  mov.w @(0x000D3E),r3          ; = 0xF726 (-2266) -> 0xFFFFF726 PERIPH
+000C5E: 2351  mov.w r5,@r3
+000C60: 926E  mov.w @(0x000D40),r2          ; = 0xF722 (-2270) -> 0xFFFFF722 PERIPH
+000C62: 2241  mov.w r4,@r2
+000C64: 916D  mov.w @(0x000D42),r1          ; = 0xF724 (-2268) -> 0xFFFFF724 PERIPH
+000C66: 2141  mov.w r4,@r1
+000C68: 2641  mov.w r4,@r6
+000C6A: 7610  add #16,r6
+000C6C: 2641  mov.w r4,@r6
+000C6E: D340  mov.l @(0x000D70),r3          ; = 0x0000EFFF const
+000C70: 9068  mov.w @(0x000D44),r0          ; = 0xF738 (-2248) -> 0xFFFFF738 PERIPH
+000C72: 2031  mov.w r3,@r0
+000C74: 7210  add #16,r2
+000C76: 2241  mov.w r4,@r2
+000C78: 9365  mov.w @(0x000D46),r3          ; = 0xF734 (-2252) -> 0xFFFFF734 PERIPH
+000C7A: 2341  mov.w r4,@r3
+000C7C: 7112  add #18,r1
+000C7E: 2141  mov.w r4,@r1
+000C80: D23C  mov.l @(0x000D74),r2          ; = 0x00009000 ROM
+000C82: 2621  mov.w r2,@r6
+000C84: 760A  add #10,r6
+000C86: 2641  mov.w r4,@r6
+000C88: 925E  mov.w @(0x000D48),r2          ; = 0xF73E (-2242) -> 0xFFFFF73E PERIPH
+000C8A: E01F  mov #31,r0
+000C8C: 2201  mov.w r0,@r2
+000C8E: 7308  add #8,r3
+000C90: 2341  mov.w r4,@r3
+000C92: 2641  mov.w r4,@r6
+000C94: 7606  add #6,r6
+000C96: 2641  mov.w r4,@r6
+000C98: 9157  mov.w @(0x000D4A),r1          ; = 0x3EFF (16127)
+000C9A: 9057  mov.w @(0x000D4C),r0          ; = 0xF746 (-2234) -> 0xFFFFF746 PERIPH
+000C9C: 2011  mov.w r1,@r0
+000C9E: 7204  add #4,r2
+000CA0: 2241  mov.w r4,@r2
+000CA2: 7308  add #8,r3
+000CA4: 2341  mov.w r4,@r3
+000CA6: 2641  mov.w r4,@r6
+000CA8: 7610  add #16,r6
+000CAA: 2641  mov.w r4,@r6
+000CAC: 914F  mov.w @(0x000D4E),r1          ; = 0xF754 (-2220) -> 0xFFFFF754 PERIPH
+000CAE: 2151  mov.w r5,@r1
+000CB0: 7210  add #16,r2
+000CB2: 2241  mov.w r4,@r2
+000CB4: 2641  mov.w r4,@r6
+000CB6: 76F8  add #-8,r6
+000CB8: 2641  mov.w r4,@r6
+000CBA: 730A  add #10,r3
+000CBC: 2351  mov.w r5,@r3
+000CBE: D12A  mov.l @(0x000D68),r1          ; = 0x00008000 ROM
+000CC0: 9046  mov.w @(0x000D50),r0          ; = 0xF74A (-2230) -> 0xFFFFF74A PERIPH
+000CC2: 2011  mov.w r1,@r0
+000CC4: 72FA  add #-6,r2
+000CC6: 2241  mov.w r4,@r2
+000CC8: 2641  mov.w r4,@r6
+000CCA: 7618  add #24,r6
+000CCC: 2641  mov.w r4,@r6
+000CCE: E30F  mov #15,r3
+000CD0: 913F  mov.w @(0x000D52),r1          ; = 0xF764 (-2204) -> 0xFFFFF764 PERIPH
+000CD2: 2131  mov.w r3,@r1
+000CD4: 903E  mov.w @(0x000D54),r0          ; = 0xF762 (-2206) -> 0xFFFFF762 PERIPH
+000CD6: 2041  mov.w r4,@r0
+000CD8: 2641  mov.w r4,@r6
+000CDA: 76C8  add #-56,r6
+000CDC: 2641  mov.w r4,@r6
+000CDE: 933A  mov.w @(0x000D56),r3          ; = 0xF72C (-2260) -> 0xFFFFF72C PERIPH
+000CE0: 2351  mov.w r5,@r3
+000CE2: 72DE  add #-34,r2
+000CE4: 2241  mov.w r4,@r2
+000CE6: 2641  mov.w r4,@r6
+000CE8: 763E  add #62,r6
+000CEA: 2641  mov.w r4,@r6
+000CEC: 7108  add #8,r1
+000CEE: 2151  mov.w r5,@r1
+000CF0: 733C  add #60,r3
+000CF2: 2341  mov.w r4,@r3
+000CF4: 7240  add #64,r2
+000CF6: 2241  mov.w r4,@r2
+000CF8: 2641  mov.w r4,@r6
+000CFA: 760A  add #10,r6
+000CFC: 2641  mov.w r4,@r6
+000CFE: 710C  add #12,r1
+000D00: 2151  mov.w r5,@r1
+000D02: 730A  add #10,r3
+000D04: 2341  mov.w r4,@r3
+000D06: 720A  add #10,r2
+000D08: 2241  mov.w r4,@r2
+000D0A: 71FE  add #-2,r1
+000D0C: 2141  mov.w r4,@r1
+000D0E: 2641  mov.w r4,@r6
+000D10: 9522  mov.w @(0x000D58),r5          ; = 0xF756 (-2218) -> 0xFFFFF756 PERIPH
+000D12: 2541  mov.w r4,@r5
+000D14: 9321  mov.w @(0x000D5A),r3          ; = 0x3FFF (16383)
+000D16: 9021  mov.w @(0x000D5C),r0          ; = 0xF75E (-2210) -> 0xFFFFF75E PERIPH
+000D18: 2031  mov.w r3,@r0
+000D1A: E250  mov #80,r2
+000D1C: 931F  mov.w @(0x000D5E),r3          ; = 0xF758 (-2216) -> 0xFFFFF758 PERIPH
+000D1E: 2321  mov.w r2,@r3
+000D20: 71E4  add #-28,r1
+000D22: 2141  mov.w r4,@r1
+000D24: 921C  mov.w @(0x000D60),r2          ; = 0xF75C (-2212) -> 0xFFFFF75C PERIPH
+000D26: 2241  mov.w r4,@r2
+000D28: 000B  rts                             ; no RAM access anywhere in this function (emulated: pass C)
+000D2A: 2541  mov.w r4,@r5
+;   pool 0x000D3C: .long 0xF720F726  const
+;   pool 0x000D40: .long 0xF722F724  const
+;   pool 0x000D44: .long 0xF738F734  const
+;   pool 0x000D48: .long 0xF73E3EFF  const
+;   pool 0x000D4C: .long 0xF746F754  const
+;   pool 0x000D50: .long 0xF74AF764  const
+;   pool 0x000D54: .long 0xF762F72C  const
+;   pool 0x000D58: .long 0xF7563FFF  const
+;   pool 0x000D5C: .long 0xF75EF758  const
+;   pool 0x000D60: .long 0xF75CFFFF  const
+;   pool 0x000D68: .long 0x00008000  ROM
+;   pool 0x000D6C: .long 0x0000FFFF  const
+;   pool 0x000D70: .long 0x0000EFFF  const
+;   pool 0x000D74: .long 0x00009000  ROM
+
+==== FUNCTION 0x00065C .. 0x000762 (109 instructions, 1 caller: 0x000C0C) -- the boot decision ====
+CONTRACT (r4 = r5 = 0 on the reset path)
+  SP := 0xFFFFBFA0 (0x00004C).  WDT start (0x000762), HCAN set-up (0x00078E, 0x0001B4): no RAM.
+  RAM: 0x000598 writes bytes 0xFFFFBFE4..0xFFFFBFEB := 0, 0xFFFFBFEC := 0xAA, 0xFFFFBFED..0xFFFFBFEF := 0,
+       0xFFFFBFF0..0xFFFFBFF7 := 0, 0xFFFFBFF8 := 0xAA, 0xFFFFBFF9..0xFFFFBFFB := 0; 0x00054A writes words
+       0xFFFFBFB8 := 0, 0xFFFFBFBA := 0; byte 0xFFFFBFAC := 0.
+  If long 0xFFFFBFFC != 0x5AA5A55A (the boot marker this function writes on every exit at 0x000756, its only
+  writer found -- find_writers, a lower bound -- so absent when the RAM content was lost, e.g. at power-up):
+  r0 = 0x0007E0(7), the message window.  r0 == 0 (a FF 86 00 00 00 00 00 00
+  message arrived) -> hand-over target 0x000924 (the boot block's own mode, not traced).
+  Otherwise: the chip class from SDSR selects the header words: class 2 -> 0x17FFFC / 0x17FFF8, else
+  0x0FFFFC / 0x0FFFF8.  With [0x0FFFFC] = 0x00002004 and [0x002004] = 0x4145354C (neither blank) and
+  [0x001000] = 0x0000127C (not blank), the target is 0x00127C.  (Blank [0x001000] -> target [0x0FFFF8];
+  blank header -> wait at 0x0006E2 for a message, polling [0x001000].)
+  Exit, every path: long 0xFFFFBFFC := 0x5AA5A55A; 0x000040: SP := 0xFFFFBFA0; jmp target.
+  The r4 != 0 entry (0x000682 bf) writes byte 0xFFFFBFA8 := r5, re-runs 0x000C54, target 0x000924.
+MECHANISM
+  000680 tst r14,r14: T = (r4 == 0); 000682 bf 0x000748 only for r4 != 0.
+  000690 cmp/eq r1,r0: T = ([0xFFFFBFFC] == 0x5AA5A55A); 000692 bt skips the window.
+  00069A tst r4,r4 (r4 = r0 of 0x0007E0): T = (r0 == 0); 00069C bf keeps r12 = 1 when r0 != 0.
+  0006A4 cmp/eq #1,r0 (r0 = r12): T = (r12 == 1); 0006A6 bf to the exit with r14 = 0x0924.
+  0006C2 / 0006DE / 0006EE / 0006FC cmp/eq #-1,r0: T when the word read is 0xFFFFFFFF (blank flash).
+  0006FC T=0 -> 000700 bra 0x000752 with 000702 (delay slot) r14 = [0x001000].
+EVIDENCE
+  hand-over words in emu pass A.  emulated: pass C -- boot marker absent: 0x0007E0 runs and writes 0xFFFFBFA8;
+  present: it is skipped and 0xFFFFBFA8 is not written (asserted both ways); the run continues at 0x00127C;
+  0xFFFFBFE4..0xFFFFBFFF end as 00x8 AA 000000 00x8 AA 000000 5AA5A55A in all 32 runs.
+LISTING
+00065C: 935E  mov.w @(0x00071C),r3          ; = 0x004C (76)
+00065E: 6E43  mov r4,r14                      ; r14 = r4 (0 on the reset path)
+000660: 6D53  mov r5,r13
+000662: 430B  jsr @r3                       ; -> 0x00004C | 0x00004C: r15 := 0xFFFFBFA0
+000664: EC01  mov #1,r12                      ; delay slot: r12 = 1
+000666: B07C  bsr 0x000762                    ; WDT registers 0xFFFFEC10 / 0xFFFFEC12 (no RAM)
+000668: 0009  nop
+00066A: B090  bsr 0x00078E                    ; HCAN 0xFFFFD000.. / 0xFFFFD800.. (no RAM)
+00066C: 0009  nop
+00066E: 9256  mov.w @(0x00071E),r2          ; = 0x01B4 (436)
+000670: 420B  jsr @r2                       ; -> 0x0001B4 | HCAN mailbox set-up (no RAM)
+000672: 0009  nop
+000674: 9354  mov.w @(0x000720),r3          ; = 0x0598 (1432)
+000676: 430B  jsr @r3                       ; -> 0x000598 | bytes 0xFFFFBFE4..0xFFFFBFFB := 00x8 AA 00 00 00 00x8 AA 00 00 00
+000678: 0009  nop
+00067A: 9252  mov.w @(0x000722),r2          ; = 0x054A (1354)
+00067C: 420B  jsr @r2                       ; -> 0x00054A | words 0xFFFFBFB8 := 0, 0xFFFFBFBA := 0
+00067E: 0009  nop
+000680: 2EE8  tst r14,r14                     ; T = (r14 == 0)
+000682: 8B61  bf 0x000748                     ; T=0 (r4 != 0, not the reset path): 0x000748
+000684: 934E  mov.w @(0x000724),r3          ; = 0xBFAC (-16468) -> 0xFFFFBFAC RAM
+000686: E200  mov #0,r2
+000688: 2320  mov.b r2,@r3                    ; byte 0xFFFFBFAC := 0
+00068A: D128  mov.l @(0x00072C),r1          ; = 0x5AA5A55A const
+00068C: D228  mov.l @(0x000730),r2          ; = 0xFFFFBFFC RAM
+00068E: 6022  mov.l @r2,r0
+000690: 3010  cmp/eq r1,r0                    ; T = (long 0xFFFFBFFC == 0x5AA5A55A): boot marker present
+000692: 8906  bt 0x0006A2                     ; T=1: skip the message window
+000694: B0A4  bsr 0x0007E0                    ; marker absent: r0 = 0x0007E0(7), the message window
+000696: E407  mov #7,r4
+000698: 6403  mov r0,r4
+00069A: 2448  tst r4,r4                       ; T = (r0 == 0): a FF 86 00 00 00 00 00 00 message was seen
+00069C: 8B01  bf 0x0006A2                     ; T=0: no message, keep r12 = 1
+00069E: EC00  mov #0,r12
+0006A0: 9E41  mov.w @(0x000726),r14         ; = 0x0924 (2340) | message seen: r12 = 0, r14 = 0x0924 (the boot block's own mode, not traced)
+0006A2: 60C3  mov r12,r0
+0006A4: 8801  cmp/eq #1,r0                    ; T = (r12 == 1)
+0006A6: 8B54  bf 0x000752                     ; T=0: 0x000752 with r14 = 0x0924
+0006A8: 9C3E  mov.w @(0x000728),r12         ; = 0x1000 (4096) | r12 = 0x1000
+0006AA: DD22  mov.l @(0x000734),r13         ; = 0x00000EE4 ROM
+0006AC: 4D0B  jsr @r13                      ; -> 0x000EE4 | r0 = chip class from SDSR (2 on a chip whose SDSR high byte is 14 or 15)
+0006AE: 0009  nop
+0006B0: 600C  extu.b r0,r0
+0006B2: 8802  cmp/eq #2,r0                    ; T = (class == 2)
+0006B4: 8903  bt 0x0006BE
+0006B6: D320  mov.l @(0x000738),r3          ; = 0x000FFFFC CAL | class != 2: r0 = [0x0FFFFC] = 0x00002004
+0006B8: 6032  mov.l @r3,r0
+0006BA: A002  bra 0x0006C2
+0006BC: 0009  nop
+0006BE: D21F  mov.l @(0x00073C),r2          ; = 0x0017FFFC const
+0006C0: 6022  mov.l @r2,r0
+0006C2: 88FF  cmp/eq #-1,r0                   ; T = (r0 == 0xFFFFFFFF)
+0006C4: 890D  bt 0x0006E2                     ; T=1: no application header word, wait at 0x0006E2
+0006C6: 4D0B  jsr @r13                      ; -> 0x000EE4
+0006C8: 0009  nop
+0006CA: 600C  extu.b r0,r0
+0006CC: 8802  cmp/eq #2,r0
+0006CE: 8903  bt 0x0006D8
+0006D0: D319  mov.l @(0x000738),r3          ; = 0x000FFFFC CAL
+0006D2: 6032  mov.l @r3,r0
+0006D4: A002  bra 0x0006DC
+0006D6: 0009  nop
+0006D8: D218  mov.l @(0x00073C),r2          ; = 0x0017FFFC const
+0006DA: 6022  mov.l @r2,r0
+0006DC: 6002  mov.l @r0,r0                    ; r0 = [[0x0FFFFC]] = [0x002004] = 0x4145354C
+0006DE: 88FF  cmp/eq #-1,r0                   ; T = (r0 == 0xFFFFFFFF)
+0006E0: 8B0B  bf 0x0006FA                     ; T=0 (this ROM): 0x0006FA
+0006E2: B07D  bsr 0x0007E0                    ; wait loop: the message window again
+0006E4: E407  mov #7,r4
+0006E6: 6403  mov r0,r4
+0006E8: 2448  tst r4,r4
+0006EA: 8931  bt 0x000750                     ; T=1 (message seen): r14 = 0x0924
+0006EC: 60C2  mov.l @r12,r0
+0006EE: 88FF  cmp/eq #-1,r0                   ; T = ([0x001000] == 0xFFFFFFFF)
+0006F0: 8B06  bf 0x000700
+0006F2: B1F1  bsr 0x000AD8                    ; blank: 0x000AD8 (SR I := 15, port registers 0xFFFFF740 / F750 / F748 / F770 := 0), wait again
+0006F4: 0009  nop
+0006F6: AFF4  bra 0x0006E2
+0006F8: 0009  nop
+0006FA: 60C2  mov.l @r12,r0
+0006FC: 88FF  cmp/eq #-1,r0                   ; T = ([0x001000] == 0xFFFFFFFF); [0x001000] = 0x0000127C here
+0006FE: 8901  bt 0x000704                     ; T=1: hand over to [0x0FFFF8] instead
+000700: A027  bra 0x000752                    ; T=0: 0x000752
+000702: 6EC2  mov.l @r12,r14                  ; delay slot: r14 = [0x001000] = 0x0000127C
+000704: 4D0B  jsr @r13                      ; -> 0x000EE4
+000706: 0009  nop
+000708: 600C  extu.b r0,r0
+00070A: 8802  cmp/eq #2,r0
+00070C: 8903  bt 0x000716
+00070E: D30C  mov.l @(0x000740),r3          ; = 0x000FFFF8 CAL
+000710: 6E32  mov.l @r3,r14                   ; r14 = [0x0FFFF8] = 0x0000FA34 (only when [0x001000] is blank)
+000712: A01E  bra 0x000752
+000714: 0009  nop
+000716: D20B  mov.l @(0x000744),r2          ; = 0x0017FFF8 const
+000718: A01B  bra 0x000752
+00071A: 6E22  mov.l @r2,r14
+;   pool 0x00071C: .long 0x004C01B4  const
+;   pool 0x000720: .long 0x0598054A  const
+;   pool 0x000724: .long 0xBFAC0924  const f32 -1.344029
+;   pool 0x000728: .long 0x1000FFFF  const
+;   pool 0x00072C: .long 0x5AA5A55A  const
+;   pool 0x000730: .long 0xFFFFBFFC  RAM
+;   pool 0x000734: .long 0x00000EE4  ROM
+;   pool 0x000738: .long 0x000FFFFC  CAL
+;   pool 0x00073C: .long 0x0017FFFC  const
+;   pool 0x000740: .long 0x000FFFF8  CAL
+;   pool 0x000744: .long 0x0017FFF8  const
+000748: D34A  mov.l @(0x000874),r3          ; = 0xFFFFBFA8 RAM
+00074A: 9283  mov.w @(0x000854),r2          ; = 0x0C54 (3156)
+00074C: 420B  jsr @r2                       ; -> 0x000C54
+00074E: 23D0  mov.b r13,@r3                   ; delay slot: byte 0xFFFFBFA8 := r13 (= r5; r4 != 0 path only)
+000750: 9E81  mov.w @(0x000856),r14         ; = 0x0924 (2340)
+000752: D349  mov.l @(0x000878),r3          ; = 0x5AA5A55A const
+000754: D249  mov.l @(0x00087C),r2          ; = 0xFFFFBFFC RAM
+000756: 2232  mov.l r3,@r2                    ; long 0xFFFFBFFC := 0x5AA5A55A (boot marker), on every exit
+000758: 937E  mov.w @(0x000858),r3          ; = 0x0040 (64)
+00075A: 430B  jsr @r3                       ; -> 0x000040 | 0x000040: r15 := 0xFFFFBFA0, jmp @r4
+00075C: 64E3  mov r14,r4                      ; delay slot: r4 = r14 = 0x0000127C on this ROM's reset path
+00075E: AFFE  bra 0x00075E
+000760: 0009  nop
+;   pool 0x000854: .long 0x0C540924  const
+;   pool 0x000858: .long 0x00405A1F  const
+;   pool 0x000874: .long 0xFFFFBFA8  RAM
+;   pool 0x000878: .long 0x5AA5A55A  const
+;   pool 0x00087C: .long 0xFFFFBFFC  RAM
+
+---- callees of 0x00065C that write RAM ----
+  0x000598 (26 instructions): the 24 boot-area bytes above.  0x00054A (6): two zero words.  0x000040 (3):
+  SP := 0xFFFFBFA0, jmp @r4.  0x00004C (3): SP := 0xFFFFBFA0, rts.  emulated: pass C.
+000598: 9559  mov.w @(0x00064E),r5          ; = 0xBFE4 (-16412) -> 0xFFFFBFE4 RAM
+00059A: E400  mov #0,r4
+00059C: 9658  mov.w @(0x000650),r6          ; = 0xBFF0 (-16400) -> 0xFFFFBFF0 RAM
+00059E: E708  mov #8,r7
+0005A0: 2540  mov.b r4,@r5                    ; byte [r5] := 0, r5 from 0xFFFFBFE4
+0005A2: 77FF  add #-1,r7
+0005A4: 2640  mov.b r4,@r6                    ; byte [r6] := 0, r6 from 0xFFFFBFF0
+0005A6: 2778  tst r7,r7
+0005A8: 7601  add #1,r6
+0005AA: 8FF9  bf/s 0x0005A0                   ; 8 passes: 0xFFFFBFE4..0xFFFFBFEB and 0xFFFFBFF0..0xFFFFBFF7 := 0
+0005AC: 7501  add #1,r5
+0005AE: 9750  mov.w @(0x000652),r7          ; = 0x00AA (170)
+0005B0: 2570  mov.b r7,@r5                    ; byte 0xFFFFBFEC := 0xAA
+0005B2: 7501  add #1,r5
+0005B4: 2670  mov.b r7,@r6                    ; byte 0xFFFFBFF8 := 0xAA
+0005B6: 7601  add #1,r6
+0005B8: E703  mov #3,r7
+0005BA: 77FF  add #-1,r7
+0005BC: 2540  mov.b r4,@r5
+0005BE: 2778  tst r7,r7
+0005C0: 2640  mov.b r4,@r6
+0005C2: 7601  add #1,r6
+0005C4: 8FF9  bf/s 0x0005BA                   ; 3 passes: 0xFFFFBFED..0xFFFFBFEF and 0xFFFFBFF9..0xFFFFBFFB := 0
+0005C6: 7501  add #1,r5
+0005C8: 000B  rts
+0005CA: 0009  nop
+;   pool 0x00064C: .long 0x6EF6BFE4  const
+;   pool 0x000650: .long 0xBFF000AA  const f32 -1.87502
+00054A: E400  mov #0,r4
+00054C: 9314  mov.w @(0x000578),r3          ; = 0xBFB8 (-16456) -> 0xFFFFBFB8 RAM
+00054E: 2341  mov.w r4,@r3                    ; word 0xFFFFBFB8 := 0
+000550: 9215  mov.w @(0x00057E),r2          ; = 0xBFBA (-16454) -> 0xFFFFBFBA RAM
+000552: 000B  rts
+000554: 2241  mov.w r4,@r2                    ; delay slot: word 0xFFFFBFBA := 0
+;   pool 0x000578: .long 0xBFB80344  const f32 -1.4376
+;   pool 0x00057C: .long 0x05CCBFBA  const
+000040: DF01  mov.l @(0x000048),r15         ; = 0xFFFFBFA0 RAM
+000042: 442B  jmp @r4                       ; -> target NOT statically resolved | jump to r4 with the boot stack 0xFFFFBFA0
+000044: 0009  nop
+;   pool 0x000048: .long 0xFFFFBFA0  RAM
+00004C: DF01  mov.l @(0x000054),r15         ; = 0xFFFFBFA0 RAM | r15 := 0xFFFFBFA0
+00004E: 000B  rts
+000050: 0009  nop
+;   pool 0x000054: .long 0xFFFFBFA0  RAM
+
+==== FUNCTION 0x0007E0 .. 0x000854 (58 instructions, 1 caller: 0x00065C, call sites 0x000694 / 0x0006E2) ====
+CONTRACT
+  r4 = n (7 at both sites); the count is n & 0xFFFF (extu.w at 0x0007F2).  (n & 0xFFFF) == 0: return 1 at
+  once (so n = 0x10000 returns 1, and n = -1 runs 65535 events).  Otherwise loop until n & 0xFFFF events of
+  TCSR bit 7 (OVF, manual 13.2.2) have been counted:
+    byte 0xFFFFBFA8 := (byte 0xFFFFBFEC == 0x55) (0x00088C, stored in the delay slot of jsr 0x0004D6);
+    0x0004D6: take one message into ring slot 0xFFFFB4E0 + 8 * word[0xFFFFBFB8] (from HCAN via 0x000344 when
+      BFA8 = 0, from bytes 0xFFFFBFE4..0xFFFFBFEB via 0x0005CC when BFA8 != 0); if taken, word 0xFFFFBFB8 :=
+      (+1, 0 at >= 100);
+    if 0x000556 (= (word BFB8 - word BFBA) mod 100) != 0: p = 0x000524 (slot address for word BFBA, which
+      then steps the same way); if 0x00089E(p) (the 8 bytes are FF 86 00 00 00 00 00 00): return 0;
+    if TCSR (0xFFFFEC10) bit 7 is set: WDT service 0x000484 (TCSR := 0xA53C, which clears OVF after it was
+      read as 1) and count one event.
+  Return 1 when no such message is seen.  The WDT runs in interval mode here (0x000762: TCSR 0xA53C), and
+  IPRL is 0 after reset, so the overflows are polled, never taken as interrupts.
+  Because 0x000598 has just set byte 0xFFFFBFEC := 0xAA, 0x00088C returns 0 on the reset path: BFA8 := 0 and
+  the HCAN branch is used.  RAM outside 0xFFFF4000..0xFFFFBF9F: byte BFA8, words BFB8 / BFBA (0 unless a
+  message is received).  The ring 0xFFFFB4E0..0xFFFFB7FF (100 slots x 8 bytes) lies inside the filled range.
+MECHANISM
+  0007F2 extu.w r4,r10; 0007F6 cmp/pl r10: T = (r10 > 0) signed, and r10 is 0..65535, so T = 0 only for
+  (r4 & 0xFFFF) == 0; 000800 bf/s returns 1 then.  000830 tst r9,r2 (r9 = 0x80): T = ((TCSR
+  & 0x80) == 0); 000832 bt skips the service; the counter r14 is incremented only in the delay slot 000838.
+  00083C cmp/ge r10,r3: T = (count >= n); 00083E bf loops.  000516 / 00053C cmp/ge r2,r3|r1 with r2 = 100:
+  T = (index >= 100) -> index := 0.
+EVIDENCE
+  emulated: pass C, boot marker absent (16 runs): BFA8 = 0 and BFB8..BFBB = 0 at the kernel start (no message
+  in the model; the WDT model counts 7 overflows, the number of passes per overflow is a model input).
+  emulated: pass I -- r4 = 0x00010000 returns r0 = 1 without reaching 0x000804; r4 = 0xFFFFFFFF reaches
+  0x000804 with r10 = 0xFFFF.  The message-received branch (0x000344 copy, index steps) is bytes only.
+LISTING
+0007E0: 2FE6  mov.l r14,@-r15
+0007E2: 2FD6  mov.l r13,@-r15
+0007E4: 2FC6  mov.l r12,@-r15
+0007E6: ED00  mov #0,r13
+0007E8: 2FB6  mov.l r11,@-r15
+0007EA: 6ED3  mov r13,r14
+0007EC: 9C37  mov.w @(0x00085E),r12         ; = 0xEC10 (-5104) -> 0xFFFFEC10 PERIPH
+0007EE: EB01  mov #1,r11
+0007F0: 2FA6  mov.l r10,@-r15
+0007F2: 6A4D  extu.w r4,r10                   ; r10 = (u16)n (n = 7 at both call sites)
+0007F4: 2F96  mov.l r9,@-r15
+0007F6: 4A15  cmp/pl r10                      ; T = (r10 > 0) signed
+0007F8: 2F86  mov.l r8,@-r15
+0007FA: 69B3  mov r11,r9                      ; r9 = 1
+0007FC: 4F22  sts.l pr,@-r15
+0007FE: D81D  mov.l @(0x000874),r8          ; = 0xFFFFBFA8 RAM
+000800: 8F1E  bf/s 0x000840                   ; T=0 ((r4 & 0xFFFF) == 0): return 1
+000802: 797F  add #127,r9                     ; delay slot: r9 = 0x80 (TCSR bit 7)
+000804: B042  bsr 0x00088C                    ; r0 = (byte 0xFFFFBFEC == 0x55)
+000806: 0009  nop
+000808: 932F  mov.w @(0x00086A),r3          ; = 0x04D6 (1238)
+00080A: 430B  jsr @r3                       ; -> 0x0004D6
+00080C: 2800  mov.b r0,@r8                    ; delay slot: byte 0xFFFFBFA8 := r0; then 0x0004D6 takes one message into slot 0xFFFFB4E0 + 8 * [0xFFFFBFB8]
+00080E: 922D  mov.w @(0x00086C),r2          ; = 0x0556 (1366)
+000810: 420B  jsr @r2                       ; -> 0x000556 | r0 = ([0xFFFFBFB8] - [0xFFFFBFBA]) mod 100: messages waiting
+000812: 0009  nop
+000814: 600D  extu.w r0,r0
+000816: 2008  tst r0,r0                       ; T = (none waiting)
+000818: 8908  bt 0x00082C
+00081A: 9228  mov.w @(0x00086E),r2          ; = 0x0524 (1316)
+00081C: 420B  jsr @r2                       ; -> 0x000524 | r0 = 0xFFFFB4E0 + 8 * [0xFFFFBFBA]; [0xFFFFBFBA] := ([0xFFFFBFBA] + 1) mod 100
+00081E: 0009  nop
+000820: B03D  bsr 0x00089E                    ; r0 = 1 iff the 8 bytes are FF 86 00 00 00 00 00 00
+000822: 6403  mov r0,r4
+000824: 2008  tst r0,r0
+000826: 8901  bt 0x00082C                     ; T=1 (other message): carry on
+000828: A00A  bra 0x000840
+00082A: 6BD3  mov r13,r11                     ; delay slot: r11 = 0, return 0
+00082C: 62C0  mov.b @r12,r2
+00082E: 622C  extu.b r2,r2
+000830: 2298  tst r9,r2                       ; T = ((TCSR & 0x80) == 0): no WDT overflow (OVF) since the last service
+000832: 8902  bt 0x00083A
+000834: 921C  mov.w @(0x000870),r2          ; = 0x0484 (1156)
+000836: 420B  jsr @r2                       ; -> 0x000484 | TCSR bit 7 set: WDT service
+000838: 7E01  add #1,r14                      ; delay slot: r14 += 1 (counts TCSR bit-7 events, not passes)
+00083A: 63ED  extu.w r14,r3
+00083C: 33A3  cmp/ge r10,r3                   ; T = (r14 >= n) signed
+00083E: 8BE1  bf 0x000804                     ; T=0: next pass
+000840: 4F26  lds.l @r15+,pr
+000842: 60B3  mov r11,r0                      ; return r11 (1 = no matching message in n events)
+000844: 68F6  mov.l @r15+,r8
+000846: 69F6  mov.l @r15+,r9
+000848: 6AF6  mov.l @r15+,r10
+00084A: 6BF6  mov.l @r15+,r11
+00084C: 6CF6  mov.l @r15+,r12
+00084E: 6DF6  mov.l @r15+,r13
+000850: 000B  rts
+000852: 6EF6  mov.l @r15+,r14
+;   pool 0x00085C: .long 0xEC12EC10  const
+;   pool 0x000868: .long 0xD90004D6  const
+;   pool 0x00086C: .long 0x05560524  const
+;   pool 0x000870: .long 0x0484FFFF  const
+;   pool 0x000874: .long 0xFFFFBFA8  RAM
+00088C: 9047  mov.w @(0x00091E),r0          ; = 0xBFEC (-16404) -> 0xFFFFBFEC RAM
+00088E: 6000  mov.b @r0,r0
+000890: 600C  extu.b r0,r0
+000892: 8855  cmp/eq #85,r0                   ; T = (byte 0xFFFFBFEC == 0x55)
+000894: 8F01  bf/s 0x00089A
+000896: E400  mov #0,r4
+000898: E401  mov #1,r4
+00089A: 000B  rts
+00089C: 6043  mov r4,r0
+;   pool 0x00091C: .long 0x7F04BFEC  const
+0004D6: 2FE6  mov.l r14,@-r15
+0004D8: 4F22  sts.l pr,@-r15
+0004DA: 9E4D  mov.w @(0x000578),r14         ; = 0xBFB8 (-16456) -> 0xFFFFBFB8 RAM
+0004DC: D32D  mov.l @(0x000594),r3          ; = 0xFFFFB4E0 RAM
+0004DE: 64E1  mov.w @r14,r4
+0004E0: D12B  mov.l @(0x000590),r1          ; = 0xFFFFBFA8 RAM
+0004E2: 644D  extu.w r4,r4
+0004E4: 6210  mov.b @r1,r2
+0004E6: 4408  shll2 r4
+0004E8: 4400  shll r4
+0004EA: 2228  tst r2,r2                       ; T = (byte 0xFFFFBFA8 == 0)
+0004EC: 8F06  bf/s 0x0004FC
+0004EE: 343C  add r3,r4
+0004F0: 9243  mov.w @(0x00057A),r2          ; = 0x0344 (836)
+0004F2: 420B  jsr @r2                       ; -> 0x000344 | BFA8 == 0: HCAN0 / HCAN1 receive into the slot (0x000344)
+0004F4: 0009  nop
+0004F6: 6503  mov r0,r5
+0004F8: A004  bra 0x000504
+0004FA: 8801  cmp/eq #1,r0
+0004FC: 923E  mov.w @(0x00057C),r2          ; = 0x05CC (1484)
+0004FE: 420B  jsr @r2                       ; -> 0x0005CC | BFA8 != 0: copy bytes 0xFFFFBFE4..BFEB into the slot if byte 0xFFFFBFEC == 0x55 (0x0005CC)
+000500: 0009  nop
+000502: 6503  mov r0,r5
+000504: 6053  mov r5,r0
+000506: 8801  cmp/eq #1,r0                    ; T = (one message taken)
+000508: 8B09  bf 0x00051E
+00050A: 62E1  mov.w @r14,r2
+00050C: 7201  add #1,r2
+00050E: 2E21  mov.w r2,@r14                   ; word 0xFFFFBFB8 := +1
+000510: 63E1  mov.w @r14,r3
+000512: E264  mov #100,r2
+000514: 633D  extu.w r3,r3
+000516: 3323  cmp/ge r2,r3                    ; T = ([0xFFFFBFB8] >= 100) signed
+000518: 8B01  bf 0x00051E
+00051A: E100  mov #0,r1
+00051C: 2E11  mov.w r1,@r14                   ; wrap: word 0xFFFFBFB8 := 0
+00051E: 4F26  lds.l @r15+,pr
+000520: 000B  rts
+000522: 6EF6  mov.l @r15+,r14
+;   pool 0x000578: .long 0xBFB80344  const f32 -1.4376
+;   pool 0x00057C: .long 0x05CCBFBA  const
+;   pool 0x000590: .long 0xFFFFBFA8  RAM
+;   pool 0x000594: .long 0xFFFFB4E0  RAM
+000524: 942B  mov.w @(0x00057E),r4          ; = 0xBFBA (-16454) -> 0xFFFFBFBA RAM
+000526: 6541  mov.w @r4,r5
+000528: D31A  mov.l @(0x000594),r3          ; = 0xFFFFB4E0 RAM
+00052A: 655D  extu.w r5,r5
+00052C: 6241  mov.w @r4,r2
+00052E: 4508  shll2 r5
+000530: 4500  shll r5
+000532: 7201  add #1,r2
+000534: 2421  mov.w r2,@r4                    ; word 0xFFFFBFBA := +1
+000536: E264  mov #100,r2
+000538: 6141  mov.w @r4,r1
+00053A: 611D  extu.w r1,r1
+00053C: 3123  cmp/ge r2,r1                    ; T = ([0xFFFFBFBA] >= 100) signed
+00053E: 8F02  bf/s 0x000546
+000540: 353C  add r3,r5
+000542: E000  mov #0,r0
+000544: 2401  mov.w r0,@r4                    ; wrap: word 0xFFFFBFBA := 0
+000546: 000B  rts
+000548: 6053  mov r5,r0                       ; delay slot: r0 = 0xFFFFB4E0 + 8 * old index
+;   pool 0x00057C: .long 0x05CCBFBA  const
+;   pool 0x000594: .long 0xFFFFB4E0  RAM
+
+==== FUNCTION 0x00127C .. 0x001296 (13 instructions, reached by jmp from 0x000040) and 0x0012C0 .. 0x001332 (57 instructions, 2 callers) ====
+CONTRACT
+  0x00127C: r0 = [0x002000] = 0xFFFF204C; not 0xFFFFFFFF -> byte 0xFFFF204C := 0x77; 0x0012C0(0).
+  0x0012C0(r4): r14 = r4.  class = 0x001994 (SDSR high byte: 11 / 13 -> 0, 80 -> 1, else 0xFF).  class == 1 ->
+  r4 = 0xA53D; else SYSCR2 := 0x3C00 | (SYSCR2 & 0x7F) (0x001014) and r4 = 0xA53C.  word 0xFFFF800C := r4;
+  0x001332 writes TCSR := 0xA51C, RSTCSR := 0x5A1F, TCNT := 0, then TCSR := word 0xFFFF800C (0xA53C: interval
+  mode, TME, CKS 4); 0x00B2AA and 0x010C52 overwrite that before 0x010878 reads it (see 0x00FA5A).  0x00105C HCAN
+  (no RAM).  0x0019F0(r14): longs 0xFFFF80A4 := 0xFFFFFFFF, 0xFFFF80A0 := 0, 0xFFFF80A8 := 0, 0xFFFF809C := 0,
+  0xFFFF80AC := r14.  r14 == 0 and neither [0x0FFFFC] nor [[0x0FFFFC]] blank -> r14 = [0x0FFFF8] = 0x0000FA34
+  and, [0x002000] not blank, byte 0xFFFF204C := 0x88; 0x001008: SP := 0xFFFFBF7C, jmp 0x00FA34.
+  (r4 != 0 entry, from 0x001296: target 0x00134E -- not a reset path.)
+  Net RAM effect that survives the fill: byte 0xFFFF204C = 0x88.  0xFFFF800C and 0xFFFF809C..0xFFFF80AF lie in
+  the filled range.  Both functions run on the boot stack: SP = 0xFFFFBFA0 at 0x00127C, 0x0012C0 and 0x001008
+  (set by 0x000040; 0x0012C0 saves nothing because it never returns).  0x001008 loads SP := 0xFFFFBF7C only as
+  it jumps to 0x00FA34 (pass C, all 32 runs).
+MECHANISM
+  001280 cmp/eq #-1,r0: T = ([0x002000] == 0xFFFFFFFF); 001282 bt/s skips the 0x77 store.  0012C8 cmp/eq #1:
+  T = (class == 1).  0012EE tst r14,r14: T = (r14 == 0); 0012F0 bf/s to 0x001326 for r14 != 0.  0012F8 /
+  001302 cmp/eq #-1: T when blank; 001304 bf/s 0x001312 when [[0x0FFFFC]] is not blank.  00131C (delay slot of
+  00131A bt/s, executed both ways): r14 = [0x0FFFF8].  001324 (delay slot of bra): byte 0xFFFF204C := 0x88.
+EVIDENCE
+  emu pass A: [0x002000] = 0xFFFF204C, [0x0FFFF8] = 0x0000FA34.  emulated: pass C, byte 0xFFFF204C = 0x88 at
+  the kernel start in all 32 runs; every other byte of 0xFFFF2000..0xFFFF3FFF unchanged (asserted).
+LISTING
+00127C: 9419  mov.w @(0x0012B2),r4          ; = 0x2000 (8192)
+00127E: 6042  mov.l @r4,r0                    ; r0 = [0x002000] = 0xFFFF204C
+001280: 88FF  cmp/eq #-1,r0                   ; T = (r0 == 0xFFFFFFFF)
+001282: 8D03  bt/s 0x00128C
+001284: 0009  nop
+001286: 6242  mov.l @r4,r2
+001288: E377  mov #119,r3
+00128A: 2230  mov.b r3,@r2                    ; byte 0xFFFF204C := 0x77
+00128C: 9212  mov.w @(0x0012B4),r2          ; = 0x12C0 (4800)
+00128E: 420B  jsr @r2                       ; -> 0x0012C0 | 0x0012C0(r4 = 0)
+001290: E400  mov #0,r4
+001292: AFFE  bra 0x001292
+001294: 0009  nop
+;   pool 0x0012B0: .long 0x00092000  ROM
+;   pool 0x0012B4: .long 0x12C0ECB0  const
+0012C0: 9373  mov.w @(0x0013AA),r3          ; = 0x1994 (6548)
+0012C2: 430B  jsr @r3                       ; -> 0x001994 | r0 = class from SDSR (0 for high byte 11 or 13, 1 for 80, else 0xFF)
+0012C4: 6E43  mov r4,r14                      ; delay slot: r14 = r4 = 0
+0012C6: 600C  extu.b r0,r0
+0012C8: 8801  cmp/eq #1,r0                    ; T = (class == 1)
+0012CA: 8F03  bf/s 0x0012D4
+0012CC: 0009  nop
+0012CE: D43F  mov.l @(0x0013CC),r4          ; = 0x0000A53D const
+0012D0: A004  bra 0x0012DC
+0012D2: 0009  nop
+0012D4: 926A  mov.w @(0x0013AC),r2          ; = 0x1014 (4116)
+0012D6: 420B  jsr @r2                       ; -> 0x001014 | SYSCR2 := 0x3C00 | (SYSCR2 & 0x7F)
+0012D8: E400  mov #0,r4
+0012DA: D43D  mov.l @(0x0013D0),r4          ; = 0x0000A53C ROM | r4 = 0xA53C
+0012DC: 9367  mov.w @(0x0013AE),r3          ; = 0x800C (-32756) -> 0xFFFF800C RAM
+0012DE: B028  bsr 0x001332
+0012E0: 2341  mov.w r4,@r3                    ; delay slot: word 0xFFFF800C := r4 (0xA53C for class 0); 0x001332 copies it to TCSR
+0012E2: 9165  mov.w @(0x0013B0),r1          ; = 0x105C (4188)
+0012E4: 410B  jsr @r1                       ; -> 0x00105C | HCAN (no RAM)
+0012E6: 0009  nop
+0012E8: 9363  mov.w @(0x0013B2),r3          ; = 0x19F0 (6640)
+0012EA: 430B  jsr @r3                       ; -> 0x0019F0 | longs 0xFFFF80A4 := 0xFFFFFFFF, 0xFFFF80A0 / 80A8 / 809C := 0, 0xFFFF80AC := r4
+0012EC: 64E3  mov r14,r4
+0012EE: 2EE8  tst r14,r14                     ; T = (r14 == 0)
+0012F0: 8F19  bf/s 0x001326
+0012F2: 0009  nop
+0012F4: D437  mov.l @(0x0013D4),r4          ; = 0x000FFFFC CAL
+0012F6: 6042  mov.l @r4,r0
+0012F8: 88FF  cmp/eq #-1,r0                   ; T = ([0x0FFFFC] == 0xFFFFFFFF)
+0012FA: 8D05  bt/s 0x001308
+0012FC: 0009  nop
+0012FE: 6042  mov.l @r4,r0
+001300: 6002  mov.l @r0,r0
+001302: 88FF  cmp/eq #-1,r0                   ; T = ([[0x0FFFFC]] == 0xFFFFFFFF)
+001304: 8F05  bf/s 0x001312                   ; T=0 (this ROM): 0x001312
+001306: 0009  nop
+001308: D233  mov.l @(0x0013D8),r2          ; = 0x00001EC8 ROM
+00130A: 420B  jsr @r2                       ; -> 0x001EC8
+00130C: 0009  nop
+00130E: A00A  bra 0x001326
+001310: 0009  nop
+001312: D232  mov.l @(0x0013DC),r2          ; = 0x000FFFF8 CAL
+001314: 944E  mov.w @(0x0013B4),r4          ; = 0x2000 (8192)
+001316: 6042  mov.l @r4,r0
+001318: 88FF  cmp/eq #-1,r0                   ; T = ([0x002000] == 0xFFFFFFFF)
+00131A: 8D05  bt/s 0x001328
+00131C: 6E22  mov.l @r2,r14                   ; delay slot, both ways: r14 = [0x0FFFF8] = 0x0000FA34
+00131E: 6142  mov.l @r4,r1
+001320: 9349  mov.w @(0x0013B6),r3          ; = 0x0088 (136)
+001322: A001  bra 0x001328
+001324: 2130  mov.b r3,@r1                    ; delay slot: byte 0xFFFF204C := 0x88
+001326: 9E47  mov.w @(0x0013B8),r14         ; = 0x134E (4942)
+001328: 9347  mov.w @(0x0013BA),r3          ; = 0x1008 (4104)
+00132A: 430B  jsr @r3                       ; -> 0x001008 | 0x001008: r15 := 0xFFFFBF7C, jmp @r4
+00132C: 64E3  mov r14,r4                      ; delay slot: r4 = r14 = 0x0000FA34
+00132E: AFFE  bra 0x00132E
+001330: 0009  nop
+;   pool 0x0013A8: .long 0x00091994  ROM
+;   pool 0x0013AC: .long 0x1014800C  const
+;   pool 0x0013B0: .long 0x105C19F0  const
+;   pool 0x0013B4: .long 0x20000088  const
+;   pool 0x0013B8: .long 0x134E1008  const
+;   pool 0x0013CC: .long 0x0000A53D  const
+;   pool 0x0013D0: .long 0x0000A53C  ROM
+;   pool 0x0013D4: .long 0x000FFFFC  CAL
+;   pool 0x0013D8: .long 0x00001EC8  ROM
+;   pool 0x0013DC: .long 0x000FFFF8  CAL
+0019F0: 9272  mov.w @(0x001AD8),r2          ; = 0x80A4 (-32604) -> 0xFFFF80A4 RAM
+0019F2: E500  mov #0,r5
+0019F4: 9172  mov.w @(0x001ADC),r1          ; = 0x80A8 (-32600) -> 0xFFFF80A8 RAM
+0019F6: E3FF  mov #-1,r3
+0019F8: 2232  mov.l r3,@r2                    ; long 0xFFFF80A4 := 0xFFFFFFFF
+0019FA: 936E  mov.w @(0x001ADA),r3          ; = 0x80A0 (-32608) -> 0xFFFF80A0 RAM
+0019FC: 926F  mov.w @(0x001ADE),r2          ; = 0x809C (-32612) -> 0xFFFF809C RAM
+0019FE: 2352  mov.l r5,@r3                    ; long 0xFFFF80A0 := 0
+001A00: 2152  mov.l r5,@r1                    ; long 0xFFFF80A8 := 0
+001A02: 2252  mov.l r5,@r2                    ; long 0xFFFF809C := 0
+001A04: 936C  mov.w @(0x001AE0),r3          ; = 0x80AC (-32596) -> 0xFFFF80AC RAM
+001A06: 000B  rts
+001A08: 2342  mov.l r4,@r3                    ; delay slot: long 0xFFFF80AC := r4
+;   pool 0x001AD8: .long 0x80A480A0  const
+;   pool 0x001ADC: .long 0x80A8809C  const
+;   pool 0x001AE0: .long 0x80AC80B0  const
+001008: DF01  mov.l @(0x001010),r15         ; = 0xFFFFBF7C RAM
+00100A: 442B  jmp @r4                       ; -> target NOT statically resolved | jump to r4 = 0x00FA34 with r15 = 0xFFFFBF7C (inside 0xFFFF4000..0xFFFFBF9F); stage 2 itself ran on 0xFFFFBFA0
+00100C: 0009  nop
+;   pool 0x001010: .long 0xFFFFBF7C  RAM
+
+==== FUNCTION 0x00FA34 .. 0x00FA5A (19 instructions, application entry, reached by jmp from 0x001008) with 0x0040CA, 0x0040C0, 0x0040C6 ====
+CONTRACT
+  Entered with SP = 0xFFFFBF7C (from 0x001008).  SR I-mask := 15; VBR := 0x000FFC50; FPSCR := 0x00040001;
+  jsr 0x0040CA, whose rts delay slot 0x0040CC sets SP := r4 = [0x011CC8] = 0xFFFF12DC; byte 0xFFFFBFAD :=
+  0x88; 0x00FA5A (never returns).  SP 0xFFFFBF7C is therefore in force only from 0x00FA34 to 0x0040CC, and no
+  instruction in that span touches the stack (jsr pushes nothing).
+  0x0040C0(r4): long [r4 - 4] := SP; SP := r4 - 4.   0x0040C6: SP := [SP].   (used by 0x010290)
+EVIDENCE
+  emu pass A: [0x011CC8] = 0xFFFF12DC.  emulated: pass C, SR loads 00FA3C I = 15 and 00FA82 I = 13 logged; SP at
+  first visit 0x00FA34 = 0x0040CA = 0xFFFFBF7C, 0x00FA4E = 0xFFFF12DC (asserted, 32 runs).  With interrupt
+  acceptance off the lowest SP of the run is 0xFFFF125C (0xFFFF125C..0xFFFF12DB is then the only part of
+  0xFFFF0020..0xFFFF1FFF that changes, asserted); with ITIs taken it is lower (pass G, see 0x00F6E6).
+LISTING
+00FA34: 0002  stc sr,r0
+00FA36: 96C9  mov.w @(0x00FBCC),r6          ; = 0xFF0F (-241) -> 0xFFFFFF0F PERIPH
+00FA38: 2069  and r6,r0
+00FA3A: CBF0  or #240,r0
+00FA3C: 400E  ldc r0,sr                       ; SR I-mask := 15
+00FA3E: D2A1  mov.l @(0x00FCC4),r2          ; = 0x000FFC50 CAL
+00FA40: 422E  ldc r2,vbr                      ; VBR := 0x000FFC50
+00FA42: D2A1  mov.l @(0x00FCC8),r2          ; = 0x00040001 const
+00FA44: 426A  lds r2,fpscr                    ; FPSCR := 0x00040001
+00FA46: D6A1  mov.l @(0x00FCCC),r6          ; = 0x00011CC8 ROM
+00FA48: D2A1  mov.l @(0x00FCD0),r2          ; = 0x000040CA ROM
+00FA4A: 420B  jsr @r2                       ; -> 0x0040CA | 0x0040CA: r15 := r4 (in its rts delay slot 0x0040CC)
+00FA4C: 6462  mov.l @r6,r4                    ; delay slot: r4 = [0x011CC8] = 0xFFFF12DC: the stack moves into 0xFFFF0020..0xFFFF1FFF at 0x0040CC
+00FA4E: 92BE  mov.w @(0x00FBCE),r2          ; = 0xBFAD (-16467) -> 0xFFFFBFAD RAM
+00FA50: E688  mov #-120,r6
+00FA52: B002  bsr 0x00FA5A
+00FA54: 2260  mov.b r6,@r2                    ; delay slot: byte 0xFFFFBFAD := 0x88
+00FA56: AFFE  bra 0x00FA56
+00FA58: 0009  nop
+;   pool 0x00FBCC: .long 0xFF0FBFAD  const
+;   pool 0x00FCC4: .long 0x000FFC50  CAL
+;   pool 0x00FCC8: .long 0x00040001  const
+;   pool 0x00FCCC: .long 0x00011CC8  ROM
+;   pool 0x00FCD0: .long 0x000040CA  ROM
+0040CA: 000B  rts
+0040CC: 6F43  mov r4,r15                      ; delay slot: r15 := r4 = 0xFFFF12DC, the application SP (ends the 0xFFFFBF7C span)
+0040C0: 24F6  mov.l r15,@-r4                  ; long [r4 - 4] := r15 (old SP); r4 -= 4
+0040C2: 000B  rts
+0040C4: 6F43  mov r4,r15                      ; delay slot: r15 = r4
+0040C6: 000B  rts
+0040C8: 6FF2  mov.l @r15,r15                  ; delay slot: r15 := [r15] (back to the saved SP)
+
+==== FUNCTION 0x00FA5A .. 0x00FACA (56 instructions, 1 caller: 0x00FA34), with 0x0108DA, 0x010878, 0x00FBBA ====
+CONTRACT
+  In order: 0x00AD98 (peripherals; among them 0x00B2AA, which stops the WDT -- see the WDT section),
+  0x00AE1C (IPRA..IPRL, words 0xFFFFED00..0xFFFFED16, := 0), 0x00AE50 (IPRL := (IPRL & 0xFF0F) | 0xE0: bits 7-4,
+  the WDT ITI priority by manual Table 7.4, := 14), 0x0108DA(0), 0x010942 (TCSR := 0xA520 | TCSR byte: TME := 1,
+  so TCSR = 0x3C, interval mode), SR I-mask := 13 (now 14 > 13: an ITI is taken on each WDT overflow outside
+  the 0xE0 critical sections), 0x010290, 0x00FBBA(0), 0x0BEAB8(2000) (counts r5 to 8 * 2000), critical section
+  {r0 = 0x006BC4(20); 0x006BF0(20, (u8)((r0 & ~8) | 8))}, 0x00AE1C (IPRL := 0: no ITI from here on),
+  0x003324(0).
+  0x0108DA(r4 = 0), inside a 0xE0 critical section: 0x0BEAB8(300); 0x011880 (toggles bit 15 of port word
+  0xFFFFF738); byte 0xFFFF0008 := 0; r4 = 0 -> 0x010C52(4); 0x010878(300.0).
+  0x010878(fr4): CKS = TCSR & 7 (byte read of 0xFFFFEC10, the TCSR read address, manual 13.2.4); fr15 =
+  0.8192 if CKS == 3 else 1.6384; long 0xFFFF0000 := trunc(fr4 / fr15 + 0.5); long 0xFFFF0004 := 0.  The read
+  returns 0x1C (CKS 4) on this path, because 0x010C52(4) has just written TCSR := 0xA518 | 4 | (old TME = 0,
+  0x00B2AA stopped the WDT): 183; no last-bit question arises (300 / 1.6384 = 183.105..).
+  0x00FBBA(r4): byte 0xFFFF5B6C := r4.
+  0xFFFF0000 / 0xFFFF0004 are the limit and count of the boot watchdog run by the ITI handler 0x00F6E6 ->
+  0x010AD8 (own section below): 183 ITIs may be taken before 0x00FABC closes the window, or the ECU halts.
+  RAM written by this function's callees, besides the stack: 0xFFFF0000..0xFFFF0008 (before 0x010290, inside
+  the save / restore range B, which runs masked, so preserved), 0xFFFF5B89 (0x010290), 0xFFFF5B6C (after the
+  fill); and by any ITI in the window: long 0xFFFF0004 (+1 each) and the ISR frames.
+MECHANISM
+  010906 cmp/eq #2: T = (r4 == 2) skips the timer part; 01090E cmp/eq #0: T = (r4 == 0), delay slot r5 = 4,
+  010928 r4 = r5.  010890 cmp/eq #3: T = (CKS == 3).
+EVIDENCE
+  emulated: pass C (acceptance off) -- 0xFFFF0000 = 183, 0xFFFF0004 = 0, 0xFFFF0008 = 0 in all 32 runs; the
+  WDT writes from 0x00B2AA on are exactly (0x00B2B8 TCSR, TME := 0), (0x00B2BE RSTCSR 0x5A1F), (0x00B2C2 TCSR
+  0xA518), (0x010C5C TCSR 0xA518), (0x010C66 TCSR 0xA51C -> 0x1C), (0x01094C TCSR 0xA53C -> 0x3C), and the read
+  at 0x010884 returns 0x1C (asserted); the IPR writes are 0x00AE1C's twelve zeros, IPRL := 0x00E0 (0x00AE5C,
+  logged at the rts 0x00AE5A) and 0x00AE1C's twelve zeros again (asserted); the only writes into
+  0xFFFF4000..0xFFFFBF9F after the fill are (00FBBC delay slot, 0xFFFF5B6C) and (010352, 0xFFFF5B89).
+  emulated: pass G (acceptance on) -- 0xFFFF0004 = number of ITIs taken (19, 101, 6, 13, 31 at the model rates).
+LISTING
+00FA5A: 7FFC  add #-4,r15
+00FA5C: D29D  mov.l @(0x00FCD4),r2          ; = 0x0000AD98 ROM
+00FA5E: 420B  jsr @r2                       ; -> 0x00AD98 | peripheral set-up, incl. 0x00B2AA (WDT stopped); no RAM outside the stack (emulated)
+00FA60: 0009  nop
+00FA62: D69D  mov.l @(0x00FCD8),r6          ; = 0x0000AE1C ROM
+00FA64: 460B  jsr @r6                       ; -> 0x00AE1C | IPRA..IPRL 0xFFFFED00..0xFFFFED16 := 0 (manual Table 7.4)
+00FA66: 0009  nop
+00FA68: D29C  mov.l @(0x00FCDC),r2          ; = 0x0000AE50 ROM
+00FA6A: 420B  jsr @r2                       ; -> 0x00AE50 | IPRL 0xFFFFED16 bits 7-4 := 14: the WDT ITI priority
+00FA6C: 0009  nop
+00FA6E: D29C  mov.l @(0x00FCE0),r2          ; = 0x000108DA ROM
+00FA70: 420B  jsr @r2                       ; -> 0x0108DA | 0x0108DA(0): byte 0xFFFF0008 := 0, long 0xFFFF0000 := 183 (limit), long 0xFFFF0004 := 0 (count)
+00FA72: E400  mov #0,r4
+00FA74: D29B  mov.l @(0x00FCE4),r2          ; = 0x00010942 ROM
+00FA76: 420B  jsr @r2                       ; -> 0x010942 | TCSR := 0xA520 | TCSR byte = 0x3C: TME = 1, interval mode, the WDT counts
+00FA78: 0009  nop
+00FA7A: 0002  stc sr,r0
+00FA7C: 95A6  mov.w @(0x00FBCC),r5          ; = 0xFF0F (-241) -> 0xFFFFFF0F PERIPH
+00FA7E: 2059  and r5,r0
+00FA80: CBD0  or #208,r0
+00FA82: 400E  ldc r0,sr                       ; SR I-mask := 13: the WDT ITI (priority 14) is now accepted; window opens
+00FA84: D298  mov.l @(0x00FCE8),r2          ; = 0x00010290 ROM
+00FA86: 420B  jsr @r2                       ; -> 0x010290 | RAM tests, then the DMA zero fill of 0xFFFF4000..0xFFFFBF9F
+00FA88: 0009  nop
+00FA8A: B096  bsr 0x00FBBA                    ; byte 0xFFFF5B6C := 0 (delay slot r4 = 0)
+00FA8C: E400  mov #0,r4
+00FA8E: D297  mov.l @(0x00FCEC),r2          ; = 0x000BEAB8 ROM
+00FA90: 949E  mov.w @(0x00FBD0),r4          ; = 0x07D0 (2000)
+00FA92: 420B  jsr @r2                       ; -> 0x0BEAB8 | busy wait, 2000 * 8 iterations (ITIs can be taken here)
+00FA94: 0009  nop
+00FA96: 64F3  mov r15,r4
+00FA98: D295  mov.l @(0x00FCF0),r2          ; = 0x000BE81C ROM
+00FA9A: E5E0  mov #-32,r5
+00FA9C: 420B  jsr @r2                       ; -> 0x0BE81C | SR I := 14 (0xE0): ITI masked until 0x00FAB6
+00FA9E: 655C  extu.b r5,r5
+00FAA0: D294  mov.l @(0x00FCF4),r2          ; = 0x00006BC4 ROM
+00FAA2: 420B  jsr @r2                       ; -> 0x006BC4 | external-device transaction (port H, no RAM outside the stack)
+00FAA4: E414  mov #20,r4
+00FAA6: E2F7  mov #-9,r2
+00FAA8: 2029  and r2,r0
+00FAAA: CB08  or #8,r0
+00FAAC: 650C  extu.b r0,r5
+00FAAE: D292  mov.l @(0x00FCF8),r2          ; = 0x00006BF0 ROM
+00FAB0: 420B  jsr @r2                       ; -> 0x006BF0
+00FAB2: E414  mov #20,r4
+00FAB4: D291  mov.l @(0x00FCFC),r2          ; = 0x000BE82C ROM
+00FAB6: 420B  jsr @r2                       ; -> 0x0BE82C
+00FAB8: 64F2  mov.l @r15,r4
+00FABA: D687  mov.l @(0x00FCD8),r6          ; = 0x0000AE1C ROM
+00FABC: 460B  jsr @r6                       ; -> 0x00AE1C | IPRA..IPRL := 0 (IPRL at 0x00AE4E): no ITI after this; window closes
+00FABE: 0009  nop
+00FAC0: D28F  mov.l @(0x00FD00),r2          ; = 0x00003324 ROM
+00FAC2: 420B  jsr @r2                       ; -> 0x003324 | 0x003324(0): the kernel start (not traced here)
+00FAC4: E400  mov #0,r4
+00FAC6: AFFE  bra 0x00FAC6
+00FAC8: 0009  nop
+;   pool 0x00FBCC: .long 0xFF0FBFAD  const
+;   pool 0x00FBD0: .long 0x07D0F430  const
+;   pool 0x00FCD4: .long 0x0000AD98  ROM
+;   pool 0x00FCD8: .long 0x0000AE1C  ROM
+;   pool 0x00FCDC: .long 0x0000AE50  ROM
+;   pool 0x00FCE0: .long 0x000108DA  ROM
+;   pool 0x00FCE4: .long 0x00010942  ROM
+;   pool 0x00FCE8: .long 0x00010290  ROM
+;   pool 0x00FCEC: .long 0x000BEAB8  ROM
+;   pool 0x00FCF0: .long 0x000BE81C  ROM
+;   pool 0x00FCF4: .long 0x00006BC4  ROM
+;   pool 0x00FCF8: .long 0x00006BF0  ROM
+;   pool 0x00FCFC: .long 0x000BE82C  ROM
+;   pool 0x00FD00: .long 0x00003324  ROM
+0108DA: 6043  mov r4,r0
+0108DC: 9549  mov.w @(0x010972),r5          ; = 0x00E0 (224)
+0108DE: 4F22  sts.l pr,@-r15
+0108E0: D329  mov.l @(0x010988),r3          ; = 0x000BE81C ROM
+0108E2: 7FF8  add #-8,r15
+0108E4: 80F4  mov.b r0,@(4,r15)               ; byte @(4,r15) := r4
+0108E6: 430B  jsr @r3                       ; -> 0x0BE81C
+0108E8: 64F3  mov r15,r4
+0108EA: 9443  mov.w @(0x010974),r4          ; = 0x012C (300)
+0108EC: D22B  mov.l @(0x01099C),r2          ; = 0x000BEAB8 ROM
+0108EE: 420B  jsr @r2                       ; -> 0x0BEAB8
+0108F0: 0009  nop
+0108F2: D32B  mov.l @(0x0109A0),r3          ; = 0x00011880 ROM
+0108F4: 430B  jsr @r3                       ; -> 0x011880 | toggles bit 15 of port word 0xFFFFF738
+0108F6: 0009  nop
+0108F8: 84F4  mov.b @(4,r15),r0
+0108FA: D32A  mov.l @(0x0109A4),r3          ; = 0xFFFF0008 RAM
+0108FC: 2300  mov.b r0,@r3                    ; byte 0xFFFF0008 := r4
+0108FE: 84F4  mov.b @(4,r15),r0
+010900: 6403  mov r0,r4
+010902: 644C  extu.b r4,r4
+010904: 6043  mov r4,r0
+010906: 8802  cmp/eq #2,r0                    ; T = (r4 == 2): skip the timer part
+010908: 8D14  bt/s 0x010934
+01090A: 0009  nop
+01090C: 6043  mov r4,r0
+01090E: 8800  cmp/eq #0,r0
+010910: 8D0A  bt/s 0x010928                   ; r4 == 0: r4 := r5 = 4
+010912: E504  mov #4,r5
+010914: 8801  cmp/eq #1,r0
+010916: 8D05  bt/s 0x010924
+010918: 0009  nop
+01091A: 8803  cmp/eq #3,r0
+01091C: 8D04  bt/s 0x010928
+01091E: 0009  nop
+010920: A002  bra 0x010928
+010922: 0009  nop
+010924: A001  bra 0x01092A
+010926: E403  mov #3,r4
+010928: 6453  mov r5,r4
+01092A: B192  bsr 0x010C52                    ; 0x010C52(4): TCSR := 0xA518 | 4 | old TME (0) -> 0x1C, WDT still stopped
+01092C: 0009  nop
+01092E: C71E  mova @(0x0109A8),r0           ; -> 0x0109A8: long 0x43960000 f32 300
+010930: BFA2  bsr 0x010878
+010932: F408  fmov.s @r0,fr4                  ; 0x010878(fr4 = 300.0)
+010934: D318  mov.l @(0x010998),r3          ; = 0x000BE82C ROM
+010936: 430B  jsr @r3                       ; -> 0x0BE82C
+010938: 64F2  mov.l @r15,r4
+01093A: 7F08  add #8,r15
+01093C: 4F26  lds.l @r15+,pr
+01093E: 000B  rts
+010940: 0009  nop
+;   pool 0x010970: .long 0xEC1000E0  const
+;   pool 0x010974: .long 0x012C0000  const
+;   pool 0x010988: .long 0x000BE81C  ROM
+;   pool 0x010998: .long 0x000BE82C  ROM
+;   pool 0x01099C: .long 0x000BEAB8  ROM
+;   pool 0x0109A0: .long 0x00011880  ROM
+;   pool 0x0109A4: .long 0xFFFF0008  RAM
+010878: FFFB  fmov.s fr15,@-r15
+01087A: E004  mov #4,r0
+01087C: 9378  mov.w @(0x010970),r3          ; = 0xEC10 (-5104) -> 0xFFFFEC10 PERIPH
+01087E: 4F22  sts.l pr,@-r15
+010880: 7FF8  add #-8,r15
+010882: FF47  fmov.s fr4,@(r0,r15)
+010884: 6030  mov.b @r3,r0                    ; TCSR byte read = 0x1C on this path (0x010C52(4) at 0x01092A)
+010886: C907  and #7,r0                       ; r4 = TCSR & 7 (clock select) = 4
+010888: 6403  mov r0,r4
+01088A: C73D  mova @(0x010980),r0           ; -> 0x010980: long 0x3FD1B717 f32 1.6384
+01088C: F408  fmov.s @r0,fr4
+01088E: 604C  extu.b r4,r0
+010890: 8803  cmp/eq #3,r0                    ; T = (CKS == 3)
+010892: 8D05  bt/s 0x0108A0
+010894: 0009  nop
+010896: 8804  cmp/eq #4,r0
+010898: 8D05  bt/s 0x0108A6
+01089A: 0009  nop
+01089C: A003  bra 0x0108A6
+01089E: 0009  nop
+0108A0: C738  mova @(0x010984),r0           ; -> 0x010984: long 0x3F51B717 f32 0.8192
+0108A2: A001  bra 0x0108A8
+0108A4: FF08  fmov.s @r0,fr15                 ; CKS == 3: fr15 = 0.8192
+0108A6: FF4C  fmov fr4,fr15                   ; otherwise: fr15 = 1.6384
+0108A8: 9563  mov.w @(0x010972),r5          ; = 0x00E0 (224)
+0108AA: D337  mov.l @(0x010988),r3          ; = 0x000BE81C ROM
+0108AC: 430B  jsr @r3                       ; -> 0x0BE81C
+0108AE: 64F3  mov r15,r4
+0108B0: E004  mov #4,r0
+0108B2: F3F6  fmov.s @(r0,r15),fr3
+0108B4: F3F3  fdiv fr15,fr3                   ; fr3 = fr4 / fr15
+0108B6: F33C  fmov fr3,fr3
+0108B8: C734  mova @(0x01098C),r0           ; -> 0x01098C: long 0x3F000000 f32 0.5
+0108BA: E100  mov #0,r1
+0108BC: F208  fmov.s @r0,fr2
+0108BE: F320  fadd fr2,fr3                    ; fr3 += 0.5
+0108C0: D233  mov.l @(0x010990),r2          ; = 0xFFFF0000 RAM
+0108C2: F33D  ftrc fr3,fpul                   ; truncate toward zero
+0108C4: D033  mov.l @(0x010994),r0          ; = 0xFFFF0004 RAM
+0108C6: 035A  sts fpul,r3
+0108C8: 2232  mov.l r3,@r2                    ; long 0xFFFF0000 := trunc(fr4 / fr15 + 0.5): 183 for 300.0 / 1.6384, the limit 0x010AE8 compares with
+0108CA: 2012  mov.l r1,@r0                    ; long 0xFFFF0004 := 0: the boot-watchdog count, +1 per ITI taken (0x010AE4)
+0108CC: D332  mov.l @(0x010998),r3          ; = 0x000BE82C ROM
+0108CE: 430B  jsr @r3                       ; -> 0x0BE82C
+0108D0: 64F2  mov.l @r15,r4
+0108D2: 7F08  add #8,r15
+0108D4: 4F26  lds.l @r15+,pr
+0108D6: 000B  rts
+0108D8: FFF9  fmov.s @r15+,fr15
+;   pool 0x010970: .long 0xEC1000E0  const
+;   pool 0x010988: .long 0x000BE81C  ROM
+;   pool 0x010990: .long 0xFFFF0000  RAM
+;   pool 0x010994: .long 0xFFFF0004  RAM
+;   pool 0x010998: .long 0x000BE82C  ROM
+00FBBA: D658  mov.l @(0x00FD1C),r6          ; = 0xFFFF5B6C RAM
+00FBBC: 000B  rts
+00FBBE: 2640  mov.b r4,@r6                    ; delay slot: byte 0xFFFF5B6C := r4
+;   pool 0x00FD1C: .long 0xFFFF5B6C  RAM
+
+==== FUNCTION 0x00B2AA .. 0x00B2C6 (14 instructions, 1 caller: 0x00AD98) with 0x010C52, 0x010942, 0x00AE50 -- WDT and IPRL set-up before the window ====
+CONTRACT
+  0x00B2AA (called from 0x00AD98 at 0x00ADB2): TCSR := 0xA500 | (TCSR & 0xDF) (TME := 0: TCNT cleared and
+    stopped, manual 13.2.2); RSTCSR := 0x5A1F (RSTE = 0, RSTS = 0, manual 13.2.3); TCSR := 0xA518 (OVF written
+    0, WT/IT 0, TME 0, CKS 0).
+  0x010C52(r4) (called from 0x0108DA at 0x01092A with r4 = 4): t = TCSR & 0x20 (the old TME); TCSR := 0xA518;
+    byte read of TCSR (value unused); TCSR := 0xA518 | r4 | t.  On this path t = 0, so TCSR = 0x1C: CKS 4,
+    still stopped.  (Had TME been 1, the result would be 0x3C and the timer would keep running.)
+  0x010942: TCSR := 0xA520 | (TCSR byte): TME := 1.  From 0x1C the result is 0x3C.
+  0x00AE50: IPRL 0xFFFFED16 := (IPRL & 0xFF0F) | 0xE0: bits 7-4 := 14, everything else kept (0 after
+    0x00AE1C).  Manual Table 7.4: IPRL bits 7-4 = WDT; Table 7.3: its only source is ITI, vector 224.
+  Net: the byte read at 0x010884 returns 0x1C; after 0x010942 the WDT counts in interval-timer mode (WT/IT =
+  0), so each TCNT overflow sets OVF and requests an ITI (manual 13.2.2 bit 6).  In this mode an overflow
+  cannot reset the chip, and RSTE = 0 would forbid an internal reset even in watchdog mode.
+  The census also lists 0x00DF14 (after the kernel start) as a caller of 0x00AE50: not traced here.
+MECHANISM
+  Straight-line code.  010C56 and #32 keeps only TME; 010C62 / 010C64 or in r4 and 0xA518.
+EVIDENCE
+  emulated: pass C (WDT model of manual 13.2) -- the six WDT writes from 0x00B2AA on and the 0x1C read at
+  0x010884 asserted in all 32 runs (first run: 00B2B8 A59C -> TCSR 0x9C, 00B2BE 5A1F, 00B2C2 A518 -> 0x18,
+  010C5C A518 -> 0x18, 010C66 A51C -> 0x1C, 01094C A53C -> 0x3C); IPRL = 0x00E0 from 0x00AE5C to the second
+  0x00AE1C, 0 at the kernel start.
+LISTING
+00ADB2: B27A  bsr 0x00B2AA                    ; in 0x00AD98 (called at 0x00FA5E): the WDT stop below
+00B2AA: 9441  mov.w @(0x00B330),r4          ; = 0xEC10 (-5104) -> 0xFFFFEC10 PERIPH
+00B2AC: 6340  mov.b @r4,r3                    ; r3 = TCSR (byte read address 0xFFFFEC10, manual 13.2.4)
+00B2AE: 633C  extu.b r3,r3
+00B2B0: D222  mov.l @(0x00B33C),r2          ; = 0x0000FFDF const
+00B2B2: 2329  and r2,r3                       ; clear bit 5 (TME)
+00B2B4: D122  mov.l @(0x00B340),r1          ; = 0x0000A500 ROM
+00B2B6: 231B  or r1,r3
+00B2B8: 2431  mov.w r3,@r4                    ; TCSR := 0xA500 | (TCSR & 0xDF): TME = 0, TCNT cleared and stopped
+00B2BA: 903A  mov.w @(0x00B332),r0          ; = 0x5A1F (23071)
+00B2BC: 933A  mov.w @(0x00B334),r3          ; = 0xEC12 (-5102) -> 0xFFFFEC12 PERIPH
+00B2BE: 2301  mov.w r0,@r3                    ; RSTCSR := 0x5A1F: RSTE = 0, RSTS = 0
+00B2C0: D220  mov.l @(0x00B344),r2          ; = 0x0000A518 ROM
+00B2C2: 000B  rts
+00B2C4: 2421  mov.w r2,@r4                    ; delay slot: TCSR := 0xA518 (OVF 0, interval mode, TME 0, CKS 0)
+;   pool 0x00B330: .long 0xEC105A1F  const
+;   pool 0x00B334: .long 0xEC12EC13  const
+;   pool 0x00B33C: .long 0x0000FFDF  const
+;   pool 0x00B340: .long 0x0000A500  ROM
+;   pool 0x00B344: .long 0x0000A518  ROM
+010C52: 950A  mov.w @(0x010C6A),r5          ; = 0xEC10 (-5104) -> 0xFFFFEC10 PERIPH
+010C54: 6050  mov.b @r5,r0                    ; r0 = TCSR
+010C56: C920  and #32,r0                      ; t = TCSR & 0x20 (old TME; 0 here, 0x00B2AA stopped the WDT)
+010C58: D70F  mov.l @(0x010C98),r7          ; = 0x0000A518 ROM
+010C5A: 6603  mov r0,r6
+010C5C: 2571  mov.w r7,@r5                    ; TCSR := 0xA518
+010C5E: 6350  mov.b @r5,r3                    ; byte read of TCSR, value unused
+010C60: 666C  extu.b r6,r6
+010C62: 264B  or r4,r6                        ; | r4 (= 4: CKS 4)
+010C64: 267B  or r7,r6                        ; | 0xA518
+010C66: 000B  rts
+010C68: 2561  mov.w r6,@r5                    ; delay slot: TCSR := 0xA51C -> TCSR = 0x1C (CKS 4, TME 0)
+;   pool 0x010C98: .long 0x0000A518  ROM
+010942: 9415  mov.w @(0x010970),r4          ; = 0xEC10 (-5104) -> 0xFFFFEC10 PERIPH
+010944: 6340  mov.b @r4,r3                    ; r3 = TCSR = 0x1C
+010946: 633C  extu.b r3,r3
+010948: D218  mov.l @(0x0109AC),r2          ; = 0x0000A520 ROM
+01094A: 232B  or r2,r3
+01094C: 000B  rts
+01094E: 2431  mov.w r3,@r4                    ; delay slot: TCSR := 0xA53C -> TME = 1: the WDT counts, interval mode
+;   pool 0x010970: .long 0xEC1000E0  const
+;   pool 0x0109AC: .long 0x0000A520  ROM
+00AE50: 940A  mov.w @(0x00AE68),r4          ; = 0xED16 (-4842) -> 0xFFFFED16 PERIPH
+00AE52: D306  mov.l @(0x00AE6C),r3          ; = 0x0000FF0F const
+00AE54: 6041  mov.w @r4,r0                    ; r0 = IPRL (0 after 0x00AE1C)
+00AE56: 2039  and r3,r0
+00AE58: CBE0  or #224,r0                      ; bits 7-4 := 14
+00AE5A: 000B  rts
+00AE5C: 2401  mov.w r0,@r4                    ; delay slot: IPRL := 0x00E0 -- WDT ITI priority 14 (manual Table 7.4)
+;   pool 0x00AE68: .long 0xED160000  const
+;   pool 0x00AE6C: .long 0x0000FF0F  const
+
+==== FUNCTION 0x00F6E6 .. 0x00F75C (59 instructions, 0 callers: VBR vector 224 = the WDT ITI) with 0x010AD8, 0x011880, 0x00FBA4 -- the boot watchdog ====
+CONTRACT
+  Entered by the CPU on an accepted WDT interval-timer interrupt (manual Table 7.3: vector 224, VBR offset
+  0x380; [0x000FFC50 + 0x380] = [0x0FFFD0] = 0x0000F6E6, while vectors 225..227 hold the default 0x0000E852
+  that vector 0 also holds).  The CPU has pushed SR and PC and set SR.I := 14 (the IPRL priority, 7.4.1).
+  0x00F6E6: push r7..r0, fr11..fr0, pr, fpul, fpscr (23 longs; 100 bytes with SR and PC); TCSR := 0xA500 |
+    (TCSR & 0x7F): OVF written 0 after being read 1, so cleared (manual 13.2.2); call 0x010AD8; pop; rte.
+  0x010AD8: count = [0xFFFF0004] + 1; [0xFFFF0004] := count;
+    count < [0xFFFF0000] (unsigned) -> tail jmp 0x011880, which returns to 0x00F72A;
+    otherwise r4 = 0x2100 / 0x2200 / 0x2300 for byte [0xFFFF0008] = 0 / 1 / anything else (3 is also
+    0x2300); 0x010800(r4, r5 = 0) records {code, 0} in the log at 0xFFFF2060.. (rtos_core_trace.txt,
+    verified); jmp 0x00FBA4, which never returns.
+  0x011880: inside a 0xE0 critical section, word 0xFFFFF738 := ~(w | 0x7FFF) + (w & 0x7FFF): bit 15
+    inverted, bits 14..0 kept.  (Manual Table A.1 puts PBDR at 0xFFFFF738; what the pin drives is not decoded.)
+  0x00FBA4: SR.I := 15; words 0xFFFFF592 := 0, 0xFFFFF590 := 0; spin at 0x00FBB6 forever.
+  So 0xFFFF0000 (183 here) is the number of ITIs the boot may take before 0x00FABC closes the window; the
+  183rd ends the boot in 0x00FBA4 instead of 0x003324.  An ITI that returns writes SP-108..SP-1 (the 100-byte
+  frame, then 0x011880's pr push and add #-4, then 0x0BE81C's mask slot at @r15) and long 0xFFFF0004, nothing
+  else.
+  On the reset path the ITI is acceptable only while IPRL bits 7-4 = 14 > SR.I: from 0x00FA84 to 0x00AE4E,
+  and never inside a 0xE0 critical section (0x0BE81C raises SR.I to 14; 14 is not > 14).  B's save / test /
+  restore (0x0102BE..0x0102FE) lies inside one; A's and C's do not.
+MECHANISM
+  010AE8 cmp/hs r2,r1: T = (count r1 >= limit r2) unsigned; 010AEA bf/s 0x010B24 when count < limit.
+  010AF6 cmp/eq #0 / 010AFC cmp/eq #1 / 010B02 cmp/eq #3: T on equality; 3 and any other value both reach
+  010B18 r4 = r5 = 0x2300.  0BE81C..0BE82A: r0 = SR & 0xF0; cmp/hs r0,r5: T = (r5 >= r0) unsigned -> keep r5,
+  else r5 = r0; the old mask is stored at @r4 in the delay slot; ldc r5,sr.
+  Lowest SP below 0xFFFF4000 at which an ITI can be accepted (perfect RAM): 0xFFFF1268, inside 0x0105AA during
+  the range-A test; deeper points (0x00F7FC's frame, lowest SP 0xFFFF125C) lie inside 0xE0 sections.  Deepest
+  ISR write: 0xFFFF1268 - 0x6C = 0xFFFF11FC.  Residue there is saved and restored by range C, so it survives.
+  While SP sits at 0xFFFFBF9C (range-C phase) the lowest acceptable SP is 0xFFFFBF44, so frames land in
+  0xFFFFBED8..0xFFFFBF9B, inside range A, and the DMA fill erases them.
+EVIDENCE
+  vector word: emu pass A.  emulated: pass C (acceptance off) -- lowest acceptable SPs 0xFFFF1268 and (range-C
+  phase) 0xFFFFBF44, identical in all 32 runs.  emulated: pass G (acceptance on; 5 runs; WDT rate a model
+  input): every run reaches 0x003324; long 0xFFFF0004 equals the number of ITIs taken (19, 101, 6, 13, 31);
+  every ITI comes after 0x00FA82 and none inside 0x0102C2..0x010300; every ISR writes exactly SP-0x6C..SP-1
+  plus long 0xFFFF0004; ITIs are taken inside 0x0105AA during the A test (SP 0xFFFF1268), during the C copy and
+  test (SP 0xFFFFBF9C, 0xFFFFBF44), right after the B section (0x010302), in 0x0BEAB8 and at 0x00FABA; region A
+  is zero and 0xFFFF2000..0xFFFF3FFF unchanged except 0xFFFF204C at the kernel start; the changed bytes of
+  0xFFFF0020..0xFFFF1FFF lie in 0xFFFF11FC..0xFFFF12DB, and some lie below 0xFFFF125C.  Expiry run (rate high
+  enough for 183 ITIs): stops in the 0x00FBA4 spin, 0x003324 never reached, 0xFFFF0004 = 183, 0x010800 called
+  with (0x2100, 0), SR.I = 15.
+LISTING
+00F6E6: 2F76  mov.l r7,@-r15                  ; the CPU has pushed SR (SP-4) and PC (SP-8)
+00F6E8: 2F66  mov.l r6,@-r15
+00F6EA: 2F56  mov.l r5,@-r15
+00F6EC: 2F46  mov.l r4,@-r15
+00F6EE: 2F36  mov.l r3,@-r15
+00F6F0: 2F26  mov.l r2,@-r15
+00F6F2: 2F16  mov.l r1,@-r15
+00F6F4: 2F06  mov.l r0,@-r15
+00F6F6: FFBB  fmov.s fr11,@-r15
+00F6F8: FFAB  fmov.s fr10,@-r15
+00F6FA: FF9B  fmov.s fr9,@-r15
+00F6FC: FF8B  fmov.s fr8,@-r15
+00F6FE: FF7B  fmov.s fr7,@-r15
+00F700: FF6B  fmov.s fr6,@-r15
+00F702: FF5B  fmov.s fr5,@-r15
+00F704: FF4B  fmov.s fr4,@-r15
+00F706: FF3B  fmov.s fr3,@-r15
+00F708: FF2B  fmov.s fr2,@-r15
+00F70A: FF1B  fmov.s fr1,@-r15
+00F70C: FF0B  fmov.s fr0,@-r15
+00F70E: 4F22  sts.l pr,@-r15
+00F710: 4F52  sts.l fpul,@-r15
+00F712: 4F62  sts.l fpscr,@-r15                ; 23 longs pushed: SP = entry SP - 100
+00F714: 945D  mov.w @(0x00F7D2),r4          ; = 0xEC10 (-5104) -> 0xFFFFEC10 PERIPH
+00F716: 6340  mov.b @r4,r3                    ; r3 = TCSR (OVF = 1: the request being served)
+00F718: 633C  extu.b r3,r3
+00F71A: D235  mov.l @(0x00F7F0),r2          ; = 0x0000FF7F const
+00F71C: D135  mov.l @(0x00F7F4),r1          ; = 0x0000A500 ROM
+00F71E: 2329  and r2,r3
+00F720: 231B  or r1,r3
+00F722: 2431  mov.w r3,@r4                    ; TCSR := 0xA500 | (TCSR & 0x7F): OVF cleared (0 written after reading 1)
+00F724: D334  mov.l @(0x00F7F8),r3          ; = 0x00010AD8 ROM
+00F726: 430B  jsr @r3                       ; -> 0x010AD8 | count the ITI against the limit
+00F728: 0009  nop
+00F72A: 4F66  lds.l @r15+,fpscr
+00F72C: 4F56  lds.l @r15+,fpul
+00F72E: 4F26  lds.l @r15+,pr
+00F730: F0F9  fmov.s @r15+,fr0
+00F732: F1F9  fmov.s @r15+,fr1
+00F734: F2F9  fmov.s @r15+,fr2
+00F736: F3F9  fmov.s @r15+,fr3
+00F738: F4F9  fmov.s @r15+,fr4
+00F73A: F5F9  fmov.s @r15+,fr5
+00F73C: F6F9  fmov.s @r15+,fr6
+00F73E: F7F9  fmov.s @r15+,fr7
+00F740: F8F9  fmov.s @r15+,fr8
+00F742: F9F9  fmov.s @r15+,fr9
+00F744: FAF9  fmov.s @r15+,fr10
+00F746: FBF9  fmov.s @r15+,fr11
+00F748: 60F6  mov.l @r15+,r0
+00F74A: 61F6  mov.l @r15+,r1
+00F74C: 62F6  mov.l @r15+,r2
+00F74E: 63F6  mov.l @r15+,r3
+00F750: 64F6  mov.l @r15+,r4
+00F752: 65F6  mov.l @r15+,r5
+00F754: 66F6  mov.l @r15+,r6
+00F756: 67F6  mov.l @r15+,r7
+00F758: 002B  rte                             ; PC := @SP, SR := @(SP+4) (SR.I back to the interrupted level)
+00F75A: 0009  nop
+;   pool 0x00F7D0: .long 0xD032EC10  const
+;   pool 0x00F7F0: .long 0x0000FF7F  const
+;   pool 0x00F7F4: .long 0x0000A500  ROM
+;   pool 0x00F7F8: .long 0x00010AD8  ROM
+010AD8: 4F22  sts.l pr,@-r15                  ; SP - 104
+010ADA: D42E  mov.l @(0x010B94),r4          ; = 0xFFFF0004 RAM
+010ADC: D02E  mov.l @(0x010B98),r0          ; = 0xFFFF0000 RAM
+010ADE: 6342  mov.l @r4,r3
+010AE0: 7301  add #1,r3
+010AE2: 6133  mov r3,r1
+010AE4: 2432  mov.l r3,@r4                    ; long 0xFFFF0004 := count + 1
+010AE6: 6202  mov.l @r0,r2                    ; r2 = limit [0xFFFF0000] (183 on this path)
+010AE8: 3122  cmp/hs r2,r1                    ; T = (count >= limit) unsigned
+010AEA: 8F1B  bf/s 0x010B24                   ; T=0 (count < limit): 0x010B24, back to the handler via 0x011880
+010AEC: 0009  nop
+010AEE: 954D  mov.w @(0x010B8C),r5          ; = 0x2300 (8960)
+010AF0: D12A  mov.l @(0x010B9C),r1          ; = 0xFFFF0008 RAM
+010AF2: 6010  mov.b @r1,r0                    ; r0 = byte 0xFFFF0008 (0 on this path)
+010AF4: 600C  extu.b r0,r0
+010AF6: 8800  cmp/eq #0,r0
+010AF8: 8D08  bt/s 0x010B0C                   ; 0: code 0x2100
+010AFA: 0009  nop
+010AFC: 8801  cmp/eq #1,r0
+010AFE: 8D08  bt/s 0x010B12                   ; 1: code 0x2200
+010B00: 0009  nop
+010B02: 8803  cmp/eq #3,r0
+010B04: 8D08  bt/s 0x010B18                   ; 3: code 0x2300
+010B06: 0009  nop
+010B08: A006  bra 0x010B18                    ; anything else: code 0x2300 too
+010B0A: 0009  nop
+010B0C: 943F  mov.w @(0x010B8E),r4          ; = 0x2100 (8448)
+010B0E: A004  bra 0x010B1A
+010B10: 0009  nop
+010B12: 943D  mov.w @(0x010B90),r4          ; = 0x2200 (8704)
+010B14: A001  bra 0x010B1A
+010B16: 0009  nop
+010B18: 6453  mov r5,r4
+010B1A: BE71  bsr 0x010800                    ; 0x010800(code, 0): record in the log at 0xFFFF2060..
+010B1C: E500  mov #0,r5
+010B1E: D220  mov.l @(0x010BA0),r2          ; = 0x0000FBA4 ROM
+010B20: 422B  jmp @r2                       ; -> 0x00FBA4 | limit reached: the endless loop, no kernel start
+010B22: 4F26  lds.l @r15+,pr
+010B24: D11F  mov.l @(0x010BA4),r1          ; = 0x00011880 ROM
+010B26: 412B  jmp @r1                       ; -> 0x011880 | tail call; 0x011880 returns to 0x00F72A
+010B28: 4F26  lds.l @r15+,pr                  ; delay slot: SP back to entry SP - 100
+;   pool 0x010B8C: .long 0x23002100  const
+;   pool 0x010B90: .long 0x220000FF  const
+;   pool 0x010B94: .long 0xFFFF0004  RAM
+;   pool 0x010B98: .long 0xFFFF0000  RAM
+;   pool 0x010B9C: .long 0xFFFF0008  RAM
+;   pool 0x010BA0: .long 0x0000FBA4  ROM
+;   pool 0x010BA4: .long 0x00011880  ROM
+011880: 4F22  sts.l pr,@-r15                  ; SP - 104 (inside the ISR)
+011882: 7FFC  add #-4,r15                     ; SP - 108
+011884: 952F  mov.w @(0x0118E6),r5          ; = 0x00E0 (224)
+011886: D31A  mov.l @(0x0118F0),r3          ; = 0x000BE81C ROM
+011888: 430B  jsr @r3                       ; -> 0x0BE81C | old mask stored at @r15 = SP - 108: the deepest ISR write
+01188A: 64F3  mov r15,r4
+01188C: 952C  mov.w @(0x0118E8),r5          ; = 0x7FFF (32767)
+01188E: 942C  mov.w @(0x0118EA),r4          ; = 0xF738 (-2248) -> 0xFFFFF738 PERIPH
+011890: 6241  mov.w @r4,r2
+011892: 225B  or r5,r2
+011894: 6227  not r2,r2                       ; r2 = ~(w | 0x7FFF): inverted bit 15 only
+011896: 6341  mov.w @r4,r3
+011898: 2359  and r5,r3
+01189A: 323C  add r3,r2
+01189C: 2421  mov.w r2,@r4                    ; word 0xFFFFF738 := w with bit 15 inverted
+01189E: D315  mov.l @(0x0118F4),r3          ; = 0x000BE82C ROM
+0118A0: 430B  jsr @r3                       ; -> 0x0BE82C
+0118A2: 64F2  mov.l @r15,r4
+0118A4: 7F04  add #4,r15
+0118A6: 4F26  lds.l @r15+,pr
+0118A8: 000B  rts
+0118AA: 0009  nop
+;   pool 0x0118E4: .long 0x6EF600E0  const
+;   pool 0x0118E8: .long 0x7FFFF738  const
+;   pool 0x0118F0: .long 0x000BE81C  ROM
+;   pool 0x0118F4: .long 0x000BE82C  ROM
+00FBA4: 0002  stc sr,r0
+00FBA6: 9611  mov.w @(0x00FBCC),r6          ; = 0xFF0F (-241) -> 0xFFFFFF0F PERIPH
+00FBA8: 2069  and r6,r0
+00FBAA: CBF0  or #240,r0
+00FBAC: 400E  ldc r0,sr                       ; SR.I := 15
+00FBAE: 9212  mov.w @(0x00FBD6),r2          ; = 0xF590 (-2672) -> 0xFFFFF590 PERIPH
+00FBB0: E000  mov #0,r0
+00FBB2: 8121  mov.w r0,@(2,r2)                ; word 0xFFFFF592 := 0
+00FBB4: 2201  mov.w r0,@r2                    ; word 0xFFFFF590 := 0
+00FBB6: AFFE  bra 0x00FBB6                    ; forever
+00FBB8: 0009  nop
+;   pool 0x00FBCC: .long 0xFF0FBFAD  const
+;   pool 0x00FBD4: .long 0x3E80F590  const f32 0.2518735
+0BE81C: 0002  stc sr,r0                       ; the critical-section entry used everywhere above (verified, helpers_wrap_trace.txt)
+0BE81E: C9F0  and #240,r0
+0BE820: 3502  cmp/hs r0,r5                    ; T = (requested mask r5 >= current mask r0) unsigned
+0BE822: 8D01  bt/s 0x0BE828
+0BE824: 2402  mov.l r0,@r4                    ; delay slot, both ways: old mask -> @r4
+0BE826: 6503  mov r0,r5                       ; requested mask lower: keep the current one
+0BE828: 000B  rts
+0BE82A: 450E  ldc r5,sr                       ; SR := r5 (0xE0: I = 14, the ITI masked)
+
+==== FUNCTION 0x010290 .. 0x010362 (105 instructions, 1 caller: 0x00FA5A) -- the RAM tests ====
+CONTRACT
+  r14 = 0.
+  A: if 0x010448(0xFFFF4000, 0xFFFFBF9F) fails: r14 = 1 and skip B and C.
+  B (only if A passed), inside a 0xE0 critical section: copy longs 0xFFFF0000..0xFFFF001F to 0xFFFF4000..
+     0xFFFF401F; if 0x010448(0xFFFF0000, 0xFFFF001F) fails: r14 += 8; copy them back (always).
+  C (only if A passed): 0x0040C0(0xFFFFBFA0) moves SP to 0xFFFFBF9C (old SP saved there); copy longs
+     0xFFFF0020..0xFFFF1FFF to 0xFFFF4000..0xFFFF5FDF; if 0x010448(0xFFFF0020, 0xFFFF1FFF) fails: r14 += 2; copy
+     them back (always); 0x0040C6 restores SP.
+  Always: 0x010398 (the DMA zero fill of 0xFFFF4000..0xFFFFBF9F); byte 0xFFFF5B89 := r14.
+  Result byte: 1 = A failed (B, C untested); otherwise 8 * B_failed + 2 * C_failed (0, 2, 8 or 10).
+  So 0xFFFF0000..0xFFFF1FFF keeps its pre-test content whatever the result (with perfect save RAM) -- apart
+  from what interrupts add: ITI increments of long 0xFFFF0004 and ISR frame residue below the current SP --
+  A is wiped, and 0xFFFF2000..0xFFFF3FFF is not touched (unless a mismatch is reported: 0x010800 then logs in
+  0xFFFF2060..0xFFFF20A7, pass J).
+  The stack is never inside the range under test: A and B run on SP 0xFFFF12xx (in C), C runs on SP
+  0xFFFFBF9C (top of A, already tested, filled afterwards).  ISR frames follow SP, so the same holds for them.
+  Interrupts: B (0x0102BE..0x0102FE, save, test and restore of the range that holds the boot-watchdog count
+  0xFFFF0004) runs inside a 0xE0 critical section, so the priority-14 ITI is masked there; A, C and the DMA
+  spin run at SR.I = 13, where ITIs are taken (pass G).  An ITI increment landing between B's save and its
+  restore would be undone by the restore; whether that is why B alone is masked is NOT ESTABLISHED (intent).
+MECHANISM
+  0102AA tst r0,r0: T = (A passed); 0102B0 runs only for T = 0.  0102B4 tst r2,r2 (r2 = (u8)r14): T = (r14 ==
+  0); 0102B6 bf/s 0x01034C for r14 != 0.  Copy loops: 0102D4 / 0102F6 cmp/hs r2|r3,r4: T = (r4 >= 0xFFFF001F)
+  unsigned, bf/s loops while below: last long copied starts at 0xFFFF001C.  01031E / 010340: the same against
+  0xFFFF1FFF: last long 0xFFFF1FFC.  The restore loops run after the test whatever it returned (0102E4 bt/s
+  only skips the r14 += 8; its delay slot 0102E6 sets up the restore).
+EVIDENCE
+  emu pass A: [0x011CCC..0x011CE8] = 0xFFFF0000, 0xFFFF001F, 0xFFFF0020, 0xFFFF1FFF, 0xFFFF2000, 0xFFFF3FFF,
+  0xFFFF4000, 0xFFFFBF9F.  emulated: pass E -- 0x010448 replaced by a stub that writes 0xEE over the whole
+  range it is given and returns a chosen result, all 8 combinations: test order, SP at each test (0xFFFF1284,
+  0xFFFF1284, 0xFFFFBF9C), SR.I at each test (13, 14, 13), 0xFFFF5B89 = 0 / 2 / 8 / 10 / 1, 0xFFFF0000..
+  0xFFFF1FFF restored, A zero, one DMA transfer; pass C with the real 0x010448: 0xFFFF5B89 = 0; pass J (stuck
+  bit at 0xFFFF8EDC): 0xFFFF5B89 = 1, two 0x010800(0x7000, 0xFFFF8EDC) records, writes in 0xFFFF2000..0xFFFF3FFF
+  only at 0xFFFF204C and in 0xFFFF2060..0xFFFF20A7.
+LISTING
+010290: 2FE6  mov.l r14,@-r15
+010292: EE00  mov #0,r14                      ; r14 = 0: result bits
+010294: D336  mov.l @(0x010370),r3          ; = 0x00011CE8 ROM
+010296: 2FD6  mov.l r13,@-r15
+010298: 2FC6  mov.l r12,@-r15
+01029A: 2FB6  mov.l r11,@-r15
+01029C: 4F22  sts.l pr,@-r15
+01029E: 7FFC  add #-4,r15
+0102A0: DB32  mov.l @(0x01036C),r11         ; = 0x00011CE4 ROM | r11 = 0x011CE4 (holds 0xFFFF4000)
+0102A2: 6532  mov.l @r3,r5
+0102A4: B0D0  bsr 0x010448                    ; 0x010448(0xFFFF4000, 0xFFFFBF9F): test A, destructive
+0102A6: 64B2  mov.l @r11,r4                   ; delay slot: r4 = [0x011CE4] = 0xFFFF4000 (r5 = [0x011CE8] = 0xFFFFBF9F)
+0102A8: 600C  extu.b r0,r0
+0102AA: 2008  tst r0,r0                       ; T = (test A passed)
+0102AC: 8D01  bt/s 0x0102B2
+0102AE: 0009  nop
+0102B0: EE01  mov #1,r14                      ; failed: r14 = 1
+0102B2: 62EC  extu.b r14,r2
+0102B4: 2228  tst r2,r2
+0102B6: 8F49  bf/s 0x01034C                   ; T=0 (A failed): straight to the DMA fill, B and C untested
+0102B8: 0009  nop
+0102BA: 9553  mov.w @(0x010364),r5          ; = 0x00E0 (224)
+0102BC: D22D  mov.l @(0x010374),r2          ; = 0x000BE81C ROM
+0102BE: 420B  jsr @r2                       ; -> 0x0BE81C | critical section, level 0xE0, old SR at @r15: the ITI is masked for all of B
+0102C0: 64F3  mov r15,r4
+0102C2: DC2D  mov.l @(0x010378),r12         ; = 0x00011CCC ROM
+0102C4: DD2D  mov.l @(0x01037C),r13         ; = 0x00011CD0 ROM
+0102C6: 65B2  mov.l @r11,r5
+0102C8: A003  bra 0x0102D2
+0102CA: 64C2  mov.l @r12,r4
+0102CC: 6346  mov.l @r4+,r3
+0102CE: 2532  mov.l r3,@r5                    ; copy long [0xFFFF0000 + 4k] -> [0xFFFF4000 + 4k]
+0102D0: 7504  add #4,r5
+0102D2: 62D2  mov.l @r13,r2
+0102D4: 3422  cmp/hs r2,r4                    ; T = (r4 >= 0xFFFF001F) unsigned
+0102D6: 8FF9  bf/s 0x0102CC                   ; T=0: loop; copies 0xFFFF0000..0xFFFF001F (8 longs)
+0102D8: 0009  nop
+0102DA: 65D2  mov.l @r13,r5
+0102DC: B0B4  bsr 0x010448                    ; 0x010448(0xFFFF0000, 0xFFFF001F): test B
+0102DE: 64C2  mov.l @r12,r4
+0102E0: 600C  extu.b r0,r0
+0102E2: 2008  tst r0,r0
+0102E4: 8D01  bt/s 0x0102EA
+0102E6: 65B2  mov.l @r11,r5
+0102E8: 7E08  add #8,r14                      ; failed: r14 += 8
+0102EA: A003  bra 0x0102F4
+0102EC: 64C2  mov.l @r12,r4
+0102EE: 6256  mov.l @r5+,r2
+0102F0: 2422  mov.l r2,@r4                    ; restore long [0xFFFF4000 + 4k] -> [0xFFFF0000 + 4k], pass or fail
+0102F2: 7404  add #4,r4
+0102F4: 63D2  mov.l @r13,r3
+0102F6: 3432  cmp/hs r3,r4                    ; T = (r4 >= 0xFFFF001F) unsigned
+0102F8: 8FF9  bf/s 0x0102EE
+0102FA: 0009  nop
+0102FC: D320  mov.l @(0x010380),r3          ; = 0x000BE82C ROM
+0102FE: 430B  jsr @r3                       ; -> 0x0BE82C | leave the critical section: SR.I back to 13, ITIs possible again
+010300: 64F2  mov.l @r15,r4
+010302: D21B  mov.l @(0x010370),r2          ; = 0x00011CE8 ROM
+010304: D31F  mov.l @(0x010384),r3          ; = 0x000040C0 ROM
+010306: 6422  mov.l @r2,r4
+010308: 430B  jsr @r3                       ; -> 0x0040C0 | 0x0040C0: old SP pushed at 0xFFFFBF9C, r15 := 0xFFFFBF9C
+01030A: 7401  add #1,r4                       ; delay slot: r4 = 0xFFFFBF9F + 1 = 0xFFFFBFA0
+01030C: DC1E  mov.l @(0x010388),r12         ; = 0x00011CD4 ROM
+01030E: DD1F  mov.l @(0x01038C),r13         ; = 0x00011CD8 ROM
+010310: 65B2  mov.l @r11,r5
+010312: A003  bra 0x01031C
+010314: 64C2  mov.l @r12,r4
+010316: 6246  mov.l @r4+,r2
+010318: 2522  mov.l r2,@r5                    ; copy long [0xFFFF0020 + 4k] -> [0xFFFF4000 + 4k]
+01031A: 7504  add #4,r5
+01031C: 63D2  mov.l @r13,r3
+01031E: 3432  cmp/hs r3,r4                    ; T = (r4 >= 0xFFFF1FFF) unsigned: copies 0xFFFF0020..0xFFFF1FFF to 0xFFFF4000..0xFFFF5FDF
+010320: 8FF9  bf/s 0x010316
+010322: 0009  nop
+010324: 65D2  mov.l @r13,r5
+010326: B08F  bsr 0x010448                    ; 0x010448(0xFFFF0020, 0xFFFF1FFF): test C, which includes the old stack
+010328: 64C2  mov.l @r12,r4
+01032A: 600C  extu.b r0,r0
+01032C: 2008  tst r0,r0
+01032E: 8D01  bt/s 0x010334
+010330: 65B2  mov.l @r11,r5
+010332: 7E02  add #2,r14                      ; failed: r14 += 2
+010334: A003  bra 0x01033E
+010336: 64C2  mov.l @r12,r4
+010338: 6356  mov.l @r5+,r3
+01033A: 2432  mov.l r3,@r4                    ; restore long [0xFFFF4000 + 4k] -> [0xFFFF0020 + 4k], pass or fail
+01033C: 7404  add #4,r4
+01033E: 62D2  mov.l @r13,r2
+010340: 3422  cmp/hs r2,r4                    ; T = (r4 >= 0xFFFF1FFF) unsigned
+010342: 8FF9  bf/s 0x010338
+010344: 0009  nop
+010346: D112  mov.l @(0x010390),r1          ; = 0x000040C6 ROM
+010348: 410B  jsr @r1                       ; -> 0x0040C6 | 0x0040C6: r15 := [0xFFFFBF9C], the stack in 0xFFFF0020..0xFFFF1FFF again
+01034A: 0009  nop
+01034C: B024  bsr 0x010398                    ; reached on both paths: the DMA zero fill
+01034E: 0009  nop
+010350: D110  mov.l @(0x010394),r1          ; = 0xFFFF5B89 RAM
+010352: 21E0  mov.b r14,@r1                   ; byte 0xFFFF5B89 := r14 (bit 0 A failed, bit 3 B failed, bit 1 C failed)
+010354: 7F04  add #4,r15
+010356: 4F26  lds.l @r15+,pr
+010358: 6BF6  mov.l @r15+,r11
+01035A: 6CF6  mov.l @r15+,r12
+01035C: 6DF6  mov.l @r15+,r13
+01035E: 000B  rts
+010360: 6EF6  mov.l @r15+,r14
+;   pool 0x010364: .long 0x00E00000  const
+;   pool 0x01036C: .long 0x00011CE4  ROM
+;   pool 0x010370: .long 0x00011CE8  ROM
+;   pool 0x010374: .long 0x000BE81C  ROM
+;   pool 0x010378: .long 0x00011CCC  ROM
+;   pool 0x01037C: .long 0x00011CD0  ROM
+;   pool 0x010380: .long 0x000BE82C  ROM
+;   pool 0x010384: .long 0x000040C0  ROM
+;   pool 0x010388: .long 0x00011CD4  ROM
+;   pool 0x01038C: .long 0x00011CD8  ROM
+;   pool 0x010390: .long 0x000040C6  ROM
+;   pool 0x010394: .long 0xFFFF5B89  RAM
+
+==== FUNCTION 0x010398 .. 0x010448 (88 instructions, 1 caller: 0x010290) -- the reset DMA ====
+CONTRACT
+  Inside 0xE0 critical sections: DMAOR := (DMAOR & 0xFFF8) | 1; long 0xFFFF4000 := 0; SAR0 := 0xFFFF4000;
+  DAR0 := 0xFFFF4000; CHCR0 low half := 0x0128 then CHCR0 := 0x001F0128; DMATCR0 := 0x1FE8; CHCR0 := (CHCR0 &
+  ~6) | 1; spin until CHCR0 bit 1 (TE) is set; CHCR0 &= ~3.
+  Result (manual decode below): 0xFFFF4000..0xFFFFBF9F := 0, as 0x1FE8 longword writes.
+DMAC DECODE (REJ09B0046-0300H)
+;  register  address      value written   field decode (section 10.2)
+;  DMAOR     0xFFFFECB0   (old & 0xFFF8)|1 bit 0 DME = 1 (all channels enabled), bit 1 NMIF = 0, bit 2 AE = 0
+;                                           (16-bit store; Table 10.1 note 4 forbids 32-bit access)
+;  SAR0      0xFFFFECC0   0xFFFF4000       source address (Table 10.1)
+;  DAR0      0xFFFFECC4   0xFFFF4000       destination address, 32-bit aligned as 10.2.2 requires
+;  DMATCR0   0xFFFFECC8   0x00001FE8       24-bit transfer count (10.2.3): 0x1FE8 = 8168 transfers
+;  CHCR0     0xFFFFECCC   0x001F0128       bits 31-29, 27-25, 23-21, 15-14, 11-10, 7-6 reserved = 0
+;                                          bit 28 DI = 0 (direct; only meaningful in CHCR3)
+;                                          bit 24 RO = 0 (no reload; only meaningful in CHCR2)
+;                                          bits 20-16 RS4-RS0 = 11111: auto-request (p.172 table, last row)
+;                                          bits 13-12 SM1,SM0 = 00: source address fixed
+;                                          bits 9-8   DM1,DM0 = 01: destination incremented, +4 for 32-bit
+;                                          bits 5-4   TS1,TS0 = 10: longword (32-bit) units
+;                                          bit 3 TM = 1: burst mode;  bit 2 IE = 0: no end interrupt
+;                                          bit 1 TE = 0;  bit 0 DE = 0 (channel not yet enabled)
+;  CHCR0     0xFFFFECCC   0x001F0129       0x01040E..0x010414: and #-7 clears IE and TE, or #1 sets DE.  With
+;                                          auto-request, DE = 1 and DME = 1 start the transfer (10.2.4 bit 0)
+;  CHCR0     0xFFFFECCC   value & ~3       after TE = 1 is read: DE := 0, TE := 0 (TE: 0 write after 1 read)
+  Transfer: 8168 dual-address longword moves, each reading the long at the fixed source 0xFFFF4000 (just set to
+  0; the first move writes it onto itself) and writing it to DAR, DAR += 4: 0xFFFF4000, 0xFFFF4004, ..,
+  0xFFFF4000 + 4 * 8167 = 0xFFFFBF9C.  Table 10.3: on-chip memory to on-chip memory is a supported transfer;
+  24.1: the DMAC reaches the on-chip RAM.  The first store of 0x0128 to the low half (0xFFFFECCE) leaves the
+  upper half as it was (H'0000 after a power-on reset, Table 10.1 note 2) until the long store sets RS.  DE is
+  set only by the last CHCR write, as section 10.5 usage notes 2, 6 and 12 require (p.198).  Usage note 7
+  (write 0 to DMATCR after a completed transfer) is not followed; it has no bearing on the fill.
+MECHANISM
+  01041E tst r4,r2 with r4 = 2: T = ((CHCR0 & 2) == 0); 010420 bt/s spins while TE = 0.  0103FC..010400:
+  r4 = ((0xFFFFBF9F - 0xFFFF4000 + 1) >> 2) & 0x00FFFFFF.  01042C mov #-4: and with 0xFFFFFFFC.
+EVIDENCE
+  emu pass B decodes 0x001F0128 field by field with the manual's tables (asserted).  emulated: pass C -- the
+  manual-based DMAC model sees exactly one start, at 010414, with SAR 0xFFFF4000, DAR 0xFFFF4000, count
+  0x1FE8, size 4, SM fixed, DM increment, and 0xFFFF4000..0xFFFFBF9F is all zero afterwards in all 32 runs
+  (starting images: random, 0x00, 0xFF, 0x5A, 0xA5).  The model raises on any other request source.
+LISTING
+010398: 2FE6  mov.l r14,@-r15
+01039A: 2FD6  mov.l r13,@-r15
+01039C: 2FC6  mov.l r12,@-r15
+01039E: 2FB6  mov.l r11,@-r15
+0103A0: 2FA6  mov.l r10,@-r15
+0103A2: 4F22  sts.l pr,@-r15
+0103A4: DC4E  mov.l @(0x0104E0),r12         ; = 0x000BE81C ROM
+0103A6: 7FF0  add #-16,r15
+0103A8: 9D8E  mov.w @(0x0104C8),r13         ; = 0x00E0 (224)
+0103AA: 64F3  mov r15,r4
+0103AC: 65D3  mov r13,r5
+0103AE: 4C0B  jsr @r12                      ; -> 0x0BE81C | critical section 0xE0, old SR at @(12,r15)
+0103B0: 740C  add #12,r4
+0103B2: 948A  mov.w @(0x0104CA),r4          ; = 0xECB0 (-4944) -> 0xFFFFECB0 PERIPH
+0103B4: D34B  mov.l @(0x0104E4),r3          ; = 0x0000FFF8 ROM
+0103B6: 6041  mov.w @r4,r0
+0103B8: 2039  and r3,r0
+0103BA: CB01  or #1,r0
+0103BC: 2401  mov.w r0,@r4                    ; DMAOR 0xFFFFECB0 := (DMAOR & 0xFFF8) | 1: AE = NMIF = 0, DME = 1 (16-bit store, manual note 4)
+0103BE: DB4A  mov.l @(0x0104E8),r11         ; = 0x000BE82C ROM
+0103C0: 4B0B  jsr @r11                      ; -> 0x0BE82C
+0103C2: 54F3  mov.l @(12,r15),r4
+0103C4: DA49  mov.l @(0x0104EC),r10         ; = 0x00011CE4 ROM
+0103C6: E200  mov #0,r2
+0103C8: 63A2  mov.l @r10,r3
+0103CA: 65D3  mov r13,r5
+0103CC: 2322  mov.l r2,@r3                    ; long 0xFFFF4000 := 0: the source word
+0103CE: 64F3  mov r15,r4
+0103D0: 4C0B  jsr @r12                      ; -> 0x0BE81C
+0103D2: 7408  add #8,r4
+0103D4: 63A2  mov.l @r10,r3
+0103D6: 9279  mov.w @(0x0104CC),r2          ; = 0xECC0 (-4928) -> 0xFFFFECC0 PERIPH
+0103D8: 2232  mov.l r3,@r2                    ; SAR0 0xFFFFECC0 := 0xFFFF4000
+0103DA: 61A2  mov.l @r10,r1
+0103DC: 9077  mov.w @(0x0104CE),r0          ; = 0xECC4 (-4924) -> 0xFFFFECC4 PERIPH
+0103DE: 2012  mov.l r1,@r0                    ; DAR0 0xFFFFECC4 := 0xFFFF4000
+0103E0: 9376  mov.w @(0x0104D0),r3          ; = 0x0128 (296)
+0103E2: 9176  mov.w @(0x0104D2),r1          ; = 0xECCE (-4914) -> 0xFFFFECCE PERIPH
+0103E4: 2131  mov.w r3,@r1                    ; low half of CHCR0 := 0x0128 (upper half held, Table 10.1 note 2)
+0103E6: 9E75  mov.w @(0x0104D4),r14         ; = 0xECCC (-4916) -> 0xFFFFECCC PERIPH
+0103E8: D341  mov.l @(0x0104F0),r3          ; = 0x001F0128 const
+0103EA: 2E32  mov.l r3,@r14                   ; CHCR0 0xFFFFECCC := 0x001F0128: RS 11111 auto-request, SM 00 fixed, DM 01 increment, TS 10 longword, TM 1 burst, IE 0, DE 0
+0103EC: 4B0B  jsr @r11                      ; -> 0x0BE82C
+0103EE: 54F2  mov.l @(8,r15),r4
+0103F0: 63A2  mov.l @r10,r3
+0103F2: D240  mov.l @(0x0104F4),r2          ; = 0x00011CE8 ROM
+0103F4: D140  mov.l @(0x0104F8),r1          ; = 0x00FFFFFF const
+0103F6: 6422  mov.l @r2,r4
+0103F8: 3438  sub r3,r4                       ; r4 = 0xFFFFBF9F - 0xFFFF4000
+0103FA: 7401  add #1,r4
+0103FC: 936B  mov.w @(0x0104D6),r3          ; = 0xECC8 (-4920) -> 0xFFFFECC8 PERIPH
+0103FE: 4409  shlr2 r4
+010400: 2419  and r1,r4
+010402: 2342  mov.l r4,@r3                    ; DMATCR0 0xFFFFECC8 := ((0x7F9F + 1) >> 2) & 0xFFFFFF = 0x1FE8 longword transfers
+010404: 65D3  mov r13,r5
+010406: 64F3  mov r15,r4
+010408: 4C0B  jsr @r12                      ; -> 0x0BE81C
+01040A: 7404  add #4,r4
+01040C: E3F9  mov #-7,r3
+01040E: 60E2  mov.l @r14,r0
+010410: 2039  and r3,r0
+010412: CB01  or #1,r0                        ; clear IE (bit 2) and TE (bit 1), set DE (bit 0)
+010414: 2E02  mov.l r0,@r14                   ; CHCR0 := 0x001F0129: transfer starts (auto-request)
+010416: 4B0B  jsr @r11                      ; -> 0x0BE82C
+010418: 54F1  mov.l @(4,r15),r4
+01041A: E402  mov #2,r4
+01041C: 62E2  mov.l @r14,r2
+01041E: 2248  tst r4,r2                       ; T = ((CHCR0 & 2) == 0): TE not yet set
+010420: 8DFC  bt/s 0x01041C                   ; T=1: spin until TE = 1 (0x1FE8 transfers done)
+010422: 0009  nop
+010424: 65D3  mov r13,r5
+010426: 4C0B  jsr @r12                      ; -> 0x0BE81C
+010428: 64F3  mov r15,r4
+01042A: 62E2  mov.l @r14,r2
+01042C: E3FC  mov #-4,r3
+01042E: 62E2  mov.l @r14,r2
+010430: 2239  and r3,r2                       ; clear DE and TE (TE read as 1 first)
+010432: 2E22  mov.l r2,@r14                   ; CHCR0 := value & ~3
+010434: 4B0B  jsr @r11                      ; -> 0x0BE82C
+010436: 64F2  mov.l @r15,r4
+010438: 7F10  add #16,r15
+01043A: 4F26  lds.l @r15+,pr
+01043C: 6AF6  mov.l @r15+,r10
+01043E: 6BF6  mov.l @r15+,r11
+010440: 6CF6  mov.l @r15+,r12
+010442: 6DF6  mov.l @r15+,r13
+010444: 000B  rts
+010446: 6EF6  mov.l @r15+,r14
+;   pool 0x0104C8: .long 0x00E0ECB0  const
+;   pool 0x0104CC: .long 0xECC0ECC4  const
+;   pool 0x0104D0: .long 0x0128ECCE  const
+;   pool 0x0104D4: .long 0xECCCECC8  const
+;   pool 0x0104E0: .long 0x000BE81C  ROM
+;   pool 0x0104E4: .long 0x0000FFF8  ROM
+;   pool 0x0104E8: .long 0x000BE82C  ROM
+;   pool 0x0104EC: .long 0x00011CE4  ROM
+;   pool 0x0104F0: .long 0x001F0128  const
+;   pool 0x0104F4: .long 0x00011CE8  ROM
+;   pool 0x0104F8: .long 0x00FFFFFF  const
+
+==== FUNCTION 0x010448 .. 0x0105AA (149 instructions, 2 callers: 0x010124, 0x010290) -- the RAM test ====
+CONTRACT
+  r4 = start, r5 = end (inclusive; every range the ROM passes is long-aligned with end = 3 mod 4).
+  class = 0x00F7FC (from SDSR).  class 0 (SDSR high byte 11 or 13 -- the SH7058 value 0x0B, manual 19.3.2):
+  stride 16 bytes, block 0x1000 bytes, highest block base 0xFFFFB000, 4 pattern longs.  Any other class:
+  stride 32, block 0x4000, base 0xFFFF8000, 8 pattern longs.
+  Up to [0x0C4730] = 2 attempts; each attempt:
+    1. for j = 0 .. stride/4 - 1: 0x0105AA(start + 4j, end - stride + 4j); stop at the first failing j.
+       Together these write and verify every long of [start, end] and leave each = 0x5AA5A55A.
+    2. base = highest block base stepped down by the block size until base <= start.
+       Heads: start, then base + block, base + 2 * block, .. while < end.  At each head write the pattern
+       longs [0x011C88..] (A55A5AA5, 5AA5A55A, ..) to head + 0, + 4, .. and verify them; stop at a mismatch
+       (only the first head is done when step 1 failed).
+    3. no failure -> return 0.  Otherwise attempt again while attempts < 2.
+  Return 1 after two failing attempts.  Every mismatch calls 0x01068E(address).
+  Final content of a passed test (class 0): every long of [start, end] = 0x5AA5A55A except the first 16 bytes
+  at each head = A55A5AA5 5AA5A55A A55A5AA5 5AA5A55A.  Heads: A -> 0xFFFF4000, 0xFFFF5000, .., 0xFFFFB000;
+  B -> 0xFFFF0000; C -> 0xFFFF0020, 0xFFFF1000; 0xFFFF2000..0xFFFF3FFF -> 0xFFFF2000, 0xFFFF3000.
+  Extent: with L = end + 1 - start, it writes nothing outside [start, end] (except the caller's stack) when L
+  is a multiple of the stride s (L >= s) and every block head h < end has end + 1 - h >= s; in all 43 emulated
+  ranges the converse held too.  All four ranges the ROM passes satisfy the rule for both strides.  Otherwise it writes past end: the strided passes reach the first
+  start + 4j + k * s at or above end - s + 4j, and a head's pattern runs s bytes from the head
+  (pass H: [0xFFFF6000, 0xFFFF6017] writes 0xFFFF6018 / 0xFFFF601C; [0xFFFF600C, 0xFFFF700B] writes 0xFFFF700C).
+  For 0xFFFF4000..0xFFFFBF9F this content is erased by the DMA fill; for B and C it is erased by the restore
+  copy; for 0xFFFF2000..0xFFFF3FFF (0x010124) by the clear that follows.  So the RAM test leaves NO pattern
+  in RAM that a reader could see after the reset path, and nothing in 0xFFFF8EDC..0xFFFF8EF6.
+MECHANISM
+  010470 tst r0,r0: T = (class == 0); 010472 bf/s 0x010484 for class != 0.  0104AE cmp/hs r12,r14: T =
+  (end - stride >= end) unsigned, only on wrap-around.  010502 cmp/hs r12,r14: T = (r14 >= end); 010504 bf/s
+  loops: r14 = end - stride, .., end - 4 -> stride/4 calls.  01050A / 010512 cmp/hi r11,r14: T = (base >
+  start) unsigned; 010510 subtracts the block.  010538 cmp/ge r13,r3: T = (i >= count) signed.  010574 bf/s:
+  exit when the fail flag is set.  01057A bf/s: next head while head < end (cmp/hs r12,r14 at 010578).
+  010582 bt/s: T = (no failure).  01058E cmp/ge r3,r1: T = (attempts >= 2) signed; 010590 bf/s retries.
+EVIDENCE
+  emulated: pass D -- all four ranges x both SDSR classes on random RAM: r0 = 0, final contents exactly as
+  above, zero writes outside the range and the stack, no reports.  Stuck bits (and 0xFE / or 0x80) at
+  0xFFFF8EDC, 0xFFFFBF9F, 0xFFFF0020, 0xFFFF3000: r0 = 1, exactly 2 attempts, every report = (0x7000, the
+  long-aligned faulty address).  emulated: pass H -- four fixed off-table ranges write exactly the longs past
+  end listed by the pass; the extent rule above agrees with the emulated writes on 43 ranges (3 fixed, 40
+  random, stride 16).
+LISTING
+010448: 2FE6  mov.l r14,@-r15
+01044A: 2FD6  mov.l r13,@-r15
+01044C: 2FC6  mov.l r12,@-r15
+01044E: 6C53  mov r5,r12                      ; r12 = end
+010450: D323  mov.l @(0x0104E0),r3          ; = 0x000BE81C ROM
+010452: 2FB6  mov.l r11,@-r15
+010454: 2FA6  mov.l r10,@-r15
+010456: 6B43  mov r4,r11                      ; r11 = start
+010458: 9536  mov.w @(0x0104C8),r5          ; = 0x00E0 (224)
+01045A: 2F96  mov.l r9,@-r15
+01045C: 2F86  mov.l r8,@-r15
+01045E: 4F22  sts.l pr,@-r15
+010460: 7FEC  add #-20,r15
+010462: 64F3  mov r15,r4
+010464: 430B  jsr @r3                       ; -> 0x0BE81C
+010466: 7404  add #4,r4
+010468: D224  mov.l @(0x0104FC),r2          ; = 0x0000F7FC ROM
+01046A: 420B  jsr @r2                       ; -> 0x00F7FC | r0 = SDSR class (0x00F7FC)
+01046C: 0009  nop
+01046E: 600C  extu.b r0,r0
+010470: 2008  tst r0,r0                       ; T = (class == 0)
+010472: 8F07  bf/s 0x010484                   ; T=0 (class != 0): 0x010484
+010474: 0009  nop
+010476: E404  mov #4,r4                       ; class 0 (SDSR high byte 11 or 13): 4 pattern longs
+010478: 9D2E  mov.w @(0x0104D8),r13         ; = 0x0400 (1024) | r13 = 0x400: block 0x1000 bytes
+01047A: 6E43  mov r4,r14
+01047C: 932D  mov.w @(0x0104DA),r3          ; = 0xB000 (-20480) -> 0xFFFFB000 RAM | r3 = 0xFFFFB000: the highest block base
+01047E: 6043  mov r4,r0
+010480: A006  bra 0x010490
+010482: 80FC  mov.b r0,@(12,r15)              ; delay slot: byte @(12,r15) := 4
+010484: 9D2A  mov.w @(0x0104DC),r13         ; = 0x1000 (4096) | class != 0: r13 = 0x1000, block 0x4000 bytes
+010486: E408  mov #8,r4
+010488: 9329  mov.w @(0x0104DE),r3          ; = 0x8000 (-32768) -> 0xFFFF8000 RAM | r3 = 0xFFFF8000
+01048A: 6E43  mov r4,r14
+01048C: 6043  mov r4,r0
+01048E: 80FC  mov.b r0,@(12,r15)              ; byte @(12,r15) := 8
+010490: 1F34  mov.l r3,@(16,r15)              ; @(16,r15) = highest block base
+010492: D315  mov.l @(0x0104E8),r3          ; = 0x000BE82C ROM
+010494: 430B  jsr @r3                       ; -> 0x0BE82C
+010496: 54F1  mov.l @(4,r15),r4
+010498: EA00  mov #0,r10
+01049A: 68A3  mov r10,r8                      ; r8 = 0: attempts
+01049C: 69D3  mov r13,r9
+01049E: 4908  shll2 r9                        ; r9 = block size in bytes
+0104A0: 6EEC  extu.b r14,r14
+0104A2: 4E08  shll2 r14                       ; r14 = 16 or 32: stride
+0104A4: 62C3  mov r12,r2
+0104A6: 32E8  sub r14,r2
+0104A8: 1F22  mov.l r2,@(8,r15)               ; @(8,r15) = end - stride
+0104AA: 2FA0  mov.b r10,@r15                  ; attempt: fail flag @r15 := 0
+0104AC: 5EF2  mov.l @(8,r15),r14
+0104AE: 3EC2  cmp/hs r12,r14                  ; T = (end - stride >= end) unsigned: only on wrap-around
+0104B0: 8D2A  bt/s 0x010508
+0104B2: 6DB3  mov r11,r13                     ; delay slot: r13 = start
+0104B4: 65E3  mov r14,r5
+0104B6: B078  bsr 0x0105AA                    ; 0x0105AA(r4 = start + 4j, r5 = end - stride + 4j)
+0104B8: 64D3  mov r13,r4
+0104BA: 600C  extu.b r0,r0
+0104BC: 2008  tst r0,r0
+0104BE: 8D1F  bt/s 0x010500                   ; T = (pass j passed)
+0104C0: 0009  nop
+0104C2: E201  mov #1,r2
+0104C4: A020  bra 0x010508
+0104C6: 2F20  mov.b r2,@r15                   ; delay slot: fail flag := 1, stop the passes
+;   pool 0x0104C8: .long 0x00E0ECB0  const
+;   pool 0x0104CC: .long 0xECC0ECC4  const
+;   pool 0x0104D0: .long 0x0128ECCE  const
+;   pool 0x0104D4: .long 0xECCCECC8  const
+;   pool 0x0104D8: .long 0x0400B000  const
+;   pool 0x0104DC: .long 0x10008000  const
+;   pool 0x0104E0: .long 0x000BE81C  ROM
+;   pool 0x0104E4: .long 0x0000FFF8  ROM
+;   pool 0x0104E8: .long 0x000BE82C  ROM
+;   pool 0x0104EC: .long 0x00011CE4  ROM
+;   pool 0x0104F0: .long 0x001F0128  const
+;   pool 0x0104F4: .long 0x00011CE8  ROM
+;   pool 0x0104F8: .long 0x00FFFFFF  const
+;   pool 0x0104FC: .long 0x0000F7FC  ROM
+010500: 7E04  add #4,r14
+010502: 3EC2  cmp/hs r12,r14                  ; T = (r14 >= end) unsigned
+010504: 8FD6  bf/s 0x0104B4                   ; T=0: next j; stride / 4 passes cover every long
+010506: 7D04  add #4,r13                      ; delay slot: r13 += 4
+010508: 5EF4  mov.l @(16,r15),r14
+01050A: 3EB6  cmp/hi r11,r14                  ; T = (base > start) unsigned
+01050C: 8F04  bf/s 0x010518
+01050E: 0009  nop
+010510: 3E98  sub r9,r14                      ; base -= block
+010512: 3EB6  cmp/hi r11,r14
+010514: 8DFC  bt/s 0x010510                   ; loop while base > start: base = highest block base <= start
+010516: 0009  nop
+010518: 84FC  mov.b @(12,r15),r0
+01051A: 65B3  mov r11,r5
+01051C: 6D03  mov r0,r13
+01051E: 6DDC  extu.b r13,r13
+010520: 66A3  mov r10,r6
+010522: 4D15  cmp/pl r13
+010524: 8F0B  bf/s 0x01053E                   ; T = (count > 0) from 0x010522; T=0 skips the writes; delay slot r4 = 0 (r5 = head, start for the first)
+010526: 64A3  mov r10,r4
+010528: D22D  mov.l @(0x0105E0),r2          ; = 0x00011C88 ROM
+01052A: 7601  add #1,r6
+01052C: 6043  mov r4,r0
+01052E: 6343  mov r4,r3
+010530: 022E  mov.l @(r0,r2),r2
+010532: 335C  add r5,r3
+010534: 2322  mov.l r2,@r3                    ; long [head + 4i] := pattern [0x011C88 + 4i]
+010536: 636C  extu.b r6,r3
+010538: 33D3  cmp/ge r13,r3
+01053A: 8FF5  bf/s 0x010528                   ; T=0: next i (4 or 8 longs)
+01053C: 7404  add #4,r4
+01053E: 67A3  mov r10,r7
+010540: E400  mov #0,r4
+010542: 345C  add r5,r4
+010544: 4D15  cmp/pl r13
+010546: 8F12  bf/s 0x01056E
+010548: E600  mov #0,r6
+01054A: 6063  mov r6,r0
+01054C: D224  mov.l @(0x0105E0),r2          ; = 0x00011C88 ROM
+01054E: 035E  mov.l @(r0,r5),r3
+010550: 022E  mov.l @(r0,r2),r2
+010552: 3320  cmp/eq r2,r3                    ; T = (read back == pattern)
+010554: 8D05  bt/s 0x010562
+010556: 0009  nop
+010558: B099  bsr 0x01068E                    ; mismatch: report the address (0x01068E)
+01055A: 0009  nop
+01055C: E301  mov #1,r3
+01055E: A006  bra 0x01056E
+010560: 2F30  mov.b r3,@r15                   ; delay slot: fail flag := 1
+010562: 7701  add #1,r7
+010564: 7404  add #4,r4
+010566: 637C  extu.b r7,r3
+010568: 33D3  cmp/ge r13,r3
+01056A: 8FEE  bf/s 0x01054A                   ; T=0: next i
+01056C: 7604  add #4,r6
+01056E: 3E9C  add r9,r14                      ; r14 = base + k * block
+010570: 63F0  mov.b @r15,r3
+010572: 2338  tst r3,r3
+010574: 8F03  bf/s 0x01057E                   ; T=0 (failed): stop
+010576: 65E3  mov r14,r5                      ; delay slot: next head r5 = base + k * block
+010578: 3EC2  cmp/hs r12,r14
+01057A: 8FD1  bf/s 0x010520                   ; T=0 (head < end): next head
+01057C: 0009  nop
+01057E: 62F0  mov.b @r15,r2
+010580: 2228  tst r2,r2
+010582: 8D07  bt/s 0x010594                   ; T = (no failure): return 0
+010584: 7801  add #1,r8                       ; delay slot: r8 += 1
+010586: 618C  extu.b r8,r1
+010588: D216  mov.l @(0x0105E4),r2          ; = 0x000C4730 CAL | r2 = 0x0C4730; r3 = its byte = 2 (0x01058A)
+01058A: 6320  mov.b @r2,r3
+01058C: 633C  extu.b r3,r3
+01058E: 3133  cmp/ge r3,r1
+010590: 8F8B  bf/s 0x0104AA                   ; T=0 (attempts < 2) signed: retry from 0x0104AA
+010592: 0009  nop
+010594: 60F0  mov.b @r15,r0                   ; return the fail flag
+010596: 7F14  add #20,r15
+010598: 4F26  lds.l @r15+,pr
+01059A: 68F6  mov.l @r15+,r8
+01059C: 69F6  mov.l @r15+,r9
+01059E: 6AF6  mov.l @r15+,r10
+0105A0: 6BF6  mov.l @r15+,r11
+0105A2: 6CF6  mov.l @r15+,r12
+0105A4: 6DF6  mov.l @r15+,r13
+0105A6: 000B  rts
+0105A8: 6EF6  mov.l @r15+,r14
+;   pool 0x0105E0: .long 0x00011C88  ROM
+;   pool 0x0105E4: .long 0x000C4730  CAL
+
+==== FUNCTION 0x0105AA .. 0x010668 (85 instructions, 1 caller: 0x010448) -- one strided pass ====
+CONTRACT
+  r4 = a, r5 = lim.  s = 16 bytes (class 0) or 32.
+  [a] := 0xA55A5AA5, verify (mismatch: report a, fail = 1, continue).
+  p = a; while p < lim: [p] := 0x5AA5A55A; [p + s] := 0xA55A5AA5; verify [p] then [p + s] (mismatch: report
+  that address, fail = 1, leave the loop); p += s.
+  [p] := 0x5AA5A55A (p = the first a + k * s >= lim on a normal exit), verify.  Return fail.
+  Every long it visits ends as 0x5AA5A55A.  With lim = end - s + 4j and a = start + 4j (0x010448's call) the
+  last long written is the first a + k * s >= lim; it starts at most at end - 3 only when end + 1 - start is a
+  multiple of s, which holds for the four ROM ranges; otherwise it lies past end (pass H).
+MECHANISM
+  0105D2 tst r0,r0: T = (class == 0); 0105D4 bf/s to r11 = 8, else 0105DA r11 = 4; 01060A..010612: s =
+  (u8)r11 << 2.  01060E / 01063C cmp/hs r8,r14: T = (p >= lim) unsigned; 01063E bf/s loops while below.
+  0105FE / 01061C / 010628 / 010646 cmp/eq: T = (read back == written).
+EVIDENCE
+  emulated: pass D (exercised through 0x010448: contents, extent and fault reports above); pass H (writes past
+  end for ranges whose length is not a multiple of the stride).  pass G: ITIs are taken inside this function
+  (0x010614..0x01063E) at SP 0xFFFF1268 during the A test and 0xFFFFBF44 during the C test.
+LISTING
+0105AA: 2FE6  mov.l r14,@-r15
+0105AC: 2FD6  mov.l r13,@-r15
+0105AE: 6E43  mov r4,r14                      ; r14 = a (start)
+0105B0: D30D  mov.l @(0x0105E8),r3          ; = 0x000BE81C ROM
+0105B2: 2FC6  mov.l r12,@-r15
+0105B4: 2FB6  mov.l r11,@-r15
+0105B6: 2FA6  mov.l r10,@-r15
+0105B8: 2F96  mov.l r9,@-r15
+0105BA: EA00  mov #0,r10
+0105BC: 2F86  mov.l r8,@-r15
+0105BE: 6853  mov r5,r8                       ; r8 = lim
+0105C0: 4F22  sts.l pr,@-r15
+0105C2: 7FFC  add #-4,r15
+0105C4: 950A  mov.w @(0x0105DC),r5          ; = 0x00E0 (224)
+0105C6: 430B  jsr @r3                       ; -> 0x0BE81C
+0105C8: 64F3  mov r15,r4
+0105CA: D208  mov.l @(0x0105EC),r2          ; = 0x0000F7FC ROM
+0105CC: 420B  jsr @r2                       ; -> 0x00F7FC
+0105CE: 0009  nop
+0105D0: 600C  extu.b r0,r0
+0105D2: 2008  tst r0,r0                       ; T = (class == 0)
+0105D4: 8F0C  bf/s 0x0105F0                   ; T=0: stride words 8
+0105D6: 0009  nop
+0105D8: A00B  bra 0x0105F2
+0105DA: EB04  mov #4,r11                      ; delay slot: stride words 4 (class 0)
+;   pool 0x0105DC: .long 0x00E00000  const
+;   pool 0x0105E0: .long 0x00011C88  ROM
+;   pool 0x0105E4: .long 0x000C4730  CAL
+;   pool 0x0105E8: .long 0x000BE81C  ROM
+;   pool 0x0105EC: .long 0x0000F7FC  ROM
+0105F0: EB08  mov #8,r11
+0105F2: D33D  mov.l @(0x0106E8),r3          ; = 0x000BE82C ROM
+0105F4: 430B  jsr @r3                       ; -> 0x0BE82C
+0105F6: 64F2  mov.l @r15,r4
+0105F8: DD3C  mov.l @(0x0106EC),r13         ; = 0xA55A5AA5 const
+0105FA: 2ED2  mov.l r13,@r14                  ; long [a] := 0xA55A5AA5
+0105FC: 62E2  mov.l @r14,r2
+0105FE: 32D0  cmp/eq r13,r2                   ; T = (read back == 0xA55A5AA5)
+010600: 8D03  bt/s 0x01060A
+010602: EC01  mov #1,r12
+010604: B043  bsr 0x01068E                    ; mismatch: report a, fail := 1 (no exit)
+010606: 64E3  mov r14,r4
+010608: 6AC3  mov r12,r10
+01060A: 69BC  extu.b r11,r9
+01060C: DB38  mov.l @(0x0106F0),r11         ; = 0x5AA5A55A const
+01060E: 3E82  cmp/hs r8,r14                   ; T = (a >= lim) unsigned
+010610: 8D17  bt/s 0x010642
+010612: 4908  shll2 r9                        ; delay slot: r9 = stride bytes (16 or 32)
+010614: 2EB2  mov.l r11,@r14                  ; long [p] := 0x5AA5A55A
+010616: 6093  mov r9,r0
+010618: 0ED6  mov.l r13,@(r0,r14)             ; long [p + stride] := 0xA55A5AA5
+01061A: 62E2  mov.l @r14,r2
+01061C: 32B0  cmp/eq r11,r2                   ; T = ([p] == 0x5AA5A55A)
+01061E: 8D02  bt/s 0x010626
+010620: 0009  nop
+010622: A006  bra 0x010632
+010624: 64E3  mov r14,r4
+010626: 03EE  mov.l @(r0,r14),r3
+010628: 33D0  cmp/eq r13,r3                   ; T = ([p + stride] == 0xA55A5AA5)
+01062A: 8D06  bt/s 0x01063A
+01062C: 0009  nop
+01062E: 6493  mov r9,r4
+010630: 34EC  add r14,r4
+010632: B02C  bsr 0x01068E                    ; mismatch: report the failing address, fail := 1, exit the loop
+010634: 0009  nop
+010636: A004  bra 0x010642
+010638: 6AC3  mov r12,r10
+01063A: 3E9C  add r9,r14                      ; p += stride
+01063C: 3E82  cmp/hs r8,r14                   ; T = (p >= lim) unsigned
+01063E: 8FE9  bf/s 0x010614                   ; T=0: loop
+010640: 0009  nop
+010642: 2EB2  mov.l r11,@r14                  ; long [p_last] := 0x5AA5A55A; p_last = first a + k * stride >= lim
+010644: 63E2  mov.l @r14,r3
+010646: 33B0  cmp/eq r11,r3                   ; T = (read back == 0x5AA5A55A)
+010648: 8D03  bt/s 0x010652
+01064A: 0009  nop
+01064C: B01F  bsr 0x01068E
+01064E: 64E3  mov r14,r4
+010650: 6AC3  mov r12,r10
+010652: 60A3  mov r10,r0                      ; return fail (0 or 1)
+010654: 7F04  add #4,r15
+010656: 4F26  lds.l @r15+,pr
+010658: 68F6  mov.l @r15+,r8
+01065A: 69F6  mov.l @r15+,r9
+01065C: 6AF6  mov.l @r15+,r10
+01065E: 6BF6  mov.l @r15+,r11
+010660: 6CF6  mov.l @r15+,r12
+010662: 6DF6  mov.l @r15+,r13
+010664: 000B  rts
+010666: 6EF6  mov.l @r15+,r14
+;   pool 0x0106E8: .long 0x000BE82C  ROM
+;   pool 0x0106EC: .long 0xA55A5AA5  const
+;   pool 0x0106F0: .long 0x5AA5A55A  const
+
+==== FUNCTION 0x01068E .. 0x0106B6 (20 instructions, 2 callers) and 0x00F7FC .. 0x00F860 (50 instructions, 3 callers) ====
+CONTRACT
+  0x01068E(addr): code = 0x7000 if 0xFFFF0000 <= addr <= [0x011CE8] = 0xFFFFBF9F (unsigned) else 0x7010;
+  tail call 0x010800(code, addr), which records it through 0x010B2A in the log at 0xFFFF2060..0xFFFF20A7
+  (rtos_core_trace.txt, verified).  Every address the RAM test can report for the four ROM ranges lies in the
+  inside range, so the code is always 0x7000 on the reset path.
+  0x00F7FC: SYSCR2 low byte with MSTOP2 cleared (H-UDI clock on) is written through 0x00E756 (word 0x3C00 |
+  byte to 0xFFFFF70A), SDSR 0xFFFFF7C2 is read, SYSCR2 is restored; high byte 11 / 13 -> 0, 80 -> 1, 14 / 15
+  -> 2, else 0xFF.  By the manual (19.3.2) the SH7058's SDSR high byte reads 0x0B, so class 0.
+MECHANISM
+  010696 cmp/hs r3,r14: T = (addr >= 0xFFFF0000); 010698 bf/s to 0x7010 when below.  0106A0 cmp/hi r0,r14:
+  T = (addr > 0xFFFFBF9F); 0106A2 bt/s to 0x7010.
+EVIDENCE
+  emulated: pass D (report codes, 0x010800 stubbed); pass J (0x010800 run: writes only in 0xFFFF2060..
+  0xFFFF20A7); pass C (class 0 path taken with SDSR = 0x0B01 in the model).
+LISTING
+01068E: 2FE6  mov.l r14,@-r15
+010690: D218  mov.l @(0x0106F4),r2          ; = 0x00011CCC ROM
+010692: 6E43  mov r4,r14
+010694: 6322  mov.l @r2,r3
+010696: 3E32  cmp/hs r3,r14                   ; T = (addr >= 0xFFFF0000) unsigned
+010698: 8F08  bf/s 0x0106AC
+01069A: 0009  nop
+01069C: D116  mov.l @(0x0106F8),r1          ; = 0x00011CE8 ROM
+01069E: 6012  mov.l @r1,r0
+0106A0: 3E06  cmp/hi r0,r14                   ; T = (addr > 0xFFFFBF9F) unsigned
+0106A2: 8D03  bt/s 0x0106AC
+0106A4: 0009  nop
+0106A6: 941B  mov.w @(0x0106E0),r4          ; = 0x7000 (28672) | inside 0xFFFF0000..0xFFFFBF9F: code 0x7000
+0106A8: A002  bra 0x0106B0
+0106AA: 65E3  mov r14,r5
+0106AC: 9419  mov.w @(0x0106E2),r4          ; = 0x7010 (28688) | outside: code 0x7010
+0106AE: 65E3  mov r14,r5
+0106B0: D212  mov.l @(0x0106FC),r2          ; = 0x00010800 ROM
+0106B2: 422B  jmp @r2                       ; -> 0x010800 | tail call 0x010800(code, addr): a record in the log at 0xFFFF2060..0xFFFF20A7
+0106B4: 6EF6  mov.l @r15+,r14
+;   pool 0x0106E0: .long 0x70007010  const
+;   pool 0x0106F4: .long 0x00011CCC  ROM
+;   pool 0x0106F8: .long 0x00011CE8  ROM
+;   pool 0x0106FC: .long 0x00010800  ROM
+00F7FC: 2FE6  mov.l r14,@-r15
+00F7FE: 4F22  sts.l pr,@-r15
+00F800: 932E  mov.w @(0x00F860),r3          ; = 0xF70B (-2293) -> 0xFFFFF70B PERIPH
+00F802: 7FFC  add #-4,r15
+00F804: 6E30  mov.b @r3,r14                   ; r14 = SYSCR2 (read address 0xFFFFF70B)
+00F806: 942C  mov.w @(0x00F862),r4          ; = 0x00FB (251)
+00F808: D217  mov.l @(0x00F868),r2          ; = 0x0000E756 ROM
+00F80A: 420B  jsr @r2                       ; -> 0x00E756
+00F80C: 24E9  and r14,r4                      ; delay slot: r4 = SYSCR2 & 0xFB: MSTOP2 = 0, the H-UDI clock runs
+00F80E: 9229  mov.w @(0x00F864),r2          ; = 0xF7C2 (-2110) -> 0xFFFFF7C2 PERIPH
+00F810: 6321  mov.w @r2,r3
+00F812: 633D  extu.w r3,r3
+00F814: D114  mov.l @(0x00F868),r1          ; = 0x0000E756 ROM
+00F816: 4319  shlr8 r3                        ; r3 = SDSR (0xFFFFF7C2) >> 8
+00F818: 2F30  mov.b r3,@r15
+00F81A: 410B  jsr @r1                       ; -> 0x00E756
+00F81C: 64E3  mov r14,r4                      ; delay slot: restore SYSCR2
+00F81E: 6EF0  mov.b @r15,r14
+00F820: 6EEC  extu.b r14,r14
+00F822: 60E3  mov r14,r0
+00F824: 880B  cmp/eq #11,r0                   ; T = (high byte == 11)
+00F826: 8D04  bt/s 0x00F832
+00F828: 0009  nop
+00F82A: 60E3  mov r14,r0
+00F82C: 880D  cmp/eq #13,r0                   ; T = (high byte == 13)
+00F82E: 8F02  bf/s 0x00F836
+00F830: 0009  nop
+00F832: A010  bra 0x00F856
+00F834: E400  mov #0,r4                       ; 11 or 13: class 0 (SH7058 manual 19.3.2: bits 11, 9, 8 read 1, so 0x0B)
+00F836: 8850  cmp/eq #80,r0                   ; T = (high byte == 80)
+00F838: 8F02  bf/s 0x00F840
+00F83A: 0009  nop
+00F83C: A00B  bra 0x00F856
+00F83E: E401  mov #1,r4                       ; 80: class 1
+00F840: 60E3  mov r14,r0
+00F842: 880E  cmp/eq #14,r0
+00F844: 8D04  bt/s 0x00F850
+00F846: 0009  nop
+00F848: 60E3  mov r14,r0
+00F84A: 880F  cmp/eq #15,r0
+00F84C: 8F02  bf/s 0x00F854
+00F84E: 0009  nop
+00F850: A001  bra 0x00F856
+00F852: E402  mov #2,r4                       ; 14 or 15: class 2
+00F854: 9407  mov.w @(0x00F866),r4          ; = 0x00FF (255) | anything else: class 0xFF
+00F856: 6043  mov r4,r0
+00F858: 7F04  add #4,r15
+00F85A: 4F26  lds.l @r15+,pr
+00F85C: 000B  rts
+00F85E: 6EF6  mov.l @r15+,r14
+;   pool 0x00F860: .long 0xF70B00FB  const
+;   pool 0x00F864: .long 0xF7C200FF  const
+;   pool 0x00F868: .long 0x0000E756  ROM
+
+==== AFTER THE KERNEL START: 0x010124, THE WARM / COLD DECISION (context; verified in revlim_freeze_gate_trace.txt) ====
+  Its contract is taken from that file and re-run here on the post-reset image (emu pass F, 0x00FDB4 stubbed):
+  marker word 0xFFFF2000 == 0xAA55 and event 16 succeeds -> 0xFFFF2000..0xFFFF3FFF untouched; marker absent,
+  or event 16 reports failure -> 0x010448(0xFFFF2000, 0xFFFF3FFF), then longs 0xFFFF2000..0xFFFF3FFC := 0, word
+  0xFFFF2000 := 0x55AA, event 18.  Emulated: all four combinations; the cleared range is exact.
+  Nothing in 0x010124 touches 0xFFFF4000..0xFFFFBF9F except bytes 0xFFFF5B8D / 0xFFFF5B88.
+  Later in the same task, 0x010198 (revlim_freeze_gate_trace.txt:1186-1192, verified) writes word
+  0xFFFF2000 := 0xAA55 when byte 0xFFFF5B8D == 1, so the 0x55AA left by 0x01018A does not last.  That file
+  lists three resolved stores to 0xFFFF2000 (0x01018A, 0x0101B2, 0x010028); no search here or there shows
+  that 0x010124 is the only code that clears 0xFFFF2000..0xFFFF3FFF.
+
+RAM CELLS (roles settled by the decoded writers; names neutral, physical identity NOT established)
+;  0xFFFF0000  long   boot-watchdog limit: trunc(300 / 1.6384 + 0.5) = 183 (0x010878); 0x010AE8 compares the
+;                     count with it
+;  0xFFFF0004  long   boot-watchdog count: 0 at 0x010878, +1 per WDT ITI taken (0x010AE4); 0..182 at the
+;                     kernel start, value timing-dependent (not established)
+;  0xFFFF0008  byte   copy of 0x0108DA's argument, 0 at reset; picks the expiry code 0x2100 / 0x2200 / 0x2300
+;                     (0x010AF2)
+;  0xFFFF204C  byte   boot hand-over byte: 0x77 at 0x00128A, 0x88 at 0x001324 (address from ROM long 0x002000)
+;  0xFFFF5B6C  byte   0x00FBBA's argument, 0 at reset (0x00FA8A)
+;  0xFFFF5B89  byte   reset RAM-test result: 1 = range A failed, else 8 * (B failed) + 2 * (C failed)
+;  0xFFFF800C  word   WDT TCSR value 0xA53C / 0xA53D written by 0x0012C0 before the fill (overwritten later)
+;  0xFFFFBFA8  byte   boot window: (byte 0xFFFFBFEC == 0x55), written only when the window runs (boot marker
+;                     absent); r5 on the r4 != 0 boot entry; otherwise not written (keeps its value)
+;  0xFFFFBFAC  byte   boot block: 0 on the reset path (0x000688)
+;  0xFFFFBFAD  byte   0x77 by the boot block (0x000C3A), 0x88 by the application entry (0x00FA54)
+;  0xFFFFBFB8  word   boot message ring write index, 0 at reset, mod 100 (0x00054A, 0x0004D6)
+;  0xFFFFBFBA  word   boot message ring read index, 0 at reset, mod 100 (0x00054A, 0x000524)
+;  0xFFFFBFE4  8 B    boot mailbox bytes (copied by 0x0005CC when 0xFFFFBFEC == 0x55), zeroed by 0x000598
+;  0xFFFFBFEC  byte   boot mailbox flag: 0xAA after 0x000598; 0x55 requests the copy; 0x0005CC sets 0xAA
+;  0xFFFFBFF0  12 B   zeroed by 0x000598 except 0xFFFFBFF8 = 0xAA
+;  0xFFFFBFFC  long   boot marker 0x5AA5A55A written by 0x000756 on every boot-block exit
+;  0xFFFFB4E0  800 B  boot message ring, 100 slots x 8 bytes (inside the filled range)
+
+COMPARISON WITH EXISTING CLAIMS (opened only after the sections above were written)
+  Sources searched for every address above (all spellings): fn_dump --labels, docs/, disassembly/analysis/,
+  disassembly/ghidra/ImportAE5L600L.java, docs/verification-status.json.
+  CONTRADICTED BY THE BYTES
+  C1. disassembly/analysis/startup_hw_init_analysis.txt:172 "RAM clear (FFFF0000-FFFFBFFF zeroed)".  Only
+      0xFFFF4000..0xFFFFBF9F is zeroed (0x010398, by DMA); 0xFFFF0000..0xFFFF1FFF is tested and restored
+      (0x0102F0, 0x01033A) apart from 0xFFFF0000..0xFFFF0008, the stack window and any ISR residue,
+      0xFFFF2000..0xFFFF3FFF is untouched at reset (perfect RAM), 0xFFFFBFA0..0xFFFFBFFF is the boot block's
+      area and is not cleared.  emu pass C, G.
+  C2. startup_hw_init_analysis.txt:173 "BSS init + static data copy".  The reset path makes no copy from ROM to
+      RAM: pass C logs every RAM write from the vector to 0x003324 and the only multi-word copies are the
+      save / restore loops of 0x010290 (RAM to RAM).
+  C3. startup_hw_init_analysis.txt:170 "hw_init_A: WDT setup (F70A)".  0x000C20 writes BSC (0xFFFFEC20..26),
+      SYSCR2 (0xFFFFF70A, manual 25.2.3) and ICR (0xFFFFED18); the WDT is 0xFFFFEC10 / 0xFFFFEC12, written by
+      0x000762.  171 "hw_init_B: ATU timer base setup (F720-F726)": 0xFFFFF720 / 0xFFFFF726 are PAIOR / PADR
+      (manual Table A.1); 0x000C54 writes only port registers.
+  C4. startup_hw_init_analysis.txt:181-182 and ImportAE5L600L.java:2548 / 2581 (0x000EE4 "isr_intevt_resolver",
+      "reads INTEVT register (FFFF70B)").  0x000EE4 (and its twins 0x001994, 0x00F7FC) reads 0xFFFFF70B, the
+      SYSCR2 read address (manual Table A.1 note), clears MSTOP2, reads the H-UDI SDSR 0xFFFFF7C2 and classifies
+      its high byte (11 / 13 -> 0, 80 -> 1, 14 / 15 -> 2, else 0xFF; 0x001994 has no 14 / 15 case): a
+      chip-identity test whose result picks the header words (0x0006B2) and the RAM-test geometry (0x010470),
+      not an interrupt resolver.
+  C5. startup_hw_init_analysis.txt:29 "0x001000-0x003700 Calibration data tables (float_data)".  0x001000..
+      0x001FFF holds the second boot stage: 0x00127C (entry, [0x001000]), 0x0012C0, 0x001332, 0x001994,
+      0x0019F0, 0x001008 all execute on every reset (pass C); 0x002000 / 0x002004 are hand-over words.
+  C6. ImportAE5L600L.java:2981-2985 (0x00065C "rtos_startup": "Registers task table @ 0x3F80, starts
+      scheduler ... RTOS init (0x598) ... scheduler watchdog (0x0EE4)") and :2794 ("Called by RTOS startup
+      (0x65C)").  0x00065C has no literal near 0x3F80 (its pool words are listed with its LISTING), starts no
+      scheduler, and leaves through 0x000040 to 0x00127C; 0x000598 fills 24 boot-area bytes; 0x000EE4 is C4.
+      The kernel start is 0x003324, reached three hand-overs later from 0x00FA5A.
+  C7. ImportAE5L600L.java:2489-2493 (0xFFFF0000 / 0xFFFF0004 / 0xFFFF0008 "SH7058_STBCR / STBCR2 / STBCR3,
+      Standby Control Register").  These addresses are on-chip RAM (manual 24.1: H'FFFF0000..H'FFFFBFFF); the
+      reset path writes long 183, long 0 and byte 0 there (0x0108C8, 0x0108CA, 0x0108FC), and the WDT ITI
+      handler counts in 0xFFFF0004 (0x010AE4).  No peripheral register lives at them.
+  C8. docs/plans/valet-limiter.claims.md:20-28 reads equality of 0xFFFFBFFC with 0x5AA5A55A as "RAM survived
+      (a warm start)" and asks which RAM a cold start (marker absent) clears.  That marker gates only the boot
+      message window 0x0007E0 and byte 0xFFFFBFA8 (0x000692); it decides no clear.  The reset clear of
+      0xFFFF4000..0xFFFFBF9F is unconditional; the only marker-dependent clear is 0x010124's, keyed on word
+      0xFFFF2000 == 0xAA55 and covering 0xFFFF2000..0xFFFF3FFF (which holds 0xFFFF3234, the plan's example).
+      docs/plans/valet-limiter.md:93 also cites the test / write at 0x00068A / 0x000752; the compare is
+      0x000690 and the store 0x000756 (0x00068A / 0x000752 load the constants).
+  C9. The literal 0xFFFF8000 at 0x010488 carries the claim "ramp_out_8000"; here it is the class-1 highest block
+      base of the RAM test (0x010490 stores it as a bound), not an access to a variable.  The label itself may
+      be right elsewhere; this site does not support it.
+  C10. function_census.json label_claim "task10_init_irq_scratch" for 0x00AE50: the bytes write IPRL bits 7-4
+      (the WDT ITI priority, manual Table 7.4) := 14 and nothing else; no RAM, no "scratch".
+  SETTLED HERE (previously open)
+  S1. revlim_freeze_gate_trace.txt NOT ESTABLISHED d (and its RESET section), docs/rev-limit-patch.md:178,
+      docs/corrections.md:6799: the reset transfer IS a zero fill of 0xFFFF4000..0xFFFFBF9F (CHCR decoded from
+      REJ09B0046-0300H).  The non-fill alternative those files kept open (gate 0xAA after a scrub of 0xAAAA) does
+      not occur: 0x010448's patterns are erased by the fill, and the gate reads 0x00 after every reset until a
+      writer runs.
+  S2. timing_bound_040AF6_trace.txt:2053-2060 N8(a): the power-on contents of 0xFFFF7FF4, 0xFFFF7FBC and
+      0xFFFF69E6 are 0 / +0.0 / 0 at the kernel start after every reset.  N8(b) (the order of 0x047C40 and the
+      first 0x0410D4 call) is not touched here.
+  S3. ffb_residual_trace.txt:2167-2170 [7A44] "holds whatever the RAM start-up leaves": that is +0.0 (long 0),
+      on every reset.  With no writer (find_writers: none; that file: none) it stays +0.0.
+  S4. special_exit_gate_trace.txt:100-103: its "first normal-mode set from all-zero RAM" premise holds after
+      every reset -- 0xFFFF8E66 and its neighbours 0xFFFF8E65..0xFFFF8E93 are in the filled range -- and the
+      set-only latch 0xFFFF8E66 is cleared by every reset.
+  S5. docs/analysis-plan.md:292-295 item 5 ("start-up state"): the reset DMA and the RAM test are done here;
+      0x047C40 is not part of this trace.
+  CONFIRMED
+  K1. ImportAE5L600L.java:2977-2979 (0x000C0C: SP 0xFFFFBFA0, calls 0x000C20, 0x000C54, then 0x00065C with
+      r4 = r5 = 0, spin at 0x000C1C) -- the bytes agree; only the name "RTOS startup" for 0x00065C is wrong (C6).
+  K2. ImportAE5L600L.java:198 (0x010800 [DECODED]: critical section around 0x010B2A, the five-record log at
+      0xFFFF2060 / 2064, corrections item 84; docs/open-holes.md:188): the RAM test's 0x01068E reports through it
+      with code 0x7000.  The name "sched_event_post" aside, the contract agrees.
+  K3. The VBR value 0x000FFC50 at 0x00FA40 carries the claim "VBR_VectorTable"; the bytes agree it is loaded into
+      VBR at the application entry.
+  K4. revlim_freeze_gate_trace.txt RESET section: every register store it lists for 0x010398 (0x0103B2..
+      0x010432), the reach of 0x01034C on both paths, the ranges of the three tests and 0xFFFF5B89 := result.
+  K5. docs/architecture.md:32 (0xFFFFBFFC is the last aligned word of RAM) and the vector words (pass A).
+  K6. timing_0410D4_0415B8_trace.txt:1678 / 1740 (0xFFFF800C written as a float by task code): no conflict --
+      the boot stage's word 0xA53C there is erased by the fill before the kernel starts.
+  K7. function_census.json label_claims "halt_forever" (0x00FBA4: SR.I := 15, two port words := 0, spin) and
+      "io_F738_toggle_bit15" (0x011880: bit 15 of word 0xFFFFF738 inverted inside a critical section): the
+      bytes agree.  rtos_core_trace.txt's site list puts 0x010B1A (codes 0x2100 / 0x2200 / 0x2300) among the
+      0x010800 calls followed by 0x00FBA4: agrees with 0x010AD8 above.
+  docs/verification-status.json: 0xFFFF0000, 0xFFFF0004, 0xFFFF0008, 0xFFFF204C, 0xFFFF5B89, 0xFFFF5B6C,
+  0xFFFFBFA8, 0xFFFFBFFC, 0xFFFF69E6, 0xFFFF7A44, 0xFFFF8E66, 0xFFFF2000 are UNMAPPED; 0xFFFF8EDC
+  ("ol_dispatch_gate") and 0xFFFF7FBC ("previous_timing_output") are DISASM-ONLY; 0xFFFF800C, 0xFFFFBFAD,
+  0xFFFFBFB8, 0xFFFFBFBA, 0xFFFF7FF4 have no record.  This trace settles post-reset VALUES only, not names.
+
+
+ESTABLISHED
+  1. The power-on and manual-reset vectors are 0x00000C0C with SP 0xFFFFBFA0; the reset path is 0x000C0C ->
+     0x00065C -> (0x000040) 0x00127C -> 0x0012C0 -> (0x001008) 0x00FA34 -> 0x00FA5A -> 0x003324(0).  Stack
+     pointers: 0xFFFFBFA0 for the boot block and for stage 2 (0x00127C, 0x0012C0, 0x001008), from the vector
+     word 0x000004 and again from 0x00004C / 0x000040 (pools 0x000054 / 0x000048); 0xFFFFBF7C from 0x001008
+     (pool 0x001010) only until 0x0040CC, a span that uses no stack; 0xFFFF12DC, the application SP, from
+     0x0040CC ([0x011CC8]); 0xFFFFBF9C during range C (0x0040C0 / 0x0040C6).  Pass A, C.
+  2. 0x010290 runs once per reset (sole caller 0x00FA86) and always ends in 0x010398 (0x0102B6 bf/s,
+     0x01034C).  Pass C, E.
+  3. 0x010398 programs DMAC channel 0 for 0x1FE8 longword auto-request burst transfers from a fixed source
+     0xFFFF4000 (holding 0, 0x0103CC) to an incrementing destination from 0xFFFF4000 (CHCR 0x001F0128 decoded
+     with REJ09B0046-0300H 10.2.4): a zero fill of 0xFFFF4000..0xFFFFBF9F, waited for at 0x01041C..0x010420.
+     Pass B, C.
+  4. At the kernel start 0xFFFF4000..0xFFFFBF9F is all zero after every reset, independent of the 0xFFFF2000
+     marker, the boot marker, the starting RAM image and of WDT interrupts; the only bytes written there after
+     the fill are 0xFFFF5B89 (0x010352) and 0xFFFF5B6C (0x00FBBE).  ISR frames pushed there during the range-C
+     phase (0xFFFFBED8..0xFFFFBF9B) precede the fill.  Pass C (32 runs), G (5 runs).
+  5. Hence 0xFFFF8EDC, 0xFFFF8EDD, 0xFFFF8EED, 0xFFFF8ECC, 0xFFFF8EF6, 0xFFFF7FF4, 0xFFFF7FBC, 0xFFFF69E6,
+     0xFFFF7A44, 0xFFFF8E66 are 0 at the kernel start after every reset; set-only latch 0xFFFF8E66 does not
+     survive a reset.  Pass C, G.
+  6. 0xFFFF0000..0xFFFF1FFF is tested with save / restore (0x0102C6..0x0102F8, 0x01030C..0x010344) and keeps
+     its pre-reset content (perfect RAM), except 0xFFFF0000..0xFFFF0008 (0x0108C8, 0x0108CA, 0x0108FC, and
+     0x010AE4 for 0xFFFF0004) and a stack window ending at 0xFFFF12DB: 0xFFFF125C..0xFFFF12DB when no ITI is
+     taken; never below 0xFFFF11FC when ITIs are taken (lowest acceptable SP 0xFFFF1268 minus the 0x6C-byte ISR
+     depth), the residue being kept by the range-C save / restore.  Pass C, E, G.
+  7. 0xFFFF2000..0xFFFF3FFF is neither tested nor filled at reset; only byte 0xFFFF204C changes (0x00128A,
+     0x001324 -> 0x88), unless a RAM-test mismatch is reported, which adds the 0x010800 log writes in
+     0xFFFF2060..0xFFFF20A7.  Pass C, G, J.
+  8. 0x010448's patterns, heads, two attempts ([0x0C4730] = 2) and 0x7000 reports; it stays inside [start,
+     end] when the length is a multiple of the stride and every block head h < end has end + 1 - h >= stride,
+     true for all four ROM ranges (and wrote past end in every emulated range that breaks the rule: 43 ranges
+     agree both ways); its result is invisible after the reset path.  Pass D, H.
+  9. The boot-block area 0xFFFFBFA0..0xFFFFBFFF is not cleared.  BFAD ends 0x88 (0x000C3A writes 0x77, 0x00FA54
+     0x88), BFAC = 0 (0x000688), BFB8..BFBB = 0 (0x00054A; no message received), BFE4..BFFF as tabled
+     (0x000598, 0x000756).  BFA8 is written only when the boot marker was absent (0x000690 / 0x000692 skip the
+     window, 0x00080C writes), and then to 0 because 0x000598 has just set BFEC := 0xAA and 0x00088C tests for
+     0x55; with the marker present BFA8 keeps its pre-reset value.  Pass C (asserted both ways).
+  10. The boot watchdog.  0x00B2AA stops the WDT (0x00B2B8, 0x00B2C4) and 0x010C52(4) sets TCSR = 0x1C
+     (0x010C5C, 0x010C68), so 0x010878 reads CKS 4 and stores 183 / 0 (0x0108C8, 0x0108CA); 0x010942 restarts
+     the WDT in interval mode (0x01094E, TCSR 0x3C); 0x00AE50 puts 14 into IPRL bits 7-4 (0x00AE5C), the WDT
+     ITI priority; 0x00FA82 lowers SR.I to 13; 0x00AE1C, called again from 0x00FABC, zeroes IPRL.  Vector 224
+     is 0x00F6E6 (pass A); it clears OVF (0x00F722) and calls 0x010AD8: count += 1 (0x010AE4); count < limit
+     (0x010AE8 cmp/hs, unsigned) -> 0x011880 and return; otherwise 0x010800(0x2100 / 0x2200 / 0x2300, 0) and
+     0x00FBA4 (SR.I := 15, endless loop).  B's save / test / restore runs masked (0x0102BE..0x0102FE, level
+     0xE0).  Pass C, E, G (expiry run included).
+  11. At the kernel start long 0xFFFF0004 equals the number of ITIs taken in the acceptance window, and lies in
+     0..182: the 183rd ITI ends in 0x00FBA4, so 0x003324 is not reached.  Pass G.
+  12. 0x0007E0 counts r4 & 0xFFFF events (0x0007F2 extu.w) and returns 1 at once only when that is 0.  Pass I.
+  13. Every ROM byte executed or read in these runs is identical in all 20 bins: nothing here is rev-dependent.
+     Pass Z.
+
+NOT ESTABLISHED
+  a. Power-up RAM content: the manual gives none ("undefined" above).  Settles only by measurement.
+  b. Whether RAM is kept powered across ignition off (how often 0x010124 sees a cold start): board-level, not
+     in the ROM.
+  c. The SDSR high byte on the actual part: taken from the manual (0x0B); it only changes the test's stride and
+     block size, not the post-reset content (pass D runs both classes).
+  d. What the boot window receives on a real bus (0x000344 copy path, index steps): bytes only; a received
+     FF 86 00 00 00 00 00 00 diverts to 0x000924 (not traced) and the application does not start.
+  e. What the logged codes (0x7000 from the RAM test, 0x2100 / 0x2200 / 0x2300 from the boot watchdog) mean to
+     anything that reads the 0xFFFF2060 log: rtos_core_trace.txt found no reader that drains it.  The writes
+     themselves are established (pass J, G).
+  f. Peripheral meanings beyond the DMAC, BSC, ICR NMIL, SYSCR2, SDSR, WDT (TCSR / TCNT / RSTCSR) and IPRL
+     fields cited: port bits (0xFFFFF738 bit 15 toggled by 0x011880 and 0x000484, 0xFFFFF590 / 0xFFFFF592
+     cleared by 0x00FBA4), HCAN, the other 0x00AD98 callees.  The emulation treats them as a register file.
+  g. How many ITIs the window takes on the real chip, hence the value of 0xFFFF0004 at the kernel start and the
+     exact extent of the ISR residue inside 0xFFFF11FC..0xFFFF125B.  It depends on the CPU clock versus the WDT
+     clock phi, flash wait states and the DMA's duration, none of which the bytes give; the emulation's rate is
+     an input (pass G shows 6..101 at its rates, pass C 0).  Settles by reading 0xFFFF0004 on a running ECU
+     shortly after start-up, or with a cycle-accurate model.
+  h. What "300.0" is in time.  The WDT counts phi / 512 at CKS 4, and phi is 4 or 8 times the input clock
+     (manual 13.4.7).  1.6384 = 256 x 512 / 80 MHz in ms, so the ROM's constant fits phi = 80 MHz (the
+     manual's own example column, at phi = 40 MHz, gives 3.3 ms for CKS 4).  Neither the crystal nor the
+     multiplier is decoded here, so whether 183 overflows are 300 ms is not established.
+  i. What happens to the boot watchdog after the kernel start: the census lists 0x00DF14 as another caller of
+     0x00AE50; whether the kernel re-enables the ITI, resets 0xFFFF0004 or rewrites 0xFFFF0000 was not traced.
+  j. Why B alone runs masked (an ITI increment between B's save and restore would be undone): intent, inferred.
+  k. Whether any code other than 0x010124 clears 0xFFFF2000..0xFFFF3FFF: not searched.
+  l. Other exception sources: only the WDT ITI is modelled.  Every IPR field except IPRL bits 7-4 is 0 in the
+     window (pass C, asserted), so no other maskable interrupt can be accepted there; NMI and the other
+     non-maskable sources are a board question.
+  m. With a RAM fault the stack goes deeper (0x01068E -> 0x010800 -> 0x010B2A) and an ITI taken there deeper
+     still: the 0xFFFF11FC bound is for perfect RAM only.
+  n. The kernel start 0x003324 / 0x0036C4 and everything after it, apart from 0x010124 (context).
+
+REVIEW HISTORY (third, deciding decode; 2026-11-27)
+  The first trace modelled no interrupts.  An adversarial reviewer disputed seven claims, listed five misses
+  and ten file problems.  Each was re-decoded from bytes here and, where numeric, re-run in the repaired
+  emulation (WDT per manual 13.2, ITI acceptance per manual 7.4.1, rte).  Claim ids are the trace's.
+  P2 "SPs 0xFFFFBFA0 (boot block), 0xFFFFBF7C (stage 2, set by 0x001008), 0xFFFF12DC (set at 0x00FA4A)".
+     Reviewer right (imprecise).  Stage 2 runs on 0xFFFFBFA0, which 0x000040 sets before jumping to it:
+000040: DF01  mov.l @(0x000048),r15         ; = 0xFFFFBFA0 RAM
+000042: 442B  jmp @r4                       ; -> target NOT statically resolved | to 0x00127C, stage 2
+001008: DF01  mov.l @(0x001010),r15         ; = 0xFFFFBF7C RAM
+00100A: 442B  jmp @r4                       ; -> target NOT statically resolved | to 0x00FA34
+0040CC: 6F43  mov r4,r15                      ; delay slot of 0x0040CA's rts, reached by 0x00FA4A's jsr
+     Pass C: SP at first visit 0x00127C / 0x0012C0 / 0x001008 = 0xFFFFBFA0, 0x00FA34 / 0x0040CA = 0xFFFFBF7C,
+     0x00FA4E = 0xFFFF12DC in all 32 runs.  Fixed in RESET PATH, the 0x00127C and 0x00FA34 sections, ESTABLISHED 1.
+  A2 "0x010878 writes 183 and long 0xFFFF0004 := 0; 0x0108DA writes byte 0xFFFF0008 := 0".  Reviewer right
+     (imprecise): the writes are right, but 0xFFFF0004 does not stay 0.
+0108CA: 2012  mov.l r1,@r0                    ; long 0xFFFF0004 := 0
+00AE5C: 2401  mov.w r0,@r4                    ; IPRL := 0x00E0: WDT ITI priority 14
+01094E: 2431  mov.w r3,@r4                    ; TCSR := 0xA53C: TME = 1, interval mode
+00FA82: 400E  ldc r0,sr                       ; SR.I := 13 < 14
+010AE4: 2432  mov.l r3,@r4                    ; in the vector-224 handler's callee: 0xFFFF0004 := count + 1
+     and [0x0FFFD0] (VBR 0x000FFC50 + 224 * 4) = 0x0000F6E6 (pass A).  Pass G: 0xFFFF0004 = 19 / 101 / 6 / 13 /
+     31 = the ITI count of each run; the expiry run halts at 0x00FBA4 with 183.  Fixed in ANSWER 2 / 3, the
+     0x00FA5A section, RAM CELLS, ESTABLISHED 10 / 11.
+  A3 "0.8192 only when TCSR & 7 == 3; TCSR holds 0x3C (CKS 4) after 0x001332, so 183".  Reviewer right
+     (imprecise): the result 183 and the CKS == 3 logic stand; the mechanism was wrong.  0x001332's value is
+     overwritten twice before the read:
+00ADB2: B27A  bsr 0x00B2AA                    ; from 0x00AD98
+00B2B8: 2431  mov.w r3,@r4                    ; TCSR := 0xA500 | (TCSR & 0xDF): TME = 0
+00B2C4: 2421  mov.w r2,@r4                    ; TCSR := 0xA518
+01092A: B192  bsr 0x010C52                    ; r4 = 4
+010C68: 2561  mov.w r6,@r5                    ; TCSR := 0xA518 | 4 | old TME (0) = 0xA51C
+010884: 6030  mov.b @r3,r0                    ; reads 0x1C
+010890: 8803  cmp/eq #3,r0                    ; T = (CKS == 3): false, CKS = 4
+     Pass C asserts the six writes and the 0x1C read in all 32 runs.  Fixed in ANSWER 3 ("183"), the 0x00FA5A
+     section, the new WDT section.
+  Z6 "0xFFFF0000..0xFFFF1FFF keeps its pre-reset content except 0xFFFF0000..0008 and 0xFFFF125C..0xFFFF12DB".
+     Reviewer right (refuted as stated): with ITIs the window extends below 0xFFFF125C.  ITI frames are 100
+     bytes plus 8 more in the handler's callees:
+00F712: 4F62  sts.l fpscr,@-r15                ; last of 23 pushes after the CPU's SR / PC
+011882: 7FFC  add #-4,r15                     ; inside the handler: SP - 108
+     Pass C: lowest SP at which an ITI is acceptable below 0xFFFF4000 = 0xFFFF1268 (inside 0x0105AA, A test) ->
+     deepest write 0xFFFF11FC.  Pass G: every ISR writes exactly SP-0x6C..SP-1; changed bytes of 0xFFFF0020..
+     0xFFFF1FFF lie in 0xFFFF11FC..0xFFFF12DB, some below 0xFFFF125C, kept through the C save / restore.
+     The bound 0xFFFF11FC is mine (the reviewer gave the observed extent); the exact extent stays timing-
+     dependent.  Fixed in the ANSWER table, the 0x00F6E6 section, ESTABLISHED 6, NOT ESTABLISHED g / m.
+  Z7 "0xFFFF2000..0xFFFF3FFF neither tested nor filled; only 0x010124 clears it ... leaving 0x55AA".
+     Reviewer right (imprecise).  The reset-path half holds (pass C, G).  "Only 0x010124" was never searched,
+     and 0x010198 later writes 0xAA55 when byte 0xFFFF5B8D == 1 (revlim_freeze_gate_trace.txt:1186-1192,
+     verified).  Added here: a reported RAM-test mismatch writes the 0x010800 log in 0xFFFF2060..0xFFFF20A7
+     (pass J), so the "only 0xFFFF204C" half needs perfect RAM.  Fixed in ANSWER 3, the 0x010124 section,
+     ESTABLISHED 7, NOT ESTABLISHED k.
+  R4 "0x010448 writes nothing outside [start, end] except the caller's stack".  Reviewer right (imprecise):
+     true for the four ROM ranges (pass D), false in general.  Pass H reproduces the reviewer's three cases
+     (0xFFFF6018 / 601C, 0xFFFF7008 / 700C, 0xFFFF7000) and adds a head case ([0xFFFF600C, 0xFFFF700B] ->
+     0xFFFF700C); the rule "length a multiple of the stride and every block head h < end has end + 1 - h >=
+     stride" matched the emulated extent on all 43 ranges tried.  Fixed in the 0x010448 / 0x0105AA contracts.
+  K1 "BFAD ends 0x88 and BFA8 = 0 only when the boot marker was absent".  Reviewer right (wording): BFA8 is
+     WRITTEN only when the marker is absent; with the marker present it keeps whatever it held, which may be 0.
+000692: 8906  bt 0x0006A2                     ; marker present: skip the window
+00080C: 2800  mov.b r0,@r8                    ; the only write of BFA8 on the reset path
+     Pass C asserts "written iff the marker is absent" and, with the marker present, BFA8 = its pre-reset byte.
+     Fixed in the ANSWER table, RAM CELLS, ESTABLISHED 9.
+  MISSED, all checked from bytes and added:
+     1. The WDT ITI is live in 0x010290, the DMA spin and the 2000-loop delay: vector 224 -> 0x00F6E6
+        (pass A), IPRL bits 7-4 = WDT (manual Table 7.4, read here from REJ09B0046-0300H p.116), 0x00AE5C,
+        0x01094E, 0x00FA82; IPRL zeroed at 0x00AE4E.  NOT ESTABLISHED g (old) asked whether an overflow could
+        reset the chip: in interval mode (WT/IT = 0) it cannot (manual 13.2.2), and RSTE = 0 (0x00B2BE) would
+        forbid it in watchdog mode too.  Replaced.
+     2. The handler 0x00F6E6 and 0x010AD8 / 0x011880 / 0x00FBA4 (new section; expiry run in pass G).
+     3. B runs inside a 0xE0 critical section, C and A do not (0x0102BE, 0x0102FE; pass E records SR.I 13 /
+        14 / 13 at the three tests; pass G finds no ITI in 0x0102C2..0x010300).  The reviewer's reading of the
+        intent stays inferred (NOT ESTABLISHED j).
+     4. The WDT state before 0x010878 (A3 above; new WDT section).
+     5. 0x0007E0's test is on r4 & 0xFFFF (0x0007F2 extu.w): pass I.
+  FILE PROBLEMS: all ten accepted and fixed where they sat (ANSWER table rows for 0xFFFF0004 and 0xFFFF0020..
+     0xFFFF1FFF, RAM CELLS, the 183 paragraph, the 0x00AE50 description, NOT ESTABLISHED g, ESTABLISHED 1, the
+     header's span list -- replaced by pass Z, which compares every executed or read byte in all 20 bins -- the
+     cold / warm sentence, the 0x010448 contract, the 0x0007E0 contract).

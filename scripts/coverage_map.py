@@ -392,7 +392,7 @@ def deref_widths(buf, lit, addr, back=0x400, fwd=14):
 _TYPECODE_WIDTH = {0x0000: 4, 0x0400: 1, 0x0800: 2, 0x0C00: 1, 0x1000: 2}
 
 
-def _desc_at(buf, a):
+def _desc_at_raw(buf, a):
     """Try to decode one descriptor at `a`.  Returns dict or None."""
     if a + 28 > len(buf):
         return None
@@ -413,7 +413,7 @@ def _desc_at(buf, a):
     return None
 
 
-def _desc_loose_at(buf, a):
+def _desc_loose_at_raw(buf, a):
     """Decode a descriptor at an address CODE has already proven is one.
 
     Used only for addresses recovered from `jsr` sites in the feed trace, where
@@ -439,6 +439,29 @@ def _desc_loose_at(buf, a):
         return dict(addr=a, dim="2D", count=c1 * c2, width=_TYPECODE_WIDTH[tch],
                     data=dp2, axes=[a1, a2], counts=[c1, c2], loose=True)
     return None
+
+
+def _fixed_width(d):
+    """Records consumed by a FIXED-type wrapper carry a dead typecode: the cell
+    width is the wrapper's (corrections item 106; desc_types.fixed_type, derived
+    from the call sites by scripts/mapping/fixed_type_records.py). Without this
+    37 rom-block entities were sized at 4 bytes/cell where the code reads 1 or 2."""
+    if d is not None:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import desc_types as _DT
+        fx = _DT.fixed_type(d["addr"])
+        if fx is not None:
+            d["width"] = _DT.TYPE_SIZES[fx["cell_typecode"]]
+            d["fixed_type"] = True
+    return d
+
+
+def _desc_at(buf, a):
+    return _fixed_width(_desc_at_raw(buf, a))
+
+
+def _desc_loose_at(buf, a):
+    return _fixed_width(_desc_loose_at_raw(buf, a))
 
 
 def scan_descriptors(buf):

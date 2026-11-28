@@ -66,9 +66,12 @@ The earlier version called `0xD2F48` the retard step per knock event; the
 retard step is `0xD2F50`. It called `0xD2F40` a gate on retard and
 `0xD2F54`/`0xD2F58` recovery rates; neither holds as written. What reads
 `[0xFFFF8290]` was **not checked**, so no replacement meaning is given for
-`0xD2F54`/`0xD2F58`. `0xFFFF8258` carries three conflicting labels in
+`0xD2F54`/`0xD2F58`. `0xFFFF8258` carried three conflicting labels in
 `ImportAE5L600L.java` (`flkc_fg_limit_FR15`, `flkc_retard`,
-`knock_metric_accum`); its identity is not settled.
+`knock_metric_accum`). **Settled 2026-11-27 (corrections item 114, `fn_0448F4_trace.txt`):**
+`0x045970` overwrites it every call with (1−w)·"KC Advance Max (Cruise)" + w·"KC Advance Max
+(Non-Cruise)", w = the cruise blend `[0xFFFF90A8]`, and never reads the old value. So the FLKC
+fine-correction ceiling above is built from the KC Advance Max tables, not a knock integrator.
 
 Knock-intensity thresholds (input to level code 0/2/4/5/6/7):
 
@@ -207,9 +210,11 @@ Documented in `knock_flkc_report.txt`, kept here for context:
   RPM x LOAD lookup at `0x043858`. So the detector DOES have a load input —
   but that axis is calibrated exactly flat, which is why "knock detection has
   no load input" held up empirically while being false about the code.
-- `knock_metric @ 0xFFFF8258` — cumulative knock signal used as the
-  exponential weight in `flkc_paths_FG`. Computed elsewhere; not yet
-  fully traced.
+- ~~`knock_metric @ 0xFFFF8258` — cumulative knock signal~~ — **wrong (item 114):** it is the
+  Cruise/Non-Cruise blend of the "KC Advance Max" tables, rewritten every call by `0x045970`.
+- `0x0448F4` computes `[0xFFFF8234]`, the enable of FBKC's knock step and delayed recovery
+  (item 114). The FBKC window it uses is tuned in 20.19c (load 0.95/1.0, rpm 1100/1200/6000/6100,
+  recovery count 70), so stock-based reasoning about when FBKC acts does not carry over.
 - `0xFFFF93E0` (FLKC displayed by RomRaider) vs the internal working
   values (positive = advance, see Sign convention) — the commit function
   around 0x73600 is not checked.

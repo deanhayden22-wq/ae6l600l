@@ -1,0 +1,76 @@
+{
+  "id": "valet_limiter",
+  "doc": "docs/plans/valet-limiter.md",
+  "status": "DRAFT -- built with PLACEHOLDERS (STATE, BUTTON, HOLD_TICKS); not flashable",
+  "base": "rom/AE5L600L 20g rev 20.19d.bin",
+  "claims": [
+    {
+      "id": "valet_hook",
+      "start": "0x0F102E",
+      "end": "0x0F1031",
+      "kind": "hook-rewrite",
+      "note": "inside launch_body: `fadd fr8,fr15 / mov.l @(0x0F1044),r2` -> `bra 0x0F1060 / nop`",
+      "amends": "launch_body"
+    },
+    {
+      "id": "valet_body",
+      "start": "0x0F1060",
+      "end": "0x0F1107",
+      "kind": "injected-code"
+    }
+  ],
+  "ram": [
+    {
+      "id": "valet_state",
+      "start": "0xFFFF3FD0",
+      "end": "0xFFFF3FD7",
+      "evidence": "PLACEHOLDER -- V1 (retained?) and V6 (unused?) not settled"
+    }
+  ],
+  "code": [
+    {
+      "entry": "0x03B668",
+      "kind": "call",
+      "region": [
+        "0x03B668",
+        "0x03B7C3"
+      ],
+      "exits": [
+        "0x03D2FC"
+      ],
+      "detours": {
+        "0x0F1000": "0x03B6B2"
+      },
+      "accepted": [
+        {
+          "pc": "0x03B6B2",
+          "why": "As launch_control: delay-slot r2 is dead (reloaded at 0x0F10E4 before use)."
+        },
+        {
+          "pc": "0x03B6BC",
+          "why": "As launch_control: delay-slot r2 is dead; the detour always returns to 0x03B6B2."
+        }
+      ]
+    },
+    {
+      "entry": "0x0F1000",
+      "kind": "detour",
+      "region": [
+        "0x0F1000",
+        "0x0F1107"
+      ],
+      "note": "Launch detour plus the valet block. Same clobber set as launch_control.",
+      "exits": [
+        "0x03B6B2"
+      ],
+      "clobbers": [
+        "r0",
+        "r2",
+        "fr6",
+        "fr8",
+        "fr9",
+        "fr15"
+      ]
+    }
+  ]
+}

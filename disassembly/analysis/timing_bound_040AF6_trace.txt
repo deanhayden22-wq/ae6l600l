@@ -1,0 +1,2132 @@
+================================================================================================================
+TIMING-INTEGRATOR BOUND: FUNCTION 0x040AF6 (WRITES THE FOUR FACTORS OF H = [0xFFFF7FC0]) -- BLIND TRACE FROM BYTES
+================================================================================================================
+Date:           2026-11-27
+Reference bin:  rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+                Code 0x040AF6..0x0410C4, all 21 records the function reads (record, axis and data bytes) and
+                every calibration scalar and pool constant it reads are byte-identical in stock rom/ae5l600l.bin
+                (asserted by the emulation script), so every statement below holds for both bins.
+Method:         listing printed by scripts/mapping/fn_dump.py 0x040AF6 (blind, no labels), decoded instruction by
+                instruction; every contract checked bit-exactly in sh2e_emu by scripts/trace/emu_timing_bound_040AF6.py.
+EVIDENCE CLASS: bytes + emulated for 0x040AF6 (whole-function runs on four images), for 0x041030 run after it, for
+                the task 0x040918 iterated end to end, and for the writers of the three gate bytes (context
+                sections; the 0x028210 excerpt is decoded only). The PHYSICAL identity of the RAM inputs is NOT
+                established by these bytes, with one exception settled at step 4 from bytes: [0xFFFF6354] is the
+                x of a definition axis named "Coolant Temperature" (0x03A5E4, context section). No data pointer
+                and no axis pointer of the 21 records is named by a definition. One identity-level statement IS made from bytes plus definitions: byte [0xFFFF90BE] == 1
+                is the state in which 0x06114E moves float [0xFFFF90A8] toward 0, and 0x04004A uses [90A8] as the
+                weight of the "Non-Cruise" side of its blend of the definition tables "Base Timing Primary Cruise" /
+                "Base Timing Primary Non-Cruise" (data pointers 0x0D4714 / 0x0D48D4) -- so [90BE] == 1 drives that
+                blend toward the table named Cruise. What "cruise" means physically is not established here.
+                Added at the third-reader repair, bytes + emulated: the 0x0410D4 latch in the task (check_latch),
+                window B of 0x040A9C in the task (check_window_b), 0x026634 / 0x026698 (the writers of byte
+                0xFFFF69E6) and 0x0409C0 (the second writer of this function's counter / edge state).
+Runtime-library calls are used by their verified contracts (helpers_wrap / helpers_arith traces, item 107); the
+H formula of 0x041030 and the 0x0410D4 contract (latch, steps, branches) are the verified contracts of
+timing_0410D4_0415B8_trace.txt, re-run here in the task 0x040918. 0x026634 is stub class 35 of
+stub_shapes_b_trace.txt (verified), re-run here.
+No statement depends on the last bit of a float (FPU rounding mode, open-holes #11).
+Third-reader repair 2026-11-27: disputed items settled from bytes and emulation; see REVIEW HISTORY at the end.
+
+QUESTION: can the timing integrator [0xFFFF7FBC] be non-zero on the car?
+----------------------------------------------------------------------------------------------------------------
+ANSWER (repaired at the third-reader review; H is the same in 20.19c and stock, the up path is not -- item 5)
+1. ON THE CAR: NOT ESTABLISHED. What the bytes establish is the set of conditions under which the code lets
+   [7FBC] leave 0: it rises (+0.16 per call toward H, emulated) only on a 0x0410D4 call at which ALL of
+     (a) H > 0: ([3158] == 1 or [90BE] == 1) and [9707] == 0 and [67FC] != 1 (0x040AF6 + 0x041030, item 3);
+     (b) latch byte [0xFFFF7FF4] == 0;
+     (c) byte [0xFFFF69E6] != 0 (F9 of the timing trace). With F9 == 0 no call can increase X: branch 12 needs
+         F12 = byte [85D7] == 1, and step 10 (F12 == 1 and F9 == 0 -> X - 0.015) is tested before it
+         (0x0413C4..0x0413CC); step 6 takes F12 == 0 (0x041280..0x041286); branch 11 adds L13 = 0 and needs
+         F9 == 1 in any case;
+     (d) the rest of the branch-12 up conditions of the timing trace (F12 == 1, [7FF5] == 0, V < 510, word
+         [67EC] window, T / N / P tests -- timing trace MECHANISM step 12);
+     (e) in 20.19c only: byte [0xFFFF7FDC] == 0 (item 5).
+   The latch is what the first answer ("YES") left out. One 0x0410D4 call with F9 == 0 while |[7FBC]| <=
+   0.001373291015625 (or [7FBC] NaN) sets [7FF4] = 1 (0x0411D8..0x0411F6), and from then on [7FBC] := +0.0 on
+   every call before any other step (0x04124A..0x041258). find_writers (a lower bound) reports one store to
+   [7FF4], the set at 0x0411F6; nothing found clears it, and 0x040970 (which zeroes [7FBC]) does not write it.
+   Emulated (check_latch, REAL and STOCK): one call with [69E6] = 0 at X = 0 latches; the next 200 calls with
+   [69E6] = 1, H = 15.029 and every up condition met give X = 0.0 on every call.
+2. Byte [69E6] is set to 1 only by 0x026634 (bytes [69E4] [69E5] [69E6] [69E7] := 1; census caller 0x047C40,
+   which also calls the initialiser 0x04092A) and is cleared, never set, by 0x026698 (via 0x026642, caller
+   0x049CF0): [69E6] := 0 whenever float [0xFFFF6350] > [0x0C34D0] = 70.0 or NOT (lut(0x0AAF5C, [0xFFFF6354]) >
+   float [0xFFFF63D4]); 0x0AAF5C is 1240 at -40 falling to 210 at >= 50 on its -40..110 axis. These are the two
+   writers find_writers reports (a lower bound). So, if they are all its writers, once [69E6] is 0 it stays 0
+   until 0x026634 runs again; while it is 0 no up step can happen, and the first call with |X| <= w latches X
+   at 0, with no latch-clearing writer found (emulated: from X = 1.0,
+   step 10 takes 0.015 per call, X = +0.0 at call 67, latched at call 68). [6350] is the x of a definition axis
+   named "Coolant Temperature" (timing trace E13), as is [6354] (E15 here). What [63D4] is, the power-on contents
+   of [7FF4] / [7FBC] / [69E6], and when 0x047C40 and 0x049CF0 run relative to the first 0x0410D4 call are NOT
+   established -- and they decide whether the car ever has [7FBC] != 0 (NOT ESTABLISHED N8, N9).
+3. With the shipped tables and scalars the four factors collapse to
+       [7FB0] = [7FB4] = 20.0390625 if byte [0xFFFF3158] == 1 or byte [0xFFFF90BE] == 1, else +0.0
+       [7FC4] = 1.0 always                [7FD4] = +0.0 if byte [0xFFFF9707] != 0, else 1.0
+       [7FB8] = T90([0xFFFF6354])        (record 0x0ADD90, byte-identical to 0x0ADDA4)
+   so H = [7FB8]*[7FB0]*[7FC4]*[7FD4]*0.01 (0x041030) is
+       H = T90([6354]) * 20.0390625 * 0.01     when ([3158] == 1 or [90BE] == 1) and [9707] == 0 and [67FC] != 1
+       H = 0                                     otherwise
+   T90 on axis 0x0D2FCC (-40..110 step 10): 100 at <= 30, 89.84375 at 40, 85.15625 at 50, 79.6875 at 60, 75 at
+   >= 70 and for NaN. H is therefore about 20.04 at [6354] <= 30 and about 15.03 at [6354] >= 70 (emulated
+   20.039061 / 15.029296; the last digits depend on the rounding mode and are not claimed). This is the same in
+   20.19c and stock.
+4. A non-zero H is not dead calibration: the nine records 0x040AF6 selects when [3158] == 1 or [90BE] == 1 hold
+   raw 0x39 (57 * 0.3515625 = 20.0390625) in both cells; the eight it selects otherwise hold 0. No other input of
+   the selector (word [67EC], byte [8E7E], byte [8970]) changes the value. Run end to end (task 0x040918 =
+   0x040A9C, 0x040AF6, 0x041030, 0x0410D4) with byte [69E6] = 1, latch [7FF4] = 0 and [7FEF] = 0 SET BY
+   CONSTRUCTION, [90BE] == 1 and the 0x0410D4 up-step conditions met, [7FBC] rises +0.16 per call from 0 and
+   is held at H = 15.029 ([6354] = 90); with [3158] == 1 at [6354] = 20 it is held at 20.039.
+5. 20.19c differs from stock on the up path, not on H. u16 [0x0D29C4] = 438 in 20.19c, 0 in stock (timing trace
+   headline 6): 0x040A9C stores byte [7FDC] = 1 while byte [7FEF] == 1 and u16 [7FEA] < [0x0D29C4] (and byte
+   [726C] != 1). [7FDC] == 1 blocks every branch-12 increment, and with byte [65C0] == 1 it triggers the step-8
+   decrement (0.015 per call). [7FEF] := 1 with [7FEA] := 0 is stored by 0x0409C0 when byte [85D7] == 1, its
+   previous value (byte [7FF3]) was 0 and byte [726C] != 1; [7FEA] then counts one per 0x0409C0 call
+   (saturating), so in 20.19c the window lasts 438 calls of 0x0409C0 after each such edge. Emulated
+   (check_window_b): [7FEF] = 1 with [7FEA] = 0 or 437 holds X at 0.0 in 20.19c and climbs in stock; [7FEA] =
+   438 climbs in both; from X = H with [65C0] = 1, 20.19c steps down 0.015 per call while stock holds H. The
+   first check_chain sets [7FEE] = [7FEF] = 0, so it never exercised this window.
+6. In definition-named terms, the GATE is the Cruise / Non-Cruise base-timing blend: [90BE] (written every pass
+   by 0x06114E) is 1 exactly when 0x06114E steps [90A8] DOWN by 0.008 per call (toward the "Base Timing Primary
+   Cruise" side of 0x04004A's blend) and 0 when it steps it up (toward "Non-Cruise"). With [0x0D9AC4] = 0 as
+   shipped, [90BE] = byte [90C4] == 1, unless byte [972E] or byte [9705] is non-zero (then 0). [90C4] is 1 iff
+   u16 [90B2] >= 250 and u16 [90B4] >= 375 and (4.0 > float [90EC] or u16 [90B0] == 0) (0x0610E6). The second
+   gate, byte [3158], is the value byte of a u16 value:~value pair (0x02F57E / 0x02F768 / 0x02EE78); what it
+   means is not established.
+7. The SIZE of the bound is set by calibration no definition names: the nine 20.0390625 records (0x0ADC3C,
+   0x0ADC50 / 64 / 78 / 8C, 0x0ADCF0, 0x0ADD04 / 18 / 2C), the taper 0x0ADD90 / 0x0ADDA4 against [0xFFFF6354]
+   (100 -> 75 between 30 and 70 on the axis), and the literal 0.01 at 0x0410CC. [0xFFFF6354] is coolant
+   temperature in degC (settled at step 4 from bytes: 0x03A5E4 puts it on the definition axis "Coolant
+   Temperature", context section). So the bound is about 20.04 at <= 30 degC coolant, tapering to about 15.03 at
+   >= 70 degC: on a warm engine with the gate open H is about 15.03, in the units of 0x03F368's outputs, from
+   which [7FBC] is subtracted. The flat 1.0 tables 0x0ADDB8 / 0x0ADDCC and the four lag weights (all 1.0)
+   contribute nothing. In definition terms the gate has a name (Cruise) and the size's input has one (coolant);
+   the 20.0390625 and the taper tables themselves are unnamed.
+8. Two ways the bound is 0 although [90BE] == 1: byte [9707] != 0 (0x0297D0 returns 2: [7FD4] = 0) or byte
+   [67FC] == 1 (0x041030 multiplies by [0x0D2B9C] = 0.0). [9707] is set to 1 by 0x028210 (decoded excerpt, not
+   emulated) iff (byte sp+72 != 0 or the 0x058524 result at sp+0 == 1) AND (byte [3884] & 0x08 or byte [3864] &
+   0x10 or byte [3864] & 0x20, bytes of the array at 0xFFFF3836), else 0; the meaning of the two stack bytes
+   and of the three bits is not established.
+9. A zero bound zeroes [7FBC] only on an UPDATE path of 0x0410D4 (clamp 0x0BE56C(x, +0, H = 0) returns +0.0 or
+   H = 0) or, H aside, on the latch path. Its hold paths neither read H nor write [7FBC] (timing trace), so a
+   value left in [7FBC] when the gate closes survives until 0x0410D4 next takes an update path, the latch path,
+   or 0x040970 resets it. Emulated: with [7FBC] at H and the up-step conditions still met, the first call after
+   [90BE] -> 0 writes 0.0.
+
+RAM, CALIBRATION AND TABLES (all values from bytes; 20.19c == stock for every one listed here)
+----------------------------------------------------------------------------------------------------------------
+; GBR = 0xFFFF7FB0 (0x040B12, pool 0x040BBC); float outputs addressed off r13 / r14 = 0xFFFF7FFC (pools 0x040E04,
+;   0x041074) with r0 = -72 .. -40, so 7FFC-76 = 7FB0 ... 7FFC-40 = 7FD4.
+; inputs (pool literals): float E [0xFFFF6354] (0x040BC0)   float N [0xFFFF6624] (0x040BC4)   float Q [0xFFFF6898]
+;   (0x040BC8)   word C [0xFFFF67EC] (0x040BCC)   byte M [0xFFFF8970] (0x040B98)   byte S [0xFFFF90BE] (0x040B88)
+;   byte U [0xFFFF8E7E] (0x040B8C)   byte G [0xFFFF3158] (0x040BD0)   float P [0xFFFF6210] (0x040BD4)
+;   byte F [0xFFFF85D7] (0x040B84)   float V [0xFFFF65FC] (0x040BE0)   byte D [0xFFFF9707] (pool 0x029920 of 0x0297D0)
+; outputs: float [7FB4] r13-72 (selected table at N)    float [7FB0] r14-76 (lag / copy of [7FB4])
+;          float [7FB8] r14-68 (taper at E)             float [7FC4] r14-56 (0x0ADDB8 at Q)
+;          float [7FC8] r14-52 (P - [0x0D2BDC])         float [7FCC] r14-48    float [7FD0] r14-44    float [7FD4] r14-40
+;          word [7FF8] gbr+72, word [7FFC] gbr+76, word [7FE4] gbr+52, word [7FE6] gbr+54 (counters / timers)
+;          byte [7FFB] gbr+75 (S of last call), [7FFF] gbr+79 (U of last call), [7FFA] gbr+74, [7FFE] gbr+78 (armed
+;          on a falling edge), [7FEC] gbr+60, [7FED] gbr+61, [7FF6] gbr+70 (set only here; 0x040970 clears it);
+;          byte [7FF0] gbr+64 is only READ here (written by 0x0409C0 := M every call, and by 0x04092A := 1)
+; other writers of this state (find_writers, a lower bound; each decoded in a context section): 0x0409C0 writes
+;   [7FED] / [7FE6] / [7FF0], plus [7FE8] [7FEA] [7FEE] [7FEF] (read by 0x040A9C) and [7FF2] [7FF3]; 0x04092A seeds
+;   [7FD4] [7FE6] [7FE8] [7FEA] [7FF0] [7FF2] [7FF3] [7FF8] [7FFB] [7FFC] [7FFF]; 0x040970 (timing trace) writes
+;   [7FBC] [7FDC] [7FE4] [7FEC] [7FF1] [7FF6] [7FF8] [7FFA] [7FFB] [7FFC] [7FFE] [7FFF].
+; calibration:  byte 0D297C 0x5A (90)   u16 0D29BC 0xFFFF   u16 0D29BE 0   u16 0D29C0 0   u16 0D29C6 0xFFFF
+;               float 0D2B84 1.0  0D2B88 1.0  0D2B8C 1.0  0D2B90 1.0  (lag weights of [7FB0])
+;               float 0D2BDC -160.0  0D2BE0 1.0  0D2BE4 -1000.0  0D2BE8 1.0  0D2BEC 1000.0
+;               pool 0x041078 0x3AB40000 = 0.001373291015625, 0x0410AC 0x3A83126E = 0.001, 0x0410BC 0x3A000000 =
+;               0.00048828125 (lag snap thresholds); 0x041030 uses pool 0x0410CC 0x3C23D70A = 0.01 and [0x0D2B9C] = 0.0
+; definitions: defs.load().at(p, include_axes=True) is empty for every data pointer and axis pointer below, and
+;   for every calibration address above.
+; records (all 1-D, typecode byte 0x04 = uint8, consumed by 0x0BE830 so the byte is live; none is in
+;   fixed_type_records.json; values = raw * scale):
+;   record  n  axis    data    scale      raw                                               value         selected when
+;   0ADC3C  2  0D32C0  0D32C8  0.3515625  39 39                                             20.0390625    [0D297C] == 90 and G == 1
+;   0ADC50  2  0D32CC  0D32D4  0.3515625  39 39                                             20.0390625    C <  [0D29BC], S == 1, U == 1, M in {4,7,8}
+;   0ADC64  2  0D32D8  0D32E0  0.3515625  39 39                                             20.0390625    C <  [0D29BC], S == 1, U == 1, M not
+;   0ADC78  2  0D32E4  0D32EC  0.3515625  39 39                                             20.0390625    C <  [0D29BC], S == 1, U != 1, M in
+;   0ADC8C  2  0D32F0  0D32F8  0.3515625  39 39                                             20.0390625    C <  [0D29BC], S == 1, U != 1, M not
+;   0ADCA0  2  0D32FC  0D3304  0.3515625  00 00                                             0             C <  [0D29BC], S != 1, U == 1, M in
+;   0ADCB4  2  0D3308  0D3310  0.3515625  00 00                                             0             C <  [0D29BC], S != 1, U == 1, M not
+;   0ADCC8  2  0D3314  0D331C  0.3515625  00 00                                             0             C <  [0D29BC], S != 1, U != 1, M in
+;   0ADCDC  2  0D3320  0D3328  0.3515625  00 00                                             0             C <  [0D29BC], S != 1, U != 1, M not
+;   0ADCF0  2  0D332C  0D3334  0.3515625  39 39                                             20.0390625    C >= [0D29BC], S == 1, U == 1, M in
+;   0ADD04  2  0D3338  0D3340  0.3515625  39 39                                             20.0390625    C >= [0D29BC], S == 1, U == 1, M not
+;   0ADD18  2  0D3344  0D334C  0.3515625  39 39                                             20.0390625    C >= [0D29BC], S == 1, U != 1, M in
+;   0ADD2C  2  0D3350  0D3358  0.3515625  39 39                                             20.0390625    C >= [0D29BC], S == 1, U != 1, M not
+;   0ADD40  2  0D335C  0D3364  0.3515625  00 00                                             0             C >= [0D29BC], S != 1, U == 1, M in
+;   0ADD54  2  0D3368  0D3370  0.3515625  00 00                                             0             C >= [0D29BC], S != 1, U == 1, M not
+;   0ADD68  2  0D3374  0D337C  0.3515625  00 00                                             0             C >= [0D29BC], S != 1, U != 1, M in
+;   0ADD7C  2  0D3380  0D3388  0.3515625  00 00                                             0             C >= [0D29BC], S != 1, U != 1, M not
+;     (the 16-way rows are reached when [0D297C] != 90 or G != 1; each of the 17 has a 2-point axis 800, 1200 and
+;      input N; the "M in" rows are M == 4, 7 or 8)
+;   0ADD90 16  0D2FCC  0D338A  0.78125    80 80 80 80 80 80 80 80 73 6d 66 60 60 60 60 60   100 x8, 89.84375, 85.15625, 79.6875, 75 x5   M not in set, input E
+;   0ADDA4 16  0D2FCC  0D339A  0.78125    80 80 80 80 80 80 80 80 73 6d 66 60 60 60 60 60   (same)        M in {4,7,8}, input E
+;     axis 0x0D2FCC = -40, -30, ..., 110 (16 points)
+;   0ADDB8  6  0D33AC  0D33C4  0.0078125  80 80 80 80 80 80                                 1.0 x6        always, input Q; axis 440 504 568 632 696 760
+;   0ADDCC  7  0D33CC  0D33E8  0.0078125  80 80 80 80 80 80 80                              1.0 x7        input [7FCC]; axis 0 5 10 15 20 25 30
+; 0x0ADD90 and 0x0ADDA4 are passed to 0x0BE830 at 0x040F38 but fn_dump does not mark them DESC: they are missing
+;   from coverage_map.scan_descriptors (818 records in this run; fn_dump and verification-status use it), NOT from
+;   the descriptor census -- disassembly/maps/descriptor_map.txt rows 731 / 732 (lines 747-748) and
+;   disassembly/maps/table_triage.json list both. Their bytes are a well-formed 20-byte 1-D record (00100400
+;   000D2FCC 000D338A / 000D339A 3F480000 00000000: count 16, typecode 0x04, axis, data, scale 0.78125, bias 0)
+;   and the emulated lookup equals desc_types.read_table + linear interpolation.
+
+==== FUNCTION 0x040AF6 .. 0x041030  (568 instructions, 1 caller: 0x040918) ====
+CONTRACT
+  in    RAM only. Callees: 0x029A64 (returns r0 = 0; result discarded), 0x0297D0 (r0 = 2 iff byte [9707] != 0),
+        0x0BE830 table_lookup_1D (x21 records), 0x0BE554 sat_add_u16, 0x0BEA40 lag, 0x0BE960 max.
+  reads float E = [6354], N = [6624], Q = [6898], P = [6210], V = [65FC]; word C = [67EC]; bytes M = [8970],
+        S = [90BE], U = [8E7E], G = [3158] (the HIGH byte of the u16 at 0xFFFF3158), F = [85D7], D = [9707]
+        (through 0x0297D0) and [7FF0], always. Its own state only on the paths that need it: bytes [7FFB] (S == 0),
+        [7FFF] (U == 0), [7FFA] / [7FFE] / words [7FF8] / [7FFC] (unless reset in the same call), word [7FE4]
+        (C >= [0D29BC]), byte [7FED] and word [7FE6] (third lag arm reached), floats [7FB0] (a lag arm taken),
+        [7FD4] (a lag into it taken), [7FCC] (gated lag taken), byte [7FF6] (gated path reached, latch not set
+        this call). The read set is asserted exactly per case.
+  writes every call: float [7FB4] [7FB0] [7FB8] [7FC4] [7FC8] [7FD0] [7FD4]; float [7FCC] unless D != 0;
+        word [7FF8] [7FFC] [7FE4]; byte [7FFB] [7FFF] [7FEC].  On conditions: byte [7FFA] := 1 with word
+        [7FF8] := 0 (then incremented), byte [7FFE] := 1 with word [7FFC] := 0 (then incremented), byte [7FED] :=
+        1 with word [7FE6] := 0, byte [7FF6] := 1. Nothing else outside its stack frame (write set asserted).
+  out   none in registers; preserves r8-r14, r15, GBR, fr12-fr15, PR (asserted).
+MECHANISM   (shipped values in brackets; "lag" = 0x0BEA40, "lut" = 0x0BE830)
+  1  [7FB4] = lut(rec, N):  rec = 0x0ADC3C if byte [0D297C] == 90 [90] and G == 1, else the 16-way table above
+        keyed by (C >= [0D29BC] [0xFFFF], S == 1, U == 1, M in {4,7,8}).  With the shipped data:
+        [7FB4] = 20.0390625 iff G == 1 or S == 1, else +0.0, for every N (NaN and +-inf included).
+  2  if S == 0 and [7FFB] == 1: [7FFA] = 1, [7FF8] = 0.      [7FF8] = min([7FF8] + 1, 0xFFFF).
+     r14 = 1 iff [7FFA] == 1 and [7FF8] <= [0D29BE] [0];  [7FFB] = S.
+  3  if C >= [0D29BC]: [7FE4] = min([7FE4] + 1, 0xFFFF), [7FEC] = 1;  else [7FE4] = 0, [7FEC] = 0.
+  4  if [7FF0] not in {4,7,8} and M in {4,7,8}: [7FED] = 1, [7FE6] = 0.
+  5  if U == 0 and [7FFF] == 1: [7FFE] = 1, [7FFC] = 0.      [7FFC] = min([7FFC] + 1, 0xFFFF).
+     r4 = 1 iff [7FFE] == 1 and [7FFC] <= [0D29BE] [0];  [7FFF] = U.
+  6  [7FB0] = lag(A = [7FB4], B = [7FB0], k, eps = 0.001373291015625) with the FIRST arm that applies:
+        k = [0D2B88] [1.0]  if [7FEC] == 1 and [7FE4] <= [0D29BE]
+        k = [0D2B84] [1.0]  if r14 == 1
+        k = [0D2B8C] [1.0]  if [7FED] == 1 and [7FE6] <= [0D29C0] [0]
+        k = [0D2B90] [1.0]  if r4 == 1
+        otherwise [7FB0] = [7FB4] (plain copy, 0x040F1A..0x040F22)
+     lag(A, B, k, eps) = A if B is +-inf / NaN or eps > |A - r|, else r = A + (1 - k)(B - A), one rounding.
+     With k = 1.0 the fmac adds 0 * (B - A) to A, so every arm returns A = [7FB4] exactly: [7FB0] == [7FB4].
+  7  [7FB8] = lut(M in {4,7,8} ? 0x0ADDA4 : 0x0ADD90, E);   [7FC4] = lut(0x0ADDB8, Q) [1.0];
+     [7FC8] = P - [0D2BDC] [-160.0];   if NOT ([0D2BEC] [1000.0] > V): [7FF6] = 1 (V >= 1000 or V NaN).
+  8  if D != 0 (0x0297D0 returned 2):  [7FD0] = +0.0;  [7FD4] = lag(+0.0, [7FD4], [0D2BE8] [1.0], 0.00048828125)
+        [= +0.0]; [7FCC] untouched.
+     elif C >= [0D29C6] [0xFFFF] and F == 1 and [7FF6] == 1:
+        [7FCC] = [7FC8]                                                        if [7FC8] > [0D2BE4] [-1000.0]
+               = max(lag([7FC8], [7FCC], [0D2BE0] [1.0], 0.001), +0.0)        otherwise (incl. [7FC8] NaN)
+        [7FD0] = lut(0x0ADDCC, [7FCC]) [1.0];   [7FD4] = lag([7FD0], [7FD4], [0D2BE8], 0.00048828125) [= 1.0]
+     else:  [7FCC] = [7FC8];  [7FD0] = lut(0x0ADDCC, [7FCC]) [1.0];  [7FD4] = 1.0 (fldi1, no lag)
+  Compares: C and the u16 thresholds are compared either zero-extended with cmp/ge / cmp/gt or as two
+  sign-extended words with cmp/hi; both are unsigned 16-bit orders. Byte gates are compared exactly: S == 0 (tst)
+  arms the edge but S == 1 selects the 20.04 tables, so S = 2 does neither; G, U, M, F, [7FF0], [7FFB], [7FFF],
+  [7FFA], [7FFE], [7FED], [7FF6] are compared with == only.
+  Edge cases (all emulated):
+   - With [0D29BE] = 0 the first, second and fourth lag arms are unreachable: [7FE4], [7FF8], [7FFC] are >= 1
+     when compared (incremented after any reset in the same call). The third arm IS reachable ([7FED] == 1 and
+     [7FE6] == 0) but its weight is 1.0. This function only ever zeroes [7FE6]; it never increments it. Its
+     other state is kept OUTSIDE it: 0x0409C0 (context section) increments [7FE6] (0x040A1E), stores [7FED] := 1
+     / [7FE6] := 0 on the same "[7FF0] not in set, M in set" test (0x040A0C / 0x040A12) and writes [7FF0] := M
+     (0x040A22) every call -- so the [7FF0] this function compares is M as of 0x0409C0's last call.
+   - A non-finite old [7FB0] / [7FD4] / [7FCC] (B) makes lag return A: the outputs cannot be poisoned through B.
+   - NaN P: [7FC8] = NaN; on the gated path fcmp is false, the lag returns NaN and max(NaN, +0.0) returns +0.0;
+     on the plain path [7FCC] = NaN and 0x0ADDCC still returns 1.0 (NaN -> last cell).
+   - E NaN or >= 70 -> [7FB8] = 75.0; E <= 30 -> 100.0; N, Q, [7FCC] of any value (NaN, +-inf) give the flat
+     values; so with the shipped data H does not depend on N, Q, P, V, C, U, M or F at all.
+   - In 20.19c / stock: [7FB0] == [7FB4] on every path; [7FC4] = [7FD0] = 1.0 except [7FD0] = +0.0 when D != 0;
+     [7FD4] = +0.0 iff D != 0, else 1.0 (gated path included: lag toward 1.0 with weight 1.0).
+EVIDENCE
+  inputs and frame: 0x040B10..0x040B5E.  first-record gate: 0x040B54..0x040B6A (cmp/eq #90 on the sign-extended
+  byte; cmp/eq #1 on G zero-extended).  16-way: 0x040BF0..0x040D62 (C test 0x040BF6, cmp/ge r6,r7 = r7 >= r6;
+  S at 0x040BFC / 0x040CB2 from the slot at 0x040BFA; U from the slots 0x040C00 / 0x040CB6; M == 4 / 7 / 8 from the
+  slots 0x040C06 ... and the three cmp/eq per leaf).  store of [7FB4]: slot 0x040D6C, r13 = 0xFFFF7FFC, r0 = -72.
+  edge S: 0x040D68..0x040D7A; counter 0x040D7C..0x040D86; r14: 0x040D88..0x040D9C (cmp/hi r2,r0 = r0 > r2);
+  [7FFB]: 0x040DA0.  C window: 0x040DA2..0x040E14.  M entry: 0x040E16..0x040E40.  edge U: 0x040E42..0x040E76.
+  lag arms: 0x040E78..0x040EA2 (k 0x0D2B88), 0x040EA4..0x040EC4 (0x0D2B84), 0x040EC6..0x040EF6 (0x0D2B8C,
+  cmp/gt r6,r5 = r5 > r6), 0x040EF8..0x040F18 (0x0D2B90), copy 0x040F1A..0x040F22; every arm stores fr0 to
+  r14-76 in the slot of its bra.  taper: 0x040F24..0x040F40 (r4 chosen with T from cmp/eq #8 preserved across
+  mov.l; jsr @r1 with r1 = sp+16, written 0x0BE830 on all seventeen paths into 0x040D64).  [7FC4]: 0x040F42..
+  0x040F4C (fr4 = sp+0 = Q from 0x040B22).  [7FC8]: 0x040F4E..0x040F56 (fsub fr9,fr13: fr13 -= fr9).  latch:
+  0x040F58..0x040F62 (fcmp/gt fr15,fr8: T = fr8 > fr15; bt skips).  tail: 0x040F64..0x041010 (sp+20 = 0x0BEA40
+  written at 0x040F96 in a bt/s slot and at 0x040FF6, the only two ways into 0x040FF8).
+  emulated: emu_timing_bound_040AF6.py check_main -- 31,920 whole-function runs (REAL 4,872, STOCK 4,872, UNIQ1
+  11,088, UNIQ2 11,088): outputs bit-exact, write set and read set exact, callee-saved state restored. On UNIQ1 /
+  UNIQ2 every table and scalar is unique and the windows are open, so all five [7FB0] arms, the gated copy, gated
+  lag, plain and D paths are taken (path counts printed); a model naming a wrong record or address fails there.
+  check_real -- 4,320 runs on REAL + STOCK asserting the shipped-calibration facts above with explicit bits, then
+  0x041030 in the same machine: H = 0 unless ([3158] == 1 or [90BE] == 1) and [9707] == 0 and [67FC] != 1, and
+  15.0 < H <= 20.0390625 when it holds.  check_tables -- the 21 records decoded in both bins, lookup vs
+  read_table + linear interpolation, flat tables single-valued for NaN / +-inf / out-of-range inputs.
+LISTING
+040AF6: 2F86  mov.l r8,@-r15  ; prologue: push r8..r14
+040AF8: 2F96  mov.l r9,@-r15
+040AFA: 2FA6  mov.l r10,@-r15
+040AFC: 2FB6  mov.l r11,@-r15
+040AFE: 2FC6  mov.l r12,@-r15
+040B00: 2FD6  mov.l r13,@-r15
+040B02: 2FE6  mov.l r14,@-r15
+040B04: 4F22  sts.l pr,@-r15  ; push PR
+040B06: FFCB  fmov.s fr12,@-r15  ; push fr12..fr15
+040B08: FFDB  fmov.s fr13,@-r15
+040B0A: FFEB  fmov.s fr14,@-r15
+040B0C: FFFB  fmov.s fr15,@-r15
+040B0E: 4F13  stc.l gbr,@-r15  ; push GBR
+040B10: D02A  mov.l @(0x040BBC),r0          ; = 0xFFFF7FB0 RAM
+040B12: 401E  ldc r0,gbr                    ; GBR = 0xFFFF7FB0  | GBR = 0xFFFF7FB0 for the whole body
+040B14: 7FDC  add #-36,r15  ; frame 36 bytes (sp+0 .. sp+32)
+040B16: D22A  mov.l @(0x040BC0),r2          ; = 0xFFFF6354 RAM
+040B18: FC28  fmov.s @r2,fr12  ; fr12 = E = [0xFFFF6354]: axis input of 0x0ADD90 / 0x0ADDA4 (0x040F3A)
+040B1A: D22A  mov.l @(0x040BC4),r2          ; = 0xFFFF6624 RAM
+040B1C: FE28  fmov.s @r2,fr14  ; fr14 = N = [0xFFFF6624]: axis input of the seventeen [7FB4] records
+040B1E: D22A  mov.l @(0x040BC8),r2          ; = 0xFFFF6898 RAM
+040B20: F928  fmov.s @r2,fr9  ; fr9 = Q = [0xFFFF6898]
+040B22: FF9A  fmov.s fr9,@r15  ; sp+0 = Q: axis input of 0x0ADDB8 (0x040F48)
+040B24: D629  mov.l @(0x040BCC),r6          ; = 0xFFFF67EC RAM
+040B26: 6E61  mov.w @r6,r14  ; r14 = word C = [0xFFFF67EC] (sign-extended; zero-extended into r7 at 0x040B58)
+040B28: D61B  mov.l @(0x040B98),r6          ; = 0xFFFF8970 RAM
+040B2A: 6D60  mov.b @r6,r13  ; r13 = byte M = [0xFFFF8970]
+040B2C: D616  mov.l @(0x040B88),r6          ; = 0xFFFF90BE RAM
+040B2E: 6B60  mov.b @r6,r11  ; r11 = byte S = [0xFFFF90BE]
+040B30: D616  mov.l @(0x040B8C),r6          ; = 0xFFFF8E7E RAM
+040B32: 6A60  mov.b @r6,r10  ; r10 = byte U = [0xFFFF8E7E]
+040B34: D626  mov.l @(0x040BD0),r6          ; = 0xFFFF3158 RAM
+040B36: 6C60  mov.b @r6,r12  ; r12 = byte G = [0xFFFF3158]: the HIGH byte of the big-endian u16 value:~value pair at 0xFFFF3158
+040B38: D226  mov.l @(0x040BD4),r2          ; = 0xFFFF6210 RAM
+040B3A: FD28  fmov.s @r2,fr13  ; fr13 = P = [0xFFFF6210]
+040B3C: D226  mov.l @(0x040BD8),r2          ; = 0x00029A64 ROM
+040B3E: 420B  jsr @r2                       ; -> 0x029A64  | 0x029A64 returns r0 = 0; the result is never used (r0 is overwritten by the next call)
+040B40: 0009  nop
+040B42: D226  mov.l @(0x040BDC),r2          ; = 0x000297D0 ROM
+040B44: 420B  jsr @r2                       ; -> 0x0297D0  | 0x0297D0: r0 = 2 if byte [0xFFFF9707] != 0 else 0
+040B46: 0009  nop
+040B48: 80F4  mov.b r0,@(4,r15)  ; sp+4 = that byte (tested at 0x040F64)
+040B4A: D60E  mov.l @(0x040B84),r6          ; = 0xFFFF85D7 RAM
+040B4C: 6060  mov.b @r6,r0
+040B4E: 80F8  mov.b r0,@(8,r15)  ; sp+8 = byte F = [0xFFFF85D7] (tested at 0x040F76)
+040B50: D223  mov.l @(0x040BE0),r2          ; = 0xFFFF65FC RAM
+040B52: FF28  fmov.s @r2,fr15  ; fr15 = V = [0xFFFF65FC] (compared at 0x040F5C)
+040B54: D623  mov.l @(0x040BE4),r6          ; = 0x000D297C CAL
+040B56: 6060  mov.b @r6,r0  ; r0 = byte [0x0D297C] sign-extended (0x5A = 90 in 20.19c and stock)
+040B58: 67ED  extu.w r14,r7
+040B5A: 1F73  mov.l r7,@(12,r15)  ; sp+12 = C zero-extended (r7)
+040B5C: 6EBC  extu.b r11,r14  ; r14 = S zero-extended
+040B5E: 69AC  extu.b r10,r9  ; r9 = U zero-extended
+040B60: 885A  cmp/eq #90,r0  ; T = ([0x0D297C] == 90)
+040B62: 8F45  bf/s 0x040BF0  ; T=0 -> 16-way select at 0x040BF0. Slot runs first
+040B64: 68DC  extu.b r13,r8  ; [slot] r8 = M zero-extended
+040B66: 60CC  extu.b r12,r0
+040B68: 8801  cmp/eq #1,r0  ; T = (G == 1)
+040B6A: 8B41  bf 0x040BF0  ; G != 1 -> 16-way select
+040B6C: D41E  mov.l @(0x040BE8),r4          ; = 0x000ADC3C DESC  | [0D297C] == 90 and G == 1: record 0x0ADC3C (20.0390625 in both cells)
+040B6E: D11F  mov.l @(0x040BEC),r1          ; = 0x000BE830 ROM
+040B70: 1F14  mov.l r1,@(16,r15)  ; sp+16 = 0x0BE830: every later "jsr @r1" with r1 = @(16,r15) is table_lookup_1D (each path stores it)
+040B72: 410B  jsr @r1                       ; -> 0x0BE830  | table_lookup_1D(r4, fr4)
+040B74: F4EC  fmov fr14,fr4  ; [slot] fr4 = N
+040B76: A0F5  bra 0x040D64  ; -> store [7FB4] at 0x040D6C
+040B78: 0009  nop
+;   pool 0x040B7A: .word 0x0000
+;   pool 0x040B7C: .long 0xFFFF7FD4  RAM
+;   pool 0x040B7E: .word 0x7FD4
+;   pool 0x040B80: .long 0xFFFF65C0  RAM
+;   pool 0x040B82: .word 0x65C0
+;   pool 0x040B84: .long 0xFFFF85D7  RAM
+;   pool 0x040B86: .word 0x85D7
+;   pool 0x040B88: .long 0xFFFF90BE  RAM
+;   pool 0x040B8A: .word 0x90BE
+;   pool 0x040B8C: .long 0xFFFF8E7E  RAM
+;   pool 0x040B8E: .word 0x8E7E
+;   pool 0x040B90: .long 0xFFFF7FBC  RAM
+;   pool 0x040B92: .word 0x7FBC
+;   pool 0x040B94: .long 0x00022F92  ROM
+;   pool 0x040B96: .word 0x2F92
+;   pool 0x040B98: .long 0xFFFF8970  RAM
+;   pool 0x040B9A: .word 0x8970
+;   pool 0x040B9C: .long 0x0002F8EA  ROM
+;   pool 0x040B9E: .word 0xF8EA
+;   pool 0x040BA0: .long 0x00022CF4  ROM
+;   pool 0x040BA2: .word 0x2CF4
+;   pool 0x040BA4: .long 0xFFFF7FE6  RAM
+;   pool 0x040BA6: .word 0x7FE6
+;   pool 0x040BA8: .long 0x000BE554  ROM
+;   pool 0x040BAA: .word 0xE554
+;   pool 0x040BAC: .long 0xFFFF7FE8  RAM
+;   pool 0x040BAE: .word 0x7FE8
+;   pool 0x040BB0: .long 0x000D29C2  CAL
+;   pool 0x040BB2: .word 0x29C2
+;   pool 0x040BB4: .long 0x000D29C4  CAL
+;   pool 0x040BB6: .word 0x29C4
+;   pool 0x040BB8: .long 0xFFFF7FDC  RAM
+;   pool 0x040BBA: .word 0x7FDC
+;   pool 0x040BBC: .long 0xFFFF7FB0  RAM
+;   pool 0x040BBE: .word 0x7FB0
+;   pool 0x040BC0: .long 0xFFFF6354  RAM
+;   pool 0x040BC2: .word 0x6354
+;   pool 0x040BC4: .long 0xFFFF6624  RAM
+;   pool 0x040BC6: .word 0x6624
+;   pool 0x040BC8: .long 0xFFFF6898  RAM
+;   pool 0x040BCA: .word 0x6898
+;   pool 0x040BCC: .long 0xFFFF67EC  RAM
+;   pool 0x040BCE: .word 0x67EC
+;   pool 0x040BD0: .long 0xFFFF3158  RAM
+;   pool 0x040BD2: .word 0x3158
+;   pool 0x040BD4: .long 0xFFFF6210  RAM
+;   pool 0x040BD6: .word 0x6210
+;   pool 0x040BD8: .long 0x00029A64  ROM
+;   pool 0x040BDA: .word 0x9A64
+;   pool 0x040BDC: .long 0x000297D0  ROM
+;   pool 0x040BDE: .word 0x97D0
+;   pool 0x040BE0: .long 0xFFFF65FC  RAM
+;   pool 0x040BE2: .word 0x65FC
+;   pool 0x040BE4: .long 0x000D297C  CAL
+;   pool 0x040BE6: .word 0x297C
+;   pool 0x040BE8: .long 0x000ADC3C  DESC
+;   pool 0x040BEA: .word 0xDC3C
+;   pool 0x040BEC: .long 0x000BE830  ROM
+;   pool 0x040BEE: .word 0xE830
+040BF0: D672  mov.l @(0x040DBC),r6          ; = 0x000D29BC CAL
+040BF2: 6261  mov.w @r6,r2
+040BF4: 662D  extu.w r2,r6
+040BF6: 3763  cmp/ge r6,r7  ; T = (C >= [0x0D29BC])  [cmp/ge r6,r7: T = r7 >= r6; both zero-extended -> unsigned 16-bit]
+040BF8: 8D5B  bt/s 0x040CB2  ; T=1 -> block B (0x040CB2). [0x0D29BC] = 0xFFFF in both bins: block B iff C == 0xFFFF
+040BFA: 60E3  mov r14,r0  ; [slot] r0 = S (both blocks)
+040BFC: 8801  cmp/eq #1,r0  ; block A. T = (S == 1)
+040BFE: 8F2C  bf/s 0x040C5A  ; S != 1 -> 0x040C5A. Slot runs first
+040C00: 6093  mov r9,r0  ; [slot] r0 = U
+040C02: 8801  cmp/eq #1,r0  ; T = (U == 1)
+040C04: 8F15  bf/s 0x040C32  ; U != 1 -> 0x040C32. Slot runs first
+040C06: 6083  mov r8,r0  ; [slot] r0 = M
+040C08: 8804  cmp/eq #4,r0  ; M == 4 / 7 / 8 -> 0x040C24
+040C0A: 890B  bt 0x040C24
+040C0C: 6083  mov r8,r0
+040C0E: 8807  cmp/eq #7,r0
+040C10: 8908  bt 0x040C24
+040C12: 8808  cmp/eq #8,r0
+040C14: 8906  bt 0x040C24
+040C16: D46A  mov.l @(0x040DC0),r4          ; = 0x000ADC64 DESC  | A, S=1, U=1, M not in {4,7,8}: 0x0ADC64 (20.0390625)
+040C18: D26A  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040C1A: 1F24  mov.l r2,@(16,r15)
+040C1C: 420B  jsr @r2                       ; -> 0x0BE830
+040C1E: F4EC  fmov fr14,fr4
+040C20: A0A0  bra 0x040D64
+040C22: 0009  nop
+040C24: D468  mov.l @(0x040DC8),r4          ; = 0x000ADC50 DESC  | A, S=1, U=1, M in {4,7,8}: 0x0ADC50 (20.0390625)
+040C26: D267  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040C28: 1F24  mov.l r2,@(16,r15)
+040C2A: 420B  jsr @r2                       ; -> 0x0BE830
+040C2C: F4EC  fmov fr14,fr4
+040C2E: A099  bra 0x040D64
+040C30: 0009  nop
+040C32: 8804  cmp/eq #4,r0
+040C34: 890A  bt 0x040C4C
+040C36: 8807  cmp/eq #7,r0
+040C38: 8908  bt 0x040C4C
+040C3A: 8808  cmp/eq #8,r0
+040C3C: 8906  bt 0x040C4C
+040C3E: D463  mov.l @(0x040DCC),r4          ; = 0x000ADC8C DESC  | A, S=1, U!=1, M not in set: 0x0ADC8C (20.0390625)
+040C40: D260  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040C42: 1F24  mov.l r2,@(16,r15)
+040C44: 420B  jsr @r2                       ; -> 0x0BE830
+040C46: F4EC  fmov fr14,fr4
+040C48: A08C  bra 0x040D64
+040C4A: 0009  nop
+040C4C: D460  mov.l @(0x040DD0),r4          ; = 0x000ADC78 DESC  | A, S=1, U!=1, M in set: 0x0ADC78 (20.0390625)
+040C4E: D25D  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040C50: 1F24  mov.l r2,@(16,r15)
+040C52: 420B  jsr @r2                       ; -> 0x0BE830
+040C54: F4EC  fmov fr14,fr4
+040C56: A085  bra 0x040D64
+040C58: 0009  nop
+040C5A: 8801  cmp/eq #1,r0  ; A, S != 1: T = (U == 1)
+040C5C: 8F15  bf/s 0x040C8A
+040C5E: 6083  mov r8,r0
+040C60: 8804  cmp/eq #4,r0
+040C62: 890B  bt 0x040C7C
+040C64: 6083  mov r8,r0
+040C66: 8807  cmp/eq #7,r0
+040C68: 8908  bt 0x040C7C
+040C6A: 8808  cmp/eq #8,r0
+040C6C: 8906  bt 0x040C7C
+040C6E: D459  mov.l @(0x040DD4),r4          ; = 0x000ADCB4 DESC  | A, S!=1, U=1, M not in set: 0x0ADCB4 (0.0)
+040C70: D254  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040C72: 1F24  mov.l r2,@(16,r15)
+040C74: 420B  jsr @r2                       ; -> 0x0BE830
+040C76: F4EC  fmov fr14,fr4
+040C78: A074  bra 0x040D64
+040C7A: 0009  nop
+040C7C: D456  mov.l @(0x040DD8),r4          ; = 0x000ADCA0 DESC  | A, S!=1, U=1, M in set: 0x0ADCA0 (0.0)
+040C7E: D251  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040C80: 1F24  mov.l r2,@(16,r15)
+040C82: 420B  jsr @r2                       ; -> 0x0BE830
+040C84: F4EC  fmov fr14,fr4
+040C86: A06D  bra 0x040D64
+040C88: 0009  nop
+040C8A: 8804  cmp/eq #4,r0
+040C8C: 890A  bt 0x040CA4
+040C8E: 8807  cmp/eq #7,r0
+040C90: 8908  bt 0x040CA4
+040C92: 8808  cmp/eq #8,r0
+040C94: 8906  bt 0x040CA4
+040C96: D451  mov.l @(0x040DDC),r4          ; = 0x000ADCDC DESC  | A, S!=1, U!=1, M not in set: 0x0ADCDC (0.0)
+040C98: D24A  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040C9A: 1F24  mov.l r2,@(16,r15)
+040C9C: 420B  jsr @r2                       ; -> 0x0BE830
+040C9E: F4EC  fmov fr14,fr4
+040CA0: A060  bra 0x040D64
+040CA2: 0009  nop
+040CA4: D44E  mov.l @(0x040DE0),r4          ; = 0x000ADCC8 DESC  | A, S!=1, U!=1, M in set: 0x0ADCC8 (0.0)
+040CA6: D247  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040CA8: 1F24  mov.l r2,@(16,r15)
+040CAA: 420B  jsr @r2                       ; -> 0x0BE830
+040CAC: F4EC  fmov fr14,fr4
+040CAE: A059  bra 0x040D64
+040CB0: 0009  nop
+040CB2: 8801  cmp/eq #1,r0  ; block B (C >= [0x0D29BC]). T = (S == 1)
+040CB4: 8F2C  bf/s 0x040D10
+040CB6: 6093  mov r9,r0
+040CB8: 8801  cmp/eq #1,r0
+040CBA: 8F15  bf/s 0x040CE8
+040CBC: 6083  mov r8,r0
+040CBE: 8804  cmp/eq #4,r0
+040CC0: 890B  bt 0x040CDA
+040CC2: 6083  mov r8,r0
+040CC4: 8807  cmp/eq #7,r0
+040CC6: 8908  bt 0x040CDA
+040CC8: 8808  cmp/eq #8,r0
+040CCA: 8906  bt 0x040CDA
+040CCC: D445  mov.l @(0x040DE4),r4          ; = 0x000ADD04 DESC  | B, S=1, U=1, M not in set: 0x0ADD04 (20.0390625)
+040CCE: D23D  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040CD0: 1F24  mov.l r2,@(16,r15)
+040CD2: 420B  jsr @r2                       ; -> 0x0BE830
+040CD4: F4EC  fmov fr14,fr4
+040CD6: A045  bra 0x040D64
+040CD8: 0009  nop
+040CDA: D443  mov.l @(0x040DE8),r4          ; = 0x000ADCF0 DESC  | B, S=1, U=1, M in set: 0x0ADCF0 (20.0390625)
+040CDC: D239  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040CDE: 1F24  mov.l r2,@(16,r15)
+040CE0: 420B  jsr @r2                       ; -> 0x0BE830
+040CE2: F4EC  fmov fr14,fr4
+040CE4: A03E  bra 0x040D64
+040CE6: 0009  nop
+040CE8: 8804  cmp/eq #4,r0
+040CEA: 890A  bt 0x040D02
+040CEC: 8807  cmp/eq #7,r0
+040CEE: 8908  bt 0x040D02
+040CF0: 8808  cmp/eq #8,r0
+040CF2: 8906  bt 0x040D02
+040CF4: D43D  mov.l @(0x040DEC),r4          ; = 0x000ADD2C DESC  | B, S=1, U!=1, M not in set: 0x0ADD2C (20.0390625)
+040CF6: D233  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040CF8: 1F24  mov.l r2,@(16,r15)
+040CFA: 420B  jsr @r2                       ; -> 0x0BE830
+040CFC: F4EC  fmov fr14,fr4
+040CFE: A031  bra 0x040D64
+040D00: 0009  nop
+040D02: D43B  mov.l @(0x040DF0),r4          ; = 0x000ADD18 DESC  | B, S=1, U!=1, M in set: 0x0ADD18 (20.0390625)
+040D04: D22F  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040D06: 1F24  mov.l r2,@(16,r15)
+040D08: 420B  jsr @r2                       ; -> 0x0BE830
+040D0A: F4EC  fmov fr14,fr4
+040D0C: A02A  bra 0x040D64
+040D0E: 0009  nop
+040D10: 8801  cmp/eq #1,r0
+040D12: 8F15  bf/s 0x040D40
+040D14: 6083  mov r8,r0
+040D16: 8804  cmp/eq #4,r0
+040D18: 890B  bt 0x040D32
+040D1A: 6083  mov r8,r0
+040D1C: 8807  cmp/eq #7,r0
+040D1E: 8908  bt 0x040D32
+040D20: 8808  cmp/eq #8,r0
+040D22: 8906  bt 0x040D32
+040D24: D433  mov.l @(0x040DF4),r4          ; = 0x000ADD54 DESC  | B, S!=1, U=1, M not in set: 0x0ADD54 (0.0)
+040D26: D227  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040D28: 1F24  mov.l r2,@(16,r15)
+040D2A: 420B  jsr @r2                       ; -> 0x0BE830
+040D2C: F4EC  fmov fr14,fr4
+040D2E: A019  bra 0x040D64
+040D30: 0009  nop
+040D32: D431  mov.l @(0x040DF8),r4          ; = 0x000ADD40 DESC  | B, S!=1, U=1, M in set: 0x0ADD40 (0.0)
+040D34: D223  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040D36: 1F24  mov.l r2,@(16,r15)
+040D38: 420B  jsr @r2                       ; -> 0x0BE830
+040D3A: F4EC  fmov fr14,fr4
+040D3C: A012  bra 0x040D64
+040D3E: 0009  nop
+040D40: 8804  cmp/eq #4,r0
+040D42: 890A  bt 0x040D5A
+040D44: 8807  cmp/eq #7,r0
+040D46: 8908  bt 0x040D5A
+040D48: 8808  cmp/eq #8,r0
+040D4A: 8906  bt 0x040D5A
+040D4C: D42B  mov.l @(0x040DFC),r4          ; = 0x000ADD7C DESC  | B, S!=1, U!=1, M not in set: 0x0ADD7C (0.0)
+040D4E: D21D  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040D50: 1F24  mov.l r2,@(16,r15)
+040D52: 420B  jsr @r2                       ; -> 0x0BE830
+040D54: F4EC  fmov fr14,fr4
+040D56: A005  bra 0x040D64
+040D58: 0009  nop
+040D5A: D429  mov.l @(0x040E00),r4          ; = 0x000ADD68 DESC  | B, S!=1, U!=1, M in set: 0x0ADD68 (0.0)
+040D5C: D219  mov.l @(0x040DC4),r2          ; = 0x000BE830 ROM
+040D5E: 1F24  mov.l r2,@(16,r15)
+040D60: 420B  jsr @r2                       ; -> 0x0BE830
+040D62: F4EC  fmov fr14,fr4
+040D64: DD27  mov.l @(0x040E04),r13         ; = 0xFFFF7FFC RAM  | r13 = 0xFFFF7FFC: literal base of every float output (7FFC-72 = 7FB4, -76 = 7FB0, ...)
+040D66: E0B8  mov #-72,r0  ; r0 = -72
+040D68: 2EE8  tst r14,r14  ; T = (S == 0)
+040D6A: 8F07  bf/s 0x040D7C  ; S != 0 -> skip the edge test. Slot runs first
+040D6C: FD07  fmov.s fr0,@(r0,r13)  ; [slot] [0xFFFF7FB4] = fr0 (every path)
+040D6E: C44B  mov.b @(75,gbr),r0            ; gbr+75 = 0xFFFF7FFB  | r0 = byte [0xFFFF7FFB] = S of the previous call
+040D70: 8801  cmp/eq #1,r0
+040D72: 8B03  bf 0x040D7C  ; previous S != 1 -> skip
+040D74: E001  mov #1,r0
+040D76: C04A  mov.b r0,@(74,gbr)            ; gbr+74 = 0xFFFF7FFA  | falling edge 1 -> 0 of S: byte [7FFA] = 1
+040D78: E000  mov #0,r0
+040D7A: C124  mov.w r0,@(72,gbr)            ; gbr+72 = 0xFFFF7FF8  | word [7FF8] = 0
+040D7C: DD22  mov.l @(0x040E08),r13         ; = 0x000BE554 ROM  | r13 = 0x0BE554 (saturating u16 add) for the rest of the body
+040D7E: C524  mov.w @(72,gbr),r0            ; gbr+72 = 0xFFFF7FF8
+040D80: 640D  extu.w r0,r4
+040D82: 4D0B  jsr @r13                      ; -> 0x0BE554  | sat_add_u16([7FF8], 1)
+040D84: E501  mov #1,r5  ; [slot] r5 = 1
+040D86: C124  mov.w r0,@(72,gbr)            ; gbr+72 = 0xFFFF7FF8  | word [7FF8] = min([7FF8] + 1, 0xFFFF)
+040D88: C44A  mov.b @(74,gbr),r0            ; gbr+74 = 0xFFFF7FFA
+040D8A: 8801  cmp/eq #1,r0  ; T = (byte [7FFA] == 1)
+040D8C: 8B06  bf 0x040D9C  ; != 1 -> r14 = 0
+040D8E: C524  mov.w @(72,gbr),r0            ; gbr+72 = 0xFFFF7FF8
+040D90: D61E  mov.l @(0x040E0C),r6          ; = 0x000D29BE CAL
+040D92: 6261  mov.w @r6,r2  ; r2 = word [0x0D29BE] sign-extended (0 in both bins)
+040D94: 3026  cmp/hi r2,r0  ; T = ([7FF8] > [0x0D29BE]) [cmp/hi r2,r0: T = r0 > r2 unsigned; both sign-extended words keep u16 order]
+040D96: 8901  bt 0x040D9C  ; T=1 -> r14 = 0
+040D98: A001  bra 0x040D9E
+040D9A: EE01  mov #1,r14  ; [slot] r14 = 1: [7FFA] == 1 and [7FF8] <= [0x0D29BE] (never with [0x0D29BE] = 0: [7FF8] >= 1 here)
+040D9C: EE00  mov #0,r14  ; r14 = 0
+040D9E: 60B3  mov r11,r0
+040DA0: C04B  mov.b r0,@(75,gbr)            ; gbr+75 = 0xFFFF7FFB  | byte [0xFFFF7FFB] = S (low byte of r11)
+040DA2: D606  mov.l @(0x040DBC),r6          ; = 0x000D29BC CAL
+040DA4: 6261  mov.w @r6,r2
+040DA6: 662D  extu.w r2,r6
+040DA8: 57F3  mov.l @(12,r15),r7
+040DAA: 3763  cmp/ge r6,r7  ; T = (C >= [0x0D29BC]) [cmp/ge r6,r7, both zero-extended]
+040DAC: 8B30  bf 0x040E10  ; C < [0x0D29BC] -> 0x040E10
+040DAE: C51A  mov.w @(52,gbr),r0            ; gbr+52 = 0xFFFF7FE4
+040DB0: 640D  extu.w r0,r4
+040DB2: 4D0B  jsr @r13                      ; -> 0x0BE554  | sat_add_u16([7FE4], 1)
+040DB4: E501  mov #1,r5
+040DB6: C11A  mov.w r0,@(52,gbr)            ; gbr+52 = 0xFFFF7FE4  | word [0xFFFF7FE4] = min([7FE4] + 1, 0xFFFF)
+040DB8: A02C  bra 0x040E14  ; -> 0x040E14 with r0 = 1
+040DBA: E001  mov #1,r0
+;   pool 0x040DBC: .long 0x000D29BC  CAL
+;   pool 0x040DC0: .long 0x000ADC64  DESC
+;   pool 0x040DC4: .long 0x000BE830  ROM
+;   pool 0x040DC8: .long 0x000ADC50  DESC
+;   pool 0x040DCC: .long 0x000ADC8C  DESC
+;   pool 0x040DD0: .long 0x000ADC78  DESC
+;   pool 0x040DD4: .long 0x000ADCB4  DESC
+;   pool 0x040DD8: .long 0x000ADCA0  DESC
+;   pool 0x040DDC: .long 0x000ADCDC  DESC
+;   pool 0x040DE0: .long 0x000ADCC8  DESC
+;   pool 0x040DE4: .long 0x000ADD04  DESC
+;   pool 0x040DE8: .long 0x000ADCF0  DESC
+;   pool 0x040DEC: .long 0x000ADD2C  DESC
+;   pool 0x040DF0: .long 0x000ADD18  DESC
+;   pool 0x040DF4: .long 0x000ADD54  DESC
+;   pool 0x040DF8: .long 0x000ADD40  DESC
+;   pool 0x040DFC: .long 0x000ADD7C  DESC
+;   pool 0x040E00: .long 0x000ADD68  DESC
+;   pool 0x040E04: .long 0xFFFF7FFC  RAM
+;   pool 0x040E08: .long 0x000BE554  ROM
+;   pool 0x040E0C: .long 0x000D29BE  CAL
+040E10: E000  mov #0,r0
+040E12: C11A  mov.w r0,@(52,gbr)            ; gbr+52 = 0xFFFF7FE4  | word [0xFFFF7FE4] = 0
+040E14: C03C  mov.b r0,@(60,gbr)            ; gbr+60 = 0xFFFF7FEC  | byte [0xFFFF7FEC] = (C >= [0x0D29BC]) (r0 = 1 or 0)
+040E16: C440  mov.b @(64,gbr),r0            ; gbr+64 = 0xFFFF7FF0  | byte [0xFFFF7FF0] (never written by this function)
+040E18: 8804  cmp/eq #4,r0  ; [7FF0] == 4 / 7 / 8 -> 0x040E42
+040E1A: 8912  bt 0x040E42
+040E1C: C440  mov.b @(64,gbr),r0            ; gbr+64 = 0xFFFF7FF0
+040E1E: 8807  cmp/eq #7,r0
+040E20: 890F  bt 0x040E42
+040E22: C440  mov.b @(64,gbr),r0            ; gbr+64 = 0xFFFF7FF0
+040E24: 1F06  mov.l r0,@(24,r15)  ; sp+24 = [7FF0] (dead store)
+040E26: 600C  extu.b r0,r0
+040E28: 8808  cmp/eq #8,r0
+040E2A: 890A  bt 0x040E42
+040E2C: 6083  mov r8,r0  ; r0 = M
+040E2E: 8804  cmp/eq #4,r0
+040E30: 8903  bt 0x040E3A
+040E32: 8807  cmp/eq #7,r0
+040E34: 8901  bt 0x040E3A
+040E36: 8808  cmp/eq #8,r0
+040E38: 8B03  bf 0x040E42  ; M not in {4,7,8} -> 0x040E42
+040E3A: E001  mov #1,r0
+040E3C: C03D  mov.b r0,@(61,gbr)            ; gbr+61 = 0xFFFF7FED  | [7FF0] not in set, M in set: byte [0xFFFF7FED] = 1
+040E3E: E000  mov #0,r0
+040E40: C11B  mov.w r0,@(54,gbr)            ; gbr+54 = 0xFFFF7FE6  | word [0xFFFF7FE6] = 0
+040E42: 2998  tst r9,r9  ; T = (U == 0)
+040E44: 8B06  bf 0x040E54  ; U != 0 -> skip
+040E46: C44F  mov.b @(79,gbr),r0            ; gbr+79 = 0xFFFF7FFF  | byte [0xFFFF7FFF] = U of the previous call
+040E48: 8801  cmp/eq #1,r0
+040E4A: 8B03  bf 0x040E54
+040E4C: E001  mov #1,r0
+040E4E: C04E  mov.b r0,@(78,gbr)            ; gbr+78 = 0xFFFF7FFE  | falling edge 1 -> 0 of U: byte [7FFE] = 1
+040E50: E000  mov #0,r0
+040E52: C126  mov.w r0,@(76,gbr)            ; gbr+76 = 0xFFFF7FFC  | word [7FFC] = 0
+040E54: E501  mov #1,r5
+040E56: C526  mov.w @(76,gbr),r0            ; gbr+76 = 0xFFFF7FFC
+040E58: 4D0B  jsr @r13                      ; -> 0x0BE554  | sat_add_u16([7FFC], 1)
+040E5A: 640D  extu.w r0,r4  ; [slot] r4 = [7FFC] zero-extended
+040E5C: C126  mov.w r0,@(76,gbr)            ; gbr+76 = 0xFFFF7FFC  | word [0xFFFF7FFC] = min([7FFC] + 1, 0xFFFF)
+040E5E: C44E  mov.b @(78,gbr),r0            ; gbr+78 = 0xFFFF7FFE
+040E60: 8801  cmp/eq #1,r0
+040E62: 8B06  bf 0x040E72  ; byte [7FFE] != 1 -> r4 = 0
+040E64: C526  mov.w @(76,gbr),r0            ; gbr+76 = 0xFFFF7FFC
+040E66: D681  mov.l @(0x04106C),r6          ; = 0x000D29BE CAL
+040E68: 6261  mov.w @r6,r2
+040E6A: 3026  cmp/hi r2,r0  ; T = ([7FFC] > [0x0D29BE]) unsigned 16-bit
+040E6C: 8901  bt 0x040E72
+040E6E: A001  bra 0x040E74
+040E70: E401  mov #1,r4  ; [slot] r4 = 1: [7FFE] == 1 and [7FFC] <= [0x0D29BE] (never with [0x0D29BE] = 0)
+040E72: E400  mov #0,r4  ; r4 = 0
+040E74: 60A3  mov r10,r0
+040E76: C04F  mov.b r0,@(79,gbr)            ; gbr+79 = 0xFFFF7FFF  | byte [0xFFFF7FFF] = U
+040E78: C43C  mov.b @(60,gbr),r0            ; gbr+60 = 0xFFFF7FEC
+040E7A: 8801  cmp/eq #1,r0  ; T = (byte [7FEC] == 1)
+040E7C: 8B12  bf 0x040EA4  ; != 1 -> 0x040EA4
+040E7E: C51A  mov.w @(52,gbr),r0            ; gbr+52 = 0xFFFF7FE4
+040E80: D67A  mov.l @(0x04106C),r6          ; = 0x000D29BE CAL
+040E82: 6261  mov.w @r6,r2
+040E84: 3026  cmp/hi r2,r0  ; T = ([7FE4] > [0x0D29BE]) unsigned 16-bit
+040E86: 890D  bt 0x040EA4  ; T=1 -> 0x040EA4
+040E88: D279  mov.l @(0x041070),r2          ; = 0x000BEA40 ROM  | lag arm 1 (weight [0x0D2B88])
+040E8A: DE7A  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040E8C: E0B8  mov #-72,r0
+040E8E: F4E6  fmov.s @(r0,r14),fr4  ; fr4 = A = [7FB4]
+040E90: C779  mova @(0x041078),r0           ; -> 0x041078: long 0x3AB40000 f32 0.001373291
+040E92: F708  fmov.s @r0,fr7  ; fr7 = eps = 0.001373291015625
+040E94: D679  mov.l @(0x04107C),r6          ; = 0x000D2B88 CAL
+040E96: F668  fmov.s @r6,fr6  ; fr6 = k = [0x0D2B88] (1.0 in both bins)
+040E98: E0B4  mov #-76,r0
+040E9A: 420B  jsr @r2                       ; -> 0x0BEA40  | lag(A, B, k, eps)
+040E9C: F5E6  fmov.s @(r0,r14),fr5  ; [slot] fr5 = B = [7FB0]
+040E9E: E0B4  mov #-76,r0
+040EA0: A040  bra 0x040F24
+040EA2: FE07  fmov.s fr0,@(r0,r14)  ; [slot] [0xFFFF7FB0] = fr0
+040EA4: 60E3  mov r14,r0
+040EA6: 8801  cmp/eq #1,r0  ; T = (r14 == 1)
+040EA8: 8B0D  bf 0x040EC6  ; != 1 -> 0x040EC6
+040EAA: D271  mov.l @(0x041070),r2          ; = 0x000BEA40 ROM  | lag arm 2 (weight [0x0D2B84])
+040EAC: DE71  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040EAE: E0B8  mov #-72,r0
+040EB0: F4E6  fmov.s @(r0,r14),fr4
+040EB2: C771  mova @(0x041078),r0           ; -> 0x041078: long 0x3AB40000 f32 0.001373291
+040EB4: F708  fmov.s @r0,fr7
+040EB6: E0B4  mov #-76,r0
+040EB8: F5E6  fmov.s @(r0,r14),fr5
+040EBA: D671  mov.l @(0x041080),r6          ; = 0x000D2B84 CAL
+040EBC: 420B  jsr @r2                       ; -> 0x0BEA40
+040EBE: F668  fmov.s @r6,fr6  ; [slot] fr6 = k = [0x0D2B84] (1.0)
+040EC0: E0B4  mov #-76,r0
+040EC2: A02F  bra 0x040F24
+040EC4: FE07  fmov.s fr0,@(r0,r14)  ; [slot] [0xFFFF7FB0] = fr0
+040EC6: C43D  mov.b @(61,gbr),r0            ; gbr+61 = 0xFFFF7FED
+040EC8: 8801  cmp/eq #1,r0  ; T = (byte [7FED] == 1)
+040ECA: 8B15  bf 0x040EF8  ; != 1 -> 0x040EF8
+040ECC: C51B  mov.w @(54,gbr),r0            ; gbr+54 = 0xFFFF7FE6
+040ECE: 1F07  mov.l r0,@(28,r15)
+040ED0: 650D  extu.w r0,r5
+040ED2: D66C  mov.l @(0x041084),r6          ; = 0x000D29C0 CAL
+040ED4: 6261  mov.w @r6,r2
+040ED6: 662D  extu.w r2,r6
+040ED8: 3567  cmp/gt r6,r5  ; T = ([7FE6] > [0x0D29C0]) [cmp/gt r6,r5: T = r5 > r6; both zero-extended]
+040EDA: 890D  bt 0x040EF8  ; T=1 -> 0x040EF8
+040EDC: D264  mov.l @(0x041070),r2          ; = 0x000BEA40 ROM  | lag arm 3 (weight [0x0D2B8C])
+040EDE: DE65  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040EE0: E0B8  mov #-72,r0
+040EE2: F4E6  fmov.s @(r0,r14),fr4
+040EE4: C764  mova @(0x041078),r0           ; -> 0x041078: long 0x3AB40000 f32 0.001373291
+040EE6: F708  fmov.s @r0,fr7
+040EE8: E0B4  mov #-76,r0
+040EEA: F5E6  fmov.s @(r0,r14),fr5
+040EEC: D666  mov.l @(0x041088),r6          ; = 0x000D2B8C CAL
+040EEE: 420B  jsr @r2                       ; -> 0x0BEA40
+040EF0: F668  fmov.s @r6,fr6  ; [slot] fr6 = k = [0x0D2B8C] (1.0)
+040EF2: E0B4  mov #-76,r0
+040EF4: A016  bra 0x040F24
+040EF6: FE07  fmov.s fr0,@(r0,r14)  ; [slot] [0xFFFF7FB0] = fr0
+040EF8: 6043  mov r4,r0
+040EFA: 8801  cmp/eq #1,r0  ; T = (r4 == 1)
+040EFC: 8B0D  bf 0x040F1A  ; != 1 -> copy
+040EFE: D25C  mov.l @(0x041070),r2          ; = 0x000BEA40 ROM  | lag arm 4 (weight [0x0D2B90])
+040F00: DE5C  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040F02: E0B8  mov #-72,r0
+040F04: F4E6  fmov.s @(r0,r14),fr4
+040F06: C75C  mova @(0x041078),r0           ; -> 0x041078: long 0x3AB40000 f32 0.001373291
+040F08: F708  fmov.s @r0,fr7
+040F0A: E0B4  mov #-76,r0
+040F0C: F5E6  fmov.s @(r0,r14),fr5
+040F0E: D65F  mov.l @(0x04108C),r6          ; = 0x000D2B90 CAL
+040F10: 420B  jsr @r2                       ; -> 0x0BEA40
+040F12: F668  fmov.s @r6,fr6  ; [slot] fr6 = k = [0x0D2B90] (1.0)
+040F14: E0B4  mov #-76,r0
+040F16: A005  bra 0x040F24
+040F18: FE07  fmov.s fr0,@(r0,r14)  ; [slot] [0xFFFF7FB0] = fr0
+040F1A: DE56  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040F1C: E0B8  mov #-72,r0
+040F1E: F8E6  fmov.s @(r0,r14),fr8  ; no arm: fr8 = [7FB4]
+040F20: E0B4  mov #-76,r0
+040F22: FE87  fmov.s fr8,@(r0,r14)  ; [0xFFFF7FB0] = [7FB4]
+040F24: 6083  mov r8,r0  ; r0 = M
+040F26: 8804  cmp/eq #4,r0
+040F28: 8904  bt 0x040F34
+040F2A: 8807  cmp/eq #7,r0
+040F2C: 8902  bt 0x040F34
+040F2E: 8808  cmp/eq #8,r0  ; T = (M == 8)
+040F30: D457  mov.l @(0x041090),r4          ; = 0x000ADD90 ROM  | r4 = 0x0ADD90 (mov.l does not touch T)
+040F32: 8B00  bf 0x040F36  ; M not in {4,7,8} -> keep 0x0ADD90
+040F34: D457  mov.l @(0x041094),r4          ; = 0x000ADDA4 ROM  | M in {4,7,8}: r4 = 0x0ADDA4 (same axis, byte-identical data)
+040F36: 51F4  mov.l @(16,r15),r1  ; r1 = sp+16 = 0x0BE830 (stored on every path to 0x040D64)
+040F38: 410B  jsr @r1                       ; -> target NOT statically resolved  | table_lookup_1D
+040F3A: F4CC  fmov fr12,fr4  ; [slot] fr4 = E
+040F3C: DE4D  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040F3E: E0BC  mov #-68,r0
+040F40: FE07  fmov.s fr0,@(r0,r14)  ; [0xFFFF7FB8] = 0x0ADD90 / 0x0ADDA4 at E
+040F42: D455  mov.l @(0x041098),r4          ; = 0x000ADDB8 DESC  | record 0x0ADDB8 (1.0 in every cell)
+040F44: 51F4  mov.l @(16,r15),r1
+040F46: 410B  jsr @r1                       ; -> target NOT statically resolved  | table_lookup_1D
+040F48: F4F8  fmov.s @r15,fr4  ; [slot] fr4 = sp+0 = Q
+040F4A: E0C8  mov #-56,r0
+040F4C: FE07  fmov.s fr0,@(r0,r14)  ; [0xFFFF7FC4] = 0x0ADDB8 at Q
+040F4E: D253  mov.l @(0x04109C),r2          ; = 0x000D2BDC CAL
+040F50: F928  fmov.s @r2,fr9  ; fr9 = [0x0D2BDC] (-160.0)
+040F52: FD91  fsub fr9,fr13  ; fr13 = P - [0x0D2BDC]  [fsub FRm,FRn: FRn -= FRm]
+040F54: E0CC  mov #-52,r0
+040F56: FED7  fmov.s fr13,@(r0,r14)  ; [0xFFFF7FC8] = P - [0x0D2BDC]
+040F58: D251  mov.l @(0x0410A0),r2          ; = 0x000D2BEC CAL
+040F5A: F828  fmov.s @r2,fr8  ; fr8 = [0x0D2BEC] (1000.0)
+040F5C: F8F5  fcmp/gt fr15,fr8  ; T = ([0x0D2BEC] > V)  [fcmp/gt fr15,fr8: T = fr8 > fr15]
+040F5E: 8901  bt 0x040F64  ; T=1 -> skip
+040F60: E001  mov #1,r0
+040F62: C046  mov.b r0,@(70,gbr)            ; gbr+70 = 0xFFFF7FF6  | V >= [0x0D2BEC] or V NaN: byte [0xFFFF7FF6] = 1 (set only here; cleared by 0x040970)
+040F64: 84F4  mov.b @(4,r15),r0  ; r0 = sp+4 = 0x0297D0 result
+040F66: 8802  cmp/eq #2,r0  ; T = (result == 2), i.e. byte [9707] != 0
+040F68: 8940  bt 0x040FEC  ; -> 0x040FEC: [7FD0] = 0, [7FD4] lags toward 0
+040F6A: D64E  mov.l @(0x0410A4),r6          ; = 0x000D29C6 CAL
+040F6C: 6261  mov.w @r6,r2
+040F6E: 662D  extu.w r2,r6
+040F70: 57F3  mov.l @(12,r15),r7
+040F72: 3763  cmp/ge r6,r7  ; T = (C >= [0x0D29C6]) unsigned 16-bit ([0x0D29C6] = 0xFFFF in both bins)
+040F74: 8B2B  bf 0x040FCE  ; C < [0x0D29C6] -> plain path 0x040FCE
+040F76: 84F8  mov.b @(8,r15),r0
+040F78: 8801  cmp/eq #1,r0  ; T = (F == 1)
+040F7A: 8B28  bf 0x040FCE  ; F != 1 -> plain path
+040F7C: C446  mov.b @(70,gbr),r0            ; gbr+70 = 0xFFFF7FF6  | r0 = byte [0xFFFF7FF6]
+040F7E: 1F08  mov.l r0,@(32,r15)  ; sp+32 = it (dead store)
+040F80: 600C  extu.b r0,r0
+040F82: 8801  cmp/eq #1,r0
+040F84: 8B23  bf 0x040FCE  ; [7FF6] != 1 -> plain path
+040F86: DE3B  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040F88: E0CC  mov #-52,r0
+040F8A: F9E6  fmov.s @(r0,r14),fr9  ; gated path: fr9 = [7FC8]
+040F8C: D246  mov.l @(0x0410A8),r2          ; = 0x000D2BE4 CAL
+040F8E: F828  fmov.s @r2,fr8  ; fr8 = [0x0D2BE4] (-1000.0)
+040F90: F985  fcmp/gt fr8,fr9  ; T = ([7FC8] > [0x0D2BE4])  [fcmp/gt fr8,fr9: T = fr9 > fr8]
+040F92: D237  mov.l @(0x041070),r2          ; = 0x000BEA40 ROM
+040F94: 8D0F  bt/s 0x040FB6  ; T=1 -> 0x040FB6: [7FCC] = [7FC8]. Slot runs first
+040F96: 1F25  mov.l r2,@(20,r15)  ; [slot] sp+20 = 0x0BEA40
+040F98: F4E6  fmov.s @(r0,r14),fr4  ; fr4 = A = [7FC8] (r0 still -52)
+040F9A: C744  mova @(0x0410AC),r0           ; -> 0x0410AC: long 0x3A83126E f32 0.0009999999
+040F9C: F708  fmov.s @r0,fr7  ; fr7 = eps = 0.001 (0x3A83126E)
+040F9E: D644  mov.l @(0x0410B0),r6          ; = 0x000D2BE0 CAL
+040FA0: F668  fmov.s @r6,fr6  ; fr6 = k = [0x0D2BE0] (1.0)
+040FA2: E0D0  mov #-48,r0
+040FA4: 420B  jsr @r2                       ; -> 0x0BEA40  | lag(A = [7FC8], B = [7FCC], k, eps)
+040FA6: F5E6  fmov.s @(r0,r14),fr5  ; [slot] fr5 = B = [7FCC]
+040FA8: F40C  fmov fr0,fr4
+040FAA: D642  mov.l @(0x0410B4),r6          ; = 0x000BE960 ROM
+040FAC: 460B  jsr @r6                       ; -> 0x0BE960  | max(fr4, fr5)
+040FAE: F58D  fldi0 fr5  ; [slot] fr5 = +0.0
+040FB0: E0D0  mov #-48,r0
+040FB2: A003  bra 0x040FBC
+040FB4: FE07  fmov.s fr0,@(r0,r14)  ; [slot] [0xFFFF7FCC] = max(lag, 0.0)
+040FB6: F8E6  fmov.s @(r0,r14),fr8  ; fr8 = [7FC8]
+040FB8: E0D0  mov #-48,r0
+040FBA: FE87  fmov.s fr8,@(r0,r14)  ; [0xFFFF7FCC] = [7FC8]
+040FBC: D43E  mov.l @(0x0410B8),r4          ; = 0x000ADDCC DESC  | record 0x0ADDCC (1.0 in every cell)
+040FBE: 51F4  mov.l @(16,r15),r1
+040FC0: DE2C  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040FC2: E0D0  mov #-48,r0
+040FC4: 410B  jsr @r1                       ; -> target NOT statically resolved  | table_lookup_1D
+040FC6: F4E6  fmov.s @(r0,r14),fr4  ; [slot] fr4 = [7FCC]
+040FC8: E0D4  mov #-44,r0
+040FCA: A015  bra 0x040FF8
+040FCC: FE07  fmov.s fr0,@(r0,r14)  ; [slot] [0xFFFF7FD0] = 0x0ADDCC at [7FCC]; -> lag into [7FD4]
+040FCE: DE29  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040FD0: E0CC  mov #-52,r0
+040FD2: F8E6  fmov.s @(r0,r14),fr8  ; plain path: fr8 = [7FC8]
+040FD4: E0D0  mov #-48,r0
+040FD6: FE87  fmov.s fr8,@(r0,r14)  ; [0xFFFF7FCC] = [7FC8]
+040FD8: D437  mov.l @(0x0410B8),r4          ; = 0x000ADDCC DESC
+040FDA: 51F4  mov.l @(16,r15),r1
+040FDC: 410B  jsr @r1                       ; -> target NOT statically resolved  | table_lookup_1D(0x0ADDCC)
+040FDE: F4E6  fmov.s @(r0,r14),fr4  ; [slot] fr4 = [7FCC] (r0 = -48)
+040FE0: E0D4  mov #-44,r0
+040FE2: FE07  fmov.s fr0,@(r0,r14)  ; [0xFFFF7FD0] = 0x0ADDCC at [7FCC]
+040FE4: F89D  fldi1 fr8  ; fr8 = 1.0
+040FE6: E0D8  mov #-40,r0
+040FE8: A013  bra 0x041012  ; -> epilogue
+040FEA: FE87  fmov.s fr8,@(r0,r14)  ; [slot] [0xFFFF7FD4] = 1.0 (no lag on this path)
+040FEC: F58D  fldi0 fr5  ; byte [9707] != 0: fr5 = +0.0
+040FEE: DE21  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040FF0: E0D4  mov #-44,r0
+040FF2: FE57  fmov.s fr5,@(r0,r14)  ; [0xFFFF7FD0] = +0.0
+040FF4: D21E  mov.l @(0x041070),r2          ; = 0x000BEA40 ROM
+040FF6: 1F25  mov.l r2,@(20,r15)  ; sp+20 = 0x0BEA40
+040FF8: 52F5  mov.l @(20,r15),r2  ; r2 = sp+20 = 0x0BEA40 (stored on both paths that reach here)
+040FFA: DE1E  mov.l @(0x041074),r14         ; = 0xFFFF7FFC RAM
+040FFC: E0D4  mov #-44,r0
+040FFE: F4E6  fmov.s @(r0,r14),fr4  ; fr4 = A = [7FD0]
+041000: E0D8  mov #-40,r0
+041002: F5E6  fmov.s @(r0,r14),fr5  ; fr5 = B = [7FD4]
+041004: C72D  mova @(0x0410BC),r0           ; -> 0x0410BC: long 0x3A000000 f32 0.0004882812
+041006: F708  fmov.s @r0,fr7  ; fr7 = eps = 0.00048828125
+041008: D62D  mov.l @(0x0410C0),r6          ; = 0x000D2BE8 CAL
+04100A: 420B  jsr @r2                       ; -> target NOT statically resolved  | lag(A, B, k, eps) (0x0BEA40, through the stack slot)
+04100C: F668  fmov.s @r6,fr6  ; [slot] fr6 = k = [0x0D2BE8] (1.0)
+04100E: E0D8  mov #-40,r0
+041010: FE07  fmov.s fr0,@(r0,r14)  ; [0xFFFF7FD4] = lag result
+041012: 7F24  add #36,r15  ; epilogue: drop frame, restore GBR, fr15..fr12, PR, r14..r8
+041014: 4F17  ldc.l @r15+,gbr
+041016: FFF9  fmov.s @r15+,fr15
+041018: FEF9  fmov.s @r15+,fr14
+04101A: FDF9  fmov.s @r15+,fr13
+04101C: FCF9  fmov.s @r15+,fr12
+04101E: 4F26  lds.l @r15+,pr
+041020: 6EF6  mov.l @r15+,r14
+041022: 6DF6  mov.l @r15+,r13
+041024: 6CF6  mov.l @r15+,r12
+041026: 6BF6  mov.l @r15+,r11
+041028: 6AF6  mov.l @r15+,r10
+04102A: 69F6  mov.l @r15+,r9
+04102C: 000B  rts  ; return
+04102E: 68F6  mov.l @r15+,r8
+;   pool 0x04106C: .long 0x000D29BE  CAL
+;   pool 0x041070: .long 0x000BEA40  ROM
+;   pool 0x041074: .long 0xFFFF7FFC  RAM
+;   pool 0x04107C: .long 0x000D2B88  CAL
+;   pool 0x041080: .long 0x000D2B84  CAL
+;   pool 0x041084: .long 0x000D29C0  CAL
+;   pool 0x041088: .long 0x000D2B8C  CAL
+;   pool 0x04108C: .long 0x000D2B90  CAL
+;   pool 0x041090: .long 0x000ADD90  ROM
+;   pool 0x041094: .long 0x000ADDA4  ROM
+;   pool 0x041098: .long 0x000ADDB8  DESC
+;   pool 0x04109C: .long 0x000D2BDC  CAL
+;   pool 0x0410A0: .long 0x000D2BEC  CAL
+;   pool 0x0410A4: .long 0x000D29C6  CAL
+;   pool 0x0410A8: .long 0x000D2BE4  CAL
+;   pool 0x0410B0: .long 0x000D2BE0  CAL
+;   pool 0x0410B4: .long 0x000BE960  ROM
+;   pool 0x0410B8: .long 0x000ADDCC  DESC
+;   pool 0x0410C0: .long 0x000D2BE8  CAL
+
+==== CONTEXT: 0x041030 AND THE TASK 0x040918 (verified in timing_0410D4_0415B8_trace.txt; re-run here) ====
+CONTRACT   0x040918 runs 0x040A9C, 0x040AF6, 0x041030 and tail-branches into 0x0410D4 on every pass. 0x041030:
+           H = [7FB8] * [7FB0] * [7FC4] * [7FD4] * 0.01, then * [0x0D2B9C] (= 0.0) when byte [0xFFFF67FC] == 1.
+           0x0410D4: [7FBC] = clamp([7FBC] -/+ step, +0.0, H) on its update paths, held on its hold paths.
+           Latch (timing trace MECHANISM steps 1 and 4, E5): byte [7FF4] := 1 when F9 = byte [69E6] == 0 and
+           NOT (-w > X or X > w), w = 0.001373291015625 (X NaN included); while [7FF4] == 1, X := +0.0 on every
+           call, before steps 5..12. With F9 == 0 no step increases X (step 10 precedes branch 12; branch 11
+           needs F9 == 1 and adds 0). Window B: byte [7FDC] (0x040A9C, run first in the task) blocks every
+           branch-12 increment (0x04146E) and, with byte [65C0] == 1, triggers step 8 (0x0412BA).
+EVIDENCE   emulated: check_real runs 0x041030 after each 0x040AF6 case and compares H with the product computed
+           from the cells 0x040AF6 just wrote. check_chain runs 0x040918 itself, iterated, on the reference bin:
+           [90BE] = 1, [3158] = 0, [6354] = 90 -> H = 15.029296, [7FBC] = 0.16, 0.32, ..., held at H by call 110;
+           [3158] = 1, [90BE] = 0, [6354] = 20 -> H = 20.039061 reached; [90BE] and [3158] both != 1 (0/0, 2/2,
+           0/0x81, 0x81/0), or [9707] = 1, or [67FC] = 1 -> H = 0 and [7FBC] = 0.0 on every call; [7FBC] at H then
+           [90BE] -> 0 -> next call writes H = 0 and [7FBC] = 0.0 (up-step update path still active).
+           Inputs used for the 0x0410D4 up path (its branch 12, first arm): [69E6] = 1, [65FC] = 60 (< 510),
+           [85D7] = 1, [65C0] = 0, [726C] = 0, [7FF4] = 0, [7EE4] = 100 < [7E9C..7E90] = 200, word [67EC] = 100,
+           [895C] = 800, [6624] = 2000, [6634] = 10, [7FEE] = [7FEF] = 0. Those check_chain cases therefore
+           assume [69E6] = 1, [7FF4] = 0 and window B shut; they do not show the car reaches that state.
+           check_latch (REAL and STOCK, same inputs): one call with [69E6] = 0 at X = 0 -> [7FF4] = 1, X = 0.0;
+           then 200 calls with [69E6] = 1, H = 15.029 -> X = 0.0 on every call (control without the first call:
+           0.16, 0.32, 0.48). [69E6] = 0 from X = 1.0 -> X falls 0.015 per call (step 10), +0.0 at call 67,
+           [7FF4] = 1 at call 68, then 200 calls with [69E6] = 1 stay 0.0. [69E6] = 0 at X = 0.001 -> latched at
+           once, X = 0.0. check_window_b: 20.19c with [7FEF] = 1 and [7FEA] = 0 / 437 -> [7FDC] = 1 and X = 0.0
+           after 20 calls; [7FEA] = 438 -> climbs; stock -> all three climb; X at H then [65C0] = 1 with window B
+           open -> 20.19c X - 0.015 per call for 10 calls, stock X stays H.
+LISTING  (0x0410D4 excerpts that decide the latch and the F9 / F12 order; fn_dump 0x0410D4)
+041130: D684  mov.l @(0x041344),r6          ; = 0xFFFF69E6 RAM  | r6 = 0xFFFF69E6
+041132: D285  mov.l @(0x041348),r2          ; = 0x0002F8EA ROM
+041134: 420B  jsr @r2                       ; -> 0x02F8EA  | r0 = (byte [726C] == 1)
+041136: 6D60  mov.b @r6,r13  ; [slot] r13 = F9 = byte [0xFFFF69E6]
+0411D8: 69DC  extu.b r13,r9  ; r9 = F9 zero-extended
+0411DA: 2998  tst r9,r9  ; T = (F9 == 0)
+0411DC: 8B0C  bf 0x0411F8  ; F9 != 0 -> no latch test
+0411DE: D66C  mov.l @(0x041390),r6          ; = 0x000BE608 ROM  | 0x0BE608: r0 = 1 iff fr4 OUTSIDE [fr5 - fr6, fr5 + fr6]
+0411E0: C76C  mova @(0x041394),r0           ; -> 0x041394: long 0x3AB40000 f32 0.001373291
+0411E2: F608  fmov.s @r0,fr6  ; fr6 = w = 0.001373291015625
+0411E4: F58D  fldi0 fr5  ; fr5 = 0
+0411E6: D16C  mov.l @(0x041398),r1          ; = 0xFFFF7FF4 RAM  | r1 = 0xFFFF7FF4 (literal; r1-56 = 0xFFFF7FBC)
+0411E8: E0C8  mov #-56,r0
+0411EA: 460B  jsr @r6                       ; -> 0x0BE608
+0411EC: F416  fmov.s @(r0,r1),fr4  ; [slot] fr4 = X = [0xFFFF7FBC]
+0411EE: 660C  extu.b r0,r6
+0411F0: 2668  tst r6,r6  ; T = (inside: r0 == 0)
+0411F2: 8B01  bf 0x0411F8  ; outside -> no latch
+0411F4: E001  mov #1,r0
+0411F6: C038  mov.b r0,@(56,gbr)            ; gbr+56 = 0xFFFF7FF4  | LATCH: byte [0xFFFF7FF4] = 1 (F9 == 0 and |X| <= w, NaN included)
+04124A: C438  mov.b @(56,gbr),r0            ; gbr+56 = 0xFFFF7FF4  | r0 = latch byte
+04124C: 8801  cmp/eq #1,r0  ; T = (latch == 1)
+04124E: 8B04  bf 0x04125A  ; not latched -> steps 5..12
+041250: F58D  fldi0 fr5  ; fr5 = +0.0
+041252: D151  mov.l @(0x041398),r1          ; = 0xFFFF7FF4 RAM
+041254: E0C8  mov #-56,r0
+041256: A17D  bra 0x041554  ; -> return (no clamp)
+041258: F157  fmov.s fr5,@(r0,r1)  ; [slot] [0xFFFF7FBC] = +0.0
+041280: 66CC  extu.b r12,r6  ; r6 = F12 = byte [0xFFFF85D7] (loaded at 0x04112E)
+041282: 2668  tst r6,r6  ; T = (F12 == 0)
+041284: 8B01  bf 0x04128A  ; F12 != 0 -> steps 7..
+041286: A150  bra 0x04152A  ; F12 == 0 -> step 6 (X - 0.7, clamp)
+041288: 0009  nop
+0413C4: 6063  mov r6,r0  ; r0 = F12 (r6 unchanged since 0x041280 on both paths here)
+0413C6: 8801  cmp/eq #1,r0  ; T = (F12 == 1)
+0413C8: 8B0F  bf 0x0413EA  ; F12 != 1 -> branches 11 / 12
+0413CA: 2998  tst r9,r9  ; T = (F9 == 0)
+0413CC: 8B0D  bf 0x0413EA  ; F9 != 0 -> branches 11 / 12. Else step 10:
+0413CE: 60B3  mov r11,r0
+0413D0: 8801  cmp/eq #1,r0  ; T = F1
+0413D2: D168  mov.l @(0x041574),r1          ; = 0xFFFF7FF4 RAM
+0413D4: E0C8  mov #-56,r0
+0413D6: 8F04  bf/s 0x0413E2
+0413D8: F416  fmov.s @(r0,r1),fr4  ; [slot] fr4 = X
+0413DA: D267  mov.l @(0x041578),r2          ; = 0x000D2BD4 CAL
+0413DC: F828  fmov.s @r2,fr8
+0413DE: A0B1  bra 0x041544
+0413E0: F481  fsub fr8,fr4  ; [slot] F1: X - [0x0D2BD4] -> clamp
+0413E2: D266  mov.l @(0x04157C),r2          ; = 0x000D2BB4 CAL
+0413E4: F828  fmov.s @r2,fr8
+0413E6: A0AD  bra 0x041544
+0413E8: F481  fsub fr8,fr4  ; [slot] not F1: X - [0x0D2BB4] (0.015) -> clamp
+
+==== CONTEXT: 0x0297D0 AND 0x029A64 (the two calls at 0x040B3E / 0x040B44) ====
+CONTRACT   0x0297D0: r0 = 2 if byte [0xFFFF9707] != 0 else 0.   0x029A64: r0 = 0 (no memory access).
+EVIDENCE   emulated: check_context, all 256 byte values; 0x029A64 with r0 preloaded.
+LISTING
+0297D0: D653  mov.l @(0x029920),r6          ; = 0xFFFF9707 RAM
+0297D2: 6260  mov.b @r6,r2  ; r2 = byte [0xFFFF9707]
+0297D4: 2228  tst r2,r2  ; T = (byte == 0)
+0297D6: 8F01  bf/s 0x0297DC  ; byte != 0 -> return 2. Slot runs first
+0297D8: E002  mov #2,r0  ; [slot] r0 = 2
+0297DA: E000  mov #0,r0  ; byte == 0: r0 = 0
+0297DC: 000B  rts
+0297DE: 0009  nop
+;   pool 0x029920: .long 0xFFFF9707  RAM
+029A64: 000B  rts  ; return
+029A66: E000  mov #0,r0  ; [slot] r0 = 0
+
+==== CONTEXT: 0x06114E (79 instructions, caller 0x060568) -- THE WRITER OF BYTE [0xFFFF90BE] ====
+CONTRACT   byte [90BE] := 0 if byte [0xFFFF972E] != 0 (0x029AA0 returns 2) or byte [0xFFFF9705] != 0 (0x0297B0);
+           else by g = byte [0x0D9AC4]: g < 1 or g > 4 -> ([0xFFFF90C4] == 1); g == 1 -> 1; g == 2 -> 0;
+           g == 3 -> (byte [0xFFFF9113] == 1); g == 4 -> ([9113] == 0).  Written on every call.
+           Then float [0xFFFF90A8] := clamp([90A8] - [0x0D9B44], 0, 1) if [90BE] != 0, else
+           clamp([90A8] + [0x0D9B40], 0, 1).  g = 0 in 20.19c and stock; [0x0D9B40] = [0x0D9B44] = 0.008.
+           find_writers lists 0x0611BC as the only writer of [90BE] (flagged "IN FLOAT_DATA"; it is real code,
+           census function 0x06114E..0x0611EC).
+EVIDENCE   emulated: check_context, 2,646 runs over g in {0,1,2,3,4,5,0xFF} (in-memory copies), [972E], [9705],
+           [90C4], [9113] and [90A8] in {0, 0.004, 0.5, 0.996, 1, 1.5, -0.5}: [90BE] and [90A8] as stated.
+           0x029AA0 / 0x0297B0 have the shape of 0x0297D0 (pools 0x029B70 = 0xFFFF972E, 0x029918 = 0xFFFF9705).
+LISTING
+06114E: 4F22  sts.l pr,@-r15
+061150: 4F13  stc.l gbr,@-r15
+061152: D044  mov.l @(0x061264),r0          ; = 0xFFFF90A8 RAM
+061154: 401E  ldc r0,gbr                    ; GBR = 0xFFFF90A8
+061156: 7FF0  add #-16,r15
+061158: D243  mov.l @(0x061268),r2          ; = 0x00029AA0 ROM
+06115A: 420B  jsr @r2                       ; -> 0x029AA0  | 0x029AA0: r0 = 2 if byte [0xFFFF972E] != 0 else 0
+06115C: 0009  nop
+06115E: D243  mov.l @(0x06126C),r2          ; = 0x000297B0 ROM
+061160: 420B  jsr @r2                       ; -> 0x0297B0  | 0x0297B0: r0 = 2 if byte [0xFFFF9705] != 0 else 0
+061162: 2F00  mov.b r0,@r15  ; [slot] sp+0 = first result
+061164: 620C  extu.b r0,r2
+061166: D542  mov.l @(0x061270),r5          ; = 0x000D9AC4 CAL
+061168: 6550  mov.b @r5,r5  ; r5 = byte g = [0x0D9AC4] (0 in 20.19c and stock)
+06116A: 60F0  mov.b @r15,r0
+06116C: 8802  cmp/eq #2,r0  ; first result == 2 -> [90BE] = 0
+06116E: 8924  bt 0x0611BA
+061170: 6023  mov r2,r0
+061172: 8802  cmp/eq #2,r0  ; second result == 2 -> [90BE] = 0
+061174: 8921  bt 0x0611BA
+061176: 625C  extu.b r5,r2
+061178: E601  mov #1,r6
+06117A: 3263  cmp/ge r6,r2  ; T = (g >= 1) signed
+06117C: 8B16  bf 0x0611AC  ; g < 1 -> 0x0611AC (taken with g = 0)
+06117E: E604  mov #4,r6
+061180: 3267  cmp/gt r6,r2  ; T = (g > 4)
+061182: 8913  bt 0x0611AC  ; g > 4 -> 0x0611AC
+061184: 6023  mov r2,r0
+061186: 8801  cmp/eq #1,r0
+061188: 8915  bt 0x0611B6  ; g == 1 -> [90BE] = 1
+06118A: 6023  mov r2,r0
+06118C: 8803  cmp/eq #3,r0
+06118E: 8B04  bf 0x06119A  ; g != 3 -> 0x06119A
+061190: C46B  mov.b @(107,gbr),r0           ; gbr+107 = 0xFFFF9113
+061192: 1F01  mov.l r0,@(4,r15)
+061194: 600C  extu.b r0,r0
+061196: 8801  cmp/eq #1,r0
+061198: 890D  bt 0x0611B6  ; g == 3 and byte [9113] == 1 -> 1
+06119A: 6023  mov r2,r0
+06119C: 8804  cmp/eq #4,r0
+06119E: 8B0C  bf 0x0611BA  ; g == 2 or (g == 3, [9113] != 1) -> 0
+0611A0: C46B  mov.b @(107,gbr),r0           ; gbr+107 = 0xFFFF9113
+0611A2: 2008  tst r0,r0
+0611A4: 8D07  bt/s 0x0611B6  ; g == 4: byte [9113] == 0 -> 1, else 0
+0611A6: 1F02  mov.l r0,@(8,r15)
+0611A8: A007  bra 0x0611BA
+0611AA: 0009  nop
+0611AC: C41C  mov.b @(28,gbr),r0            ; gbr+28 = 0xFFFF90C4  | g outside 1..4: r0 = byte [0xFFFF90C4]
+0611AE: 1F03  mov.l r0,@(12,r15)
+0611B0: 600C  extu.b r0,r0
+0611B2: 8801  cmp/eq #1,r0
+0611B4: 8B01  bf 0x0611BA  ; [90C4] != 1 -> 0
+0611B6: A001  bra 0x0611BC
+0611B8: E001  mov #1,r0  ; [slot] r0 = 1
+0611BA: E000  mov #0,r0  ; r0 = 0
+0611BC: C016  mov.b r0,@(22,gbr)            ; gbr+22 = 0xFFFF90BE  | byte [0xFFFF90BE] = r0 (every call)
+0611BE: C416  mov.b @(22,gbr),r0            ; gbr+22 = 0xFFFF90BE
+0611C0: 2008  tst r0,r0
+0611C2: D628  mov.l @(0x061264),r6          ; = 0xFFFF90A8 RAM
+0611C4: 8F04  bf/s 0x0611D0  ; [90BE] != 0 -> 0x0611D0. Slot runs first
+0611C6: F468  fmov.s @r6,fr4  ; [slot] fr4 = [0xFFFF90A8]
+0611C8: D22A  mov.l @(0x061274),r2          ; = 0x000D9B40 CAL
+0611CA: F928  fmov.s @r2,fr9
+0611CC: A003  bra 0x0611D6
+0611CE: F490  fadd fr9,fr4  ; [90BE] == 0: fr4 = [90A8] + [0x0D9B40] (0.008)
+0611D0: D229  mov.l @(0x061278),r2          ; = 0x000D9B44 CAL
+0611D2: F828  fmov.s @r2,fr8
+0611D4: F481  fsub fr8,fr4  ; [90BE] != 0: fr4 = [90A8] - [0x0D9B44] (0.008)
+0611D6: D229  mov.l @(0x06127C),r2          ; = 0x000BE56C ROM
+0611D8: F69D  fldi1 fr6
+0611DA: 420B  jsr @r2                       ; -> 0x0BE56C  | clamp(fr4, 0.0, 1.0)
+0611DC: F58D  fldi0 fr5
+0611DE: D621  mov.l @(0x061264),r6          ; = 0xFFFF90A8 RAM
+0611E0: F60A  fmov.s fr0,@r6  ; [0xFFFF90A8] = clamped
+0611E2: 7F10  add #16,r15
+0611E4: 4F17  ldc.l @r15+,gbr
+0611E6: 4F26  lds.l @r15+,pr
+0611E8: 000B  rts
+0611EA: 0009  nop
+;   pool 0x061264: .long 0xFFFF90A8  RAM
+;   pool 0x061268: .long 0x00029AA0  ROM
+;   pool 0x06126C: .long 0x000297B0  ROM
+;   pool 0x061270: .long 0x000D9AC4  CAL
+;   pool 0x061274: .long 0x000D9B40  CAL
+;   pool 0x061278: .long 0x000D9B44  CAL
+;   pool 0x06127C: .long 0x000BE56C  ROM
+
+==== CONTEXT: 0x0610E6 (29 instructions, caller 0x060568) AND 0x06081C (33 instructions, caller 0x047C40) -- WRITERS OF BYTE [0xFFFF90C4] ====
+CONTRACT   0x0610E6: byte [90C4] := 1 iff u16 [0xFFFF90B2] >= [0x0D9AD8] (250) and (float [0x0D9B2C] (4.0) >
+           float [0xFFFF90EC] or u16 [0xFFFF90B0] < 1) and u16 [0xFFFF90B4] >= [0x0D9ADA] (375); else 0.
+           0x06081C: byte [90C4] := 1, word [90B2] := word [90B4] := 0xFFFF unconditionally (plus other cells).
+           find_writers (a lower bound) finds no other writer of [90C4].
+EVIDENCE   emulated: check_context, 540 runs of 0x0610E6 over the thresholds +-1, [90B0] in {0, 1, 0xFFFF} and
+           [90EC] in {0, 3.99, 4.0, 4.01, NaN}; 0x06081C with its two callees stubbed (r0 = 0 / 1 / 2): the three
+           stores happen every time. The writers of [90B2], [90B4], [90B0] and [90EC] (0x060ECC writes [90B2]) are
+           not decoded here.
+LISTING
+0610E6: D459  mov.l @(0x06124C),r4          ; = 0xFFFF90B0 RAM
+0610E8: 8541  mov.w @(2,r4),r0  ; r0 = word [0xFFFF90B2]
+0610EA: D559  mov.l @(0x061250),r5          ; = 0x000D9AD8 CAL
+0610EC: 6251  mov.w @r5,r2
+0610EE: 3022  cmp/hs r2,r0  ; T = ([90B2] >= [0x0D9AD8] = 250) unsigned
+0610F0: 8B0E  bf 0x061110  ; < 250 -> [90C4] = 0
+0610F2: D258  mov.l @(0x061254),r2          ; = 0x000D9B2C CAL
+0610F4: F928  fmov.s @r2,fr9
+0610F6: E03C  mov #60,r0
+0610F8: F846  fmov.s @(r0,r4),fr8  ; fr8 = [0xFFFF90EC] (r4+60)
+0610FA: F985  fcmp/gt fr8,fr9  ; T = ([0x0D9B2C] = 4.0 > [90EC])
+0610FC: 8903  bt 0x061106  ; T -> test [90B4]
+0610FE: 6241  mov.w @r4,r2
+061100: E601  mov #1,r6
+061102: 3262  cmp/hs r6,r2  ; T = (word [0xFFFF90B0] >= 1) unsigned
+061104: 8904  bt 0x061110  ; >= 1 -> [90C4] = 0
+061106: 8542  mov.w @(4,r4),r0  ; r0 = word [0xFFFF90B4]
+061108: D553  mov.l @(0x061258),r5          ; = 0x000D9ADA CAL
+06110A: 6251  mov.w @r5,r2
+06110C: 3022  cmp/hs r2,r0  ; T = ([90B4] >= [0x0D9ADA] = 375) unsigned
+06110E: 8903  bt 0x061118  ; -> [90C4] = 1
+061110: E200  mov #0,r2
+061112: D652  mov.l @(0x06125C),r6          ; = 0xFFFF90C4 RAM
+061114: 000B  rts
+061116: 2620  mov.b r2,@r6  ; [slot] byte [0xFFFF90C4] = 0
+061118: E201  mov #1,r2
+06111A: D650  mov.l @(0x06125C),r6          ; = 0xFFFF90C4 RAM
+06111C: 000B  rts
+06111E: 2620  mov.b r2,@r6  ; [slot] byte [0xFFFF90C4] = 1
+;   pool 0x06124C: .long 0xFFFF90B0  RAM
+;   pool 0x061250: .long 0x000D9AD8  CAL
+;   pool 0x061254: .long 0x000D9B2C  CAL
+;   pool 0x061258: .long 0x000D9ADA  CAL
+;   pool 0x06125C: .long 0xFFFF90C4  RAM
+06081C: 4F22  sts.l pr,@-r15
+06081E: 4F13  stc.l gbr,@-r15
+060820: D089  mov.l @(0x060A48),r0          ; = 0xFFFF90B2 RAM
+060822: 401E  ldc r0,gbr                    ; GBR = 0xFFFF90B2
+060824: D289  mov.l @(0x060A4C),r2          ; = 0xFFFF6350 RAM
+060826: F828  fmov.s @r2,fr8
+060828: D289  mov.l @(0x060A50),r2          ; = 0xFFFF90E0 RAM
+06082A: F28A  fmov.s fr8,@r2
+06082C: D289  mov.l @(0x060A54),r2          ; = 0xFFFF65C0 RAM
+06082E: 6020  mov.b @r2,r0
+060830: B61A  bsr 0x061468
+060832: C067  mov.b r0,@(103,gbr)           ; gbr+103 = 0xFFFF9119
+060834: 600E  exts.b r0,r0
+060836: 8801  cmp/eq #1,r0
+060838: 8B01  bf 0x06083E
+06083A: E001  mov #1,r0
+06083C: C00F  mov.b r0,@(15,gbr)            ; gbr+15 = 0xFFFF90C1
+06083E: B5F3  bsr 0x061428
+060840: 0009  nop
+060842: E2FF  mov #-1,r2
+060844: 6023  mov r2,r0
+060846: C100  mov.w r0,@(0,gbr)             ; gbr+0 = 0xFFFF90B2  | word [0xFFFF90B2] = 0xFFFF
+060848: C101  mov.w r0,@(2,gbr)             ; gbr+2 = 0xFFFF90B4  | word [0xFFFF90B4] = 0xFFFF
+06084A: E001  mov #1,r0
+06084C: C012  mov.b r0,@(18,gbr)            ; gbr+18 = 0xFFFF90C4  | byte [0xFFFF90C4] = 1 (unconditional)
+06084E: C011  mov.b r0,@(17,gbr)            ; gbr+17 = 0xFFFF90C3
+060850: C05D  mov.b r0,@(93,gbr)            ; gbr+93 = 0xFFFF910F
+060852: 6023  mov r2,r0
+060854: C12B  mov.w r0,@(86,gbr)            ; gbr+86 = 0xFFFF9108
+060856: 4F17  ldc.l @r15+,gbr
+060858: 4F26  lds.l @r15+,pr
+06085A: 000B  rts
+06085C: 0009  nop
+;   pool 0x060A48: .long 0xFFFF90B2  RAM
+;   pool 0x060A4C: .long 0xFFFF6350  RAM
+;   pool 0x060A50: .long 0xFFFF90E0  RAM
+;   pool 0x060A54: .long 0xFFFF65C0  RAM
+
+==== CONTEXT: 0x04004A (215 instructions) -- WHICH SIDE OF THE BLEND THE WEIGHT [0xFFFF90A8] SELECTS ====
+CONTRACT   w = float [90A8] (0x04006C). [7F40] = PC - max(PC - RC, 0) * [7F3C] and [7F44] = PN - max(PN - RN, 0) *
+           [7F3C], where PC, RC, PN, RN are the 2-D lookups of 0x0AE31C, 0x0AE354, 0x0AE338, 0x0AE370 at
+           ([63F8], [7F4C]); then [7F58] = (1 - w) * [7F40] + w * [7F44] (0x0401D6..0x0401EA, one fmac).
+           Definitions by DATA pointer: 0x0D4714 "Base Timing Primary Cruise" (0x0AE31C), 0x0D48D4 "Base Timing
+           Primary Non-Cruise" (0x0AE338), 0x0D4A94 "Base Timing Reference Cruise (AVCS related)" (0x0AE354),
+           0x0D4C54 "Base Timing Reference Non-Cruise (AVCS related)" (0x0AE370). So w = 0 is all Cruise and w = 1
+           all Non-Cruise; 0x06114E lowers w while [90BE] != 0 (and the shipped [90BE] is 0 or 1).
+EVIDENCE   emulated: check_context, 12 whole-function runs on an in-memory copy with the two Cruise tables raised
+           by 17 raw (in 20.19c the four tables give equal values at the points tried): [7F40] equals the Cruise
+           lookup, [7F44] the Non-Cruise lookup, [7F58] the fmac above, = Cruise at w = 0 and Non-Cruise at w = 1.
+           Only the lines below are decoded here; the rest of 0x04004A is not.
+LISTING
+04006A: D233  mov.l @(0x040138),r2          ; = 0xFFFF90A8 RAM
+04006C: F828  fmov.s @r2,fr8  ; fr8 = w = [0xFFFF90A8]
+04006E: FF8A  fmov.s fr8,@r15  ; sp+0 = w
+04016E: D47A  mov.l @(0x040358),r4          ; = 0x000AE31C DESC  | 0x0AE31C: data 0x0D4714 = "Base Timing Primary Cruise"
+040170: DE7A  mov.l @(0x04035C),r14         ; = 0x000BE8E4 ROM
+040172: F4EC  fmov fr14,fr4
+040174: E0EC  mov #-20,r0
+040176: 4E0B  jsr @r14                      ; -> 0x0BE8E4
+040178: F5C6  fmov.s @(r0,r12),fr5
+04017A: FF0C  fmov fr0,fr15  ; fr15 = PC
+04017C: D478  mov.l @(0x040360),r4          ; = 0x000AE354 DESC  | 0x0AE354: "Base Timing Reference Cruise (AVCS related)"
+04017E: F4EC  fmov fr14,fr4
+040180: E0EC  mov #-20,r0
+040182: 4E0B  jsr @r14                      ; -> 0x0BE8E4
+040184: F5C6  fmov.s @(r0,r12),fr5
+040186: FD0C  fmov fr0,fr13  ; fr13 = RC
+040188: D476  mov.l @(0x040364),r4          ; = 0x000AE338 DESC  | 0x0AE338: data 0x0D48D4 = "Base Timing Primary Non-Cruise"
+04018A: F4EC  fmov fr14,fr4
+04018C: E0EC  mov #-20,r0
+04018E: 4E0B  jsr @r14                      ; -> 0x0BE8E4
+040190: F5C6  fmov.s @(r0,r12),fr5
+040192: FC0C  fmov fr0,fr12  ; fr12 = PN
+040194: D474  mov.l @(0x040368),r4          ; = 0x000AE370 DESC  | 0x0AE370: "Base Timing Reference Non-Cruise (AVCS related)"
+040196: F4EC  fmov fr14,fr4
+040198: E0EC  mov #-20,r0
+04019A: 4E0B  jsr @r14                      ; -> 0x0BE8E4
+04019C: F5C6  fmov.s @(r0,r12),fr5
+04019E: E008  mov #8,r0
+0401A0: FF07  fmov.s fr0,@(r0,r15)  ; sp+8 = RN
+0401A2: FEFC  fmov fr15,fr14
+0401A4: FFD1  fsub fr13,fr15
+0401A6: F4FC  fmov fr15,fr4
+0401A8: D270  mov.l @(0x04036C),r2          ; = 0x000BE960 ROM
+0401AA: 420B  jsr @r2                       ; -> 0x0BE960
+0401AC: F58D  fldi0 fr5
+0401AE: F04D  fneg fr0
+0401B0: E004  mov #4,r0
+0401B2: F6F6  fmov.s @(r0,r15),fr6
+0401B4: FE6E  fmac fr0,fr6,fr14  ; fr14 = PC - max(PC - RC, 0) * [7F3C]
+0401B6: E0E0  mov #-32,r0
+0401B8: FCE7  fmov.s fr14,@(r0,r12)  ; [0xFFFF7F40] = Cruise side
+0401BA: FECC  fmov fr12,fr14
+0401BC: E008  mov #8,r0
+0401BE: F8F6  fmov.s @(r0,r15),fr8
+0401C0: FC81  fsub fr8,fr12
+0401C2: F4CC  fmov fr12,fr4
+0401C4: D269  mov.l @(0x04036C),r2          ; = 0x000BE960 ROM
+0401C6: 420B  jsr @r2                       ; -> 0x0BE960
+0401C8: F58D  fldi0 fr5
+0401CA: F04D  fneg fr0
+0401CC: E004  mov #4,r0
+0401CE: F6F6  fmov.s @(r0,r15),fr6
+0401D0: FE6E  fmac fr0,fr6,fr14  ; fr14 = PN - max(PN - RN, 0) * [7F3C]
+0401D2: E0E4  mov #-28,r0
+0401D4: FCE7  fmov.s fr14,@(r0,r12)  ; [0xFFFF7F44] = Non-Cruise side
+0401D6: F9F8  fmov.s @r15,fr9
+0401D8: F89C  fmov fr9,fr8
+0401DA: F6C6  fmov.s @(r0,r12),fr6
+0401DC: F862  fmul fr6,fr8  ; fr8 = w * [7F44]
+0401DE: F09D  fldi1 fr0
+0401E0: F091  fsub fr9,fr0  ; fr0 = 1 - w
+0401E2: E0E0  mov #-32,r0
+0401E4: F9C6  fmov.s @(r0,r12),fr9
+0401E6: F89E  fmac fr0,fr9,fr8  ; fr8 = (1 - w) * [7F40] + w * [7F44]: w = 1 is all Non-Cruise, w = 0 all Cruise
+0401E8: E0F8  mov #-8,r0
+0401EA: FC87  fmov.s fr8,@(r0,r12)  ; [0xFFFF7F58] = blended
+
+==== CONTEXT: 0x02F57E, 0x02F768, 0x02EE78 -- THE WRITERS OF THE u16 AT 0xFFFF3158 (HIGH BYTE = G) ====
+CONTRACT   0x02F57E (97 instructions, caller 0x02EF0C): word [72C6] counts (saturating) while byte [65C2] == 1,
+           else 0; word [315A] := 0x01FE when byte [7E50] == 1; word [315C] := 0x01FE when [6624] > [0x0CBDDC],
+           or u16 [223C] >= 0x0AC8C4([6350]) (fixed uint16 lookup), or [65C2] == 1 and [72C6] >= u16 [0x0CBC1E];
+           then, only when byte [65C2] == 1 and byte [72CF] == 0 ([72CF] := [65C2] at 0x02F62E on every call, so
+           this is a 0 -> 1 edge of [65C2] as this function sees it): word [3158] := 0x01FE (value 1) if the value
+           bytes of [315A] and [315C] -- read AFTER this call's own stores to them -- are both 1, else 0x00FF
+           (value 0).
+           0x02F768 (107 instructions, caller 0x02EF26): word [72C4] counts while byte [65BD] == 0, else 0; when
+           [72C4] >= 0x0AC8B8([6350]) or ([72C4] >= u16 [0x0CBC1C] and [0x0CC5F0] > [4130]), words [3158],
+           [315A], [315C], [3160], [315E] := 0x00FF.  0x02EE78 (caller 0x048732) stores 0x00FF to all five.
+           find_writers (a lower bound) reports exactly four stores to 0xFFFF3158: 0x02F622 and 0x02F62A (here,
+           flagged "IN UNMAPPED"), 0x02F7CE and 0x02EE8A (flagged "IN FLOAT_DATA"); among them value 1 is stored
+           only at 0x02F622. 0x0BE9A0 builds (v << 8) | (~v & 0xFF).
+EVIDENCE   emulated: check_context, 3,072 runs of 0x02F57E (word [3158], [72C6], [72CF] asserted); 40 runs of
+           0x02F768 with 0x00DCE4 stubbed; one run of 0x02EE78. Which physical event [65C2], [65BD] and the
+           counters stand for is not established.
+LISTING
+02F57E: 2FB6  mov.l r11,@-r15
+02F580: 2FC6  mov.l r12,@-r15
+02F582: 2FD6  mov.l r13,@-r15
+02F584: 2FE6  mov.l r14,@-r15
+02F586: 4F22  sts.l pr,@-r15
+02F588: FFEB  fmov.s fr14,@-r15
+02F58A: FFFB  fmov.s fr15,@-r15
+02F58C: D248  mov.l @(0x02F6B0),r2          ; = 0xFFFF6624 RAM
+02F58E: FF28  fmov.s @r2,fr15
+02F590: D243  mov.l @(0x02F6A0),r2          ; = 0xFFFF6350 RAM
+02F592: FE28  fmov.s @r2,fr14
+02F594: D647  mov.l @(0x02F6B4),r6          ; = 0xFFFF65C2 RAM
+02F596: 6C60  mov.b @r6,r12  ; r12 = byte [0xFFFF65C2]
+02F598: D247  mov.l @(0x02F6B8),r2          ; = 0xFFFF7E50 RAM
+02F59A: 6020  mov.b @r2,r0  ; r0 = byte [0xFFFF7E50]
+02F59C: D547  mov.l @(0x02F6BC),r5          ; = 0xFFFF223C RAM
+02F59E: 8801  cmp/eq #1,r0
+02F5A0: 8F05  bf/s 0x02F5AE  ; [7E50] != 1 -> skip. Slot runs first
+02F5A2: 6E51  mov.w @r5,r14  ; [slot] r14 = word [0xFFFF223C]
+02F5A4: D246  mov.l @(0x02F6C0),r2          ; = 0x000BE9A0 ROM
+02F5A6: 420B  jsr @r2                       ; -> 0x0BE9A0
+02F5A8: E401  mov #1,r4
+02F5AA: D146  mov.l @(0x02F6C4),r1          ; = 0xFFFF3158 RAM
+02F5AC: 8111  mov.w r0,@(2,r1)  ; word [0xFFFF315A] = 0x01FE (value 1)
+02F5AE: 6DCC  extu.b r12,r13
+02F5B0: 60D3  mov r13,r0
+02F5B2: 8801  cmp/eq #1,r0
+02F5B4: 8B07  bf 0x02F5C6  ; byte [65C2] != 1 -> counter 0
+02F5B6: D244  mov.l @(0x02F6C8),r2          ; = 0x000BE554 ROM
+02F5B8: E501  mov #1,r5
+02F5BA: DB44  mov.l @(0x02F6CC),r11         ; = 0xFFFF72C6 RAM
+02F5BC: 66B1  mov.w @r11,r6
+02F5BE: 420B  jsr @r2                       ; -> 0x0BE554  | sat_add_u16(word [0xFFFF72C6], 1)
+02F5C0: 646D  extu.w r6,r4
+02F5C2: A003  bra 0x02F5CC
+02F5C4: 2B01  mov.w r0,@r11
+02F5C6: E200  mov #0,r2
+02F5C8: DB40  mov.l @(0x02F6CC),r11         ; = 0xFFFF72C6 RAM
+02F5CA: 2B21  mov.w r2,@r11  ; word [72C6] = 0
+02F5CC: D440  mov.l @(0x02F6D0),r4          ; = 0x000AC8C4 ROM
+02F5CE: D241  mov.l @(0x02F6D4),r2          ; = 0x000BE8AC ROM
+02F5D0: 420B  jsr @r2                       ; -> 0x0BE8AC  | r0 = fixed uint16 lookup 0x0AC8C4 at [0xFFFF6350]
+02F5D2: F4EC  fmov fr14,fr4
+02F5D4: D640  mov.l @(0x02F6D8),r6          ; = 0x000CBDDC CAL
+02F5D6: F868  fmov.s @r6,fr8
+02F5D8: FF85  fcmp/gt fr8,fr15  ; T = ([0xFFFF6624] > [0x0CBDDC])
+02F5DA: 8D0B  bt/s 0x02F5F4  ; T -> [315C] = value 1. Slot runs first
+02F5DC: 620D  extu.w r0,r2
+02F5DE: 65ED  extu.w r14,r5
+02F5E0: 3523  cmp/ge r2,r5  ; T = (u16 [223C] >= table value)
+02F5E2: 8907  bt 0x02F5F4
+02F5E4: 60D3  mov r13,r0
+02F5E6: 8801  cmp/eq #1,r0
+02F5E8: 8B09  bf 0x02F5FE
+02F5EA: 66B1  mov.w @r11,r6
+02F5EC: D53B  mov.l @(0x02F6DC),r5          ; = 0x000CBC1E CAL
+02F5EE: 6251  mov.w @r5,r2
+02F5F0: 3622  cmp/hs r2,r6  ; T = ([72C6] >= u16 [0x0CBC1E]) unsigned
+02F5F2: 8B04  bf 0x02F5FE
+02F5F4: D232  mov.l @(0x02F6C0),r2          ; = 0x000BE9A0 ROM
+02F5F6: 420B  jsr @r2                       ; -> 0x0BE9A0
+02F5F8: E401  mov #1,r4
+02F5FA: D132  mov.l @(0x02F6C4),r1          ; = 0xFFFF3158 RAM
+02F5FC: 8112  mov.w r0,@(4,r1)  ; word [0xFFFF315C] = 0x01FE (value 1)
+02F5FE: 60D3  mov r13,r0
+02F600: 8801  cmp/eq #1,r0
+02F602: 8B13  bf 0x02F62C
+02F604: 84B9  mov.b @(9,r11),r0
+02F606: 2008  tst r0,r0
+02F608: 8B10  bf 0x02F62C  ; byte [72CF] (previous [65C2]) != 0 -> no write
+02F60A: D12E  mov.l @(0x02F6C4),r1          ; = 0xFFFF3158 RAM
+02F60C: 8412  mov.b @(2,r1),r0  ; r0 = byte [0xFFFF315A] (value byte)
+02F60E: 8801  cmp/eq #1,r0
+02F610: D62B  mov.l @(0x02F6C0),r6          ; = 0x000BE9A0 ROM
+02F612: 8B07  bf 0x02F624
+02F614: 8414  mov.b @(4,r1),r0  ; r0 = byte [0xFFFF315C] (value byte)
+02F616: 8801  cmp/eq #1,r0
+02F618: 8B04  bf 0x02F624
+02F61A: 460B  jsr @r6                       ; -> 0x0BE9A0
+02F61C: E401  mov #1,r4
+02F61E: D129  mov.l @(0x02F6C4),r1          ; = 0xFFFF3158 RAM
+02F620: A004  bra 0x02F62C
+02F622: 2101  mov.w r0,@r1  ; [slot] word [0xFFFF3158] = 0x01FE: value 1 (the only such store found)
+02F624: 460B  jsr @r6                       ; -> 0x0BE9A0
+02F626: E400  mov #0,r4
+02F628: D126  mov.l @(0x02F6C4),r1          ; = 0xFFFF3158 RAM
+02F62A: 2101  mov.w r0,@r1  ; word [0xFFFF3158] = 0x00FF: value 0
+02F62C: 60C3  mov r12,r0
+02F62E: 80B9  mov.b r0,@(9,r11)  ; byte [0xFFFF72CF] = [65C2]
+02F630: FFF9  fmov.s @r15+,fr15
+02F632: FEF9  fmov.s @r15+,fr14
+02F634: 4F26  lds.l @r15+,pr
+02F636: 6EF6  mov.l @r15+,r14
+02F638: 6DF6  mov.l @r15+,r13
+02F63A: 6CF6  mov.l @r15+,r12
+02F63C: 000B  rts
+02F63E: 6BF6  mov.l @r15+,r11
+;   pool 0x02F6A0: .long 0xFFFF6350  RAM
+;   pool 0x02F6B0: .long 0xFFFF6624  RAM
+;   pool 0x02F6B4: .long 0xFFFF65C2  RAM
+;   pool 0x02F6B8: .long 0xFFFF7E50  RAM
+;   pool 0x02F6BC: .long 0xFFFF223C  RAM
+;   pool 0x02F6C0: .long 0x000BE9A0  ROM
+;   pool 0x02F6C4: .long 0xFFFF3158  RAM
+;   pool 0x02F6C8: .long 0x000BE554  ROM
+;   pool 0x02F6CC: .long 0xFFFF72C6  RAM
+;   pool 0x02F6D0: .long 0x000AC8C4  ROM
+;   pool 0x02F6D4: .long 0x000BE8AC  ROM
+;   pool 0x02F6D8: .long 0x000CBDDC  CAL
+;   pool 0x02F6DC: .long 0x000CBC1E  CAL
+02F77A: D665  mov.l @(0x02F910),r6          ; = 0xFFFF65BD RAM
+02F77C: 6C60  mov.b @r6,r12  ; r12 = byte [0xFFFF65BD]
+02F77E: D268  mov.l @(0x02F920),r2          ; = 0xFFFF6350 RAM
+02F780: FE28  fmov.s @r2,fr14
+02F782: D268  mov.l @(0x02F924),r2          ; = 0xFFFF4130 RAM
+02F784: FF28  fmov.s @r2,fr15
+02F786: D968  mov.l @(0x02F928),r9          ; = 0xFFFF72C4 RAM
+02F788: 849E  mov.b @(14,r9),r0
+02F78A: 2CC8  tst r12,r12
+02F78C: 8F07  bf/s 0x02F79E  ; [65BD] != 0 -> counter 0. Slot runs first
+02F78E: 6B03  mov r0,r11
+02F790: D266  mov.l @(0x02F92C),r2          ; = 0x000BE554 ROM
+02F792: E501  mov #1,r5
+02F794: 6691  mov.w @r9,r6
+02F796: 420B  jsr @r2                       ; -> 0x0BE554  | sat_add_u16(word [0xFFFF72C4], 1)
+02F798: 646D  extu.w r6,r4
+02F79A: A002  bra 0x02F7A2
+02F79C: 2901  mov.w r0,@r9
+02F79E: E200  mov #0,r2
+02F7A0: 2921  mov.w r2,@r9  ; word [72C4] = 0
+02F7A2: D463  mov.l @(0x02F930),r4          ; = 0x000AC8B8 ROM
+02F7A4: D263  mov.l @(0x02F934),r2          ; = 0x000BE8AC ROM
+02F7A6: 420B  jsr @r2                       ; -> 0x0BE8AC  | fixed uint16 lookup 0x0AC8B8 at [0xFFFF6350]
+02F7A8: F4EC  fmov fr14,fr4
+02F7AA: 620D  extu.w r0,r2
+02F7AC: 6691  mov.w @r9,r6
+02F7AE: 656D  extu.w r6,r5
+02F7B0: 3523  cmp/ge r2,r5  ; T = ([72C4] >= table value)
+02F7B2: 8908  bt 0x02F7C6
+02F7B4: 6691  mov.w @r9,r6
+02F7B6: D560  mov.l @(0x02F938),r5          ; = 0x000CBC1C CAL
+02F7B8: 6251  mov.w @r5,r2
+02F7BA: 3622  cmp/hs r2,r6  ; T = ([72C4] >= u16 [0x0CBC1C]) unsigned
+02F7BC: 8B18  bf 0x02F7F0
+02F7BE: D25F  mov.l @(0x02F93C),r2          ; = 0x000CC5F0 CAL
+02F7C0: F828  fmov.s @r2,fr8
+02F7C2: F8F5  fcmp/gt fr15,fr8  ; T = ([0x0CC5F0] > [0xFFFF4130])
+02F7C4: 8B14  bf 0x02F7F0
+02F7C6: DE54  mov.l @(0x02F918),r14         ; = 0x000BE9A0 ROM
+02F7C8: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02F7CA: E400  mov #0,r4
+02F7CC: DA5C  mov.l @(0x02F940),r10         ; = 0xFFFF3158 RAM
+02F7CE: 2A01  mov.w r0,@r10  ; word [0xFFFF3158] = 0x00FF (value 0); then 315A, 315C, 3160, 315E
+02F7D0: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02F7D2: E400  mov #0,r4
+02F7D4: 81A1  mov.w r0,@(2,r10)
+02F7D6: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02F7D8: E400  mov #0,r4
+02F7DA: 81A2  mov.w r0,@(4,r10)
+02F7DC: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02F7DE: E400  mov #0,r4
+02F7E0: 81A4  mov.w r0,@(8,r10)
+02F7E2: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02F7E4: E400  mov #0,r4
+02F7E6: D257  mov.l @(0x02F944),r2          ; = 0x00024CA0 ROM
+02F7E8: 420B  jsr @r2                       ; -> 0x024CA0
+02F7EA: 81A3  mov.w r0,@(6,r10)
+02F7EC: E001  mov #1,r0
+02EE78: 2FC6  mov.l r12,@-r15
+02EE7A: 2FD6  mov.l r13,@-r15
+02EE7C: 2FE6  mov.l r14,@-r15
+02EE7E: 4F22  sts.l pr,@-r15
+02EE80: DE86  mov.l @(0x02F09C),r14         ; = 0x000BE9A0 ROM
+02EE82: ED00  mov #0,r13
+02EE84: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02EE86: 64D3  mov r13,r4
+02EE88: DC85  mov.l @(0x02F0A0),r12         ; = 0xFFFF3158 RAM
+02EE8A: 2C01  mov.w r0,@r12  ; word [0xFFFF3158] = 0x00FF; then 315A, 315C, 3160, 315E
+02EE8C: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02EE8E: 64D3  mov r13,r4
+02EE90: 81C1  mov.w r0,@(2,r12)
+02EE92: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02EE94: 64D3  mov r13,r4
+02EE96: 81C2  mov.w r0,@(4,r12)
+02EE98: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02EE9A: 64D3  mov r13,r4
+02EE9C: 81C4  mov.w r0,@(8,r12)
+02EE9E: 4E0B  jsr @r14                      ; -> 0x0BE9A0
+02EEA0: 64D3  mov r13,r4
+02EEA2: 81C3  mov.w r0,@(6,r12)
+02EEA4: 4F26  lds.l @r15+,pr
+02EEA6: 6EF6  mov.l @r15+,r14
+02EEA8: 6DF6  mov.l @r15+,r13
+02EEAA: 000B  rts
+02EEAC: 6CF6  mov.l @r15+,r12
+;   pool 0x02F09C: .long 0x000BE9A0  ROM
+;   pool 0x02F0A0: .long 0xFFFF3158  RAM
+
+==== CONTEXT: 0x028210 EXCERPT (2541-instruction function, caller 0x04A03E) -- THE WRITER OF BYTE [0xFFFF9707] ====
+CONTRACT   byte [9707] := 1 iff (byte sp+72 != 0 or the 0x058524 result at sp+0 == 1) and (byte [0xFFFF3884] &
+           0x08 or byte [0xFFFF3864] & 0x10 or byte [0xFFFF3864] & 0x20); else 0. The (index, mask) pairs come
+           from the byte table 0x09A834 at offsets 1182, 1042, 1062; the index i addresses byte [0xFFFF3836 + 2i].
+           The same function writes [9705] at 0x02852A (gbr+1) and [9706] at 0x0285A4 (gbr+2).
+EVIDENCE   decoded from the listing only (not emulated); table bytes read directly: 0x09A834+1182 = 39, 0x08;
+           +1042 = 23, 0x10; +1062 = 23, 0x20. find_writers (a lower bound) reports one store to [9707], this one
+           at 0x028618 (flagged "IN UNMAPPED, LIKELY NOT A REAL WRITER"; it is the code below).
+LISTING
+0285A6: E048  mov #72,r0
+0285A8: 01FC  mov.b @(r0,r15),r1  ; r1 = byte sp+72 (set earlier in this 2541-instruction function; not decoded here)
+0285AA: 2118  tst r1,r1
+0285AC: 8B02  bf 0x0285B4
+0285AE: 60F0  mov.b @r15,r0  ; r0 = byte sp+0 = result of 0x058524 (not decoded here)
+0285B0: 8801  cmp/eq #1,r0
+0285B2: 8B28  bf 0x028606  ; sp+72 == 0 and sp+0 != 1 -> [9707] = 0
+0285B4: D790  mov.l @(0x0287F8),r7          ; = 0xFFFF3836 RAM  | r7 = 0xFFFF3836: base of a byte array indexed 2*i
+0285B6: D491  mov.l @(0x0287FC),r4          ; = 0x0009A834 ROM  | r4 = 0x09A834: table of (i, mask) byte pairs
+0285B8: 952A  mov.w @(0x028610),r5          ; = 0x049E (1182)
+0285BA: 6053  mov r5,r0
+0285BC: 024C  mov.b @(r0,r4),r2
+0285BE: 602C  extu.b r2,r0
+0285C0: 4000  shll r0
+0285C2: 067C  mov.b @(r0,r7),r6
+0285C4: 7501  add #1,r5
+0285C6: 6053  mov r5,r0
+0285C8: 024C  mov.b @(r0,r4),r2
+0285CA: 622C  extu.b r2,r2
+0285CC: 2629  and r2,r6
+0285CE: 4615  cmp/pl r6  ; T = byte [0xFFFF3884] & 0x08 != 0 (entry 1182: i = 39, mask 0x08)
+0285D0: 8921  bt 0x028616
+0285D2: 951E  mov.w @(0x028612),r5          ; = 0x0412 (1042)
+0285D4: 6053  mov r5,r0
+0285D6: 024C  mov.b @(r0,r4),r2
+0285D8: 602C  extu.b r2,r0
+0285DA: 4000  shll r0
+0285DC: 067C  mov.b @(r0,r7),r6
+0285DE: 7501  add #1,r5
+0285E0: 6053  mov r5,r0
+0285E2: 024C  mov.b @(r0,r4),r2
+0285E4: 622C  extu.b r2,r2
+0285E6: 2629  and r2,r6
+0285E8: 4615  cmp/pl r6  ; T = byte [0xFFFF3864] & 0x10 != 0 (entry 1042: i = 23, mask 0x10)
+0285EA: 8914  bt 0x028616
+0285EC: 9612  mov.w @(0x028614),r6          ; = 0x0426 (1062)
+0285EE: 6063  mov r6,r0
+0285F0: 024C  mov.b @(r0,r4),r2
+0285F2: 602C  extu.b r2,r0
+0285F4: 4000  shll r0
+0285F6: 057C  mov.b @(r0,r7),r5
+0285F8: 7601  add #1,r6
+0285FA: 6063  mov r6,r0
+0285FC: 024C  mov.b @(r0,r4),r2
+0285FE: 622C  extu.b r2,r2
+028600: 2529  and r2,r5
+028602: 4515  cmp/pl r5  ; T = byte [0xFFFF3864] & 0x20 != 0 (entry 1062: i = 23, mask 0x20)
+028604: 8907  bt 0x028616
+028606: A007  bra 0x028618
+028608: E000  mov #0,r0  ; [slot] r0 = 0
+;   word pool 0x02860A..0x028615 (mov.w operands; fn_dump prints longs here, which overlap the code at 0x028616):
+;   pool 0x02860A: .word 0x0386  (902; used earlier in the function, not decoded here)
+;   pool 0x02860C: .word 0x039A  (922; same)
+;   pool 0x02860E: .word 0x03AE  (942; same)
+;   pool 0x028610: .word 0x049E  (1182; 0x0285B8)
+;   pool 0x028612: .word 0x0412  (1042; 0x0285D2)
+;   pool 0x028614: .word 0x0426  (1062; 0x0285EC)
+028616: E001  mov #1,r0  ; r0 = 1 (any of the three bits set)
+028618: C003  mov.b r0,@(3,gbr)             ; gbr+3 = 0xFFFF9707  | byte [0xFFFF9707] = r0
+
+==== CONTEXT: 0x04092A (35 instructions, caller 0x047C40) -- THE OTHER WRITER OF [0xFFFF7FD4] FIND_WRITERS REPORTS ====
+CONTRACT   An initialiser for this function's state (GBR = 0xFFFF7FD4): [7FD4] := 1.0; words [7FE6] [7FE8] [7FEA]
+           [7FF8] [7FFC] := 0xFFFF; byte [7FF0] := 1; bytes [7FFB] := [90BE], [7FFF] := [8E7E] (so the first
+           0x040AF6 call sees no falling edge), [7FF2] := [65C0], [7FF3] := [85D7]. Reads no table.
+           find_writers (a lower bound) over 0xFFFF7FB0..0xFFFF7FD6 reports stores from 0x040AF6 (all of them,
+           [7FB0] / [7FB4] included, but flagged "IN FLOAT_DATA / IN UNMAPPED, LIKELY NOT A REAL WRITER": the
+           region map files this code as data, so --code-only hides them), 0x04092A (0x04096A, same flag),
+           0x041030 (H, same flag), 0x0410D4 (0x041258 / 0x041552) and 0x040970 (0x040990, flagged) for [7FBC],
+           and a phantom at 0x03F504 (pool word 0xC1A00000 = -20.0 of 0x03F368 decoded as mov.w r0,@(320,gbr)).
+           So among the writers it reports, the only one outside 0x040AF6 that stores a factor cell of H
+           ([7FB0] [7FB8] [7FC4] [7FD4]) is this function ([7FD4] := 1.0).
+EVIDENCE   emulated: check_context, three runs, values and the exact write set asserted. Whether 0x047C40 is a
+           power-on initialiser is not established (it also calls 0x06081C and 0x0418FC).
+LISTING
+04092A: 4F13  stc.l gbr,@-r15
+04092C: D093  mov.l @(0x040B7C),r0          ; = 0xFFFF7FD4 RAM
+04092E: 401E  ldc r0,gbr                    ; GBR = 0xFFFF7FD4  | GBR = 0xFFFF7FD4 (this function only)
+040930: D693  mov.l @(0x040B80),r6          ; = 0xFFFF65C0 RAM
+040932: 6560  mov.b @r6,r5  ; r5 = byte [0xFFFF65C0]
+040934: D693  mov.l @(0x040B84),r6          ; = 0xFFFF85D7 RAM
+040936: 6660  mov.b @r6,r6  ; r6 = byte [0xFFFF85D7]
+040938: D493  mov.l @(0x040B88),r4          ; = 0xFFFF90BE RAM
+04093A: 6440  mov.b @r4,r4  ; r4 = byte [0xFFFF90BE]
+04093C: D193  mov.l @(0x040B8C),r1          ; = 0xFFFF8E7E RAM
+04093E: 6110  mov.b @r1,r1  ; r1 = byte [0xFFFF8E7E]
+040940: E2FF  mov #-1,r2
+040942: 6023  mov r2,r0
+040944: C10A  mov.w r0,@(20,gbr)            ; gbr+20 = 0xFFFF7FE8  | word [0xFFFF7FE8] = 0xFFFF
+040946: C10B  mov.w r0,@(22,gbr)            ; gbr+22 = 0xFFFF7FEA  | word [0xFFFF7FEA] = 0xFFFF
+040948: C109  mov.w r0,@(18,gbr)            ; gbr+18 = 0xFFFF7FE6  | word [0xFFFF7FE6] = 0xFFFF
+04094A: 6053  mov r5,r0
+04094C: C01E  mov.b r0,@(30,gbr)            ; gbr+30 = 0xFFFF7FF2  | byte [0xFFFF7FF2] = [65C0]
+04094E: 6063  mov r6,r0
+040950: C01F  mov.b r0,@(31,gbr)            ; gbr+31 = 0xFFFF7FF3  | byte [0xFFFF7FF3] = [85D7]
+040952: E001  mov #1,r0
+040954: C01C  mov.b r0,@(28,gbr)            ; gbr+28 = 0xFFFF7FF0  | byte [0xFFFF7FF0] = 1
+040956: 6043  mov r4,r0
+040958: C027  mov.b r0,@(39,gbr)            ; gbr+39 = 0xFFFF7FFB  | byte [0xFFFF7FFB] = [90BE] (so no falling edge is seen on the first 0x040AF6 call)
+04095A: 6023  mov r2,r0
+04095C: C112  mov.w r0,@(36,gbr)            ; gbr+36 = 0xFFFF7FF8  | word [0xFFFF7FF8] = 0xFFFF
+04095E: 6013  mov r1,r0
+040960: C02B  mov.b r0,@(43,gbr)            ; gbr+43 = 0xFFFF7FFF  | byte [0xFFFF7FFF] = [8E7E]
+040962: 6023  mov r2,r0
+040964: C114  mov.w r0,@(40,gbr)            ; gbr+40 = 0xFFFF7FFC  | word [0xFFFF7FFC] = 0xFFFF
+040966: F89D  fldi1 fr8
+040968: D284  mov.l @(0x040B7C),r2          ; = 0xFFFF7FD4 RAM
+04096A: F28A  fmov.s fr8,@r2  ; [0xFFFF7FD4] = 1.0
+04096C: 000B  rts
+04096E: 4F17  ldc.l @r15+,gbr  ; [slot] restore GBR
+;   pool 0x040B7C: .long 0xFFFF7FD4  RAM
+;   pool 0x040B80: .long 0xFFFF65C0  RAM
+;   pool 0x040B84: .long 0xFFFF85D7  RAM
+;   pool 0x040B88: .long 0xFFFF90BE  RAM
+;   pool 0x040B8C: .long 0xFFFF8E7E  RAM
+
+==== CONTEXT: 0x026634 (7 insns), 0x026642 (7), 0x026698 (36) -- THE WRITERS OF BYTE [0xFFFF69E6] (F9 OF 0x0410D4) ====
+CALLERS    0x026634: 0x047C40.  0x026642: 0x049CF0.  0x026698: 0x026642 (census).
+CONTRACT   0x026634: bytes [69E4] [69E5] [69E6] [69E7] := 1, r0 = 1 (stub class 35 of stub_shapes_b_trace.txt,
+           verified; re-run here). 0x026642 calls 0x026650, then 0x026698, then tail-branches to 0x0266E0
+           (class-12 shape of stub_shapes_a_trace.txt; 0x026650 / 0x0266E0 not decoded here).
+           0x026698: lut = table_lookup_1D(0x0AAF5C, float [0xFFFF6354]); byte [69E6] := 0 if float [0xFFFF6350] >
+           [0x0C34D0] (70.0) or NOT (lut > float [0xFFFF63D4]) -- NaN in [6350] fails the first test, NaN in lut
+           or [63D4] makes the second NOT true, so a NaN [63D4] clears; otherwise [69E6] is not written. Byte
+           [69E7] likewise with [0x0C34D4] (60.0). It stores only 0. Reads exactly [6350], [6354], [63D4].
+           find_writers (a lower bound) reports exactly these two writers of [69E6]: 0x02663C (value 1) and
+           0x0266C2 (value 0). So [69E6] is 1 from a 0x026634 call until the first 0x026698 call that clears it,
+           and 0 from then until 0x026634 runs again.
+           0x0AAF5C (uint16 x 2.0, axis 0x0C3954 = -40..110, data 0x0C3994): 1240 1170 1100 1040 980 570 280 266
+           250 210 x7. No definition names 0x0AAF5C's data or axis pointer, nor 0x0C34D0 / 0x0C34D4 (defs.at
+           empty). Code 0x026698..0x026747, the record, axis, data and both thresholds are identical in stock.
+EVIDENCE   emulated: check_writers -- 0x026634 once (write set exactly [69E4..69E7], r0 = 1); 0x026698 525 runs
+           over [6350] in {59, 60, 60.5, 69, 70, 70.5, NaN}, [6354] in {-40, 5, 45, 80, NaN}, [63D4] at lut - 1,
+           lut, lut + 1, 0, NaN, prior byte 1 / 0x55 / 0: both bytes, the exact write set and the exact read set
+           as stated. Identities: [6350] is the x of a definition axis named "Coolant Temperature" (timing trace
+           E13, joined by axis pointer 0x0D2F8C); [6354] likewise (E15 here); [63D4] is not identified.
+           When 0x047C40 (census caller 0x00DF14) and 0x049CF0 (census caller 0x00E54E) run is not decoded.
+LISTING
+026634: E001  mov #1,r0  ; r0 = 1
+026636: D638  mov.l @(0x026718),r6          ; = 0xFFFF69E4 RAM
+026638: 2600  mov.b r0,@r6  ; byte [0xFFFF69E4] = 1
+02663A: 8061  mov.b r0,@(1,r6)  ; byte [0xFFFF69E5] = 1
+02663C: 8062  mov.b r0,@(2,r6)  ; byte [0xFFFF69E6] = 1
+02663E: 000B  rts  ; return (r0 = 1)
+026640: 8063  mov.b r0,@(3,r6)  ; [slot] byte [0xFFFF69E7] = 1
+;   pool 0x026718: .long 0xFFFF69E4  RAM
+026642: 4F22  sts.l pr,@-r15  ; push PR
+026644: B004  bsr 0x026650  ; call 0x026650 (not decoded here)
+026646: 0009  nop
+026648: B026  bsr 0x026698  ; call 0x026698
+02664A: 0009  nop
+02664C: A048  bra 0x0266E0  ; tail-branch to 0x0266E0 (not decoded here)
+02664E: 4F26  lds.l @r15+,pr  ; [slot] restore PR
+026698: 4F22  sts.l pr,@-r15  ; push PR, fr14, fr15
+02669A: FFEB  fmov.s fr14,@-r15
+02669C: FFFB  fmov.s fr15,@-r15
+02669E: D21F  mov.l @(0x02671C),r2          ; = 0xFFFF6354 RAM
+0266A0: F428  fmov.s @r2,fr4  ; fr4 = [0xFFFF6354] (lookup input)
+0266A2: D21F  mov.l @(0x026720),r2          ; = 0xFFFF6350 RAM
+0266A4: FE28  fmov.s @r2,fr14  ; fr14 = [0xFFFF6350]
+0266A6: D21F  mov.l @(0x026724),r2          ; = 0xFFFF63D4 RAM
+0266A8: FF28  fmov.s @r2,fr15  ; fr15 = [0xFFFF63D4]
+0266AA: D423  mov.l @(0x026738),r4          ; = 0x000AAF5C DESC  | record 0x0AAF5C: uint16 x 2.0, axis 0x0C3954 (-40..110), 1240 .. 210
+0266AC: D21F  mov.l @(0x02672C),r2          ; = 0x000BE830 ROM
+0266AE: 420B  jsr @r2                       ; -> 0x0BE830  | fr0 = lut(0x0AAF5C, [6354])
+0266B0: 0009  nop
+0266B2: D222  mov.l @(0x02673C),r2          ; = 0x000C34D0 CAL
+0266B4: F828  fmov.s @r2,fr8  ; fr8 = [0x0C34D0] = 70.0
+0266B6: FE85  fcmp/gt fr8,fr14  ; T = ([6350] > 70.0)  [fcmp/gt fr8,fr14: T = fr14 > fr8]
+0266B8: 8901  bt 0x0266BE  ; T=1 -> clear [69E6]
+0266BA: F0F5  fcmp/gt fr15,fr0  ; T = (lut > [63D4])  [fcmp/gt fr15,fr0: T = fr0 > fr15]
+0266BC: 8902  bt 0x0266C4  ; T=1 -> leave [69E6]
+0266BE: E200  mov #0,r2  ; r2 = 0
+0266C0: D61F  mov.l @(0x026740),r6          ; = 0xFFFF69E6 RAM
+0266C2: 2620  mov.b r2,@r6  ; byte [0xFFFF69E6] = 0 (the only value stored here)
+0266C4: D21F  mov.l @(0x026744),r2          ; = 0x000C34D4 CAL
+0266C6: F828  fmov.s @r2,fr8  ; fr8 = [0x0C34D4] = 60.0
+0266C8: FE85  fcmp/gt fr8,fr14  ; T = ([6350] > 60.0)
+0266CA: 8901  bt 0x0266D0  ; T=1 -> clear [69E7]
+0266CC: F0F5  fcmp/gt fr15,fr0  ; T = (lut > [63D4])
+0266CE: 8902  bt 0x0266D6  ; T=1 -> leave [69E7]
+0266D0: E000  mov #0,r0
+0266D2: D61B  mov.l @(0x026740),r6          ; = 0xFFFF69E6 RAM
+0266D4: 8061  mov.b r0,@(1,r6)  ; byte [0xFFFF69E7] = 0
+0266D6: FFF9  fmov.s @r15+,fr15  ; epilogue
+0266D8: FEF9  fmov.s @r15+,fr14
+0266DA: 4F26  lds.l @r15+,pr
+0266DC: 000B  rts  ; return
+0266DE: 0009  nop
+;   pool 0x02671C: .long 0xFFFF6354  RAM
+;   pool 0x026720: .long 0xFFFF6350  RAM
+;   pool 0x026724: .long 0xFFFF63D4  RAM
+;   pool 0x02672C: .long 0x000BE830  ROM
+;   pool 0x026738: .long 0x000AAF5C  DESC
+;   pool 0x02673C: .long 0x000C34D0  CAL
+;   pool 0x026740: .long 0xFFFF69E6  RAM
+;   pool 0x026744: .long 0x000C34D4  CAL
+
+==== CONTEXT: 0x0409C0 (110 instructions, caller 0x04907C) -- WRITES [7FED] / [7FE6] / [7FF0] (0x040AF6's third-arm state) AND [7FEF] / [7FEA] (0x040A9C's window B) ====
+CONTRACT   with M = byte [8970], A = byte [65C0], F = byte [85D7], t = (byte [726C] == 1) (0x02F8EA), c = (byte
+           [65C5] == 1) (0x022CF4), all read every call:
+           1  if [7FF0] not in {4,7,8} and M in {4,7,8}: byte [7FED] := 1, word [7FE6] := 0
+              else word [7FE6] := min([7FE6] + 1, 0xFFFF).                 Then byte [7FF0] := M.
+           2  if c: byte [7FEE] := 0, word [7FE8] := 0xFFFF
+              elif not t and byte [7FF2] == 0 and A == 1: byte [7FEE] := 1, word [7FE8] := 0
+              else word [7FE8] := min([7FE8] + 1, 0xFFFF).                 Then byte [7FF2] := A.
+           3  if t: byte [7FEF] := 0, word [7FEA] := 0xFFFF
+              elif byte [7FF3] == 0 and F == 1: byte [7FEF] := 1, word [7FEA] := 0
+              else word [7FEA] := min([7FEA] + 1, 0xFFFF).                 Then byte [7FF3] := F.
+           Byte compares are exact (== 1, == 0; [7FF0] sign-extended against #4 / #7 / #8). Nothing else
+           outside the stack is written. So [7FEF] / [7FEA] (window B of 0x040A9C) are armed on a 0 -> 1 edge of
+           byte [85D7] and counted per call of THIS function; in 20.19c [7FDC] can be 1 for the first 438 counts
+           (ANSWER 5). [7FED] / [7FE6] / [7FF0] are the state of 0x040AF6's third lag arm (weight 1.0 in both
+           bins: no effect on H). Code identical in stock.
+EVIDENCE   emulated: check_writers, 1,944 runs (M, [7FF0] in {0, 4, 7, 8, 3 / 5, 0x84}, [65C5], [726C] in
+           {0, 1, 2}, random edge bytes and counters at 0 / 5 / 437 / 438 / 0xFFFE / 0xFFFF): every cell, the
+           exact write set and the exact read set as stated. find_writers (a lower bound) lists 0x040A0C for
+           [7FED], 0x040A12 / 0x040A1E for [7FE6], 0x040A22 for [7FF0], 0x040A6C / 0x040A82 for [7FEF], 0x040A86
+           for [7FEA] -- all flagged "IN FLOAT_DATA, LIKELY NOT A REAL WRITER"; they are this real code.
+           Callers: 0x04907C (census caller 0x00E448); 0x040918 is reached from 0x04AA58 (census caller 0x00E4BA).
+           Their relative order and rates are not decoded here.
+LISTING
+0409C0: 2FA6  mov.l r10,@-r15  ; prologue: push r10..r14, PR
+0409C2: 2FB6  mov.l r11,@-r15
+0409C4: 2FC6  mov.l r12,@-r15
+0409C6: 2FD6  mov.l r13,@-r15
+0409C8: 2FE6  mov.l r14,@-r15
+0409CA: 4F22  sts.l pr,@-r15
+0409CC: 7FF8  add #-8,r15  ; frame 8 bytes (sp+0, sp+4)
+0409CE: D672  mov.l @(0x040B98),r6          ; = 0xFFFF8970 RAM
+0409D0: 6E60  mov.b @r6,r14  ; r14 = byte M = [0xFFFF8970]
+0409D2: D66B  mov.l @(0x040B80),r6          ; = 0xFFFF65C0 RAM
+0409D4: 6C60  mov.b @r6,r12  ; r12 = byte [0xFFFF65C0]
+0409D6: D66B  mov.l @(0x040B84),r6          ; = 0xFFFF85D7 RAM
+0409D8: D270  mov.l @(0x040B9C),r2          ; = 0x0002F8EA ROM
+0409DA: 420B  jsr @r2                       ; -> 0x02F8EA  | r0 = (byte [0xFFFF726C] == 1)
+0409DC: 6B60  mov.b @r6,r11  ; [slot] r11 = byte [0xFFFF85D7]
+0409DE: D670  mov.l @(0x040BA0),r6          ; = 0x00022CF4 ROM
+0409E0: 460B  jsr @r6                       ; -> 0x022CF4  | r0 = (byte [0xFFFF65C5] == 1)
+0409E2: 2F00  mov.b r0,@r15  ; [slot] sp+0 = ([726C] == 1)
+0409E4: 80F4  mov.b r0,@(4,r15)  ; sp+4 = ([65C5] == 1)
+0409E6: DA6F  mov.l @(0x040BA4),r10         ; = 0xFFFF7FE6 RAM  | r10 = 0xFFFF7FE6 literal: +2 7FE8, +4 7FEA, +7 7FED, +8 7FEE, +9 7FEF, +10 7FF0, +12 7FF2, +13 7FF3
+0409E8: 84AA  mov.b @(10,r10),r0  ; r0 = byte [0xFFFF7FF0] (sign-extended)
+0409EA: 8804  cmp/eq #4,r0  ; T = ([7FF0] == 4)
+0409EC: 8D12  bt/s 0x040A14  ; [7FF0] == 4 -> 0x040A14 (count [7FE6]). Slot runs first
+0409EE: 6DF0  mov.b @r15,r13  ; [slot] r13 = sp+0 = ([726C] == 1)
+0409F0: 84AA  mov.b @(10,r10),r0
+0409F2: 8807  cmp/eq #7,r0  ; T = ([7FF0] == 7)
+0409F4: 890E  bt 0x040A14
+0409F6: 84AA  mov.b @(10,r10),r0
+0409F8: 8808  cmp/eq #8,r0  ; T = ([7FF0] == 8)
+0409FA: 890B  bt 0x040A14
+0409FC: 60EC  extu.b r14,r0  ; r0 = M zero-extended
+0409FE: 8804  cmp/eq #4,r0
+040A00: 8903  bt 0x040A0A
+040A02: 8807  cmp/eq #7,r0
+040A04: 8901  bt 0x040A0A
+040A06: 8808  cmp/eq #8,r0
+040A08: 8B04  bf 0x040A14  ; M not in {4,7,8} -> 0x040A14
+040A0A: E001  mov #1,r0
+040A0C: 80A7  mov.b r0,@(7,r10)  ; [7FF0] not in set, M in set: byte [0xFFFF7FED] = 1
+040A0E: E200  mov #0,r2
+040A10: A006  bra 0x040A20  ; -> 0x040A20
+040A12: 2A21  mov.w r2,@r10  ; [slot] word [0xFFFF7FE6] = 0
+040A14: D264  mov.l @(0x040BA8),r2          ; = 0x000BE554 ROM
+040A16: 66A1  mov.w @r10,r6
+040A18: 646D  extu.w r6,r4  ; r4 = [7FE6] zero-extended
+040A1A: 420B  jsr @r2                       ; -> 0x0BE554  | sat_add_u16([7FE6], 1)
+040A1C: E501  mov #1,r5  ; [slot] r5 = 1
+040A1E: 2A01  mov.w r0,@r10  ; word [0xFFFF7FE6] = min([7FE6] + 1, 0xFFFF)
+040A20: 60E3  mov r14,r0
+040A22: 80AA  mov.b r0,@(10,r10)  ; byte [0xFFFF7FF0] = M (every call)
+040A24: 84F4  mov.b @(4,r15),r0  ; r0 = sp+4 = ([65C5] == 1)
+040A26: 8801  cmp/eq #1,r0
+040A28: 8B03  bf 0x040A32  ; [65C5] != 1 -> 0x040A32
+040A2A: E000  mov #0,r0
+040A2C: 80A8  mov.b r0,@(8,r10)  ; [65C5] == 1: byte [0xFFFF7FEE] = 0
+040A2E: A011  bra 0x040A54
+040A30: E0FF  mov #-1,r0  ; [slot] r0 = -1 -> word [7FE8] = 0xFFFF at 0x040A54
+040A32: 2DD8  tst r13,r13  ; T = ([726C] != 1)
+040A34: 8B09  bf 0x040A4A  ; [726C] == 1 -> count [7FE8]
+040A36: 84AC  mov.b @(12,r10),r0  ; r0 = byte [0xFFFF7FF2] ([65C0] of the last call)
+040A38: 2008  tst r0,r0
+040A3A: 8B06  bf 0x040A4A  ; [7FF2] != 0 -> count
+040A3C: 60CC  extu.b r12,r0
+040A3E: 8801  cmp/eq #1,r0
+040A40: 8B03  bf 0x040A4A  ; [65C0] != 1 -> count
+040A42: E001  mov #1,r0
+040A44: 80A8  mov.b r0,@(8,r10)  ; rising [65C0]: byte [0xFFFF7FEE] = 1
+040A46: A005  bra 0x040A54
+040A48: E000  mov #0,r0  ; [slot] r0 = 0 -> word [7FE8] = 0 at 0x040A54
+040A4A: D257  mov.l @(0x040BA8),r2          ; = 0x000BE554 ROM
+040A4C: 85A1  mov.w @(2,r10),r0
+040A4E: 640D  extu.w r0,r4
+040A50: 420B  jsr @r2                       ; -> 0x0BE554  | sat_add_u16([7FE8], 1)
+040A52: E501  mov #1,r5  ; [slot] r5 = 1
+040A54: 81A1  mov.w r0,@(2,r10)  ; word [0xFFFF7FE8] = r0 (every call)
+040A56: 60C3  mov r12,r0  ; r0 = [65C0]
+040A58: 2DD8  tst r13,r13  ; T = ([726C] != 1)
+040A5A: 8F11  bf/s 0x040A80  ; [726C] == 1 -> 0x040A80. Slot runs first
+040A5C: 80AC  mov.b r0,@(12,r10)  ; [slot] byte [0xFFFF7FF2] = [65C0] (every call)
+040A5E: 84AD  mov.b @(13,r10),r0  ; r0 = byte [0xFFFF7FF3] ([85D7] of the last call)
+040A60: 2008  tst r0,r0
+040A62: 8B06  bf 0x040A72  ; [7FF3] != 0 -> count [7FEA]
+040A64: 60BC  extu.b r11,r0
+040A66: 8801  cmp/eq #1,r0
+040A68: 8B03  bf 0x040A72  ; [85D7] != 1 -> count
+040A6A: E001  mov #1,r0
+040A6C: 80A9  mov.b r0,@(9,r10)  ; rising [85D7]: byte [0xFFFF7FEF] = 1
+040A6E: A00A  bra 0x040A86
+040A70: E000  mov #0,r0  ; [slot] r0 = 0 -> word [7FEA] = 0 at 0x040A86
+040A72: D24D  mov.l @(0x040BA8),r2          ; = 0x000BE554 ROM
+040A74: E501  mov #1,r5
+040A76: 85A2  mov.w @(4,r10),r0
+040A78: 420B  jsr @r2                       ; -> 0x0BE554  | sat_add_u16([7FEA], 1)
+040A7A: 640D  extu.w r0,r4  ; [slot] r4 = [7FEA] zero-extended
+040A7C: A003  bra 0x040A86
+040A7E: 0009  nop
+040A80: E000  mov #0,r0
+040A82: 80A9  mov.b r0,@(9,r10)  ; [726C] == 1: byte [0xFFFF7FEF] = 0
+040A84: E0FF  mov #-1,r0  ; r0 = 0xFFFF
+040A86: 81A2  mov.w r0,@(4,r10)  ; word [0xFFFF7FEA] = r0 (every call)
+040A88: 60B3  mov r11,r0
+040A8A: 80AD  mov.b r0,@(13,r10)  ; byte [0xFFFF7FF3] = [85D7] (every call)
+040A8C: 7F08  add #8,r15  ; epilogue
+040A8E: 4F26  lds.l @r15+,pr
+040A90: 6EF6  mov.l @r15+,r14
+040A92: 6DF6  mov.l @r15+,r13
+040A94: 6CF6  mov.l @r15+,r12
+040A96: 6BF6  mov.l @r15+,r11
+040A98: 000B  rts  ; return
+040A9A: 6AF6  mov.l @r15+,r10
+;   pool 0x040B80: .long 0xFFFF65C0  RAM
+;   pool 0x040B84: .long 0xFFFF85D7  RAM
+;   pool 0x040B98: .long 0xFFFF8970  RAM
+;   pool 0x040B9C: .long 0x0002F8EA  ROM
+;   pool 0x040BA0: .long 0x00022CF4  ROM
+;   pool 0x040BA4: .long 0xFFFF7FE6  RAM
+;   pool 0x040BA8: .long 0x000BE554  ROM
+
+==== CONTEXT: 0x03A5E4 (22 instructions) -- [0xFFFF6354] IS THE x OF A DEFINITION AXIS NAMED "Coolant Temperature" ====
+CONTRACT   [7C34] = [7C38] = table_lookup_1D(0x0AD3C4, [6354]). Record 0x0AD3C4: axis pointer 0x0CC664, which the
+           definitions name "Coolant Temperature" (scaling DegreesF, displayed (x*1.8)+32, so the raw axis is
+           degrees C); data 0x0CEE40 = "Tip-in Enrichment Compensation D (ECT)". Found at step 4 while testing
+           the status-file claim on [6354]; decoded and emulated here so the identity rests on bytes.
+EVIDENCE   emulated: check_context, 9 runs ([6354] in -50..130 and NaN) against the ROM lookup. Definition names
+           asserted by check_tables through scripts/defs.py.
+LISTING
+03A5E4: 4F22  sts.l pr,@-r15
+03A5E6: D690  mov.l @(0x03A828),r6          ; = 0xFFFF7C9D RAM
+03A5E8: 6060  mov.b @r6,r0
+03A5EA: D590  mov.l @(0x03A82C),r5          ; = 0xFFFF7C60 RAM
+03A5EC: 8053  mov.b r0,@(3,r5)
+03A5EE: D690  mov.l @(0x03A830),r6          ; = 0x000CBC07 CAL
+03A5F0: 6060  mov.b @r6,r0
+03A5F2: 8052  mov.b r0,@(2,r5)
+03A5F4: D28F  mov.l @(0x03A834),r2          ; = 0xFFFF6354 RAM
+03A5F6: F428  fmov.s @r2,fr4  ; fr4 = [0xFFFF6354]
+03A5F8: D48F  mov.l @(0x03A838),r4          ; = 0x000AD3C4 ROM  | record 0x0AD3C4: axis 0x0CC664 "Coolant Temperature" (raw degC), data 0x0CEE40 "Tip-in Enrichment Compensation D (ECT)"
+03A5FA: D290  mov.l @(0x03A83C),r2          ; = 0x000BE830 ROM
+03A5FC: 420B  jsr @r2                       ; -> 0x0BE830  | table_lookup_1D(0x0AD3C4, [6354])
+03A5FE: 0009  nop
+03A600: D58A  mov.l @(0x03A82C),r5          ; = 0xFFFF7C60 RAM
+03A602: E0D4  mov #-44,r0
+03A604: F507  fmov.s fr0,@(r0,r5)  ; [0xFFFF7C34] = result
+03A606: F956  fmov.s @(r0,r5),fr9
+03A608: E0D8  mov #-40,r0
+03A60A: 4F26  lds.l @r15+,pr
+03A60C: 000B  rts
+03A60E: F597  fmov.s fr9,@(r0,r5)  ; [slot] [0xFFFF7C38] = result
+;   pool 0x03A828: .long 0xFFFF7C9D  RAM
+;   pool 0x03A82C: .long 0xFFFF7C60  RAM
+;   pool 0x03A830: .long 0x000CBC07  CAL
+;   pool 0x03A834: .long 0xFFFF6354  RAM
+;   pool 0x03A838: .long 0x000AD3C4  ROM
+;   pool 0x03A83C: .long 0x000BE830  ROM
+
+================================================================================================================
+COMPARISON WITH EXISTING CLAIMS  (step 4: read only after the listing, the model and the emulation were done)
+================================================================================================================
+Sources searched for every address above in all its spellings (0x040AF6, 40AF6, 0x0410..., FFFF7FB0, 7FB0, ...):
+docs/, disassembly/analysis/, disassembly/ghidra/ImportAE5L600L.java, docs/verification-status.json, fn_dump
+--labels. docs/exploration/ (blind-audit and hypothesis scratch) was searched but is not listed. Nothing in the
+step-1..3 reading changed as a result; two identities were ADDED at this step and settled from bytes (0x03A5E4
+for [6354]; hole9_identity_trace.txt for the Cruise sense of [90BE], see K3).
+
+CONTRADICTED BY THE BYTES
+C1  disassembly/analysis/mystery_subs_analysis.txt:394-395: "0x40AF6 timing_offset_applier -- Applies per-condition
+    timing offset corrections". 0x040AF6 applies nothing to any timing value: its float outputs are the factor
+    cells [7FB0] [7FB4] [7FB8] [7FC4] [7FC8] [7FCC] [7FD0] [7FD4], read by 0x041030 (four of them) to form the clamp
+    bound H of the 0x0410D4 integrator, and by itself (write set asserted, E1).
+C2  disassembly/analysis/mystery_subs_analysis.txt:397-398: "0x41030 timing_cyl_selector -- Selects timing
+    correction for specific cylinder index". 0x041030 multiplies [7FB8], [7FB0], [7FC4], [7FD4] and 0.01 (and
+    [0x0D2B9C] = 0.0 when byte [67FC] == 1) into [0xFFFF7FC0]; there is no index (re-run in check_real).
+C3  disassembly/analysis/map_switching_analysis.txt:596 "BSR 0x40AF6: Sub-function B -- Additional workspace setup"
+    (section 6 heading :590 "TASK 33 - TIMING WORKSPACE INIT"): 0x040AF6 runs every pass and recomputes the bound
+    factors; it is not a setup routine. Same file :600-616, "6.1 Sub-function A (0x40A9C -> appears at 0x4092A)",
+    GBR = FFFF7FD4, selecting descriptors 0xADB4C / 60 / 74 / 88 by "throttle" and "engine_running": 0x04092A is a
+    separate function (caller 0x047C40, not 0x040918) that reads no descriptor and only seeds this function's
+    state (context section, write set asserted); 0x040A9C is the [7FDC] flag writer (timing trace).
+C4  disassembly/ghidra/ImportAE5L600L.java:8300 0xFFFF90BE "ect_warmup_mode_flag_A" (named from a USE: :8294-8298 say it
+    selects among four ECT warm-up records for 0xFFFF7F68), and
+    map_switching_analysis.txt:607 / :623 / :843 "timing_ws_scratch ... Timing workspace flag": its only writer
+    found, 0x06114E (0x0611BC), sets it from bytes [972E], [9705] and [90C4] (and [9113] under other values of
+    [0x0D9AC4]) -- no temperature is read there -- and the same byte steers the Cruise / Non-Cruise weight [90A8]
+    (E9, E10). It is the Cruise-request byte of the base-timing blend, as map_switching_analysis.txt:76-89 and
+    :794 ("cruise_request_flag") already say; the warm-up and scratch names are not supported by any byte here.
+C5  disassembly/ghidra/ImportAE5L600L.java:6933 0xFFFF90A8 "timing_dispatch_state" ("Timing dispatch state"): it is a
+    float weight clamped to 0..1 and stepped +-0.008 per call (0x06114E), the Non-Cruise weight of 0x04004A's
+    blend. ram_reference.txt:303 and verification-status.json already carry the corrected "map_blend_ratio"; the
+    Ghidra import still applies the old name (no later label at that address in the file).
+C6  docs/verification-status.json:33121 (ram_reference.txt:303) "Consumed by task32 lerp at 0x4001D6-0x4001EA":
+    the lerp is at 0x0401D6..0x0401EA (an address 0x4001D6 is outside the 1 MB ROM). Imprecise, not wrong in
+    substance.
+
+UNSUPPORTED (the bytes here neither confirm nor refute; flagged because a name implies more than is known)
+U1  0xFFFF3158 "afl_diagnostic_flag" (ImportAE5L600L.java:6744; ram_reference.txt:262; DISASM-ONLY): here it is the
+    value byte of a value:~value u16 set to 1 only at 0x02F622 on a 0 -> 1 edge of byte [65C2] while the value
+    bytes of [315A] / [315C] are 1 (E12). Nothing ties it to AFL or to a diagnostic.
+U2  0xFFFF8E7E "afc_enable_flag_A" (:1445), 0xFFFF85D7 "fuel_system_state" (:2416), 0xFFFF67EC
+    "dtc_maturation_counter_67EC" (:2224), 0xFFFF6210 "dt_lookup_input2" (:5651): their roles in 0x040AF6 are a
+    record selector whose values do not depend on it, an equality gate, a u16 compared with 0xFFFF thresholds, and
+    an offset input to a flat table. None affects H with the shipped calibration, so none is tested here.
+U3  0xFFFF7FD4 "gbr_base_corr_init_ws" (:5252; map_switching_analysis.txt:602 / :816 "timing_ws_gbr";
+    ignition_timing_analysis.txt:214 / :607): the address is a GBR base only inside the initialiser 0x04092A; in
+    0x040AF6 / 0x041030 it is the fourth float factor of H (0 iff byte [9707] != 0, else 1). The labels describe
+    the less important role. 0xFFFF7FB0 "gbr_tim_7FB0" (:7519) likewise: the float there is the first factor.
+U4  0x0ADD90 / 0x0ADDA4: well-formed records consumed at 0x040F38 but absent from coverage_map.scan_descriptors
+    (818 records in this run), so fn_dump does not mark them DESC and verification-status has no entity for their
+    data 0x0D338A / 0x0D339A -- like the 14 records of the timing trace's headline 5. They ARE in the descriptor
+    census: disassembly/maps/descriptor_map.txt:747-748 (rows 731 / 732, uint8 x16, 0.781250, axis 0x0D2FCC) and
+    disassembly/maps/table_triage.json. None of the 21 records has a verification-status RECORD entity; only the
+    data blocks 0xD32C8, 0xD33C4, 0xD33E8 ... appear (DISASM-ONLY, unnamed).
+U5  map_switching_analysis.txt:44-49 and :110 (counter 0xFFFF90B2 reset when any gate fails; 0x061120 maintains
+    0xFFFF90B4, reset only on the falling edge of [90C4]): not decoded here (N1).
+
+CONFIRMED
+K1  timing_0410D4_0415B8_trace.txt CONTEXT 0x041030 and ImportAE5L600L.java:9486 / :8764 ("integ_7FBC_hi",
+    H = [7FB8]*[7FB0]*[7FC4]*[7FD4]*0.01, *0.0 when byte [67FC] == 1): re-run after 0x040AF6, 4,320 cases.
+K2  CLAUDE.md "The cruise/non-cruise blend ratio is 0xFFFF90A8" and "The decision is the 0x60ECC-0x6114E chain
+    calibrated at 0xD9AC4-0xD9E26"; verification-status / ram_reference.txt:303 "0.0 = full Cruise, 1.0 = full
+    Non-Cruise, sole writer 0x0611E0": 0x04004A emulated with the Cruise tables raised gives the Cruise lookup at
+    w = 0 and the Non-Cruise lookup at w = 1; 0x0611E0 is the store of 0x06114E; [90BE] is written at 0x0611BC with
+    [0x0D9AC4] read at 0x061166 and [90C4] from 0x0610E6 (cal 0x0D9AD8 / 0x0D9ADA / 0x0D9B2C).
+K3  map_switching_analysis.txt:70-71, :76-89 ("0xFFFF90BE == 1 means cruise requested and drives the ratio DOWN toward 0.0
+    (Cruise)"; selector [0xD9AC4] = 0 -> flag = ([0xFFFF90C4] == 1); fault bytes [972E] / [9705] force 0) and
+    :91-108 (arming thresholds 250 / 4.0 / 375): every statement re-derived and emulated here (0x06114E 2,646
+    runs, 0x0610E6 540 runs). Independent corroboration of the Cruise sense: hole9_identity_trace.txt:1255-1256
+    (batch 2, verified) selects "CL Fueling Target Compensation Imm. Cruise (ECT)" when byte [90BE] == 1 and the
+    Non-Cruise table otherwise (0x0339E4).
+K4  docs/verification-status.json 0xFFFF6354 VERIFIED-BOTH "ect_gated_c" (ram_reference.txt:201 "COOLANT TEMP degC"):
+    corroborated from bytes at step 4 by 0x03A5E4 (context section): [6354] is the x of record 0x0AD3C4 on the
+    definition axis "Coolant Temperature" 0x0CC664. So the taper 0x0ADD90 runs on coolant temperature in degC, and
+    its axis 0x0D2FCC (-40..110) is that range; 0x0D2FCC itself is named by no definition.
+K5  ram_reference.txt:209 / ImportAE5L600L.java:9232 0xFFFF6898 "atm_pressure_current", "raw mmHg-class 440..760":
+    the 0x0ADDB8 axis is exactly 440..760. Consistent; the table is flat, so it does not matter to H.
+K6  docs/open-issues.md:159, docs/analysis-plan.md:243-244, docs/corrections.md:6545 leave open whether [7FBC] can be
+    non-zero and point at 0x040AF6 for its bound. Answered here only as far as the code goes: the bound H is
+    non-zero under the stated gate (ANSWER 3), but whether [7FBC] leaves 0 on the car turns on the 0x0410D4 latch
+    and byte [69E6] (ANSWER 1-2) and is NOT established (N8, N9). Their statement that window B blocks increments
+    is re-run here in the task (check_window_b, 20.19c only); "subtracted by 0x03F368" is the timing trace's and
+    is not re-tested.
+K8  disassembly/ghidra/ImportAE5L600L.java:9494 0xFFFF7FF4 "integ_7FBC_latch" ("set at 0x0411F6 (byte [69E6]==0 and X
+    inside +-0.001373291 ...); while 1, X forced to 0. No clearing writer found"): re-run in the task here
+    (check_latch); find_writers again reports only 0x0411F6.
+K7  Runtime-library labels at the call sites (table_lookup_1D 0x0BE830, uint16_add_sat 0x0BE554, float_lag_filter
+    0x0BEA40, float_max 0x0BE960) match their use here.
+
+================================================================================================================
+ESTABLISHED  (bytes + emulation; addresses cited)
+================================================================================================================
+E1  0x040AF6 writes the four factors of H: [7FB0] at 0x040EA2 / 0x040EC4 / 0x040EF6 / 0x040F18 / 0x040F22,
+    [7FB8] at 0x040F40, [7FC4] at 0x040F4C, [7FD4] at 0x040FEA / 0x041010; all addressed off the literal
+    0xFFFF7FFC (pools 0x040E04, 0x041074), not a stack frame.
+E2  [7FB4] (0x040D6C) is one of 17 uint8 records at [0xFFFF6624]: 0x0ADC3C when byte [0x0D297C] == 90 and byte
+    [0xFFFF3158] == 1 (0x040B54..0x040B76), else one of 16 keyed by word [67EC] >= [0x0D29BC], byte [90BE] == 1,
+    byte [8E7E] == 1, byte [8970] in {4,7,8} (0x040BF0..0x040D62). Shipped: 20.0390625 (raw 0x39) in the nine
+    records selected with [3158] == 1 or [90BE] == 1, 0 in the other eight; all 17 flat.
+E3  [7FB0] = [7FB4] exactly in 20.19c and stock: four lag arms 0x040E88 / 0x040EAA / 0x040EDC / 0x040EFE with
+    weights [0x0D2B88] / [0x0D2B84] / [0x0D2B8C] / [0x0D2B90] = 1.0 and the copy 0x040F1A; with [0x0D29BE] = 0 the
+    first, second and fourth are unreachable (counters >= 1 after 0x040D86 / 0x040DB6 / 0x040E5C).
+E4  [7FB8] = 0x0ADD90 / 0x0ADDA4 (byte-identical data 0x0D338A / 0x0D339A, shared axis 0x0D2FCC) at
+    [0xFFFF6354]: 100 at <= 30, 89.84375, 85.15625, 79.6875 at 40 / 50 / 60, 75 at >= 70 and for NaN.
+E5  [7FC4] = 0x0ADDB8 at [0xFFFF6898] = 1.0 and [7FD0] = 0x0ADDCC at [7FCC] = 1.0 for every input (flat).
+E6  [7FD4] = +0.0 when byte [0xFFFF9707] != 0 (0x0297D0 at 0x040B44, test 0x040F64..0x040F68, path 0x040FEC), else
+    1.0 (plain path 0x040FE4..0x040FEA, or gated lag 0x040FF8..0x041010 toward 1.0 with weight [0x0D2BE8] = 1.0).
+E7  Consequently H (0x041030) = 0x0ADD90([6354]) * 20.0390625 * 0.01 when ([3158] == 1 or [90BE] == 1) and [9707]
+    == 0 and [67FC] != 1, and 0 otherwise; 15.0 < H <= 20.04 on the first condition (check_real, 4,320 runs).
+E8  The CODE lets [7FBC] be non-zero: task 0x040918 iterated in the emulator holds it at H (15.029 or 20.039) with
+    byte [69E6] = 1, latch [7FF4] = 0 and [7FEF] = 0 set by construction plus the branch-12 inputs, and at exactly
+    0.0 when the gate is closed (check_chain). Whether the car reaches those inputs is not established (N8, N9).
+E9  byte [90BE] is written every pass by 0x06114E (0x0611BC) and equals (byte [90C4] == 1) when bytes [972E] and
+    [9705] are 0, because [0x0D9AC4] = 0 (both bins); the same byte steps [90A8] down (1) or up (0) by 0.008.
+E10 [90A8] weights the Non-Cruise side of 0x04004A's blend of "Base Timing Primary Cruise" / "Non-Cruise"
+    (0x0401D6..0x0401EA; data pointers 0x0D4714 / 0x0D48D4), so [90BE] == 1 drives the base-timing blend toward
+    the definition table named Cruise.
+E11 byte [90C4] := 1 iff u16 [90B2] >= 250 and u16 [90B4] >= 375 and (4.0 > [90EC] or u16 [90B0] == 0) (0x0610E6),
+    and := 1 unconditionally by 0x06081C, which also sets [90B2] = [90B4] = 0xFFFF.
+E12 byte [3158] is the value byte of a value:~value u16. Among the four writers find_writers reports (0x02EE8A,
+    0x02F622, 0x02F62A, 0x02F7CE; a lower bound), value 1 is stored only at 0x02F622 (0x02F57E), when byte [65C2]
+    == 1, byte [72CF] (its previous value) == 0 and the value bytes of [315A] and [315C] are both 1 after this
+    call's own stores; value 0 at 0x02F62A, 0x02F7CE, 0x02EE8A.
+E13 byte [7FF6] is set only at 0x040F62 (V >= [0x0D2BEC] = 1000.0, or V NaN) and is cleared by 0x040970 (timing
+    trace context); it gates only the [7FCC] / [7FD4] lag path, which cannot change [7FD4] from 1.0 here.
+E14 None of the 21 records, their axes, or the scalars 0x040AF6 reads is named by a definition (defs.at empty).
+E15 [0xFFFF6354], the taper input, is the x of record 0x0AD3C4 in 0x03A5E4 (0x03A5F4..0x03A5FC), whose axis 0x0CC664 the
+    definitions name "Coolant Temperature" (raw degC): the bound tapers with coolant temperature.
+E16 Among the writers find_writers reports (a lower bound) for 0xFFFF7FB0..0xFFFF7FD6, the only one outside
+    0x040AF6 that stores a factor cell is the initialiser 0x04092A ([7FD4] := 1.0 at 0x04096A); the others are
+    0x041030 (H), 0x0410D4 / 0x040970 ([7FBC]) and the phantom 0x03F504. The tool DOES list every store of
+    0x040AF6 (all five [7FB0] stores and 0x040D6C for [7FB4] included) but flags them "LIKELY NOT A REAL WRITER"
+    (region map), so a --code-only run hides them.
+E17 Latch: byte [7FF4] := 1 at 0x0411F6 when byte [69E6] == 0 and |[7FBC]| <= 0.001373291015625 (or NaN); while it
+    is 1, 0x0410D4 stores +0.0 to [7FBC] on every call (0x04124A..0x041258). With [69E6] == 0 no 0x0410D4 path
+    increases [7FBC] (step 10 at 0x0413C4..0x0413CC precedes branch 12; step 6 at 0x041280..0x041286). One
+    call with [69E6] = 0 at X = 0 keeps [7FBC] at 0.0 through 200 later calls with every up condition met
+    (check_latch, 20.19c and stock). find_writers reports only 0x0411F6 for [7FF4].
+E18 byte [69E6] := 1 by 0x026634 (0x02663C, with [69E4] [69E5] [69E7]); := 0 by 0x026698 (0x0266C2) when [6350] >
+    70.0 ([0x0C34D0]) or NOT (lut(0x0AAF5C, [6354]) > [63D4]), else untouched; 0x026698 never stores non-zero.
+    These are the two writers find_writers reports (check_writers, 525 runs).
+E19 In 20.19c only ([0x0D29C4] = 438 vs 0 in stock) byte [7FDC] = 1 while [7FEF] == 1 and [7FEA] < 438, which
+    holds [7FBC] (no increment) and, with byte [65C0] == 1, steps it down 0.015 per call (check_window_b).
+E20 0x0409C0 (caller 0x04907C) arms [7FEF] := 1, [7FEA] := 0 on byte [85D7] == 1 with [7FF3] == 0 and [726C] != 1
+    (0x040A6C / 0x040A70 / 0x040A86) and counts [7FEA] otherwise; it also writes [7FF0] := M (0x040A22), [7FED] :=
+    1 / [7FE6] := 0 (0x040A0C / 0x040A12) and counts [7FE6] (0x040A1E) (check_writers, 1,944 runs, exact sets).
+
+================================================================================================================
+NOT ESTABLISHED  (and what would settle it)
+================================================================================================================
+N1  How often [90BE] == 1 in normal warm driving. It follows [90C4], whose counters [90B2] / [90B4] and inputs
+    [90EC] / [90B0] are written by the chain under 0x060568 (0x060ECC writes [90B2]; the [90B4], [90B0], [90EC]
+    writers are not decoded). Settle: decode those writers, or log byte 0xFFFF90BE / float 0xFFFF90A8.
+    (Answering this alone would not settle N8: H > 0 is necessary, not sufficient.)
+N2  The physical meaning of "Cruise" in the definition names, of byte [3158] (and of [65C2], [65BD], [7E50], the
+    counters [72C4] / [72C6] and the tables 0x0AC8C4 / 0x0AC8B8 that drive it), and of the bits behind [9707]
+    (bytes 0xFFFF3884 / 0xFFFF3864 and the 0x058524 gate of 0x028210). Settle: decode their writers / consumers.
+N3  The identity of the taper axis 0x0D2FCC itself (no definition names that pointer); its input is settled (E15).
+N4  When 0x06081C runs (caller 0x047C40) and so whether [90C4] starts at 1 after it. Settle: decode 0x047C40.
+N5  The relative order and call rates of 0x0409C0 (from 0x04907C) and task 0x040918 (from 0x04AA58), hence how
+    long the 20.19c window B lasts in time (438 counts of 0x0409C0) and which [7FF0] / [7FE6] 0x040AF6 sees. The
+    third lag arm is irrelevant to H with the shipped weights (all 1.0). Settle: decode the scheduler entries
+    0x00E448 / 0x00E4BA and their rates (rtos_core_trace.txt task table).
+N6  Whether the 0x0410D4 update paths (which zero [7FBC] when H = 0) run often enough to clear a value left from a
+    closed gate; that is a 0x0410D4 / input-state question (its hold paths keep [7FBC]).
+N7  Exact last-bit values of H (15.029296..., 20.039061...): rounding mode, open-holes #11.
+N8  Whether [7FBC] is ever non-zero ON THE CAR. It needs [69E6] != 0 and [7FF4] == 0 together with H > 0 and the
+    branch-12 conditions (ANSWER 1). Not settled by these bytes: (a) the power-on contents of [7FF4], [7FBC] and
+    [69E6] -- the emulator models RAM writes only, so a block RAM clear at reset would not show, and none was
+    looked for beyond the first reset subroutines (0x000C0C -> 0x000C20 / 0x000C54, port set-up); (b) when
+    0x047C40 (which calls 0x026634, setting [69E6] = 1, and 0x04092A) runs relative to the first 0x0410D4 call --
+    if 0x0410D4 runs first with [69E6] == 0 and X inside the window, the latch is set before [69E6] is ever 1;
+    (c) whether anything clears [7FF4] (find_writers, a lower bound, reports only the set at 0x0411F6; a block
+    clear or a stack-slot-based store would be missed). Settle: decode 0x047C40's call path from 0x00DF14 and
+    the reset path into 0x00065C for RAM initialisation, or log bytes 0xFFFF69E6 / 0xFFFF7FF4 and float
+    0xFFFF7FBC on the car.
+N9  What [63D4] is and how long lut(0x0AAF5C, [6354]) > [63D4] and [6350] <= 70.0 hold after 0x026634 runs (the
+    only interval in which [69E6] == 1); when 0x049CF0 (-> 0x026642 -> 0x026698) runs. Settle: find and decode
+    the writers of 0xFFFF63D4 and the callers of 0x049CF0.
+N10 Whether byte [85D7] (F12) is 1, [7FF5] is 0 and the other branch-12 inputs hold during that interval, and in
+    20.19c whether window B ([7FEF] == 1, [7FEA] < 438) overlaps it -- [7FEF] is armed on a 0 -> 1 edge of the
+    same byte [85D7] that branch 12 needs at 1.
+
+================================================================================================================
+REVIEW HISTORY  (third-reader decode, 2026-11-27: tracer vs adversarial reviewer; neither presumed right)
+================================================================================================================
+A20 "[7FBC] can be non-zero" (ANSWER 1 "YES", ANSWER 2, E8).  REVIEWER RIGHT: the claim held only for the
+    emulated inputs, which set byte [69E6] = 1 and latch [7FF4] = 0 by construction. Deciding bytes (0x0410D4):
+0411DA: 2998  tst r9,r9  ; T = (F9 == 0)
+0411DC: 8B0C  bf 0x0411F8  ; F9 != 0 -> no latch test
+0411F6: C038  mov.b r0,@(56,gbr)            ; gbr+56 = 0xFFFF7FF4  | latch set when F9 == 0 and 0x0BE608 says inside
+04124E: 8B04  bf 0x04125A  ; latch != 1 -> steps 5..12
+041258: F157  fmov.s fr5,@(r0,r1)  ; [slot] latch == 1: [0xFFFF7FBC] = +0.0, return
+0413CA: 2998  tst r9,r9  ; step 10 (F12 == 1 already tested at 0x0413C6): T = (F9 == 0)
+0413CC: 8B0D  bf 0x0413EA  ; only F9 != 0 reaches branch 12, the only branch that increases X
+    Emulated (check_latch, REAL and STOCK): one call with [69E6] = 0 at X = 0 -> [7FF4] = 1; 200 further calls with
+    [69E6] = 1, H = 15.029 and every up condition met -> X = 0.0 throughout. Repaired: ANSWER 1 is now "on the car:
+    NOT ESTABLISHED" with the five conditions; E8 qualified; E17 added; N8-N10 added. Beyond the reviewer, this
+    decode found and emulated the two writers of [69E6] (0x026634 := 1; 0x026698 := 0 on [6350] > 70.0 or
+    lut(0x0AAF5C, [6354]) <= [63D4]) -- new context section, ANSWER 2, E18 -- which bound the only interval in
+    which the integrator can rise; the reviewer had them as "not decoded".
+A28 [3158] value 1 stored "only at 0x02F622, on a 0 -> 1 edge of [65C2]".  REVIEWER RIGHT ON THE WORDING, WRONG ON
+    ONE PIECE OF EVIDENCE. The decode is agreed. "Only" rests on find_writers, a lower bound, and the edge is
+    precisely [65C2] == 1 with [72CF] == 0, the [315A] / [315C] value bytes read after this call's own stores --
+    adopted in the 0x02F57E contract and E12. The reviewer's support, that find_writers "reported NO store to
+    [7FB0] / [7FB4]", does not reproduce: find_writers FFFF7FB0 FFFF7FD7 (default ROM and --rom 20.19c) lists
+    0x040EA2, 0x040EC4, 0x040EF6, 0x040F18, 0x040F22 ([7FB0]) and 0x040D6C ([7FB4]), each flagged "IN FLOAT_DATA"
+    or "IN UNMAPPED, LIKELY NOT A REAL WRITER"; only --code-only hides them (it also hides the 0x040AF6 stores to
+    7FB8 / 7FC4 / 7FC8 / 7FCC / 7FD0 / 7FD4, leaving 0x041258, 0x041552 and the phantom 0x03F504). For [3158]
+    the same tool lists exactly 0x02EE8A, 0x02F622, 0x02F62A, 0x02F7CE.
+A31 "The only other writer of a factor cell is 0x04092A".  REVIEWER RIGHT that it must be stated as "among the
+    writers find_writers reports" (adopted: E16 and the 0x04092A context, whose header no longer says "the only");
+    WRONG that the tool "misses even 0x040AF6's own [7FB0] / [7FB4] stores" (output quoted under A28). The
+    0x04092A decode (0x04096A fldi1 -> [7FD4]) and the 0x03F504 phantom (pool word 0xC1A00000 of 0x03F368) are
+    agreed.
+A34 0x0ADD90 / 0x0ADDA4 "missing from the descriptor scan".  REVIEWER RIGHT. coverage_map.scan_descriptors returns
+    818 records on 20.19c, none at 0x0ADD90 / 0x0ADDA4 (it does return 0x0ADD7C, 0x0ADDB8, 0x0ADDCC); but
+    descriptor_map.txt:747-748 has them as rows 731 / 732 (uint8 x16, 0.781250, axis 0x0D2FCC, data 0x0D338A /
+    0x0D339A) and table_triage.json has both (site 0x40F30 / 0x40F34, gbr FFFF7FB0). Record bytes:
+    00100400 000D2FCC 000D338A 3F480000 00000000 and 00100400 000D2FCC 000D339A 3F480000 00000000. Repaired in
+    the RAM / TABLES block and U4.
+MISSED-1 (latch / [69E6]).  CONFIRMED: see A20; ANSWER 1-2, E17, E18, N8, N9.
+MISSED-2 (20.19c window B blocks the up path; check_chain never exercised it).  CONFIRMED by emulation in the task
+    (check_window_b): 20.19c with [7FEF] = 1 and [7FEA] = 0 or 437 holds X at 0.0 ([7FDC] = 1), [7FEA] = 438
+    climbs, stock climbs in all three; from X = H with [65C0] = 1, 20.19c steps down 0.015 per call, stock holds
+    H. [0x0D29C4] = 0x01B6 (438) in 20.19c, 0 in stock. ANSWER 5, E19; the ANSWER heading no longer says "20.19c
+    and stock alike" for the up path.
+MISSED-3 (find_writers misses the [7FB0] / [7FB4] stores).  NOT CONFIRMED as stated (output under A28). What
+    survives is weaker and is now in the file: the tool flags the real stores of 0x040AF6, 0x04092A, 0x0409C0,
+    0x041030 and 0x02F57E as "LIKELY NOT A REAL WRITER", so every "find_writers finds no other writer" statement
+    here means "in its default output, flagged hits included", and remains a lower bound.
+MISSED-4 (0x0409C0 maintains [7FED] / [7FE6] / [7FF0] outside 0x040AF6).  CONFIRMED and extended: 0x0409C0 decoded
+    and emulated (1,944 runs, exact read / write sets); it also arms and counts the window-B state [7FEF] / [7FEA]
+    that 0x040A9C reads. New context section, E20; old N5 ("not decoded") replaced.
+FILE-1 ANSWER 1 / E8 unqualified.  FIXED (A20).
+FILE-2 U4 and the RAM / TABLES note said "missing from the descriptor scan".  FIXED (A34).
+FILE-3 ANSWER 5 (now 8) omitted the (sp+72 != 0 or 0x058524 result == 1) gate of [9707].  CONFIRMED against the
+    0x028210 excerpt (0x0285A6..0x0285B2) and FIXED.
+FILE-4 0x028210 excerpt: fn_dump pool longs at 0x02860C / 0x028610 / 0x028614 are mov.w word pools; the last
+    overlapped the instruction at 0x028616.  CONFIRMED from bytes (0x02860A..0x028615 = 0386 039A 03AE 049E 0412
+    0426; 0x028616 = E001) and FIXED: rewritten as six ".word" pool lines.
+FILE-5 Verifier.  Re-run after this repair: verify_disasm_v2.py (default ROM) and --rom 20.19c both report 1,295 of
+    1,295 instruction lines agreeing, mismatch 0 (the review-history lines above included).
+Emulation script: scripts/trace/emu_timing_bound_040AF6.py gained check_latch, check_window_b and check_writers;
+check_chain now uses a Chain helper with the same inputs as before and prints that those inputs are by
+construction. It exits 0.

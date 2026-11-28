@@ -70,9 +70,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00000BAC, "NMI_Handler",
             "[TRACED] NMI handler - saves all regs, checks NMI source, handles watchdog");
         count += labelComment(0x00000BFA, "DefaultExceptionHandler",
-            "[UNVERIFIED] Default exception handler - infinite loop (bra self)");
-        count += labelComment(0x00000C0C, "Entry",
-            "[TRACED] Power-on reset entry point. Calls HW init, then main scheduler.");
+            "[DECODED] Default exception handler - infinite loop (bra self)");
 
         // Scheduler / Task table
         count += labelComment(0x0004A94C, "sched_periodic_dispatch",
@@ -149,28 +147,11 @@ public class ImportAE5L600L extends GhidraScript {
             + "word[gbr+76] via 0x0BE554, tested against word[0x0CBC5A]=200 and "
             + "word[0x0CBC64]=0. It feeds a DTC MATURATION COUNTER, not enrichment. No "
             + "fuel-path consumer exists anywhere in the image.");
-        count += labelComment(0x000BEA40, "float_lag_filter",
-            "[TRACED] The earlier \"float_lerp\" was right in substance -- this IS a lerp between "
-            + "current and target, used as a first-order lag. "
-            + "fr0 = target + (1-alpha)*(current-target); snaps to target when the residual "
-            + "is below fr7. Args fr4=target fr5=current fr6=alpha fr7=snap.");
-        count += labelComment(0x000BEAB0, "float_abs_diff",
-            "[TRACED] fr0 = |fr4 - fr5|. Three instructions: fsub fr5,fr4 / fabs fr4 / rts. "
-            + "SUPERSEDES \"table_lookup_err_scale\", which the bytes do not support (item 90).");
 
         // -- item 88: the coolant fractions are a STAGED DECAY BANK, inert >40 degC ----
-        count += labelComment(0x0002EFD2, "fn_2EFD2_coolant_decay_bank",
-            "[TRACED] GBR = 0xFFFF726C (two bytes below the transient knock inhibit flag FFFF726E). "
-            + "Charge: [FFFF728C] = [FFFF72DC], four outputs seeded, gbr+3..6 = 1. "
-            + "Decay: [FFFF728C] = max([FFFF728C] * f(coolant), 0.0), then four staged "
-            + "comparisons that each clear one flag as the accumulator falls below its "
-            + "RAM threshold. ALL EIGHT coolant curves are a flat 0.900 above 40 degC, so "
-            + "the coolant axis is inert at operating temperature. corrections.md item 88.");
         count += labelComment(0xFFFF728CL, "coolant_decay_accumulator",
             "[TRACED] Multiplicative accumulator. Exactly two writers, both in fn 0x02EFD2: "
             + "0x02F1EE charges it from [FFFF72DC], 0x02F178 decays it by f(coolant).");
-        count += labelComment(0xFFFF72DCL, "coolant_decay_charge_value",
-            "[TRACED] RAM. Value the accumulator is reset to at 0x02F1E6. Writer NOT traced.");
         count += labelComment(0xFFFF726FL, "coolant_decay_flag_0",
             "[TRACED] gbr+3. Set on charge, cleared when the accumulator falls below [FFFF7328].");
         count += labelComment(0xFFFF7270L, "coolant_decay_flag_1",
@@ -194,27 +175,19 @@ public class ImportAE5L600L extends GhidraScript {
             + "knock-workspace integrator (item 80). Unidentified.");
         count += labelComment(0xFFFF7F48L, "fn_3684A_term_7F48",
             "[TRACED] Float input to the 0x03684A mix. UNIDENTIFIED (item 86).");
-        count += labelComment(0xFFFF7E90L, "fn_3684A_term_7E90",
-            "[TRACED] Float subtrahend in the 0x03684A mix. UNIDENTIFIED (item 86).");
 
         // -- item 84: the RTOS event queue ---------------------------------------
         count += labelComment(0x00010B2A, "sched_event_queue_walk",
-            "[TRACED] THE WALKER. Linear scan of the 5-slot event table at 0xFFFF2064 (stride 12) "
+            "[DECODED] THE WALKER. Linear scan of the 5-slot event table at 0xFFFF2064 (stride 12) "
             + "with count byte at 0xFFFF2060. On id match, bumps entry+8 (saturates at 255). "
             + "On miss with count < 5, appends. On miss with count >= 5, SILENTLY DROPS -- "
             + "cmp/ge #5 at 0x010BCC, no error path. corrections.md item 84.");
         count += labelComment(0x00010800, "sched_event_post",
-            "[TRACED] Packs (r4 = event id, r5 = payload), enters critical section via 0x0BE81C, "
+            "[DECODED] Packs (r4 = event id, r5 = payload), enters critical section via 0x0BE81C, "
             + "calls the walker 0x010B2A, leaves via 0x0BE82C. Same thing the earlier "
             + "\"event_notify\" label described; merged (item 90).");
         // 0x0000E774 also carried "ADC_StateMachine" from an earlier pass; item 84's
         // trace does not support that reading. Merged here -- see corrections item 90.
-        count += labelComment(0x0000E774, "sched_isr_common_entry",
-            "[TRACED] Every ISR stub in the 0x00E9xx family bra's here with r4 = its event id "
-            + "(80, 84, 90, 92 seen). Raises SR to IMASK=15 (or #240) before posting. "
-            + "SUPERSEDES the earlier \"ADC_StateMachine\" label (item 90).");
-        count += labelComment(0xFFFF2060L, "sched_event_count",
-            "[TRACED] byte. Number of occupied slots in the event table at 0xFFFF2064. HARD MAX 5.");
         count += labelComment(0xFFFF2064L, "sched_event_table",
             "[TRACED] 5 entries x 12 bytes. +0 word event id, +4 long payload, +8 byte pending "
             + "counter (saturating at 255). Coalescing: a repeat id bumps the counter.");
@@ -240,25 +213,18 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Knock detection. GBR=0xFFFF80FC. Writes KNOCK_FLAG [0xFFFF81BA] and KNOCK_BANK_FLAG [0xFFFF81BB]");
         count += labelComment(0x00043470, "LowPW_GateFunction",
             "[CITED] Low PW Injector Comp gate: checks RPM < max and IPW < max");
-        count += labelComment(0x0004438C, "task11_knock_flag_read",
-            "[TRACED] Task [11] Knock flag consumer. Gates on check_transient_knock_inhibit (0x2F8FE, FFFF726E) "
-            + "and flkc_state_flag_reader_table slot 0 (0x29858, FFFF970E). If transient inhibit active "
-            + "or FLKC slot not converged: skips knock response. Otherwise: reads KNOCK_FLAG/BANK_FLAG "
-            + "and dispatches to DAM knock table (cal 0xD2DC4/D2DD4). GBR=FFFF81F0.");
         count += labelComment(0x00043D68, "task12_knock_post",
-            "[TRACED] Task [12] Knock post-process - writes 0xFFFF81D9, refs knock GBR base, cal 0xD2D60-74");
+            "[DECODED] Task [12] Knock post-process - writes 0xFFFF81D9, refs knock GBR base, cal 0xD2D60-74");
         count += labelComment(0x00045BFE, "flkc_path_J",
-            "[TRACED] Task [18] FLKC fast-response. If KNOCK_FLAG!=0: FR13 -= base_step*0.5. ROM[0x045DD8]=0.5 multiplier.");
+            "[DECODED] Task [18] FLKC fast-response. If KNOCK_FLAG!=0: FR13 -= base_step*0.5. ROM[0x045DD8]=0.5 multiplier.");
         count += labelComment(0x000463BA, "flkc_paths_FG",
-            "[TRACED] Task [25] FLKC sustained-knock. GBR=0xFFFF8290. Requires 7 conditions. bank!=1->retard 1.01, bank==1->retard 2.80");
+            "[DECODED] Task [25] FLKC sustained-knock. GBR=0xFFFF8290. Requires 7 conditions. bank!=1->retard 1.01, bank==1->retard 2.80");
 
         // ── Scheduler tasks: complete 59-entry map ──
         // Timing / Per-Cylinder Compensation
         count += labelComment(0x00044188, "task00_timing_percyl",
             "[TRACED] Task [0] Per-cylinder timing comp. RPM+MAF, cal Timing Comp Max RPM/Min Load/Min ECT");
         // Knock → Timing Feedback
-        count += labelComment(0x00045970, "task01_knock_timing_fb",
-            "[TRACED] Task [1] Post-knock timing adjustment. Knock corr state RAM 0x8204-821C");
         // Knock Window Setup
         count += labelComment(0x00045098, "iat_running_min_update",
             "[TRACED] Running minimum of intake air temp: [0xFFFF8210] = float_min(0xBE970)([0xFFFF8210], IAT "
@@ -273,47 +239,41 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0004530A, "task05_knock_det",
             "[TRACED] Task [5] Knock detection. KNOCK_FLAG+MAF+IAM, sets GBR");
         count += labelComment(0x00045354, "task06_knock_det",
-            "[UNVERIFIED] Task [6] Knock detection. KNOCK_FLAG+MAF, sets GBR");
+            "[TRACED] Task [6] Knock detection. KNOCK_FLAG+MAF, sets GBR");
         count += labelComment(0x000450AE, "task07_knock_det",
-            "[CITED] Task [7] Knock detection. KNOCK_FLAG+MAF, sets GBR");
+            "[TRACED] Task [7] Knock detection. KNOCK_FLAG+MAF, sets GBR");
         count += labelComment(0x00044E04, "task08_knock_window",
             "[TRACED] Task [8] Knock window setup. Gates on check_transient_knock_inhibit (0x2F8FE). "
             + "Loads RPM/IAM/FFFF6898. Iterates 35 flkc_fg_var entries vs KnockWindow_FLKC_Cell_Threshold "
             + "(0xD2E34) with uint8_add_sat. Iterates 6 knock history slots vs 0xD2E3C/40/44/48. "
             + "GBR=FFFF8210. Cal 0xD2E1C/20/2C/34/3C/40/44/48, threshold 0xD299C.");
-        count += labelComment(0x00044DB0, "load_lag_filter_and_delta",
-            "[CITED] Lag-filters engine load (0xFFFF63F8) through 0xBEA40 with coefficient [0xD2E18]=0.03125 "
-            + "into 0xFFFF81F4, then stores load minus filtered load to 0xFFFF81F8. rts at 0x044DDC. KNOCK_FLAG "
-            + "is first read at 0x044DE0, the NEXT function. Was task09_knock_det. corrections.md item 96.");
-        count += labelComment(0x000448F4, "task10_knock_config",
-            "[TRACED] Task [10] Knock config dispatcher. RPM+MAF+sched, multi-RAM refs");
         // Tasks 11/12 already labeled above
         // Rough Correction
         count += labelComment(0x00045A3E, "task13_rough_corr",
-            "[UNVERIFIED] Task [13] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
+            "[DECODED] Task [13] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
         count += labelComment(0x00044834, "task14_knock_thresh_lu",
-            "[UNVERIFIED] Task [14] Knock threshold lookup. 8 cal params 0xD2DEC-0xD2E04");
+            "[TRACED] Task [14] Knock threshold lookup. 8 cal params 0xD2DEC-0xD2E04");
         count += labelComment(0x00045A84, "task15_rough_corr",
-            "[UNVERIFIED] Task [15] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
+            "[TRACED] Task [15] Rough correction range. Rough Corr Min KC Advance (0xD2EDC)");
         // FLKC Pipeline
         count += labelComment(0x00045BBC, "task16_flkc_pre",
             "[TRACED] Task [16] FLKC pre-process. KNOCK_FLAG+FLKC_BASE_STEP+IAM+MAF");
         count += labelComment(0x00045B44, "task17_flkc_pre",
-            "[CITED] Task [17] FLKC pre-process. FLKC_BASE_STEP+IAM, Advance Multiplier");
+            "[TRACED] Task [17] FLKC pre-process. FLKC_BASE_STEP+IAM, Advance Multiplier");
         // Tasks 18/25 already labeled above (flkc_path_J, flkc_paths_FG)
         count += labelComment(0x00045E96, "task19_flkc_post",
-            "[TRACED] Task [19] FLKC post-process. Calls flkc_state_flag_slot15 (0x2999C, FFFF971B) to check "
+            "[DECODED] Task [19] FLKC post-process. Calls flkc_state_flag_slot15 (0x2999C, FFFF971B) to check "
             + "convergence. If converged AND CL/OL transition (FFFF65BD) met: triggers IAM (FFFF3234) "
             + "and FLKC_BASE_STEP (FFFF323C) update via 0xBDBCC. Sets flkc_fg_R0_init (FFFF3244) "
             + "bits [1:0]=0b10 on successful update. Writes result to flkc_post_state (FFFF8286).");
         count += labelComment(0x000459F6, "task20_knock_win_upd",
-            "[TRACED] Task [20] Knock window per-cyl update. IAM+MAF, sets GBR");
+            "[DECODED] Task [20] Knock window per-cyl update. IAM+MAF, sets GBR");
         count += labelComment(0x000467AE, "task21_knock_win_upd",
-            "[TRACED] Task [21] Knock window per-cyl update. MAF+cyl index, sets GBR");
+            "[DECODED] Task [21] Knock window per-cyl update. MAF+cyl index, sets GBR");
         count += labelComment(0x000461D2, "task22_knock_percyl",
             "[TRACED] Task [22] Knock per-cyl config. Cyl index (0xFFFF8298L), sets GBR");
         count += labelComment(0x000467F4, "task23_knock_cyl_track",
-            "[TRACED] Task [23] Knock cyl tracking. Calls flkc_state_flag_slot15 (0x2999C, FFFF971B). "
+            "[DECODED] Task [23] Knock cyl tracking. Calls flkc_state_flag_slot15 (0x2999C, FFFF971B). "
             + "If converged AND FFFF82AB==2: iterates 35 flkc_fg_var entries (FFFF3248+i*8), "
             + "calls 0xBDBCC per cell. Writes result to FFFF82AB. Also manages KNOCK_FLAG "
             + "counter at FFFF8294 and cl_ol_transition_flag (FFFF65BD) check.");
@@ -321,14 +281,14 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Task [24] FLKC output stage. flkc_output_table+cal 0xD29F0");
         // Task 25 already labeled above
         count += labelComment(0x00046978, "task26_flkc_output",
-            "[TRACED] Task [26] FLKC output stage. flkc output+cal 0xD29F0");
+            "[DECODED] Task [26] FLKC output stage. flkc output+cal 0xD29F0");
         count += labelComment(0x00046296, "task27_knock_timing",
             "[TRACED] Task [27] Knock timing correction. KNOCK_FLAG+timing output");
         count += labelComment(0x00045DF8, "task28_flkc_recovery",
-            "[TRACED] Task [28] FLKC recovery. Advance recovery steps 0xD2EEC-0xD2F08");
+            "[DECODED] Task [28] FLKC recovery. Advance recovery steps 0xD2EEC-0xD2F08");
         // Timing Pipeline
         count += labelComment(0x00044296, "task29_timing_percyl",
-            "[TRACED] Task [29] Per-cyl timing comp. Calls flkc_state_flag_reader_table slot 0 (0x29858, "
+            "[DECODED] Task [29] Per-cyl timing comp. Calls flkc_state_flag_reader_table slot 0 (0x29858, "
             + "FFFF970E) — skip timing correction if FLKC learning slot 0 not converged. "
             + "Also calls 0x2997C. Uses knock_GBR_base (FFFF81F0) + FFFF8260/828C float offsets. "
             + "Writes per-cylinder timing comp to FFFF81EC.");
@@ -339,15 +299,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0004004A, "task32_timing_blend_app",
             "[TRACED] Task [32] Timing blend application. Blend Min Ratio+RPM Limit");
         count += labelComment(0x00040918, "task33_timing_ws_init",
-            "[TRACED] Task [33] Timing workspace init. Multi-GBR-write, 3 BSR calls");
+            "[DECODED] Task [33] Timing workspace init. Multi-GBR-write, 3 BSR calls");
         count += labelComment(0x00040516, "task34_timing_throttle",
             "[TRACED] Task [34] Timing throttle comp. Throttle+MAF voltage+injector");
         count += labelComment(0x000418AC, "task35_timing_corr",
-            "[TRACED] Task [35] Timing correction stage. Cal 0xD2C04, timing state RAM");
-        count += labelComment(0x000415B8, "task36_timing_percond",
-            "[TRACED] Task [36] Timing per-condition. RPM+MAF+throttle+fuel rate");
-        count += labelComment(0x000419BA, "task37_timing_multiaxis",
-            "[TRACED] Task [37] Timing multi-axis. RPM+MAF, 3 cal params, 3 BSR calls");
+            "[DECODED] Task [35] Timing correction stage. Cal 0xD2C04, timing state RAM");
         // Ignition Output
         count += labelComment(0x00042A78, "task38_ign_output",
             "[TRACED] Task [38] Ignition output. RPM+MAF+throttle, cal 0xD2CB0-CB8");
@@ -375,8 +331,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0004359C, "task48_final_timing",
             "[TRACED] Task [48] Final timing/injector output. Throttle+MAF+boost, 4 JSR");
         // Base Advance
-        count += labelComment(0x0003F00C, "task49_base_advance",
-            "[TRACED] Task [49] Base timing advance. RPM+MAF+load+ATM, 16+ RAM refs");
         count += labelComment(0x0003F368, "task50_timing_blend_int",
             "[TRACED] Task [50] Timing blend integration. RPM+MAF+cl_enable, blend output");
         // Boost / Wastegate
@@ -427,15 +381,12 @@ public class ImportAE5L600L extends GhidraScript {
             + "active(1/2)->signal_minmax_tracker_66C40(0x66C40), disabled(0)->sub_66D20/66DEC/66EBC. "
             + "Workspace at FFFF236C (5 floats + 6 u16s). GBR=FFFF933C.");
         count += labelComment(0x000662D0, "evap_workspace_init_trampoline",
-            "[TRACED] Trampoline: bra 0x665C0. Redirect to primary evap_workspace_init.");
+            "[DECODED] Trampoline: bra 0x665C0. Redirect to primary evap_workspace_init.");
         count += labelComment(0x000665C0, "evap_workspace_init",
-            "[TRACED] EVAP workspace initialization. Zeros 6 uint16 slots (FFFF2368-FFFF237C) "
+            "[DECODED] EVAP workspace initialization. Zeros 6 uint16 slots (FFFF2368-FFFF237C) "
             + "via uint16_pack(0), sets 6 byte flags (FFFF2380-FFFF238A) to 1 via uint8_pack(1).");
-        count += labelComment(0x00066626, "evap_ect_threshold_lookup",
-            "[TRACED] EVAP ECT-based threshold lookup. Two 1D tables (desc 0xACF64, 0xACF78) "
-            + "compute lower/upper EVAP pressure bounds. Delta/sum stored to FFFF9314/9318.");
         count += labelComment(0x0006665E, "evap_condition_eval",
-            "[TRACED] EVAP precondition evaluation. GBR=FFFF933C. Checks RPM, manifold_pressure, "
+            "[DECODED] EVAP precondition evaluation. GBR=FFFF933C. Checks RPM, manifold_pressure, "
             + "IAT, engine_run_time, purge flow. Cal: 0xC48DC-0xC50E8.");
 
         // Diagnostics -- Task 57: EGR/Emissions
@@ -475,13 +426,13 @@ public class ImportAE5L600L extends GhidraScript {
 
         // Front O2 sensor processing
         count += labelComment(0x00021A40, "frontO2_process",
-            "[UNVERIFIED] Front O2 sensor processing. Reads rich limit (0.75 lambda) inline, atm pressure comp via descriptor 0xAAE8C.");
+            "[TRACED] Front O2 sensor processing. Reads rich limit (0.75 lambda) inline, atm pressure comp via descriptor 0xAAE8C.");
         count += labelComment(0x0001FE54, "frontO2_comp_atm",
             "[TRACED] Front O2 atmospheric compensation sub-function. Accesses descriptor at 0xAAE78.");
 
         // CL Fueling Target computation
         count += labelComment(0x00033CC4, "cl_fuel_target_calc",
-            "[UNVERIFIED] CL Fueling Target computation. Accesses both Comp A (0xD14D0) and Comp B (0xD1740) via descriptors.");
+            "[TRACED] CL Fueling Target computation. Accesses both Comp A (0xD14D0) and Comp B (0xD1740) via descriptors.");
 
         // CL/OL transition sub-functions
         count += labelComment(0x00036070, "clol_main_transition",
@@ -500,7 +451,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "Decision: 744B!=0→OL; 744D==1 AND 744C!=0→OL; 7449|744A==1→CL; else→OL. "
             + "See cl_ol_master_analysis.txt Section 3.");
         count += labelComment(0x00031628, "cl_master_readiness_writer",
-            "[UNVERIFIED] Wrapper that calls cl_master_readiness_eval (0x3162C). Called with FFFF7452 context.");
+            "[TRACED] Wrapper that calls cl_master_readiness_eval (0x3162C). Called with FFFF7452 context.");
         count += labelComment(0x0003162C, "cl_master_readiness_eval",
             "[TRACED] Computes FFFF7452 (cl_master_readiness) and 3 secondary flags. GBR=FFFF7450. "
             + "Outputs: FFFF7450 (speed CL flag), FFFF7451 (speed+coolant CL flag), "
@@ -514,20 +465,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "See cl_ol_master_analysis.txt Section 4, disasm_3162C_annotated.txt.");
 
         // ── AFL Learning Functions ────────────────────────────────────────────
-        count += labelComment(0x00034884, "afl_learning_entry",
-            "[TRACED] AFL (A/F Learning) entry point. Dispatches to afl_learning_core (0x3452A). "
-            + "Gates: cl_active_check (0x345A4) requires CL mode (FFFF7448==1) — learning frozen in OL.");
-        count += labelComment(0x0003452A, "afl_learning_core",
-            "[TRACED] AFL learning core. Updates per-range stored values (FFFF316C/317C/317C/3184). "
-            + "4 airflow ranges (0-6, 6-23, 23-40, 40-80 g/s, breakpoints at CC074-CC07C). "
-            + "Learning gate: 0x34C54 reads FFFF7448; if OL, skips update. ");
-        count += labelComment(0x000345A4, "afl_cl_active_check",
-            "[TRACED] AFL CL-active gate (10-condition check). Called from afl_learning_core. "
-            + "Checks FFFF8F24, CC020 (MAF<=70g/s), FFFF73A4, FFFF7354, FFFF7374, "
-            + "FFFF7A14, FFFF7A20, FFFF7D18, FFFF7BE2 etc. All must pass to allow AFL update.");
-        count += labelComment(0x00034C54, "afl_clol_gate",
-            "[TRACED] AFL CL/OL gate inside learning pipeline. Reads FFFF7448 (clol_mode_flag). "
-            + "If FFFF7448==0 (OL mode): skip AFL learning update. Frozen in OL.");
 
         // ── Path A Phase Functions (already partially labeled, update details) ─
         count += labelComment(0x00036F76, "clol_post_transition_B",
@@ -539,46 +476,44 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── FFFF7BA8 Writer / WOT Enrichment Context ──────────────────────────
         count += labelComment(0x0003952C, "afr_deviation_calc",
-            "[TRACED] Computes FFFF7BA8 (AFR deviation metric). Inputs: FFFF77D8 + FFFF77DC, FFFF798C, "
+            "[DECODED] Computes FFFF7BA8 (AFR deviation metric). Inputs: FFFF77D8 + FFFF77DC, FFFF798C, "
             + "FFFF7800, FFFF6354. Calls sub_3961C to clamp result to [0, 0.03] via CAL@CC3E8. "
             + "Since max=0.03 < CBE78 threshold 0.11, FFFF7BA8 NEVER blocks cl_master_readiness_eval. "
             + "See cl_ol_master_analysis.txt Section 5 (WOT delay root cause).");
         count += labelComment(0x0003961C, "afr_deviation_clamp",
-            "[TRACED] Item 83: computes clamp(1.0/S - 1.0, 0.0, [0x0CC3E8]=0.03) into [FFFF7BAC], where S = 1.0 + [FFFF77D8] + [FFFF77DC]. Reached only when byte[FFFF782C] == 0. "
+            "[DECODED] Item 83: computes clamp(1.0/S - 1.0, 0.0, [0x0CC3E8]=0.03) into [FFFF7BAC], where S = 1.0 + [FFFF77D8] + [FFFF77DC]. Reached only when byte[FFFF782C] == 0. "
             +             "Helper for afr_deviation_calc. Clamps FFFF7BA8 to max 0.03 (CAL@CC3E8). "
             + "Calls 0xBE56C (float_clamp). Result written to FFFF7BAC area.");
         count += labelComment(0x00039668, "afr_deviation_init",
-            "[TRACED] AFR deviation context initialization/setup. Runs on startup/reset. "
+            "[DECODED] AFR deviation context initialization/setup. Runs on startup/reset. "
             + "Sets up FFFF7BB8-BBC flags, FFFF7BB2 counter, FFFF7BB0 fault flag. "
             + "References table-of-pointers at ROM 0x63B54, calls 0x21D9A, 0x1FD7C.");
 
         // Front O2 sensor scaling (ADC processing)
         count += labelComment(0x00058902, "frontO2_scaling_lookup",
-            "[TRACED] Front O2 sensor scaling table lookup. Accesses descriptor near 0xAF468.");
+            "[DECODED] Front O2 sensor scaling table lookup. Accesses descriptor near 0xAF468.");
         count += labelComment(0x00004A2C, "frontO2_scaling_init",
-            "[TRACED] Front O2 sensor scaling initialization/read. Accesses descriptor near 0xAF45C.");
+            "[DECODED] Front O2 sensor scaling initialization/read. Accesses descriptor near 0xAF45C.");
 
         // AFC (Short-Term Fuel Correction) Pipeline
         count += labelComment(0x00033304, "afc_dispatcher",
-            "[TRACED] CL fueling master controller. Sequences: target comp -> sensor prep -> PI controller -> clamp. Entry at 0x33304 with reg saves.");
+            "[DECODED] CL fueling master controller. Sequences: target comp -> sensor prep -> PI controller -> clamp. Entry at 0x33304 with reg saves.");
         count += labelComment(0x00033D1C, "cl_fuel_target_B",
             "[TRACED] CL Fueling Target Comp B (load-based). Called from afc_dispatcher via BSR.");
         count += labelComment(0x00033CC0, "cl_fuel_target_A",
-            "[TRACED] CL Fueling Target Comp A (load-based). Called from afc_dispatcher via BSR.");
+            "[DECODED] CL Fueling Target Comp A (load-based). Called from afc_dispatcher via BSR.");
         count += labelComment(0x00033658, "afc_sensor_prep",
-            "[TRACED] AFC sensor state preparation/conditioning. Reads 0xFFFF7828, calls 0x22CF4.");
+            "[DECODED] AFC sensor state preparation/conditioning. Reads 0xFFFF7828, calls 0x22CF4.");
         count += labelComment(0x00033FCE, "afc_target_calc",
             "[TRACED] AFC target computation with compensation. Table lookups via 0xBE598/0xBE8E4. Outputs to 0xFFFF782C.");
         count += labelComment(0x00033DBE, "afc_cl_decision",
             "[TRACED] CL/OL AFC decision & hysteresis. GBR=0xFFFF77F4. CL check via 0x22F92. Active: correction from 0xACE8C. Inactive: writes 0.0. Thresholds 0xCBFD0-0xCBFE4.");
-        count += labelComment(0x000340A0, "afc_pi_output",
-            "[TRACED] AFC PI output stage. P-gains: 0xACEA0(load),0xACEB4(RPM). I-gains: 0xACEC8(load),0xACEDC(RPM). Blend: out=P*alpha+I*(1-alpha). Output: 0xFFFF7870.");
         count += labelComment(0x000342A8, "afc_pi_controller",
-            "[TRACED] AFC PI controller - THE SHORT-TERM CORRECTION. Computes error (fsub), looks up gain (0xBEAB0), clamps to limits. ROM 0xCC000-0xCC00C. Output: 0xFFFF7864.");
+            "[DECODED] AFC PI controller - THE SHORT-TERM CORRECTION. Computes error (fsub), looks up gain (0xBEAB0), clamps to limits. ROM 0xCC000-0xCC00C. Output: 0xFFFF7864.");
         count += labelComment(0x0003439E, "afc_enable_gate",
-            "[TRACED] AFC enable/disable gate. Calls 0x2BE2C/0x2BE38. Reads ROM 0xCC010.");
+            "[DECODED] AFC enable/disable gate. Calls 0x2BE2C/0x2BE38. Reads ROM 0xCC010.");
         count += labelComment(0x000343CE, "pedal_hysteresis_flag_343CE",
-            "[TRACED] Entry sets GBR=0xFFFF7820 and loads accelerator pedal (0xFFFF64D8). byte[gbr+82] is SET "
+            "[DECODED] Entry sets GBR=0xFFFF7820 and loads accelerator pedal (0xFFFF64D8). byte[gbr+82] is SET "
             + "when pedal >= [0xCC014]=200.0 and CLEARED when pedal < [0xCC018]=190.0 (0x0343E6-0x0343FA). "
             + "Hysteresis on an input, not a clamp on an output; at 200/190 the flag cannot set on a 0-100 "
             + "pedal. Body continues past 0x0343FC, not read. Was afc_output_clamp. corrections.md item 97.");
@@ -594,98 +529,18 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
 
         // Float utility functions
-        count += labelComment(0x000BE608, "float_deadband_check",
-            "[TRACED] Verified from bytes 2026-08-19: returns 1 when fr4 is OUTSIDE fr5 +/- fr6, else 0. "
-            +             "Returns 1 if |fr4-fr5| > fr6 (hysteresis/deadband comparison)");
-        count += labelComment(0x000BE628, "float_safe_div",
-            "[TRACED] Verified from bytes 2026-08-19: fr0 = fr4 / fr5, opening with a zero-denominator test. "
-            +             "fr4/fr5 with zero-division guard. If fr5==0: returns +/-max based on sign of fr4");
-        count += labelComment(0x000BE800, "float_clamp_with_step",
-            "[TRACED] Soft clamp from above. If fr4>fr5: 1, if fr4>fr5-fr6: 0, else: fr4");
-        count += labelComment(0x000BE960, "float_max",
-            "[TRACED] Returns max(fr4, fr5). F455 = fcmp/gt FR5,FR4 (T = FR4>FR5) → keeps larger. Provides a FLOOR clamp. Called by PI controller for I-term floor");
-        count += labelComment(0x000BE970, "float_min",
-            "[TRACED] Returns min(fr4, fr5). F545 = fcmp/gt FR4,FR5 (T = FR5>FR4) → keeps smaller. Provides a CEILING clamp. Called by PI controller for I-term cap");
-        count += labelComment(0x000BEAB0, "float_abs_diff",
-            "[TRACED] Returns |fr4 - fr5|. Called by PI controller for error magnitude");
 
         // Integer utility functions
-        count += labelComment(0x000BE654, "int32_div_sat",
-            "[TRACED] 32-bit unsigned divide with saturation. Unrolled 32-iter div1 loop. Saturates at +/-0x7FFFFFFF");
-        count += labelComment(0x000BE980, "uint8_unpack",
-            "[TRACED] Extracts size from packed hi:~lo byte pair");
-        count += labelComment(0x000BE990, "uint16_unpack",
-            "[TRACED] Extracts size from packed hi:~lo word pair");
-        count += labelComment(0x000BE9A0, "uint8_pack",
-            "[TRACED] Packs byte into hi:~lo complement format");
-        count += labelComment(0x000BE9B0, "uint16_pack",
-            "[TRACED] Packs word into hi:~lo complement format");
-        count += labelComment(0x000BE9C0, "int32_fixmul",
-            "[TRACED] Signed 32x32 fixed-point multiply via dmuls.l, right-shift 14 bits");
-        count += labelComment(0x000BEA6C, "int_fixpoint_lerp",
-            "[TRACED] Integer fixed-point interpolation. result = r4 + (r5-r4)*frac, frac from uint16 r6");
-        count += labelComment(0x000BEA98, "int_sat_sub",
-            "[TRACED] Saturating subtraction r4-r5, clamps at +/-0x7FFFFFFF on overflow");
-        count += labelComment(0x000BEAB8, "int_count_shifts",
-            "[TRACED] Counts shift iterations until r5 >= r4*8");
 
         // Top-level 1D descriptor processors
-        count += labelComment(0x000BE830, "table_desc_1d_float",
-            "[TRACED] 1D descriptor lookup, float output. Calls LowPW_AxisLookup + type-dispatched interp via 0xBE860. "
-            + "Types: 0=f32, 1=i8, 2=i16, 3=u8, 4=u16. Used by afc_pi_output for P/I gain tables");
-        count += labelComment(0x000BE874, "LowPW_TableProcessor",
-            "[TRACED] 1D descriptor lookup, uint8->int return. Calls LowPW_AxisLookup + interp_1d_uint8, ftrc to int");
-        count += labelComment(0x000BE8AC, "table_desc_1d_uint16",
-            "[TRACED] 1D descriptor lookup, uint16->int return. Calls LowPW_AxisLookup + interp_1d_uint16, ftrc to int");
 
         // Top-level 2D descriptor processors
-        count += labelComment(0x000BE88C, "table_desc_2d_uint8",
-            "[TRACED] 2D descriptor lookup, uint8 data. Calls axis_lookup_2d + interp_1d_uint8_int");
-        count += labelComment(0x000BE8C4, "table_desc_2d_uint16",
-            "[TRACED] 2D descriptor lookup, uint16 data. Calls axis_lookup_2d + interp_1d_uint16_int");
-        count += labelComment(0x000BE8E4, "table_desc_2d_typed",
-            "[TRACED] 2D descriptor lookup, type-dispatched. Calls axis_lookup_2d_typed. Jump table at 0xBE916. "
-            + "Supports fmac correction. Used by afc_pi_output for 2D I-component table");
-        count += labelComment(0x000BE928, "table_desc_2d_uint8_int",
-            "[CITED] 2D descriptor, uint8 data, integer return. Calls axis_lookup_2d_typed + interp_2d_uint8");
-        count += labelComment(0x000BE944, "table_desc_2d_uint16_int",
-            "[TRACED] 2D descriptor, uint16 data, integer return. Calls axis_lookup_2d_typed + interp_2d_uint16");
 
         // 1D data interpolation routines
-        count += labelComment(0x000BEACC, "interp_1d_float32",
-            "[TRACED] 1D float32 interpolation. fmac-based: result = a + frac*(b-a)");
-        count += labelComment(0x000BEAE4, "interp_1d_int8",
-            "[TRACED] 1D signed int8 interpolation with float conversion");
-        count += labelComment(0x000BEB00, "interp_1d_int16",
-            "[TRACED] 1D signed int16 interpolation with float conversion");
-        count += labelComment(0x000BEB20, "interp_1d_uint8",
-            "[TRACED] 1D unsigned uint8 interpolation with float conversion");
-        count += labelComment(0x000BEB40, "interp_1d_uint8_int",
-            "[TRACED] 1D unsigned uint8 integer interpolation (no float). Uses dmulu.l for fractional part");
-        count += labelComment(0x000BEB6C, "interp_1d_uint16",
-            "[TRACED] 1D unsigned uint16 interpolation with float conversion");
-        count += labelComment(0x000BEB90, "interp_1d_uint16_int",
-            "[TRACED] 1D unsigned uint16 integer interpolation (no float)");
 
         // 2D bilinear interpolation routines
-        count += labelComment(0x000BEBC0, "interp_2d_float32",
-            "[TRACED] 2D bilinear interpolation, float32 data. Two 1D interps + fmac cross-blend");
-        count += labelComment(0x000BEBF0, "interp_2d_int8",
-            "[TRACED] 2D bilinear interpolation, int8 data");
-        count += labelComment(0x000BEC1C, "interp_2d_int16",
-            "[TRACED] 2D bilinear interpolation, int16 data");
-        count += labelComment(0x000BEC4C, "interp_2d_uint8",
-            "[TRACED] 2D bilinear interpolation, uint8 data");
-        count += labelComment(0x000BEC78, "interp_2d_uint16",
-            "[TRACED] 2D bilinear interpolation, uint16 data");
 
         // Axis lookup routines
-        count += labelComment(0x000BECA8, "LowPW_AxisLookup",
-            "[TRACED] 1D axis binary search. Input: r0=size, r1=axis_ptr, fr0=value. Output: r0=index, fr0=frac");
-        count += labelComment(0x000BECDC, "axis_lookup_2d",
-            "[TRACED] 2D axis lookup (two sequential 1D searches)");
-        count += labelComment(0x000BED98, "axis_lookup_2d_typed",
-            "[TRACED] 2D axis lookup with type-aware data stride");
 
         // =====================================================================
         // ROM CONSTANTS (FLKC literal pool)
@@ -794,8 +649,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Active flag; cleared on knock entry");
         count += labelComment(0xFFFF829DL, "flkc_fg_retard_done",
             "[TRACED] Set to 1 after retard applied");
-        count += labelComment(0xFFFF829EL, "flkc_fg_enable",
-            "[TRACED] Must == 1 to enter main logic");
         count += labelComment(0xFFFF82A0L, "flkc_fg_exit_flag",
             "[TRACED] Set to 1 at normal exit");
         count += labelComment(0xFFFF82A1L, "flkc_fg_bank_route",
@@ -819,8 +672,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] FLKC learning convergence flag for slot 15. Read by flkc_state_flag_slot15 (0x2999C). "
             + "When non-zero: task19 consolidates FLKC corrections, task23 propagates per-cell "
             + "corrections, task56 EVAP precondition passes.");
-        count += labelComment(0xFFFF8258L, "flkc_fg_limit_FR15",
-            "[TRACED] Loaded into FR15, compared vs 100.0");
         count += labelComment(0xFFFF3244L, "flkc_fg_R0_init",
             "[TRACED] Early R0 setup");
         count += labelComment(0xFFFF8233L, "flkc_fg_flag_8233",
@@ -829,8 +680,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Read at fn_0463ba (flkc_paths_FG) entry");
         count += labelComment(0xFFFF3360L, "flkc_output_table",
             "[TRACED] FLKC output (word array indexed by cylinder)");
-        count += labelComment(0xFFFF8EDCL, "sched_disable_flag",
-            "[TRACED] If != 0, entire scheduler dispatch is skipped");
 
         // =====================================================================
         // BOOST CONTROL WORKSPACE (GBR base 0xFFFF8B50)
@@ -946,9 +795,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000D2D20, "LowPW_GateThresh_FR8_Max",
             "[TRACED] Max FR8 gate threshold for Low PW comp (float)");
         count += labelComment(0x000D3988, "LowPW_BasePW_Axis",
-            "[CITED] Y axis - 8 float32: 0.7 to 4.5 ms");
+            "[TRACED] Y axis - 8 float32: 0.7 to 4.5 ms");
         count += labelComment(0x000D39A8, "LowPW_InjectorComp_Data",
-            "[CITED] 8 x uint8, scaling: InjectorPulseWidthCompensation");
+            "[TRACED] 8 x uint8, scaling: InjectorPulseWidthCompensation");
         count += labelComment(0x000D2D28, "LowPW_MaxRPM",
             "[TRACED] Max RPM gate (float). Currently 10000 = feature disabled.");
         count += labelComment(0x000D2D2C, "LowPW_MaxIPW",
@@ -1167,41 +1016,25 @@ public class ImportAE5L600L extends GhidraScript {
         // AFC / CLOSED-LOOP FUELING — CODE FUNCTIONS
         // =====================================================================
         count += labelComment(0x000332A2, "fuel_main_entry",
-            "[TRACED] Main fueling entry (non-returning). Dispatched from fuel_dispatch_table_B.");
+            "[DECODED] Main fueling entry (non-returning). Dispatched from fuel_dispatch_table_B.");
         count += labelComment(0x00033278, "fuel_precalc",
             "[TRACED] Fueling pre-calculation. Dispatched from fuel_dispatch_table_A.");
-        count += labelComment(0x0003452A, "afl_core_entry",
-            "[TRACED] A/F Learning core entry. Calls CL active check, range selection, value update. Dispatch B.");
-        count += labelComment(0x000344BA, "afl_range_loop",
-            "[TRACED] A/F Learning 4-range loop. Iterates ranges A-D at FFFF316C, 8-byte stride.");
         count += labelComment(0x000344EE, "afl_validity_check",
-            "[UNVERIFIED] A/F Learning range validity check. Iterates 4 ranges, calls 0xBDCB6.");
-        count += labelComment(0x000345A4, "cl_active_check",
-            "[TRACED] CL Active Check: 10-condition gate. Returns 1=CL active (learning OK), 0=inactive. "
-            + "Checks FFFF8F24, CC020 (MAF<=70g/s), FFFF73A4, FFFF7354, FFFF7374, "
-            + "FFFF7A14, FFFF7A20, FFFF7D18, FFFF7BE2.");
-        count += labelComment(0x00034488, "afl_sub_dispatcher",
-            "[TRACED] A/F Learning sub-dispatcher. Dispatched from fuel_dispatch_table_A.");
-        count += labelComment(0x00034EC8, "afl_airflow_processor",
-            "[TRACED] A/F Learning airflow range processor. Dispatch A. Refs CC074-CC090.");
-        count += labelComment(0x00034EF4, "afl_airflow_update",
-            "[TRACED] A/F Learning airflow update. Dispatched from fuel_dispatch_table_B.");
+            "[DECODED] A/F Learning range validity check. Iterates 4 ranges, calls 0xBDCB6.");
         count += labelComment(0x000357D0, "clol_transition_sub_B",
-            "[TRACED] CL/OL transition sub B. Dispatched from fuel_dispatch_table_A.");
-        count += labelComment(0x0003580C, "clol_transition_core",
-            "[TRACED] CL/OL transition core. Dispatched from fuel_dispatch_table_B.");
+            "[DECODED] CL/OL transition sub B. Dispatched from fuel_dispatch_table_A.");
         count += labelComment(0x00036008, "clol_delay_manager_A",
-            "[TRACED] CL/OL delay manager A. Dispatched from fuel_dispatch_table_A.");
+            "[DECODED] CL/OL delay manager A. Dispatched from fuel_dispatch_table_A.");
         count += labelComment(0x0003605E, "ol_fuel_map_selector",
-            "[TRACED] OL fuel map selector. Reads IAM from FFFF3234, compares vs CC16C (0.5). Dispatch B.");
+            "[DECODED] OL fuel map selector. Reads IAM from FFFF3234, compares vs CC16C (0.5). Dispatch B.");
         count += labelComment(0x00036A98, "clol_hysteresis_handler",
-            "[TRACED] CL/OL hysteresis handler. Refs CC178 (throttle hyst), CC174 (BPW hyst). Dispatch A.");
+            "[DECODED] CL/OL hysteresis handler. Refs CC178 (throttle hyst), CC174 (BPW hyst). Dispatch A.");
         count += labelComment(0x00036BF4, "clol_delay_manager_B",
-            "[TRACED] CL/OL delay manager B. Dispatched from fuel_dispatch_table_A.");
+            "[DECODED] CL/OL delay manager B. Dispatched from fuel_dispatch_table_A.");
         count += labelComment(0x00036C3C, "clol_state_cleanup",
-            "[TRACED] CL/OL state cleanup. Dispatched from fuel_dispatch_table_B.");
+            "[DECODED] CL/OL state cleanup. Dispatched from fuel_dispatch_table_B.");
         count += labelComment(0x00036E60, "fuel_post_transition",
-            "[TRACED] Post-transition handler. Dispatched from fuel_dispatch_table_A.");
+            "[DECODED] Post-transition handler. Dispatched from fuel_dispatch_table_A.");
 
         // =====================================================================
         // TRANSIENT FUEL CONTROL — CODE FUNCTIONS (Pipeline B)
@@ -1211,11 +1044,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00037B68, "fuel_injector_comp",
             "[TRACED] Injector compensation. 2D maps 0xAC648/634, RPM/load indexed. Pipeline B.");
         count += labelComment(0x00039528, "fuel_wot_enrich_calc",
-            "[TRACED] WOT enrichment factor calculation. 2D map 0xAD258. Pipeline B.");
+            "[DECODED] WOT enrichment factor calculation. 2D map 0xAD258. Pipeline B.");
         count += labelComment(0x0003BB6C, "fuel_accel_enrich",
             "[TRACED] Acceleration enrichment. Tip-in/out gains CC51C-530, cal 0xCBC0B/0C. Pipeline B.");
         count += labelComment(0x0003CD34, "fuel_warmup_enrich",
-            "[TRACED] Warmup/cold-start enrichment. Reads ECT FFFF69FC, IAT FFFF69F0. Pipeline B.");
+            "[DECODED] Warmup/cold-start enrichment. Reads ECT FFFF69FC, IAT FFFF69F0. Pipeline B.");
         count += labelComment(0x0003EB8C, "fuel_overrun_cutoff",
             "[TRACED] Overrun fuel cutoff. RPM/airflow thresholds, cal 0xD29AA, tail-calls 0x46BCC. Pipeline B.");
 
@@ -1231,7 +1064,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CC020, "CL_MAF_Threshold",
             "[TRACED] MAF threshold for CL learning enable = 70.0 g/s. Float.");
         count += labelComment(0x000CBF9C, "CL_FuelTarget_ECT_Disable",
-            "[UNVERIFIED] CL Fuel Target ECT Disable = 119.0 degF. Above this, ECT comp stops. Float.");
+            "[TRACED] CL Fuel Target ECT Disable = 119.0 degF. Above this, ECT comp stops. Float.");
         count += labelComment(0x000CBC62, "CL_to_OL_Delay",
             "[TRACED] CL to OL Delay (base) = 0.0. ZERO = immediate CL->OL transition. Float.");
         count += labelComment(0x000CBC5C, "CL_to_OL_Delay_SIDRIVE",
@@ -1482,13 +1315,13 @@ public class ImportAE5L600L extends GhidraScript {
 
         // Front O2 Sensor
         count += labelComment(0x00021CAC, "FrontO2_RichLimit",
-            "[UNVERIFIED] Front Oxygen Sensor Rich Limit = lambda 0.750 (AFR 11.02). Float.");
+            "[TRACED] Front Oxygen Sensor Rich Limit = lambda 0.750 (AFR 11.02). Float.");
         count += labelComment(0x000D8D74, "FrontO2_Scaling_Yaxis",
             "[TRACED] Front O2 sensor scaling Y-axis: 13 float mA values, -1.3 to 0.74 mA (wideband).");
         count += labelComment(0x000D8DA8, "FrontO2_Scaling_Data",
             "[TRACED] Front O2 sensor scaling: 13 float lambda values, 0.7586-1.3793 (AFR 11.15-20.28).");
         count += labelComment(0x000C3708, "FrontO2_Comp_AtmPressure",
-            "[UNVERIFIED] Front O2 atmospheric pressure compensation. Formula: ((AFR-14.7)*comp)+14.7.");
+            "[TRACED] Front O2 atmospheric pressure compensation. Formula: ((AFR-14.7)*comp)+14.7.");
 
         // AFC P/I Gain Descriptors (UNDOCUMENTED — found via afc_pi_output decompilation)
         count += labelComment(0x000ACEA0, "AFC_PGain_A_Desc",
@@ -1517,7 +1350,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // AF 3 Correction (rear O2 - disabled)
         count += labelComment(0x00035FFC, "AF3_CorrectionLimits",
-            "[UNVERIFIED] AF 3 Correction Limits = 0.0/0.0 (DISABLED). Setting to 0 disables rear O2 input on target AFR.");
+            "[TRACED] AF 3 Correction Limits = 0.0/0.0 (DISABLED). Setting to 0 disables rear O2 input on target AFR.");
 
         // =====================================================================
         // AFC / CLOSED-LOOP FUELING — RAM VARIABLES
@@ -1549,12 +1382,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[UNVERIFIED] AFC I-gain by RPM output (float). Written by afc_pi_output.");
         count += labelComment(0xFFFF7850L, "afc_i_norm_out",
             "[UNVERIFIED] AFC I normalizer output (float). Written by afc_pi_output.");
-        count += labelComment(0xFFFF7804L, "afc_p_total",
-            "[UNVERIFIED] AFC P_total = (P_load + P_rpm) * P_norm. Written by afc_pi_output.");
-        count += labelComment(0xFFFF7808L, "afc_i_total",
-            "[UNVERIFIED] AFC I_total = (I_2d + I_load + I_rpm) * I_norm. Written by afc_pi_output.");
-        count += labelComment(0xFFFF7810L, "afc_pi_blend_out",
-            "[UNVERIFIED] AFC final blend = P_total*alpha + I_total*(1-alpha). Written by afc_pi_output.");
         count += labelComment(0xFFFF8E7EL, "afc_enable_flag_A",
             "[TRACED] PI output enable flag A (byte). Must == 1 for afc_pi_output to compute.");
         // REMOVED: 0xFFFF85D7 "afc_enable_flag_B" — wrong. Correct: fuel_system_state (line 2238)
@@ -1565,10 +1392,6 @@ public class ImportAE5L600L extends GhidraScript {
         // REMOVED: 0xFFFF65FC "afc_axis_val_B" — wrong. Correct: engine_load_current (line 2160)
         count += labelComment(0xFFFF68DCL, "ram_coolant_alt",
             "[TRACED] Coolant temperature alternate/computed (float). Input to P/I gain lookups.");
-        count += labelComment(0xFFFF653CL, "ram_sensor_val",
-            "[TRACED] Sensor value (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF7904L, "fuel_corr_param_A",
-            "[TRACED] Fuel correction parameter A (float). Read by fuel_correction_final.");
         count += labelComment(0xFFFF77D8L, "fuel_corr_param_B",
             "[TRACED] NO WRITER ANYWHERE IN THE ROM (corrections.md item 83, four independent "
             + "searches). Read at 0x032260, 0x03953A, 0x07D680 only. Pointer-table slot "
@@ -1580,29 +1403,11 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Fuel correction parameter D (float). Read by fuel_correction_final.");
         count += labelComment(0xFFFF77DCL, "fuel_corr_cl_target_A",
             "[TRACED] CL target comp A output (float). Read by fuel_correction_final.");
-        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
-            "[TRACED] CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
-            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
-            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
-            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
-            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
-            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
-            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
-            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
-            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
-            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
-            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
-            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
-            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
-            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
-            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
 
         count += labelComment(0xFFFF316CL, "afl_table_base",
             "[TRACED] A/F Learning table base in RAM (4 ranges x 8 bytes = 32 bytes)");
         count += labelComment(0xFFFF78A0L, "afl_output_struct",
-            "[UNVERIFIED] A/F Learning output data structure base (~100 bytes). +3=CL active flag.");
-        count += labelComment(0xFFFF787FL, "afl_airflow_range_idx",
-            "[CITED] Current A/F Learning airflow range index (byte, 0-3: A/B/C/D)");
+            "[TRACED] A/F Learning output data structure base (~100 bytes). +3=CL active flag.");
         count += labelComment(0xFFFF8F24L, "cl_global_enable",
             "[TRACED] Global CL enable flag (byte). Must be non-zero for CL fueling.");
         count += labelComment(0xFFFF7BE2L, "cl_enable_final",
@@ -1632,35 +1437,31 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ISR stubs (vector table entries point here)
         count += labelComment(0x0000207C, "ISR_IRQ0",
-            "[UNVERIFIED] IRQ0 external interrupt stub -> dispatches to 0xE8D8");
+            "[DECODED] IRQ0 external interrupt stub -> dispatches to 0xE8D8");
         count += labelComment(0x00002094, "ISR_IRQ1",
-            "[UNVERIFIED] IRQ1 external interrupt stub -> dispatches to 0xE8E4");
+            "[DECODED] IRQ1 external interrupt stub -> dispatches to 0xE8E4");
         count += labelComment(0x000020AC, "ISR_IRQ2",
-            "[UNVERIFIED] IRQ2 external interrupt stub -> dispatches to 0xE8F0");
+            "[DECODED] IRQ2 external interrupt stub -> dispatches to 0xE8F0");
         count += labelComment(0x000020C4, "ISR_IRQ3",
-            "[UNVERIFIED] IRQ3 external interrupt stub -> dispatches to 0xE8FC");
+            "[DECODED] IRQ3 external interrupt stub -> dispatches to 0xE8FC");
         count += labelComment(0x000020DC, "ISR_IRQ4",
-            "[UNVERIFIED] IRQ4 external interrupt stub");
+            "[TRACED] IRQ4 external interrupt stub");
         count += labelComment(0x000020F4, "ISR_IRQ5",
-            "[UNVERIFIED] IRQ5 external interrupt stub");
+            "[TRACED] IRQ5 external interrupt stub");
         count += labelComment(0x0000210C, "ISR_IRQ6",
-            "[UNVERIFIED] IRQ6 external interrupt stub");
+            "[TRACED] IRQ6 external interrupt stub");
         count += labelComment(0x00002124, "ISR_IRQ7",
-            "[UNVERIFIED] IRQ7 external interrupt stub");
+            "[TRACED] IRQ7 external interrupt stub");
         count += labelComment(0x0000219C, "ISR_ATU_ITV",
-            "[UNVERIFIED] ATU interval timer ISR stub -> dispatches to 0xE970 (scheduler tick)");
+            "[TRACED] ATU interval timer ISR stub -> dispatches to 0xE970 (scheduler tick)");
         count += labelComment(0x000027E4, "ISR_CMT_CMI0",
-            "[UNVERIFIED] CMT compare match timer 0 ISR stub -> dispatches to 0xF2F6");
+            "[TRACED] CMT compare match timer 0 ISR stub -> dispatches to 0xF2F6");
         count += labelComment(0x00002814, "ISR_ADI0",
-            "[UNVERIFIED] ADI0 A/D Group 0 conversion complete ISR stub -> dispatches to 0xF312");
+            "[TRACED] ADI0 A/D Group 0 conversion complete ISR stub -> dispatches to 0xF312");
         count += labelComment(0x00002904, "ISR_WDT",
-            "[UNVERIFIED] Watchdog timer interrupt ISR stub");
+            "[TRACED] Watchdog timer interrupt ISR stub");
 
         // ISR common dispatcher and epilogue
-        count += labelComment(0x00002B8C, "ISR_CommonDispatcher",
-            "[UNVERIFIED] ISR prologue: saves r2-r7, fr0-fr11, pr, mach, macl. Sets up epilogue.");
-        count += labelComment(0x00002BD4, "ISR_CommonEpilogue",
-            "[UNVERIFIED] ISR epilogue: restores all saved context, decrements nesting counter.");
 
         // ISR nesting context
 
@@ -1670,11 +1471,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000040E0, "ADC_BulkRead",
             "[TRACED] Synchronous ADC read: configures ADCSR0/1/2, starts all 3 groups, polls completion, bulk-reads all 32 channels to GBR-relative RAM.");
         count += labelComment(0x0000F312, "ADI0_Handler",
-            "[UNVERIFIED] ADI0 actual handler: clears ADF flag, advances ADC state machine.");
+            "[DECODED] ADI0 actual handler: clears ADF flag, advances ADC state machine.");
         count += labelComment(0x0000F320, "ADI0_Handler2",
-            "[UNVERIFIED] ADI0 second handler: calls ADC_DataCopy(0x7110), Sensor_Scaling(0x7D26), ADC_Notify(0xBB6C).");
+            "[TRACED] ADI0 second handler: calls ADC_DataCopy(0x7110), Sensor_Scaling(0x7D26), ADC_Notify(0xBB6C).");
         count += labelComment(0x0000E852, "ISR_SharedHalt",
-            "[CITED] Shared ISR handler for unused/error interrupts. Halts with infinite loop after logging error code.");
+            "[TRACED] Shared ISR handler for unused/error interrupts. Halts with infinite loop after logging error code.");
         count += labelComment(0x00007110, "ADC_DataCopy",
             "[UNVERIFIED] Copy ADC conversion results to working RAM structures.");
         count += labelComment(0x00007D26, "Sensor_Scaling",
@@ -1717,39 +1518,17 @@ public class ImportAE5L600L extends GhidraScript {
 
         // OL Enrichment State Machine (Path A)
         count += labelComment(0x0003643A, "ol_condition_checker",
-            "[TRACED] OL enrichment condition checker. Throttle/RPM/load thresholds for Path A (7-phase pipeline).");
+            "[DECODED] OL enrichment condition checker. Throttle/RPM/load thresholds for Path A (7-phase pipeline).");
         count += labelComment(0x0003606C, "ol_enrichment_dispatch",
-            "[TRACED] OL enrichment dispatch. Reads FFFF79C6 mode state (always 0). Values 1/2 are dead code hooks.");
+            "[DECODED] OL enrichment dispatch. Reads FFFF79C6 mode state (always 0). Values 1/2 are dead code hooks.");
 
         // AFL Core Functions
-        count += labelComment(0x00034488, "afl_sub_dispatcher",
-            "[TRACED] AFL sub-dispatcher. Dispatch Table A entry [5]. Orchestrates AFL learning cycle.");
-        count += labelComment(0x000344BA, "afl_range_loop",
-            "[TRACED] AFL range loop. Iterates 4 learning ranges (0-3).");
         count += labelComment(0x000344EE, "afl_validity_check",
-            "[UNVERIFIED] AFL validity check before learning cycle.");
-        count += labelComment(0x0003452A, "afl_core_entry",
-            "[TRACED] AFL core entry. Calls: airflow range -> CL check -> range select -> value update -> store -> max check -> transition.");
-        count += labelComment(0x000345A4, "afl_cl_active_check",
-            "[TRACED] AFL CL active check. 10-condition gate including FFFF8F24, MAF>70g/s, FFFF7BE2, etc.");
-        count += labelComment(0x00034778, "afl_range_selection",
-            "[UNVERIFIED] AFL range selection with additional enable logic.");
-        count += labelComment(0x00034884, "afl_value_update",
-            "[TRACED] AFL value update. Actual learning adjustment. Step size 0.001 (CC05C). Limits +/-25% (CC064/CC068).");
-        count += labelComment(0x00034B1C, "afl_value_store",
-            "[UNVERIFIED] AFL value store. Clamp + write to FFFF316C+(range*8) array.");
+            "[DECODED] AFL validity check before learning cycle.");
         count += labelComment(0x00034C18, "afl_clol_transition_handler",
-            "[UNVERIFIED] AFL CL/OL transition handler. Calls afl_clol_mode_check at 0x34C54.");
-        count += labelComment(0x00034C54, "afl_clol_mode_check",
-            "[TRACED] AFL CL/OL mode check. Reads FFFF7448. When 0 (OL): AFL learning FROZEN.");
+            "[DECODED] AFL CL/OL transition handler. Calls afl_clol_mode_check at 0x34C54.");
         count += labelComment(0x00034CC8, "afl_max_airflow_rate_check",
-            "[TRACED] AFL max airflow learning rate check. <35g/s: 88 ticks, >=35g/s: 244 ticks (~2.8x slower).");
-        count += labelComment(0x00034D52, "afl_airflow_range_determination",
-            "[CITED] AFL airflow range determination. Selects range 0-3 from breakpoints at CC074-CC07C.");
-        count += labelComment(0x00034EC8, "afl_airflow_processor",
-            "[TRACED] AFL airflow processor. Dispatch Table A entry [7].");
-        count += labelComment(0x00034EF4, "afl_airflow_update",
-            "[TRACED] AFL airflow update (Dispatch B entry).");
+            "[DECODED] AFL max airflow learning rate check. <35g/s: 88 ticks, >=35g/s: 244 ticks (~2.8x slower).");
 
         // AFL Application (KEY: no CL/OL gate!)
         count += labelComment(0x00037ABA, "iat_ect_filter_and_blend",
@@ -1759,19 +1538,17 @@ public class ImportAE5L600L extends GhidraScript {
             + "then writes 1.0 to 0xFFFF7AB4. No A/F learning table is read. Was injector_trim_application. "
             + "corrections.md item 97.");
         count += labelComment(0x00037B74, "afl_application",
-            "[TRACED] AFL APPLICATION. Writes FFFF7AB4 multiplier. WARNING: Does NOT check FFFF7448 CL/OL mode. Does NOT check airflow max. Only gates: FFFF726C (transient), FFFF7C68 (status). AFL persists into OL.");
+            "[DECODED] AFL APPLICATION. Writes FFFF7AB4 multiplier. WARNING: Does NOT check FFFF7448 CL/OL mode. Does NOT check airflow max. Only gates: FFFF726C (transient), FFFF7C68 (status). AFL persists into OL.");
         count += labelComment(0x00037F00, "iat_ect_weighted_blend",
             "[TRACED] ([0xFFFF31AC] ECT x [0xCC2FC] + [0xFFFF31A4] IAT x [0xCC2F4]) passed with [0xCC300] to "
             + "0xBE628, result to 0xFFFF7AB8. All three constants are 0.0 on rev 20.19c. A temperature blend, "
             + "not an AFL multiplier. Was afl_multiplier_computation. corrections.md item 97.");
 
         // Fuel Pulse Width (consumes AFL)
-        count += labelComment(0x000301E4, "fuel_pulse_width_calc",
-            "[TRACED] Fuel pulse width calculation. Reads FFFF7AB4 (AFL multiplier) at 0x030230. No CL/OL check — AFL applied unconditionally.");
 
         // AFC PI Controller
         count += labelComment(0x000342A8, "afc_pi_controller",
-            "[TRACED] AFC PI controller. Reads FFFF7448 every cycle. When FFFF7448=0 (OL): AFC output=0. Drops immediately on CL->OL.");
+            "[DECODED] AFC PI controller. Reads FFFF7448 every cycle. When FFFF7448=0 (OL): AFC output=0. Drops immediately on CL->OL.");
 
         // =====================================================================
         // AFL / CL/OL PERSISTENCE ANALYSIS — RAM Addresses
@@ -1790,15 +1567,10 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF31ACL, "ect_filtered_31AC",
             "[TRACED] Lag-filtered (or raw) coolant temp, float. Written by 0x037ABA, read by 0x037F00. Was "
             + "afl_interp_primary. corrections.md item 97.");
-        count += labelComment(0xFFFF726CL, "transient_state_flag",
-            "[TRACED] Transient state flag (byte). Gates AFL application — when set, forces FFFF7AB4=1.0.");
         count += labelComment(0xFFFF726EL, "transient_knock_inhibit",
             "[TRACED] Transient knock inhibit flag (byte). Read by check_transient_knock_inhibit (0x2F8FE). "
             + "When ==1: tasks 8/10/11 suppress knock window/flag updates (tip-in protection). "
             + "Distinct from transient_state_flag (FFFF726C) which gates AFL/fuel corrections.");
-        count += labelComment(0xFFFF7E4CL, "transient_accum_ptr",
-            "[TRACED] Pointer/accumulator used by transient_correction_calc (0x2F984). "
-            + "Loaded as 32-bit value, used in float multiply chain for tip-in enrichment.");
         count += labelComment(0xFFFF65F1L, "transient_enable_gate",
             "[TRACED] Gate flag checked by transient_correction_calc (0x2F984). When zero, skips tip-in "
             + "calculation entirely. Related to 0x2F974 entry guard.");
@@ -1833,8 +1605,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] OL active flag (byte). Written by Path A state machine.");
         count += labelComment(0xFFFF7AB4L, "afl_multiplier_output",
             "[TRACED] AFL multiplier output (float). Written by afl_application at 0x37B74. Consumed by fuel PW calc at 0x0301E4. Applied unconditionally in CL and OL.");
-        count += labelComment(0xFFFF7C68L, "engine_status_flag",
-            "[TRACED] Engine status flag (byte). Gates AFL application — abnormal condition forces FFFF7AB4=1.0.");
 
         // ── CL/OL Path B — FFFF7452 Readiness Inputs & Working Variables ─────
         count += labelComment(0xFFFF7450L, "cl_speed_readiness",
@@ -1932,9 +1702,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7990L, "ol_enrichment_target",
             "[TRACED] OL enrichment accumulator target (float). Computed as FR15 * ol_blend_coeff. "
             + "WRITE 4 filter clamps ol_enrichment_accum to not drop below this target.");
-        count += labelComment(0xFFFF79A0L, "ol_blend_coeff",
-            "[TRACED] OL enrichment blend coefficient (float). Multiplied with target enrichment value "
-            + "to compute ol_enrichment_target. Controls blend rate.");
         count += labelComment(0xFFFF79C7L, "clol_diagnostic_flag",
             "[TRACED] CL/OL diagnostic flag (byte). Set by ol_condition_checker (0x3643A) to indicate "
             + "which condition triggered the OL transition. Used for SSM/diagnostics.");
@@ -1999,17 +1766,6 @@ public class ImportAE5L600L extends GhidraScript {
         // REMOVED: 0xFFFF6624 "engine_rpm_or_maf" — wrong. Correct: rpm_current (line 2154)
         // SUPERSEDED 2026-07-26: this note was itself WRONG. 0xFFFF65FC IS vehicle speed (km/h);
         // removing that label was a wrong-direction correction. See docs/corrections.md item 9.
-        count += labelComment(0xFFFF6898L, "atm_pressure_current",
-            "[TRACED] CORRECTED 2026-07-26. ATMOSPHERIC / BAROMETRIC PRESSURE (float, raw mmHg-class; 440..760 raw = "
-            + "8.5..14.7 psi absolute via psi1 toexpr x*.01933677). Was 'rpm_delta' here and 'manifold_pressure' "
-            + "below; both wrong. Proof: 0x013B02 mov.l @(0x013CCC),r2 (=FFFF6898); 0x013B04 fmov.s @r2,fr4 -> "
-            + "0x013B0E jsr 0x0BE8E4, descriptor 0x0AA99C, axis0 0xC0E94 = definition-named "
-            + "'Target Boost Compensation (Atm. Pressure)_ / Atmospheric Pressure' (440,580,670,720,740,760). "
-            + "Zero 'Manifold Pressure' axes. The OL_Condition thresholds CC1DC=691.9/CC1E0=699.9 read here are "
-            + "a barometric (altitude) hysteresis pair, not an RPM delta; and FFFF7458 set when "
-            + "(FFFF6898 - FFFF620C) <= 570 is baro minus MAP = MANIFOLD VACUUM, which is dimensionally coherent "
-            + "whereas 'RPM delta minus manifold pressure' is not. Manifold pressure is 0xFFFF620C. "
-            + "See docs/corrections.md item 11.");
 
         // ── AFL Application Working Variables ─────────────────────────────────
         count += labelComment(0xFFFF7AC0L, "afl_ramp_multiplier",
@@ -2094,54 +1850,18 @@ public class ImportAE5L600L extends GhidraScript {
         // across the entire firmware.
 
         // ── Integer Arithmetic (saturating add/clamp) ──────────────────────
-        count += labelComment(0x000BE554, "uint16_add_sat",
-            "[TRACED] 685 calls. r0 = min(r4+r5, 0xFFFF). Saturating uint16 add, returns in r0.");
-        count += labelComment(0x000BE53C, "uint8_add_sat",
-            "[TRACED] 461 calls. r0 = min(r4+r5, 0xFF). Saturating uint8 add with carry check, returns in r0.");
 
         // ── Float-to-Descriptor Processor (NaN-safe) ───────────────────────
-        count += labelComment(0x000BDBCC, "desc_read_float_safe",
-            "[TRACED] 309 calls. Reads float from descriptor ptr r4, NaN-checks via fcmp/eq self, "
-            + "calls interrupt_priority_set(16) + interrupt_restore. Returns validated float or 0.");
 
         // ── Interrupt Priority Control ─────────────────────────────────────
-        count += labelComment(0x0000317C, "interrupt_priority_set",
-            "[TRACED] 298 calls. Sets SR interrupt mask to level r4 (0-15). Reads SR, masks with 0x00F0, "
-            + "shifts r4 into I-bits. Returns old SR in r0. Used by all descriptor reads for atomicity.");
-        count += labelComment(0x00003190, "interrupt_restore",
-            "[TRACED] 181 calls. Restores SR interrupt mask from r4 (previously saved by interrupt_priority_set). "
-            + "Checks flag at FFFF1288+0x18, may call 0x3664. Paired with interrupt_priority_set.");
 
         // ── Critical Section Enter/Exit ────────────────────────────────────
-        count += labelComment(0x000BE81C, "critical_section_enter",
-            "[TRACED] 235 calls. Saves SR, sets interrupt level from mask 0xF0, stores old priority at @r4. "
-            + "Returns old SR in r5. Wraps descriptor/table reads for data consistency.");
-        count += labelComment(0x000BE82C, "critical_section_exit",
-            "[TRACED] 236 calls. Restores SR interrupt mask. Just: rts + ldc r4,sr. "
-            + "Paired with critical_section_enter.");
 
         // ── Float Clamp/Range ──────────────────────────────────────────────
-        count += labelComment(0x000BE56C, "float_clamp_range",
-            "[TRACED] Verified from bytes 2026-08-19: fr0 = clamp(fr4, fr5, fr6). "
-            +             "218 calls. Clamps fr4 to [fr6, fr5]. If fr4>fr5: fr7=fr5; elif fr4<fr6: fr7=fr6; else fr7=fr4. "
-            + "Returns clamped value in fr0. Core range-limiter for calibration outputs.");
 
         // ── Float Axis Interpolation (fraction calc) ───────────────────────
-        count += labelComment(0x000BE5D8, "axis_frac_to_uint16",
-            "[TRACED] 147 calls. Converts float axis position to uint16 index+fraction. "
-            + "fr4=value, fr5=range divisor, fr6=axis base. Computes (value-base)/divisor, "
-            + "ftrc to int, clamps [0, 0xFFFF]. Used by all 1D/2D table lookups.");
-        count += labelComment(0x000BE5A8, "axis_frac_to_uint8",
-            "[TRACED] 113 calls. Same as axis_frac_to_uint16 but clamps to [0, 0xFF]. "
-            + "Used by lower-resolution table lookups.");
 
         // ── Float fmac Interpolation Primitives ────────────────────────────
-        count += labelComment(0x000BE598, "fmac_interp_uint16",
-            "[TRACED] 145 calls. Converts uint16 r4 fraction to float, then fmac blend: "
-            + "fr0 = fr4 + fr3*(fr5-fr4). Core 1D interpolation for uint16-indexed tables.");
-        count += labelComment(0x000BE588, "fmac_interp_uint8",
-            "[TRACED] 31 calls. Converts uint8 r4 fraction to float, then fmac blend. "
-            + "Same as fmac_interp_uint16 but for uint8-indexed tables.");
 
         // ── DTC (Diagnostic Trouble Code) Framework ────────────────────────
         count += labelComment(0x0009EDEC, "dtc_set_code",
@@ -2152,28 +1872,15 @@ public class ImportAE5L600L extends GhidraScript {
             + "Calls 0xA1CC0 and 0xA240C. DTC clear dispatcher.");
 
         // ── Descriptor Read (integer, no NaN check) ────────────────────────
-        count += labelComment(0x000BDCB6, "desc_read_int_safe",
-            "[TRACED] 120 calls. Reads integer value from descriptor ptr r4. Calls interrupt_priority_set(16), "
-            + "reads data with boundary checks, calls interrupt_restore. Integer variant of desc_read_float_safe.");
 
         // ── Context Save/Restore (ISR prologue) ────────────────────────────
-        count += labelComment(0x00002B8C, "isr_context_save",
-            "[UNVERIFIED] 118 calls. Full register save for ISR: saves r2-r7, fr0-fr10, FPUL, PR to stack. "
-            + "Increments counter at FFFF1288+8. Returns address of restore routine in r0. "
-            + "Used at entry of all interrupt handlers.");
 
         // ── CL/OL Mode Check Helpers ───────────────────────────────────────
-        count += labelComment(0x00022F92, "check_cl_active",
-            "[TRACED] 111 calls. Reads FFFF65F6 byte, returns T-bit = (value==1). "
-            + "Quick CL-mode gate used throughout fuel/timing/diagnostic code.");
-        count += labelComment(0x00022CF4, "check_engine_running",
-            "[TRACED] 100 calls. Reads FFFF65C5 byte, returns T-bit = (value==1). "
-            + "Engine-running gate used throughout fuel/timing/diagnostic code.");
         count += labelComment(0x0002F8EA, "check_transient_flag",
-            "[TRACED] 65 calls. Reads FFFF726C byte (transient flag), returns T-bit = (value==1). "
+            "[DECODED] 65 calls. Reads FFFF726C byte (transient flag), returns T-bit = (value==1). "
             + "Transient condition gate for AFL/fuel corrections.");
         count += labelComment(0x0002F8FE, "check_transient_knock_inhibit",
-            "[TRACED] 6-instruction leaf stub. Reads FFFF726E (transient knock-inhibit sub-flag, 2 bytes "
+            "[DECODED] 6-instruction leaf stub. Reads FFFF726E (transient knock-inhibit sub-flag, 2 bytes "
             + "after FFFF726C). Returns R0=1 if ==1, R0=0 otherwise. Distinct from "
             + "check_transient_flag (0x2F8EA): this flag suppresses knock window/flag updates "
             + "during tip-in. Called by task08 (knock_window), task10, task11 (knock_flag).");
@@ -2182,18 +1889,11 @@ public class ImportAE5L600L extends GhidraScript {
             + "and FFFF726C == 1, then calls 3x table_1d_desc (0xAC34C, 0xAC360, 0xAC374) for "
             + "tip-in RPM/load factors. Float multiply chain writes results to FFFF72E8/72F4/7300. "
             + "Final stage calls check_cl_active — skips update if not in closed-loop mode.");
-        count += labelComment(0x0003AB20, "check_engine_status",
-            "[TRACED] 35 calls. Reads FFFF7C68 byte (engine status), returns T-bit = (value==1). "
-            + "Gates AFL application — forces multiplier=1.0 on abnormal.");
 
         // ── Diagnostic / Sensor Validation Framework ───────────────────────
         count += labelComment(0x000582D2, "check_engine_running_diag",
             "[TRACED] 108 calls. Calls engine_running_eval(0xA6728) with R4=DTC_index. "
             + "Returns R0=1 if engine running. Used by task55 (R4=72), task58 (R4=39).");
-        count += labelComment(0x000582AC, "check_diag_state",
-            "[TRACED] 100 calls. Reads FFFF36F4 (dtc_enable_flag). Returns: "
-            + "0=no fault(0x00), 1=confirmed(0xFF), 2=scan-cleared(0xA5). "
-            + "Used by task56 (EVAP), task58 extended.");
         count += labelComment(0x000582E0, "diag_read_pack_2val",
             "[TRACED] 43 calls. Reads descriptor, packs 2 values via uint16_pack/uint8_pack, "
             + "calls interrupt_restore. Diagnostic data read with atomicity.");
@@ -2204,51 +1904,43 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] 43 calls. Reads FFFFAE08 byte, returns 1 if == 1. "
             + "Master diagnostic precondition gate. Used by task55, task58.");
         count += labelComment(0x00058524, "diag_read_state_E",
-            "[TRACED] 11 calls. Reads diag_state_E[R4] at FFFFAD52+R4. Returns active fault bitmask.");
+            "[DECODED] 11 calls. Reads diag_state_E[R4] at FFFFAD52+R4. Returns active fault bitmask.");
         count += labelComment(0x0005850E, "diag_read_state_E_indexed",
-            "[TRACED] Reads diag_state_E array at FFFFAD52 indexed by R4. Returns fault bitmask byte.");
+            "[DECODED] Reads diag_state_E array at FFFFAD52 indexed by R4. Returns fault bitmask byte.");
         count += labelComment(0x00058518, "diag_read_indexed_table",
-            "[TRACED] Reads FFFF3B06 + R4*2. Indexed diagnostic lookup table.");
+            "[DECODED] Reads FFFF3B06 + R4*2. Indexed diagnostic lookup table.");
 
         // ── Scheduler / Timer Utilities ────────────────────────────────────
-        count += labelComment(0x0000E6E4, "sched_event_post",
-            "[UNVERIFIED] 73 calls. Posts event to scheduler: reads SR mask, checks event queue word at @r4, "
-            + "sets bits. Atomic scheduler event notification.");
-        count += labelComment(0x0000E6C4, "sched_event_clear",
-            "[TRACED] 11 calls. Clears scheduler event flag. Paired with sched_event_post.");
 
         // ── Address / Offset Calculation ───────────────────────────────────
         count += labelComment(0x00006B5A, "calc_table_offset",
-            "[TRACED] 53 calls. Complex offset computation using calibration base 0xC0080 "
+            "[DECODED] 53 calls. Complex offset computation using calibration base 0xC0080 "
             + "and lookup tables at 0x1190C/0x11914/0x1193C. Returns computed address in r0. "
             + "Used by calibration descriptor reads to resolve table pointers.");
 
         // ── Peripheral I/O Wrappers ────────────────────────────────────────
         count += labelComment(0x00006BC4, "io_write_word_atomic",
-            "[TRACED] 35 calls. Atomic word write: critical_section_enter, "
+            "[DECODED] 35 calls. Atomic word write: critical_section_enter, "
             + "BSR to formatter, BSR to writer, critical_section_exit. "
             + "Used for peripheral register updates.");
         count += labelComment(0x00006BF0, "io_write_2word_atomic",
             "[TRACED] 31 calls. Atomic 2-word write: critical_section_enter, "
             + "write 2 values, critical_section_exit. Extended I/O update.");
         count += labelComment(0x000067A6, "io_sched_event_atomic",
-            "[TRACED] 26 calls. Atomic scheduler event + I/O: calls subroutines for "
+            "[DECODED] 26 calls. Atomic scheduler event + I/O: calls subroutines for "
             + "event setup, sched_event_post, critical_section_exit.");
         count += labelComment(0x00067DC, "io_sched_event_atomic_2",
-            "[TRACED] 21 calls. Variant of io_sched_event_atomic with different event type.");
+            "[DECODED] 21 calls. Variant of io_sched_event_atomic with different event type.");
 
         // ── RAM Word Compare-and-Write ─────────────────────────────────────
         count += labelComment(0x0000B9E0, "ram_word_update",
-            "[UNVERIFIED] 44 calls. Compares word at @r14 with r5, if different: "
+            "[TRACED] 44 calls. Compares word at @r14 with r5, if different: "
             + "calls 0x10800 with event code, writes new value. "
             + "Used for state change detection with notification.");
         count += labelComment(0x0000B99C, "ram_word_update_B",
             "[UNVERIFIED] 22 calls. Variant of ram_word_update with different event routing.");
 
         // ── DTC Table Iterator ─────────────────────────────────────────────
-        count += labelComment(0x0009CFEE, "dtc_scan_loop",
-            "[UNVERIFIED] 48 calls. Iterates DTC entries, calls handler per-entry via r13 (0x9CCF8). "
-            + "Reads FFFFB6DF enable, checks DTC table. Bulk DTC processing.");
 
         // ── Communication / Serial ─────────────────────────────────────────
         count += labelComment(0x00058318, "comms_pack_response",
@@ -2269,11 +1961,11 @@ public class ImportAE5L600L extends GhidraScript {
             "[UNVERIFIED] 40 calls. Sets GBR=0xFFFF83AB, allocates 64-byte workspace, copies r4-r7 args. "
             + "Writes multiple GBR-offset bytes from inputs. GBR-relative task setup.");
         count += labelComment(0x000297B0, "float_load_from_desc_B",
-            "[TRACED] 16 calls. Variant of float_load_from_desc.");
+            "[DECODED] 16 calls. Variant of float_load_from_desc.");
 
         // ── FLKC Learning State Flag Dispatch Table ────────────────────────
         count += labelComment(0x00029858, "flkc_state_flag_reader_table",
-            "[TRACED] Dispatch table of 16-byte stubs (NOT a single function). Each stub reads one byte "
+            "[DECODED] Dispatch table of 16-byte stubs (NOT a single function). Each stub reads one byte "
             + "from the FFFF970E learning state flag array and returns R0=2 (non-zero/converged) "
             + "or R0=0 (zero/empty). Callers JSR to a specific offset to check a specific flag slot. "
             + "Covers FFFF970E-FFFF9737 (41 bytes). Dead slots return R0=0 unconditionally. "
@@ -2286,16 +1978,14 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Sensor Reading Helpers ─────────────────────────────────────────
         count += labelComment(0x00045EEA, "knock_helper_leaf",
-            "[TRACED] 13 calls. Leaf function in knock processing pipeline. Short helper called by multiple knock tasks.");
+            "[DECODED] 13 calls. Leaf function in knock processing pipeline. Short helper called by multiple knock tasks.");
         count += labelComment(0x0001CF16, "engine_state_helper",
             "[TRACED] 10 calls. Engine state utility. Called from AFL/timing/boost contexts.");
         count += labelComment(0x00021D9A, "cl_readiness_check",
-            "[TRACED] 12 calls. CL readiness evaluation. Called from CL/OL transition, fuel, and AFL code. "
+            "[DECODED] 12 calls. CL readiness evaluation. Called from CL/OL transition, fuel, and AFL code. "
             + "Referenced by clol_cond analysis.");
         count += labelComment(0x000717B2, "eeprom_read_helper",
             "[TRACED] 25 calls. EEPROM/NV-memory read utility. Called from DTC and adaptation contexts.");
-        count += labelComment(0x0005CC9A, "sensor_diag_helper",
-            "[TRACED] 20 calls. Sensor diagnostic utility. Called from O2 sensor, boost, and idle contexts.");
 
         // ── Fueling Sub-Function Labels (0x020000-0x02FFFF) ──
         // Flag readers and utility functions called by the fueling pipeline
@@ -2352,38 +2042,24 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0002D92C, "fuel_correction_helper_B");
 
         // ── BDD88 family (appears in multiple peripheral I/O contexts) ─────
-        count += labelComment(0x000BDD5A, "peripheral_io_read",
-            "[TRACED] 20 calls. Peripheral register read utility. Groups of read calls in I/O driver code.");
-        count += labelComment(0x000BDD88, "peripheral_io_write",
-            "[UNVERIFIED] 10 calls. Peripheral register write utility. Paired with peripheral_io_read.");
-        count += labelComment(0x000BDB92, "peripheral_io_init",
-            "[TRACED] 17 calls. Peripheral I/O initialization. Called during startup and reconfiguration.");
-        count += labelComment(0x000BDC6A, "peripheral_io_config",
-            "[TRACED] 10 calls. Peripheral I/O configuration. Sets up register access parameters.");
 
         // ── Remaining High-Value Targets ───────────────────────────────────
         count += labelComment(0x00006828, "io_read_word_atomic",
-            "[TRACED] 15 calls. Atomic word read from I/O region with interrupt protection.");
+            "[DECODED] 15 calls. Atomic word read from I/O region with interrupt protection.");
         count += labelComment(0x00006884, "io_read_2word_atomic",
-            "[TRACED] 20 calls. Atomic 2-word read from I/O region.");
+            "[DECODED] 20 calls. Atomic 2-word read from I/O region.");
         count += labelComment(0x0000CA72, "timer_reload",
             "[TRACED] 11 calls. Timer/counter reload function. Called in groups (0xCBC6-0xCBDA range).");
-        count += labelComment(0x0000E794, "sched_timer_dispatch",
-            "[UNVERIFIED] 8 calls. Timer-based scheduler dispatch. Manages periodic callback timing.");
         count += labelComment(0x00002EDC, "stack_frame_setup",
-            "[UNVERIFIED] 8 calls. Stack frame setup utility for complex function prologues.");
+            "[DECODED] 8 calls. Stack frame setup utility for complex function prologues.");
         count += labelComment(0x000117E8, "hw_register_set",
             "[TRACED] 16 calls. Hardware register write. Used for peripheral configuration.");
         count += labelComment(0x000117FC, "hw_register_get",
             "[TRACED] 13 calls. Hardware register read. Paired with hw_register_set.");
-        count += labelComment(0x00098686, "dtc_status_check",
-            "[UNVERIFIED] 14 calls. DTC status check for specific fault code. Returns fault state.");
-        count += labelComment(0x0009D052, "dtc_counter_update",
-            "[UNVERIFIED] 14 calls. DTC maturation counter update. Increments fault detection counters.");
         count += labelComment(0x0009DD78, "dtc_vector_table",
-            "[UNVERIFIED] 17 calls. DTC handler vector dispatch. Called via pointer table from dtc_scan_loop.");
+            "[TRACED] 17 calls. DTC handler vector dispatch. Called via pointer table from dtc_scan_loop.");
         count += labelComment(0x0009CABE, "dtc_freeze_frame",
-            "[UNVERIFIED] 11 calls. DTC freeze frame capture. Records operating conditions at fault time.");
+            "[DECODED] 11 calls. DTC freeze frame capture. Records operating conditions at fault time.");
         count += labelComment(0x0009884E, "dtc_monitor_helper",
             "[UNVERIFIED] 12 calls. DTC monitor helper. Shared logic for OBD-II monitor routines.");
         count += labelComment(0x00098832, "dtc_monitor_gate",
@@ -2392,10 +2068,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[UNVERIFIED] 10 calls. DTC history memory update. Writes fault history for readout.");
 
         // ── Known RAM: Status Check Addresses ──────────────────────────────
-        count += labelComment(0xFFFF65F6L, "cl_active_flag",
-            "[TRACED] Byte: 1=closed loop active. Read by check_cl_active (0x22F92), 111 calls.");
-        count += labelComment(0xFFFF65C5L, "engine_running_flag",
-            "[TRACED] Byte: 1=engine running. Read by check_engine_running (0x22CF4), 100 calls.");
         count += labelComment(0xFFFFB71CL, "dtc_master_enable",
             "[TRACED] Byte: DTC system master enable. Read by dtc_set_code/dtc_clear_code.");
         count += labelComment(0xFFFF36F0L, "diag_mode_status",
@@ -2427,14 +2099,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "(b) axis 0x0C0294 via descriptor 0x0AA760 reads 0,8,16..120 = km/h; "
             + "(c) launch-control patch 0x0F1000 compares it to 8.0515 = 5 mph via LCSPEED(MPH) toexpr x*.621. "
             + "Engine load is 0xFFFF63F8. See docs/corrections.md item 9.");
-        count += labelComment(0xFFFF67ECL, "dtc_maturation_counter_67EC",
-            "[TRACED] CORRECTED 2026-07-26. uint16 DTC MATURATION COUNTER at +4 in the 0xFFFF67E8 counter block. "
-            + "NOT atmospheric pressure and NOT a float. Access census over all 99 pool refs: 99 int16 "
-            + "(mov.w) accesses, ZERO FP accesses -- e.g. 0x01202A mov.l @(0x01210C),r6 ; 0x01202C mov.w @r6,r11, "
-            + "in a function that reads real floats through fmov.s from FFFF6624/FFFF6634 in the same breath. "
-            + "Reset to 0 at 0x023AA8; incremented through the saturating u16 helper 0x0BE554 at 0x023AB2; "
-            + "compared against the uint16 calibration at 0xC0212 (=306) at 0x01207E. Barometric pressure is "
-            + "the float at 0xFFFF6898. See docs/corrections.md item 15.");
         count += labelComment(0xFFFF65C0L, "diag_precondition_flag_65C0",
             "[TRACED] CORRECTED 2026-07-26. BYTE boolean in the 0xFFFF65B7-0xFFFF65C6 flag block. NOT throttle position "
             + "and NOT a float. Census: 89 int8 accesses, ZERO FP accesses; every address in that block is "
@@ -2462,22 +2126,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF6364L, "iat_current",
             "[TRACED] CORRECTED 2026-07-26. INTAKE AIR TEMPERATURE (float, degC). See the full proof on the earlier "
             + "labelComment for this address and docs/corrections.md item 12.");
-        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
-            "[TRACED] CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
-            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
-            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
-            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
-            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
-            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
-            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
-            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
-            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
-            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
-            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
-            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
-            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
-            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
-            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
         count += labelComment(0xFFFF6254L, "flag_6254",
             "[TRACED] CORRECTED 2026-07-26. BYTE boolean at +4 in the 0xFFFF6250 block. NOT mass airflow and NOT a float. "
             + "Census: 51 int8 accesses, ZERO FP accesses. Set to the literal 1 together with its siblings at "
@@ -2502,9 +2150,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF62DCL, "throttle_plate_angle",
             "[TRACED] CORRECTED 2026-07-26. THROTTLE PLATE OPENING ANGLE (float). See the full proof on the earlier "
             + "labelComment for this address and docs/corrections.md item 13.");
-        count += labelComment(0xFFFF6898L, "atm_pressure_current",
-            "[TRACED] CORRECTED 2026-07-26. ATMOSPHERIC / BAROMETRIC PRESSURE (float). See the full proof on the earlier "
-            + "labelComment for this address and docs/corrections.md item 11.");
         count += labelComment(0xFFFF69F0L, "ratio_0to1_69F0",
             "[TRACED] CORRECTED 2026-07-27. A 0..1 RATIO (float). Definitively NOT a temperature. 0x0272CE "
             + "mov.l @(0x0274DC),r2 (=0x0BE56C) ; 0x0272D0 fldi1 fr6 ; 0x0272D2 fldi0 fr5 ; 0x0272D6 jsr @r2 with "
@@ -2514,12 +2159,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "all the SAME unnamed 0..1 axis 0xC4514, and ZERO temperature-named axes -- while 0xFFFF6364 reaches "
             + "9. A value clamped to [0,1] cannot be a -40..120 C temperature, so the old name is refuted outright. "
             + "WHICH ratio it is remains UNRESOLVED and is deliberately not guessed. corrections.md items 23 + 33.");
-        count += labelComment(0xFFFF6C48L, "diag_status_code_6C48",
-            "[CITED] CORRECTED 2026-07-26. BYTE status/result code. NOT battery voltage and NOT a float. Census: "
-            + "34 int8 accesses (13 loads, 21 stores), ZERO FP accesses. Every stored constant is a "
-            + "nibble-doubled sentinel -- 0x00/0x33/0x55/0x77/0xAA/0xBB/0xDD/0xEE (e.g. 0x02C148 mov #-69,r2 ; "
-            + "0x02C14C mov.b r2,@r1 stores 0xBB). A voltage does not take eight discrete hand-written values. "
-            + "Real battery voltage is the float at 0xFFFF4130. See docs/corrections.md item 14.");
 
         // ── ADC / Sensor Raw + Status (0xFFFF61xx-0xFFFF65xx) ──────────────
         count += labelComment(0xFFFF6155L, "adc_channel_status",
@@ -2535,8 +2174,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "Accelerator Pedal Angle'. See docs/corrections.md item 13.");
         count += labelComment(0xFFFF65BDL, "engine_state_byte",
             "[TRACED] 34 refs. Engine state byte (cranking/running/etc).");
-        count += labelComment(0xFFFF653CL, "o2_sensor_voltage",
-            "[TRACED] 19 refs. O2 sensor voltage or lambda value.");
 
         // ── Sensor / Input Block (0xFFFF4xxx) ──────────────────────────────
         count += labelComment(0xFFFF4130L, "battery_voltage",
@@ -2566,15 +2203,8 @@ public class ImportAE5L600L extends GhidraScript {
             + "'Turbo Dynamics Proportional / Boost Error', 0xC0D3C 'Turbo Dynamics Integral Negative / "
             + "Boost Error', 0xC0D74 'Turbo Dynamics Integral Positive / Boost Error'. 3 of 3 named axes agree. "
             + "See docs/corrections.md item 22.");
-        count += labelComment(0xFFFF62E4L, "throttle_angle_change",
-            "[CITED] IDENTIFIED 2026-07-26. THROTTLE ANGLE CHANGE -- the tip-in enrichment trigger value (float, %, "
-            + "axis 0..31.3). 0x03A9BC mov.l @(0x03AA70),r2 (=FFFF62E4) ; 0x03A9BE fmov.s @r2,fr4 (FR4 untouched) "
-            + "; 0x03A9D0 jsr 0x0BE830 -> descriptor 0x0AD368, axis 0xCED08 = 'Throttle Tip-in Enrichment A / "
-            + "Throttle Angle Change'; the alternate branch reaches 0xCED74 'Throttle Tip-in Enrichment B / "
-            + "Throttle Angle Change', selected by the byte at 0xFFFF844F. Tuning-relevant. "
-            + "See docs/corrections.md item 22.");
         count += labelComment(0xFFFF7324L, "last_calc_base_pulse_width",
-            "[CITED] IDENTIFIED 2026-07-26. LAST CALCULATED BASE PULSE WIDTH (float; ms toexpr x*.001; axis "
+            "[TRACED] IDENTIFIED 2026-07-26. LAST CALCULATED BASE PULSE WIDTH (float; ms toexpr x*.001; axis "
             + "1000..16000 = 1..16 ms). 0x038DCE mov.l @(0x038E14),r2 (=FFFF7324) ; 0x038DD0 fmov.s @r2,fr4 ; "
             + "0x038DD8 jsr 0x0BE8E4 with delay fmov fr15,fr5 (FR15 = [FFFF6624] rpm) -> descriptor 0x0AD738, "
             + "axis0 0xD0760 = 'Per Injector Pulse Width Compensation A / Last Calculated Base Pulse Width', "
@@ -2605,9 +2235,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF366CL, "timer_counter_A",
             "[TRACED] 41 refs. Timer/counter A.");
         count += labelComment(0xFFFF367CL, "timer_counter_B",
-            "[UNVERIFIED] 25 refs. Timer/counter B.");
+            "[TRACED] 25 refs. Timer/counter B.");
         count += labelComment(0xFFFF3674L, "timer_counter_C",
-            "[UNVERIFIED] 25 refs. Timer/counter C.");
+            "[TRACED] 25 refs. Timer/counter C.");
         count += labelComment(0xFFFF25CCL, "system_tick_counter",
             "[TRACED] 48 refs. System tick/event counter.");
 
@@ -2615,7 +2245,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF837EL, "idle_control_GBR",
             "[TRACED] 39 refs. Idle control GBR base (19 GBR uses). Primary GBR for task54_idle.");
         count += labelComment(0xFFFF83ACL, "idle_workspace_GBR",
-            "[UNVERIFIED] 26 refs. Secondary idle GBR workspace (7 GBR uses).");
+            "[TRACED] 26 refs. Secondary idle GBR workspace (7 GBR uses).");
         count += labelComment(0xFFFF8E98L, "cl_state_struct",
             "[TRACED] 97 refs. CL monitoring state struct (15+ bytes). Base for cl_monitor_state_machine "
             + "(0x5AB44). Layout: +0=state_phase(u8: 0=IDLE,1=ACTIVE,2=CONVERGED), "
@@ -2635,7 +2265,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF8C9CL, "timing_workspace_A",
             "[UNVERIFIED] 17 refs. Timing workspace variable.");
         count += labelComment(0xFFFF8EA8L, "sched_control_GBR",
-            "[UNVERIFIED] 14 refs. Scheduler control GBR base (5 GBR uses).");
+            "[TRACED] 14 refs. Scheduler control GBR base (5 GBR uses).");
         count += labelComment(0xFFFF8E46L, "fuel_mode_flags",
             "[TRACED] 39 refs. Fuel mode flags register.");
 
@@ -2666,29 +2296,21 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Scheduler / System (0xFFFF9xxx) ────────────────────────────────
         count += labelComment(0xFFFF9094L, "sched_task_GBR",
-            "[UNVERIFIED] 36 refs. Scheduler task GBR base (6 GBR uses).");
+            "[TRACED] 36 refs. Scheduler task GBR base (6 GBR uses).");
         count += labelComment(0xFFFF9058L, "sched_state_A",
             "[UNVERIFIED] 32 refs. Scheduler state variable A.");
         count += labelComment(0xFFFF9FC6L, "sched_timer_base",
-            "[UNVERIFIED] 22 refs. Scheduler timer base. GBR base (3 uses).");
+            "[TRACED] 22 refs. Scheduler timer base. GBR base (3 uses).");
         count += labelComment(0xFFFF9FA8L, "sched_timer_B",
             "[UNVERIFIED] 17 refs. Scheduler timer variable B.");
         count += labelComment(0xFFFF91C4L, "sched_queue_base",
-            "[UNVERIFIED] 8 refs. Scheduler queue base. GBR base (3 uses).");
+            "[TRACED] 8 refs. Scheduler queue base. GBR base (3 uses).");
         count += labelComment(0xFFFF980CL, "sched_periodic_GBR",
             "[UNVERIFIED] 7 refs. Scheduler periodic timer GBR base (4 GBR uses).");
 
         // ── Fuel / Timing Working (0xFFFF7xxx) ─────────────────────────────
-        count += labelComment(0xFFFF77C8L, "afc_output",
-            "[TRACED] 19 refs. AFC output value. Referenced in fuel_correction_final.");
         count += labelComment(0xFFFF798CL, "timing_state_var",
             "[TRACED] 17 refs. Timing state variable. Referenced by task35_timing_corr.");
-        count += labelComment(0xFFFF7E90L, "timing_output_A",
-            "[TRACED] 25 refs. Timing output value A.");
-        count += labelComment(0xFFFF7D68L, "throttle_delta_pos",
-            "[TRACED] 19 refs. Positive throttle rate of change (float). Used by accel enrichment. Was timing_blend_state.");
-        count += labelComment(0xFFFF7FBCL, "timing_final_advance",
-            "[TRACED] 14 refs. Final timing advance value.");
         count += labelComment(0xFFFF7C9DL, "fuel_state_byte",
             "[TRACED] 32 refs. Fuel state byte/flag.");
 
@@ -2708,7 +2330,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── System State (0xFFFF2xxx) ──────────────────────────────────────
         count += labelComment(0xFFFF2004L, "system_init_flags",
-            "[UNVERIFIED] 23 refs. System initialization flags.");
+            "[TRACED] 23 refs. System initialization flags.");
 
         // =====================================================================
         // SH7058 ON-CHIP PERIPHERAL REGISTERS (0xFFFF0000-0xFFFF1FFF)
@@ -2716,26 +2338,16 @@ public class ImportAE5L600L extends GhidraScript {
         // From SH7058 hardware manual + cross-reference with code context.
         // Only addresses actually referenced in the ROM are labeled.
 
-        count += labelComment(0xFFFF0000L, "SH7058_STBCR",
-            "[TRACED] 9 refs. Standby Control Register (power management). Module stop control bits.");
-        count += labelComment(0xFFFF0004L, "SH7058_STBCR2",
-            "[UNVERIFIED] 2 refs. Standby Control Register 2. Additional module stop bits.");
-        count += labelComment(0xFFFF0008L, "SH7058_STBCR3",
-            "[TRACED] 2 refs. Standby Control Register 3. Peripheral clock gating.");
         count += labelComment(0xFFFF0020L, "SH7058_SYSCR",
-            "[UNVERIFIED] 2 refs. System Control Register. Bus width, endianness, clock divider.");
-        count += labelComment(0xFFFF1230L, "SH7058_TIER_MTU0",
-            "[CITED] 3 refs. Timer Interrupt Enable Register (MTU channel 0). Used for periodic interrupts.");
+            "[TRACED] 2 refs. System Control Register. Bus width, endianness, clock divider.");
         count += labelComment(0xFFFF12B0L, "SH7058_SCI_SMR",
-            "[CITED] 2 refs. Serial Mode Register (SCI). Baud rate, parity, data length config.");
+            "[TRACED] 2 refs. Serial Mode Register (SCI). Baud rate, parity, data length config.");
         count += labelComment(0xFFFF12B4L, "SH7058_SCI_BRR",
-            "[UNVERIFIED] 1 ref. Bit Rate Register (SCI). Baud rate divisor.");
+            "[TRACED] 1 ref. Bit Rate Register (SCI). Baud rate divisor.");
         count += labelComment(0xFFFF12B5L, "SH7058_SCI_SCR",
-            "[UNVERIFIED] 1 ref. Serial Control Register (SCI). TX/RX enable, interrupt enable.");
-        count += labelComment(0xFFFF12B8L, "SH7058_SCI_TDR",
-            "[UNVERIFIED] 5 refs. Transmit Data Register (SCI). Write byte to send.");
+            "[TRACED] 1 ref. Serial Control Register (SCI). TX/RX enable, interrupt enable.");
         count += labelComment(0xFFFF12C8L, "SH7058_SCI_SSR",
-            "[UNVERIFIED] 2 refs. Serial Status Register (SCI). TX empty, RX full, error flags.");
+            "[TRACED] 2 refs. Serial Status Register (SCI). TX empty, RX full, error flags.");
 
         // =====================================================================
         // THUNK FUNCTIONS — Resolved Targets
@@ -2808,24 +2420,22 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000BF6L, "isr_generic_rte",
             "[TRACED] Generic ISR RTE (return from interrupt) after register restore");
         count += labelComment(0x000BFAL, "exc_trap_infinite_loop",
-            "[UNVERIFIED] Exception trap: illegal instruction / address error (infinite loop)");
+            "[DECODED] Exception trap: illegal instruction / address error (infinite loop)");
         count += labelComment(0x000F4CL, "isr_ack_wrapper_F4C",
             "[TRACED] Calls 0xEE4; if the result is non-zero doubles its argument (0x000F60 shll r4); tail- "
             + "jumps to 0xD78. No table access in this body. Was isr_dispatch_manager. corrections.md item 97.");
         count += labelComment(0x000EE4L, "isr_intevt_resolver",
             "[TRACED] Reads INTEVT/priority register to identify interrupt source, returns index");
-        count += labelComment(0x000D78L, "isr_int_acknowledge",
-            "[UNVERIFIED] Interrupt acknowledge/clear function");
         // 0x000E5EC previously carried "isr_dispatch_table" ("Interrupt dispatch table:
         // 54 function pointers"). RETIRED -- item 84 proved this range is the shared
         // LITERAL POOL of the 0x00E4xx task stubs, and none of the 51 addresses it holds
         // appears in the 0x0-0x400 interrupt vector table. See corrections item 91.
         // Slot labels below: entry N is at 0x0E5EC + N*4.
-        count += labelComment(0x00E5F0, "stubpool_slot_1", "[UNVERIFIED] Literal pool slot 1 at 0x0E5F0 holds 0x00FC04. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
-        count += labelComment(0x00E5F4, "stubpool_slot_2", "[UNVERIFIED] Literal pool slot 2 at 0x0E5F4 holds 0x005840. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
-        count += labelComment(0x00E5F8, "stubpool_slot_3", "[UNVERIFIED] Literal pool slot 3 at 0x0E5F8 holds 0x00D658. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
-        count += labelComment(0x00E5FC, "stubpool_slot_4", "[UNVERIFIED] Literal pool slot 4 at 0x0E5FC holds 0x00CBAC. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
-        count += labelComment(0x00E600, "stubpool_slot_5", "[UNVERIFIED] Literal pool slot 5 at 0x0E600 holds 0x04907C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E5F0, "stubpool_slot_1", "[TRACED] Literal pool slot 1 at 0x0E5F0 holds 0x00FC04. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E5F4, "stubpool_slot_2", "[TRACED] Literal pool slot 2 at 0x0E5F4 holds 0x005840. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E5F8, "stubpool_slot_3", "[TRACED] Literal pool slot 3 at 0x0E5F8 holds 0x00D658. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E5FC, "stubpool_slot_4", "[TRACED] Literal pool slot 4 at 0x0E5FC holds 0x00CBAC. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E600, "stubpool_slot_5", "[TRACED] Literal pool slot 5 at 0x0E600 holds 0x04907C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00E604, "stubpool_slot_6", "[UNVERIFIED] Literal pool slot 6 at 0x0E604 holds 0x009A58. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00E608, "stubpool_slot_7", "[UNVERIFIED] Literal pool slot 7 at 0x0E608 holds 0x00D268. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00E60C, "stubpool_slot_8", "[UNVERIFIED] Literal pool slot 8 at 0x0E60C holds 0x00CBEE. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
@@ -2855,26 +2465,21 @@ public class ImportAE5L600L extends GhidraScript {
             + "RENAMED from \"isr_handler_20\", which was positional over a structure misread as an "
             + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
             + "the 0x0-0x400 vector table. corrections.md item 91.");
-        count += labelComment(0x00E640, "stubpool_slot_21", "[UNVERIFIED] Literal pool slot 21 at 0x0E640 holds 0x04793C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E640, "stubpool_slot_21", "[TRACED] Literal pool slot 21 at 0x0E640 holds 0x04793C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x04793CL, "isr_rcan0", "[TRACED] ISR dispatch table entry 21");
         count += labelComment(0x00E644, "stubpool_slot_22", "[TRACED] Literal pool slot 22 at 0x0E644 holds 0x048732. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x048732L, "isr_rcan1", "[TRACED] ISR dispatch table entry 22");
-        count += labelComment(0x00E648, "stubpool_slot_23", "[UNVERIFIED] Literal pool slot 23 at 0x0E648 holds 0x01076A. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
-        count += labelComment(0x00E64C, "stubpool_slot_24", "[UNVERIFIED] Literal pool slot 24 at 0x0E64C holds 0x004BCA. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
-        count += labelComment(0x00E650, "stubpool_slot_25", "[UNVERIFIED] Literal pool slot 25 at 0x0E650 holds 0x010124. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
-        count += labelComment(0x010124, "stubpool_target_25",
-            "[TRACED] Slot 25 of the LITERAL POOL at 0x00E5EC (0x0E650), called from a 0x00E4xx task stub. "
-            + "RENAMED from \"isr_handler_25\", which was positional over a structure misread as an "
-            + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
-            + "the 0x0-0x400 vector table. corrections.md item 91.");
-        count += labelComment(0x00E654, "stubpool_slot_26", "[UNVERIFIED] Literal pool slot 26 at 0x0E654 holds 0x047B66. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E648, "stubpool_slot_23", "[TRACED] Literal pool slot 23 at 0x0E648 holds 0x01076A. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E64C, "stubpool_slot_24", "[TRACED] Literal pool slot 24 at 0x0E64C holds 0x004BCA. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E650, "stubpool_slot_25", "[TRACED] Literal pool slot 25 at 0x0E650 holds 0x010124. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E654, "stubpool_slot_26", "[TRACED] Literal pool slot 26 at 0x0E654 holds 0x047B66. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00E658, "stubpool_slot_27", "[TRACED] Literal pool slot 27 at 0x0E658 holds 0x049A7A. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x049A7A, "stubpool_target_27",
-            "[TRACED] Slot 27 of the LITERAL POOL at 0x00E5EC (0x0E658), called from a 0x00E4xx task stub. "
+            "[DECODED] Slot 27 of the LITERAL POOL at 0x00E5EC (0x0E658), called from a 0x00E4xx task stub. "
             + "RENAMED from \"isr_handler_27\", which was positional over a structure misread as an "
             + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
             + "the 0x0-0x400 vector table. corrections.md item 91.");
-        count += labelComment(0x00E65C, "stubpool_slot_28", "[UNVERIFIED] Literal pool slot 28 at 0x0E65C holds 0x00C36C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E65C, "stubpool_slot_28", "[TRACED] Literal pool slot 28 at 0x0E65C holds 0x00C36C. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00C36C, "stubpool_target_28",
             "[TRACED] Slot 28 of the LITERAL POOL at 0x00E5EC (0x0E65C), called from a 0x00E4xx task stub. "
             + "RENAMED from \"isr_handler_28\", which was positional over a structure misread as an "
@@ -2892,7 +2497,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "RENAMED from \"isr_handler_30\", which was positional over a structure misread as an "
             + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
             + "the 0x0-0x400 vector table. corrections.md item 91.");
-        count += labelComment(0x00E668, "stubpool_slot_31", "[UNVERIFIED] Literal pool slot 31 at 0x0E668 holds 0x00C370. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E668, "stubpool_slot_31", "[TRACED] Literal pool slot 31 at 0x0E668 holds 0x00C370. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x00C370, "stubpool_target_31",
             "[TRACED] Slot 31 of the LITERAL POOL at 0x00E5EC (0x0E668), called from a 0x00E4xx task stub. "
             + "RENAMED from \"isr_handler_31\", which was positional over a structure misread as an "
@@ -2918,7 +2523,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "RENAMED from \"isr_handler_36\", which was positional over a structure misread as an "
             + "ISR dispatch table -- it is a literal pool (item 84), and this address is NOT in "
             + "the 0x0-0x400 vector table. corrections.md item 91.");
-        count += labelComment(0x00E680, "stubpool_slot_37", "[UNVERIFIED] Literal pool slot 37 at 0x0E680 holds 0x04A03E. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
+        count += labelComment(0x00E680, "stubpool_slot_37", "[TRACED] Literal pool slot 37 at 0x0E680 holds 0x04A03E. NOT a dispatch table (item 84) -- 0x00E5EC-0x00E6C0 is the shared literal pool of the 0x00E4xx task stubs. Renamed from dtbl_isr_*, which asserted a table that does not exist.");
         count += labelComment(0x04A03E, "stubpool_target_37",
             "[TRACED] Slot 37 of the LITERAL POOL at 0x00E5EC (0x0E680), called from a 0x00E4xx task stub. "
             + "RENAMED from \"isr_handler_37\", which was positional over a structure misread as an "
@@ -3128,7 +2733,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // Task 10 sub-function labels
         count += labelComment(0x00040D4L, "adc_bulk_read_wrapper",
-            "[TRACED] ADC bulk read outer wrapper (Task 10 call_09). Saves R10-R14,PR then falls "
+            "[DECODED] ADC bulk read outer wrapper (Task 10 call_09). Saves R10-R14,PR then falls "
             + "through to inner function at 0x040DE (GBR=FFFF4024, reads 32 A/D channels). "
             + "Called by Task 10 at highest interrupt priority to capture ADC snapshot.");
         count += labelComment(0x00040DEL, "adc_bulk_read",
@@ -3137,9 +2742,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "Channel map: ADDR4=Baro(402C), ADDR5=TPS(402E), ADDR7=VBatt(4032), "
             + "ADDR14=MAP-baro(4040), ADDR15=MAF(4042), ADDR22=MAP-man(4050), "
             + "ADDR26=FuelT(4058), ADDR28=O2(405C), ADDR29=ECT(405E), ADDR30=IAT(4060).");
-        count += labelComment(0x0000AE50L, "task10_init_irq_scratch",
-            "[TRACED] Task 10 call_01: tiny function. Manipulates interrupt-level mask bits (0xFF0F), "
-            + "bit operation on SR scratch value, immediate RTS. Init helper.");
         count += labelComment(0x0000ACF4L, "task10_batv_calibrate",
             "[TRACED] Task 10 call_29: Battery Voltage calibration. Reads FFFF4032 (Battery Voltage raw "
             + "ADC ADDR7), scales via ROM table 0xC4A74, writes calibrated float to FFFF432C/432E.");
@@ -3184,7 +2786,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // Task 11 -- fast minimal (10 ms)
         count += labelComment(0x0000E3E4L, "rtos_task11_fast_minimal",
-            "[TRACED] RTOS Task 11: fast minimal (10 ms, pri 2). TCB=FFFF1220. "
+            "[DECODED] RTOS Task 11: fast minimal (10 ms, pri 2). TCB=FFFF1220. "
             + "Immediate JMP to epilogue (0x35A4). 10 ms heartbeat alongside Task 1.");
 
         // Task 12 -- gate-only / sub-task entry (20 ms)
@@ -3214,16 +2816,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "0xF97C -> 0xE54E (wrapper) -> 0x5798 (pre-calc) -> 0x049CF0 (runner). "
             + "References 0xBE81C and sub-table base 0x11BA4.");
 
-        count += labelComment(0x00000C0CL, "rtos_reset_entry",
-            "[TRACED] Power-on reset entry point (= vec_PowerOnResetPC = 0x0C0C). "
-            + "Initial SP = 0xFFFFBFA0. Calls HW init (0xC20, 0xC54), "
-            + "then RTOS startup 0x65C with R4=R5=0. Main loop at 0x0C1C is infinite BRA.");
 
-        count += labelComment(0x0000065CL, "rtos_startup",
-            "[TRACED] RTOS startup / initialization. Called from reset entry (0x0C0C) with R4=R5=0. "
-            + "Registers task table @ 0x3F80, starts scheduler. "
-            + "Calls gate infra (0x004C), hardware setup (0x762, 0x78E), RTOS init (0x598). "
-            + "Checks magic at FFFF_BFFC, calls scheduler watchdog (0x0EE4).");
 
         // -- Sub-task pool: OL-gated dispatchers (all check FFFF8EDC) --
         count += labelComment(0x00049CF0L, "fuel_dispatch_tableB_runner",
@@ -3254,13 +2847,13 @@ public class ImportAE5L600L extends GhidraScript {
 
         // -- Secondary sub-task wrappers (pool table 0xE5EC entries 32-33) --
         count += labelComment(0x0000E54EL, "subtask_wrap_fuel_tableB",
-            "[UNVERIFIED] Secondary sub-task wrapper for fuel_dispatch_table_B path. "
+            "[TRACED] Secondary sub-task wrapper for fuel_dispatch_table_B path. "
             + "Indexed at secondary sub-table [0x11BF0], flags=0 (always execute). "
             + "JSR 0x5798 (fuel_tableB pre-calc/setup), then JMP 0x049CF0 (tableB runner). "
             + "Called via: Task2/3 -> rtos_secondary_dispatcher -> this wrapper.");
 
         count += labelComment(0x00005798L, "fuel_tableB_precalc",
-            "[UNVERIFIED] fuel_dispatch_table_B pre-calculation setup. Called before fuel_dispatch_tableB_runner. "
+            "[TRACED] fuel_dispatch_table_B pre-calculation setup. Called before fuel_dispatch_tableB_runner. "
             + "Accesses FFFF405C (struct base), FFFF4114, 0xBEA6C, 0xAF92C. "
             + "Sets up working data for the 18-function table-B dispatch chain. "
             + "Also labeled isr_handler_32 (that label is also valid).");
@@ -3310,14 +2903,6 @@ public class ImportAE5L600L extends GhidraScript {
             +             "RTOS scheduler state word. Read by task gate (0x10A46/rtos_task_gate) "
             + "and task epilogue (0x35A4/rtos_task_epilogue) to determine task run eligibility.");
 
-        count += labelComment(0xFFFF8EDCL, "ol_dispatch_gate",
-            "[TRACED] OL enrichment dispatch gate (byte). Checked by all 4 OL-gated dispatchers: "
-            + "0x049CF0 (fuel_dispatch_tableB), 0x4907C (fuel_dispatch_tableA), "
-            + "0x48DB8 (injection timing), 0x48E16 (ATU channels). "
-            + "0x00 = OL enrichment active (all dispatchers run their sub-functions). "
-            + "0xFF = special mode (dispatchers JMP to 0x5AB44 cl_monitor_state_machine, R4=1). "
-            + "other = CL mode (dispatchers JMP to 0x5AB44 cl_monitor_state_machine, R4=0). "
-            + "Written by: clol_mode_flag_writer (0x31528) each scheduler cycle.");
 
         count += labelComment(0x0005AB44L, "cl_monitor_state_machine",
             "[TRACED] CL monitoring state machine. Runs every 20ms tick when FFFF8EDC != 0 "
@@ -3371,31 +2956,25 @@ public class ImportAE5L600L extends GhidraScript {
             + "Calls watchdog_fault_reset (0xFBA4) on hardware status failure. "
             + "Uses FFFF205C counter, FFFF5B68 timer base.");
 
-        count += labelComment(0x0000FBA4L, "watchdog_fault_reset",
-            "[TRACED] SAFETY: Raises IRQ to priority 15 (blocks all interrupts), "
-            + "clears WDT registers at 0xF590-0xF594, enters infinite loop "
-            + "to trigger watchdog timeout and ECU reset. Called from "
-            + "cl_finalize_injection_sync on hardware failure, and from "
-            + "cl_monitor_state_machine on sensor failure during CL+engine running.");
 
         count += labelComment(0x0004AE6AL, "ol_gate_dispatcher",
-            "[TRACED] Conditional OL-only dispatcher. Checks FFFF8EDC: if 0 (OL active) "
+            "[DECODED] Conditional OL-only dispatcher. Checks FFFF8EDC: if 0 (OL active) "
             + "JMP to 0xA8518; if non-zero (CL mode) returns immediately. "
             + "Called from cl_monitor_state_machine on state 0->1 transition.");
 
         count += labelComment(0x0004AE82L, "ol_fuel_table_init",
-            "[TRACED] Multi-function fuel table initializer, gated by FFFF8EDC==0. "
+            "[DECODED] Multi-function fuel table initializer, gated by FFFF8EDC==0. "
             + "If R14==1: calls 0x303C0, 0x46C88, 0x475A8, 0x3DBF4. "
             + "If R14!=1: calls 0x44132, 0x475B0, 0x3DBFC. "
             + "Tail-calls 0x6F0C2.");
 
         count += labelComment(0x00036E60L, "ol_post_correction_select",
-            "[TRACED] Phase 7 sub-A: selects post-transition correction float based on "
+            "[DECODED] Phase 7 sub-A: selects post-transition correction float based on "
             + "engine state (0x22CF4). Loads from ROM 0xCC288 or 0xCC284. "
             + "Writes to FFFF7A38 struct.");
 
         count += labelComment(0x00036E86L, "ol_post_transition_main",
-            "[TRACED] Phase 7 sub-B: main OL post-transition logic. GBR=FFFF7A20. "
+            "[DECODED] Phase 7 sub-B: main OL post-transition logic. GBR=FFFF7A20. "
             + "Reads RPM/load/MAF, checks FLKC states via 0x297B0/0x29AA0, "
             + "evaluates 4 GBR condition flags, compares against ROM thresholds "
             + "at 0xCC274-0xCC290. NOT dead code — active when prior OL phases "
@@ -3429,10 +3008,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "Reads FFFF36BE counter, iterates FFFF3D08 array. "
             + "Float multiply chains with BE830 table lookups.");
 
-        count += labelComment(0x0001076AL, "charge_workspace_init",
-            "[TRACED] Sub-table B [03a]. Initializes OL charge workspace FFFF2060-20A8. "
-            + "Calls BDB6E/BDB80 (float_init) for 5 entries × 12 bytes. "
-            + "Clears FFFF20A8.");
 
         count += labelComment(0x00004BCAL, "charge_validation_check",
             "[TRACED] Sub-table B [03b]. OL charge validation. Reads FFFF2058, "
@@ -3524,17 +3099,13 @@ public class ImportAE5L600L extends GhidraScript {
             + "all with R4=0. Background throttle position processing.");
 
         // --- Fuel path helper functions (Task 5/6/9) ---
-        count += labelComment(0x0000FE22L, "charge_table_advance",
-            "[TRACED] Double-buffered function pointer selector. Struct at FFFF5B70 "
-            + "(12 bytes/entry: 2 func ptrs + slot index). Ping-pongs slot "
-            + "0/1 each call, returns selected function pointer. Called by Task 5/6.");
 
         count += labelComment(0x0000FDECL, "charge_table_store",
             "[TRACED] Stores a new function pointer into the next slot of the "
             + "double-buffered charge table at FFFF5B70.");
 
         count += labelComment(0x0000FE5CL, "charge_channel_dispatch_7",
-            "[TRACED] IRQ-protected charge calc dispatcher for channel 7. "
+            "[DECODED] IRQ-protected charge calc dispatcher for channel 7. "
             + "interrupt_save(0xE0), stack_frame_setup(7), "
             + "calls charge_calc_active(0x107B6) or charge_calc_idle(0x107F4), "
             + "interrupt_restore.");
@@ -3574,11 +3145,11 @@ public class ImportAE5L600L extends GhidraScript {
             + "Workspace: FFFF4284, 28 bytes/channel. Calls 0xA55E (get_channel_count) "
             + "and 0xA4E0 (process_channel). Allocs 224-byte workspace per iteration.");
         count += labelComment(0x0000A4E0L, "maf_process_channel",
-            "[TRACED] Per-channel intake processing. Clamps count to 0xFFFF, computes "
+            "[DECODED] Per-channel intake processing. Clamps count to 0xFFFF, computes "
             + "remainder, calls atomic_store_u16_twice (0x11848) and stores "
             + "accumulator result to FFFF4294[ch].");
         count += labelComment(0x0000A55EL, "maf_get_channel_count",
-            "[TRACED] Reads raw crank-synced MAF count from intake channel table (0x11A7C) "
+            "[DECODED] Reads raw crank-synced MAF count from intake channel table (0x11A7C) "
             + "and adds to accumulator at FFFF4294[ch]. Returns new total count.");
         count += labelComment(0x00009A72L, "intake_channel_processor",
             "[TRACED] Per-channel intake processor. Descriptor dispatch(group=16), computes "
@@ -3599,7 +3170,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "Ch0: F640/F444/0x10000, Ch1: F642/F446/0x20000, "
             + "Ch2: F644/F448/0x40000, Ch3: F646/F44A/0x80000.");
         count += labelComment(0x00011848L, "atomic_store_u16_twice",
-            "[TRACED] Stores a 16-bit value (r5) to the caller-supplied address (r4) twice (0x01185E, "
+            "[DECODED] Stores a 16-bit value (r5) to the caller-supplied address (r4) twice (0x01185E, "
             + "0x011864) inside a critical section (0xBE81C/0xBE82C). 0xE0 is the interrupt mask, not a "
             + "workspace size. No interpolation. Was descriptor_interpolation. corrections.md item 97.");
 
@@ -3845,7 +3416,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0AC7D8L, "desc_1D_ECT_u8_16_AC7D8",
             "[UNVERIFIED] RR: Tip-in Enrichment Compensation A (ECT)");
         count += labelComment(0x0AC7ECL, "desc_1D_ECT_u8_16_AC7EC",
-            "[UNVERIFIED] RR: Tip-in Enrichment Disable Applied Counter Threshold A (ECT)");
+            "[TRACED] RR: Tip-in Enrichment Disable Applied Counter Threshold A (ECT)");
         count += label(0x0AC804L, "desc_1D_ECT_u16_16_AC804");
         count += label(0x0AC818L, "desc_1D_ECT_u16_16_AC818");
         count += label(0x0AC82CL, "desc_1D_ECT_u16_16_AC82C");
@@ -3904,17 +3475,17 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0ACB18L, "desc_1D_ECT_u16_16_ACB18");
         count += label(0x0ACB2CL, "desc_1D_ECT_u16_16_ACB2C");
         count += labelComment(0x0ACB40L, "desc_1D_ECT_u16_16_ACB40",
-            "[UNVERIFIED] RR: Tau Input A Rising Load Activation");
+            "[TRACED] RR: Tau Input A Rising Load Activation");
         count += label(0x0ACB54L, "desc_1D_ECT_u16_16_ACB54");
         count += label(0x0ACB68L, "desc_1D_ECT_u16_16_ACB68");
         count += labelComment(0x0ACB7CL, "desc_1D_ECT_u16_16_ACB7C",
-            "[UNVERIFIED] RR: Tau Input A Falling Load Activation");
+            "[TRACED] RR: Tau Input A Falling Load Activation");
         count += labelComment(0x0ACB90L, "desc_1D_ECT_u16_16_ACB90",
-            "[UNVERIFIED] RR: Tau Input A Falling Load Activation A");
+            "[TRACED] RR: Tau Input A Falling Load Activation A");
         count += labelComment(0x0ACBCCL, "desc_1D_ECT_u16_16_ACBCC",
-            "[UNVERIFIED] RR: Tau Input A Falling Load Activation B");
+            "[TRACED] RR: Tau Input A Falling Load Activation B");
         count += labelComment(0x0ACBE0L, "desc_1D_ECT_u16_16_ACBE0",
-            "[UNVERIFIED] RR: Tau Input A Falling Load Activation C");
+            "[TRACED] RR: Tau Input A Falling Load Activation C");
         count += label(0x0ACC1CL, "desc_1D_ECT_u16_16_ACC1C");
         count += label(0x0ACC30L, "desc_1D_ECT_u16_16_ACC30");
         count += label(0x0ACC44L, "desc_1D_ECT_u16_16_ACC44");
@@ -4353,7 +3924,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x0AAE64L, "desc_1D_range_4000_7500_u16_8");
         count += label(0x0AAE78L, "desc_1D_range_3200_6000_u16_8");
         count += labelComment(0x0AAE8CL, "desc_1D_range_524_758_u16_4",
-            "[UNVERIFIED] RR: Front Oxygen Sensor Compensation (Atm. Pressure)");
+            "[TRACED] RR: Front Oxygen Sensor Compensation (Atm. Pressure)");
         count += label(0x0AAFDCL, "desc_1D_range_15_60_f32_4");
         count += label(0x0AB154L, "desc_1D_range_20_80_u8_7");
         count += label(0x0AB190L, "desc_1D_range_0_0_u16_7_AB190");
@@ -4542,7 +4113,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- 2D_PressurexRPM (2 descriptors) ---
         count += labelComment(0x0AA9F0L, "desc_2D_PressurexRPM_u16_11x15",
-            "[CITED] RR: Target Boost_");
+            "[TRACED] RR: Target Boost_");
         count += label(0x0AD9ECL, "desc_2D_PressurexRPM_u16_10x7");
 
         // --- 2D_PressurexSmallRatio (2 descriptors) ---
@@ -4581,7 +4152,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- 2D_RPMxVoltage (1 descriptors) ---
         count += labelComment(0x0AF4B0L, "desc_2D_RPMxVoltage_f32_16x5",
-            "[CITED] RR: Ignition Dwell");
+            "[TRACED] RR: Ignition Dwell");
 
         // --- 2D_RPMxrange (1 descriptors) ---
         count += label(0x0AB03CL, "desc_2D_RPMxrange_11_84_u8_15x31");
@@ -4623,9 +4194,9 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] RR: Initial Wastegate Duty_");
         count += label(0x0AACECL, "desc_2D_range_200_800_xRPM_mid_u16_5x5");
         count += labelComment(0x0AB004L, "desc_2D_range_210_960_xRPM_u8_11x14_AB004",
-            "[UNVERIFIED] RR: Engine Load Compensation Cruise (MP)");
+            "[TRACED] RR: Engine Load Compensation Cruise (MP)");
         count += labelComment(0x0AB020L, "desc_2D_range_210_960_xRPM_u8_11x14_AB020",
-            "[UNVERIFIED] RR: Engine Load Compensation Non-Cruise (MP)");
+            "[TRACED] RR: Engine Load Compensation Non-Cruise (MP)");
         count += label(0x0AB088L, "desc_2D_range_520_760_xIAT_u16_4x5");
         count += label(0x0AB288L, "desc_2D_range_39_508_xLoad_u16_13x13");
         count += label(0x0ABED0L, "desc_2D_range_10_40_xrange_0_3001_f32_4x5");
@@ -4986,29 +4557,18 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
 
         // -- Fuel Aggregation --
-        count += labelComment(0x00033460, "fuel_aggregator_tail",
-            "[TRACED] Fuel correction aggregator (620 bytes). GBR=FFFF77BC. Uses FFFF7828 struct. "
-            + "Computes final fuel correction factor, clamps [0.75, 1.25]. Writes to FFFF74BC/BD mode flags.");
 
         // -- Fuel Pipeline RAM --
-        count += labelComment(0xFFFF77BCL, "fuel_pipeline_base",
-            "[TRACED] GBR base for fuel aggregator pipeline. Struct contains fuel correction state.");
         count += labelComment(0xFFFF7828L, "aggregator_struct_base",
             "[TRACED] Major struct base for fuel aggregation (R9 in aggregator). Offsets -108 to -12 hold working values.");
-        count += labelComment(0xFFFF7904L, "aggregator_fuel_output",
-            "[TRACED] Fuel correction output (float). Written by aggregator_tail. Prior cycle value read as input.");
         count += labelComment(0xFFFF7344L, "fuel_per_cyl_struct",
             "[TRACED] Per-cylinder pulse width struct. 8 float outputs written by fuel_pulse_width_calc at offsets -36,0,-32,-12,-28,-24,-20,-16.");
-        count += labelComment(0xFFFF7348L, "fuel_base_factor",
-            "[TRACED] Base fuel factor (float). Input to fuel_pulse_width_calc — multiplied by enrichment sum.");
         count += labelComment(0xFFFF73A4L, "fuel_correction_A",
             "[TRACED] Fuel correction term A (float). Input to fuel_pulse_width_calc.");
         count += labelComment(0xFFFF7A08L, "fuel_correction_B",
             "[TRACED] Fuel correction term B (float). Input to fuel_pulse_width_calc.");
         count += labelComment(0xFFFF7BC4L, "fuel_correction_C",
             "[TRACED] Fuel correction C / global scaler (float). Used as FR12 in fuel_pulse_width_calc — multiplied into every term.");
-        count += labelComment(0xFFFF76D4L, "fuel_enrichment_A",
-            "[TRACED] Fuel enrichment term A (float). Summed with B+C then multiplied by base factor.");
         count += labelComment(0xFFFF7878L, "fuel_enrichment_B",
             "[TRACED] Fuel enrichment term B (float). Summed with A+C.");
         count += labelComment(0xFFFF7AE4L, "fuel_enrichment_C",
@@ -5053,17 +4613,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] ATU primary control register. 36 code refs — master injection/ignition angle timing.");
         count += labelComment(0xFFFF40C8L, "ATU_compare_reg",
             "[TRACED] ATU compare register. 17 code refs — injection/ignition window timing.");
-        count += labelComment(0xFFFF40E0L, "front_o2_sensor_ma",
-            "[TRACED] CORRECTED 2026-07-27. FRONT OXYGEN / AF SENSOR CURRENT (float, mA), NOT an ATU output control "
-            + "register. Proof 1: the entire function at 0x058902 does only this -- 0x058904 mov.l @(0x058A34),r2 "
-            + "(=0xFFFF40E0) ; 0x058906 fmov.s @r2,fr4 ; 0x058908 mov.l @(0x058A38),r4 (=0x0AF468) ; 0x05890C jsr "
-            + "0x0BE830, with no branch and no intervening call between that fmov.s and the jsr. Descriptor 0x0AF468 "
-            + "= count 13 / axis 0xD8D74 / data 0xD8DA8, exactly the definition \"Front Oxygen Sensor Scaling\" "
-            + "(13 elements) over axis \"Front Oxygen Sensor\" in mA, breakpoints -1.3..0.74. Proof 2: SSM "
-            + "getter-table entry 0x42 at 0x05D726 reads this same address with FR6=-16.0 and FR5=0.125, i.e. "
-            + "value = (raw-128)*0.125 in [-16, +15.875] -- a signed bipolar current in the same units and sign "
-            + "convention as the axis. A hardware output register is not read as a float and used as a table "
-            + "index. corrections.md item 31.");
 
         // -- InternalIO Ports (injection/ignition driver) --
         count += labelComment(0xFFFF3B06L, "io_inj_ign_port_ctrl",
@@ -5121,7 +4670,7 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] ISR[22]: Injection pulse width application (426 bytes). Converts float PW to timer counts. "
             + "Contains embedded per-cylinder jump table. Reads port status FFFF36BE and fuel state FFFF3D08.");
         count += labelComment(0x00047B66, "isr26_injection_window",
-            "[TRACED] ISR[26]: Injection window handler (62 bytes).");
+            "[DECODED] ISR[26]: Injection window handler (62 bytes).");
 
         // -- ATU Event Handlers (exception vectors) --
         count += labelComment(0x00000DA8, "vec202_atu_status_ack",
@@ -5159,8 +4708,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Injection status array (2-byte entries). Read by ISR[21] gate logic.");
         count += labelComment(0xFFFF3D1CL, "inj_status_end",
             "[TRACED] End pointer for injection status array.");
-        count += labelComment(0xFFFF36BEL, "inj_ign_port_status",
-            "[TRACED] Injection/ignition port status word. Read by ISR[21] and ISR[22].");
 
         // -- Calibration for ATU --
         count += labelComment(0x000C008C, "atu_interp_cal_table",
@@ -5173,8 +4720,6 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
         // From avcs_analysis.txt — intake/exhaust cam advance control
 
-        count += labelComment(0x00031DB4, "avcs_control",
-            "[TRACED] Main AVCS control. RPM enable/disable hysteresis, intake+exhaust duty correction, cam advance output.");
         count += labelComment(0x00031DEA, "avcs_control__enable_check",
             "[TRACED] AVCS RPM enable/disable hysteresis check. Lower=500, upper=550 RPM.");
         count += labelComment(0x00031E12, "avcs_control__intake_duty_corr",
@@ -5195,22 +4740,16 @@ public class ImportAE5L600L extends GhidraScript {
         // ── AVCS RAM ──
         count += labelComment(0xFFFF40C8L, "cam_angle_sensor",
             "[TRACED] Actual cam position from CMP/CKP (float, degrees).");
-        count += labelComment(0xFFFF7480L, "intake_avcs_workspace",
-            "[TRACED] Intake AVCS working data struct base.");
-        count += labelComment(0xFFFF7474L, "intake_previous_output",
-            "[UNVERIFIED] Intake AVCS previous output (float). Workspace - 12.");
-        count += labelComment(0xFFFF7478L, "intake_duty_correction",
-            "[TRACED] Intake AVCS duty correction (float). Workspace - 8.");
         count += labelComment(0xFFFF747CL, "intake_computed_duty",
-            "[UNVERIFIED] Intake AVCS computed duty (float). Workspace - 4.");
+            "[TRACED] Intake AVCS computed duty (float). Workspace - 4.");
         count += labelComment(0xFFFF76F4L, "exhaust_avcs_workspace",
             "[TRACED] Exhaust AVCS working data struct base (vestigial on EJ255).");
         count += labelComment(0xFFFF76E8L, "exhaust_correction_A",
-            "[UNVERIFIED] Exhaust AVCS correction A (float). Workspace - 12.");
+            "[TRACED] Exhaust AVCS correction A (float). Workspace - 12.");
         count += labelComment(0xFFFF76ECL, "exhaust_correction_B",
-            "[UNVERIFIED] Exhaust AVCS correction B (float). Workspace - 8.");
+            "[TRACED] Exhaust AVCS correction B (float). Workspace - 8.");
         count += labelComment(0xFFFF76F0L, "exhaust_computed",
-            "[UNVERIFIED] Exhaust AVCS computed value (float, near zero on EJ255). Workspace - 4.");
+            "[TRACED] Exhaust AVCS computed value (float, near zero on EJ255). Workspace - 4.");
         count += labelComment(0xFFFF920CL, "vvt_error_feedback_A",
             "[TRACED] Intake VVT error feedback result A (float).");
         count += labelComment(0xFFFF9210L, "vvt_error_feedback_B",
@@ -5368,8 +4907,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] EVAP pressure delta (baseline - lower threshold). Written by task56.");
         count += labelComment(0xFFFF9318L, "evap_pressure_sum",
             "[TRACED] EVAP pressure sum (baseline + upper threshold). Written by task56.");
-        count += labelComment(0xFFFF318CL, "evap_pressure_baseline",
-            "[TRACED] EVAP pressure baseline value (float).");
         count += labelComment(0xFFFF236CL, "evap_cal_cache",
             "[TRACED] EVAP calibration cache (5 floats + 6 u16s = 32 bytes). "
             + "Loaded from descriptors by task56 workspace init.");
@@ -5395,24 +4932,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Monitoring state byte: 1=transitioning, 2=active. Read by task58 maturation.");
         count += labelComment(0xFFFF65A9L, "engine_state_extended",
             "[TRACED] Engine state extended byte. Read by task58 extended MAF diagnostics.");
-        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
-            "[TRACED] CORRECTED 2026-07-27. MASS AIRFLOW (float, g/s) -- THIS IS THE MAF VARIABLE. Two proofs that do not "
-            + "depend on any definition axis NAME. (1) SSM: getter table 0x06423C entry 0x13/0x14 (Mass Airflow, "
-            + "logcfg x/100) is 0x05D3AC -- 0x05D3AE mov.l @(0x05D5B8),r2 (=0xFFFF63C4) ; 0x05D3B0 fmov.s @r2,fr4 ; "
-            + "0x05D3B8 jsr 0x0BE5D8 with fr6=0.0 fr5=0.01, and 0x0BE5D8 = clamp_u16(round((FR4-FR6)/FR5)), so the "
-            + "transported word is value*100 and the value is g/s. (2) THRESHOLD PAIRING: 0x034D52 mov.l "
-            + "@(0x034E68),r2 (=0xFFFF63C4) ; 0x034D54 fmov.s @r2,fr8, FR8 untouched through 0x034D8E, compared "
-            + "against 0xCC074/78/7C = the definition-named table \"A/F Learning #1 Airflow Ranges\" "
-            + "(scaling MassAirflow(g/s): 5.6 / 10 / 50). PRODUCER: 0x01FF66 writes it as min(MAF*IATcomp, "
-            + "\"MAF Limit (Maximum)\" 0xC3100 = 300 g/s stock, 475 in 20.19c) via 0x0BE970. LOG: the MAF "
-            + "channel in logs/7-26 20.19b spans 2.40..296.24 g/s and the widest axis it feeds is 0..300. "
-            + "THE THREE-WAY AXIS SPLIT IS RESOLVED, and it was NOT a stale-FR-tag artifact: 0x031DD2 loads FR14 "
-            + "from here ONCE and feeds it unchanged to descriptors 0xAD620 / 0xAD848 / 0xAD864. Axes 0xCF9EC "
-            + "\"Intake VVT Error\" and 0xD11D0 \"Exhaust VVT Error\" are DEFINITION-SIDE ERRORS in "
-            + "32BITBASE.xml -- one value cannot be both the intake and the exhaust VVT error; Intake/Exhaust Duty "
-            + "Correction A are indexed by [Mass Airflow g/s] x [Engine Speed 650..3600]. corrections.md item 28.");
-        count += labelComment(0xFFFF63FCL, "barometric_pressure",
-            "[TRACED] Barometric/atmospheric pressure (float). Read by task56 EVAP.");
         count += labelComment(0xFFFF3B06L, "diag_indexed_lookup_table",
             "[TRACED] Diagnostic indexed lookup table. Accessed at FFFF3B06 + R4*2 by 0x58518.");
 
@@ -5436,7 +4955,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000D8A40, "cal_maf_diag_maturation_thresh",
             "[TRACED] MAF diagnostic maturation counter threshold.");
         count += labelComment(0x0000F754, "hw_port_maf_status",
-            "[UNVERIFIED] Port status register. Bits 0x20/0x40 = MAF fault lines.");
+            "[TRACED] Port status register. Bits 0x20/0x40 = MAF fault lines.");
 
         // ── MPS Diagnostic Calibration ──
         count += labelComment(0x000D8AB8, "cal_mps_min_run_time",
@@ -5489,23 +5008,17 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Ignition Timing Sub-Functions ──
         count += labelComment(0x00040314, "task30_pre_calc",
-            "[TRACED] Task30 base timing pre-calculation subroutine.");
+            "[DECODED] Task30 base timing pre-calculation subroutine.");
         count += labelComment(0x00040520, "task34_throttle_calc_sub",
             "[TRACED] Task34 throttle timing calc subroutine.");
         count += labelComment(0x00044296, "task29_timing_percyl",
-            "[TRACED] Task 29: secondary per-cylinder timing computation.");
+            "[DECODED] Task 29: secondary per-cylinder timing computation.");
         count += labelComment(0x00046296, "task27_knock_timing",
             "[TRACED] Task 27: knock timing retard per-cylinder.");
 
         // ── Ignition Timing Workspace RAM ──
         count += labelComment(0xFFFF7F64L, "base_timing_output",
             "[TRACED] Base timing output (float). Written by task30.");
-        count += labelComment(0xFFFF7F10L, "gbr_base_timing_ws",
-            "[TRACED] GBR base for task30 base timing workspace.");
-        count += labelComment(0xFFFF7FD4L, "gbr_base_corr_init_ws",
-            "[TRACED] GBR base for timing corrections init workspace (task33).");
-        count += labelComment(0xFFFF8000L, "gbr_base_percond_ws",
-            "[TRACED] GBR base for per-condition timing workspace (task36).");
         count += labelComment(0xFFFF8098L, "ign_output_workspace",
             "[TRACED] Ignition output workspace (float). Task38.");
         count += labelComment(0xFFFF80AEL, "dwell_output",
@@ -5520,8 +5033,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Final combined timing advance (float). Task48 output.");
         count += labelComment(0xFFFF81E8L, "per_cyl_timing_corr",
             "[TRACED] Per-cylinder timing corrections (float[4]). Task0/29.");
-        count += labelComment(0xFFFF8258L, "flkc_retard",
-            "[TRACED] FLKC retard value (float).");
         count += labelComment(0xFFFF322CL, "FLKC_slow_learning_value",
             "[TRACED] Fine knock learn (FLKC slow) learning value (float).");
         count += labelComment(0xFFFF3248L, "flkc_grid",
@@ -5668,14 +5179,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── Fueling Dispatch & Init ──
         count += labelComment(0x00031600, "fuel_init_flag_writer",
-            "[TRACED] Writes -1 to FFFF745B init flag.");
-        count += labelComment(0x00032AA8, "fuel_correction_array",
-            "[TRACED] 29-element gear-dependent correction array.");
-        count += labelComment(0x00031C9C, "fuel_percyl_array_init",
-            "[TRACED] Zeros 3x42 floats per-cylinder init.");
-        count += labelComment(0x00032958, "correction_filter_reset_to_1",
-            "[TRACED] When 0x22F92 returns 1, sets the three floats at 0xFFFF7704, 0xFFFF7708 and 0xFFFF770C "
-            + "to 1.0 (fldi1), not 0. Was fuel_correction_filter_init. corrections.md item 97.");
+            "[DECODED] Writes -1 to FFFF745B init flag.");
         count += labelComment(0x00031A4C, "fuel_trim_init_B",
             "[TRACED] Writes FFFF7464, checks cal IDs.");
         count += labelComment(0x0003160A, "major_correction_aggregator",
@@ -5683,19 +5187,17 @@ public class ImportAE5L600L extends GhidraScript {
 
         // ── CL AFC Pipeline Stages ──
         count += labelComment(0x00033304, "cl_fuel_dispatcher",
-            "[TRACED] CL fuel dispatcher. Sequences 9-stage AFC pipeline.");
-        count += labelComment(0x00033460, "fuel_aggregator_tail",
-            "[TRACED] AFC final correction, clamp [0.75, 1.25].");
+            "[DECODED] CL fuel dispatcher. Sequences 9-stage AFC pipeline.");
         count += labelComment(0x00033CC0, "cl_fuel_target_A",
-            "[TRACED] AFC Stage 2: CL fuel target, 2D table lookup RPM x Load.");
+            "[DECODED] AFC Stage 2: CL fuel target, 2D table lookup RPM x Load.");
         count += labelComment(0x00033D1C, "cl_fuel_target_B",
             "[TRACED] AFC Stage 1: PID-like CL fuel target controller.");
         count += labelComment(0x00033658, "afc_sensor_conditioning",
-            "[TRACED] AFC Stage 3: rate-limited sensor conditioning (566 bytes).");
+            "[DECODED] AFC Stage 3: rate-limited sensor conditioning (566 bytes).");
         count += labelComment(0x00033FCE, "afc_target_computation",
             "[TRACED] AFC Stage 4: multi-table AFC target (212 bytes).");
         count += labelComment(0x0003439E, "afc_enable_disable_gate",
-            "[TRACED] AFC Stage 7: AFC enable/disable gate (50 bytes).");
+            "[DECODED] AFC Stage 7: AFC enable/disable gate (50 bytes).");
 
         // ── Fuel Calculation & Output ──
         count += labelComment(0x000303C2L, "injector_dead_time_calc",
@@ -5709,30 +5211,20 @@ public class ImportAE5L600L extends GhidraScript {
             + "then calls 0x9E4A stub to write FFFF4280. Also calls 0xBE598 "
             + "for float path. Tail-calls 0x3190 (irq level restore). "
             + "Called from Task 10 dead time update chain.");
-        count += labelComment(0x00030430, "status_byte_copy",
-            "[TRACED] Copies FFFF726C to FFFF7370.");
-        count += labelComment(0x00030744, "sensor_prep",
-            "[TRACED] Calls 0x23E48, writes FFFF73A2.");
         count += labelComment(0x00030ACC, "base_fuel_map_combiner",
             "[TRACED] 2D map + descriptors to FFFF73AC base fuel.");
         count += labelComment(0x00030B68, "base_fuel_table_calc",
-            "[TRACED] Dual 1D lookups to FFFF7400 base fuel table.");
+            "[DECODED] Dual 1D lookups to FFFF7400 base fuel table.");
         count += labelComment(0x000320AE, "final_fuel_correction_accum",
             "[TRACED] AFC+LTFT+enrichments accumulated to final IPW.");
-        count += labelComment(0x00032892, "per_element_correction_calc",
-            "[TRACED] 42-element correction loop for per-element fuel trim.");
         count += labelComment(0x00037156, "fuel_trim_input",
             "[TRACED] A/F ratio to FFFF7A74 fuel trim input.");
         count += labelComment(0x0003756C, "injector_trim_init",
             "[TRACED] Reads FFFF895C, zeros FFFF7AB0 injector trim workspace.");
-        count += labelComment(0x00038158, "main_ipw_calculator",
-            "[TRACED] Main IPW calc. CL/OL state, WOT thresholds, blend channels.");
         count += labelComment(0x00038D16, "ltft_learning_init",
             "[TRACED] LTFT learning init. Step 0.001.");
-        count += labelComment(0x00038E30, "ltft_learning_algorithm",
-            "[TRACED] LTFT learning algorithm. RPM threshold 3600.");
         count += labelComment(0x000399EE, "default_fuel_multiplier_writer",
-            "[TRACED] Writes 1.05 to FFFF7BDC default fuel multiplier.");
+            "[DECODED] Writes 1.05 to FFFF7BDC default fuel multiplier.");
         count += labelComment(0x0003A222, "percyl_fuel_trim",
             "[TRACED] Per-cylinder fuel trim. 4-iteration loop.");
         count += labelComment(0x0003EB8C, "overrun_fuel_cutoff",
@@ -5740,15 +5232,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000403C4, "ect_warmup_correction",
             "[TRACED] Mode-selected ECT correction, 4 curves.");
         count += labelComment(0x0003CD34, "warmup_coldstart_enrichment",
-            "[TRACED] ECT/IAT indexed warmup enrichment.");
+            "[DECODED] ECT/IAT indexed warmup enrichment.");
 
         // ── ECT Warmup Consumer ──
         count += labelComment(0x0003F374, "ect_warmup_consumer",
             "[TRACED] ECT warmup consumer (2050 bytes). Reads FFFF7F68, outputs 8 per-channel corrections.");
-        count += labelComment(0x0003FA8C, "warmup_state_init",
-            "[TRACED] Embedded sub: initializes warmup state struct.");
-        count += labelComment(0x0003FACE, "warmup_mode_transition",
-            "[TRACED] Embedded sub: warmup mode transition evaluator.");
 
         // ── Fuel Cut / Injector Output Chain ──
         count += labelComment(0x00046BCC, "fuel_cut_output_tail",
@@ -5772,11 +5260,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00008408, "hw_timer_init",
             "[TRACED] Hardware timer initialization.");
         count += labelComment(0x00009E4AL, "dead_time_apply_stub",
-            "[TRACED] Dead time apply stub (3 instr). R2=FFFF4280; RTS; delay: [FFFF4280]=R4. "
+            "[DECODED] Dead time apply stub (3 instr). R2=FFFF4280; RTS; delay: [FFFF4280]=R4. "
             + "Called from 0x0303C2 (JSR) with R4=zero-extended uint16 dead time. "
             + "Writes the current dead time to injector_dead_time_applied.");
         count += labelComment(0x0003D63AL, "dead_time_read_stub",
-            "[TRACED] Dead time read stub (3 instr). R2=FFFF4280; RTS; delay: R0=[FFFF4280]. "
+            "[DECODED] Dead time read stub (3 instr). R2=FFFF4280; RTS; delay: R0=[FFFF4280]. "
             + "Returns applied dead time in R0. Used by ATU callback handlers.");
         count += labelComment(0x0000A0C8L, "dt_atu_apply_A0C8",
             "[TRACED] ATU dead time application #1. R3=[FFFF4280]; "
@@ -5789,7 +5277,7 @@ public class ImportAE5L600L extends GhidraScript {
             + "BF/S if window expired; MOV.W R0,@(20,R7) writes ATU OCR; "
             + "BSR 0xA4E0; JSR 0xBE82C. Final per-cylinder pulse width write.");
         count += labelComment(0x00009B2CL, "crank_angle_calc_9B2C",
-            "[CITED] ([0xFFFF4280]+[0xFFFF42F4]+arg) x 180.0 / [0xFFFF4158]; then (arg fr4 - [0xFFFF4168]) "
+            "[DECODED] ([0xFFFF4280]+[0xFFFF42F4]+arg) x 180.0 / [0xFFFF4158]; then (arg fr4 - [0xFFFF4168]) "
             + "is wrapped by +720/-720 against -60 and 660 (constants at 0x9C14-0x9C28 are 180, -60, 720, 660, "
             + "-720, not tables). Arithmetic on a 720-degree cycle, NOT an injector dead-time correction. "
             + "Purpose unverified. Was dt_float_correction. corrections.md item 96.");
@@ -5797,22 +5285,12 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Dead time float accumulate. R0=[FFFF4280]; R2+=R0 (add DT to R2); "
             + "FP multiply/divide chain; writes ATU float output; "
             + "tail-calls 0x3190 (irq level restore).");
-        count += labelComment(0x0000317CL, "irq_level_set",
-            "[TRACED] Interrupt level setter helper. R5=0xF0; R0=SR&R5 (current IPM x0x10); "
-            + "CMP/HI R0,R4 (T if R4>current); BF 318C; RTS + delay: LDC R4,SR. "
-            + "Sets SR interrupt mask level to R4 if R4 is higher than current level.");
-        count += labelComment(0x00003190L, "irq_level_restore",
-            "[TRACED] Interrupt level restore / gate. TST R4,R4; BF 0x31A4; "
-            + "reads FFFF1288 ptr; checks status flag; if gate open: JMP 0x3664, LDC R4,SR. "
-            + "Tail-call target from dead time compute chain; restores interrupt mask.");
         count += labelComment(0x0000300E, "call_3F2C_with_flag_bit15",
-            "[CITED] ORs 0x00008000 into the long at RAM 0xFFFF1290, calls through the pointer stored at "
+            "[TRACED] ORs 0x00008000 into the long at RAM 0xFFFF1290, calls through the pointer stored at "
             + "0x3F2C, then ANDs it back out with 0xFFFF7FFF. Does not load 0xF00F00. Was injector_ic_trigger. "
             + "corrections.md item 96.");
-        count += labelComment(0x000035FC, "inj_channel_timer_setup",
-            "[UNVERIFIED] RAM-resident injection channel timer setup.");
         count += labelComment(0x00002FEC, "inj_final_hw_write",
-            "[CITED] Final hardware write to injector IC + XRAM.");
+            "[DECODED] Final hardware write to injector IC + XRAM.");
 
         // ── Sensor Composite ──
         count += labelComment(0x000517A0, "sensor_composite_calc",
@@ -5852,16 +5330,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += label(0x00054822, "etb_boost_limit");
 
         // ── Library / Utility ──
-        count += labelComment(0x000BE830, "table_lookup_1D",
-            "[TRACED] 1D table lookup utility.");
-        count += labelComment(0x000BE8E4, "table_lookup_2D",
-            "[TRACED] 2D table lookup utility.");
-        count += labelComment(0x000BE944, "table_lookup_2D_int",
-            "[TRACED] 2D table lookup returning integer.");
-        count += labelComment(0x000BE960, "float_max",
-            "[TRACED] Returns max(FR4, FR5) in FR0. F455 = fcmp/gt FR5,FR4. FLOOR clamp.");
-        count += labelComment(0x000BE970, "float_min",
-            "[TRACED] Returns min(FR4, FR5) in FR0. F545 = fcmp/gt FR4,FR5. CEILING clamp.");
 
         // ── Fueling Pipeline RAM (Key Working Addresses) ──
         count += labelComment(0xFFFF7448L, "clol_mode_flag",
@@ -5874,8 +5342,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] AFC clamped output (float). Stage 8 output.");
         count += labelComment(0xFFFF7870L, "afc_pi_blended_output",
             "[TRACED] AFC PI blended output (float). Stage 5 output.");
-        count += labelComment(0xFFFF7904L, "afc_aggregator_output",
-            "[TRACED] AFC final correction output (float).");
         count += labelComment(0xFFFF7344L, "fuel_per_cyl_struct",
             "[TRACED] Per-cylinder fuel struct (8 x float final IPW values).");
         count += labelComment(0xFFFF7350L, "injector_dead_time_ticks",
@@ -5892,12 +5358,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Default fuel multiplier (float, 1.05).");
         count += labelComment(0xFFFF7A74L, "fuel_trim_af_ratio",
             "[TRACED] A/F ratio fuel trim input (float).");
-        count += labelComment(0xFFFF7AB0L, "injector_trim_workspace",
-            "[TRACED] Injector trim workspace (4 slots).");
-        count += labelComment(0xFFFF7730L, "fuel_correction_array_base",
-            "[TRACED] 29-element correction array base.");
-        count += labelComment(0xFFFF770CL, "correction_filter_base",
-            "[TRACED] Correction filter base (3 floats).");
 
         // ── OL Enrichment State ──
         count += labelComment(0xFFFF7954L, "ol_enrichment_factor_A",
@@ -5908,10 +5368,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] OL enrichment blend value (float).");
 
         // ── Main IPW Calculator State ──
-        count += labelComment(0xFFFF7AF4L, "fuel_ipw_state_B",
-            "[TRACED] Final IPW correction output (float).");
-        count += labelComment(0xFFFF7B38L, "wot_active_flag",
-            "[TRACED] WOT active flag.");
         count += labelComment(0xFFFF7B60L, "ltft_workspace",
             "[TRACED] LTFT learning workspace.");
 
@@ -5945,8 +5401,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Injection channel enable mask. 0xFF = all 8 channels.");
 
         // ── ECT Warmup Consumer State ──
-        count += labelComment(0xFFFF7E90L, "warmup_corr_cyl0",
-            "[TRACED] Final warmup correction cylinder 0 (float).");
         count += labelComment(0xFFFF7E94L, "warmup_corr_cyl1",
             "[TRACED] Final warmup correction cylinder 1 (float).");
         count += labelComment(0xFFFF7E98L, "warmup_corr_cyl2",
@@ -6109,7 +5563,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0009A787, "cal_P1420_FUEL_TANK_PRESSURE_SOL_HIGH_INPUT",
             "[UNVERIFIED] RomRaider: (P1420) FUEL TANK PRESSURE SOL. HIGH INPUT");
         count += labelComment(0x0009A788, "cal_P0458_EVAP_PURGE_VALVE_CIRCUIT_LOW",
-            "[UNVERIFIED] RomRaider: (P0458) EVAP PURGE VALVE CIRCUIT LOW");
+            "[TRACED] RomRaider: (P0458) EVAP PURGE VALVE CIRCUIT LOW");
         count += labelComment(0x0009A789, "cal_P0459_EVAP_PURGE_VALVE_CIRCUIT_HIGH",
             "[UNVERIFIED] RomRaider: (P0459) EVAP PURGE VALVE CIRCUIT HIGH");
         count += labelComment(0x0009A78A, "cal_P0141_REAR_O2_SENSOR_MALFUNCTION",
@@ -6337,7 +5791,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0009A80C, "cal_P0451_EVAP_PRESSURE_SENSOR_RANGE_PERF",
             "[UNVERIFIED] RomRaider: (P0451) EVAP PRESSURE SENSOR RANGE/PERF");
         count += labelComment(0x0009A80D, "cal_P0441_EVAP_INCORRECT_PURGE_FLOW",
-            "[UNVERIFIED] RomRaider: (P0441) EVAP INCORRECT PURGE FLOW");
+            "[TRACED] RomRaider: (P0441) EVAP INCORRECT PURGE FLOW");
         count += labelComment(0x0009A80F, "cal_P219A_BANK_1_AFR_IMBALANCE",
             "[UNVERIFIED] RomRaider: (P219A) BANK 1 AFR IMBALANCE");
         count += labelComment(0x0009A810, "cal_P2404_EVAP_LEAK_DETECTION_PUMP_SENSE_CIRCUIT_RANGE_PERF",
@@ -6431,9 +5885,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000C0EC4, "cal_Target_Boost_Compensation_Atm_Pressure",
             "[TRACED] RomRaider: Target Boost Compensation (Atm. Pressure)_");
         count += labelComment(0x000C0EE8, "cal_Requested_Torque",
-            "[UNVERIFIED] RomRaider: Requested Torque");
+            "[TRACED] RomRaider: Requested Torque");
         count += labelComment(0x000C0F24, "cal_Engine_Speed",
-            "[UNVERIFIED] RomRaider: Engine Speed");
+            "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000C10E0, "cal_Requested_Torque",
             "[UNVERIFIED] RomRaider: Requested Torque");
         count += labelComment(0x000C111C, "cal_Engine_Speed",
@@ -6461,31 +5915,31 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000C1F40, "cal_Engine_Speed",
             "[UNVERIFIED] RomRaider: Engine Speed");
         count += labelComment(0x000C3474, "cal_Gear_Determination_Thresholds_A",
-            "[UNVERIFIED] RomRaider: Gear Determination Thresholds A");
+            "[TRACED] RomRaider: Gear Determination Thresholds A");
         count += labelComment(0x000C3488, "cal_Gear_Determination_Thresholds_B",
             "[TRACED] RomRaider: Gear Determination Thresholds B");
         count += labelComment(0x000C349C, "cal_Gear_Determination_Thresholds_C",
-            "[UNVERIFIED] RomRaider: Gear Determination Thresholds C");
+            "[TRACED] RomRaider: Gear Determination Thresholds C");
         count += labelComment(0x000C3600, "cal_Engine_Speed",
-            "[UNVERIFIED] RomRaider: Engine Speed");
+            "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000C36F8, "cal_Atmospheric_Pressure",
-            "[CITED] RomRaider: Atmospheric Pressure");
+            "[TRACED] RomRaider: Atmospheric Pressure");
         count += labelComment(0x000C3B7C, "cal_Intake_Temperature",
-            "[CITED] RomRaider: Intake Temperature");
+            "[TRACED] RomRaider: Intake Temperature");
         count += labelComment(0x000C3B90, "cal_Mass_Airflow",
-            "[CITED] RomRaider: Mass Airflow");
+            "[TRACED] RomRaider: Mass Airflow");
         count += labelComment(0x000C3BB0, "cal_MAF_Compensation_IAT",
             "[TRACED] RomRaider: MAF Compensation (IAT)");
         count += labelComment(0x000C3BD8, "cal_Manifold_Pressure",
-            "[UNVERIFIED] RomRaider: Manifold Pressure");
+            "[TRACED] RomRaider: Manifold Pressure");
         count += labelComment(0x000C3C04, "cal_Engine_Speed",
-            "[UNVERIFIED] RomRaider: Engine Speed");
+            "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000C3C3C, "cal_Engine_Load_Compensation_Cruise_MP",
             "[TRACED] RomRaider: Engine Load Compensation Cruise (MP)");
         count += labelComment(0x000C3CD8, "cal_Manifold_Pressure",
-            "[UNVERIFIED] RomRaider: Manifold Pressure");
+            "[TRACED] RomRaider: Manifold Pressure");
         count += labelComment(0x000C3D04, "cal_Engine_Speed",
-            "[UNVERIFIED] RomRaider: Engine Speed");
+            "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000C3D3C, "cal_Engine_Load_Compensation_Non_Cruise_MP",
             "[TRACED] RomRaider: Engine Load Compensation Non-Cruise (MP)");
         count += labelComment(0x000CBC09, "cal_Tip_in_Throttle_Cumulative_Reset",
@@ -6499,7 +5953,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CC830, "cal_Min_Primary_Base_Enrichment_1_Non_Primary_OL",
             "[TRACED] RomRaider: Min Primary Base Enrichment 1 (Non-Primary OL)_");
         count += labelComment(0x000CC840, "cal_Manifold_Pressure",
-            "[CITED] RomRaider: Manifold Pressure");
+            "[TRACED] RomRaider: Manifold Pressure");
         count += labelComment(0x000CC868, "cal_Cranking_Fuel_IPW_Compensation_MAP",
             "[TRACED] RomRaider: Cranking Fuel IPW Compensation (MAP)");
         count += labelComment(0x000CC874, "cal_Accelerator_Pedal_Angle",
@@ -6515,11 +5969,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CCD30, "cal_Primary_Open_Loop_Fueling_Compensation_Timing_Compensati",
             "[TRACED] RomRaider: Primary Open Loop Fueling Compensation (Timing Compensation)_");
         count += labelComment(0x000CCD38, "cal_Engine_Speed",
-            "[UNVERIFIED] RomRaider: Engine Speed");
+            "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000CCD88, "cal_Throttle_Plate_Opening_Angle",
-            "[CITED] RomRaider: Throttle Plate Opening Angle");
+            "[TRACED] RomRaider: Throttle Plate Opening Angle");
         count += labelComment(0x000CCDA0, "cal_Minimum_Primary_Open_Loop_Enrichment_Throttle",
-            "[UNVERIFIED] RomRaider: Minimum Primary Open Loop Enrichment (Throttle)");
+            "[TRACED] RomRaider: Minimum Primary Open Loop Enrichment (Throttle)");
         count += labelComment(0x000CCDA8, "cal_Accelerator_Pedal_Angle",
             "[CITED] RomRaider: Accelerator Pedal Angle");
         count += labelComment(0x000CCDC0, "cal_Minimum_Primary_Open_Loop_Enrichment_Accelerator",
@@ -6529,7 +5983,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CE5B8, "cal_Engine_Speed",
             "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000CE618, "cal_Mass_Airflow",
-            "[CITED] RomRaider: Mass Airflow");
+            "[TRACED] RomRaider: Mass Airflow");
         count += labelComment(0x000CE6CC, "cal_Primary_Open_Loop_Fueling_Compensation_ECT",
             "[TRACED] RomRaider: Primary Open Loop Fueling Compensation (ECT)");
         count += labelComment(0x000CED74, "cal_Throttle_Angle_Change",
@@ -6625,7 +6079,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000D2DA0, "cal_Timing_Comp_Minimum_Coolant_Temp_Per_Cylinder",
             "[TRACED] RomRaider: Timing Comp Minimum Coolant Temp (Per Cylinder)");
         count += labelComment(0x000D2DAC, "cal_Feedback_Correction_Range_RPM",
-            "[UNVERIFIED] RomRaider: Feedback Correction Range (RPM)");
+            "[TRACED] RomRaider: Feedback Correction Range (RPM)");
         count += labelComment(0x000D2DD8, "cal_Extended_Feedback_Correction_High_RPM_Compensation",
             "[TRACED] RomRaider: Extended Feedback Correction High RPM Compensation");
         count += labelComment(0x000D2EBC, "cal_Rough_Correction_Range_RPM",
@@ -6661,9 +6115,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000D38A0, "cal_Timing_Compensation_B_IAT",
             "[TRACED] RomRaider: Timing Compensation B (IAT)");
         count += labelComment(0x000D3C04, "cal_Engine_Speed",
-            "[UNVERIFIED] RomRaider: Engine Speed");
+            "[TRACED] RomRaider: Engine Speed");
         count += labelComment(0x000D3C2C, "cal_Rough_Correction_Learning_Delay_Increasing",
-            "[CITED] RomRaider: Rough Correction Learning Delay (Increasing)_");
+            "[TRACED] RomRaider: Rough Correction Learning Delay (Increasing)_");
         count += labelComment(0x000D4688, "cal_Engine_Load",
             "[TRACED] RomRaider: Engine Load");
         count += labelComment(0x000D46CC, "cal_Engine_Speed",
@@ -6803,7 +6257,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000D91CC, "cal_Battery_Volts",
             "[TRACED] RomRaider: Battery Volts");
         count += labelComment(0x000D91E0, "cal_Ignition_Dwell",
-            "[UNVERIFIED] RomRaider: Ignition Dwell");
+            "[TRACED] RomRaider: Ignition Dwell");
         count += labelComment(0x000D932C, "cal_Radiator_Fan_Modes_A_ECT",
             "[UNVERIFIED] RomRaider: Radiator Fan Modes A (ECT)");
         count += labelComment(0x000D933C, "cal_Radiator_Fan_Modes_B_ECT",
@@ -6871,7 +6325,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- Alpha Engine Load Limit B Multiplier ---
         count += labelComment(0x000AAE20, "cal_Engine_Load_Limit_B_Maximum_RPM_Multiplier",
-            "[UNVERIFIED] RomRaider: Engine Load Limit B Maximum (RPM) - Multiplier");
+            "[TRACED] RomRaider: Engine Load Limit B Maximum (RPM) - Multiplier");
 
         // --- Map Switching - Cruise/Non-Cruise ---
         count += labelComment(0x000D29AE, "cal_Map_Switching_Cruise_Switch_Min_Delay_A",
@@ -6985,11 +6439,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CC514, "cal_Rev_Limit_Off_3",
             "[TRACED] RomRaider: Rev Limit Off (3)");
         count += labelComment(0x000F104C, "cal_LC_disable_speed_KMH_threshold",
-            "[CITED] RomRaider: LC disable speed(KMH)threshold");
+            "[TRACED] RomRaider: LC disable speed(KMH)threshold");
         count += labelComment(0x000F1050, "cal_LC_RPM_delta",
-            "[UNVERIFIED] RomRaider: LC RPM delta");
+            "[TRACED] RomRaider: LC RPM delta");
         count += labelComment(0x000F1054, "cal_FFS_RPM_delta",
-            "[UNVERIFIED] RomRaider: FFS RPM delta");
+            "[TRACED] RomRaider: FFS RPM delta");
 
 
         // =====================================================================
@@ -7005,11 +6459,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF20C0L, "system_state_var_C",
             "[UNVERIFIED] System state variable C. System state cluster.");
         count += labelComment(0xFFFF20C4L, "system_state_var_D",
-            "[UNVERIFIED] System state variable D. Paired with system_state_var_C (+4).");
+            "[TRACED] System state variable D. Paired with system_state_var_C (+4).");
         count += labelComment(0xFFFF20CCL, "system_state_flags_A",
-            "[UNVERIFIED] System state flags A. System state cluster 0xFFFF20A0-0xFFFF227C.");
+            "[TRACED] System state flags A. System state cluster 0xFFFF20A0-0xFFFF227C.");
         count += labelComment(0xFFFF20D4L, "system_init_flags_B",
-            "[UNVERIFIED] System initialization flags B. System state cluster.");
+            "[TRACED] System initialization flags B. System state cluster.");
         count += labelComment(0xFFFF20F4L, "system_config_timer_A",
             "[TRACED] System config/timer variable A. System state cluster.");
         count += labelComment(0xFFFF233CL, "timer_config_block",
@@ -7021,9 +6475,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF2AB4L, "system_state_descriptor",
             "[UNVERIFIED] System state descriptor variable. Descriptor region.");
         count += labelComment(0xFFFF2D38L, "system_state_timer_A",
-            "[UNVERIFIED] System state timer counter A. Extended system_state region.");
+            "[TRACED] System state timer counter A. Extended system_state region.");
         count += labelComment(0xFFFF2D40L, "system_state_timer_B",
-            "[UNVERIFIED] System state timer counter B. Adjacent to timer_A (+8).");
+            "[TRACED] System state timer counter B. Adjacent to timer_A (+8).");
         count += labelComment(0xFFFF2EF4L, "desc_region_workspace_B",
             "[CITED] Descriptor region workspace B (GBR base). Descriptor queue/mirror operations.");
         count += labelComment(0xFFFF2F84L, "desc_table_mirror",
@@ -7041,17 +6495,17 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF3420L, "cal_mirror_descriptor_ptr",
             "[UNVERIFIED] Cal mirror descriptor pointer. Cal mirror region 0xFFFF341A-0xFFFF3612.");
         count += labelComment(0xFFFF3438L, "cal_mirror_queue_index",
-            "[UNVERIFIED] Cal mirror descriptor queue index. Cal mirror pipeline management.");
+            "[TRACED] Cal mirror descriptor queue index. Cal mirror pipeline management.");
         count += labelComment(0xFFFF3444L, "dtc_idle_enable_cond",
             "[UNVERIFIED] DTC idle control enable condition flag (byte). Cal mirror for P0506-P050A diagnostic preconditions.");
         count += labelComment(0xFFFF34D8L, "cal_mirror_data",
-            "[UNVERIFIED] Calibration mirror data area");
+            "[TRACED] Calibration mirror data area");
         count += labelComment(0xFFFF35E4L, "cal_mirror_lookup",
             "[UNVERIFIED] Cal mirror lookup workspace (GBR base). 26 fields, 40 accesses.");
         count += labelComment(0xFFFF3654L, "cal_mirror_cache_A",
-            "[UNVERIFIED] Calibration mirror workspace/cache A. Cal mirrors region.");
+            "[TRACED] Calibration mirror workspace/cache A. Cal mirrors region.");
         count += labelComment(0xFFFF365CL, "cal_mirror_timer",
-            "[UNVERIFIED] Calibration mirror timer/counter");
+            "[TRACED] Calibration mirror timer/counter");
         count += labelComment(0xFFFF3668L, "cal_mirror_cache_B",
             "[UNVERIFIED] Calibration mirror workspace/cache B. Cal mirrors region.");
         count += labelComment(0xFFFF366EL, "io_output_packed",
@@ -7063,7 +6517,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF3718L, "cal_descriptor_queue",
             "[UNVERIFIED] Cal descriptor queue workspace (GBR base). 39 fields, 129 accesses.");
         count += labelComment(0xFFFF3C70L, "cal_mirror_state_base",
-            "[UNVERIFIED] Cal mirror state/control base. Precedes cal_mirror_timer_workspace.");
+            "[TRACED] Cal mirror state/control base. Precedes cal_mirror_timer_workspace.");
         count += labelComment(0xFFFF3C80L, "cal_mirror_timer_workspace",
             "[UNVERIFIED] Cal mirror timer workspace. Cal mirror timer region.");
         count += labelComment(0xFFFF3C88L, "cal_mirror_sync_timer_A",
@@ -7100,7 +6554,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF5E40L, "sensor_data_misc",
             "[TRACED] Sensor data miscellaneous");
         count += labelComment(0xFFFF5F94L, "sensor_burst_buf_0",
-            "[UNVERIFIED] Sensor data burst buffer byte 0. Consecutive 6-byte buffer.");
+            "[TRACED] Sensor data burst buffer byte 0. Consecutive 6-byte buffer.");
         count += labelComment(0xFFFF5F95L, "sensor_burst_buf_1",
             "[UNVERIFIED] Sensor data burst buffer byte 1.");
         count += labelComment(0xFFFF5F97L, "sensor_burst_buf_3",
@@ -7128,24 +6582,16 @@ public class ImportAE5L600L extends GhidraScript {
             + "Feeds definition-named axis 0xCC840 'Cranking Fuel IPW Compensation (MAP) / Manifold Pressure'; "
             + "span 0..1500. Corroborated by 0xC0BC8 'Boost disable during fuel cut-Boost(bar) threshold' "
             + "= 1.68 bar absolute compared against this value at 0x0141F2. See docs/corrections.md item 9.");
-        count += labelComment(0xFFFF63B0L, "adc_processed_temperature_B",
-            "[UNVERIFIED] ADC processed temperature B (float). ECT/IAT sensor region.");
-        count += labelComment(0xFFFF6430L, "adc_processed_secondary",
-            "[CITED] ADC processed secondary sensor value");
-        count += labelComment(0xFFFF6540L, "o2_sensor_conditioned",
-            "[TRACED] Conditioned O2 sensor value (float). Rate-limited ±0.02/cycle. AFC PI error input.");
         count += labelComment(0xFFFF6598L, "adc_processed_temp",
-            "[UNVERIFIED] ADC processed intermediate sensor value (float). Pipeline temp between raw ADC and engine state.");
+            "[TRACED] ADC processed intermediate sensor value (float). Pipeline temp between raw ADC and engine state.");
         count += labelComment(0xFFFF65A2L, "engine_state_var_A",
             "[UNVERIFIED] Engine state variable A. Near engine_state_extended (0xFFFF65A9L).");
         count += labelComment(0xFFFF65ABL, "engine_state_ext_byte_B",
             "[TRACED] Engine state extended byte B. Adjacent to engine_state_extended (+2).");
         count += labelComment(0xFFFF65BFL, "accel_state",
             "[TRACED] Acceleration state flag (task50 map switching).");
-        count += labelComment(0xFFFF6810L, "ol_condition_selector",
-            "[TRACED] OL condition selector byte (1-5). Selects ROM threshold");
         count += labelComment(0xFFFF682CL, "adc_processed_misc",
-            "[UNVERIFIED] ADC processed miscellaneous sensor value");
+            "[TRACED] ADC processed miscellaneous sensor value");
         count += labelComment(0xFFFF69FCL, "ect_input_float",
             "[TRACED] ECT input value for fuel/ignition lookups (float). Startup enrichment / fueling pipeline.");
 
@@ -7162,14 +6608,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Ignition timing workspace variable (float). Multiple re");
 
         // --- knock_flkc (25 labels) ---
-        count += labelComment(0xFFFF8080L, "knock_flkc_workspace",
-            "[UNVERIFIED] Knock/FLKC workspace area");
-        count += labelComment(0xFFFF81F8L, "knock_thresh_config",
-            "[TRACED] Knock threshold config workspace (GBR base). Task04/10.");
         count += labelComment(0xFFFF8210L, "knock_window_state",
             "[TRACED] Knock window state workspace (GBR base). Task08.");
         count += labelComment(0xFFFF8318L, "knock_state_var",
-            "[UNVERIFIED] Knock state variable");
+            "[TRACED] Knock state variable");
         count += labelComment(0xFFFF8366L, "fuel_pump_workspace",
             "[TRACED] Fuel pump state machine (14-byte struct). Was knock_workspace_B (misidentified). See fuel_pump_analysis.txt.");
         count += labelComment(0xFFFF837BL, "idle_dispatch_workspace",
@@ -7184,8 +6626,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[UNVERIFIED] Idle workspace variable (near idle GBR base)");
         count += labelComment(0xFFFF8570L, "knock_flkc_event_flag",
             "[TRACED] Knock/FLKC interrupt or event flag. Knock processing region.");
-        count += labelComment(0xFFFF85DCL, "knock_fuel_interlock",
-            "[UNVERIFIED] Knock/fuel interlock control byte. Between fuel_system_state and fuel_knock_state_var; gates knoc...");
         count += labelComment(0xFFFF85E4L, "fuel_knock_state_var",
             "[TRACED] Fuel/knock state variable. Near fuel_system_state (0xFFFF85D7L).");
         count += labelComment(0xFFFF8910L, "ignition_system_state",
@@ -7216,9 +6656,9 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF8D2CL, "ign_ext_workspace_B",
             "[UNVERIFIED] Ignition/knock extended workspace B (GBR base). Timing calculation chain.");
         count += labelComment(0xFFFF8E38L, "knock_level_accum",
-            "[UNVERIFIED] Knock intensity/level accumulator. Near fuel_mode_flags.");
+            "[TRACED] Knock intensity/level accumulator. Near fuel_mode_flags.");
         count += labelComment(0xFFFF8EC7L, "sched_control_secondary",
-            "[UNVERIFIED] Secondary scheduler control (GBR base). Adjacent to sched_control_GBR.");
+            "[TRACED] Secondary scheduler control (GBR base). Adjacent to sched_control_GBR.");
         count += labelComment(0xFFFF8EDEL, "sensor_filter_workspace",
             "[TRACED] O2 sensor rate-of-change filter workspace. CL entry validation via sub 0xC8E8.");
         count += labelComment(0xFFFF8EF8L, "cl_readiness_state",
@@ -7234,7 +6674,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF922CL, "scheduler_counter",
             "[UNVERIFIED] Scheduler counter variable");
         count += labelComment(0xFFFF9358L, "sched_event_counter",
-            "[UNVERIFIED] Scheduler event/task counter (GBR base). Scheduler region.");
+            "[TRACED] Scheduler event/task counter (GBR base). Scheduler region.");
         count += labelComment(0xFFFF9FBCL, "sched_timer_extended_C",
             "[UNVERIFIED] Scheduler timer extension C (GBR base). Adjacent to sched_timer_base cluster.");
         count += labelComment(0xFFFF9FDFL, "sched_timer_state",
@@ -7266,7 +6706,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFFAD1CL, "diag_active_fault_B",
             "[UNVERIFIED] Active fault status byte B. Part of diag_state_E (0xFFFFAD14-0xFFFFAD52, 268 refs).");
         count += labelComment(0xFFFFAD20L, "diag_active_fault_D",
-            "[UNVERIFIED] Active fault status byte D. diag_state_E array offset +0x0C.");
+            "[TRACED] Active fault status byte D. diag_state_E array offset +0x0C.");
         count += labelComment(0xFFFFAD24L, "diag_active_fault_E",
             "[UNVERIFIED] Active fault status byte E. diag_state_E array offset +0x10.");
         count += labelComment(0xFFFFAD28L, "diag_active_fault_F",
@@ -7296,16 +6736,10 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] 597-entry diagnostic monitor dispatch table (12 bytes/entry). "
             + "Each entry: 3 function pointers [precondition, main, output]. "
             + "Spans 0x064100-0x065CFC. Dominant handlers: 0x05E76A (noop), 0x05D1D0 (status read).");
-        count += labelComment(0x0005E76AL, "diag_monitor_noop",
-            "[TRACED] Diagnostic monitor NO-OP handler (rts;nop). Used by 270 of 597 table entries = disabled monitors.");
-        count += labelComment(0x0005D1D0L, "diag_monitor_status_read",
-            "[TRACED] Default status byte reader: reads byte at 0x064239. Used by 159 entries.");
-        count += labelComment(0x0005D1CAL, "diag_monitor_status_read_B",
-            "[TRACED] Status byte reader B: reads byte at 0x064238.");
         count += labelComment(0x0005D1DAL, "diag_monitor_cal_read_8F0B",
-            "[TRACED] Diagnostic cal reader: reads FFFF8F0B (RAM).");
+            "[DECODED] Diagnostic cal reader: reads FFFF8F0B (RAM).");
         count += labelComment(0x0005D1E0L, "diag_monitor_cal_read_D97F0",
-            "[TRACED] DTC enable byte reader: reads 0x0D97F0 (ROM cal).");
+            "[DECODED] DTC enable byte reader: reads 0x0D97F0 (ROM cal).");
         count += labelComment(0x0005D1E6L, "diag_monitor_cal_read_D97F1",
             "[TRACED] DTC enable byte reader: reads 0x0D97F1 (ROM cal).");
         count += labelComment(0x0005D1ECL, "diag_monitor_cal_read_D97F2",
@@ -7317,11 +6751,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x0005D1FEL, "diag_monitor_read_fault_hist",
             "[TRACED] Reads FFFFAF73 (diag_fault_history_byte).");
         count += labelComment(0x0005E76EL, "diag_monitor_write_36BE",
-            "[TRACED] Write R4 byte to FFFF36BE.");
+            "[DECODED] Write R4 byte to FFFF36BE.");
         count += labelComment(0x0005E774L, "diag_monitor_interp_write_8F04",
-            "[TRACED] Interpolation + write float result to FFFF8F04.");
+            "[DECODED] Interpolation + write float result to FFFF8F04.");
         count += labelComment(0x0005E788L, "diag_monitor_pack_write_36BA",
-            "[TRACED] uint8_pack -> write to FFFF36BA.");
+            "[DECODED] uint8_pack -> write to FFFF36BA.");
         count += labelComment(0x0005E798L, "diag_monitor_pack_write_36BC",
             "[TRACED] uint8_pack -> write to FFFF36BC.");
         count += labelComment(0x0005E7A8L, "diag_monitor_write_8F11",
@@ -7333,37 +6767,30 @@ public class ImportAE5L600L extends GhidraScript {
         // REGION 0x020000 UTILITY LIBRARY LABELS
         // Key functions identified from scout analysis
         // =====================================================================
-        count += labelComment(0x00022F92L, "check_cl_active",
-            "[TRACED] Flag reader: returns 1 if FFFF65F6 == 1 (closed-loop active). 111 callers -- #1 most-called in region.");
-        count += labelComment(0x00022CF4L, "check_engine_running",
-            "[TRACED] Flag reader: returns 1 if FFFF65C5 == 1 (engine running). 100 callers.");
         count += labelComment(0x0002F8EAL, "check_transient_flag",
-            "[TRACED] Flag reader: returns 1 if FFFF726C == 1 (transient_state_flag). 65 callers.");
+            "[DECODED] Flag reader: returns 1 if FFFF726C == 1 (transient_state_flag). 65 callers.");
         count += labelComment(0x00022CEAL, "check_accel_pedal_idle",
-            "[TRACED] Flag reader: returns 1 if FFFF65B1 == 1 (accel pedal at idle). 15 callers.");
+            "[DECODED] Flag reader: returns 1 if FFFF65B1 == 1 (accel pedal at idle). 15 callers.");
         count += labelComment(0x00023E48L, "check_afl_ready",
-            "[TRACED] DECODED (item 92): reads byte[FFFF67FC], compares == 1, movt. No descriptor. Supersedes \"fuel_desc_reader\". "
+            "[DECODED] DECODED (item 92): reads byte[FFFF67FC], compares == 1, movt. No descriptor. Supersedes \"fuel_desc_reader\". "
             +             "Flag reader: returns 1 if FFFF67FC == 1 (A/F learning ready). 15 callers.");
         count += labelComment(0x000281DCL, "check_diag_mode_active",
-            "[TRACED] DECODED (item 92): reads byte[FFFF96A8], compares == 1. No scaling, no float. Supersedes \"sensor_scale_helper\". "
+            "[DECODED] DECODED (item 92): reads byte[FFFF96A8], compares == 1. No scaling, no float. Supersedes \"sensor_scale_helper\". "
             +             "Flag reader: returns 1 if FFFF96A8 set (diagnostic mode active). 15 callers.");
         count += labelComment(0x000299BCL, "diag_check_P0137",
-            "[TRACED] DECODED (item 92): reads byte[FFFF971C], returns 2 if non-zero else 0. It is a READ, not a store, and there is no float. Supersedes \"float_store_to_ram\". "
+            "[DECODED] DECODED (item 92): reads byte[FFFF971C], returns 2 if non-zero else 0. It is a READ, not a store, and there is no float. Supersedes \"float_store_to_ram\". "
             +             "DTC flag reader: returns 2 if FFFF971C nonzero (P0137 rear O2 low). 14 callers.");
         count += labelComment(0x00021D9AL, "check_sensor_valid",
-            "[TRACED] Sensor validity check: reads FFFF6552. Called from CL/OL transition. 12 callers.");
-        count += labelComment(0x000278D2L, "check_maf_valid",
-            "[TRACED] DECODED (item 92): reads byte[FFFF6A29], tests bit 7, returns the inverted flag in five instructions. Nothing dwell-related. Supersedes \"dwell_calculator\". "
-            +             "MAF validity check: reads FFFF6A29. 7 callers.");
+            "[DECODED] Sensor validity check: reads FFFF6552. Called from CL/OL transition. 12 callers.");
         count += labelComment(0x000297A0L, "diag_flag_reader_cluster_start",
-            "[TRACED] DECODED 2026-08-19 (item 92): reads byte[FFFF9704], returns 2 if non-zero else 0. Six instructions, no float and no descriptor. Supersedes \"float_load_from_desc\". "
+            "[DECODED] DECODED 2026-08-19 (item 92): reads byte[FFFF9704], returns 2 if non-zero else 0. Six instructions, no float and no descriptor. Supersedes \"float_load_from_desc\". "
             +             "Start of 45 sequential DTC flag readers (16B each). FFFF9704-FFFF9742. "
             + "Each returns 2 if DTC flag nonzero, 0 if clear.");
         count += labelComment(0x0002D718L, "fuel_correction_eeprom_loader",
             "[TRACED] Per-cylinder/per-bank fuel correction loader from EEPROM. "
             + "Writes 12 uint16 values to FFFF7204+. A/F learning initialization.");
         count += labelComment(0x0002EE78L, "ipw_output_pack",
-            "[TRACED] IPW batch serializer: 5x uint8_pack calls writing to FFFF3158-FFFF3168.");
+            "[DECODED] IPW batch serializer: 5x uint8_pack calls writing to FFFF3158-FFFF3168.");
         count += labelComment(0x0002C078L, "eeprom_persistence_state_machine",
             "[TRACED] EEPROM read/write state machine for learned value persistence. "
             + "Uses FFFF6C4C buffer, calls EEPROM helpers at 0x6B5A/0x6884/0x67DC.");
@@ -7379,7 +6806,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00021DAEL, "return_0_stub_1DAE",
             "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x000281C8L, "return_0_stub_81C8",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
 
         // --- Standard flag readers (cmp/eq #1) ---
         count += labelComment(0x000281CCL, "check_sched_96A0",
@@ -7389,17 +6816,17 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000281FCL, "return_0_stub_81FC",
             "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x000297F0L, "return_0_stub_97F0",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x00029804L, "return_0_stub_9804",
             "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x00029818L, "return_0_stub_9818",
             "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x00029824L, "return_0_stub_9824",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
 
         // --- DTC flag readers (returns 2/0) ---
         count += labelComment(0x00029838L, "diag_check_P0107",
-            "[UNVERIFIED] DTC flag reader: returns 2 if P0107 (0xFFFF970C) is set.");
+            "[TRACED] DTC flag reader: returns 2 if P0107 (0xFFFF970C) is set.");
         count += labelComment(0x00029878L, "diag_check_P0113",
             "[TRACED] DTC flag reader: returns 2 if P0113 (0xFFFF9710) is set.");
 
@@ -7441,9 +6868,9 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- Standard flag readers (cmp/eq #1) ---
         count += labelComment(0x0002BE10L, "check_diag_A39E",
-            "[UNVERIFIED] Flag reader (T1): reads 0xFFFFA39E.");
+            "[TRACED] Flag reader (T1): reads 0xFFFFA39E.");
         count += labelComment(0x0002BE1AL, "check_diag_A39D",
-            "[UNVERIFIED] Flag reader (T1): reads 0xFFFFA39D.");
+            "[TRACED] Flag reader (T1): reads 0xFFFFA39D.");
 
         // --- T5 ---
         count += labelComment(0x0002BE38L, "return_0_stub_BE38",
@@ -7451,39 +6878,35 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- Standard flag readers (cmp/eq #1) ---
         count += labelComment(0x0002BE40L, "check_flag_2F44",
-            "[UNVERIFIED] Flag reader (T1): reads 0xFFFF2F44.");
+            "[TRACED] Flag reader (T1): reads 0xFFFF2F44.");
         count += labelComment(0x0002BE4AL, "check_diag_A5B4",
-            "[UNVERIFIED] Flag reader (T1): reads 0xFFFFA5B4.");
+            "[TRACED] Flag reader (T1): reads 0xFFFFA5B4.");
         count += labelComment(0x0002BE54L, "check_flag_2F46",
-            "[UNVERIFIED] Flag reader (T1): reads 0xFFFF2F46.");
+            "[TRACED] Flag reader (T1): reads 0xFFFF2F46.");
         count += labelComment(0x0002BE5EL, "check_diag_A5B5",
-            "[UNVERIFIED] Flag reader (T1): reads 0xFFFFA5B5.");
-        count += labelComment(0x0002E7D8L, "check_fuel_7234",
-            "[UNVERIFIED] Flag reader (T1): reads 0xFFFF7234.");
-        count += labelComment(0x0002E7E2L, "check_fuel_7235",
-            "[UNVERIFIED] Flag reader (T1): reads 0xFFFF7235.");
+            "[TRACED] Flag reader (T1): reads 0xFFFFA5B5.");
 
         // --- T5 ---
         count += labelComment(0x0005D3F8L, "return_0_stub_D3F8",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[DECODED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005D436L, "return_0_stub_D436",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005DCAAL, "return_0_stub_DCAA",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005DEBEL, "return_0_stub_DEBE",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005DFE4L, "return_0_stub_DFE4",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005E2E6L, "return_0_stub_E2E6",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005E4CCL, "return_0_stub_E4CC",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005E638L, "return_0_stub_E638",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005E71EL, "return_0_stub_E71E",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
         count += labelComment(0x0005E73AL, "return_0_stub_E73A",
-            "[UNVERIFIED] Tiny return stub: always returns 0.");
+            "[TRACED] Tiny return stub: always returns 0.");
 
 
         // =====================================================================
@@ -7494,7 +6917,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- system_state ---
         count += labelComment(0xFFFF21ACL, "gbr_sys_21AC",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: system_state.");
+            "[TRACED] GBR workspace base (1 use). Region: system_state.");
         count += labelComment(0xFFFF2398L, "desc_table_copy_2398",
             "[CITED] Descriptor table clone. 222 bytes, 66 fields. Alternating long-write/word-read pattern.");
         count += labelComment(0xFFFF2AACL, "gbr_sys_2AAC",
@@ -7510,7 +6933,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF30E4L, "desc_partial_copy_30E4",
             "[CITED] Descriptor partial copy. 90 bytes, 24 fields.");
         count += labelComment(0xFFFF33F4L, "gbr_cal_33F4",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: cal_mirrors.");
+            "[TRACED] GBR workspace base (1 use). Region: cal_mirrors.");
         count += labelComment(0xFFFF34ECL, "desc_table_copy_34EC",
             "[CITED] Descriptor table clone. 218 bytes, 64 fields. Near-full descriptor copy.");
         count += labelComment(0xFFFF35F4L, "gbr_cal_35F4",
@@ -7522,7 +6945,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- I/O peripheral ---
         count += labelComment(0xFFFF5BD8L, "gbr_io_5BD8",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: I/O peripheral.");
+            "[TRACED] GBR workspace base (2 uses). Region: I/O peripheral.");
         count += labelComment(0xFFFF5BDFL, "gbr_io_5BDF",
             "[UNVERIFIED] GBR workspace base (2 uses). Region: I/O peripheral.");
         count += labelComment(0xFFFF5BE1L, "gbr_io_5BE1",
@@ -7558,7 +6981,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF5D80L, "gbr_io_5D80",
             "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
         count += labelComment(0xFFFF5D86L, "gbr_io_5D86",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: I/O state.");
+            "[TRACED] GBR workspace base (2 uses). Region: I/O state.");
         count += labelComment(0xFFFF5D9CL, "gbr_io_5D9C",
             "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
         count += labelComment(0xFFFF5D9EL, "gbr_io_5D9E",
@@ -7566,19 +6989,19 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF5D9FL, "gbr_io_5D9F",
             "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
         count += labelComment(0xFFFF5DBAL, "gbr_io_5DBA",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
+            "[TRACED] GBR workspace base (1 use). Region: I/O state.");
         count += labelComment(0xFFFF5DC0L, "gbr_io_5DC0",
             "[UNVERIFIED] GBR workspace base (2 uses). Region: I/O state.");
         count += labelComment(0xFFFF5DECL, "gbr_io_5DEC",
             "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
         count += labelComment(0xFFFF5E58L, "gbr_io_5E58",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: I/O state.");
+            "[TRACED] GBR workspace base (2 uses). Region: I/O state.");
         count += labelComment(0xFFFF5E76L, "gbr_io_5E76",
             "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
         count += labelComment(0xFFFF5EBCL, "gbr_io_5EBC",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
+            "[TRACED] GBR workspace base (1 use). Region: I/O state.");
         count += labelComment(0xFFFF5EC0L, "gbr_io_5EC0",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
+            "[TRACED] GBR workspace base (1 use). Region: I/O state.");
         count += labelComment(0xFFFF5EDBL, "gbr_io_5EDB",
             "[UNVERIFIED] GBR workspace base (1 use). Region: I/O state.");
 
@@ -7604,9 +7027,9 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- ADC channels ---
         count += labelComment(0xFFFF6078L, "gbr_adc_6078",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC channels.");
+            "[TRACED] GBR workspace base (1 use). Region: ADC channels.");
         count += labelComment(0xFFFF6080L, "gbr_adc_6080",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC channels.");
+            "[TRACED] GBR workspace base (1 use). Region: ADC channels.");
         count += labelComment(0xFFFF60C0L, "gbr_adc_60C0",
             "[UNVERIFIED] GBR workspace base (1 use). Region: ADC channels.");
         count += labelComment(0xFFFF6118L, "gbr_adc_6118",
@@ -7636,33 +7059,14 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF6374L, "gbr_adc_6374",
             "[UNVERIFIED] GBR workspace base (2 uses). Region: ADC sensors.");
         count += labelComment(0xFFFF63B4L, "maf_sample_in",
-            "[CITED] IDENTIFIED 2026-07-27. Head of the MAF sample shift register (float, g/s). Written from "
+            "[TRACED] IDENTIFIED 2026-07-27. Head of the MAF sample shift register (float, g/s). Written from "
             + "0xFFFF40B4 at 0x0203E0 mov.l @(0x0205E4),r2 (=0xFFFF40B4) ; 0x0203E2 fmov.s @r2,fr8 ; 0x0203E4 "
             + "mov.l @(0x0205E8),r14 (=0xFFFF6424) ; 0x0203E6 mov #-112,r0 ; 0x0203E8 fmov.s fr8,@(r0,r14) "
             + "=> 0xFFFF6424-112 = 0xFFFF63B4. corrections.md item 29.");
-        count += labelComment(0xFFFF63B8L, "maf_sample_prev",
-            "[CITED] IDENTIFIED 2026-07-27. Previous MAF sample (float, g/s), slot 1 of the 2-entry shift register that "
-            + "feeds 0xFFFF63C0. Written 0x01FF04 fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-120; read back at "
-            + "0x01FF24. corrections.md item 29.");
-        count += labelComment(0xFFFF63BCL, "maf_sample_curr",
-            "[CITED] IDENTIFIED 2026-07-27. Current MAF sample (float, g/s), slot 2 of the shift register feeding "
-            + "0xFFFF63C0. Written 0x01FF0C fmov.s fr8,@(r0,r1) with r1=0xFFFF6430, r0=-116, sourced from "
-            + "0xFFFF6424 which is itself loaded from 0xFFFF63B4. corrections.md item 29.");
-        count += labelComment(0xFFFF63C0L, "maf_uncompensated_gps",
-            "[CITED] IDENTIFIED 2026-07-27. MASS AIRFLOW, 2-sample average, BEFORE the charge-temperature compensation (float, g/s). "
-            + "0x01FF20 r1=0xFFFF6430 ; 0x01FF24 fmov.s @(r0,r1),fr8 (r0=-120 => 0xFFFF63B8) ; 0x01FF28 fmov.s "
-            + "@(r0,r1),fr9 (r0=-116 => 0xFFFF63BC) ; 0x01FF2A fadd fr9,fr8 ; 0x01FF30 fmul fr4,fr8 with FR4 = "
-            + "*(0x020090) = 0.5 ; 0x01FF34 fmov.s fr8,@(r0,r1) (r0=-112) => 0xFFFF63C0 = 0.5*(63B8+63BC). It is "
-            + "then fed straight back out as the axis-1 input: 0x01FF3A fmov.s @(r0,r1),fr5 ; 0x01FF3E jsr "
-            + "0x0BE8E4 with r4 = 0x0AAFE8 = counts 5x8, axis1 0xC3B90, whose definition name ends \"/ Mass "
-            + "Airflow\" (1.6..290 g/s). The computed-address form is why a literal-pool-only trace cannot see "
-            + "it. corrections.md items 28 + 29.");
 
         // --- ADC throttle/TPS ---
         count += labelComment(0xFFFF643CL, "gbr_adc_643C",
             "[TRACED] GBR workspace base (1 use). Region: ADC throttle/TPS.");
-        count += labelComment(0xFFFF6458L, "gbr_adc_6458",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC throttle/TPS.");
         count += labelComment(0xFFFF6490L, "sensor_dispatch_workspace",
             "[UNVERIFIED] Sensor dispatch workspace. 3 GBR uses. Sensor data region.");
         count += labelComment(0xFFFF64A0L, "gbr_adc_64A0",
@@ -7674,7 +7078,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF65A8L, "gbr_adc_65A8",
             "[UNVERIFIED] GBR workspace base (1 use). Region: ADC throttle/TPS.");
         count += labelComment(0xFFFF65AAL, "gbr_adc_65AA",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC throttle/TPS.");
+            "[TRACED] GBR workspace base (1 use). Region: ADC throttle/TPS.");
 
         // --- ADC RPM/speed ---
         count += labelComment(0xFFFF678CL, "gbr_adc_678C",
@@ -7684,7 +7088,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- ADC pressure/misc ---
         count += labelComment(0xFFFF6811L, "gbr_adc_6811",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC pressure/misc.");
+            "[TRACED] GBR workspace base (1 use). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF683CL, "gbr_adc_683C",
             "[TRACED] GBR workspace base (1 use). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF68A4L, "gbr_adc_68A4",
@@ -7700,15 +7104,11 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF69F8L, "gbr_adc_69F8",
             "[UNVERIFIED] GBR workspace base (1 use). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF6A18L, "gbr_adc_6A18",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC pressure/misc.");
-        count += labelComment(0xFFFF6A29L, "gbr_adc_6A29",
-            "[TRACED] GBR workspace base (2 uses). Region: ADC pressure/misc.");
+            "[TRACED] GBR workspace base (1 use). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF6A64L, "gbr_adc_6A64",
             "[TRACED] GBR workspace base (2 uses). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF6A74L, "gbr_adc_6A74",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC pressure/misc.");
-        count += labelComment(0xFFFF6A84L, "gbr_adc_6A84",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: ADC pressure/misc.");
+            "[TRACED] GBR workspace base (1 use). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF6AC0L, "gbr_adc_6AC0",
             "[UNVERIFIED] GBR workspace base (2 uses). Region: ADC pressure/misc.");
         count += labelComment(0xFFFF6AC4L, "gbr_adc_6AC4",
@@ -7744,27 +7144,21 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF721CL, "gbr_fuel_721C",
             "[UNVERIFIED] GBR workspace base (2 uses). Region: fuel state.");
         count += labelComment(0xFFFF7244L, "gbr_fuel_7244",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: fuel state.");
+            "[TRACED] GBR workspace base (2 uses). Region: fuel state.");
         count += labelComment(0xFFFF726DL, "gbr_fuel_726D",
             "[TRACED] GBR workspace base (1 use). Region: fuel state.");
         count += labelComment(0xFFFF7278L, "gbr_fuel_7278",
             "[TRACED] GBR workspace base (2 uses). Region: fuel state.");
         count += labelComment(0xFFFF72A0L, "gbr_fuel_72A0",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: fuel state.");
-        count += labelComment(0xFFFF72B4L, "gbr_fuel_72B4",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: fuel state.");
-        count += labelComment(0xFFFF7354L, "gbr_fuel_7354",
             "[TRACED] GBR workspace base (1 use). Region: fuel state.");
-        count += labelComment(0xFFFF7374L, "gbr_fuel_7374",
+        count += labelComment(0xFFFF72B4L, "gbr_fuel_72B4",
             "[TRACED] GBR workspace base (1 use). Region: fuel state.");
         count += labelComment(0xFFFF73B0L, "gbr_fuel_73B0",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: fuel state.");
+            "[TRACED] GBR workspace base (1 use). Region: fuel state.");
         count += labelComment(0xFFFF73E0L, "gbr_fuel_73E0",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: fuel state.");
+            "[TRACED] GBR workspace base (1 use). Region: fuel state.");
 
         // --- fuel pipeline ---
-        count += labelComment(0xFFFF7710L, "gbr_fuel_7710",
-            "[TRACED] GBR workspace base (1 use). Region: fuel pipeline.");
         count += labelComment(0xFFFF77F4L, "gbr_fuel_77F4",
             "[TRACED] GBR workspace base (1 use). Region: fuel pipeline.");
 
@@ -7772,18 +7166,12 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF7830L, "gbr_afc_7830",
             "[UNVERIFIED] GBR workspace base (2 uses). Region: AFC/AFL state.");
         count += labelComment(0xFFFF7858L, "gbr_afc_7858",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: AFC/AFL state.");
-        count += labelComment(0xFFFF7874L, "gbr_afc_7874",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: AFC/AFL state.");
-        count += labelComment(0xFFFF787EL, "gbr_afc_787E",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: AFC/AFL state.");
+            "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF7888L, "gbr_afc_7888",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: AFC/AFL state.");
+            "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF78ACL, "gbr_afc_78AC",
             "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF7950L, "gbr_afc_7950",
-            "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
-        count += labelComment(0xFFFF79C0L, "gbr_afc_79C0",
             "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
         count += labelComment(0xFFFF79CCL, "gbr_afc_79CC",
             "[TRACED] GBR workspace base (1 use). Region: AFC/AFL state.");
@@ -7793,74 +7181,46 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Phase 7 sub-C ol_transition_completion_check");
         count += labelComment(0xFFFF7A2CL, "gbr_afl_7A2C",
             "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
-        count += labelComment(0xFFFF7A78L, "gbr_afl_7A78",
-            "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
-        count += labelComment(0xFFFF7AA0L, "gbr_afl_7AA0",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: AFL/fuel trim.");
         count += labelComment(0xFFFF7AB8L, "gbr_afl_7AB8",
-            "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
-        count += labelComment(0xFFFF7AF8L, "gbr_afl_7AF8",
-            "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
-        count += labelComment(0xFFFF7B7CL, "gbr_afl_7B7C",
-            "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
-        count += labelComment(0xFFFF7B8CL, "gbr_afl_7B8C",
             "[TRACED] GBR workspace base (1 use). Region: AFL/fuel trim.");
 
         // --- timing state ---
         count += labelComment(0xFFFF7C30L, "gbr_tim_7C30",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
+            "[TRACED] GBR workspace base (1 use). Region: timing state.");
         count += labelComment(0xFFFF7C34L, "gbr_tim_7C34",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: timing state.");
-        count += labelComment(0xFFFF7C6CL, "gbr_tim_7C6C",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: timing state.");
-        count += labelComment(0xFFFF7C80L, "gbr_tim_7C80",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
-        count += labelComment(0xFFFF7C82L, "gbr_tim_7C82",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
-        count += labelComment(0xFFFF7C92L, "gbr_tim_7C92",
-            "[CITED] GBR workspace base (1 use). Region: timing state.");
+            "[TRACED] GBR workspace base (2 uses). Region: timing state.");
         count += labelComment(0xFFFF7CCAL, "gbr_tim_7CCA",
             "[TRACED] GBR workspace base (1 use). Region: timing state.");
         count += labelComment(0xFFFF7D08L, "gbr_tim_7D08",
             "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
         count += labelComment(0xFFFF7D11L, "gbr_tim_7D11",
-            "[CITED] GBR workspace base (1 use). Region: timing state.");
+            "[TRACED] GBR workspace base (1 use). Region: timing state.");
         count += labelComment(0xFFFF7D28L, "gbr_tim_7D28",
             "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
         count += labelComment(0xFFFF7D2AL, "gbr_tim_7D2A",
             "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
         count += labelComment(0xFFFF7D5CL, "gbr_tim_7D5C",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: timing state.");
+            "[TRACED] GBR workspace base (1 use). Region: timing state.");
 
         // --- timing workspace ---
         count += labelComment(0xFFFF7E74L, "gbr_tim_7E74",
             "[UNVERIFIED] GBR workspace base (1 use). Region: timing workspace.");
-        count += labelComment(0xFFFF7EC0L, "base_advance_state",
-            "[TRACED] Task49 base advance workspace. GBR base for base_advance calculations.");
         count += labelComment(0xFFFF7ED4L, "gbr_tim_7ED4",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: timing workspace.");
+            "[TRACED] GBR workspace base (1 use). Region: timing workspace.");
         count += labelComment(0xFFFF7EECL, "gbr_tim_7EEC",
             "[TRACED] GBR workspace base (1 use). Region: timing workspace.");
-        count += labelComment(0xFFFF7F0CL, "timing_blend_app",
-            "[TRACED] Task32 timing blend application workspace.");
         count += labelComment(0xFFFF7F74L, "gbr_tim_7F74",
             "[TRACED] GBR workspace base (2 uses). Region: timing workspace.");
         count += labelComment(0xFFFF7F8CL, "gbr_tim_7F8C",
             "[TRACED] GBR workspace base (1 use). Region: timing workspace.");
-        count += labelComment(0xFFFF7FB0L, "gbr_tim_7FB0",
-            "[TRACED] GBR workspace base (1 use). Region: timing workspace.");
 
         // --- knock_flkc ---
-        count += labelComment(0xFFFF8020L, "gbr_kflk_8020",
-            "[CITED] GBR workspace base (2 uses). Region: knock_flkc.");
         count += labelComment(0xFFFF8024L, "gbr_kflk_8024",
-            "[CITED] GBR workspace base (1 use). Region: knock_flkc.");
+            "[TRACED] GBR workspace base (1 use). Region: knock_flkc.");
         count += labelComment(0xFFFF804CL, "gbr_kflk_804C",
             "[TRACED] GBR workspace base (1 use). Region: knock_flkc.");
-        count += labelComment(0xFFFF805CL, "gbr_kflk_805C",
-            "[TRACED] GBR workspace base (1 use). Region: knock_flkc.");
         count += labelComment(0xFFFF8068L, "gbr_kflk_8068",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: knock_flkc.");
+            "[TRACED] GBR workspace base (1 use). Region: knock_flkc.");
 
         // --- knock detection ---
 
@@ -7869,8 +7229,6 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] Knock detection workspace extension.");
         count += labelComment(0xFFFF821CL, "knock_thresh_calc",
             "[TRACED] Task03 knock threshold calculation workspace.");
-        count += labelComment(0xFFFF8277L, "roughness_detection",
-            "[UNVERIFIED] Task13 roughness detection workspace.");
 
         // --- idle control ---
         count += labelComment(0xFFFF8330L, "gbr_idle_8330",
@@ -7882,13 +7240,13 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF8354L, "gbr_idle_8354",
             "[TRACED] GBR workspace base (1 use). Region: idle control.");
         count += labelComment(0xFFFF8358L, "gbr_idle_8358",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: idle control.");
+            "[TRACED] GBR workspace base (1 use). Region: idle control.");
         count += labelComment(0xFFFF8364L, "gbr_idle_8364",
             "[TRACED] GBR workspace base (1 use). Region: idle control.");
         count += labelComment(0xFFFF8378L, "gbr_idle_8378",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: idle control.");
+            "[TRACED] GBR workspace base (2 uses). Region: idle control.");
         count += labelComment(0xFFFF837CL, "gbr_idle_837C",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: idle control.");
+            "[TRACED] GBR workspace base (2 uses). Region: idle control.");
         count += labelComment(0xFFFF8389L, "gbr_idle_8389",
             "[UNVERIFIED] GBR workspace base (2 uses). Region: idle control.");
         count += labelComment(0xFFFF83ABL, "gbr_idle_83AB",
@@ -7904,7 +7262,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF840CL, "gbr_eng_840C",
             "[UNVERIFIED] GBR workspace base (1 use). Region: engine state.");
         count += labelComment(0xFFFF8434L, "gbr_eng_8434",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: engine state.");
+            "[TRACED] GBR workspace base (1 use). Region: engine state.");
         count += labelComment(0xFFFF8550L, "gbr_eng_8550",
             "[TRACED] GBR workspace base (1 use). Region: engine state.");
         count += labelComment(0xFFFF4150L, "rpm_from_tooth_period",
@@ -7964,7 +7322,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF8680L, "gbr_eng_8680",
             "[UNVERIFIED] GBR workspace base (1 use). Region: engine state.");
         count += labelComment(0xFFFF8694L, "gbr_eng_8694",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: engine state.");
+            "[TRACED] GBR workspace base (1 use). Region: engine state.");
 
         // --- ignition/timing ---
         count += labelComment(0xFFFF87A8L, "gbr_ign_87A8",
@@ -8020,7 +7378,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF8C9AL, "gbr_tim_8C9A",
             "[UNVERIFIED] GBR workspace base (1 use). Region: timing workspace.");
         count += labelComment(0xFFFF8D14L, "ignition_ext_workspace_A",
-            "[UNVERIFIED] Ignition/knock extended workspace A. 3 GBR uses.");
+            "[TRACED] Ignition/knock extended workspace A. 3 GBR uses.");
         count += labelComment(0xFFFF8D22L, "gbr_tim_8D22",
             "[UNVERIFIED] GBR workspace base (1 use). Region: timing workspace.");
         count += labelComment(0xFFFF8D2AL, "gbr_tim_8D2A",
@@ -8042,33 +7400,29 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF8E0EL, "gbr_sched_8E0E",
             "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8E34L, "gbr_sched_8E34",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8E3CL, "gbr_sched_8E3C",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8E44L, "gbr_sched_8E44",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (2 uses). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8E48L, "gbr_sched_8E48",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8E64L, "gbr_sched_8E64",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: scheduler/CL-OL.");
-        count += labelComment(0xFFFF8E65L, "gbr_sched_8E65",
-            "[UNVERIFIED] GBR workspace base (2 uses). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (2 uses). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8EB0L, "gbr_sched_8EB0",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8EB4L, "gbr_sched_8EB4",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8EC4L, "gbr_sched_8EC4",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
-        count += labelComment(0xFFFF8ECCL, "gbr_sched_8ECC",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8F28L, "cl_ol_scheduler_workspace",
-            "[UNVERIFIED] CL/OL scheduler workspace. 3 GBR uses. CL/OL region.");
+            "[TRACED] CL/OL scheduler workspace. 3 GBR uses. CL/OL region.");
         count += labelComment(0xFFFF8F2AL, "gbr_sched_8F2A",
             "[TRACED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8F2CL, "gbr_sched_8F2C",
             "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
         count += labelComment(0xFFFF8F34L, "gbr_sched_8F34",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler/CL-OL.");
 
         // --- scheduler core ---
         count += labelComment(0xFFFF90A0L, "gbr_sched_90A0",
@@ -8088,7 +7442,7 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- scheduler queues ---
         count += labelComment(0xFFFF9124L, "gbr_sched_9124",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler queues.");
+            "[TRACED] GBR workspace base (1 use). Region: scheduler queues.");
         count += labelComment(0xFFFF91E0L, "gbr_sched_91E0",
             "[UNVERIFIED] GBR workspace base (1 use). Region: scheduler queues.");
         count += labelComment(0xFFFF9218L, "gbr_sched_9218",
@@ -8106,7 +7460,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFF93E8L, "gbr_evap_93E8",
             "[UNVERIFIED] GBR workspace base (1 use). Region: EVAP/emissions diag.");
         count += labelComment(0xFFFF94B3L, "gbr_evap_94B3",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: EVAP/emissions diag.");
+            "[TRACED] GBR workspace base (1 use). Region: EVAP/emissions diag.");
         count += labelComment(0xFFFF94BCL, "gbr_evap_94BC",
             "[TRACED] GBR workspace base (1 use). Region: EVAP/emissions diag.");
         count += labelComment(0xFFFF94C4L, "gbr_evap_94C4",
@@ -8200,7 +7554,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFFA350L, "gbr_diag_A350",
             "[UNVERIFIED] GBR workspace base (1 use). Region: diag trip/fault.");
         count += labelComment(0xFFFFA3B8L, "gbr_diag_A3B8",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: diag trip/fault.");
+            "[TRACED] GBR workspace base (1 use). Region: diag trip/fault.");
         count += labelComment(0xFFFFA3D8L, "gbr_diag_A3D8",
             "[UNVERIFIED] GBR workspace base (1 use). Region: diag trip/fault.");
         count += labelComment(0xFFFFA450L, "gbr_diag_A450",
@@ -8266,7 +7620,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFFA72BL, "gbr_diag_A72B",
             "[UNVERIFIED] GBR workspace base (1 use). Region: diag maturation.");
         count += labelComment(0xFFFFA734L, "gbr_diag_A734",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: diag maturation.");
+            "[TRACED] GBR workspace base (1 use). Region: diag maturation.");
         count += labelComment(0xFFFFA735L, "gbr_diag_A735",
             "[UNVERIFIED] GBR workspace base (1 use). Region: diag maturation.");
         count += labelComment(0xFFFFA736L, "gbr_diag_A736",
@@ -8312,7 +7666,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0xFFFFACC0L, "gbr_diag_ACC0",
             "[UNVERIFIED] GBR workspace base (1 use). Region: diag protocol.");
         count += labelComment(0xFFFFACCEL, "gbr_diag_ACCE",
-            "[UNVERIFIED] GBR workspace base (1 use). Region: diag protocol.");
+            "[TRACED] GBR workspace base (1 use). Region: diag protocol.");
 
         // --- diag history ---
         count += labelComment(0xFFFFAE06L, "gbr_diag_AE06",
@@ -8341,14 +7695,14 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00071A76L, "sensor_diag_dispatch_1_disabled",
             "[TRACED] DISABLED sensor diagnostic dispatcher — rts/nop stub. Real body at 0x071ABA.");
         count += labelComment(0x00071A7AL, "sensor_diag_state_helper",
-            "[UNVERIFIED] Packs uint8(0) -> FFFF255E (diagnostic state byte).");
+            "[TRACED] Packs uint8(0) -> FFFF255E (diagnostic state byte).");
         count += labelComment(0x00071A8EL, "sensor_diag_eeprom_init",
             "[UNVERIFIED] Initializes 3 EEPROM diagnostic slots: FFFF2544/254C/2554 via eeprom_op.");
         count += labelComment(0x00071ABAL, "sensor_diag_dispatch_1_body",
             "[TRACED] Real dispatcher body: 13 BSR calls — sensor acq, FPU compute, float clamp, "
             + "6 DTC monitor pairs, EEPROM storage, final handler. GBR=FFFF7C9F.");
         count += labelComment(0x00071AFAL, "sensor_conditional_calc",
-            "[UNVERIFIED] Conditional sensor computation: sensor_val - offset + corrections, float_abs, "
+            "[TRACED] Conditional sensor computation: sensor_val - offset + corrections, float_abs, "
             + "float_clamp. Output -> FFFF97B0/97B4. Cal bounds at 0xC50B4.");
         count += labelComment(0x00071B58L, "sensor_computation_fpu",
             "[TRACED] FPU-heavy sensor computation sub (called from dispatcher 1 body).");
@@ -8447,10 +7801,6 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x00016558L, "battery_voltage_state_eval",
             "[TRACED] 4 callers. Compares battery voltage (FFFF4130) against 9.0V/9.5V "
             + "hysteresis thresholds (cal 0xC152C/C1530); sets low-voltage flag FFFF5E45.");
-        count += labelComment(0x00011880L, "io_F738_toggle_bit15",
-            "[TRACED] A write, not a read: inside a critical section, toggles bit 15 of the word at "
-            + "0xFFFFF738 and keeps bits 0-14 (0x011890-0x01189C). Which peripheral register that is has NOT "
-            + "been checked. Was atu_timer_capture_read. corrections.md item 96.");
         count += labelComment(0x00014278L, "bit_test_nz",
             "[TRACED] Returns 1 if (R4 & R5) != 0. Part of trio: bit_test/bit_extract/byte_pair_merge "
             + "at 0x14278/82/8C.");
@@ -8468,36 +7818,36 @@ public class ImportAE5L600L extends GhidraScript {
 
         // --- Per-Cylinder Injection Output Pipeline (7 stages, dispatched from 0x48754-0x4876C) ---
         count += labelComment(0x0008E3E4L, "percyl_precalc_ect_gate",
-            "[TRACED] Stage 0: Read ECT from FFFF4144, compare thresholds (cal 0xC545C), "
+            "[DECODED] Stage 0: Read ECT from FFFF4144, compare thresholds (cal 0xC545C), "
             + "gate pipeline on check_diag_state.");
         count += labelComment(0x0008E474L, "percyl_ect_threshold_calc",
-            "[TRACED] Sub of Stage 0: Load ECT float, compare against workspace FFFFA8B0 thresholds.");
+            "[DECODED] Sub of Stage 0: Load ECT float, compare against workspace FFFFA8B0 thresholds.");
         count += labelComment(0x00081A64L, "percyl_interp_gate",
-            "[TRACED] Stage 1: Gate on check_diag_state, then call interp_pipeline for "
+            "[DECODED] Stage 1: Gate on check_diag_state, then call interp_pipeline for "
             + "multi-dim fuel table interpolation.");
         count += labelComment(0x00081E14L, "percyl_interp_pipeline",
             "[TRACED] Sub of Stage 1: 4x fmac_interp_uint16 + axis_frac_to_uint16 + float_safe_div. "
             + "Reads desc at 0x09800C.");
         count += labelComment(0x00082A9CL, "percyl_pack_workspace_A",
-            "[TRACED] Stage 2: Init GBR workspace at FFFFA494, call pack_sub_A, "
+            "[DECODED] Stage 2: Init GBR workspace at FFFFA494, call pack_sub_A, "
             + "clear output at FFFFA4BA.");
         count += labelComment(0x0008396EL, "percyl_pack_sub_A",
             "[TRACED] Sub of Stage 2: GBR=FFFF2EBC, 2x uint16_pack + 2x uint8_pack. "
             + "Float-to-integer packing.");
         count += labelComment(0x000839F8L, "percyl_pack_workspace_B",
-            "[TRACED] Stage 3: Float accumulation from FFFF43FC, init GBR workspace at FFFFA4D4, "
+            "[DECODED] Stage 3: Float accumulation from FFFF43FC, init GBR workspace at FFFFA4D4, "
             + "clear output at FFFFA4F9.");
         count += labelComment(0x00084326L, "percyl_pack_sub_B",
             "[TRACED] Sub of Stage 3: GBR=FFFF2EC8, 2x uint16_pack + 2x uint8_pack. "
             + "Parallel packing workspace B.");
         count += labelComment(0x000843ACL, "percyl_state_capture",
-            "[TRACED] Stage 4: Read float from workspace, read fuel_state_byte (FFFF7C9D), "
+            "[DECODED] Stage 4: Read float from workspace, read fuel_state_byte (FFFF7C9D), "
             + "store to output at FFFFA518.");
         count += labelComment(0x00084A28L, "percyl_engine_status_gate",
-            "[TRACED] Stage 5: Call check_engine_status (0x3AB20), store result + fuel_state_byte "
+            "[DECODED] Stage 5: Call check_engine_status (0x3AB20), store result + fuel_state_byte "
             + "to output at FFFFA52D.");
         count += labelComment(0x0008C31EL, "percyl_completion_flag",
-            "[TRACED] Stage 6: Write constant 2 to FFFFA827. Pipeline completion marker "
+            "[DECODED] Stage 6: Write constant 2 to FFFFA827. Pipeline completion marker "
             + "(2=normal injection mode).");
 
         // --- Sensor Float Aggregation (misclassified as float_data, actually code) ---
@@ -8531,44 +7881,22 @@ public class ImportAE5L600L extends GhidraScript {
         // =====================================================================
 
         // -- item 74: task37 one-shot timing retard ---------------------------
-        count += labelComment(0x00041BE4, "timing_oneshot_retard",
-            "[CITED] task37 stage 4. Applies ECT retard (desc 0xADE08) for ONE call when "
-            + "[FFFF7C9A] hit 4 on the previous pass and [FFFF7C78] > rpm; then recovers "
-            + "toward 0 at +0.7 deg/call, clamped by float_min so it never advances. "
-            + "Output arbitrated most-retard-wins into FFFF8028. NOT FBKC, NOT FLKC.");
-        count += label(0x00041A02, "task37_stage1");
-        count += label(0x00041A48, "task37_stage2");
-        count += labelComment(0x00041A7E, "task37_stage3",
-            "[TRACED] Uses desc 0xAE170 / 0xAE17C, both all-zero on this calibration.");
         count += labelComment(0x000ADE08, "desc_task37_ect_retard",
             "[TRACED] 1D uint8 x16 on ECT. [0,0,0,0,0,-8.09,-11.95,-16.17,...]. The ONLY "
             + "descriptor FUN_00041be4 loads. Base of a 17-record contiguous array "
             + "at stride 0x14; indexing NOT demonstrated -- do not assume it.");
         count += labelComment(0x000D2C0C, "cal_task37_rpm_gate_INERT",
-            "[CITED] Compared as rpm_current < this. Value is 0.0, so the gate can NEVER "
+            "[TRACED] Compared as rpm_current < this. Value is 0.0, so the gate can NEVER "
             + "fire. No XML definition. corrections.md item 74.");
         count += labelComment(0x000D2980, "cal_task37_counter_B_reload",
             "[TRACED] Reload for FFFF8033 = 1: the retard applies for exactly ONE call.");
         count += label(0x000D2981, "cal_task37_counter_A_reload");
         count += labelComment(0x000D2982, "cal_task37_byte_gate",
-            "[CITED] = 4. Compared against byte [FFFF5E94] when the engine is not running.");
-        count += labelComment(0xFFFF7C9AL, "tier_state_7C9A",
-            "[CITED] 5-state tier code written at 0x03AF04/20/3A/4C/5E. 0-3 from an "
-            + "ascending 3-threshold ladder on [FFFF7CAA]; 4 is a SEPARATE branch "
-            + "that also sets four companion flags. State 4 arms timing_oneshot_retard. "
-            + "Subsystem NOT identified -- adjacent to the decel fuel-cut tier code "
-            + "at 0x03AFF6, which is a lead, not a conclusion.");
-        count += labelComment(0xFFFF7C78L, "task37_rpm_threshold",
-            "[CITED] float, written at 0x03AD06. Trigger requires this > rpm_current.");
-        count += labelComment(0xFFFF8028L, "kflk_retard_arbitrated",
-            "[TRACED] = float_min(FFFF8020, FFFF8024). Most-retard-wins across sibling "
-            + "timing channels.");
+            "[TRACED] = 4. Compared against byte [FFFF5E94] when the engine is not running.");
         count += label(0xFFFF8032L, "task37_counter_A");
         count += label(0xFFFF8033L, "task37_counter_B");
-        count += labelComment(0xFFFF8034L, "task37_prev_tier_latch",
-            "[CITED] Latched previous value of FFFF7C9A -- makes the trigger edge-detected.");
         count += labelComment(0xFFFF8036L, "task37_prev_precond_latch",
-            "[UNVERIFIED] Latched previous value of FFFF65C0.");
+            "[TRACED] Latched previous value of FFFF65C0.");
         count += label(0xFFFF5E94L, "task37_gate_byte_5E94");
 
         // -- item 72: func_37B74 fuel multiplier is dead ----------------------
@@ -8578,7 +7906,7 @@ public class ImportAE5L600L extends GhidraScript {
         count += labelComment(0x000CC330, "cal_afl_ramp_down_rate_ZERO",
             "[TRACED] AFL ramp-down rate = 0.0. Same effect on the max(x-0,0) arm.");
         count += labelComment(0x000D0740, "cal_afl_2d_correction_NEUTRAL",
-            "[CITED] Data for desc 0xAD71C, 16x2 uint8. All 32 cells raw 0x80 = 0.0 after "
+            "[TRACED] Data for desc 0xAD71C, 16x2 uint8. All 32 cells raw 0x80 = 0.0 after "
             + "scale 0.00390625 / bias -0.5. Neutral-filled, NOT empty. This is why "
             + "func_37B74's product is 0 and the fuel multiplier is a constant 1.0.");
         count += label(0xFFFF7AC4L, "afl_product_term_C");
@@ -8586,10 +7914,10 @@ public class ImportAE5L600L extends GhidraScript {
 
         // -- item 76: 0xFFFF64F5 is a debounced closed-pedal flag ------------
         count += labelComment(0x000218F6L, "pedal_released_debounce",
-            "[CITED] Hysteretic pedal-released flag (set <0.001, cleared >=0.252) -> "
+            "[DECODED] Hysteretic pedal-released flag (set <0.001, cleared >=0.252) -> "
             + "saturating counter -> [FFFF64F5] = counter>2. corrections.md item 76.");
         count += labelComment(0xFFFF653BL, "pedal_released_raw",
-            "[CITED] Hysteretic. Set when accel_pedal_angle < 0.001, cleared at >= 0.252.");
+            "[TRACED] Hysteretic. Set when accel_pedal_angle < 0.001, cleared at >= 0.252.");
         count += label(0xFFFF64F0L, "pedal_released_counter");
         count += labelComment(0xFFFF64F5L, "pedal_released_debounced",
             "[TRACED] = (pedal_released_counter > 2). OVERLOADED: when adc_channel_status==1 "
@@ -8607,25 +7935,14 @@ public class ImportAE5L600L extends GhidraScript {
             + "The function starts at 0x0BF604, not here. corrections.md item 78.");
 
         // -- item 79: the tier ladder is decel-fuelcut dwell; 8024 is inert ---
-        count += labelComment(0x0003AE6CL, "overrun_fuelcut_classifier",
-            "[CITED] Decel fuel-cut / overrun classifier. GBR 0xFFFF7C92. Holds BOTH the "
-            + "dwell ladder writing tier_state_7C9A (0x03AF04..5E) and the RPM ladder "
-            + "at 0x03AFF6 against Overrun_FuelCut_RPMThreshold (0xCC4EC=2250, "
-            + "0xCC4F0=3000). corrections.md item 79.");
-        count += labelComment(0xFFFF7CAAL, "overrun_dwell_counter",
-            "[CITED] Saturating uint16. Incremented at 0x03B5EC while the overrun condition "
-            + "holds, reset to 0 at 0x03B5FC and 0x03B610. Banded by the three uint16 "
-            + "thresholds at 0xFFFF7C92/94/96 to give tier_state_7C9A 0-3. Tier 4 is "
-            + "NOT on this ladder -- it is a separate immediate entry at 0x03AF4A.");
-        count += label(0xFFFF7C92L, "overrun_dwell_threshold_1");
         count += label(0xFFFF7C94L, "overrun_dwell_threshold_2");
         count += label(0xFFFF7C96L, "overrun_dwell_threshold_3");
         count += labelComment(0x000AE17CL, "desc_task37_stage3_mode1_ZERO",
-            "[CITED] 6 cells, all 0.0. Stage 3 mode 1 accumulates this into gbr_kflk_8024.");
+            "[TRACED] 6 cells, all 0.0. Stage 3 mode 1 accumulates this into gbr_kflk_8024.");
         count += labelComment(0x000AE170L, "desc_task37_stage3_mode2_ZERO",
-            "[CITED] 6 cells, all 0.0. Stage 3 mode 2 source.");
+            "[TRACED] 6 cells, all 0.0. Stage 3 mode 2 source.");
         count += labelComment(0x000D2C28L, "cal_task37_stage3_mode3_ZERO",
-            "[CITED] = 0.0. Stage 3 mode 3 writes this to gbr_kflk_8024 directly.");
+            "[TRACED] = 0.0. Stage 3 mode 3 writes this to gbr_kflk_8024 directly.");
 
         // -- item 80: five open-hole-1 adjudications --------------------------
         count += labelComment(0xFFFF7F68L, "ect_warmup_blend_out",
@@ -8634,12 +7951,6 @@ public class ImportAE5L600L extends GhidraScript {
             + "Written at 0x0403F8. 'blend_output' named the same thing from the "
             + "consumer side -- identity vs use, not a conflict. Item 80.");
         count += label(0xFFFF90BEL, "ect_warmup_mode_flag_A");
-        count += labelComment(0xFFFF8258L, "knock_metric_accum",
-            "[TRACED] Accumulator: += [0xFFFF826C] * ([8214]*[8204]*knock_thresh_calc*"
-            + "knock_det_workspace_ext), at 0x0459E4. Integrates knock-detector terms; "
-            + "produces NO degrees, so the competing 'flkc_retard' name is unsupported. "
-            + "Whether it is later converted to retard is NOT established.");
-        count += label(0xFFFF826CL, "knock_metric_gain");
         count += labelComment(0xFFFF8F24L, "status90_debounced_flag",
             "[TRACED] Set 1 when byte [0xFFFF8F12] == 90; cleared after 6 consecutive non-90 "
             + "samples. Written at 0x05E9C6. NEITHER 'blend_state_b' NOR "
@@ -8663,6 +7974,5851 @@ public class ImportAE5L600L extends GhidraScript {
             "[TRACED] = 0.60. Timing Compensation B (IAT) is zeroed when IAM <= this. The "
             + "comparison at 0x042F74 is what identifies 0xFFFF3234 as the IAM.");
 
+        // >>> BEGIN decoded labels (sync_decoded_labels.py) -- do not hand-edit >>>
+        // One label per address whose meaning a byte-level trace settled (function
+        // programme, docs/analysis-plan.md Part 1). Placed last so these names are
+        // primary. Source: disassembly/maps/decoded_labels.json.
+        count += labelComment(0x00000040L, "set_sp_and_jump",
+            "[DECODED] Class 75 (2): r15 = constant SP, jump to r4. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000065CL, "boot_block_decision",
+            "[DECODED] Boot decision. SP:=0xFFFFBFA0; WDT (0x000762: RSTCSR 0x5A1F, TCNT 0, TCSR 0xA53C), "
+            + "HCAN set-up; 0x000598/0x00054A write 0xFFFFBFE4..BFFB and words BFB8/BFBA:=0; byte BFAC:=0; if "
+            + "long 0xFFFFBFFC != 0x5AA5A55A runs the message window 0x0007E0(7); on every exit long "
+            + "0xFFFFBFFC:=0x5AA5A55A and jumps via 0x000040 (SP 0xFFFFBFA0) to [0x001000]=0x00127C on this "
+            + "ROM. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x000007E0L, "boot_msg_window",
+            "[DECODED] Boot message window: counts (r4 & 0xFFFF) WDT overflow events (TCSR bit 7, polled; "
+            + "0x000484 services) and returns 1 at once when that is 0; each pass writes byte 0xFFFFBFA8 := "
+            + "(BFEC == 0x55) and takes CAN messages into the ring 0xFFFFB4E0; returns 0 if FF 86 00.. is seen. "
+            + "Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00000C0CL, "reset_entry",
+            "[DECODED] Power-on / manual-reset vector target (SP 0xFFFFBFA0 from 0x000004): calls 0x000C20, "
+            + "0x000C54, then 0x00065C(r4=0,r5=0), which never returns. Writes no RAM itself. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00000C20L, "boot_bsc_sysc_init",
+            "[DECODED] BCR1:=0x000F, BCR2:=0, WCR:=0x7777, RAMER:=0, byte 0xFFFFBFAD:=0x77, SYSCR2:=0x3C04, "
+            + "ICR:=0, then spins while ICR bit 15 (NMIL) reads 0. Trace: poweron_state_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x00000C54L, "boot_port_init",
+            "[DECODED] Stores constants to 43 port words 0xFFFFF720..0xFFFFF778; no RAM access. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00000D78L, "busy_wait_8n_D78",
+            "[DECODED] Class 76 (2): busy-wait r5 = 0 .. (r4 << 3) (cmp/hs r4,r5: T when r5 >= r4 unsigned); "
+            + "no memory access. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000127CL, "boot_stage2_entry",
+            "[DECODED] Stage 2 entry (SP 0xFFFFBFA0): byte [[0x002000]]=0xFFFF204C := 0x77 unless the word is "
+            + "blank; calls 0x0012C0(0). Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x000012C0L, "boot_stage2",
+            "[DECODED] Stage 2 (SP 0xFFFFBFA0, saves nothing): word 0xFFFF800C := 0xA53C (class 0), 0x001332 "
+            + "WDT writes, HCAN, longs 0xFFFF809C..80AF; byte 0xFFFF204C := 0x88; 0x001008 loads SP 0xFFFFBF7C "
+            + "and jumps to [0x0FFFF8]=0x00FA34. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x000015FCL, "empty_function",
+            "[DECODED] Class 2 (68 members): rts; nop. No register, flag or memory changes. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000213CL, "isr_entry_v72",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E938 vec=72. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002154L, "isr_entry_v74",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E946 vec=74. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000216CL, "isr_entry_v76",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E954 vec=76. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002184L, "isr_entry_v78",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E962 vec=78. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000021B4L, "isr_entry_v84",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E97A vec=84. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000021CCL, "isr_entry_v86",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E986 vec=86. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000021E4L, "isr_entry_v88",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E99C vec=88. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000021FCL, "isr_entry_v90",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E9B2 vec=90. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002214L, "isr_entry_v92",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E9BE vec=92. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000222CL, "isr_entry_v96",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00E9F4 vec=96. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002244L, "isr_entry_v97",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA08 vec=97. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000225CL, "isr_entry_v98",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA14 vec=98. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002274L, "isr_entry_v99",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA20 vec=99. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000228CL, "isr_entry_v100",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA2C vec=100. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000022A4L, "isr_entry_v101",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA38 vec=101. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000022BCL, "isr_entry_v102",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA44 vec=102. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000022D4L, "isr_entry_v103",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA50 vec=103. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000022ECL, "isr_entry_v104",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA5C vec=104. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002304L, "isr_entry_v108",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA70 vec=108. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000231CL, "isr_entry_v109",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA82 vec=109. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002334L, "isr_entry_v110",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EA94 vec=110. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000234CL, "isr_entry_v111",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EAA6 vec=111. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002364L, "isr_entry_v112",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EAB8 vec=112. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000237CL, "isr_entry_v113",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EACA vec=113. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002394L, "isr_entry_v114",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EADC vec=114. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000023ACL, "isr_entry_v115",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EAEE vec=115. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000023C4L, "isr_entry_v116",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EB18 vec=116. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000023DCL, "isr_entry_v120",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EB2A vec=120. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000023F4L, "isr_entry_v121",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EB36 vec=121. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000240CL, "isr_entry_v122",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EB42 vec=122. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002424L, "isr_entry_v123",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EC9E vec=123. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000243CL, "isr_entry_v124",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00ECAA vec=124. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002454L, "isr_entry_v128",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00ECB6 vec=128. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000246CL, "isr_entry_v129",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00ECC2 vec=129. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002484L, "irq_entry_stub",
+            "[DECODED] Interrupt stub (one of 34 checked; all at 0x00207C + 24k): push r0/PR/r1, jsr "
+            + "0x002B8C, r1 = member long at stub+16, jmp @r1 with lds r0,pr in the slot (PR = 0x002BD4). "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000249CL, "isr_entry_v131",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EE22 vec=131. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000024B4L, "isr_entry_v132",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EE30 vec=132. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000024CCL, "isr_entry_v136",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EE5C vec=136. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000024E4L, "isr_entry_v137",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00EFA4 vec=137. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000024FCL, "isr_entry_v138",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F0F8 vec=138. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002514L, "isr_entry_v139",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F106 vec=139. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000252CL, "isr_entry_v140",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F114 vec=140. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002544L, "isr_entry_v144",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F122 vec=144. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000255CL, "isr_entry_v145",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F130 vec=145. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002574L, "isr_entry_v146",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F13E vec=146. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000258CL, "isr_entry_v147",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F14C vec=147. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000025A4L, "isr_entry_v148",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F15A vec=148. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000025BCL, "isr_entry_v149",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F168 vec=149. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000025D4L, "isr_entry_v150",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F176 vec=150. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000025ECL, "isr_entry_v151",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F184 vec=151. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002604L, "isr_entry_v152",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F192 vec=152. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000261CL, "isr_entry_v153",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F1A0 vec=153. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002634L, "isr_entry_v154",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F1AE vec=154. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000264CL, "isr_entry_v155",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F1BC vec=155. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002664L, "isr_entry_v156",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F1CA vec=156. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000267CL, "isr_entry_v157",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F1D8 vec=157. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002694L, "isr_entry_v158",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F1E6 vec=158. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000026ACL, "isr_entry_v159",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F240 vec=159. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000026C4L, "isr_entry_v160",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F24E vec=160. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000026DCL, "isr_entry_v161",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F25C vec=161. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000026F4L, "isr_entry_v162",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F26A vec=162. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000270CL, "isr_entry_v163",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F278 vec=163. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002724L, "isr_entry_v164",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F286 vec=164. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000273CL, "isr_entry_v165",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F294 vec=165. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002754L, "isr_entry_v166",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F2A2 vec=166. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000276CL, "isr_entry_v167",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F2B0 vec=167. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002784L, "isr_entry_v168",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F2BE vec=168. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000279CL, "isr_entry_v169",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F2CC vec=169. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000027B4L, "isr_entry_v170",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F2DA vec=170. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000027CCL, "isr_entry_v171",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F2E8 vec=171. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000027FCL, "isr_entry_v174",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F304 vec=174. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000282CL, "isr_entry_v178",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F320 vec=178. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002844L, "isr_entry_v180",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F390 vec=180. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000285CL, "isr_entry_v187",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F4CE vec=187. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002874L, "isr_entry_v188",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F4DC vec=188. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000288CL, "isr_entry_v192",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F518 vec=192. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000028A4L, "isr_entry_v190",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F4EC vec=190. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000028BCL, "isr_entry_v194",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F536 vec=194. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000028D4L, "isr_entry_v196",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F542 vec=196. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000028ECL, "isr_entry_v200",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F54E vec=200. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000291CL, "isr_entry_v208",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5A2 vec=208. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002934L, "isr_entry_v212",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5CE vec=212. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000294CL, "isr_entry_v216",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5FA vec=216. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002964L, "isr_entry_v201",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F55C vec=201. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000297CL, "isr_entry_v205",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F586 vec=205. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002994L, "isr_entry_v209",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5B2 vec=209. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000029ACL, "isr_entry_v213",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5DE vec=213. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000029C4L, "isr_entry_v217",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F608 vec=217. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000029DCL, "isr_entry_v202",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F56A vec=202. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000029F4L, "isr_entry_v206",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F596 vec=206. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002A0CL, "isr_entry_v210",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5C2 vec=210. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002A24L, "isr_entry_v214",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5EE vec=214. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002A3CL, "isr_entry_v218",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F616 vec=218. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002A54L, "isr_entry_v203",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F570 vec=203. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002A6CL, "isr_entry_v207",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F59C vec=207. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002A84L, "isr_entry_v211",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5C8 vec=211. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002A9CL, "isr_entry_v215",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F5F4 vec=215. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002AB4L, "isr_entry_v219",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F61C vec=219. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002ACCL, "isr_entry_v220",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F67C vec=220. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002AE4L, "isr_entry_v228",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F75C vec=228. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002AFCL, "isr_entry_v221",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F688 vec=221. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002B14L, "isr_entry_v229",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F766 vec=229. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002B2CL, "isr_entry_v222",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F694 vec=222. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002B44L, "isr_entry_v230",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F772 vec=230. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002B5CL, "isr_entry_v223",
+            "[TRACED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F69A vec=223. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002B74L, "isr_entry_v231",
+            "[DECODED] Shape class 1: interrupt entry stub: push r0/PR/r1, call 0x002B8C, jump to handler H "
+            + "with PR = r0 Member parameters: H=0x00F778 vec=231. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00002B8CL, "isr_context_save",
+            "[DECODED] Entered only by the jsr at stub+6 of the 118 interrupt stubs. Pushes r2; [0xFFFF1290] "
+            + "+= 1 with SR = [0xFFFF1298] around the update and the entry SR put back after; pushes r3-r7, "
+            + "fr0-fr10, FPSCR, fr11, FPUL (20 longs). Returns r0 = 0x002BD4 (the common exit), which the stub "
+            + "loads into PR before jumping to the handler. Calls and dispatches nothing. Trace: "
+            + "rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x00002BD4L, "ISR_CommonEpilogue",
+            "[DECODED] Common interrupt exit. Pops the 0x002B8C frame and [0xFFFF1290] -= 1. It rtes unless "
+            + "the count, the flag bits and the interrupted SR mask field are all zero, byte [0xFFFF1288] != "
+            + "0xFF, record byte +1 != 1 and byte [0xFFFF1288] >u the running task byte +1. In that case it "
+            + "saves the full context and jumps to 0x0035FC. With bit 31 set (idle loop interrupted) it "
+            + "abandons the stack and jumps to 0x0035FC. Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x0000317CL, "sr_mask_raise_return_previous",
+            "[DECODED] In: r4 = SR value wanted. Out: r0 = SR & 0xF0 on entry. SR := r4 (whole register, & "
+            + "0x3F3) only when r4 >u (SR & 0xF0), otherwise SR unchanged except T = 0. r5 := 0xF0. No memory "
+            + "access, no stack. Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x00003190L, "interrupt_restore",
+            "[DECODED] In: r4 = SR value (call sites pass back what 0x00317C returned). SR := r4 on every "
+            + "path (delay slots). If r4 == 0 and byte +1 of the record at [0xFFFF12A0] != 1, it tail-jumps to "
+            + "0x003664, which switches tasks when word [0xFFFF128C] != word [0xFFFF128E] and bit 12 of "
+            + "[0xFFFF1290] is clear, and returns r0 = 0 to the original caller. Trace: rtos_core_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x00003206L, "ready_queue_insert",
+            "[DECODED] r4 = 0xFFFF1288, r5 = id, r6 = index. Queues the id on the ring of that index; if the "
+            + "ring was empty, sets the map bit at 0xFFFF12B8. If index > (int8) byte [0xFFFF1288], it sets "
+            + "that byte := index and word [0xFFFF128E] := id and returns 1; otherwise returns 0. A full ring "
+            + "is not detected. Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x00003324L, "kernel_start_entry",
+            "[DECODED] Returns 0 unless r4 < byte [0x003F1C] = 1 (unsigned). For r4 = 0 it sets SR, SP and "
+            + "KCB+8 := 0x100, then jumps to 0x0036C4 with r4 unchanged (bytes only; ldc sr not emulated). "
+            + "Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x00003440L, "context_save_callee_saved",
+            "[DECODED] Pushes r5 (SR image), pr, a 4-byte gap, r8-r12, gbr, r13, mach, r14, macl and, only "
+            + "when byte @(0,r6) == 4, fr12-fr15; sets byte @(0, long @(4,r6)) := 4 and long @(12,r4) := r15; "
+            + "branches to 0x0034B4. Never saves r0-r7, fr0-fr11, fpul. Trace: helpers_desc_read_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x000035F8L, "spin_forever_0035F8",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0035F8 (bra to itself: endless loop). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000035FCL, "rtos_task_dispatch",
+            "[DECODED] Task dispatcher: writes word [KCB+4] = id and the [KCB+20]/[KCB+24] record pointers, "
+            + "then starts or resumes the task via 0x003820 or the resume table at 0x004090. Trace: "
+            + "rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x00003664L, "deferred_task_switch",
+            "[DECODED] Reached only from 0x0031A0. Saves SR in r13 and loads SR := [0xFFFF1298]. If word "
+            + "[0xFFFF128C] == word [0xFFFF128E], or bit 12 of [0xFFFF1290] is set, it restores SR and returns "
+            + "0. Otherwise [0xFFFF1290] := 0x100 and it calls the context save 0x003440 (r4 = 0xFFFF1288, r5 = "
+            + "entry SR, r6 = [0xFFFF12A0]); on resume it returns 0. Trace: rtos_core_trace.txt (corrections "
+            + "item 107).");
+        count += labelComment(0x00003774L, "empty_fn_003774",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003778L, "empty_fn_003778",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000377CL, "byte_clear",
+            "[DECODED] Class 46 (4): u8[A] = 0. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00003788L, "set_12B4_0",
+            "[TRACED] Shape class 46: u8[A] = V (V = 0 in every member). Member parameters: A=0xffff12b4 "
+            + "V=0. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x00003794L, "empty_fn_003794",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003798L, "empty_fn_003798",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000387CL, "kernel_autostart_queue",
+            "[DECODED] k = byte [KCB+1]; for count word [0x00408C+2k] ids from the list at long "
+            + "[0x004088+4k]: RAM record byte +3 -= 1, then 0x003206(KCB, id, ROM record byte +2). For k=0 it "
+            + "queues ids 0 and 10; for k=1 it queues nothing. Trace: revlim_freeze_gate_trace.txt (corrections "
+            + "item 111).");
+        count += labelComment(0x00003B2AL, "unrolled_long_copy_entry",
+            "[DECODED] Class 16 (15 members): entries into one unrolled copy. Member D copies D/4+1 longs "
+            + "[r2+o] -> [r1+o] for o = D..0, then pops r3 and returns at 0x003B6A. The 2-instruction census "
+            + "extent is an artefact of the dispatch table. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x00003B2EL, "copy_15longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=56 copies 15 longs (offsets 56..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B32L, "copy_14longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=52 copies 14 longs (offsets 52..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B36L, "copy_13longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=48 copies 13 longs (offsets 48..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B3AL, "copy_12longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=44 copies 12 longs (offsets 44..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B3EL, "copy_11longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=40 copies 11 longs (offsets 40..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B42L, "copy_10longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=36 copies 10 longs (offsets 36..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B46L, "copy_9longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=32 copies 9 longs (offsets 32..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B4AL, "copy_8longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=28 copies 8 longs (offsets 28..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B4EL, "copy_7longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=24 copies 7 longs (offsets 24..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B52L, "copy_6longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=20 copies 6 longs (offsets 20..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B56L, "copy_5longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=16 copies 5 longs (offsets 16..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B5AL, "copy_4longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=12 copies 4 longs (offsets 12..0 step -4). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B5EL, "copy_3longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=8 copies 3 longs (offsets 8..0 step -4). Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003B62L, "copy_2longs",
+            "[DECODED] Shape class 16: entries into an unrolled long copy: copy longs D, D-4 .. 0 from [r2] "
+            + "to [r1], pop r3, rts Member parameters: D=4 copies 2 longs (offsets 4..0 step -4). Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00003CB4L, "asr_variable",
+            "[TRACED] r0 = arithmetic r0 >> r1 (r1 < 0: unchanged; r1 >= 32: sign fill); r2 preserved, r1 "
+            + "clobbered. Emulated whole, 387 runs. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00003E14L, "lsr_variable",
+            "[TRACED] r0 = logical r0 >> r1 (r1 < 0: unchanged; r1 >= 32: 0). No static reference to "
+            + "0x003E14; only interior 0x003E20 is entered (from 0x003CDE). Emulated whole from its first word, "
+            + "387 runs. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00004210L, "empty_fn_004210",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00004214L, "return_constant",
+            "[DECODED] Class 6 (56 members): r0 = I (0 in 54 members, 1 at 0x09EF10, 2 at 0x0A9858). Nothing "
+            + "else changes. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000042ECL, "empty_fn_0042EC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00004302L, "empty_fn_004302",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00004EEAL, "empty_fn_004EEA",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00004F54L, "indexed_byte_store",
+            "[DECODED] Class 80 (2): u8[A + (r4 & 0xFF)] = V. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000056ECL, "word_copy_fallthrough",
+            "[DECODED] Class 26 (9 members): word[B] = word[A], with no return. Execution falls through into "
+            + "the census function at entry+8. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00005790L, "copyw_405C_4114_fallthru",
+            "[TRACED] Shape class 26: word [B] = word [A], then FALL THROUGH into the next function Member "
+            + "parameters: A=0xFFFF405C -> B=0xFFFF4114 falls through to 0x005798. Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00005978L, "copyw_4060_412C_fallthru",
+            "[TRACED] Shape class 26: word [B] = word [A], then FALL THROUGH into the next function Member "
+            + "parameters: A=0xFFFF4060 -> B=0xFFFF412C falls through to 0x005980. Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00005A18L, "copyw_402C_4134_fallthru",
+            "[TRACED] Shape class 26: word [B] = word [A], then FALL THROUGH into the next function Member "
+            + "parameters: A=0xFFFF402C -> B=0xFFFF4134 falls through to 0x005A20. Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00006584L, "copyw_405E_4148_fallthru",
+            "[TRACED] Shape class 26: word [B] = word [A], then FALL THROUGH into the next function Member "
+            + "parameters: A=0xFFFF405E -> B=0xFFFF4148 falls through to 0x00658C. Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00006624L, "empty_fn_006624",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00006CE2L, "empty_fn_006CE2",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00006FF6L, "store_byte_r4_via_r2",
+            "[DECODED] Class 21 (11 members): byte[K] = r4 & 0xFF, r2 = K. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000717CL, "call2_then_tail_branch",
+            "[DECODED] Class 12 (19 members): bsr A, bsr B, then bra C with the caller's PR restored. Each "
+            + "callee receives exactly what the previous one left. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00008124L, "copyw_4032_41E4_fallthru",
+            "[TRACED] Shape class 26: word [B] = word [A], then FALL THROUGH into the next function Member "
+            + "parameters: A=0xFFFF4032 -> B=0xFFFF41E4 falls through to 0x00812C. Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000081C0L, "copyw_4058_41EC_fallthru",
+            "[TRACED] Shape class 26: word [B] = word [A], then FALL THROUGH into the next function Member "
+            + "parameters: A=0xFFFF4058 -> B=0xFFFF41EC falls through to 0x0081C8. Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00008FB8L, "set_4272_0",
+            "[TRACED] Shape class 46: u8[A] = V (V = 0 in every member). Member parameters: A=0xffff4272 "
+            + "V=0. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x00009A54L, "thunk_to_00A1A6",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x00A1A6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00009BFCL, "empty_fn_009BFC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00009C00L, "thunk_to_00A280",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x00A280. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0000A690L, "empty_fn_00A690",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000AE1CL, "ipr_clear_all",
+            "[TRACED] Words 0xFFFFED00..0xFFFFED16 (IPRA..IPRL) := 0. Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0000AE50L, "iprl_wdt_prio14",
+            "[DECODED] IPRL 0xFFFFED16 := (IPRL & 0xFF0F) | 0xE0: WDT ITI priority 14 (manual Table 7.4). "
+            + "Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x0000B072L, "empty_fn_00B072",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B2A2L, "empty_fn_00B2A2",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B2A6L, "empty_fn_00B2A6",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B2AAL, "wdt_stop",
+            "[DECODED] TCSR := 0xA500|(TCSR&0xDF) (TME 0); RSTCSR := 0x5A1F; TCSR := 0xA518. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x0000B2E6L, "empty_fn_00B2E6",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B2EAL, "empty_fn_00B2EA",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B364L, "empty_fn_00B364",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B470L, "empty_fn_00B470",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B474L, "empty_fn_00B474",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000B4DEL, "empty_fn_00B4DE",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000C5FCL, "scale_word_4050_to_43FC",
+            "[DECODED] [0xFFFF43FC] = float(u16 [0xFFFF4050]) * 5/65536, exact. Trace: hole9_afl_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x0000C9CCL, "empty_fn_00C9CC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000C9D0L, "empty_fn_00C9D0",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E4FAL, "empty_fn_00E4FA",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E4FEL, "event15_handler_noop",
+            "[DECODED] rts / nop: the event-15 handler (row 0 of 0x011C10). Trace: "
+            + "revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0000E502L, "jmp_to_04793C",
+            "[DECODED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x04793C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E508L, "jmp_to_048732",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x048732. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E52AL, "empty_fn_00E52A",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E52EL, "jmp_to_049A7A",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x049A7A. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E590L, "jmp_to_04A674",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x04A674. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E596L, "jmp_to_04A6C6",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x04A6C6. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E59CL, "jmp_to_04A6FA",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x04A6FA. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E5E4L, "empty_fn_00E5E4",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E5E8L, "empty_fn_00E5E8",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E6C4L, "byte_bits_set_clear_at_mask_E0",
+            "[DECODED] Byte-wide twin of 0x00E6E4: sets or clears (by r6) bits of a byte register inside an "
+            + "SR-mask bracket. No scheduler event. Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x0000E6E4L, "word_bits_set_clear_at_mask_E0",
+            "[DECODED] In: r4 = address of a 16-bit word, r5 = bit mask, r6 = selector (low 16 bits). word@r4 "
+            + ":= r6 ? word | r5 : word & ~r5, with SR loaded with the constant 0x00E0 during the "
+            + "read-modify-write (it LOWERS a 0xF0 mask) and the exact entry SR restored after. No other "
+            + "memory, no call, no return value. Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x0000E774L, "fatal_trap_log_and_halt",
+            "[DECODED] Never returns: masks interrupts, logs {0x4000, r4 = vector} via 0x010800, jumps to "
+            + "0x00FBA4 (mask all, zero a register pair, bra-to-self at 0x00FBB6). Trace: rtos_core_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x0000E794L, "fatal_trap_log_stack_and_halt",
+            "[DECODED] Never returns: masks interrupts, calls 0x0040CE, logs {its r4 argument, the long at "
+            + "(returned r0)+8} through 0x010800 and jumps to the endless loop at 0x00FBA4. Not a timer "
+            + "dispatch. Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x0000E858L, "vector_trap_code_then_spin",
+            "[DECODED] Class 30 (8 members): r4 = W (0x1000 + 0x100k), bsr 0x00E794, then bra to self "
+            + "forever. Each member is reachable only through slots of the vector table at 0x0FFC50 (exact "
+            + "32-bit search of the whole ROM; not in the address-0 table). Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000E862L, "exc_trap_1100_halt",
+            "[TRACED] Shape class 30: no caller: each member's address is a vector-table entry (MAP: vector "
+            + "numbers). r4 = W (0x1000 + 0x100*k by Member parameters: W=0x1100 F=0xe794 LOOP=0xe868 vectors "
+            + "[6]. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E86CL, "exc_trap_1200_halt",
+            "[TRACED] Shape class 30: no caller: each member's address is a vector-table entry (MAP: vector "
+            + "numbers). r4 = W (0x1000 + 0x100*k by Member parameters: W=0x1200 F=0xe794 LOOP=0xe872 vectors "
+            + "[9]. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E876L, "exc_trap_1300_halt",
+            "[TRACED] Shape class 30: no caller: each member's address is a vector-table entry (MAP: vector "
+            + "numbers). r4 = W (0x1000 + 0x100*k by Member parameters: W=0x1300 F=0xe794 LOOP=0xe87c vectors "
+            + "[10]. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E880L, "exc_trap_1400_halt",
+            "[TRACED] Shape class 30: no caller: each member's address is a vector-table entry (MAP: vector "
+            + "numbers). r4 = W (0x1000 + 0x100*k by Member parameters: W=0x1400 F=0xe794 LOOP=0xe886 vectors "
+            + "[12]. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E88AL, "exc_trap_1500_halt",
+            "[TRACED] Shape class 30: no caller: each member's address is a vector-table entry (MAP: vector "
+            + "numbers). r4 = W (0x1000 + 0x100*k by Member parameters: W=0x1500 F=0xe794 LOOP=0xe890 vectors "
+            + "[13]. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E8C4L, "exc_trap_1600_halt",
+            "[TRACED] Shape class 30: no caller: each member's address is a vector-table entry (MAP: vector "
+            + "numbers). r4 = W (0x1000 + 0x100*k by Member parameters: W=0x1600 F=0xe794 LOOP=0xe8ca vectors "
+            + "[14]. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E8CEL, "exc_trap_1700_halt",
+            "[TRACED] Shape class 30: no caller: each member's address is a vector-table entry (MAP: vector "
+            + "numbers). r4 = W (0x1000 + 0x100*k by Member parameters: W=0x1700 F=0xe794 LOOP=0xe8d4 vectors "
+            + "[32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, "
+            + "56, 57, 58, 59, 60, 61, 62, 63]. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E8E4L, "irq_handler_read_write_P",
+            "[DECODED] Class 13 (19 members): r3 = word[P] (the value is dead in 0x00E774), word[P] = V, then "
+            + "bra 0x00E774 with r4 = N. In 19 of 19, N is the vector slot of the stub that reaches the "
+            + "handler. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E8F0L, "irq_v66_ack_halt",
+            "[DECODED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFED1A V=0x00DF N=66 T=0x00E774 via stub 0x0020AC = vector "
+            + "66. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E8FCL, "irq_v67_ack_halt",
+            "[DECODED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFED1A V=0x00EF N=67 T=0x00E774 via stub 0x0020C4 = vector "
+            + "67. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E908L, "irq_v68_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFED1A V=0x00F7 N=68 T=0x00E774 via stub 0x0020DC = vector "
+            + "68. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E914L, "irq_v69_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFED1A V=0x00FB N=69 T=0x00E774 via stub 0x0020F4 = vector "
+            + "69. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E920L, "irq_v70_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFED1A V=0x00FD N=70 T=0x00E774 via stub 0x00210C = vector "
+            + "70. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E92CL, "irq_v71_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFED1A V=0x00FE N=71 T=0x00E774 via stub 0x002124 = vector "
+            + "71. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E938L, "irq_bit1_clear_then_trap_E938",
+            "[DECODED] Class 83 (2, v72 76): u32[P] &= ~2; tail-call 0x00E774 with r4 = own vector. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E946L, "irq_bit1_clear_then_trap_E946",
+            "[DECODED] Class 84 (2, v74 78): as class 83, first two instructions swapped. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E954L, "irq_v76_ack_halt",
+            "[TRACED] Shape class 83: u32[P] = u32[P] & 0xFFFFFFFD (bit 1 cleared), P in register space; "
+            + "tail-call G = 0x00E774 with r4 = C. Member parameters: P=0xffffecec M=-3 G=0xe774 C=76 irq "
+            + "vector 76 via stub 00216C. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000E962L, "irq_v78_ack_halt",
+            "[TRACED] Shape class 84: as class 83 (u32[P] &= 0xFFFFFFFD; tail-call 0x00E774 with r4 = C); "
+            + "only the order of the first two Member parameters: M=-3 P=0xffffecfc G=0xe774 C=78 irq vector 78 "
+            + "via stub 002184. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000E970L, "trap_vector80",
+            "[DECODED] A trap, not the scheduler tick: writes word [0xFFFFF42C] = 0x1F, r4 = 80 (its vector), "
+            + "branches to 0x00E774 and never returns. Vectors 172, 176, 204 are the same shape. Trace: "
+            + "rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0x0000E97AL, "irq_v84_ack_halt",
+            "[DECODED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF42C V=0x00FE N=84 T=0x00E774 via stub 0x0021B4 = vector "
+            + "84. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E986L, "irq_v86_ack_to_00DBC0",
+            "[DECODED] Shape class 85: r3 = s16[P] (unused), u16[P] = K (0x00FD / 0x00FB), call F = 0x00713C "
+            + "with r4 = V (0 / 1), then tail-call G. Member parameters: P=0xfffff42c K=0xfd F=0x713c V=0 "
+            + "G=0xdbc0 irq vector 86 via stub 0021CC. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E99CL, "irq_v88_ack_to_00DBF4",
+            "[TRACED] Shape class 85: r3 = s16[P] (unused), u16[P] = K (0x00FD / 0x00FB), call F = 0x00713C "
+            + "with r4 = V (0 / 1), then tail-call G. Member parameters: P=0xfffff42c K=0xfb F=0x713c V=1 "
+            + "G=0xdbf4 irq vector 88 via stub 0021E4. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000E9B2L, "irq_v90_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF42C V=0x00F7 N=90 T=0x00E774 via stub 0x0021FC = vector "
+            + "90. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000E9BEL, "irq_v92_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF42C V=0x00EF N=92 T=0x00E774 via stub 0x002214 = vector "
+            + "92. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000EA08L, "irq_v97_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF45E V=0x01FD N=97 T=0x00E774 via stub 0x002244 = vector "
+            + "97. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000EA14L, "irq_v98_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF45E V=0x01FB N=98 T=0x00E774 via stub 0x00225C = vector "
+            + "98. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000EA20L, "irq_v99_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF45E V=0x01F7 N=99 T=0x00E774 via stub 0x002274 = vector "
+            + "99. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000EA2CL, "irq_v100_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF45E V=0x01EF N=100 T=0x00E774 via stub 0x00228C = vector "
+            + "100. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000EA38L, "irq_v101_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF45E V=0x01DF N=101 T=0x00E774 via stub 0x0022A4 = vector "
+            + "101. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000EA44L, "irq_v102_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF45E V=0x01BF N=102 T=0x00E774 via stub 0x0022BC = vector "
+            + "102. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000EA50L, "irq_v103_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF45E V=0x017F N=103 T=0x00E774 via stub 0x0022D4 = vector "
+            + "103. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000EA70L, "irq_handler_two_word_write",
+            "[DECODED] Class 27 (9 members): reads word[P] and word[P+2] and writes V to both (P = "
+            + "0xFFFFF62C), then bra 0x00E774 with r4 = N, which equals the vector slot in 9 of 9. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000EA82L, "irq_v109_ack_halt",
+            "[TRACED] Shape class 27: interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF62C P+2=0xFFFFF62E V=0x01FD N=109 T=0x00E774 via stub "
+            + "0x00231C = vector 109. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000EA94L, "irq_v110_ack_halt",
+            "[TRACED] Shape class 27: interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF62C P+2=0xFFFFF62E V=0x01FB N=110 T=0x00E774 via stub "
+            + "0x002334 = vector 110. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000EAA6L, "irq_v111_ack_halt",
+            "[TRACED] Shape class 27: interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF62C P+2=0xFFFFF62E V=0x01F7 N=111 T=0x00E774 via stub "
+            + "0x00234C = vector 111. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000EAB8L, "irq_v112_ack_halt",
+            "[TRACED] Shape class 27: interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF62C P+2=0xFFFFF62E V=0x01EF N=112 T=0x00E774 via stub "
+            + "0x002364 = vector 112. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000EACAL, "irq_v113_ack_halt",
+            "[TRACED] Shape class 27: interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF62C P+2=0xFFFFF62E V=0x01DF N=113 T=0x00E774 via stub "
+            + "0x00237C = vector 113. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000EADCL, "irq_v114_ack_halt",
+            "[TRACED] Shape class 27: interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF62C P+2=0xFFFFF62E V=0x01BF N=114 T=0x00E774 via stub "
+            + "0x002394 = vector 114. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000EAEEL, "irq_v115_ack_halt",
+            "[TRACED] Shape class 27: interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF62C P+2=0xFFFFF62E V=0x017F N=115 T=0x00E774 via stub "
+            + "0x0023AC = vector 115. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000EB18L, "irq_v116_ack_halt",
+            "[TRACED] Shape class 27: interrupt handler: write V to word [P] and word [P+2], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF62C P+2=0xFFFFF62E V=0x00FF N=116 T=0x00E774 via stub "
+            + "0x0023C4 = vector 116. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000EB2AL, "irq_reg_write_tail_EB2A",
+            "[DECODED] Class 57 (3, interrupt handlers v120 121 128): s16 read of P (discarded), u16[P] = K "
+            + "in the jmp slot, tail-call G with r4 = P. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000EB36L, "irq_v121_ack_to_00DC58",
+            "[TRACED] Shape class 57: r3 = s16[P] (read, value not used by the member), u16[P] = K, "
+            + "tail-call G with r4 = P (and r2 = K, r3 = G). Member parameters: P=0xfffff480 K=0x7ffd G=0xdc58 "
+            + "irq vector 121 via stub 0023F4. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000EC9EL, "irq_v123_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF480 V=0x7FF7 N=123 T=0x00E774 via stub 0x002424 = vector "
+            + "123. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000ECAAL, "irq_v124_ack_halt",
+            "[TRACED] Shape class 13: interrupt handler: read word [P], write word V to [P], goto 0x00E774 "
+            + "with r4 = N Member parameters: P=0xFFFFF480 V=0x7FEF N=124 T=0x00E774 via stub 0x00243C = vector "
+            + "124. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000ECB6L, "irq_v128_ack_to_00A70E",
+            "[TRACED] Shape class 57: r3 = s16[P] (read, value not used by the member), u16[P] = K, "
+            + "tail-call G with r4 = P (and r2 = K, r3 = G). Member parameters: P=0xfffff480 K=0x7fdf G=0xa70e "
+            + "irq vector 128 via stub 002454. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000EE14L, "irq_reg_write_then_trap",
+            "[DECODED] Class 32 (7, interrupt handlers v130..167): r3 = s16[P] (unused), u16[P] = K, "
+            + "tail-call 0x00E774 with r4 = C = own vector number; entered with PR = 0x002BD4 so 0x00E774 "
+            + "returns there. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000EE22L, "irq_v131_ack_halt",
+            "[TRACED] Shape class 32: r3 = s16[P] (a 16-bit READ of register-space address P; the member "
+            + "never uses the value, it is left in r3); Member parameters: P=0xfffff480 K=0x7eff C=0x83 "
+            + "G=0xe774 irq vector 131 via stub 00249C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000EE30L, "irq_v132_ack_halt",
+            "[TRACED] Shape class 32: r3 = s16[P] (a 16-bit READ of register-space address P; the member "
+            + "never uses the value, it is left in r3); Member parameters: P=0xfffff480 K=0x7dff C=0x84 "
+            + "G=0xe774 irq vector 132 via stub 0024B4. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F0F8L, "irq_v138_ack_halt",
+            "[TRACED] Shape class 32: r3 = s16[P] (a 16-bit READ of register-space address P; the member "
+            + "never uses the value, it is left in r3); Member parameters: P=0xfffff480 K=0x6fff C=0x8a "
+            + "G=0xe774 irq vector 138 via stub 0024FC. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F106L, "irq_v139_ack_halt",
+            "[TRACED] Shape class 32: r3 = s16[P] (a 16-bit READ of register-space address P; the member "
+            + "never uses the value, it is left in r3); Member parameters: P=0xfffff480 K=0x5fff C=0x8b "
+            + "G=0xe774 irq vector 139 via stub 002514. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F114L, "irq_v140_ack_halt",
+            "[TRACED] Shape class 32: r3 = s16[P] (a 16-bit READ of register-space address P; the member "
+            + "never uses the value, it is left in r3); Member parameters: P=0xfffff480 K=0x3fff C=0x8c "
+            + "G=0xe774 irq vector 140 via stub 00252C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F122L, "irq_handler_read_write_P_imm",
+            "[DECODED] Class 15 (16 members): same as class 13, except V comes from a sign-extended mov #imm "
+            + "and N from a word literal. N equals the vector slot in 16 of 16. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000F130L, "irq_v145_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF522 V=0x000D N=145 T=0x00E774 via stub 0x00255C = vector 145. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F13EL, "irq_v146_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF522 V=0x000B N=146 T=0x00E774 via stub 0x002574 = vector 146. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F14CL, "irq_v147_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF522 V=0x0007 N=147 T=0x00E774 via stub 0x00258C = vector 147. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F15AL, "irq_v148_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF5A2 V=0x000E N=148 T=0x00E774 via stub 0x0025A4 = vector 148. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F168L, "irq_v149_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF5A2 V=0x000D N=149 T=0x00E774 via stub 0x0025BC = vector 149. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F176L, "irq_v150_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF5A2 V=0x000B N=150 T=0x00E774 via stub 0x0025D4 = vector 150. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F184L, "irq_v151_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF5A2 V=0x0007 N=151 T=0x00E774 via stub 0x0025EC = vector 151. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F1A0L, "irq_reg_write_tail_F1A0",
+            "[DECODED] Class 58 (3, v153..155): s16 read of 0xFFFFF66A, u16 write K, tail-call 0x009A54 with "
+            + "r4 = 1/2/3. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F1AEL, "irq_v154_ack_to_009A54",
+            "[TRACED] Shape class 58: r3 = s16[P] (unused), u16[P] = K & 0xFFFF with K = 0xFFFD / 0xFFFB / "
+            + "0xFFF7, tail-call G = 0x009A54 with Member parameters: P=0xfffff66a K=0xfffb G=0x9a54 V=2 irq "
+            + "vector 154 via stub 002634. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F1BCL, "irq_v155_ack_to_009A54",
+            "[TRACED] Shape class 58: r3 = s16[P] (unused), u16[P] = K & 0xFFFF with K = 0xFFFD / 0xFFFB / "
+            + "0xFFF7, tail-call G = 0x009A54 with Member parameters: P=0xfffff66a K=0xfff7 G=0x9a54 V=3 irq "
+            + "vector 155 via stub 00264C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F1CAL, "irq_handler_read_write_P_long",
+            "[DECODED] Class 22 (11 members): same as class 13, except V comes from a long literal (low 16 "
+            + "bits stored) and N from a word literal. P = 0xFFFFF66A in all members, and N equals the vector "
+            + "slot in 11 of 11. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F1D8L, "irq_v157_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xFFDF N=157 T=0x00E774 via stub 0x00267C = vector "
+            + "157. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F1E6L, "irq_v158_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xFFBF N=158 T=0x00E774 via stub 0x002694 = vector "
+            + "158. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F240L, "irq_v159_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xFF7F N=159 T=0x00E774 via stub 0x0026AC = vector "
+            + "159. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F24EL, "irq_v160_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xFEFF N=160 T=0x00E774 via stub 0x0026C4 = vector "
+            + "160. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F25CL, "irq_v161_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xFDFF N=161 T=0x00E774 via stub 0x0026DC = vector "
+            + "161. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F26AL, "irq_v162_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xFBFF N=162 T=0x00E774 via stub 0x0026F4 = vector "
+            + "162. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F278L, "irq_v163_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xF7FF N=163 T=0x00E774 via stub 0x00270C = vector "
+            + "163. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F286L, "irq_v164_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xEFFF N=164 T=0x00E774 via stub 0x002724 = vector "
+            + "164. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F294L, "irq_v165_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xDFFF N=165 T=0x00E774 via stub 0x00273C = vector "
+            + "165. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F2A2L, "irq_v166_ack_halt",
+            "[TRACED] Shape class 22: interrupt handler: as class 13, V from a long literal, N from a word "
+            + "literal Member parameters: P=0xFFFFF66A V=0xBFFF N=166 T=0x00E774 via stub 0x002754 = vector "
+            + "166. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F2B0L, "irq_v167_ack_halt",
+            "[TRACED] Shape class 32: r3 = s16[P] (a 16-bit READ of register-space address P; the member "
+            + "never uses the value, it is left in r3); Member parameters: P=0xfffff66a K=0x7fff C=0xa7 "
+            + "G=0xe774 irq vector 167 via stub 00276C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F2BEL, "irq_v168_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF69E V=0x003E N=168 T=0x00E774 via stub 0x002784 = vector 168. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F2CCL, "irq_v169_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF69E V=0x003D N=169 T=0x00E774 via stub 0x00279C = vector 169. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F2DAL, "irq_v170_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF69E V=0x003B N=170 T=0x00E774 via stub 0x0027B4 = vector 170. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F2E8L, "irq_v171_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF69E V=0x0037 N=171 T=0x00E774 via stub 0x0027CC = vector 171. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F2F6L, "irq_v172_ack_halt",
+            "[DECODED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF69E V=0x002F N=172 T=0x00E774 via stub 0x0027E4 = vector 172. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F304L, "irq_v174_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF69E V=0x001F N=174 T=0x00E774 via stub 0x0027FC = vector 174. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F4CEL, "irq_v187_ack_halt",
+            "[TRACED] Shape class 15: interrupt handler: as class 13, V from mov #imm, N from a word literal "
+            + "Member parameters: P=0xFFFFF5CA V=0x0003 N=187 T=0x00E774 via stub 0x00285C = vector 187. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F4ECL, "irq_bit7_clear_tail",
+            "[DECODED] Class 59 (3, v190 194 196): u8[P] &= 0x7F, tail-call G with r3 = P. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F536L, "irq_v194_ack_to_0042F0",
+            "[TRACED] Shape class 59: u8[P] = u8[P] & 0x7F (bit 7 cleared), then tail-call G with r3 = P. "
+            + "Interrupt handlers for vectors 190 194 196. Member parameters: P=0xfffff838 M=0x7f G=0x42f0 irq "
+            + "vector 194 via stub 0028BC. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F542L, "irq_v196_ack_to_004302",
+            "[TRACED] Shape class 59: u8[P] = u8[P] & 0x7F (bit 7 cleared), then tail-call G with r3 = P. "
+            + "Interrupt handlers for vectors 190 194 196. Member parameters: P=0xfffff858 M=0x7f G=0x4302 irq "
+            + "vector 196 via stub 0028D4. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F54EL, "irq_v200_ack_to_04B4EA",
+            "[DECODED] Shape class 86: u8[P] = (u8[P] & 0x07) | 0xC0; tail-call G with r4 = P. Interrupt "
+            + "handlers for vectors 200 and 216. Member parameters: P=0xfffff004 M=0x07 G=0x4b4ea K=0xc0 irq "
+            + "vector 200 via stub 0028EC. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F55CL, "irq_v201_ack_to_04B4E4",
+            "[DECODED] Shape class 87: u8[P] = (u8[P] & 0x07) | 0xB8; tail-call G with r4 = P. (Class 86 with "
+            + "K = 0xB8 and the or before the Member parameters: P=0xfffff004 M=0x07 K=0xb8 G=0x4b4e4 irq "
+            + "vector 201 via stub 002964. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F56AL, "irq_handler_vector_only",
+            "[DECODED] Class 28 (9 members): r4 = N (a word literal), then bra 0x00E774. No peripheral or RAM "
+            + "access. N equals the vector slot in 9 of 9. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F570L, "irq_v203_halt",
+            "[TRACED] Shape class 28: interrupt handler: goto 0x00E774 with r4 = N, nothing else Member "
+            + "parameters: N=203 T=0x00E774 via stub 0x002A54 = vector 203. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F576L, "irq_byte_rmw_then_trap",
+            "[DECODED] Class 33 (6, interrupt handlers v204..213): u8[P] = (u8[P] & 7) | K (K = 0xC0 / 0xB8), "
+            + "tail-call 0x00E774 with r4 = own vector number. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0000F586L, "irq_v205_ack_halt",
+            "[TRACED] Shape class 33: u8[P] = (u8[P] & M) | K with M = 0x07 and K = 0xC0 or 0xB8, P in "
+            + "register space; then tail-call Member parameters: P=0xfffff00c M=0x07 K=0xb8 C=0xcd G=0xe774 irq "
+            + "vector 205 via stub 00297C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F596L, "irq_v206_halt",
+            "[TRACED] Shape class 28: interrupt handler: goto 0x00E774 with r4 = N, nothing else Member "
+            + "parameters: N=206 T=0x00E774 via stub 0x0029F4 = vector 206. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F59CL, "irq_v207_halt",
+            "[TRACED] Shape class 28: interrupt handler: goto 0x00E774 with r4 = N, nothing else Member "
+            + "parameters: N=207 T=0x00E774 via stub 0x002A6C = vector 207. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5A2L, "irq_v208_ack_halt",
+            "[TRACED] Shape class 33: u8[P] = (u8[P] & M) | K with M = 0x07 and K = 0xC0 or 0xB8, P in "
+            + "register space; then tail-call Member parameters: P=0xfffff014 M=0x07 K=0xc0 C=0xd0 G=0xe774 irq "
+            + "vector 208 via stub 00291C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5B2L, "irq_v209_ack_halt",
+            "[TRACED] Shape class 33: u8[P] = (u8[P] & M) | K with M = 0x07 and K = 0xC0 or 0xB8, P in "
+            + "register space; then tail-call Member parameters: P=0xfffff014 M=0x07 K=0xb8 C=0xd1 G=0xe774 irq "
+            + "vector 209 via stub 002994. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5C2L, "irq_v210_halt",
+            "[TRACED] Shape class 28: interrupt handler: goto 0x00E774 with r4 = N, nothing else Member "
+            + "parameters: N=210 T=0x00E774 via stub 0x002A0C = vector 210. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5C8L, "irq_v211_halt",
+            "[TRACED] Shape class 28: interrupt handler: goto 0x00E774 with r4 = N, nothing else Member "
+            + "parameters: N=211 T=0x00E774 via stub 0x002A84 = vector 211. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5CEL, "irq_v212_ack_halt",
+            "[TRACED] Shape class 33: u8[P] = (u8[P] & M) | K with M = 0x07 and K = 0xC0 or 0xB8, P in "
+            + "register space; then tail-call Member parameters: P=0xfffff01c M=0x07 K=0xc0 C=0xd4 G=0xe774 irq "
+            + "vector 212 via stub 002934. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5DEL, "irq_v213_ack_halt",
+            "[TRACED] Shape class 33: u8[P] = (u8[P] & M) | K with M = 0x07 and K = 0xC0 or 0xB8, P in "
+            + "register space; then tail-call Member parameters: P=0xfffff01c M=0x07 K=0xb8 C=0xd5 G=0xe774 irq "
+            + "vector 213 via stub 0029AC. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5EEL, "irq_v214_halt",
+            "[TRACED] Shape class 28: interrupt handler: goto 0x00E774 with r4 = N, nothing else Member "
+            + "parameters: N=214 T=0x00E774 via stub 0x002A24 = vector 214. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5F4L, "irq_v215_halt",
+            "[TRACED] Shape class 28: interrupt handler: goto 0x00E774 with r4 = N, nothing else Member "
+            + "parameters: N=215 T=0x00E774 via stub 0x002A9C = vector 215. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F5FAL, "irq_v216_ack_to_008DD8",
+            "[TRACED] Shape class 86: u8[P] = (u8[P] & 0x07) | 0xC0; tail-call G with r4 = P. Interrupt "
+            + "handlers for vectors 200 and 216. Member parameters: P=0xfffff024 M=0x07 G=0x8dd8 K=0xc0 irq "
+            + "vector 216 via stub 00294C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F608L, "irq_v217_ack_to_008D28",
+            "[TRACED] Shape class 87: u8[P] = (u8[P] & 0x07) | 0xB8; tail-call G with r4 = P. (Class 86 with "
+            + "K = 0xB8 and the or before the Member parameters: P=0xfffff024 M=0x07 K=0xb8 G=0x8d28 irq vector "
+            + "217 via stub 0029C4. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000F616L, "irq_v218_halt",
+            "[TRACED] Shape class 28: interrupt handler: goto 0x00E774 with r4 = N, nothing else Member "
+            + "parameters: N=218 T=0x00E774 via stub 0x002A3C = vector 218. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F61CL, "jmp_to_008CBC",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x008CBC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F688L, "irq_v221_ack_halt",
+            "[DECODED] Shape class 88: u16[P] = 0xFC81 with P = 0xFFFFD008 or 0xFFFFD808 (no read); tail-call "
+            + "G = 0x00E774 with r4 = C. Member parameters: K=0xfc81 P=0xffffd008 C=0xdd G=0xe774 irq vector "
+            + "221 via stub 002AFC. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000F694L, "jmp_to_006316_00F694",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x006316. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F6E6L, "wdt_iti_handler",
+            "[DECODED] Vector 224 (WDT ITI): pushes r7..r0, fr11..fr0, pr, fpul, fpscr (100-byte frame with "
+            + "SR/PC), clears TCSR OVF (A500|(TCSR&0x7F)), calls 0x010AD8, pops, rte. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x0000F766L, "irq_v229_ack_halt",
+            "[TRACED] Shape class 88: u16[P] = 0xFC81 with P = 0xFFFFD008 or 0xFFFFD808 (no read); tail-call "
+            + "G = 0x00E774 with r4 = C. Member parameters: K=0xfc81 P=0xffffd808 C=0xe5 G=0xe774 irq vector "
+            + "229 via stub 002B14. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000F772L, "jmp_to_006316_00F772",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x006316. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000F86CL, "empty_fn_00F86C",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000FA34L, "app_entry",
+            "[DECODED] Application entry (SP 0xFFFFBF7C, unused): SR.I:=15, VBR:=0x000FFC50, "
+            + "FPSCR:=0x00040001, jsr 0x0040CA whose delay slot 0x0040CC sets SP:=[0x011CC8]=0xFFFF12DC; byte "
+            + "0xFFFFBFAD:=0x88; 0x00FA5A. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x0000FA5AL, "app_init_sequence",
+            "[DECODED] Init sequence: 0x00AD98 (incl. 0x00B2AA WDT stop), 0x00AE1C IPRs:=0, 0x00AE50 "
+            + "IPRL[7:4]:=14, 0x0108DA(0), 0x010942 TME:=1, SR.I:=13 (ITI window opens), 0x010290, 0x00FBBA(0), "
+            + "0x0BEAB8(2000), masked 0x006BC4/0x006BF0, 0x00AE1C (window closes at 0x00AE4E), 0x003324(0). "
+            + "Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x0000FBA4L, "halt_forever",
+            "[DECODED] SR mask = 15, zeroes the 16-bit pair at the address in the literal at 0x00FBD6, then "
+            + "00FBB6: bra 0x00FBB6 forever (until a watchdog or reset). Trace: rtos_core_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x0000FBBAL, "store_byte_r4_via_r6",
+            "[DECODED] Class 18 (13 members): byte[K] = r4 & 0xFF, r6 = K. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0000FBC0L, "read_s8_byte",
+            "[DECODED] Class 3 (65 members): r0 = sext8(byte[K]), r2 = K. One byte is read and nothing is "
+            + "written. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0000FBC6L, "word_getter",
+            "[DECODED] Class 89 (2): r0 = s16[A]. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000FBF4L, "pair16_init_zero",
+            "[DECODED] Class 34 (6): u32[A] = 0x0BE9B0(r4 = 0) = 0x0000FFFF; returns r0 = same. 0x024CA0 and "
+            + "0x024CB0 behave identically (same F, A = 0xFFFF223C) but their PC-relative displacement bytes "
+            + "differ. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0000FDB4L, "post_event",
+            "[DECODED] id < 15 -> jsr [0x011BD4+4*id](arg). Otherwise 0x00DCE4(1, id-15, &arg). Event 15 -> "
+            + "row 0 -> bare rts 0x00E4FE; event 16 -> row 1 -> 0x00E502 -> 0x04793C. Trace: "
+            + "revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0000FE22L, "mailbox_read_alternate",
+            "[DECODED] r0 = long [0xFFFF5B70+12*r4+4*idx], with idx = byte [rec+9]; then idx = (idx+1) mod 2. "
+            + "This is a two-slot mailbox read alternately. Trace: ffb_cl_side_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0000FE58L, "empty_fn_00FE58",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000100E4L, "clear_startup_bytes_5B88_5B8D",
+            "[DECODED] Bytes 0xFFFF5B8D, 5B8C, 5B8B, 5B88 := 0. Called unconditionally by task 10 at "
+            + "0x00DF28, before 0x00DF80. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x00010124L, "warm_cold_start_decision",
+            "[DECODED] Marker != 0xAA55 -> 5B8D := 1. 5B8D == 0 -> post event 16 (0x04793C). 5B8D == 1 at the "
+            + "re-read -> RAM test, clear 0xFFFF2000..3FFF, marker := 0x55AA, event 18. Marker present with "
+            + "5B8D outside {0,1}: nothing. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x00010290L, "reset_ram_tests",
+            "[DECODED] Tests A 0xFFFF4000..BF9F (destructive); if passed, B 0xFFFF0000..001F (masked 0xE0 "
+            + "section) and C 0xFFFF0020..1FFF (SP moved to 0xFFFFBF9C) with save/restore; always 0x010398; "
+            + "byte 0xFFFF5B89 := 1 or 8*B_fail + 2*C_fail. Trace: poweron_state_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x00010398L, "reset_dma_zero_fill",
+            "[DECODED] DMAC ch0: SAR=DAR=0xFFFF4000 (long 0 stored there), DMATCR 0x1FE8, CHCR 0x001F0128 "
+            + "then DE: auto-request burst longword fixed-source fill -> 0xFFFF4000..0xFFFFBF9F := 0; spins on "
+            + "TE. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00010448L, "ram_test",
+            "[DECODED] RAM test of [r4,r5]: stride 16/32 strided passes via 0x0105AA plus pattern heads per "
+            + "block, up to [0x0C4730]=2 attempts, mismatches reported through 0x01068E; r0 = 1 on failure. "
+            + "Stays inside the range when its length is a multiple of the stride and no block head lies closer "
+            + "than a stride to end (true for all four ROM ranges). Trace: poweron_state_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x000105AAL, "ram_test_stride_pass",
+            "[DECODED] One strided write/verify pass (0xA55A5AA5 / 0x5AA5A55A) from a to the first a+k*s >= "
+            + "lim; returns fail flag. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x0001076AL, "trap_log_clear",
+            "[DECODED] Clears the five-record trap log at 0xFFFF2060 (stores value:~value pairs via 0x0BDB6E "
+            + "/ 0x0BDB80, no FPU). Not a charge workspace init. Trace: rtos_core_trace.txt (corrections item "
+            + "107).");
+        count += labelComment(0x00010878L, "boot_wdt_limit_set",
+            "[DECODED] Reads TCSR & 7 (0x1C -> 4 on this path); long 0xFFFF0000 := trunc(fr4/(CKS==3 ? 0.8192 "
+            + ": 1.6384) + 0.5) = 183 for 300.0; long 0xFFFF0004 := 0. Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x000108DAL, "boot_wdt_arm",
+            "[DECODED] Inside a 0xE0 section: delay(300), 0x011880, byte 0xFFFF0008:=r4; r4==0 -> "
+            + "0x010C52(4); 0x010878(300.0). Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00010942L, "wdt_start",
+            "[DECODED] TCSR := 0xA520 | TCSR byte (TME := 1); 0x1C -> 0x3C, interval mode. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00010962L, "call_then_tail_branch",
+            "[DECODED] Class 4 (62 members): bsr A, then bra B with the caller's PR restored. There is no "
+            + "argument set-up: A gets the caller's state and B gets exactly what A left in r0-r14, fr0-fr15 "
+            + "and T. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001096CL, "thunk_to_010950",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x010950. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00010AD8L, "boot_wdt_count",
+            "[DECODED] long 0xFFFF0004 += 1; if count < [0xFFFF0000] (unsigned) tail-calls 0x011880; else "
+            + "0x010800(0x2100/0x2200/0x2300 for byte 0xFFFF0008 = 0/1/other, 0) and jmp 0x00FBA4. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00010C52L, "wdt_set_cks",
+            "[DECODED] TCSR := 0xA518, then 0xA518 | r4 | (old TCSR & 0x20); on the reset path r4=4, old TME "
+            + "0 -> TCSR 0x1C. Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00011880L, "port_F738_bit15_toggle",
+            "[DECODED] Inside a 0xE0 section inverts bit 15 of port word 0xFFFFF738. Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0x00011EEAL, "initpair_20AC",
+            "[TRACED] Shape class 34: r0 = F(r4 = V) with F = 0x0BE9B0 and V = 0 in every member; u32[A] = "
+            + "r0; return r0. By the 0x0BE9B0 Member parameters: F=0xbe9b0 V=0 A=0xffff20ac. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000128BEL, "empty_fn_0128BE",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000133CEL, "thunk_to_013422",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x013422. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000133D2L, "put_5C74",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF5C74. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001382CL, "ret0_01382C",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00014274L, "ret0_014274",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000154FAL, "float_ge_flag",
+            "[DECODED] Class 92 (2): u8[B] = !(C > f32[X]) (C = 50.0 / 10.9); r0 = same. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000155CAL, "float_copy_155CA",
+            "[DECODED] Class 93 (2): f32[B] = f32[A] through fr9. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00015BFAL, "clear_two_bytes",
+            "[DECODED] Class 29 (9 members): byte[K] = byte[K+D] = 0. D is 1 in 7 members, 2 at 0x02E35A and "
+            + "12 at 0x0967C8. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000161CAL, "store_byte_immediate",
+            "[DECODED] Class 8 (44 members): byte[K] = I (0, 1 or 2), r2 = I, r6 = K. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00016DBCL, "bit_test_flag",
+            "[DECODED] Class 94 (2): u8[A+D] = ((u8[A] & K) != 0). Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001774AL, "chain3_017A46_017A7C",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x017A46 "
+            + "B=0x017A72 C=0x017A7C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001783AL, "byte_quad_store",
+            "[DECODED] Class 35 (6): four byte stores of V at A, A+D1, A+D2, A+D3; r0 = V. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00017D32L, "call_017DEA_then_017DF4",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x017DEA B=0x017DF4. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00017DDCL, "set4_5F50_0",
+            "[TRACED] Shape class 35: u8[A] = u8[A+D1] = u8[A+D2] = u8[A+D3] = V; r0 = V. V = 0 except "
+            + "0x026634 (V = 1). Member parameters: V=0 A=0xffff5f50 D1=+1 D2=+2 D3=+4. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000182ECL, "call4_then_tail_branch",
+            "[DECODED] Class 23 (11 members): bsr A, B, C, D, then bra E with the caller's PR restored. Each "
+            + "callee receives what the previous one left. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x00018660L, "call3_then_tail_branch",
+            "[DECODED] Class 17 (14 members): bsr A, B, C, then bra D with the caller's PR restored. Each "
+            + "callee receives what the previous one left. Trace: stub_shapes_a_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0001912AL, "thunk_to_0193F0",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0193F0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00019D28L, "lookup1d_store",
+            "[DECODED] Class 96 (2): f32[B] = 0x0BE830(record R, f32[X]). Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001A168L, "chain4_01A1B8_01A31C",
+            "[TRACED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x01A1B8 "
+            + "B=0x01A220 C=0x01A2B0 D=0x01A31C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001A17AL, "guarded_record_zero_pair",
+            "[DECODED] Class 47 (4): 0x0BDBCC(A1, 0.0) then tail 0x0BDBCC(A1 + 8, 0.0). Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001BC34L, "thunk_to_01BBF0",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x01BBF0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0001CB1CL, "set_61E0_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF61E0 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001CEF6L, "single_mask_bit_test",
+            "[DECODED] Class 5 (58 members): r0 = ((byte[K] & M) != 0), since X = 1 in all members. T is left "
+            + "= ((byte[K] & M) == 0). Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001CF22L, "test_61F4_m40",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF61F4 M=0x40 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001CF2EL, "test_61F4_m20",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF61F4 M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001CF3AL, "test_61F4_m10",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF61F4 M=0x10 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001CF46L, "test_61F4_m08",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF61F4 M=0x08 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001CF52L, "test_61F4_m04",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF61F4 M=0x04 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001CF5EL, "test_61F4_m02",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF61F4 M=0x02 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001CF6AL, "test_61F4_m01",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF61F4 M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001D51CL, "guarded_record_zero_tail",
+            "[DECODED] Class 31 (8): tail-call 0x0BDBCC with r4 = RAM record A, fr4 = 0.0 (guarded float "
+            + "record zeroed). Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001DEB8L, "zero_rec_2104",
+            "[TRACED] Shape class 31: tail-call F = 0x0BDBCC with r4 = A (a RAM address) and fr4 = 0.0. By "
+            + "the 0x0BDBCC contract Member parameters: A=0xffff2104 F=0xbdbcc. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001E786L, "zero_rec2_2140",
+            "[TRACED] Shape class 47: call F = 0x0BDBCC with r4 = A1, fr4 = 0.0; then tail-call F2 = "
+            + "0x0BDBCC with r4 = A2 = A1 + 8, fr4 = 0.0: Member parameters: A1=0xffff2140 F=0xbdbcc "
+            + "A2=0xffff2148 F2=0xbdbcc. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001EC20L, "byte_copy_1EC20",
+            "[DECODED] Class 40 (5): u8[B] = u8[A]; r2 = s8[A]. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0001F38CL, "float_copy_1F38C",
+            "[DECODED] Class 36 (6): f32[B] = f32[A] bit copy through fr8. Member 0x01FDF2 copies "
+            + "f32[0xFFFF4130] to 0xFFFF63B0. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001F3B4L, "thunk_to_01F478",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x01F478. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0001F3B8L, "thunk_to_01F492",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x01F492. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0001F3BCL, "empty_fn_01F3BC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001F3C0L, "empty_fn_01F3C0",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001F3C4L, "empty_fn_01F3C4",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001F3C8L, "empty_fn_01F3C8",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001F3CCL, "empty_fn_01F3CC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001F3D0L, "set_6310_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF6310 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001FA78L, "zero_rec_219C",
+            "[TRACED] Shape class 31: tail-call F = 0x0BDBCC with r4 = A (a RAM address) and fr4 = 0.0. By "
+            + "the 0x0BDBCC contract Member parameters: A=0xffff219c F=0xbdbcc. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001FD16L, "copyf_43FC_63A0",
+            "[TRACED] Shape class 36: f32[B] = f32[A] (a 32-bit copy through fr8; fr8 is left holding the "
+            + "value). Member parameters: A=0xffff43fc B=0xffff63a0. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001FD7CL, "byte_eq1_select",
+            "[DECODED] Class 41 (5): r0 = (u8[A] == 1) ? V1 : V0 (0x01FD7C: 2 : 0; others 0 : 2). Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001FD8CL, "ret0_01FD8C",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0001FDD4L, "lag_ffff4130_into_ffff63b0",
+            "[DECODED] f32[0xFFFF63B0] = 0x0BEA40(A = f32[0xFFFF4130], B = f32[0xFFFF63B0], k = 0.5, eps = "
+            + "10*2^-15): halfway lag toward 0xFFFF4130, snapped to A within eps, A if B non-finite. Emulated "
+            + "REAL, 7 exact cases. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001FDF2L, "copyf_4130_63B0",
+            "[TRACED] Shape class 36: f32[B] = f32[A] (a 32-bit copy through fr8; fr8 is left holding the "
+            + "value). Member parameters: A=0xffff4130 B=0xffff63b0. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001FE10L, "zero_rec_21A4",
+            "[TRACED] Shape class 31: tail-call F = 0x0BDBCC with r4 = A (a RAM address) and fr4 = 0.0. By "
+            + "the 0x0BDBCC contract Member parameters: A=0xffff21a4 F=0xbdbcc. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0001FE34L, "chain3_020468_02053E",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x020468 "
+            + "B=0x0204F8 C=0x02053E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0001FE42L, "thunk_to_0204BA",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0204BA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0001FE46L, "airflow_cap_load_and_lift_latch",
+            "[DECODED] One function 0x01FE46..0x02035E (census splits it at 0x020000/0x020012). Writes [63C4] "
+            + "= min([63C0]*[63F0] + [69F4]*0x0C3104, 0x0C3100), where [63C0] is the mean of the window max and "
+            + "min. It also writes the g/rev chain [63E0] [63DC] [63E4] [6408] [6414] [63E8], the "
+            + "[641C]/[641A]/[641B] latch, and the engine-load cell [63F8] with its rule list (frozen against "
+            + "rising while [641C]==1), plus [63FC] and [6400]. Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x000203DCL, "maf_window_sampler",
+            "[DECODED] [63B4] = [40B4]. If byte [65F6] == 1, [6420] = [6424] = 0x0AAE00([6350]); otherwise "
+            + "[6420] = max([6420], [63B4]) and [6424] = min([6424], [63B4]). Trace: fn_01FE46_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00020426L, "airflow_8call_delta",
+            "[DECODED] byte [6438] = sat([6438]+1). When it reaches >= 8 (0x0C302D): [63C8] = [63C4] - "
+            + "[6434], [6434] = [63C4], and [6438] = 0. Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0x00020580L, "latch_hold_counter_20580",
+            "[DECODED] byte [6418] = 0 if byte [641A] == 1, else sat_u8([6418]+1). Trace: fn_01FE46_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00020678L, "seed_airflow_load_and_clear_latch",
+            "[DECODED] Unconditionally seeds the airflow cells with 0x0AAE00([6350]) and the g/rev cells with "
+            + "0x0AAE50([6350]). Clears bytes [641C] [641A] [641B], sets [6419] = [6438] = 0xFF and [6439] = "
+            + "byte [65F6]. Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0x00020726L, "seed_and_clear_latch_if_65F6",
+            "[DECODED] Only when byte [65F6] == 1: seeds [63B8] [63BC] [63C0] [63C4] [63CC] with "
+            + "0x0AAE00([6350]) and the g/rev cells with 0x0AAE50([6350]), and clears [641C] [641A] [641B]. "
+            + "Writes nothing otherwise. GBR is 0xFFFF63B8. Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0x000207D0L, "thunk_to_0207FA",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0207FA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00021F34L, "chain5_021F70_022292",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x021F70 "
+            + "B=0x021F90 C=0x021FE0 D=0x022230 E=0x022292. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00021F66L, "call_022210_then_0224DA",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x022210 B=0x0224DA. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002259CL, "store_value_complement_pair",
+            "[DECODED] Class 9 (40 members): word[K] = ((I&0xFF)<<8)|(~I&0xFF), built by 0x0BE9A0. On return "
+            + "r0 = r4 = that word, r3 = (I&0xFF)<<8 and r2 = K. T, FPUL and fr0-fr15 are unchanged. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002269AL, "byte_copy_2269A",
+            "[DECODED] Class 62 (3): u8[A+D] = u8[A]; r0 = s8[A]. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002271CL, "thunk_to_022CB6_02271C",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x022CB6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00022720L, "thunk_to_022CB6_022720",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x022CB6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00022724L, "thunk_to_022CB6_022724",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x022CB6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00022728L, "thunk_to_022CB6_022728",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x022CB6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002272CL, "chain3_022746_022B9E",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x022746 "
+            + "B=0x022760 C=0x022B9E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002273AL, "thunk_to_022760",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x022760. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002273EL, "thunk_to_022BB0",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x022BB0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00022742L, "thunk_to_022C84",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x022C84. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00022CF4L, "test_65C5_eq1",
+            "[DECODED] r0 = (byte [0xFFFF65C5] == 1); clobbers r0, r6, T. Emulated over all 256 byte values. "
+            + "Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0x00022F1CL, "copy_415C_to_65F6",
+            "[DECODED] Inside a critical section, byte [65F6] = byte [415C]. If that byte is 1, it also sets "
+            + "byte [65F7] = 0 and calls 0x006FF6 with r4 = 0. Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x00022F92L, "get_65F6_is_1",
+            "[DECODED] Returns ([65F6] == 1). Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x000230F4L, "initpair_2220",
+            "[TRACED] Shape class 34: r0 = F(r4 = V) with F = 0x0BE9B0 and V = 0 in every member; u32[A] = "
+            + "r0; return r0. By the 0x0BE9B0 Member parameters: F=0xbe9b0 V=0 A=0xffff2220. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00023270L, "thunk_to_0238EA_023270",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0238EA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00023274L, "thunk_to_0238EA_023274",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0238EA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00023278L, "call_0235F8_then_0238B2",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0235F8 B=0x0238B2. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00023282L, "thunk_to_023434",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x023434. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000232A2L, "thunk_to_023458",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x023458. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00023A94L, "count_67EC_since_726C",
+            "[DECODED] If byte [726C]==1: word [67EC] = 0 and nothing else. Otherwise [67EC] and [67E8] each "
+            + "= sat16(+1). It is the only [67EC] writer find_writers shows. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00023EB8L, "gear_estimate_writer",
+            "[DECODED] Writer of byte 0xFFFF6810. Copies one of three threshold sets "
+            + "(0x0C3474/0x0C3488/0x0C349C) to 0xFFFF6814..6824 by bytes 0xFFFF5F03/0xFFFF5FB8. Mode byte "
+            + "non-zero: 6 if byte 0xFFFF65C0==1 or byte 0xFFFF9704!=0; 5 (neighbour 6811=6) if "
+            + "0xFFFF6624<0.1953125 or ratio>200; else 1..5 by ratio 0xFFFF65FC/(0xFFFF6624/1000) against the "
+            + "thresholds; NaN ratio gives 1. Mode byte 0: copy byte 0xFFFF5E93 for 1..5, 7->1, ... Trace: "
+            + "fn_042506_trace.txt (corrections item 107).");
+        count += labelComment(0x00024094L, "sel_force_6",
+            "[DECODED] No inputs; stores 6 to 0xFFFF6810, 1 to 0xFFFF6812 and threshold set B (0x0C3488..) to "
+            + "0xFFFF6814..6824. Caller 0x047C40. Trace: fn_042506_trace.txt (corrections item 107).");
+        count += labelComment(0x000240C8L, "call_023EB8_then_024024",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x023EB8 B=0x024024. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000243ACL, "call_0243B6_then_02487C",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0243B6 B=0x02487C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00024CA0L, "initpair_223C_024CA0",
+            "[TRACED] Shape class 34: r0 = F(r4 = V) with F = 0x0BE9B0 and V = 0 in every member; u32[A] = "
+            + "r0; return r0. By the 0x0BE9B0 Member parameters: F=0xbe9b0 V=0 A=0xffff223c. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00024CB0L, "initpair_223C_024CB0",
+            "[TRACED] Shape class 34: r0 = F(r4 = V) with F = 0x0BE9B0 and V = 0 in every member; u32[A] = "
+            + "r0; return r0. By the 0x0BE9B0 Member parameters: F=0xbe9b0 V=0 A=0xffff223c. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00024DE4L, "thunk_to_024ED8",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x024ED8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00024ED8L, "setpair_2248_1",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2248 I=1 stored word 0x01FE. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000258C6L, "call_025BA8_then_025978",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x025BA8 B=0x025978. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000258D0L, "thunk_to_0258DE",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0258DE. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000258D4L, "call_0259E0_then_025B28",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0259E0 B=0x025B28. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00025C24L, "store_byte_FF",
+            "[DECODED] Class 24 (10 members): byte[K] = 0xFF, r6 = 0xFFFFFFFF. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00026100L, "thunk_to_026104",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x026104. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000261A8L, "call_0261B2_then_02627E",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0261B2 B=0x02627E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000263DCL, "chain5_026406_0264A0",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x026406 "
+            + "B=0x0265AE C=0x026410 D=0x026470 E=0x0264A0. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000263F2L, "thunk_to_026512",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x026512. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000263F6L, "thunk_to_026584",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x026584. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00026406L, "copyb_65F6_69D1",
+            "[TRACED] Shape class 40: u8[B] = u8[A]; r2 = s8[A] (sign-extended copy left in r2). Member "
+            + "parameters: A=0xffff65f6 B=0xffff69d1. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00026634L, "set_69E4_to_69E7",
+            "[DECODED] Bytes [69E4] [69E5] [69E6] [69E7] := 1, r0 = 1 (stub class 35, re-run; write set "
+            + "exact). Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0x00026642L, "chain3_026650_0266E0",
+            "[DECODED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x026650 "
+            + "B=0x026698 C=0x0266E0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00026698L, "clear_69E6_69E7",
+            "[DECODED] lut = table_lookup_1D(0x0AAF5C, [6354]); byte [69E6]:=0 if [6350] > [0x0C34D0]=70.0 or "
+            + "NOT(lut > [63D4]), else untouched; byte [69E7] the same with [0x0C34D4]=60.0. Stores only 0. "
+            + "Reads exactly [6350] [6354] [63D4]. 525 runs. Trace: timing_bound_040AF6_trace.txt (corrections "
+            + "item 111).");
+        count += labelComment(0x00026754L, "initpair_2334",
+            "[TRACED] Shape class 34: r0 = F(r4 = V) with F = 0x0BE9B0 and V = 0 in every member; u32[A] = "
+            + "r0; return r0. By the 0x0BE9B0 Member parameters: F=0xbe9b0 V=0 A=0xffff2334. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000267D4L, "thunk_to_0272B8",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0272B8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000273E0L, "float_set_one",
+            "[DECODED] Class 63 (3): f32[A] = 1.0. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000278D2L, "test_bit7_6A29",
+            "[DECODED] r0 = 1 if bit 7 of byte [6A29] is set, else 0. Writes nothing. Trace: "
+            + "cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x000278DEL, "test_6A29_m40",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF6A29 M=0x40 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00027D66L, "chain4_027D78_0280CC",
+            "[TRACED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x027D78 "
+            + "B=0x027D86 C=0x027E34 D=0x0280CC. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00027D78L, "byte_eq1_flag_27D78",
+            "[DECODED] Class 100 (2): u8[B] = (u8[A] == 1). For 0x027D78, B = 0xFFFF6A84, read back at "
+            + "@(0,gbr) by 0x027D86; 0x027D66 calls writer then reader. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00028200L, "jmp_to_029750_028200",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x029750. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00028206L, "jmp_to_029750_028206",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x029750. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002820CL, "thunk_to_028210",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x028210. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000298B0L, "ret0_0298B0",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029A14L, "ret0_029A14",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029A2CL, "ret0_029A2C",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029A54L, "ret0_029A54",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029A58L, "ret0_029A58",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029A5CL, "ret0_029A5C",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029A60L, "ret0_029A60",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029A64L, "ret0_029A64",
+            "[DECODED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029BA8L, "get_s8_979E",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF979E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00029BD4L, "setpair_2560_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2560 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002B1DCL, "call_02ACD4_then_02B0D0",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x02ACD4 B=0x02B0D0. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002B22CL, "test_A17E_m01",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFFA17E M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002B238L, "test_A17F_m01",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFFA17F M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002B244L, "test_A180_m01",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFFA180 M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002B250L, "test_A181_m01",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFFA181 M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002B28CL, "test_A176_m01",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFFA176 M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002B298L, "test_A16C_m01",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFFA16C M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002BE2CL, "test_A3AE_m10",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFFA3AE M=0x10 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002BEF6L, "call_02BF00_then_02BF54",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x02BF00 B=0x02BF54. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002C210L, "init_313C_71F7",
+            "[DECODED] Shape class 48: r0 = F(r4 = V) with F = 0x0BE9A0, V = 0 -> 0x00FF; u16[A] = r0; u8[B] "
+            + "= V2 (= 0); return r0 (0x00FF). Member parameters: F=0xbe9a0 V=0 A=0xffff313c V2=0 B=0xffff71f7. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002D318L, "jmp_thunk_r2",
+            "[DECODED] Class 20 (12 members): r2 = T, then jmp @r2 with PR untouched (a tail call). Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002D77AL, "init_3150_7231",
+            "[TRACED] Shape class 48: r0 = F(r4 = V) with F = 0x0BE9A0, V = 0 -> 0x00FF; u16[A] = r0; u8[B] "
+            + "= V2 (= 0); return r0 (0x00FF). Member parameters: F=0xbe9a0 V=0 A=0xffff3150 V2=0 B=0xffff7231. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002D790L, "setpair_3150_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF3150 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002E35AL, "set2_7234_0",
+            "[DECODED] Shape class 29: byte [K] = I and byte [K+D] = I Member parameters: K=0xFFFF7234 "
+            + "K+2=0xFFFF7236 I=0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0002E364L, "set_7235_1",
+            "[DECODED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7235 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002E7D8L, "flag_7234_eq1",
+            "[DECODED] r0 = (u8[0xFFFF7234] == 1). Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0002E7E2L, "flag_7235_eq1",
+            "[DECODED] r0 = (u8[0xFFFF7235] == 1). Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0002E808L, "init_3154_7268",
+            "[TRACED] Shape class 48: r0 = F(r4 = V) with F = 0x0BE9A0, V = 0 -> 0x00FF; u16[A] = r0; u8[B] "
+            + "= V2 (= 0); return r0 (0x00FF). Member parameters: F=0xbe9a0 V=0 A=0xffff3154 V2=0 B=0xffff7268. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002E8C0L, "eeprom_phase_dispatch",
+            "[DECODED] Copies the high byte of word [3154] into [7268] when the value:~value pair is "
+            + "consistent, else rebuilds the word from [7268]. Then dispatches phases A/B/C on gate byte [8E98] "
+            + "!= 0. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0002EB02L, "eeprom_writeback_pass",
+            "[DECODED] One pass of a six-word serial-EEPROM write-back (GBR 0xFFFF7244). Session-start writes "
+            + "come before the lock test. Backs off unless byte [0xFFFF6C48] is 0 or 0xEE. 7 busy passes -> "
+            + "finish without EWDS. State 2/3 or V<6.0 -> EWDS and finish. 0xEE is written only on a ready, "
+            + "non-aborting pass. Verifies and retries up to cal byte 0x0C472C=3, and writes word k to address "
+            + "483+k. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0002ED88L, "eeprom_outcome_record",
+            "[DECODED] Phase C. ([726A]==1 and count>6) or state 3 -> [7268] = 1 and word [3154] = 0x01FE. "
+            + "Else state 2 -> [7268] = 0 and word 0x00FF. Otherwise no outcome. Always sets [7265] = 1. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0002EF08L, "thunk_to_02F85E",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02F85E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002EF0CL, "runtime_floor_rearm_check",
+            "[DECODED] if 0x022F92()==1 (byte [65F6]==1): bsr 0x02F83E (bytes [726C] [72C8] [726F..7272]:=1, "
+            + "[72D1]:=0); then 0x02F57E and tail jump 0x02F6E0 (not decoded). Called by task-9 runner 0x04907C "
+            + "at 0491B0 on every pass with byte [8EDC]==0. Trace: injector_path_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0002EF26L, "call_02F718_then_02F768",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x02F718 B=0x02F768. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002EF30L, "thunk_to_02F494",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02F494. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002EF34L, "thunk_to_02F550",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02F550. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002EF38L, "thunk_to_02F2C2",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02F2C2. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002EF4CL, "call_02F22A_then_02EFD2",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x02F22A B=0x02EFD2. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002EF56L, "crank_flag_726C",
+            "[DECODED] [72A8] = AC804([6350]) = 500. [72C8] = 0 if [6624] > 500, 1 if [6624] <= 300, else "
+            + "held. [726C] = [726D] = 0 when [72C8]==0 and [7E4C] >= [72A4] (=0), else [726C] = 1. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0002EFD2L, "per_channel_pulse_after_start_floor",
+            "[DECODED] PW_j=[7290+4j]: RESET ([726C]!=0) to [72DC]; else if any flag byte [726F..7272]==1, "
+            + "EVERY channel (flag 0 or not) gets [7328+4j] if > [728C] else [728C], with "
+            + "[728C]=max([728C]*T(D,[6354]),0) and flag_j cleared when its pulse beats the floor; else COPY "
+            + "[7328+4j]. Latch [72D1]=1 when byte [7306]==1. Trace: injector_path_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0002F2C2L, "lookup1d_ect_store",
+            "[DECODED] Class 102 (2): f32[B] = 0x0BE830(R, f32[0xFFFF6350]); R = 0x0AC2BC (all cells 0) or "
+            + "0x0AD0DC. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002F550L, "set_7288",
+            "[DECODED] [7288] = AC338([6350]) (flat 1.0) and [726E]=1 if byte [65C1]==1; otherwise [7288] = "
+            + "1.0 and [726E] = 0. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0002F974L, "mode0_factor_lookups",
+            "[DECODED] Returns at once if byte [0xFFFF65F1] != 0. If (signed) byte [726C] == 1: "
+            + "[72E0]/[72E4]/[72E8] = 1-D lookups of 0x0AC34C/0x0AC360/0x0AC374 at f32 [620C]/[64D8]/[6364], "
+            + "and [72DC] = 0x02F9E0(r4=[7E4C]+1), where r4 is unused. Trace: fns_03D856_02EB02_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0002F9E0L, "mode0_duration_clamp",
+            "[DECODED] fr0 = clamp([7300] + [72FC]*[72E0]*[72E4]*[72EC]*[72F4]*[72E8], 0, 262136) via "
+            + "0x0BE56C. The r4 argument has no effect. Trace: fns_03D856_02EB02_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0002FA68L, "thunk_to_02FA94",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02FA94. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002FA6CL, "call_022F92_tail_02FA94_if1",
+            "[DECODED] Shape class 49: r = F() & 0xFF; if r == K (K = 1): tail-call G (r0 = 1 at G); else "
+            + "return r. Member parameters: F=0x22f92 K=1 G=0x2fa94. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002FB1CL, "get_f32_72EC",
+            "[DECODED] fr0 = f32 [0xFFFF72EC]; r4 is never read. Trace: fns_03D856_02EB02_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0002FB68L, "thunk_to_02FB88",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02FB88. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002FB6CL, "call_022F92_tail_02FB88_if1",
+            "[TRACED] Shape class 49: r = F() & 0xFF; if r == K (K = 1): tail-call G (r0 = 1 at G); else "
+            + "return r. Member parameters: F=0x22f92 K=1 G=0x2fb88. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002FB84L, "thunk_to_02FB96",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02FB96. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002FCBAL, "getf_72FC",
+            "[DECODED] Shape class 103: fr0 = f32[A]. Member parameters: A=0xffff72fc. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0002FD3AL, "thunk_to_02FD8C",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02FD8C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002FD3EL, "thunk_to_02FE7E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x02FE7E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0002FF7CL, "chain4_02FF8E_0301E4",
+            "[DECODED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x02FF8E "
+            + "B=0x02FFA2 C=0x02FFE0 D=0x0301E4. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0002FF8EL, "set_pulse_lower_clamp",
+            "[DECODED] [733C] = 0.0 if byte [641C]==1 (sign-extended cmp/eq) else [0x0CBE08]=300.0; only "
+            + "writer found; called at 02FF7E right before the tail branch to 0x0301E4. Trace: "
+            + "injector_path_trace.txt (corrections item 114).");
+        count += labelComment(0x0002FFE0L, "ffb_sum_and_clamp",
+            "[DECODED] Live branch (byte 0x0CBBD2 = 0 in all three bins): S = "
+            + "[73B4]+[7A08]+[7A14]+[7AF4]+[7B8C]+1.0-[7A44]+[7BCC]+[7BA8]+max(min([798C]+[7A20],0.52), "
+            + "min([73A4]+[7BE4],0.65)+[7354]+[7374]); [730C] = clamp(S*[7340],0,32), [7310+4i] = "
+            + "clamp((S+[7B44+4i]+[7A78+4i])*[7340],0,32). The six max()-side addends count only while their "
+            + "side is larger. Trace: ffb_residual_trace.txt (corrections item 111).");
+        count += labelComment(0x000301E4L, "fuel_product_ffb_afc_load",
+            "[DECODED] C = ([76D4]+[7878]+[7AE4])*[7348]. Writes eight outputs, each clamped to [[733C], "
+            + "262136]: [7320] [7344] [7324] [7328] [732C] [7330] [7334] are proportional to C; [7338] does not "
+            + "depend on [76D4]. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x00030378L, "load_times_injector_scaling",
+            "[DECODED] [7348] = clamp([63F8]*[0x0CBE0C] (\"Injector Flow Scaling\", 4916.0), 0, 131072) when "
+            + "byte 0x0F8A84 == 0, as it is in 20.19c and stock. Trace: cl_target_to_fuel_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0x00030430L, "init_7370",
+            "[DECODED] byte [7370] = byte [726C]. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0003043AL, "ffb_cl_addend_a_runner",
+            "[DECODED] Calls 0x030454 on every call, then tail-branches to 0x0304BE only when bit 0 of r4 "
+            + "(the 0x04AA58 runner argument) is clear (030444-03044A). Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00030454L, "seed_7358_while_726C",
+            "[DECODED] If byte [726C]==1: [7358] = 0x0AC970(E)*[7288] ([90C1]==0,[3158]==0), 0x0AC984(E) "
+            + "([90C1]==0,[3158]!=0), 0x0AC948(E)*[7288] ([90C1]!=0,[3158]==0), 0x0AC95C(E) (both !=0), "
+            + "E=[6350]. Otherwise it writes nothing. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x000304BEL, "post_start_addend_7354",
+            "[DECODED] [7354] = AD594([6898],[6354]) * [7358] * [7364] (* [7360] if byte [7369]==1). [7358] "
+            + "*= 0.8984375 every N=AC3AC/AC3A0([6350])*[7368] calls, only while zext [67EC] > 38 and byte "
+            + "[7C9D]==0. A latch zeroes [7358]/[7354] when the previous [7354] is within +-2^-12 and "
+            + "[726C]==0. Byte [7370] = [726C]. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00030744L, "init_73A2",
+            "[DECODED] byte [73A2] = (byte [67FC]==1). Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00030754L, "ffb_cl_addend_b_runner",
+            "[DECODED] Calls 0x03076E on every call, then tail-branches to 0x03082E only when bit 0 of r4 is "
+            + "clear (03075E-030764). Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0003076EL, "seed_7378_7384_while_726C",
+            "[DECODED] If byte [726C]==1, seeds [7378]/[737C]/[7380]/[7384] from coolant tables of [6350]. "
+            + "With [3158]==0 these are AC9A4, AC9CC-or-AC9B8, ACA08 and ACA30-or-ACA1C, times [7288]. With "
+            + "[3158]!=0 they are AC9E0, AC9F4, ACA44 and ACA58. Otherwise it writes nothing. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x0003082EL, "post_start_addend_7374",
+            "[DECODED] [7374] = max(P0*[7390]+[7398], P1*[7394]+[739C]) * AD5CC([6898],[6354]). P0/P1 = "
+            + "[7378]/[737C] if [90C1]==0 and [647C]==1, else [7380]/[7384]. Each is decayed linearly (floored "
+            + "at 0) only while zext [67EC] > [73A0](=0) and [7C9D]==0. [7390] = ACAF0(E) and [7394] = ACB04(E) "
+            + "= 0 when [67FC]==1; both are 1.0 otherwise. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00030C38L, "transient_residual_writer",
+            "[DECODED] Writes [73B4] every call: 0 if u16 [67EC] < (625 latch clear / 25 latch set) or bit1 "
+            + "of byte [61F4]; else (T1+T2+T3)*[7400], max(.,0) while [67EC] < 875, no upper bound. Calls "
+            + "0x0312BC, history shift, 0x0312DE, 0x030F02, 0x03110C before the gate. Trace: "
+            + "ffb_residual_trace.txt (corrections item 111).");
+        count += labelComment(0x0003110CL, "transient_multiplier_seed_decay",
+            "[DECODED] [7400]: 1.0 if [73E0]~1,[73E4]~0 and byte [7445]==0; else [67EC] < 13: re-seed from "
+            + "tables at [6354], [7400] = M(seed) without testing [73F0]/[73F4]; [67EC] >= 13: 1.0 if [73F0] < "
+            + "0 or [73F4] < 0 else M([73E0]+[73E4]), then decay one step per hold count 0x0AC430 at the "
+            + "CURRENT [6354]. Trace: ffb_residual_trace.txt (corrections item 111).");
+        count += labelComment(0x000312DEL, "transient_rate_and_follower",
+            "[DECODED] [73EC] = clamp(two-call change of [73B0], -10, 10) with RPM deadband 0x0ACD34; "
+            + "followers [73D0]/[73D4] snap to [73B0] on hold, snap to the PREVIOUS [73B0] when previous [73D8] "
+            + "< 0 and [73EC] >= 0.975, else first-order lag (0.014 rising; 0.08/0.015 falling); [73D8] = "
+            + "[73B0]-[73D0] with band [-0.05,0.05) -> 0; [73DC] = [73B0]-[73D4]. Trace: ffb_residual_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0x00031A66L, "thunk_to_031C08",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x031C08. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00031C9CL, "reset_state_block_of_0x032204",
+            "[DECODED] If 0x022F92 returns 1 (byte [0xFFFF65F6] == 0x01): zeroes 0xFFFF74C8 x42, 0xFFFF757C "
+            + "x42, 0xFFFF7630 x41 floats; writes 1.0 to 0xFFFF76D4, 0xFFFF76FC, 0xFFFF76D8, 0xFFFF76DC; byte "
+            + "0xFFFF7701 = byte [0xFFFF94B3]; bytes 0xFFFF7702 and 0xFFFF76E0 = 0. Otherwise writes nothing. "
+            + "Reads byte [0xFFFF94B3] on both paths. Trace: fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0x00031D1EL, "gated_chain_into_0x032204",
+            "[DECODED] If byte [0xFFFF65F0] equals one of cal bytes 0x0CBBD8..0x0CBBDB (00 06 0C 12 in all "
+            + "bins), calls 0x031D88, 0x031DB4, 0x031F98, 0x032042, 0x0320AC and tail-calls 0x032204 with "
+            + "r4=0x0639C4 r5=0x0639B0 r6=0x063984 r7=0; otherwise returns calling nothing. Trace: "
+            + "fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0x00031D84L, "empty_fn_031D84",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00031D88L, "afc_model_sample_period",
+            "[DECODED] [0xFFFF7474] = [0x0CBEBC] (30.0) / [0xFFFF6624], written only when [6624] is outside "
+            + "[-0.1953125, 0.1953125]. Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0x00031DB4L, "afc_model_operating_point",
+            "[DECODED] Byte [7700] hysteresis on [40C8] (1 at <= 500, 0 above 550); L = min(lookup2D "
+            + "0x0AD620, 40); TH = T*L; TAU = 0x0AD848 * 0x0AC45C; W = 0x0ACE0C(TAU) * 0x0AC470([6350]) (= 1.9) "
+            + "when byte [6254] == 1 or byte [7700] == 0, else 0x0AD864 x three unit tables; WT = W*T. Writes "
+            + "only those RAM cells. Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0x00031F98L, "afc_model_pole_delay_coeffs",
+            "[DECODED] r4 = Q table 0x063984. Q0 = T/TAU and Q4 = (T - Q3)/TAU only when TAU = [0xFFFF7480] "
+            + "is outside [-2^-11, 2^-11]; every call Q1 = e(Q0), Q2 = float(trunc(L) & 0xFF), Q3 = TH - Q2*T "
+            + "(fused), Q5 = 1 - e(Q4), Q6 = (1 - Q1) - Q5. Trace: afc_coefficients_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0x00032042L, "afc_target_pole_coeffs",
+            "[DECODED] V0 = c*WT, V1 = 2*V0, A = -2 e(V0)(1 - (1 - c^2) WT^2/2), B = e(V1), c = [0x0CBEC8] = "
+            + "1.0, so A = -2 e(WT), B = e(2 WT). Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0x000320ACL, "afc_controller_coeff_polynomial",
+            "[DECODED] P0 = (1 + A + B)/(Q5 + Q6) when Q5+Q6 is outside [-2^-11, 2^-11]; P4[1..41] by the c1 "
+            + "/ c2 / recurrence / call / zero rule with n = trunc(Q2). 0x032892 is called at most once: k = 2 "
+            + "when Q2 <= 1 or NaN, k = n+1 when Q2 >= 2 and n <= 40, never when 1 < Q2 < 2 (unreachable live) "
+            + "or n >= 41. Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0x00032204L, "ptr_table_state_block_update_0x032204",
+            "[DECODED] r4/r5/r6 = ROM pointer tables R 0x0639C4, P 0x0639B0, Q 0x063984; r7 byte flag (always "
+            + "0 from the only caller). Each call: guarded reciprocals R0 = 1/[0xFFFF653C], R1 = "
+            + "1/[0xFFFF77C8], R6 = 1/R1 (written only when |x| > 2^-13); R2 = R0; R9/R10 by the F1/F2/SEL "
+            + "gate; R8 = sat(...) in [0.5,1.5] by block Z/A/B/C on EN = byte [0xFFFF7448] and FLAG; R7 "
+            + "41-float history of v; tail R13, R11 = R2, R12 = R8, R14 = SEL, ... Trace: fn_032204_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0003286CL, "exp_neg_approx",
+            "[DECODED] fr0 = 1 - x + x^2/2 for !(x > 0.35); else writes [0xFFFF76E4] = x and tail-calls "
+            + "lookup 0x0ACE20. Within 0.0286 of exp(-x) on [0,6] (max 0.02858 at x = 1.4567); e(x >= 6) = 0. "
+            + "Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0x00032892L, "afc_delay_tail_coeffs",
+            "[DECODED] No loop. P1 = P4[idx] (idx 1 / trunc(d) / 40); P2 = (a*P1 - b2*P0) * a/(a*b1 + b2) "
+            + "when |a*b1 + b2| > 2^-16; P3 = P2*b2/a when |a| > 2^-11; returns [P3]. Trace: "
+            + "afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0x00032958L, "afc_lag_filters_reset",
+            "[DECODED] Iff byte [65F6] == 1: [7704] = [7708] = [770C] = 1.0 (base 0xFFFF770C, offsets "
+            + "-8/-4/0). Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0x0003297AL, "afc_lag_filters",
+            "[DECODED] Gate byte [65F0] in {00 06 0C 12}. When byte [7448] == 1: W0/W1/W2 = clamp(lag(R8, old "
+            + "W, 1/64 / 1/128 / 1/64, snap 2^-15 / 2^-15 / 2^-13), 0.5, 1.5) at 0xFFFF7704/7708/770C, reading "
+            + "each old W back through table 0x063A04; else all three = 1.0. Trace: afc_coefficients_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0x00032AA8L, "afc_bounds_reset",
+            "[DECODED] Iff byte [65F6] == 1 (0x022F92): HI [7710] = LO [7714] = [771C] = [772C] = CAP [7730] "
+            + "= 1.0, [7718] = [7728] = 0.75, [7724] = 1.25, bytes [77B6] = [77B8] = 0, [77A8] = 0.0, 29 floats "
+            + "[7734..77A7] = [7348]. No gear input read. Trace: afc_coefficients_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0x00032B10L, "afc_bounds_update_gated",
+            "[DECODED] Gate: works only when byte [65F0] is 0x00/0x06/0x0C/0x12 (cal 0x0CBBD8..DB). Then "
+            + "[7720] = [40C8] (read before the gate), calls 0x0331C6 and 0x032B5E, then tail-branches to "
+            + "0x032E28 with r4 = 0x063A10. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x00032B5AL, "thunk_to_03308E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03308E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00032B5EL, "afc_hi_bound_select",
+            "[DECODED] If byte [77B6] != 0: MODE = 8 and [77B6] -= 1. Otherwise MODE = (byte[7448]==1) + "
+            + "2*(CUR==1) + 4*(byte[77B8]==1) + 16*(byte[7828]==1), where CUR = byte [98F4] is read and "
+            + "cleared. [7710] = clamp(min(T(AC4C0,[7720]),1.25),0.5,1.5) in MODEs 0/1/2/3/4/6/16/18/20/22 "
+            + "(MODE 3 takes min with [770C]+8.0). In MODE 17/19 it goes through 0x0330CA. MODEs 5/7/8/21/23 do "
+            + "not write it. Last, [77B8] = CUR. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x00032CE8L, "afc_g1_predicate",
+            "[DECODED] Reloads u16 [77B0] = 1250 unless -0.1 < [73B4] < 0.05 (strict; NaN reloads). r0 = 1 "
+            + "iff NOT(0 > [73E0]+[73E4]) and -40<=[6350]<119 and -40<=[6354]<119 and [77B0] != 0. Trace: "
+            + "cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x00032D52L, "afc_g2_predicate",
+            "[DECODED] Updates the hysteresis latch bytes [77B9] and [77BA] on [6624]. Reloads [77B2] (= 0) "
+            + "on a 1->0 edge of bit 7 of [6A29]. r0 = 1 iff all of: [77B2] != 0; NOT([65FC]>0); "
+            + "NOT(119>[6364]); latches both 1; bytes [A56A] and [ACE6] are 0; NOT([76D4]>0); byte [7828] == 0. "
+            + "Then [77BB] = the bit. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x00032E28L, "afc_lo_bound_update",
+            "[DECODED] r4 = 0x063A10 table. Builds [771C] as a ratio over a 21-deep history of [7348] and "
+            + "shifts the history A[0..20]. Updates byte [77B7]. Loads u16 [77B4] from ACE34 (cells all 0) when "
+            + "NOT(|[7BCC]|>2^-15) and |[77A8]|>2^-15. Then writes [7714] by exactly one of HOLD95 / RAMP / "
+            + "TRACK (via 0x033128) / BASE on every call, and sets [77A8] = [7BCC]. Trace: "
+            + "cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x0003308EL, "afc_decrement_77B0_counters",
+            "[DECODED] Inside a critical section, decrements each of u16 [77B4], [77B0], [77B2] by 1 when "
+            + "nonzero. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x000330CAL, "afc_hi_bound_track",
+            "[DECODED] K = 0x033186() (contains 1/[77C8]). [7724] = clamp(x+K,0.5,1.5). [7710] = "
+            + "clamp(min(clamp([7724],[7710]-0.25,[7710]+0.25),[7730]),0.5,1.5). Writes [7724] and [7710] only. "
+            + "Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x00033128L, "afc_lo_bound_track",
+            "[DECODED] Same shape as 0x0330CA, applied to [7728] and [7714], with step [0x0CBF30] = 0.25 and "
+            + "the min with [7730]. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x000331C6L, "afc_bound_cap_calc",
+            "[DECODED] [772C] = lookup 0x0ACE40([6350]) = 0.6999969 everywhere; CAP [7730] = clamp(1/((1 + "
+            + "[7BE4]) * [772C]), 0.5, 1.5) via the guarded divide 0x0BE628. Trace: afc_coefficients_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0x00033376L, "call_03388C_then_0338E2",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x03388C B=0x0338E2. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000333E6L, "call_0339E4_then_033F9E",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0339E4 B=0x033F9E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00033460L, "cl_lambda_target_and_reference",
+            "[DECODED] Writes [77BC] = clamp(clamp(S, [0x0CBF3C]=0.85, [7BDC]), 0.75, 1.25), with the low "
+            + "bound tested first and S summed in instruction order. It then takes one of four exits, COPY, "
+            + "COPY2, SPECIAL or STEP, which write [77C4], [77C8], bytes [7828]/[7829], and [77C0] on SPECIAL. "
+            + "Every exit leaves [77C8] in [0.75,1.25], and at >= 0.8499756 once [7BDC] holds a stored value. "
+            + "Trace: hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0x000340A0L, "special_exit_blend_term",
+            "[DECODED] If byte [8E7E] != 1 it writes [7804]=[7808]=[7810]=0. Otherwise it does seven table "
+            + "lookups, sets [7804]=(T_ACEA0([6350])+T_ACEB4([68DC]))*T_AC4FC([78B0]) and "
+            + "[7808]=((T2D_AD928([63F8],[6624])+T_ACEC8([6350]))+T_ACEDC([68DC]))*T_AC510([78B0]), then "
+            + "[7810]=(1-[780C])*[7808]+[7804]*[780C] (fmac). [780C] is a 0..1 ramp that steps +-10 per call "
+            + "and rises while byte [85D7]==1 and [65FC] < 4.0. Byte [7871] = byte ... Trace: "
+            + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0x00034488L, "afl_seed_7878",
+            "[DECODED] [78A1]=[6254]; [7878]=clamp(cell[[787F]],-0.25,0.25), with no range check on [787F]; "
+            + "[78AA]=1. Called only at 0x047F4C on 0x047C40's [8EDC]==0 arm. The call at 0x047D98 to 0x00FACA "
+            + "comes before it on one path, and whether 0x00FACA returns is not established. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0x000344BAL, "afl_cells_clear",
+            "[DECODED] Writes the four cell records 0xFFFF316C+8i := 0.0 with valid check words. Its only "
+            + "call site is 0x048972 in 0x048732, reached straight-line from 0x048732's entry. 0x048732 has two "
+            + "callers: event 17 and 0x047C40 (bsr 0x047DA6). Trace: afl_learning_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0003452AL, "afl_pass",
+            "[DECODED] Each pass: [78A6]=old [78A1]; [78A1]=byte [6254]; copies [6350],[6364],[63FC],[69FC] "
+            + "to [7888]..[7894], word [6A22] to [7898], ([65F6]==1) to [78A0]; then calls 0x034D52, 0x0345A4, "
+            + "0x034778, 0x034884, 0x034B1C; then [7874]=[7D68], 0x034CC8, 0x034C18, and tail-branches to "
+            + "0x034CEE. The copies stored in delay slots happen before the callee runs. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0x00034592L, "thunk_to_034DA6",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x034DA6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00034596L, "call_034C54_then_034D2E",
+            "[DECODED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x034C54 B=0x034D2E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000345A0L, "thunk_to_034DD6",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x034DD6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000345A4L, "afl_enable_conjunctions_78A3_7883",
+            "[DECODED] Two bodies. The first writes [78A3] = 70>[788C] && |[73A4]|<=2^-8 && "
+            + "|[7354]|,|[7374]|<=2^-12 && |[7A14]|<=2^-10 && |[7A20]|<=2^-8 && bytes [7D18],[8F24],[7BE2]==0 "
+            + "(NaN counts as inside). It falls through to 0x034644, which writes [7883] = [7448]==1 && "
+            + "[78A7]>=128 && [A56A],[ACE6],[94B1]==0 && [7453]==1 && [78A8]>=128 && [7324]>[733C] && "
+            + "[78A3]==1. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0x00034778L, "afl_gate_7884",
+            "[DECODED] [78A4] = 75<=[7888]<95 && 0.012>|[7890]| && [78A5]==1 && ([78A1]==0 || [789C]>=78) && "
+            + "!([7AB4]>10000). [78AA] hysteresis on [7A44]: set at <=-2 or NaN, cleared above -1. [7884] = "
+            + "[7883] && [9709]==0 && (|[7894]|<=2^-11 || ([78AA] && w[7898]>=29)) && [78A4]. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0x00034884L, "afl_learning_step",
+            "[DECODED] The learning step. Struct 0x063A5C. Updates [78A9]. Resets the window ([7881]=0, "
+            + "[7882]=128) when G1-G4 fail or the mode-1 dt test fails. Otherwise it samples e = W0[7704] - 1/t "
+            + "+ [7BA8] + 1 (t=[77C8], replaced by 1.0 inside +-2^-13 or NaN) and votes up (e>=1.01) or down "
+            + "(e<0.99). At [7881]==40 (mode 1) or 16 it steps cell[[787F]] by +-0.001 (votes >=144 / <113), "
+            + "clamps to +-0.25 (0x0CC04C/50) and writes it with ... Trace: afl_learning_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x00034B1CL, "afl_applied_value_update",
+            "[DECODED] [7878] = clamp(clamp(x,-0.25,0.25),-0.5,0.5), where x = cell[[787F]] when "
+            + "0.02>|[7878]-cell| or [78A0]==1, and otherwise 0x0BEA40 lag(cell, [7878], k=0.0156, eps 2^-11). "
+            + "[7885]=1 while lagging, 0 on a snap. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0x00034C54L, "afc_lag_window_counter",
+            "[DECODED] If byte [787E] > 0: byte [789E] += 1 until it reaches cal byte 0x0CBBEE (20), then "
+            + "byte [787E] = 0; else byte [789E] = 0. Then if byte [7448] == 1, byte [7453] == 1 and 0.95 < "
+            + "[7708] < 1.05 (strict): byte [787E] -= 1 when non-zero. Trace: afc_coefficients_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0x00034D52L, "afl_cell_index_34D52",
+            "[DECODED] [787F] = 0..3 from [63C4] against 0x0CC074/78/7C; NaN gives 3. [78A5] = 1.6<=x<80. "
+            + "When [78A0]==1 it writes index 0 and flag 0. Trace: afl_learning_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x00034EC8L, "ctl7904_init",
+            "[DECODED] Init. Sets [78B0] = lookup(0xAD054,[6354]), [792C] = [78B4] = [43FC] and [78B8] = 0.7, "
+            + "then falls into 0x034F28. Trace: hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x00034EF4L, "ctl7904_pass_entry",
+            "[DECODED] Copies [0xFFFF63CC] to [0xFFFF7920] and byte [0xFFFF984D] to byte [0xFFFF7941]. Then "
+            + "calls 0x034F94, 0x0351FA, 0x03528A, 0x035218, 0x0352DE, 0x035318, 0x035340 and 0x0353BC, and "
+            + "tail-jumps to 0x0355B8. Has no arithmetic of its own. Trace: hole9_afl_trace.txt (corrections "
+            + "item 107).");
+        count += labelComment(0x00034F28L, "ctl7904_init_tail",
+            "[DECODED] Init tail with no clamp. [7904] = [318C] + step (step is +-0.01 or 0). [7908] = "
+            + "[7904]/[CC0B0]. [790C] = [318C]. Trace: hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x00034F94L, "enable_gate_7912",
+            "[DECODED] Latches its inputs and runs the reload block when byte [6A28]==1. Sets byte [7912]=1 "
+            + "(word [7910]+1, saturating) only if all twelve conditions hold (see E11). Otherwise sets byte "
+            + "[7912]=0 and word [7910]=0. Trace: hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x000353BCL, "ctl7904_gain_and_window_select",
+            "[DECODED] Runs only when byte [7912]==1. Writes the gains, the P limits and the window widths "
+            + "0xFFFF78C4..78E0 from tables. byte [7941]==0 picks table set A and byte [782B]==0 picks the "
+            + "window tables. [78DC] = max(table, 0.07 if bit4 of byte [A3AE] is set, else 0). Trace: "
+            + "hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x000355B8L, "windowed_pi_controller_out_7904",
+            "[DECODED] Error E -> lpf -> one-side limit -> total = clamp(e2*Kp) + Ki*([7908]+e2) + [78C0]. "
+            + "inner = clamp(total, [318C]-[78DC], [318C]+[78E0]). When byte [7912]==1 it stores clamp(inner, "
+            + "ROM 0x0357CC, ROM 0x0357C8) to 0xFFFF7904. Stock bounds are -0.5/+0.5; every flashed rev has "
+            + "0/0, which gives +0.0. Trace: hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x000357E8L, "zero_rec_318C",
+            "[DECODED] Shape class 31: tail-call F = 0x0BDBCC with r4 = A (a RAM address) and fr4 = 0.0. By "
+            + "the 0x0BDBCC contract Member parameters: A=0xffff318c F=0xbdbcc. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0003580CL, "ctl7904_periodic_learn_gate",
+            "[DECODED] Runs its body only when byte [7986] >= byte [CBBEF] (=1), compared unsigned. The body "
+            + "latches inputs and calls 0x0358A0, 0x0359A4, 0x035DE4 and 0x035E2C. Every call leaves byte "
+            + "[7986]=1, then tail-jumps to 0x035E64. Trace: hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x000359A4L, "filter_vote_step_318C",
+            "[DECODED] If byte [7950]==1, filters [7904] into [7944]. Then either resets the vote state or "
+            + "casts one vote and makes at most one 0.0005 step of L=[318C] (six sites, limited at +-0.05 or "
+            + "+-0.06). Every path tail-jumps to 0x035F48(0, L), so the tuned image always stores +0.0. Trace: "
+            + "hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x00035F48L, "store_318C_clamped",
+            "[DECODED] If (r4&0xFF)==0, stores clamp(fr4, ROM 0x036000, ROM 0x035FFC) to the checksummed "
+            + "record 0xFFFF318C via 0x0BDBCC. The bounds are stock -0.5/+0.5 and tuned 0/0. Trace: "
+            + "hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x0003605AL, "thunk_to_036322",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x036322. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00036062L, "call_036962_then_036848",
+            "[DECODED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x036962 B=0x036848. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00036322L, "cl_ol_delay_counter_79C2",
+            "[DECODED] [79F3] = 0x036978(). [79C4]==0: [79C2] = 65535, then TAIL. [79F3]==1: [79C2] = 0, and "
+            + "[79C0] = subtract-or-zero of 0x0AD0D0 (65535) unless [7C68]==1, which holds it. [79F4]==1 "
+            + "(falling edge): [79C2] = [79C0]. Otherwise [79C2] = sat16(+0x0AD0B8 (1)); if the old [79C2] < "
+            + "[79C4], [79C0] = the new [79C2], else TAIL. TAIL: [79C0] = subtract-or-zero of 0x0AD0C4 (65535). "
+            + "Then [79C8] = (0 < [79C2] < [79C4]) and [79F4] = ... Trace: ffb_cl_side_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x00036962L, "ol_target_multiplier_79A0",
+            "[DECODED] [79A0] = 0x0AD0DC([6350]), in [0, 1.0] in every bin compared. No other store to it is "
+            + "found. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00036978L, "cl_ol_transition_test",
+            "[DECODED] [79CC]=AC5BC([6624]), [79D0]=AD0A4([6624]). [79FE]/[79FF] are hysteresis bytes for "
+            + "[62DC] vs [79CC]-8.4 and [7348] vs [79D0]-756. Returns 1 iff both bytes are 1. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00036AAAL, "thunk_to_036AB2",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x036AB2. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00036AAEL, "thunk_to_036B48",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x036B48. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00036C38L, "thunk_to_036C44",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x036C44. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00036C40L, "thunk_to_036D14",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x036D14. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00036C44L, "empty_fn_036C44",
+            "[DECODED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00037118L, "zero_rec2_3194",
+            "[TRACED] Shape class 47: call F = 0x0BDBCC with r4 = A1, fr4 = 0.0; then tail-call F2 = "
+            + "0x0BDBCC with r4 = A2 = A1 + 8, fr4 = 0.0: Member parameters: A1=0xffff3194 F=0xbdbcc "
+            + "A2=0xffff319c F2=0xbdbcc. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00037570L, "call_03757E_then_0376EC",
+            "[DECODED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x03757E B=0x0376EC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003757AL, "thunk_to_0375B8",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0375B8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003757EL, "reset_per_cyl_addends",
+            "[DECODED] If byte [65F6]==1: [7A78..7A84] = 0.0, [7AAC] = [895C], and bytes [7AB1] = [7AA0] = 0. "
+            + "Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x000375B8L, "per_cyl_addend_dispatch",
+            "[DECODED] Maps byte [9FC6] 0/1/2/3 to cylinder index 0/2/1/3, calls 0x037604, then tail-calls "
+            + "0x037710(index). Any other byte value does nothing. Trace: ffb_cl_side_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0x00037604L, "per_cyl_counter_gate_37604",
+            "[DECODED] [7AB1] = (|[895C]-[7AAC]| < 100) and clears [7AB0] when false; [7AAC] = [895C]. [7AA0] "
+            + "= 1 iff 75<=[67EC]<=7500, [62F8]<6.3, [6624]>300, [620C]<500, ([0CBBF8]==1 or bit0 [A176]), "
+            + "[6354]>=70, [6364]>=0, [7AB1]==1 and [7AB0]>=38. Trace: ffb_cl_side_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x000376ECL, "count_7AB0",
+            "[DECODED] [7AB0] = sat8([7AB0]+1) if byte [7AB1]==1, else 0. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00037710L, "per_cyl_addend_7A78",
+            "[DECODED] Updates the above/below counters of the cylinder in r4, against [99B4] vs "
+            + "AB880-or-AB51C([6624])*AD464([6624]), while [7AA0]==1 (all counters zeroed otherwise). Cap "
+            + "[7A88+4i] = 1.0, or max(old x-0.025, 0.19999999) when 0x021D9A()==1 and [6540]<=0.75. [7C18]==1: "
+            + "x = clamp(max(x-0.8,0),0,cap) for all four. Otherwise each cylinder with cnt>=2 steps to "
+            + "clamp(min(x+0.4,cap_i),0,cap), cap_i = 0.79999995/0/0.59999996/0. ... Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0x00037B6CL, "thunk_to_037C52",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x037C52. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00037B70L, "thunk_to_037CA0",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x037CA0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00037D74L, "s4_factor_7ABC",
+            "[DECODED] if bytes [7AD0]==0,[7AD2]==0, u8 [7ADD]>=2, u8 [7ADE]>=2: [7ACC]=[7320], "
+            + "[7ABC]=T2(AD71C,[7ACC],[7AB8]) (table all raw 0x80 -> 0.0); else [7ABC]=0.0. Trace: "
+            + "injector_path_trace.txt (corrections item 114).");
+        count += labelComment(0x00038158L, "arm_block_7B3A_then_reset",
+            "[DECODED] Writes [7B3E] = 1, [7B3F] = 0, CNT16 = 0xFFFF and [7B3D] = byte [65C0], then "
+            + "tail-branches to 0x038860. Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0x0003816EL, "reset_then_0x03817C",
+            "[DECODED] bsr 0x038860 (reset), then tail-branches to 0x03817C. Trace: fn_0382C2_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00038178L, "thunk_to_0382C2",
+            "[DECODED] Thunk: bra 0x0382C2 / nop. Called from 0x04AA58 at 0x04AAFE, so 0x0382C2 returns "
+            + "straight to 0x04AA58. Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0x000382C2L, "gated_dual_accumulator_bounded_output_7AF4",
+            "[DECODED] Keeps the state block 0xFFFF7AF4..0xFFFF7B40 (GBR 0xFFFF7AF4, r10 0xFFFF7B40 literal). "
+            + "When byte EN [7B38] == 1 it runs two clamped accumulators with negated-strict anti-windup, a "
+            + "RAMP factor, and X_OUT [7AF4] = clamp(A_ACC + B_ACC [x RAMP if previous X_OUT < 0], LO, HI). "
+            + "When EN != 1 it zeroes the accumulators and applies a dead band plus a step floored or capped at "
+            + "+0.0 to X_OUT. FORCE0 ([67FC] == 1) writes ... Trace: fn_0382C2_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x00038860L, "reset_block_7AF4",
+            "[DECODED] If byte [0xFFFF65F6] == 1 (via 0x022F92) it zeroes A_I1..B_ACC and X_OUT, sets RAMP = "
+            + "1.0, CNT8 = 0 and PREV = EN; otherwise it writes nothing. Reached by bsr from 0x03816E and by "
+            + "the tail bra at 0x03816A (0x038158). The census lists only 0x03816E as a caller. Trace: "
+            + "fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0x00038928L, "call_038D34_then_038940",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x038D34 B=0x038940. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00038932L, "chain3_0389C4_038C50",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x0389C4 "
+            + "B=0x038BD2 C=0x038C50. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00038D34L, "call_022F92_tail_038D4C_if1",
+            "[TRACED] Shape class 49: r = F() & 0xFF; if r == K (K = 1): tail-call G (r0 = 1 at G); else "
+            + "return r. Member parameters: F=0x22f92 K=1 G=0x38d4c. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00038DC0L, "pipwc_trim_lookup",
+            "[DECODED] [7B6C+4j] = T2(PIPWC A..D, fr4=[7324] (+4 axis), fr5=[6624] (+8 axis)), j=0..3; writes "
+            + "those four cells only. Trace: injector_path_trace.txt (corrections item 114).");
+        count += labelComment(0x00038E30L, "force_flag_bits_7B9F_7BA0",
+            "[DECODED] Calls 0x0392A4, ORs 0x80, 0x20 and 0x08 into both 0xFFFF7B9F and 0xFFFF7BA0, then "
+            + "tail-calls 0x0393EA. Decoded as a supporting listing; its caller 0x047C40 is not traced. Trace: "
+            + "fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0x00038E60L, "thunk_to_0392A4",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0392A4. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00038E64L, "edge_seeded_hold_decay_block_7B7C",
+            "[DECODED] Void, no register arguments. Reads floats 0xFFFF6624/6350/63F8/73E8/7400, bytes "
+            + "0xFFFF7C68/7D2E/90BD, and U0/U1 0xFFFF6458/645C through 0x039316. Writes every byte of "
+            + "0xFFFF7B7C..0xFFFF7BA0 on every call and no other non-stack RAM. Main path iff 3600.0 > X0, "
+            + "NOT(G1==1 and G2==0), G3 != 0; there edge events seed states A..D from X0 tables, O1/O2 are "
+            + "clamped weighted sums, S = O1 + O2, and A..D hold then step ... Trace: fn_038E64_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x000392A4L, "conditional_reset_on_65F6",
+            "[DECODED] If 0x022F92 returns 1 (byte 0xFFFF65F6 == 1): calls 0x0392C4 and clears bit1 of "
+            + "0xFFFF7B9F. Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0x000392C4L, "reset_block_7B7C",
+            "[DECODED] Writes +0.0 to 0xFFFF7B7C..7B98 (eight floats; the first four through 0x0392FC) and "
+            + "0xFF to 0xFFFF7B9C/9D/9E. Leaves 7B9F/7BA0 alone. Saves and restores GBR, which is 0xFFFF7B8C "
+            + "inside. Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0x000392FCL, "zero_states_7B7C_7B88",
+            "[DECODED] Writes +0.0 to 0xFFFF7B88, 7B84, 7B80, 7B7C. Trace: fn_038E64_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00039316L, "hyst_bits_7B9F_7BA0",
+            "[DECODED] Set-at / clear-below hysteresis on bits 7, 5, 3 of byte 0xFFFF7B9F (from float "
+            + "0xFFFF6458) and byte 0xFFFF7BA0 (from float 0xFFFF645C). Thresholds 10.0/9.5, 80.0/79.5, "
+            + "80.0/79.5 (0x0CC3CC/C8, D4/D0, DC/D8). NaN sets all three bits; other bits are untouched. Trace: "
+            + "fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0x000393EAL, "prev_bits_copy_7B9F_7BA0",
+            "[DECODED] For both bytes 0xFFFF7B9F/7BA0: bit6 = bit7, bit4 = bit5, bit2 = bit3; bits 0, 1, 3, "
+            + "5, 7 kept. Both bytes are always written (stores 0393F8, 039406, 039414, 03947E, 03948C, "
+            + "03949C); r0 = new 0xFFFF7BA0. Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0x0003949EL, "hold_then_decay_toward_zero",
+            "[DECODED] fr0 = 0.0 if |v| <= 2^-12 or v is NaN; else, if (r4&0xFF) >= (r5&0xFF), max(v-step,0) "
+            + "for v>0 or min(v+step,0) for v<0; else clamp(v,-8,8). fr4 = v, fr5 = step. No memory effect. "
+            + "Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0x00039524L, "thunk_to_03952C",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03952C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000397ACL, "small_pulse_factor_F",
+            "[DECODED] if 4000.0 > [6624] and 600.0 > [7344] (strict, NaN fails): [7BC8]=T(AC760,[7344]), "
+            + "[7BC4]=clamp([7BC8],0.5,1.5); else [7BC4]=1.0 ([7BC8] untouched). Trace: injector_path_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00039860L, "thunk_to_03988E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03988E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00039864L, "thunk_to_039952",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x039952. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000399E0L, "chain3_0399FE_039D1C",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x0399FE "
+            + "B=0x039B1E C=0x039D1C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00039E0CL, "call_039E20_then_039E4A",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x039E20 B=0x039E4A. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00039E16L, "call_039E6E_then_039F42",
+            "[DECODED] Calls 0x039E6E with bsr, then tail-branches to 0x039F42. Trace: "
+            + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0x0003A21EL, "thunk_to_03A3E6",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03A3E6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003A226L, "call_03A32E_then_03A350",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x03A32E B=0x03A350. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003AA24L, "test_7C5E_m80",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF7C5E M=0x80 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0003AAA4L, "any_cut_byte_7C68",
+            "[DECODED] [7C68] = 1 iff any of eleven bytes [7C9D] [7CB8] [7CBC] [7CD5] [7CE5] [7CE8] [7CF4] "
+            + "[7CF9] [7D11] [7D2E] [7D48] == 1 (reads stop at the first 1), else 0. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003AB06L, "reset_any_cut_byte",
+            "[DECODED] [7C68] = 0 when [65F6] == 1, else nothing. Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0003AB20L, "get_any_cut_byte",
+            "[DECODED] Returns r0 = ([7C68] == 1). Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003AB90L, "thunk_to_03AE5A",
+            "[DECODED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03AE5A. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003AB94L, "resume_rpm_threshold_with_adders",
+            "[DECODED] Every call: [7C78] = lookup(0x0AD40C, [6350]) + [895C] + S (S = gated adders "
+            + "300/1100/1000/600/0, stored in [7C7C]); [7C74] = 100*([5BE3]==1) + 1000*([7CA2]==1); [7C6C] = "
+            + "[7C70] + [7C74]; [7C70] latched 200 when [85D7]==0, 1000 when [85D7]!=0 and [7C78] > [6624], "
+            + "else kept. Also runs an 88-call timer ([7CA1]=0) started only by a [65C0] falling edge seen "
+            + "while !(15>[6634]) and !(10000>[6624]), a 31-call countdown ... Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0x0003AE5AL, "overrun_ladder_sequencer",
+            "[DECODED] Sequencer: bsr 0x03B3DA, bsr 0x03AF88, bsr 0x03AE6C, then bra 0x03B62C with PR "
+            + "restored in the slot, so 0x03B62C's rts returns to the caller. Only reference is 0x03AB90 (bra), "
+            + "reached by jsr at 0x0491B6 in task 9's body 0x04907C when [8EDC] == 0. Trace: "
+            + "overrun_ladder_trace.txt (corrections item 111).");
+        count += labelComment(0x0003AE6CL, "overrun_tier_comparator",
+            "[DECODED] Rung comparator (GBR 0xFFFF7C92). [7CB2] = consecutive [65D0]==1 calls. Tier [7C9A]: 0 "
+            + "if [7C9E]==0; 4 if [7CAA] >= [7C98] or by the second route (flag, [7CAA] > 625, [65D0]==1, "
+            + "[7CB2] >= u16 lookup 0x0AD400, [8E46]==0 or word 0x0CBC92==0); else 3/2/1/0 by "
+            + "[7C96]/[7C94]/[7C92]. Writes the thermometer [7CA3..A6], [7C9D] = tier>=1 and [7CB7] = tier>=4, "
+            + "then jmps to 0x03D2FC. Trace: overrun_ladder_trace.txt (corrections item 111).");
+        count += labelComment(0x0003AF88L, "rpm_banded_count_threshold_ladder",
+            "[DECODED] Every call writes four u16 outputs [7C92..98] = sat16 chains on M = max(u16 [7C8C], "
+            + "u16 [7C80]) plus ext1/ext2 and four adds. Section 1 (only when s8 [7C9E] == 0) reloads "
+            + "base/ext1/ext2 from a 4-band ([6624] vs 0x0CC4EC/F0/F4) x (side, selector) pointer-table triple: "
+            + "[65C0]==1 overrides (13/0/0), no selector match keeps the old values, [8E46]==1 floors base at "
+            + "0x0CBC92 (0). Section 2 sets [7C80]/[7C9C] by four ... Trace: fns_03AF88_03AB94_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0003B3DAL, "overrun_count_writer",
+            "[DECODED] Counter writer (GBR 0xFFFF7C6C). Every call it writes [7CA7] (window, first rule that "
+            + "holds: 1 if !([7C78]+[7C6C] > x); 0 if [7C78] > x; else [7C9E]==1), [7CAC], [7CAE], [7C9E] and "
+            + "[7CAA]. Paths are CLEAR, IMMEDIATE ([7CAA] := [7C98]), COUNT ([7CAA] sat+1, [7CA0]=0), G==0 -> "
+            + "CLEAR, else drop ([7CA0]=1 iff [7CA7]==0). Trace: overrun_ladder_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0x0003B64CL, "is_7C9D_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFF7C9D I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003B668L, "rev_limit_flag_update_head",
+            "[DECODED] void; reached from 0x04AA58 (jsr at 0x04AAA4) only when int8 [0xFFFF8EDC]==0. Loads "
+            + "fr15=f32[0xFFFF6624], fr14=f32[0xFFFF65FC], fr12=f32[0xFFFF620C], frame bytes from "
+            + "0x022CF4/0x0299AC/0x0299BC, r13=int8[0xFFFF65C0], r14=int8[0xFFFF5E95]; window test "
+            + "0x0BE608(fr14,0,1). Stock picks pair 0x0CC500/504 (outside) or 0x0CC508/50C (inside/NaN); tuned "
+            + "jmps to 0x0F1000 on both outcomes with pr=0x03B6A8. Trace: launch_closure_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003B6B2L, "rev_limit_hysteresis_latch",
+            "[DECODED] Hysteresis: byte 0xFFFF7CB9 with fr8/fr6 (cut/resume), byte 0xFFFF7CBA with "
+            + "[0x0CC510]/[0x0CC514], both on offset fr15; selector picks one; latch 0xFFFF7CB8 := 1 if "
+            + "selected==1, := 0 if [0x0CC518] > f32[0xFFFF620C], else held. Restores frame, tail-jumps "
+            + "0x03D2FC. Only RAM reads in 0x03B668..0x03D2FC are the CONTRACT inputs plus 7CB9/7CBA (and 65D0 "
+            + "tuned). Trace: launch_closure_trace.txt (corrections item 108).");
+        count += labelComment(0x0003B76EL, "is_7CB8_eq1",
+            "[DECODED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFF7CB8 I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003BCCCL, "set_7CE6_FF",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFF7CE6 I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003BCD4L, "is_7CE0_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFF7CE0 I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003BCDEL, "is_7CE5_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFF7CE5 I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003BDBEL, "is_7CE8_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFF7CE8 I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003C374L, "thunk_to_03C3A4",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03C3A4. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003C378L, "thunk_to_03C6F0",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03C6F0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003C37CL, "chain5_03C3A4_03C76C",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x03C3A4 "
+            + "B=0x03C6B2 C=0x03C67A D=0x03C6D8 E=0x03C76C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003C392L, "thunk_to_03C516",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03C516. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003C396L, "chain3_03C3F4_03C6E0",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x03C3F4 "
+            + "B=0x03C440 C=0x03C6E0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0003C7EAL, "thunk_to_03C800",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03C800. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003C7EEL, "chain4_03C82E_03CAAE",
+            "[TRACED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x03C82E "
+            + "B=0x03C8FE C=0x03C972 D=0x03CAAE. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003CB62L, "is_7D2E_eq1",
+            "[DECODED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFF7D2E I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003CD00L, "init_7D58_block",
+            "[DECODED] init (caller 0x047C40): [7D58..7D64]=1.0, [7D70]=[0x0CC56C], u16 [7D74]=0xFFFF, byte "
+            + "[7D7D]=(byte [65F6]==1). Trace: injector_path_trace.txt (corrections item 114).");
+        count += labelComment(0x0003CD46L, "thunk_to_03D21A",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03D21A. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003D4F0L, "getw_7D80",
+            "[DECODED] Shape class 89: r0 = s16[A] (sign-extended). Member parameters: A=0xffff7d80. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0003D50EL, "pending_angle",
+            "[DECODED] Mode 0: rec+32 = trunc(0x02F8A6(word rec+4)*65536). Mode 1: rec+32 = "
+            + "trunc((180+[7280])*65536). Any other mode byte writes nothing. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003D552L, "call_02F8EA_tail_03D698_if1",
+            "[DECODED] Shape class 49: r = F() & 0xFF; if r == K (K = 1): tail-call G (r0 = 1 at G); else "
+            + "return r. Member parameters: F=0x2f8ea K=1 G=0x3d698. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0003D56AL, "call_02F8EA_tail_03D698_if0",
+            "[DECODED] Shape class 42: r = F(); if (r & 0xFF) == 0: tail-call G (r0 = r at G); else return r "
+            + "unchanged. Member parameters: F=0x2f8ea G=0x3d698. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0003D582L, "pending_duration",
+            "[DECODED] Mode 0: rec+24 = trunc(0x02F9E0 * [7DA4] / 0.25), the same for every event number. "
+            + "Mode 1: rec+24 = trunc([7290+4ch]*[7DA4]/0.25) for ch<=3. Both modes clear rec+36. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003D634L, "get_cal_0CBDB4",
+            "[DECODED] r0 = cal long [0x0CBDB4] (0x7850 in all three bins); r4 unused. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003D708L, "scheduler_record_init",
+            "[DECODED] Record init. Writes +0..+7, +8 target, +12 k, +16 hw, +17, +20, +24, +28 = +32 = "
+            + "720<<16, +36 (pads untouched). S+0/4/8/9/10 = 0, S+13 = 1, and 0x009E44 is called with cal long "
+            + "0x0CBDB4. Reached only on 0x047C40's [8EDC] == 0 path. Trace: fns_03D856_02EB02_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0003D856L, "angle_scheduler_4ch",
+            "[DECODED] Per-call angle scheduler over four 40-byte records at 0xFFFF7DA8. Angle = 30*(r4&0xFF, "
+            + "-24 once if >=24)<<16 on a 720<<16 cycle. Re-arm when d>=720; state 0 tests the status byte "
+            + "[0xFFFF429B+28*hw] first, then d<=100 -> state 2, else count once per arming and fire unless "
+            + "cut. An init request clears the fields and sets counts, and the main loop runs in the same call. "
+            + "A resync (0x03DB16) stores S+9/S+10, so ... Trace: fns_03D856_02EB02_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0003DB16L, "resync",
+            "[DECODED] Resync from byte [0xFFFF4167]. Stores S+9 = mode index and S+10 = mask. For each "
+            + "record: re-arm fields, 0x03D582, 0x03D50E, 0x009D48(hw), +28 = +32, then the new mode's check "
+            + "sets the state. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003DBF4L, "set_7E55_1",
+            "[DECODED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7E55 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003DBFCL, "scheduler_reset_counters",
+            "[DECODED] Calls 0x009D48(byte rec+16) for each record, then word S+0 = 0, long S+4 = 0, byte S+8 "
+            + "= 0. Record fields are not written. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003DD46L, "set_7E50_1",
+            "[DECODED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7E50 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003DD4EL, "driver_angle_fold_once",
+            "[DECODED] r0 = 30*byte[0xFFFF7E54] - 10 - r4 (16.16), with -720 once if >= 720 and +720 once if "
+            + "< 0. The byte is the unreduced step byte, so 255 -> 6920. Trace: fns_03D856_02EB02_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0003DFC8L, "fire_mode1",
+            "[DECODED] Mode-1 fire function: calls 0x009B2C(hw, rec+20, 0, angle) or 0x009C38/0x009D48 by "
+            + "sub-state. Calls 0x03E0FA when rec+2 != 0. Writes [7E50] = 1 unless rec+7 != 0, and never "
+            + "touches [7E4C]. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003E0BAL, "mode1_check",
+            "[DECODED] Mode-1 check: r0 = 1 iff d > rec+32 and d >= 0x03E0FA(rec+16). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003E0FAL, "duration_to_angle_check",
+            "[DECODED] r0 = 180*Q16div(rec+24 + cal long [0x0CBDB4] + [4280], [4158]) + rec+28. This is the "
+            + "calibration read of the 0x03D856 tree. Trace: fns_03D856_02EB02_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x0003E168L, "fire_mode0",
+            "[DECODED] Mode-0 fire function. rec+7 != 0 -> rec+2 = 2. 'Too early' (d - rec+28 >= 30deg) -> no "
+            + "driver call and rec+6 = 1. Otherwise calls 0x009A72(hw, rec+20, angle), then [7E4C] = sat+1 and "
+            + "[7E50] = 1 (only on those calls). Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0x0003E2B0L, "ret0_03E2B0",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003E2B4L, "thunk_to_03E2BC",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03E2BC. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003E2B8L, "thunk_to_03E352",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03E352. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003E4BCL, "thunk_to_03E4C4",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03E4C4. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003E4C0L, "thunk_to_03E54C",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x03E54C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0003E6CCL, "call_03E766_then_03E77E",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x03E766 B=0x03E77E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003E6D6L, "call_03E766_then_03E7C0",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x03E766 B=0x03E7C0. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003EA5AL, "set_7E75_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF7E75 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0003ED56L, "cap_load_value_7ECC",
+            "[DECODED] [7ED0] = 69.65 if [65C5]!=1 and word [5E74] >= 38, else by byte [6810]: 1/2/3 -> "
+            + "0x0ADAC0/0x0ADAD4/0x0ADAE8(x), 4/5 -> 10.0, other -> 69.7; [7ECC] = max([7ED0], "
+            + "0x0ADAAC([6350])). Lowest [7ECC] -2.07. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003EF58L, "trigger_7EED",
+            "[DECODED] [7EFE] = [6254]==1 ? sat16(+1) : 0; [7EED] = 0 if ([6254]==1 and [7EFE] > 100) or 0 > "
+            + "x, else ([7EEC]==1). No cut byte read. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003F00CL, "logged_timing_bounds",
+            "[DECODED] Writes the post-sum bounds of the logged cell: [7EC0] cap (OFF 69.65 and latch clear / "
+            + "LOAD [7ECC] every call while latch [7F09] set and [7EEA]==1 / RAMP +0.7), [7EC4] (69.65 for any "
+            + "real x), [7EC8] (loaded on rising edge of [7EED] from 0x0ADB10([620C]), -100/call when "
+            + "[7EED]==0), [7EE4] (-20.0 on every path with shipped tables). The cut byte reaches only [7EE8], "
+            + "[7F06] and the [7EEB] set test. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003FA8CL, "init_bounds_state",
+            "[DECODED] (bytes only) Init: [7ECC]=[7EC0]=[7EC4]=69.65, [7EDC]=12.0, words "
+            + "[7EFC]=[7EFE]=0xFFFF, [7EE8]=0xFF, [7EE4]=0x0ADA98([6350]). Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x0003FACEL, "reset_bounds_state",
+            "[DECODED] (bytes only) On [65F6]==1: resets 0x03F00C state incl. [7EC0]=[7EC4]=69.65, "
+            + "[7EF0]=[805C], [7F05]=[85D7], [7F09]=0, [7EE4]=0x0ADA98([6350]), [7EE8]=0xFF, "
+            + "[7F06]=([7C68]==1), [7EEB]=0, [7F0B]=[7EED]; never writes [7EC8]. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0003FBBCL, "blend_weight_7F10",
+            "[DECODED] k=[7F10]: -0.0156/call while [85D7]==1, +0.0156 otherwise, clamped 0..1 (65 calls end "
+            + "to end); jumps to the end only when already at an end and x >= 6000 / [65FC] >= 200 / [65FC] < "
+            + "0. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0004092AL, "init_7FD4_state",
+            "[DECODED] Seeds [7FD4]:=1.0, words [7FE6] [7FE8] [7FEA] [7FF8] [7FFC]:=0xFFFF, [7FF0]:=1, "
+            + "[7FFB]:=[90BE], [7FFF]:=[8E7E], [7FF2]:=[65C0], [7FF3]:=[85D7]; nothing else (write set exact). "
+            + "Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0x000409C0L, "edge_counters_7FE6_7FEA",
+            "[DECODED] [7FF0]:=M every call; [7FED]:=1,[7FE6]:=0 when [7FF0] not in {4,7,8} and M in it, else "
+            + "[7FE6]+=1 (sat). [7FEF]:=1,[7FEA]:=0 on byte [85D7]==1 with [7FF3]==0 and [726C]!=1; "
+            + "[7FEF]:=0,[7FEA]:=0xFFFF on [726C]==1; else [7FEA]+=1 (sat); [7FF3]:=[85D7]. Same pattern for "
+            + "[7FEE]/[7FE8]/[7FF2] on [65C0], with [65C5]==1 forcing [7FEE]:=0,[7FE8]:=0xFFFF. 1,944 runs, "
+            + "exact sets. Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0x00040A9CL, "flag_7FDC_writer",
+            "[DECODED] Stores byte [0xFFFF7FDC] on every call: 1 iff byte [726C]!=1 and ((byte [65C5]!=1 and "
+            + "byte [7FEE]==1 and u16 [7FE8] < u16 [0D29C2] and byte [65C0]==1) or (byte [7FEF]==1 and u16 "
+            + "[7FEA] < u16 [0D29C4])), else 0. [0D29C2]=0 both bins, [0D29C4]=438 (20.19c) / 0 (stock): never "
+            + "1 in stock. Trace: timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0x00040AF6L, "timing_integrator_bound_factors",
+            "[DECODED] Writes the bound factors [7FB0] [7FB4] [7FB8] [7FC4] [7FC8] [7FCC] [7FD0] [7FD4] (off "
+            + "literal 0xFFFF7FFC) and its counter/edge state (GBR 0xFFFF7FB0). Shipped data: "
+            + "[7FB0]=[7FB4]=20.0390625 iff byte [3158]==1 or byte [90BE]==1 else +0.0; [7FB8]=taper "
+            + "0x0ADD90/0x0ADDA4 at [6354]; [7FC4]=1.0; [7FD4]=+0.0 iff byte [9707]!=0 else 1.0. 31,920 "
+            + "whole-function runs, bit-exact, exact read and write sets. Trace: timing_bound_040AF6_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0x00041030L, "clamp_bound_7FC0_writer",
+            "[DECODED] Writes [0xFFFF7FC0] = [7FB8]*[7FB0]*[7FC4]*[7FD4]*0.01, then *[0x0D2B9C] (=0.0) when "
+            + "byte [67FC]==1: +-0.0 for a finite product, NaN for an infinite or NaN factor; finite "
+            + "overflowing factors give 0.0 only under round-toward-zero. Trace: timing_0410D4_0415B8_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x000410D4L, "clamped_integrator_7FBC",
+            "[DECODED] Clamped integrator of float [0xFFFF7FBC]: per call holds, steps down "
+            + "(0D2BB8/0D2BB0/0D2BAC/0D2BB4, or 0D2BC4..0D2BD4 when byte [67FC]==1) or steps up "
+            + "(0AE040/0AE054|0AE068/0AE07C|0AE090, or 0AE0B0|0AE0C4), each update through 0x0BE56C(x, lo=+0.0, "
+            + "hi=H=[0xFFFF7FC0]) = +0 if !(x>0), x if H>x, else H (NaN H passes for x>0). Latch byte [7FF4]:=1 "
+            + "when byte [69E6]==0 and NOT(-w>X or X>w), w=0.001373291015625 (NaN X ... Trace: "
+            + "timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0x000415B8L, "ramp_state_machine_8000",
+            "[DECODED] Ramp state machine: R'=[8004] rises min(R+0.7, target) in states 1/2/4, falls "
+            + "max(R-0.02,0) in states 3/5, reset to 0 when byte [65C1]!=0 and [0D297F]==90; states 2/4 targets "
+            + "are all zero so R'=+0 for R>=-0.7, R+0.7 for R<-0.7. Writes "
+            + "[8000]=max(R'-max([8258]-[81EC],0),0) on every call, plus [8014], [801C], [801E], [801F], and "
+            + "[8018] when acting in states 1/2/4. Trace: timing_0410D4_0415B8_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x00041954L, "reset_8020_block",
+            "[DECODED] Only when [65F6]==1: zeroes [8020] [8024] [8028] [802E] [8032] [8033] [8035] [8037] "
+            + "[802C] [802D], [8030]=0xFFFF, [8034]=[7C9A], [8036]=[65C0]. Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x000419BAL, "overrun_retard_sequence",
+            "[DECODED] No state of its own: bsr 0x041A02, bsr 0x041A48, bsr 0x041A7E, then bra 0x041BE4 with "
+            + "PR restored in the slot. Called once per pass of task body 0x04AA58 (04AC18), after 0x03AAA4 and "
+            + "before 0x03F00C / 0x03F368. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x000419CCL, "cut_counters_802E_8030",
+            "[DECODED] [7C9D]==1: [802E] = sat16(+1), [8030]=0; else [802E]=0, [8030] = sat16(+1). Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041A02L, "mode_gate_802C",
+            "[DECODED] [802C] = 1 iff ([8E09]==0 or [8E0D]==1) and [6350] > 200.0 and 0.0 > [63F8] and 0.0 > "
+            + "x; written every call. 0 for physical inputs with the shipped cal. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041A48L, "edge_latch_802D",
+            "[DECODED] [8037] = [7C9D] every call; [802D] = 0 if [85D7]==1, else on a falling edge of [7C9D] "
+            + "0 if [7C78] > x else 1, else unchanged. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041A7EL, "mode_machine_8024",
+            "[DECODED] Mode 0..3 from [802C]/[7C9D]/[802D]/[802E]/[8030]/[43FC]; mode 1/2: [8024] = "
+            + "min([8024] + table(x), 0) with all-zero tables 0x0AE17C/0x0AE170; mode 3: [8024] = 0x0D2C28 "
+            + "(0.0); else 0.0. [8035] = mode. Neutral by calibration (code live: patched copy emulated). "
+            + "Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041BE4L, "cut_exit_retard_8028",
+            "[DECODED] Arm on [7C78] > x and previous-call tier [8034]==4 (every such call, no edge test): "
+            + "[8032]=0,[8033]=1 and [8020] = 0x0ADE08([6350]) in the same call; else counters decrement; ramp "
+            + "[8020] = min([8020]+0.7, 0); reset to 0 on ([65C5]!=1 and [5E94]<4) or [6254]==0 or [6634] < -20 "
+            + "or x < 0. [8028] = min([8020],[8024]); [8034]=[7C9A]; [8036]=[65C0]. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x00041D84L, "zero_rec_3204",
+            "[TRACED] Shape class 31: tail-call F = 0x0BDBCC with r4 = A (a RAM address) and fr4 = 0.0. By "
+            + "the 0x0BDBCC contract Member parameters: A=0xffff3204 F=0xbdbcc. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00042368L, "enable_bit_owner",
+            "[DECODED] Sibling called two calls earlier by 0x04907C. Recomputes W bit 0x0200 as a hysteresis "
+            + "of B (on at B>=1.56, off below 0.537) and stores W on every call; counts calls with F bit1 set "
+            + "in u16 0xFFFF8078; sets F bit1 (042474) only when F bit0 set, [8078]<88, [8076]<25, not(W&4 and "
+            + "not W&2), and W&0x0200; clears F bit1 and W bit0 when any of the first four fails; otherwise "
+            + "leaves F unchanged. Trace: fn_042506_trace.txt (corrections item 107).");
+        count += labelComment(0x00042E88L, "test_8098_m20",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8098 M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00042ED8L, "term_80B4_42ED8",
+            "[DECODED] [79C8]==1: [80B4] = max([80B4]-0.5, 0x0AE514(x,[63F8]) = 0); else min([80B4]+0.01, 0). "
+            + "0.0 is a fixed point; reaches 0.0 from any start (NaN included) whatever [79C8] does. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x000432B0L, "set_80C8_FF",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFF80C8 I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00044132L, "set_81AC_FF",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFF81AC I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004438CL, "fbkc_update_81F0",
+            "[DECODED] FBKC routine, decoded only on its [8234] and [81F0] paths. A head chain that never "
+            + "reads [8234] runs first: bit 6 of [61F4] -> [81F0]=0.0; [7E76]==1, [7F10] outside 1 +- 2^-8, or "
+            + "[824A]==1 -> relax min(x+0.35, 0); [970E] or [9718] != 0 -> -5.0; [824C] != 1 -> [81FC]. After "
+            + "that come blocks A, B, C and the main block, each gated by [8234]==1 and [824B]==[824C]==1, with "
+            + "steps 0.0 / 1.4, floor -11.799999 ... Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0x000448F4L, "fbkc_step_enable_8234",
+            "[DECODED] Writes byte [0xFFFF8234] := 1 if any of G1..G23 holds, else 1 iff [798C] > 0 and u8 "
+            + "[8249] < 63 (the [8253] tail term needs byte 0x0D299A == 90, and it is 0). It also clears [8249] "
+            + "when [798C] is not > 0, and updates [824D] and [8253] through 0x0457D2 / 0x0457F4. It runs only "
+            + "on 0x04AA58 passes with byte [8EDC] == 0. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0x00044DB0L, "load_lag_and_delta",
+            "[DECODED] [81F4] = lag([63F8], k=0.03125, snap 2^-14); [81F8] = [63F8] - [81F4]. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0x000457D2L, "rpm_hyst_824D",
+            "[DECODED] byte [824D] := 1 if 1500.0 > fr4; := 0 if not (1600.0 > fr4), NaN included; otherwise "
+            + "unchanged. The limits are 0x0D2F6C / 0x0D2F70. Trace: fn_0448F4_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0x000457F4L, "thresh_79A8_to_8253",
+            "[DECODED] byte [8253] := 1 if not (10000 > [79A8]); else := 0 if 10000 > [79A8]. Both limits are "
+            + "10000.0 as shipped, so the byte is written on every call. Trace: fn_0448F4_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00045970L, "kc_adv_max_blend",
+            "[DECODED] [826C] = T(0x0AE664) = 0.0 (the table is all zero). [8258] = (1-w)T(0x0AE680) + "
+            + "wT(0x0AE69C), w=[90A8]. It overwrites [8258] and does not accumulate. Trace: fn_0448F4_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0x00045F0AL, "zero_rec_3234",
+            "[DECODED] Shape class 31: tail-call F = 0x0BDBCC with r4 = A (a RAM address) and fr4 = 0.0. By "
+            + "the 0x0BDBCC contract Member parameters: A=0xffff3234 F=0xbdbcc. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000469C6L, "set_829C_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF829C I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00046A3AL, "set_829D_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF829D I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00046A42L, "set_82A0_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF82A0 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00046DB8L, "get_s8_7E75",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF7E75. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00046DCAL, "ret0_046DCA",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000471E2L, "jmp_to_046DCE",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x046DCE. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000475A8L, "set_831D_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF831D I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00047604L, "get_s8_8318",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8318. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004AF7CL, "jmp_to_05AB14",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05AB14. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004AF82L, "jmp_to_05AB2C",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05AB2C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004B288L, "setpair_33A8_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF33A8 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004B4DEL, "jmp_to_05A97C",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05A97C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004B4E4L, "jmp_to_05AA24",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05AA24. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004B4EAL, "jmp_to_05AA2A",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05AA2A. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0004E82EL, "test_83AC_m80",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF83AC M=0x80 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0004E83AL, "test_83AC_m40",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF83AC M=0x40 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0004E846L, "test_83AC_m20",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF83AC M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0004E852L, "test_83AC_m10",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF83AC M=0x10 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0004E85EL, "test_83AC_m02",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF83AC M=0x02 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0004E86AL, "test_83AC_m01",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF83AC M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0004F2E8L, "copyf_8550_8434",
+            "[TRACED] Shape class 36: f32[B] = f32[A] (a 32-bit copy through fr8; fr8 is left holding the "
+            + "value). Member parameters: A=0xffff8550 B=0xffff8434. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000500E4L, "thunk_to_050222",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x050222. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00050E08L, "thunk_to_051A50",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x051A50. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005305EL, "byte_copy_5305E",
+            "[DECODED] Class 50 (4): u8[B] = u8[A]; r6 = s8[A]. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000530B8L, "call_0530C2_then_0530E4",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0530C2 B=0x0530E4. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00053228L, "chain5_053248_053546",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x053248 "
+            + "B=0x05336A C=0x0533DE D=0x053498 E=0x053546. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005323EL, "copyb_65BF_8A80",
+            "[TRACED] Shape class 50: u8[B] = u8[A]; r6 = s8[A]. (Same effect as class 40 with r6 and r2 "
+            + "exchanged.) Member parameters: A=0xffff65bf B=0xffff8a80. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000535A0L, "chain5_05390A_0536BC",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x05390A "
+            + "B=0x0535CA C=0x053610 D=0x05363A E=0x0536BC. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000539B0L, "chain3_053AF8_0539C8",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x053AF8 "
+            + "B=0x053A76 C=0x0539C8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x000539BEL, "copyb_8E46_8AE1",
+            "[TRACED] Shape class 50: u8[B] = u8[A]; r6 = s8[A]. (Same effect as class 40 with r6 and r2 "
+            + "exchanged.) Member parameters: A=0xffff8e46 B=0xffff8ae1. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00053C16L, "chain4_053D78_053C2C",
+            "[TRACED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x053D78 "
+            + "B=0x053C44 C=0x053C7E D=0x053C2C. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00053C28L, "thunk_to_053CEA",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x053CEA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00055568L, "call_0555A0_then_055896",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0555A0 B=0x055896. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00055572L, "chain5_0558AC_055856",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x0558AC "
+            + "B=0x055716 C=0x0556F0 D=0x0556A0 E=0x055856. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000559C4L, "call_0559CE_then_0559D8",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0559CE B=0x0559D8. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000559CEL, "copyf_8C58_8C50",
+            "[TRACED] Shape class 36: f32[B] = f32[A] (a 32-bit copy through fr8; fr8 is left holding the "
+            + "value). Member parameters: A=0xffff8c58 B=0xffff8c50. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000559D8L, "byte_eq1_flag_559D8",
+            "[DECODED] Class 66 (3): u8[B] = (u8[A] == 1). Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x000559F8L, "copyb_5F94_8C79",
+            "[TRACED] Shape class 40: u8[B] = u8[A]; r2 = s8[A] (sign-extended copy left in r2). Member "
+            + "parameters: A=0xffff5f94 B=0xffff8c79. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00055BD4L, "empty_fn_055BD4",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00055F58L, "copyb_65A9_8CD0",
+            "[TRACED] Shape class 50: u8[B] = u8[A]; r6 = s8[A]. (Same effect as class 40 with r6 and r2 "
+            + "exchanged.) Member parameters: A=0xffff65a9 B=0xffff8cd0. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00055FB8L, "conditional_pair1_store_FFFF3474",
+            "[TRACED] Not a class member. Stores word 0x01FE (pair(1) via 0x0BE9A0) to 0xFFFF3474 iff all "
+            + "four tests (byte[2F48]==1 or byte[A5DF]==1), (byte[2566]==1 or byte[6ACE]==1), (byte[2568]==1 or "
+            + "byte[6ACF]==1), (byte[2E3E]==1 or byte[A38F]==1) pass. Otherwise it writes nothing. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00056022L, "setpair_3474_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF3474 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00057AD6L, "empty_fn_057AD6",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00057B90L, "set_8D75_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF8D75 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00057FC8L, "empty_fn_057FC8",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000582ACL, "classify_byte_36F4",
+            "[DECODED] r0 = 1 if byte 0xFFFF36F4 == 0xFF, 2 if it is 0xA5, else 0. No write. Trace: "
+            + "revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x000584D2L, "is_AE0A_eq1",
+            "[DECODED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFFAE0A I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000584DCL, "is_AE0B_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFFAE0B I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000584E6L, "is_AE0C_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFFAE0C I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000584F0L, "is_AE0D_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFFAE0D I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000584FAL, "is_AE0E_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFFAE0E I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00058504L, "is_AE0F_eq1",
+            "[DECODED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFFAE0F I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005852AL, "get_s8_AD45",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFFAD45. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00058530L, "is_AF34_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFFAF34 I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005853AL, "is_AF33_eq1",
+            "[TRACED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFFAF33 I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000587FCL, "empty_fn_0587FC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000588F0L, "call_058944_then_058992",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x058944 B=0x058992. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000588FAL, "thunk_to_058964_0588FA",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x058964. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000588FEL, "thunk_to_058964_0588FE",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x058964. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00058918L, "empty_fn_058918",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005891CL, "thunk_to_058992",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x058992. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00058920L, "call_05892A_then_058944",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x05892A B=0x058944. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00058A84L, "set_B018_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFB018 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00058A8CL, "jmp_to_0983E4",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x0983E4. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00058A9CL, "ret0_058A9C",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00058AA0L, "set_8E17_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF8E17 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005940AL, "set_8E30_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF8E30 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000594F8L, "latch_8E38_from_4144",
+            "[DECODED] [8E38]:=f32[4144]; [8E61]:=([65F6]==1); u16 [8E3C]:=0xFFFF. Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005951CL, "request_chain_dispatcher",
+            "[DECODED] [8E5B]:=[65C2]; calls 0x05979C..0x059DB4 incl. 0x059862, 0x059AE2, 0x059C3A; "
+            + "[8E5C]:=[8E5B]. Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005979CL, "relatch_8E38_on_65C2_edge",
+            "[DECODED] If [8E5B]==1 && [8E5C]==0: [8E38] := [9705]==0 ? [4144] : 70.0. Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x00059862L, "request_byte_8E44",
+            "[DECODED] [8E44] := 0 unless [8E58] on, [682C] in [3,120), !([3666]!=0&&[225C]!=0), "
+            + "[9720]/[9705]/[9706]/[9707]/[9714] flags 0, [65F6]!=1, [65BD]==1; then [8E5B]/[8E46]/[4166] "
+            + "rule. Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x00059AE2L, "request_byte_8E45",
+            "[DECODED] [8E50]:=0.0 (table 0x0AF4F0); [8E45] := 0<=[8E38]<60 (NaN fails) && [366A]==1 && "
+            + "([85D7]==0 || !([8E50]>[7FBC])). Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x00059C3AL, "output_8E46",
+            "[DECODED] [8E46] state machine (min on-time 31 calls; normal: set only while [8E44]==1); drives "
+            + "bit 0x10 of 0xFFFFF754; edge events 5/6 via latch [8E60]. Trace: special_exit_gate_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0x00059F94L, "request_term_dispatcher",
+            "[DECODED] [8E7B]:=[8E65]; bsr 0x05A3F6, 0x059FB4, 0x05A218, 0x05A066, 0x05A26E; tail bra "
+            + "0x05A498. Called only from 0x049CF0's [8EDC]==0 arm, immediately after 0x05951C. Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x00059FB4L, "request_byte_8E64",
+            "[DECODED] [8E64] := [8E78]==1 && [9720]==0 && ([8E7D]==1 || ([8E46]==1 && [8E76]>=10)); [8E78] "
+            + "10.9/8.9 hysteresis on [4130]. Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005A066L, "request_byte_8E65",
+            "[DECODED] [8E6C]/[8E70] := T1D 0x0AF51C/0x0AF530([6624]); [8E79] hysteresis ([63C4] >= [8E6C] "
+            + "on, < [8E6C]-5 off); [8E7A] hysteresis ([2200]-[620C] <= [8E70] on, > [8E70]+100 off); u16 "
+            + "[8E74] counts consecutive [7C68]==1; [8E65]:=1 if [8E79] or [8E7A] or [8E74]>=313 or "
+            + "([8E66]==1&&[A733]==0&&[A734]==0), else ([8E6A]==1). u8 [0x0D93B1] term dead. Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005A218L, "latch_8E66_8E67",
+            "[DECODED] If sat_s32([8E3E]-[3660]) <= u16[0x0D93BA]=78: [8E66]:=1 if [A733]==1 or [A734]==1; "
+            + "[8E67]:=1 if both. Never clears; only resolved writer of both bytes. Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005A26EL, "request_byte_8E68",
+            "[DECODED] [8E7C]:=0 if [8E46]==0, :=1 on rising edge of [8E65] with [365C]>=3125 or [3664]>=1; "
+            + "[8E68] by 12 ordered rules, rule 1 [225C]==0 -> 1; [8E69]=1 only on rules 10/11. Writes only "
+            + "[8E68] [8E69] [8E7C]. Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005A3F6L, "inhibit_8E6A",
+            "[DECODED] [8E6A] := ([68ED]==1&&[8E45]==0) || [68EC]==1 || ([3666]==1&&[225C]==1). Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005A498L, "output_sequencer_8E7E",
+            "[DECODED] Output sequencer. [8E7E] := ([8E7F]==1||[8E80]==1) on P1 (diag==1 and bit0 [8F1E] or "
+            + "bit7 [8F21]); := 1 on BOTH/ON20/ON40; := 0 on CLEAR; else unchanged. In normal mode every set "
+            + "sits behind r5==1 (0x05A79A); CLEAR needs r14 and (r5==0 or r5==1 with [A733]==[A734]==1). "
+            + "Drives bits 0x20/0x40 of 0xFFFFF754 every call. Trace: special_exit_gate_trace.txt (corrections "
+            + "item 111).");
+        count += labelComment(0x0005A8B8L, "output_edge_event",
+            "[DECODED] Edge poster: r4!=0 clears latch; r5==1 with latch 0 -> 0x00DCE4(0,5), latch:=1; r5==0 "
+            + "with latch 1 -> 0x00DCE4(0,6), latch:=0. Trace: special_exit_gate_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0x0005AA24L, "jmp_to_05EC76",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05EC76. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005AA2AL, "jmp_to_05ED02",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05ED02. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005AB14L, "masked_byte_increment",
+            "[DECODED] Class 111 (2): m = 0x00317C(r4 = 0x10); u8[A] += 1; tail-call 0x003190(r4 = m): masked "
+            + "byte increment. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005AE92L, "jmp_to_05B510",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05B510. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005AE98L, "jmp_to_05B574",
+            "[TRACED] Shape class 20: jmp T via r2 -- tail-jump thunk Member parameters: T=0x05B574. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005B5D8L, "window_test_to_8EDA",
+            "[DECODED] 8EDA := 1 iff A and B lie within +-60 of F (on the first or second try, registers "
+            + "re-read for the second) and F lies within +-60 of 3600 (CNT<8) or 5400 (CNT>=8). Trace: "
+            + "revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005B690L, "set_V_word_8ECC",
+            "[DECODED] V := 1 iff bit 1 of 0x006BC4(17) is 0 and byte 8EDA == 1; 8EE8 := 0/1/2; word 8ECC := "
+            + "build16(V); shadow 8EF6 := V. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005B73CL, "update_cnt_3694_lim_8EEE",
+            "[DECODED] CNT (byte 3694) +1 saturating when V==1 and byte ACF6==0. LIM (8EEE) := cal 9/7/5 "
+            + "selected by 36A6/36A2, floored at 2 when 8EE8==1. Float 8EBC is updated only when 8EE8==1. "
+            + "Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005CA22L, "setpair_3692_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF3692 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005CB1CL, "write_gate_8EDC_from_V_cnt_lim",
+            "[DECODED] g = (V==1) ? (CNT>=LIM unsigned ? 0xFF : 0xA5) : 0x00; word 0xFFFF8EDC := g:~g, byte "
+            + "0xFFFF8EED := g. Writes only these three values; it is the only value writer of the gate and has "
+            + "a single call site, 0x047964. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005CBC8L, "scrub_word_8EDC_with_shadow_8EED",
+            "[DECODED] If word 8EDC is value:~value, shadow 8EED := its high byte. Otherwise word := "
+            + "build16(shadow), and the shadow then decides the byte readers see (A500/00 -> 00FF, AAAA/AA -> "
+            + "AA55, 5555/FF -> FF00). Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005CC9AL, "read_validated_byte_8ECC",
+            "[DECODED] r0 = high byte of word 0xFFFF8ECC if it is consistent (shadow 8EF6 := it), else shadow "
+            + "byte 0xFFFF8EF6. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0x0005CE40L, "setpair_36B4_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF36B4 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D1CAL, "rom_const_byte_064238",
+            "[DECODED] Class 67 (3): r0 = s8[C], C a fixed ROM address (0x05D1CA returns s8[0x064238] = 0). "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D1D0L, "getter_const_FF",
+            "[DECODED] Default getter for 486 indices: r0 = s8[ROM 0x064239] = 0xFF (class G00, example "
+            + "listed at 0x05D1CA which returns ROM 0x064238 = 0x00 for 17 indices). Trace: "
+            + "stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0005D204L, "float_offset_to_u8",
+            "[DECODED] Class 51 (4): r0 = sat8(f32[X] - OFF) & 0xFF (x + 40 or x + 50). Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D308L, "const_via_sat8_5D308",
+            "[DECODED] Class 114 (2): constant 128. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D31EL, "float_to_u8_scaled_5D31E",
+            "[DECODED] Class 14 (18 members): r0 = clamp(trunc(float[K]/C + 0.5), 0, 255) via 0x0BE5A8. "
+            + "Saturation starts at x/C = 254.5. On return r4 = r0, r5 = 255, r2 = 0x0BE5A8, fr2 = x/C+0.5, fr3 "
+            + "= 0.5, fr4 = x/C, fr5 = C, fr6 = 0, FPUL = the pre-clamp trunc, and T = (that trunc >= 0). "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D354L, "float_to_u16_scaled",
+            "[DECODED] Class 52 (4): r0 = sat16(f32[X]/SC) & 0xFFFF. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005D36AL, "float_to_u8",
+            "[DECODED] Class 68 (3): r0 = sat8(f32[X]) & 0xFF. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005D37EL, "ssm_get_7E90",
+            "[DECODED] SSM getter table 0x06423C entry 0x11: r0 = clamp(trunc(([7E90] + 64)/0.5 + 0.5), 0, "
+            + "255). Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0x0005D396L, "f2u8_4128",
+            "[TRACED] Shape class 51: r0 = sat8(f32[X] - OFF) & 0xFF (scale 1.0): (x + 40) or (x + 50) "
+            + "rounded half-up and clamped to 0..255. Member parameters: X=0xffff4128 F=0xbe5a8 OFF=@05D5B4:-40 "
+            + "(C2200000). Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005D3CCL, "f2u16_63C4",
+            "[TRACED] Shape class 52: r0 = sat16(f32[X] / SC) & 0xFFFF (offset 0.0): x/0.25, x/0.01, "
+            + "x/0.005, x/0.01 by member. Member parameters: X=0xffff63c4 F=0xbe5d8 SC=@05D5BC:0.00999999978 "
+            + "(3C23D70A). Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005D3E2L, "f2u8_62D4",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF62D4 C=0.31372547149658203 (0x3EA0A0A0 @ 0x05D5C4). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D3FCL, "ret0_05D3FC",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D420L, "f2u16_43FC",
+            "[TRACED] Shape class 52: r0 = sat16(f32[X] / SC) & 0xFFFF (offset 0.0): x/0.25, x/0.01, "
+            + "x/0.005, x/0.01 by member. Member parameters: X=0xffff43fc F=0xbe5d8 SC=@05D5CC:0.00499999989 "
+            + "(3BA3D70A). Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005D43AL, "ret0_05D43A",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D43EL, "f2u8_4130",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF4130 C=0.07999999821186066 (0x3DA3D70A @ 0x05D5D4). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D478L, "f2u8_7D84",
+            "[DECODED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF7D84 C=256.0 (0x43800000 @ 0x05D5EC). Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D4A6L, "f2u8_689C",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF689C C=7.500634670257568 (0x40F00533 @ 0x05D590). Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D4F8L, "f2u8_64D8",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF64D8 C=0.39215683937072754 (0x3EC8C8C8 @ 0x05D604). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D50EL, "const_via_sat8_5D50E",
+            "[DECODED] Class 38 (6): 0x0BE5A8 with fr4 = 0.0: constant 40 40 50 50 128 40 by member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D522L, "f2u8_6388",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF6388 C=0.019999999552965164 (0x3CA3D70A @ 0x05D5E4). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D538L, "const_zero_via_sat8",
+            "[DECODED] Class 53 (4): constant 0 via 0x0BE5A8(0.0, 0.0, 1.0). Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005D54AL, "f2u8_5C98",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF5C98 C=0.3919999897480011 (0x3EC8B439 @ 0x05D610). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D668L, "ret0_05D668",
+            "[TRACED] Shape class 53: returns the CONSTANT 0: 0x0BE5A8(fr4 = 0.0, fr6 = 0.0, fr5 = 1.0) = "
+            + "trunc(0.5) = 0. Member parameters: F=0xbe5a8. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D67AL, "ret0_05D67A",
+            "[TRACED] Shape class 53: returns the CONSTANT 0: 0x0BE5A8(fr4 = 0.0, fr6 = 0.0, fr5 = 1.0) = "
+            + "trunc(0.5) = 0. Member parameters: F=0xbe5a8. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D68CL, "f2u8_8354",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF8354 C=0.3913894295692444 (0x3EC86432 @ 0x05D850). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D6A2L, "f2u8_9164",
+            "[TRACED] Shape class 51: r0 = sat8(f32[X] - OFF) & 0xFF (scale 1.0): (x + 40) or (x + 50) "
+            + "rounded half-up and clamped to 0..255. Member parameters: X=0xffff9164 F=0xbe5a8 OFF=@05D858:-50 "
+            + "(C2480000). Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005D6B8L, "f2u8_9168",
+            "[TRACED] Shape class 51: r0 = sat8(f32[X] - OFF) & 0xFF (scale 1.0): (x + 40) or (x + 50) "
+            + "rounded half-up and clamped to 0..255. Member parameters: X=0xffff9168 F=0xbe5a8 OFF=@05D858:-50 "
+            + "(C2480000). Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005D6CEL, "f2u8_91C4",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF91C4 C=0.39215683937072754 (0x3EC8C8C8 @ 0x05D864). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D6E4L, "f2u8_91C8",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF91C8 C=0.39215683937072754 (0x3EC8C8C8 @ 0x05D864). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D6FAL, "f2u8_643C",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF643C C=0.03199999779462814 (0x3D03126E @ 0x05D870). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D710L, "f2u8_6448",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF6448 C=0.03199999779462814 (0x3D03126E @ 0x05D870). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D726L, "f2u8_40E0",
+            "[TRACED] Shape class 37: r0 = sat8((f32[X] - OFF) / SC) & 0xFF, i.e. 0x0BE5A8(fr4 = f32[X], fr6 "
+            + "= f32@OFF, fr5 = f32@SC) then extu.b. Member parameters: X=0xffff40e0 F=0xbe5a8 OFF=@05D87C:-16 "
+            + "(C1800000) SC=@05D880:0.125 (3E000000). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D73EL, "const_via_sat8_5D73E",
+            "[DECODED] Class 69 (3): constant 128 / 64 / 128 via 0x0BE5A8 with fr4 = 0.0. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D768L, "ret0_05D768",
+            "[TRACED] Shape class 53: returns the CONSTANT 0: 0x0BE5A8(fr4 = 0.0, fr6 = 0.0, fr5 = 1.0) = "
+            + "trunc(0.5) = 0. Member parameters: F=0xbe5a8. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D77AL, "f2u8_653C",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF653C C=0.0078125 (0x3C000000 @ 0x05D88C). Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005D790L, "return_0_via_f2u8",
+            "[DECODED] Class 25 (10 members): r0 = 0 for every entry state, because 0x0BE5A8 is called on the "
+            + "constant 0.0. It reads no RAM beyond its own PR push/pop. On return r4 = 0, r5 = 255, r2 = "
+            + "0x0BE5A8, fr2 = fr3 = 0.5, fr4 = fr6 = +0.0, fr5 = C, FPUL = 0 and T = 1. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DAEEL, "return_zero",
+            "[DECODED] Class 39 (6): r0 = 0; dead byte store into a released 4-byte frame. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DC32L, "ret0_05DC32",
+            "[TRACED] Shape class 39: returns r0 = 0. The only other effect: the byte at (caller's r15) - 4 "
+            + "-- below the stack pointer, in a frame Member parameters: S1=-4 V=0 S2=4. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DC3CL, "ret0_05DC3C",
+            "[TRACED] Shape class 39: returns r0 = 0. The only other effect: the byte at (caller's r15) - 4 "
+            + "-- below the stack pointer, in a frame Member parameters: S1=-4 V=0 S2=4. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DC46L, "ret0_05DC46",
+            "[TRACED] Shape class 39: returns r0 = 0. The only other effect: the byte at (caller's r15) - 4 "
+            + "-- below the stack pointer, in a frame Member parameters: S1=-4 V=0 S2=4. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DC82L, "get_s8_36BA",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF36BA. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DC88L, "get_s8_36BC",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF36BC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DC8EL, "get_s8_8F11",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F11. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DC94L, "read_u8_byte",
+            "[DECODED] Class 19 (13 members): r0 = zero-extended byte[K], r2 = sign-extended byte, r6 = K. "
+            + "Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DC9CL, "get_u8_8F1E",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF8F1E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DCA4L, "get_s8_837C",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF837C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DCAEL, "read_FFFFAD52_rom_remapped",
+            "[DECODED] Not a class member. k = ROM byte[0x065C2E + (r4 & 0xFFFF)], then r0 = 0x05850E(r4 = k) "
+            + "= byte[0xFFFFAD52 + k]. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DCC8L, "get_s8_837D",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF837D. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DCE8L, "get_s8_340E",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF340E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DCEEL, "get_s8_9FD1",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9FD1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DCF4L, "get_s8_9FD2",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9FD2. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DCFAL, "f2u8_7904",
+            "[DECODED] Shape class 37: r0 = sat8((f32[X] - OFF) / SC) & 0xFF, i.e. 0x0BE5A8(fr4 = f32[X], fr6 "
+            + "= f32@OFF, fr5 = f32@SC) then extu.b. Member parameters: X=0xffff7904 F=0xbe5a8 "
+            + "OFF=@05DDDC:-0.049999997 (BD4CCCCC) SC=@05DDE0:0.000781249953 (3A4CCCCC). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DD2AL, "ret0_05DD2A",
+            "[TRACED] Shape class 39: returns r0 = 0. The only other effect: the byte at (caller's r15) - 4 "
+            + "-- below the stack pointer, in a frame Member parameters: S1=-4 V=0 S2=4. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DEA0L, "get_s8_9FD3",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9FD3. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DEA6L, "get_s8_9FD4",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9FD4. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DEC2L, "ret0_05DEC2",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFBAL, "get_s8_8F0E",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F0E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFC0L, "get_s8_8F0F",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F0F. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFC6L, "get_s8_8F10",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F10. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFCCL, "get_s8_8378",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8378. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFD2L, "get_s8_8379",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8379. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFD8L, "get_s8_837A",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF837A. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFDEL, "get_s8_36B8",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF36B8. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFE8L, "ret0_05DFE8",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005DFECL, "f2u8_3234",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF3234 C=0.0625 (0x3D800000 @ 0x05E0CC). Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E002L, "f2u8_8D4C",
+            "[TRACED] Shape class 37: r0 = sat8((f32[X] - OFF) / SC) & 0xFF, i.e. 0x0BE5A8(fr4 = f32[X], fr6 "
+            + "= f32@OFF, fr5 = f32@SC) then extu.b. Member parameters: X=0xffff8d4c F=0xbe5a8 OFF=@05E0D4:-100 "
+            + "(C2C80000) SC=@05E0D8:0.78125 (3F480000). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E01AL, "f2u8_6598",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF6598 C=0.07999999821186066 (0x3DA3D70A @ 0x05E0E0). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E160L, "ret0_05E160",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=7.500634670257568 (0x40F00533 @ 0x05E390). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E174L, "f2u8_4108",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF4108 C=7.500634670257568 (0x40F00533 @ 0x05E390). Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E1CAL, "f2u8_5EC0",
+            "[TRACED] Shape class 14: r0 = clamp(trunc(float [K] / C + 0.5), 0, 255) (via 0x0BE5A8) Member "
+            + "parameters: K=0xFFFF5EC0 C=0.7999999523162842 (0x3F4CCCCC @ 0x05E3AC). Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E1F8L, "get_s8_250C",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF250C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E1FEL, "get_s8_250E",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF250E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E204L, "get_s8_2510",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2510. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E20AL, "ret_const_05E20A",
+            "[TRACED] Shape class 38: returns a CONSTANT: r0 = sat8((0.0 - OFF) / 1.0) = trunc(-OFF + 0.5) "
+            + "clamped: 40 40 50 50 128 40 by member. Member parameters: F=0xbe5a8 OFF=@05E3C0:-40 (C2200000). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E21EL, "ret0_05E21E",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=0.39215683937072754 (0x3EC8C8C8 @ 0x05E3C4). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E232L, "ret0_05E232",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=0.39215683937072754 (0x3EC8C8C8 @ 0x05E3C4). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E246L, "ret0_05E246",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=0.03199999779462814 (0x3D03126E @ 0x05E3C8). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E25AL, "ret0_05E25A",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=0.03199999779462814 (0x3D03126E @ 0x05E3C8). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E26EL, "ret_const_05E26E",
+            "[TRACED] Shape class 38: returns a CONSTANT: r0 = sat8((0.0 - OFF) / 1.0) = trunc(-OFF + 0.5) "
+            + "clamped: 40 40 50 50 128 40 by member. Member parameters: F=0xbe5a8 OFF=@05E3CC:-50 (C2480000). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E282L, "ret_const_05E282",
+            "[TRACED] Shape class 38: returns a CONSTANT: r0 = sat8((0.0 - OFF) / 1.0) = trunc(-OFF + 0.5) "
+            + "clamped: 40 40 50 50 128 40 by member. Member parameters: F=0xbe5a8 OFF=@05E3CC:-50 (C2480000). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E296L, "ret0_05E296",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=0.39215683937072754 (0x3EC8C8C8 @ 0x05E3C4). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E2AAL, "ret0_05E2AA",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=0.39215683937072754 (0x3EC8C8C8 @ 0x05E3C4). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E2BEL, "ret0_05E2BE",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=0.03199999779462814 (0x3D03126E @ 0x05E3C8). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E2D2L, "ret0_05E2D2",
+            "[TRACED] Shape class 25: r0 = 0 always (0x0BE5A8 on the constant input 0.0) Member parameters: "
+            + "C=0.03199999779462814 (0x3D03126E @ 0x05E3C8). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E47EL, "ret0_05E47E",
+            "[TRACED] Shape class 39: returns r0 = 0. The only other effect: the byte at (caller's r15) - 4 "
+            + "-- below the stack pointer, in a frame Member parameters: S1=-4 V=0 S2=4. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E488L, "get_u8_61CC",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF61CC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E490L, "get_u8_61CD",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF61CD. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E498L, "get_u8_61CE",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF61CE. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4A0L, "get_u8_61CF",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF61CF. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4A8L, "get_s8_20D4",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF20D4. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4AEL, "get_s8_20D6",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF20D6. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4B4L, "get_s8_20D8",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF20D8. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4BAL, "get_s8_20DA",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF20DA. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4C0L, "get_s8_B018",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFFB018. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4C6L, "get_s8_5DB6",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF5DB6. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4D0L, "ret0_05E4D0",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E4F4L, "f2u16_68D8",
+            "[TRACED] Shape class 52: r0 = sat16(f32[X] / SC) & 0xFFFF (offset 0.0): x/0.25, x/0.01, "
+            + "x/0.005, x/0.01 by member. Member parameters: X=0xffff68d8 F=0xbe5d8 SC=@05E69C:0.00999999978 "
+            + "(3C23D70A). Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005E50AL, "get_u8_8F1F",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF8F1F. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E512L, "get_u8_8F22",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF8F22. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E51AL, "get_s8_8F12",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F12. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E520L, "f2u8_5D70",
+            "[TRACED] Shape class 37: r0 = sat8((f32[X] - OFF) / SC) & 0xFF, i.e. 0x0BE5A8(fr4 = f32[X], fr6 "
+            + "= f32@OFF, fr5 = f32@SC) then extu.b. Member parameters: X=0xffff5d70 F=0xbe5a8 "
+            + "OFF=@05E6B4:-12.7999992 (C14CCCCC) SC=@05E6B8:0.099999994 (3DCCCCCC). Shape-matched and emulated "
+            + "per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E538L, "get_u8_8F21",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF8F21. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E540L, "get_u8_8F20",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF8F20. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E548L, "get_u8_8F23",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF8F23. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E550L, "get_s8_8F08",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F08. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E556L, "get_s8_8F09",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F09. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E57AL, "get_s8_8F13",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F13. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E5EEL, "get_s8_8E94",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8E94. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E5F4L, "f2u8_828C",
+            "[TRACED] Shape class 37: r0 = sat8((f32[X] - OFF) / SC) & 0xFF, i.e. 0x0BE5A8(fr4 = f32[X], fr6 "
+            + "= f32@OFF, fr5 = f32@SC) then extu.b. Member parameters: X=0xffff828c F=0xbe5a8 OFF=@05E6F0:-32 "
+            + "(C2000000) SC=@05E6F4:0.25 (3E800000). Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E622L, "get_u8_840D",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF840D. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E62AL, "get_u8_61D0",
+            "[TRACED] Shape class 19: r0 = zero-extended byte [K] Member parameters: K=0xFFFF61D0. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E632L, "get_s8_20DC",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF20DC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E718L, "getl_69B0",
+            "[DECODED] Shape class 106: r0 = u32[A]. Member parameters: A=0xffff69b0. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E722L, "ret0_05E722",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E726L, "ret_const_05E726",
+            "[TRACED] Shape class 38: returns a CONSTANT: r0 = sat8((0.0 - OFF) / 1.0) = trunc(-OFF + 0.5) "
+            + "clamped: 40 40 50 50 128 40 by member. Member parameters: F=0xbe5a8 OFF=@05E8E0:-128 (C3000000). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E73EL, "ret_const_05E73E",
+            "[TRACED] Shape class 38: returns a CONSTANT: r0 = sat8((0.0 - OFF) / 1.0) = trunc(-OFF + 0.5) "
+            + "clamped: 40 40 50 50 128 40 by member. Member parameters: F=0xbe5a8 OFF=@05E8E4:-40 (C2200000). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E752L, "get_s8_8F14",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F14. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E758L, "get_s8_8F15",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F15. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E75EL, "get_s8_8F16",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF8F16. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E764L, "put_8F0B",
+            "[DECODED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F0B. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E76AL, "null_setter",
+            "[DECODED] rts / nop: the null setter, at 816 setter indices; also the constant 0x09A680 compares "
+            + "against. Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0005E7B4L, "put_8F1E",
+            "[TRACED] Shape class 21: byte [K] = r4 (via r2) Member parameters: K=0xFFFF8F1E. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E7BAL, "empty_fn_05E7BA",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E7BEL, "empty_fn_05E7BE",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E7DAL, "putpair_8F0C",
+            "[TRACED] Shape class 44: r0 = F(r4 & 0xFF) with F = 0x0BE9A0; u16[A] = r0; return r0. By the "
+            + "0x0BE9A0 contract Member parameters: F=0xbe9a0 A=0xffff8f0c. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E7EAL, "setpair_8F0C_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF8F0C I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E822L, "put_8F0E",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F0E. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E828L, "put_8F0F",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F0F. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E82EL, "put_8F10",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F10. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E834L, "putpair_36B8",
+            "[TRACED] Shape class 44: r0 = F(r4 & 0xFF) with F = 0x0BE9A0; u16[A] = r0; return r0. By the "
+            + "0x0BE9A0 contract Member parameters: F=0xbe9a0 A=0xffff36b8. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E86CL, "put_8F1F",
+            "[TRACED] Shape class 21: byte [K] = r4 (via r2) Member parameters: K=0xFFFF8F1F. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E872L, "put_8F22",
+            "[TRACED] Shape class 21: byte [K] = r4 (via r2) Member parameters: K=0xFFFF8F22. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E878L, "put_8F12",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F12. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E87EL, "put_8F21",
+            "[TRACED] Shape class 21: byte [K] = r4 (via r2) Member parameters: K=0xFFFF8F21. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E884L, "put_8F20",
+            "[TRACED] Shape class 21: byte [K] = r4 (via r2) Member parameters: K=0xFFFF8F20. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E88AL, "put_8F23",
+            "[TRACED] Shape class 21: byte [K] = r4 (via r2) Member parameters: K=0xFFFF8F23. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E890L, "put_8F08",
+            "[TRACED] Shape class 21: byte [K] = r4 (via r2) Member parameters: K=0xFFFF8F08. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E896L, "put_8F09",
+            "[TRACED] Shape class 21: byte [K] = r4 (via r2) Member parameters: K=0xFFFF8F09. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E89CL, "put_8F13",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F13. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E8C4L, "put_8F14",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F14. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E8CAL, "put_8F15",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F15. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E8D0L, "put_8F16",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFF8F16. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005E994L, "call_05E99E_then_05E9F0",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x05E99E B=0x05E9F0. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005EA4EL, "test_8F1D_m80",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1D M=0x80 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EA5AL, "test_8F1D_m40",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1D M=0x40 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EA66L, "test_8F1D_m20",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1D M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EA72L, "test_8F1D_m10",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1D M=0x10 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EA7EL, "test_8F1D_m02",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1D M=0x02 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EA8AL, "test_8F1D_m01",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1D M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EA96L, "test_8F1E_m08",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1E M=0x08 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EAA2L, "test_8F1E_m04",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1E M=0x04 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EAAEL, "test_8F1E_m01",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1E M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EABAL, "test_8F1F_m01",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F1F M=0x01 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EAC6L, "test_8F20_m80",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F20 M=0x80 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EAD2L, "test_8F21_m80",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F21 M=0x80 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EADEL, "test_8F21_m40",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F21 M=0x40 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EAEAL, "test_8F21_m20",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F21 M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EAF6L, "test_8F21_m08",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F21 M=0x08 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB02L, "test_8F21_m04",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F21 M=0x04 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB0EL, "test_8F21_m02",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F21 M=0x02 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB1AL, "test_8F22_m80",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F22 M=0x80 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB26L, "test_8F22_m40",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F22 M=0x40 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB32L, "test_8F22_m20",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F22 M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB3EL, "test_8F22_m10",
+            "[DECODED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F22 M=0x10 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB4AL, "test_8F23_m80",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F23 M=0x80 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB56L, "test_8F23_m40",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F23 M=0x40 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB62L, "test_8F23_m20",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F23 M=0x20 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB6EL, "test_8F23_m10",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F23 M=0x10 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB7AL, "test_8F23_m08",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F23 M=0x08 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005EB86L, "test_8F23_m04",
+            "[TRACED] Shape class 5: r0 = ((byte [K] & M) != 0) -- single-mask flag test Member parameters: "
+            + "K=0xFFFF8F23 M=0x04 X=1. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0005F2FCL, "copy_request_bit0_to_flag15",
+            "[DECODED] Sets bit 15 of u16[0xFFFF9048] to bit 0 of u8[0xFFFF8F42]; the other 15 bits "
+            + "unchanged. Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0005F718L, "getter_dispatch_byte",
+            "[DECODED] If flags bit 6: u8[0xFFFF903C+pos] = getter[u16[0xFFFF8F28]](r4 = index) & 0xFF and "
+            + "bit 6 cleared; else the memory-pointer path. r0..r6 clobbered. Trace: stub_tables_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x0005F758L, "setter_dispatch_byte",
+            "[DECODED] With the interrupt mask raised (0x0BE81C/0x0BE82C): if flags bit 7, u16[0xFFFFEC0A] |= "
+            + "1; if bit 6, setter[u16[0xFFFF8F28]](r4 = sext8(u8[0xFFFF8F3C])); elif bit 5, "
+            + "u8[u32[0xFFFF9044]] = value; then u16[0xFFFFEC0A] &= ~1 unconditionally. No index range check "
+            + "here. Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0005F7E2L, "ret0_05F7E2",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005F87AL, "thunk_to_05FE08",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x05FE08. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0005FE74L, "empty_fn_05FE74",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0005FE78L, "empty_fn_05FE78",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00060026L, "empty_fn_060026",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006085EL, "zero_rec2_36C8",
+            "[TRACED] Shape class 47: call F = 0x0BDBCC with r4 = A1, fr4 = 0.0; then tail-call F2 = "
+            + "0x0BDBCC with r4 = A2 = A1 + 8, fr4 = 0.0: Member parameters: A1=0xffff36c8 F=0xbdbcc "
+            + "A2=0xffff36d0 F2=0xbdbcc. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0006114EL, "cruise_blend_weight_step",
+            "[DECODED] byte [90BE] := 0 if byte [972E]!=0 or byte [9705]!=0, else by g=[0x0D9AC4] (0 shipped "
+            + "-> [90C4]==1); then [90A8] := clamp([90A8] -/+ 0.008, 0, 1), down when [90BE]!=0. 2,646 runs. "
+            + "Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0x00061486L, "sel_90BC_eq1",
+            "[TRACED] Shape class 41: r0 = V1 if u8[A] == K else V0, with K = 1. 0x01FD7C: (== 1) ? 2 : 0. "
+            + "The other four: (== 1) ? 0 : 2. Member parameters: A=0xffff90bc K=1 V0=2 V1=0. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00061496L, "is_90BB_eq1",
+            "[DECODED] Shape class 10: r0 = (byte [K] == I) Member parameters: K=0xFFFF90BB I=1. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000614E4L, "ret0_0614E4",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000614E8L, "ret0_0614E8",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000614ECL, "ret0_0614EC",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000614F0L, "ret0_0614F0",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000616E4L, "set_9128_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF9128 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000616ECL, "empty_fn_0616EC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006290CL, "chain3_06297E_06291E",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x06297E "
+            + "B=0x062A46 C=0x06291E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0006291AL, "thunk_to_062A8E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x062A8E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000662C4L, "set_61E0_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF61E0 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000664CAL, "call_0582AC_tail_066626_if0",
+            "[TRACED] Shape class 42: r = F(); if (r & 0xFF) == 0: tail-call G (r0 = r at G); else return r "
+            + "unchanged. Member parameters: F=0x582ac G=0x66626. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000665BCL, "thunk_to_066F94",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x066F94. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00066626L, "ctl7904_window_edges_copy",
+            "[DECODED] [9314] = [318C] - lookup(0xACF64,[63CC]) and [9318] = [318C] + lookup(0xACF78,[63CC]). "
+            + "Trace: hole9_afl_trace.txt (corrections item 107).");
+        count += labelComment(0x00067B32L, "jmp_to_06B1D8",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x06B1D8. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006B410L, "set_9544_FF",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFF9544 I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006B450L, "thunk_to_06B716",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x06B716. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0006B4C4L, "call_06B4CE_then_06B5AE",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x06B4CE B=0x06B5AE. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006B754L, "thunk_to_06BA6A_06B754",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x06BA6A. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0006B7A4L, "thunk_to_06BA6A_06B7A4",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x06BA6A. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0006B864L, "chain3_06B872_06B93C",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x06B872 "
+            + "B=0x06B8B6 C=0x06B93C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0006BAD8L, "call_06BAE2_then_06BB52",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x06BAE2 B=0x06BB52. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006C000L, "call_06C00A_then_06C2A8",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x06C00A B=0x06C2A8. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006C3CEL, "set_9584_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF9584 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006C3D6L, "setpair_2498_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2498 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006C6D8L, "setpair_249C_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF249C I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006C6E8L, "setpair_249E_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF249E I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006C900L, "setpair_24A0_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF24A0 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006C910L, "setpair_24A2_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF24A2 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006CAF4L, "call_06CAFE_then_06CB98",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x06CAFE B=0x06CB98. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006CDB0L, "setpair_24A4_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF24A4 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006D20CL, "chain5_06D222_06D4C0",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x06D222 "
+            + "B=0x06D27A C=0x06D2DE D=0x06D3A8 E=0x06D4C0. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006D5EAL, "thunk_to_06D8A2",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x06D8A2. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0006D890L, "chain4_06DA84_06DB80",
+            "[TRACED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x06DA84 "
+            + "B=0x06DA9E C=0x06DB50 D=0x06DB80. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006E224L, "setpair_24E4_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF24E4 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006E47CL, "call_06E486_then_06E50E",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x06E486 B=0x06E50E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006E5BCL, "set_964E_FF_06E5BC",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFF964E I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006E5C4L, "set_964E_FF_06E5C4",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFF964E I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006E834L, "pair16_store",
+            "[DECODED] Class 117 (2): u32[A] = 0x0BE9B0(r4 & 0xFFFF); returns it. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0006E854L, "putpair_24F0",
+            "[TRACED] Shape class 44: r0 = F(r4 & 0xFF) with F = 0x0BE9A0; u16[A] = r0; return r0. By the "
+            + "0x0BE9A0 contract Member parameters: F=0xbe9a0 A=0xffff24f0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0006F5B4L, "thunk_to_06F5C2",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x06F5C2. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0006F5B8L, "call_06F6B4_then_06F6E2",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x06F6B4 B=0x06F6E2. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006F844L, "set4_96F5_0",
+            "[TRACED] Shape class 35: u8[A] = u8[A+D1] = u8[A+D2] = u8[A+D3] = V; r0 = V. V = 0 except "
+            + "0x026634 (V = 1). Member parameters: V=0 A=0xffff96f5 D1=+1 D2=+11 D3=+12. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0006F8B2L, "thunk_to_06F968",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x06F968. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0006F8B6L, "chain3_06F8C4_06FBAA",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x06F8C4 "
+            + "B=0x06FA10 C=0x06FBAA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0006FC04L, "setpair_2504_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2504 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0006FC14L, "call_06FC70_then_06FC56",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x06FC70 B=0x06FC56. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007042EL, "get_s8_2508",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2508. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070434L, "get_s8_2E38",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2E38. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007043AL, "get_s8_2560",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2560. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070440L, "get_s8_2E3E",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2E3E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070446L, "get_s8_2E3C",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2E3C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007044CL, "get_s8_2F48",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2F48. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070452L, "get_s8_2EB8",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2EB8. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070458L, "get_s8_2E2C",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2E2C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007045EL, "get_s8_9746",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9746. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070464L, "get_s8_9747",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9747. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007046AL, "get_s8_9748",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9748. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070470L, "get_s8_9749",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9749. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070476L, "get_s8_974A",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF974A. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007047CL, "get_s8_974B",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF974B. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070482L, "get_s8_9743",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9743. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070488L, "get_s8_9744",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9744. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007048EL, "get_s8_9745",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9745. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070494L, "get_s8_30BC",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF30BC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007049AL, "get_s8_233C",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF233C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000704A0L, "get_s8_2570",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF2570. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000704A6L, "get_s8_307C",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF307C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000704ACL, "get_s8_9733",
+            "[TRACED] Shape class 3: r0 = sign-extended byte [K] Member parameters: K=0xFFFF9733. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00070768L, "thunk_to_0707A8",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0707A8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000710C8L, "call_0710D2_then_071152",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0710D2 B=0x071152. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007120CL, "call_0582AC_tail_071624_if0",
+            "[TRACED] Shape class 42: r = F(); if (r & 0xFF) == 0: tail-call G (r0 = r at G); else return r "
+            + "unchanged. Member parameters: F=0x582ac G=0x71624. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000712C2L, "call_0714A4_then_07132C",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0714A4 B=0x07132C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00071328L, "thunk_to_071672",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x071672. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000717A8L, "call_0717DA_then_0717EC",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0717DA B=0x0717EC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00071A66L, "setpair_255C_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF255C I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00071A8AL, "empty_fn_071A8A",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00071AAEL, "empty_fn_071AAE",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00071AB2L, "thunk_to_071AFA",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x071AFA. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00071AB6L, "thunk_to_071CE0",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x071CE0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00072674L, "call_07267E_then_0727F0",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x07267E B=0x0727F0. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00072F54L, "call_072F5E_then_073006",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x072F5E B=0x073006. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000734E0L, "jmp_to_07494E",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x07494E. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00074A54L, "read_and_clear_byte_98F4",
+            "[DECODED] Inside the 0x00317C/0x003190 critical section: r0 = byte [98F4 + r4] (sign-extended), "
+            + "then that byte is set to 0. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0x000757C6L, "setpair_2BEC_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2BEC I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000757D6L, "setpair_2BEE_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2BEE I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000757E6L, "setpair_2BF0_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2BF0 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000757F6L, "setpair_2BF2_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2BF2 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00075806L, "setpair_2BF4_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2BF4 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00075816L, "setpair_2BF6_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2BF6 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000758BEL, "jmp_to_07ADD8",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x07ADD8. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007C9E8L, "call_07C9F2_then_07CA4C",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x07C9F2 B=0x07CA4C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007CB16L, "thunk_to_07CDCE",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07CDCE. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0007CB1AL, "chain3_07CB30_07CCD0",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x07CB30 "
+            + "B=0x07CC30 C=0x07CCD0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0007CB28L, "set_A232_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA232 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007CE6EL, "thunk_to_07D070",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07D070. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0007CE72L, "chain3_07CE80_07CF94",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x07CE80 "
+            + "B=0x07CEF4 C=0x07CF94. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0007D144L, "call_0582AC_tail_07D2C4_if0",
+            "[TRACED] Shape class 42: r = F(); if (r & 0xFF) == 0: tail-call G (r0 = r at G); else return r "
+            + "unchanged. Member parameters: F=0x582ac G=0x7d2c4. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0007D1CCL, "thunk_to_07D312",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07D312. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0007D3E8L, "empty_fn_07D3E8",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007D3ECL, "setpair_2E20_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2E20 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007D3FCL, "empty_fn_07D3FC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007D506L, "thunk_to_07D554",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07D554. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0007D50AL, "thunk_to_07D620",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07D620. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0007E268L, "empty_fn_07E268",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007E294L, "init_2E24_A340",
+            "[TRACED] Shape class 48: r0 = F(r4 = V) with F = 0x0BE9A0, V = 0 -> 0x00FF; u16[A] = r0; u8[B] "
+            + "= V2 (= 0); return r0 (0x00FF). Member parameters: F=0xbe9a0 V=0 A=0xffff2e24 V2=0 B=0xffffa340. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0007F584L, "call_07F58E_then_07F5EE",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x07F58E B=0x07F5EE. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007F678L, "set_A36C_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA36C I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007F69AL, "setpair_2E2C_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2E2C I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007F8C8L, "set_A374_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA374 I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007F95AL, "thunk_to_07F962",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07F962. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0007F95EL, "thunk_to_07FA08",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07FA08. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0007FADCL, "set_A37E_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA37E I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007FAFEL, "setpair_2E38_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2E38 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007FC80L, "set_A38C_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA38C I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007FC88L, "set_A38D_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA38D I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007FCAAL, "setpair_2E3C_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2E3C I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007FCBAL, "setpair_2E3E_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2E3E I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0007FF90L, "thunk_to_07FF98",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07FF98. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0007FF94L, "thunk_to_07FFC6",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x07FFC6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00080538L, "chain4_08054A_08070E",
+            "[TRACED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x08054A "
+            + "B=0x0806AC C=0x0806BC D=0x08070E. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00080C50L, "thunk_to_08189E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08189E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00080C54L, "thunk_to_0818B0",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0818B0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00080C58L, "thunk_to_080E44",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x080E44. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00080C78L, "thunk_to_080D9C",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x080D9C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00081B22L, "thunk_to_081B4A",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x081B4A. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00081B46L, "thunk_to_081D86",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x081D86. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00081F70L, "thunk_to_08211E_081F70",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08211E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00081FA4L, "thunk_to_08211E_081FA4",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08211E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000821C0L, "thunk_to_08250C_0821C0",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08250C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00082210L, "thunk_to_08250C_082210",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08250C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000822D0L, "chain3_0822DE_0823C4",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x0822DE "
+            + "B=0x08232E C=0x0823C4. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x000825E0L, "thunk_to_0825E8",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0825E8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000825E4L, "thunk_to_082702",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x082702. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000827FCL, "set_A44A_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA44A I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00082810L, "setpair_2EB8_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2EB8 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00082A68L, "thunk_to_08396E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08396E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00082B40L, "call_0833A4_then_08340C",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x0833A4 B=0x08340C. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000839C4L, "thunk_to_084326",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x084326. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00083AB8L, "chain3_083B6C_083DF0",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x083B6C "
+            + "B=0x083C70 C=0x083DF0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00083AC6L, "chain5_083ADC_084028",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x083ADC "
+            + "B=0x083EC0 C=0x083F48 D=0x083F8E E=0x084028. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00084378L, "thunk_to_084978",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x084978. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0008496EL, "set2_A511_0",
+            "[TRACED] Shape class 29: byte [K] = I and byte [K+D] = I Member parameters: K=0xFFFFA511 "
+            + "K+1=0xFFFFA512 I=0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x000849F4L, "thunk_to_084D8C_0849F4",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x084D8C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00084A3EL, "thunk_to_084D8C_084A3E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x084D8C. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00084D82L, "set2_A527_0",
+            "[TRACED] Shape class 29: byte [K] = I and byte [K+D] = I Member parameters: K=0xFFFFA527 "
+            + "K+1=0xFFFFA528 I=0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00084E6CL, "call_084E80_then_085068",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x084E80 B=0x085068. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00084E76L, "call_084F86_then_085164",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x084F86 B=0x085164. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00085252L, "thunk_to_085D14",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x085D14. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00085D88L, "chain4_085D9A_085EE2",
+            "[TRACED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x085D9A "
+            + "B=0x085DE8 C=0x085E5C D=0x085EE2. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00085F8CL, "call_085F96_then_085FFC",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x085F96 B=0x085FFC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008608CL, "copyf_42FC_A584",
+            "[TRACED] Shape class 36: f32[B] = f32[A] (a 32-bit copy through fr8; fr8 is left holding the "
+            + "value). Member parameters: A=0xffff42fc B=0xffffa584. Shape-matched and emulated per member. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00086096L, "set4_A589_0",
+            "[TRACED] Shape class 35: u8[A] = u8[A+D1] = u8[A+D2] = u8[A+D3] = V; r0 = V. V = 0 except "
+            + "0x026634 (V = 1). Member parameters: V=0 A=0xffffa589 D1=+1 D2=+3 D3=+4. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000860A4L, "chain3_0860B2_08614E",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x0860B2 "
+            + "B=0x08611A C=0x08614E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00087074L, "set_A59C_1",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA59C I=1 (byte 0x01). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008707CL, "set_A59C_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA59C I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00087084L, "setpair_2F40_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2F40 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00087604L, "thunk_to_087B2E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x087B2E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00087EF0L, "set_A5DE_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA5DE I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00087F0CL, "setpair_2F48_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF2F48 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00088160L, "thunk_to_0884A4_088160",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0884A4. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00088164L, "thunk_to_0884A4_088164",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0884A4. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00088270L, "call_08827A_then_088350",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x08827A B=0x088350. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008C3A8L, "setpair_307A_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF307A I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008C3B8L, "empty_fn_08C3B8",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008C3BCL, "setpair_3078_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF3078 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008C3CCL, "empty_fn_08C3CC",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008C3F0L, "empty_fn_08C3F0",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008CD40L, "set4_A83C_0",
+            "[TRACED] Shape class 35: u8[A] = u8[A+D1] = u8[A+D2] = u8[A+D3] = V; r0 = V. V = 0 except "
+            + "0x026634 (V = 1). Member parameters: V=0 A=0xffffa83c D1=+1 D2=+4 D3=+5. Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0008CEC2L, "set_A83C_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA83C I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008CECAL, "set_A83D_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA83D I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008CED2L, "set_A840_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA840 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008CEDAL, "set_A841_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA841 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008CF38L, "set_A84A_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA84A I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008CF40L, "set_A849_FF",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFFA849 I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008D094L, "set2_A84C_0",
+            "[TRACED] Shape class 29: byte [K] = I and byte [K+D] = I Member parameters: K=0xFFFFA84C "
+            + "K+1=0xFFFFA84D I=0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0008D186L, "set_A84C_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA84C I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008D18EL, "set_A84D_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA84D I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008D1D4L, "set2_A854_0",
+            "[TRACED] Shape class 29: byte [K] = I and byte [K+D] = I Member parameters: K=0xFFFFA854 "
+            + "K+1=0xFFFFA855 I=0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0008D2D8L, "set_A854_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA854 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008D2E0L, "set_A855_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFA855 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008D398L, "thunk_to_08D6F4",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08D6F4. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0008D3D2L, "thunk_to_08D8B8",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08D8B8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0008D908L, "call_08D912_then_08D982",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x08D912 B=0x08D982. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008DA1CL, "set_A882_FF_08DA1C",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFFA882 I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008DA24L, "set_A882_FF_08DA24",
+            "[TRACED] Shape class 24: byte [K] = 0xFF Member parameters: K=0xFFFFA882 I=-1 (byte 0xFF). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008DC2CL, "thunk_to_08DC3E",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08DC3E. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0008DC30L, "chain3_08DC80_08DD1A",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x08DC80 "
+            + "B=0x08DCE4 C=0x08DD1A. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0008DE90L, "thunk_to_08E1F6",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08E1F6. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0008E13CL, "call_08E148_twice_08E13C",
+            "[DECODED] Shape class 54: call F(r4 = R1), then FALL THROUGH into F with r4 = R2: F is the "
+            + "function that starts at the member's end Member parameters: R1=0x9827c F=0x8e148 R2=0x98288. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0008E1F6L, "call_08E202_twice_08E1F6",
+            "[TRACED] Shape class 54: call F(r4 = R1), then FALL THROUGH into F with r4 = R2: F is the "
+            + "function that starts at the member's end Member parameters: R1=0x9827c F=0x8e202 R2=0x98288. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0008E2A0L, "chain3_08E2AE_08E346",
+            "[TRACED] Shape class 12: call A, call B, then tail-branch to C Member parameters: A=0x08E2AE "
+            + "B=0x08E2DE C=0x08E346. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0008E588L, "thunk_to_08EF62",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08EF62. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0008EFE2L, "setpair_30B0_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF30B0 I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008F826L, "setpair_30BC_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF30BC I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008FA3AL, "chain5_08FA54_08FB58",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x08FA54 "
+            + "B=0x08FA78 C=0x08FAA4 D=0x08FAEC E=0x08FB58. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008FA50L, "thunk_to_08FB88",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x08FB88. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x0008FC10L, "call_08FC1A_then_08FC8A",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x08FC1A B=0x08FC8A. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0008FD24L, "set2_ABD2_0",
+            "[TRACED] Shape class 29: byte [K] = I and byte [K+D] = I Member parameters: K=0xFFFFABD2 "
+            + "K+1=0xFFFFABD3 I=0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x0008FDA4L, "chain5_08FDBA_090038",
+            "[TRACED] Shape class 23: call A, B, C, D, then tail-branch to E Member parameters: A=0x08FDBA "
+            + "B=0x08FDEE C=0x08FEB6 D=0x08FF28 E=0x090038. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000900A6L, "thunk_to_0900B8",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0900B8. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000900AAL, "call_09021A_then_090334",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x09021A B=0x090334. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000903DCL, "set2_ABFC_0",
+            "[TRACED] Shape class 29: byte [K] = I and byte [K+D] = I Member parameters: K=0xFFFFABFC "
+            + "K+1=0xFFFFABFD I=0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x000903E6L, "thunk_to_0903EE",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x0903EE. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000903EAL, "thunk_to_090408",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x090408. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00090930L, "chain4_09111A_090AFC",
+            "[TRACED] Shape class 17: call A, B, C, then tail-branch to D Member parameters: A=0x09111A "
+            + "B=0x090A2C C=0x090966 D=0x090AFC. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00090962L, "thunk_to_090FFC",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x090FFC. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x00090F92L, "call_090F9E_twice_090F92",
+            "[TRACED] Shape class 54: call F(r4 = R1), then FALL THROUGH into F with r4 = R2: F is the "
+            + "function that starts at the member's end Member parameters: R1=0x982f4 F=0x90f9e R2=0x98354. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x00090FFCL, "call_091008_twice_090FFC",
+            "[TRACED] Shape class 54: call F(r4 = R1), then FALL THROUGH into F with r4 = R2: F is the "
+            + "function that starts at the member's end Member parameters: R1=0x982f4 F=0x91008 R2=0x98354. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x0009123CL, "call_091246_then_091292",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x091246 B=0x091292. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009148EL, "set_ACF6_when_V1",
+            "[DECODED] If V == 1 and byte 0xFFFF34D8 is not in {0, 20}: byte 0xFFFFACF6 := 1. This is the "
+            + "only resolved writer of ACF6, and it stores 1 only. Trace: revlim_freeze_gate_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0x00095A90L, "call_095AA4_then_095C10",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x095AA4 B=0x095C10. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00095A9AL, "call_095B7E_then_095D28",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x095B7E B=0x095D28. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00095E58L, "call_095E6C_then_095FD0",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x095E6C B=0x095FD0. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00095E62L, "call_095F42_then_0960EA",
+            "[TRACED] Shape class 4: call A, then tail-branch to B Member parameters: A=0x095F42 B=0x0960EA. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00096534L, "call_0582AC_tail_096640_if0",
+            "[TRACED] Shape class 42: r = F(); if (r & 0xFF) == 0: tail-call G (r0 = r at G); else return r "
+            + "unchanged. Member parameters: F=0x582ac G=0x96640. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000965BCL, "thunk_to_096690",
+            "[TRACED] Shape class 0: bra T; nop -- branch thunk (137) or endless loop (2) Member parameters: "
+            + "T=0x096690. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0x000967C8L, "set2_AD34_0",
+            "[TRACED] Shape class 29: byte [K] = I and byte [K+D] = I Member parameters: K=0xFFFFAD34 "
+            + "K+12=0xFFFFAD40 I=0. Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x00097514L, "set_8E30_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFF8E30 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00098686L, "negative_reply_7F",
+            "[DECODED] r4 = id, r5 = code, r6 = kind. kind 2: reset write index (0x09D084), append 7F, id, "
+            + "code and 8 ROM bytes from 0x09B770 (all 00), then 0x09CABE(&{id,3,8,0}). kind 1: "
+            + "0x09CABE(&{id,0,8,1}) only (bytes, not emulated). Else nothing. Trace: stub_tables_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x00098864L, "empty_fn_098864",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x00098868L, "ret0_098868",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009894AL, "put_B04A",
+            "[TRACED] Shape class 18: byte [K] = r4 (via r6) Member parameters: K=0xFFFFB04A. Shape-matched "
+            + "and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000990EAL, "set_B71C_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFB71C I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009A3ACL, "diag_read_by_index_handler_0xA8",
+            "[DECODED] Handler for id 0xA8 (record 0x09B778). r4 = request length; fetches min(len,253) bytes "
+            + "via 0x09D052 before checking len (4..253, len%3==1, else code 0x13). Per 3-byte item: b0 "
+            + "FF/F2/F4 copies 1/2/4 bytes from 0xFFFF0000|(b1<<8)|b2 with no address bound; otherwise index "
+            + "(sext8(b0)<<16)+(b1<<8)+b2 < 848 unsigned -> getter[index](r4=index)&0xFF, else code 0x12. Reply "
+            + "bytes are stored from 0xFFFFB3F4 through an ... Trace: stub_tables_trace.txt (corrections item "
+            + "107).");
+        count += labelComment(0x0009A628L, "diag_write_by_index_handler_0xB8",
+            "[DECODED] Handler for id 0xB8. Only len == 4 fetches the request; index (b0<<16)+(b1<<8)+b2 must "
+            + "be < 848, equal to the one ROM whitelist entry 0x60 (0x09CA0C), and have a setter other than "
+            + "0x05E76A; then setter(r4=b3), read-back getter(r4=0) must equal b3. Reply F8 b3, or 7F B8 code "
+            + "via 0x098686. Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0009A710L, "write_whitelist_check",
+            "[DECODED] r4 = index; r0 = 0 if index == u32[0x09CA0C] (= 0x60), else 1. List length is the "
+            + "immediate 1 at 0x09A712, which is also the not-found result. Trace: stub_tables_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x0009CA10L, "set_B450_0",
+            "[TRACED] Shape class 46: u8[A] = V (V = 0 in every member). Member parameters: A=0xffffb450 "
+            + "V=0. Shape-matched and emulated per member. Trace: stub_shapes_b_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0x0009CACCL, "jmp_to_098940",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x098940. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009CAD2L, "jmp_to_09894A",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x09894A. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009CAD8L, "jmp_to_098950",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x098950. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009CADEL, "jmp_to_09895A",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x09895A. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009CAE4L, "jmp_to_098982",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x098982. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009CAEAL, "service_record_dispatch",
+            "[DECODED] r4 = service id, r5 = 16-bit value passed to the handler as r4, r6 low byte selects "
+            + "record table 0x09B88C (0) or 0x09B778 (non-zero). Returns 0 after calling u32[record+4], 1 if "
+            + "the id is absent, 2 if (1 << u8[0xFFFFB450]) & record mask == 0; every mask is 1, so any "
+            + "non-zero mode byte refuses every listed id. Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0009CC44L, "ring_reset_write_index",
+            "[DECODED] r4 = channel. Sets the record's write index to mark+1, or 0 when mark >= 600. Trace: "
+            + "stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0009CCF8L, "ring_append_bytes",
+            "[DECODED] Appends count bytes to record 0xFFFFB454+608n at the write index (u16 +0); drops a "
+            + "byte when write index == mark; stores at record+6+zero-extended write index with no range check "
+            + "before the store; wraps at 601. Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0009CD50L, "ring_read_bytes",
+            "[DECODED] r4 = channel, r5 = destination, r6 = count. Copies count bytes from record "
+            + "0xFFFFB454+608n at its read index (u16 +2), wrapping at 601; writes 0 when nothing is unread "
+            + "(read == mark+1, or mark >= 600 and read == 0). Trace: stub_tables_trace.txt (corrections item "
+            + "107).");
+        count += labelComment(0x0009CFEAL, "empty_fn_09CFEA",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009CFEEL, "ring_append_if_bound",
+            "[DECODED] r4 = id, r5 = source, r6 = count. If u8[0xFFFFB6DF] == id, calls 0x09CCF8(0, r5, r6). "
+            + "Trace: stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0009D052L, "ring_read_if_bound",
+            "[DECODED] r4 = id, r5 = destination, r6 = count. If u8[0xFFFFB6DF] == id, calls 0x09CD50(0, r5, "
+            + "r6); otherwise the destination is untouched. Only channel 0 is scanned. Trace: "
+            + "stub_tables_trace.txt (corrections item 107).");
+        count += labelComment(0x0009D084L, "ring_reset_if_bound",
+            "[DECODED] r4 = id. If u8[0xFFFFB6DF] == id, calls 0x09CC44(0). Trace: stub_tables_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x0009D92CL, "ret0_09D92C",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=0. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009DDF8L, "setpair_36EC_0",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF36EC I=0 stored word 0x00FF. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009E034L, "empty_fn_09E034",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009E038L, "empty_fn_09E038",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009E1CAL, "jmp_to_0A6122",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x0A6122. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009E1D0L, "jmp_to_0A3BEC",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x0A3BEC. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x0009EF10L, "ret1_09EF10",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=1. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000A67CCL, "copyb_34DC_AFBF",
+            "[TRACED] Shape class 40: u8[B] = u8[A]; r2 = s8[A] (sign-extended copy left in r2). Member "
+            + "parameters: A=0xffff34dc B=0xffffafbf. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000A67D6L, "jmp_to_0A84A4",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x0A84A4. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000A67DCL, "jmp_to_0A8482",
+            "[TRACED] Shape class 11: jmp T via r3 -- tail-jump thunk Member parameters: T=0x0A8482. "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000A7108L, "setpair_3C9C_7",
+            "[TRACED] Shape class 9: word [K] = value:~value pair of the constant I (via 0x0BE9A0) Member "
+            + "parameters: K=0xFFFF3C9C I=7 stored word 0x07F8. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000A85FCL, "set_AF72_0",
+            "[TRACED] Shape class 8: byte [K] = I Member parameters: K=0xFFFFAF72 I=0 (byte 0x00). "
+            + "Shape-matched and emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000A86C4L, "float_offset_to_u8_store",
+            "[DECODED] Class 73 (3): u8[O] = sat8(f32[X] + 40); r0 = same. Trace: stub_shapes_b_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0x000A873AL, "float_to_u16_store",
+            "[DECODED] Class 45 (5): u16[O] = sat16(f32[X]/SC) via 0x0BE5D8; r0 = same. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000A879AL, "f2u16_63B4_to_AF7E",
+            "[TRACED] Shape class 45: u16[O] = sat16(f32[X] / SC) and r0 = the same value, i.e. 0x0BE5D8(fr4 "
+            + "= f32[X], fr6 = 0.0, fr5 = f32@SC). Member parameters: X=0xffff63b4 F=0xbe5d8 "
+            + "SC=@0A8890:0.00999999978 (3C23D70A) O=0xffffaf7e. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000A8A2AL, "f2u16_653C_to_AF88",
+            "[TRACED] Shape class 45: u16[O] = sat16(f32[X] / SC) and r0 = the same value, i.e. 0x0BE5D8(fr4 "
+            + "= f32[X], fr6 = 0.0, fr5 = f32@SC). Member parameters: X=0xffff653c F=0xbe5d8 "
+            + "SC=@0A8B80:3.05175781e-05 (38000000) O=0xffffaf88. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000A8CC8L, "f2u16_653C_to_AF92",
+            "[TRACED] Shape class 45: u16[O] = sat16(f32[X] / SC) and r0 = the same value, i.e. 0x0BE5D8(fr4 "
+            + "= f32[X], fr6 = 0.0, fr5 = f32@SC). Member parameters: X=0xffff653c F=0xbe5d8 "
+            + "SC=@0A8E24:3.05175781e-05 (38000000) O=0xffffaf92. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000A9224L, "f2u16_4130_to_AF98",
+            "[TRACED] Shape class 45: u16[O] = sat16(f32[X] / SC) and r0 = the same value, i.e. 0x0BE5D8(fr4 "
+            + "= f32[X], fr6 = 0.0, fr5 = f32@SC). Member parameters: X=0xffff4130 F=0xbe5d8 "
+            + "SC=@0A93C8:0.000999999931 (3A83126E) O=0xffffaf98. Shape-matched and emulated per member. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0x000A9858L, "ret2_0A9858",
+            "[TRACED] Shape class 6: r0 = constant I Member parameters: I=2. Shape-matched and emulated per "
+            + "member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000BDB30L, "rec8_read_float_or_default",
+            "[DECODED] in r4 = REC8 record, fr4 = default. out fr0 = float at [r4] if CK(V) matches word +4 "
+            + "or +6, else fr4 (bit-exact). Never writes the record; reads V twice inside the mask window "
+            + "(0BDB42/0BDB44 words, 0BDB5C long). SR returned with I as found, M=Q=S=T=0. Trace: "
+            + "helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDB6EL, "pair8_write",
+            "[DECODED] in r4 = PAIR8 (word-aligned), r5 = byte. word[r4] = (b<<8)|(~b&0xFF); r0 = 0. Leaf, no "
+            + "mask window, SR untouched. Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDB80L, "pair16_write",
+            "[DECODED] in r4 = PAIR16 (long-aligned), r5 = word. long[r4] = (w<<16)|(~w&0xFFFF); r0 = 0. "
+            + "Leaf, no mask window, SR untouched. Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDB92L, "rec8_write_long",
+            "[DECODED] in r4 = REC8 record, r5 = 32-bit value. Inside the mask window stores word +4 = CK, "
+            + "long +0 = value, word +6 = CK (last in the jsr 0x003190 slot). No test of any kind; r0 = 0 "
+            + "always; the record is never read. Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDBCCL, "rec8_write_float",
+            "[DECODED] in r4 = REC8 record, fr4 = float. NaN (fcmp/eq fr4,fr4 T=0) -> r0 = 1, nothing "
+            + "written, no SR load. Else inside the mask window word +4 = CK(bits), float +0 = fr4, word +6 = "
+            + "CK; r0 = 0. No range check; no caller ever reads r0. Trace: helpers_desc_read_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x000BDC0EL, "pair8_validate",
+            "[DECODED] in r4 = PAIR8. out r0 = 0 if byte[+0] == ~byte[+1] & 0xFF else 1. Read-only, masked "
+            + "window, verdict only. Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDC3CL, "pair16_validate",
+            "[DECODED] in r4 = PAIR16. out r0 = 0 if word[+0] == ~word[+2] & 0xFFFF else 1. Read-only, masked "
+            + "window, verdict only. Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDC6AL, "rec8_validate_long",
+            "[DECODED] in r4 = REC8 record. r0 = 0 if CK(V) equals word +4 or +6, and then both check words "
+            + "are rewritten with CK(V); else r0 = 1 and the record is untouched. V read once as a long "
+            + "(0BDC7C). No FP register touched. Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDCB6L, "rec8_validate_float",
+            "[DECODED] Same as 0x0BDC6A but V is moved through fr8 (0BDCC8 fmov.s @r13,fr8). No NaN test. fr8 "
+            + "holds the record float on return only if no context switch happens in 0x003190/0x003664; no "
+            + "caller reads fr8 afterwards. Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDD0CL, "u16_saturating_sub",
+            "[DECODED] r0 = max(u16(r4) - u16(r5), 0). Leaf. No reference anywhere in the ROM. Trace: "
+            + "helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDD1CL, "u16_weighted_mean",
+            "[DECODED] a=u16(r4), b=u16(r5), k=u16(r6): k==0 -> b; else a +/- ((|b-a| * (0x10000-k)) >> 16) "
+            + "toward b. MACL saved/restored. Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDD5AL, "clamp_s32_x_hi_lo",
+            "[DECODED] r0 = hi if x >= hi; else x if x > lo; else lo (signed; args x=r4, hi=r5, lo=r6). "
+            + "Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDD6EL, "min_u32",
+            "[DECODED] r0 = unsigned min(r4, r5). Trace: helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDD78L, "max_by_u16",
+            "[DECODED] r0 = r4 if u16(r4) >= u16(r5) else r5; the whole register is returned. Trace: "
+            + "helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0x000BDD88L, "absdiff_s32",
+            "[DECODED] r0 = r4 - r5 if r4 > r5 (signed) else r5 - r4. Trace: helpers_desc_read_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x000BE4FAL, "step_lookup_u8_by_float_threshold",
+            "[DECODED] r4 = record {s16 count @+0, float32* thresholds @+4, u8* values @+8}, fr4 = x. Returns "
+            + "in r0 the zero-extended byte paired with the highest-index threshold that is NOT greater than x; "
+            + "values[0] if none or if count <= 0 (values[0] is read before the count is tested). Clobbers r0 "
+            + "r2 r4 r5 r6 r7 fr8; no memory written. Trace: helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE524L, "sat_add_s32",
+            "[DECODED] r0 = r4 + r5 saturated to signed 32 bits (0x7FFFFFFF on positive overflow, 0x80000000 "
+            + "on negative). Clobbers r0 r5. Trace: helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE53CL, "uint8_add_sat",
+            "[DECODED] r0 = min((r4 & 0xFF) + (r5 & 0xFF), 255). Unsigned, add only; upper 24 input bits "
+            + "ignored. Clobbers r0 r3 r4 r5. Trace: helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE554L, "uint16_add_sat",
+            "[DECODED] r0 = min((r4 & 0xFFFF) + (r5 & 0xFFFF), 65535). Unsigned, add only; upper 16 input "
+            + "bits ignored. Clobbers r0 r4 r5. Trace: helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE56CL, "float_clamp_range",
+            "[DECODED] fr4 = x, fr5 = LOW, fr6 = HIGH. fr0 = fr5 if not (fr4 > fr5), else fr4 if fr6 > fr4, "
+            + "else fr6 (bit-exact move, no arithmetic). With low > high it returns fr5 for x <= fr5 and fr6 "
+            + "otherwise. Changes only fr0 and fr7. Also entered by a tail jmp at 0x02FA20. Trace: "
+            + "helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE588L, "u8_to_float_scale_offset",
+            "[DECODED] fr0 = fr4 * (float)(r4 & 0xFF) + fr5 by one fmac (raw = r4 zero-extended, SCALE = fr4, "
+            + "OFFSET = fr5). Clobbers r4 fr0 fr3 fr5 fpul. Final rounding: firmware expects truncation; "
+            + "fused-vs-unfused not established. Trace: helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE598L, "u16_to_float_scale_offset",
+            "[DECODED] fr0 = fr4 * (float)(r4 & 0xFFFF) + fr5 by one fmac (raw = r4 zero-extended, SCALE = "
+            + "fr4, OFFSET = fr5). Clobbers r4 fr0 fr3 fr5 fpul. Same rounding caveat as 0x0BE588. Trace: "
+            + "helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE5A8L, "float_to_u8_scale_offset_round_clamp",
+            "[DECODED] x = fr4, SCALE = fr5 (divisor), OFFSET = fr6 (subtracted first). r0 = clamp(trunc((fr4 "
+            + "- fr6) / fr5 + 0.5), 0, 255). No zero-divisor test. Clobbers r0 r4 r5 fr2 fr3 fr4 fpul. Trace: "
+            + "helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE5D8L, "float_to_u16_scale_offset_round_clamp",
+            "[DECODED] x = fr4, SCALE = fr5 (divisor), OFFSET = fr6 (subtracted first). r0 = clamp(trunc((fr4 "
+            + "- fr6) / fr5 + 0.5), 0, 65535). No zero-divisor test. Clobbers r0 r4 r5 fr2 fr3 fr4 fpul. Trace: "
+            + "helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE608L, "float_outside_window",
+            "[DECODED] x = fr4, CENTRE = fr5, HALF-WIDTH = fr6. r0 = 1 if (fr5 - fr6) > fr4 or fr4 > (fr5 + "
+            + "fr6), else 0: 1 means OUTSIDE, both edges count as inside. Clobbers r0 r4 fr3. Trace: "
+            + "helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE628L, "float_safe_div",
+            "[DECODED] fr0 = fr4 / fr5; when fr5 == 0 (either sign) it returns +0.0 if fr4 == 0, +FLT_MAX "
+            + "(0x7F7FFFFF) if fr4 > 0, -FLT_MAX otherwise. Clobbers fr0 fr6, and fr3/r0 on the substituted "
+            + "path. Trace: helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE654L, "sat_div_s32_q16",
+            "[DECODED] Signed r0 = trunc((r4 << 16) / r5) (16.16 quotient) with saturation: r4==0 -> 0; r5==0 "
+            + "-> 0x7FFFFFFF/0x80000000 by sign of r4; integer quotient > 32767 -> 0x7FFFFFFF, < -32768 -> "
+            + "0x80000000. Guard hole: integer quotient == -32768 with a remainder returns a positive wrapped "
+            + "value. Clobbers r0 r1 r3 r4 r6 r7. Trace: helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE800L, "float_hysteresis_comparator",
+            "[DECODED] x = fr4, THRESHOLD = fr5, WIDTH = fr6, previous state = r4. r0 = 1 if not (fr5 > fr4); "
+            + "0 if (fr5 - fr6) > fr4; otherwise r4 returned unchanged and unmasked. Destroys fr5; clobbers r0 "
+            + "r5. Trace: helpers_arith_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE81CL, "critical_section_enter",
+            "[DECODED] r4 = address of a long, r5 = value for SR. Stores SR&0xF0 at @r4 and in r0, then loads "
+            + "SR with r5 if r5 >= SR&0xF0 (unsigned, all 32 bits), else with SR&0xF0. The mask field can be "
+            + "lowered only by an r5 >= 0x100; every resolved caller passes 0x00E0. Trace: "
+            + "helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE82CL, "critical_section_exit",
+            "[DECODED] SR = r4 (the value, not a pointer); r0 not written. Trace: helpers_wrap_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x000BE830L, "table_lookup_1D",
+            "[DECODED] r4 = 1-D record, fr4 = x. fr0 = clamped linear interpolation of the cells, which have "
+            + "the type the byte at +2 selects through the table at 0x0BE860 (0x00 f32, 0x04 u8, 0x08 u16, 0x0C "
+            + "s8, 0x10 s16). Scale (+12) and bias (+16) are applied after interpolating, and only when the "
+            + "typecode is non-zero. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE874L, "table1d_lookup_u8_int",
+            "[DECODED] r4 = 1-D record, fr4 = x. r0 = trunc(interpolation of uint8 cells) & 0xFF. Reads only "
+            + "+0, +4 and +8: no typecode, scale or bias. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE88CL, "table1d_intaxis_u8",
+            "[DECODED] r4 = 1-D record whose axis is signed longs, r5 = signed integer input. r0 = integer "
+            + "interpolation of uint8 cells with a 0.32 fraction, & 0xFF. No FPU instruction; MACH/MACL saved. "
+            + "Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE8ACL, "table_desc_1d_uint16",
+            "[DECODED] r4 = 1-D record, fr4 = x. r0 = trunc(interpolation of uint16 cells) & 0xFFFF. No "
+            + "typecode, scale or bias. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE8C4L, "table1d_intaxis_u16",
+            "[DECODED] r4 = 1-D record whose axis is signed longs, r5 = signed integer input. r0 = integer "
+            + "interpolation of uint16 cells, & 0xFFFF. No FPU instruction; MACH/MACL saved. Trace: "
+            + "helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE8E4L, "table_lookup_2D",
+            "[DECODED] r4 = 2-D record, fr4 = axis A input (count at +0, axis pointer at +4), fr5 = axis B "
+            + "input (count at +2, axis pointer at +8). cell(iA,iB) = cells[iB*countA+iA]. fr0 = clamped "
+            + "bilinear interpolation; the typecode at +16 selects the cell type; scale (+20) and bias (+24) "
+            + "are applied unless the typecode is 0. fr4 is destroyed. Trace: helpers_wrap_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x000BE928L, "table_desc_2d_uint8_int",
+            "[DECODED] 2-D record. r0 = trunc(bilinear interpolation of uint8 cells) & 0xFF. Byte +16, +20 "
+            + "and +24 are not read. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE944L, "table_lookup_2D_int",
+            "[DECODED] 2-D record. r0 = trunc(bilinear interpolation of uint16 cells) & 0xFFFF. Byte +16, +20 "
+            + "and +24 are not read. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE960L, "float_max",
+            "[DECODED] fr0 = fr6 = fr4 if fr4 > fr5, else fr5: the larger. Equal inputs or a NaN in either "
+            + "return fr5. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE970L, "float_min",
+            "[DECODED] fr0 = fr6 = fr4 if fr5 > fr4, else fr5: the smaller. Equal inputs or a NaN in either "
+            + "return fr5. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE980L, "check_u8_complement_pair",
+            "[DECODED] r0 = (0xFF - lo - hi) & 0xFF of the 16-bit word at @r4; zero exactly when hi == ~lo. "
+            + "It does not return the stored value. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE990L, "check_u16_complement_pair",
+            "[DECODED] r0 = (0xFFFF - lo16 - hi16) & 0xFFFF of the long at @r4; zero exactly when hi16 == "
+            + "~lo16. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BE9A0L, "uint8_pack",
+            "[DECODED] r0 = ((r4&0xFF)<<8) | (~r4&0xFF). No memory write. Trace: helpers_wrap_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0x000BE9B0L, "uint16_pack",
+            "[DECODED] r0 = ((r4&0xFFFF)<<16) | (~r4&0xFFFF). Trace: helpers_wrap_trace.txt (corrections item "
+            + "107).");
+        count += labelComment(0x000BE9C0L, "int32_fixmul",
+            "[DECODED] r0 = sat32(floor((s64)r4*(s64)r5 / 65536)); MACH/MACL preserved. Trace: "
+            + "helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEA3CL, "empty_fn_0BEA3C",
+            "[TRACED] Shape class 2: rts; nop -- empty function Member parameters: . Shape-matched and "
+            + "emulated per member. Trace: stub_shapes_a_trace.txt (corrections item 108).");
+        count += labelComment(0x000BEA40L, "float_lag_filter",
+            "[DECODED] fr4 = A, fr5 = B, fr6 = k, fr7 = eps. r = A + (1-k)*(B-A). Returns A when B is Inf/NaN "
+            + "(only fr5 is tested) or when eps > |A-r|; otherwise r. With A = +/-Inf and B finite: NaN for k "
+            + "<= 1, A for k > 1. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEA6CL, "int_lag_coeff256",
+            "[DECODED] r0 = r4 + trunc((1 - (r6&0xFFFF)/256) * (float(r5) - float(r4))), in single precision. "
+            + "k = 256 returns r4, k = 0 returns r5. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEA98L, "int_sat_sub",
+            "[DECODED] r0 = sat32(r4 - r5): 0x7FFFFFFF on positive overflow, 0x80000000 on negative. Trace: "
+            + "helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEAB0L, "float_abs_diff",
+            "[DECODED] fr0 = fr4 = |fr4 - fr5|. Trace: helpers_wrap_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEAB8L, "busy_wait_8n",
+            "[DECODED] Busy-wait: counts r5 from 0 to (8*r4 mod 2^32), 3 instructions per count. No result; "
+            + "r0 untouched. 12 call sites, all constant (2..10000). Trace: helpers_wrap_trace.txt (corrections "
+            + "item 107).");
+        count += labelComment(0x000BEACCL, "interp_1d_float32",
+            "[DECODED] r0 = cell index, r1 = data pointer (float32 cells), fr0 = fraction -> fr2 = cell[i] "
+            + "when fr0 == 0.0 (cell[i+1] not read), else cell[i] + fr0*(cell[i+1]-cell[i]) via fsub + fmac. "
+            + "Changes r0, r1, fr2 and (interpolating path) fr1 only; no fpul/mach/macl. Trace: "
+            + "helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEAE4L, "interp_1d_int8",
+            "[DECODED] Same contract as 0x0BEACC with SIGNED 8-bit cells (mov.b, no extu), result in raw "
+            + "counts in fr2; also writes fpul (lds r0,fpul). Reachable only via handler-table slot 0x0BE86C "
+            + "and bsr from 0x0BEBF0; no real record uses it. Trace: helpers_interp_trace.txt (corrections item "
+            + "107).");
+        count += labelComment(0x000BEB00L, "interp_1d_int16",
+            "[DECODED] Same as 0x0BEACC with SIGNED 16-bit cells (mov.w, no extu; index x2), raw counts in "
+            + "fr2, writes fpul. Reachable only via slot 0x0BE870 and bsr from 0x0BEC1C; no real record uses "
+            + "it. Trace: helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEB20L, "interp_1d_uint8",
+            "[DECODED] Same as 0x0BEACC with UNSIGNED 8-bit cells (mov.b + extu.b), raw counts in fr2, writes "
+            + "fpul. Called via slot 0x0BE864 (typecode 0x04), bsr from 0x0BE874 and twice from 0x0BEC4C. "
+            + "Trace: helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEB40L, "interp_1d_uint8_int",
+            "[DECODED] r0 = index, r1 = data (uint8 cells), r2 = unsigned 0.32 fraction -> r0 = d0 when r2 == "
+            + "0, else d0 + floor((d1-d0)*r2/2^32) if d1 > d0, else d0 - floor((d0-d1)*r2/2^32); truncates "
+            + "toward d0. Changes r0, r1, r3, mach, macl (only r0, r1 when r2 == 0). Only caller: bsr at "
+            + "0x0BE89C. Trace: helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEB6CL, "interp_1d_uint16",
+            "[DECODED] Same as 0x0BEACC with UNSIGNED 16-bit cells (mov.w + extu.w, index x2), raw counts in "
+            + "fr2, writes fpul. Called via slot 0x0BE868 (typecode 0x08), bsr from 0x0BE8AC and twice from "
+            + "0x0BEC78. Linear between cells, not a step lookup. Trace: helpers_interp_trace.txt (corrections "
+            + "item 107).");
+        count += labelComment(0x000BEB90L, "interp_1d_uint16_int",
+            "[DECODED] Same as 0x0BEB40 with UNSIGNED 16-bit cells (index x2, mov.w + extu.w). Changes r0, "
+            + "r1, r3, mach, macl. Only caller: bsr at 0x0BE8D4; no long in the ROM points at it. Trace: "
+            + "helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEBC0L, "interp_2d_float32",
+            "[DECODED] r0 = count0 (run length), r1 = data, r2 = index0, r3 = index1, fr0 = fraction0, fr1 = "
+            + "fraction1 -> fr2 = bilinear value in raw units: interpolate along run index1 with 0x0BEACC, and "
+            + "if fraction1 != 0 also along run index1+1 and blend. cell(i0,i1) at r1 + (i1*count0 + i0)*4 "
+            + "(muls.w, signed 16-bit). Changes r0 r1 r3 fr0 fr1 fr2 fr3 fr4 macl. Trace: "
+            + "helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEBF0L, "interp_2d_int8",
+            "[DECODED] 2-D contract of 0x0BEBC0 with signed 8-bit cells (stride count0*1) through 0x0BEAE4; "
+            + "also writes fpul. Reachable only via slot 0x0BE920; no real record uses it. Trace: "
+            + "helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEC1CL, "interp_2d_int16",
+            "[DECODED] 2-D contract of 0x0BEBC0 with signed 16-bit cells (stride count0*2) through 0x0BEB00; "
+            + "writes fpul. Reachable only via slot 0x0BE924; no real record uses it. Trace: "
+            + "helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEC4CL, "interp_2d_uint8",
+            "[DECODED] 2-D contract of 0x0BEBC0 with uint8 cells (stride count0) through 0x0BEB20; writes "
+            + "fpul. Called via slot 0x0BE918 (typecode 0x04) and bsr from 0x0BE928. Trace: "
+            + "helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BEC78L, "interp_2d_uint16",
+            "[DECODED] 2-D contract of 0x0BEBC0 with uint16 cells (stride count0*2) through 0x0BEB6C; writes "
+            + "fpul. Called via slot 0x0BE91C (typecode 0x08) and bsr from 0x0BE944. Trace: "
+            + "helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BECA8L, "axis_search_f32_linear",
+            "[DECODED] r0 = count, r1 = float32 axis, fr0 = x -> r0 = index, fr0 = fraction. Linear scan DOWN "
+            + "from axis[count-1]; x >= last (or NaN in the emulator) -> (count-1, 0.0); x < axis[0] -> (0, "
+            + "0.0); else highest i with axis[i] <= x and fraction (x-axis[i])/(axis[i+1]-axis[i]). No count <= "
+            + "0 guard: with count 0 it reads below the axis and keeps walking down while the long read is > x. "
+            + "Changes r0 fr0 fr1 (fr2 interior). Trace: helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BECDCL, "axis_search_i32_linear",
+            "[DECODED] r0 = count, r1 = INT32 axis, r2 = signed 32-bit x -> r0 = index, r1 = unsigned 0.32 "
+            + "fraction floor((x-axis[i])*2^32/(axis[i+1]-axis[i])) from a div0u + 32 x (rotcl, div1) divide; "
+            + "same top-down linear scan and clamps as 0x0BECA8 with signed compares; no count <= 0 guard. "
+            + "Changes r0 r1 r3 (r2 interior), T/Q/M. Trace: helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000BED98L, "axis_search_2d_pair",
+            "[DECODED] r4 = 2-D record, fr4, fr5 -> (r2, fr0) = 0x0BECA8(word[r4+0], long[r4+4], fr4) and "
+            + "(r3, fr1) = 0x0BECA8(word[r4+2], long[r4+8], fr5). No typecode read, no stride computed. Changes "
+            + "r0 r1 r2 r3 fr0 fr1 fr2 fr3. Trace: helpers_interp_trace.txt (corrections item 107).");
+        count += labelComment(0x000F1000L, "launch_offset_inject",
+            "[DECODED] Tuned only. fr15 += [0x0F1050]=2700.0 when speed<K (byte 0xFFFF65D0==1) or !(speed>K) "
+            + "(otherwise); else [0x0F1054] / [0x0F1048], both 0.0 in 20.19c. fr8=[0x0CC500]; jmp 0x03B6B2. "
+            + "Clobbers r0,r2,fr6,fr8,fr9,T; no memory write; pr untouched (0x03B6A8 on entry, not the caller's "
+            + "return address). Trace: launch_closure_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF0000L, "boot_wdt_limit",
+            "[TRACED] long; trunc(300/1.6384+0.5)=183 written by 0x010878; compared by 0x010AD8 (0x010AE8) "
+            + "Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF0004L, "boot_wdt_iti_count",
+            "[TRACED] long; 0 at 0x010878, +1 per WDT ITI taken (0x010AE4); 0..182 at the kernel start, value "
+            + "timing-dependent Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF0008L, "boot_wdt_code_select",
+            "[TRACED] byte; 0x0108DA's argument (0 at reset); selects expiry code 0x2100/0x2200/0x2300 "
+            + "(0x010AF2) Trace: poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF1230L, "rtos_queued_ids",
+            "[TRACED] On-chip RAM, not an MTU register: the array of queued task ids that [KCB+36] points to. "
+            + "Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0xFFFF12B8L, "rtos_ready_map",
+            "[TRACED] On-chip RAM, not an SCI register: the 16-byte ready map that 0x0034CC scans and "
+            + "0x003206 sets. Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0xFFFF2000L, "keepblock_marker_2000",
+            "[TRACED] 0xAA55 = warm marker (set by 0x010198 at the end of a cold start); 0x55AA during the "
+            + "cold path (0x01018A). Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF204CL, "boot_handover_byte_204C",
+            "[TRACED] byte; 0x77 at 0x00128A, 0x88 at 0x001324 (address from ROM long 0x002000) Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF2060L, "trap_log_count",
+            "[TRACED] Count byte of the five-record trap log at 0xFFFF2064 (stride 12), filled by 0x010800 "
+            + "from 0x00E774 with {code 0x4000, vector number}. Nothing drains it; item 84's 'scheduler event "
+            + "queue' reading is retracted. Trace: rtos_core_trace.txt (corrections item 107).");
+        count += labelComment(0xFFFF223CL, "pair16_init_223C",
+            "[TRACED] u32 set to 0x0000FFFF (value 0 : complement) by 0x024CA0 and 0x024CB0 through 0x0BE9B0. "
+            + "Meaning not established. Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF3154L, "eeprom_outcome_pair_word",
+            "[TRACED] value:~value word of [7268] (0x01FE / 0x00FF), written by 0x02ED88 and rebuilt by "
+            + "0x02E8C0 when inconsistent. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF318CL, "ctl7904_centre_rec",
+            "[TRACED] Guarded float record (value + two check words) holding the centre of the 0xFFFF7904 "
+            + "window; stepped by 0.0005 in 0x0359A4 and stored through the clamp ROM 0x036000 (lo) .. 0x035FFC "
+            + "(hi), zeroed in every flashed rev. Nothing ties it to a pressure. Trace: hole9_afl_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0xFFFF3694L, "cnt_3694",
+            "[TRACED] High byte of word 3694/3695: counter incremented on qualifying warm starts, compared "
+            + "with LIM 0xFFFF8EEE by 0x05CB1C. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF36BEL, "startup_reinit_request_word",
+            "[TRACED] 0x047C40 calls 0x048732 (full re-init including the AFL cell clear) iff this "
+            + "word==0x4055 at its entry with [8EDC]==0. 0x05D070 writes 0x4055 (caller 0x098FE4), 0x05D032 "
+            + "writes 0xAA55. 0x04793C accepts 0x4055 or 0xAA55. Trace: afl_learning_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0xFFFF40E0L, "front_o2_sensor_ma",
+            "[TRACED] Front O2 sensor current (mA): x of \"Front Oxygen Sensor Scaling\" (axis pointer 0x0D8D74 "
+            + "= definition axis \"Front Oxygen Sensor\"); read by 0x058902. Trace: hole9_identity_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF5B6CL, "fbba_arg_5B6C",
+            "[TRACED] byte; 0x00FBBA's argument, 0 at reset (0x00FA8A) Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF5B89L, "reset_ramtest_result",
+            "[TRACED] byte; 1 = range A failed, else 8*B_fail + 2*C_fail (0x010352) Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF5B8DL, "startup_status_5B8D",
+            "[TRACED] Zeroed by 0x0100E4. 0x010124 sets 1 when marker 0xFFFF2000 != 0xAA55; 0x01001C stores "
+            + "0x04793C's result (0 pass / 1 fail). Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF62E4L, "plate_change_2calls",
+            "[TRACED] 0x01F588: [62DC] minus [62DC] from two calls earlier Trace: fn_01FE46_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF63B0L, "ffff4130_lag_filtered",
+            "[TRACED] Written only (find_writers lower bound) by 0x01FDF2 (bit copy of f32[0xFFFF4130]) and "
+            + "0x01FDD4 (0x0BEA40 lag toward f32[0xFFFF4130], k = 0.5, eps = 10*2^-15). Same quantity and units "
+            + "as 0xFFFF4130; the label adc_processed_temperature_B is unsupported. Trace: "
+            + "stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF63B8L, "maf_window_max_snap",
+            "[TRACED] snapshot of running max [6420] (01FF04) Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF63BCL, "maf_window_min_snap",
+            "[TRACED] snapshot of running min [6424] (01FF0C) Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF63C0L, "maf_window_mid_gps",
+            "[CITED] ([63B8]+[63BC])*0.5 = (max+min)/2 of [63B4] samples since the previous 0x01FE46 call "
+            + "Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63C4L, "mass_airflow_gps",
+            "[TRACED] min(window mean * MAF Compensation(IAT) + [69F4]*0x0C3104, MAF Limit 0x0C3100); written "
+            + "at 01FF66 Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63DCL, "gps_per_679C_load",
+            "[UNVERIFIED] min([63C4]*60/[679C], Limit A), written only when [679C] > 0.1953125 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63E0L, "gps_per_rpm_load",
+            "[UNVERIFIED] min([63C4]*60/RPM, Limit A), written only when RPM > 0.1953125 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63F4L, "load_comp_blend",
+            "[UNVERIFIED] (1-[90A8])*0x0AB004 + [90A8]*0x0AB020; the maps are byte-identical, so it equals the "
+            + "Cruise value Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF63FCL, "load_cell_delta",
+            "[TRACED] [63F8] new minus entry value, every 0x01FE46 call (020328) Trace: fn_01FE46_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF6404L, "ffb_641C_threshold",
+            "[TRACED] f32 written by 0x01FE46 at 01FF8C: 0x0AAE64(RPM) when [65FC] >= 50 else 0x0AAE78(RPM) = "
+            + "32.0 Trace: ffb_residual_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF6418L, "latch_hold_counter_6418",
+            "[TRACED] 0x020580: 0 if [641A]==1 else sat+1 Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF641AL, "latch_set_this_call",
+            "[TRACED] 1 on a set call, else 0 (01FFEA / 01FFEE) Trace: fn_01FE46_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF641BL, "latch_hold_enable",
+            "[TRACED] 1 on every set call; 0 once u8 [6418] >= 13 Trace: fn_01FE46_trace.txt (corrections "
+            + "item 114).");
+        count += labelComment(0xFFFF641CL, "lift_latch_641C",
+            "[TRACED] set by the 0x01FE46 set gate; held/cleared per hold gate; cleared by 0x020678/0x020726; "
+            + "freezes [63F8] against rising Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6420L, "maf_window_max",
+            "[UNVERIFIED] 0x0203DC: max([6420],[63B4]); restarted at [63B4] by 0x01FE46 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6424L, "maf_window_min",
+            "[TRACED] 0x0203DC: min([6424],[63B4]); restarted at [63B4] by 0x01FE46 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6430L, "factor_AAE3C",
+            "[TRACED] 0x0AAE3C([6898]), 1.0 flat; also the literal base used in 0x01FE46 Trace: "
+            + "fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6458L, "u0_ratio_6458",
+            "[TRACED] float written by 0x0209DC: 020D7E = max(([0xFFFF44A8]-fr15)/(fr13-fr15)*100, 0) or the "
+            + "old value; 020CFC = U1 on the r11 == 2 branch. Read by 0x039316. Identity not established. "
+            + "Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF645CL, "u1_ratio_645C",
+            "[TRACED] float written by 0x0209DC: 020DB6 = max(([0xFFFF44AC]-fr12)/([F+28]-fr12)*100, 0) or "
+            + "the old value; 020CEA = 0.0 / 020CF2 = 100.0 on the r11 == 2 branch. Read by 0x039316. Trace: "
+            + "fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF653CL, "front_o2_lambda_atm_comp",
+            "[TRACED] Atmospheric-pressure-compensated front-O2 lambda, clamp(1 + "
+            + "([8DE4]-1)*T_0x0AAE8C([6898]), 0.75, 2.0) (the definition formula /14.7), or 1.0; written only "
+            + "by 0x021A3C and 0x021D7C (1.0). NOT a sensor voltage. Trace: hole9_identity_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF6540L, "front_o2_lambda_lag",
+            "[TRACED] First-order lag (k = [0x0C3184] = 0.5, 0x0BEA40) of [653C], or a straight copy, or 1.0; "
+            + "written by 0x021A3C / 0x021D7C. No rate limit. Trace: hole9_identity_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0xFFFF65C5L, "opt_C303F_not_AA",
+            "[TRACED] u8 = (ROM byte 0x0C303F == 0xAA) ? 0 : 1, a calibration option; 0x55 in all 20 bins, so "
+            + "always 1. Not an engine-running state. Read by 0x022CF4 (== 1). Trace: fn_042506_trace.txt "
+            + "(corrections item 107).");
+        count += labelComment(0xFFFF65F6L, "byte_65F6_copy_of_415C",
+            "[TRACED] 0x022F1C copies byte [415C]; 0x022DB0 zeroes it; ==1 triggers re-seeding in "
+            + "0x020726/0x0203DC. Identity not established. Trace: fn_01FE46_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF67ECL, "passes_since_crank_67EC",
+            "[TRACED] u16. 0x023A94 holds it at 0 while byte [726C]==1, else increments it once per 0x04907C "
+            + "main-list pass (saturating). It is the decay gate of [7354] (>38) and [7374] (>0). Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6810L, "gear_estimate",
+            "[TRACED] u8 gear estimate 1..5, 6 = none determined. Writer 0x023EB8: "
+            + "[0xFFFF65FC]/([0xFFFF6624]/1000) ladder against the definition tables 'Gear Determination "
+            + "Thresholds A/B/C'. Not an open-loop selector. Trace: fn_042506_trace.txt (corrections item 107).");
+        count += labelComment(0xFFFF6898L, "atm_pressure_current",
+            "[TRACED] Atmospheric pressure: x of \"Front Oxygen Sensor Compensation (Atm. Pressure)\" (axis "
+            + "pointer 0x0C36F8 = definition axis \"Atmospheric Pressure\"); read by 0x021A3C. Trace: "
+            + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF69E6L, "gate_69E6",
+            "[TRACED] Byte F9 of 0x0410D4. Set to 1 by 0x026634 (with 69E4/69E5/69E7). 0x026698 sets it to 0 "
+            + "when [6350]>70.0 or NOT(lut(0x0AAF5C,[6354])>[63D4]). Never set to non-zero there. Physical "
+            + "meaning not established. Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF6A00L, "one_plus_afl_x_tbl0AB140",
+            "[TRACED] 0x02782C: (1+[7878])*[6A30], times [6A34] when bit 7 of [6A53] and bit 5 of [6A52]; the "
+            + "consumer is not decoded. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF6A29L, "flags_6A29_bit5_cleared_by_revlim",
+            "[TRACED] Bit 5 written by 0x026CF4 only (0x026DE8 or.b #32 / 0x026DEC and.b #223, GBR "
+            + "0xFFFF6A29): cleared on every pass while b0 == 1. Meaning of the bit not established. Trace: "
+            + "launch_closure_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF6A84L, "flag_8CAA_eq1_gbr_base",
+            "[TRACED] u8 = (u8[0xFFFF8CAA] == 1), written by 0x027D78 (class 100); GBR base of 0x027D86, "
+            + "which reads it at @(0,gbr) and runs 0x027DB8.. only when it is 1. Meaning not established. "
+            + "Trace: stub_shapes_b_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF6C48L, "eeprom_owner_token_in_02EB02",
+            "[TRACED] In 0x02EB02 / 0x02E968: 0 = free, 0xEE written by 0x02EB02 on ready non-aborting "
+            + "passes, 0 at finish. Other sentinels belong to other clients (not established). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7268L, "eeprom_writeback_outcome",
+            "[TRACED] 1 = busy timeout or gave up, 0 = all written (0x02ED88). Kept consistent with word "
+            + "[3154] by 0x02E8C0 (copy if the pair is consistent, else the word is rebuilt). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF726CL, "crank_stall_flag",
+            "[TRACED] u8. 1 while [6624] (axis Engine Speed) <= 300 until [6624] > 500 (0x02EF56); also set "
+            + "to 1 by 0x02F83E. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7288L, "post_start_seed_multiplier",
+            "[TRACED] f32 = 0x0AC338([6350]) (flat 1.0) or 1.0, by 0x02F550 / 0x02F85E. Multiplies the "
+            + "[3158]==0 seeds. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF72DCL, "mode0_duration_clamp_copy",
+            "[TRACED] Written only by 0x02F974 (02F9D2) = 0x02F9E0 clamp. Readers not checked. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF72E0L, "mode0_factor_a",
+            "[TRACED] 0x02F974: lookup 0x0AC34C at f32 [620C]; used in the mode-0 duration product. Physical "
+            + "meaning not established. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF733CL, "pulse_lower_clamp",
+            "[TRACED] f32 lower clamp of all 0x0301E4 outputs: 0.0 if byte [641C]==1 else 300.0 ([0x0CBE08]); "
+            + "sole writer 0x02FF8E (02FFA0), run just before 0x0301E4 Trace: injector_path_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7348L, "load_x_injector_scaling",
+            "[TRACED] clamp([63F8]*'Injector Flow Scaling' raw,0,131072), written by 0x030378; multiplies C "
+            + "in 0x0301E4. Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7354L, "post_start_addend_a",
+            "[TRACED] f32 CL-side FFB addend = AD594*[7358]*[7364](*[7360]), written by 0x0304BE. Seeded "
+            + "while [726C]==1, decays afterwards. Range [0, 4.53125]. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7358L, "post_start_a_state",
+            "[TRACED] f32 seed of [7354] (0x030454 while [726C]==1). Multiplied by 0.8984375 per N calls "
+            + "while [67EC]>38; zero latch. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7374L, "post_start_addend_b",
+            "[TRACED] f32 CL-side FFB addend = P0*[7390]*AD5CC with the shipped tables, written by 0x03082E. "
+            + "Range [0, 1.540802]. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7378L, "post_start_b_seed_pair_a",
+            "[UNVERIFIED] f32 P0 when [90C1]==0 and [647C]==1. Seeded by 0x03076E, decays linearly in 0x03082E. "
+            + "Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7380L, "post_start_b_seed_pair_b",
+            "[UNVERIFIED] f32 P0 otherwise. Seeded by 0x03076E, decays linearly in 0x03082E. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF73A0L, "addend_b_decay_threshold",
+            "[TRACED] u16 = 0x0ACA6C([6354]) = 0, written by 0x03082E. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF73D0L, "ffb_follower_fast",
+            "[TRACED] f32 lag state of [73B0] written by 0x0312DE (031484); also read by 0x01FE46 to set byte "
+            + "[641C] Trace: ffb_residual_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7441L, "ffb_mult_decay_counter",
+            "[TRACED] u8, counter of the [73E0]/[73E4] decay in 0x03110C (031248-0312AA); not reset by the "
+            + "seeder 0x030B68 Trace: ffb_residual_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7442L, "ffb_hold_word_counter",
+            "[TRACED] u16 written by 0x030C10: saturating +1 while byte [7C9D] == 1, else 0; read by the "
+            + "0x0312DE hold test (threshold 0x0ACD48 = 0) Trace: ffb_residual_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0xFFFF7474L, "afc_model_T",
+            "[TRACED] T = 30.0 / [0xFFFF6624], written by 0x031D88. Trace: afc_coefficients_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0xFFFF7478L, "afc_model_L",
+            "[TRACED] L = min(lookup2D 0x0AD620, 40); trunc(L) is the integer dead-time count Q2. Trace: "
+            + "afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7480L, "afc_model_TAU",
+            "[TRACED] TAU = lookup2D 0x0AD848 * lookup 0x0AC45C, the divisor of T in Q0/Q4. Trace: "
+            + "afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7484L, "afc_model_W",
+            "[TRACED] W = 1.9 (constant branch) or lookup 0x0AD864 (table branch), written by 0x031DB4. "
+            + "Second reader 0x06847E not decoded. Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7570L, "r0_recip_653C_032204",
+            "[TRACED] R0: 1/[0xFFFF653C] when |[0xFFFF653C]| > 2^-13, else held (0x032308). Trace: "
+            + "fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7574L, "r1_recip_77C8_032204",
+            "[TRACED] R1 (live config): 1/[0xFFFF77C8] when |.| > 2^-13, else held (0x032338). Trace: "
+            + "fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7630L, "r7_v_history_032204",
+            "[TRACED] R7: 41 floats 0xFFFF7630..0xFFFF76D3, history of v (R7[0]=R7[1]=v at end of call); "
+            + "zeroed by block Z and 0x031C9C. Trace: fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF76D4L, "afc_factor_76D4",
+            "[TRACED] R8: the output of 0x032204's closed loop, clamped to [LO,HI] and then [0.5,1.5]; served "
+            + "as SSM id 0x009 by getter 0x05D2C0. Its physical meaning is not established. Trace: "
+            + "afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF76E0L, "r13_flag_032204",
+            "[TRACED] R13 byte: 1 when EN==1, FLAG==1 and R8 outside R10 +- 2^-13; 0 when FLAG==0; 0 from "
+            + "0x031C9C. Trace: fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF76E4L, "exp_approx_last_arg",
+            "[TRACED] 0x03286C stores its argument here whenever x > 0.35, before the table lookup. Trace: "
+            + "afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF76F8L, "r11_prev_r2_032204",
+            "[TRACED] R11: = R2 at the end of every 0x032204 call (0x03283C); never written by 0x031C9C. "
+            + "Trace: fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF76FCL, "r12_prev_r8_032204",
+            "[TRACED] R12: = R8 at the end of every 0x032204 call (0x032844); 1.0 from 0x031C9C; read by "
+            + "block C as the previous R8. Trace: fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7700L, "afc_model_branch_flag",
+            "[TRACED] Byte hysteresis flag on [40C8]: 1 at <= 500, 0 above 550, written by 0x031DB4. 0 "
+            + "selects the constant W branch. Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7701L, "r14_prev_sel_032204",
+            "[TRACED] R14 byte: = byte [0xFFFF94B3] at the end of every call (0x03284C) and in 0x031C9C "
+            + "(0x031D0E); compared at 0x032502 to latch R9. Trace: fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7702L, "r15_prev_flag_032204",
+            "[TRACED] R15 byte: = FLAG (F1==1 && F2==0) at the end of every call (0x032850); 0 from 0x031C9C; "
+            + "selects block B vs C. Trace: fn_032204_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7704L, "afc_lag_1_64_a",
+            "[TRACED] First-order lag of R8, k = 1/64, clamped to [0.5,1.5], written by 0x03297A; 1.0 from "
+            + "0x032958 or when byte [7448] != 1. Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7708L, "afc_lag_1_128",
+            "[TRACED] First-order lag of R8, k = 1/128, written by 0x03297A; window-tested by 0x034C54 "
+            + "(0.95..1.05). Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF770CL, "afc_lag_1_64_b",
+            "[TRACED] clamp(lag([76D4],k=0.015625,snap 2^-13),0.5,1.5) when byte [7448]==1, else 1.0 "
+            + "(0x03297A). 1.0 on the [65F6] reset (0x032958). Read by 0x032B5E in MODE 3/19. Trace: "
+            + "cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7710L, "afc_hi_bound",
+            "[TRACED] Upper clamp bound of R8. Writers: 0x032AA8 (1.0), 0x032B5E (0x0AC4C0 lookup) and "
+            + "0x0330CA (rate-limited, capped). Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7714L, "afc_lo_bound",
+            "[TRACED] LO clamp of [76D4] in 0x032204. Written on every gated 0x032E28 call "
+            + "(03302E/033072/033178) and by 0x032AA8. Trace: cl_target_to_fuel_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0xFFFF771CL, "afc_7348_history_ratio",
+            "[TRACED] 0x032E28: 2.0 when [7348] < 2.0, else A[20]/[7348] (history ratio of [7348]). Trace: "
+            + "cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7720L, "afc_40C8_copy",
+            "[TRACED] Copy of [40C8], made by 0x032B10 (032B48); the input of lookups AC4C0/AC4D4. Trace: "
+            + "cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7724L, "afc_hi_track_target",
+            "[TRACED] clamp(x+K,0.5,1.5), K from 1/[77C8]; written by 0x0330CA (MODE 17/19). Trace: "
+            + "cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7728L, "afc_lo_track_target",
+            "[TRACED] clamp(BASE+K,0.5,1.5); written by 0x033128 (TRACK). Trace: cl_target_to_fuel_trace.txt "
+            + "(corrections item 111).");
+        count += labelComment(0xFFFF7730L, "afc_bound_cap",
+            "[TRACED] CAP = clamp(1/((1+[7BE4])*[772C]), 0.5, 1.5), written by 0x0331C6; used as the min for "
+            + "HI/LO in 0x0330CA/0x033128. Trace: afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF77B6L, "afc_bound_mode_counter",
+            "[TRACED] Byte down-counter in 0x032B5E. Reloaded to 1 in MODE 5/21; forces MODE 8 while nonzero. "
+            + "Trace: cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF77B8L, "afc_bound_prev_event",
+            "[TRACED] Byte: the previous call's CUR (byte [98F4]); written last by 0x032B5E. Trace: "
+            + "cl_target_to_fuel_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF77BCL, "cl_lambda_target",
+            "[TRACED] Closed-loop target in lambda units, written by 0x033460: clamp(clamp(1 + CL Fueling "
+            + "Target Compensation terms (AFR points/14.7) + [7904] + ..., 0.85, [7BDC]), 0.75, 1.25); [7BDC] "
+            + "<= 1.05 in this cal. Read only inside 0x033460. Trace: hole9_identity_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0xFFFF77C8L, "cl_lambda_target_out",
+            "[TRACED] What other routines read of the CL target (lambda units): = [77BC] on 0x033460 "
+            + "COPY/COPY2, a ramp toward it on STEP, [77C0] on SPECIAL (1.0, or 1.20 at standstill with byte "
+            + "[85D7]==1). In [0.75,1.25]. Path to the injector pulse not traced. Trace: "
+            + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7804L, "special_blend_term_a",
+            "[TRACED] 0x0340A0: (T_0x0ACEA0([6350]) + T_0x0ACEB4([68DC])) * T_0x0AC4FC([78B0]); 0.20001221 in "
+            + "20.19c/stock. Trace: hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7808L, "special_blend_term_b",
+            "[TRACED] 0x0340A0: ((T2D_0x0AD928([63F8],[6624]) + T_0x0ACEC8([6350])) + T_0x0ACEDC([68DC])) * "
+            + "T_0x0AC510([78B0]); 0.0 in 20.19c/stock. Trace: hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF780CL, "special_blend_factor",
+            "[TRACED] 0x0340A0: a 0..1 ramp (+-[0x0CBFF8]/[0x0CBFFC] = 10 per call) that rises while byte "
+            + "[85D7]==1 and [65FC] < [0x0CBFF4]=4.0. Set to 1.0 by the 0x0332A2 reset. Trace: "
+            + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7810L, "special_exit_blend",
+            "[TRACED] Written by 0x0340A0 (03427C/034284) and the 0x0332A2 reset. Equals (1-[780C])*[7808] + "
+            + "[7804]*[780C]; read only by the 0x033460 SPECIAL exit (0335AC). 0.0 or 0.20001221 in "
+            + "20.19c/stock. Physical meaning not established. Trace: hole9_identity_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0xFFFF7874L, "copy_of_7D68",
+            "[TRACED] f32 copied from [7D68] by 0x03452A (034586) before bsr 0x034CC8 Trace: "
+            + "injector_path_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF787EL, "afc_lag_window_countdown",
+            "[TRACED] Decremented by 0x034C54 when non-zero and 0.95 < [7708] < 1.05 (with bytes [7448] == 1 "
+            + "and [7453] == 1); zeroed when byte [789E] reaches cal 0x0CBBEE. Its setter is not traced. Trace: "
+            + "afc_coefficients_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF787FL, "afl_cell_index_787F",
+            "[TRACED] 0..3 from [63C4] vs 0x0CC074/78/7C (0x034D52); 0 when [78A0]==1. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7881L, "afl_window_samples",
+            "[TRACED] Sample count of the current AFL window. Incremented at 0x034A44-0x034A4E, cleared at "
+            + "0x034AFE. Not reset by a change of [787F]. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7882L, "afl_window_votes",
+            "[TRACED] Vote counter of the current window: reset to 128 at 0x034B06, +1 when e>=1.01, -1 when "
+            + "e<0.99. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7883L, "afl_gate_byte_7883",
+            "[TRACED] byte written by 0x0345A4 second body: 1 iff nine terms incl. [7324] > [733C]; meaning "
+            + "in 0x03452A not established Trace: injector_path_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7884L, "afl_gate_g1",
+            "[TRACED] Conjunction written by 0x0347F0 body at 0x03487A; read by 0x034884 and 0x071B58. Trace: "
+            + "afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7885L, "afl_7878_lagging_flag",
+            "[TRACED] 1 while 0x034B1C lags [7878] toward the cell, 0 on a snap (0x034B70). Read by 0x03CD4A "
+            + "and 0x03CFDA. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF78A9L, "afl_g2_consecutive_7884",
+            "[TRACED] Consecutive passes with [7884]==1, saturating (0x0348E2-0x0348F0). G2 needs >=63. "
+            + "Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7904L, "cl_target_trim_7904",
+            "[TRACED] Output of the windowed PI controller 0x0355B8, added with weight +1 into the CL lambda "
+            + "target [77BC] by 0x033460: positive = higher target lambda (leaner by the definitions' AFR "
+            + "convention). Pinned at 0 in every flashed rev (0x0357C8/CC and 0x035FFC/6000 zeroed). Reaches "
+            + "[77C8] only while byte [8E7E] != 1 or byte [9720] != 0. Open-holes #9. Trace: "
+            + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF79A0L, "ol_target_multiplier",
+            "[TRACED] f32 = 0x0AD0DC([6350]) in [0,1]; only writer 0x036962. Scales [7990] in 0x03606C. "
+            + "Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF79C0L, "cl_ol_delay_counter_copy",
+            "[TRACED] u16 counter (mov.w only, 0x036322). Not read by 0x03606C. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF79C2L, "cl_ol_delay_counter",
+            "[TRACED] u16. Counts calls while the 0x036978 test fails. 0x03606C compares it with [79C4]. "
+            + "Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF79C8L, "gate_79C8",
+            "[TRACED] 0x036322 036428: 1 iff 0 < [79C2] < [79C4]; only writer found. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7A78L, "per_cyl_addend_0",
+            "[TRACED] f32 array [7A78+4i], i=0..3, written by 0x037710; zeroed by 0x03757E. Enters [7310+4i] "
+            + "only. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7A88L, "per_cyl_addend_cap_0",
+            "[TRACED] f32 array: the upper clamp of [7A78+4i], 1.0 or max(old-0.025, 0.19999999). Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7AA0L, "per_cyl_counter_gate_7AA0",
+            "[TRACED] u8, set by 0x037604 from eleven tests; zeroed by 0x03757E. Trace: ffb_cl_side_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7AACL, "prev_895C",
+            "[UNVERIFIED] f32 [895C] as saved by the previous 0x037604 run, or by 0x03757E. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7AB0L, "stable_895C_pass_count",
+            "[TRACED] u8. Passes of 0x04907C with the latest [7AB1]==1, saturating at 255 (0x0376EC). Cleared "
+            + "by 0x037604 when its test fails. Trace: ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7AB1L, "stable_895C_flag",
+            "[TRACED] u8 (|[895C]-[7AAC]| < 100), written by 0x037604; zeroed by 0x03757E. Trace: "
+            + "ffb_cl_side_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7AF4L, "fn382C2_x_out",
+            "[TRACED] f32 output of 0x0382C2: clamp(A_ACC+B_ACC[*RAMP], LO, HI) when EN==1, else dead "
+            + "band/decay; +0.0 on FORCE0. Read by 0x02FFE0 at 0x03004A. Physical meaning not established. "
+            + "Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7AF8L, "fn382C2_ofs",
+            "[TRACED] f32 subtrahend of DIFF. Only writer found: 0x03817C at 0x03828E ([895C] - K364, only "
+            + "when EN==1). Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7AFCL, "fn382C2_lo",
+            "[TRACED] f32 lower clamp bound = tbl_AC6AC(8*[67EC]) * tbl_AC6C0([6350]), written at 0x038762 "
+            + "when EN==1 and not FORCE0 Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B00L, "fn382C2_hi",
+            "[TRACED] f32 upper clamp bound = tbl_AC6D4(8*[67EC]) * tbl_AC6E8([6350]), written at 0x03876C "
+            + "Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B04L, "fn382C2_diff",
+            "[TRACED] f32 [6624] - [7AF8], written every call at 0x038326 Trace: fn_0382C2_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF7B14L, "fn382C2_acc_a",
+            "[TRACED] f32 accumulator A: seeded min(X_OUT,0); negated-strict windup; zeroed when EN!=1 or by "
+            + "the K370/[647D] gate Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B24L, "fn382C2_acc_b",
+            "[TRACED] f32 accumulator B: seeded max(X_OUT,0); windup set = max(cand,0); zeroed when EN!=1 "
+            + "Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B34L, "fn382C2_ramp",
+            "[TRACED] f32 ramp factor: (1>RAMP) ? min(min(RAMP,t)+K37C,1) : t, with t = tbl_AC698(Q3); 1.0 "
+            + "after reset 0x038860 Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B38L, "fn382C2_enable",
+            "[TRACED] u8 enable. Only writer found: 0x03817C at 0x03827E, which always writes 0 on shipped "
+            + "cals (K_C7A = K_C7C = 0) Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B3AL, "fn382C2_cnt16",
+            "[TRACED] u16 count of 0x03817C calls with [65C0] unchanged (0x0382A6); 0xFFFF from 0x038158 "
+            + "Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B3CL, "fn382C2_cnt8",
+            "[TRACED] u8 saturating counter, zeroed when [726C] != 0 (0x038632 / 0x03869A) Trace: "
+            + "fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B3EL, "fn3817C_latch_a",
+            "[TRACED] u8 latch: 0 when [6254]!=1, 1 on a strict window around [895C] +- K350, else unwritten; "
+            + "with K350=0 only 0x038158 sets 1. EN precondition. Trace: fn_0382C2_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0xFFFF7B3FL, "fn3817C_latch_b",
+            "[TRACED] u8 latch: 0 when [726C]!=0, 1 when [6624] > [895C], else unwritten; 0x038158 writes 0. "
+            + "EN precondition. Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B40L, "fn382C2_prev_en",
+            "[TRACED] u8 copy of EN made at the end of each call (0x038846) and by the reset (0x0388B0) "
+            + "Trace: fn_0382C2_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B7CL, "blk7B7C_state_A",
+            "[TRACED] float. Seeded by EVENT 7 from 0x0AC710(X0), zeroed by EVENT 5, held 4 calls then "
+            + "decayed by 0x03949E (store 039224). Weights O1 via aL/aE. Physical meaning not established. "
+            + "Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B80L, "blk7B7C_state_C",
+            "[TRACED] float. Seeded by EVENT 7 from 0x0AC724(X0), zeroed by EVENT 5, held 8 calls (counter "
+            + "N0) then decayed (store 039262). Weights O1 via cL/cE*M. Trace: fn_038E64_trace.txt (corrections "
+            + "item 108).");
+        count += labelComment(0xFFFF7B84L, "blk7B7C_state_B",
+            "[TRACED] float. Seeded by EVENT 5 from 0x0AC738 (all zero in 20.19c), zeroed by EVENT 7, hold 0 "
+            + "(store 039244). Weights O2. Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B88L, "blk7B7C_state_D",
+            "[TRACED] float. Seeded by EVENT 3 from 0x0AC74C(X0), zeroed by EVENTS 7 and 5, hold 0 (store "
+            + "039282). Weights O2 via dL/dE*M. Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B8CL, "blk7B7C_sum_S",
+            "[TRACED] float, S = O1 + O2 stored at 0391D0. Zeroed by 0x0392C4. Read by 0x02FFE0 at 02FFFA and "
+            + "added at 03004E. Bounded to <= +0.046875 with stock tables from a zero start. Trace: "
+            + "fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B90L, "blk7B7C_out_O1",
+            "[TRACED] float = clamp(C*cL*cE*M + A*aL*aE, lo1, hi1), store 03918E Trace: fn_038E64_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF7B94L, "blk7B7C_out_O2",
+            "[TRACED] float = clamp(D*dL*dE*M + B*bL*bE, lo2, hi2), store 0391C2; hi2 = 0.0, so it is never "
+            + "positive Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B98L, "blk7B7C_mult_M",
+            "[TRACED] float = ((P-1)*K_P+1)*((Q-1)*K_Q+1), stored every call at 038ED4; 1.0 with stock K = "
+            + "0.0, NaN for non-finite P or Q Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B9CL, "blk7B7C_count_N0",
+            "[TRACED] u8 saturating counter, +1 per main-path call, 0 on EVENT 7, 0xFF on reset. Holds A (4) "
+            + "and C (8). Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B9DL, "blk7B7C_count_N1",
+            "[TRACED] u8 counter, 0 on EVENT 5, holds B Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B9EL, "blk7B7C_count_N2",
+            "[TRACED] u8 counter, 0 on EVENT 3, holds D Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7B9FL, "blk7B7C_flags_F0",
+            "[TRACED] byte. Bits 7/5/3 are hysteresis bits from U0 (0x039316); bits 6/4/2 are last call's "
+            + "7/5/3 (0x0393EA); bit1 is the initialised flag (038EB0 or.b, cleared by 0x0392A4). Trace: "
+            + "fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7BA0L, "blk7B7C_flags_F1",
+            "[TRACED] byte. Bits 7/5/3 are hysteresis bits from U1; bits 6/4/2 are their previous copy. "
+            + "Trace: fn_038E64_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7BECL, "b_cl_exit_copy2_select",
+            "[TRACED] Byte written only by 0x039E6E (039F14 = 0, 039F28 = 1). It picks COPY2 over SPECIAL in "
+            + "0x033460 and P3 in 0x039F42 when byte [8E7E]==1. It is 0 after every call in 20.19c/stock "
+            + "because [0x0CC488]=0.0 > [653C] never holds. Trace: hole9_identity_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0xFFFF7C68L, "any_cut_byte",
+            "[TRACED] 0x03AAA4: 1 iff any of eleven cut bytes incl. [7C9D] == 1. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7C6CL, "resume_band_7C6C",
+            "[TRACED] f32 [7C70] + [7C74]; writer 03AE3A; read by 0x015672 added to [7C78] Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C70L, "resume_latch_7C70",
+            "[TRACED] f32 200.0 / 1000.0 latch; writers 03AD50, 03AD64, 03AD72, 03AE0C Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C74L, "resume_band_terms_7C74",
+            "[TRACED] f32 100*([5BE3]==1) + 1000*([7CA2]==1); writer 03AE2C Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C78L, "resume_threshold_7C78",
+            "[TRACED] f32 lookup(0x0AD40C,[6350]) + [895C] + [7C7C], rpm units (compared with [6624]); only "
+            + "writer 03AD06 Trace: fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C7CL, "resume_adder_sum_7C7C",
+            "[TRACED] f32 sum of gated adders 300/1100/1000/600/0; writer 03ACF2 Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C80L, "ladder_alt_base_7C80",
+            "[TRACED] u16 alternate base 250 (03B332) or 0 (03B2F8), else kept; M = max([7C8C], [7C80]) "
+            + "Trace: fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C82L, "counter_7C82",
+            "[TRACED] u16 0 if [7C9E]==1, 0xFFFF if [85D7]==0, else saturating +1 (03AD24); initialised "
+            + "0xFFFF by 0x03AB60 Trace: fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C84L, "ladder_add1_7C84",
+            "[TRACED] u16 add 625 or 0 (03B228 / 03B2DA); [7C86]/[7C88]/[7C8A] are adds 2-4, written together "
+            + "Trace: fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C8CL, "ladder_base_count_7C8C",
+            "[TRACED] u16 base count of 0x03AF88, state; only real writer 03B218 (section 1); read 03AFE0, "
+            + "03B33A Trace: fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C8EL, "ladder_ext1_7C8E",
+            "[TRACED] u16 ext1 of 0x03AF88 (section 1 stores, e.g. 03B0AC); feeds output 2 Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C90L, "ladder_ext2_7C90",
+            "[TRACED] u16 ext2 of 0x03AF88; feeds outputs 3 and 4 Trace: fns_03AF88_03AB94_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF7C92L, "overrun_dwell_threshold_1",
+            "[TRACED] u16 output 1 = sat16(M + [7C84]) written 03B374; compared with [7CAA] by 0x03AE6C "
+            + "(03AF32) and by 0x03AF88 section 2 (03B304) on the next call; initialised 0xFFFF by 0x03AB60 "
+            + "Trace: fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C98L, "ladder_rung4_7C98",
+            "[TRACED] u16 output 4 written 03B3BE; equals [7C96] (03B3B2) whenever section 1 has run Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C9AL, "overrun_cut_tier",
+            "[TRACED] u8 tier 0/1/2/4 (3 is unreachable). Written only by 0x03AE6C. Read by 0x041BE4, which "
+            + "saves it to [8034] for its next run. Trace: overrun_ladder_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7C9BL, "ladder_add_flag_7C9B",
+            "[TRACED] u8 1 when the 625 adds are loaded (03B240), 0 when cleared (03B2EC) Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7C9CL, "ladder_alt_flag_7C9C",
+            "[TRACED] u8 alternate flag: 1 at 03B336, 0 at 03B2FA / 03B30A Trace: fns_03AF88_03AB94_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF7C9EL, "overrun_count_active",
+            "[TRACED] u8, 1 on the COUNT and IMMEDIATE paths of 0x03B3DA, otherwise 0. It freezes 0x03AF88's "
+            + "section 1 and lets 0x03AE6C produce a tier. Trace: overrun_ladder_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0xFFFF7CA1L, "edge_timer_idle_7CA1",
+            "[TRACED] u8 0 while the 88-call [65C0]-edge timer runs, else 1; gates the 1000 adder Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7CA2L, "counter_window_7CA2",
+            "[TRACED] u8 1 iff 0 < [7C82] < 188 (03AD42); gates the 1000 term of [7C74] Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7CA7L, "overrun_rpm_window_flag",
+            "[TRACED] u8 window flag, first rule that holds: !([7C78]+[7C6C] > x) -> 1; [7C78] > x -> 0; else "
+            + "[7C9E]==1. Writer 03B46A. Trace: overrun_ladder_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7CA8L, "edge_timer_count_7CA8",
+            "[TRACED] u16 timer count 0..88 (03AC14, 03AC3C, 03AC46) Trace: fns_03AF88_03AB94_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF7CAAL, "overrun_cut_count",
+            "[TRACED] u16 count of consecutive COUNT-path passes of 0x03AE5A. Writers are 0x03B3DA (03B5EC "
+            + "+1, 03B5FC/03B610 = 0, 03B544 = [7C98] on the IMMEDIATE path). Read by 0x03AE6C and 0x03AF88. "
+            + "Trace: overrun_ladder_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7CB0L, "countdown_65BF_7CB0",
+            "[TRACED] u16 loaded 31 on a [65BF] falling edge, -1 per call to 0 (03AC6A, 03AC76) Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7CB2L, "run_65D0_eq1",
+            "[TRACED] u16 run length of [65D0]==1, updated every call of 0x03AE6C (03AEA4). Used by the "
+            + "second tier-4 route. Trace: overrun_ladder_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7CB4L, "edge_timer_active_7CB4",
+            "[TRACED] u8 timer running flag (03AC10, 03AC50); also the literal base r12 of the 0x03AB94 float "
+            + "stores Trace: fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7CB5L, "hist_65C0_7CB5",
+            "[TRACED] u8 previous-call copy of [65C0] (03AC58; initialised by 0x03AB60) Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7CB6L, "hist_65BF_7CB6",
+            "[TRACED] u8 previous-call copy of [65BF] (03AC7A; initialised by 0x03AB60) Trace: "
+            + "fns_03AF88_03AB94_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7CB8L, "revlim_latch_b0",
+            "[TRACED] Latch: :=1 when the selected hysteresis byte ==1; :=0 when not and [0x0CC518] > "
+            + "f32[0xFFFF620C]; else held. Read by 0x03D2FC (forces 0xFFFF7D80 = 0xFFFF), 0x03AAA4, 0x03B76E "
+            + "(-> 0x026CF4 clears bit 5 of 0xFFFF6A29). Not updated or reset while int8[0xFFFF8EDC] != 0. "
+            + "Trace: launch_closure_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7CB9L, "revlim_hyst_b1",
+            "[TRACED] Hysteresis byte: :=1 when !([cut] > x), :=0 when [resume] > x, else held; cut/resume = "
+            + "0x0CC500/0x0CC504 (tuned always; stock outside |spd|<=1). Written 0x03B6CA/0x03B6D4, cleared "
+            + "0x03B75E; read only at 0x03B71E. Trace: launch_closure_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7CBAL, "revlim_hyst_b2",
+            "[TRACED] Same rule with 0x0CC510/0x0CC514 on the same (tuned: offset) x. Written "
+            + "0x03B6E4/0x03B6F2, cleared 0x03B760; read only at 0x03B71A. Trace: launch_closure_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF7D58L, "ratio_7D58",
+            "[TRACED] f32 written by 0x03D0B8 (clamp([7324]/[7338]-[7878]-[7AE4],0,2) / 2.0 / 1.0); "
+            + "initialised to 1.0 by 0x03CD00 together with [7D5C..7D64] Trace: injector_path_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7D68L, "fn_03CD4A_out",
+            "[TRACED] f32 = 0x03D23A([7D5C],[7D64],[7D68],stack byte) written at 03CF54; 0x03D23A not decoded "
+            + "Trace: injector_path_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7D80L, "channel_suppress_mask",
+            "[TRACED] Word written only by 0x03D2FC (0x03D44C): 0xFFFF if any of six bytes (7CB8 among them) "
+            + "==1, else bits 0..3 from four flag groups; bit k set makes 0x03DCB6 return at once for channel "
+            + "k. Physical channel type not established. Trace: launch_closure_trace.txt (corrections item "
+            + "108).");
+        count += labelComment(0xFFFF7D84L, "sched_active_duration_plus_734C",
+            "[TRACED] f32 [7D84+4k] = [7D94+4k] + f32 [734C], or 0.0 while cut (0x03D648). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7D94L, "sched_active_duration_export",
+            "[TRACED] f32 [7D94+4k] = rec_k+20 * 0.25, or 0.0 while cut (0x03D648). Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7DA4L, "sched_duration_scale_1p0",
+            "[TRACED] Constant 1.0 written by 0x03D68C every task-5 pass before 0x03D856. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7DA8L, "sched_records_4x40",
+            "[TRACED] Four 40-byte channel records; the layout is in the file's RAM LAYOUT. Pads +13..15, "
+            + "+18, +19, +37..39 are never written. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E48L, "sched_event_count_u16",
+            "[TRACED] S+0: saturating +1 each time a record is counted (0x03DA9E / 0x03D930). Zeroed by "
+            + "0x03D708, the init path and 0x03DBFC. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E4CL, "sched_mode0_fire_count_s32",
+            "[TRACED] S+4: saturating +1 per 0x03E168 call that reached 0x009A72 (0x03DD32). Zeroed by "
+            + "0x03D708, the init path and 0x03DBFC. Read by 0x02F974, where it has no effect, and by 0x02EF56 "
+            + "(not checked). Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E50L, "sched_fired_flag",
+            "[TRACED] S+8: set to 1 by 0x03DD46, from 0x03E168 on calls that reached 0x009A72 and from "
+            + "0x03DFC8 unless rec+7 != 0. Zeroed by 0x03D708 and 0x03DBFC, not by the init path. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E51L, "sched_saved_mode_index",
+            "[TRACED] S+9: 0 or 2. Written by 0x03D856 at 0x03D99E and by 0x03DB16 at 0x03DB4A. Trace: "
+            + "fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E52L, "sched_saved_mask",
+            "[TRACED] S+10: copy of word [7D80]. Written by 0x03D856 at 0x03D9BA and by 0x03DB16 at 0x03DB4E. "
+            + "Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E54L, "sched_last_step_byte",
+            "[TRACED] S+12: the unreduced r4&0xFF of the last 0x03D856 call (0x03D880). Read by 0x03DD4E. "
+            + "Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E55L, "sched_init_request",
+            "[TRACED] S+13: 1 makes the next 0x03D856 call take the init path. Set by 0x03D708 and 0x03DBF4; "
+            + "cleared at 0x03D8A2. Trace: fns_03D856_02EB02_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7E90L, "timing_cell_slot0_clamped",
+            "[TRACED] 0x03F368 03F9FA: clamp(clamp(clamp(S0,-20,[7EC0]),-20,[7EC4]) - [7EC8], [7EE4], 69.65); "
+            + "SSM id 0x11 reports it. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7EA0L, "out_03F368_7EA0",
+            "[TRACED] first of four floats [7EA0..7EAC] written by 0x03F368 at 0x03FA38..0x03FA6E = "
+            + "clamp([81DC..81E8] + ([7F0C]+[7F68]+[7F6C]-[7FBC]), -20, 69.65) when [0D2976]==90. Meaning not "
+            + "established. Trace: timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF7EC0L, "timing_cap_A",
+            "[TRACED] 0x03F00C: 69.65 (OFF) / [7ECC] (LOAD while latch [7F09]) / +0.7 ramp. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7EC8L, "timing_subtrahend",
+            "[UNVERIFIED] 0x03F00C: 0x0ADB10([620C]) on rising edge of [7EED], held while 1, -100/call to 0 while "
+            + "0. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7ECCL, "timing_cap_A_load",
+            "[TRACED] 0x03ED56: max([7ED0], 0x0ADAAC([6350])); 0x03FA8C: 69.65. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7EE4L, "timing_floor",
+            "[TRACED] 0x03F00C: -20.0 on every path with shipped tables. Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF7F09L, "cap_A_latch",
+            "[TRACED] 0x03F00C: set on falling edge of [85D7], cleared only on the OFF branch (03F160). "
+            + "Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7F0CL, "blend_out_sum_term0",
+            "[TRACED] 0x04004A tail: k*[7F48] + (1-k)*[7F18] or [7F48]; first term of the sum. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7F10L, "blend_weight_k",
+            "[TRACED] 0x03FBBC: steps 0.0156/call toward 0 while [85D7]==1, toward 1 otherwise. Trace: "
+            + "overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF7FB0L, "bound_factor_7FB0",
+            "[TRACED] Float factor of H. Lag or copy of [7FB4]; equal to [7FB4] in both bins. Trace: "
+            + "timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7FB4L, "bound_sel_7FB4",
+            "[TRACED] Float. One of 17 uint8 records at [6624]: 20.0390625 iff byte [3158]==1 or byte "
+            + "[90BE]==1, else 0. Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7FB8L, "bound_taper_7FB8",
+            "[TRACED] Float factor of H. Table 0x0ADD90/0x0ADDA4 at [6354]: 100 at <=30, 75 at >=70. Trace: "
+            + "timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7FBCL, "integ_7FBC",
+            "[TRACED] Float integrator written by 0x0410D4. It is clamped to [+0, H] on update paths, and "
+            + "forced to +0.0 while latch [7FF4]==1. Trace: timing_bound_040AF6_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0xFFFF7FC0L, "integ_7FBC_hi",
+            "[TRACED] Float clamp bound H = [7FB8]*[7FB0]*[7FC4]*[7FD4]*0.01 (times 0.0 if byte [67FC]==1), "
+            + "written by 0x041030. Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7FD4L, "bound_factor_7FD4",
+            "[TRACED] Float factor of H. +0.0 iff byte [9707]!=0, else 1.0. 0x04092A seeds it to 1.0. Trace: "
+            + "timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7FDCL, "flag_7FDC",
+            "[TRACED] byte written every pass by 0x040A9C (0x040AF4) from u16 window tests against "
+            + "[0D29C2]/[0D29C4]; cleared by 0x040970. Never 1 in stock. Trace: timing_0410D4_0415B8_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF7FE6L, "count_7FE6",
+            "[TRACED] u16. Zeroed with [7FED]:=1 on the M entry edge (0x0409C0 and 0x040AF6); counted +1 "
+            + "(sat) by 0x0409C0. Trace: timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7FEAL, "winB_count_7FEA",
+            "[TRACED] u16. Set to 0 with [7FEF]:=1, counted +1 (sat) per 0x0409C0 call, set to 0xFFFF on "
+            + "[726C]==1. [7FDC]=1 while <[0x0D29C4] (438 in 20.19c, 0 stock). Trace: "
+            + "timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF7FEFL, "winB_arm_7FEF",
+            "[TRACED] Byte set to 1 by 0x0409C0 on a 0->1 edge of byte [85D7] (with [726C]!=1); cleared on "
+            + "[726C]==1. Read by 0x040A9C for [7FDC]. Trace: timing_bound_040AF6_trace.txt (corrections item "
+            + "111).");
+        count += labelComment(0xFFFF7FF0L, "prev_M_7FF0",
+            "[TRACED] Byte. Set to byte [8970] by 0x0409C0 every call, and to 1 by 0x04092A. Read by 0x040AF6 "
+            + "and 0x0409C0 for the M in {4,7,8} entry edge. Trace: timing_bound_040AF6_trace.txt (corrections "
+            + "item 111).");
+        count += labelComment(0xFFFF7FF4L, "integ_7FBC_latch",
+            "[TRACED] Byte. Set to 1 at 0x0411F6 when byte [69E6]==0 and |[7FBC]|<=0.001373291015625 (or "
+            + "NaN). While 1, [7FBC]=+0.0 every call. find_writers reports no clearing store. Trace: "
+            + "timing_bound_040AF6_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8000L, "ramp_out_8000",
+            "[TRACED] float max(R' - max([8258]-[81EC],0), 0) written every call by 0x0415B8 (0x0417DA), "
+            + "zeroed by 0x0418FC; read by 0x03F368 only on its two sum paths. Trace: "
+            + "timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF8004L, "ramp_state_8004",
+            "[TRACED] float ramp state R' of 0x0415B8 (0x0417CC), zeroed by 0x0418FC (0x04191E). Trace: "
+            + "timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF8008L, "ramp_gain_8008",
+            "[TRACED] float multiplier of 0x0415B8 states 1/2; 1.0 from 0x0418AC (flat float32 table "
+            + "0x0AE164) and 0x0418FC. Trace: timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF801EL, "ramp_state_id",
+            "[TRACED] byte state number 0..5 of 0x0415B8 (0x0417DE). Trace: timing_0410D4_0415B8_trace.txt "
+            + "(corrections item 108).");
+        count += labelComment(0xFFFF801FL, "ramp_counter",
+            "[TRACED] byte action counter of 0x0415B8 (0x0417E4), compared with divider [0D297E]. Trace: "
+            + "timing_0410D4_0415B8_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF8020L, "cut_exit_retard_state",
+            "[TRACED] 0x041BE4: table 0x0ADE08([6350]) on each armed call, else min(+0.7, 0), reset to 0; "
+            + "always <= 0. Trace: overrun_timing_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8028L, "cut_exit_retard_term",
+            "[TRACED] = min([8020],[8024]) written every call by 0x041BE4 (041D0E); added into the 0x03F368 "
+            + "sum only on the sixteen-term path (03F644). Trace: overrun_timing_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF8034L, "prev_overrun_tier_041BE4",
+            "[TRACED] u8 copy of [7C9A] stored at the end of every 0x041BE4 run (041D12) and tested by the "
+            + "next run's arm (041C2A). 0x041954 also writes it when 0x022F92 returns 1. Trace: "
+            + "overrun_ladder_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF805CL, "timing_term_805C",
+            "[TRACED] f32 output of 0x042506 (GBR base of its struct). Zero or negative only (to about -30.7 "
+            + "in this calibration); summed into total timing at 0x03F656. Gear-, rpm- and step-indexed; what "
+            + "it compensates is not established. Trace: fn_042506_trace.txt (corrections item 107).");
+        count += labelComment(0xFFFF8080L, "flags16_8080",
+            "[TRACED] u16 flag word; bits 0x1000/0x2000/0x4000 select 0x042506's output path. Stored at "
+            + "twelve sites in 0x04209A, 0x042368 and 0x041EEE (three through a stack-held base find_writers.py "
+            + "misses). No knock quantity read. Trace: fn_042506_trace.txt (corrections item 107).");
+        count += labelComment(0xFFFF80B4L, "term_80B4_80B4",
+            "[TRACED] 0x042ED8: converges to 0.0 from any start; sum term. Trace: overrun_timing_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF81ECL, "fbkc_timing_term",
+            "[TRACED] 0x044296: [81F0] + [8260] + [828C] (or [81F0] alone, or 0). A term of the 0x03F368 sum. "
+            + "Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF81F4L, "load_lag",
+            "[TRACED] 0x044DB0: first-order lag of [63F8] (0x0BEA40, k = [0x0D2E18] = 0.03125, snap 2^-14). "
+            + "Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF81F8L, "load_minus_lag",
+            "[TRACED] 0x044DB0: [63F8] - lag([63F8]) with k = 0.03125. G11/G12 compare it with "
+            + "0xBDCCCCCC/0x3DCCCCCC. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF81FCL, "fbkc_81F0_saved",
+            "[TRACED] 0x04581A: [81F0] saved while [824C] == 1. Restored into [81F0] when [824C] != 1. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF822CL, "cnt_since_79C8",
+            "[TRACED] 0x044CEA: 0 when [79C8] == 1, else +1 (saturating 255). 0x044300 sets it to 255 at "
+            + "init. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8234L, "fbkc_step_enable",
+            "[TRACED] Written only by 0x0448F4 at 0x044CCA (0 or 1). 0x04438C needs it == 1 for blocks "
+            + "A/B/C/main. 0x02487C packs it into bit 6 of [6893]. Trace: fn_0448F4_trace.txt (corrections item "
+            + "114).");
+        count += labelComment(0xFFFF8235L, "fbkc_rpm_hi_ok_copy",
+            "[TRACED] 0x04581A: 1 iff [824C] == 1. The value 0 selects head exit 7 ([81F0] = [81FC]). Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8240L, "cnt_5BE2_set",
+            "[TRACED] 0x044D12: u16 count of calls while [5BE2] != 0 (saturating), else 0. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8249L, "cnt_798C_pos",
+            "[TRACED] 0x044D12: counts up while [798C] > 0 (saturating 255), else 0. 0x044B1A also clears it. "
+            + "Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF824AL, "fbkc_load_below_min",
+            "[TRACED] 0x0456E0: 1 when load < 0.95, 0 when load >= 1.0 (20.19c; stock 0.75/0x3F4CCCCC). FBKC "
+            + "head exit 4. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF824BL, "fbkc_rpm_above_lo",
+            "[TRACED] 0x04578C via 0x0BE800: 1 at RPM >= 1200, 0 below 1100 (20.19c). Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF824CL, "fbkc_rpm_below_hi",
+            "[TRACED] 0x04578C: 1 when RPM < 6000, 0 when RPM >= 6100 (20.19c). Trace: fn_0448F4_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFF824DL, "rpm_below_fine_lo_hyst",
+            "[TRACED] 0x0457D2: 1 when RPM < 1500, 0 when RPM >= 1600, held in between. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8253L, "v79A8_ge_10000",
+            "[TRACED] 0x0457F4: written every call as shipped. Only reader is the 0x0448F4 tail, which is "
+            + "dead (0x0D299A = 0). Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8258L, "kc_adv_max_blended_8258",
+            "[TRACED] 0x045970: (1-[90A8]) T(KC Advance Max Cruise) + [90A8] T(Non-Cruise). Overwritten every "
+            + "call. Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF826CL, "kc_gain_0AE664",
+            "[TRACED] 0x045970: T(0x0AE664), an all-zero table, so 0.0 every call as shipped. Trace: "
+            + "fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8277L, "rough_corr_window_ok",
+            "[TRACED] 0x045A3E: AND of [8287..828A], set by 0x045F9A on the Rough Correction Range constants "
+            + "(tuned). Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF829EL, "fine_corr_window_ok",
+            "[TRACED] 0x0467AE: AND of [82AD..82B0], set by 0x046A4A on the Fine Correction Range constants. "
+            + "Trace: fn_0448F4_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFF8320L, "r04907C_pass_counter_8320",
+            "[TRACED] With gate 0xFF, 0x04907C adds 1 per call and makes its five calls when the low nibble "
+            + "is 0. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF85DCL, "guarded_float_rec_85DC",
+            "[TRACED] 8-byte guarded float record (value + two check words ~(hi16+lo16)), written through "
+            + "0x0BDBCC. Not a byte. What the float means is not established. Trace: "
+            + "helpers_desc_read_trace.txt (corrections item 107).");
+        count += labelComment(0xFFFF8DE4L, "front_o2_lambda",
+            "[TRACED] Front O2 sensor lambda = table 0x0AF468 (\"Front Oxygen Sensor Scaling\", AFR = 14.7x) at "
+            + "x = [0xFFFF40E0] (axis \"Front Oxygen Sensor\", mA); written by 0x058902 (058916). Trace: "
+            + "hole9_identity_trace.txt (corrections item 108).");
+        count += labelComment(0xFFFF8E65L, "request_inhibit_8E65",
+            "[TRACED] Written only by 0x05A066 (0x05A17E); r5 of 0x05A498 needs it 0. Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8E66L, "latch_8E66_set_only",
+            "[TRACED] Set to 1 only by 0x05A218 (0x05A252) when [A733] or [A734]==1 and [8E3E]-[3660]<=78; "
+            + "never cleared by a resolved store; ==1 with [A733]=[A734]=0 forces [8E65]=1 (blocks BOTH). "
+            + "Physical meaning not established. Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8E67L, "latch_8E67_set_only",
+            "[TRACED] Set to 1 only by 0x05A218 (0x05A264) when [A733]==[A734]==1 and [8E3E]-[3660]<=78. "
+            + "Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8E68L, "request_inhibit_8E68",
+            "[TRACED] Written only by 0x05A26E (0x05A3D2/0x05A3DA); 1 whenever [225C]==0; r5 needs it 0. "
+            + "Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8E69L, "flag_8E69",
+            "[TRACED] Written only by 0x05A26E (0x05A3DE); 1 only on its rules 10/11; read by 0x039F42 and "
+            + "0x02538C. Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8E79L, "hyst_63C4_vs_8E6C",
+            "[TRACED] 0x05A066: 1 when [63C4] >= [8E6C] (30.0018) or NaN, 0 when [63C4] < [8E6C]-5.0. Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8E7AL, "hyst_2200_minus_620C_vs_8E70",
+            "[TRACED] 0x05A066: 1 when [2200]-[620C] <= [8E70] or NaN, 0 when > [8E70]+100. Trace: "
+            + "special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8E7CL, "edge_flag_8E7C",
+            "[TRACED] 0x05A26E: 0 when [8E46]==0; 1 on a rising edge of [8E65] with [365C]>=3125 or "
+            + "[3664]>=1. Trace: special_exit_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8ECCL, "V_word_8ECC",
+            "[TRACED] V in {0,1} as a value:~value word, written only by 0x05B690; shadow at 0xFFFF8EF6. "
+            + "Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF8EDCL, "gate_8EDC",
+            "[TRACED] High byte of word 8EDC/8EDD (value:~value). 0x05CB1C writes 00/A5/FF at most once per "
+            + "reset (warm start only); otherwise the byte holds post-reset content as repaired by scrub "
+            + "0x05CBC8. Physical meaning not established. Trace: revlim_freeze_gate_trace.txt (corrections "
+            + "item 111).");
+        count += labelComment(0xFFFF8EEDL, "gate_8EDC_shadow",
+            "[TRACED] Shadow of the gate byte; it decides the gate when the word is inconsistent. Written by "
+            + "0x05CB1C and 0x05CBC8. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFF97B0L, "max0_653C_m_77C8_p_76D4_p_afl",
+            "[TRACED] 0x071AFA: max([653C]-[77C8]+[76D4]+[7878], 0), or 1.0 when [65F6]==1 or [7449]==0. "
+            + "[97B4] is its k=0.125 lag. Trace: afl_learning_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFFACF6L, "cnt_inc_block_ACF6",
+            "[TRACED] 1 blocks the CNT increment in 0x05B73C. Set to 1 only by 0x0914AE; no resolved store "
+            + "clears it. Trace: revlim_freeze_gate_trace.txt (corrections item 111).");
+        count += labelComment(0xFFFFBFA8L, "boot_window_flag_BFA8",
+            "[TRACED] byte; (BFEC == 0x55), written only when the boot window runs Trace: "
+            + "poweron_state_trace.txt (corrections item 114).");
+        count += labelComment(0xFFFFBFB8L, "boot_ring_wr_index",
+            "[TRACED] word; mod 100, 0 at reset (0x00054A, 0x0004D6) Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFFBFBAL, "boot_ring_rd_index",
+            "[TRACED] word; mod 100, 0 at reset (0x00054A, 0x000524) Trace: poweron_state_trace.txt "
+            + "(corrections item 114).");
+        count += labelComment(0xFFFFBFFCL, "boot_marker_BFFC",
+            "[TRACED] long 0x5AA5A55A written by 0x000756 on every boot-block exit; gates only the message "
+            + "window Trace: poweron_state_trace.txt (corrections item 114).");
+        // <<< END decoded labels <<<
         printf("ImportAE5L600L: Applied %d labels/comments.\n", count);
         printf("Done! ROM is labeled for AE5L600L analysis.\n");
     }

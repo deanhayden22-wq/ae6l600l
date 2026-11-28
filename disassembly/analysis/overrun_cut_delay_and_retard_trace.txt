@@ -1,0 +1,138 @@
+================================================================================
+OVERRUN FUEL CUT: LIFT-TO-CUT DELAY TABLES AND THE FUEL-CUT TIMING RETARD
+Traced 2026-11-21.  Reference bin: rom/AE5L600L 20g rev 20.19c.bin
+Compared against stock rom/ae5l600l.bin.  Decoder: scripts/sh2e_disasm.py
+(displacements below are already in bytes).
+================================================================================
+
+HEADLINE
+--------------------------------------------------------------------------------
+1. The lift-to-cut delay is a per-gear x per-RPM-band uint16 count selected in
+   the function at 0x03AF88 through pointer tables at 0x63B70-0x63BF0. The
+   values live at 0xCBCA0-0xCBCF1, have NO definition, and are byte-identical to
+   stock. Only the RPM band edges differ from stock (0xCC4EC 1800 -> 2250,
+   0xCC4F0 2500 -> 3000, 0xCC4F4 4500 unchanged).
+2. The timing drop seen at fuel resume is the task37 retard (corrections 74/79).
+   It is NOT one-shot: it is re-armed on every pass while the overrun tier byte
+   0xFFFF7C9A was 4 on the previous pass and rpm < [0xFFFF7C78], so it is HELD
+   at the ECT table value (0xADE08, -24.96 deg warm) for the whole cut and then
+   ramps out at +0.7 deg per call (0xD2C10). Table and rate are stock-identical.
+3. Tier 4 IS on the dwell ladder (corrects item 79): the first test at 0x03AEBC
+   is dwell >= [0xFFFF7C98], the top rung.
+
+PART 1 - RPM BAND SELECT (function 0x03AF88, GBR = 0xFFFF7C80)
+--------------------------------------------------------------------------------
+  03AFF6: D11F  mov.l @(0x03B074),r1   ; 0xCC4EC = 2250.0 (stock 1800.0)
+  03AFF8: F818  fmov.s @r1,fr8
+  03AFFA: F8E5  fcmp/gt fr14,fr8   ; T = 2250 > rpm
+  03AFFC: 8B01  bf 0x03B002
+  03AFFE: A043  bra 0x03B088
+  03B000: E100  mov #0,r1   ; band 0
+  03B002: D11D  mov.l @(0x03B078),r1   ; 0xCC4F0 = 3000.0 (stock 2500.0)
+  03B004: F818  fmov.s @r1,fr8
+  03B006: F8E5  fcmp/gt fr14,fr8
+  03B008: 8B38  bf 0x03B07C
+  03B00A: A03D  bra 0x03B088
+  03B00C: E101  mov #1,r1   ; band 1
+  03B07C: D171  mov.l @(0x03B244),r1   ; 0xCC4F4 = 4500.0 (stock 4500.0)
+  03B07E: F818  fmov.s @r1,fr8
+  03B080: F8E5  fcmp/gt fr14,fr8
+  03B082: 8F01  bf/s 0x03B088
+  03B084: E103  mov #3,r1   ; band 3 (delay slot)
+  03B086: E102  mov #2,r1   ; band 2
+  03B088: 2558  tst r5,r5
+  03B08A: 8B5D  bf 0x03B148
+
+PART 2 - GEAR SELECT AND TABLE FETCH (r7 = byte [0xFFFF6810], r5 = byte [0xFFFF5DB8])
+--------------------------------------------------------------------------------
+Gear 1, flag [5DB8] == 0 (the other gears repeat this shape with the next
+pointer table: 0x63B80 gear 2, 0x63B90 gear 3, 0x63BA0 gear 4 and 5):
+  03B0BA: 607C  extu.b r7,r0
+  03B0BC: 8801  cmp/eq #1,r0
+  03B0BE: 8B0E  bf 0x03B0DE
+  03B0C0: 4108  shll2 r1
+  03B0C2: D565  mov.l @(0x03B258),r5   ; 0x63B70 = pointer table, 4 entries
+  03B0C4: 6013  mov r1,r0
+  03B0C6: 025E  mov.l @(r0,r5),r2
+  03B0C8: 6421  mov.w @r2,r4   ; r4 = delay count for this gear and RPM band
+  03B0CA: D264  mov.l @(0x03B25C),r2
+  03B0CC: 052E  mov.l @(r0,r2),r5
+  03B0CE: 6051  mov.w @r5,r0
+  03B0D0: C107  mov.w r0,@(14,gbr)   ; [0xFFFF7C8E]
+  03B0D2: D263  mov.l @(0x03B260),r2
+  03B0D4: 6013  mov r1,r0
+  03B0D6: 052E  mov.l @(r0,r2),r5
+  03B0D8: 6051  mov.w @r5,r0
+  03B0DA: A092  bra 0x03B202
+  03B0DC: C108  mov.w r0,@(16,gbr)   ; [0xFFFF7C90] (delay slot)
+
+Delay counts (uint16), RPM bands <2250 | <3000 | <4500 | >=4500, 19c == stock:
+    gear 1   0xCBCA0   44  44   6  13
+    gear 2   0xCBCA8   19  19  19   9
+    gear 3   0xCBCB0   25  25  13   6
+    gear 4/5 0xCBCB8   44  44  44   6
+    [5DB8] != 0 family (0xCBCCA..): 6 6 44 13 / 13 6 44 13 / 13 13 44 13 / 25 13 44 13
+
+OBSERVED (logs 8-2, 8-14, 11-20; clean lifts, warm; median lift-to-cut seconds):
+    lowest logged gear   0.20 0.20 0.20 0.12    <- matches the gear-2 row at ~8 ms/count
+    next                 0.24 0.24 0.12 0.10    <- matches the gear-3 row
+    16.2 mph/krpm gear   0.40 0.40 0.40 0.06    <- matches the gear-4/5 row
+    25.3 mph/krpm gear   0.40 0.40 0.40  -      <- matches the gear-4/5 row
+  44 counts = ~0.35 s plus ~0.05 s pedal-to-closed lag. The 16.2 mph/krpm gear
+  is therefore 4th, not 3rd (five ratios: ~5, 8.5, 12, 16.2, 25.3).
+NOT WALKED: the instructions between r4 and the cut flag. The identification of
+r4 as the delay rests on the 11-cell match above, not on that path.
+
+PART 3 - TIER CLASSIFIER (function 0x03AE6C, GBR = 0xFFFF7C92)
+--------------------------------------------------------------------------------
+  03AEB6: C50C  mov.w @(24,gbr),r0   ; dwell counter [0xFFFF7CAA]
+  03AEB8: 6403  mov r0,r4
+  03AEBA: C503  mov.w @(6,gbr),r0   ; [0xFFFF7C98]
+  03AEBC: 3402  cmp/hs r0,r4   ; T = dwell >= [7C98]
+  03AEBE: 8944  bt 0x03AF4A   ; -> tier 4
+  03AF4A: E004  mov #4,r0   ; tier 4
+  03AF4C: C008  mov.b r0,@(8,gbr)   ; [0xFFFF7C9A] = 4
+
+PART 4 - THE RETARD IS HELD, NOT ONE-SHOT (function 0x041BE4, GBR = 0xFFFF8020)
+--------------------------------------------------------------------------------
+  041C22: FEF5  fcmp/gt fr15,fr14   ; T = [0xFFFF7C78] > rpm
+  041C24: 8F0A  bf/s 0x041C3C
+  041C26: 620C  extu.b r0,r2
+  041C28: C414  mov.b @(20,gbr),r0   ; [0xFFFF8034] = previous pass's tier byte
+  041C2A: 8804  cmp/eq #4,r0   ; == 4 ?
+  041C2C: 8B06  bf 0x041C3C
+  041C2E: D54A  mov.l @(0x041D58),r5   ; 0xD2981 = 0
+  041C30: 6050  mov.b @r5,r0
+  041C32: C012  mov.b r0,@(18,gbr)   ; [0xFFFF8032] = 0
+  041C34: D549  mov.l @(0x041D5C),r5   ; 0xD2980 = 1
+  041C36: 6050  mov.b @r5,r0
+  041C38: A010  bra 0x041C5C
+  041C3A: C013  mov.b r0,@(19,gbr)   ; [0xFFFF8033] = 1  (re-armed EVERY pass while true)
+  041C96: C413  mov.b @(19,gbr),r0   ; [0xFFFF8033] != 0 -> apply
+  041C98: 2008  tst r0,r0
+  041C9A: 8D0A  bt/s 0x041CB2
+  041C9C: 1F03  mov.l r0,@(12,r15)
+  041C9E: D435  mov.l @(0x041D74),r4   ; descriptor 0xADE08 (ECT axis, uint8)
+  041CA0: D235  mov.l @(0x041D78),r2
+  041CA2: 420B  jsr @r2
+  041CA4: F4DC  fmov fr13,fr4   ; fr4 = ECT
+  041CA6: DE31  mov.l @(0x041D6C),r14
+  041CA8: E0EC  mov #-20,r0
+  041CAA: FE07  fmov.s fr0,@(r0,r14)   ; [0xFFFF8020] = table value
+  041CD4: DE25  mov.l @(0x041D6C),r14
+  041CD6: E0EC  mov #-20,r0
+  041CD8: F4E6  fmov.s @(r0,r14),fr4
+  041CDA: D228  mov.l @(0x041D7C),r2   ; 0xD2C10 = 0.7
+  041CDC: F828  fmov.s @r2,fr8
+  041CDE: F480  fadd fr8,fr4   ; [8020] + 0.7, then float_min(.., 0.0)
+  041D10: 60B3  mov r11,r0
+  041D12: C014  mov.b r0,@(20,gbr)   ; [0xFFFF8034] = this pass's tier byte
+
+Table 0xADE08 by coolant degC (19c == stock):
+    <= 0: 0.00   10: -8.09   20: -11.95   30: -16.17   40: -17.93
+    50-60: -20.04   70 and up: -24.96
+
+OBSERVED: logged Timing sits ~15-25 deg below its pre-lift value while IPW = 0
+and climbs back over <0.6 s after fuel resumes (median dip at resume with pedal
+on: -10.0 to -15.5 across 7-26, 8-2, 8-14, 8-22, 11-20).
+================================================================================

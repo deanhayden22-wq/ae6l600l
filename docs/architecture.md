@@ -134,9 +134,10 @@ bookmark, no bad-instruction marker. Measured from the old export:
   word. They look like short complete functions. They are truncated stubs.
 - **~239 KB** of code beginning with an FPU word was never disassembled, vs
   ~172 KB decoded. **More code was missing than present.**
-- `fmac_interp_uint16` (`0xBE598`) and `fmac_interp_uint8` (`0xBE588`) — the two
-  table-interpolation primitives, **176 call sites** between them — had **0%**
-  coverage. Every calibration lookup path dead-ended.
+- `0xBE598` and `0xBE588` — **176 call sites** between them — had **0%**
+  coverage. (They were then labelled `fmac_interp_uint16/8` and called the
+  table-interpolation primitives; decoded in 2026-11 they are raw-to-float
+  conversions, fr5 + fr4·raw — corrections item 107.)
 - `KNOCK_DETECTOR`, `FLKC_PATH_J`, `FLKC_PATHS_FG`: 1–5% coverage. That is why
   they were carried as raw hex dumps in `disassembly.txt`.
 - The generic ISR prologue at `0x2B8C` (118 callers) decoded 28 bytes, then died

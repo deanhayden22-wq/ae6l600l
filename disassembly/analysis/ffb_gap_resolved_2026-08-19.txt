@@ -2,6 +2,15 @@
 FFB BELOW THE OL MAP -- RESOLVED. The term is the transient enrichment, and it
 is hard-clamped at +0.09998 phi.
 ================================================================================
+
+*** ANSWER RETRACTED 2026-11-27 -- docs/corrections.md item 109 ***
+  - [7B8C] CANNOT reach +0.09998. Its reachable maximum with these tables is
+    +0.046875 (seed C <= 0.0234375, cL <= 1.0, cE <= 2.0, O2 <= 0). The clamp
+    in section 2 is real but never attained, so "pinned at its upper clamp"
+    (section 0) is wrong and the transient residual needs another addend.
+  - It is NOT a recursive filter (section 2e): states are SET from tables on
+    an edge, held for a count, then stepped toward zero. fn_038E64_trace.txt.
+  - Section 1 (settled WOT commands 11.0; the excess is transient-only) stands.
 Reference bin : rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
                 (md5 re-computed this session, matches)
 Logs          : all 20.19c logs -- 7-29, 8-2, 8-4, 8-4 2, 8-8, 8-14 weekend

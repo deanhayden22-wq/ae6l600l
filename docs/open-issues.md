@@ -1,6 +1,6 @@
 # Open issues — AE5L600L tuning
 
-Last updated **2026-08-19** (20.19c re-score; see the CURRENT STATE block below).
+Last updated **2026-11-28** (two more 20.19e drives, `logs/11-28 20.19e/` day1/day2: **2 of 3 knock incidents fell in the 19e AVCS +3 zone** (1600-3800 x load 1.0-1.3; 2.1 vs 0.44 steps per zone-minute on 19c, n=2 incidents, watch item); held WOT, >70 mph highway and pedal pull-aways still not driven; gear-threshold recentre proposed 7700/5480/4250/2967, not staged). Before that **2026-11-24** (first 20.19e log; block added below). Before that **2026-11-21** (two more 19c logs). Previously **2026-08-19** (20.19c re-score; see the CURRENT STATE block below).
 The paragraph that follows is the 2026-06-05 header, kept for the trail: — 20.17a driven 6-5 (`logs/6-5 20.17a/log0001.csv`, 32 min, thin cusp data): **the cusp lean/knock is NOT a tip-in fuel deficit** (G1 barely moved despite +2 ms more IPW; deep FBKC is overrun noise) → move to the load/timing/AVCS substrate. See "20.17a watch". Still **part-throttle only — 3rd log running with no real boost** (peak 13.77 psi), so the 20.17 top-end / 17-psi FLKC fix is STILL untested (WOT test pending). 20.15 tip-in fix was a real ~18% gain; tip-in is now ~3× lifted at the cusp via 20.17a BE-comp but the residual lean is wall-wetting, not fuel.
 **On car for 6-5:** 20.17a *as-driven* = BE-comp lift + an accidental `0xCC4EC` decel-tier change (reverted post-drive). **On-disk `rom/AE5L600L 20g rev 20.17a.bin` is now BE-comp-only**, staged for the weekend long drive. (Underlying 20.17 base: target → ~17 to arm Turbo Dynamics + WGDC down + TD-negative up + per-gear 5th timing comp + OL richen; TD-arm confirmed 6-3, high-load knock fix still UNTESTED.)
 **Prior P0s (from 20.16, still open):** ghost-zone −11.8° knock (2200-3300 × 1.0-1.4) + injector IDC >100% at top end — see "20.16 watch". (6-3 in-zone IDC was fine at 54-62%, but that was part-throttle, ≤14.3 psi.)
@@ -23,10 +23,48 @@ diverge from this snapshot.
 > treat anything below as history unless it is repeated here.** Rev-by-rev detail
 > is in `tune-state.md` ("20.18 → 20.19d — reconstructed 2026-08-19").
 
-**On car:** 20.19c. **Built but never driven:** 20.19d (13 bytes of FLKC
+**On car:** 20.19e since 2026-11-24 (was 20.19c). **Built but never driven:** 20.19d (13 bytes of FLKC
 calibration at `0xD2F29`–`0xD2F36`; re-check its intent against
 `project_flkc_grid_is_bucketed` before flashing — the question it was built to
 answer has since been settled).
+
+### Update 2026-11-24 — 20.19e flashed, first log
+
+Full entry in `logs/REVIEW_LOG.md`; changeset in `tune-state.md` ("20.19d -> 20.19e"). **On car: 20.19e.**
+19d was never flashed. The log is 42 min of town driving with a cold start, no held WOT, peak 12.6 psi.
+
+- **Overrun fuel cut delay — works as built.** Six cells measured, all moved by count x 8 ms. The cut still fires
+  on 98% of lifts because shifts keep the pedal at 0 for 0.5-0.8 s. Open: is the delay meant to outlast a shift?
+- **Highway open loop — improved where sampled, not measured on the highway.** 3300-4000 rpm x load 0.75-0.80:
+  17-25% OL vs 38-100% on 11-20 (n = 20-58).
+- **AVCS +3 deg at load 1.0-1.3** — delivered, knock-free in 40 s. Low-validation.
+- **Untested on 19e:** the 18 psi boost target (down from 20), WGDC, full torque to 6400 rpm, the new FLKC axis.
+- **Item 1 (injector ceiling)** now matters at a new place: full requested torque runs to 6400 rpm (was tapered to
+  70 at 6400). 8-8 saw IDC 106% at 6315 rpm on 19c at ~21 psi.
+- **Item 2 (FLKC cell 29)** — cleared by the flash.
+- **Cold rich bias** — OL still 0.45-0.59 AFR rich of command. With one filter across logs it reads -0.46 on 8-22
+  (IAT 81) and -0.12 on 8-14 (IAT 82), so it does not sort by intake temperature.
+- **Check:** Initial Wastegate Duty (6400 rpm, torque 0) = 59.96, rest of row 30.
+
+### Update 2026-11-21 — two more 19c logs (8-22, and 11-20 = first cold-season log)
+
+Full entry in `logs/REVIEW_LOG.md`. What moved:
+
+- **Item 2 (FLKC band) — improved.** Per-cell map on both logs: every cell in 2900-4300 x 1.4-2.8 is back to 0.
+  **One cell remains: cell 29 (4000-4600 rpm x load >= 2.0) = -0.75**, unchanged from 8-22 to 11-20. It is
+  residency-starved (seconds per drive), not actively knocking.
+- **Item 5 (light-load lean tilt) — reframed.** In cold air (IAT med 68) the tilt is gone and the whole cruise band
+  trims -0.8..-3.9% with AFL -3.12. Steady OL reads 0.45 AFR richer than commanded at IAT 52, +0.42 lean at IAT 99.
+  It is a **temperature-dependent fuelling error (~7% hot-to-cold in OL)**, cause unknown. Not a MAF-curve tilt.
+
+  **Refined 2026-11-21:** the richness does NOT track intake temperature within the 11-20 drive (steady OL wb-cmd: -0.35 at IAT 40-55, -0.46 at 55-65, -0.63 at 65-75, -0.43 at 75-85). It is a per-day / seasonal offset, not a function of logged IAT. `MAF Compensation (IAT)` (`0xC3BB0`) is all zeros in stock and 19c, so no IAT fuel table is involved. Candidates, none verified: fuel density/temperature, winter blend, MAF sensor.
+- **Item 1 (injector ceiling)** — 93.6% at 4618 rpm / 58% throttle / IAT 81 on 8-22. Cold air will make it worse.
+- **NEW: highway open loop.** 5th gear > 70 mph is 42% OL on 11-20. Entry follows load and matches the interpolated
+  OL B map crossing 13.82 (`Minimum Active Primary Open Loop Enrichment`) with `CL to OL Delay` = 0. The 3400 rpm
+  per-gear limit is **not** what forces it (load < 0.7 above 3400 rpm stays closed loop).
+- **20.19d should not be flashed as built.** Its first FLKC load boundary (1.30) leaves a writable sliver in the cell
+  that reads back for all load < 1.30, and its top boundary (3.50) is dead. Proposed replacement axis
+  1.20 / 1.70 / 2.20 / 2.80 — not built.
 
 ### What is now SETTLED
 
@@ -111,6 +149,32 @@ A/B" + 2 alt-path bleeds). Survey data: `rom/reference/README.md`.
 evidence-integrator → desensitizes); event-B source untraced; tick unit
 unverified (~8 ms family → 438 ≈ 3.5 s). Either sign is engine-safe to A/B.
 
+> **Update 2026-11-27 (corrections item 108, `timing_0410D4_0415B8_trace.txt`):
+> the sign is settled from bytes.** `FFFF7FBC` is a clamped integrator (0 .. `[FFFF7FC0]`)
+> written only by `0x0410D4`, and the timing routine `0x03F368` **subtracts** it at every
+> read (`03F8AC`/`03F8C8`), so it can only retard its outputs (`[FFFF7EA0..7EAC]`, clamped
+> −20..69.65). Window B (`0xD29C4` = 438, armed since 20.19c) enables flag `[FFFF7FDC]`,
+> which blocks every increment of the integrator and, with byte `[FFFF65C0]` == 1, bleeds it
+> by 0.015 — so arming it can only REMOVE that retard. Still open: whether the integrator is
+> ever non-zero on the car (its bound's four factors come from `0x040AF6`, not decoded),
+> and that "knock" is what drives it (not established either way). Batch 3, item 4.
+>
+> **Update 2026-11-27 (corrections item 111, `timing_bound_040AF6_trace.txt`): the window may
+> be acting on a term that is always 0.** The bound H is non-zero only while the Cruise
+> request byte `[FFFF90BE]` == 1 or byte `[FFFF3158]` == 1 (≈ 20.0 cold, ≈ 15.0 at ≥ 70 °C, same in
+> stock). More importantly, a one-way latch `[FFFF7FF4]` pins `FFFF7FBC` at 0 from the first call
+> where gate byte `[FFFF69E6]` is 0 and the integrator is near 0 (`0411D8`..`041258`; the only writer
+> found stores 1). `[69E6]` is set only at init (`0x026634`) and is cleared once ECT exceeds 70 °C. So
+> the integrator can rise only in an early window, if at all. Whether it is ever non-zero on the car
+> is not established. **Log `0xFFFF69E6`, `0xFFFF7FF4` and `0xFFFF7FBC` before crediting the 20.19c
+> window B change with any effect** — it may have none.
+>
+> **Update 2026-11-27 (corrections item 117):** RAM 0xFFFF4000..BF9F is zero-filled by DMA on every
+> reset, so `[FFFF69E6]` and `[FFFF7FBC]` are 0 at every kernel start and the latch `[FFFF7FF4]` starts
+> clear. If the integrator's update `0x0410D4` runs once before init `0x026634` sets `[69E6]`, the latch
+> trips at once and `FFFF7FBC` is 0 for the whole drive. That order is still the open question; the log
+> above settles it.
+
 **Plan (Dean to schedule):**
 1. 20.18 candidate = single-variable: arm window B 0 → 438 (factory STI value,
    bleed untouched). Purpose of first log = sign determination via shift-class
@@ -120,7 +184,8 @@ unverified (~8 ms family → 438 ≈ 3.5 s). Either sign is engine-safe to A/B.
 2. Fallback/companion lever (proven plumbing): FBKC no-knock advance delay
    0xD29DE 70 → 35 — halves false-pull duration (13 s → 6.5 s from −8.4°).
    Hold for 20.19 to keep attribution clean.
-3. Next disassembly session: FFFF7FBC comparison consumer (sign, static), flagB
+3. Next disassembly session: ~~FFFF7FBC comparison consumer (sign, static)~~ (done,
+   item 108 — subtracted at every read), flagB
    writer (event B), ctrB incrementer (tick unit), FFFF65C1 writer (the other
    inhibit's duration source).
 

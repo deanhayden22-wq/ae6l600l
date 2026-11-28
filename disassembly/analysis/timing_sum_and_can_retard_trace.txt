@@ -1,0 +1,285 @@
+================================================================================
+FINAL TIMING SUM, AND THE REQUEST-DRIVEN RETARD CHANNEL 0xFFFF803C
+Traced 2026-11-25.  Reference bin: rom/AE5L600L 20g rev 20.19e.bin
+Every table and constant below is byte-identical to stock rom/ae5l600l.bin.
+Decoder: scripts/sh2e_disasm.py (displacements below are already in bytes).
+================================================================================
+
+WHY
+--------------------------------------------------------------------------------
+Logs show single-sample timing stabs (4-11 deg against ~17-20 settled) after a
+gear change, on the rpm upswings of a ~6 Hz oscillation, with fuel on. The
+question was which routine produces them. This trace decodes the sum that
+builds total timing, rules two channels out, and decodes the one channel that
+fits. It does NOT prove that channel fires on this car: its input arrives over
+CAN and cannot be settled from ROM bytes.
+
+HEADLINE
+--------------------------------------------------------------------------------
+1. Total timing is a straight sum when byte [0xD2976] == 90 (it is 90, stock
+   and 19e). The sum at 0x03F618-0x03F674 adds or subtracts sixteen terms.
+   Three are retard channels of interest:
+     [0xFFFF8028]  added       overrun retard, function 0x041BE4 (items 74/79/103)
+     [0xFFFF803C]  added       request-driven retard, function 0x041E00 (this file)
+     [0xFFFF8000]  subtracted  cold-engine retard, function ~0x0415B8
+2. 0x041E00 writes [0xFFFF803C]. While byte [0xFFFF5DD8] == 1 and float
+   [0xFFFF5E64] >= 1.0 it applies descriptor 0xADE1C indexed by [0xFFFF5E64]:
+     input   0     1.96    3.92    5.88    7.84   25.1   100
+     retard  0    -4.92   -9.84  -15.12  -20.04    0      0
+   then recovers at +1.05 deg per call above 800 rpm (descriptor 0xADE30).
+   A continuous request is cut off after 125 calls (uint16 [0xD29CC]).
+3. [0xFFFF5E64] is byte 1 of received CAN frame 0x421, scaled 100/255
+   (unpack at 0x016928-0x016940, message table 0x063690). So this channel is
+   an ignition retard requested by another module on the bus.
+4. No definition XML covers 0xADE1C, 0xADE30, 0xD29CC or 0xD2983.
+
+PART 1 - THE SUM (function containing 0x03F610; fr6 accumulates)
+--------------------------------------------------------------------------------
+  03F610: D680  mov.l @(0x03F814),r6
+  03F612: 6060  mov.b @r6,r0
+  03F614: 885A  cmp/eq #90,r0   ; byte [0xD2976] == 90 -> sum path
+  03F616: 8B49  bf 0x03F6AC
+  03F618: D27B  mov.l @(0x03F808),r2   ; [0xFFFF7F0C]
+  03F61A: F628  fmov.s @r2,fr6
+  03F61C: E004  mov #4,r0
+  03F61E: F9F6  fmov.s @(r0,r15),fr9
+  03F620: F690  fadd fr9,fr6
+  03F622: D27D  mov.l @(0x03F818),r2
+  03F624: F928  fmov.s @r2,fr9
+  03F626: F690  fadd fr9,fr6
+  03F628: D27C  mov.l @(0x03F81C),r2
+  03F62A: F928  fmov.s @r2,fr9
+  03F62C: F690  fadd fr9,fr6
+  03F62E: E008  mov #8,r0
+  03F630: F9F6  fmov.s @(r0,r15),fr9
+  03F632: F691  fsub fr9,fr6
+  03F634: D67A  mov.l @(0x03F820),r6   ; - [0xFFFF8000] cold-engine retard
+  03F636: F968  fmov.s @r6,fr9
+  03F638: F691  fsub fr9,fr6
+  03F63A: D27A  mov.l @(0x03F824),r2   ; + [0xFFFF81EC]
+  03F63C: F928  fmov.s @r2,fr9
+  03F63E: F690  fadd fr9,fr6
+  03F640: D279  mov.l @(0x03F828),r2   ; + [0xFFFF8028] overrun retard
+  03F642: F928  fmov.s @r2,fr9
+  03F644: F690  fadd fr9,fr6
+  03F646: D279  mov.l @(0x03F82C),r2   ; - [0xFFFF8038]
+  03F648: F928  fmov.s @r2,fr9
+  03F64A: F691  fsub fr9,fr6
+  03F64C: D678  mov.l @(0x03F830),r6   ; + [0xFFFF803C] request-driven retard
+  03F64E: F968  fmov.s @r6,fr9
+  03F650: F690  fadd fr9,fr6
+  03F652: D678  mov.l @(0x03F834),r6
+  03F654: F968  fmov.s @r6,fr9
+  03F656: F690  fadd fr9,fr6
+  03F658: D277  mov.l @(0x03F838),r2
+  03F65A: F928  fmov.s @r2,fr9
+  03F65C: F691  fsub fr9,fr6
+  03F65E: D277  mov.l @(0x03F83C),r2
+  03F660: F928  fmov.s @r2,fr9
+  03F662: F690  fadd fr9,fr6
+  03F664: D276  mov.l @(0x03F840),r2
+  03F666: F928  fmov.s @r2,fr9
+  03F668: F690  fadd fr9,fr6
+  03F66A: D276  mov.l @(0x03F844),r2
+  03F66C: F928  fmov.s @r2,fr9
+  03F66E: F691  fsub fr9,fr6
+  03F670: D275  mov.l @(0x03F848),r2
+  03F672: F828  fmov.s @r2,fr8
+  03F674: F680  fadd fr8,fr6
+
+PART 2 - THE REQUEST-DRIVEN RETARD (function 0x041E00, r14 = 0xFFFF8040)
+--------------------------------------------------------------------------------
+State: [0xFFFF803C] output, byte [0xFFFF8040] active flag, float [0xFFFF8044]
+last table value, uint16 [0xFFFF8048] call counter.
+  041E00: 2FE6  mov.l r14,@-r15
+  041E02: 4F22  sts.l pr,@-r15
+  041E04: FFCB  fmov.s fr12,@-r15
+  041E06: FFEB  fmov.s fr14,@-r15
+  041E08: FFFB  fmov.s fr15,@-r15
+  041E0A: D629  mov.l @(0x041EB0),r6   ; r5 = byte [0xFFFF5DD8] (interface-valid flag)
+  041E0C: 6560  mov.b @r6,r5
+  041E0E: D229  mov.l @(0x041EB4),r2   ; fr14 = [0xFFFF5E64] (request, 0-100)
+  041E10: FE28  fmov.s @r2,fr14
+  041E12: D229  mov.l @(0x041EB8),r2
+  041E14: F428  fmov.s @r2,fr4
+  041E16: D229  mov.l @(0x041EBC),r2
+  041E18: FC28  fmov.s @r2,fr12
+  041E1A: D229  mov.l @(0x041EC0),r2
+  041E1C: F89D  fldi1 fr8
+  041E1E: F8E5  fcmp/gt fr14,fr8   ; T = 1.0 > request
+  041E20: 8D06  bt/s 0x041E30
+  041E22: FF28  fmov.s @r2,fr15
+  041E24: DE27  mov.l @(0x041EC4),r14
+  041E26: 85E4  mov.w @(8,r14),r0
+  041E28: D427  mov.l @(0x041EC8),r4   ; uint16 [0xD29CC] = 125
+  041E2A: 6241  mov.w @r4,r2
+  041E2C: 3022  cmp/hs r2,r0   ; counter >= 125 -> recover
+  041E2E: 8920  bt 0x041E72
+  041E30: 605C  extu.b r5,r0
+  041E32: 8801  cmp/eq #1,r0   ; flag must be 1
+  041E34: 8B1D  bf 0x041E72
+  041E36: F8E5  fcmp/gt fr14,fr8
+  041E38: 891B  bt 0x041E72
+  041E3A: D424  mov.l @(0x041ECC),r4   ; descriptor 0xADE1C
+  041E3C: D224  mov.l @(0x041ED0),r2
+  041E3E: 420B  jsr @r2
+  041E40: F4EC  fmov fr14,fr4
+  041E42: DE20  mov.l @(0x041EC4),r14
+  041E44: E004  mov #4,r0
+  041E46: FE07  fmov.s fr0,@(r0,r14)
+  041E48: D622  mov.l @(0x041ED4),r6   ; byte [0xD2983] = 0xAA
+  041E4A: 6260  mov.b @r6,r2
+  041E4C: E6AA  mov #-86,r6
+  041E4E: 3260  cmp/eq r6,r2
+  041E50: 8B0A  bf 0x041E68
+  041E52: FCF1  fsub fr15,fr12   ; fr12 = [0xFFFF8258] - [0xFFFF81EC]
+  041E54: E004  mov #4,r0
+  041E56: F8E6  fmov.s @(r0,r14),fr8
+  041E58: FC80  fadd fr8,fr12   ; + table value
+  041E5A: F4CC  fmov fr12,fr4
+  041E5C: D21E  mov.l @(0x041ED8),r2   ; float_MIN(.., 0.0)
+  041E5E: 420B  jsr @r2
+  041E60: F58D  fldi0 fr5
+  041E62: E0FC  mov #-4,r0
+  041E64: A003  bra 0x041E6E
+  041E66: FE07  fmov.s fr0,@(r0,r14)   ; [0xFFFF803C] = result
+  041E68: F8E6  fmov.s @(r0,r14),fr8
+  041E6A: E0FC  mov #-4,r0
+  041E6C: FE87  fmov.s fr8,@(r0,r14)
+  041E6E: A00E  bra 0x041E8E
+  041E70: E201  mov #1,r2
+  041E72: D41A  mov.l @(0x041EDC),r4   ; descriptor 0xADE30 (rpm): 49.92 at 400, 1.05 from 800
+  041E74: D216  mov.l @(0x041ED0),r2
+  041E76: 420B  jsr @r2
+  041E78: 0009  nop
+  041E7A: DE12  mov.l @(0x041EC4),r14
+  041E7C: E0FC  mov #-4,r0
+  041E7E: F4E6  fmov.s @(r0,r14),fr4
+  041E80: F400  fadd fr0,fr4   ; [0xFFFF803C] + recovery step, then float_MIN(.., 0.0)
+  041E82: D215  mov.l @(0x041ED8),r2
+  041E84: 420B  jsr @r2
+  041E86: F58D  fldi0 fr5
+  041E88: E0FC  mov #-4,r0
+  041E8A: FE07  fmov.s fr0,@(r0,r14)
+  041E8C: E200  mov #0,r2
+  041E8E: 2E20  mov.b r2,@r14
+  041E90: F89D  fldi1 fr8
+  041E92: F8E5  fcmp/gt fr14,fr8
+  041E94: 8D05  bt/s 0x041EA2
+  041E96: E000  mov #0,r0
+  041E98: D211  mov.l @(0x041EE0),r2
+  041E9A: 85E4  mov.w @(8,r14),r0
+  041E9C: 640D  extu.w r0,r4
+  041E9E: 420B  jsr @r2   ; saturating counter + 1 while request >= 1.0
+  041EA0: E501  mov #1,r5
+  041EA2: 81E4  mov.w r0,@(8,r14)   ; counter = 0 when request < 1.0
+  041EA4: FFF9  fmov.s @r15+,fr15
+  041EA6: FEF9  fmov.s @r15+,fr14
+  041EA8: FCF9  fmov.s @r15+,fr12
+  041EAA: 4F26  lds.l @r15+,pr
+  041EAC: 000B  rts
+  041EAE: 6EF6  mov.l @r15+,r14
+
+Because the sum also adds [0xFFFF81EC], the applied branch nets out to
+[0xFFFF8258] + table value in place of [0xFFFF81EC], clamped so the channel
+never advances.
+
+PART 3 - WHERE THE REQUEST COMES FROM
+--------------------------------------------------------------------------------
+Message table at 0x063690, 16-byte records: id (uint32), direction byte,
+slot, length, 00, buffer pointer. Record at 0x063730:
+    00 00 04 21 | 01 | 0b | 08 | 00 | ff ff 5e 80 | 01 00 00 00
+    id 0x421, direction 1 (the 0x7DF and 0x7E0 diagnostic request ids carry the
+    same direction byte; 0x410/0x411/0x412/0x7E8 carry 0), buffer 0xFFFF5E80.
+GBR in this function is 0xFFFF5E58 (0x0167F8), so @(40,gbr) is 0xFFFF5E80.
+  0168FC: 54F2  mov.l @(8,r15),r4
+  0168FE: 747F  add #127,r4   ; r4 = 0x063690 + 127 ...
+  016900: D27B  mov.l @(0x016AF0),r2
+  016902: 420B  jsr @r2
+  016904: 7421  add #33,r4   ; ... + 33 = 0x063730, the 0x421 record
+  016906: 620C  extu.b r0,r2
+  016908: 2228  tst r2,r2
+  01690A: 8F3F  bf/s 0x01698C
+  01690C: 1F29  mov.l r2,@(36,r15)
+  01690E: C428  mov.b @(40,gbr),r0   ; byte 0 of the frame
+  016910: 6203  mov r0,r2
+  016912: E028  mov #40,r0
+  016914: 0F24  mov.b r2,@(r0,r15)
+  016916: 642C  extu.b r2,r4
+  016918: D276  mov.l @(0x016AF4),r2
+  01691A: F58D  fldi0 fr5
+  01691C: F49D  fldi1 fr4
+  01691E: 420B  jsr @r2
+  016920: F440  fadd fr4,fr4   ; scale 2.0
+  016922: D776  mov.l @(0x016AFC),r7
+  016924: E0AC  mov #-84,r0
+  016926: F707  fmov.s fr0,@(r0,r7)   ; [0xFFFF5E60] = byte 0 * 2.0
+  016928: C429  mov.b @(41,gbr),r0   ; byte 1 of the frame
+  01692A: 6203  mov r0,r2
+  01692C: E058  mov #88,r0
+  01692E: 0F24  mov.b r2,@(r0,r15)
+  016930: 642C  extu.b r2,r4
+  016932: F58D  fldi0 fr5
+  016934: D26F  mov.l @(0x016AF4),r2
+  016936: C774  mova @(0x016B08),r0   ; scale 0.3921568 = 100/255
+  016938: 420B  jsr @r2
+  01693A: F408  fmov.s @r0,fr4
+  01693C: D76F  mov.l @(0x016AFC),r7
+  01693E: E0B0  mov #-80,r0
+  016940: F707  fmov.s fr0,@(r0,r7)   ; [0xFFFF5E64] = byte 1 * 100/255
+
+PART 4 - THE VALID FLAG (function 0x014EB6)
+--------------------------------------------------------------------------------
+  014EB6: 4F22  sts.l pr,@-r15
+  014EB8: 7FFC  add #-4,r15
+  014EBA: D26E  mov.l @(0x015074),r2
+  014EBC: 420B  jsr @r2
+  014EBE: 0009  nop
+  014EC0: D66F  mov.l @(0x015080),r6
+  014EC2: 460B  jsr @r6
+  014EC4: 2F00  mov.b r0,@r15
+  014EC6: 62F0  mov.b @r15,r2
+  014EC8: 2228  tst r2,r2
+  014ECA: 8F0B  bf/s 0x014EE4
+  014ECC: 660C  extu.b r0,r6
+  014ECE: D46B  mov.l @(0x01507C),r4   ; byte [0xFFFF5DD7] must be 0
+  014ED0: 6240  mov.b @r4,r2
+  014ED2: 2228  tst r2,r2
+  014ED4: 8B06  bf 0x014EE4
+  014ED6: D56B  mov.l @(0x015084),r5   ; byte [0xFFFF5E98] must be 0
+  014ED8: 6250  mov.b @r5,r2
+  014EDA: 2228  tst r2,r2
+  014EDC: 8B02  bf 0x014EE4
+  014EDE: 2668  tst r6,r6
+  014EE0: 8D02  bt/s 0x014EE8
+  014EE2: E001  mov #1,r0
+  014EE4: E000  mov #0,r0
+  014EE6: D465  mov.l @(0x01507C),r4
+  014EE8: 7F04  add #4,r15
+  014EEA: 4F26  lds.l @r15+,pr
+  014EEC: 000B  rts
+  014EEE: 8041  mov.b r0,@(1,r4)   ; [0xFFFF5DD8] = r0 (1 only if every test passed)
+
+RULED OUT FOR THE WARM POST-SHIFT STABS
+--------------------------------------------------------------------------------
+[0xFFFF8000]: every table its writer reads on the ECT axis is 0 at 70 degC and
+above (descriptors 0xAE46C, 0xAE450; 0xAE4A4, 0xAE4F8, 0xAE4C0 are all zero).
+At 20-50 degC, load 0.52, 0xAE46C holds 20.04 deg, so it matters cold, not warm.
+[0xFFFF8028]: OBSERVED in logs/11-24 20.19e, 1-2 shift at t=438.0-438.5 s:
+Timing reads 24.5, 23.0, 21.5, 20.0, 20.0, 20.0 while IPW = 0, i.e. the overrun
+retard never armed during the short cut, so there is nothing to ramp out, and
+re-arming needs the previous pass's tier byte to be 4.
+
+OBSERVED (logs/11-24 20.19e, same shift, fuel back at 438.52 s)
+--------------------------------------------------------------------------------
+    time    rpm   Timing
+  438.76   1846    16.5
+  438.84   1973     5.0
+  438.92   1887    16.5
+  439.00   2033    10.5
+  439.08   1947    16.5
+A table value of -11.5 then -6 corresponds to a request of about 4.6 then 2.4
+on the 0xADE1C axis. That fit is INFERRED. Not established: that frame 0x421
+is present on this car's bus, which module sends it, and that [0xFFFF5DD8] is 1.
+To settle: log floats 0xFFFF803C, 0xFFFF8028 and 0xFFFF5E64 through a shift.
+================================================================================

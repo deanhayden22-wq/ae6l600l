@@ -1,0 +1,1596 @@
+OVERRUN FUEL-CUT LADDER: SEQUENCER 0x03AE5A, COUNTER WRITER 0x03B3DA, RUNG COMPARATOR 0x03AE6C, TAIL 0x03B62C
+BLIND TRACE FROM BYTES, EVERY CONTRACT CHECKED BY EMULATION
+====================================================================================================
+
+Date           2026-11-27
+Reference bin  rom/AE5L600L 20g rev 20.19c.bin   md5 92cae8275cd4f9b473a3a9e36efe6449
+Stock bin      rom/ae5l600l.bin                  md5 a8ea39d447f977e270e27ee670243c88
+               0x03AE5A..0x03B663 (all four functions and their pools), 0x03D2FC..0x03D45F, record 0x0AD400 with
+               axis 0x0CEEA0 and data 0x0CEEC0, cal 0x0CBC0A and 0x0CBC90..0x0CBD93, pointer tables 0x063B70..
+               0x063D4F, 0x0C2220..0x0C2227, 0x0BE4FA..0x0BEDB7, the rate chain (0x00F518.., 0x010C9C..0x010DF3),
+               0x041BE4..0x041D83 with cal 0x0D2980..0x0D2983 / 0x0D2C08..0x0D2C17, and the input writers quoted
+               (0x0218F6.., 0x023A94.., 0x015BFA.., 0x0C3444..0x0C3453, 0x0C30B0) are byte-identical in the two
+               bins.  The rev differences that reach the ladder are the two band edges of 0x03AF88 (0x0CC4EC /
+               0x0CC4F0) and the resume table behind [7C78] (batch-2 E17).
+Method         Every listing is scripts/mapping/fn_dump.py output started at the real entry, no labels, read from
+               bytes; each contract is run in scripts/sh2e_emu.py against a model: scripts/trace/emu_overrun_ladder.py.
+EVIDENCE CLASS bytes + emulated (20,702 emulated cases, both bins, exit 0) for every control path, write set and
+               read set of 0x03B3DA, 0x03AE6C, 0x03B62C, 0x023A94 and 0x0218F6, the tier -> [7D80] mapping, 180
+               whole-sequence lifts (both [5DB8] sides), the 0x041BE4 arm timing against the sequence and the
+               1-in-8 activation of task 9.  [definition] marks an identity taken from a base-matched 32BITBASE
+               definition.  The tick period in MILLISECONDS is not in the ROM (it needs the peripheral clock and
+               the CMT clock-divider meaning from the SH7058 manual) and is NOT ESTABLISHED here (N3).
+               Third decode 2026-11-27 after an adversarial review: see REVIEW HISTORY at the end.
+               Callees in the runtime library are used through their verified CONTRACT sections (helpers_*) and
+               are also executed from ROM by the emulator; 0x03AF88 / 0x03AB94 through
+               fns_03AF88_03AB94_trace.txt and 0x03D2FC through launch_closure_trace.txt (both batch 2, verified).
+               Names are neutral: [xxxx] means RAM 0xFFFFxxxx, "x" means f32 [0xFFFF6624].
+
+SUMMARY (each point is proved below)
+  * 0x03AE5A runs, in order: 0x03B3DA (counter), 0x03AF88 (rungs), 0x03AE6C (tier + mask), 0x03B62C (tail).
+    It is reached only through 0x03AB90 (bra), called once per run of 0x04907C, which is the body of RTOS task 9
+    (entry 0x00E448).  Task 9 is activated on one call in eight of 0x010D10, the tail of the interrupt handler
+    0x00F518 (vector 192, rtos_core_trace.txt stub table); that handler's timer is loaded with period register
+    2499 (2500 counts) and control word 0x00C0.  So one count of [7CAA] = 8 handler entries = 20,000 counts of
+    that timer.  In milliseconds that is 8 ms ONLY IF the timer clock is P-clock/8 at a 20 MHz P-clock -- neither
+    fact is in the ROM (NOT ESTABLISHED, N3; it agrees with the ~8 ms per count of item 103's logs).
+  * [7CAA] (u16) counts consecutive passes of 0x03AE5A in which every count condition holds (below); any pass
+    that fails one zeroes it.  On the other "immediate" path it is set straight to rung 4 [7C98].
+  * Count conditions (0x03B3DA, shipped cal): G = ([64F5] == 1) (cal byte 0x0CBC0A = 0x80 selects [64F5]; hold
+    count 0x0CBC96 = 0), [67EC] >= 750 (u16), window flag [7CA7] = 1, [5E98] == 0, [972E] == 0, and none of the
+    clear conditions [5FB6] == 1, [5FB7] == 1, ([8F24] == 1 and bit 4 of [8F22]), ([5E96] == 2 and [5D85] == 1
+    and |[5E68]| > 1).
+  * Window [7CA7] (first rule that holds): 1 when NOT ([7C78] + [7C6C] > x) -- this test does not look at
+    [7C78] alone, and is also 1 when x or the sum is NaN; else 0 when [7C78] > x; else ([7C9E] == 1).  With
+    [7C6C] >= 0 and nothing NaN that reads: set when x >= [7C78] + [7C6C]; while [7C9E] == 1 it stays set down
+    to x >= [7C78]; below [7C78] it is 0.  (A negative band would keep it set below [7C78]: emulated.)  [7C78]
+    is the 'Overrun Fueling RPM Resume Threshold' table value plus adders and [7C6C] the 200/1000 (+100/+1000)
+    band (batch-2 0x03AB94 contract: once its latch [7C70] has been written, [7C6C] is one of 200 .. 2100, so
+    >= 0).  So: entry needs x >= resume + band, exit at x < resume.
+    [definition: 32BITBASE describes 0x0CEED0 as the RPM at which injectors switch back on]
+  * 0x03AE6C turns the count into a tier [7C9A] in 0..4 and a thermometer code [7CA3..A6] (tier k sets the first
+    k bytes), [7C9D] = (tier >= 1), [7CB7] = (tier >= 4).  tier 4 if [7CAA] >= [7C98] or (second route: flag,
+    [7CAA] > 625, [65D0] == 1 for >= lookup(0x0AD400, x) passes, and ([8E46] == 0 or word 0x0CBC92 == 0));
+    else 3 / 2 / 1 / 0 by [7C96] / [7C94] / [7C92].  [7C9E] == 0 forces tier 0.
+  * Tier 3 never occurs in these calibrations: 0x03AF88 always makes [7C96] == [7C98] (batch-2 E15a) and tier 4
+    is tested first.  Tier 2 occurs only when [7C94] < [7C98].
+  * The thermometer bytes have one reader, 0x03D2FC, which ORs them into bits 0..3 of word [7D80]: tier 1 ->
+    0x0001, tier 2 -> 0x0003, tier 4 -> 0x000F (emulated).  A set bit k makes 0x03DCB6 skip output scheduling for
+    channel k (launch_closure_trace.txt).  The same word goes to 0xFFFF when the base-defined 'Rev Limit (Fuel
+    Cut)' latch [7CB8] is set.  So the ladder is a progressive per-channel cut: tier 1 cuts one channel, tier 2
+    two, tier 4 all four.  THE FULL CUT IS TIER 4.  Whether the channels are injectors or coils is not decoded
+    from peripheral bytes here (see NOT ESTABLISHED); both definition anchors say fuel.
+  * The tier byte [7C9A] itself feeds the other side: 0x041BE4 stores it as [8034] at the end of every run and,
+    when [8034] (the tier its PREVIOUS run read) == 4 and [7C78] > x, loads [8032] = 0 / [8033] = 1 (cal
+    0x0D2981 / 0x0D2980) -- the arm of the [8020] term (corrections item 103 calls it the overrun retard; item
+    104 puts [8028] in the timing sum; not re-derived here).  On the count path (with [7C6C] >= 0) the arm
+    fires, while x is still below [7C78], on the first 0x041BE4 run AFTER the 0x03AE5A pass that drops the
+    tier, when [7C9A] is already 0, and also on any run between x falling below [7C78] and that pass
+    (emulated).  So tier 4 drives both the channel mask and, at the exit, that arm.
+  * Rungs (0x03AF88; base/ext/adds frozen while [7C9E] == 1): [7C92] = M + add, [7C94] = M + ext1 + add, [7C96] = [7C98] =
+    M + ext2 + add, M = max(base, [7C80]) ([7C80] = 250 only via 0x03AF88's arm).  With adds off: tier 1 at count = base, tier 2 at base + ext1, tier 4
+    at base + ext2 (emulated tables in BOTTOM LINE, one per side of byte [5DB8]).  20.19c differs from stock
+    only by moving the band edges 1800 / 2500 -> 2250 / 3000 rpm and by the flat 1000 resume table.  With
+    [5DB8] == 0 that edit never makes a tier come sooner; with [5DB8] != 0 it makes tier 1 come sooner for
+    every selector (all three tiers for selectors 2 and 3) when x is in 2500..3000 (emulated).  What [5DB8] is,
+    and whether it is ever non-zero, is not established (N8).
+
+==== FUNCTION 0x03AE5A .. 0x03AE6C  (9 instructions, 1 caller) ====
+CONTRACT
+  No inputs or outputs of its own.  Calls 0x03B3DA, 0x03AF88, 0x03AE6C in that order, then tail-branches to
+  0x03B62C with PR already restored, so 0x03B62C's rts returns to 0x03AE5A's caller.  Caller: 0x03AB90 (bra).
+MECHANISM
+  push PR; bsr 0x03B3DA; bsr 0x03AF88; bsr 0x03AE6C; pop PR (delay slot of bra); bra 0x03B62C
+EVIDENCE
+  03AE5C / 03AE60 / 03AE64 bsr targets and 03AE68 bra target from the bytes (fn_dump).  A whole-image scan finds
+  no long equal to 0x0003AE5A / 0x0003AE6C / 0x0003B3DA / 0x0003B62C and no other bra / bsr to them: the only
+  references are 03AB90 (bra -> 0x03AE5A) and the three branches above.  0x03AB90 is reached by the one long
+  0x0493D4 (jsr at 0x0491B6).  emulated: test_sequence (60 lifts + resume / re-entry /
+  immediate cases run the whole sequence with only the critical-section calls stubbed).
+LISTING
+; function 0x03AE5A..0x03AE6C  9 instructions  rom AE5L600L 20g rev 20.19c.bin
+03AE5A: 4F22  sts.l pr,@-r15                  ; save PR
+03AE5C: B2BD  bsr 0x03B3DA                    ; step 1: counter writer -> [7CA7] [7CAC] [7CAE] [7C9E] [7CAA] (+[7CA0])
+03AE5E: 0009  nop
+03AE60: B092  bsr 0x03AF88                    ; step 2: rung builder (fns_03AF88_03AB94_trace.txt) -> rungs [7C92] [7C94] [7C96] [7C98]
+03AE62: 0009  nop
+03AE64: B002  bsr 0x03AE6C                    ; step 3: comparator -> tier [7C9A], [7CA3..A6] [7C9D] [7CB7], then tail-jump 0x03D2FC
+03AE66: 0009  nop
+03AE68: A3E0  bra 0x03B62C                    ; step 4: tail-branch to 0x03B62C ([7C9F]); its rts returns to our caller
+03AE6A: 4F26  lds.l @r15+,pr                  ; delay slot: PR restored before 0x03B62C runs
+
+==== FUNCTION 0x03B3DA .. 0x03B62C  (242 instructions, 1 caller) ====
+CONTRACT
+  inputs   f32 [6624] x, u16 [67EC], u8 [5E96] [85D7] [64F5] [5E98] [5FB6] [5FB7] [5D85] [8F24] [5D86],
+           f32 [5E68], u8 [972E] (through 0x029AA0), u8 [8F22] bit 4 (through 0x05EB3E), f32 [7C78] [7C6C],
+           u8 [7C9E], u16 [7CAC] [7CAE] [7C98] [7CAA]; cal byte 0x0CBC0A, cal words 0x0CBC94 / 0x0CBC96.
+  outputs  every call: u8 [7CA7], u16 [7CAC], u16 [7CAE], u8 [7C9E], u16 [7CAA]; u8 [7CA0] on two paths only.
+  [7CA7]   = 1 if not ([7C78] + [7C6C] > x)                       (also when x or the sum is NaN)
+           = 0 if [7C78] > x                                       (tested only when the line above fails)
+           = ([7C9E] == 1) otherwise                               (hysteresis on the cut state)
+           The first line does not test [7C78]: with [7C6C] < 0 (or NaN) it gives 1 for x below [7C78]
+           (emulated: [7C78] 1500, [7C6C] -600, x 1000 -> 1).  "[7CA7] = 0 below [7C78]" therefore needs
+           [7C6C] >= 0 and a non-NaN sum, which holds for every value 0x03AB94 writes once its latch is set.
+  [7CAC]   = [85D7] == 1 ? sat16([7CAC] + 1) : 0        [7CAE] = [64F5] == 1 ? sat16([7CAE] + 1) : 0
+  G        = byte 0x0CBC0A == 0x80 ? ([64F5] == 1 and new [7CAE] >= word 0x0CBC96)
+                                   : ([85D7] == 1 and new [7CAC] >= word 0x0CBC96)
+             both bins: 0x0CBC0A = 0x80 and 0x0CBC96 = 0, so G = ([64F5] == 1) and [85D7] / [7CAC] are dead.
+  W        = 1 if [5E68] < -1.0 or [5E68] > 1.0, else 0 (NaN -> 0)               (0x0BE608 with 0.0, 1.0)
+  first match wins:
+    CLEAR      [5FB6] == 1, or [5FB7] == 1, or ([8F24] == 1 and bit 4 of [8F22] set),
+               or ([5E96] == 2 and [5D85] == 1 and W == 1)          -> [7C9E] = 0, [7CAA] = 0
+    IMMEDIATE  G and [5E96] == 1 and [5D85] == 1 and [5D86] == 0 and W == 0
+                                                                     -> [7C9E] = 1, [7CAA] = [7C98]
+    COUNT      u16 [67EC] >= word 0x0CBC94 (750) and [7CA7] == 1 and G and [5E98] == 0 and [972E] == 0
+                                                                     -> [7C9E] = 1, [7CAA] = sat16([7CAA] + 1),
+                                                                        [7CA0] = 0
+    G == 0                                                           -> CLEAR
+    otherwise (G == 1, a count condition failed)                    -> [7C9E] = 0, [7CAA] = 0, and
+                                                                        [7CA0] = 1 if [7CA7] == 0 (else kept)
+  effects  nothing else written (emulated write set); r8-r14, fr14, fr15, GBR restored.
+MECHANISM
+  Byte tests: every "== 1" / "== 2" is mov.b (sign-extend) + cmp/eq #imm or extu.b + cmp/eq, i.e. on the byte;
+  every "== 0" is tst on the sign-extended byte, i.e. byte zero.  So 0x81 or 2 is "not 1" everywhere.
+  [67EC] >= 750: both words are loaded with mov.w (sign-extended) and compared with cmp/hs; for 16-bit values
+  that is the same order as an unsigned u16 compare (0x8000 counts as above 750; emulated).
+  The order of the CLEAR tests and of the paths is the branch order at 03B4E4 .. 03B5F6.
+  [7CAA] therefore = number of consecutive 0x03AE5A passes, ending with this one, on the COUNT path (it is
+  incremented before 0x03AE6C reads it in the same pass), or [7C98] after an IMMEDIATE pass.
+  Edge cases (all emulated): x NaN -> [7CA7] = 1; [7C6C] NaN or [7C78] NaN -> [7CA7] = 1; [7C6C] = -600 with
+  [7C78] = 1500, x = 1000 -> [7CA7] = 1 and the COUNT path runs; [5E68] = -1.0 is inside the window, -1.0000001 outside;
+  [5E68] NaN -> W = 0; [7CAA] = 0xFFFF stays 0xFFFF; [64F5] = 2 is "not 1" (G = 0 -> CLEAR); [5E98] = 0x80 fails.
+EVIDENCE
+  03B446 / 03B44A: r2 = 0xFFFF7CAC from pool 0x03B5A4, r0 = -52 / -64 -> absolute cells 0xFFFF7C78 / 0xFFFF7C6C.
+  03B44E fcmp/gt fr14,fr8: T when fr8 (sum) > fr14 (x); 03B450 bf -> 1.  03B456 fcmp/gt fr14,fr8: T when
+  [7C78] > x; 03B458 bt -> 0.  03B462 cmp/eq #1 on [7C9E].
+  03B49E cmp/eq r5,r2 with r5 = -128 and r2 = mov.b of 0x0CBC0A (0x80 -> -128): bt 0x03B4BC.
+  03B4B4 / 03B4CE cmp/ge r6,r5: T when count >= word 0x0CBC96.  03B5BA cmp/hs r2,r6: T when [67EC] >= 750.
+  03B53E..03B544: [7CAA] := [7C98] (gbr+44 / gbr+62 with GBR 0xFFFF7C6C).  03B5E8..03B5EC: sat16 + 1 by 0x0BE554.
+  emulated: test_b3da -- 34 single-factor variants per bin (printed), 5 window-precondition cases per bin
+  (printed: negative band, NaN band, NaN [7C78], zero band, normal band), 3,000 random states per bin, and
+  1,500 + 1,500 states on a MODIFIED ROM (0x0CBC0A = 0x00 and/or 0x0CBC96 = 5) for the dead [85D7] branch and a
+  non-zero hold count; every case asserts each output, the exact write set and the exact read set.
+  Callees: 0x029AA0 r0 = ([972E] != 0) ? 2 : 0; 0x05EB3E r0 = bit 4 of [8F22]; listed below; run from ROM.
+LISTING
+; function 0x03B3DA..0x03B62C  242 instructions  rom AE5L600L 20g rev 20.19c.bin
+; GBR is set once in this function: 0xFFFF7C6C
+03B3DA: 2F86  mov.l r8,@-r15
+03B3DC: 2F96  mov.l r9,@-r15
+03B3DE: 2FA6  mov.l r10,@-r15
+03B3E0: 2FB6  mov.l r11,@-r15
+03B3E2: 2FC6  mov.l r12,@-r15
+03B3E4: 2FD6  mov.l r13,@-r15
+03B3E6: 2FE6  mov.l r14,@-r15
+03B3E8: 4F22  sts.l pr,@-r15
+03B3EA: FFEB  fmov.s fr14,@-r15
+03B3EC: FFFB  fmov.s fr15,@-r15
+03B3EE: 4F13  stc.l gbr,@-r15
+03B3F0: D05D  mov.l @(0x03B568),r0          ; = 0xFFFF7C6C RAM  -- r0 = 0xFFFF7C6C (literal)
+03B3F2: 401E  ldc r0,gbr                    ; GBR = 0xFFFF7C6C
+03B3F4: 7FCC  add #-52,r15
+03B3F6: D25D  mov.l @(0x03B56C),r2          ; = 0xFFFF6624 RAM
+03B3F8: FE28  fmov.s @r2,fr14                 ; fr14 = f32 [6624] (x)
+03B3FA: D65D  mov.l @(0x03B570),r6          ; = 0xFFFF67EC RAM
+03B3FC: 6261  mov.w @r6,r2
+03B3FE: 2F21  mov.w r2,@r15                   ; local w @r15 = [67EC] (sign-extended word)
+03B400: D65C  mov.l @(0x03B574),r6          ; = 0xFFFF5E96 RAM
+03B402: 6860  mov.b @r6,r8                    ; r8 = s8 [5E96]
+03B404: D65C  mov.l @(0x03B578),r6          ; = 0xFFFF85D7 RAM
+03B406: 6E60  mov.b @r6,r14                   ; r14 = s8 [85D7]
+03B408: D65C  mov.l @(0x03B57C),r6          ; = 0xFFFF64F5 RAM
+03B40A: 6C60  mov.b @r6,r12                   ; r12 = s8 [64F5]
+03B40C: D65C  mov.l @(0x03B580),r6          ; = 0xFFFF5E98 RAM
+03B40E: 6060  mov.b @r6,r0
+03B410: 80F4  mov.b r0,@(4,r15)               ; local @(4) = [5E98]
+03B412: D65C  mov.l @(0x03B584),r6          ; = 0xFFFF5FB6 RAM
+03B414: 6B60  mov.b @r6,r11                   ; r11 = s8 [5FB6]
+03B416: D65C  mov.l @(0x03B588),r6          ; = 0xFFFF5FB7 RAM
+03B418: D25C  mov.l @(0x03B58C),r2          ; = 0x00029AA0 ROM
+03B41A: 420B  jsr @r2                       ; -> 0x029AA0  -- r0 = 0x029AA0() = 2 if [972E] != 0 else 0
+03B41C: 6A60  mov.b @r6,r10                   ; delay slot: r10 = s8 [5FB7]
+03B41E: 80F8  mov.b r0,@(8,r15)               ; local @(8) = that result
+03B420: D65B  mov.l @(0x03B590),r6          ; = 0xFFFF5D85 RAM
+03B422: 6060  mov.b @r6,r0
+03B424: 80FC  mov.b r0,@(12,r15)              ; local @(12) = [5D85]
+03B426: D65B  mov.l @(0x03B594),r6          ; = 0xFFFF8F24 RAM
+03B428: 6960  mov.b @r6,r9                    ; r9 = s8 [8F24]
+03B42A: D65B  mov.l @(0x03B598),r6          ; = 0xFFFF5D86 RAM
+03B42C: 6260  mov.b @r6,r2
+03B42E: E010  mov #16,r0
+03B430: 0F24  mov.b r2,@(r0,r15)              ; local @(16) = [5D86]
+03B432: D25A  mov.l @(0x03B59C),r2          ; = 0xFFFF5E68 RAM
+03B434: FF28  fmov.s @r2,fr15                 ; fr15 = f32 [5E68]
+03B436: D25A  mov.l @(0x03B5A0),r2          ; = 0x0005EB3E ROM
+03B438: 420B  jsr @r2                       ; -> 0x05EB3E  -- r0 = 0x05EB3E() = 1 if bit 4 of [8F22] set
+03B43A: 0009  nop
+03B43C: 6103  mov r0,r1
+03B43E: E014  mov #20,r0
+03B440: 0F14  mov.b r1,@(r0,r15)              ; local @(20) = that result
+03B442: D258  mov.l @(0x03B5A4),r2          ; = 0xFFFF7CAC RAM  -- r2 = 0xFFFF7CAC (literal): the two loads below are absolute cells
+03B444: E0CC  mov #-52,r0
+03B446: F826  fmov.s @(r0,r2),fr8             ; fr8 = [0xFFFF7CAC - 52] = f32 [7C78]
+03B448: E0C0  mov #-64,r0
+03B44A: F926  fmov.s @(r0,r2),fr9             ; fr9 = [0xFFFF7CAC - 64] = f32 [7C6C]
+03B44C: F890  fadd fr9,fr8                    ; fr8 = [7C78] + [7C6C]
+03B44E: F8E5  fcmp/gt fr14,fr8                ; T = (fr8 > fr14) = ([7C78] + [7C6C] > x)
+03B450: 8B0A  bf 0x03B468                     ; not (sum > x) -> [7CA7] = 1 (also when either is NaN)
+03B452: E0CC  mov #-52,r0
+03B454: F826  fmov.s @(r0,r2),fr8
+03B456: F8E5  fcmp/gt fr14,fr8                ; T = ([7C78] > x)
+03B458: 8904  bt 0x03B464                     ; x below [7C78] -> [7CA7] = 0
+03B45A: C432  mov.b @(50,gbr),r0            ; gbr+50 = 0xFFFF7C9E  -- between: r0 = [7C9E]
+03B45C: 1F06  mov.l r0,@(24,r15)
+03B45E: 600C  extu.b r0,r0
+03B460: 8801  cmp/eq #1,r0
+03B462: 8901  bt 0x03B468                     ; [7C9E] == 1 -> [7CA7] = 1 (hold), else 0
+03B464: A001  bra 0x03B46A
+03B466: E000  mov #0,r0
+03B468: E001  mov #1,r0
+03B46A: C03B  mov.b r0,@(59,gbr)            ; gbr+59 = 0xFFFF7CA7  -- [7CA7] = window flag
+03B46C: 6DEC  extu.b r14,r13
+03B46E: 60D3  mov r13,r0
+03B470: 8801  cmp/eq #1,r0
+03B472: 8F05  bf/s 0x03B480                   ; [85D7] != 1 -> [7CAC] = 0
+03B474: E000  mov #0,r0
+03B476: D23B  mov.l @(0x03B564),r2          ; = 0x000BE554 ROM
+03B478: C520  mov.w @(64,gbr),r0            ; gbr+64 = 0xFFFF7CAC
+03B47A: 640D  extu.w r0,r4
+03B47C: 420B  jsr @r2                       ; -> 0x0BE554  -- r0 = sat_u16([7CAC] + 1)
+03B47E: E501  mov #1,r5
+03B480: C120  mov.w r0,@(64,gbr)            ; gbr+64 = 0xFFFF7CAC  -- [7CAC] = run length of [85D7] == 1
+03B482: 6ECC  extu.b r12,r14
+03B484: 60E3  mov r14,r0
+03B486: 8801  cmp/eq #1,r0
+03B488: 8F05  bf/s 0x03B496                   ; [64F5] != 1 -> [7CAE] = 0
+03B48A: E000  mov #0,r0
+03B48C: D235  mov.l @(0x03B564),r2          ; = 0x000BE554 ROM
+03B48E: C521  mov.w @(66,gbr),r0            ; gbr+66 = 0xFFFF7CAE
+03B490: 640D  extu.w r0,r4
+03B492: 420B  jsr @r2                       ; -> 0x0BE554  -- r0 = sat_u16([7CAE] + 1)
+03B494: E501  mov #1,r5
+03B496: C121  mov.w r0,@(66,gbr)            ; gbr+66 = 0xFFFF7CAE  -- [7CAE] = run length of [64F5] == 1
+03B498: D643  mov.l @(0x03B5A8),r6          ; = 0x000CBC0A CAL
+03B49A: 6260  mov.b @r6,r2                    ; r2 = s8 cal byte 0x0CBC0A (0x80 both bins)
+03B49C: E580  mov #-128,r5
+03B49E: 3250  cmp/eq r5,r2                    ; T = (r2 == -128)
+03B4A0: 890C  bt 0x03B4BC                     ; 0x80 -> the [64F5] / [7CAE] branch (0x03B4BC); the [85D7] branch is dead in both bins
+03B4A2: 60D3  mov r13,r0
+03B4A4: 8801  cmp/eq #1,r0
+03B4A6: 8B16  bf 0x03B4D6
+03B4A8: C520  mov.w @(64,gbr),r0            ; gbr+64 = 0xFFFF7CAC
+03B4AA: 1F07  mov.l r0,@(28,r15)
+03B4AC: 650D  extu.w r0,r5
+03B4AE: D63F  mov.l @(0x03B5AC),r6          ; = 0x000CBC96 CAL  -- r6 -> cal word 0x0CBC96 (0 both bins)
+03B4B0: 6261  mov.w @r6,r2
+03B4B2: 662D  extu.w r2,r6
+03B4B4: 3563  cmp/ge r6,r5                    ; T = (r5 >= r6) = ([7CAC] >= word 0x0CBC96)
+03B4B6: 890C  bt 0x03B4D2
+03B4B8: A00D  bra 0x03B4D6
+03B4BA: 0009  nop
+03B4BC: 60E3  mov r14,r0
+03B4BE: 8801  cmp/eq #1,r0
+03B4C0: 8B09  bf 0x03B4D6                     ; [64F5] != 1 -> G = 0
+03B4C2: C521  mov.w @(66,gbr),r0            ; gbr+66 = 0xFFFF7CAE
+03B4C4: 1F08  mov.l r0,@(32,r15)
+03B4C6: 650D  extu.w r0,r5
+03B4C8: D638  mov.l @(0x03B5AC),r6          ; = 0x000CBC96 CAL
+03B4CA: 6261  mov.w @r6,r2
+03B4CC: 662D  extu.w r2,r6
+03B4CE: 3563  cmp/ge r6,r5                    ; T = ([7CAE] >= word 0x0CBC96); with 0 always true
+03B4D0: 8B01  bf 0x03B4D6                     ; below -> G = 0
+03B4D2: A001  bra 0x03B4D8
+03B4D4: EE01  mov #1,r14                      ; delay slot: G (r14) = 1
+03B4D6: EE00  mov #0,r14                      ; G (r14) = 0
+03B4D8: D235  mov.l @(0x03B5B0),r2          ; = 0x000BE608 ROM
+03B4DA: F4FC  fmov fr15,fr4
+03B4DC: F69D  fldi1 fr6
+03B4DE: 420B  jsr @r2                       ; -> 0x0BE608  -- r0 = 1 if [5E68] < -1.0 or [5E68] > 1.0 (0x0BE608: centre 0.0, half-width 1.0); NaN -> 0
+03B4E0: F58D  fldi0 fr5
+03B4E2: 620C  extu.b r0,r2                    ; r2 = out-of-window flag W
+03B4E4: 60BC  extu.b r11,r0
+03B4E6: 8801  cmp/eq #1,r0
+03B4E8: 8B01  bf 0x03B4EE                     ; [5FB6] == 1 -> clear (0x03B60C)
+03B4EA: A08F  bra 0x03B60C
+03B4EC: 0009  nop
+03B4EE: 60AC  extu.b r10,r0
+03B4F0: 8801  cmp/eq #1,r0
+03B4F2: 8B01  bf 0x03B4F8                     ; [5FB7] == 1 -> clear
+03B4F4: A08A  bra 0x03B60C
+03B4F6: 0009  nop
+03B4F8: 609C  extu.b r9,r0
+03B4FA: 8801  cmp/eq #1,r0
+03B4FC: 8B05  bf 0x03B50A                     ; [8F24] != 1 -> next test
+03B4FE: E014  mov #20,r0
+03B500: 00FC  mov.b @(r0,r15),r0
+03B502: 8801  cmp/eq #1,r0
+03B504: 8B01  bf 0x03B50A                     ; [8F24] == 1 and bit 4 of [8F22] -> clear
+03B506: A081  bra 0x03B60C
+03B508: 0009  nop
+03B50A: 658C  extu.b r8,r5
+03B50C: 6053  mov r5,r0
+03B50E: 8802  cmp/eq #2,r0
+03B510: 8B04  bf 0x03B51C                     ; [5E96] != 2 -> next test
+03B512: 84FC  mov.b @(12,r15),r0
+03B514: 8801  cmp/eq #1,r0
+03B516: 8B01  bf 0x03B51C                     ; [5D85] != 1 -> next test
+03B518: 2228  tst r2,r2
+03B51A: 8B77  bf 0x03B60C                     ; T = (W == 0); W != 0 -> clear
+03B51C: 60E3  mov r14,r0
+03B51E: 8801  cmp/eq #1,r0
+03B520: 8B48  bf 0x03B5B4                     ; immediate path: G must be 1
+03B522: 6053  mov r5,r0
+03B524: 8801  cmp/eq #1,r0
+03B526: 8B45  bf 0x03B5B4                     ; [5E96] must be 1
+03B528: 84FC  mov.b @(12,r15),r0
+03B52A: 8801  cmp/eq #1,r0
+03B52C: 8B42  bf 0x03B5B4                     ; [5D85] must be 1
+03B52E: E010  mov #16,r0
+03B530: 07FC  mov.b @(r0,r15),r7
+03B532: 2778  tst r7,r7
+03B534: 8B3E  bf 0x03B5B4                     ; [5D86] must be 0
+03B536: 2228  tst r2,r2
+03B538: 8B3C  bf 0x03B5B4                     ; W must be 0
+03B53A: E001  mov #1,r0
+03B53C: C032  mov.b r0,@(50,gbr)            ; gbr+50 = 0xFFFF7C9E  -- immediate: [7C9E] = 1
+03B53E: C516  mov.w @(44,gbr),r0            ; gbr+44 = 0xFFFF7C98  -- r0 = rung 4 [7C98] (gbr+44)
+03B540: 1F09  mov.l r0,@(36,r15)
+03B542: A066  bra 0x03B612
+03B544: C11F  mov.w r0,@(62,gbr)            ; gbr+62 = 0xFFFF7CAA  -- delay slot: [7CAA] = [7C98] -> tier 4 in the same pass (0x03AE6C)
+;   pool 0x03B546: .word 0x0000
+;   pool 0x03B548: .long 0x000CC4F8  CAL
+;   pool 0x03B54A: .word 0xC4F8
+;   pool 0x03B54C: .long 0x000CC4FC  CAL
+;   pool 0x03B54E: .word 0xC4FC
+;   pool 0x03B550: .long 0x000CBD92  CAL
+;   pool 0x03B552: .word 0xBD92
+;   pool 0x03B554: .long 0x000BE598  ROM
+;   pool 0x03B556: .word 0xE598
+;   pool 0x03B558: .long 0x41000000  const f32 8
+;   pool 0x03B55A: .word 0x0000
+;   pool 0x03B55C: .long 0x000BE960  ROM
+;   pool 0x03B55E: .word 0xE960
+;   pool 0x03B560: .long 0x000BE5D8  ROM
+;   pool 0x03B562: .word 0xE5D8
+;   pool 0x03B564: .long 0x000BE554  ROM
+;   pool 0x03B566: .word 0xE554
+;   pool 0x03B568: .long 0xFFFF7C6C  RAM
+;   pool 0x03B56A: .word 0x7C6C
+;   pool 0x03B56C: .long 0xFFFF6624  RAM
+;   pool 0x03B56E: .word 0x6624
+;   pool 0x03B570: .long 0xFFFF67EC  RAM
+;   pool 0x03B572: .word 0x67EC
+;   pool 0x03B574: .long 0xFFFF5E96  RAM
+;   pool 0x03B576: .word 0x5E96
+;   pool 0x03B578: .long 0xFFFF85D7  RAM
+;   pool 0x03B57A: .word 0x85D7
+;   pool 0x03B57C: .long 0xFFFF64F5  RAM
+;   pool 0x03B57E: .word 0x64F5
+;   pool 0x03B580: .long 0xFFFF5E98  RAM
+;   pool 0x03B582: .word 0x5E98
+;   pool 0x03B584: .long 0xFFFF5FB6  RAM
+;   pool 0x03B586: .word 0x5FB6
+;   pool 0x03B588: .long 0xFFFF5FB7  RAM
+;   pool 0x03B58A: .word 0x5FB7
+;   pool 0x03B58C: .long 0x00029AA0  ROM
+;   pool 0x03B58E: .word 0x9AA0
+;   pool 0x03B590: .long 0xFFFF5D85  RAM
+;   pool 0x03B592: .word 0x5D85
+;   pool 0x03B594: .long 0xFFFF8F24  RAM
+;   pool 0x03B596: .word 0x8F24
+;   pool 0x03B598: .long 0xFFFF5D86  RAM
+;   pool 0x03B59A: .word 0x5D86
+;   pool 0x03B59C: .long 0xFFFF5E68  RAM
+;   pool 0x03B59E: .word 0x5E68
+;   pool 0x03B5A0: .long 0x0005EB3E  ROM
+;   pool 0x03B5A2: .word 0xEB3E
+;   pool 0x03B5A4: .long 0xFFFF7CAC  RAM
+;   pool 0x03B5A6: .word 0x7CAC
+;   pool 0x03B5A8: .long 0x000CBC0A  CAL
+;   pool 0x03B5AA: .word 0xBC0A
+;   pool 0x03B5AC: .long 0x000CBC96  CAL
+;   pool 0x03B5AE: .word 0xBC96
+;   pool 0x03B5B0: .long 0x000BE608  ROM
+;   pool 0x03B5B2: .word 0xE608
+03B5B4: D628  mov.l @(0x03B658),r6          ; = 0x000CBC94 CAL
+03B5B6: 6261  mov.w @r6,r2                    ; r2 = cal word 0x0CBC94 (750 both bins), sign-extended
+03B5B8: 66F1  mov.w @r15,r6                   ; r6 = [67EC], sign-extended
+03B5BA: 3622  cmp/hs r2,r6                    ; T = (r6 >= r2) unsigned: equals u16 [67EC] >= 750
+03B5BC: 8B1A  bf 0x03B5F4                     ; below -> 0x03B5F4
+03B5BE: C43B  mov.b @(59,gbr),r0            ; gbr+59 = 0xFFFF7CA7
+03B5C0: 1F0A  mov.l r0,@(40,r15)
+03B5C2: 600C  extu.b r0,r0
+03B5C4: 8801  cmp/eq #1,r0
+03B5C6: 8B15  bf 0x03B5F4                     ; [7CA7] != 1 -> 0x03B5F4
+03B5C8: 60E3  mov r14,r0
+03B5CA: 8801  cmp/eq #1,r0
+03B5CC: 8B12  bf 0x03B5F4                     ; G != 1 -> 0x03B5F4
+03B5CE: 84F4  mov.b @(4,r15),r0
+03B5D0: 650C  extu.b r0,r5
+03B5D2: 2058  tst r5,r0                       ; T = ([5E98] == 0) (tst on the byte and its zero extension)
+03B5D4: 8B0E  bf 0x03B5F4                     ; [5E98] != 0 -> 0x03B5F4
+03B5D6: 84F8  mov.b @(8,r15),r0
+03B5D8: 2008  tst r0,r0
+03B5DA: 8B0B  bf 0x03B5F4                     ; 0x029AA0 result != 0 ([972E] != 0) -> 0x03B5F4
+03B5DC: E001  mov #1,r0
+03B5DE: C032  mov.b r0,@(50,gbr)            ; gbr+50 = 0xFFFF7C9E  -- count: [7C9E] = 1
+03B5E0: D21E  mov.l @(0x03B65C),r2          ; = 0x000BE554 ROM
+03B5E2: 6503  mov r0,r5
+03B5E4: C51F  mov.w @(62,gbr),r0            ; gbr+62 = 0xFFFF7CAA
+03B5E6: 1F0B  mov.l r0,@(44,r15)
+03B5E8: 420B  jsr @r2                       ; -> 0x0BE554  -- r0 = sat_u16([7CAA] + 1)
+03B5EA: 640D  extu.w r0,r4
+03B5EC: C11F  mov.w r0,@(62,gbr)            ; gbr+62 = 0xFFFF7CAA  -- [7CAA] = [7CAA] + 1 (one per call of 0x03AE5A)
+03B5EE: E000  mov #0,r0
+03B5F0: A00F  bra 0x03B612
+03B5F2: C034  mov.b r0,@(52,gbr)            ; gbr+52 = 0xFFFF7CA0  -- delay slot: [7CA0] = 0
+03B5F4: 2EE8  tst r14,r14                     ; T = (G == 0)
+03B5F6: 8909  bt 0x03B60C                     ; G == 0 -> clear
+03B5F8: E000  mov #0,r0
+03B5FA: C032  mov.b r0,@(50,gbr)            ; gbr+50 = 0xFFFF7C9E  -- drop: [7C9E] = 0
+03B5FC: C11F  mov.w r0,@(62,gbr)            ; gbr+62 = 0xFFFF7CAA  -- [7CAA] = 0
+03B5FE: C43B  mov.b @(59,gbr),r0            ; gbr+59 = 0xFFFF7CA7
+03B600: 2008  tst r0,r0                       ; T = ([7CA7] == 0)
+03B602: 8F06  bf/s 0x03B612                   ; [7CA7] != 0 -> return, [7CA0] untouched
+03B604: 1F0C  mov.l r0,@(48,r15)
+03B606: E001  mov #1,r0
+03B608: A003  bra 0x03B612
+03B60A: C034  mov.b r0,@(52,gbr)            ; gbr+52 = 0xFFFF7CA0  -- delay slot: [7CA0] = 1 (count dropped because x left the window while G = 1)
+03B60C: E000  mov #0,r0
+03B60E: C032  mov.b r0,@(50,gbr)            ; gbr+50 = 0xFFFF7C9E  -- clear: [7C9E] = 0
+03B610: C11F  mov.w r0,@(62,gbr)            ; gbr+62 = 0xFFFF7CAA  -- [7CAA] = 0 ([7CA0] untouched)
+03B612: 7F34  add #52,r15
+03B614: 4F17  ldc.l @r15+,gbr
+03B616: FFF9  fmov.s @r15+,fr15
+03B618: FEF9  fmov.s @r15+,fr14
+03B61A: 4F26  lds.l @r15+,pr
+03B61C: 6EF6  mov.l @r15+,r14
+03B61E: 6DF6  mov.l @r15+,r13
+03B620: 6CF6  mov.l @r15+,r12
+03B622: 6BF6  mov.l @r15+,r11
+03B624: 6AF6  mov.l @r15+,r10
+03B626: 69F6  mov.l @r15+,r9
+03B628: 000B  rts
+03B62A: 68F6  mov.l @r15+,r8
+;   pool 0x03B658: .long 0x000CBC94  CAL
+;   pool 0x03B65C: .long 0x000BE554  ROM
+
+==== FUNCTION 0x03AE6C .. 0x03AF88  (142 instructions, 1 caller) ====
+CONTRACT
+  inputs   f32 [6624] x, u8 [65C5] (through 0x022CF4: flag = ([65C5] == 1)), u8 [65D0], u8 [8E46], u16 [7CB2],
+           u8 [7C9E], u16 [7CAA], u16 [7C92] [7C94] [7C96] [7C98]; record 0x0AD400; cal words 0x0CBC90 / 0x0CBC92.
+  outputs  every call: u16 [7CB2], u8 [7C9A] tier, u8 [7CA3] [7CA4] [7CA5] [7CA6], u8 [7C9D], u8 [7CB7];
+           then tail-jumps to 0x03D2FC (which rebuilds word [7D80]).
+  [7CB2]   = [65D0] == 1 ? sat16([7CB2] + 1) : 0          (updated before the [7C9E] test, every call)
+  lut      = u16 lookup(0x0AD400, x) by the fixed uint16 wrapper 0x0BE8AC: axis 1000..8000 step 1000, cells
+             63 63 63 38 38 38 38 38 (both bins); clamped at both ends; 3000..4000 step 100 -> 63 60 58 55 53 50 48
+             45 43 40 38 (emulated).
+  tier     = 0                                      if [7C9E] == 0
+           = 4                                      if u16 [7CAA] >= [7C98]
+           = 4                                      if flag and [7CAA] > word 0x0CBC90 (625) and [65D0] == 1 and
+                                                       new [7CB2] >= lut and ([8E46] == 0 or word 0x0CBC92 == 0)
+           = 3 / 2 / 1                              if [7CAA] >= [7C96] / [7C94] / [7C92]   (first that holds)
+           = 0                                      otherwise
+  [7CA3..A6] = thermometer: tier 1 -> 1 0 0 0, 2 -> 1 1 0 0, 3 -> 1 1 1 0, 4 -> 1 1 1 1, 0 -> 0 0 0 0
+  [7C9D]   = (tier >= 1)          [7CB7] = (tier >= 4)
+  effects  nothing else written by 0x03AE6C itself (emulated write set with 0x03D2FC stubbed); r13, r14, fr14,
+           GBR restored before the jmp.
+MECHANISM
+  As the contract, in branch order 03AEAA, 03AEBE, 03AEC4..03AEF0, 03AEFE, 03AF1A, 03AF34.  The tier-byte stores
+  share code: tier 3 enters 0x03AF44 with r0 = 1, tier 2 enters 0x03AF40 with r0 = 1, tier 1 enters 0x03AF40 with
+  r0 = 0; tier 4 and tier 0 have their own store runs.  The thermometer above is the result (emulated).
+  Second route: both bins hold 0x0CBC92 = 0, so [8E46] never matters there (a MODIFIED ROM with 0x0CBC92 = 1
+  shows [8E46] = 1 then blocks it).  It can fire only when [7C98] > 626, i.e. when 0x03AF88's 625 adds are on
+  ([6155] == 1 and [615F] == 0): then tier 4 can come at count 626 straight from tier 0 (emulated at x = 2000,
+  sel 1, [5DB8] = 0: rungs 669 / 744 / 788 / 788 in 20.19c and 669 / 713 / 763 / 763 in stock; with [65D0] = 1
+  from pass 0 BOTH bins reach tier 4 first at pass 626 and see only tiers 0 and 4).
+  Tier 3: only 03AF02 / 03AF04 store 3, reached only when [7CAA] < [7C98] and [7CAA] >= [7C96]; 0x03AF88 always
+  produces [7C96] == [7C98] (batch-2 E15a), so tier 3 is unreachable in both calibrations (asserted over 60 lifts
+  and a 130-count walk with [7C96] = [7C98]).  With [7C96] < [7C98] (synthetic) it does occur.
+EVIDENCE
+  03AEBC cmp/hs r0,r4: T when r4 ([7CAA]) >= r0 ([7C98]), both sign-extended words -> u16 order; bt 0x03AF4A.
+  03AED2 cmp/gt r4,r6: T when [7CAA] > 625.  03AEE0 cmp/ge r5,r6: T when [7CB2] >= lut.  03AEFC / 03AF18 / 03AF32
+  cmp/ge r5,r6 on zero-extended words: T when [7CAA] >= rung.  03AF6E cmp/hs r6,r0 with r6 = 4: T when tier >= 4.
+  emulated: test_ae6c -- per bin: lookup at every axis point, both clamps and 11 interior points; a 131-value
+  count walk over rungs 44/75/100/119 (printed); the [7C96] = [7C98] walk; 8 second-route cases (printed);
+  3,000 random states; plus 802 states on the MODIFIED ROM.  Exact write set, exact read set and one jump to
+  0x03D2FC asserted per case.  7,346 calls in all.
+  test_tier_to_mask: 0x03AE6C followed by the real 0x03D2FC (only 0x00317C / 0x003190 stubbed), all other 0x03D2FC
+  flag bytes 0: tier 0/1/2/3/4 -> [7D80] = 0x0000 / 0x0001 / 0x0003 / 0x0007 / 0x000F, both bins.
+LISTING
+; function 0x03AE6C..0x03AF88  142 instructions  rom AE5L600L 20g rev 20.19c.bin
+; GBR is set once in this function: 0xFFFF7C92
+03AE6C: 2FD6  mov.l r13,@-r15
+03AE6E: 2FE6  mov.l r14,@-r15
+03AE70: 4F22  sts.l pr,@-r15
+03AE72: FFEB  fmov.s fr14,@-r15
+03AE74: 4F13  stc.l gbr,@-r15
+03AE76: D069  mov.l @(0x03B01C),r0          ; = 0xFFFF7C92 RAM  -- r0 = 0xFFFF7C92 (literal, not a frame)
+03AE78: 401E  ldc r0,gbr                    ; GBR = 0xFFFF7C92
+03AE7A: 7FDC  add #-36,r15
+03AE7C: D268  mov.l @(0x03B020),r2          ; = 0xFFFF6624 RAM
+03AE7E: FE28  fmov.s @r2,fr14                 ; fr14 = f32 [6624] (x; compared in rpm units elsewhere, see CONTRACT)
+03AE80: D268  mov.l @(0x03B024),r2          ; = 0x00022CF4 ROM
+03AE82: 420B  jsr @r2                       ; -> 0x022CF4  -- flag = ([65C5] == 1), 0x022CF4
+03AE84: 0009  nop
+03AE86: 2F00  mov.b r0,@r15                   ; local byte @r15 = flag
+03AE88: D267  mov.l @(0x03B028),r2          ; = 0xFFFF65D0 RAM
+03AE8A: 6220  mov.b @r2,r2                    ; r2 = s8 [65D0]
+03AE8C: D567  mov.l @(0x03B02C),r5          ; = 0xFFFF8E46 RAM
+03AE8E: 6D50  mov.b @r5,r13                   ; r13 = s8 [8E46]
+03AE90: 6E2C  extu.b r2,r14                   ; r14 = u8 [65D0]
+03AE92: 60E3  mov r14,r0
+03AE94: 8801  cmp/eq #1,r0                    ; T = ([65D0] == 1)
+03AE96: 8F05  bf/s 0x03AEA4                   ; not 1 -> store 0 (slot r0 = 0)
+03AE98: E000  mov #0,r0
+03AE9A: D265  mov.l @(0x03B030),r2          ; = 0x000BE554 ROM
+03AE9C: E501  mov #1,r5
+03AE9E: C510  mov.w @(32,gbr),r0            ; gbr+32 = 0xFFFF7CB2
+03AEA0: 420B  jsr @r2                       ; -> 0x0BE554  -- r0 = sat_u16([7CB2] + 1)
+03AEA2: 640D  extu.w r0,r4
+03AEA4: C110  mov.w r0,@(32,gbr)            ; gbr+32 = 0xFFFF7CB2  -- [7CB2] = 0 or [7CB2]+1: consecutive calls with [65D0] == 1
+03AEA6: C40C  mov.b @(12,gbr),r0            ; gbr+12 = 0xFFFF7C9E  -- r0 = s8 [7C9E]
+03AEA8: 2008  tst r0,r0                       ; T = ([7C9E] == 0)
+03AEAA: 8957  bt 0x03AF5C                     ; [7C9E] == 0 -> tier 0 (0x03AF5C)
+03AEAC: D461  mov.l @(0x03B034),r4          ; = 0x000AD400 DESC
+03AEAE: D262  mov.l @(0x03B038),r2          ; = 0x000BE8AC ROM
+03AEB0: 420B  jsr @r2                       ; -> 0x0BE8AC  -- r0 = u16 lookup(0x0AD400, x): 63 at x <= 3000, 38 at x >= 4000, linear between
+03AEB2: F4EC  fmov fr14,fr4                   ; delay slot: fr4 = x
+03AEB4: 650D  extu.w r0,r5                    ; r5 = lut
+03AEB6: C50C  mov.w @(24,gbr),r0            ; gbr+24 = 0xFFFF7CAA  -- r0 = [7CAA] (count)
+03AEB8: 6403  mov r0,r4
+03AEBA: C503  mov.w @(6,gbr),r0             ; gbr+6 = 0xFFFF7C98  -- r0 = rung 4 [7C98]
+03AEBC: 3402  cmp/hs r0,r4                    ; T = (r4 >= r0) unsigned = ([7CAA] >= [7C98]); both sign-extended words: same order as u16
+03AEBE: 8944  bt 0x03AF4A                     ; count >= rung 4 -> tier 4 (0x03AF4A)
+03AEC0: 60F0  mov.b @r15,r0                   ; r0 = flag
+03AEC2: 8801  cmp/eq #1,r0
+03AEC4: 8B15  bf 0x03AEF2                     ; flag != 1 -> ladder
+03AEC6: C50C  mov.w @(24,gbr),r0            ; gbr+24 = 0xFFFF7CAA
+03AEC8: 1F01  mov.l r0,@(4,r15)
+03AECA: 660D  extu.w r0,r6
+03AECC: D45B  mov.l @(0x03B03C),r4          ; = 0x000CBC90 CAL  -- r4 -> cal word 0x0CBC90 (625 both bins)
+03AECE: 6241  mov.w @r4,r2
+03AED0: 642D  extu.w r2,r4
+03AED2: 3647  cmp/gt r4,r6                    ; T = (r6 > r4) signed = ([7CAA] > 625)
+03AED4: 8B0D  bf 0x03AEF2                     ; not above 625 -> ladder
+03AED6: 60E3  mov r14,r0
+03AED8: 8801  cmp/eq #1,r0                    ; T = ([65D0] == 1)
+03AEDA: 8B0A  bf 0x03AEF2                     ; [65D0] != 1 -> ladder
+03AEDC: C510  mov.w @(32,gbr),r0            ; gbr+32 = 0xFFFF7CB2  -- r0 = [7CB2] (just written)
+03AEDE: 660D  extu.w r0,r6
+03AEE0: 3653  cmp/ge r5,r6                    ; T = (r6 >= r5) = ([7CB2] >= lut)
+03AEE2: 8F06  bf/s 0x03AEF2                   ; below lut -> ladder
+03AEE4: 1F02  mov.l r0,@(8,r15)
+03AEE6: 2DD8  tst r13,r13                     ; T = ([8E46] == 0)
+03AEE8: 892F  bt 0x03AF4A                     ; [8E46] == 0 -> tier 4 (second route)
+03AEEA: D655  mov.l @(0x03B040),r6          ; = 0x000CBC92 CAL  -- r6 -> cal word 0x0CBC92 (0 both bins)
+03AEEC: 6261  mov.w @r6,r2
+03AEEE: 2228  tst r2,r2                       ; T = (word 0x0CBC92 == 0)
+03AEF0: 892B  bt 0x03AF4A                     ; cal 0 -> tier 4 (second route; always taken in both bins)
+03AEF2: C50C  mov.w @(24,gbr),r0            ; gbr+24 = 0xFFFF7CAA  -- ladder: r0 = [7CAA]
+03AEF4: 1F03  mov.l r0,@(12,r15)
+03AEF6: 660D  extu.w r0,r6
+03AEF8: C502  mov.w @(4,gbr),r0             ; gbr+4 = 0xFFFF7C96  -- r0 = rung 3 [7C96]
+03AEFA: 650D  extu.w r0,r5
+03AEFC: 3653  cmp/ge r5,r6                    ; T = (r6 >= r5) = ([7CAA] >= [7C96]); zero-extended, so same as unsigned
+03AEFE: 8F06  bf/s 0x03AF0E                   ; below -> try rung 2
+03AF00: 1F04  mov.l r0,@(16,r15)
+03AF02: E003  mov #3,r0
+03AF04: C008  mov.b r0,@(8,gbr)             ; gbr+8 = 0xFFFF7C9A  -- tier 3 (only store of 3; unreachable while [7C96] == [7C98])
+03AF06: E001  mov #1,r0
+03AF08: C011  mov.b r0,@(17,gbr)            ; gbr+17 = 0xFFFF7CA3  -- [7CA3] = 1
+03AF0A: A01B  bra 0x03AF44                    ; -> 0x03AF44 with r0 = 1
+03AF0C: C012  mov.b r0,@(18,gbr)            ; gbr+18 = 0xFFFF7CA4  -- delay slot: [7CA4] = 1
+03AF0E: C50C  mov.w @(24,gbr),r0            ; gbr+24 = 0xFFFF7CAA
+03AF10: 1F05  mov.l r0,@(20,r15)
+03AF12: 660D  extu.w r0,r6
+03AF14: C501  mov.w @(2,gbr),r0             ; gbr+2 = 0xFFFF7C94  -- r0 = rung 2 [7C94]
+03AF16: 650D  extu.w r0,r5
+03AF18: 3653  cmp/ge r5,r6                    ; T = ([7CAA] >= [7C94])
+03AF1A: 8F05  bf/s 0x03AF28
+03AF1C: 1F06  mov.l r0,@(24,r15)
+03AF1E: E002  mov #2,r0
+03AF20: C008  mov.b r0,@(8,gbr)             ; gbr+8 = 0xFFFF7C9A  -- tier 2
+03AF22: E001  mov #1,r0
+03AF24: A00C  bra 0x03AF40                    ; -> 0x03AF40 with r0 = 1
+03AF26: C011  mov.b r0,@(17,gbr)            ; gbr+17 = 0xFFFF7CA3  -- delay slot: [7CA3] = 1
+03AF28: C50C  mov.w @(24,gbr),r0            ; gbr+24 = 0xFFFF7CAA
+03AF2A: 1F07  mov.l r0,@(28,r15)
+03AF2C: 660D  extu.w r0,r6
+03AF2E: C500  mov.w @(0,gbr),r0             ; gbr+0 = 0xFFFF7C92  -- r0 = rung 1 [7C92]
+03AF30: 650D  extu.w r0,r5
+03AF32: 3653  cmp/ge r5,r6                    ; T = ([7CAA] >= [7C92])
+03AF34: 8F12  bf/s 0x03AF5C                   ; below rung 1 -> tier 0 (0x03AF5C)
+03AF36: 1F08  mov.l r0,@(32,r15)
+03AF38: E001  mov #1,r0
+03AF3A: C008  mov.b r0,@(8,gbr)             ; gbr+8 = 0xFFFF7C9A  -- tier 1
+03AF3C: C011  mov.b r0,@(17,gbr)            ; gbr+17 = 0xFFFF7CA3  -- [7CA3] = 1
+03AF3E: E000  mov #0,r0
+03AF40: C012  mov.b r0,@(18,gbr)            ; gbr+18 = 0xFFFF7CA4  -- [7CA4] = r0 (1 from tier 2, 0 from tier 1)
+03AF42: E000  mov #0,r0
+03AF44: C013  mov.b r0,@(19,gbr)            ; gbr+19 = 0xFFFF7CA5  -- [7CA5] = r0 (1 from tier 3, else 0)
+03AF46: A006  bra 0x03AF56                    ; -> 0x03AF56 with r0 = 0
+03AF48: E000  mov #0,r0
+03AF4A: E004  mov #4,r0                       ; tier 4 entry
+03AF4C: C008  mov.b r0,@(8,gbr)             ; gbr+8 = 0xFFFF7C9A  -- [7C9A] = 4
+03AF4E: E001  mov #1,r0
+03AF50: C011  mov.b r0,@(17,gbr)            ; gbr+17 = 0xFFFF7CA3  -- [7CA3] = 1
+03AF52: C012  mov.b r0,@(18,gbr)            ; gbr+18 = 0xFFFF7CA4  -- [7CA4] = 1
+03AF54: C013  mov.b r0,@(19,gbr)            ; gbr+19 = 0xFFFF7CA5  -- [7CA5] = 1
+03AF56: C014  mov.b r0,@(20,gbr)            ; gbr+20 = 0xFFFF7CA6  -- [7CA6] = r0 (1 only from tier 4)
+03AF58: A006  bra 0x03AF68                    ; -> 0x03AF68 with r0 = 1
+03AF5A: E001  mov #1,r0
+03AF5C: E000  mov #0,r0                       ; tier 0 entry: r0 = 0
+03AF5E: C008  mov.b r0,@(8,gbr)             ; gbr+8 = 0xFFFF7C9A  -- [7C9A] = 0
+03AF60: C011  mov.b r0,@(17,gbr)            ; gbr+17 = 0xFFFF7CA3
+03AF62: C012  mov.b r0,@(18,gbr)            ; gbr+18 = 0xFFFF7CA4
+03AF64: C013  mov.b r0,@(19,gbr)            ; gbr+19 = 0xFFFF7CA5
+03AF66: C014  mov.b r0,@(20,gbr)            ; gbr+20 = 0xFFFF7CA6
+03AF68: C00B  mov.b r0,@(11,gbr)            ; gbr+11 = 0xFFFF7C9D  -- [7C9D] = 1 for tiers 1..4, 0 for tier 0
+03AF6A: C408  mov.b @(8,gbr),r0             ; gbr+8 = 0xFFFF7C9A  -- r0 = [7C9A]
+03AF6C: E604  mov #4,r6
+03AF6E: 3062  cmp/hs r6,r0                    ; T = ([7C9A] >= 4) unsigned
+03AF70: 8F01  bf/s 0x03AF76
+03AF72: E000  mov #0,r0
+03AF74: E001  mov #1,r0
+03AF76: C025  mov.b r0,@(37,gbr)            ; gbr+37 = 0xFFFF7CB7  -- [7CB7] = (tier >= 4)
+03AF78: D232  mov.l @(0x03B044),r2          ; = 0x0003D2FC ROM
+03AF7A: 7F24  add #36,r15
+03AF7C: 4F17  ldc.l @r15+,gbr
+03AF7E: FEF9  fmov.s @r15+,fr14
+03AF80: 4F26  lds.l @r15+,pr
+03AF82: 6EF6  mov.l @r15+,r14
+03AF84: 422B  jmp @r2                       ; -> 0x03D2FC  -- tail-jump 0x03D2FC: reads [7CA3..A6] into bits 0..3 of word [7D80] (launch_closure_trace.txt)
+03AF86: 6DF6  mov.l @r15+,r13
+;   pool 0x03B01C: .long 0xFFFF7C92  RAM
+;   pool 0x03B020: .long 0xFFFF6624  RAM
+;   pool 0x03B024: .long 0x00022CF4  ROM
+;   pool 0x03B028: .long 0xFFFF65D0  RAM
+;   pool 0x03B02C: .long 0xFFFF8E46  RAM
+;   pool 0x03B030: .long 0x000BE554  ROM
+;   pool 0x03B034: .long 0x000AD400  DESC
+;   pool 0x03B038: .long 0x000BE8AC  ROM
+;   pool 0x03B03C: .long 0x000CBC90  CAL
+;   pool 0x03B040: .long 0x000CBC92  CAL
+;   pool 0x03B044: .long 0x0003D2FC  ROM
+;
+; descriptors referenced (geometry and data decoded from bytes):
+;   DESC 0x0AD400 1D uint16 x8 data 38..63 (cell type set by wrapper 0x0BE8AC, typecode byte 0x00 not read; axis float32)
+
+==== FUNCTION 0x03B62C .. 0x03B64C  (16 instructions, 1 caller) ====
+CONTRACT
+  [7C9F] = 1 if [7C9B] == 1 and [7C9E] == 1 and [7C9A] != 4, else 0.  Writes nothing else.
+  [7C9B] is 0x03AF88's "625 adds active" flag ([6155] == 1 and [615F] == 0, batch-2 E7), so [7C9F] = 1 while the
+  count is running with the adds on and tier 4 has not been reached.  Readers of [7C9F] (literal): 0x071ABA,
+  0x077BC4, 0x07AB36 -- not decoded.
+EVIDENCE
+  03B62E / 03B634 / 03B63A: mov.b @(1/4/0,r5) with r5 = 0xFFFF7C9A (pool 0x03B660) -> 0xFFFF7C9B / 7C9E / 7C9A.
+  03B63E bf 0x03B646 when [7C9A] != 4 -> r0 = 1.  emulated: test_b62c, 343 byte triples, exact write and read set.
+LISTING
+; function 0x03B62C..0x03B64C  16 instructions  rom AE5L600L 20g rev 20.19c.bin
+03B62C: D50C  mov.l @(0x03B660),r5          ; = 0xFFFF7C9A RAM  -- r5 = 0xFFFF7C9A (literal)
+03B62E: 8451  mov.b @(1,r5),r0                ; r0 = s8 [7C9B] (0x03AF88 add flag)
+03B630: 8801  cmp/eq #1,r0
+03B632: 8B05  bf 0x03B640
+03B634: 8454  mov.b @(4,r5),r0                ; r0 = s8 [7C9E]
+03B636: 8801  cmp/eq #1,r0
+03B638: 8B02  bf 0x03B640
+03B63A: 6050  mov.b @r5,r0                    ; r0 = s8 [7C9A] (tier)
+03B63C: 8804  cmp/eq #4,r0
+03B63E: 8B02  bf 0x03B646                     ; tier != 4 -> 1
+03B640: E000  mov #0,r0
+03B642: 000B  rts
+03B644: 8055  mov.b r0,@(5,r5)                ; [7C9F] = 0
+03B646: E001  mov #1,r0
+03B648: 000B  rts
+03B64A: 8055  mov.b r0,@(5,r5)                ; [7C9F] = 1
+;   pool 0x03B660: .long 0xFFFF7C9A  RAM
+
+==== CALLEES 0x022CF4 / 0x029AA0 / 0x05EB3E  (5 / 8 / 6 instructions) ====
+CONTRACT
+  0x022CF4  r0 = ([65C5] == 1)                     (also batch-2 E2)
+  0x029AA0  r0 = 2 if byte [972E] != 0, else 0
+  0x05EB3E  r0 = 1 if bit 4 of byte [8F22] is set, else 0      (tst #16 -> T = bit clear; movt; xor #1)
+EVIDENCE
+  bytes below; all three run from ROM in every emulated call of 0x03B3DA / 0x03AE6C.
+LISTING
+; function 0x022CF4..0x022CFE  5 instructions  rom AE5L600L 20g rev 20.19c.bin
+022CF4: D60C  mov.l @(0x022D28),r6          ; = 0xFFFF65C5 RAM
+022CF6: 6060  mov.b @r6,r0
+022CF8: 8801  cmp/eq #1,r0
+022CFA: 000B  rts
+022CFC: 0029  movt r0
+;   pool 0x022D28: .long 0xFFFF65C5  RAM
+; function 0x029AA0..0x029AB0  8 instructions  rom AE5L600L 20g rev 20.19c.bin
+029AA0: D633  mov.l @(0x029B70),r6          ; = 0xFFFF972E RAM
+029AA2: 6260  mov.b @r6,r2
+029AA4: 2228  tst r2,r2
+029AA6: 8F01  bf/s 0x029AAC                   ; byte != 0 -> return 2 (slot r0 = 2)
+029AA8: E002  mov #2,r0
+029AAA: E000  mov #0,r0
+029AAC: 000B  rts
+029AAE: 0009  nop
+;   pool 0x029B70: .long 0xFFFF972E  RAM
+; function 0x05EB3E..0x05EB4A  6 instructions  rom AE5L600L 20g rev 20.19c.bin
+05EB3E: D61A  mov.l @(0x05EBA8),r6          ; = 0xFFFF8F22 RAM
+05EB40: 6060  mov.b @r6,r0
+05EB42: C810  tst #16,r0
+05EB44: 0029  movt r0
+05EB46: 000B  rts
+05EB48: CA01  xor #1,r0
+;   pool 0x05EBA8: .long 0xFFFF8F22  RAM
+
+==== CALL RATE: 0x00F518 -> 0x010D10 -> 0x00FDB4(3) -> 0x00FF1E -> task 9 (0x00E448) -> 0x04907C -> 0x03AB90 ====
+CONTRACT
+  0x03AE5A runs once per run of RTOS task 9, provided byte [8EDC] == 0 (0x04907C returns early otherwise).
+  Task 9 is activated once per eight entries of the handler 0x00F518 (vector 192: stub 0x00288C, pool long
+  0x00289C = 0x0000F518; rtos_core_trace.txt stub table).  The timer the handler acknowledges (it clears bit 7
+  of word [0xFFFFF718] at 00F51A..00F522) is set up by 0x010C9C / 0x010CE2 with [0xFFFFF71C] = 2499 (2500
+  counts per period), [0xFFFFF718] = 0x00C0 and [0xFFFFF71A] = 0.  From the bytes alone: one count of [7CAA] =
+  one task-9 pass = 8 handler entries = 8 x 2500 = 20,000 counts of that timer.
+  NOT ESTABLISHED (N3): the time of a timer count.  Reading 0xFFFFF718 / 71A / 71C as SH7058 CMT channel 1
+  CMCSR / CMCNT / CMCOR with 0x00C0 = CMIE + clock select 0 = P-clock / 8 comes from the hardware manual, and
+  the P-clock frequency from the board; neither is in the ROM.  IF both hold with a 20 MHz P-clock, the handler
+  period is 1.000 ms and one count of [7CAA] is 8 ms, which agrees with the ~8 ms per count item 103 measured
+  from logs (corroboration, not proof).
+MECHANISM
+  0x00F518: clears bit 7 of word [0xFFFFF718] (flag-clear), calls 0x004218 and 0x007E98, tail-jumps 0x010D10.
+  0x010D10: 0x00FDB4(0) every call; c = ++[5BBE]; if (c & 3) == 3: 0x00FDB4(1); if (c & 7) == 5: 0x00FDB4(3),
+            0x00FDB4(4).
+  0x00FDB4(r4 < 15): calls table 0x011BD4[r4]; entry 3 = 0x00FF1E, which calls 0x002EDC (activate) with r4 = 9.
+  Task record 9 (0x003F84 + 16 * 9, rtos_core_trace.txt table): entry 0x00E448.  0x00E448 calls 0x010A46(9) and
+  four other routines, then 0x04907C, ...  0x04907C: if [8EDC] == 0 it runs a straight list of 101 jsr from
+  0x0490E8 to 0x049346, the 35th being 0x03AB90 at 0x0491B6 (no branch between); 0x03AB90 is bra 0x03AE5A.
+  Activation is a request: 0x002EDC returns 4 and queues nothing when the task's RAM record byte +3 is 0
+  (rtos_core contract); whether task 9 can miss a period under load is not established.
+EVIDENCE
+  emulated: test_rate -- 64 calls of 0x010D10 with 0x00FDB4 recorded: index 0 every call, index 1 at calls 2, 6,
+  10 ..., index 3 at calls 4, 12, 20, ..., 60 (every 8th); 0x00FDB4(3) run with 0x002EDC recorded -> one
+  activation, id 9.  Byte assertions in the same test: pool 0x00F65C = 0x010D10, table word 0x011BD4[3] =
+  0x00FF1E, 0x00FF30 = E409, task-9 record entry 0x00E448, pool 0x00E600 = 0x04907C, pool 0x0493D4 = 0x03AB90,
+  every word 0x0490E8..0x0491B6 is mov.l @(d,pc),r2 / jsr @r2 / nop, 0x03AB90 = A163, CMT words 0x00C0 / 2499.
+LISTING
+; function 0x00F518..0x00F536  15 instructions  rom AE5L600L 20g rev 20.19c.bin
+00F518: 4F22  sts.l pr,@-r15
+00F51A: 9382  mov.w @(0x00F622),r3          ; = 0xF718 (-2280) -> 0xFFFFF718 PERIPH  -- r3 = 0xFFFFF718 (on-chip peripheral word)
+00F51C: D24C  mov.l @(0x00F650),r2          ; = 0x0000FF7F const
+00F51E: 6131  mov.w @r3,r1
+00F520: 2129  and r2,r1                       ; clear bit 7
+00F522: 2311  mov.w r1,@r3                    ; write back (interrupt-flag clear pattern)
+00F524: D34B  mov.l @(0x00F654),r3          ; = 0x00004218 ROM
+00F526: 430B  jsr @r3                       ; -> 0x004218
+00F528: 0009  nop
+00F52A: D34B  mov.l @(0x00F658),r3          ; = 0x00007E98 ROM
+00F52C: 430B  jsr @r3                       ; -> 0x007E98
+00F52E: 0009  nop
+00F530: D34A  mov.l @(0x00F65C),r3          ; = 0x00010D10 ROM
+00F532: 432B  jmp @r3                       ; -> 0x010D10  -- tail-jump 0x010D10 once per entry of this handler
+00F534: 4F26  lds.l @r15+,pr
+;   pool 0x00F620: .long 0x0009F718  ROM
+;   pool 0x00F650: .long 0x0000FF7F  const
+;   pool 0x00F654: .long 0x00004218  ROM
+;   pool 0x00F658: .long 0x00007E98  ROM
+;   pool 0x00F65C: .long 0x00010D10  ROM
+; function 0x010C9C..0x010CC0  18 instructions  rom AE5L600L 20g rev 20.19c.bin
+010C9C: D24C  mov.l @(0x010DD0),r2          ; = 0xFFFF5BBC RAM
+010C9E: E30C  mov #12,r3
+010CA0: D14C  mov.l @(0x010DD4),r1          ; = 0x0000FFFD const
+010CA2: 2231  mov.w r3,@r2
+010CA4: 938D  mov.w @(0x010DC2),r3          ; = 0xF710 (-2288) -> 0xFFFFF710 PERIPH
+010CA6: 6031  mov.w @r3,r0
+010CA8: 2019  and r1,r0
+010CAA: 2301  mov.w r0,@r3
+010CAC: 938A  mov.w @(0x010DC4),r3          ; = 0x00C0 (192)
+010CAE: 908A  mov.w @(0x010DC6),r0          ; = 0xF718 (-2280) -> 0xFFFFF718 PERIPH  -- r0 = 0xFFFFF718
+010CB0: 2031  mov.w r3,@r0                    ; [0xFFFFF718] = 0x00C0
+010CB2: 9289  mov.w @(0x010DC8),r2          ; = 0x09C3 (2499)
+010CB4: 9389  mov.w @(0x010DCA),r3          ; = 0xF71C (-2276) -> 0xFFFFF71C PERIPH  -- r3 = 0xFFFFF71C
+010CB6: 2321  mov.w r2,@r3                    ; [0xFFFFF71C] = 2499 (period register: 2500 counts)
+010CB8: 9288  mov.w @(0x010DCC),r2          ; = 0xF71A (-2278) -> 0xFFFFF71A PERIPH
+010CBA: E100  mov #0,r1
+010CBC: 000B  rts
+010CBE: 2211  mov.w r1,@r2                    ; delay slot: [0xFFFFF71A] = 0
+;   pool 0x010DC0: .long 0x6EF6F710  const
+;   pool 0x010DC4: .long 0x00C0F718  const
+;   pool 0x010DC8: .long 0x09C3F71C  const
+;   pool 0x010DCC: .long 0xF71A00E0  const
+;   pool 0x010DD0: .long 0xFFFF5BBC  RAM
+;   pool 0x010DD4: .long 0x0000FFFD  const
+; function 0x010D10..0x010D58  36 instructions  rom AE5L600L 20g rev 20.19c.bin
+010D10: 2FE6  mov.l r14,@-r15
+010D12: E500  mov #0,r5
+010D14: 2FD6  mov.l r13,@-r15
+010D16: 4F22  sts.l pr,@-r15
+010D18: DE31  mov.l @(0x010DE0),r14         ; = 0x0000FDB4 ROM
+010D1A: 4E0B  jsr @r14                      ; -> 0x00FDB4  -- every call: 0x00FDB4(index 0)
+010D1C: 6453  mov r5,r4
+010D1E: DD31  mov.l @(0x010DE4),r13         ; = 0xFFFF5BBE RAM
+010D20: 63D0  mov.b @r13,r3
+010D22: 7301  add #1,r3
+010D24: 2D30  mov.b r3,@r13                   ; r3 = ++[5BBE] (u8)
+010D26: 60D0  mov.b @r13,r0
+010D28: 600C  extu.b r0,r0
+010D2A: C903  and #3,r0
+010D2C: 8803  cmp/eq #3,r0                    ; T = ((count & 3) == 3)
+010D2E: 8F03  bf/s 0x010D38
+010D30: 0009  nop
+010D32: E500  mov #0,r5
+010D34: 4E0B  jsr @r14                      ; -> 0x00FDB4  -- index 1 on one call in 4
+010D36: E401  mov #1,r4
+010D38: 60D0  mov.b @r13,r0
+010D3A: 600C  extu.b r0,r0
+010D3C: C907  and #7,r0
+010D3E: 8805  cmp/eq #5,r0                    ; T = ((count & 7) == 5)
+010D40: 8F06  bf/s 0x010D50
+010D42: 0009  nop
+010D44: E500  mov #0,r5
+010D46: 4E0B  jsr @r14                      ; -> 0x00FDB4  -- index 3 on one call in 8 (-> task 9)
+010D48: E403  mov #3,r4
+010D4A: E500  mov #0,r5
+010D4C: 4E0B  jsr @r14                      ; -> 0x00FDB4  -- index 4 on the same call
+010D4E: E404  mov #4,r4
+010D50: 4F26  lds.l @r15+,pr
+010D52: 6DF6  mov.l @r15+,r13
+010D54: 000B  rts
+010D56: 6EF6  mov.l @r15+,r14
+;   pool 0x010DE0: .long 0x0000FDB4  ROM
+;   pool 0x010DE4: .long 0xFFFF5BBE  RAM
+; function 0x00FDB4..0x00FDEC  28 instructions  rom AE5L600L 20g rev 20.19c.bin
+00FDB4: 2FE6  mov.l r14,@-r15
+00FDB6: E30F  mov #15,r3
+00FDB8: 4F22  sts.l pr,@-r15
+00FDBA: 6E43  mov r4,r14
+00FDBC: 7FFC  add #-4,r15
+00FDBE: 62ED  extu.w r14,r2
+00FDC0: 2F52  mov.l r5,@r15
+00FDC2: 3233  cmp/ge r3,r2
+00FDC4: 8D08  bt/s 0x00FDD8                   ; index >= 15 -> other path
+00FDC6: 0009  nop
+00FDC8: D03E  mov.l @(0x00FEC4),r0          ; = 0x00011BD4 ROM
+00FDCA: 6EED  extu.w r14,r14
+00FDCC: 4E08  shll2 r14
+00FDCE: 01EE  mov.l @(r0,r14),r1
+00FDD0: 410B  jsr @r1                       ; -> table 0x011BD4 x15  -- call table 0x011BD4[index]; [3] = 0x00FF1E
+00FDD2: 64F2  mov.l @r15,r4
+00FDD4: A006  bra 0x00FDE4
+00FDD6: 0009  nop
+00FDD8: D53B  mov.l @(0x00FEC8),r5          ; = 0x0000FFF1 const
+00FDDA: 66F3  mov r15,r6
+00FDDC: D23B  mov.l @(0x00FECC),r2          ; = 0x0000DCE4 ROM
+00FDDE: 35EC  add r14,r5
+00FDE0: 420B  jsr @r2                       ; -> 0x00DCE4
+00FDE2: E401  mov #1,r4
+00FDE4: 7F04  add #4,r15
+00FDE6: 4F26  lds.l @r15+,pr
+00FDE8: 000B  rts
+00FDEA: 6EF6  mov.l @r15+,r14
+;   pool 0x00FEC4: .long 0x00011BD4  ROM
+;   pool 0x00FEC8: .long 0x0000FFF1  const
+;   pool 0x00FECC: .long 0x0000DCE4  ROM
+; function 0x00FF1E..0x00FF50  25 instructions  rom AE5L600L 20g rev 20.19c.bin
+00FF1E: 4F22  sts.l pr,@-r15
+00FF20: 9460  mov.w @(0x00FFE4),r4          ; = 0x00E0 (224)
+00FF22: 7FFC  add #-4,r15
+00FF24: D330  mov.l @(0x00FFE8),r3          ; = 0x0000317C ROM
+00FF26: 430B  jsr @r3                       ; -> 0x00317C
+00FF28: 0009  nop
+00FF2A: 2F02  mov.l r0,@r15
+00FF2C: D32F  mov.l @(0x00FFEC),r3          ; = 0x00002EDC ROM
+00FF2E: 430B  jsr @r3                       ; -> 0x002EDC  -- activate task id ...
+00FF30: E409  mov #9,r4                       ; delay slot: r4 = 9
+00FF32: 2008  tst r0,r0
+00FF34: 8D05  bt/s 0x00FF42
+00FF36: 0009  nop
+00FF38: D32D  mov.l @(0x00FFF0),r3          ; = 0x000107B6 ROM
+00FF3A: 430B  jsr @r3                       ; -> 0x0107B6
+00FF3C: E409  mov #9,r4
+00FF3E: A003  bra 0x00FF48
+00FF40: 0009  nop
+00FF42: D32C  mov.l @(0x00FFF4),r3          ; = 0x000107F4 ROM
+00FF44: 430B  jsr @r3                       ; -> 0x0107F4
+00FF46: E409  mov #9,r4
+00FF48: 64F6  mov.l @r15+,r4
+00FF4A: D32B  mov.l @(0x00FFF8),r3          ; = 0x00003190 ROM
+00FF4C: 432B  jmp @r3                       ; -> 0x003190
+00FF4E: 4F26  lds.l @r15+,pr
+;   pool 0x00FFE4: .long 0x00E00000  const
+;   pool 0x00FFE8: .long 0x0000317C  ROM
+;   pool 0x00FFEC: .long 0x00002EDC  ROM
+;   pool 0x00FFF0: .long 0x000107B6  ROM
+;   pool 0x00FFF4: .long 0x000107F4  ROM
+;   pool 0x00FFF8: .long 0x00003190  ROM
+; function 0x00E448..0x00E486  31 instructions  rom AE5L600L 20g rev 20.19c.bin
+00E448: 4F22  sts.l pr,@-r15
+00E44A: D368  mov.l @(0x00E5EC),r3          ; = 0x00010A46 ROM
+00E44C: 430B  jsr @r3                       ; -> 0x010A46  -- r4 = 9 in the delay slot: own task id
+00E44E: E409  mov #9,r4
+00E450: D267  mov.l @(0x00E5F0),r2          ; = 0x0000FC04 ROM
+00E452: 420B  jsr @r2                       ; -> 0x00FC04
+00E454: 0009  nop
+00E456: D367  mov.l @(0x00E5F4),r3          ; = 0x00005840 ROM
+00E458: 430B  jsr @r3                       ; -> 0x005840
+00E45A: 0009  nop
+00E45C: D266  mov.l @(0x00E5F8),r2          ; = 0x0000D658 ROM
+00E45E: 420B  jsr @r2                       ; -> 0x00D658
+00E460: 0009  nop
+00E462: D366  mov.l @(0x00E5FC),r3          ; = 0x0000CBAC ROM
+00E464: 430B  jsr @r3                       ; -> 0x00CBAC
+00E466: 0009  nop
+00E468: D265  mov.l @(0x00E600),r2          ; = 0x0004907C ROM
+00E46A: 420B  jsr @r2                       ; -> 0x04907C  -- task 9 body calls 0x04907C
+00E46C: 0009  nop
+;   pool 0x00E5EC: .long 0x00010A46  ROM
+;   pool 0x00E5F0: .long 0x0000FC04  ROM
+;   pool 0x00E5F4: .long 0x00005840  ROM
+;   pool 0x00E5F8: .long 0x0000D658  ROM
+;   pool 0x00E5FC: .long 0x0000CBAC  ROM
+;   pool 0x00E600: .long 0x0004907C  ROM
+; (excerpt of 0x04907C .. 0x049A7A, 887 instructions: entry test and the call to 0x03AB90)
+; function 0x04907C..0x049A7A  887 instructions  rom AE5L600L 20g rev 20.19c.bin
+04907C: 2FC6  mov.l r12,@-r15
+04907E: 2FD6  mov.l r13,@-r15
+049080: 2FE6  mov.l r14,@-r15
+049082: 4F22  sts.l pr,@-r15
+049084: 7FD8  add #-40,r15
+049086: D211  mov.l @(0x0490CC),r2          ; = 0xFFFF8EDC RAM
+049088: 6620  mov.b @r2,r6
+04908A: 626C  extu.b r6,r2
+04908C: 2228  tst r2,r2
+04908E: 892B  bt 0x0490E8                     ; [8EDC] == 0 -> 0x0490E8, the straight call list
+;   pool 0x0490CC: .long 0xFFFF8EDC  RAM
+0491B4: D287  mov.l @(0x0493D4),r2          ; = 0x0003AB90 ROM
+0491B6: 420B  jsr @r2                       ; -> 0x03AB90  -- unconditional on the [8EDC] == 0 path (no branch from 0x0490E8 to here)
+0491B8: 0009  nop
+;   pool 0x0493D4: .long 0x0003AB90  ROM
+; function 0x03AB90..0x03AB94  2 instructions  rom AE5L600L 20g rev 20.19c.bin
+03AB90: A163  bra 0x03AE5A                    ; tail-branch to the sequencer 0x03AE5A
+03AB92: 0009  nop
+
+==== CONSUMERS OF [7C9A] (excerpts) AND OF [7CA3..A6] ====
+CONTRACT
+  [7CA3..A6]: the only literal-pool reference in the image is 0x03D2FC's (one long each); no function with a GBR
+    base in 0xFFFF7A00..0xFFFF7CC0 other than the writer touches them GBR-relative (scan of every census function).
+    0x03D2FC (launch_closure_trace.txt contract): word [7D80] = 0xFFFF if any of six "all" bytes (among them
+    [7CB8], the 'Rev Limit (Fuel Cut)' latch) == 1, else bit k set if any byte of group k == 1 (group k contains
+    [7CA3 + k]) or bit 0 of [A17E + k]; a set bit k makes 0x03DCB6 skip channel k (0x009C00 -> 0x00A280, an
+    on-chip peripheral driver, 0x03DD46 and 0x07CB28).
+  [7C9A]: literal in 0x0312DE, 0x031A6A, 0x031C08, 0x03B62C, 0x041954, 0x041BE4, 0x04F9D8, 0x084438.  Read here:
+    0x041BE4  r11 = [7C9A] (041C14); every path ends through 041D00 .. 041D12, which stores [8034] = r11.  Arm
+              (041C22 .. 041C3A): if [7C78] > x and [8034] == 4 -- [8034] being the tier the PREVIOUS run of
+              0x041BE4 read, not the current [7C9A] -- then [8032] = byte 0x0D2981 (0), [8033] = byte 0x0D2980
+              (1).  What those drive ([8020] from table 0x0ADE08 on [6350], ramp +0.7 = f32 0x0D2C10) is listed by
+              item 103; only the arm is decoded here.
+              Timing against 0x03AE5A (emulated, test_arm_timing; x = 999 below [7C78] = 1000):
+                order 0x03AE5A then 0x041BE4: no arm while a counted tier 4 is held at x >= [7C78]; after the
+                  pass that drops to tier 0 the next 0x041BE4 run arms (current [7C9A] = 0, [8034] = 4); the run
+                  after that does not.
+                0x041BE4 run between x falling and the 0x03AE5A pass: arms with tier 4 still set, and again on
+                  the run after the drop.
+                IMMEDIATE-path tier 4 (no window test) below [7C78]: arms on every run while it is held.
+                synthetic [7C6C] = -600: a counted tier 4 is held below [7C78] and the arm fires on every run.
+              Which task runs 0x041BE4 (callers 0x0419BA <- 0x04AA58) and so its order against 0x03AE5A is not
+              established (N4).
+    0x041954  (called from 0x04907C and from 0x047C40): when 0x022F92 returns 1 (not decoded) it zeroes [8032]
+              [8033] and stores [8034] = [7C9A] (0419A2 / 0419A4), among other resets; otherwise it writes none
+              of them.
+    0x031C08  [7468] = sat_u8([7468] + 1) while [7C9A] >= 1 (unsigned), else 0: a tier-active run counter.
+    0x084438  copies [7C9D] and [7C9A] into a record at 0xFFFFA519 / 0xFFFFA51B inside a critical section.
+    0x0312DE, 0x031A6A, 0x04F9D8 not decoded.
+  [7C9D] (tier >= 1): 24+ literal readers, not decoded.  [7CB7] (tier 4): literal in 0x0250AA only, not decoded.
+EVIDENCE
+  041C22 fcmp/gt fr15,fr14: T when fr14 ([7C78], pool 0x041D40) > fr15 ([6624]); 041C24 bf/s skips the arm.
+  041C2A cmp/eq #4 on gbr+20 = 0xFFFF8034 (GBR 0xFFFF8020).  041D12 stores r11 (= [7C9A] read at 041C14);
+  every path joins at 041C5C (041C38 bra, 041C48 bra, 041C52 bf, fall-through 041C5A) and then at 041D00
+  (041C92 / 041CAE / 041CEA bra, 041CEE..041CFE fall-through), so [8034] is rewritten on every run (fn_dump
+  0x041BE4, 166 instructions; emulated: test_arm_timing runs it from ROM, arm detected by stopping at 041C2E).
+  031C10 cmp/hs r6,r2 with r6 = 1: T when [7C9A] >= 1.  Literal scan: aligned longs in 0x0..0xBFFFF equal to
+  each address, matched to census functions through their literal lists.
+LISTING
+; (excerpt of 0x041BE4 .. 0x041D30, 166 instructions)
+; GBR is set once in this function: 0xFFFF8020
+041BF8: D04D  mov.l @(0x041D30),r0          ; = 0xFFFF8020 RAM
+041BFA: 401E  ldc r0,gbr                    ; GBR = 0xFFFF8020
+041BFC: 7FEC  add #-20,r15
+041BFE: D24D  mov.l @(0x041D34),r2          ; = 0xFFFF6634 RAM
+041C00: FC28  fmov.s @r2,fr12
+041C02: D24D  mov.l @(0x041D38),r2          ; = 0xFFFF6350 RAM
+041C04: FD28  fmov.s @r2,fr13
+041C06: D24D  mov.l @(0x041D3C),r2          ; = 0xFFFF6624 RAM
+041C08: FF28  fmov.s @r2,fr15                 ; fr15 = f32 [6624] (x)
+041C0A: D24D  mov.l @(0x041D40),r2          ; = 0xFFFF7C78 RAM
+041C0C: FE28  fmov.s @r2,fr14                 ; fr14 = f32 [7C78] (window low edge of 0x03B3DA)
+041C0E: D64D  mov.l @(0x041D44),r6          ; = 0xFFFF5E94 RAM
+041C10: 6D60  mov.b @r6,r13
+041C12: D64D  mov.l @(0x041D48),r6          ; = 0xFFFF7C9A RAM
+041C14: 6B60  mov.b @r6,r11                   ; r11 = s8 [7C9A] (tier, this pass)
+041C16: D64D  mov.l @(0x041D4C),r6          ; = 0xFFFF6254 RAM
+041C18: 6E60  mov.b @r6,r14
+041C1A: D64D  mov.l @(0x041D50),r6          ; = 0xFFFF65C0 RAM
+041C1C: D24D  mov.l @(0x041D54),r2          ; = 0x00022CF4 ROM
+041C1E: 420B  jsr @r2                       ; -> 0x022CF4
+041C20: 6C60  mov.b @r6,r12
+041C22: FEF5  fcmp/gt fr15,fr14               ; T = (fr14 > fr15) = ([7C78] > x)
+041C24: 8F0A  bf/s 0x041C3C                   ; x not below [7C78] -> no arm
+041C26: 620C  extu.b r0,r2
+041C28: C414  mov.b @(20,gbr),r0            ; gbr+20 = 0xFFFF8034  -- r0 = [8034] = tier stored by the previous run (0x041D12)
+041C2A: 8804  cmp/eq #4,r0                    ; T = (previous tier == 4)
+041C2C: 8B06  bf 0x041C3C
+041C2E: D54A  mov.l @(0x041D58),r5          ; = 0x000D2981 CAL
+041C30: 6050  mov.b @r5,r0
+041C32: C012  mov.b r0,@(18,gbr)            ; gbr+18 = 0xFFFF8032  -- [8032] = byte 0x0D2981 (0 both bins)
+041C34: D549  mov.l @(0x041D5C),r5          ; = 0x000D2980 CAL
+041C36: 6050  mov.b @r5,r0
+041C38: A010  bra 0x041C5C
+041C3A: C013  mov.b r0,@(19,gbr)            ; gbr+19 = 0xFFFF8033  -- delay slot: [8033] = byte 0x0D2980 (1 both bins)
+;   pool 0x041D30: .long 0xFFFF8020  RAM
+;   pool 0x041D34: .long 0xFFFF6634  RAM
+;   pool 0x041D38: .long 0xFFFF6350  RAM
+;   pool 0x041D3C: .long 0xFFFF6624  RAM
+;   pool 0x041D40: .long 0xFFFF7C78  RAM
+;   pool 0x041D44: .long 0xFFFF5E94  RAM
+;   pool 0x041D48: .long 0xFFFF7C9A  RAM
+;   pool 0x041D4C: .long 0xFFFF6254  RAM
+;   pool 0x041D50: .long 0xFFFF65C0  RAM
+;   pool 0x041D54: .long 0x00022CF4  ROM
+;   pool 0x041D58: .long 0x000D2981  CAL
+;   pool 0x041D5C: .long 0x000D2980  CAL
+; GBR is set once in this function: 0xFFFF8020
+041D10: 60B3  mov r11,r0
+041D12: C014  mov.b r0,@(20,gbr)            ; gbr+20 = 0xFFFF8034  -- [8034] = this pass's tier, for the next run
+; (excerpt of 0x041954 .. 0x0419BA, 51 instructions)
+; GBR is set once in this function: 0xFFFF8020
+04195C: D083  mov.l @(0x041B6C),r0          ; = 0xFFFF8020 RAM
+04195E: 401E  ldc r0,gbr                    ; GBR = 0xFFFF8020
+041960: D683  mov.l @(0x041B70),r6          ; = 0xFFFF7C9A RAM
+041962: D284  mov.l @(0x041B74),r2          ; = 0x00022F92 ROM
+041964: 420B  jsr @r2                       ; -> 0x022F92
+041966: 6D60  mov.b @r6,r13                   ; delay slot: r13 = s8 [7C9A]
+;   pool 0x041B6C: .long 0xFFFF8020  RAM
+;   pool 0x041B70: .long 0xFFFF7C9A  RAM
+;   pool 0x041B74: .long 0x00022F92  ROM
+; GBR is set once in this function: 0xFFFF8020
+0419A2: 60D3  mov r13,r0
+0419A4: C014  mov.b r0,@(20,gbr)            ; gbr+20 = 0xFFFF8034  -- [8034] = [7C9A] (initialiser path)
+; function 0x031C08..0x031C32  21 instructions  rom AE5L600L 20g rev 20.19c.bin
+031C08: 4F22  sts.l pr,@-r15
+031C0A: D214  mov.l @(0x031C5C),r2          ; = 0xFFFF7C9A RAM
+031C0C: 6220  mov.b @r2,r2                    ; r2 = [7C9A]
+031C0E: E601  mov #1,r6
+031C10: 3262  cmp/hs r6,r2                    ; T = ([7C9A] >= 1) unsigned
+031C12: 8B08  bf 0x031C26
+031C14: D21F  mov.l @(0x031C94),r2          ; = 0x000BE53C ROM
+031C16: E501  mov #1,r5
+031C18: D11F  mov.l @(0x031C98),r1          ; = 0xFFFF7468 RAM
+031C1A: 6610  mov.b @r1,r6
+031C1C: 420B  jsr @r2                       ; -> 0x0BE53C
+031C1E: 646C  extu.b r6,r4
+031C20: D11D  mov.l @(0x031C98),r1          ; = 0xFFFF7468 RAM
+031C22: A003  bra 0x031C2C
+031C24: 2100  mov.b r0,@r1                    ; delay slot: [7468] = sat_u8([7468] + 1) while tier >= 1
+031C26: E200  mov #0,r2
+031C28: D11B  mov.l @(0x031C98),r1          ; = 0xFFFF7468 RAM
+031C2A: 2120  mov.b r2,@r1                    ; [7468] = 0 at tier 0
+031C2C: 4F26  lds.l @r15+,pr
+031C2E: 000B  rts
+031C30: 0009  nop
+;   pool 0x031C5C: .long 0xFFFF7C9A  RAM
+;   pool 0x031C94: .long 0x000BE53C  ROM
+;   pool 0x031C98: .long 0xFFFF7468  RAM
+
+==== WRITERS OF THE TWO MAIN GATES: [64F5] (0x0218F6) AND [67EC] (0x023A94) ====
+CONTRACT
+  0x0218F6 (GBR 0xFFFF64D8; called from 0x021094, which task 9's 0x04907C calls at 0x04912A):
+    lo, hi = byte [65CA] == 1 ? (f32 0x0C3444, f32 0x0C344C) : (f32 0x0C3448, f32 0x0C3450)
+             (both pairs 0.001 / 0.252 in both bins, so [65CA] has no effect in the shipped cal)
+    [653B] = 1 when lo > f32 [64D8]; else 0 when NOT (hi > [64D8]) ([64D8] >= hi, or NaN); else kept
+    [64F0] = [653B] == 1 ? sat16([64F0] + 1) : 0
+    [64F5] = [6155] == 1 ? [85D7] : ([653B] == 1 and [64F0] >= word 0x0C30B0 (3 both bins))
+    [64F6] = [6155] == 1 ? [85D7] : ([653B] == 1 ? 1 : 0)           (written on every call)
+    So in the shipped cal G = ([64F5] == 1) means: f32 [64D8] has been below 0.001 (and not since back at or
+    above 0.252) for at least 3 runs of 0x0218F6 -- or, when [6155] == 1, [85D7] == 1.  A NaN [64D8] clears
+    [653B].  What [64D8] and [64F6] are, is not decoded here.
+  0x023A94 (called from 0x04907C at 0x049124): [726C] == 1 (0x02F8EA) -> [67EC] = 0 and nothing else written;
+    otherwise [67EC] = sat16([67EC] + 1) AND word [67E8] = sat16([67E8] + 1).  So [67EC] >= 750 = at least 750
+    runs since [726C] was last 1; [67E8] counts only the runs with [726C] != 1 and is never reset here.
+    0x023A94 is called directly in the same straight call list as 0x03AB90 (0x049124 vs 0x0491B6), so it steps
+    once per task-9 pass: 750 passes = 6.0 s IF one pass is 8 ms (N3).  0x0218F6 is reached through 0x021094
+    behind a branch (0x02109E), not traced; its run rate is not established.  What [726C], [67E8] and [64D8]
+    mean is not decoded.
+EVIDENCE
+  02192A fcmp/gt fr6,fr8 -> T when lo > [64D8]; 021936 fcmp/gt fr8,fr9 -> T when hi > [64D8] (bt keeps [653B]);
+  021970 cmp/ge r5,r6 on zero-extended words -> T when [64F0] >= 3 (movt).  [64F6]: 02195A bra / slot 02195C
+  leaves r0 = [85D7]; 021976 bra / slot 021978 mov #1; 02197A mov #0; all three reach 02197E mov.b r0,@(30,gbr).
+  [65CA]: 02190E..021912 cmp/eq #1 / bf picks pools 0x021A04 / 0x021A08 or 0x021A0C / 0x021A10.
+  023AA6 bra 0x023AC8 with slot 023AA8 skips 023ABA..023AC6, the only [67E8] update.
+  emulated: test_gate_writers -- 0x023A94: 75 cases per bin ([726C] in 0/1/2/0x81/0xFF x edge values of both
+  words); 0x0218F6: 1,500 random states per bin plus 4 printed cases; exact outputs, write set and read set.
+LISTING
+; function 0x0218F6..0x02198C  75 instructions  rom AE5L600L 20g rev 20.19c.bin
+; GBR is set once in this function: 0xFFFF64D8
+0218F6: 2FD6  mov.l r13,@-r15
+0218F8: 2FE6  mov.l r14,@-r15
+0218FA: 4F22  sts.l pr,@-r15
+0218FC: 4F13  stc.l gbr,@-r15
+0218FE: D03D  mov.l @(0x0219F4),r0          ; = 0xFFFF64D8 RAM
+021900: 401E  ldc r0,gbr                    ; GBR = 0xFFFF64D8
+021902: 7FFC  add #-4,r15
+021904: D63C  mov.l @(0x0219F8),r6          ; = 0xFFFF6155 RAM
+021906: 6E60  mov.b @r6,r14                   ; r14 = s8 [6155]
+021908: D63C  mov.l @(0x0219FC),r6          ; = 0xFFFF85D7 RAM
+02190A: 6D60  mov.b @r6,r13                   ; r13 = s8 [85D7]
+02190C: D63C  mov.l @(0x021A00),r6          ; = 0xFFFF65CA RAM
+02190E: 6060  mov.b @r6,r0
+021910: 8801  cmp/eq #1,r0
+021912: 8B04  bf 0x02191E
+021914: D23B  mov.l @(0x021A04),r2          ; = 0x000C3444 CAL
+021916: F828  fmov.s @r2,fr8
+021918: D23B  mov.l @(0x021A08),r2          ; = 0x000C344C CAL
+02191A: A004  bra 0x021926
+02191C: F928  fmov.s @r2,fr9
+02191E: D23B  mov.l @(0x021A0C),r2          ; = 0x000C3448 CAL
+021920: F828  fmov.s @r2,fr8
+021922: D23B  mov.l @(0x021A10),r2          ; = 0x000C3450 CAL
+021924: F928  fmov.s @r2,fr9
+021926: D233  mov.l @(0x0219F4),r2          ; = 0xFFFF64D8 RAM
+021928: F628  fmov.s @r2,fr6                  ; fr6 = f32 [64D8]
+02192A: F865  fcmp/gt fr6,fr8                 ; T = (fr8 > fr6) = (low cal > [64D8])
+02192C: 8B02  bf 0x021934
+02192E: E001  mov #1,r0
+021930: A005  bra 0x02193E
+021932: C063  mov.b r0,@(99,gbr)            ; gbr+99 = 0xFFFF653B  -- delay slot: [653B] = 1 when [64D8] < low cal (0.001 both bins)
+021934: F828  fmov.s @r2,fr8
+021936: F985  fcmp/gt fr8,fr9                 ; T = (fr9 > fr8) = (high cal > [64D8])
+021938: 8901  bt 0x02193E                     ; between -> [653B] kept
+02193A: E000  mov #0,r0
+02193C: C063  mov.b r0,@(99,gbr)            ; gbr+99 = 0xFFFF653B  -- [653B] = 0 when [64D8] >= high cal (0.252 both bins) or NaN
+02193E: C463  mov.b @(99,gbr),r0            ; gbr+99 = 0xFFFF653B
+021940: 8801  cmp/eq #1,r0
+021942: 8F05  bf/s 0x021950
+021944: E000  mov #0,r0
+021946: D233  mov.l @(0x021A14),r2          ; = 0x000BE554 ROM
+021948: E501  mov #1,r5
+02194A: C50C  mov.w @(24,gbr),r0            ; gbr+24 = 0xFFFF64F0
+02194C: 420B  jsr @r2                       ; -> 0x0BE554  -- r0 = sat_u16([64F0] + 1)
+02194E: 640D  extu.w r0,r4
+021950: C10C  mov.w r0,@(24,gbr)            ; gbr+24 = 0xFFFF64F0  -- [64F0] = run length of [653B] == 1
+021952: 60EC  extu.b r14,r0
+021954: 8801  cmp/eq #1,r0
+021956: 8B02  bf 0x02195E                     ; [6155] != 1 -> 0x02195E
+021958: 60D3  mov r13,r0
+02195A: A010  bra 0x02197E
+02195C: C01D  mov.b r0,@(29,gbr)            ; gbr+29 = 0xFFFF64F5  -- delay slot: [64F5] = [85D7] when [6155] == 1
+02195E: C463  mov.b @(99,gbr),r0            ; gbr+99 = 0xFFFF653B
+021960: 8801  cmp/eq #1,r0
+021962: 8B0A  bf 0x02197A
+021964: C50C  mov.w @(24,gbr),r0            ; gbr+24 = 0xFFFF64F0
+021966: 2F02  mov.l r0,@r15
+021968: 660D  extu.w r0,r6
+02196A: D52B  mov.l @(0x021A18),r5          ; = 0x000C30B0 CAL
+02196C: 6251  mov.w @r5,r2
+02196E: 652D  extu.w r2,r5
+021970: 3653  cmp/ge r5,r6                    ; T = ([64F0] >= word 0x0C30B0 = 3)
+021972: 0029  movt r0
+021974: C01D  mov.b r0,@(29,gbr)            ; gbr+29 = 0xFFFF64F5  -- [64F5] = T while [653B] == 1
+021976: A002  bra 0x02197E
+021978: E001  mov #1,r0
+02197A: E000  mov #0,r0
+02197C: C01D  mov.b r0,@(29,gbr)            ; gbr+29 = 0xFFFF64F5  -- [64F5] = 0 while [653B] != 1
+02197E: C01E  mov.b r0,@(30,gbr)            ; gbr+30 = 0xFFFF64F6  -- [64F6] = r0: [85D7] / 1 / 0 by the path taken
+021980: 7F04  add #4,r15
+021982: 4F17  ldc.l @r15+,gbr
+021984: 4F26  lds.l @r15+,pr
+021986: 6EF6  mov.l @r15+,r14
+021988: 000B  rts
+02198A: 6DF6  mov.l @r15+,r13
+;   pool 0x0219F4: .long 0xFFFF64D8  RAM
+;   pool 0x0219F8: .long 0xFFFF6155  RAM
+;   pool 0x0219FC: .long 0xFFFF85D7  RAM
+;   pool 0x021A00: .long 0xFFFF65CA  RAM
+;   pool 0x021A04: .long 0x000C3444  CAL
+;   pool 0x021A08: .long 0x000C344C  CAL
+;   pool 0x021A0C: .long 0x000C3448  CAL
+;   pool 0x021A10: .long 0x000C3450  CAL
+;   pool 0x021A14: .long 0x000BE554  ROM
+;   pool 0x021A18: .long 0x000C30B0  CAL
+; function 0x023A94..0x023ACE  29 instructions  rom AE5L600L 20g rev 20.19c.bin
+023A94: 4F22  sts.l pr,@-r15
+023A96: D21C  mov.l @(0x023B08),r2          ; = 0x0002F8EA ROM
+023A98: 420B  jsr @r2                       ; -> 0x02F8EA  -- r0 = ([726C] == 1)  (0x02F8EA)
+023A9A: 0009  nop
+023A9C: 600C  extu.b r0,r0
+023A9E: 8801  cmp/eq #1,r0
+023AA0: 8B03  bf 0x023AAA
+023AA2: E000  mov #0,r0
+023AA4: D119  mov.l @(0x023B0C),r1          ; = 0xFFFF67E8 RAM
+023AA6: A00F  bra 0x023AC8                    ; skips the [67E8] update at 023ABA..023AC6
+023AA8: 8112  mov.w r0,@(4,r1)                ; delay slot: [67EC] = 0 when that is 1
+023AAA: D619  mov.l @(0x023B10),r6          ; = 0x000BE554 ROM
+023AAC: D117  mov.l @(0x023B0C),r1          ; = 0xFFFF67E8 RAM
+023AAE: 8512  mov.w @(4,r1),r0
+023AB0: 640D  extu.w r0,r4
+023AB2: 460B  jsr @r6                       ; -> 0x0BE554
+023AB4: E501  mov #1,r5
+023AB6: D115  mov.l @(0x023B0C),r1          ; = 0xFFFF67E8 RAM
+023AB8: 8112  mov.w r0,@(4,r1)                ; [67EC] = sat_u16([67EC] + 1) otherwise
+023ABA: D615  mov.l @(0x023B10),r6          ; = 0x000BE554 ROM
+023ABC: E501  mov #1,r5
+023ABE: 6211  mov.w @r1,r2                    ; r2 = word [67E8] (r1 = 0xFFFF67E8 from 023AB6)
+023AC0: 460B  jsr @r6                       ; -> 0x0BE554  -- r0 = sat_u16([67E8] + 1)
+023AC2: 642D  extu.w r2,r4
+023AC4: D111  mov.l @(0x023B0C),r1          ; = 0xFFFF67E8 RAM
+023AC6: 2101  mov.w r0,@r1                    ; [67E8] = sat_u16([67E8] + 1), only on the [726C] != 1 path
+023AC8: 4F26  lds.l @r15+,pr
+023ACA: 000B  rts
+023ACC: 0009  nop
+;   pool 0x023B08: .long 0x0002F8EA  ROM
+;   pool 0x023B0C: .long 0xFFFF67E8  RAM
+;   pool 0x023B10: .long 0x000BE554  ROM
+; function 0x02F8EA..0x02F8F4  5 instructions  rom AE5L600L 20g rev 20.19c.bin
+02F8EA: D607  mov.l @(0x02F908),r6          ; = 0xFFFF726C RAM
+02F8EC: 6060  mov.b @r6,r0
+02F8EE: 8801  cmp/eq #1,r0
+02F8F0: 000B  rts
+02F8F2: 0029  movt r0
+;   pool 0x02F908: .long 0xFFFF726C  RAM
+
+==== BOTTOM LINE: FROM LIFT TO CUT TO RESUME ====
+  Times in seconds below assume 8 ms per count, which is NOT established from bytes (N3).  "x" is f32 [6624],
+  compared in rpm units by the base-defined band edges and resume table (batch-2 E5 / E9 / E10).
+  1. Gate opens.  [64F5] goes to 1 (f32 [64D8] < 0.001 for >= 3 runs) while [67EC] >= 750, [5E98] == 0,
+     [972E] == 0, none of the CLEAR conditions, and x >= [7C78] + [7C6C] (entry needs the resume threshold
+     PLUS the band; [7C6C] = 200 or 1000 base, +100 / +1000 adders: batch-2 E14 / E15).
+  2. From that first qualifying pass 0x03AF88's selection section stops ([7C9E] goes to 1 in step 1 of the
+     sequence; the section runs only while [7C9E] == 0), so base / ext1 / ext2 / adds are frozen at the values of
+     the last pass BEFORE the lift: the band of x at that moment, the [6810] selector and the [5DB8] side.  The
+     one thing that can still move a rung is 0x03AF88's section-2 arm ([7C80] = 250 when [65FC] >= 500,
+     [6350] >= 40, flag, [7EED] == 1 and [7CAA] < [7C92]; batch-2 E8), which raises M to 250.
+  3. [7CAA] = 1, 2, 3 ... one per pass.  tier 1 (channel 0 cut) at [7CAA] = base (+625 with the adds), tier 2
+     (channels 0-1) at base + ext1, tier 4 (all four channels) at base + ext2.  If base + ext1 >= base + ext2
+     tier 2 is skipped; tier 3 never happens.  Any failing pass (pedal gate, window, a CLEAR flag) zeroes
+     [7CAA] and the tier on that same pass -- the delay starts again from 0.
+  4. Cut held: while counting continues the tier stays 4 down to x >= [7C78] (hysteresis on [7C9E]), given
+     [7C6C] >= 0 (with a negative band it would stay down to x >= [7C78] + [7C6C]: E2).
+  5. Resume: the first pass with x < [7C78] (or any failed condition) gives [7C9E] = 0, [7CAA] = 0, tier 0,
+     [7D80] bits 0..3 clear in the same pass; [7CA0] = 1 when it was the window that ended it.  The next
+     0x041BE4 run (and any run between x falling and that pass) arms [8032] / [8033], because it tests the
+     tier its previous run stored in [8034] (E15, E20).  Re-entry needs x >= [7C78] + [7C6C] again.
+  Exception: the IMMEDIATE path ([5E96] == 1, [5D85] == 1, [5D86] == 0, |[5E68]| <= 1, G) skips the count:
+     tier 4 on the first pass, and it does not test the window (emulated: still tier 4 at x = 500).
+
+  Counts from the first qualifying pass to tier 1 / 2 / 4 (emulated, adds off, flag = 1; "-" would mark a
+  skipped tier, none occurs here), selector = [6810] (1, 2, 3, 4/5; 5 asserted equal to 4), one table per side
+  of byte [5DB8] (0x03AF88's side select; what [5DB8] is and whether it is ever non-zero: N8).  20.19c band
+  edges 2250 / 3000 / 4500; stock 1800 / 2500 / 4500.  Count and pointer tables identical in both bins.
+;  [5DB8] = 0
+;      x    sel |  20.19c  t1  t2  t4  |  stock   t1  t2  t4
+;   1500    1   |          44 119 163  |          44 119 163
+;   1500    2   |          19 119 169  |          19 119 169
+;   1500    3   |          25  81 175  |          25  81 175
+;   1500   4/5  |          44 119 144  |          44 119 144
+;   2000    1   |          44 119 163  |          44  88 138
+;   2000    2   |          19 119 169  |          19  94 169
+;   2000    3   |          25  81 175  |          25  81 150
+;   2000   4/5  |          44 119 144  |          44 119 144
+;   2100    1   |          44 119 163  |          44  88 138
+;   2100    2   |          19 119 169  |          19  94 169
+;   2100    3   |          25  81 175  |          25  81 150
+;   2100   4/5  |          44 119 144  |          44 119 144
+;   2400    1   |          44  88 138  |          44  88 138
+;   2400    2   |          19  94 169  |          19  94 169
+;   2400    3   |          25  81 150  |          25  81 150
+;   2400   4/5  |          44 119 144  |          44 119 144
+;   2600    1   |          44  88 138  |           6  50  87
+;   2600    2   |          19  94 169  |          19  57  94
+;   2600    3   |          25  81 150  |          13  63 113
+;   2600   4/5  |          44 119 144  |          44  69  94
+;   2700    1   |          44  88 138  |           6  50  87
+;   2700    2   |          19  94 169  |          19  57  94
+;   2700    3   |          25  81 150  |          13  63 113
+;   2700   4/5  |          44 119 144  |          44  69  94
+;   2900    1   |          44  88 138  |           6  50  87
+;   2900    2   |          19  94 169  |          19  57  94
+;   2900    3   |          25  81 150  |          13  63 113
+;   2900   4/5  |          44 119 144  |          44  69  94
+;   3500    1   |           6  50  87  |           6  50  87
+;   3500    2   |          19  57  94  |          19  57  94
+;   3500    3   |          13  63 113  |          13  63 113
+;   3500   4/5  |          44  69  94  |          44  69  94
+;   5000    1   |          13  32  63  |          13  32  63
+;   5000    2   |           9  18  28  |           9  18  28
+;   5000    3   |           6  12  19  |           6  12  19
+;   5000   4/5  |           6  12  19  |           6  12  19
+;  [5DB8] = 1
+;      x    sel |  20.19c  t1  t2  t4  |  stock   t1  t2  t4
+;   1500    1   |           6  81 106  |           6  81 106
+;   1500    2   |          13  51  76  |          13  51  76
+;   1500    3   |          13  63 113  |          13  63 113
+;   1500   4/5  |          25  88 113  |          25  88 113
+;   2000    1   |           6  81 106  |           6  81 106
+;   2000    2   |          13  51  76  |           6  44  69
+;   2000    3   |          13  63 113  |          13  38  76
+;   2000   4/5  |          25  88 113  |          13  76 101
+;   2100    1   |           6  81 106  |           6  81 106
+;   2100    2   |          13  51  76  |           6  44  69
+;   2100    3   |          13  63 113  |          13  38  76
+;   2100   4/5  |          25  88 113  |          13  76 101
+;   2400    1   |           6  81 106  |           6  81 106
+;   2400    2   |           6  44  69  |           6  44  69
+;   2400    3   |          13  38  76  |          13  38  76
+;   2400   4/5  |          13  76 101  |          13  76 101
+;   2600    1   |           6  81 106  |          44  69  94
+;   2600    2   |           6  44  69  |          44  69  94
+;   2600    3   |          13  38  76  |          44  57  82
+;   2600   4/5  |          13  76 101  |          44  57  82
+;   2700    1   |           6  81 106  |          44  69  94
+;   2700    2   |           6  44  69  |          44  69  94
+;   2700    3   |          13  38  76  |          44  57  82
+;   2700   4/5  |          13  76 101  |          44  57  82
+;   2900    1   |           6  81 106  |          44  69  94
+;   2900    2   |           6  44  69  |          44  69  94
+;   2900    3   |          13  38  76  |          44  57  82
+;   2900   4/5  |          13  76 101  |          44  57  82
+;   3500    1   |          44  69  94  |          44  69  94
+;   3500    2   |          44  69  94  |          44  69  94
+;   3500    3   |          44  57  82  |          44  57  82
+;   3500   4/5  |          44  57  82  |          44  57  82
+;   5000    1   |          13  38  63  |          13  38  63
+;   5000    2   |          13  26  51  |          13  26  51
+;   5000    3   |          13  26  51  |          13  26  51
+;   5000   4/5  |          13  26  51  |          13  26  51
+;  [5DB8] = 0, e.g. 20.19c, sel 1, x = 2000: one channel off at 44 x 8 = 0.35 s, two at 0.95 s, all four at
+;  1.30 s; stock at the same x: 0.35 / 0.70 / 1.10 s (8 ms assumed, N3).  On side 0 the 20.19c band-edge edit
+;  never makes a tier come sooner: for x (at the last pass before the lift) in 1800..2250 and 2500..3000 it
+;  lengthens some or all of t1 / t2 / t4 (sel 4/5 at 2000 is unchanged because its band-0 and band-1 rows are
+;  equal) -- asserted over every side-0 row.
+;  [5DB8] = 1: the side-1 base tables are not monotone in band (e.g. 0x063BC0 -> 6 6 44 13), so moving the Med
+;  edge 2500 -> 3000 puts x in 2500..3000 into band 1 instead of band 2 and the lift gets SHORTER: tier 1 sooner
+;  for every selector, tiers 1, 2 and 4 all sooner for selectors 2 and 3 (sel 2: 6 / 44 / 69 vs 44 / 69 / 94),
+;  while tiers 2 and 4 come later for selectors 1 and 4/5 (printed).  For x in 1800..2250 side 1 never comes
+;  sooner: some tiers later for sel 2..5, unchanged for sel 1.  Outside those two ranges both bins give the same
+;  counts.  Sooner / never-sooner / equal asserted per row (emu test_sequence).
+;  With the adds on ([6155] == 1, [615F] == 0) every rung moves +625 (x = 2000, sel 1, side 0: 669 / 744 / 788
+;  in 20.19c, 669 / 713 / 763 in stock), and in both bins the second route can give tier 4 at 626 if
+;  [65D0] == 1 has held for >= 63 passes (38 above 4000).
+  Resume side (batch 2): [7C78] = resume table([6350]) + [895C] + adders.  The 20.19c table is flat 1000; stock
+  runs 900 .. 300 over the ECT axis (300 from 70 C up).  1000 is above every stock cell, so in 20.19c the cut
+  ends at a higher x at every ECT (by 700 when warm), and entry ([7C78] + [7C6C]) moves up by the same amount.
+
+COMPARISON WITH EXISTING CLAIMS  (step 4 -- read only after the listings, emulation and contracts above)
+  Sources searched for 3AE5A / 3AE6C / 3B3DA / 3B62C in every spelling, and for each cell, cal and record above:
+  docs/, disassembly/analysis/, disassembly/ghidra/ImportAE5L600L.java, the project definition XML, fn_dump --labels,
+  docs/verification-status.json.  Nothing in the step 1..3 reading was changed by what was found.
+
+  CONTRADICTED BY THE BYTES
+  X1  docs/corrections.md:6132-6140 (item 103, title and first paragraph): the overrun retard "is HELD for the
+      whole fuel cut ... held at the 0xADE08 ECT table value for as long as tier 4 persists".  The arm (041C22..
+      041C3A) needs [7C78] > x AND [8034] == 4, where [8034] is the tier the PREVIOUS 0x041BE4 run read.  On the
+      COUNT path tier 4 needs [7C9E] == 1, which needs [7CA7] == 1.  With [7C6C] >= 0 and a non-NaN sum (true
+      for every value 0x03AB94 writes once its latch is set), [7CA7] == 1 needs x >= [7C78] (03B44E / 03B450
+      give 1 only when x >= sum >= [7C78], or x is NaN -- then the arm's [7C78] > x is false as well;
+      03B456 / 03B458: [7C78] > x gives [7CA7] = 0, and then the pass
+      zeroes [7C9E] and [7CAA] at 03B5FA / 03B60E).  Under that precondition the arm condition and the hold
+      condition of a counted cut are mutually exclusive: the arm fires only once x has fallen below [7C78] --
+      on a 0x041BE4 run between that moment and the 0x03AE5A pass that drops the tier, and on the first
+      0x041BE4 run AFTER that pass (current tier already 0, [8034] still 4) -- or on the IMMEDIATE path
+      (03B53A..03B544, which ignores the window).  All four cases emulated (test_arm_timing), plus a synthetic
+      [7C6C] = -600 case in which a counted tier 4 is held below [7C78] and the arm fires every run.  "Held for
+      the whole cut" holds only on the IMMEDIATE path, with a negative band, or if 0x041BE4 runs while
+      0x03AE5A does not (0x04907C skipped when [8EDC] != 0).  The logged "timing 15-25 deg low while IPW = 0" is
+      therefore not explained by this arm on the count path; see N4.
+  X2  docs/corrections.md:4463-4464 (item 79): "timing_oneshot_retard fires on the edge into tier 4".  No edge
+      into tier 4 is tested; the arm is "previous tier 4 and [7C78] > x" (X1) -- on the count path that is the
+      EXIT.  (Item 74's "ONE call" at ImportAE5L600L.java:8201-8204 fits the count path when 0x041BE4 runs once
+      per 0x03AE5A pass and after it: then exactly one run, the first after the drop pass, arms.  If it runs
+      between x falling and the drop pass, two consecutive runs arm (emulated).  Its order and rate against
+      0x03AE5A are not established, N4.)
+  X3  disassembly/ghidra/ImportAE5L600L.java:8280-8284 (overrun_dwell_counter on [7CAA]) and :8222-8227
+      (tier_state_7C9A): "Tier 4 is NOT on this ladder -- it is a separate immediate entry at 0x03AF4A" / "4 is
+      a SEPARATE branch".  Tier 4 is the top rung (03AEBC [7CAA] >= [7C98] -> 03AF4A) or the second route
+      (03AEC0..03AEF0); 0x03AF4A is just the tier-4 store run.  The [7CAA] comment also omits the third writer,
+      03B544 ([7CAA] := [7C98] on the IMMEDIATE path).  Item 103 retracted the claim in prose; the label text
+      still carries it.  [7C9A] "Subsystem NOT identified": it is the overrun cut ladder (E11, E17).
+  X4  disassembly/ghidra/ImportAE5L600L.java:8275-8279 (overrun_fuelcut_classifier on 0x03AE6C) and
+      docs/corrections.md:4431-4433 (item 79): 0x03AE6C "holds BOTH the dwell ladder ... and the RPM ladder at
+      0x03AFF6".  0x03AE6C ends at 03AF84 jmp @r2 / 03AF86 (-> 0x03D2FC); 0x03AFF6 is inside 0x03AF88, a
+      separate function called from 0x03AE60.  (Already batch-2 X1; confirmed.)
+  X5  definitions/AE5L600L 2013 USDM Impreza WRX MT.xml:1429-1430 ('Overrun Fuel Cut Delay (1st Gear)',
+      project-written description, flag VERIFIED-BYTES = contents only): "Counts the pedal must stay released
+      before injectors cut on overrun".  The cell is the BASE term of the rungs: at that count only tier 1 is
+      reached, i.e. [7CA3] = 1 = bit 0 of [7D80], ONE channel.  All four channels cut at base + ext2 (+ add),
+      ext2 from the undefined words 0x0CBCF4.. (batch-2 table).  The gate is not only [64F5]: [67EC] >= 750, the
+      rpm window and five more flags must hold (03B5B4..03B5DA).  Severity: misleading.
+  X6  docs/corrections.md:6146-6151 (item 103, "lift-to-cut delay"): "Not walked: the path from that count to the
+      cut flag".  Now walked (E5, E6, E8, E11): the counts reach [7CAA] one per task-9 pass and set tier 1 at
+      count = base; if the logged IPW that item 103 matched is channel 0's, the match is with tier 1, not with the
+      full cut (which comes later by ext2 counts).  Severity: imprecise (the match itself is not contradicted).
+
+  UNSUPPORTED BY THESE BYTES (identity claims nothing here tests)
+  U1  CLAUDE.md:203 and docs/corrections.md:559-592 (item 15), label dtc_maturation_counter_67EC
+      (ImportAE5L600L.java:2224; flag DISASM-ONLY): "[67EC] is a uint16 DTC counter".  Here it is a per-task-9-pass
+      saturating count, zeroed while [726C] == 1 (0x023A94), used as a >= 750-pass gate on the overrun count.
+      Nothing in these bytes involves a DTC.
+  U2  labels on gate inputs: fuel_system_state ([85D7]), cl_global_enable ([8F24]), fuel_mode_flags ([8E46]),
+      fuel_state_byte ([7C9D], ImportAE5L600L.java:2477 "Fuel state byte/flag").  [7C9D] is exactly (tier >= 1)
+      of this ladder (03AF68); the others are only tested here, not written.
+  U3  docs/corrections.md:4221-4262 (item 76) and label pedal_released_debounced: confirmed byte for byte
+      ([653B] hysteresis 0.001 / 0.252, [64F0] run count, [64F5] = [64F0] >= 3, overload by [6155] == 1), except
+      that the identity of [64D8] as pedal angle is DISASM-ONLY in verification-status.json, and in the
+      [6155] == 1 branch [64F6] = [85D7] (02195C slot, 02197E), which item 76's pseudo-code leaves undefined.
+
+  CONFIRMED
+  C1  docs/corrections.md:6142-6144 (item 103): tier 4 is the top rung, tested first (03AEB6..03AEBE), and the
+      second route (> 625) is real and additional (03AEC0..03AEF0).
+  C2  docs/corrections.md:4445-4456 (item 79): [7CAA] is a saturating u16 incremented at 03B5EC and reset at
+      03B5FC / 03B610 (plus the IMMEDIATE write 03B544 it did not list).
+  C3  docs/corrections.md:6547-6551 and fns_03AF88_03AB94_trace.txt E15a: base counts are the 'Overrun Fuel Cut
+      Delay' cells, rungs 2-4 from undefined words, tier 3 unreachable.  Also that file's N9 hypothesis ("the
+      lift-to-cut match fits the BASE value = tier-1 rung") is what the bytes show.
+  C4  docs/corrections.md:6146-6150: about 8 ms per count -- consistent with the 1-in-8 activation of task 9 off
+      a 2500-count timer (E13, E14); the millisecond value itself is not established from bytes (N3).
+  C5  ImportAE5L600L.java:9473-9477 (channel_suppress_mask on [7D80], "physical channel type not established")
+      and :9402-9404 (resume_threshold_7C78 in rpm units, compared with [6624]): consistent; [7C6C] (9393) is
+      also read by 0x03B3DA (03B44A), which that comment does not list.
+  C6  verification-status.json: [6624] VERIFIED-BOTH rpm_current (so "x in rpm" holds); 0x0CC4EC VERIFIED-BOTH;
+      0x0CBCA0 / 0x0CEED0 VERIFIED-BYTES; [64F5], [7C9A], [7CA3], [7CB7], [7D80], [7C6C], [7C78] UNMAPPED;
+      [7CAA], [7C9E], [7CA7], [7CB2], 0x0AD400 and cal 0x0CBC0A / 0x0CBC90..96 have no entity at all.
+
+ESTABLISHED  (bytes + emulation unless marked)
+  E1  0x03AE5A runs 0x03B3DA, 0x03AF88, 0x03AE6C, then tail-branches 0x03B62C (03AE5C, 03AE60, 03AE64, 03AE68).
+  E2  [7CA7] = window flag, first rule that holds: 1 if !([7C78] + [7C6C] > x); 0 if [7C78] > x; else
+      ([7C9E] == 1) (03B442..03B46A).  The first rule does not test [7C78]: "0 below [7C78]" needs [7C6C] >= 0
+      and a non-NaN sum (emulated: [7C78] 1500, [7C6C] -600 or NaN, x 1000 -> 1).
+  E3  [7CAC] / [7CAE] = saturating run lengths of [85D7] == 1 / [64F5] == 1 (03B46C..03B496).
+  E4  G = ([64F5] == 1 and [7CAE] >= word 0x0CBC96) because byte 0x0CBC0A = 0x80 (03B498..03B4D6); with
+      0x0CBC96 = 0 in both bins G = ([64F5] == 1).  The [85D7] / [7CAC] alternative is dead in both bins.
+  E5  0x03B3DA path order and effects as in its CONTRACT: CLEAR, IMMEDIATE ([7CAA] := [7C98]), COUNT ([7CAA] + 1,
+      [7CA0] = 0), G == 0 -> CLEAR, else drop ([7CA0] = 1 iff [7CA7] == 0) (03B4E4..03B610).
+  E6  [7CAA] = consecutive COUNT passes of 0x03AE5A; any other path writes 0 or [7C98] (03B544, 03B5EC, 03B5FC,
+      03B610).  The COUNT test of [67EC] >= 750 is an unsigned u16 compare (03B5BA).
+  E7  [7CB2] = consecutive calls with [65D0] == 1, updated every call before the [7C9E] test (03AE8A..03AEA4).
+  E8  0x03AE6C tier rule as in its CONTRACT (03AEA6..03AF66); thermometer [7CA3..A6], [7C9D] = tier >= 1,
+      [7CB7] = tier >= 4 (03AF68..03AF76).
+  E9  The second tier-4 route needs flag, [7CAA] > 625, [65D0] == 1, [7CB2] >= lookup(0x0AD400, x) and
+      ([8E46] == 0 or word 0x0CBC92 == 0); 0x0CBC92 = 0 in both bins (03AEC0..03AEF0).  0x0AD400 = 63 at
+      x <= 3000, 38 at x >= 4000, linear between, read by the fixed uint16 wrapper 0x0BE8AC.
+  E10 Tier 3 is unreachable whenever [7C96] == [7C98], which 0x03AF88 always produces (03AEBC before 03AEFC;
+      batch-2 E15a); tier 2 needs [7C94] < [7C98].
+  E11 Tier k -> word [7D80] = (1 << k) - 1 for k = 0, 1, 2, 3 and 0x000F for k = 4 through 0x03D2FC, with every
+      other 0x03D2FC input 0 (03AF84 jmp; emulated with the real 0x03D2FC).  0x03D2FC is the only literal
+      reader of [7CA3..A6].
+  E12 [7C9F] = ([7C9B] == 1 and [7C9E] == 1 and [7C9A] != 4) (0x03B62C).
+  E13 0x03AE5A is called once per run of 0x04907C when [8EDC] == 0 (0x04908E, 0x0491B6, 0x03AB90); 0x04907C is
+      called by task 9's entry 0x00E448 (0x00E46A); task 9 is activated by 0x00FF1E (0x00FF30 r4 = 9), table entry
+      3 of 0x011BD4, which 0x010D10 calls when (++[5BBE] & 7) == 5 -- one call in eight; 0x010D10 is the tail of
+      0x00F518 (0x00F532), whose timer has period register 2499 (0x010CB6).
+  E14 One count of [7CAA] = one task-9 pass = 8 entries of 0x00F518 = 8 x 2500 = 20,000 counts of the timer
+      at 0xFFFFF718..0xFFFFF71C (0x010CB6 period 2499, 0x010D10 one-in-eight, 00F51A..00F522 flag clear).
+      The duration of a timer count is NOT established (N3).
+  E15 [7C9A] is read by 0x041BE4 (041C14), which stores it as [8034] on every run (041D12, all paths join at
+      041D00) and arms [8032] = 0, [8033] = 1 when [7C78] > x and [8034] == 4, i.e. when its PREVIOUS run read
+      tier 4 (041C22..041C3A).  So the arm can fire on a run where the current [7C9A] is already 0 (emulated).
+  E16 [64F5] = ([64D8] < 0.001 latched until >= 0.252 or NaN, for >= 3 runs) or [85D7] when [6155] == 1, and
+      [64F6] = [85D7] / ([653B] == 1) / 0 on every call (0x0218F6; [65CA] picks between two equal cal pairs);
+      [67EC] = runs since [726C] was last 1, and [67E8] is sat-incremented only when [726C] != 1 (0x023A94,
+      023AA6 bra skips 023ABA..023AC6).  Emulated (test_gate_writers), both bins.
+  E18 [5DB8] side select reaches the lift counts (0x03AF88 03B088 tst / 03B08A bf -> side-1 pointer tables).
+      Emulated lifts ([6810] 1..5, both bins, adds off): with [5DB8] == 0 the 20.19c band-edge edit never makes
+      a tier come sooner; with [5DB8] == 1 and x in 2500..3000 it makes tier 1 come sooner for every selector
+      and tiers 1, 2 and 4 sooner for selectors 2 and 3 (e.g. sel 2: 6 / 44 / 69 vs stock 44 / 69 / 94).  The
+      count and pointer tables (0x0CBC90..0x0CBD93, 0x063B70..0x063D4F) are byte-identical between bins.
+  E19 With the 625 adds on, x = 2000, sel 1, [5DB8] = 0: rungs 669 / 744 / 788 / 788 in 20.19c and 669 / 713 /
+      763 / 763 in stock; with [65D0] == 1 held, both bins reach tier 4 first at count 626 by the second route
+      and pass through no other tier (emulated).
+  E20 Under [7C6C] >= 0 and a non-NaN sum, the 0x041BE4 arm never fires while a COUNT-path tier 4 is held at
+      x >= [7C78]; it fires on the first 0x041BE4 run after the drop pass, on any run between x falling and
+      that pass, and on every run of an IMMEDIATE-path tier 4 below [7C78] (E2, E15; emulated test_arm_timing).
+  E17 [definition] The rung counts are selected by the base-matched 'Overrun Fueling Cut Counter RPM Threshold'
+      cells ("RPM count before injectors cut off during overrun"), and [7C78] comes from the base-matched
+      'Overrun Fueling RPM Resume Threshold' ("RPM [at which] the injectors switch back on").  Both bind this
+      ladder to the injector cut; the bytes (E11) put the full cut at tier 4.
+
+NOT ESTABLISHED  (and what would settle it)
+  N1  Whether the four [7D80] channels are injectors, coils or both.  The bytes stop at 0x009C00 -> 0x00A280
+      (peripheral words 0xFFFFF666 / 0xFFFFF66A, launch_closure_trace.txt) and 0x07CB28 (sets [A232]).  Settle by
+      decoding 0x00A280 against the SH7058 ATU-II register map and following what the scheduled pulse drives;
+      or log IPW and ignition timing through a lift with the tier byte [7C9A] (a step 0 -> 1 -> 2 -> 4 with IPW
+      falling per cylinder would confirm injectors).
+  N2  The physical meaning of every gate input: [64D8] (and so [64F5]), [67EC] / [726C], [5E96], [5D85], [5D86],
+      [5E68], [5E98], [972E], [5FB6], [5FB7], [8F24], [8F22], [65D0], [8E46], [85D7], [6155], [65C5].  None is
+      tied to a definition axis in these bytes.  Settle each by decoding its writer.  In particular whether the
+      IMMEDIATE path ([5E96] == 1 ...) is reachable on this car decides whether some lifts cut with no delay.
+  N3  The tick period in milliseconds.  In the bytes: 2499 + 1 counts per period, control word 0x00C0, 8
+      handler entries per task-9 pass (E14).  Not in the bytes: that 0xFFFFF718 is a CMT CMCSR whose clock
+      select 0 means P-clock / 8, and the P-clock frequency (20 MHz would give 1.000 ms per entry and 8 ms per
+      count, which agrees with item 103's ~8 ms from logs -- corroboration only).  Every "s" or "ms" figure in
+      this file assumes 8 ms.  A log of a counter known to step once per task-9 pass (e.g. [7CAA] during a
+      lift) against the logger clock would settle it directly.  Also whether task 9 can be delayed or skipped
+      under load.
+  N4  What [8020] / [8028] are (item 103 / 104 claims, not re-derived), and the full behaviour of 0x041BE4
+      beyond the arm (E15).  Which task runs 0x041BE4 (0x0419BA caller chain) and so how many runs see the
+      tier-4 -> 0 transition (one if it runs once per 0x03AE5A pass after it).  Item 103's log observation
+      (timing 15-25 deg low while IPW = 0) is not explained by this arm on the count path (X1); either those
+      cuts took the IMMEDIATE path, or another term lowers timing during the cut.  Settle by logging [7C9A],
+      [7CAA], [8020] and [5E96] / [5D85] through a lift.
+  N5  Consumers not decoded: [7C9D] (24+ literal readers), [7CB7] (0x0250AA), [7C9F] (0x071ABA, 0x077BC4,
+      0x07AB36), [7CA0], [7CA7]; and 0x0312DE / 0x031A6A / 0x04F9D8 which hold the [7C9A] literal.
+  N6  Whether 0x03AB94 (writer of [7C78] / [7C6C], parent 0x049BA4) runs at the same rate as 0x03AE5A.
+  N7  find_writers-style scans are lower bounds; a store to [7CAA] / [7C9E] through a register-computed address
+      would not be seen (the GBR scan and literal scan above found only 0x03B3DA and the initialiser 0x03AB60).
+  N8  What byte [5DB8] is and whether it is ever non-zero in running.  It decides which pointer-table side
+      0x03AF88 uses and so whether the 20.19c edit shortens any lift (E18).  The only writer find_writers finds
+      (a lower bound) is 0x015BFA (called from 0x01436E), which stores 0 to [5DB8] and [5DB9]
+      (015BFA mov #0 / 015BFE mov.b r0,@r6 / 015C02 slot); if that is the only writer, side 1 is dead.  Settle
+      by a whole-image search for indirect stores into 0xFFFF5DB8 (block copies, computed bases) or by logging
+      the byte.
+  N9  The value of [7C6C] before 0x03AB94 has first written its latch [7C70] (batch-2: afterwards it is one of
+      200 .. 2100).  Only a negative or NaN value would break the window exclusion (E2, E20).
+
+REVIEW HISTORY  (third, deciding decode, 2026-11-27: tracer's file vs an adversarial reviewer; both checked
+against the bytes and the emulator; neither presumed right)
+  C31  "With CMT clock select 0 = P-clock/8 and a 20 MHz P-clock ... one count of [7CAA] is 8 ms" (tracer,
+       basis inferred).  REVIEWER RIGHT (unsupported as an established figure).  In the bytes:
+010CAC: 938A  mov.w @(0x010DC4),r3          ; = 0x00C0 (192)
+010CB0: 2031  mov.w r3,@r0                    ; [0xFFFFF718] = 0x00C0
+010CB2: 9289  mov.w @(0x010DC8),r2          ; = 0x09C3 (2499)
+010CB6: 2321  mov.w r2,@r3                    ; [0xFFFFF71C] = 2499
+010D3C: C907  and #7,r0
+010D3E: 8805  cmp/eq #5,r0                    ; task-9 activation on one handler entry in eight
+       The meaning of 0xFFFFF718 (CMT CMCSR, clock select 0 = P-clock / 8) and the P-clock frequency are not in
+       the ROM.  Repair: E14 now states 20,000 timer counts per [7CAA] count; the 8 ms figure is conditional and
+       lives in N3; the SUMMARY, CALL RATE and BOTTOM LINE say so.
+  C33  "The 20.19c band-edge edit never shortens a rung; all count tables are identical between bins"
+       (tracer, emulated with [5DB8] = 0 only).  REVIEWER RIGHT (refuted as a general statement).  0x03AF88
+       selects a second set of pointer tables when byte [5DB8] != 0 (batch-2, verified):
+03B088: 2558  tst r5,r5                       ; T = ([5DB8] == 0)
+03B08A: 8B5D  bf 0x03B148                     ; non-zero: side-1 pointer tables
+03B180: D544  mov.l @(0x03B294),r5          ; = 0x00063BC0 ROM
+       emulated (test_sequence, both bins, [5DB8] = 1, x = 2600 / 2700 / 2900): 20.19c vs stock t1/t2/t4 =
+       sel 1 6/81/106 vs 44/69/94; sel 2 6/44/69 vs 44/69/94; sel 3 13/38/76 vs 44/57/82; sel 4/5 13/76/101
+       vs 44/57/82.  The "never sooner" half holds only on side 0 (asserted over every side-0 row).  The second
+       half -- count and pointer tables identical -- is right (byte diff of 0x0CBC90..0x0CBD93 and
+       0x063B70..0x063D4F).  Repair: SUMMARY rung bullet, BOTTOM LINE side-1 table, E18, N8.
+  C35  "With the 625 adds on the rungs are 669/744/788/788 at x=2000 sel 1, and with [65D0]==1 held the second
+       route gives tier 4 at count 626" (tracer, emulated on 20.19c only).  REVIEWER RIGHT (imprecise).
+       emulated (test_sequence (c)): 20.19c rungs 669/744/788/788, stock 669/713/763/763 (stock's x = 2000 is in
+       band 1); with [65D0] = 1 from pass 0 both bins reach tier 4 first at pass 626, tiers seen {0, 4}.
+       Repair: 0x03AE6C MECHANISM, BOTTOM LINE, E19.
+  C37  "For the same x and [7C78] the 0x041BE4 arm condition and the hold condition of a COUNT-path tier 4 are
+       mutually exclusive; the arm can coincide with tier 4 only after x falls below [7C78] (before 0x03AE5A
+       drops the tier) or on the IMMEDIATE path" (tracer, basis bytes).  REVIEWER RIGHT on both points
+       (imprecise).  (1) The window's first test does not look at [7C78]:
+03B44C: F890  fadd fr9,fr8                    ; fr8 = [7C78] + [7C6C]
+03B44E: F8E5  fcmp/gt fr14,fr8                ; T = (sum > x)
+03B450: 8B0A  bf 0x03B468                     ; not -> [7CA7] = 1, [7C78] never tested
+03B456: F8E5  fcmp/gt fr14,fr8                ; T = ([7C78] > x), reached only when sum > x
+       emulated (test_b3da): [7C78] 1500, [7C6C] -600 (or NaN), x 1000 -> [7CA7] = 1 and the COUNT path runs;
+       (test_arm_timing (c)) a counted tier 4 is then held below [7C78] and the arm fires on every run.  The
+       exclusion needs [7C6C] >= 0 and a non-NaN sum -- true for every value 0x03AB94 writes once its latch is
+       set (batch-2: 200 .. 2100).  (2) The arm tests [8034], the tier the PREVIOUS 0x041BE4 run stored:
+041C28: C414  mov.b @(20,gbr),r0            ; gbr+20 = 0xFFFF8034
+041C2A: 8804  cmp/eq #4,r0
+041D12: C014  mov.b r0,@(20,gbr)            ; gbr+20 = 0xFFFF8034
+       emulated (test_arm_timing (a)): with 0x041BE4 after 0x03AE5A, the arm fires on the run AFTER the drop
+       pass, when [7C9A] is already 0, and on no other run; "(before 0x03AE5A drops the tier)" was therefore too
+       narrow.  Repair: SUMMARY window and tier-byte bullets, 0x03B3DA CONTRACT, CONSUMERS, X1, X2, BOTTOM
+       LINE 4 / 5, E2, E15, E20, N9.
+  MISSED (reviewer), each checked here and added:
+    M1 side 1 of [5DB8] -- as C33; side-1 table at 2100 matches the reviewer (6/81/106, 13/51/76, 13/63/113,
+       25/88/113, 25/88/113).  What [5DB8] is stays open (N8); new lead found here: the only writer
+       find_writers reports stores 0 (0x015BFA).
+    M2 0x023A94 updates [67E8] only when [726C] != 1:
+023AA6: A00F  bra 0x023AC8                    ; [726C] == 1: skips 023ABA..023AC6
+023AA8: 8112  mov.w r0,@(4,r1)                ; slot: [67EC] = 0
+023AC6: 2101  mov.w r0,@r1                    ; [67E8] = sat_u16([67E8] + 1), fall-through path only
+       emulated (test_gate_writers, 75 cases per bin).  Added to the WRITERS contract and E16.
+    M3 0x0218F6 writes [64F6] every call and [65CA] picks the cal pair; NaN [64D8] clears [653B]:
+021910: 8801  cmp/eq #1,r0                    ; [65CA] == 1 ?
+021912: 8B04  bf 0x02191E                     ; no -> cal 0x0C3448 / 0x0C3450, else 0x0C3444 / 0x0C344C
+02195A: A010  bra 0x02197E                    ; [6155] == 1: r0 = [85D7] stays in r0
+021978: E001  mov #1,r0                       ; slot of 021976 bra: [653B] == 1 path
+02197A: E000  mov #0,r0                       ; [653B] != 1 path
+02197E: C01E  mov.b r0,@(30,gbr)            ; gbr+30 = 0xFFFF64F6
+       emulated (test_gate_writers, 1,500 states per bin + 4 printed cases, including NaN).  Both cal pairs are
+       0.001 / 0.252 in both bins.  Added to the WRITERS contract and E16.
+    M4 the window precondition -- as C37 (1).
+  Found in this round, not raised by either side: 0x041954 is called from task 9's 0x04907C as well as from
+  0x047C40, and writes [8034] = [7C9A] only when 0x022F92 returns 1 (it was called an "initialiser branch");
+  0x00F518 is reached as the handler of vector 192 (rtos_core_trace.txt stub table, pool long 0x00289C).
